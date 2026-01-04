@@ -70,7 +70,9 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionDrawer do
                 <label class="label">
                   <span class="label-text-alt block w-full">
                     <span class="font-medium">Working directory:</span>
-                    <span class="truncate block" title={@current_project.path}><%= @current_project.path %></span>
+                    <span class="block truncate" dir="rtl" title={@current_project.path}>
+                      <span dir="ltr"><%= @current_project.path %></span>
+                    </span>
                   </span>
                 </label>
               </div>

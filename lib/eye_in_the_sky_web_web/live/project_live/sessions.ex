@@ -113,11 +113,17 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                model_name: model
              }) do
           {:ok, _session} ->
+            # Reload project with agents to show the new one
+            project =
+              Projects.get_project!(project.id)
+              |> Repo.preload([:agents], force: true)
+
             socket =
               socket
+              |> assign(:project, project)
               |> assign(:show_new_session_drawer, false)
+              |> update_filtered_agents()
               |> put_flash(:info, "Session created successfully")
-              |> push_navigate(to: ~p"/agents/#{agent_id}")
 
             {:noreply, socket}
 

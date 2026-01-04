@@ -353,87 +353,15 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
     </div>
 
     <!-- New Session Drawer -->
-    <div class="drawer drawer-end">
-      <input
-        id="new-session-drawer"
-        type="checkbox"
-        class="drawer-toggle"
-        checked={@show_new_session_drawer}
-        phx-click="toggle_new_session_drawer"
-      />
-      <div class="drawer-side z-50">
-        <label for="new-session-drawer" class="drawer-overlay"></label>
-        <div class="menu p-6 w-96 min-h-full bg-base-100 text-base-content">
-          <div class="flex items-center justify-between mb-6">
-            <h2 class="text-xl font-semibold">New Session</h2>
-            <button phx-click="toggle_new_session_drawer" class="btn btn-ghost btn-sm btn-circle">✕</button>
-          </div>
-
-          <form phx-submit="create_new_session" class="flex flex-col gap-4">
-            <!-- Model Selection -->
-            <div class="form-control">
-              <label class="label">
-                <span class="label-text font-medium">Model</span>
-              </label>
-              <select name="model" class="select select-bordered" required>
-                <option value="sonnet">Sonnet</option>
-                <option value="haiku">Haiku</option>
-                <option value="opus">Opus</option>
-              </select>
-            </div>
-
-            <!-- Project (read-only) -->
-            <div class="form-control">
-              <label class="label">
-                <span class="label-text font-medium">Project</span>
-              </label>
-              <input
-                type="text"
-                value={@project.name}
-                class="input input-bordered"
-                disabled
-              />
-              <label class="label">
-                <span class="label-text-alt">Working directory: <%= @project.path %></span>
-              </label>
-            </div>
-
-            <!-- Agent Name -->
-            <div class="form-control">
-              <label class="label">
-                <span class="label-text font-medium">Agent Name</span>
-              </label>
-              <input
-                type="text"
-                name="agent_name"
-                class="input input-bordered"
-                placeholder="e.g., Frontend Dev Agent"
-                required
-              />
-            </div>
-
-            <!-- Description -->
-            <div class="form-control">
-              <label class="label">
-                <span class="label-text font-medium">Description</span>
-              </label>
-              <textarea
-                name="description"
-                class="textarea textarea-bordered h-24"
-                placeholder="What will this session work on?"
-                required
-              ></textarea>
-            </div>
-
-            <!-- Actions -->
-            <div class="flex gap-2 mt-4">
-              <button type="submit" class="btn btn-primary flex-1">Create Session</button>
-              <button type="button" phx-click="toggle_new_session_drawer" class="btn btn-ghost flex-shrink-0">Cancel</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+    <.live_component
+      module={EyeInTheSkyWebWeb.Components.NewSessionDrawer}
+      id="new-session-drawer-project"
+      show={@show_new_session_drawer}
+      projects={nil}
+      current_project={@project}
+      toggle_event="toggle_new_session_drawer"
+      submit_event="create_new_session"
+    />
     """
   end
 

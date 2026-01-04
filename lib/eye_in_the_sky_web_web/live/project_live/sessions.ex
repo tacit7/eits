@@ -428,7 +428,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
             <!-- Actions -->
             <div class="flex gap-2 mt-4">
               <button type="submit" class="btn btn-primary flex-1">Create Session</button>
-              <button type="button" phx-click="toggle_new_session_drawer" class="btn btn-ghost">Cancel</button>
+              <button type="button" phx-click="toggle_new_session_drawer" class="btn btn-ghost flex-shrink-0">Cancel</button>
             </div>
           </form>
         </div>

@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         |> assign(:project, project)
         |> assign(:tasks, tasks)
         |> assign(:search_query, "")
-        |> assign(:status_filter, "active")
+        |> assign(:status_filter, "all")
         |> assign(:filtered_agents, filtered_agents)
         |> assign(:show_new_session_drawer, false)
       else

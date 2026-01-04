@@ -63,11 +63,14 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionDrawer do
                 <input
                   type="text"
                   value={@current_project.name}
-                  class="input input-bordered"
+                  class="input input-bordered truncate"
                   disabled
+                  title={@current_project.name}
                 />
                 <label class="label">
-                  <span class="label-text-alt">Working directory: <%= @current_project.path %></span>
+                  <span class="label-text-alt truncate block" title={@current_project.path}>
+                    Working directory: <%= @current_project.path %>
+                  </span>
                 </label>
               </div>
             <% end %>

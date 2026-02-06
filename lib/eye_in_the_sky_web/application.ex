@@ -1,0 +1,48 @@
+defmodule EyeInTheSkyWeb.Application do
+  # See https://hexdocs.pm/elixir/Application.html
+  # for more information on OTP Applications
+  @moduledoc false
+
+  use Application
+
+  @impl true
+  def start(_type, _args) do
+    children = [
+      # Disabled SSR - server module not built
+      # {NodeJS.Supervisor, [path: LiveSvelte.SSR.NodeJS.server_path(), pool_size: 4]},
+      EyeInTheSkyWebWeb.Telemetry,
+      EyeInTheSkyWeb.Repo,
+      {Ecto.Migrator,
+       repos: Application.fetch_env!(:eye_in_the_sky_web, :ecto_repos), skip: skip_migrations?()},
+      {DNSCluster,
+       query: Application.get_env(:eye_in_the_sky_web, :dns_cluster_query) || :ignore},
+      {Phoenix.PubSub, name: EyeInTheSkyWeb.PubSub},
+      # NATS connection + pub/sub relay (registers :gnat)
+      EyeInTheSkyWeb.NATS.Consumer,
+      # JetStream durable pull consumer (depends on :gnat from Consumer)
+      EyeInTheSkyWeb.NATS.JetStreamConsumer,
+      # Claude CLI session manager
+      EyeInTheSkyWeb.Claude.SessionManager,
+      # Start to serve requests, typically the last entry
+      EyeInTheSkyWebWeb.Endpoint
+    ]
+
+    # See https://hexdocs.pm/elixir/Supervisor.html
+    # for other strategies and supported options
+    opts = [strategy: :one_for_one, name: EyeInTheSkyWeb.Supervisor]
+    Supervisor.start_link(children, opts)
+  end
+
+  # Tell Phoenix to update the endpoint configuration
+  # whenever the application is updated.
+  @impl true
+  def config_change(changed, _new, removed) do
+    EyeInTheSkyWebWeb.Endpoint.config_change(changed, removed)
+    :ok
+  end
+
+  defp skip_migrations?() do
+    # By default, sqlite migrations are run when using a release
+    System.get_env("RELEASE_NAME") == nil
+  end
+end

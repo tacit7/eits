@@ -1,0 +1,74 @@
+defmodule EyeInTheSkyWeb.Messages.Message do
+  use Ecto.Schema
+  import Ecto.Changeset
+
+  @primary_key {:id, :string, autogenerate: false}
+  @foreign_key_type :string
+
+  schema "messages" do
+    field :sender_role, :string
+    field :recipient_role, :string
+    field :provider, :string
+    field :provider_session_id, :string
+    field :direction, :string
+    field :body, :string
+    field :status, :string, default: "sent"
+    field :metadata, :map
+    field :thread_reply_count, :integer, default: 0
+    field :last_thread_reply_at, :utc_datetime
+
+    belongs_to :project, EyeInTheSkyWeb.Projects.Project, type: :integer
+
+    belongs_to :session, EyeInTheSkyWeb.Sessions.Session,
+      define_field: false,
+      foreign_key: :session_id,
+      type: :string
+
+    belongs_to :channel, EyeInTheSkyWeb.Channels.Channel,
+      define_field: false,
+      foreign_key: :channel_id,
+      type: :string
+
+    belongs_to :parent_message, __MODULE__,
+      define_field: false,
+      foreign_key: :parent_message_id,
+      type: :string
+
+    has_many :thread_replies, __MODULE__, foreign_key: :parent_message_id
+    has_many :reactions, EyeInTheSkyWeb.Messages.MessageReaction
+    has_many :attachments, EyeInTheSkyWeb.Messages.FileAttachment
+
+    field :session_id, :string
+    field :channel_id, :string
+    field :parent_message_id, :string
+    field :inserted_at, :utc_datetime
+    field :updated_at, :utc_datetime
+  end
+
+  @doc false
+  def changeset(message, attrs) do
+    message
+    |> cast(attrs, [
+      :id,
+      :project_id,
+      :session_id,
+      :channel_id,
+      :parent_message_id,
+      :sender_role,
+      :recipient_role,
+      :provider,
+      :provider_session_id,
+      :direction,
+      :body,
+      :status,
+      :metadata,
+      :thread_reply_count,
+      :last_thread_reply_at,
+      :inserted_at,
+      :updated_at
+    ])
+    |> validate_required([:id, :sender_role, :direction, :body])
+    |> validate_inclusion(:direction, ["inbound", "outbound"])
+    |> validate_inclusion(:status, ["sent", "delivered", "failed", "pending"])
+  end
+end

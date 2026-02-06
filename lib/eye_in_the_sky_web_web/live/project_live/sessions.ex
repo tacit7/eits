@@ -26,7 +26,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
           filter_agents(%{
             project: project,
             search_query: "",
-            status_filter: "active"
+            status_filter: "all"
           })
 
         socket
@@ -78,7 +78,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
 
   @impl true
   def handle_event("create_new_session", params, socket) do
-    alias EyeInTheSkyWeb.{Sessions, Agents}
+    alias EyeInTheSkyWeb.{Sessions, Agents, Claude.SessionManager}
 
     # Extract form data
     model = params["model"]
@@ -113,6 +113,44 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                model_name: model
              }) do
           {:ok, _session} ->
+            # Build initialization prompt for Claude Code with EITS integration
+            init_prompt = """
+            INITIALIZATION - Eye in the Sky Session:
+
+            Session ID: #{session_id}
+            Agent ID: #{agent_id}
+            Project: #{project.name}
+            Description: #{description}
+
+            CRITICAL FIRST STEP: Call i-start-session MCP tool to register with Eye in the Sky:
+
+            mcp__eye-in-the-sky__i-start-session({
+              "session_id": "#{session_id}",
+              "description": "#{description}",
+              "agent_description": "#{agent_name}",
+              "project_name": "#{project.name}",
+              "worktree_path": "#{project.path}"
+            })
+
+            WORKFLOW:
+            1. Use i-start-session to register (done above)
+            2. Log significant actions with i-note-add
+            3. Track tasks with i-todo-create and i-todo-list
+            4. Use i-end-session when done
+
+            YOUR TASK: #{description}
+
+            Ready to start working. What would you like me to do?
+            """
+
+            # Spawn Claude Code process with the session
+            Task.start(fn ->
+              SessionManager.start_session(session_id, init_prompt,
+                model: model,
+                project_path: project.path
+              )
+            end)
+
             # Reload project with agents to show the new one
             project =
               Projects.get_project!(project.id)
@@ -123,7 +161,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
               |> assign(:project, project)
               |> assign(:show_new_session_drawer, false)
               |> update_filtered_agents()
-              |> put_flash(:info, "Session created successfully")
+              |> put_flash(:info, "Session created and Claude Code launched")
 
             {:noreply, socket}
 
@@ -148,6 +186,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
 
     agents
     |> Enum.filter(fn agent ->
+      # Exclude archived agents
+      not_archived = is_nil(agent.archived_at) || agent.archived_at == ""
+
       # Search filter
       search_match =
         if query == "" do
@@ -166,7 +207,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
           status -> get_agent_status(agent) == status
         end
 
-      search_match && status_match
+      not_archived && search_match && status_match
     end)
   end
 
@@ -371,10 +412,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
     """
   end
 
-  defp get_agent_status(_agent) do
-    # Agents now get their status from their sessions
-    # For display purposes, return nil if no active session
-    nil
+  defp get_agent_status(agent) do
+    # Return the agent's status field from the database
+    agent.status
   end
 
   defp status_badge_class(status) do

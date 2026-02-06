@@ -9,8 +9,11 @@ defmodule EyeInTheSkyWeb.Agents.Agent do
     field :persona_id, :string
     field :source, :string
     field :description, :string
+    field :feature_description, :string
+    field :status, :string
     field :bookmarked, :boolean, default: false
     field :git_worktree_path, :string
+    field :session_id, :string
 
     belongs_to :project, EyeInTheSkyWeb.Projects.Project, type: :integer
 

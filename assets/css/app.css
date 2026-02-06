@@ -1,0 +1,89 @@
+/* See the Tailwind configuration guide for advanced usage
+   https://tailwindcss.com/docs/configuration */
+
+@import "tailwindcss" source(none);
+@import "highlight.js/styles/github-dark.css";
+@source "../css";
+@source "../js";
+@source "../../lib/eye_in_the_sky_web_web";
+
+/* A Tailwind plugin that makes "hero-#{ICON}" classes available.
+   The heroicons installation itself is managed by your mix.exs */
+@plugin "../vendor/heroicons";
+
+/* daisyUI Tailwind Plugin - installed via npm */
+@plugin "daisyui" {
+  themes: all;
+}
+
+/* Add variants based on LiveView classes */
+@custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);
+@custom-variant phx-submit-loading (.phx-submit-loading&, .phx-submit-loading &);
+@custom-variant phx-change-loading (.phx-change-loading&, .phx-change-loading &);
+
+/* Use the data attribute for dark mode  */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* Make LiveView wrapper divs transparent for layout */
+[data-phx-session], [data-phx-teleported-src] { display: contents }
+
+/* Disable global dimming on LiveView loading states */
+.phx-click-loading,
+.phx-submit-loading,
+.phx-change-loading { opacity: 1 !important; }
+
+body .phx-click-loading,
+body .phx-submit-loading,
+body .phx-change-loading { opacity: 1 !important; }
+
+/* Force agent detail to stay visible */
+.agent-detail-wrapper,
+.agent-detail-wrapper > *,
+[data-phx-component] { opacity: 1 !important; }
+
+/* Dim only the thing being clicked */
+button.phx-click-loading,
+a.phx-click-loading,
+input.phx-click-loading { opacity: .6 !important; pointer-events: none; }
+
+/* This file is for your main application CSS */
+
+/* Make cards, tables, modals, and navbar lighter to stand out */
+.card,
+.table,
+.modal-box,
+.navbar {
+  --tw-bg-opacity: 1;
+}
+
+/* Dark theme overrides - YouTube style elevated surfaces */
+[data-theme="dark"] .card,
+[data-theme="dark"] .table,
+[data-theme="dark"] .modal-box,
+[data-theme="dark"] .navbar,
+[data-theme="dark"] .tab-content,
+[data-theme="dark"] [role="tabpanel"] {
+  background-color: oklch(22% 0 0) !important; /* #383838 - Cards with higher contrast */
+}
+
+/* Hover states for YouTube-like interaction */
+[data-theme="dark"] .btn:hover,
+[data-theme="dark"] .menu li:hover,
+[data-theme="dark"] tr:hover {
+  background-color: oklch(28% 0 0) !important; /* #474747 - Elevated hover state */
+}
+
+/* Light theme overrides */
+[data-theme="light"] .card,
+[data-theme="light"] .table,
+[data-theme="light"] .modal-box,
+[data-theme="light"] .navbar,
+[data-theme="light"] .tab-content,
+[data-theme="light"] [role="tabpanel"] {
+  background-color: oklch(91% 0 0) !important;
+}
+
+/* Hide scrollbar for webkit browsers */
+#messages-container::-webkit-scrollbar {
+  display: none;
+}

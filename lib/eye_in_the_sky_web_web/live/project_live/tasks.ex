@@ -15,6 +15,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
         _ -> nil
       end
 
+    workflow_states = Tasks.list_workflow_states()
+
     socket =
       if project_id do
         project =
@@ -26,6 +28,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
         |> assign(:project, project)
         |> assign(:project_id, project_id)
         |> assign(:search_query, "")
+        |> assign(:workflow_states, workflow_states)
+        |> assign(:show_new_task_drawer, false)
         |> assign(:tasks, [])
         |> load_tasks()
       else
@@ -34,6 +38,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
         |> assign(:project, nil)
         |> assign(:project_id, nil)
         |> assign(:search_query, "")
+        |> assign(:workflow_states, workflow_states)
+        |> assign(:show_new_task_drawer, false)
         |> assign(:tasks, [])
         |> put_flash(:error, "Invalid project ID")
       end
@@ -43,12 +49,75 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
 
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
+    effective_query = if String.length(String.trim(query)) >= 4, do: query, else: ""
+
     socket =
       socket
-      |> assign(:search_query, query)
+      |> assign(:search_query, effective_query)
       |> load_tasks()
 
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("toggle_new_task_drawer", _params, socket) do
+    {:noreply, assign(socket, :show_new_task_drawer, !socket.assigns.show_new_task_drawer)}
+  end
+
+  @impl true
+  def handle_event("create_new_task", params, socket) do
+    title = params["title"]
+    description = params["description"]
+    state_id = String.to_integer(params["state_id"])
+    priority = String.to_integer(params["priority"] || "1")
+    tags_string = params["tags"] || ""
+
+    tag_names =
+      tags_string
+      |> String.split(",")
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+
+    task_id = String.upcase(Ecto.UUID.generate())
+    now = DateTime.utc_now() |> DateTime.to_iso8601()
+
+    case Tasks.create_task(%{
+           id: task_id,
+           title: title,
+           description: description,
+           state_id: state_id,
+           priority: priority,
+           project_id: Integer.to_string(socket.assigns.project_id),
+           created_at: now,
+           updated_at: now
+         }) do
+      {:ok, task} ->
+        if length(tag_names) > 0 do
+          Enum.each(tag_names, fn tag_name ->
+            case Tasks.get_or_create_tag(tag_name) do
+              {:ok, tag} ->
+                Repo.query(
+                  "INSERT INTO task_tags (task_id, tag_id) VALUES (?, ?)",
+                  [task.id, tag.id]
+                )
+
+              _ ->
+                :ok
+            end
+          end)
+        end
+
+        socket =
+          socket
+          |> assign(:show_new_task_drawer, false)
+          |> load_tasks()
+          |> put_flash(:info, "Task created successfully")
+
+        {:noreply, socket}
+
+      {:error, changeset} ->
+        {:noreply, put_flash(socket, :error, "Failed to create task: #{inspect(changeset.errors)}")}
+    end
   end
 
   defp load_tasks(socket) do
@@ -80,18 +149,23 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
       current_tab={:tasks}
     />
 
-    <!-- Search -->
+    <!-- Search and New Task -->
     <div class="px-4 sm:px-6 lg:px-8 py-6">
-      <form phx-change="search" class="w-full max-w-2xl">
-        <input
-          type="text"
-          name="query"
-          value={@search_query}
-          placeholder="Search tasks by title or description..."
-          class="input input-bordered w-full"
-          autocomplete="off"
-        />
-      </form>
+      <div class="flex items-center gap-4 max-w-2xl">
+        <form phx-change="search" class="flex-1">
+          <input
+            type="text"
+            name="query"
+            value={@search_query}
+            placeholder="Search tasks by title or description..."
+            class="input input-bordered w-full"
+            autocomplete="off"
+          />
+        </form>
+        <button phx-click="toggle_new_task_drawer" class="btn btn-primary btn-sm">
+          + New Task
+        </button>
+      </div>
     </div>
 
     <!-- Tasks Grid -->
@@ -137,6 +211,16 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
         </div>
       <% end %>
     </div>
+
+    <!-- New Task Drawer -->
+    <.live_component
+      module={EyeInTheSkyWebWeb.Components.NewTaskDrawer}
+      id="new-task-drawer"
+      show={@show_new_task_drawer}
+      workflow_states={@workflow_states}
+      toggle_event="toggle_new_task_drawer"
+      submit_event="create_new_task"
+    />
     """
   end
 end

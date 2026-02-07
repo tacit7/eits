@@ -1,18 +1,24 @@
 import { marked } from 'marked';
+import { markedHighlight } from 'marked-highlight';
 import hljs from 'highlight.js';
 
-// Configure marked to use highlight.js
-marked.setOptions({
-  highlight: function(code, lang) {
-    if (lang && hljs.getLanguage(lang)) {
-      try {
-        return hljs.highlight(code, { language: lang }).value;
-      } catch (err) {
-        console.error('Highlight error:', err);
+marked.use(
+  markedHighlight({
+    langPrefix: 'hljs language-',
+    highlight(code, lang) {
+      if (lang && hljs.getLanguage(lang)) {
+        try {
+          return hljs.highlight(code, { language: lang }).value;
+        } catch (err) {
+          console.error('Highlight error:', err);
+        }
       }
+      return hljs.highlightAuto(code).value;
     }
-    return hljs.highlightAuto(code).value;
-  },
+  })
+);
+
+marked.setOptions({
   breaks: true,
   gfm: true
 });

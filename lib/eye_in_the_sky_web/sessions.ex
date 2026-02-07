@@ -168,11 +168,11 @@ defmodule EyeInTheSkyWeb.Sessions do
   end
 
   @doc """
-  Lists sessions filtered by search query and status filter.
+  Lists sessions filtered by search query and status filter using FTS5 full-text search.
   Only returns active (non-archived) sessions.
 
   Options:
-  - `:search_query` - String to search across session name, description, project name, session ID
+  - `:search_query` - String to search across session name, description, project name, session ID, agent description
   - `:status_filter` - One of: "all", "active", "completed", "stale", "discovered"
   - `:limit` - Maximum number of results (default: 100)
   - `:offset` - Number of results to skip (default: 0)
@@ -192,18 +192,20 @@ defmodule EyeInTheSkyWeb.Sessions do
         limit: ^limit,
         offset: ^offset
 
-    # Apply search filter
+    # Apply FTS5 search filter
     base_query =
       if search_query != "" do
-        search_pattern = "%#{search_query}%"
+        # Use FTS5 MATCH query for full-text search
+        fts_query = prepare_fts_query(search_query)
 
         where(
           base_query,
           [s, a],
-          fragment("LOWER(COALESCE(?, '')) LIKE LOWER(?)", s.id, ^search_pattern) or
-            fragment("LOWER(COALESCE(?, '')) LIKE LOWER(?)", s.name, ^search_pattern) or
-            fragment("LOWER(COALESCE(?, '')) LIKE LOWER(?)", a.description, ^search_pattern) or
-            fragment("LOWER(COALESCE(?, '')) LIKE LOWER(?)", a.project_name, ^search_pattern)
+          fragment(
+            "EXISTS (SELECT 1 FROM sessions_fts WHERE sessions_fts.rowid = ?.rowid AND sessions_fts MATCH ?)",
+            s,
+            ^fts_query
+          )
         )
       else
         base_query
@@ -235,13 +237,43 @@ defmodule EyeInTheSkyWeb.Sessions do
   end
 
   @doc """
+  Prepares a search query for FTS5 MATCH.
+  Handles basic query sanitization and wildcard support.
+  """
+  defp prepare_fts_query(query) do
+    # Remove special FTS5 characters that could break the query
+    sanitized =
+      query
+      |> String.replace(~r/[^\w\s\-]/, "")
+      |> String.trim()
+
+    # Split into tokens and add prefix matching with *
+    tokens =
+      sanitized
+      |> String.split(~r/\s+/)
+      |> Enum.filter(&(&1 != ""))
+      |> Enum.map(&"#{&1}*")
+
+    # Join with OR for broader matching
+    Enum.join(tokens, " OR ")
+  end
+
+  @doc """
   Returns session overview rows for the sessions table.
   Joins sessions with agents and projects to get complete information.
   Excludes archived sessions by default. Pass `include_archived: true` to include archived sessions.
+
+  Options:
+  - `:limit` - Maximum number of results (default: 20)
+  - `:include_archived` - Include archived sessions (default: false)
+  - `:project_id` - Filter by project ID
+  - `:search_query` - FTS5 search query across all searchable fields
   """
   def list_session_overview_rows(opts \\ []) do
     limit = Keyword.get(opts, :limit, 20)
     include_archived = Keyword.get(opts, :include_archived, false)
+    project_id = Keyword.get(opts, :project_id, nil)
+    search_query = Keyword.get(opts, :search_query, "")
 
     query =
       from(s in Session,
@@ -254,6 +286,7 @@ defmodule EyeInTheSkyWeb.Sessions do
           session_id: s.id,
           session_name: s.name,
           agent_id: a.id,
+          agent_description: a.description,
           project_name: p.name,
           started_at: s.started_at,
           ended_at: s.ended_at
@@ -265,6 +298,31 @@ defmodule EyeInTheSkyWeb.Sessions do
         query
       else
         where(query, [s], is_nil(s.archived_at))
+      end
+
+    query =
+      if project_id do
+        where(query, [s, a], a.project_id == ^project_id)
+      else
+        query
+      end
+
+    # Apply FTS5 search if query provided
+    query =
+      if search_query != "" do
+        fts_query = prepare_fts_query(search_query)
+
+        where(
+          query,
+          [s],
+          fragment(
+            "EXISTS (SELECT 1 FROM sessions_fts WHERE sessions_fts.rowid = ?.rowid AND sessions_fts MATCH ?)",
+            s,
+            ^fts_query
+          )
+        )
+      else
+        query
       end
 
     Repo.all(query)

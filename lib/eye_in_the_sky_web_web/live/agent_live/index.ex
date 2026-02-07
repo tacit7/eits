@@ -185,9 +185,11 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
+    effective_query = if String.length(String.trim(query)) >= 4, do: query, else: ""
+
     socket =
       socket
-      |> assign(:search_query, query)
+      |> assign(:search_query, effective_query)
       |> load_sessions()
 
     {:noreply, socket}
@@ -285,55 +287,32 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_event("create_new_session", params, socket) do
-    # Extract form data
+    alias EyeInTheSkyWeb.Claude.SessionManager
+
     model = params["model"]
     project_id = String.to_integer(params["project_id"])
-    agent_name = params["agent_name"]
     description = params["description"]
 
-    # Get project for git path
     project = EyeInTheSkyWeb.Projects.get_project!(project_id)
 
-    # Generate UUIDs
     session_id = Ecto.UUID.generate()
     agent_id = Ecto.UUID.generate()
-    now = DateTime.utc_now() |> DateTime.to_iso8601()
 
-    # Create agent
-    case EyeInTheSkyWeb.Agents.create_agent(%{
-           id: agent_id,
-           name: agent_name,
-           description: description,
-           project_id: project_id,
-           git_worktree_path: project.path
-         }) do
-      {:ok, _agent} ->
-        # Create session
-        case Sessions.create_session_with_model(%{
-               id: session_id,
-               agent_id: agent_id,
-               name: agent_name,
-               description: description,
-               started_at: now,
-               model_provider: "claude",
-               model_name: model
-             }) do
-          {:ok, _session} ->
-            socket =
-              socket
-              |> assign(:show_new_session_drawer, false)
-              |> put_flash(:info, "Session created successfully")
-              |> push_navigate(to: ~p"/agents/#{agent_id}")
+    prompt = "Start new eits session: session-id #{session_id} agent-id #{agent_id} description: #{description}"
 
-            {:noreply, socket}
+    Task.start(fn ->
+      SessionManager.start_session(session_id, prompt,
+        model: model,
+        project_path: project.path
+      )
+    end)
 
-          {:error, changeset} ->
-            {:noreply, put_flash(socket, :error, "Failed to create session: #{inspect(changeset.errors)}")}
-        end
+    socket =
+      socket
+      |> assign(:show_new_session_drawer, false)
+      |> put_flash(:info, "Session launched — Claude Code will register with EITS")
 
-      {:error, changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to create agent: #{inspect(changeset.errors)}")}
-    end
+    {:noreply, socket}
   end
 
   @impl true

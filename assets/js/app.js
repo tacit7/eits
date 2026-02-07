@@ -27,6 +27,7 @@ import {CopyToClipboard} from "./hooks/copy_to_clipboard"
 import {CopySessionId} from "./hooks/copy_session_id"
 import {BookmarkAgent} from "./hooks/bookmark_agent"
 import {ScrollToBottom} from "./hooks/scroll_to_bottom"
+import {MarkdownMessage} from "./hooks/markdown_message"
 import {CommandHistory} from "./hooks/command_history"
 import {getHooks} from "live_svelte"
 import "./theme"
@@ -62,6 +63,7 @@ Hooks.CopySessionId = CopySessionId
 Hooks.BookmarkAgent = BookmarkAgent
 Hooks.ScrollToBottom = ScrollToBottom
 Hooks.CommandHistory = CommandHistory
+Hooks.MarkdownMessage = MarkdownMessage
 Hooks.Highlight = {
   mounted() {
     hljs.highlightElement(this.el)
@@ -73,7 +75,7 @@ Hooks.Highlight = {
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
-  longPollFallbackMs: 2500,
+  longPollFallbackMs: 5000,
   params: {_csrf_token: csrfToken},
   hooks: Hooks,
 })

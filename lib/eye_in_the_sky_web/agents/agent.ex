@@ -22,7 +22,7 @@ defmodule EyeInTheSkyWeb.Agents.Agent do
 
     field :created_at, :string
     field :archived_at, :string
-    field :project_name, :string, virtual: true
+    field :project_name, :string
   end
 
   @doc false

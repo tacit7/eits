@@ -6,8 +6,8 @@ config :eye_in_the_sky_web, EyeInTheSkyWeb.Repo,
   journal_mode: :wal,
   temp_store: :memory,
   foreign_keys: :on,
-  busy_timeout: 2000,
-  pool_size: 5,
+  busy_timeout: 5000,
+  pool_size: 10,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true
 
@@ -20,7 +20,11 @@ config :eye_in_the_sky_web, EyeInTheSkyWeb.Repo,
 config :eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [ip: {127, 0, 0, 1}, port: String.to_integer(System.get_env("PORT") || "4000")],
+  https: [
+    port: 4001,
+    certfile: "priv/cert/selfsigned.pem",
+    keyfile: "priv/cert/selfsigned_key.pem"
+  ],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,

@@ -26,9 +26,11 @@ defmodule EyeInTheSkyWebWeb.PromptLive.Index do
 
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
+    effective_query = if String.length(String.trim(query)) >= 4, do: query, else: ""
+
     socket =
       socket
-      |> assign(:search_query, query)
+      |> assign(:search_query, effective_query)
       |> update_filtered_prompts()
 
     {:noreply, socket}

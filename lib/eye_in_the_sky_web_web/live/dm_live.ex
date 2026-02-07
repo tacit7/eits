@@ -93,9 +93,13 @@ defmodule EyeInTheSkyWebWeb.DmLive do
           EyeInTheSkyWeb.FileAttachments.create_attachment(Map.put(file_data, :message_id, message.id))
         end)
 
+        # Set processing immediately so the Stop button renders on this same response
+        socket =
+          socket
+          |> assign(:processing, true)
+          |> load_tab_data("messages", socket.assigns.session_id)
+
         # Send to Claude via SessionManager using --resume (no NATS)
-        # With unified session IDs, session.id IS the Claude session ID.
-        # If there are existing messages, resume; otherwise start fresh.
         session_id = socket.assigns.session_id
         session = socket.assigns.session
         agent = socket.assigns.agent
@@ -104,7 +108,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
           {:ok, project_path} ->
             Logger.info("🗂️  Resolved project path: #{project_path}")
             has_messages = Messages.count_messages_for_session(session_id) > 1
-            Logger.info("📊 Has messages: #{has_messages}, count: #{Messages.count_messages_for_session(session_id)}")
 
             result =
               if has_messages do
@@ -125,16 +128,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
               {:ok, session_ref} ->
                 Logger.info("✅ Claude session started/resumed with ref: #{inspect(session_ref)}")
 
-                # Set a 30-second timeout to reset processing state if Claude doesn't respond
-                Process.send_after(self(), {:processing_timeout, session_ref}, 30_000)
-
-                socket =
-                  socket
-                  |> assign(:session_ref, session_ref)
-                  |> assign(:processing, true)
-                  |> load_tab_data("messages", socket.assigns.session_id)
-
-                {:noreply, socket}
+                {:noreply, assign(socket, :session_ref, session_ref)}
 
               {:error, reason} ->
                 Logger.error("❌ Failed to start/resume Claude session: #{inspect(reason)}")
@@ -142,7 +136,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
                   socket
                   |> assign(:processing, false)
                   |> put_flash(:error, "Failed to send to Claude: #{inspect(reason)}")
-                  |> load_tab_data("messages", socket.assigns.session_id)
 
                 {:noreply, socket}
             end
@@ -153,7 +146,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
               socket
               |> assign(:processing, false)
               |> put_flash(:error, "No project path configured. Set git_worktree_path on session, agent, or project.")
-              |> load_tab_data("messages", socket.assigns.session_id)
 
             {:noreply, socket}
         end
@@ -286,22 +278,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     {:noreply, socket}
   end
 
-  @impl true
-  def handle_info({:processing_timeout, session_ref}, socket) do
-    require Logger
-    # If processing is still true and session_ref matches, reset it
-    if socket.assigns.processing && socket.assigns.session_ref == session_ref do
-      Logger.warning("⏱️  Processing timeout for session_ref #{inspect(session_ref)} - resetting state")
-      socket =
-        socket
-        |> assign(:processing, false)
-        |> put_flash(:info, "Claude is taking longer than expected. You can try sending another message.")
-
-      {:noreply, socket}
-    else
-      {:noreply, socket}
-    end
-  end
 
   @impl true
   def handle_info(msg, socket) do
@@ -403,7 +379,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
                               <%= format_time(message.inserted_at) %>
                             </span>
                           </div>
-                          <div class="text-sm text-base-content mt-0.5 leading-relaxed whitespace-pre-wrap"><%= message.body %></div>
+                          <div id={"msg-body-#{message.id}"} class="dm-markdown text-sm text-base-content mt-0.5 leading-relaxed" phx-hook="MarkdownMessage" data-raw-body={message.body}></div>
 
                           <%= if message.attachments && length(message.attachments) > 0 do %>
                             <div class="mt-2 space-y-1">
@@ -462,7 +438,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
                       Stop
                     </button>
                   <% else %>
-                    <button type="submit" class="btn btn-primary">Send</button>
+                    <button type="submit" class="btn btn-primary" phx-disable-with="Sending...">Send</button>
                   <% end %>
                 </div>
               </form>
@@ -600,9 +576,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
                           <button
                             type="button"
                             class="star-icon cursor-pointer transition-all z-10 p-1 rounded hover:scale-110 hover:bg-black/5"
-                            phx-click="toggle_star"
-                            phx-value-note_id={note.id}
-                            onclick="event.stopPropagation(); event.preventDefault();"
+                            phx-click={JS.push("toggle_star", value: %{note_id: note.id})}
                           >
                             <.icon
                               name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}

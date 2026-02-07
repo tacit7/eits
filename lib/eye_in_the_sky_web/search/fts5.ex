@@ -17,6 +17,7 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
   - `:fts_table` - FTS5 search table name (required)
   - `:schema` - Ecto schema module (required)
   - `:query` - Search query string (required)
+  - `:join_key` - FTS column to join on main table id (e.g. "task_id"). Defaults to "rowid"
   - `:sql_filter` - Additional SQL WHERE clause (optional)
   - `:sql_params` - Parameters for SQL filter (optional, default: [])
   - `:fallback_query` - Ecto query for LIKE fallback (required)
@@ -40,6 +41,7 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
     fts_table = Keyword.fetch!(opts, :fts_table)
     schema = Keyword.fetch!(opts, :schema)
     query = Keyword.fetch!(opts, :query)
+    join_key = Keyword.get(opts, :join_key, "rowid")
     sql_filter = Keyword.get(opts, :sql_filter, "")
     sql_params = Keyword.get(opts, :sql_params, [])
     fallback_query = Keyword.fetch!(opts, :fallback_query)
@@ -50,6 +52,7 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
       fts_table,
       schema,
       query,
+      join_key,
       sql_filter,
       sql_params,
       fallback_query,
@@ -57,17 +60,17 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
     )
   end
 
-  defp fts5_search(table, fts_table, schema, query, sql_filter, sql_params, fallback_query, preloads) do
+  defp fts5_search(table, fts_table, schema, query, join_key, sql_filter, sql_params, fallback_query, preloads) do
     # Use table alias for cleaner SQL
     alias_letter = String.first(table)
 
     sql = """
     SELECT #{alias_letter}.*
     FROM #{table} #{alias_letter}
-    JOIN #{fts_table} #{fts_table} ON #{alias_letter}.id = #{fts_table}.rowid
-    WHERE #{fts_table}.#{fts_table} MATCH ?
+    JOIN #{fts_table} fts ON #{alias_letter}.id = fts.#{join_key}
+    WHERE fts.#{fts_table} MATCH ?
     #{sql_filter}
-    ORDER BY #{fts_table}.rank
+    ORDER BY fts.rank
     LIMIT 50
     """
 

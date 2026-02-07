@@ -126,6 +126,7 @@ defmodule EyeInTheSkyWeb.Tasks do
       fts_table: "task_search",
       schema: Task,
       query: query,
+      join_key: "task_id",
       sql_filter: if(project_id, do: "AND t.project_id = ?", else: ""),
       sql_params: if(project_id, do: [Integer.to_string(project_id)], else: []),
       fallback_query: fallback_query,

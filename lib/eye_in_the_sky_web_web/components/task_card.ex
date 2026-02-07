@@ -12,16 +12,12 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
 
   def task_card(assigns) do
     ~H"""
-    <div
-      class={card_class(@variant)}
-      phx-click={@on_click}
-      phx-value-task_id={@task.id}
-    >
+    <div class={card_class(@variant)}>
       <div class={card_body_class(@variant)}>
         <%= if @variant == "kanban" do %>
-          <.kanban_card_content task={@task} />
+          <.kanban_card_content task={@task} on_click={@on_click} />
         <% else %>
-          <.grid_card_content task={@task} />
+          <.grid_card_content task={@task} on_click={@on_click} />
         <% end %>
       </div>
     </div>
@@ -56,14 +52,18 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
           </svg>
         <% end %>
       </button>
-      <h4 class={
-        "text-sm font-medium flex-1 " <>
-          if @task.completed_at do
-            "text-base-content/50 line-through"
-          else
-            "text-base-content"
-          end
-      }>
+      <h4
+        class={
+          "text-sm font-medium flex-1 hover:text-primary transition-colors cursor-pointer " <>
+            if @task.completed_at do
+              "text-base-content/50 line-through"
+            else
+              "text-base-content"
+            end
+        }
+        phx-click={@on_click}
+        phx-value-task_id={@task.id}
+      >
         {@task.title}
       </h4>
       <%= if @task.priority && @task.priority > 0 do %>
@@ -85,6 +85,16 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       <span class="font-mono text-xs">
         {String.slice(@task.id, 0..7)}
       </span>
+      <button
+        type="button"
+        class="cursor-pointer hover:text-primary transition-colors z-10"
+        phx-hook="CopyToClipboard"
+        id={"copy-task-kanban-#{@task.id}"}
+        data-copy={@task.id}
+        onclick="event.stopPropagation(); event.preventDefault();"
+      >
+        <.icon name="hero-clipboard-document" class="w-3 h-3" />
+      </button>
       <%= if @task.due_at do %>
         <span class="flex items-center gap-1">
           <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
@@ -121,7 +131,11 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
     <!-- Task Header with Priority -->
     <div class="flex items-start justify-between gap-2 mb-3">
       <div class="flex-1 min-w-0">
-        <h3 class="text-base font-semibold text-base-content group-hover:text-primary transition-colors line-clamp-2">
+        <h3
+          class="text-base font-semibold text-base-content hover:text-primary transition-colors line-clamp-2 cursor-pointer"
+          phx-click={@on_click}
+          phx-value-task_id={@task.id}
+        >
           {@task.title}
         </h3>
       </div>
@@ -149,6 +163,16 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       <span class="badge badge-ghost badge-sm font-mono text-xs">
         {String.slice(@task.id, 0..7)}
       </span>
+      <button
+        type="button"
+        class="cursor-pointer hover:text-primary transition-colors z-10"
+        phx-hook="CopyToClipboard"
+        id={"copy-task-grid-#{@task.id}"}
+        data-copy={@task.id}
+        onclick="event.stopPropagation(); event.preventDefault();"
+      >
+        <.icon name="hero-clipboard-document" class="w-3 h-3" />
+      </button>
       <%= if @task.state do %>
         <span class="badge badge-ghost badge-sm">
           {@task.state.name}
@@ -181,11 +205,11 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   end
 
   defp card_class("kanban") do
-    "card bg-base-100 border border-base-300 hover:border-primary hover:shadow-md transition-all cursor-pointer"
+    "card bg-base-100 border border-base-300 hover:shadow-md transition-all"
   end
 
   defp card_class("grid") do
-    "card bg-base-200 border border-base-300 hover:border-primary hover:shadow-lg transition-all cursor-pointer group"
+    "card bg-base-200 border border-base-300 hover:shadow-lg transition-all group"
   end
 
   defp card_body_class("kanban"), do: "card-body p-3"

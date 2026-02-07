@@ -15,7 +15,7 @@ defmodule EyeInTheSkyWeb.Tasks.Task do
     field :agent_id, :string
 
     belongs_to :state, EyeInTheSkyWeb.Tasks.WorkflowState, foreign_key: :state_id, type: :integer
-    belongs_to :project, EyeInTheSkyWeb.Projects.Project, foreign_key: :project_id, type: :integer
+    belongs_to :project, EyeInTheSkyWeb.Projects.Project, foreign_key: :project_id, type: :string
 
     belongs_to :agent, EyeInTheSkyWeb.Agents.Agent,
       define_field: false,

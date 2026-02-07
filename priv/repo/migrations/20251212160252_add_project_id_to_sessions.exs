@@ -2,25 +2,29 @@ defmodule EyeInTheSkyWeb.Repo.Migrations.AddProjectIdToSessions do
   use Ecto.Migration
 
   def change do
-    if table_exists?(:sessions) do
+    if table_exists?(:sessions) && !column_exists?(:sessions, :project_id) do
       alter table(:sessions) do
         add :project_id, :integer, null: true
       end
 
-      # Backfill project_id from agent's project_id
-      execute """
-      UPDATE sessions
-      SET project_id = (
-        SELECT agents.project_id
-        FROM agents
-        WHERE agents.id = sessions.agent_id
-        LIMIT 1
-      )
-      WHERE project_id IS NULL
-      """
+      # Skip backfill - agents table doesn't have project_id column in MCP server schema
+      # The MCP server uses project_name (TEXT) instead
 
       # Add index for performance
       create index(:sessions, [:project_id])
+    end
+  end
+
+  defp column_exists?(table, column) do
+    case repo().query("PRAGMA table_info(#{table})", []) do
+      {:ok, %{rows: rows}} ->
+        Enum.any?(rows, fn row ->
+          # SQLite PRAGMA table_info returns: [cid, name, type, notnull, dflt_value, pk]
+          Enum.at(row, 1) == Atom.to_string(column)
+        end)
+
+      {:error, _} ->
+        false
     end
   end
 

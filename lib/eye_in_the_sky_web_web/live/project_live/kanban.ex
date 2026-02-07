@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Tasks
+  alias EyeInTheSkyWeb.Notes
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWebWeb.Components.TaskCard
 
@@ -35,6 +36,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
         |> assign(:show_new_task_drawer, false)
         |> assign(:show_task_detail_drawer, false)
         |> assign(:selected_task, nil)
+        |> assign(:task_notes, [])
         |> load_tasks()
       else
         workflow_states = Tasks.list_workflow_states()
@@ -55,9 +57,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
+    effective_query = if String.length(String.trim(query)) >= 4, do: query, else: ""
+
     socket =
       socket
-      |> assign(:search_query, query)
+      |> assign(:search_query, effective_query)
       |> load_tasks()
 
     {:noreply, socket}
@@ -77,9 +81,13 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   def handle_event("open_task_detail", %{"task_id" => task_id}, socket) do
     task = Tasks.get_task!(task_id)
 
+    # Load notes for this task (handles both "task" and "tasks" parent_type)
+    notes = Notes.list_notes_for_task(task_id)
+
     socket =
       socket
       |> assign(:selected_task, task)
+      |> assign(:task_notes, notes)
       |> assign(:show_task_detail_drawer, true)
 
     {:noreply, socket}
@@ -170,6 +178,95 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Failed to delete task")}
+    end
+  end
+
+  @impl true
+  def handle_event("start_agent_for_task", %{"task_id" => task_id}, socket) do
+    alias EyeInTheSkyWeb.{Sessions, Agents, Claude.SessionManager}
+
+    task = Tasks.get_task!(task_id)
+    project = socket.assigns.project
+
+    session_id = Ecto.UUID.generate()
+    agent_id = Ecto.UUID.generate()
+    now = DateTime.utc_now() |> DateTime.to_iso8601()
+
+    task_prompt = "#{task.title}\n\n#{task.description || ""}" |> String.trim()
+
+    case Agents.create_agent(%{
+           id: agent_id,
+           name: "Agent for: #{String.slice(task.title, 0..40)}",
+           description: task_prompt,
+           project_id: project.id,
+           git_worktree_path: project.path
+         }) do
+      {:ok, _agent} ->
+        case Sessions.create_session_with_model(%{
+               id: session_id,
+               agent_id: agent_id,
+               name: task.title,
+               description: task_prompt,
+               started_at: now,
+               model_provider: "claude",
+               model_name: "sonnet"
+             }) do
+          {:ok, _session} ->
+            # Link task to session
+            Repo.query(
+              "INSERT INTO task_sessions (task_id, session_id) VALUES (?, ?)",
+              [task_id, session_id]
+            )
+
+            init_prompt = """
+            INITIALIZATION - Eye in the Sky Session:
+
+            Session ID: #{session_id}
+            Agent ID: #{agent_id}
+            Project: #{project.name}
+            Task ID: #{task_id}
+
+            CRITICAL FIRST STEP: Call i-start-session MCP tool to register with Eye in the Sky:
+
+            mcp__eye-in-the-sky__i-start-session({
+              "session_id": "#{session_id}",
+              "description": "#{task_prompt}",
+              "agent_description": "Agent for task #{String.slice(task_id, 0..7)}",
+              "project_name": "#{project.name}",
+              "worktree_path": "#{project.path}"
+            })
+
+            WORKFLOW:
+            1. Use i-start-session to register (done above)
+            2. Log significant actions with i-note-add
+            3. Track tasks with i-todo-create and i-todo-list
+            4. Use i-end-session when done
+
+            YOUR TASK: #{task_prompt}
+
+            Ready to start working.
+            """
+
+            Task.start(fn ->
+              SessionManager.start_session(session_id, init_prompt,
+                model: "sonnet",
+                project_path: project.path
+              )
+            end)
+
+            socket =
+              socket
+              |> assign(:show_task_detail_drawer, false)
+              |> put_flash(:info, "Agent spawned for task: #{String.slice(task.title, 0..40)}")
+
+            {:noreply, socket}
+
+          {:error, changeset} ->
+            {:noreply, put_flash(socket, :error, "Failed to create session: #{inspect(changeset.errors)}")}
+        end
+
+      {:error, changeset} ->
+        {:noreply, put_flash(socket, :error, "Failed to create agent: #{inspect(changeset.errors)}")}
     end
   end
 
@@ -360,6 +457,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       id="task-detail-drawer"
       show={@show_task_detail_drawer}
       task={@selected_task}
+      notes={@task_notes}
       workflow_states={@workflow_states}
       toggle_event="toggle_task_detail_drawer"
       update_event="update_task"

@@ -47,6 +47,17 @@ defmodule EyeInTheSkyWeb.Notes do
   end
 
   @doc """
+  Returns notes for a specific task.
+  Handles both "task" and "tasks" parent_type for backwards compatibility.
+  """
+  def list_notes_for_task(task_id) do
+    Note
+    |> where([n], n.parent_type in ["task", "tasks"] and n.parent_id == ^task_id)
+    |> order_by([n], desc: n.created_at)
+    |> Repo.all()
+  end
+
+  @doc """
   Gets a single note.
   """
   def get_note!(id) do

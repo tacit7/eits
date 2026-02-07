@@ -86,8 +86,18 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                       <% end %>
                     <% end %>
                     <!-- Task ID -->
-                    <div class="badge badge-ghost badge-sm font-mono">
+                    <div class="badge badge-ghost badge-sm font-mono gap-1">
                       {String.slice(@task.id, 0..7)}
+                      <button
+                        type="button"
+                        class="cursor-pointer hover:text-primary transition-colors"
+                        phx-hook="CopyToClipboard"
+                        id={"copy-task-detail-#{@task.id}"}
+                        data-copy={@task.id}
+                        onclick="event.stopPropagation(); event.preventDefault();"
+                      >
+                        <.icon name="hero-clipboard-document" class="w-3 h-3" />
+                      </button>
                     </div>
                   </div>
 
@@ -104,6 +114,31 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                     >{@task.description}</textarea>
                     <p class="text-xs text-base-content/50">Markdown supported</p>
                   </div>
+
+                  <!-- Annotations -->
+                  <%= if @notes && length(@notes) > 0 do %>
+                    <div class="space-y-2">
+                      <div class="flex items-center gap-2">
+                        <.icon name="hero-document-text" class="w-5 h-5 text-base-content/60" />
+                        <h3 class="font-semibold">Annotations</h3>
+                        <span class="badge badge-sm">{length(@notes)}</span>
+                      </div>
+                      <div class="space-y-3">
+                        <%= for note <- @notes do %>
+                          <div class="border border-base-300 rounded-lg p-3 bg-base-50">
+                            <%= if note.title do %>
+                              <h4 class="font-semibold text-sm mb-2">{note.title}</h4>
+                            <% end %>
+                            <pre class="whitespace-pre-wrap text-sm text-base-content/80 font-mono leading-relaxed">{note.body}</pre>
+                            <div class="flex items-center gap-2 mt-2 text-xs text-base-content/50">
+                              <.icon name="hero-clock" class="w-3 h-3" />
+                              <span>{format_relative_time(note.created_at)}</span>
+                            </div>
+                          </div>
+                        <% end %>
+                      </div>
+                    </div>
+                  <% end %>
 
                   <!-- Hidden form fields -->
                   <input type="hidden" name="state_id" value={@task.state_id} />
@@ -193,6 +228,17 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                       onchange="document.querySelector('input[name=due_at]').value = this.value"
                     />
                   </div>
+
+                  <!-- Start Agent Button -->
+                  <button
+                    type="button"
+                    phx-click="start_agent_for_task"
+                    phx-value-task_id={@task.id}
+                    class="btn btn-accent btn-sm w-full"
+                  >
+                    <.icon name="hero-play" class="w-4 h-4" />
+                    Start Agent
+                  </button>
 
                   <!-- Delete Button -->
                   <button

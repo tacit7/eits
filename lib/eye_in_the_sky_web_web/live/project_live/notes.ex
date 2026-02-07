@@ -46,9 +46,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
 
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
+    effective_query = if String.length(String.trim(query)) >= 4, do: query, else: ""
+
     socket =
       socket
-      |> assign(:search_query, query)
+      |> assign(:search_query, effective_query)
       |> load_notes()
 
     {:noreply, socket}
@@ -89,8 +91,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
       else
         from(n in EyeInTheSkyWeb.Notes.Note,
           where:
-            (n.parent_type == "agent" and n.parent_id in ^agent_ids) or
-              (n.parent_type == "session" and n.parent_id in ^session_ids),
+            (n.parent_type in ["agent", "agents"] and n.parent_id in ^agent_ids) or
+              (n.parent_type in ["session", "sessions"] and n.parent_id in ^session_ids),
           order_by: [desc: n.created_at]
         )
         |> Repo.all()

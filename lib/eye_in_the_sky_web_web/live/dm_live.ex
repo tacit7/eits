@@ -22,6 +22,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:active_tab, "messages")
       |> assign(:session_ref, nil)
       |> assign(:processing, false)
+      |> assign(:message_limit, 20)
+      |> assign(:has_more_messages, false)
       |> allow_upload(:files,
         accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
         max_entries: 10,
@@ -172,6 +174,88 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_event("sync_from_session_file", _params, socket) do
+    alias EyeInTheSkyWeb.Claude.SessionReader
+
+    session = socket.assigns.session
+    agent = socket.assigns.agent
+    session_id = socket.assigns.session_id
+
+    case resolve_project_path(session, agent) do
+      {:ok, project_path} ->
+        case SessionReader.read_recent_messages(session_id, project_path, 999_999) do
+          {:ok, raw_messages} ->
+            formatted = SessionReader.format_messages(raw_messages)
+            now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+            imported =
+              formatted
+              |> Enum.filter(fn msg -> msg.uuid end)
+              |> Enum.reject(fn msg -> Messages.message_exists_by_source_uuid?(msg.uuid) end)
+              |> Enum.map(fn msg ->
+                {sender_role, recipient_role, direction} =
+                  case msg.role do
+                    "user" -> {"user", "agent", "outbound"}
+                    _ -> {"agent", "user", "inbound"}
+                  end
+
+                inserted_at =
+                  case DateTime.from_iso8601(msg.timestamp) do
+                    {:ok, dt, _} -> DateTime.truncate(dt, :second)
+                    _ -> now
+                  end
+
+                Messages.create_message(%{
+                  id: Ecto.UUID.generate(),
+                  source_uuid: msg.uuid,
+                  session_id: session_id,
+                  sender_role: sender_role,
+                  recipient_role: recipient_role,
+                  direction: direction,
+                  body: msg.content,
+                  status: "delivered",
+                  provider: "claude",
+                  inserted_at: inserted_at,
+                  updated_at: now
+                })
+              end)
+              |> Enum.count(fn
+                {:ok, _} -> true
+                _ -> false
+              end)
+
+            socket =
+              socket
+              |> load_tab_data("messages", session_id)
+              |> put_flash(:info, "Synced #{imported} new messages from session file")
+
+            {:noreply, socket}
+
+          {:error, :not_found} ->
+            {:noreply, put_flash(socket, :error, "No session file found for this session")}
+
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, "Failed to read session file: #{inspect(reason)}")}
+        end
+
+      {:error, :no_project_path} ->
+        {:noreply, put_flash(socket, :error, "No project path configured")}
+    end
+  end
+
+  @impl true
+  def handle_event("load_more_messages", _params, socket) do
+    new_limit = (socket.assigns[:message_limit] || 20) + 20
+
+    socket =
+      socket
+      |> assign(:message_limit, new_limit)
+      |> load_tab_data("messages", socket.assigns.session_id)
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("kill_session", _params, socket) do
     if socket.assigns.session_ref do
       EyeInTheSkyWeb.Claude.SessionManager.cancel_session(socket.assigns.session_ref)
@@ -287,15 +371,25 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   defp load_tab_data(socket, tab, session_id) do
-    messages = if tab == "messages" do
-      Messages.list_recent_messages(session_id, 100)
-      |> EyeInTheSkyWeb.Repo.preload(:attachments)
+    {messages, has_more} = if tab == "messages" do
+      limit = socket.assigns[:message_limit] || 20
+      # Fetch one extra to detect if more exist
+      fetched =
+        Messages.list_recent_messages(session_id, limit + 1)
+        |> EyeInTheSkyWeb.Repo.preload(:attachments)
+
+      if length(fetched) > limit do
+        {Enum.drop(fetched, 1), true}
+      else
+        {fetched, false}
+      end
     else
-      socket.assigns[:messages] || []
+      {socket.assigns[:messages] || [], socket.assigns[:has_more_messages] || false}
     end
 
     socket
     |> assign(:messages, messages)
+    |> assign(:has_more_messages, has_more)
     |> assign(:tasks, if(tab == "tasks", do: Tasks.list_tasks_for_session(session_id), else: socket.assigns[:tasks] || []))
     |> assign(:commits, if(tab == "commits", do: Commits.list_commits_for_session(session_id), else: socket.assigns[:commits] || []))
     |> assign(:logs, if(tab == "logs", do: Logs.list_logs_for_session(session_id), else: socket.assigns[:logs] || []))
@@ -355,6 +449,19 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         <%= case @active_tab do %>
           <% "messages" -> %>
             <div class="flex flex-col h-[calc(100vh-16rem)]">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs text-base-content/40"><%= length(@messages) %> messages</span>
+                <button
+                  phx-click="sync_from_session_file"
+                  class="btn btn-xs btn-ghost gap-1 text-base-content/60 hover:text-primary"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Sync
+                </button>
+              </div>
               <div class="flex-1 overflow-y-auto space-y-4 mb-4" id="messages-container" phx-hook="ScrollToBottom" style="scrollbar-width: none; -ms-overflow-style: none;">
                 <%= if @messages == [] do %>
                   <div class="text-center text-base-content/60 py-8">
@@ -362,6 +469,16 @@ defmodule EyeInTheSkyWebWeb.DmLive do
                     <p class="text-xs mt-2">Send a message to start the conversation</p>
                   </div>
                 <% else %>
+                  <%= if @has_more_messages do %>
+                    <div class="text-center py-2">
+                      <button
+                        phx-click="load_more_messages"
+                        class="btn btn-xs btn-ghost text-base-content/50 hover:text-primary"
+                      >
+                        Load older messages
+                      </button>
+                    </div>
+                  <% end %>
                   <%= for message <- @messages do %>
                     <div class="group hover:bg-base-300/30 px-2 py-1.5 -mx-2 rounded">
                       <div class="flex gap-3">

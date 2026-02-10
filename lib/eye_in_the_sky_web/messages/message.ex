@@ -38,6 +38,7 @@ defmodule EyeInTheSkyWeb.Messages.Message do
     has_many :reactions, EyeInTheSkyWeb.Messages.MessageReaction
     has_many :attachments, EyeInTheSkyWeb.Messages.FileAttachment
 
+    field :source_uuid, :string
     field :session_id, :string
     field :channel_id, :string
     field :parent_message_id, :string
@@ -62,6 +63,7 @@ defmodule EyeInTheSkyWeb.Messages.Message do
       :body,
       :status,
       :metadata,
+      :source_uuid,
       :thread_reply_count,
       :last_thread_reply_at,
       :inserted_at,

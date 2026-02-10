@@ -92,16 +92,23 @@ defmodule EyeInTheSkyWeb.Messages do
   end
 
   @doc """
+  Checks if a message with the given source_uuid exists.
+  """
+  def message_exists_by_source_uuid?(source_uuid) do
+    Message
+    |> where([m], m.source_uuid == ^source_uuid)
+    |> Repo.exists?()
+  end
+
+  @doc """
   Creates a message.
   """
   def create_message(attrs \\ %{}) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     attrs =
-      Map.merge(attrs, %{
-        inserted_at: now,
-        updated_at: now
-      })
+      %{inserted_at: now, updated_at: now}
+      |> Map.merge(attrs)
 
     %Message{}
     |> Message.changeset(attrs)
@@ -138,23 +145,38 @@ defmodule EyeInTheSkyWeb.Messages do
   @doc """
   Records an incoming reply (creates an inbound message).
   """
-  def record_incoming_reply(session_id, provider, body) do
+  def record_incoming_reply(session_id, provider, body, opts \\ []) do
+    id = Keyword.get(opts, :id) || Ecto.UUID.generate()
+    source_uuid = Keyword.get(opts, :source_uuid)
+
+    attrs = %{
+      id: id,
+      session_id: session_id,
+      sender_role: "agent",
+      recipient_role: "user",
+      provider: provider,
+      direction: "inbound",
+      body: body,
+      status: "delivered",
+      source_uuid: source_uuid,
+      metadata: %{}
+    }
+
     result =
-      create_message(%{
-        id: Ecto.UUID.generate(),
-        session_id: session_id,
-        sender_role: "agent",
-        recipient_role: "user",
-        provider: provider,
-        direction: "inbound",
-        body: body,
-        status: "delivered",
-        metadata: %{}
-      })
+      if source_uuid do
+        # Upsert: skip insert if this source_uuid already exists
+        %Message{}
+        |> Message.changeset(attrs)
+        |> Repo.insert(
+          on_conflict: :nothing,
+          conflict_target: :source_uuid
+        )
+      else
+        create_message(attrs)
+      end
 
     case result do
       {:ok, message} ->
-        # Broadcast new message to session topic
         Phoenix.PubSub.broadcast(
           EyeInTheSkyWeb.PubSub,
           "session:#{message.session_id}",

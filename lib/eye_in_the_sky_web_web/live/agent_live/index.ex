@@ -185,7 +185,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
-    effective_query = if String.length(String.trim(query)) >= 4, do: query, else: ""
+    effective_query = if String.length(String.trim(query)) >= 3, do: query, else: ""
 
     socket =
       socket
@@ -311,7 +311,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     socket =
       socket
       |> assign(:show_new_session_drawer, false)
-      |> put_flash(:info, "Session launched — Claude Code will register with EITS")
+      |> put_flash(:info, "Session launched")
 
     {:noreply, socket}
   end
@@ -333,6 +333,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   def render(assigns) do
     ~H"""
     <.live_component module={EyeInTheSkyWebWeb.Components.Navbar} id="navbar" />
+    <Layouts.flash_group flash={@flash} />
     <div class="px-6 lg:px-8">
       <div class="max-w-7xl mx-auto">
         <!-- Page Header -->
@@ -372,7 +373,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     <!-- Search and Filters Toolbar -->
         <div class="sticky top-16 z-10 bg-base-100/80 backdrop-blur border-b border-base-content/10 -mx-6 lg:-mx-8 px-6 lg:px-8 py-4 my-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-4">
           <!-- Search -->
-          <form phx-submit="search" class="flex-1 max-w-md flex gap-2">
+          <form phx-submit="search" phx-change="search" class="flex-1 max-w-md flex gap-2">
             <label for="search" class="sr-only">Search sessions</label>
             <div class="relative flex-1">
               <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -389,6 +390,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                 name="query"
                 id="search"
                 value={@search_query}
+                phx-debounce="300"
                 class="input input-bordered w-full pl-10"
                 placeholder="Search sessions, projects, descriptions..."
               />

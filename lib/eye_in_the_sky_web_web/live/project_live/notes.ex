@@ -29,6 +29,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
         |> assign(:project, project)
         |> assign(:tasks, tasks)
         |> assign(:search_query, "")
+        |> assign(:starred_filter, false)
         |> assign(:notes, [])
         |> load_notes()
       else
@@ -54,6 +55,14 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
       |> load_notes()
 
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("toggle_starred_filter", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:starred_filter, !socket.assigns.starred_filter)
+     |> load_notes()}
   end
 
   @impl true
@@ -85,17 +94,26 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
 
     query = socket.assigns.search_query
 
+    starred_only = socket.assigns.starred_filter
+
     notes =
       if query != "" and String.trim(query) != "" do
-        Notes.search_notes(query, agent_ids)
+        results = Notes.search_notes(query, agent_ids)
+        if starred_only, do: Enum.filter(results, &(&1.starred == 1)), else: results
       else
-        from(n in EyeInTheSkyWeb.Notes.Note,
-          where:
-            (n.parent_type in ["agent", "agents"] and n.parent_id in ^agent_ids) or
-              (n.parent_type in ["session", "sessions"] and n.parent_id in ^session_ids),
-          order_by: [desc: n.created_at]
-        )
-        |> Repo.all()
+        project_id_str = to_string(project.id)
+
+        base =
+          from(n in EyeInTheSkyWeb.Notes.Note,
+            where:
+              (n.parent_type in ["project", "projects"] and n.parent_id == ^project_id_str) or
+                (n.parent_type in ["agent", "agents"] and n.parent_id in ^agent_ids) or
+                (n.parent_type in ["session", "sessions"] and n.parent_id in ^session_ids),
+            order_by: [desc: n.created_at]
+          )
+
+        base = if starred_only, do: from(n in base, where: n.starred == 1), else: base
+        Repo.all(base)
       end
 
     assign(socket, :notes, notes)
@@ -141,9 +159,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
 
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <div class="max-w-6xl mx-auto">
-        <!-- Search Input -->
-        <div class="mb-6">
-          <form phx-change="search" class="w-full">
+        <!-- Search + Filter -->
+        <div class="mb-6 flex items-center gap-3">
+          <form phx-change="search" class="flex-1">
             <input
               type="text"
               name="query"
@@ -153,6 +171,17 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
               autocomplete="off"
             />
           </form>
+          <button
+            type="button"
+            phx-click="toggle_starred_filter"
+            class={"btn btn-sm gap-2 #{if @starred_filter, do: "btn-warning", else: "btn-ghost"}"}
+          >
+            <.icon
+              name={if @starred_filter, do: "hero-star-solid", else: "hero-star"}
+              class="w-4 h-4"
+            />
+            Starred
+          </button>
         </div>
 
         <%= if length(@notes) > 0 do %>
@@ -194,11 +223,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
                 
     <!-- Collapse Content -->
                 <div class="collapse-content bg-base-50">
-                  <pre
-                    id={"note-highlight-#{note.id}"}
-                    phx-hook="Highlight"
-                    class="whitespace-pre-wrap text-sm text-base-content p-0 font-mono leading-relaxed"
-                  ><code class="language-plaintext"><%= note.body %></code></pre>
+                  <div
+                    id={"note-body-#{note.id}"}
+                    class="dm-markdown text-sm text-base-content leading-relaxed"
+                    phx-hook="MarkdownMessage"
+                    data-raw-body={note.body}
+                  ></div>
                 </div>
               </div>
             <% end %>
@@ -232,6 +262,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
     |> String.trim()
     |> String.split("\n")
     |> List.first()
+    |> String.replace(~r/^#+\s*/, "")
     |> String.slice(0..50)
     |> then(fn text ->
       if String.length(text) >= 50, do: text <> "...", else: text

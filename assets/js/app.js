@@ -32,7 +32,7 @@ import {CommandHistory} from "./hooks/command_history"
 import {getHooks} from "live_svelte"
 import "./theme"
 import hljs from 'highlight.js'
-import 'highlight.js/styles/github-dark.css'
+// highlight.js theme is handled in app.css (theme-aware)
 
 // Import Svelte components manually (esbuild doesn't support import.meta.glob)
 import SessionsSidebar from "../svelte/components/SessionsSidebar.svelte"

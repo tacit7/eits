@@ -57,7 +57,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
           Logger.debug("Spawning new Claude session in #{project_path}")
         end
 
-        session_ref = make_ref()
+        session_ref = Keyword.get(opts, :session_ref, make_ref())
 
         # Spawn output handler first
         handler_pid =
@@ -145,7 +145,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
           "Spawning channel agent session=#{session_id} channel=#{channel_id} in #{project_path}"
         )
 
-        session_ref = make_ref()
+        session_ref = Keyword.get(opts, :session_ref, make_ref())
 
         # Spawn output handler with channel_id context and line buffer
         handler_pid =
@@ -257,7 +257,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
         require Logger
         Logger.debug("Spawning Claude with #{flag} flag in #{project_path}")
 
-        session_ref = make_ref()
+        session_ref = Keyword.get(opts, :session_ref, make_ref())
 
         # Spawn output handler first
         handler_pid =

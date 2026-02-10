@@ -151,12 +151,15 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
           |> DateTime.to_iso8601()
 
       %{
+        uuid: msg["uuid"],
         role: get_in(msg, ["message", "role"]) || msg["type"],
         content: extract_content(msg),
         timestamp: timestamp
       }
     end)
-    |> Enum.reject(&(&1.content == ""))
+    |> Enum.reject(fn msg ->
+      msg.content == "" || String.starts_with?(String.trim(msg.content), "<")
+    end)
   end
 
   defp extract_content(%{"message" => %{"content" => content}}) when is_binary(content) do
@@ -164,21 +167,15 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
   end
 
   defp extract_content(%{"message" => %{"content" => content}}) when is_list(content) do
-    # Handle structured content (text blocks, tool calls, etc.)
     content
     |> Enum.filter(&is_map/1)
-    |> Enum.map(fn block ->
-      case block do
-        %{"type" => "text", "text" => text} -> text
-        %{"type" => "tool_use", "name" => name} -> "[Tool: #{name}]"
-        # Skip tool results
-        %{"type" => "tool_result"} -> ""
-        %{"text" => text} -> text
-        _ -> ""
-      end
+    |> Enum.flat_map(fn
+      %{"type" => "text", "text" => text} -> [text]
+      %{"type" => "tool_use", "name" => name, "input" => input} ->
+        [format_tool_call(name, input)]
+      _ -> []
     end)
-    |> Enum.reject(&(&1 == ""))
-    |> Enum.join("\n")
+    |> Enum.join("\n\n")
   end
 
   # Handle case where content is directly in message (not nested)
@@ -189,19 +186,48 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
   defp extract_content(%{"content" => content}) when is_list(content) do
     content
     |> Enum.filter(&is_map/1)
-    |> Enum.map(fn block ->
-      case block do
-        %{"type" => "text", "text" => text} -> text
-        %{"type" => "tool_use", "name" => name} -> "[Tool: #{name}]"
-        # Skip tool results
-        %{"type" => "tool_result"} -> ""
-        %{"text" => text} -> text
-        _ -> ""
-      end
+    |> Enum.flat_map(fn
+      %{"type" => "text", "text" => text} -> [text]
+      %{"type" => "tool_use", "name" => name, "input" => input} ->
+        [format_tool_call(name, input)]
+      _ -> []
     end)
-    |> Enum.reject(&(&1 == ""))
-    |> Enum.join("\n")
+    |> Enum.join("\n\n")
   end
 
   defp extract_content(_), do: ""
+
+  # Tool call formatting - compact summaries for chat display
+  defp format_tool_call("Read", %{"file_path" => path}), do: "> `Read` #{path}"
+  defp format_tool_call("Write", %{"file_path" => path}), do: "> `Write` #{path}"
+  defp format_tool_call("Edit", %{"file_path" => path}), do: "> `Edit` #{path}"
+  defp format_tool_call("Glob", %{"pattern" => pat}), do: "> `Glob` #{pat}"
+  defp format_tool_call("Grep", %{"pattern" => pat} = input) do
+    path = input["path"] || ""
+    "> `Grep` `#{pat}` #{path}"
+  end
+  defp format_tool_call("Bash", %{"command" => cmd}) do
+    truncated = String.slice(cmd, 0..120)
+    suffix = if String.length(cmd) > 121, do: "...", else: ""
+    "> `Bash` `#{truncated}#{suffix}`"
+  end
+  defp format_tool_call("Task", %{"prompt" => prompt}) do
+    truncated = String.slice(prompt, 0..80)
+    suffix = if String.length(prompt) > 81, do: "...", else: ""
+    "> `Task` #{truncated}#{suffix}"
+  end
+  defp format_tool_call(name, input) when is_map(input) do
+    summary =
+      input
+      |> Map.to_list()
+      |> Enum.take(2)
+      |> Enum.filter(fn {_k, v} -> is_binary(v) or is_number(v) or is_atom(v) end)
+      |> Enum.map(fn {k, v} ->
+        val = v |> to_string() |> String.slice(0..60)
+        "#{k}: #{val}"
+      end)
+      |> Enum.join(", ")
+    "> `#{name}` #{summary}"
+  end
+  defp format_tool_call(name, _), do: "> `#{name}`"
 end

@@ -33,7 +33,6 @@ defmodule EyeInTheSkyWebWeb.Router do
     live "/projects/:id/files", ProjectLive.Files, :show
     live "/chat", ChatLive, :index
     live "/dm/:session_id", DmLive, :show
-    live "/settings", ThemeLive, :index
   end
 
   # Other scopes may use custom stacks.

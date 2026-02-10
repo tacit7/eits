@@ -586,11 +586,12 @@ defmodule EyeInTheSkyWebWeb.DmLive do
                         </div>
                       </div>
                       <div class="collapse-content bg-base-50">
-                        <pre
-                          id={"note-highlight-#{note.id}"}
-                          phx-hook="Highlight"
-                          class="whitespace-pre-wrap text-sm text-base-content p-0 font-mono leading-relaxed"
-                        ><code class="language-markdown"><%= note.body %></code></pre>
+                        <div
+                          id={"note-body-#{note.id}"}
+                          class="dm-markdown text-sm text-base-content leading-relaxed"
+                          phx-hook="MarkdownMessage"
+                          data-raw-body={note.body}
+                        ></div>
                       </div>
                     </div>
                   <% end %>

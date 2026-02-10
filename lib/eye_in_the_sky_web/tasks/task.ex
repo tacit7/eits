@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWeb.Tasks.Task do
   @foreign_key_type :string
 
   schema "tasks" do
+    field :int_id, :integer
     field :title, :string
     field :description, :string
     field :priority, :integer, default: 0

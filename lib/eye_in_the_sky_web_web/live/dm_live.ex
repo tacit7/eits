@@ -183,7 +183,10 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
     case resolve_project_path(session, agent) do
       {:ok, project_path} ->
-        case SessionReader.read_recent_messages(session_id, project_path, 999_999) do
+        # Use last source_uuid as cursor to only read new messages
+        last_uuid = Messages.get_last_source_uuid(session_id)
+
+        case SessionReader.read_messages_after_uuid(session_id, project_path, last_uuid) do
           {:ok, raw_messages} ->
             formatted = SessionReader.format_messages(raw_messages)
             now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -191,7 +194,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
             imported =
               formatted
               |> Enum.filter(fn msg -> msg.uuid end)
-              |> Enum.reject(fn msg -> Messages.message_exists_by_source_uuid?(msg.uuid) end)
               |> Enum.map(fn msg ->
                 {sender_role, recipient_role, direction} =
                   case msg.role do

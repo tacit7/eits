@@ -101,6 +101,18 @@ defmodule EyeInTheSkyWeb.Messages do
   end
 
   @doc """
+  Returns the most recent source_uuid for a session, used as sync cursor.
+  """
+  def get_last_source_uuid(session_id) do
+    Message
+    |> where([m], m.session_id == ^session_id and not is_nil(m.source_uuid))
+    |> order_by([m], desc: m.inserted_at)
+    |> limit(1)
+    |> select([m], m.source_uuid)
+    |> Repo.one()
+  end
+
+  @doc """
   Creates a message.
   """
   def create_message(attrs \\ %{}) do

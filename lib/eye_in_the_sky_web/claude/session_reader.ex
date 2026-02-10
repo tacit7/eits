@@ -101,6 +101,17 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
   end
 
   @doc """
+  Reads messages from a session file that come after the given uuid.
+  If after_uuid is nil, reads all messages. Used for incremental sync.
+  """
+  def read_messages_after_uuid(session_id, project_path, after_uuid) do
+    case find_session_file(session_id, project_path) do
+      {:ok, file_path} -> parse_session_file_after(file_path, after_uuid)
+      {:error, _} = error -> error
+    end
+  end
+
+  @doc """
   Parses a Claude session JSONL file and extracts conversation messages.
   Returns the last N messages in chronological order.
   """
@@ -112,8 +123,31 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
           |> String.split("\n", trim: true)
           |> Enum.map(&parse_line/1)
           |> Enum.filter(&is_conversation_message?/1)
-          # Get last N messages
           |> Enum.take(-limit)
+
+        {:ok, messages}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp parse_session_file_after(file_path, nil) do
+    # No cursor; read everything
+    parse_session_file(file_path, 999_999)
+  end
+
+  defp parse_session_file_after(file_path, after_uuid) do
+    case File.read(file_path) do
+      {:ok, content} ->
+        lines = String.split(content, "\n", trim: true)
+
+        messages =
+          lines
+          |> Enum.map(&parse_line/1)
+          |> Enum.filter(&is_conversation_message?/1)
+          |> Enum.drop_while(fn msg -> msg["uuid"] != after_uuid end)
+          |> Enum.drop(1)
 
         {:ok, messages}
 

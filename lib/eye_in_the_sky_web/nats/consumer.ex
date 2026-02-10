@@ -14,10 +14,14 @@ defmodule EyeInTheSkyWeb.NATS.Consumer do
 
   @impl true
   def init(_opts) do
+    nats_config = Application.get_env(:eye_in_the_sky_web, :nats, [])
+    host = Keyword.get(nats_config, :host, "localhost")
+    port = Keyword.get(nats_config, :port, 4222)
+
     {:ok, conn} =
       Gnat.start_link(%{
-        host: "localhost",
-        port: 4222
+        host: host,
+        port: port
       })
 
     Process.register(conn, :gnat)

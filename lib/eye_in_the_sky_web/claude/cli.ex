@@ -394,7 +394,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   defp process_channel_line(line, channel_id) do
     require Logger
 
-    Logger.debug("📄 Channel agent line: #{line}")
+    Logger.debug("Channel agent line: #{line}")
 
     case Jason.decode(line) do
       {:ok, %{"type" => "text", "text" => text}} when text != "" ->
@@ -406,7 +406,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
         Logger.error("Claude error: #{error_msg}")
 
         # Spawn async task to avoid blocking the port reader
-        Task.start(fn ->
+        Task.Supervisor.start_child(EyeInTheSkyWeb.TaskSupervisor, fn ->
           {:ok, error_message} =
             EyeInTheSkyWeb.Messages.send_channel_message(%{
               channel_id: channel_id,
@@ -414,7 +414,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
               sender_role: "system",
               recipient_role: "user",
               provider: "system",
-              body: "⚠️ Agent error: #{error_msg}"
+              body: "Agent error: #{error_msg}"
             })
 
           Phoenix.PubSub.broadcast(
@@ -430,7 +430,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
 
       {:error, err} ->
         # Not JSON - might be stderr or startup messages
-        Logger.warning("⚠️  FAILED TO PARSE JSON: #{inspect(err)} - Line: #{line}")
+        Logger.warning("Failed to parse JSON: #{inspect(err)} - line: #{line}")
     end
   end
 
@@ -451,7 +451,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
 
       {^port, {:data, data}} when is_binary(data) ->
         # Fallback: raw binary data (shouldn't happen with {:line, N} but handle gracefully)
-        Logger.debug("📨 Channel agent output received: #{byte_size(data)} bytes")
+        Logger.debug("Channel agent output received: #{byte_size(data)} bytes")
 
         # Append to buffer and process line-by-line
         new_buffer = buffer <> data
@@ -476,12 +476,12 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
         handle_channel_output(port, session_ref, caller, channel_id, session_id, remaining)
 
       {^port, {:exit_status, status}} ->
-        Logger.error("❌ Channel agent process exited with status #{status}")
-        Logger.error("💀 Session ID: #{session_id}")
-        Logger.error("📡 Channel ID: #{channel_id}")
+        Logger.error("Channel agent process exited with status #{status}")
+        Logger.error("Session ID: #{session_id}")
+        Logger.error("Channel ID: #{channel_id}")
 
         # Spawn async task to send exit notification without blocking port reader
-        Task.start(fn ->
+        Task.Supervisor.start_child(EyeInTheSkyWeb.TaskSupervisor, fn ->
           {:ok, exit_msg} =
             EyeInTheSkyWeb.Messages.send_channel_message(%{
               channel_id: channel_id,
@@ -507,7 +507,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
         Port.close(port)
 
         # Spawn async task to send timeout notification without blocking port reader
-        Task.start(fn ->
+        Task.Supervisor.start_child(EyeInTheSkyWeb.TaskSupervisor, fn ->
           {:ok, timeout_msg} =
             EyeInTheSkyWeb.Messages.send_channel_message(%{
               channel_id: channel_id,
@@ -515,7 +515,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
               sender_role: "system",
               recipient_role: "user",
               provider: "system",
-              body: "⏱️ Agent session timed out (no activity for 5 minutes)"
+              body: "Agent session timed out (no activity for 5 minutes)"
             })
 
           Phoenix.PubSub.broadcast(

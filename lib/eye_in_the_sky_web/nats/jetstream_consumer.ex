@@ -10,14 +10,14 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
 
   alias EyeInTheSkyWeb.Messages
 
-  @stream "EVENTS"
-  @consumer_name "eits-web"
-  @filter "events.>"
-
   def start_link(_opts) do
+    config = nats_config()
+    stream = Keyword.get(config, :stream_name, "EVENTS")
+    consumer = Keyword.get(config, :consumer_name, "eits-web")
+
     with :ok <- wait_for_gnat(),
          :ok <- ensure_consumer_exists() do
-      Logger.info("JetStreamConsumer: starting pull consumer on #{@stream}/#{@consumer_name}")
+      Logger.info("JetStreamConsumer: starting pull consumer on #{stream}/#{consumer}")
       Gnat.Jetstream.PullConsumer.start_link(__MODULE__, [], name: __MODULE__)
     end
   end
@@ -25,11 +25,12 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
   @impl true
   def init(_state) do
     Logger.info("JetStreamConsumer: initializing")
+    config = nats_config()
 
     connection_options = [
       connection_name: :gnat,
-      stream_name: @stream,
-      consumer_name: @consumer_name
+      stream_name: Keyword.get(config, :stream_name, "EVENTS"),
+      consumer_name: Keyword.get(config, :consumer_name, "eits-web")
     ]
 
     {:ok, %{}, connection_options}
@@ -70,25 +71,30 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
   end
 
   defp ensure_consumer_exists do
-    case Gnat.Jetstream.API.Consumer.info(:gnat, @stream, @consumer_name) do
+    config = nats_config()
+    stream = Keyword.get(config, :stream_name, "EVENTS")
+    consumer = Keyword.get(config, :consumer_name, "eits-web")
+    filter = Keyword.get(config, :filter_subject, "events.>")
+
+    case Gnat.Jetstream.API.Consumer.info(:gnat, stream, consumer) do
       {:ok, _info} ->
-        Logger.info("JetStreamConsumer: durable consumer #{@consumer_name} exists")
+        Logger.info("JetStreamConsumer: durable consumer #{consumer} exists")
         :ok
 
       {:error, _} ->
-        Logger.info("JetStreamConsumer: creating durable consumer #{@consumer_name}")
+        Logger.info("JetStreamConsumer: creating durable consumer #{consumer}")
 
-        consumer = %Gnat.Jetstream.API.Consumer{
-          stream_name: @stream,
-          durable_name: @consumer_name,
-          filter_subject: @filter,
+        consumer_config = %Gnat.Jetstream.API.Consumer{
+          stream_name: stream,
+          durable_name: consumer,
+          filter_subject: filter,
           ack_policy: :explicit,
           deliver_policy: :new
         }
 
-        case Gnat.Jetstream.API.Consumer.create(:gnat, consumer) do
+        case Gnat.Jetstream.API.Consumer.create(:gnat, consumer_config) do
           {:ok, _} ->
-            Logger.info("JetStreamConsumer: consumer #{@consumer_name} created")
+            Logger.info("JetStreamConsumer: consumer #{consumer} created")
             :ok
 
           {:error, reason} ->
@@ -96,6 +102,10 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
             {:error, reason}
         end
     end
+  end
+
+  defp nats_config do
+    Application.get_env(:eye_in_the_sky_web, :nats, [])
   end
 
   # --- Body decoding ---

@@ -53,6 +53,14 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# NATS connection
+config :eye_in_the_sky_web, :nats,
+  host: "localhost",
+  port: 4222,
+  stream_name: "EVENTS",
+  consumer_name: "eits-web",
+  filter_subject: "events.>"
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

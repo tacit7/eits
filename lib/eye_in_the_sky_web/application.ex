@@ -21,6 +21,8 @@ defmodule EyeInTheSkyWeb.Application do
       EyeInTheSkyWeb.NATS.Consumer,
       # JetStream durable pull consumer (depends on :gnat from Consumer)
       EyeInTheSkyWeb.NATS.JetStreamConsumer,
+      # Task supervisor for fire-and-forget async work
+      {Task.Supervisor, name: EyeInTheSkyWeb.TaskSupervisor},
       # Claude CLI session manager
       EyeInTheSkyWeb.Claude.SessionManager,
       # Start to serve requests, typically the last entry

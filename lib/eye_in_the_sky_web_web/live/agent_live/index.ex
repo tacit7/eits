@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agents")
       # Refresh agents list every 30 seconds (less aggressive)
-      :timer.send_interval(@refresh_interval_ms, self(), :refresh_agents)
+      schedule_refresh()
     end
 
     projects = EyeInTheSkyWeb.Projects.list_projects()
@@ -277,6 +277,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_info(:refresh_agents, socket) do
+    schedule_refresh()
     {:noreply, load_sessions(socket)}
   end
 
@@ -300,7 +301,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
     prompt = "Start new eits session: session-id #{session_id} agent-id #{agent_id} description: #{description}"
 
-    Task.start(fn ->
+    Task.Supervisor.start_child(EyeInTheSkyWeb.TaskSupervisor, fn ->
       SessionManager.start_session(session_id, prompt,
         model: model,
         project_path: project.path
@@ -322,6 +323,10 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   defp apply_action(socket, :index, _params) do
     assign(socket, :page_title, "Agents")
+  end
+
+  defp schedule_refresh do
+    Process.send_after(self(), :refresh_agents, @refresh_interval_ms)
   end
 
   @impl true

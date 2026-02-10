@@ -184,7 +184,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
         {:noreply, state}
 
       session_info ->
-        Logger.debug("📥 RAW CLAUDE LINE: #{line}")
+        Logger.debug("Raw Claude line: #{line}")
 
         # Parse the JSON line
         case Jason.decode(line) do
@@ -193,7 +193,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
 
           {:error, reason} ->
             # Not JSON, just buffer it
-            Logger.warning("⚠️  FAILED TO PARSE JSON: #{inspect(reason)} - Line: #{line}")
+            Logger.warning("Failed to parse JSON: #{inspect(reason)} - line: #{line}")
             updated_info = update_in(session_info.output_buffer, &[line | &1])
             {:noreply, Map.put(state, session_ref, updated_info)}
         end
@@ -247,7 +247,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
 
   defp handle_parsed_output(session_ref, session_info, parsed, state) do
     # DEBUG: Log all parsed messages to understand Claude's output format
-    Logger.info("🔍 PARSED CLAUDE OUTPUT: #{inspect(parsed, pretty: true)}")
+    Logger.info("Parsed Claude output: #{inspect(parsed, pretty: true)}")
 
     # Log init message for debugging (session ID is now unified, no need to store)
     if parsed["type"] == "system" && parsed["subtype"] == "init" do
@@ -259,29 +259,29 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
       # Extract text from Claude's content array structure
       content = extract_text_content(parsed)
 
-      Logger.info("🤖 ASSISTANT MESSAGE DETECTED - Content: #{inspect(content)}")
+      Logger.info("Assistant message detected - content: #{inspect(content)}")
 
       # Create inbound message in database (async to avoid blocking GenServer)
       if content && is_binary(content) do
         session_id = session_info.session_id
 
-        Task.start(fn ->
+        Task.Supervisor.start_child(EyeInTheSkyWeb.TaskSupervisor, fn ->
           case Messages.record_incoming_reply(session_id, "claude", content) do
             {:ok, message} ->
               Publisher.publish_message(message)
 
               Logger.info(
-                "✅ Recorded and published assistant message for session #{session_id}"
+                "Recorded and published assistant message for session #{session_id}"
               )
 
             {:error, reason} ->
               Logger.error(
-                "❌ Failed to record assistant message for session #{session_id}: #{inspect(reason)}"
+                "Failed to record assistant message for session #{session_id}: #{inspect(reason)}"
               )
           end
         end)
       else
-        Logger.warning("⚠️  ASSISTANT MESSAGE BUT NO VALID TEXT CONTENT: #{inspect(parsed)}")
+        Logger.warning("Assistant message with no valid text content: #{inspect(parsed)}")
       end
     end
 

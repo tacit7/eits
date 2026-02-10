@@ -351,15 +351,22 @@ defmodule EyeInTheSkyWeb.Sessions do
   Gets counts for all tabs (cheap aggregate queries).
   """
   def get_session_counts(session_id) do
-    alias EyeInTheSkyWeb.{Tasks, Commits, Logs, Notes, Messages}
+    sql = """
+    SELECT
+      (SELECT COUNT(*) FROM task_sessions WHERE session_id = ?1),
+      (SELECT COUNT(*) FROM commits WHERE session_id = ?1),
+      (SELECT COUNT(*) FROM logs WHERE session_id = ?1),
+      (SELECT COUNT(*) FROM notes WHERE parent_type IN ('session','sessions') AND parent_id = ?1),
+      (SELECT COUNT(*) FROM messages WHERE session_id = ?1)
+    """
 
-    %{
-      tasks: Tasks.count_tasks_for_session(session_id),
-      commits: Commits.count_commits_for_session(session_id),
-      logs: Logs.count_logs_for_session(session_id),
-      notes: Notes.count_notes_for_session(session_id),
-      messages: Messages.count_messages_for_session(session_id)
-    }
+    case Repo.query(sql, [session_id]) do
+      {:ok, %{rows: [[tasks, commits, logs, notes, messages]]}} ->
+        %{tasks: tasks, commits: commits, logs: logs, notes: notes, messages: messages}
+
+      _ ->
+        %{tasks: 0, commits: 0, logs: 0, notes: 0, messages: 0}
+    end
   end
 
   @doc """

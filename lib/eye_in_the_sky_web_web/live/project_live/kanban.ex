@@ -247,7 +247,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
             Ready to start working.
             """
 
-            Task.start(fn ->
+            Task.Supervisor.start_child(EyeInTheSkyWeb.TaskSupervisor, fn ->
               SessionManager.start_session(session_id, init_prompt,
                 model: "sonnet",
                 project_path: project.path

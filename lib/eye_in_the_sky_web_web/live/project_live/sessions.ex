@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
 
     prompt = "Start new eits session: session-id #{session_id} agent-id #{agent_id} description: #{description}"
 
-    Task.start(fn ->
+    Task.Supervisor.start_child(EyeInTheSkyWeb.TaskSupervisor, fn ->
       SessionManager.start_session(session_id, prompt,
         model: model,
         project_path: project.path

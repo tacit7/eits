@@ -83,6 +83,16 @@ defmodule EyeInTheSkyWeb.Messages do
   end
 
   @doc """
+  Gets a message by ID, returning {:ok, message} or {:error, :not_found}.
+  """
+  def get_message(id) do
+    case Repo.get(Message, id) do
+      nil -> {:error, :not_found}
+      message -> {:ok, message}
+    end
+  end
+
+  @doc """
   Checks if a message with the given ID exists.
   """
   def message_exists?(id) do
@@ -147,6 +157,15 @@ defmodule EyeInTheSkyWeb.Messages do
           {:new_message, message}
         )
 
+        # Also broadcast to channel topic if this is a channel message
+        if message.channel_id do
+          Phoenix.PubSub.broadcast(
+            EyeInTheSkyWeb.PubSub,
+            "channel:#{message.channel_id}:messages",
+            {:new_message, message}
+          )
+        end
+
         {:ok, message}
 
       error ->
@@ -194,6 +213,15 @@ defmodule EyeInTheSkyWeb.Messages do
           "session:#{message.session_id}",
           {:new_message, message}
         )
+
+        # Also broadcast to channel topic if this is a channel message
+        if message.channel_id do
+          Phoenix.PubSub.broadcast(
+            EyeInTheSkyWeb.PubSub,
+            "channel:#{message.channel_id}:messages",
+            {:new_message, message}
+          )
+        end
 
         {:ok, message}
 

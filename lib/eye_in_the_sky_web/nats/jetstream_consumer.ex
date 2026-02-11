@@ -43,6 +43,14 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
     case decode_body(body) do
       {:ok, decoded} when is_map(decoded) ->
         topic = message.topic || message[:subject] || "unknown"
+
+        # Broadcast to NATS page UI
+        Phoenix.PubSub.broadcast(
+          EyeInTheSkyWeb.PubSub,
+          "nats:events",
+          {:nats_message, topic, decoded}
+        )
+
         process_decoded(decoded, topic)
 
       _ ->
@@ -151,11 +159,23 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
 
   defp handle_v2_channel_message(envelope) do
     message_id = get_in(envelope, ["meta", "message_id"])
+    channel_id = envelope["channel_id"]
 
     if message_id && Messages.message_exists?(message_id) do
-      Logger.debug("JetStreamConsumer: skipping duplicate v2 message #{message_id}")
+      Logger.debug("JetStreamConsumer: duplicate v2 message #{message_id}, broadcasting to UI")
+
+      # Fetch existing message and broadcast to UI
+      case Messages.get_message(message_id) do
+        {:ok, message} ->
+          Phoenix.PubSub.broadcast(
+            EyeInTheSkyWeb.PubSub,
+            "channel:#{channel_id}:messages",
+            {:new_message, message}
+          )
+        _ ->
+          :ok
+      end
     else
-      channel_id = envelope["channel_id"]
       parent_message_id = envelope["parent_message_id"]
       sender_session_id = get_in(envelope, ["meta", "sender_session_id"])
       provider = get_in(envelope, ["meta", "provider"]) || "unknown"

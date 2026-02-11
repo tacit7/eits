@@ -194,14 +194,9 @@ defmodule EyeInTheSkyWeb.Messages do
     }
 
     result =
-      if source_uuid do
-        # Upsert: skip insert if this source_uuid already exists
-        %Message{}
-        |> Message.changeset(attrs)
-        |> Repo.insert(
-          on_conflict: :nothing,
-          conflict_target: :source_uuid
-        )
+      if source_uuid && message_exists_by_source_uuid?(source_uuid) do
+        # Already recorded, return existing message
+        {:ok, Repo.get_by!(Message, source_uuid: source_uuid)}
       else
         create_message(attrs)
       end

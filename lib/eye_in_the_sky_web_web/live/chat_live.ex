@@ -10,12 +10,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   @impl true
   def mount(_params, _session, socket) do
     session_id = ensure_web_session()
-
-    {:ok,
-     socket
-     |> assign(:session_id, session_id)
-     |> assign(:working_sessions, %{})
-     |> assign(:subscribed_sessions, MapSet.new())}
+    {:ok, assign(socket, :session_id, session_id)}
   end
 
   defp ensure_web_session do
@@ -106,10 +101,9 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       Prompts.list_prompts(project_id: project_id)
       |> serialize_prompts()
 
-    # Load active sessions for @ autocomplete (exclude web UI session)
+    # Load active sessions for @ autocomplete
     active_agents =
       Sessions.list_active_sessions()
-      |> Enum.reject(&(&1.uuid == @web_session_uuid))
       |> EyeInTheSkyWeb.Repo.preload(:agent)
       |> Enum.map(fn session ->
         %{
@@ -197,19 +191,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
             latest_seq = EyeInTheSkyWeb.NATS.Reader.get_latest_sequence(channel_id)
             start_from = max(0, latest_seq - 10)
 
-            prompt_with_reminder = """
-            REMINDER: Use i-chat-send MCP tool to send your response to the channel.
-
-            Channel context available via NATS:
-            - Channel ID: #{channel_id}
-            - Latest NATS sequence: #{latest_seq}
-            - Replay from sequence: #{start_from} (last 10 messages)
-
-            To see recent channel history, use:
-            i-nats-listen with session_id="#{session.uuid}" and last_sequence=#{start_from}
-
-            New message: #{body}
-            """
+            prompt_with_reminder = "eits-chat: channel:#{channel_id} seq:#{latest_seq} msg:#{body}"
 
             case EyeInTheSkyWeb.Claude.SessionManager.resume_session(
                    session.uuid,
@@ -218,7 +200,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
                    project_path: project_path
                  ) do
               {:ok, _session_ref} ->
-                socket = subscribe_session_status(socket, session.uuid, target_id)
                 {:noreply, socket}
 
               {:error, reason} ->
@@ -234,7 +215,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       end
     end
   end
-
 
   @impl true
   def handle_event("send_channel_message", %{"channel_id" => channel_id, "body" => body}, socket) do
@@ -528,23 +508,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   end
 
   @impl true
-  def handle_info({:session_status, session_uuid, status}, socket) do
-    working =
-      case status do
-        :working ->
-          socket.assigns.working_sessions
-
-        s when s in [:idle, :error, :queue_full] ->
-          Map.delete(socket.assigns.working_sessions, session_uuid)
-
-        _ ->
-          socket.assigns.working_sessions
-      end
-
-    {:noreply, assign(socket, :working_sessions, working)}
-  end
-
-  @impl true
   def render(assigns) do
     ~H"""
     <.live_component module={EyeInTheSkyWebWeb.Components.Navbar} id="navbar" />
@@ -560,8 +523,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
             activeThread: @active_thread,
             agentStatusCounts: @agent_status_counts,
             prompts: @prompts,
-            activeAgents: @active_agents,
-            workingSessions: Map.values(@working_sessions)
+            activeAgents: @active_agents
           }
         }
         socket={@socket}
@@ -637,23 +599,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
   defp get_session_id(socket) do
     socket.assigns[:session_id]
-  end
-
-  defp subscribe_session_status(socket, session_uuid, session_int_id) do
-    socket =
-      if connected?(socket) && !MapSet.member?(socket.assigns.subscribed_sessions, session_uuid) do
-        Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session_uuid}:status")
-
-        assign(
-          socket,
-          :subscribed_sessions,
-          MapSet.put(socket.assigns.subscribed_sessions, session_uuid)
-        )
-      else
-        socket
-      end
-
-    assign(socket, :working_sessions, Map.put(socket.assigns.working_sessions, session_uuid, session_int_id))
   end
 
   defp load_thread(nil), do: nil

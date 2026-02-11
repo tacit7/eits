@@ -130,7 +130,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
 
     Phoenix.PubSub.broadcast(
       EyeInTheSkyWeb.PubSub,
-      "session:#{state.session_id}",
+      "session:#{state.session_int_id}",
       {:claude_complete, state.session_ref, exit_code}
     )
 
@@ -292,7 +292,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
 
     Phoenix.PubSub.broadcast(
       EyeInTheSkyWeb.PubSub,
-      "session:#{state.session_id}",
+      "session:#{state.session_int_id}",
       {:claude_response, state.session_ref, parsed}
     )
 

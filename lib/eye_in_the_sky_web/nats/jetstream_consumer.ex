@@ -150,6 +150,15 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
       %{"op" => "ack"} ->
         Logger.debug("JetStreamConsumer: received ACK: #{inspect(decoded)}")
 
+      %{"message_id" => _, "channel_id" => _, "body" => _} = msg
+      when is_binary(topic) and topic != "unknown" ->
+        # Direct chat message from Go MCP i-chat-send tool
+        if String.starts_with?(topic, "events.chat.message.") do
+          handle_direct_chat_message(msg)
+        else
+          maybe_handle_dm(decoded, topic)
+        end
+
       _ ->
         maybe_handle_dm(decoded, topic)
     end
@@ -161,8 +170,20 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
     message_id = get_in(envelope, ["meta", "message_id"])
     channel_id = envelope["channel_id"]
 
-    if message_id && Messages.message_exists_by_source_uuid?(message_id) do
-      Logger.debug("JetStreamConsumer: duplicate v2 message #{message_id}, skipping")
+    if message_id && Messages.message_exists?(message_id) do
+      Logger.debug("JetStreamConsumer: duplicate v2 message #{message_id}, broadcasting to UI")
+
+      # Fetch existing message and broadcast to UI
+      case Messages.get_message(message_id) do
+        {:ok, message} ->
+          Phoenix.PubSub.broadcast(
+            EyeInTheSkyWeb.PubSub,
+            "channel:#{channel_id}:messages",
+            {:new_message, message}
+          )
+        _ ->
+          :ok
+      end
     else
       parent_message_id = envelope["parent_message_id"]
       sender_session_id = get_in(envelope, ["meta", "sender_session_id"])
@@ -170,7 +191,8 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
       message_body = envelope["msg"]
 
       attrs = %{
-        source_uuid: message_id,
+        id: message_id || Ecto.UUID.generate(),
+        uuid: Ecto.UUID.generate(),
         channel_id: channel_id,
         parent_message_id: parent_message_id,
         session_id: sender_session_id,
@@ -199,12 +221,35 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
     end
   end
 
+  # --- Direct chat messages (from Go MCP i-chat-send) ---
+
+  defp handle_direct_chat_message(payload) do
+    message_id = payload["message_id"]
+    channel_id = payload["channel_id"]
+
+    # Go MCP already inserted this message into the DB with uuid = message_id.
+    # We just need to fetch it and broadcast to PubSub for LiveView updates.
+    case Messages.get_message_by_uuid(message_id) do
+      {:ok, message} ->
+        Logger.info("JetStreamConsumer: broadcasting existing i-chat-send message #{message.id} to LiveView")
+
+        Phoenix.PubSub.broadcast(
+          EyeInTheSkyWeb.PubSub,
+          "channel:#{channel_id}:messages",
+          {:new_message, message}
+        )
+
+      {:error, :not_found} ->
+        Logger.warning("JetStreamConsumer: i-chat-send message not found in DB (uuid=#{message_id}), skipping")
+    end
+  end
+
   # --- V1 session messages ---
 
   defp handle_v1_session_message(envelope) do
     message_id = get_in(envelope, ["meta", "message_id"])
 
-    if message_id && Messages.message_exists_by_source_uuid?(message_id) do
+    if message_id && Messages.message_exists?(message_id) do
       Logger.debug("JetStreamConsumer: skipping duplicate v1 message #{message_id}")
     else
       session_id = envelope["reply_to"]
@@ -249,11 +294,12 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
   defp broadcast_to_dm(session_id, sender_id, message_text, envelope) do
     dedup_id = compute_dedup_id(envelope, sender_id, session_id, message_text)
 
-    if Messages.message_exists_by_source_uuid?(dedup_id) do
+    if Messages.message_exists?(dedup_id) do
       Logger.debug("JetStreamConsumer: skipping duplicate DM #{dedup_id}")
     else
       attrs = %{
-        source_uuid: dedup_id,
+        id: dedup_id,
+        uuid: Ecto.UUID.generate(),
         session_id: session_id,
         sender_role: "agent",
         recipient_role: "user",

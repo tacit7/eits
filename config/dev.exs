@@ -9,7 +9,8 @@ config :eye_in_the_sky_web, EyeInTheSkyWeb.Repo,
   busy_timeout: 5000,
   pool_size: 10,
   stacktrace: true,
-  show_sensitive_data_on_connection_error: true
+  show_sensitive_data_on_connection_error: true,
+  log: false
 
 # For development, we disable any cache and enable
 # debugging and code reloading.
@@ -20,11 +21,7 @@ config :eye_in_the_sky_web, EyeInTheSkyWeb.Repo,
 config :eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  https: [
-    port: 4000,
-    certfile: "priv/cert/selfsigned.pem",
-    keyfile: "priv/cert/selfsigned_key.pem"
-  ],
+  http: [port: 4000],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,

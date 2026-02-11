@@ -111,6 +111,28 @@ defmodule EyeInTheSkyWeb.Messages do
   end
 
   @doc """
+  Gets a message by its source_uuid.
+  Returns {:ok, message} or {:error, :not_found}.
+  """
+  def get_message_by_source_uuid(source_uuid) do
+    case Repo.get_by(Message, source_uuid: source_uuid) do
+      nil -> {:error, :not_found}
+      message -> {:ok, Repo.preload(message, [:session, :reactions])}
+    end
+  end
+
+  @doc """
+  Gets a message by its uuid column.
+  Returns {:ok, message} or {:error, :not_found}.
+  """
+  def get_message_by_uuid(uuid) do
+    case Repo.get_by(Message, uuid: uuid) do
+      nil -> {:error, :not_found}
+      message -> {:ok, Repo.preload(message, [:session, :reactions])}
+    end
+  end
+
+  @doc """
   Returns the most recent source_uuid for a session, used as sync cursor.
   """
   def get_last_source_uuid(session_id) do
@@ -355,16 +377,16 @@ defmodule EyeInTheSkyWeb.Messages do
   Returns the list of messages for a specific channel.
   """
   def list_messages_for_channel(channel_id, opts \\ []) do
-    offset = Keyword.get(opts, :offset, 0)
     limit = Keyword.get(opts, :limit, 100)
 
+    # Get the last N messages by ordering DESC, then reverse for chronological display
     Message
     |> where([m], m.channel_id == ^channel_id and is_nil(m.parent_message_id))
-    |> order_by([m], asc: m.inserted_at)
-    |> offset(^offset)
+    |> order_by([m], desc: m.inserted_at)
     |> limit(^limit)
     |> preload([:reactions, :attachments, :session])
     |> Repo.all()
+    |> Enum.reverse()
   end
 
   @doc """

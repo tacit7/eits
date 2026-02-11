@@ -10,7 +10,13 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   @impl true
   def mount(_params, _session, socket) do
     session_id = ensure_web_session()
-    {:ok, assign(socket, :session_id, session_id)}
+
+    # Subscribe to agent working events once on mount
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
+    end
+
+    {:ok, assign(socket, :session_id, session_id) |> assign(:working_agents, %{})}
   end
 
   defp ensure_web_session do
@@ -133,6 +139,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       |> assign(:agent_status_counts, agent_status_counts)
       |> assign(:prompts, prompts)
       |> assign(:active_agents, active_agents)
+      |> assign(:show_agent_drawer, false)
 
     {:noreply, socket}
   end
@@ -335,6 +342,11 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   end
 
   @impl true
+  def handle_event("toggle_agent_drawer", _params, socket) do
+    {:noreply, assign(socket, :show_agent_drawer, !socket.assigns.show_agent_drawer)}
+  end
+
+  @impl true
   def handle_event("create_channel", _params, socket) do
     # TODO: Open modal or navigate to channel creation page
     {:noreply, put_flash(socket, :info, "Channel creation coming soon")}
@@ -345,13 +357,13 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     %{
       "agent_type" => agent_type,
       "model" => model,
-      "instructions" => instructions,
-      "channel_id" => channel_id
+      "instructions" => instructions
     } = params
 
     prompt_id = params["prompt_id"]
     description = params["description"]
     project_id = socket.assigns.project_id
+    channel_id = socket.assigns.active_channel_id
 
     # Log what we received
     require Logger
@@ -475,7 +487,24 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       end
     end)
 
-    {:noreply, socket}
+    {:noreply, assign(socket, :show_agent_drawer, false)}
+  end
+
+  @impl true
+  def handle_info({:agent_working, _session_uuid, session_int_id}, socket) do
+    require Logger
+    Logger.info("🔔 ChatLive received agent_working for session_int_id=#{session_int_id}")
+    working_agents = Map.put(socket.assigns.working_agents, session_int_id, true)
+    Logger.info("🗂️ Updated working_agents: #{inspect(working_agents)}")
+    {:noreply, assign(socket, :working_agents, working_agents)}
+  end
+
+  @impl true
+  def handle_info({:agent_stopped, _session_uuid, session_int_id}, socket) do
+    require Logger
+    Logger.info("🛑 ChatLive received agent_stopped for session_int_id=#{session_int_id}")
+    working_agents = Map.delete(socket.assigns.working_agents, session_int_id)
+    {:noreply, assign(socket, :working_agents, working_agents)}
   end
 
   @impl true
@@ -523,12 +552,22 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
             activeThread: @active_thread,
             agentStatusCounts: @agent_status_counts,
             prompts: @prompts,
-            activeAgents: @active_agents
+            activeAgents: @active_agents,
+            workingAgents: @working_agents
           }
         }
         socket={@socket}
       />
     </div>
+
+    <.live_component
+      module={EyeInTheSkyWebWeb.Components.NewAgentDrawer}
+      id="new-agent-drawer"
+      show={@show_agent_drawer}
+      toggle_event="toggle_agent_drawer"
+      submit_event="create_agent"
+      prompts={@prompts}
+    />
     """
   end
 
@@ -568,7 +607,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   defp get_project_id_for_jsonl(socket) do
     # For JSONL storage, use channel_id as the project identifier
     # (Claude Code uses path-based project IDs, not database IDs)
-    socket.assigns.active_channel_id || "default"
+    to_string(socket.assigns.active_channel_id || "default")
   end
 
   defp get_default_channel_id(channels, _project_id) do

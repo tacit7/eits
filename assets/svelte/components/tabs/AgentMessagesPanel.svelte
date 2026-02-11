@@ -14,18 +14,16 @@
   export let agentStatusCounts = {}
   export let prompts = []
   export let activeAgents = []
-  export let workingSessions = []
+  export let workingAgents = {}
   export let live
+
+  // Debug working agents
+  $: if (workingAgents) {
+    console.log('🔍 workingAgents updated:', workingAgents)
+    console.log('🔍 workingAgents keys:', Object.keys(workingAgents))
+  }
   let inputValue = ''
   let inputElement
-
-  // Modal state
-  let showAgentModal = false
-  let agentType = 'claude'
-  let agentModel = 'sonnet'
-  let agentDescription = ''
-  let agentInstructions = ''
-  let selectedPromptId = ''
 
   // Autocomplete state
   let showAutocomplete = false
@@ -37,47 +35,14 @@
   let historyIndex = -1
   let currentDraft = ''
 
-  function openAgentModal() {
-    showAgentModal = true
-    agentType = 'claude'
-    agentModel = 'sonnet'
-    agentDescription = ''
-    agentInstructions = ''
-    selectedPromptId = ''
-  }
-
-  function closeAgentModal() {
-    showAgentModal = false
-  }
-
-  function handlePromptChange(e) {
-    selectedPromptId = e.target.value
-    if (selectedPromptId) {
-      const prompt = prompts.find(p => p.id === selectedPromptId)
-      if (prompt && prompt.prompt_text) {
-        agentInstructions = prompt.prompt_text
-      }
-    }
-  }
-
-  function createAgent() {
-    live.pushEvent('create_agent', {
-      agent_type: agentType,
-      model: agentModel,
-      description: agentDescription,
-      instructions: agentInstructions,
-      prompt_id: selectedPromptId || null,
-      channel_id: activeChannelId
-    })
-    closeAgentModal()
+  function openAgentDrawer() {
+    live.pushEvent('toggle_agent_drawer', {})
   }
 
   function handleSessionIdClick(sessionId) {
-    inputValue = `@${sessionId} `
-    showAutocomplete = false
-    if (inputElement) {
-      inputElement.focus()
-    }
+    console.log('🔍 Badge clicked, session_id:', sessionId)
+    // Navigate to DM page for this session
+    window.location.href = `/dm/${sessionId}`
   }
 
   function handleInputChange(e) {
@@ -408,10 +373,14 @@
     font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
     cursor: pointer;
     transition: all 0.15s;
+    position: relative;
+    z-index: 10;
+    pointer-events: auto;
   }
 
   .session-id-badge:hover {
     transform: scale(1.05);
+    background-color: var(--accent-soft);
   }
 
   .input-area {
@@ -516,41 +485,6 @@
     margin-left: auto;
   }
 
-  .typing-indicator {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-  }
-
-  .typing-dots {
-    display: flex;
-    gap: 0.25rem;
-  }
-
-  .typing-dots .dot {
-    width: 6px;
-    height: 6px;
-    background-color: var(--text-tertiary);
-    border-radius: 50%;
-    animation: typing-bounce 1.4s infinite ease-in-out both;
-  }
-
-  .typing-dots .dot:nth-child(1) { animation-delay: -0.32s; }
-  .typing-dots .dot:nth-child(2) { animation-delay: -0.16s; }
-  .typing-dots .dot:nth-child(3) { animation-delay: 0s; }
-
-  @keyframes typing-bounce {
-    0%, 80%, 100% { transform: scale(0); }
-    40% { transform: scale(1); }
-  }
-
-  .typing-text {
-    font-style: italic;
-  }
-
   .empty-state {
     display: flex;
     align-items: center;
@@ -614,7 +548,7 @@
             NATS: Live
           </span>
         </div>
-        <button class="new-agent-btn" on:click={openAgentModal}>
+        <button class="new-agent-btn" on:click={openAgentDrawer}>
           + New Agent
         </button>
       </div>
@@ -625,6 +559,25 @@
       use:autoScroll={{ trigger: messages?.length }}
       class="messages-scroll"
     >
+      <!-- Working Agents Indicator -->
+      {#if workingAgents && Object.keys(workingAgents).length > 0}
+        <div class="alert alert-info mb-3">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6 animate-pulse"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <span>
+            {#each Object.entries(workingAgents) as [sessionId, isWorking]}
+              {#if isWorking}
+                {@const agent = activeAgents.find(a => a.id == sessionId)}
+                {#if agent}
+                  Agent @{sessionId} ({agent.name || agent.description || 'unknown'}) is working...
+                {:else}
+                  Agent @{sessionId} is working...
+                {/if}
+              {/if}
+            {/each}
+          </span>
+        </div>
+      {/if}
+
       {#if messages && messages.length > 0}
         {#each messages as message, idx}
           <!-- Date separator -->
@@ -636,49 +589,50 @@
             </div>
           {/if}
 
-          <!-- Message card -->
-          <div class="card bg-base-100 shadow-sm mb-3 {message.sender_role === 'user' ? 'border-l-4 border-primary' : 'border-l-4 border-base-300'}">
-            <div class="card-body p-4">
-              <div class="flex items-center gap-2 mb-2">
-                <h3 class="card-title text-sm">
-                  {message.sender_role === 'user' ? 'You' : `Agent (${message.provider || 'unknown'})`}
-                </h3>
-                <time class="text-xs opacity-50">{formatTime(message.inserted_at)}</time>
-                {#if message.sender_role === 'agent' && message.session_id}
-                  {@const agent = activeAgents.find(a => a.id === message.session_id)}
-                  <span
-                    class="badge badge-xs badge-outline session-id-badge ml-auto"
-                    on:click={() => handleSessionIdClick(message.session_id)}
-                    on:keydown={(e) => e.key === 'Enter' && handleSessionIdClick(message.session_id)}
-                    role="button"
-                    tabindex="0"
-                    title={agent ? `Session #${message.session_id}` : String(message.session_id)}
-                  >
-                    {agent?.name || message.session_name || `#${message.session_id}`}
-                  </span>
-                {/if}
+          <!-- Message bubble (DM-style) -->
+          <div class="group hover:bg-base-300/30 px-2 py-1.5 -mx-2 rounded mb-1">
+            <div class="flex gap-3">
+              <div class="flex-shrink-0">
+                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
+                  {message.sender_role === 'user' ? 'U' : (message.provider ? message.provider.charAt(0).toUpperCase() : 'A')}
+                </div>
               </div>
-              <p class="text-sm whitespace-pre-wrap">{message.body}</p>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-baseline gap-2">
+                  <span class={"font-semibold text-sm " + (message.sender_role === 'user' ? 'text-primary' : 'text-accent')}>
+                    {message.sender_role === 'user' ? 'You' : (message.provider || 'Agent')}
+                  </span>
+                  <time class="text-xs text-base-content/40">{formatTime(message.inserted_at)}</time>
+                  {#if message.sender_role === 'agent' && message.session_id}
+                    <span
+                      class="text-xs text-base-content/50 font-mono cursor-pointer hover:text-primary transition-colors"
+                      on:click={() => handleSessionIdClick(message.session_id)}
+                      on:keydown={(e) => e.key === 'Enter' && handleSessionIdClick(message.session_id)}
+                      role="button"
+                      tabindex="0"
+                    >
+                      @{message.session_id}
+                    </span>
+                  {/if}
+                  {#if message.sender_role === 'agent' && message.session_id}
+                    {@const agent = activeAgents.find(a => a.id === message.session_id)}
+                    <span
+                      class="badge badge-xs badge-outline session-id-badge ml-auto"
+                      on:click={() => handleSessionIdClick(message.session_id)}
+                      on:keydown={(e) => e.key === 'Enter' && handleSessionIdClick(message.session_id)}
+                      role="button"
+                      tabindex="0"
+                      title={agent ? `Session #${message.session_id}` : String(message.session_id)}
+                    >
+                      {agent?.name || message.session_name || `#${message.session_id}`}
+                    </span>
+                  {/if}
+                </div>
+                <p class="text-sm text-base-content mt-0.5 leading-relaxed whitespace-pre-wrap">{message.body}</p>
+              </div>
             </div>
           </div>
         {/each}
-
-        {#if workingSessions.length > 0}
-          <div class="typing-indicator">
-            <div class="typing-dots">
-              <span class="dot"></span>
-              <span class="dot"></span>
-              <span class="dot"></span>
-            </div>
-            <span class="typing-text">
-              {#each workingSessions as sessionId, idx}
-                {@const agent = activeAgents.find(a => a.id === sessionId)}
-                {agent?.name || `Agent #${sessionId}`}{idx < workingSessions.length - 1 ? ', ' : ''}
-              {/each}
-              {workingSessions.length === 1 ? ' is' : ' are'} working...
-            </span>
-          </div>
-        {/if}
       {:else}
         <div class="empty-state">
           <div class="empty-state-content">
@@ -733,101 +687,4 @@
       </form>
     </div>
   </div>
-
-  <!-- Agent Creation Modal -->
-  {#if showAgentModal}
-    <dialog class="modal modal-open">
-      <div class="modal-box">
-        <h3 class="font-bold text-lg mb-4">Create New Agent</h3>
-
-        <!-- Agent Type -->
-        <div class="form-control w-full mb-4">
-          <label class="label" for="agent-type">
-            <span class="label-text">Agent Type</span>
-          </label>
-          <select id="agent-type" class="select select-bordered w-full" bind:value={agentType}>
-            <option value="claude">Claude</option>
-            <option value="codex">Codex</option>
-          </select>
-        </div>
-
-        <!-- Model -->
-        <div class="form-control w-full mb-4">
-          <label class="label" for="model">
-            <span class="label-text">Model</span>
-          </label>
-          <select id="model" class="select select-bordered w-full" bind:value={agentModel}>
-            {#if agentType === 'claude'}
-              <option value="sonnet">Sonnet</option>
-              <option value="opus">Opus</option>
-              <option value="haiku">Haiku</option>
-            {:else}
-              <option value="gpt-4">GPT-4</option>
-              <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-            {/if}
-          </select>
-        </div>
-
-        <!-- Description/Nickname -->
-        <div class="form-control w-full mb-4">
-          <label class="label" for="description">
-            <span class="label-text">Agent Name / Nickname</span>
-          </label>
-          <input
-            id="description"
-            type="text"
-            class="input input-bordered w-full"
-            placeholder="e.g., Code Reviewer, Bug Fixer, Feature Dev..."
-            bind:value={agentDescription}
-          />
-        </div>
-
-        <!-- Prompt Template -->
-        <div class="form-control w-full mb-4">
-          <label class="label" for="prompt">
-            <span class="label-text">Prompt Template (Optional)</span>
-          </label>
-          <select
-            id="prompt"
-            class="select select-bordered w-full"
-            bind:value={selectedPromptId}
-            on:change={handlePromptChange}
-          >
-            <option value="">-- None (Custom Instructions) --</option>
-            {#each prompts as prompt}
-              <option value={prompt.id}>{prompt.name}</option>
-            {/each}
-          </select>
-          {#if selectedPromptId}
-            <label class="label">
-              <span class="label-text-alt text-info">
-                {prompts.find(p => p.id === selectedPromptId)?.description || ''}
-              </span>
-            </label>
-          {/if}
-        </div>
-
-        <!-- Instructions -->
-        <div class="form-control w-full mb-4">
-          <label class="label" for="instructions">
-            <span class="label-text">Instructions</span>
-          </label>
-          <textarea
-            id="instructions"
-            class="textarea textarea-bordered h-24"
-            placeholder="Enter agent instructions..."
-            bind:value={agentInstructions}
-          ></textarea>
-        </div>
-
-        <div class="modal-action">
-          <button class="btn" on:click={closeAgentModal}>Cancel</button>
-          <button class="btn btn-primary" on:click={createAgent}>Create</button>
-        </div>
-      </div>
-      <form method="dialog" class="modal-backdrop">
-        <button on:click={closeAgentModal}>close</button>
-      </form>
-    </dialog>
-  {/if}
 </div>

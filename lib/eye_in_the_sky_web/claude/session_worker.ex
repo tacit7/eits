@@ -69,6 +69,15 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
         }
 
         Logger.info("SessionWorker started for #{session_id} (ref: #{inspect(session_ref)})")
+
+        # Broadcast agent working state
+        Logger.info("📢 Broadcasting agent_working for session_id=#{session_id}, session_int_id=#{session_int_id}")
+        Phoenix.PubSub.broadcast(
+          EyeInTheSkyWeb.PubSub,
+          "agent:working",
+          {:agent_working, session_id, session_int_id}
+        )
+
         {:ok, state}
 
       {:error, reason} ->
@@ -142,6 +151,15 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
 
   @impl true
   def terminate(_reason, state) do
+    # Broadcast agent stopped state
+    if state[:session_id] && state[:session_int_id] do
+      Phoenix.PubSub.broadcast(
+        EyeInTheSkyWeb.PubSub,
+        "agent:working",
+        {:agent_stopped, state.session_id, state.session_int_id}
+      )
+    end
+
     # Defense-in-depth: close port if still open
     if state[:port] && Port.info(state.port) != nil do
       try do

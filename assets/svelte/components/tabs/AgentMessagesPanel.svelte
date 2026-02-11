@@ -14,6 +14,7 @@
   export let agentStatusCounts = {}
   export let prompts = []
   export let activeAgents = []
+  export let workingSessions = []
   export let live
   let inputValue = ''
   let inputElement
@@ -515,6 +516,41 @@
     margin-left: auto;
   }
 
+  .typing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+
+  .typing-dots {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  .typing-dots .dot {
+    width: 6px;
+    height: 6px;
+    background-color: var(--text-tertiary);
+    border-radius: 50%;
+    animation: typing-bounce 1.4s infinite ease-in-out both;
+  }
+
+  .typing-dots .dot:nth-child(1) { animation-delay: -0.32s; }
+  .typing-dots .dot:nth-child(2) { animation-delay: -0.16s; }
+  .typing-dots .dot:nth-child(3) { animation-delay: 0s; }
+
+  @keyframes typing-bounce {
+    0%, 80%, 100% { transform: scale(0); }
+    40% { transform: scale(1); }
+  }
+
+  .typing-text {
+    font-style: italic;
+  }
+
   .empty-state {
     display: flex;
     align-items: center;
@@ -626,6 +662,23 @@
             </div>
           </div>
         {/each}
+
+        {#if workingSessions.length > 0}
+          <div class="typing-indicator">
+            <div class="typing-dots">
+              <span class="dot"></span>
+              <span class="dot"></span>
+              <span class="dot"></span>
+            </div>
+            <span class="typing-text">
+              {#each workingSessions as sessionId, idx}
+                {@const agent = activeAgents.find(a => a.id === sessionId)}
+                {agent?.name || `Agent #${sessionId}`}{idx < workingSessions.length - 1 ? ', ' : ''}
+              {/each}
+              {workingSessions.length === 1 ? ' is' : ' are'} working...
+            </span>
+          </div>
+        {/if}
       {:else}
         <div class="empty-state">
           <div class="empty-state-content">

@@ -161,20 +161,8 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
     message_id = get_in(envelope, ["meta", "message_id"])
     channel_id = envelope["channel_id"]
 
-    if message_id && Messages.message_exists?(message_id) do
-      Logger.debug("JetStreamConsumer: duplicate v2 message #{message_id}, broadcasting to UI")
-
-      # Fetch existing message and broadcast to UI
-      case Messages.get_message(message_id) do
-        {:ok, message} ->
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "channel:#{channel_id}:messages",
-            {:new_message, message}
-          )
-        _ ->
-          :ok
-      end
+    if message_id && Messages.message_exists_by_source_uuid?(message_id) do
+      Logger.debug("JetStreamConsumer: duplicate v2 message #{message_id}, skipping")
     else
       parent_message_id = envelope["parent_message_id"]
       sender_session_id = get_in(envelope, ["meta", "sender_session_id"])
@@ -182,7 +170,7 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
       message_body = envelope["msg"]
 
       attrs = %{
-        id: message_id || Ecto.UUID.generate(),
+        source_uuid: message_id,
         channel_id: channel_id,
         parent_message_id: parent_message_id,
         session_id: sender_session_id,
@@ -216,7 +204,7 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
   defp handle_v1_session_message(envelope) do
     message_id = get_in(envelope, ["meta", "message_id"])
 
-    if message_id && Messages.message_exists?(message_id) do
+    if message_id && Messages.message_exists_by_source_uuid?(message_id) do
       Logger.debug("JetStreamConsumer: skipping duplicate v1 message #{message_id}")
     else
       session_id = envelope["reply_to"]
@@ -261,11 +249,11 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
   defp broadcast_to_dm(session_id, sender_id, message_text, envelope) do
     dedup_id = compute_dedup_id(envelope, sender_id, session_id, message_text)
 
-    if Messages.message_exists?(dedup_id) do
+    if Messages.message_exists_by_source_uuid?(dedup_id) do
       Logger.debug("JetStreamConsumer: skipping duplicate DM #{dedup_id}")
     else
       attrs = %{
-        id: dedup_id,
+        source_uuid: dedup_id,
         session_id: session_id,
         sender_role: "agent",
         recipient_role: "user",

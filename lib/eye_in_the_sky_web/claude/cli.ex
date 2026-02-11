@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   def spawn_new_session(prompt, opts \\ []) do
     model = Keyword.get(opts, :model, "sonnet")
     project_path = Keyword.get(opts, :project_path, File.cwd!())
-    output_format = Keyword.get(opts, :output_format, "stream-json")
+    output_format = Keyword.get(opts, :output_format, "json")
     skip_permissions = Keyword.get(opts, :skip_permissions, true)
     caller = Keyword.get(opts, :caller, self())
     session_id = Keyword.get(opts, :session_id)
@@ -237,7 +237,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   defp spawn_with_flag(prompt, flag, opts) do
     model = Keyword.get(opts, :model, "sonnet")
     project_path = Keyword.get(opts, :project_path, File.cwd!())
-    output_format = Keyword.get(opts, :output_format, "stream-json")
+    output_format = Keyword.get(opts, :output_format, "json")
     skip_permissions = Keyword.get(opts, :skip_permissions, true)
     caller = Keyword.get(opts, :caller, self())
     session_id = Keyword.get(opts, :session_id)
@@ -268,18 +268,16 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
             end
           end)
 
-        # Spawn the process using 'script' to provide a pseudo-TTY
-        script_args = ["-q", "/dev/null", claude_path] ++ args
-
+        # Spawn Claude Code directly (no pseudo-TTY wrapper to avoid ANSI escape codes)
         port =
           Port.open(
-            {:spawn_executable, "/usr/bin/script"},
+            {:spawn_executable, claude_path},
             [
               :binary,
               :exit_status,
               :use_stdio,
               :stderr_to_stdout,
-              {:args, script_args},
+              {:args, args},
               {:cd, project_path},
               {:env, build_env()}
             ]

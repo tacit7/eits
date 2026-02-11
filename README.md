@@ -9,6 +9,10 @@ Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
 
 Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
 
+## Documentation
+
+* [Chat @mention Workflow](docs/chat-mention-workflow.md) - Complete technical flow for agent @mentions in EITS chat
+
 ## Learn more
 
 * Official website: https://www.phoenixframework.org/

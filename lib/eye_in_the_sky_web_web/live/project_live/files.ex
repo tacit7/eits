@@ -75,6 +75,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
             {:ok, files} ->
               file_list =
                 files
+                |> Enum.filter(fn file ->
+                  file_path = Path.join(full_path, file)
+                  File.dir?(file_path) or !is_binary_file?(file_path)
+                end)
                 |> Enum.map(fn file ->
                   file_path = Path.join(full_path, file)
 
@@ -149,6 +153,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
         {:ok, files} ->
           file_list =
             files
+            |> Enum.filter(fn file ->
+              file_path = Path.join(project.path, file)
+              # Filter out binary files, but keep directories
+              File.dir?(file_path) or !is_binary_file?(file_path)
+            end)
             |> Enum.map(fn file ->
               file_path = Path.join(project.path, file)
 
@@ -185,8 +194,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
         {:ok, files} ->
           files
           |> Enum.filter(fn file ->
-            # Filter out common ignored directories/files
-            !String.starts_with?(file, ".") or file in [".claude", ".git"]
+            full_path = Path.join(current_path, file)
+            # Filter out common ignored directories/files and binary files
+            (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
+            (File.dir?(full_path) or !is_binary_file?(full_path))
           end)
           |> Enum.map(fn file ->
             full_path = Path.join(current_path, file)
@@ -223,6 +234,29 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
       {:ok, %{size: size}} -> format_size(size)
       _ -> ""
     end
+  end
+
+  defp is_binary_file?(path) do
+    # Common binary file extensions
+    binary_extensions = [
+      # Executables and libraries
+      ".so", ".dll", ".dylib", ".exe", ".bin", ".o", ".a", ".lib",
+      # Archives
+      ".zip", ".tar", ".gz", ".bz2", ".xz", ".7z", ".rar",
+      # Images
+      ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".ico", ".svg", ".webp",
+      # Media
+      ".mp3", ".mp4", ".avi", ".mov", ".mkv", ".wav", ".flac",
+      # Documents
+      ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+      # Databases
+      ".db", ".sqlite", ".sqlite3", ".db-shm", ".db-wal",
+      # Others
+      ".wasm", ".beam", ".class", ".jar", ".war"
+    ]
+
+    extension = path |> Path.extname() |> String.downcase()
+    Enum.member?(binary_extensions, extension)
   end
 
   defp format_size(size) when size < 1024, do: "#{size} B"

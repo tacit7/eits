@@ -685,7 +685,8 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       status: message.status,
       inserted_at: message.inserted_at,
       thread_reply_count: message.thread_reply_count || 0,
-      reactions: serialize_reactions(message)
+      reactions: serialize_reactions(message),
+      metadata: message.metadata || %{}
     }
   end
 

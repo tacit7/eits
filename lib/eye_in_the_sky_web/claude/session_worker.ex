@@ -107,13 +107,19 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
   def handle_info({:claude_output, _ref, line}, state) do
     Logger.debug("Raw Claude line: #{line}")
 
-    case Jason.decode(line) do
+    # Strip ANSI escape codes before parsing
+    clean_line = strip_ansi_codes(line)
+
+    case Jason.decode(clean_line) do
       {:ok, parsed} ->
         handle_parsed_output(parsed, state)
 
       {:error, reason} ->
-        Logger.warning("Failed to parse JSON: #{inspect(reason)} - line: #{line}")
-        updated_buffer = [line | state.output_buffer]
+        # Only log if it's not just empty/whitespace after stripping
+        if String.trim(clean_line) != "" do
+          Logger.warning("Failed to parse JSON: #{inspect(reason)} - clean line: #{clean_line}")
+        end
+        updated_buffer = [clean_line | state.output_buffer]
         {:noreply, %{state | output_buffer: updated_buffer}}
     end
   end
@@ -186,17 +192,80 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
     CLI.resume_session(session_id, prompt, opts)
   end
 
-  defp handle_parsed_output(parsed, state) do
+  defp handle_parsed_output(parsed, state) when is_list(parsed) do
+    Logger.debug("Received list output from Claude (likely tool/system info): #{inspect(parsed)}")
+    # Store in buffer but don't try to extract message content
+    updated_buffer = [parsed | state.output_buffer]
+    {:noreply, %{state | output_buffer: updated_buffer}}
+  end
+
+  defp handle_parsed_output(parsed, state) when is_map(parsed) do
     Logger.info("Parsed Claude output: #{inspect(parsed, pretty: true)}")
 
-    if parsed["type"] == "system" && parsed["subtype"] == "init" do
+    # Get type field safely (handles both string and atom keys)
+    type = Map.get(parsed, "type") || Map.get(parsed, :type)
+    subtype = Map.get(parsed, "subtype") || Map.get(parsed, :subtype)
+
+    if type == "system" && subtype == "init" do
       Logger.info("Claude init confirmed for session #{state.session_id}")
     end
 
-    if parsed["type"] == "assistant" || parsed["role"] == "assistant" do
+    # Handle new JSON format: type="result" with structured output
+    result = Map.get(parsed, "result") || Map.get(parsed, :result)
+    if type == "result" && result do
+      content = result
+      message_uuid = Map.get(parsed, "uuid") || Map.get(parsed, :uuid)
+
+      # Log the full JSON to debug metadata extraction
+      Logger.info("🔍 DEBUG - Full parsed JSON keys: #{inspect(Map.keys(parsed))}")
+      Logger.info("🔍 DEBUG - Full parsed content: #{inspect(parsed, pretty: true)}")
+
+      # Extract usage metadata for chat display (handle both string and atom keys)
+      metadata = %{
+        duration_ms: Map.get(parsed, "duration_ms") || Map.get(parsed, :duration_ms),
+        duration_api_ms: Map.get(parsed, "duration_api_ms") || Map.get(parsed, :duration_api_ms),
+        num_turns: Map.get(parsed, "num_turns") || Map.get(parsed, :num_turns),
+        total_cost_usd: Map.get(parsed, "total_cost_usd") || Map.get(parsed, :total_cost_usd),
+        usage: Map.get(parsed, "usage") || Map.get(parsed, :usage),
+        model_usage: Map.get(parsed, "modelUsage") || Map.get(parsed, :modelUsage),
+        is_error: Map.get(parsed, "is_error") || Map.get(parsed, :is_error)
+      }
+
+      Logger.info("🔍 DEBUG - Extracted metadata: #{inspect(metadata)}")
+
+      cost = Map.get(parsed, "total_cost_usd") || Map.get(parsed, :total_cost_usd)
+      Logger.info("Result message detected - uuid: #{inspect(message_uuid)}, cost: $#{cost}")
+
+      if content && is_binary(content) && state.session_int_id do
+        session_int_id = state.session_int_id
+        opts = [
+          source_uuid: message_uuid,
+          metadata: metadata
+        ]
+
+        Task.Supervisor.start_child(EyeInTheSkyWeb.TaskSupervisor, fn ->
+          case Messages.record_incoming_reply(session_int_id, "claude", content, opts) do
+            {:ok, message} ->
+              Publisher.publish_message(message)
+              Logger.info("Recorded and published result message for session #{state.session_id}")
+
+            {:error, reason} ->
+              Logger.error(
+                "Failed to record result message for session #{state.session_id}: #{inspect(reason)}"
+              )
+          end
+        end)
+      else
+        Logger.warning("Result message with no valid text content: #{inspect(parsed)}")
+      end
+    end
+
+    # Handle legacy stream-json format for backwards compatibility
+    role = Map.get(parsed, "role") || Map.get(parsed, :role)
+    if type == "assistant" || role == "assistant" do
       content = extract_text_content(parsed)
-      message_uuid = parsed["uuid"]
-      Logger.info("Assistant message detected - uuid: #{inspect(message_uuid)}, content: #{inspect(content)}")
+      message_uuid = Map.get(parsed, "uuid") || Map.get(parsed, :uuid)
+      Logger.info("Assistant message detected (legacy) - uuid: #{inspect(message_uuid)}")
 
       if content && is_binary(content) && state.session_int_id do
         session_int_id = state.session_int_id
@@ -230,18 +299,21 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
     {:noreply, %{state | output_buffer: updated_buffer}}
   end
 
-  defp extract_text_content(parsed) do
+  defp extract_text_content(parsed) when is_map(parsed) do
     cond do
-      message = parsed["message"] ->
-        extract_from_content_array(message["content"])
+      message = Map.get(parsed, "message") || Map.get(parsed, :message) ->
+        content_field = Map.get(message, "content") || Map.get(message, :content)
+        extract_from_content_array(content_field)
 
-      content = parsed["content"] ->
+      content = Map.get(parsed, "content") || Map.get(parsed, :content) ->
         extract_from_content_array(content)
 
       true ->
-        parsed["text"] || parsed["body"]
+        Map.get(parsed, "text") || Map.get(parsed, :text) || Map.get(parsed, "body") || Map.get(parsed, :body)
     end
   end
+
+  defp extract_text_content(_), do: nil
 
   defp extract_from_content_array(content) when is_list(content) do
     content
@@ -266,4 +338,14 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
   end
 
   defp extract_from_content_array(_), do: nil
+
+  defp strip_ansi_codes(text) when is_binary(text) do
+    # Remove ANSI escape sequences: CSI sequences (\e[...m), OSC sequences (\e]...\a), etc.
+    text
+    |> String.replace(~r/\e\[[0-9;]*[a-zA-Z]/, "")
+    |> String.replace(~r/\e\][^\a]*\a/, "")
+    |> String.replace(~r/\e[^[\]]*/, "")
+  end
+
+  defp strip_ansi_codes(text), do: text
 end

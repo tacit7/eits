@@ -119,8 +119,8 @@
       }
     }
 
-    // Handle message history navigation (up/down arrows when autocomplete is NOT shown)
-    if (e.key === 'ArrowUp') {
+    // Handle message history navigation (up/down arrows or Ctrl+P/N when autocomplete is NOT shown)
+    if (e.key === 'ArrowUp' || (e.ctrlKey && e.key === 'p')) {
       e.preventDefault()
       if (messageHistory.length === 0) return
 
@@ -134,7 +134,7 @@
         historyIndex++
         inputValue = messageHistory[historyIndex]
       }
-    } else if (e.key === 'ArrowDown') {
+    } else if (e.key === 'ArrowDown' || (e.ctrlKey && e.key === 'n')) {
       e.preventDefault()
       if (historyIndex === -1) return
 
@@ -629,6 +629,27 @@
                   {/if}
                 </div>
                 <p class="text-sm text-base-content mt-0.5 leading-relaxed whitespace-pre-wrap">{message.body}</p>
+
+                <!-- Usage metadata for agent messages -->
+                {#if message.sender_role === 'agent' && message.metadata && message.metadata.total_cost_usd}
+                  <div class="text-xs text-base-content/60 mt-2 flex gap-3 flex-wrap">
+                    {#if message.metadata.total_cost_usd}
+                      <span title="Total cost">${message.metadata.total_cost_usd.toFixed(4)}</span>
+                    {/if}
+                    {#if message.metadata.usage?.input_tokens}
+                      <span title="Input tokens">{message.metadata.usage.input_tokens} in</span>
+                    {/if}
+                    {#if message.metadata.usage?.output_tokens}
+                      <span title="Output tokens">{message.metadata.usage.output_tokens} out</span>
+                    {/if}
+                    {#if message.metadata.duration_ms}
+                      <span title="Duration">{(message.metadata.duration_ms / 1000).toFixed(1)}s</span>
+                    {/if}
+                    {#if message.metadata.num_turns}
+                      <span title="Number of turns">{message.metadata.num_turns} turns</span>
+                    {/if}
+                  </div>
+                {/if}
               </div>
             </div>
           </div>

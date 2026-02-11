@@ -201,6 +201,7 @@ defmodule EyeInTheSkyWeb.Messages do
   def record_incoming_reply(session_id, provider, body, opts \\ []) do
     id = Keyword.get(opts, :id) || Ecto.UUID.generate()
     source_uuid = Keyword.get(opts, :source_uuid)
+    metadata = Keyword.get(opts, :metadata, %{})
 
     attrs = %{
       id: id,
@@ -212,7 +213,7 @@ defmodule EyeInTheSkyWeb.Messages do
       body: body,
       status: "delivered",
       source_uuid: source_uuid,
-      metadata: %{}
+      metadata: metadata
     }
 
     result =

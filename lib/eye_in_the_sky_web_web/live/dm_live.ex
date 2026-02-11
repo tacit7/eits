@@ -563,6 +563,26 @@ defmodule EyeInTheSkyWebWeb.DmLive do
                           </div>
                           <div id={"msg-body-#{message.id}"} class="dm-markdown text-sm text-base-content mt-0.5 leading-relaxed" phx-hook="MarkdownMessage" data-raw-body={message.body}></div>
 
+                          <%= if message.sender_role == "agent" && message.metadata && message.metadata["total_cost_usd"] do %>
+                            <div class="text-xs text-base-content/60 mt-2 flex gap-3 flex-wrap">
+                              <%= if message.metadata["total_cost_usd"] do %>
+                                <span title="Total cost">$<%= :erlang.float_to_binary(message.metadata["total_cost_usd"], decimals: 4) %></span>
+                              <% end %>
+                              <%= if message.metadata["usage"] && message.metadata["usage"]["input_tokens"] do %>
+                                <span title="Input tokens"><%= message.metadata["usage"]["input_tokens"] %> in</span>
+                              <% end %>
+                              <%= if message.metadata["usage"] && message.metadata["usage"]["output_tokens"] do %>
+                                <span title="Output tokens"><%= message.metadata["usage"]["output_tokens"] %> out</span>
+                              <% end %>
+                              <%= if message.metadata["duration_ms"] do %>
+                                <span title="Duration"><%= :erlang.float_to_binary(message.metadata["duration_ms"] / 1000, decimals: 1) %>s</span>
+                              <% end %>
+                              <%= if message.metadata["num_turns"] do %>
+                                <span title="Number of turns"><%= message.metadata["num_turns"] %> turns</span>
+                              <% end %>
+                            </div>
+                          <% end %>
+
                           <%= if message.attachments && length(message.attachments) > 0 do %>
                             <div class="mt-2 space-y-1">
                               <%= for attachment <- message.attachments do %>

@@ -2,10 +2,10 @@ defmodule EyeInTheSkyWeb.Channels.Channel do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, :string, autogenerate: false}
-  @foreign_key_type :string
+  @primary_key {:id, :id, autogenerate: true}
 
   schema "channels" do
+    field :uuid, :string
     field :name, :string
     field :description, :string
     field :channel_type, :string, default: "public"
@@ -23,7 +23,7 @@ defmodule EyeInTheSkyWeb.Channels.Channel do
   def changeset(channel, attrs) do
     channel
     |> cast(attrs, [
-      :id,
+      :uuid,
       :name,
       :description,
       :channel_type,
@@ -33,7 +33,7 @@ defmodule EyeInTheSkyWeb.Channels.Channel do
       :inserted_at,
       :updated_at
     ])
-    |> validate_required([:id, :name, :channel_type])
+    |> validate_required([:name, :channel_type])
     |> validate_inclusion(:channel_type, ["public", "private", "dm"])
     |> unique_constraint([:project_id, :name], name: :channels_project_id_name_index)
   end

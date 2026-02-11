@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       Enum.filter(sessions, fn s ->
         haystack =
           [
-            s.id,
+            s.uuid,
             s.name,
             s.agent.description,
             s.agent.project_name
@@ -333,6 +333,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   def render(assigns) do
     ~H"""
     <.live_component module={EyeInTheSkyWebWeb.Components.Navbar} id="navbar" />
+    <EyeInTheSkyWebWeb.Components.OverviewNav.render current_tab={:sessions} />
     <Layouts.flash_group flash={@flash} />
     <div class="px-6 lg:px-8">
       <div class="max-w-7xl mx-auto">
@@ -448,10 +449,10 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                         <!-- Session ID and Status -->
                         <div class="flex items-center gap-3 mb-2">
                           <.link
-                            navigate={~p"/agents/#{session.agent.id}"}
+                            navigate={~p"/dm/#{session.id}"}
                             class="text-sm font-mono text-primary hover:text-primary-focus font-semibold hover:underline"
                           >
-                            {String.slice(session.id, 0..7)}
+                            #{session.id}
                           </.link>
                             <% status_badge =
                               case {session.status, session.ended_at} do
@@ -488,13 +489,13 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                               <.arrow_top_right_on_square class="w-4 h-4 text-base-content/60" />
                             </a>
                           <% end %>
-                          <%= if session.agent.id && session.id do %>
+                          <%= if session.agent.uuid && session.uuid do %>
                             <button
-                              id={"bookmark-btn-#{session.id}"}
+                              id={"bookmark-btn-#{session.uuid}"}
                               type="button"
                               phx-hook="BookmarkAgent"
-                              data-agent-id={session.agent.id}
-                              data-session-id={session.id}
+                              data-agent-id={session.agent.uuid}
+                              data-session-id={session.uuid}
                               data-agent-name={session.name || session.agent.description || "Agent"}
                               data-agent-status={session.status}
                               class="bookmark-button btn btn-ghost btn-xs text-base-content/40 hover:text-warning transition-colors"
@@ -504,7 +505,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                               <.heart class="bookmark-icon w-4 h-4 text-base-content/60" />
                             </button>
                           <% end %>
-                          <%= if session.id do %>
+                          <%= if session.uuid do %>
                             <%= if session.archived_at do %>
                               <button
                                 type="button"
@@ -523,6 +524,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                                 type="button"
                                 phx-click="archive_session"
                                 phx-value-session_id={session.id}
+
                                 phx-capture-click="true"
                                 class="btn btn-ghost btn-xs text-base-content/40 hover:text-warning transition-colors"
                                 aria-label="Archive session"

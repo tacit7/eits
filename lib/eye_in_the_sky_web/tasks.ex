@@ -64,6 +64,17 @@ defmodule EyeInTheSkyWeb.Tasks do
   end
 
   @doc """
+  Gets a single task by UUID.
+
+  Raises `Ecto.NoResultsError` if the Task does not exist.
+  """
+  def get_task_by_uuid!(uuid) do
+    Task
+    |> preload([:state, :tags, :sessions])
+    |> Repo.get_by!(uuid: uuid)
+  end
+
+  @doc """
   Creates a task.
   """
   def create_task(attrs \\ %{}) do
@@ -115,7 +126,7 @@ defmodule EyeInTheSkyWeb.Tasks do
 
     fallback_query =
       if project_id do
-        where(fallback_query, [t], t.project_id == ^Integer.to_string(project_id))
+        where(fallback_query, [t], t.project_id == ^project_id)
       else
         fallback_query
       end
@@ -126,9 +137,9 @@ defmodule EyeInTheSkyWeb.Tasks do
       fts_table: "task_search",
       schema: Task,
       query: query,
-      join_key: "task_id",
+      join_key: "rowid",
       sql_filter: if(project_id, do: "AND t.project_id = ?", else: ""),
-      sql_params: if(project_id, do: [Integer.to_string(project_id)], else: []),
+      sql_params: if(project_id, do: [project_id], else: []),
       fallback_query: fallback_query,
       preload: [:state, :tags]
     )

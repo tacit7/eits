@@ -79,10 +79,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("open_task_detail", %{"task_id" => task_id}, socket) do
-    task = Tasks.get_task!(task_id)
+    task = Tasks.get_task_by_uuid!(task_id)
 
     # Load notes for this task (handles both "task" and "tasks" parent_type)
-    notes = Notes.list_notes_for_task(task_id)
+    notes = Notes.list_notes_for_task(task.id)
 
     socket =
       socket
@@ -158,12 +158,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("delete_task", %{"task_id" => task_id}, socket) do
-    task = Tasks.get_task!(task_id)
+    task = Tasks.get_task_by_uuid!(task_id)
 
     # Delete related records first to avoid foreign key constraint errors
-    Repo.query("DELETE FROM task_tags WHERE task_id = ?", [task_id])
-    Repo.query("DELETE FROM task_sessions WHERE task_id = ?", [task_id])
-    Repo.query("DELETE FROM commit_tasks WHERE task_id = ?", [task_id])
+    Repo.query("DELETE FROM task_tags WHERE task_id = ?", [task.id])
+    Repo.query("DELETE FROM task_sessions WHERE task_id = ?", [task.id])
+    Repo.query("DELETE FROM commit_tasks WHERE task_id = ?", [task.id])
 
     case Tasks.delete_task(task) do
       {:ok, _} ->
@@ -185,7 +185,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   def handle_event("start_agent_for_task", %{"task_id" => task_id}, socket) do
     alias EyeInTheSkyWeb.{Sessions, Agents, Claude.SessionManager}
 
-    task = Tasks.get_task!(task_id)
+    task = Tasks.get_task_by_uuid!(task_id)
     project = socket.assigns.project
 
     session_id = Ecto.UUID.generate()
@@ -195,27 +195,27 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     task_prompt = "#{task.title}\n\n#{task.description || ""}" |> String.trim()
 
     case Agents.create_agent(%{
-           id: agent_id,
+           uuid: agent_id,
            name: "Agent for: #{String.slice(task.title, 0..40)}",
            description: task_prompt,
            project_id: project.id,
            git_worktree_path: project.path
          }) do
-      {:ok, _agent} ->
+      {:ok, agent} ->
         case Sessions.create_session_with_model(%{
-               id: session_id,
-               agent_id: agent_id,
+               uuid: session_id,
+               agent_id: agent.id,
                name: task.title,
                description: task_prompt,
                started_at: now,
                model_provider: "claude",
                model_name: "sonnet"
              }) do
-          {:ok, _session} ->
+          {:ok, session} ->
             # Link task to session
             Repo.query(
               "INSERT INTO task_sessions (task_id, session_id) VALUES (?, ?)",
-              [task_id, session_id]
+              [task.id, session.id]
             )
 
             init_prompt = """
@@ -287,17 +287,17 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       |> Enum.reject(&(&1 == ""))
 
     # Generate UUID for task
-    task_id = String.upcase(Ecto.UUID.generate())
+    task_uuid = Ecto.UUID.generate()
     now = DateTime.utc_now() |> DateTime.to_iso8601()
 
     # Create task
     case Tasks.create_task(%{
-           id: task_id,
+           uuid: task_uuid,
            title: title,
            description: description,
            state_id: state_id,
            priority: priority,
-           project_id: Integer.to_string(socket.assigns.project_id),
+           project_id: socket.assigns.project_id,
            created_at: now,
            updated_at: now
          }) do

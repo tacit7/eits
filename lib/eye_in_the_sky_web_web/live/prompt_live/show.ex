@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWebWeb.PromptLive.Show do
 
   @impl true
   def handle_params(%{"id" => id}, _url, socket) do
-    prompt = Prompts.get_prompt!(id)
+    prompt = Prompts.get_prompt_by_uuid!(id)
 
     socket =
       socket

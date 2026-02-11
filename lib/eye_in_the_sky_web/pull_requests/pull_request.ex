@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.PullRequests.PullRequest do
   import Ecto.Changeset
 
   schema "pull_requests" do
-    field :session_id, :string
+    field :session_id, :integer
     field :pr_number, :integer
     field :pr_url, :string
     field :base_branch, :string
@@ -12,7 +12,7 @@ defmodule EyeInTheSkyWeb.PullRequests.PullRequest do
     belongs_to :session, EyeInTheSkyWeb.Sessions.Session,
       define_field: false,
       foreign_key: :session_id,
-      type: :string
+      type: :integer
 
     timestamps(inserted_at: :created_at, updated_at: false, type: :utc_datetime)
   end

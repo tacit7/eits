@@ -2,8 +2,9 @@ defmodule EyeInTheSkyWeb.Notes.Note do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, :string, autogenerate: false}
+  @primary_key {:id, :id, autogenerate: true}
   schema "notes" do
+    field :uuid, :string
     field :parent_type, :string
     field :parent_id, :string
     field :title, :string
@@ -15,17 +16,8 @@ defmodule EyeInTheSkyWeb.Notes.Note do
   @doc false
   def changeset(note, attrs) do
     note
-    |> cast(attrs, [:id, :parent_type, :parent_id, :title, :body])
-    |> maybe_generate_id()
+    |> cast(attrs, [:uuid, :parent_type, :parent_id, :title, :body])
     |> validate_required([:parent_type, :parent_id, :body])
     |> validate_inclusion(:parent_type, ["session", "task", "agent"])
-  end
-
-  defp maybe_generate_id(changeset) do
-    if get_field(changeset, :id) do
-      changeset
-    else
-      put_change(changeset, :id, Ecto.UUID.generate())
-    end
   end
 end

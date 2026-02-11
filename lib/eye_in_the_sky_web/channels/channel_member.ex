@@ -2,11 +2,12 @@ defmodule EyeInTheSkyWeb.Channels.ChannelMember do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, :binary_id, autogenerate: true}
+  @primary_key {:id, :id, autogenerate: true}
 
   schema "channel_members" do
-    field :agent_id, :string
-    field :session_id, :string
+    field :uuid, :string
+    field :agent_id, :integer
+    field :session_id, :integer
     field :role, :string, default: "member"
     field :joined_at, :utc_datetime
     field :last_read_at, :utc_datetime
@@ -15,9 +16,9 @@ defmodule EyeInTheSkyWeb.Channels.ChannelMember do
     belongs_to :channel, EyeInTheSkyWeb.Channels.Channel,
       define_field: false,
       foreign_key: :channel_id,
-      type: :string
+      type: :integer
 
-    field :channel_id, :string
+    field :channel_id, :integer
 
     timestamps(type: :utc_datetime)
   end

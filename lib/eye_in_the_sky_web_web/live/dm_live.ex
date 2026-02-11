@@ -4,18 +4,25 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   alias EyeInTheSkyWeb.{Sessions, Messages, Tasks, Commits, Logs, Agents, Notes}
 
   @impl true
-  def mount(%{"session_id" => session_id}, _session, socket) do
-    session = Sessions.get_session!(session_id)
+  def mount(%{"session_id" => session_id_param}, _session, socket) do
+    # Accept both integer ID and UUID in URL
+    session = case Integer.parse(session_id_param) do
+      {id, ""} -> Sessions.get_session!(id)
+      _ -> Sessions.get_session_by_uuid!(session_id_param)
+    end
+
     agent = Agents.get_agent!(session.agent_id)
 
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session_id}")
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
+      send(self(), :sync_from_session_file)
     end
 
     socket =
       socket
       |> assign(:page_title, session.name || "Session")
-      |> assign(:session_id, session_id)
+      |> assign(:session_id, session.id)
+      |> assign(:session_uuid, session.uuid)
       |> assign(:agent_id, session.agent_id)
       |> assign(:agent, agent)
       |> assign(:session, session)
@@ -30,7 +37,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         max_file_size: 50_000_000,
         auto_upload: true
       )
-      |> load_tab_data("messages", session_id)
+      |> load_tab_data("messages", session.id)
 
     {:ok, socket}
   end
@@ -106,6 +113,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         session = socket.assigns.session
         agent = socket.assigns.agent
 
+        session_uuid = socket.assigns.session_uuid
+
         case resolve_project_path(session, agent) do
           {:ok, project_path} ->
             Logger.info("🗂️  Resolved project path: #{project_path}")
@@ -113,14 +122,14 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
             result =
               if has_messages do
-                Logger.info("🔄 Resuming Claude session #{session_id}")
-                EyeInTheSkyWeb.Claude.SessionManager.resume_session(session_id, full_body,
+                Logger.info("🔄 Resuming Claude session #{session_uuid}")
+                EyeInTheSkyWeb.Claude.SessionManager.resume_session(session_uuid, full_body,
                   model: "sonnet",
                   project_path: project_path
                 )
               else
-                Logger.info("🆕 Starting new Claude session #{session_id}")
-                EyeInTheSkyWeb.Claude.SessionManager.start_session(session_id, full_body,
+                Logger.info("🆕 Starting new Claude session #{session_uuid}")
+                EyeInTheSkyWeb.Claude.SessionManager.start_session(session_uuid, full_body,
                   model: "sonnet",
                   project_path: project_path
                 )
@@ -180,13 +189,14 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     session = socket.assigns.session
     agent = socket.assigns.agent
     session_id = socket.assigns.session_id
+    session_uuid = socket.assigns.session_uuid
 
     case resolve_project_path(session, agent) do
       {:ok, project_path} ->
         # Use last source_uuid as cursor to only read new messages
         last_uuid = Messages.get_last_source_uuid(session_id)
 
-        case SessionReader.read_messages_after_uuid(session_id, project_path, last_uuid) do
+        case SessionReader.read_messages_after_uuid(session_uuid, project_path, last_uuid) do
           {:ok, raw_messages} ->
             formatted = SessionReader.format_messages(raw_messages)
             now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -208,7 +218,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
                   end
 
                 Messages.create_message(%{
-                  id: Ecto.UUID.generate(),
+                  uuid: Ecto.UUID.generate(),
                   source_uuid: msg.uuid,
                   session_id: session_id,
                   sender_role: sender_role,
@@ -281,6 +291,57 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_info(:sync_from_session_file, socket) do
+    alias EyeInTheSkyWeb.Claude.SessionReader
+
+    session = socket.assigns.session
+    agent = socket.assigns.agent
+    session_id = socket.assigns.session_id
+    session_uuid = socket.assigns.session_uuid
+
+    with {:ok, project_path} <- resolve_project_path(session, agent),
+         last_uuid = Messages.get_last_source_uuid(session_id),
+         {:ok, raw_messages} <- SessionReader.read_messages_after_uuid(session_uuid, project_path, last_uuid) do
+      formatted = SessionReader.format_messages(raw_messages)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      formatted
+      |> Enum.filter(fn msg -> msg.uuid end)
+      |> Enum.each(fn msg ->
+        {sender_role, recipient_role, direction} =
+          case msg.role do
+            "user" -> {"user", "agent", "outbound"}
+            _ -> {"agent", "user", "inbound"}
+          end
+
+        inserted_at =
+          case DateTime.from_iso8601(msg.timestamp) do
+            {:ok, dt, _} -> DateTime.truncate(dt, :second)
+            _ -> now
+          end
+
+        Messages.create_message(%{
+          uuid: Ecto.UUID.generate(),
+          source_uuid: msg.uuid,
+          session_id: session_id,
+          sender_role: sender_role,
+          recipient_role: recipient_role,
+          direction: direction,
+          body: msg.content,
+          status: "delivered",
+          provider: "claude",
+          inserted_at: inserted_at,
+          updated_at: now
+        })
+      end)
+
+      {:noreply, load_tab_data(socket, "messages", session_id)}
+    else
+      _ -> {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_info({:claude_response, session_ref, response}, socket) do
     require Logger
     Logger.info("🤖 Claude response received - ref: #{inspect(session_ref)}, type: #{inspect(response["type"])}")
@@ -312,18 +373,20 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
     Logger.info("Auto-forwarding NATS message to Claude agent for session #{session_id}")
 
+    session_uuid = socket.assigns.session_uuid
+
     case resolve_project_path(session, agent) do
       {:ok, project_path} ->
         has_messages = Messages.count_messages_for_session(session_id) > 1
 
         result =
           if has_messages do
-            EyeInTheSkyWeb.Claude.SessionManager.resume_session(session_id, message_text,
+            EyeInTheSkyWeb.Claude.SessionManager.resume_session(session_uuid, message_text,
               model: "sonnet",
               project_path: project_path
             )
           else
-            EyeInTheSkyWeb.Claude.SessionManager.start_session(session_id, message_text,
+            EyeInTheSkyWeb.Claude.SessionManager.start_session(session_uuid, message_text,
               model: "sonnet",
               project_path: project_path
             )
@@ -405,7 +468,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       <div class="border-b border-base-content/10 mb-6">
         <div class="px-4 py-4">
           <h1 class="text-2xl font-bold"><%= @session.name || "Session" %></h1>
-          <p class="text-sm text-base-content/60">Session ID: <%= @session_id %></p>
+          <p class="text-sm text-base-content/60">Session ID: <%= @session_uuid %></p>
         </div>
 
         <nav class="flex gap-6 px-4 -mb-px">
@@ -584,7 +647,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
                           <div class="flex flex-col gap-1">
                             <h3 class="font-semibold text-sm text-base-content"><%= task.title %></h3>
                             <div class="flex items-center gap-2 text-xs text-base-content/60">
-                              <span class="font-mono"><%= String.slice(task.id || "", 0..7) %></span>
+                              <span class="font-mono"><%= String.slice(task.uuid || to_string(task.id), 0..7) %></span>
                               <%= if task.state do %>
                                 <span>•</span>
                                 <span class="badge badge-sm"><%= task.state.name %></span>
@@ -676,13 +739,13 @@ defmodule EyeInTheSkyWebWeb.DmLive do
                                 <%= note.title || extract_title(note.body) %>
                               </h3>
                               <div class="flex items-center gap-2 text-xs text-base-content/60">
-                                <span class="font-mono"><%= String.slice(note.id || "", 0..7) %></span>
+                                <span class="font-mono"><%= String.slice(note.uuid || to_string(note.id), 0..7) %></span>
                                 <button
                                   type="button"
                                   class="cursor-pointer hover:text-primary transition-colors z-10"
                                   phx-hook="CopyToClipboard"
                                   id={"copy-note-#{note.id}"}
-                                  data-copy={note.id}
+                                  data-copy={note.uuid || to_string(note.id)}
                                   onclick="event.stopPropagation(); event.preventDefault();"
                                 >
                                   <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" />

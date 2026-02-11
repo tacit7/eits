@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWebWeb.PromptLive.Index do
 
   @impl true
   def handle_event("delete", %{"id" => id}, socket) do
-    prompt = Prompts.get_prompt!(id)
+    prompt = Prompts.get_prompt_by_uuid!(id)
 
     case Prompts.deactivate_prompt(prompt) do
       {:ok, _prompt} ->
@@ -81,6 +81,7 @@ defmodule EyeInTheSkyWebWeb.PromptLive.Index do
   def render(assigns) do
     ~H"""
     <.live_component module={EyeInTheSkyWebWeb.Components.Navbar} id="navbar" />
+    <EyeInTheSkyWebWeb.Components.OverviewNav.render current_tab={:prompts} />
     <div class="px-4 sm:px-6 lg:px-8">
       <div class="sm:flex sm:items-center sm:justify-between">
         <div class="sm:flex-auto">
@@ -208,7 +209,7 @@ defmodule EyeInTheSkyWebWeb.PromptLive.Index do
             <% else %>
               <%= for prompt <- @filtered_prompts do %>
                 <tr
-                  phx-click={JS.navigate(~p"/prompts/#{prompt.id}")}
+                  phx-click={JS.navigate(~p"/prompts/#{prompt.uuid}")}
                   class="hover cursor-pointer group"
                 >
                   <td>
@@ -240,7 +241,7 @@ defmodule EyeInTheSkyWebWeb.PromptLive.Index do
                   <td class="text-right">
                     <div class="flex justify-end gap-2">
                       <.link
-                        navigate={~p"/prompts/#{prompt.id}"}
+                        navigate={~p"/prompts/#{prompt.uuid}"}
                         class="btn btn-ghost btn-xs"
                         title="View prompt details"
                       >
@@ -274,7 +275,7 @@ defmodule EyeInTheSkyWebWeb.PromptLive.Index do
                       </button>
                       <button
                         phx-click="delete"
-                        phx-value-id={prompt.id}
+                        phx-value-id={prompt.uuid}
                         class="btn btn-ghost btn-xs text-error"
                         title="Deactivate prompt"
                         data-confirm="Are you sure you want to deactivate this prompt?"

@@ -72,6 +72,7 @@ defmodule EyeInTheSkyWeb.Channels do
 
     create_channel(%{
       id: channel_id,
+      uuid: Ecto.UUID.generate(),
       name: "general",
       description: "Default project channel",
       channel_type: "public",

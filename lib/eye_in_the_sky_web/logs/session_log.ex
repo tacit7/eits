@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.Logs.SessionLog do
   import Ecto.Changeset
 
   schema "session_logs" do
-    field :session_id, :string
+    field :session_id, :integer
     field :level, :string
     field :category, :string
     field :message, :string
@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.Logs.SessionLog do
     belongs_to :session, EyeInTheSkyWeb.Sessions.Session,
       define_field: false,
       foreign_key: :session_id,
-      type: :string
+      type: :integer
   end
 
   @doc false

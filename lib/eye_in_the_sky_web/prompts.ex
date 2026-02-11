@@ -43,6 +43,13 @@ defmodule EyeInTheSkyWeb.Prompts do
   def get_prompt!(id), do: Repo.get!(Prompt, id)
 
   @doc """
+  Gets a single prompt by UUID.
+
+  Raises `Ecto.NoResultsError` if the Prompt does not exist.
+  """
+  def get_prompt_by_uuid!(uuid), do: Repo.get_by!(Prompt, uuid: uuid)
+
+  @doc """
   Gets a single prompt by slug.
   Returns nil if not found.
   """

@@ -2,18 +2,19 @@ defmodule EyeInTheSkyWeb.Messages.MessageReaction do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, :binary_id, autogenerate: true}
+  @primary_key {:id, :id, autogenerate: true}
 
   schema "message_reactions" do
-    field :session_id, :string
+    field :uuid, :string
+    field :session_id, :integer
     field :emoji, :string
 
     belongs_to :message, EyeInTheSkyWeb.Messages.Message,
       define_field: false,
       foreign_key: :message_id,
-      type: :string
+      type: :integer
 
-    field :message_id, :string
+    field :message_id, :integer
 
     timestamps(type: :utc_datetime, updated_at: false)
   end

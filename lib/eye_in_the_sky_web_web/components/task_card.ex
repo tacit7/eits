@@ -62,7 +62,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
             end
         }
         phx-click={@on_click}
-        phx-value-task_id={@task.id}
+        phx-value-task_id={@task.uuid}
       >
         {@task.title}
       </h4>
@@ -83,14 +83,14 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
     <!-- Meta Info -->
     <div class="flex items-center gap-2 text-xs text-base-content/50 flex-wrap">
       <span class="font-mono text-xs">
-        {String.slice(@task.id, 0..7)}
+        {String.slice(@task.uuid, 0..7)}
       </span>
       <button
         type="button"
         class="cursor-pointer hover:text-primary transition-colors z-10"
         phx-hook="CopyToClipboard"
         id={"copy-task-kanban-#{@task.id}"}
-        data-copy={@task.id}
+        data-copy={@task.uuid}
         onclick="event.stopPropagation(); event.preventDefault();"
       >
         <.icon name="hero-clipboard-document" class="w-3 h-3" />
@@ -112,7 +112,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
               d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"
             />
           </svg>
-          {String.slice(@task.agent_id, 0..7)}
+          Agent #{@task.agent_id}
         </span>
       <% end %>
       <%= if @task.tags && length(@task.tags) > 0 do %>
@@ -134,7 +134,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
         <h3
           class="text-base font-semibold text-base-content hover:text-primary transition-colors line-clamp-2 cursor-pointer"
           phx-click={@on_click}
-          phx-value-task_id={@task.id}
+          phx-value-task_id={@task.uuid}
         >
           {@task.title}
         </h3>
@@ -161,14 +161,14 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
     <!-- Task Metadata -->
     <div class="flex flex-wrap items-center gap-2 mt-auto pt-3 border-t border-base-300">
       <span class="badge badge-ghost badge-sm font-mono text-xs">
-        {String.slice(@task.id, 0..7)}
+        {String.slice(@task.uuid, 0..7)}
       </span>
       <button
         type="button"
         class="cursor-pointer hover:text-primary transition-colors z-10"
         phx-hook="CopyToClipboard"
         id={"copy-task-grid-#{@task.id}"}
-        data-copy={@task.id}
+        data-copy={@task.uuid}
         onclick="event.stopPropagation(); event.preventDefault();"
       >
         <.icon name="hero-clipboard-document" class="w-3 h-3" />

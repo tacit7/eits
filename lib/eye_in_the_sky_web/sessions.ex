@@ -40,6 +40,27 @@ defmodule EyeInTheSkyWeb.Sessions do
   end
 
   @doc """
+  Gets a single session by UUID.
+
+  Raises `Ecto.NoResultsError` if the Session does not exist.
+  """
+  def get_session_by_uuid!(uuid) do
+    Repo.get_by!(Session, uuid: uuid)
+  end
+
+  @doc """
+  Gets a single session by UUID, returning {:ok, session} or {:error, :not_found}.
+
+  This is the safe version that doesn't raise exceptions.
+  """
+  def get_session_by_uuid(uuid) do
+    case Repo.get_by(Session, uuid: uuid) do
+      nil -> {:error, :not_found}
+      session -> {:ok, session}
+    end
+  end
+
+  @doc """
   Gets a single session, returning {:ok, session} or {:error, :not_found}.
 
   This is the safe version that doesn't raise exceptions.
@@ -284,8 +305,10 @@ defmodule EyeInTheSkyWeb.Sessions do
         limit: ^limit,
         select: %{
           session_id: s.id,
+          session_uuid: s.uuid,
           session_name: s.name,
           agent_id: a.id,
+          agent_uuid: a.uuid,
           agent_description: a.description,
           project_name: p.name,
           started_at: s.started_at,

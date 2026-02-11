@@ -2,15 +2,15 @@ defmodule EyeInTheSkyWeb.Prompts.Prompt do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, :string, autogenerate: false}
-  @foreign_key_type :string
+  @primary_key {:id, :id, autogenerate: true}
 
   schema "subagent_prompts" do
+    field :uuid, :string
     field :name, :string
     field :slug, :string
     field :description, :string
     field :prompt_text, :string
-    field :project_id, :string
+    field :project_id, :integer
     field :active, :boolean, default: true
     field :version, :integer, default: 1
     field :tags, :string
@@ -23,7 +23,7 @@ defmodule EyeInTheSkyWeb.Prompts.Prompt do
   def changeset(prompt, attrs) do
     prompt
     |> cast(attrs, [
-      :id,
+      :uuid,
       :name,
       :slug,
       :description,
@@ -42,13 +42,5 @@ defmodule EyeInTheSkyWeb.Prompts.Prompt do
     |> validate_length(:slug, min: 1, max: 100)
     |> unique_constraint(:slug, name: :idx_subagent_prompts_slug_global)
     |> unique_constraint([:slug, :project_id], name: :idx_subagent_prompts_slug_project)
-    |> maybe_generate_id()
-  end
-
-  defp maybe_generate_id(changeset) do
-    case get_field(changeset, :id) do
-      nil -> put_change(changeset, :id, Ecto.UUID.generate())
-      _ -> changeset
-    end
   end
 end

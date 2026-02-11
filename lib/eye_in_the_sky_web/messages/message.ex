@@ -2,10 +2,10 @@ defmodule EyeInTheSkyWeb.Messages.Message do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, :string, autogenerate: false}
-  @foreign_key_type :string
+  @primary_key {:id, :id, autogenerate: true}
 
   schema "messages" do
+    field :uuid, :string
     field :sender_role, :string
     field :recipient_role, :string
     field :provider, :string
@@ -22,26 +22,26 @@ defmodule EyeInTheSkyWeb.Messages.Message do
     belongs_to :session, EyeInTheSkyWeb.Sessions.Session,
       define_field: false,
       foreign_key: :session_id,
-      type: :string
+      type: :integer
 
     belongs_to :channel, EyeInTheSkyWeb.Channels.Channel,
       define_field: false,
       foreign_key: :channel_id,
-      type: :string
+      type: :integer
 
     belongs_to :parent_message, __MODULE__,
       define_field: false,
       foreign_key: :parent_message_id,
-      type: :string
+      type: :integer
 
     has_many :thread_replies, __MODULE__, foreign_key: :parent_message_id
     has_many :reactions, EyeInTheSkyWeb.Messages.MessageReaction
     has_many :attachments, EyeInTheSkyWeb.Messages.FileAttachment
 
     field :source_uuid, :string
-    field :session_id, :string
-    field :channel_id, :string
-    field :parent_message_id, :string
+    field :session_id, :integer
+    field :channel_id, :integer
+    field :parent_message_id, :integer
     field :inserted_at, :utc_datetime
     field :updated_at, :utc_datetime
   end
@@ -50,7 +50,7 @@ defmodule EyeInTheSkyWeb.Messages.Message do
   def changeset(message, attrs) do
     message
     |> cast(attrs, [
-      :id,
+      :uuid,
       :project_id,
       :session_id,
       :channel_id,
@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWeb.Messages.Message do
       :inserted_at,
       :updated_at
     ])
-    |> validate_required([:id, :sender_role, :direction, :body])
+    |> validate_required([:sender_role, :direction, :body])
     |> validate_inclusion(:direction, ["inbound", "outbound"])
     |> validate_inclusion(:status, ["sent", "delivered", "failed", "pending"])
   end

@@ -3,14 +3,14 @@ defmodule EyeInTheSkyWeb.Commits.Commit do
   import Ecto.Changeset
 
   schema "commits" do
-    field :session_id, :string
+    field :session_id, :integer
     field :commit_hash, :string
     field :commit_message, :string
 
     belongs_to :session, EyeInTheSkyWeb.Sessions.Session,
       define_field: false,
       foreign_key: :session_id,
-      type: :string
+      type: :integer
 
     many_to_many :tasks, EyeInTheSkyWeb.Tasks.Task,
       join_through: "commit_tasks",

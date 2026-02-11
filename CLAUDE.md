@@ -30,40 +30,59 @@ Single SQLite database at `~/.config/eye-in-the-sky/eits.db`. Configured in `con
 
 ### FTS5 Full-Text Search
 
-Two FTS5 virtual tables in eits.db provide full-text search. They do NOT use external content (`content=`); they store their own copy of indexed text. Triggers keep them in sync.
+Three FTS5 virtual tables in eits.db provide full-text search using **external content tables** (stores only the index, not duplicate data). Triggers keep them in sync.
 
-**`sessions_fts`** - Indexes session name, description, agent description, project name.
+**`sessions_fts`** - Indexes session name and description from sessions table.
 
 ```sql
 CREATE VIRTUAL TABLE sessions_fts USING fts5(
-  session_id UNINDEXED, session_name, description,
-  agent_id UNINDEXED, agent_description, project_name
+  name, description,
+  content=sessions,
+  content_rowid=id
 );
 ```
 
 Triggers: `sessions_fts_insert`, `sessions_fts_update`, `sessions_fts_delete`
-- Insert trigger joins agents and projects tables to populate denormalized fields.
-- Update trigger re-queries agent/project via subselects.
-- Delete trigger removes by rowid.
-- Join key: `rowid` (FTS5 implicit rowid matches sessions rowid).
+- Keeps FTS index in sync with sessions table changes
+- Uses external content: FTS5 stores only the index, data lives in sessions table
+- Join key: `rowid` (FTS5 rowid matches sessions.id via content_rowid)
 
-**`task_search`** - Indexes task title and description.
+**`task_search`** - Indexes task title and description from tasks table.
 
 ```sql
 CREATE VIRTUAL TABLE task_search USING fts5(
-    task_id UNINDEXED, title, description, tokenize='porter'
+  title, description,
+  content=tasks,
+  content_rowid=id,
+  tokenize='porter'
 );
 ```
 
 Triggers: `task_search_insert`, `task_search_update`, `task_search_delete`
-- Insert trigger copies task_id, title, description on new task.
-- Update trigger fires on title/description changes; deletes old row, inserts new.
-- Delete trigger removes by task_id.
-- Join key: `task_id` (not rowid, because task IDs are UUIDs).
+- Keeps FTS index in sync with tasks table changes
+- Uses external content: FTS5 stores only the index, data lives in tasks table
+- Join key: `rowid` (FTS5 rowid matches tasks.id via content_rowid)
+
+**`notes_fts`** - Indexes note title and body from notes table.
+
+```sql
+CREATE VIRTUAL TABLE notes_fts USING fts5(
+  title, body,
+  content=notes,
+  content_rowid=id
+);
+```
+
+Triggers: `notes_fts_insert`, `notes_fts_update`, `notes_fts_delete`
+- Keeps FTS index in sync with notes table changes
+- Uses external content: FTS5 stores only the index, data lives in notes table
+- Join key: `rowid` (FTS5 rowid matches notes.id via content_rowid)
 
 ### FTS5.search Module
 
-`lib/eye_in_the_sky_web/search/fts5.ex` provides a reusable search function. Key option: `join_key` specifies which FTS column to join on the main table's `id`. Defaults to `"rowid"`. Task search uses `join_key: "task_id"`.
+`lib/eye_in_the_sky_web/search/fts5.ex` provides a reusable search function. Key option: `join_key` specifies which FTS column to join on the main table's `id`. Defaults to `"rowid"`.
+
+With external content tables, use `join_key: "rowid"` for all FTS5 searches.
 
 If the FTS5 query fails (e.g., table doesn't exist), it falls back to ILIKE.
 

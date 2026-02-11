@@ -2,10 +2,10 @@ defmodule EyeInTheSkyWeb.Agents.Agent do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, :string, autogenerate: false}
-  @foreign_key_type :string
+  @primary_key {:id, :id, autogenerate: true}
 
   schema "agents" do
+    field :uuid, :string
     field :persona_id, :string
     field :source, :string
     field :description, :string
@@ -13,9 +13,9 @@ defmodule EyeInTheSkyWeb.Agents.Agent do
     field :status, :string
     field :bookmarked, :boolean, default: false
     field :git_worktree_path, :string
-    field :session_id, :string
+    field :session_id, :integer
 
-    belongs_to :project, EyeInTheSkyWeb.Projects.Project, type: :integer
+    belongs_to :project, EyeInTheSkyWeb.Projects.Project
 
     has_many :sessions, EyeInTheSkyWeb.Sessions.Session, foreign_key: :agent_id
     has_many :tasks, EyeInTheSkyWeb.Tasks.Task, foreign_key: :agent_id
@@ -29,7 +29,7 @@ defmodule EyeInTheSkyWeb.Agents.Agent do
   def changeset(agent, attrs) do
     agent
     |> cast(attrs, [
-      :id,
+      :uuid,
       :persona_id,
       :project_id,
       :source,
@@ -37,6 +37,6 @@ defmodule EyeInTheSkyWeb.Agents.Agent do
       :bookmarked,
       :git_worktree_path
     ])
-    |> validate_required([:id])
+    |> validate_required([])
   end
 end

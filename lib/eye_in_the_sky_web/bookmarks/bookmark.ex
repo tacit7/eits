@@ -2,8 +2,9 @@ defmodule EyeInTheSkyWeb.Bookmarks.Bookmark do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, :binary_id, autogenerate: true}
+  @primary_key {:id, :id, autogenerate: true}
   schema "bookmarks" do
+    field :uuid, :string
     field :bookmark_type, :string
     field :bookmark_id, :string
     field :file_path, :string
@@ -15,7 +16,7 @@ defmodule EyeInTheSkyWeb.Bookmarks.Bookmark do
     field :priority, :integer, default: 0
     field :position, :integer
     field :project_id, :integer
-    field :agent_id, :string
+    field :agent_id, :integer
     field :accessed_at, :utc_datetime
 
     timestamps(type: :utc_datetime)

@@ -59,13 +59,10 @@ defmodule EyeInTheSkyWeb.Projects do
 
   @doc """
   Gets tasks for a project.
-  Handles type mismatch: projects.id is INTEGER, tasks.project_id is TEXT.
   """
   def get_project_tasks(project_id) when is_integer(project_id) do
-    project_id_str = Integer.to_string(project_id)
-
     from(t in EyeInTheSkyWeb.Tasks.Task,
-      where: t.project_id == ^project_id_str
+      where: t.project_id == ^project_id
     )
     |> preload([:state, :tags])
     |> Repo.all()

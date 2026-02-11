@@ -2,26 +2,25 @@ defmodule EyeInTheSkyWeb.Tasks.Task do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, :string, autogenerate: false}
-  @foreign_key_type :string
+  @primary_key {:id, :id, autogenerate: true}
 
   schema "tasks" do
-    field :int_id, :integer
+    field :uuid, :string
     field :title, :string
     field :description, :string
     field :priority, :integer, default: 0
     field :due_at, :string
     field :completed_at, :string
     field :archived, :boolean, default: false
-    field :agent_id, :string
+    field :agent_id, :integer
 
     belongs_to :state, EyeInTheSkyWeb.Tasks.WorkflowState, foreign_key: :state_id, type: :integer
-    belongs_to :project, EyeInTheSkyWeb.Projects.Project, foreign_key: :project_id, type: :string
+    belongs_to :project, EyeInTheSkyWeb.Projects.Project, foreign_key: :project_id, type: :integer
 
     belongs_to :agent, EyeInTheSkyWeb.Agents.Agent,
       define_field: false,
       foreign_key: :agent_id,
-      type: :string
+      type: :integer
 
     many_to_many :sessions, EyeInTheSkyWeb.Sessions.Session,
       join_through: "task_sessions",
@@ -46,7 +45,7 @@ defmodule EyeInTheSkyWeb.Tasks.Task do
   def changeset(task, attrs) do
     task
     |> cast(attrs, [
-      :id,
+      :uuid,
       :title,
       :description,
       :state_id,
@@ -59,6 +58,6 @@ defmodule EyeInTheSkyWeb.Tasks.Task do
       :created_at,
       :updated_at
     ])
-    |> validate_required([:id, :title])
+    |> validate_required([:title])
   end
 end

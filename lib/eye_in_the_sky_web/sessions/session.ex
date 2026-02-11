@@ -2,11 +2,11 @@ defmodule EyeInTheSkyWeb.Sessions.Session do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, :string, autogenerate: false}
-  @foreign_key_type :string
+  @primary_key {:id, :id, autogenerate: true}
 
   schema "sessions" do
-    field :agent_id, :string
+    field :uuid, :string
+    field :agent_id, :integer
     field :name, :string
     field :description, :string
     field :status, :string, default: "active"
@@ -26,7 +26,7 @@ defmodule EyeInTheSkyWeb.Sessions.Session do
     belongs_to :agent, EyeInTheSkyWeb.Agents.Agent,
       define_field: false,
       foreign_key: :agent_id,
-      type: :string
+      type: :integer
 
     has_many :logs, EyeInTheSkyWeb.Logs.SessionLog, foreign_key: :session_id
     has_many :commits, EyeInTheSkyWeb.Commits.Commit, foreign_key: :session_id
@@ -41,7 +41,7 @@ defmodule EyeInTheSkyWeb.Sessions.Session do
   def changeset(session, attrs) do
     session
     |> cast(attrs, [
-      :id,
+      :uuid,
       :agent_id,
       :name,
       :status,
@@ -58,7 +58,7 @@ defmodule EyeInTheSkyWeb.Sessions.Session do
       :project_id,
       :git_worktree_path
     ])
-    |> validate_required([:id, :agent_id, :started_at])
+    |> validate_required([:agent_id, :started_at])
     |> validate_inclusion(:status, ["active", "idle", "completed", "failed", "archived"])
   end
 

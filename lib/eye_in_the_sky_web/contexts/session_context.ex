@@ -5,9 +5,9 @@ defmodule EyeInTheSkyWeb.Contexts.SessionContext do
   schema "session_context" do
     field :context, :string
 
-    belongs_to :agent, EyeInTheSkyWeb.Agents.Agent, type: :string
+    belongs_to :agent, EyeInTheSkyWeb.Agents.Agent, type: :integer
     # Note: session_id is not a foreign key in the schema, just a field
-    field :session_id, :string
+    field :session_id, :integer
 
     field :created_at, :string
     field :updated_at, :string

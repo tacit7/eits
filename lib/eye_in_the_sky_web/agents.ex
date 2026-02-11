@@ -168,6 +168,42 @@ defmodule EyeInTheSkyWeb.Agents do
   end
 
   @doc """
+  Gets a single agent by UUID.
+
+  Raises `Ecto.NoResultsError` if the Agent does not exist.
+  """
+  def get_agent_by_uuid!(uuid) do
+    Agent
+    |> preload([:project])
+    |> Repo.get_by!(uuid: uuid)
+    |> populate_project_name()
+  end
+
+  @doc """
+  Gets a single agent by UUID, returning {:ok, agent} or {:error, :not_found}.
+
+  This is the safe version that doesn't raise exceptions.
+  """
+  def get_agent_by_uuid(uuid) do
+    case Agent
+         |> preload([:project])
+         |> Repo.get_by(uuid: uuid) do
+      nil -> {:error, :not_found}
+      agent -> {:ok, populate_project_name(agent)}
+    end
+  end
+
+  @doc """
+  Gets a single agent by UUID with all associations preloaded.
+  """
+  def get_agent_with_associations_by_uuid!(uuid) do
+    Agent
+    |> preload([:sessions, :tasks, :project])
+    |> Repo.get_by!(uuid: uuid)
+    |> populate_project_name()
+  end
+
+  @doc """
   Gets complete dashboard data for an agent.
   Returns agent, sessions, and active session.
   """
@@ -177,6 +213,24 @@ defmodule EyeInTheSkyWeb.Agents do
     agent = get_agent_with_associations!(agent_id)
     sessions = Sessions.list_sessions_for_agent(agent_id)
     # Most recent session
+    active_session = List.first(sessions)
+
+    %{
+      agent: agent,
+      sessions: sessions,
+      active_session: active_session
+    }
+  end
+
+  @doc """
+  Gets complete dashboard data for an agent by UUID.
+  Returns agent, sessions, and active session.
+  """
+  def get_agent_dashboard_data_by_uuid(uuid) do
+    alias EyeInTheSkyWeb.Sessions
+
+    agent = get_agent_with_associations_by_uuid!(uuid)
+    sessions = Sessions.list_sessions_for_agent(agent.id)
     active_session = List.first(sessions)
 
     %{

@@ -14,7 +14,7 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
   def session_card(assigns) do
     ~H"""
     <.link
-      navigate={"/agents/#{@session.agent_id}?s=#{@session.session_id}"}
+      navigate={"/dm/#{@session.session_id}"}
       class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow border border-base-300 hover:border-primary"
     >
       <div class="card-body p-4">
@@ -23,13 +23,13 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
           <div class="flex-1 min-w-0">
             <p class="text-xs text-base-content/60 mb-1">Session ID</p>
             <code class="text-sm font-mono font-semibold text-base-content break-all">
-              {String.slice(@session.session_id, 0..11)}...
+              {String.slice(@session.session_uuid, 0..11)}...
             </code>
           </div>
           <button
             phx-hook="CopyToClipboard"
-            id={"copy-#{@session.session_id}"}
-            data-session-id={@session.session_id}
+            id={"copy-#{@session.session_uuid}"}
+            data-session-id={@session.session_uuid}
             class="btn btn-ghost btn-xs flex-shrink-0"
             onclick="event.preventDefault(); event.stopPropagation();"
           >

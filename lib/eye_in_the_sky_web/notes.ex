@@ -18,21 +18,38 @@ defmodule EyeInTheSkyWeb.Notes do
   @doc """
   Returns notes for a specific session.
   Handles both "session" and "sessions" parent_type for backwards compatibility.
+  Matches on both integer ID (as string) and UUID for migration compatibility.
   """
   def list_notes_for_session(session_id) do
-    Note
-    |> where([n], n.parent_type in ["session", "sessions"] and n.parent_id == ^session_id)
-    |> order_by([n], desc: n.created_at)
-    |> Repo.all()
+    # Get session to access both id and uuid
+    session = Repo.get(EyeInTheSkyWeb.Sessions.Session, session_id)
+
+    if session do
+      Note
+      |> where([n], n.parent_type in ["session", "sessions"] and
+                    (n.parent_id == ^to_string(session_id) or n.parent_id == ^session.uuid))
+      |> order_by([n], desc: n.created_at)
+      |> Repo.all()
+    else
+      []
+    end
   end
 
   @doc """
   Counts notes for a specific session.
+  Matches on both integer ID (as string) and UUID for migration compatibility.
   """
   def count_notes_for_session(session_id) do
-    Note
-    |> where([n], n.parent_type in ["session", "sessions"] and n.parent_id == ^session_id)
-    |> Repo.aggregate(:count, :id)
+    session = Repo.get(EyeInTheSkyWeb.Sessions.Session, session_id)
+
+    if session do
+      Note
+      |> where([n], n.parent_type in ["session", "sessions"] and
+                    (n.parent_id == ^to_string(session_id) or n.parent_id == ^session.uuid))
+      |> Repo.aggregate(:count, :id)
+    else
+      0
+    end
   end
 
   @doc """
@@ -40,21 +57,36 @@ defmodule EyeInTheSkyWeb.Notes do
   Handles both "agent" and "agents" parent_type for backwards compatibility.
   """
   def list_notes_for_agent(agent_id) do
-    Note
-    |> where([n], n.parent_type in ["agent", "agents"] and n.parent_id == ^agent_id)
-    |> order_by([n], desc: n.created_at)
-    |> Repo.all()
+    agent = Repo.get(EyeInTheSkyWeb.Agents.Agent, agent_id)
+
+    if agent do
+      Note
+      |> where([n], n.parent_type in ["agent", "agents"] and
+                    (n.parent_id == ^to_string(agent_id) or n.parent_id == ^agent.uuid))
+      |> order_by([n], desc: n.created_at)
+      |> Repo.all()
+    else
+      []
+    end
   end
 
   @doc """
   Returns notes for a specific task.
   Handles both "task" and "tasks" parent_type for backwards compatibility.
+  Matches on both integer ID (as string) and UUID for migration compatibility.
   """
   def list_notes_for_task(task_id) do
-    Note
-    |> where([n], n.parent_type in ["task", "tasks"] and n.parent_id == ^task_id)
-    |> order_by([n], desc: n.created_at)
-    |> Repo.all()
+    task = Repo.get(EyeInTheSkyWeb.Tasks.Task, task_id)
+
+    if task do
+      Note
+      |> where([n], n.parent_type in ["task", "tasks"] and
+                    (n.parent_id == ^to_string(task_id) or n.parent_id == ^task.uuid))
+      |> order_by([n], desc: n.created_at)
+      |> Repo.all()
+    else
+      []
+    end
   end
 
   @doc """
@@ -94,7 +126,7 @@ defmodule EyeInTheSkyWeb.Notes do
 
   @doc """
   Search notes using FTS5.
-  Requires note_search FTS5 table in database.
+  Requires notes_fts FTS5 table in database.
   """
   def search_notes(query, agent_ids \\ []) when is_binary(query) do
     pattern = "%#{query}%"
@@ -122,9 +154,10 @@ defmodule EyeInTheSkyWeb.Notes do
 
     FTS5.search(
       table: "notes",
-      fts_table: "note_search",
+      fts_table: "notes_fts",
       schema: Note,
       query: query,
+      join_key: "rowid",
       sql_filter: sql_filter,
       sql_params: sql_params,
       fallback_query: fallback_query

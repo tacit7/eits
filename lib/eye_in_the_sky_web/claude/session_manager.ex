@@ -48,27 +48,24 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
     {:ok, %{}}
   end
 
-  # Dedup for :resume - check if a worker already exists for this session
-  @impl true
-  def handle_call({:spawn, :resume, session_id, prompt, opts}, _from, state) do
-    case Registry.lookup(@registry, {:session, session_id}) do
-      [{pid, _}] when is_pid(pid) ->
-        if Process.alive?(pid) do
-          GenServer.cast(pid, {:enqueue_message, prompt, opts})
-          Logger.info("Queued message for existing SessionWorker #{session_id}")
-          {:reply, {:ok, :queued}, state}
-        else
-          spawn_worker(:resume, session_id, prompt, opts, state)
-        end
-
-      [] ->
-        spawn_worker(:resume, session_id, prompt, opts, state)
-    end
-  end
-
   @impl true
   def handle_call({:spawn, spawn_type, session_id, prompt, opts}, _from, state) do
-    spawn_worker(spawn_type, session_id, prompt, opts, state)
+    session_ref = make_ref()
+    opts = Keyword.put(opts, :session_ref, session_ref)
+
+    child_spec =
+      {SessionWorker,
+       %{spawn_type: spawn_type, session_id: session_id, prompt: prompt, opts: opts}}
+
+    case DynamicSupervisor.start_child(@supervisor, child_spec) do
+      {:ok, _pid} ->
+        Logger.info("Spawned SessionWorker for #{session_id} (#{spawn_type})")
+        {:reply, {:ok, session_ref}, state}
+
+      {:error, reason} ->
+        Logger.error("Failed to spawn SessionWorker: #{inspect(reason)}")
+        {:reply, {:error, reason}, state}
+    end
   end
 
   @impl true
@@ -111,26 +108,5 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
   def handle_info(msg, state) do
     Logger.debug("Unhandled message in SessionManager: #{inspect(msg)}")
     {:noreply, state}
-  end
-
-  # --- Private ---
-
-  defp spawn_worker(spawn_type, session_id, prompt, opts, state) do
-    session_ref = make_ref()
-    opts = Keyword.put(opts, :session_ref, session_ref)
-
-    child_spec =
-      {SessionWorker,
-       %{spawn_type: spawn_type, session_id: session_id, prompt: prompt, opts: opts}}
-
-    case DynamicSupervisor.start_child(@supervisor, child_spec) do
-      {:ok, _pid} ->
-        Logger.info("Spawned SessionWorker for #{session_id} (#{spawn_type})")
-        {:reply, {:ok, session_ref}, state}
-
-      {:error, reason} ->
-        Logger.error("Failed to spawn SessionWorker: #{inspect(reason)}")
-        {:reply, {:error, reason}, state}
-    end
   end
 end

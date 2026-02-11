@@ -68,17 +68,19 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
             end
           end)
 
-        # Spawn Claude directly with line-buffered output
+        # Spawn the process using 'script' to provide a pseudo-TTY
+        # macOS: script -q /dev/null command args...
+        script_args = ["-q", "/dev/null", claude_path] ++ args
+
         port =
           Port.open(
-            {:spawn_executable, claude_path},
+            {:spawn_executable, "/usr/bin/script"},
             [
               :binary,
               :exit_status,
               :use_stdio,
               :stderr_to_stdout,
-              {:line, 65536},
-              {:args, args},
+              {:args, script_args},
               {:cd, project_path},
               {:env, build_env()}
             ]
@@ -253,51 +255,39 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
           end
 
         require Logger
-        Logger.info("CLI.spawn_with_flag: #{flag} session=#{session_id} path=#{project_path}")
-        Logger.info("CLI.spawn_with_flag: binary=#{claude_path}")
-        Logger.info("CLI.spawn_with_flag: args=#{inspect(args)}")
+        Logger.debug("Spawning Claude with #{flag} flag in #{project_path}")
 
         session_ref = Keyword.get(opts, :session_ref, make_ref())
 
-        # Spawn output handler
+        # Spawn output handler first
         handler_pid =
           spawn_link(fn ->
-            Logger.info("CLI: Port handler process started, waiting for port assignment")
             receive do
               {:port, port} ->
-                Logger.info("CLI: Port handler got port #{inspect(port)}, entering output loop")
                 handle_port_output(port, session_ref, caller)
-            after
-              10_000 ->
-                Logger.error("CLI: Port handler never received port assignment after 10s")
             end
           end)
 
-        Logger.info("CLI: Opening port for #{claude_path}")
+        # Spawn the process using 'script' to provide a pseudo-TTY
+        script_args = ["-q", "/dev/null", claude_path] ++ args
 
-        # Spawn Claude directly with line-buffered output
         port =
           Port.open(
-            {:spawn_executable, claude_path},
+            {:spawn_executable, "/usr/bin/script"},
             [
               :binary,
               :exit_status,
               :use_stdio,
               :stderr_to_stdout,
-              {:line, 65536},
-              {:args, args},
+              {:args, script_args},
               {:cd, project_path},
               {:env, build_env()}
             ]
           )
 
-        Logger.info("CLI: Port opened: #{inspect(port)}, connecting to handler #{inspect(handler_pid)}")
-
         # Connect port to handler
         Port.connect(port, handler_pid)
         send(handler_pid, {:port, port})
-
-        Logger.info("CLI: Port connected and handler notified, spawn complete")
 
         {:ok, port, session_ref}
 
@@ -349,29 +339,14 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     require Logger
 
     receive do
-      # Line mode: complete line received
-      {^port, {:data, {:eol, line}}} ->
-        full_line = buffer <> line
+      {^port, {:data, data}} ->
+        Logger.debug("Claude output received: #{byte_size(data)} bytes")
 
-        unless full_line == "" do
-          Logger.info("CLI output [eol]: #{String.slice(full_line, 0, 200)}")
-          send(caller, {:claude_output, session_ref, full_line})
-        end
-
-        handle_port_output(port, session_ref, caller, "")
-
-      # Line mode: incomplete line, buffer it
-      {^port, {:data, {:noeol, chunk}}} ->
-        Logger.debug("CLI output [noeol]: #{byte_size(chunk)} bytes buffered")
-        handle_port_output(port, session_ref, caller, buffer <> chunk)
-
-      # Fallback: raw binary data
-      {^port, {:data, data}} when is_binary(data) ->
-        Logger.info("CLI output [raw]: #{byte_size(data)} bytes")
-
+        # Append to buffer and split by newlines
         new_buffer = buffer <> data
         lines = String.split(new_buffer, "\n")
 
+        # Last element is either empty (if data ended with \n) or incomplete line
         {complete_lines, remaining} =
           case List.pop_at(lines, -1) do
             {last, rest} ->
@@ -382,8 +357,10 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
               end
           end
 
+        # Send complete lines
         Enum.each(complete_lines, fn line ->
           unless line == "" do
+            Logger.debug("Claude line: #{line}")
             send(caller, {:claude_output, session_ref, line})
           end
         end)
@@ -391,17 +368,18 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
         handle_port_output(port, session_ref, caller, remaining)
 
       {^port, {:exit_status, status}} ->
+        # Send any remaining buffered content
         unless buffer == "" do
-          Logger.info("CLI final buffered line: #{buffer}")
+          Logger.debug("Claude final line: #{buffer}")
           send(caller, {:claude_output, session_ref, buffer})
         end
 
-        Logger.info("CLI process exited with status #{status}")
+        Logger.info("Claude process exited with status #{status}")
         send(caller, {:claude_exit, session_ref, status})
         :ok
     after
       300_000 ->
-        Logger.warning("CLI: No output after 5 minutes, timing out port=#{inspect(port)}")
+        Logger.warning("No output from Claude after 5 minutes, timing out")
         Port.close(port)
         send(caller, {:claude_exit, session_ref, :timeout})
         :ok

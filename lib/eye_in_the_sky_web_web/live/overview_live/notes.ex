@@ -1,46 +1,20 @@
-defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
+defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Notes
+  alias EyeInTheSkyWeb.Notes.Note
   alias EyeInTheSkyWeb.Repo
   import Ecto.Query
 
   @impl true
-  def mount(%{"id" => id}, _session, socket) do
-    # Parse project ID safely
-    project_id =
-      case Integer.parse(id) do
-        {int, ""} -> int
-        _ -> nil
-      end
-
+  def mount(_params, _session, socket) do
     socket =
-      if project_id do
-        project =
-          Projects.get_project!(project_id)
-          |> Repo.preload([:agents])
-
-        # Load tasks manually due to type mismatch
-        tasks = Projects.get_project_tasks(project_id)
-
-        socket
-        |> assign(:page_title, "Notes - #{project.name}")
-        |> assign(:project, project)
-        |> assign(:tasks, tasks)
-        |> assign(:search_query, "")
-        |> assign(:starred_filter, false)
-        |> assign(:notes, [])
-        |> load_notes()
-      else
-        socket
-        |> assign(:page_title, "Project Not Found")
-        |> assign(:project, nil)
-        |> assign(:tasks, [])
-        |> assign(:search_query, "")
-        |> assign(:notes, [])
-        |> put_flash(:error, "Invalid project ID")
-      end
+      socket
+      |> assign(:page_title, "All Notes")
+      |> assign(:search_query, "")
+      |> assign(:starred_filter, false)
+      |> assign(:notes, [])
+      |> load_notes()
 
     {:ok, socket}
   end
@@ -67,8 +41,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
 
   @impl true
   def handle_event("toggle_star", params, socket) do
-    IO.inspect(params, label: "TOGGLE_STAR_PARAMS")
-
     note_id = params["note_id"] || params["note-id"] || params["value"]
 
     case Notes.toggle_starred(note_id) do
@@ -81,37 +53,18 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
   end
 
   defp load_notes(socket) do
-    project = socket.assigns.project
-    agent_ids = Enum.map(project.agents, & &1.id)
-
-    # Get all session IDs for agents in this project
-    session_ids =
-      from(s in EyeInTheSkyWeb.Sessions.Session,
-        where: s.agent_id in ^agent_ids,
-        select: s.id
-      )
-      |> Repo.all()
-
     query = socket.assigns.search_query
-
     starred_only = socket.assigns.starred_filter
 
     notes =
       if query != "" and String.trim(query) != "" do
-        results = Notes.search_notes(query, agent_ids)
+        results = Notes.search_notes(query)
         if starred_only, do: Enum.filter(results, &(&1.starred == 1)), else: results
       else
-        project_id_str = to_string(project.id)
-        agent_id_strs = Enum.map(agent_ids, &to_string/1)
-        session_id_strs = Enum.map(session_ids, &to_string/1)
-
         base =
-          from(n in EyeInTheSkyWeb.Notes.Note,
-            where:
-              (n.parent_type in ["project", "projects"] and n.parent_id == ^project_id_str) or
-                (n.parent_type in ["agent", "agents"] and n.parent_id in ^agent_id_strs) or
-                (n.parent_type in ["session", "sessions"] and n.parent_id in ^session_id_strs),
-            order_by: [desc: n.created_at]
+          from(n in Note,
+            order_by: [desc: n.created_at],
+            limit: 200
           )
 
         base = if starred_only, do: from(n in base, where: n.starred == 1), else: base
@@ -125,10 +78,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
   def render(assigns) do
     ~H"""
     <style>
-      .collapse input[type="checkbox"] {
-        position: absolute;
-        opacity: 0;
-      }
       .star-icon {
         cursor: pointer;
         transition: all 0.2s ease;
@@ -143,21 +92,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
         transform: scale(1.15);
         background: rgba(0, 0, 0, 0.05);
       }
-      .star-icon:active {
-        transform: scale(1.05);
-      }
     </style>
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.Navbar}
-      id="navbar"
-      current_project={@project}
-    />
-
-    <EyeInTheSkyWebWeb.Components.ProjectNav.render
-      project={@project}
-      tasks={@tasks}
-      current_tab={:notes}
-    />
+    <.live_component module={EyeInTheSkyWebWeb.Components.Navbar} id="navbar" />
+    <EyeInTheSkyWebWeb.Components.OverviewNav.render current_tab={:notes} />
 
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <div class="max-w-6xl mx-auto">
@@ -187,24 +124,26 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
         </div>
 
         <%= if length(@notes) > 0 do %>
-          <!-- Notes Accordion -->
           <div class="join join-vertical w-full">
             <%= for note <- @notes do %>
               <div class="collapse collapse-arrow join-item border border-base-300">
-                <!-- Collapse Title -->
                 <input type="checkbox" />
                 <div class="collapse-title bg-base-100 hover:bg-base-100/80 transition-colors">
                   <div class="flex items-center justify-between">
                     <label class="flex items-center gap-3 flex-1 cursor-pointer">
-                      <.icon name="hero-document-text" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+                      <.icon
+                        name="hero-document-text"
+                        class="w-4 h-4 text-base-content/60 flex-shrink-0"
+                      />
                       <div class="flex flex-col gap-1">
                         <h3 class="font-semibold text-sm text-base-content">
                           {note.title || extract_title(note.body)}
                         </h3>
                         <div class="flex items-center gap-2 text-xs text-base-content/60">
-                          <span class="font-mono">{String.slice(note.parent_id, 0..7)}</span>
+                          <span class="badge badge-ghost badge-xs">{note.parent_type}</span>
+                          <span class="font-mono">{String.slice(note.parent_id || "", 0..7)}</span>
                           <span>•</span>
-                          <span>{format_timestamp(note.created_at)}</span>
+                          <span>{note.created_at}</span>
                         </div>
                       </div>
                     </label>
@@ -222,21 +161,19 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
                     </button>
                   </div>
                 </div>
-                
-    <!-- Collapse Content -->
                 <div class="collapse-content bg-base-50">
                   <div
                     id={"note-body-#{note.id}"}
                     class="dm-markdown text-sm text-base-content leading-relaxed"
                     phx-hook="MarkdownMessage"
                     data-raw-body={note.body}
-                  ></div>
+                  >
+                  </div>
                 </div>
               </div>
             <% end %>
           </div>
         <% else %>
-          <!-- Empty State -->
           <div class="text-center py-12">
             <.icon name="hero-document-text" class="mx-auto h-12 w-12 text-base-content/40" />
             <h3 class="mt-2 text-sm font-medium text-base-content">No notes yet</h3>
@@ -250,14 +187,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
     """
   end
 
-  defp format_timestamp(nil), do: ""
-
-  defp format_timestamp(timestamp) when is_binary(timestamp) do
-    # Timestamp is stored as string, just display it as-is or format as needed
-    timestamp
-  end
-
-  defp extract_title(body) when is_nil(body), do: "Untitled"
+  defp extract_title(nil), do: "Untitled"
 
   defp extract_title(body) when is_binary(body) do
     body

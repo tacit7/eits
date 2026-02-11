@@ -18,8 +18,11 @@ defmodule EyeInTheSkyWebWeb.Router do
     pipe_through :browser
 
     live "/", AgentLive.Index, :index
-    live "/agents/:id/sessions/:session_id", AgentLive.Show, :show
-    live "/agents/:id", AgentLive.Show, :show
+    live "/notes", OverviewLive.Notes, :index
+    live "/tasks", OverviewLive.Tasks, :index
+    live "/usage", OverviewLive.Usage, :index
+    live "/skills", OverviewLive.Skills, :index
+    live "/config", OverviewLive.Config, :index
     live "/sessions", SessionLive.Index, :index
     live "/nats", NatsLive.Index, :index
     live "/prompts", PromptLive.Index, :index
@@ -31,6 +34,7 @@ defmodule EyeInTheSkyWebWeb.Router do
     live "/projects/:id/kanban", ProjectLive.Kanban, :show
     live "/projects/:id/notes", ProjectLive.Notes, :show
     live "/projects/:id/files", ProjectLive.Files, :show
+    live "/projects/:id/config", ProjectLive.Config, :show
     live "/chat", ChatLive, :index
     live "/dm/:session_id", DmLive, :show
   end

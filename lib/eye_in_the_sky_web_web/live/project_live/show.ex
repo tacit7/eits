@@ -135,7 +135,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
                       <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2 mb-1">
                           <code class="text-xs font-mono text-base-content/70">
-                            {String.slice(session.id, 0..7)}
+                            {String.slice(session.uuid || to_string(session.id), 0..7)}
                           </code>
                           <span class="text-sm text-base-content/80 truncate">
                             {session.name || session.agent.description || "Unnamed"}
@@ -146,7 +146,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
                         <button
                           type="button"
                           phx-click="send_direct_message"
-                          phx-value-session_id={session.id}
+                          phx-value-session_id={session.uuid}
                           class="btn btn-ghost btn-xs text-base-content/60 hover:text-primary transition-colors"
                           title="Direct message"
                           onclick="event.stopPropagation()"

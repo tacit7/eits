@@ -1,0 +1,6 @@
+[     404ms] [WARNING] %c[svelte] console_log_state
+%cYour `console.log` contained `$state` proxies. Consider using `$inspect(...)` or `$state.snapshot(...)` instead
+https://svelte.dev/e/console_log_state font-weight: bold font-weight: normal @ http://localhost:4000/assets/app.js:62145
+[   14485ms] [WARNING] %c[svelte] console_log_state
+%cYour `console.log` contained `$state` proxies. Consider using `$inspect(...)` or `$state.snapshot(...)` instead
+https://svelte.dev/e/console_log_state font-weight: bold font-weight: normal @ http://localhost:4000/assets/app.js:62145

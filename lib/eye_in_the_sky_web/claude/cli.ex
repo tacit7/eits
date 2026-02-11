@@ -244,14 +244,28 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
 
     case find_claude_binary() do
       {:ok, claude_path} ->
-        # Build args with continue or resume flag
-        base_args = build_args(prompt, model, output_format, skip_permissions)
-
+        # Build args: flag comes first, then session_id if resuming, then prompt as positional arg
         args =
           if flag == "--resume" && session_id do
-            [flag, session_id] ++ base_args
+            [flag, session_id, prompt]
           else
-            [flag] ++ base_args
+            [flag, prompt]
+          end
+
+        # Append model, output-format, and other options
+        args = args ++ [
+          "--model",
+          model,
+          "--output-format",
+          output_format,
+          "--verbose"
+        ]
+
+        args =
+          if skip_permissions do
+            args ++ ["--dangerously-skip-permissions"]
+          else
+            args
           end
 
         require Logger

@@ -8,10 +8,6 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
   down this session, not the entire SessionManager.
 
   Registry provides O(1) lookup by session_ref or session_id.
-
-  Message queueing: If a message arrives while the worker is already
-  processing, it gets queued. When the current CLI exits, the next
-  queued message is processed. Max queue depth: 5.
   """
 
   use GenServer, restart: :temporary
@@ -19,15 +15,10 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
 
   alias EyeInTheSkyWeb.Claude.CLI
   alias EyeInTheSkyWeb.Messages
+  alias EyeInTheSkyWeb.Sessions
   alias EyeInTheSkyWeb.NATS.Publisher
 
-  # Use runtime config (not compile_env) to allow test override
-  defp cli_module do
-    Application.get_env(:eye_in_the_sky_web, :cli_module, EyeInTheSkyWeb.Claude.CLI)
-  end
   @registry EyeInTheSkyWeb.Claude.Registry
-  @max_queue 5
-  @idle_timeout :timer.seconds(60)
 
   # --- Client API ---
 
@@ -59,35 +50,35 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
       |> Keyword.put(:caller, self())
       |> Keyword.put(:session_id, session_id)
 
-    Logger.info("SessionWorker.init: spawn_type=#{spawn_type} session=#{session_id}")
-    Logger.info("SessionWorker.init: prompt=#{String.slice(prompt, 0, 200)}")
+    # Resolve integer PK from sessions table for FK references (messages, etc.)
+    session_int_id =
+      case Sessions.get_session_by_uuid(session_id) do
+        {:ok, session} -> session.id
+        {:error, _} -> nil
+      end
 
     case spawn_cli(spawn_type, session_id, prompt, opts) do
       {:ok, port, ^session_ref} ->
         state = %{
           session_ref: session_ref,
           session_id: session_id,
+          session_int_id: session_int_id,
           port: port,
           started_at: DateTime.utc_now(),
-          output_buffer: [],
-          message_queue: :queue.new(),
-          processing: true
+          output_buffer: []
         }
 
-        broadcast_status(session_id, :working)
-        Logger.info("SessionWorker started for #{session_id} port=#{inspect(port)}")
+        Logger.info("SessionWorker started for #{session_id} (ref: #{inspect(session_ref)})")
         {:ok, state}
 
       {:error, reason} ->
-        Logger.error("SessionWorker.init FAILED for #{session_id}: #{inspect(reason)}")
         {:stop, reason}
     end
   end
 
   @impl true
   def handle_call(:cancel, _from, state) do
-    cli_module().cancel(state.port)
-    broadcast_status(state.session_id, :idle)
+    CLI.cancel(state.port)
     {:stop, :normal, :ok, state}
   end
 
@@ -97,43 +88,10 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
       session_ref: state.session_ref,
       session_id: state.session_id,
       started_at: state.started_at,
-      output_lines: length(state.output_buffer),
-      queue_depth: :queue.len(state.message_queue),
-      processing: state.processing
+      output_lines: length(state.output_buffer)
     }
 
     {:reply, info, state}
-  end
-
-  # Enqueue a message from SessionManager dedup
-  @impl true
-  def handle_cast({:enqueue_message, prompt, opts}, state) do
-    cond do
-      :queue.len(state.message_queue) >= @max_queue ->
-        Logger.warning("Queue full for session #{state.session_id}, dropping message")
-        broadcast_status(state.session_id, :queue_full)
-        {:noreply, state}
-
-      !state.processing ->
-        # Idle worker, process immediately
-        broadcast_status(state.session_id, :working)
-
-        case spawn_next_message(prompt, opts, state) do
-          {:ok, new_state} ->
-            {:noreply, new_state}
-
-          {:error, reason} ->
-            Logger.error("Failed to resume session #{state.session_id}: #{inspect(reason)}")
-            broadcast_status(state.session_id, :error)
-            {:noreply, state, @idle_timeout}
-        end
-
-      true ->
-        # Currently processing, queue it
-        new_queue = :queue.in({prompt, opts}, state.message_queue)
-        Logger.info("Queued message for #{state.session_id} (depth: #{:queue.len(new_queue)})")
-        {:noreply, %{state | message_queue: new_queue}}
-    end
   end
 
   @impl true
@@ -161,36 +119,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
       {:claude_complete, state.session_ref, exit_code}
     )
 
-    # Check queue for next message
-    case :queue.out(state.message_queue) do
-      {{:value, {prompt, opts}}, new_queue} ->
-        Logger.info("Processing next queued message for #{state.session_id}")
-
-        case spawn_next_message(prompt, opts, %{state | message_queue: new_queue}) do
-          {:ok, new_state} ->
-            {:noreply, new_state}
-
-          {:error, reason} ->
-            Logger.error("Failed to process queued message: #{inspect(reason)}")
-            broadcast_status(state.session_id, :error)
-            {:stop, :normal, state}
-        end
-
-      {:empty, _} ->
-        broadcast_status(state.session_id, :idle)
-        {:noreply, %{state | processing: false, port: nil}, @idle_timeout}
-    end
-  end
-
-  # Idle timeout - stop worker after inactivity
-  @impl true
-  def handle_info(:timeout, state) do
-    if state.processing do
-      {:noreply, state}
-    else
-      Logger.info("SessionWorker idle timeout for #{state.session_id}, stopping")
-      {:stop, :normal, state}
-    end
+    {:stop, :normal, state}
   end
 
   @impl true
@@ -213,11 +142,8 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
 
   @impl true
   def terminate(_reason, state) do
-    broadcast_status(state.session_id, :idle)
-
     # Defense-in-depth: close port if still open
-    # In tests, port might be a PID (mock), so check if it's actually a port
-    if state[:port] && is_port(state.port) && Port.info(state.port) != nil do
+    if state[:port] && Port.info(state.port) != nil do
       try do
         Port.close(state.port)
       rescue
@@ -231,43 +157,15 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
   # --- Private ---
 
   defp spawn_cli(:new, _session_id, prompt, opts) do
-    cli_module().spawn_new_session(prompt, opts)
+    CLI.spawn_new_session(prompt, opts)
   end
 
   defp spawn_cli(:continue, _session_id, prompt, opts) do
-    cli_module().continue_session(prompt, opts)
+    CLI.continue_session(prompt, opts)
   end
 
   defp spawn_cli(:resume, session_id, prompt, opts) do
-    cli_module().resume_session(session_id, prompt, opts)
-  end
-
-  defp spawn_next_message(prompt, opts, state) do
-    session_ref = make_ref()
-
-    opts =
-      opts
-      |> Keyword.put(:caller, self())
-      |> Keyword.put(:session_id, state.session_id)
-      |> Keyword.put(:session_ref, session_ref)
-
-    case spawn_cli(:resume, state.session_id, prompt, opts) do
-      {:ok, port, ^session_ref} ->
-        Registry.register(@registry, {:ref, session_ref}, state.session_id)
-        broadcast_status(state.session_id, :working)
-        {:ok, %{state | port: port, session_ref: session_ref, processing: true}}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  defp broadcast_status(session_id, status) do
-    Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
-      "session:#{session_id}:status",
-      {:session_status, session_id, status}
-    )
+    CLI.resume_session(session_id, prompt, opts)
   end
 
   defp handle_parsed_output(parsed, state) do
@@ -282,27 +180,20 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
       message_uuid = parsed["uuid"]
       Logger.info("Assistant message detected - uuid: #{inspect(message_uuid)}, content: #{inspect(content)}")
 
-      if content && is_binary(content) do
-        session_uuid = state.session_id
+      if content && is_binary(content) && state.session_int_id do
+        session_int_id = state.session_int_id
         opts = if message_uuid, do: [source_uuid: message_uuid], else: []
 
         Task.Supervisor.start_child(EyeInTheSkyWeb.TaskSupervisor, fn ->
-          # Look up integer session ID from UUID
-          case EyeInTheSkyWeb.Sessions.get_session_by_uuid(session_uuid) do
-            {:ok, session} ->
-              case Messages.record_incoming_reply(session.id, "claude", content, opts) do
-                {:ok, message} ->
-                  Publisher.publish_message(message)
-                  Logger.info("Recorded and published assistant message for session #{session_uuid}")
+          case Messages.record_incoming_reply(session_int_id, "claude", content, opts) do
+            {:ok, message} ->
+              Publisher.publish_message(message)
+              Logger.info("Recorded and published assistant message for session #{state.session_id}")
 
-                {:error, reason} ->
-                  Logger.error(
-                    "Failed to record assistant message for session #{session_uuid}: #{inspect(reason)}"
-                  )
-              end
-
-            {:error, :not_found} ->
-              Logger.error("Session not found for UUID #{session_uuid}, cannot record message")
+            {:error, reason} ->
+              Logger.error(
+                "Failed to record assistant message for session #{state.session_id}: #{inspect(reason)}"
+              )
           end
         end)
       else

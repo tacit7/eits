@@ -133,7 +133,7 @@ defmodule EyeInTheSkyWeb.Messages do
   def send_message(attrs) do
     result =
       attrs
-      |> Map.put(:id, Ecto.UUID.generate())
+      |> Map.put(:uuid, Ecto.UUID.generate())
       |> Map.put(:direction, "outbound")
       |> Map.put(:status, "pending")
       |> create_message()
@@ -349,7 +349,7 @@ defmodule EyeInTheSkyWeb.Messages do
   """
   def create_channel_message(attrs) do
     attrs
-    |> Map.put(:id, Ecto.UUID.generate())
+    |> Map.put(:uuid, Ecto.UUID.generate())
     |> create_message()
   end
 
@@ -358,7 +358,7 @@ defmodule EyeInTheSkyWeb.Messages do
   """
   def send_channel_message(attrs) do
     attrs
-    |> Map.put(:id, Ecto.UUID.generate())
+    |> Map.put(:uuid, Ecto.UUID.generate())
     |> Map.put(:direction, "outbound")
     |> Map.put(:status, "pending")
     |> create_message()

@@ -13,6 +13,7 @@
   export let unreadCounts = {}
   export let agentStatusCounts = {}
   export let prompts = []
+  export let activeAgents = []
   export let live
   let inputValue = ''
   let inputElement
@@ -71,8 +72,7 @@
   }
 
   function handleSessionIdClick(sessionId) {
-    const shortId = sessionId.substring(0, 8)
-    inputValue = `@${shortId} `
+    inputValue = `@${sessionId} `
     showAutocomplete = false
     if (inputElement) {
       inputElement.focus()
@@ -92,31 +92,32 @@
 
       // Check if we're still typing the mention (no space after @)
       if (!textAfterAt.includes(' ')) {
-        // Get unique agent session IDs from messages
-        const agentSessions = messages
-          .filter(m => m.sender_role === 'agent' && m.session_id)
-          .reduce((acc, m) => {
-            if (!acc.some(s => s.id === m.session_id)) {
-              acc.push({
-                id: m.session_id,
-                shortId: m.session_id.substring(0, 8),
-                provider: m.provider || 'agent',
-                name: m.session_name || null
-              })
-            }
-            return acc
-          }, [])
-
-        // Filter based on what's typed after @ (search in ID, shortID, and name)
+        // Use activeAgents prop (queried from DB) for autocomplete
         const searchTerm = textAfterAt.toLowerCase()
-        const filtered = agentSessions.filter(s =>
-          s.id.toLowerCase().includes(searchTerm) ||
-          s.shortId.toLowerCase().includes(searchTerm) ||
-          (s.name && s.name.toLowerCase().includes(searchTerm))
-        )
 
-        if (filtered.length > 0) {
-          autocompleteOptions = filtered
+        const filtered = activeAgents
+          .map(a => ({
+            id: a.id,
+            name: a.name || a.agent_description || `Session ${a.id}`,
+            provider: a.provider || 'claude',
+            model: a.model,
+            description: a.agent_description
+          }))
+          .filter(a =>
+            String(a.id).includes(searchTerm) ||
+            (a.name && a.name.toLowerCase().includes(searchTerm)) ||
+            (a.description && a.description.toLowerCase().includes(searchTerm)) ||
+            (a.provider && a.provider.toLowerCase().includes(searchTerm))
+          )
+
+        if (filtered.length > 0 || searchTerm === '') {
+          autocompleteOptions = searchTerm === '' ? activeAgents.map(a => ({
+            id: a.id,
+            name: a.name || a.agent_description || `Session ${a.id}`,
+            provider: a.provider || 'claude',
+            model: a.model,
+            description: a.agent_description
+          })) : filtered
           selectedAutocompleteIndex = 0
           showAutocomplete = true
           return
@@ -189,14 +190,12 @@
     const textAfterCursor = inputValue.substring(cursorPos)
     const lastAtIndex = textBeforeCursor.lastIndexOf('@')
 
-    // Replace from @ to cursor with first 8 chars of session ID
-    const shortId = sessionId.substring(0, 8)
-    inputValue = textBeforeCursor.substring(0, lastAtIndex) + `@${shortId} ` + textAfterCursor
+    const idStr = String(sessionId)
+    inputValue = textBeforeCursor.substring(0, lastAtIndex) + `@${idStr} ` + textAfterCursor
     showAutocomplete = false
 
-    // Set cursor after the inserted text
     setTimeout(() => {
-      const newPos = lastAtIndex + shortId.length + 2
+      const newPos = lastAtIndex + idStr.length + 2
       inputElement.setSelectionRange(newPos, newPos)
       inputElement.focus()
     }, 0)
@@ -206,25 +205,19 @@
     const body = inputValue.trim()
 
     if (body) {
-      // Check for @session-id mentions (match first 8 chars or full UUID)
-      const mentionRegex = /@([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}|[a-f0-9]{8})/gi
+      // Match @<integer> mentions
+      const mentionRegex = /@(\d+)/g
       const mentions = []
       let match
 
       while ((match = mentionRegex.exec(body)) !== null) {
-        const sessionIdPart = match[1]
-        // Find full session_id from messages that match the prefix
-        const fullSessionId = messages.find(m =>
-          m.session_id && m.session_id.startsWith(sessionIdPart)
-        )?.session_id || sessionIdPart
-
-        if (!mentions.includes(fullSessionId)) {
-          mentions.push(fullSessionId)
+        const id = parseInt(match[1], 10)
+        if (!isNaN(id) && !mentions.includes(id)) {
+          mentions.push(id)
         }
       }
 
       if (mentions.length > 0) {
-        // Send targeted message to each mentioned agent
         mentions.forEach(sessionId => {
           live.pushEvent('send_direct_message', {
             session_id: sessionId,
@@ -233,24 +226,19 @@
           })
         })
       } else {
-        // Regular broadcast message to channel
         live.pushEvent('send_channel_message', {
           channel_id: activeChannelId,
           body: body
         })
       }
 
-      // Add to message history (at beginning of array for reverse chronological)
       messageHistory.unshift(body)
-      // Keep only last 50 messages in history
       if (messageHistory.length > 50) {
         messageHistory = messageHistory.slice(0, 50)
       }
 
-      // Reset history navigation
       historyIndex = -1
       currentDraft = ''
-
       inputValue = ''
       shouldAutoScroll = true
     }
@@ -621,14 +609,16 @@
                 </h3>
                 <time class="text-xs opacity-50">{formatTime(message.inserted_at)}</time>
                 {#if message.sender_role === 'agent' && message.session_id}
+                  {@const agent = activeAgents.find(a => a.id === message.session_id)}
                   <span
                     class="badge badge-xs badge-outline session-id-badge ml-auto"
                     on:click={() => handleSessionIdClick(message.session_id)}
                     on:keydown={(e) => e.key === 'Enter' && handleSessionIdClick(message.session_id)}
                     role="button"
                     tabindex="0"
+                    title={agent ? `Session #${message.session_id}` : String(message.session_id)}
                   >
-                    {message.session_id.substring(0, 8)}
+                    {agent?.name || message.session_name || `#${message.session_id}`}
                   </span>
                 {/if}
               </div>
@@ -660,7 +650,7 @@
           bind:this={inputElement}
           on:input={handleInputChange}
           on:keydown={handleInputKeydown}
-          placeholder="Send instruction to agents (use @session-id for direct messages)..."
+          placeholder="Send instruction to agents (use @id for direct messages)..."
           class="message-input"
           autocomplete="off"
         />
@@ -676,11 +666,9 @@
                 on:click={() => selectAutocomplete(option.id)}
                 on:mouseenter={() => selectedAutocompleteIndex = idx}
               >
-                <span class="autocomplete-id">@{option.shortId}</span>
-                {#if option.name}
-                  <span class="autocomplete-name">{option.name}</span>
-                {/if}
-                <span class="autocomplete-provider">({option.provider})</span>
+                <span class="autocomplete-id">@{option.id}</span>
+                <span class="autocomplete-name">{option.name}</span>
+                <span class="autocomplete-provider">{option.provider}{option.model ? ` / ${option.model}` : ''}</span>
               </button>
             {/each}
           </div>

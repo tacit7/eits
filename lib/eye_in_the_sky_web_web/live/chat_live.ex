@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.{Agents, Channels, Messages, Prompts, Sessions}
+  alias EyeInTheSkyWeb.Claude.AgentManager
 
   # Deterministic UUIDs for the web UI user
   @web_agent_uuid "00000000-0000-0000-0000-000000000001"
@@ -189,32 +190,15 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
             {:new_message, message}
           )
 
-          # Continue the target agent's Claude session with the message
-          with {:ok, session} <- Sessions.get_session(target_id),
-               {:ok, agent} <- Agents.get_agent(session.agent_id) do
-            project_path = agent.git_worktree_path || File.cwd!()
+          # Send to AgentWorker (queues if busy, processes if idle)
+          prompt_with_reminder = "eits-chat: channel:#{channel_id} msg:#{body}"
 
-            # Get latest NATS sequence for channel context
-            latest_seq = EyeInTheSkyWeb.NATS.Reader.get_latest_sequence(channel_id)
-            start_from = max(0, latest_seq - 10)
+          case AgentManager.send_message(target_id, prompt_with_reminder, model: "sonnet") do
+            :ok ->
+              {:noreply, socket}
 
-            prompt_with_reminder = "eits-chat: channel:#{channel_id} seq:#{latest_seq} msg:#{body}"
-
-            case EyeInTheSkyWeb.Claude.SessionManager.resume_session(
-                   session.uuid,
-                   prompt_with_reminder,
-                   model: "sonnet",
-                   project_path: project_path
-                 ) do
-              {:ok, _session_ref} ->
-                {:noreply, socket}
-
-              {:error, reason} ->
-                {:noreply, put_flash(socket, :error, "Failed to send to agent: #{inspect(reason)}")}
-            end
-          else
-            {:error, :not_found} ->
-              {:noreply, put_flash(socket, :error, "Agent session not found")}
+            {:error, reason} ->
+              {:noreply, put_flash(socket, :error, "Failed to send to agent: #{inspect(reason)}")}
           end
 
         {:error, _changeset} ->

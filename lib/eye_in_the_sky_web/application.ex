@@ -27,6 +27,8 @@ defmodule EyeInTheSkyWeb.Application do
       {Registry, keys: :duplicate, name: EyeInTheSkyWeb.Claude.Registry},
       # DynamicSupervisor for per-session workers
       {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.SessionSupervisor, strategy: :one_for_one},
+      # DynamicSupervisor for persistent agent workers
+      {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.AgentSupervisor, strategy: :one_for_one},
       # Claude CLI session coordinator
       EyeInTheSkyWeb.Claude.SessionManager,
       # Start to serve requests, typically the last entry

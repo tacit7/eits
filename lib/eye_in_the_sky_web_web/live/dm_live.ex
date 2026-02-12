@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.{Sessions, Messages, Tasks, Commits, Logs, Agents, Notes}
+  alias EyeInTheSkyWeb.Claude.AgentManager
 
   @impl true
   def mount(%{"session_id" => session_id_param}, _session, socket) do
@@ -110,59 +111,19 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
         Logger.info("🔍 After load_tab_data, socket.assigns[:messages] = #{length(socket.assigns[:messages] || [])}")
 
-        # Send to Claude via SessionManager using --resume (no NATS)
+        # Send to AgentWorker (queues if busy, processes if idle)
         session_id = socket.assigns.session_id
-        session = socket.assigns.session
-        agent = socket.assigns.agent
+        case AgentManager.send_message(session_id, full_body, model: "sonnet") do
+          :ok ->
+            Logger.info("✅ Message sent to agent worker for processing")
+            {:noreply, socket}
 
-        session_uuid = socket.assigns.session_uuid
-
-        case resolve_project_path(session, agent) do
-          {:ok, project_path} ->
-            Logger.info("🗂️  Resolved project path: #{project_path}")
-            has_messages = Messages.count_messages_for_session(session_id) > 1
-
-            result =
-              if has_messages do
-                Logger.info("🔄 Resuming Claude session #{session_uuid}")
-                EyeInTheSkyWeb.Claude.SessionManager.resume_session(session_uuid, full_body,
-                  model: "sonnet",
-                  project_path: project_path
-                )
-              else
-                Logger.info("🆕 Starting new Claude session #{session_uuid}")
-                EyeInTheSkyWeb.Claude.SessionManager.start_session(session_uuid, full_body,
-                  model: "sonnet",
-                  project_path: project_path
-                )
-              end
-
-            case result do
-              {:ok, session_ref} ->
-                Logger.info("✅ Claude session started/resumed with ref: #{inspect(session_ref)}")
-                Logger.info("📨 About to return socket with #{length(socket.assigns[:messages] || [])} messages in assign")
-
-                final_socket = assign(socket, :session_ref, session_ref)
-                Logger.info("🎯 Final socket assigns: messages=#{length(final_socket.assigns[:messages] || [])}, processing=#{final_socket.assigns[:processing]}, session_ref=#{inspect(final_socket.assigns[:session_ref])}")
-
-                {:noreply, final_socket}
-
-              {:error, reason} ->
-                Logger.error("❌ Failed to start/resume Claude session: #{inspect(reason)}")
-                socket =
-                  socket
-                  |> assign(:processing, false)
-                  |> put_flash(:error, "Failed to send to Claude: #{inspect(reason)}")
-
-                {:noreply, socket}
-            end
-
-          {:error, :no_project_path} ->
-            Logger.error("❌ No project path configured")
+          {:error, reason} ->
+            Logger.error("❌ Failed to send to agent: #{inspect(reason)}")
             socket =
               socket
               |> assign(:processing, false)
-              |> put_flash(:error, "No project path configured. Set git_worktree_path on session, agent, or project.")
+              |> put_flash(:error, "Failed to send to agent: #{inspect(reason)}")
 
             {:noreply, socket}
         end

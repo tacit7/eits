@@ -78,6 +78,14 @@ defmodule EyeInTheSkyWebWeb.Telemetry do
       # VM Metrics
       summary("vm.memory.total", unit: {:byte, :kilobyte}),
       summary("vm.total_run_queue_lengths.total"),
+
+      # LiveView Metrics
+      counter("liveview.mount.count"),
+      summary("liveview.mount.duration", unit: {:native, :millisecond}),
+      counter("liveview.event.count", tags: [:event]),
+      summary("liveview.event.duration", unit: {:native, :millisecond}, tags: [:event]),
+      last_value("liveview.connections.count"),
+      last_value("liveview.channels.count"),
       summary("vm.total_run_queue_lengths.cpu"),
       summary("vm.total_run_queue_lengths.io")
     ]
@@ -88,6 +96,26 @@ defmodule EyeInTheSkyWebWeb.Telemetry do
       # A module, function and arguments to be invoked periodically.
       # This function must call :telemetry.execute/3 and a metric must be added above.
       # {EyeInTheSkyWebWeb, :count_users, []}
+      {EyeInTheSkyWebWeb.Telemetry, :measure_memory, []},
+      {EyeInTheSkyWebWeb.Telemetry, :measure_processes, []},
+      {EyeInTheSkyWebWeb.Telemetry, :measure_liveview, []}
     ]
+  end
+
+  def measure_memory do
+    memory_info = :erlang.memory()
+    :telemetry.execute([:vm, :memory, :total], %{value: memory_info[:total]})
+  end
+
+  def measure_processes do
+    process_count = :erlang.system_info(:process_count)
+    :telemetry.execute([:vm, :processes], %{count: process_count})
+  end
+
+  def measure_liveview do
+    # Just emit a simple metric for now to verify telemetry is working
+    connection_count = 0
+    :telemetry.execute([:liveview, :connections, :count], %{value: connection_count})
+    :telemetry.execute([:liveview, :channels, :count], %{value: connection_count})
   end
 end

@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
     if connected?(socket) do
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
       send(self(), :sync_from_session_file)
     end
 
@@ -103,15 +104,13 @@ defmodule EyeInTheSkyWebWeb.DmLive do
           EyeInTheSkyWeb.FileAttachments.create_attachment(Map.put(file_data, :message_id, message.id))
         end)
 
-        # Set processing immediately so the Stop button renders on this same response
-        socket =
-          socket
-          |> assign(:processing, true)
-          |> load_tab_data("messages", socket.assigns.session_id)
+        # Load messages to show the one we just sent
+        socket = load_tab_data(socket, "messages", socket.assigns.session_id)
 
         Logger.info("🔍 After load_tab_data, socket.assigns[:messages] = #{length(socket.assigns[:messages] || [])}")
 
         # Send to AgentWorker (queues if busy, processes if idle)
+        # Processing flag will be set when agent_working message arrives
         session_id = socket.assigns.session_id
         case AgentManager.send_message(session_id, full_body, model: "sonnet") do
           :ok ->
@@ -403,6 +402,25 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_info({:agent_working, _session_uuid, session_id}, socket) do
+    # Agent started processing - set flag only if this is our session
+    if session_id == socket.assigns.session_id do
+      {:noreply, assign(socket, :processing, true)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
+    # Agent finished processing - clear flag only if this is our session
+    if session_id == socket.assigns.session_id do
+      {:noreply, assign(socket, :processing, false)}
+    else
+      {:noreply, socket}
+    end
+  end
 
   @impl true
   def handle_info(msg, socket) do

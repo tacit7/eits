@@ -10,7 +10,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   use GenServer
   require Logger
 
-  alias EyeInTheSkyWeb.Claude.SessionWorker
+  alias EyeInTheSkyWeb.Claude.CLI
+  alias EyeInTheSkyWeb.Messages
 
   # --- Client API ---
 
@@ -87,9 +88,25 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   end
 
   @impl true
-  def handle_info({:claude_output, _ref, _line}, state) do
-    # Output from Claude - just log and continue
-    # SessionWorker handles parsing; AgentWorker just waits for exit
+  def handle_info({:claude_output, _ref, line}, state) do
+    Logger.debug("Claude output: #{String.slice(line, 0..100)}...")
+
+    # Parse and handle Claude output
+    clean_line = strip_ansi_codes(line)
+
+    case Jason.decode(clean_line) do
+      {:ok, parsed} ->
+        case handle_claude_result(parsed, state) do
+          {:ok, _} -> :ok
+          {:error, reason} -> Logger.warning("Error handling Claude result: #{inspect(reason)}")
+        end
+
+      {:error, reason} ->
+        if String.trim(clean_line) != "" do
+          Logger.debug("Non-JSON output: #{clean_line}")
+        end
+    end
+
     {:noreply, state}
   end
 
@@ -173,6 +190,52 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   # --- Private ---
 
+  defp handle_claude_result(parsed, state) when is_map(parsed) do
+    type = Map.get(parsed, "type") || Map.get(parsed, :type)
+
+    case type do
+      "result" ->
+        result = Map.get(parsed, "result") || Map.get(parsed, :result)
+
+        if result && is_binary(result) && state.session_id do
+          message_uuid = Map.get(parsed, "uuid") || Map.get(parsed, :uuid)
+
+          metadata = %{
+            duration_ms: Map.get(parsed, "duration_ms"),
+            total_cost_usd: Map.get(parsed, "total_cost_usd"),
+            usage: Map.get(parsed, "usage"),
+            is_error: Map.get(parsed, "is_error")
+          }
+
+          opts = [
+            source_uuid: message_uuid,
+            metadata: metadata
+          ]
+
+          Messages.record_incoming_reply(state.session_id, "claude", result, opts)
+        else
+          {:ok, :no_result}
+        end
+
+      _ ->
+        {:ok, :other_type}
+    end
+  end
+
+  defp handle_claude_result(_parsed, _state) do
+    {:ok, :non_map}
+  end
+
+  defp strip_ansi_codes(text) when is_binary(text) do
+    # Remove ANSI escape sequences
+    text
+    |> String.replace(~r/\e\[[0-9;]*[a-zA-Z]/, "")
+    |> String.replace(~r/\e\][^\a]*\a/, "")
+    |> String.replace(~r/\e[^[\\]]*/, "")
+  end
+
+  defp strip_ansi_codes(text), do: text
+
   defp spawn_claude(state, job) do
     context = job.context
 
@@ -190,39 +253,18 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       output_format: "stream-json",
       skip_permissions: true,
       session_ref: session_ref,
-      session_int_id: state.session_id,
       caller: self()
     ]
 
-    # Spawn SessionWorker to handle Claude invocation and output parsing
-    case DynamicSupervisor.start_child(
-      EyeInTheSkyWeb.Claude.SessionSupervisor,
-      {SessionWorker,
-       %{
-         spawn_type: spawn_type,
-         session_id: state.session_uuid,
-         prompt: prompt,
-         opts: opts
-       }}
-    ) do
-      {:ok, _worker_pid} ->
-        Logger.info("SessionWorker spawned for #{state.session_uuid}")
+    # Spawn Claude directly and return port + session_ref
+    case spawn_type do
+      :resume ->
+        Logger.info("Resuming session #{state.session_uuid}")
+        CLI.resume_session(state.session_uuid, prompt, opts)
 
-        # SessionWorker spawns Claude and sends port + session_ref back to caller (self)
-        # Wait to receive it
-        receive do
-          {:session_worker_ready, port, ^session_ref} ->
-            Logger.info("Received session_worker_ready for #{state.session_uuid}")
-            {:ok, port, session_ref}
-        after
-          5000 ->
-            Logger.error("Timeout waiting for SessionWorker to spawn Claude for #{state.session_uuid}")
-            {:error, :timeout}
-        end
-
-      {:error, reason} ->
-        Logger.error("Failed to spawn SessionWorker: #{inspect(reason)}")
-        {:error, reason}
+      :new ->
+        Logger.info("Starting new session #{state.session_uuid}")
+        CLI.spawn_new_session(prompt, opts)
     end
   end
 end

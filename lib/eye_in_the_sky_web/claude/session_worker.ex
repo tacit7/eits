@@ -51,13 +51,12 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
       |> Keyword.put(:caller, self())
       |> Keyword.put(:session_id, session_id)
 
-    # Get integer PK from opts if provided by caller, otherwise query database
+    # Resolve integer PK from sessions table for FK references (messages, etc.)
     session_int_id =
-      Keyword.get(opts, :session_int_id) ||
-        case Sessions.get_session_by_uuid(session_id) do
-          {:ok, session} -> session.id
-          {:error, _} -> nil
-        end
+      case Sessions.get_session_by_uuid(session_id) do
+        {:ok, session} -> session.id
+        {:error, _} -> nil
+      end
 
     case spawn_cli(spawn_type, session_id, prompt, opts) do
       {:ok, port, ^session_ref} ->
@@ -71,11 +70,6 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
         }
 
         Logger.info("SessionWorker started for #{session_id} (ref: #{inspect(session_ref)})")
-
-        # Send ready signal back to caller (AgentWorker)
-        if caller do
-          send(caller, {:session_worker_ready, port, session_ref})
-        end
 
         # Broadcast agent working state
         Logger.info("📢 Broadcasting agent_working for session_id=#{session_id}, session_int_id=#{session_int_id}")

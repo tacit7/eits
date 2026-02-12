@@ -2,14 +2,14 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
   use ExUnit.Case, async: false
   require Logger
 
+  @moduletag :capture_log
+
   alias EyeInTheSkyWeb.Claude.{AgentWorker, AgentManager}
   alias EyeInTheSkyWeb.{Sessions, Agents, Messages, Repo}
 
   setup do
-    # Allow database access in tests
+    # For non-async tests, Ecto sandbox will manage connections automatically
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
-    # Allow spawned processes (AgentWorker, SessionWorker) to access the database
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
     :ok
   end
 
@@ -70,6 +70,36 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     assert String.length(response.body) > 0
 
     Logger.info("✅ Test passed! Claude responded: #{response.body}")
+  end
+
+  test "AgentWorker can be created and receives process messages" do
+    # Create test agent
+    {:ok, agent} =
+      Agents.create_agent(%{
+        uuid: Ecto.UUID.generate(),
+        description: "Test Agent",
+        source: "test"
+      })
+
+    # Create test session
+    {:ok, session} =
+      Sessions.create_session(%{
+        uuid: Ecto.UUID.generate(),
+        agent_id: agent.id,
+        name: "Test Session",
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      })
+
+    # Send a message to start AgentWorker
+    result = AgentManager.send_message(session.id, "test", model: "haiku")
+    assert result == :ok
+
+    # Wait a bit for worker to spawn
+    Process.sleep(100)
+
+    # Verify the worker is running by sending another message
+    result2 = AgentManager.send_message(session.id, "another test", model: "haiku")
+    assert result2 == :ok
   end
 
   test "Multiple messages queue and process sequentially" do

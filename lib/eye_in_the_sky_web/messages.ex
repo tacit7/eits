@@ -204,7 +204,7 @@ defmodule EyeInTheSkyWeb.Messages do
     metadata = Keyword.get(opts, :metadata, %{})
 
     attrs = %{
-      id: id,
+      uuid: id,
       session_id: session_id,
       sender_role: "agent",
       recipient_role: "user",

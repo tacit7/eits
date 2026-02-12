@@ -39,6 +39,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
   @impl true
   def init(%{spawn_type: spawn_type, session_id: session_id, prompt: prompt, opts: opts}) do
     session_ref = Keyword.fetch!(opts, :session_ref)
+    caller = Keyword.get(opts, :caller)
 
     # Register under both keys for lookup flexibility
     Registry.register(@registry, {:ref, session_ref}, session_id)
@@ -50,12 +51,13 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
       |> Keyword.put(:caller, self())
       |> Keyword.put(:session_id, session_id)
 
-    # Resolve integer PK from sessions table for FK references (messages, etc.)
+    # Get integer PK from opts if provided by caller, otherwise query database
     session_int_id =
-      case Sessions.get_session_by_uuid(session_id) do
-        {:ok, session} -> session.id
-        {:error, _} -> nil
-      end
+      Keyword.get(opts, :session_int_id) ||
+        case Sessions.get_session_by_uuid(session_id) do
+          {:ok, session} -> session.id
+          {:error, _} -> nil
+        end
 
     case spawn_cli(spawn_type, session_id, prompt, opts) do
       {:ok, port, ^session_ref} ->
@@ -69,6 +71,11 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
         }
 
         Logger.info("SessionWorker started for #{session_id} (ref: #{inspect(session_ref)})")
+
+        # Send ready signal back to caller (AgentWorker)
+        if caller do
+          send(caller, {:session_worker_ready, port, session_ref})
+        end
 
         # Broadcast agent working state
         Logger.info("📢 Broadcasting agent_working for session_id=#{session_id}, session_int_id=#{session_int_id}")
@@ -210,9 +217,17 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
       Logger.info("Claude init confirmed for session #{state.session_id}")
     end
 
-    # Handle new JSON format: type="result" with structured output (includes metadata)
-    result = Map.get(parsed, "result") || Map.get(parsed, :result)
-    if type == "result" && result do
+    # Check for session not found error
+    is_error = Map.get(parsed, "is_error") || Map.get(parsed, :is_error)
+    errors = Map.get(parsed, "errors") || Map.get(parsed, :errors) || []
+
+    if is_error && Enum.any?(errors, &String.contains?(&1, "No conversation found")) do
+      Logger.error("Session not found: #{inspect(errors)} - stopping agent")
+      {:stop, :session_not_found, state}
+    else
+      # Handle new JSON format: type="result" with structured output (includes metadata)
+      result = Map.get(parsed, "result") || Map.get(parsed, :result)
+      if type == "result" && result do
       content = result
       message_uuid = Map.get(parsed, "uuid") || Map.get(parsed, :uuid)
 
@@ -237,20 +252,19 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
           metadata: metadata
         ]
 
-        Task.Supervisor.start_child(EyeInTheSkyWeb.TaskSupervisor, fn ->
-          case Messages.record_incoming_reply(session_int_id, "claude", content, opts) do
-            {:ok, message} ->
-              Publisher.publish_message(message)
-              Logger.info("Recorded and published result message for session #{state.session_id}")
+        case Messages.record_incoming_reply(session_int_id, "claude", content, opts) do
+          {:ok, message} ->
+            Publisher.publish_message(message)
+            Logger.info("Recorded and published result message for session #{state.session_id}")
 
-            {:error, reason} ->
-              Logger.error(
-                "Failed to record result message for session #{state.session_id}: #{inspect(reason)}"
-              )
-          end
-        end)
+          {:error, reason} ->
+            Logger.error(
+              "Failed to record result message for session #{state.session_id}: #{inspect(reason)}"
+            )
+        end
       else
         Logger.warning("Result message with no valid text content: #{inspect(parsed)}")
+      end
       end
     end
 

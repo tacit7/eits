@@ -10,7 +10,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   use GenServer
   require Logger
 
-  alias EyeInTheSkyWeb.Claude.CLI
+  alias EyeInTheSkyWeb.Claude.SessionWorker
 
   # --- Client API ---
 
@@ -63,16 +63,22 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     if state.port == nil do
       # Idle, spawn Claude immediately
       Logger.info("Agent #{state.session_id} idle, spawning Claude")
-      {:ok, port, session_ref} = spawn_claude(state, job)
 
-      # Broadcast working state
-      Phoenix.PubSub.broadcast(
-        EyeInTheSkyWeb.PubSub,
-        "agent:working",
-        {:agent_working, state.session_uuid, state.session_id}
-      )
+      case spawn_claude(state, job) do
+        {:ok, port, session_ref} ->
+          # Broadcast working state
+          Phoenix.PubSub.broadcast(
+            EyeInTheSkyWeb.PubSub,
+            "agent:working",
+            {:agent_working, state.session_uuid, state.session_id}
+          )
 
-      {:noreply, %{state | port: port, current_job: job, session_ref: session_ref}}
+          {:noreply, %{state | port: port, current_job: job, session_ref: session_ref}}
+
+        {:error, reason} ->
+          Logger.error("Failed to spawn Claude: #{inspect(reason)}")
+          {:noreply, state}
+      end
     else
       # Busy, queue the job
       Logger.info("Agent #{state.session_id} busy, queueing message")
@@ -108,16 +114,23 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       [next_job | rest] ->
         # Process next job
         Logger.info("Agent #{state.session_id} processing next queued job (#{length(rest)} remaining in queue)")
-        {:ok, port, session_ref} = spawn_claude(state, next_job)
 
-        Phoenix.PubSub.broadcast(
-          EyeInTheSkyWeb.PubSub,
-          "agent:working",
-          {:agent_working, state.session_uuid, state.session_id}
-        )
+        case spawn_claude(state, next_job) do
+          {:ok, port, session_ref} ->
+            Phoenix.PubSub.broadcast(
+              EyeInTheSkyWeb.PubSub,
+              "agent:working",
+              {:agent_working, state.session_uuid, state.session_id}
+            )
 
-        {:noreply,
-         %{state | port: port, current_job: next_job, queue: rest, session_ref: session_ref}}
+            {:noreply,
+             %{state | port: port, current_job: next_job, queue: rest, session_ref: session_ref}}
+
+          {:error, reason} ->
+            Logger.error("Failed to spawn Claude for next job: #{inspect(reason)}")
+            # Requeue the job and go idle
+            {:noreply, %{state | port: nil, current_job: nil, queue: [next_job | rest]}}
+        end
     end
   end
 
@@ -165,26 +178,51 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
     # Determine if resuming (has prior messages) or starting new
     has_messages = context[:has_messages] || false
-
     spawn_type = if has_messages, do: :resume, else: :new
     prompt = job.message
+
+    # Generate unique session_ref for this Claude invocation
+    session_ref = make_ref()
 
     opts = [
       model: context[:model] || "sonnet",
       project_path: state.project_path,
       output_format: "stream-json",
       skip_permissions: true,
+      session_ref: session_ref,
+      session_int_id: state.session_id,
       caller: self()
     ]
 
-    opts = if spawn_type == :resume, do: opts, else: opts
+    # Spawn SessionWorker to handle Claude invocation and output parsing
+    case DynamicSupervisor.start_child(
+      EyeInTheSkyWeb.Claude.SessionSupervisor,
+      {SessionWorker,
+       %{
+         spawn_type: spawn_type,
+         session_id: state.session_uuid,
+         prompt: prompt,
+         opts: opts
+       }}
+    ) do
+      {:ok, _worker_pid} ->
+        Logger.info("SessionWorker spawned for #{state.session_uuid}")
 
-    case spawn_type do
-      :resume ->
-        CLI.resume_session(state.session_uuid, prompt, opts)
+        # SessionWorker spawns Claude and sends port + session_ref back to caller (self)
+        # Wait to receive it
+        receive do
+          {:session_worker_ready, port, ^session_ref} ->
+            Logger.info("Received session_worker_ready for #{state.session_uuid}")
+            {:ok, port, session_ref}
+        after
+          5000 ->
+            Logger.error("Timeout waiting for SessionWorker to spawn Claude for #{state.session_uuid}")
+            {:error, :timeout}
+        end
 
-      :new ->
-        CLI.spawn_new_session(prompt, opts)
+      {:error, reason} ->
+        Logger.error("Failed to spawn SessionWorker: #{inspect(reason)}")
+        {:error, reason}
     end
   end
 end

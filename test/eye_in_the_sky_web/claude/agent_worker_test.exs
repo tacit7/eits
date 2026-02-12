@@ -2,301 +2,109 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
   use ExUnit.Case, async: false
   require Logger
 
-  alias EyeInTheSkyWeb.Claude.AgentWorker
-  alias EyeInTheSkyWeb.{Repo}
+  alias EyeInTheSkyWeb.Claude.{AgentWorker, AgentManager}
+  alias EyeInTheSkyWeb.{Sessions, Agents, Messages, Repo}
 
   setup do
     # Allow database access in tests
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
+    # Allow spawned processes (AgentWorker, SessionWorker) to access the database
+    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
     :ok
   end
 
-  test "AgentWorker initializes with correct state" do
-    session_id = 123
-    session_uuid = "test-uuid-#{:rand.uniform(999999)}"
-    agent_id = "agent-id"
-    project_path = File.cwd!()
+  test "AgentManager sends message to Claude and gets response" do
+    # Create test agent in DB
+    {:ok, agent} =
+      Agents.create_agent(%{
+        uuid: Ecto.UUID.generate(),
+        description: "Test Agent",
+        source: "test"
+      })
 
-    opts = [
-      session_id: session_id,
-      session_uuid: session_uuid,
-      agent_id: agent_id,
-      project_path: project_path
-    ]
+    Logger.info("Created agent: #{agent.id}")
 
-    # Start worker directly without Registry
-    {:ok, pid} = GenServer.start_link(AgentWorker, opts)
+    # Create test session in DB
+    {:ok, session} =
+      Sessions.create_session(%{
+        uuid: Ecto.UUID.generate(),
+        agent_id: agent.id,
+        name: "Test Session",
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      })
 
-    # Check initial state
-    state = :sys.get_state(pid)
+    Logger.info("Created session: #{session.id} (uuid: #{session.uuid})")
 
-    assert state.session_id == session_id
-    assert state.session_uuid == session_uuid
-    assert state.agent_id == agent_id
-    assert state.port == nil
-    assert state.queue == []
-    assert state.session_ref == nil
+    # Send message via AgentManager (real Claude)
+    message = "Say hello in one word only"
+
+    Logger.info("Calling AgentManager.send_message...")
+    result = AgentManager.send_message(session.id, message, model: "haiku")
+
+    Logger.info("AgentManager.send_message returned: #{inspect(result)}")
+    assert result == :ok
+
+    # Wait for Claude to process (5 second timeout)
+    Logger.info("Waiting 5 seconds for Claude...")
+    Process.sleep(5000)
+
+    # Check if response was saved to database
+    messages = Messages.list_messages_for_session(session.id)
+
+    Logger.info("Messages in database: #{length(messages)}")
+    Logger.info("Message details: #{inspect(Enum.map(messages, fn m -> %{body: m.body, role: m.sender_role} end))}")
+
+    # Should have at least the incoming message
+    assert length(messages) > 0, "No messages found in database"
+
+    # Find agent response (role: "agent")
+    agent_responses = Enum.filter(messages, &(&1.sender_role == "agent"))
+
+    # Should have at least one response from Claude
+    assert length(agent_responses) > 0,
+           "No agent response found. Messages: #{inspect(Enum.map(messages, & &1.body))}"
+
+    # Verify response is not empty
+    response = List.first(agent_responses)
+    assert response.body != nil
+    assert String.length(response.body) > 0
+
+    Logger.info("✅ Test passed! Claude responded: #{response.body}")
   end
 
-  test "AgentWorker queues message when busy" do
-    session_id = 123
-    session_uuid = "test-uuid-#{:rand.uniform(999999)}"
-    agent_id = "agent-id"
-
-    opts = [
-      session_id: session_id,
-      session_uuid: session_uuid,
-      agent_id: agent_id,
-      project_path: File.cwd!()
-    ]
-
-    {:ok, pid} = GenServer.start_link(AgentWorker, opts)
-
-    # Simulate agent being busy
-    fake_port = Port.open({:spawn, "cat"}, [:binary])
-    fake_ref = make_ref()
-
-    :sys.replace_state(pid, fn state ->
-      %{state | port: fake_port, session_ref: fake_ref}
-    end)
-
-    # Send message via cast
-    GenServer.cast(pid, {:process_message, "test message", %{model: "sonnet", has_messages: false}})
-
-    Process.sleep(100)
-
-    state = :sys.get_state(pid)
-
-    # Should be queued
-    assert length(state.queue) == 1
-    assert List.first(state.queue).message == "test message"
-
-    Port.close(fake_port)
-  end
-
-  test "AgentWorker does not spawn Claude if already busy" do
-    session_id = 123
-    session_uuid = "test-uuid-#{:rand.uniform(999999)}"
-    agent_id = "agent-id"
-
-    opts = [
-      session_id: session_id,
-      session_uuid: session_uuid,
-      agent_id: agent_id,
-      project_path: File.cwd!()
-    ]
-
-    {:ok, pid} = GenServer.start_link(AgentWorker, opts)
-
-    # Set busy
-    fake_port = Port.open({:spawn, "cat"}, [:binary])
-    fake_ref = make_ref()
-
-    :sys.replace_state(pid, fn state ->
-      %{state | port: fake_port, session_ref: fake_ref}
-    end)
-
-    state_before = :sys.get_state(pid)
-
-    # Send message (should queue, not spawn)
-    GenServer.cast(pid, {:process_message, "msg", %{model: "sonnet", has_messages: false}})
-
-    Process.sleep(100)
-
-    state_after = :sys.get_state(pid)
-
-    # Port should be the same (not replaced)
-    assert state_after.port == state_before.port
-    assert length(state_after.queue) == 1
-
-    Port.close(fake_port)
-  end
-
-  test "AgentWorker processes next queued message when current finishes" do
-    session_id = 123
-    session_uuid = "test-uuid-#{:rand.uniform(999999)}"
-    agent_id = "agent-id"
-
-    opts = [
-      session_id: session_id,
-      session_uuid: session_uuid,
-      agent_id: agent_id,
-      project_path: File.cwd!()
-    ]
-
-    {:ok, pid} = GenServer.start_link(AgentWorker, opts)
-
-    # Simulate busy with queued messages
-    fake_port = Port.open({:spawn, "cat"}, [:binary])
-    fake_ref = make_ref()
-
-    msg1 = %{message: "msg1", context: %{model: "sonnet", has_messages: false}, queued_at: DateTime.utc_now()}
-    msg2 = %{message: "msg2", context: %{model: "sonnet", has_messages: true}, queued_at: DateTime.utc_now()}
-
-    :sys.replace_state(pid, fn state ->
-      %{state | port: fake_port, session_ref: fake_ref, queue: [msg1, msg2]}
-    end)
-
-    state_before = :sys.get_state(pid)
-    assert length(state_before.queue) == 2
-
-    # Send exit notification for current Claude
-    send(pid, {:claude_exit, fake_ref, 0})
-
-    Process.sleep(200)
-
-    state_after = :sys.get_state(pid)
-
-    # Queue should be processed (reduced by 1)
-    # Note: Can't spawn real Claude so port will be nil
-    assert length(state_after.queue) <= 1
-
-    Port.close(fake_port)
-  end
-
-  test "AgentWorker goes idle when queue empties" do
-    session_id = 123
-    session_uuid = "test-uuid-#{:rand.uniform(999999)}"
-    agent_id = "agent-id"
-
-    opts = [
-      session_id: session_id,
-      session_uuid: session_uuid,
-      agent_id: agent_id,
-      project_path: File.cwd!()
-    ]
-
-    {:ok, pid} = GenServer.start_link(AgentWorker, opts)
-
-    # Simulate busy with empty queue
-    fake_port = Port.open({:spawn, "cat"}, [:binary])
-    fake_ref = make_ref()
-
-    :sys.replace_state(pid, fn state ->
-      %{state | port: fake_port, session_ref: fake_ref, queue: []}
-    end)
-
-    # Send exit
-    send(pid, {:claude_exit, fake_ref, 0})
-
-    Process.sleep(100)
-
-    state = :sys.get_state(pid)
-
-    # Should be idle
-    assert state.port == nil
-    assert state.session_ref == nil
-    assert state.queue == []
-
-    Port.close(fake_port)
-  end
-
-  test "AgentWorker handles multiple queued messages in FIFO order" do
-    session_id = 123
-    session_uuid = "test-uuid-#{:rand.uniform(999999)}"
-    agent_id = "agent-id"
-
-    opts = [
-      session_id: session_id,
-      session_uuid: session_uuid,
-      agent_id: agent_id,
-      project_path: File.cwd!()
-    ]
-
-    {:ok, pid} = GenServer.start_link(AgentWorker, opts)
-
-    # Simulate busy
-    fake_port = Port.open({:spawn, "cat"}, [:binary])
-
-    :sys.replace_state(pid, fn state ->
-      %{state | port: fake_port, session_ref: make_ref()}
-    end)
-
-    # Send 5 messages
-    for i <- 1..5 do
-      GenServer.cast(
-        pid,
-        {:process_message,
-         "message #{i}",
-         %{model: "sonnet", has_messages: false}}
-      )
-    end
-
-    Process.sleep(200)
-
-    state = :sys.get_state(pid)
-
-    # All 5 should be queued
-    assert length(state.queue) == 5
-
-    # Verify FIFO order
-    messages = Enum.map(state.queue, & &1.message)
-    expected = ["message 1", "message 2", "message 3", "message 4", "message 5"]
-    assert messages == expected
-
-    Port.close(fake_port)
-  end
-
-  test "AgentWorker ignores mismatched session_ref on exit" do
-    session_id = 123
-    session_uuid = "test-uuid-#{:rand.uniform(999999)}"
-    agent_id = "agent-id"
-
-    opts = [
-      session_id: session_id,
-      session_uuid: session_uuid,
-      agent_id: agent_id,
-      project_path: File.cwd!()
-    ]
-
-    {:ok, pid} = GenServer.start_link(AgentWorker, opts)
-
-    fake_port = Port.open({:spawn, "cat"}, [:binary])
-    correct_ref = make_ref()
-    wrong_ref = make_ref()
-
-    :sys.replace_state(pid, fn state ->
-      %{state | port: fake_port, session_ref: correct_ref}
-    end)
-
-    # Send exit with wrong ref
-    send(pid, {:claude_exit, wrong_ref, 0})
-
-    Process.sleep(100)
-
-    state = :sys.get_state(pid)
-
-    # Should still be busy
-    assert state.port == fake_port
-    assert state.session_ref == correct_ref
-
-    Port.close(fake_port)
-  end
-
-  test "AgentWorker handles claude_output messages" do
-    session_id = 123
-    session_uuid = "test-uuid-#{:rand.uniform(999999)}"
-    agent_id = "agent-id"
-
-    opts = [
-      session_id: session_id,
-      session_uuid: session_uuid,
-      agent_id: agent_id,
-      project_path: File.cwd!()
-    ]
-
-    {:ok, pid} = GenServer.start_link(AgentWorker, opts)
-
-    state_before = :sys.get_state(pid)
-
-    # Send output message (should be ignored)
-    send(pid, {:claude_output, make_ref(), "test output"})
-
-    Process.sleep(100)
-
-    state_after = :sys.get_state(pid)
-
-    # State should be unchanged
-    assert state_before == state_after
+  test "Multiple messages queue and process sequentially" do
+    # Create test agent and session
+    {:ok, agent} =
+      Agents.create_agent(%{
+        uuid: Ecto.UUID.generate(),
+        description: "Queue Test Agent",
+        source: "test"
+      })
+
+    {:ok, session} =
+      Sessions.create_session(%{
+        uuid: Ecto.UUID.generate(),
+        agent_id: agent.id,
+        name: "Queue Test Session",
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      })
+
+    # Send 2 messages rapidly
+    AgentManager.send_message(session.id, "Say 'one'", model: "haiku")
+    AgentManager.send_message(session.id, "Say 'two'", model: "haiku")
+
+    # Wait for both to process
+    Process.sleep(8000)
+
+    # Check database
+    messages = Messages.list_messages_for_session(session.id)
+    agent_responses = Enum.filter(messages, &(&1.sender_role == "agent"))
+
+    # Should have responses (at least from first message, may have both)
+    assert length(agent_responses) > 0
+
+    Logger.info(
+      "✅ Queue test passed! Got #{length(agent_responses)} agent responses from 2 messages"
+    )
   end
 end

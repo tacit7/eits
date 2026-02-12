@@ -210,15 +210,11 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
       Logger.info("Claude init confirmed for session #{state.session_id}")
     end
 
-    # Handle new JSON format: type="result" with structured output
+    # Handle new JSON format: type="result" with structured output (includes metadata)
     result = Map.get(parsed, "result") || Map.get(parsed, :result)
     if type == "result" && result do
       content = result
       message_uuid = Map.get(parsed, "uuid") || Map.get(parsed, :uuid)
-
-      # Log the full JSON to debug metadata extraction
-      Logger.info("🔍 DEBUG - Full parsed JSON keys: #{inspect(Map.keys(parsed))}")
-      Logger.info("🔍 DEBUG - Full parsed content: #{inspect(parsed, pretty: true)}")
 
       # Extract usage metadata for chat display (handle both string and atom keys)
       metadata = %{
@@ -230,8 +226,6 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
         model_usage: Map.get(parsed, "modelUsage") || Map.get(parsed, :modelUsage),
         is_error: Map.get(parsed, "is_error") || Map.get(parsed, :is_error)
       }
-
-      Logger.info("🔍 DEBUG - Extracted metadata: #{inspect(metadata)}")
 
       cost = Map.get(parsed, "total_cost_usd") || Map.get(parsed, :total_cost_usd)
       Logger.info("Result message detected - uuid: #{inspect(message_uuid)}, cost: $#{cost}")
@@ -261,31 +255,11 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
     end
 
     # Handle legacy stream-json format for backwards compatibility
+    # DISABLED: Assistant message saving skipped because result message (above) handles it
+    # The result message contains both content and metadata
     role = Map.get(parsed, "role") || Map.get(parsed, :role)
     if type == "assistant" || role == "assistant" do
-      content = extract_text_content(parsed)
-      message_uuid = Map.get(parsed, "uuid") || Map.get(parsed, :uuid)
-      Logger.info("Assistant message detected (legacy) - uuid: #{inspect(message_uuid)}")
-
-      if content && is_binary(content) && state.session_int_id do
-        session_int_id = state.session_int_id
-        opts = if message_uuid, do: [source_uuid: message_uuid], else: []
-
-        Task.Supervisor.start_child(EyeInTheSkyWeb.TaskSupervisor, fn ->
-          case Messages.record_incoming_reply(session_int_id, "claude", content, opts) do
-            {:ok, message} ->
-              Publisher.publish_message(message)
-              Logger.info("Recorded and published assistant message for session #{state.session_id}")
-
-            {:error, reason} ->
-              Logger.error(
-                "Failed to record assistant message for session #{state.session_id}: #{inspect(reason)}"
-              )
-          end
-        end)
-      else
-        Logger.warning("Assistant message with no valid text content: #{inspect(parsed)}")
-      end
+      Logger.debug("🔇 Assistant message detected but not saved (handled by result message)")
     end
 
     updated_buffer = [parsed | state.output_buffer]

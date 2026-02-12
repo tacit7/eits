@@ -108,6 +108,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
           |> assign(:processing, true)
           |> load_tab_data("messages", socket.assigns.session_id)
 
+        Logger.info("🔍 After load_tab_data, socket.assigns[:messages] = #{length(socket.assigns[:messages] || [])}")
+
         # Send to Claude via SessionManager using --resume (no NATS)
         session_id = socket.assigns.session_id
         session = socket.assigns.session
@@ -138,8 +140,12 @@ defmodule EyeInTheSkyWebWeb.DmLive do
             case result do
               {:ok, session_ref} ->
                 Logger.info("✅ Claude session started/resumed with ref: #{inspect(session_ref)}")
+                Logger.info("📨 About to return socket with #{length(socket.assigns[:messages] || [])} messages in assign")
 
-                {:noreply, assign(socket, :session_ref, session_ref)}
+                final_socket = assign(socket, :session_ref, session_ref)
+                Logger.info("🎯 Final socket assigns: messages=#{length(final_socket.assigns[:messages] || [])}, processing=#{final_socket.assigns[:processing]}, session_ref=#{inspect(final_socket.assigns[:session_ref])}")
+
+                {:noreply, final_socket}
 
               {:error, reason} ->
                 Logger.error("❌ Failed to start/resume Claude session: #{inspect(reason)}")
@@ -364,54 +370,63 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
-  def handle_info({:nats_message_for_agent, message_text}, socket) do
-    # NATS message received - automatically forward to Claude agent
+  def handle_info({:nats_message_for_agent, _message_text}, socket) do
+    # NATS message received - DISABLED FOR NOW to avoid duplicate messages
+    # TODO: Re-enable when deduplication is implemented
     require Logger
-    session_id = socket.assigns.session_id
-    session = socket.assigns.session
-    agent = socket.assigns.agent
-
-    Logger.info("Auto-forwarding NATS message to Claude agent for session #{session_id}")
-
-    session_uuid = socket.assigns.session_uuid
-
-    case resolve_project_path(session, agent) do
-      {:ok, project_path} ->
-        has_messages = Messages.count_messages_for_session(session_id) > 1
-
-        result =
-          if has_messages do
-            EyeInTheSkyWeb.Claude.SessionManager.resume_session(session_uuid, message_text,
-              model: "sonnet",
-              project_path: project_path
-            )
-          else
-            EyeInTheSkyWeb.Claude.SessionManager.start_session(session_uuid, message_text,
-              model: "sonnet",
-              project_path: project_path
-            )
-          end
-
-        case result do
-          {:ok, session_ref} ->
-            socket =
-              socket
-              |> assign(:session_ref, session_ref)
-              |> assign(:processing, true)
-              |> load_tab_data("messages", socket.assigns.session_id)
-
-            {:noreply, socket}
-
-          {:error, reason} ->
-            Logger.error("Failed to forward NATS message to Claude: #{inspect(reason)}")
-            {:noreply, socket}
-        end
-
-      {:error, :no_project_path} ->
-        Logger.error("Cannot forward NATS message: no project path configured")
-        {:noreply, socket}
-    end
+    Logger.debug("🔇 NATS message ignored (NATS processing disabled)")
+    {:noreply, socket}
   end
+
+  # NATS processing code kept below for reference:
+  # def handle_info({:nats_message_for_agent, message_text}, socket) do
+  #   # NATS message received - automatically forward to Claude agent
+  #   require Logger
+  #   session_id = socket.assigns.session_id
+  #   session = socket.assigns.session
+  #   agent = socket.assigns.agent
+  #
+  #   Logger.info("Auto-forwarding NATS message to Claude agent for session #{session_id}")
+  #
+  #   session_uuid = socket.assigns.session_uuid
+  #
+  #   case resolve_project_path(session, agent) do
+  #     {:ok, project_path} ->
+  #       has_messages = Messages.count_messages_for_session(session_id) > 1
+  #
+  #       result =
+  #         if has_messages do
+  #           EyeInTheSkyWeb.Claude.SessionManager.resume_session(session_uuid, message_text,
+  #             model: "sonnet",
+  #             project_path: project_path
+  #           )
+  #         else
+  #           EyeInTheSkyWeb.Claude.SessionManager.start_session(session_uuid, message_text,
+  #             model: "sonnet",
+  #             project_path: project_path
+  #           )
+  #         end
+  #
+  #       case result do
+  #         {:ok, session_ref} ->
+  #           socket =
+  #             socket
+  #             |> assign(:session_ref, session_ref)
+  #             |> assign(:processing, true)
+  #             |> load_tab_data("messages", socket.assigns.session_id)
+  #
+  #           {:noreply, socket}
+  #
+  #         {:error, reason} ->
+  #           Logger.error("Failed to forward NATS message to Claude: #{inspect(reason)}")
+  #           {:noreply, socket}
+  #       end
+  #
+  #     {:error, :no_project_path} ->
+  #       Logger.error("Cannot forward NATS message: no project path configured")
+  #       {:noreply, socket}
+  #   end
+  # end
 
   @impl true
   def handle_info({:claude_complete, session_ref, exit_code}, socket) do
@@ -436,12 +451,17 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   defp load_tab_data(socket, tab, session_id) do
+    require Logger
+    Logger.info("📋 load_tab_data called: tab=#{tab}, session_id=#{session_id}")
+
     {messages, has_more} = if tab == "messages" do
       limit = socket.assigns[:message_limit] || 20
       # Fetch one extra to detect if more exist
       fetched =
         Messages.list_recent_messages(session_id, limit + 1)
         |> EyeInTheSkyWeb.Repo.preload(:attachments)
+
+      Logger.info("📋 Fetched #{length(fetched)} messages for session #{session_id}")
 
       if length(fetched) > limit do
         {Enum.drop(fetched, 1), true}
@@ -511,8 +531,13 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       </div>
 
       <div class="px-4 py-6">
+        <!-- DEBUG: active_tab = <%= @active_tab %> -->
+        <div style="background: red; color: white; padding: 10px; margin-bottom: 10px;">
+          DEBUG: Messages length = <%= length(@messages) %>, active_tab = <%= @active_tab %>
+        </div>
         <%= case @active_tab do %>
           <% "messages" -> %>
+            <!-- DEBUG: rendering messages tab, @messages length = <%= length(@messages) %>, @has_more_messages = <%= @has_more_messages %> -->
             <div class="flex flex-col h-[calc(100vh-16rem)]">
               <div class="flex items-center justify-between mb-2">
                 <span class="text-xs text-base-content/40"><%= length(@messages) %> messages</span>

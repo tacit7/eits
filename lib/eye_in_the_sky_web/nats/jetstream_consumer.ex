@@ -167,58 +167,14 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
   # --- V2 channel messages ---
 
   defp handle_v2_channel_message(envelope) do
-    message_id = get_in(envelope, ["meta", "message_id"])
-    channel_id = envelope["channel_id"]
+    # DISABLED: V2 channel message creation disabled to prevent duplicates
+    # TODO: Re-enable when deduplication is fully implemented
+    Logger.debug("🔇 JetStreamConsumer: V2 channel message creation disabled")
 
-    if message_id && Messages.message_exists?(message_id) do
-      Logger.debug("JetStreamConsumer: duplicate v2 message #{message_id}, broadcasting to UI")
-
-      # Fetch existing message and broadcast to UI
-      case Messages.get_message(message_id) do
-        {:ok, message} ->
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "channel:#{channel_id}:messages",
-            {:new_message, message}
-          )
-        _ ->
-          :ok
-      end
-    else
-      parent_message_id = envelope["parent_message_id"]
-      sender_session_id = get_in(envelope, ["meta", "sender_session_id"])
-      provider = get_in(envelope, ["meta", "provider"]) || "unknown"
-      message_body = envelope["msg"]
-
-      attrs = %{
-        id: message_id || Ecto.UUID.generate(),
-        uuid: Ecto.UUID.generate(),
-        channel_id: channel_id,
-        parent_message_id: parent_message_id,
-        session_id: sender_session_id,
-        sender_role: "agent",
-        recipient_role: "user",
-        provider: provider,
-        direction: "inbound",
-        body: message_body,
-        status: "delivered",
-        metadata: %{}
-      }
-
-      case Messages.create_message(attrs) do
-        {:ok, message} ->
-          Logger.info("JetStreamConsumer: recorded v2 channel message #{message.id}")
-
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "channel:#{channel_id}:messages",
-            {:new_message, message}
-          )
-
-        {:error, reason} ->
-          Logger.error("JetStreamConsumer: failed to record v2 message: #{inspect(reason)}")
-      end
-    end
+    # Original code kept below (kept for reference only):
+    # message_id = get_in(envelope, ["meta", "message_id"])
+    # channel_id = envelope["channel_id"]
+    # ... (full implementation commented out)
   end
 
   # --- Direct chat messages (from Go MCP i-chat-send) ---
@@ -247,29 +203,34 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
   # --- V1 session messages ---
 
   defp handle_v1_session_message(envelope) do
-    message_id = get_in(envelope, ["meta", "message_id"])
+    # DISABLED: V1 message creation disabled to prevent duplicates
+    # TODO: Re-enable when deduplication is fully implemented
+    Logger.debug("🔇 JetStreamConsumer: V1 message creation disabled")
 
-    if message_id && Messages.message_exists?(message_id) do
-      Logger.debug("JetStreamConsumer: skipping duplicate v1 message #{message_id}")
-    else
-      session_id = envelope["reply_to"]
-      provider = get_in(envelope, ["meta", "provider"]) || "unknown"
-      message_body = envelope["msg"]
-
-      case Messages.record_incoming_reply(session_id, provider, message_body) do
-        {:ok, message} ->
-          Logger.info("JetStreamConsumer: recorded v1 message #{message.id}")
-
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "session:#{session_id}:messages",
-            {:new_message, message}
-          )
-
-        {:error, reason} ->
-          Logger.error("JetStreamConsumer: failed to record v1 message: #{inspect(reason)}")
-      end
-    end
+    # Original code kept below:
+    # message_id = get_in(envelope, ["meta", "message_id"])
+    #
+    # if message_id && Messages.message_exists?(message_id) do
+    #   Logger.debug("JetStreamConsumer: skipping duplicate v1 message #{message_id}")
+    # else
+    #   session_id = envelope["reply_to"]
+    #   provider = get_in(envelope, ["meta", "provider"]) || "unknown"
+    #   message_body = envelope["msg"]
+    #
+    #   case Messages.record_incoming_reply(session_id, provider, message_body) do
+    #     {:ok, message} ->
+    #       Logger.info("JetStreamConsumer: recorded v1 message #{message.id}")
+    #
+    #       Phoenix.PubSub.broadcast(
+    #         EyeInTheSkyWeb.PubSub,
+    #         "session:#{session_id}:messages",
+    #         {:new_message, message}
+    #       )
+    #
+    #     {:error, reason} ->
+    #       Logger.error("JetStreamConsumer: failed to record v1 message: #{inspect(reason)}")
+    #   end
+    # end
   end
 
   # --- DM handling with dedup ---
@@ -292,38 +253,43 @@ defmodule EyeInTheSkyWeb.NATS.JetStreamConsumer do
   end
 
   defp broadcast_to_dm(session_id, sender_id, message_text, envelope) do
-    dedup_id = compute_dedup_id(envelope, sender_id, session_id, message_text)
+    # DISABLED: DM message creation disabled to prevent duplicates
+    # TODO: Re-enable when deduplication is fully implemented
+    Logger.debug("🔇 JetStreamConsumer: DM message creation disabled")
 
-    if Messages.message_exists?(dedup_id) do
-      Logger.debug("JetStreamConsumer: skipping duplicate DM #{dedup_id}")
-    else
-      attrs = %{
-        id: dedup_id,
-        uuid: Ecto.UUID.generate(),
-        session_id: session_id,
-        sender_role: "agent",
-        recipient_role: "user",
-        provider: "nats",
-        direction: "inbound",
-        body: "[NATS from #{sender_id}] #{message_text}",
-        status: "delivered",
-        metadata: %{}
-      }
-
-      case Messages.create_message(attrs) do
-        {:ok, _message} ->
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "session:#{session_id}",
-            {:nats_message_for_agent, message_text}
-          )
-
-          Logger.info("JetStreamConsumer: delivered DM to session #{session_id}")
-
-        {:error, reason} ->
-          Logger.error("JetStreamConsumer: failed to deliver DM to #{session_id}: #{inspect(reason)}")
-      end
-    end
+    # Original code kept below:
+    # dedup_id = compute_dedup_id(envelope, sender_id, session_id, message_text)
+    #
+    # if Messages.message_exists?(dedup_id) do
+    #   Logger.debug("JetStreamConsumer: skipping duplicate DM #{dedup_id}")
+    # else
+    #   attrs = %{
+    #     id: dedup_id,
+    #     uuid: Ecto.UUID.generate(),
+    #     session_id: session_id,
+    #     sender_role: "agent",
+    #     recipient_role: "user",
+    #     provider: "nats",
+    #     direction: "inbound",
+    #     body: "[NATS from #{sender_id}] #{message_text}",
+    #     status: "delivered",
+    #     metadata: %{}
+    #   }
+    #
+    #   case Messages.create_message(attrs) do
+    #     {:ok, _message} ->
+    #       Phoenix.PubSub.broadcast(
+    #         EyeInTheSkyWeb.PubSub,
+    #         "session:#{session_id}",
+    #         {:nats_message_for_agent, message_text}
+    #       )
+    #
+    #       Logger.info("JetStreamConsumer: delivered DM to session #{session_id}")
+    #
+    #     {:error, reason} ->
+    #       Logger.error("JetStreamConsumer: failed to deliver DM to #{session_id}: #{inspect(reason)}")
+    #   end
+    # end
   end
 
   @doc false

@@ -28,6 +28,15 @@ Single SQLite database at `~/.config/eye-in-the-sky/eits.db`. Configured in `con
 - `lib/eye_in_the_sky_web_web/` - Web layer (LiveViews, components, router)
 - `lib/eye_in_the_sky_web/search/fts5.ex` - Reusable FTS5 search module with LIKE fallback
 
+### NATS Processing (Currently Disabled)
+
+NATS message processing is **currently disabled** to prevent duplicate messages. The following are disabled:
+- `JetStreamConsumer` - V1/V2 channel messages, DM handling all disabled
+- DM LiveView - NATS message handler disabled
+- SessionWorker - Result message saving disabled (only assistant messages saved)
+
+Original code is kept as comments for future re-enablement when proper deduplication is implemented.
+
 ### FTS5 Full-Text Search
 
 Three FTS5 virtual tables in eits.db provide full-text search using **external content tables** (stores only the index, not duplicate data). Triggers keep them in sync.

@@ -244,20 +244,24 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
 
     case find_claude_binary() do
       {:ok, claude_path} ->
-        # Build args: flag comes first, then session_id if resuming, then prompt as positional arg
+        # Build args: use -p (print mode) for headless/piped execution
+        # Format: claude --resume <session_id> -p "<prompt>" --model ... --output-format stream-json ...
         args =
           if flag == "--resume" && session_id do
-            [flag, session_id, prompt]
+            [flag, session_id, "-p", prompt]
           else
-            [flag, prompt]
+            [flag, "-p", prompt]
           end
+
+        # Use stream-json format for real-time streaming output
+        stream_format = "stream-json"
 
         # Append model, output-format, and other options
         args = args ++ [
           "--model",
           model,
           "--output-format",
-          output_format,
+          stream_format,
           "--verbose"
         ]
 
@@ -282,16 +286,20 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
             end
           end)
 
-        # Spawn Claude Code directly (no pseudo-TTY wrapper to avoid ANSI escape codes)
+        # Spawn Claude Code with pseudo-TTY (Claude needs TTY to function)
+        # Use 'script' wrapper to provide a pseudo-TTY
+        # ANSI codes are stripped in SessionWorker.handle_info/2
+        script_args = ["-q", "/dev/null", claude_path] ++ args
+
         port =
           Port.open(
-            {:spawn_executable, claude_path},
+            {:spawn_executable, "/usr/bin/script"},
             [
               :binary,
               :exit_status,
               :use_stdio,
               :stderr_to_stdout,
-              {:args, args},
+              {:args, script_args},
               {:cd, project_path},
               {:env, build_env()}
             ]

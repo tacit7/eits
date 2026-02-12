@@ -31,7 +31,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   end
 
   defp lookup_or_start(session_id) do
-    case Registry.lookup(EyeInTheSkyWeb.Claude.Registry, {:agent_worker, session_id}) do
+    case Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, session_id) do
       [{pid, _}] ->
         {:ok, pid}
 

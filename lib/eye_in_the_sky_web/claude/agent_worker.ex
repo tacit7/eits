@@ -24,7 +24,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   end
 
   defp via_tuple(session_id) do
-    {:via, Registry, {EyeInTheSkyWeb.Claude.Registry, {:agent_worker, session_id}}}
+    {:via, Registry, {EyeInTheSkyWeb.Claude.AgentRegistry, session_id}}
   end
 
   # --- Server Callbacks ---

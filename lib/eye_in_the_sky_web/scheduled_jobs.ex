@@ -1,0 +1,211 @@
+defmodule EyeInTheSkyWeb.ScheduledJobs do
+  import Ecto.Query, warn: false
+
+  alias EyeInTheSkyWeb.Repo
+  alias EyeInTheSkyWeb.ScheduledJobs.{ScheduledJob, JobRun}
+
+  def list_jobs do
+    from(j in ScheduledJob,
+      order_by: [desc: j.origin, asc: j.name]
+    )
+    |> Repo.all()
+  end
+
+  def get_job!(id), do: Repo.get!(ScheduledJob, id)
+
+  def get_job(id) do
+    case Repo.get(ScheduledJob, id) do
+      nil -> {:error, :not_found}
+      job -> {:ok, job}
+    end
+  end
+
+  def create_job(attrs) do
+    now = iso_now()
+
+    attrs =
+      attrs
+      |> stringify_keys()
+      |> Map.put_new("origin", "user")
+      |> Map.put_new("created_at", now)
+      |> Map.put_new("updated_at", now)
+      |> maybe_encode_config()
+
+    changeset = ScheduledJob.changeset(%ScheduledJob{}, attrs)
+
+    case Repo.insert(changeset) do
+      {:ok, job} ->
+        next = compute_next_run_at(job.schedule_type, job.schedule_value)
+        {:ok, _} = update_job_fields(job, %{next_run_at: next})
+        {:ok, Repo.get!(ScheduledJob, job.id)}
+
+      error ->
+        error
+    end
+  end
+
+  def update_job(%ScheduledJob{} = job, attrs) do
+    now = iso_now()
+
+    attrs =
+      attrs
+      |> stringify_keys()
+      |> Map.delete("origin")
+      |> Map.put("updated_at", now)
+      |> maybe_encode_config()
+
+    case job |> ScheduledJob.changeset(attrs) |> Repo.update() do
+      {:ok, updated} ->
+        next = compute_next_run_at(updated.schedule_type, updated.schedule_value)
+        update_job_fields(updated, %{next_run_at: next})
+        {:ok, Repo.get!(ScheduledJob, updated.id)}
+
+      error ->
+        error
+    end
+  end
+
+  def delete_job(%ScheduledJob{origin: "system"}), do: {:error, :system_job}
+
+  def delete_job(%ScheduledJob{} = job), do: Repo.delete(job)
+
+  def toggle_job(%ScheduledJob{} = job) do
+    new_enabled = if job.enabled == 1, do: 0, else: 1
+    update_job_fields(job, %{enabled: new_enabled, updated_at: iso_now()})
+  end
+
+  def list_runs_for_job(job_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 20)
+
+    from(r in JobRun,
+      where: r.job_id == ^job_id,
+      order_by: [desc: r.started_at],
+      limit: ^limit
+    )
+    |> Repo.all()
+  end
+
+  def record_run_start(job) do
+    %JobRun{}
+    |> JobRun.changeset(%{
+      job_id: job.id,
+      status: "running",
+      started_at: iso_now()
+    })
+    |> Repo.insert()
+  end
+
+  def record_run_complete(run, status, opts \\ []) do
+    result = Keyword.get(opts, :result)
+    session_id = Keyword.get(opts, :session_id)
+
+    run
+    |> JobRun.changeset(%{
+      status: status,
+      completed_at: iso_now(),
+      result: result,
+      session_id: session_id
+    })
+    |> Repo.update()
+  end
+
+  def compute_next_run_at(schedule_type, schedule_value, from \\ nil) do
+    from = from || NaiveDateTime.utc_now()
+
+    case schedule_type do
+      "interval" ->
+        seconds = String.to_integer(schedule_value)
+        NaiveDateTime.add(from, seconds) |> NaiveDateTime.to_iso8601() |> Kernel.<>("Z")
+
+      "cron" ->
+        case Crontab.CronExpression.Parser.parse(schedule_value) do
+          {:ok, parsed} ->
+            case Crontab.Scheduler.get_next_run_date(parsed, from) do
+              {:ok, next} -> NaiveDateTime.to_iso8601(next) <> "Z"
+              _ -> nil
+            end
+
+          {:error, _} ->
+            nil
+        end
+    end
+  end
+
+  @doc "Enqueue the appropriate Oban worker for a scheduled job."
+  def enqueue_job(%ScheduledJob{} = job) do
+    worker =
+      case job.job_type do
+        "shell_command" -> EyeInTheSkyWeb.Workers.ShellCommandWorker
+        "spawn_agent" -> EyeInTheSkyWeb.Workers.SpawnAgentWorker
+        "mix_task" -> EyeInTheSkyWeb.Workers.MixTaskWorker
+      end
+
+    %{"job_id" => job.id}
+    |> worker.new()
+    |> Oban.insert()
+  end
+
+  def due_jobs do
+    now = iso_now()
+
+    from(j in ScheduledJob,
+      where: j.enabled == 1 and not is_nil(j.next_run_at) and j.next_run_at <= ^now
+    )
+    |> Repo.all()
+  end
+
+  def mark_job_executed(job) do
+    now = NaiveDateTime.utc_now()
+    next = compute_next_run_at(job.schedule_type, job.schedule_value, now)
+
+    update_job_fields(job, %{
+      last_run_at: iso_now(),
+      next_run_at: next,
+      run_count: (job.run_count || 0) + 1,
+      updated_at: iso_now()
+    })
+  end
+
+  def decode_config(%ScheduledJob{config: config}) when is_binary(config) do
+    case Jason.decode(config) do
+      {:ok, map} -> map
+      _ -> %{}
+    end
+  end
+
+  def decode_config(_), do: %{}
+
+  def encode_config(map) when is_map(map), do: Jason.encode!(map)
+  def encode_config(str) when is_binary(str), do: str
+
+  def change_job(%ScheduledJob{} = job, attrs \\ %{}) do
+    ScheduledJob.changeset(job, attrs)
+  end
+
+  # Private helpers
+
+  defp update_job_fields(job, fields) do
+    job |> ScheduledJob.changeset(fields) |> Repo.update()
+  end
+
+  defp stringify_keys(map) do
+    Map.new(map, fn
+      {k, v} when is_atom(k) -> {Atom.to_string(k), v}
+      {k, v} -> {k, v}
+    end)
+  end
+
+  defp maybe_encode_config(attrs) do
+    case attrs["config"] do
+      val when is_map(val) -> Map.put(attrs, "config", Jason.encode!(val))
+      _ -> attrs
+    end
+  end
+
+  defp iso_now do
+    NaiveDateTime.utc_now()
+    |> NaiveDateTime.truncate(:second)
+    |> NaiveDateTime.to_iso8601()
+    |> Kernel.<>("Z")
+  end
+end

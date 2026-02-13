@@ -20,6 +20,7 @@ defmodule EyeInTheSkyWebWeb.Components.OverviewNav do
           <.nav_tab href={~p"/prompts"} icon="hero-chat-bubble-left-right" label="Prompts" active={@current_tab == :prompts} />
           <.nav_tab href={~p"/skills"} icon="hero-bolt" label="Skills" active={@current_tab == :skills} />
           <.nav_tab href={~p"/config"} icon="hero-cog-6-tooth" label="Claude Config" active={@current_tab == :config} />
+          <.nav_tab href={~p"/jobs"} icon="hero-calendar-days" label="Jobs" active={@current_tab == :jobs} />
         </div>
       </div>
     </div>

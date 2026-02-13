@@ -23,6 +23,7 @@ defmodule EyeInTheSkyWebWeb.Router do
     live "/usage", OverviewLive.Usage, :index
     live "/skills", OverviewLive.Skills, :index
     live "/config", OverviewLive.Config, :index
+    live "/jobs", OverviewLive.Jobs, :index
     live "/sessions", SessionLive.Index, :index
     live "/nats", NatsLive.Index, :index
     live "/prompts", PromptLive.Index, :index

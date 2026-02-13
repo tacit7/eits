@@ -7,6 +7,8 @@ defmodule EyeInTheSkyWeb.Application do
 
   @impl true
   def start(_type, _args) do
+    Oban.Telemetry.attach_default_logger(:info)
+
     children = [
       # Disabled SSR - server module not built
       # {NodeJS.Supervisor, [path: LiveSvelte.SSR.NodeJS.server_path(), pool_size: 4]},
@@ -31,6 +33,10 @@ defmodule EyeInTheSkyWeb.Application do
       {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.AgentSupervisor, strategy: :one_for_one},
       # Claude CLI session coordinator
       EyeInTheSkyWeb.Claude.SessionManager,
+      # Oban job processing
+      {Oban, Application.fetch_env!(:eye_in_the_sky_web, Oban)},
+      # Scheduled jobs enqueuer (polls due jobs, enqueues Oban workers)
+      EyeInTheSkyWeb.Scheduler.JobEnqueuer,
       # Start to serve requests, typically the last entry
       EyeInTheSkyWebWeb.Endpoint
     ]

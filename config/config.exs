@@ -53,6 +53,12 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# Oban job processing
+config :eye_in_the_sky_web, Oban,
+  engine: Oban.Engines.Lite,
+  queues: [jobs: 5],
+  repo: EyeInTheSkyWeb.Repo
+
 # NATS connection
 config :eye_in_the_sky_web, :nats,
   host: "localhost",

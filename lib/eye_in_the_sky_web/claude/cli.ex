@@ -196,7 +196,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     * `:continue` - `-c` flag
     * `:model` - `--model <model>`
     * `:output_format` - `--output-format <fmt>` (default: "stream-json")
-    * `:verbose` - `--verbose` (default: true)
+    * `:verbose` - `--verbose` (forced true when output_format is "stream-json")
     * `:skip_permissions` - `--dangerously-skip-permissions` (default: true)
     * `:max_turns` - `--max-turns <n>`
     * `:system_prompt` - `--system-prompt <text>`
@@ -246,7 +246,9 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     args = maybe_flag(args, "--mcp-config", opts[:mcp_config])
 
     # Boolean flags
-    args = if opts[:verbose], do: args ++ ["--verbose"], else: args
+    # stream-json requires --verbose for proper output parsing
+    verbose = opts[:verbose] || opts[:output_format] == "stream-json"
+    args = if verbose, do: args ++ ["--verbose"], else: args
     args = if opts[:skip_permissions], do: args ++ ["--dangerously-skip-permissions"], else: args
 
     args
@@ -278,17 +280,22 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   defp spawn_cli(opts) do
     opts = normalize_opts(opts)
 
-    case validate_opts(opts) do
+    # Merge DB defaults before validation so invalid DB values are caught
+    db_defaults = Settings.get_cli_defaults()
+    explicit = Keyword.filter(opts, fn {_k, v} -> v != nil end)
+    merged = Keyword.merge(db_defaults, explicit)
+
+    case validate_opts(merged) do
       {:error, _} = err ->
         err
 
       :ok ->
-        project_path = Keyword.get(opts, :project_path, File.cwd!())
+        project_path = Keyword.get(merged, :project_path, File.cwd!())
 
         if !File.dir?(project_path) do
           {:error, {:invalid_project_path, project_path}}
         else
-          do_spawn(opts, project_path)
+          do_spawn(merged, project_path)
         end
     end
   end
@@ -296,7 +303,12 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   defp do_spawn(opts, project_path) do
     caller = Keyword.get(opts, :caller, self())
     session_ref = Keyword.get(opts, :session_ref, make_ref())
-    idle_timeout_ms = Keyword.get(opts, :idle_timeout_ms, @default_idle_timeout_ms)
+
+    idle_timeout_ms =
+      case Keyword.get(opts, :idle_timeout_ms, @default_idle_timeout_ms) do
+        n when is_integer(n) and n > 0 -> n
+        _ -> @default_idle_timeout_ms
+      end
 
     case find_claude_binary() do
       {:ok, claude_path} ->
@@ -354,12 +366,14 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
       | base_env
     ]
 
+    # Only trust env var if it's non-empty; otherwise fall back to DB
     env =
-      if Enum.any?(env, fn {k, _} -> k == ~c"ANTHROPIC_API_KEY" end) do
+      if Enum.any?(env, fn {k, v} -> k == ~c"ANTHROPIC_API_KEY" and v != ~c"" end) do
         env
       else
         case EyeInTheSkyWeb.Settings.get_setting("api_key_anthropic") do
           nil -> env
+          "" -> env
           key -> [{~c"ANTHROPIC_API_KEY", String.to_charlist(key)} | env]
         end
       end

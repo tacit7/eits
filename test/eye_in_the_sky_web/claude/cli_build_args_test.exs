@@ -212,8 +212,8 @@ defmodule EyeInTheSkyWeb.Claude.CLIBuildArgsTest do
       assert "--verbose" in args
     end
 
-    test "verbose false omits --verbose" do
-      args = CLI.build_args(prompt: "x", verbose: false)
+    test "verbose false omits --verbose when output_format is not stream-json" do
+      args = CLI.build_args(prompt: "x", verbose: false, output_format: "json")
 
       refute "--verbose" in args
     end
@@ -334,6 +334,37 @@ defmodule EyeInTheSkyWeb.Claude.CLIBuildArgsTest do
       idx = Enum.find_index(args, &(&1 == "--allowedTools"))
       assert idx != nil
       assert Enum.at(args, idx + 1) == "Bash,Read"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # stream-json forces --verbose
+  # ---------------------------------------------------------------------------
+
+  describe "build_args/1 stream-json verbose invariant" do
+    test "stream-json output_format forces --verbose even when verbose not set" do
+      args = CLI.build_args(prompt: "x", output_format: "stream-json")
+
+      assert "--verbose" in args
+    end
+
+    test "stream-json from DB default forces --verbose" do
+      # Default fallback is stream-json, so --verbose should always appear
+      args = CLI.build_args(prompt: "x")
+
+      assert "--verbose" in args
+    end
+
+    test "json output_format does NOT force --verbose" do
+      args = CLI.build_args(prompt: "x", output_format: "json", verbose: false)
+
+      refute "--verbose" in args
+    end
+
+    test "explicit verbose: false still loses to stream-json" do
+      args = CLI.build_args(prompt: "x", output_format: "stream-json", verbose: false)
+
+      assert "--verbose" in args
     end
   end
 end

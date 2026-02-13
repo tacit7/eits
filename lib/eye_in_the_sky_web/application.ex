@@ -25,8 +25,6 @@ defmodule EyeInTheSkyWeb.Application do
       {Task.Supervisor, name: EyeInTheSkyWeb.TaskSupervisor},
       # Registry for per-session worker lookups (duplicate keys: ref + session_id)
       {Registry, keys: :duplicate, name: EyeInTheSkyWeb.Claude.Registry},
-      # Registry for persistent agent workers (unique keys: one per session)
-      {Registry, keys: :unique, name: EyeInTheSkyWeb.Claude.AgentRegistry},
       # DynamicSupervisor for per-session workers
       {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.SessionSupervisor, strategy: :one_for_one},
       # DynamicSupervisor for persistent agent workers

@@ -31,19 +31,21 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   end
 
   defp lookup_or_start(session_id) do
-    case Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, session_id) do
-      [{pid, _}] ->
-        {:ok, pid}
+    name = String.to_atom("agent_worker_#{session_id}")
 
-      [] ->
+    case Process.whereis(name) do
+      nil ->
         start_agent_worker(session_id)
+
+      pid ->
+        {:ok, pid}
     end
   end
 
   defp start_agent_worker(session_id) do
     with {:ok, session} <- Sessions.get_session(session_id),
          {:ok, agent} <- Agents.get_agent(session.agent_id) do
-      project_path = agent.git_worktree_path || File.cwd!()
+      project_path = session.git_worktree_path || agent.git_worktree_path || File.cwd!()
 
       opts = [
         session_id: session.id,

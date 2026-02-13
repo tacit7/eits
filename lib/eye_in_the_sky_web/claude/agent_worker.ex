@@ -17,15 +17,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   def start_link(opts) do
     session_id = Keyword.fetch!(opts, :session_id)
-    GenServer.start_link(__MODULE__, opts, name: via_tuple(session_id))
+    name = String.to_atom("agent_worker_#{session_id}")
+    GenServer.start_link(__MODULE__, opts, name: name)
   end
 
   def process_message(session_id, message, context) do
-    GenServer.cast(via_tuple(session_id), {:process_message, message, context})
-  end
-
-  defp via_tuple(session_id) do
-    {:via, Registry, {EyeInTheSkyWeb.Claude.AgentRegistry, session_id}}
+    name = String.to_atom("agent_worker_#{session_id}")
+    GenServer.cast(name, {:process_message, message, context})
   end
 
   # --- Server Callbacks ---
@@ -61,12 +59,17 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       queued_at: DateTime.utc_now()
     }
 
+    model = context[:model] || "sonnet"
+
     if state.port == nil do
       # Idle, spawn Claude immediately
-      Logger.info("Agent #{state.session_id} idle, spawning Claude")
+      Logger.info("🚀 [#{state.session_id}] Agent idle, spawning Claude (model: #{model})")
+      Logger.debug("   Prompt: #{String.slice(message, 0..100)}...")
 
       case spawn_claude(state, job) do
         {:ok, port, session_ref} ->
+          Logger.info("✅ [#{state.session_id}] Claude spawned successfully (ref: #{inspect(session_ref)})")
+
           # Broadcast working state
           Phoenix.PubSub.broadcast(
             EyeInTheSkyWeb.PubSub,
@@ -77,33 +80,37 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
           {:noreply, %{state | port: port, current_job: job, session_ref: session_ref}}
 
         {:error, reason} ->
-          Logger.error("Failed to spawn Claude: #{inspect(reason)}")
+          Logger.error("❌ [#{state.session_id}] Failed to spawn Claude: #{inspect(reason)}")
           {:noreply, state}
       end
     else
       # Busy, queue the job
-      Logger.info("Agent #{state.session_id} busy, queueing message")
+      queue_size = length(state.queue)
+      Logger.info("⏳ [#{state.session_id}] Agent busy, queueing message (queue size: #{queue_size})")
+      Logger.debug("   Queued prompt: #{String.slice(message, 0..100)}...")
+
       {:noreply, %{state | queue: state.queue ++ [job]}}
     end
   end
 
   @impl true
   def handle_info({:claude_output, _ref, line}, state) do
-    Logger.debug("Claude output: #{String.slice(line, 0..100)}...")
-
-    # Parse and handle Claude output
     clean_line = strip_ansi_codes(line)
 
     case Jason.decode(clean_line) do
       {:ok, parsed} ->
+        type = Map.get(parsed, "type")
+        Logger.debug("📨 [#{state.session_id}] Received output: type=#{type}")
+
         try do
           handle_claude_result(parsed, state)
         rescue
           e ->
-            Logger.error("Error handling Claude result: #{inspect(e)}")
+            Logger.error("❌ [#{state.session_id}] Error handling Claude result: #{inspect(e)}")
             # Still try to broadcast the result even if database save fails
             result = Map.get(parsed, "result")
             if result && is_binary(result) do
+              Logger.warning("⚠️  [#{state.session_id}] Broadcasting result without DB save")
               Phoenix.PubSub.broadcast(
                 EyeInTheSkyWeb.PubSub,
                 "session:#{state.session_id}",
@@ -112,9 +119,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
             end
         end
 
-      {:error, reason} ->
+      {:error, _reason} ->
         if String.trim(clean_line) != "" do
-          Logger.debug("Non-JSON output: #{clean_line}")
+          Logger.debug("📝 [#{state.session_id}] Non-JSON: #{String.slice(clean_line, 0..50)}")
         end
     end
 
@@ -123,7 +130,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   @impl true
   def handle_info({:claude_exit, session_ref, exit_code}, state) when session_ref == state.session_ref do
-    Logger.info("Claude exited for agent #{state.session_id} (exit code: #{exit_code})")
+    status_emoji = if exit_code == 0, do: "✅", else: "❌"
+    Logger.info("#{status_emoji} [#{state.session_id}] Claude exited (code: #{exit_code})")
 
     # Broadcast stopped state
     Phoenix.PubSub.broadcast(
@@ -136,12 +144,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     case state.queue do
       [] ->
         # Queue empty, go idle
-        Logger.info("Agent #{state.session_id} queue empty, going idle")
+        Logger.info("😴 [#{state.session_id}] Queue empty, agent going idle")
         {:noreply, %{state | port: nil, current_job: nil, session_ref: nil}}
 
       [next_job | rest] ->
         # Process next job
-        Logger.info("Agent #{state.session_id} processing next queued job (#{length(rest)} remaining in queue)")
+        remaining = length(rest)
+        Logger.info("📋 [#{state.session_id}] Processing next queued job (#{remaining} more in queue)")
 
         case spawn_claude(state, next_job) do
           {:ok, port, session_ref} ->
@@ -210,10 +219,14 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
         if result && is_binary(result) && state.session_id do
           message_uuid = Map.get(parsed, "uuid") || Map.get(parsed, :uuid)
+          duration_ms = Map.get(parsed, "duration_ms")
+          cost = Map.get(parsed, "total_cost_usd")
+
+          Logger.info("💬 [#{state.session_id}] Claude result: #{String.slice(result, 0..50)}... (#{duration_ms}ms, $#{cost})")
 
           metadata = %{
-            duration_ms: Map.get(parsed, "duration_ms"),
-            total_cost_usd: Map.get(parsed, "total_cost_usd"),
+            duration_ms: duration_ms,
+            total_cost_usd: cost,
             usage: Map.get(parsed, "usage"),
             is_error: Map.get(parsed, "is_error")
           }
@@ -226,6 +239,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
           # Try to save to database, but don't fail if we can't (e.g., in tests with sandbox)
           case Messages.record_incoming_reply(state.session_id, "claude", result, opts) do
             {:ok, message} ->
+              Logger.debug("💾 [#{state.session_id}] Message saved to DB (ID: #{message.id})")
               # Broadcast the message via PubSub
               Phoenix.PubSub.broadcast(
                 EyeInTheSkyWeb.PubSub,
@@ -236,6 +250,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
             {:error, _reason} ->
               # If database save fails, still broadcast via PubSub for testing
+              Logger.warning("⚠️  [#{state.session_id}] DB save failed, broadcasting result only")
               Phoenix.PubSub.broadcast(
                 EyeInTheSkyWeb.PubSub,
                 "session:#{state.session_id}",
@@ -244,16 +259,14 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
               {:ok, :broadcast_only}
           end
         else
+          Logger.warning("⚠️  [#{state.session_id}] Result has no text content")
           {:ok, :no_result}
         end
 
       _ ->
+        Logger.debug("📬 [#{state.session_id}] Other message type: #{type}")
         {:ok, :other_type}
     end
-  end
-
-  defp handle_claude_result(_parsed, _state) do
-    {:ok, :non_map}
   end
 
   defp strip_ansi_codes(text) when is_binary(text) do

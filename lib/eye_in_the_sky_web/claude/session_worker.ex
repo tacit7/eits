@@ -16,7 +16,6 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
   alias EyeInTheSkyWeb.Claude.CLI
   alias EyeInTheSkyWeb.Messages
   alias EyeInTheSkyWeb.Sessions
-  alias EyeInTheSkyWeb.NATS.Publisher
 
   @registry EyeInTheSkyWeb.Claude.Registry
 
@@ -248,8 +247,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
 
         case Messages.record_incoming_reply(session_int_id, "claude", content, opts) do
           {:ok, message} ->
-            Publisher.publish_message(message)
-            Logger.info("Recorded and published result message for session #{state.session_id}")
+            Logger.info("Recorded result message for session #{state.session_id}")
 
           {:error, reason} ->
             Logger.error(

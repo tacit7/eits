@@ -116,8 +116,5 @@ defmodule EyeInTheSkyWeb.Messages.Broadcaster do
       "channel:#{channel_id}:messages",
       {:new_message, message}
     )
-
-    # Also publish to NATS for other agents
-    EyeInTheSkyWeb.NATS.Publisher.publish_channel_message(message, channel_id)
   end
 end

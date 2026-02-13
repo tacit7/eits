@@ -19,10 +19,6 @@ defmodule EyeInTheSkyWeb.Application do
       {DNSCluster,
        query: Application.get_env(:eye_in_the_sky_web, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: EyeInTheSkyWeb.PubSub},
-      # NATS connection + pub/sub relay (registers :gnat)
-      EyeInTheSkyWeb.NATS.Consumer,
-      # JetStream durable pull consumer (depends on :gnat from Consumer)
-      EyeInTheSkyWeb.NATS.JetStreamConsumer,
       # Task supervisor for fire-and-forget async work
       {Task.Supervisor, name: EyeInTheSkyWeb.TaskSupervisor},
       # Registry for per-session worker lookups (duplicate keys: ref + session_id)

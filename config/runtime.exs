@@ -65,14 +65,6 @@ if config_env() == :prod do
     ],
     secret_key_base: secret_key_base
 
-  # NATS connection (override via env vars in production)
-  config :eye_in_the_sky_web, :nats,
-    host: System.get_env("NATS_HOST") || "localhost",
-    port: String.to_integer(System.get_env("NATS_PORT") || "4222"),
-    stream_name: System.get_env("NATS_STREAM") || "EVENTS",
-    consumer_name: System.get_env("NATS_CONSUMER") || "eits-web",
-    filter_subject: System.get_env("NATS_FILTER") || "events.>"
-
   # ## SSL Support
   #
   # To get SSL working, you will need to add the `https` key

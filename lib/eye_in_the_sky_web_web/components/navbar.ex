@@ -28,7 +28,6 @@ defmodule EyeInTheSkyWebWeb.Components.Navbar do
             <li><a href="/">Overview</a></li>
             <li><a href="/prompts">Prompts</a></li>
             <li><a href="/chat">Chat</a></li>
-            <li><a href="/nats">NATS</a></li>
           </ul>
         </div>
         <div class="navbar-end gap-2">

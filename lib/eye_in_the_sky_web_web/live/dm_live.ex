@@ -358,64 +358,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     {:noreply, socket}
   end
 
-  @impl true
-  def handle_info({:nats_message_for_agent, _message_text}, socket) do
-    # NATS message received - DISABLED FOR NOW to avoid duplicate messages
-    # TODO: Re-enable when deduplication is implemented
-    require Logger
-    Logger.debug("🔇 NATS message ignored (NATS processing disabled)")
-    {:noreply, socket}
-  end
-
-  # NATS processing code kept below for reference:
-  # def handle_info({:nats_message_for_agent, message_text}, socket) do
-  #   # NATS message received - automatically forward to Claude agent
-  #   require Logger
-  #   session_id = socket.assigns.session_id
-  #   session = socket.assigns.session
-  #   agent = socket.assigns.agent
-  #
-  #   Logger.info("Auto-forwarding NATS message to Claude agent for session #{session_id}")
-  #
-  #   session_uuid = socket.assigns.session_uuid
-  #
-  #   case resolve_project_path(session, agent) do
-  #     {:ok, project_path} ->
-  #       has_messages = Messages.count_messages_for_session(session_id) > 1
-  #
-  #       result =
-  #         if has_messages do
-  #           EyeInTheSkyWeb.Claude.SessionManager.resume_session(session_uuid, message_text,
-  #             model: "sonnet",
-  #             project_path: project_path
-  #           )
-  #         else
-  #           EyeInTheSkyWeb.Claude.SessionManager.start_session(session_uuid, message_text,
-  #             model: "sonnet",
-  #             project_path: project_path
-  #           )
-  #         end
-  #
-  #       case result do
-  #         {:ok, session_ref} ->
-  #           socket =
-  #             socket
-  #             |> assign(:session_ref, session_ref)
-  #             |> assign(:processing, true)
-  #             |> load_tab_data("messages", socket.assigns.session_id)
-  #
-  #           {:noreply, socket}
-  #
-  #         {:error, reason} ->
-  #           Logger.error("Failed to forward NATS message to Claude: #{inspect(reason)}")
-  #           {:noreply, socket}
-  #       end
-  #
-  #     {:error, :no_project_path} ->
-  #       Logger.error("Cannot forward NATS message: no project path configured")
-  #       {:noreply, socket}
-  #   end
-  # end
 
   @impl true
   def handle_info({:claude_complete, session_ref, exit_code}, socket) do

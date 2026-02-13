@@ -1,191 +1,317 @@
 defmodule EyeInTheSkyWeb.Claude.CLI do
   @moduledoc """
-  Claude CLI subprocess spawner - spawns fresh Claude Code instances like opcode does.
+  Claude CLI subprocess spawner.
 
-  Spawns `claude` binary as a subprocess with `-p "message"` flag and streams
-  stdout/stderr back to the caller via message passing.
+  Spawns `claude` binary as a Port with pseudo-TTY via `script` wrapper
+  and streams stdout back to the caller via message passing.
+
+  ## Spawning
+
+  All public functions accept a keyword list of options that map directly
+  to CLI flags via `build_args/1`. Callers describe what they want; this
+  module figures out the flags.
+
+  ## Messages sent to caller
+
+    * `{:claude_output, session_ref, line}` - each line of stdout
+    * `{:claude_exit, session_ref, exit_code}` - process exited
   """
 
   require Logger
 
+  alias EyeInTheSkyWeb.Settings
+
+  # ---------------------------------------------------------------------------
+  # Types and constants
+  # ---------------------------------------------------------------------------
+
+  @type cli_opts :: keyword()
+  @type spawn_result :: {:ok, port(), reference()} | {:error, term()}
+
+  @known_permission_modes ~w(acceptEdits bypassPermissions default delegate dontAsk plan)
+  @default_idle_timeout_ms 300_000
+  @standard_paths ["/usr/local/bin/claude", "/opt/homebrew/bin/claude", Path.expand("~/.local/bin/claude")]
+  @redacted_flags ~w(-p --system-prompt --append-system-prompt)
+  @persistent_term_key {__MODULE__, :claude_binary_path}
+
+  # ---------------------------------------------------------------------------
+  # Public spawners
+  # ---------------------------------------------------------------------------
+
   @doc """
-  Spawns a new Claude Code session with a user prompt.
+  Spawns a new Claude session.
 
-  ## Options
-    * `:model` - Model to use ("sonnet", "opus", "haiku"). If not provided, omits --model flag.
-    * `:project_path` - Working directory for Claude. Default: current directory
-    * `:output_format` - Output format. Default: "stream-json"
-    * `:skip_permissions` - Skip permission prompts. Default: true
-    * `:caller` - PID to send output to. Default: self()
-
-  ## Returns
-    * `{:ok, port, session_ref}` - Port handle and session reference
-    * `{:error, reason}` - If Claude binary not found or spawn failed
-
-  ## Messages Sent to Caller
-    * `{:claude_output, session_ref, line}` - Each line of stdout
-    * `{:claude_error, session_ref, line}` - Each line of stderr
-    * `{:claude_exit, session_ref, exit_code}` - Process exited
+  Generates a session_id if not provided and passes `--session-id` so
+  the UUID is controlled for future resume.
   """
+  @spec spawn_new_session(String.t(), cli_opts()) :: spawn_result()
   def spawn_new_session(prompt, opts \\ []) do
-    model = Keyword.get(opts, :model)
-    project_path = Keyword.get(opts, :project_path, File.cwd!())
-    output_format = Keyword.get(opts, :output_format, "json")
-    skip_permissions = Keyword.get(opts, :skip_permissions, true)
-    caller = Keyword.get(opts, :caller, self())
-    session_id = Keyword.get(opts, :session_id)
-
-    # Find claude binary
-    case find_claude_binary() do
-      {:ok, claude_path} ->
-        # Build command args like opcode does
-        base_args = build_args(prompt, model, output_format, skip_permissions)
-
-        # If session_id provided, pass --session-id to Claude so it uses our ID
-        args =
-          if session_id do
-            ["--session-id", session_id] ++ base_args
-          else
-            base_args
-          end
-
-        require Logger
-
-        if session_id do
-          Logger.debug("Spawning new Claude session with ID #{session_id} in #{project_path}")
-        else
-          Logger.debug("Spawning new Claude session in #{project_path}")
-        end
-
-        session_ref = Keyword.get(opts, :session_ref, make_ref())
-
-        # Spawn output handler first
-        handler_pid =
-          spawn_link(fn ->
-            receive do
-              {:port, port} ->
-                handle_port_output(port, session_ref, caller)
-            end
-          end)
-
-        # Spawn the process using 'script' to provide a pseudo-TTY
-        # macOS: script -q /dev/null command args...
-        script_args = ["-q", "/dev/null", claude_path] ++ args
-
-        env = build_env(opts)
-
-        port =
-          Port.open(
-            {:spawn_executable, "/usr/bin/script"},
-            [
-              :binary,
-              :exit_status,
-              :use_stdio,
-              :stderr_to_stdout,
-              {:args, script_args},
-              {:cd, project_path},
-              {:env, env}
-            ]
-          )
-
-        # Connect port to handler
-        Port.connect(port, handler_pid)
-        send(handler_pid, {:port, port})
-
-        {:ok, port, session_ref}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
+    opts
+    |> Keyword.put_new_lazy(:session_id, &Ecto.UUID.generate/0)
+    |> Keyword.put(:prompt, prompt)
+    |> spawn_cli()
   end
 
   @doc """
-  Continues an existing session (uses `-c` flag).
+  Continues the most recent session (passes `-c` flag).
   """
+  @spec continue_session(String.t(), cli_opts()) :: spawn_result()
   def continue_session(prompt, opts \\ []) do
-    opts = Keyword.put(opts, :continue, true)
-    spawn_with_flag(prompt, "-c", opts)
+    opts
+    |> Keyword.put(:prompt, prompt)
+    |> Keyword.put(:continue, true)
+    |> spawn_cli()
   end
 
   @doc """
-  Resumes a specific session by UUID (uses `--resume` flag).
+  Resumes a specific session by UUID (passes `--resume` flag).
   """
+  @spec resume_session(String.t(), String.t(), cli_opts()) :: spawn_result()
   def resume_session(session_id, prompt, opts \\ []) do
-    opts = Keyword.put(opts, :session_id, session_id)
-    spawn_with_flag(prompt, "--resume", opts)
+    opts
+    |> Keyword.put(:prompt, prompt)
+    |> Keyword.put(:resume, session_id)
+    |> spawn_cli()
   end
 
   @doc """
-  Cancels a running Claude process.
+  Cancels a running Claude process by closing its port.
   """
+  @spec cancel(port()) :: :ok
   def cancel(port) when is_port(port) do
     Port.close(port)
     :ok
   end
 
-  # Private functions
+  # ---------------------------------------------------------------------------
+  # Normalization & validation
+  # ---------------------------------------------------------------------------
 
-  defp spawn_with_flag(prompt, flag, opts) do
-    model = Keyword.get(opts, :model)
-    project_path = Keyword.get(opts, :project_path, File.cwd!())
-    skip_permissions = Keyword.get(opts, :skip_permissions, true)
+  @doc """
+  Normalize key aliases and coerce types before validation.
+
+  - `:allowed_tools` is converted to `:allowedTools`
+  - String booleans `"true"`/`"false"` are coerced to actual booleans
+    for `:skip_permissions`, `:verbose`, and `:continue`
+  """
+  @spec normalize_opts(cli_opts()) :: cli_opts()
+  def normalize_opts(opts) do
+    opts
+    |> normalize_allowed_tools()
+    |> coerce_booleans([:skip_permissions, :verbose, :continue])
+  end
+
+  defp normalize_allowed_tools(opts) do
+    case Keyword.pop(opts, :allowed_tools) do
+      {nil, rest} -> rest
+      {val, rest} -> Keyword.put_new(rest, :allowedTools, val)
+    end
+  end
+
+  defp coerce_booleans(opts, keys) do
+    Enum.reduce(keys, opts, fn key, acc ->
+      case Keyword.fetch(acc, key) do
+        {:ok, "true"} -> Keyword.put(acc, key, true)
+        {:ok, "false"} -> Keyword.put(acc, key, false)
+        _ -> acc
+      end
+    end)
+  end
+
+  @doc """
+  Validate option values. Returns `:ok` or `{:error, {key, reason}}`.
+
+  - `:prompt` must be a non-empty binary when present (nil is allowed)
+  - `:max_turns` must be a positive integer when present
+  - `:permission_mode` must be a known mode or nil/""
+  - Boolean keys must be actual booleans when present
+  """
+  @spec validate_opts(cli_opts()) :: :ok | {:error, {atom(), String.t()}}
+  def validate_opts(opts) do
+    with :ok <- validate_prompt(opts[:prompt]),
+         :ok <- validate_max_turns(opts[:max_turns]),
+         :ok <- validate_permission_mode(opts[:permission_mode]),
+         :ok <- validate_boolean(opts, :skip_permissions),
+         :ok <- validate_boolean(opts, :verbose),
+         :ok <- validate_boolean(opts, :continue) do
+      :ok
+    end
+  end
+
+  defp validate_prompt(nil), do: :ok
+  defp validate_prompt(p) when is_binary(p) and byte_size(p) > 0, do: :ok
+  defp validate_prompt(""), do: {:error, {:prompt, "must be a non-empty string"}}
+  defp validate_prompt(_), do: {:error, {:prompt, "must be a non-empty string"}}
+
+  defp validate_max_turns(nil), do: :ok
+  defp validate_max_turns(n) when is_integer(n) and n > 0, do: :ok
+  defp validate_max_turns(_), do: {:error, {:max_turns, "must be a positive integer"}}
+
+  defp validate_permission_mode(nil), do: :ok
+  defp validate_permission_mode(""), do: :ok
+
+  defp validate_permission_mode(mode) when is_binary(mode) do
+    if mode in @known_permission_modes,
+      do: :ok,
+      else: {:error, {:permission_mode, "unknown mode: #{mode}"}}
+  end
+
+  defp validate_permission_mode(_), do: {:error, {:permission_mode, "must be a string"}}
+
+  defp validate_boolean(opts, key) do
+    case Keyword.fetch(opts, key) do
+      :error -> :ok
+      {:ok, v} when is_boolean(v) -> :ok
+      {:ok, _} -> {:error, {key, "must be a boolean"}}
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Safe logging
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Redact sensitive flag values from an args list for safe logging.
+
+  Flags in `#{inspect(@redacted_flags)}` have their following value replaced
+  with `"[REDACTED]"`.
+  """
+  @spec safe_log_args([String.t()]) :: [String.t()]
+  def safe_log_args([]), do: []
+  def safe_log_args([flag, _value | rest]) when flag in @redacted_flags, do: [flag, "[REDACTED]" | safe_log_args(rest)]
+  def safe_log_args([head | rest]), do: [head | safe_log_args(rest)]
+
+  # ---------------------------------------------------------------------------
+  # Arg builder
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Builds a flat list of CLI args from a keyword list.
+
+  Supported keys (all optional unless noted):
+
+    * `:prompt` (required) - the user prompt, becomes `-p <prompt>`
+    * `:session_id` - `--session-id <id>` (for new sessions)
+    * `:resume` - `--resume <session_id>` (mutually exclusive with :continue)
+    * `:continue` - `-c` flag
+    * `:model` - `--model <model>`
+    * `:output_format` - `--output-format <fmt>` (default: "stream-json")
+    * `:verbose` - `--verbose` (default: true)
+    * `:skip_permissions` - `--dangerously-skip-permissions` (default: true)
+    * `:max_turns` - `--max-turns <n>`
+    * `:system_prompt` - `--system-prompt <text>`
+    * `:append_system_prompt` - `--append-system-prompt <text>`
+    * `:allowedTools` - `--allowedTools <csv>`
+    * `:permission_mode` - `--permission-mode <mode>`
+    * `:mcp_config` - `--mcp-config <path>`
+
+  Unknown keys are silently ignored (they may be used by env/caller logic).
+  """
+  @spec build_args(cli_opts()) :: [String.t()]
+  def build_args(caller_opts) do
+    # Three-way merge: hardcoded fallbacks <- DB settings <- caller opts
+    # Filter nils from caller so unset keys don't override DB values
+    db_defaults = Settings.get_cli_defaults()
+    explicit = Keyword.filter(caller_opts, fn {_k, v} -> v != nil end)
+    opts = Keyword.merge(db_defaults, explicit)
+    args = []
+
+    # Session mode flags (mutually exclusive: resume > continue > new)
+    args =
+      cond do
+        resume_id = opts[:resume] ->
+          args ++ ["--resume", to_string(resume_id)]
+
+        opts[:continue] ->
+          args ++ ["-c"]
+
+        session_id = opts[:session_id] ->
+          args ++ ["--session-id", to_string(session_id)]
+
+        true ->
+          args
+      end
+
+    # Prompt
+    args = args ++ ["-p", opts[:prompt]]
+
+    # Value flags
+    args = maybe_flag(args, "--output-format", opts[:output_format])
+    args = maybe_flag(args, "--model", opts[:model])
+    args = maybe_flag(args, "--max-turns", opts[:max_turns])
+    args = maybe_flag(args, "--system-prompt", opts[:system_prompt])
+    args = maybe_flag(args, "--append-system-prompt", opts[:append_system_prompt])
+    args = maybe_flag(args, "--allowedTools", opts[:allowedTools])
+    args = maybe_flag(args, "--permission-mode", opts[:permission_mode])
+    args = maybe_flag(args, "--mcp-config", opts[:mcp_config])
+
+    # Boolean flags
+    args = if opts[:verbose], do: args ++ ["--verbose"], else: args
+    args = if opts[:skip_permissions], do: args ++ ["--dangerously-skip-permissions"], else: args
+
+    args
+  end
+
+  defp maybe_flag(args, _flag, nil), do: args
+  defp maybe_flag(args, _flag, ""), do: args
+  defp maybe_flag(args, flag, value), do: args ++ [flag, to_string(value)]
+
+  # ---------------------------------------------------------------------------
+  # Binary cache
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Clear the cached binary path. Useful in tests.
+  """
+  @spec clear_binary_cache() :: :ok
+  def clear_binary_cache do
+    :persistent_term.erase(@persistent_term_key)
+    :ok
+  rescue
+    ArgumentError -> :ok
+  end
+
+  # ---------------------------------------------------------------------------
+  # Port spawning (single path)
+  # ---------------------------------------------------------------------------
+
+  defp spawn_cli(opts) do
+    opts = normalize_opts(opts)
+
+    case validate_opts(opts) do
+      {:error, _} = err ->
+        err
+
+      :ok ->
+        project_path = Keyword.get(opts, :project_path, File.cwd!())
+
+        if !File.dir?(project_path) do
+          {:error, {:invalid_project_path, project_path}}
+        else
+          do_spawn(opts, project_path)
+        end
+    end
+  end
+
+  defp do_spawn(opts, project_path) do
     caller = Keyword.get(opts, :caller, self())
-    session_id = Keyword.get(opts, :session_id)
+    session_ref = Keyword.get(opts, :session_ref, make_ref())
+    idle_timeout_ms = Keyword.get(opts, :idle_timeout_ms, @default_idle_timeout_ms)
 
     case find_claude_binary() do
       {:ok, claude_path} ->
-        # Build args: use -p (print mode) for headless/piped execution
-        # Format: claude --resume <session_id> -p "<prompt>" --model ... --output-format stream-json ...
-        args =
-          if flag == "--resume" && session_id do
-            [flag, session_id, "-p", prompt]
-          else
-            [flag, "-p", prompt]
-          end
+        args = build_args(opts)
 
-        # Use stream-json format for real-time streaming output
-        stream_format = "stream-json"
+        Logger.debug("Spawning Claude in #{project_path}: #{inspect(safe_log_args(args))}")
 
-        # Append output-format and other options
-        args = args ++ [
-          "--output-format",
-          stream_format,
-          "--verbose"
-        ]
-
-        args =
-          if model do
-            args ++ ["--model", model]
-          else
-            args
-          end
-
-        args =
-          if skip_permissions do
-            args ++ ["--dangerously-skip-permissions"]
-          else
-            args
-          end
-
-        require Logger
-        Logger.debug("Spawning Claude with #{flag} flag in #{project_path}")
-
-        session_ref = Keyword.get(opts, :session_ref, make_ref())
-
-        # Spawn output handler first
         handler_pid =
           spawn_link(fn ->
             receive do
-              {:port, port} ->
-                handle_port_output(port, session_ref, caller)
+              {:port, port} -> handle_port_output(port, session_ref, caller, "", idle_timeout_ms)
             end
           end)
 
-        # Spawn Claude Code with pseudo-TTY (Claude needs TTY to function)
-        # Use 'script' wrapper to provide a pseudo-TTY
-        # ANSI codes are stripped in SessionWorker.handle_info/2
         script_args = ["-q", "/dev/null", claude_path] ++ args
-
         env = build_env(opts)
 
         port =
@@ -202,7 +328,6 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
             ]
           )
 
-        # Connect port to handler
         Port.connect(port, handler_pid)
         send(handler_pid, {:port, port})
 
@@ -213,97 +338,72 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     end
   end
 
-  defp build_args(prompt, model, output_format, skip_permissions) do
-    base = [
-      "-p",
-      prompt,
-      "--output-format",
-      output_format,
-      "--verbose"
-    ]
-
-    base =
-      if model do
-        base ++ ["--model", model]
-      else
-        base
-      end
-
-    if skip_permissions do
-      base ++ ["--dangerously-skip-permissions"]
-    else
-      base
-    end
-  end
+  # ---------------------------------------------------------------------------
+  # Environment
+  # ---------------------------------------------------------------------------
 
   defp build_env(opts) do
-    # Pass ALL environment variables to subprocess
     base_env =
       for {key, value} <- System.get_env() do
         {String.to_charlist(key), String.to_charlist(value)}
       end
 
-    # Force non-interactive mode for Claude (disable TTY requirements)
     env = [
       {~c"CI", ~c"true"},
       {~c"TERM", ~c"dumb"}
       | base_env
     ]
 
-    # EITS tracking env vars
+    env =
+      if Enum.any?(env, fn {k, _} -> k == ~c"ANTHROPIC_API_KEY" end) do
+        env
+      else
+        case EyeInTheSkyWeb.Settings.get_setting("api_key_anthropic") do
+          nil -> env
+          key -> [{~c"ANTHROPIC_API_KEY", String.to_charlist(key)} | env]
+        end
+      end
+
     env = maybe_add_env(env, "EITS_SESSION_ID", opts[:eits_session_id])
     env = maybe_add_env(env, "EITS_AGENT_ID", opts[:eits_agent_id])
-
-    # Effort level
     maybe_add_env(env, "CLAUDE_CODE_EFFORT_LEVEL", opts[:effort_level])
   end
 
   defp maybe_add_env(env, _key, nil), do: env
   defp maybe_add_env(env, _key, ""), do: env
+
   defp maybe_add_env(env, key, value) do
     env ++ [{String.to_charlist(key), String.to_charlist(to_string(value))}]
   end
 
-  defp handle_port_output(port, session_ref, caller) do
-    handle_port_output(port, session_ref, caller, "")
-  end
+  # ---------------------------------------------------------------------------
+  # Port output handler
+  # ---------------------------------------------------------------------------
 
-  defp handle_port_output(port, session_ref, caller, buffer) do
-    require Logger
-
+  defp handle_port_output(port, session_ref, caller, buffer, idle_timeout_ms) do
     receive do
       {^port, {:data, data}} ->
-        Logger.debug("Claude output received: #{byte_size(data)} bytes")
-
-        # Append to buffer and split by newlines
         new_buffer = buffer <> data
         lines = String.split(new_buffer, "\n")
 
-        # Last element is either empty (if data ended with \n) or incomplete line
         {complete_lines, remaining} =
           case List.pop_at(lines, -1) do
             {last, rest} ->
-              if String.ends_with?(data, "\n") do
-                {lines, ""}
-              else
-                {rest, last || ""}
-              end
+              if String.ends_with?(data, "\n"),
+                do: {lines, ""},
+                else: {rest, last || ""}
           end
 
-        # Send complete lines
         Enum.each(complete_lines, fn line ->
           unless line == "" do
-            Logger.debug("Claude line: #{line}")
             send(caller, {:claude_output, session_ref, line})
           end
         end)
 
-        handle_port_output(port, session_ref, caller, remaining)
+        handle_port_output(port, session_ref, caller, remaining, idle_timeout_ms)
 
       {^port, {:exit_status, status}} ->
-        # Send any remaining buffered content
         unless buffer == "" do
-          Logger.debug("Claude final line: #{buffer}")
           send(caller, {:claude_output, session_ref, buffer})
         end
 
@@ -311,42 +411,61 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
         send(caller, {:claude_exit, session_ref, status})
         :ok
     after
-      300_000 ->
-        Logger.warning("No output from Claude after 5 minutes, timing out")
+      idle_timeout_ms ->
+        Logger.warning("No output from Claude after #{div(idle_timeout_ms, 60_000)} minutes, timing out")
         Port.close(port)
         send(caller, {:claude_exit, session_ref, :timeout})
         :ok
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # Binary locator (cached via :persistent_term)
+  # ---------------------------------------------------------------------------
+
   defp find_claude_binary do
-    # Try multiple detection strategies like opcode
+    case :persistent_term.get(@persistent_term_key, :not_cached) do
+      :not_cached ->
+        case do_find_claude_binary() do
+          {:ok, path} = ok ->
+            :persistent_term.put(@persistent_term_key, path)
+            ok
+
+          error ->
+            error
+        end
+
+      cached_path ->
+        if File.exists?(cached_path) do
+          {:ok, cached_path}
+        else
+          :persistent_term.erase(@persistent_term_key)
+          find_claude_binary()
+        end
+    end
+  end
+
+  defp do_find_claude_binary do
+    nvm_dir = System.get_env("NVM_DIR") || Path.expand("~/.nvm")
+
     cond do
-      # 1. Check which/where command
       path = System.find_executable("claude") ->
         {:ok, path}
 
-      # 2. Check standard locations
       path = find_in_standard_paths() ->
         {:ok, path}
 
-      # 3. Check NVM installations
       path = find_in_nvm() ->
         {:ok, path}
 
       true ->
-        {:error, "Claude binary not found in PATH, standard locations, or NVM"}
+        {:error, {:binary_not_found, checked_paths: @standard_paths, nvm_dir: nvm_dir}}
     end
   end
 
   defp find_in_standard_paths do
-    standard_paths = [
-      "/usr/local/bin/claude",
-      "/opt/homebrew/bin/claude",
-      Path.expand("~/.local/bin/claude")
-    ]
-
-    Enum.find(standard_paths, &File.exists?/1)
+    @standard_paths
+    |> Enum.find(&File.exists?/1)
   end
 
   defp find_in_nvm do
@@ -356,11 +475,24 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     if File.dir?(versions_dir) do
       versions_dir
       |> File.ls!()
-      |> Enum.map(&Path.join([versions_dir, &1, "bin", "claude"]))
-      |> Enum.filter(&File.exists?/1)
-      |> List.first()
+      |> Enum.filter(&semver_dir?/1)
+      |> Enum.sort_by(&parse_version/1, {:desc, Version})
+      |> Enum.find_value(fn dir ->
+        path = Path.join([versions_dir, dir, "bin", "claude"])
+        if File.exists?(path), do: path
+      end)
     else
       nil
+    end
+  end
+
+  defp semver_dir?("v" <> rest), do: match?({:ok, _}, Version.parse(rest))
+  defp semver_dir?(_), do: false
+
+  defp parse_version("v" <> rest) do
+    case Version.parse(rest) do
+      {:ok, v} -> v
+      :error -> Version.parse!("0.0.0")
     end
   end
 end

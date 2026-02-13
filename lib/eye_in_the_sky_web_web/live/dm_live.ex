@@ -510,13 +510,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       </div>
 
       <div class="px-4 py-6">
-        <!-- DEBUG: active_tab = <%= @active_tab %> -->
-        <div style="background: red; color: white; padding: 10px; margin-bottom: 10px;">
-          DEBUG: Messages length = <%= length(@messages) %>, active_tab = <%= @active_tab %>
-        </div>
         <%= case @active_tab do %>
           <% "messages" -> %>
-            <!-- DEBUG: rendering messages tab, @messages length = <%= length(@messages) %>, @has_more_messages = <%= @has_more_messages %> -->
             <div class="flex flex-col h-[calc(100vh-16rem)]">
               <div class="flex items-center justify-between mb-2">
                 <span class="text-xs text-base-content/40"><%= length(@messages) %> messages</span>

@@ -472,33 +472,28 @@ defmodule EyeInTheSkyWeb.Sessions do
   Returns "provider/name (version)" or "provider/name" if version not set.
   """
   def format_model_info(%Session{} = session) do
-    case {session.model_provider, session.model_name, session.model_version} do
-      {provider, name, version}
-      when is_binary(provider) and is_binary(name) and is_binary(version) ->
-        "#{provider}/#{name} (#{version})"
+    raw =
+      case {session.model_provider, session.model_name, session.model_version} do
+        {_provider, name, version}
+        when is_binary(name) and is_binary(version) and name != "" and version != "" ->
+          "#{name} (#{version})"
 
-      {provider, name, _} when is_binary(provider) and is_binary(name) ->
-        "#{provider}/#{name}"
+        {_provider, name, _} when is_binary(name) and name != "" ->
+          name
 
-      _ ->
-        # Fall back to provider/model fields
-        provider = session.provider
-        model = session.model
+        _ ->
+          # Fall back to provider/model fields
+          case {session.provider, session.model} do
+            {_, m} when is_binary(m) and m != "" -> m
+            {p, _} when is_binary(p) and p != "" -> p
+            _ -> "unknown"
+          end
+      end
 
-        case {provider, model} do
-          {p, m} when is_binary(p) and is_binary(m) and p != "" and m != "" ->
-            "#{p}/#{m}"
-
-          {p, _} when is_binary(p) and p != "" ->
-            p
-
-          {_, m} when is_binary(m) and m != "" ->
-            m
-
-          _ ->
-            "unknown"
-        end
-    end
+    # Strip "claude-" prefix for cleaner display (e.g. "claude-opus-4-6" -> "opus-4-6")
+    raw
+    |> String.replace(~r/^claude-/, "")
+    |> String.replace(~r/^claude\//, "")
   end
 
   def format_model_info(_), do: "unknown"

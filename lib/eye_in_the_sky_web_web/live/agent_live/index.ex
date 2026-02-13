@@ -26,6 +26,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       |> assign(:projects, projects)
       |> assign(:refresh_interval, @default_refresh_ms)
       |> assign(:timer_ref, nil)
+      |> assign(:refresh_tick, 0)
       |> load_sessions()
       |> schedule_refresh()
 
@@ -35,8 +36,14 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   defp load_sessions(socket) do
     db_sessions = Sessions.list_sessions_with_agent(include_archived: false)
 
+    # Build project lookup map from assigns
+    project_map =
+      socket.assigns.projects
+      |> Enum.into(%{}, fn p -> {p.id, p.name} end)
+
     sessions =
       db_sessions
+      |> Enum.map(fn s -> Map.put(s, :project_name, project_map[s.project_id]) end)
       |> filter_sessions_by_status(socket.assigns.session_filter)
       |> filter_sessions_by_search(socket.assigns.search_query)
       |> sort_sessions(socket.assigns.sort_by)
@@ -279,6 +286,11 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   @impl true
+  def handle_event("navigate_dm", %{"id" => id}, socket) do
+    {:noreply, push_navigate(socket, to: ~p"/dm/#{id}")}
+  end
+
+  @impl true
   def handle_event("set_refresh", %{"interval" => interval}, socket) do
     socket = cancel_timer(socket)
 
@@ -293,7 +305,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_info(:refresh_agents, socket) do
-    socket = socket |> load_sessions() |> schedule_refresh()
+    tick = socket.assigns.refresh_tick + 1
+    socket = socket |> assign(:refresh_tick, tick) |> load_sessions() |> schedule_refresh()
     {:noreply, socket}
   end
 
@@ -367,16 +380,19 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     <EyeInTheSkyWebWeb.Components.OverviewNav.render current_tab={:sessions} />
     <Layouts.flash_group flash={@flash} />
     <div class="px-6 lg:px-8">
-      <div class="max-w-7xl mx-auto">
+      <div class="max-w-3xl mx-auto">
         <!-- Page Header -->
         <div class="flex items-start justify-between py-6 border-b border-base-content/10">
-          <div class="flex-1">
-            <h1 class="text-2xl font-semibold text-base-content">Agents</h1>
-            <p class="mt-1 text-sm text-base-content/60">
-              Real-time overview of all Claude Code agents
-            </p>
-          </div>
+          <div class="flex-1"></div>
           <div class="flex items-center gap-2 flex-shrink-0">
+            <%= if @refresh_interval do %>
+              <span
+                id="refresh-dot"
+                phx-hook="RefreshDot"
+                data-tick={@refresh_tick}
+                class="inline-flex h-2 w-2 rounded-full bg-success opacity-0 transition-opacity duration-300"
+              ></span>
+            <% end %>
             <span class="text-xs text-base-content/50">Update every</span>
             <select phx-change="set_refresh" name="interval" class="select select-xs select-bordered w-20">
               <option value="0" selected={@refresh_interval == nil}>Off</option>
@@ -468,68 +484,32 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
         <div class="mt-6">
           <%= if @sessions == [] do %>
             <div class="text-center py-12">
-              <svg
-                class="mx-auto h-12 w-12 text-base-content/40"
-                fill="currentColor"
-                viewBox="0 0 16 16"
-              >
-                <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm7-3.25v2.992l2.028.812a.75.75 0 0 1-.557 1.392l-2.5-1A.751.751 0 0 1 7 8.25v-3.5a.75.75 0 0 1 1.5 0Z" />
-              </svg>
-              <h3 class="mt-2 text-sm font-medium text-base-content">No sessions found</h3>
+              <h3 class="text-sm font-medium text-base-content">No sessions found</h3>
               <p class="mt-1 text-sm text-base-content/60">Try adjusting your search or filters</p>
             </div>
           <% else %>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              <%= for session <- @sessions do %>
-                <div class="card bg-base-100 border border-base-300 hover:border-base-300 transition-all h-full relative">
-                  <div class="card-body p-3">
-                    <!-- Title Row with Actions -->
-                    <div class="flex items-start justify-between gap-2 mb-2">
-                      <div class="flex-1 min-w-0">
-                        <!-- Session ID and Status -->
-                        <div class="flex items-center gap-3 mb-2">
-                          <.link
-                            navigate={~p"/dm/#{session.id}"}
-                            class="text-sm font-mono text-primary hover:text-primary-focus font-semibold hover:underline"
-                          >
-                            #{session.id}
-                          </.link>
-                            <% status_badge =
-                              case session.status do
-                                "discovered" ->
-                                  %{text: "Discovered", class: "badge badge-info badge-sm"}
-
-                                "working" ->
-                                  %{text: "Working", class: "badge badge-warning badge-sm"}
-
-                                "completed" ->
-                                  %{text: "Completed", class: "badge badge-ghost badge-sm"}
-
-                                _ ->
-                                  %{text: "Active", class: "badge badge-success badge-sm"}
-                              end %>
-                            <span class={status_badge.class}>
-                              {status_badge.text}
-                            </span>
-                          </div>
-                          
-    <!-- Session Name -->
-                          <h3 class="text-sm font-medium text-base-content mb-2 line-clamp-2">
-                            {session.name || "Unnamed session"}
-                          </h3>
-                        </div>
-                        
-    <!-- Action Buttons -->
-                        <div class="flex items-center gap-1 flex-shrink-0">
+            <div class="overflow-x-auto">
+              <table class="table table-xs table-zebra">
+                <tbody>
+                  <%= for session <- @sessions do %>
+                    <% {status_color, status_label} =
+                      case session.status do
+                        "working" -> {"text-orange-500", "Working"}
+                        "completed" -> {"text-red-500", "Stale"}
+                        "discovered" -> {"text-green-500", "Waiting"}
+                        _ -> {"text-green-500", "Waiting"}
+                      end %>
+                    <tr class="hover cursor-pointer group" phx-click="navigate_dm" phx-value-id={session.id}>
+                      <td class="py-2">
+                        <.link navigate={~p"/dm/#{session.id}"} class="font-mono text-sm text-primary hover:underline" onclick="event.stopPropagation()">
+                          #{session.id}
+                        </.link>
+                      </td>
+                      <td class="py-2">
+                        <div class="flex items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity">
                           <%= if session.id do %>
-                            <a
-                              href={~p"/dm/#{session.id}"}
-                              target="_blank"
-                              class="btn btn-ghost btn-xs text-base-content/40 hover:text-info transition-colors"
-                              aria-label="Open DM window"
-                              onclick="event.stopPropagation()"
-                            >
-                              <.arrow_top_right_on_square class="w-4 h-4 text-base-content/60" />
+                            <a href={~p"/dm/#{session.id}"} target="_blank" class="btn btn-ghost btn-xs btn-square" aria-label="Open DM" onclick="event.stopPropagation()">
+                              <.arrow_top_right_on_square class="w-3.5 h-3.5" />
                             </a>
                           <% end %>
                           <%= if session.agent.uuid && session.uuid do %>
@@ -541,77 +521,49 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                               data-session-id={session.uuid}
                               data-agent-name={session.name || session.agent.description || "Agent"}
                               data-agent-status={session.status}
-                              class="bookmark-button btn btn-ghost btn-xs text-base-content/40 hover:text-warning transition-colors"
-                              onclick="event.stopPropagation()"
+                              class="bookmark-button btn btn-ghost btn-xs btn-square"
                               aria-label="Bookmark agent"
+                              onclick="event.stopPropagation()"
                             >
-                              <.heart class="bookmark-icon w-4 h-4 text-base-content/60" />
+                              <.heart class="bookmark-icon w-3.5 h-3.5" />
                             </button>
                           <% end %>
                           <%= if session.uuid do %>
                             <%= if session.archived_at do %>
-                              <button
-                                type="button"
-                                phx-click="unarchive_session"
-                                phx-value-session_id={session.id}
-                                class="btn btn-ghost btn-xs text-base-content/40 hover:text-success transition-colors"
-                                aria-label="Unarchive session"
-                                onclick="event.stopPropagation()"
-                              >
-                                <svg class="w-4 h-4 text-base-content/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-                                </svg>
+                              <button type="button" phx-click="unarchive_session" phx-value-session_id={session.id} class="btn btn-ghost btn-xs btn-square" aria-label="Unarchive" onclick="event.stopPropagation()">
+                                <.icon name="hero-arrow-up-tray" class="size-3.5" />
                               </button>
                             <% else %>
-                              <button
-                                type="button"
-                                phx-click="archive_session"
-                                phx-value-session_id={session.id}
-
-                                phx-capture-click="true"
-                                class="btn btn-ghost btn-xs text-base-content/40 hover:text-warning transition-colors"
-                                aria-label="Archive session"
-                              >
-                                <.archive_box class="w-4 h-4 text-base-content/60" />
+                              <button type="button" phx-click="archive_session" phx-value-session_id={session.id} class="btn btn-ghost btn-xs btn-square" aria-label="Archive" onclick="event.stopPropagation()">
+                                <.archive_box class="w-3.5 h-3.5" />
                               </button>
                             <% end %>
                           <% end %>
                         </div>
-                      </div>
-                      
-    <!-- Description -->
-                      <%= if session.agent.description do %>
-                        <p class="text-xs text-base-content/70 mb-2 line-clamp-2">
-                          {session.agent.description}
-                        </p>
-                      <% end %>
-                      
-    <!-- Meta Information -->
-                      <div class="flex items-center gap-4 text-xs text-base-content/60">
-                        <%= if session.agent.project_name do %>
-                          <span class="flex items-center gap-1">
-                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
-                              <path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z" />
-                            </svg>
-                            {session.agent.project_name}
-                          </span>
-                        <% end %>
-                        <span class="flex items-center gap-1 font-mono text-xs text-base-content/70">
-                          <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z" />
-                          </svg>
-                          {Sessions.format_model_info(session)}
-                        </span>
-                        <span class="flex items-center gap-1">
-                          <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z" />
-                          </svg>
-                          {relative_time(session.started_at)}
-                        </span>
-                      </div>
-                  </div>
-                </div>
-              <% end %>
+                      </td>
+                      <td class="py-2" title={status_label}>
+                        <div class="flex items-center gap-1.5">
+                          <.claude class={"w-3.5 h-3.5 " <> status_color} />
+                          <span class={"text-xs " <> status_color}>{status_label}</span>
+                        </div>
+                      </td>
+                      <td class="py-2">
+                        <div class="text-sm">{session.name || "Unnamed session"}</div>
+                        <div class="flex items-center gap-2 text-xs text-base-content/40 mt-1.5">
+                          <span class="font-mono">{Sessions.format_model_info(session)}</span>
+                          <%= if session.project_name do %>
+                            <span>&middot;</span>
+                            <span>{session.project_name}</span>
+                          <% end %>
+                          <span>&middot;</span>
+                          <span>{relative_time(session.started_at)}</span>
+                        </div>
+                      </td>
+                      <td class="py-2 text-xs text-base-content/50 truncate max-w-xs">{session.agent.description}</td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
             </div>
           <% end %>
         </div>

@@ -9,60 +9,8 @@ defmodule EyeInTheSkyWebWeb.Layouts do
   # The default root.html.heex file contains the HTML
   # skeleton of your application, namely HTML headers
   # and other static content.
+  # The app.html.heex template provides the navbar and main layout.
   embed_templates "layouts/*"
-
-  @doc """
-  Renders your app layout.
-
-  This function is typically invoked from every template,
-  and it often contains your application menu, sidebar,
-  or similar.
-
-  ## Examples
-
-      <Layouts.app flash={@flash}>
-        <h1>Content</h1>
-      </Layouts.app>
-
-  """
-  attr :flash, :map, required: true, doc: "the map of flash messages"
-
-  attr :current_scope, :map,
-    default: nil,
-    doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
-
-  slot :inner_block, required: true
-
-  def app(assigns) do
-    ~H"""
-    <div class="navbar bg-base-100 shadow-sm">
-      <div class="navbar-start">
-        <a href={~p"/"} class="btn btn-ghost text-xl">
-          <img src={~p"/images/logo.svg"} width="36" /> Eye in the Sky
-        </a>
-      </div>
-      <div class="navbar-center hidden lg:flex">
-        <ul class="menu menu-horizontal px-1">
-          <li><a href={~p"/"}>Overview</a></li>
-          <li><a href={~p"/prompts"}>Prompts</a></li>
-          <li><a href={~p"/chat"}>Chat</a></li>
-          <li><a href={~p"/nats"}>NATS</a></li>
-        </ul>
-      </div>
-      <div class="navbar-end">
-        <.theme_toggle />
-      </div>
-    </div>
-
-    <main class="px-4 py-20 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-2xl space-y-4">
-        {render_slot(@inner_block)}
-      </div>
-    </main>
-
-    <.flash_group flash={@flash} />
-    """
-  end
 
   @doc """
   Shows the flash group with standard titles and content.

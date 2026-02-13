@@ -481,7 +481,23 @@ defmodule EyeInTheSkyWeb.Sessions do
         "#{provider}/#{name}"
 
       _ ->
-        "unknown"
+        # Fall back to provider/model fields
+        provider = session.provider
+        model = session.model
+
+        case {provider, model} do
+          {p, m} when is_binary(p) and is_binary(m) and p != "" and m != "" ->
+            "#{p}/#{m}"
+
+          {p, _} when is_binary(p) and p != "" ->
+            p
+
+          {_, m} when is_binary(m) and m != "" ->
+            m
+
+          _ ->
+            "unknown"
+        end
     end
   end
 

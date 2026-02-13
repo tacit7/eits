@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.ChatLive do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Prompts, Sessions}
+  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Projects, Prompts, Sessions}
   alias EyeInTheSkyWeb.Claude.AgentManager
 
   # Deterministic UUIDs for the web UI user
@@ -17,7 +17,12 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
     end
 
-    {:ok, assign(socket, :session_id, session_id) |> assign(:working_agents, %{})}
+    socket =
+      socket
+      |> assign(:session_id, session_id)
+      |> assign(:working_agents, %{})
+
+    {:ok, socket, layout: {EyeInTheSkyWebWeb.Layouts, :app}}
   end
 
   defp ensure_web_session do
@@ -108,6 +113,9 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       Prompts.list_prompts(project_id: project_id)
       |> serialize_prompts()
 
+    # Load channel members
+    channel_members = load_channel_members(channel_id)
+
     # Load active sessions for @ autocomplete
     active_agents =
       Sessions.list_active_sessions()
@@ -128,10 +136,14 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         }
       end)
 
+    # Load all projects for the session drawer
+    all_projects = Projects.list_projects()
+
     socket =
       socket
       |> assign(:page_title, "Chat")
       |> assign(:project_id, project_id)
+      |> assign(:all_projects, all_projects)
       |> assign(:channels, serialize_channels(channels))
       |> assign(:active_channel_id, channel_id)
       |> assign(:messages, messages)
@@ -140,6 +152,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       |> assign(:agent_status_counts, agent_status_counts)
       |> assign(:prompts, prompts)
       |> assign(:active_agents, active_agents)
+      |> assign(:channel_members, channel_members)
       |> assign(:show_agent_drawer, false)
 
     {:noreply, socket}
@@ -151,66 +164,11 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   end
 
   @impl true
-  def handle_event(
-        "send_direct_message",
-        %{"session_id" => target_session_id, "body" => body, "channel_id" => channel_id},
-        socket
-      ) do
-    user_session_id = get_session_id(socket)
-
-    # Parse target_session_id to integer if it's a string
-    target_id =
-      case target_session_id do
-        id when is_integer(id) -> id
-        id when is_binary(id) ->
-          case Integer.parse(id) do
-            {int, ""} -> int
-            _ -> nil
-          end
-        _ -> nil
-      end
-
-    if is_nil(target_id) do
-      {:noreply, put_flash(socket, :error, "Invalid session ID")}
-    else
-      # Create message in channel (with user's session_id as sender)
-      case Messages.send_channel_message(%{
-             channel_id: channel_id,
-             session_id: user_session_id,
-             sender_role: "user",
-             recipient_role: "agent",
-             provider: "claude",
-             body: body
-           }) do
-        {:ok, message} ->
-          # Broadcast to channel subscribers
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "channel:#{channel_id}:messages",
-            {:new_message, message}
-          )
-
-          # Send to AgentWorker (queues if busy, processes if idle)
-          prompt_with_reminder = "eits-chat: channel:#{channel_id} msg:#{body}"
-
-          case AgentManager.send_message(target_id, prompt_with_reminder, model: "sonnet") do
-            :ok ->
-              {:noreply, socket}
-
-            {:error, reason} ->
-              {:noreply, put_flash(socket, :error, "Failed to send to agent: #{inspect(reason)}")}
-          end
-
-        {:error, _changeset} ->
-          {:noreply, put_flash(socket, :error, "Failed to send message")}
-      end
-    end
-  end
-
-  @impl true
   def handle_event("send_channel_message", %{"channel_id" => channel_id, "body" => body}, socket) do
+    require Logger
     session_id = get_session_id(socket)
 
+    # 1. Save user message to channel
     case Messages.send_channel_message(%{
            channel_id: channel_id,
            session_id: session_id,
@@ -220,39 +178,127 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
            body: body
          }) do
       {:ok, message} ->
-        # Also append to JSONL file (opcode-style)
-        if session_id && socket.assigns.project_id do
-          project_id_str = get_project_id_for_jsonl(socket)
-
-          Messages.append_to_jsonl(project_id_str, session_id, %{
-            id: message.id,
-            session_id: session_id,
-            sender_role: "user",
-            recipient_role: "agent",
-            provider: "claude",
-            body: body,
-            direction: "outbound",
-            inserted_at: DateTime.to_iso8601(message.inserted_at)
-          })
-        end
-
-        # Broadcast to channel subscribers (including sender)
+        # 2. Broadcast to channel PubSub
         Phoenix.PubSub.broadcast(
           EyeInTheSkyWeb.PubSub,
           "channel:#{channel_id}:messages",
           {:new_message, message}
         )
 
-        # Publish to NATS for agents to receive
-        EyeInTheSkyWeb.NATS.Publisher.publish_channel_message(message, channel_id)
-
         # Mark channel as read
         Channels.mark_as_read(channel_id, session_id)
 
-        {:noreply, socket}
+        # 3. Parse @mentions from body
+        mention_all = Regex.match?(~r/@all\b/i, body)
+
+        mentioned_ids =
+          Regex.scan(~r/@(\d+)/, body)
+          |> Enum.map(fn [_, id_str] ->
+            case Integer.parse(id_str) do
+              {id, ""} -> id
+              _ -> nil
+            end
+          end)
+          |> Enum.reject(&is_nil/1)
+          |> Enum.uniq()
+
+        # 4. Auto-add mentioned agents that aren't channel members yet
+        Enum.each(mentioned_ids, fn mid ->
+          unless Channels.is_member?(channel_id, mid) do
+            case Sessions.get_session(mid) do
+              {:ok, s} ->
+                Channels.add_member(channel_id, s.agent_id, mid)
+                Logger.info("Auto-added session=#{mid} to channel=#{channel_id}")
+              _ -> :ok
+            end
+          end
+        end)
+
+        # 5. Get all agent members of this channel (now includes auto-added)
+        agent_members = Channels.list_members(channel_id)
+
+        # 6. Route message to each agent member (skip the sending user to avoid spam)
+        Enum.each(agent_members, fn member ->
+          unless member.session_id == session_id do
+            is_mentioned = mention_all or member.session_id in mentioned_ids
+
+            prompt =
+              if is_mentioned do
+                "CHANNEL_RESPOND: You were @mentioned. Respond to: #{body}"
+              else
+                "CHANNEL_OBSERVE: Only respond if you have relevant input. If nothing to add, respond with exactly [NO_RESPONSE]. Message: #{body}"
+              end
+
+            # Save a copy of the user's message to the agent's session
+            # so the DM page shows the full conversation
+            Messages.send_message(%{
+              session_id: member.session_id,
+              channel_id: channel_id,
+              sender_role: "user",
+              recipient_role: "agent",
+              provider: "claude",
+              body: body
+            })
+
+            Logger.info("Routing to agent session=#{member.session_id} mentioned=#{is_mentioned}")
+
+            AgentManager.send_message(member.session_id, prompt,
+              model: "sonnet",
+              channel_id: channel_id
+            )
+          end
+        end)
+
+        # Reload channel members in assigns (in case auto-added)
+        channel_members = load_channel_members(channel_id)
+        {:noreply, assign(socket, :channel_members, channel_members)}
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Failed to send message")}
+    end
+  end
+
+  @impl true
+  def handle_event("add_agent_to_channel", %{"session_id" => session_id_str}, socket) do
+    require Logger
+    channel_id = socket.assigns.active_channel_id
+
+    with {session_id, ""} <- Integer.parse(session_id_str),
+         {:ok, session} <- Sessions.get_session(session_id) do
+      agent_id = session.agent_id
+
+      case Channels.add_member(channel_id, agent_id, session_id) do
+        {:ok, _member} ->
+          # Broadcast system message to channel
+          {:ok, sys_msg} =
+            Messages.send_channel_message(%{
+              channel_id: channel_id,
+              session_id: nil,
+              sender_role: "system",
+              recipient_role: "agent",
+              provider: "system",
+              body: "Agent @#{session_id} (#{session.name || "unnamed"}) joined the channel"
+            })
+
+          Phoenix.PubSub.broadcast(
+            EyeInTheSkyWeb.PubSub,
+            "channel:#{channel_id}:messages",
+            {:new_message, sys_msg}
+          )
+
+          # Reload channel members
+          channel_members = load_channel_members(channel_id)
+          Logger.info("Added agent session=#{session_id} to channel=#{channel_id}")
+
+          {:noreply, assign(socket, :channel_members, channel_members)}
+
+        {:error, changeset} ->
+          Logger.warning("Failed to add member: #{inspect(changeset)}")
+          {:noreply, put_flash(socket, :error, "Agent already in channel or invalid")}
+      end
+    else
+      _ ->
+        {:noreply, put_flash(socket, :error, "Invalid session ID")}
     end
   end
 
@@ -293,9 +339,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
           "channel:#{channel_id}:messages",
           {:new_message, message}
         )
-
-        # Publish to NATS
-        EyeInTheSkyWeb.NATS.Publisher.publish_channel_message(message, channel_id)
 
         # Reload thread
         active_thread = load_thread(parent_id)
@@ -338,140 +381,93 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
   @impl true
   def handle_event("create_agent", params, socket) do
-    %{
-      "agent_type" => agent_type,
-      "model" => model,
-      "instructions" => instructions
-    } = params
-
-    prompt_id = params["prompt_id"]
-    description = params["description"]
-    project_id = socket.assigns.project_id
+    model = params["model"] || "sonnet"
+    effort_level = params["effort_level"]
+    agent_name = params["agent_name"] || ""
+    description = params["description"] || ""
+    selected_project_id = params["project_id"]
     channel_id = socket.assigns.active_channel_id
 
-    # Log what we received
-    require Logger
-    Logger.info("📝 Creating agent with instructions: #{inspect(instructions)}")
-    Logger.info("🎯 Prompt ID: #{inspect(prompt_id)}")
-    Logger.info("📛 Description: #{inspect(description)}")
+    # Look up the selected project's path
+    selected_project =
+      Enum.find(socket.assigns.all_projects, fn p ->
+        to_string(p.id) == to_string(selected_project_id)
+      end)
 
-    # Generate UUIDs for new agent
-    agent_id = Ecto.UUID.generate()
-    session_id = Ecto.UUID.generate()
+    project_path = if selected_project, do: selected_project.path, else: File.cwd!()
 
-    # Fetch prompt if provided
-    prompt_name =
-      if prompt_id do
-        try do
-          prompt = Prompts.get_prompt!(prompt_id)
-          prompt.name
-        rescue
-          Ecto.NoResultsError -> nil
-        end
-      else
-        nil
-      end
-
-    # Use description or fallback to generic text
     agent_description =
-      if description && description != "" do
-        description
+      if agent_name != "" do
+        agent_name
       else
         "Channel agent for #{channel_id}"
       end
 
-    session_name =
-      if description && description != "" do
-        description
-      else
-        "Channel session"
-      end
-
-    # Send immediate "creating agent" message
-    {:ok, creating_msg} =
+    # Send system notification to channel
+    {:ok, _creating_msg} =
       Messages.send_channel_message(%{
         channel_id: channel_id,
         session_id: nil,
         sender_role: "system",
         recipient_role: "agent",
         provider: "system",
-        body:
-          "🤖 Creating new #{agent_type} agent (#{model})#{if description && description != "", do: " - #{description}", else: ""}..."
+        body: "Creating new agent (#{model})#{if agent_name != "", do: " - #{agent_name}", else: ""}..."
       })
 
-    # Publish to NATS
-    EyeInTheSkyWeb.NATS.Publisher.publish_channel_message(creating_msg, channel_id)
+    # Use description as initial instructions, fall back to agent name
+    instructions = if description != "", do: description, else: agent_description
 
-    # Spawn agent creation in background
-    spawn(fn ->
-      # Create agent record in database
-      {:ok, agent} =
-        Agents.create_agent(%{
-          uuid: agent_id,
-          agent_type: agent_type,
-          project_id: project_id,
-          status: "active",
-          description: agent_description
-        })
+    # Delegate to AgentManager for full lifecycle
+    opts = [
+      agent_type: "claude",
+      model: model,
+      effort_level: effort_level,
+      project_id: selected_project_id,
+      project_path: project_path,
+      description: agent_description,
+      instructions: instructions
+    ]
 
-      # Create session record
-      now = DateTime.utc_now() |> DateTime.to_iso8601()
+    case AgentManager.create_agent(opts) do
+      {:ok, %{agent: agent, session: session}} ->
+        # Auto-add the new agent to the current channel
+        if channel_id do
+          case Channels.add_member(channel_id, agent.id, session.id) do
+            {:ok, _member} ->
+              {:ok, sys_msg} =
+                Messages.send_channel_message(%{
+                  channel_id: channel_id,
+                  session_id: nil,
+                  sender_role: "system",
+                  recipient_role: "agent",
+                  provider: "system",
+                  body: "Agent @#{session.id} (#{agent_description}) joined the channel"
+                })
 
-      {:ok, new_session} =
-        EyeInTheSkyWeb.Sessions.create_session(%{
-          uuid: session_id,
-          agent_id: agent.id,
-          name: session_name,
-          description: "session-id #{session_id} agent-id #{agent_id}",
-          started_at: now
-        })
+              Phoenix.PubSub.broadcast(
+                EyeInTheSkyWeb.PubSub,
+                "channel:#{channel_id}:messages",
+                {:new_message, sys_msg}
+              )
 
-      session_int_id = new_session.id
+            {:error, _} ->
+              :ok
+          end
+        end
 
-      # Get project path (default to current directory if not set)
-      project_path = File.cwd!()
+        channel_members = load_channel_members(channel_id)
 
-      # Spawn Claude with proper flags
-      case EyeInTheSkyWeb.Claude.CLI.spawn_channel_agent(
-             session_id,
-             agent_id,
-             instructions,
-             model: model,
-             project_path: project_path,
-             channel_id: channel_id,
-             prompt_name: prompt_name
-           ) do
-        {:ok, _port, _session_ref} ->
-          # Success - Claude will start responding
-          {:ok, intro_msg} =
-            Messages.send_channel_message(%{
-              channel_id: channel_id,
-              session_id: session_int_id,
-              sender_role: "agent",
-              recipient_role: "user",
-              provider: agent_type,
-              body: "Hello! I'm a #{agent_type} agent running #{model}. Ready to help!"
-            })
+        {:noreply,
+         socket
+         |> assign(:show_agent_drawer, false)
+         |> assign(:channel_members, channel_members)}
 
-          EyeInTheSkyWeb.NATS.Publisher.publish_channel_message(intro_msg, channel_id)
-
-        {:error, reason} ->
-          # Failed to spawn
-          {:ok, error_msg} =
-            Messages.send_channel_message(%{
-              channel_id: channel_id,
-              session_id: nil,
-              sender_role: "system",
-              recipient_role: "user",
-              provider: "system",
-              body: "❌ Failed to create agent: #{inspect(reason)}"
-            })
-
-          EyeInTheSkyWeb.NATS.Publisher.publish_channel_message(error_msg, channel_id)
-      end
-    end)
-
-    {:noreply, assign(socket, :show_agent_drawer, false)}
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:show_agent_drawer, false)
+         |> put_flash(:error, "Failed to create agent: #{inspect(reason)}")}
+    end
   end
 
   @impl true
@@ -523,8 +519,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_component module={EyeInTheSkyWebWeb.Components.Navbar} id="navbar" />
-    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; overflow: hidden;">
+    <div class="h-full">
       <.svelte
         name="AgentMessagesPanel"
         props={
@@ -537,6 +532,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
             agentStatusCounts: @agent_status_counts,
             prompts: @prompts,
             activeAgents: @active_agents,
+            channelMembers: @channel_members,
             workingAgents: @working_agents
           }
         }
@@ -545,12 +541,12 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     </div>
 
     <.live_component
-      module={EyeInTheSkyWebWeb.Components.NewAgentDrawer}
-      id="new-agent-drawer"
+      module={EyeInTheSkyWebWeb.Components.NewSessionDrawer}
+      id="new-session-drawer"
       show={@show_agent_drawer}
       toggle_event="toggle_agent_drawer"
       submit_event="create_agent"
-      prompts={@prompts}
+      projects={@all_projects}
     />
     """
   end
@@ -586,12 +582,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         # Any other type, use default
         1
     end
-  end
-
-  defp get_project_id_for_jsonl(socket) do
-    # For JSONL storage, use channel_id as the project identifier
-    # (Claude Code uses path-based project IDs, not database IDs)
-    to_string(socket.assigns.active_channel_id || "default")
   end
 
   defp get_default_channel_id(channels, _project_id) do
@@ -694,6 +684,29 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     Enum.reduce(channels, %{}, fn channel, acc ->
       count = Channels.count_unread_messages(channel.id, session_id)
       Map.put(acc, channel.id, count)
+    end)
+  end
+
+  defp load_channel_members(nil), do: []
+
+  defp load_channel_members(channel_id) do
+    Channels.list_members(channel_id)
+    |> Enum.map(fn member ->
+      session_data =
+        case Sessions.get_session(member.session_id) do
+          {:ok, s} -> s
+          _ -> nil
+        end
+
+      %{
+        id: member.id,
+        session_id: member.session_id,
+        agent_id: member.agent_id,
+        role: member.role,
+        joined_at: member.joined_at,
+        session_name: session_data && session_data.name,
+        session_uuid: session_data && session_data.uuid
+      }
     end)
   end
 

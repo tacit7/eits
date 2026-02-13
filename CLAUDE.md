@@ -10,7 +10,7 @@ Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky. Reads f
 
 ```bash
 mix deps.get
-mix phx.server          # Start dev server on https://localhost:4001
+mix phx.server          # Start dev server on https://localhost:4000
 mix compile              # Compile only
 ```
 

@@ -125,9 +125,17 @@ defmodule EyeInTheSkyWeb.Channels do
   Adds a member to a channel.
   """
   def add_member(channel_id, agent_id, session_id, role \\ "member") do
+    alias EyeInTheSkyWeb.Sessions
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
+    session_uuid =
+      case Sessions.get_session(session_id) do
+        {:ok, s} -> s.uuid
+        _ -> Ecto.UUID.generate()
+      end
+
     attrs = %{
+      uuid: session_uuid,
       channel_id: channel_id,
       agent_id: agent_id,
       session_id: session_id,

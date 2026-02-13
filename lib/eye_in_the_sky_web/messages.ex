@@ -202,6 +202,7 @@ defmodule EyeInTheSkyWeb.Messages do
     id = Keyword.get(opts, :id) || Ecto.UUID.generate()
     source_uuid = Keyword.get(opts, :source_uuid)
     metadata = Keyword.get(opts, :metadata, %{})
+    channel_id = Keyword.get(opts, :channel_id)
 
     attrs = %{
       uuid: id,
@@ -215,6 +216,8 @@ defmodule EyeInTheSkyWeb.Messages do
       source_uuid: source_uuid,
       metadata: metadata
     }
+
+    attrs = if channel_id, do: Map.put(attrs, :channel_id, channel_id), else: attrs
 
     result =
       if source_uuid && message_exists_by_source_uuid?(source_uuid) do

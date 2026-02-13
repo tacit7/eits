@@ -27,6 +27,7 @@ defmodule EyeInTheSkyWeb.Channels.ChannelMember do
   def changeset(channel_member, attrs) do
     channel_member
     |> cast(attrs, [
+      :uuid,
       :channel_id,
       :agent_id,
       :session_id,

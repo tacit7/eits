@@ -6,6 +6,16 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionDrawer do
   use Phoenix.LiveComponent
 
   @impl true
+  def mount(socket) do
+    {:ok, assign(socket, :selected_model, "opus")}
+  end
+
+  @impl true
+  def handle_event("model_changed", %{"model" => model}, socket) do
+    {:noreply, assign(socket, :selected_model, model)}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <div class="drawer drawer-end">
@@ -30,53 +40,47 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionDrawer do
               <label class="label">
                 <span class="label-text font-medium">Model</span>
               </label>
-              <select name="model" class="select select-bordered" required>
-                <option value="sonnet">Sonnet</option>
-                <option value="haiku">Haiku</option>
-                <option value="opus">Opus</option>
+              <select
+                name="model"
+                class="select select-bordered"
+                required
+                phx-change="model_changed"
+                phx-target={@myself}
+              >
+                <option value="opus" selected={@selected_model == "opus"}>Opus 4.6 • Most capable for complex work</option>
+                <option value="sonnet" selected={@selected_model == "sonnet"}>Sonnet 4.5 • Best for everyday tasks</option>
+                <option value="sonnet[1m]" selected={@selected_model == "sonnet[1m]"}>Sonnet 4.5 (1M) • 1M context window</option>
+                <option value="haiku" selected={@selected_model == "haiku"}>Haiku 4.5 • Fastest for quick answers</option>
               </select>
             </div>
 
-            <!-- Project Selection or Display -->
-            <%= if @projects do %>
-              <!-- Project dropdown (for pages without fixed project) -->
+            <!-- Effort Level (Opus only) -->
+            <%= if @selected_model == "opus" do %>
               <div class="form-control">
                 <label class="label">
-                  <span class="label-text font-medium">Project</span>
+                  <span class="label-text font-medium">Effort Level</span>
                 </label>
-                <select name="project_id" class="select select-bordered" required>
-                  <option value="">Select a project...</option>
-                  <%= for project <- @projects do %>
-                    <option value={project.id}><%= project.name %></option>
-                  <% end %>
+                <select name="effort_level" class="select select-bordered">
+                  <option value="">-- Default (high) --</option>
+                  <option value="low">Low • Faster and cheaper</option>
+                  <option value="medium">Medium • Balanced approach</option>
+                  <option value="high">High • Deeper reasoning (default)</option>
                 </select>
-                <label class="label">
-                  <span class="label-text-alt">Sets the working directory for Claude Code</span>
-                </label>
-              </div>
-            <% else %>
-              <!-- Project display (for project-specific pages) -->
-              <div class="form-control">
-                <label class="label">
-                  <span class="label-text font-medium">Project</span>
-                </label>
-                <input
-                  type="text"
-                  value={@current_project.name}
-                  class="input input-bordered truncate"
-                  disabled
-                  title={@current_project.name}
-                />
-                <label class="label">
-                  <span class="label-text-alt block w-full">
-                    <span class="font-medium">Working directory:</span>
-                    <span class="block truncate" dir="rtl" title={@current_project.path}>
-                      <span dir="ltr"><%= @current_project.path %></span>
-                    </span>
-                  </span>
-                </label>
               </div>
             <% end %>
+
+            <!-- Working Directory (Project) -->
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text font-medium">Working Directory</span>
+              </label>
+              <select name="project_id" class="select select-bordered" required>
+                <option value="">Select a project...</option>
+                <%= for project <- @projects || [] do %>
+                  <option value={project.id}><%= project.name %> — <%= project.path %></option>
+                <% end %>
+              </select>
+            </div>
 
             <!-- Agent Name -->
             <div class="form-control">

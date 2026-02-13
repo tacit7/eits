@@ -198,6 +198,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         result = Map.get(parsed, "result") || Map.get(parsed, :result)
 
         if result && is_binary(result) && state.session_id do
+          # If response is exactly [NO_RESPONSE], skip saving and broadcasting
+          if String.trim(result) == "[NO_RESPONSE]" do
+            Logger.info("[#{state.session_id}] Agent responded with [NO_RESPONSE], skipping")
+            {:ok, :no_response}
+          else
           message_uuid = Map.get(parsed, "uuid") || Map.get(parsed, :uuid)
           duration_ms = Map.get(parsed, "duration_ms")
           cost = Map.get(parsed, "total_cost_usd")
@@ -209,10 +214,15 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
             is_error: Map.get(parsed, "is_error")
           }
 
+          # Include channel_id from current job context
+          channel_id = get_in(state, [:current_job, :context, :channel_id])
+
           opts = [
             source_uuid: message_uuid,
             metadata: metadata
           ]
+
+          opts = if channel_id, do: Keyword.put(opts, :channel_id, channel_id), else: opts
 
           # Try to save to database, but don't fail if we can't (e.g., in tests with sandbox)
           case Messages.record_incoming_reply(state.session_id, "claude", result, opts) do
@@ -234,6 +244,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
                 {:new_message, %{body: result, sender_role: "agent"}}
               )
               {:ok, :broadcast_only}
+          end
           end
         else
           Logger.warning("⚠️  [#{state.session_id}] Result has no text content")
@@ -267,13 +278,22 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     session_ref = make_ref()
 
     opts = [
-      model: context[:model] || "sonnet",
+      model: context[:model],
       project_path: state.project_path,
       output_format: "stream-json",
       skip_permissions: true,
       session_ref: session_ref,
-      caller: self()
+      caller: self(),
+      eits_session_id: state.session_uuid,
+      eits_agent_id: state.agent_id
     ]
+
+    opts =
+      if context[:effort_level] && context[:effort_level] != "" do
+        opts ++ [effort_level: context[:effort_level]]
+      else
+        opts
+      end
 
     # Spawn Claude directly and return port + session_ref
     case spawn_type do

@@ -5,15 +5,12 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   import EyeInTheSkyWebWeb.Helpers.ViewHelpers
   import EyeInTheSkyWebWeb.Components.Icons
 
-  @refresh_interval_ms 30_000
+  @default_refresh_ms 30_000
 
   @impl true
   def mount(_params, _session, socket) do
-    # Subscribe to agent updates if connected
     if connected?(socket) do
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agents")
-      # Refresh agents list every 30 seconds (less aggressive)
-      schedule_refresh()
     end
 
     projects = EyeInTheSkyWeb.Projects.list_projects()
@@ -27,7 +24,10 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       |> assign(:sessions, [])
       |> assign(:show_new_session_drawer, false)
       |> assign(:projects, projects)
+      |> assign(:refresh_interval, @default_refresh_ms)
+      |> assign(:timer_ref, nil)
       |> load_sessions()
+      |> schedule_refresh()
 
     {:ok, socket}
   end
@@ -47,10 +47,10 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   defp filter_sessions_by_status(sessions, filter) do
     case filter do
       "active" ->
-        Enum.filter(sessions, &(is_nil(&1.ended_at) and is_nil(&1.archived_at)))
+        Enum.filter(sessions, &(&1.status in ["active", "working", nil] and is_nil(&1.archived_at)))
 
       "completed" ->
-        Enum.filter(sessions, &(!is_nil(&1.ended_at) and is_nil(&1.archived_at)))
+        Enum.filter(sessions, &(&1.status == "completed" and is_nil(&1.archived_at)))
 
       "archived" ->
         Enum.filter(sessions, &(!is_nil(&1.archived_at)))
@@ -98,10 +98,13 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   defp session_status_rank(session) do
-    cond do
-      get_in(session, [:agent, :status]) == "discovered" -> 0
-      is_nil(session.ended_at) -> 1
-      true -> 2
+    case session.status do
+      "discovered" -> 0
+      "working" -> 1
+      "active" -> 1
+      "completed" -> 2
+      nil -> 1
+      _ -> 2
     end
   end
 
@@ -276,9 +279,22 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   @impl true
+  def handle_event("set_refresh", %{"interval" => interval}, socket) do
+    socket = cancel_timer(socket)
+
+    case Integer.parse(interval) do
+      {ms, _} when ms > 0 ->
+        {:noreply, socket |> assign(:refresh_interval, ms) |> schedule_refresh()}
+
+      _ ->
+        {:noreply, assign(socket, refresh_interval: nil, timer_ref: nil)}
+    end
+  end
+
+  @impl true
   def handle_info(:refresh_agents, socket) do
-    schedule_refresh()
-    {:noreply, load_sessions(socket)}
+    socket = socket |> load_sessions() |> schedule_refresh()
+    {:noreply, socket}
   end
 
   @impl true
@@ -288,32 +304,36 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_event("create_new_session", params, socket) do
-    alias EyeInTheSkyWeb.Claude.SessionManager
-
     model = params["model"]
+    effort_level = params["effort_level"]
     project_id = String.to_integer(params["project_id"])
     description = params["description"]
+    agent_name = params["agent_name"]
 
     project = EyeInTheSkyWeb.Projects.get_project!(project_id)
 
-    session_id = Ecto.UUID.generate()
-    agent_id = Ecto.UUID.generate()
+    opts = [
+      model: model,
+      effort_level: effort_level,
+      project_id: project_id,
+      project_path: project.path,
+      description: agent_name || description,
+      instructions: description
+    ]
 
-    prompt = "Start new eits session: session-id #{session_id} agent-id #{agent_id} description: #{description}"
+    case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
+      {:ok, _result} ->
+        socket =
+          socket
+          |> assign(:show_new_session_drawer, false)
+          |> load_sessions()
+          |> put_flash(:info, "Session launched")
 
-    Task.Supervisor.start_child(EyeInTheSkyWeb.TaskSupervisor, fn ->
-      SessionManager.start_session(session_id, prompt,
-        model: model,
-        project_path: project.path
-      )
-    end)
+        {:noreply, socket}
 
-    socket =
-      socket
-      |> assign(:show_new_session_drawer, false)
-      |> put_flash(:info, "Session launched")
-
-    {:noreply, socket}
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to create session: #{inspect(reason)}")}
+    end
   end
 
   @impl true
@@ -325,9 +345,20 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     assign(socket, :page_title, "Agents")
   end
 
-  defp schedule_refresh do
-    Process.send_after(self(), :refresh_agents, @refresh_interval_ms)
+  defp schedule_refresh(%{assigns: %{refresh_interval: nil}} = socket), do: socket
+
+  defp schedule_refresh(%{assigns: %{refresh_interval: ms}} = socket) do
+    socket = cancel_timer(socket)
+    ref = Process.send_after(self(), :refresh_agents, ms)
+    assign(socket, :timer_ref, ref)
   end
+
+  defp cancel_timer(%{assigns: %{timer_ref: ref}} = socket) when is_reference(ref) do
+    Process.cancel_timer(ref)
+    assign(socket, :timer_ref, nil)
+  end
+
+  defp cancel_timer(socket), do: socket
 
   @impl true
   def render(assigns) do
@@ -346,6 +377,15 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
             </p>
           </div>
           <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-xs text-base-content/50">Update every</span>
+            <select phx-change="set_refresh" name="interval" class="select select-xs select-bordered w-20">
+              <option value="0" selected={@refresh_interval == nil}>Off</option>
+              <option value="1000" selected={@refresh_interval == 1000}>1s</option>
+              <option value="5000" selected={@refresh_interval == 5000}>5s</option>
+              <option value="15000" selected={@refresh_interval == 15000}>15s</option>
+              <option value="30000" selected={@refresh_interval == 30000}>30s</option>
+              <option value="60000" selected={@refresh_interval == 60000}>1m</option>
+            </select>
             <button phx-click="toggle_new_session_drawer" class="btn btn-primary btn-sm">
               + New Session
             </button>
@@ -455,15 +495,18 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                             #{session.id}
                           </.link>
                             <% status_badge =
-                              case {session.status, session.ended_at} do
-                                {"discovered", _} ->
+                              case session.status do
+                                "discovered" ->
                                   %{text: "Discovered", class: "badge badge-info badge-sm"}
 
-                                {_, nil} ->
-                                  %{text: "Active", class: "badge badge-success badge-sm"}
+                                "working" ->
+                                  %{text: "Working", class: "badge badge-warning badge-sm"}
+
+                                "completed" ->
+                                  %{text: "Completed", class: "badge badge-ghost badge-sm"}
 
                                 _ ->
-                                  %{text: "Completed", class: "badge badge-ghost badge-sm"}
+                                  %{text: "Active", class: "badge badge-success badge-sm"}
                               end %>
                             <span class={status_badge.class}>
                               {status_badge.text}

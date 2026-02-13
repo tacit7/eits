@@ -36,15 +36,30 @@ defmodule EyeInTheSkyWebWeb.Components.NewAgentDrawer do
               </select>
             </div>
 
-            <!-- Model Selection -->
+            <!-- Model Selection Dropdown -->
             <div class="form-control">
               <label class="label">
                 <span class="label-text font-medium">Model</span>
               </label>
               <select name="model" class="select select-bordered" required>
-                <option value="sonnet">Sonnet</option>
-                <option value="haiku">Haiku</option>
-                <option value="opus">Opus</option>
+                <option value="opus">Opus 4.6 • Most capable for complex work</option>
+                <option value="sonnet">Sonnet 4.5 • Best for everyday tasks</option>
+                <option value="sonnet[1m]">Sonnet 4.5 (1M) • 1M context window</option>
+                <option value="haiku">Haiku 4.5 • Fastest for quick answers</option>
+              </select>
+            </div>
+
+            <!-- Effort Level (Opus & Sonnet) -->
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text font-medium">Effort Level</span>
+                <span class="label-text-alt text-xs">(Opus & Sonnet)</span>
+              </label>
+              <select name="effort_level" class="select select-bordered">
+                <option value="">-- Default (high) --</option>
+                <option value="low">Low • Faster and cheaper</option>
+                <option value="medium">Medium • Balanced approach</option>
+                <option value="high">High • Deeper reasoning (default)</option>
               </select>
             </div>
 

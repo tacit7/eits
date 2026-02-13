@@ -33,6 +33,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:processing, false)
       |> assign(:message_limit, 20)
       |> assign(:has_more_messages, false)
+      |> assign(:selected_model, "opus")
+      |> assign(:selected_effort, "")
+      |> assign(:show_model_menu, false)
       |> allow_upload(:files,
         accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
         max_entries: 10,
@@ -41,7 +44,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       )
       |> load_tab_data("messages", session.id)
 
-    {:ok, socket}
+    {:ok, socket, layout: {EyeInTheSkyWebWeb.Layouts, :app}}
   end
 
   @impl true
@@ -55,9 +58,27 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_event("toggle_model_menu", _params, socket) do
+    {:noreply, assign(socket, :show_model_menu, !socket.assigns.show_model_menu)}
+  end
+
+  @impl true
+  def handle_event("select_model", %{"model" => model, "effort" => effort}, socket) do
+    socket =
+      socket
+      |> assign(:selected_model, model)
+      |> assign(:selected_effort, effort)
+      |> assign(:show_model_menu, false)
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("send_message", %{"body" => body}, socket) when body != "" do
     require Logger
-    Logger.info("📤 DM send_message event received, body: #{body}")
+    model = socket.assigns.selected_model
+    effort_level = socket.assigns.selected_effort
+    Logger.info("📤 DM send_message event received, body: #{body}, model: #{model}, effort_level: #{effort_level}")
 
     # Consume uploaded files and save to disk
     uploaded_files = consume_uploaded_entries(socket, :files, fn %{path: temp_path}, entry ->
@@ -112,7 +133,15 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         # Send to AgentWorker (queues if busy, processes if idle)
         # Processing flag will be set when agent_working message arrives
         session_id = socket.assigns.session_id
-        case AgentManager.send_message(session_id, full_body, model: "sonnet") do
+
+        opts = [model: model]
+        opts = if effort_level && effort_level != "" do
+          opts ++ [effort_level: effort_level]
+        else
+          opts
+        end
+
+        case AgentManager.send_message(session_id, full_body, opts) do
           :ok ->
             Logger.info("✅ Message sent to agent worker for processing")
             {:noreply, socket}
@@ -614,6 +643,101 @@ defmodule EyeInTheSkyWebWeb.DmLive do
                     <% end %>
                   </div>
                 <% end %>
+
+                <!-- Model & Effort Level Icon Buttons -->
+                <div class="mb-3 flex items-center gap-2">
+                  <!-- Model Selector -->
+                  <div class="dropdown dropdown-top" phx-click="toggle_model_menu">
+                    <button type="button" tabindex="0" class="btn btn-sm btn-ghost gap-1">
+                      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                      </svg>
+                      <span class="text-xs"><%= String.slice(@selected_model, 0..20) %></span>
+                    </button>
+                    <%= if @show_model_menu do %>
+                      <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-64 p-2 shadow border border-base-300">
+                        <li>
+                          <a phx-click="select_model" phx-value-model="opus" phx-value-effort="">
+                            <div class="flex items-start gap-3">
+                              <svg class="w-5 h-5 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                              </svg>
+                              <div>
+                                <div class="font-semibold">Default (Opus 4.6)</div>
+                                <div class="text-xs text-base-content/60">Most capable for complex work</div>
+                              </div>
+                            </div>
+                          </a>
+                        </li>
+                        <li>
+                          <a phx-click="select_model" phx-value-model="sonnet" phx-value-effort="">
+                            <div class="flex items-start gap-3">
+                              <svg class="w-5 h-5 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                              </svg>
+                              <div>
+                                <div class="font-semibold">Sonnet 4.5</div>
+                                <div class="text-xs text-base-content/60">Best for everyday tasks</div>
+                              </div>
+                            </div>
+                          </a>
+                        </li>
+                        <li>
+                          <a phx-click="select_model" phx-value-model="haiku" phx-value-effort="">
+                            <div class="flex items-start gap-3">
+                              <svg class="w-5 h-5 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                              </svg>
+                              <div>
+                                <div class="font-semibold">Haiku 4.5</div>
+                                <div class="text-xs text-base-content/60">Fastest for quick answers</div>
+                              </div>
+                            </div>
+                          </a>
+                        </li>
+                      </ul>
+                    <% end %>
+                  </div>
+
+                  <!-- Effort Level Button (Opus & Sonnet) -->
+                  <%= if @selected_model in ["opus", "sonnet"] do %>
+                    <div class="dropdown dropdown-top" phx-click="toggle_model_menu">
+                      <button type="button" tabindex="0" class="btn btn-sm btn-ghost gap-1">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                        </svg>
+                        <span class="text-xs"><%= if @selected_effort != "", do: @selected_effort, else: "high" %></span>
+                      </button>
+                      <%= if @show_model_menu do %>
+                        <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-48 p-2 shadow border border-base-300">
+                          <li class="menu-title">
+                            <span>Effort Level</span>
+                          </li>
+                          <li>
+                            <a phx-click="select_model" phx-value-model={@selected_model} phx-value-effort="">
+                              Default (high)
+                            </a>
+                          </li>
+                          <li>
+                            <a phx-click="select_model" phx-value-model={@selected_model} phx-value-effort="low">
+                              Low (faster, cheaper)
+                            </a>
+                          </li>
+                          <li>
+                            <a phx-click="select_model" phx-value-model={@selected_model} phx-value-effort="medium">
+                              Medium (balanced)
+                            </a>
+                          </li>
+                          <li>
+                            <a phx-click="select_model" phx-value-model={@selected_model} phx-value-effort="high">
+                              High (deeper reasoning)
+                            </a>
+                          </li>
+                        </ul>
+                      <% end %>
+                    </div>
+                  <% end %>
+                </div>
 
                 <div class="flex gap-2">
                   <div class="flex-1 relative">

@@ -5,13 +5,12 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Config do
 
   @config_files [
     {"CLAUDE.md", "Global instructions for all projects"},
-    {"settings.json", "Claude Code settings"},
-    {"mcp.json", "MCP server configuration"},
-    {".mcp.json", "Hidden MCP configuration"}
+    {"settings.json", "Claude Code settings"}
   ]
 
   @config_dirs [
     {"commands", "Slash commands / skills"},
+    {"skills", "Reusable skills"},
     {"agents", "Agent definitions"},
     {"hooks", "Event hooks (shell scripts)"},
     {"projects", "Per-project session data"},
@@ -262,7 +261,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Config do
                   </div>
                   <div class="overflow-auto max-h-[70vh]">
                     <%= if String.ends_with?(@selected_file, ".json") do %>
-                      <pre class="p-4 text-xs font-mono text-base-content whitespace-pre-wrap break-all"><code>{@file_content}</code></pre>
+                      <pre id="json-viewer" class="p-4 text-xs font-mono whitespace-pre-wrap break-all" phx-hook="Highlight"><code class="language-json">{@file_content}</code></pre>
                     <% else %>
                       <div
                         id="config-viewer"

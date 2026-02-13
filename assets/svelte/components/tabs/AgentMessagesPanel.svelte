@@ -14,8 +14,13 @@
   export let agentStatusCounts = {}
   export let prompts = []
   export let activeAgents = []
+  export let channelMembers = []
   export let workingAgents = {}
   export let live
+
+  // Add agent input state
+  let addAgentSessionId = ''
+  let showMemberPanel = false
 
   // Debug working agents
   $: if (workingAgents) {
@@ -76,14 +81,20 @@
             (a.provider && a.provider.toLowerCase().includes(searchTerm))
           )
 
+        // Prepend @all option
+        const allOption = { id: 'all', name: 'All Agents', provider: 'system', model: null, description: 'Require all channel agents to respond' }
+
         if (filtered.length > 0 || searchTerm === '') {
-          autocompleteOptions = searchTerm === '' ? activeAgents.map(a => ({
+          const agentOptions = searchTerm === '' ? activeAgents.map(a => ({
             id: a.id,
             name: a.name || a.agent_description || `Session ${a.id}`,
             provider: a.provider || 'claude',
             model: a.model,
             description: a.agent_description
           })) : filtered
+          // Show @all if search term is empty or matches "all"
+          const showAll = searchTerm === '' || 'all'.includes(searchTerm)
+          autocompleteOptions = showAll ? [allOption, ...agentOptions] : agentOptions
           selectedAutocompleteIndex = 0
           showAutocomplete = true
           return
@@ -156,12 +167,13 @@
     const textAfterCursor = inputValue.substring(cursorPos)
     const lastAtIndex = textBeforeCursor.lastIndexOf('@')
 
-    const idStr = String(sessionId)
-    inputValue = textBeforeCursor.substring(0, lastAtIndex) + `@${idStr} ` + textAfterCursor
+    // Handle @all vs numeric session IDs
+    const mentionText = sessionId === 'all' ? 'all' : String(sessionId)
+    inputValue = textBeforeCursor.substring(0, lastAtIndex) + `@${mentionText} ` + textAfterCursor
     showAutocomplete = false
 
     setTimeout(() => {
-      const newPos = lastAtIndex + idStr.length + 2
+      const newPos = lastAtIndex + mentionText.length + 2
       inputElement.setSelectionRange(newPos, newPos)
       inputElement.focus()
     }, 0)
@@ -171,32 +183,12 @@
     const body = inputValue.trim()
 
     if (body) {
-      // Match @<integer> mentions
-      const mentionRegex = /@(\d+)/g
-      const mentions = []
-      let match
-
-      while ((match = mentionRegex.exec(body)) !== null) {
-        const id = parseInt(match[1], 10)
-        if (!isNaN(id) && !mentions.includes(id)) {
-          mentions.push(id)
-        }
-      }
-
-      if (mentions.length > 0) {
-        mentions.forEach(sessionId => {
-          live.pushEvent('send_direct_message', {
-            session_id: sessionId,
-            body: body,
-            channel_id: activeChannelId
-          })
-        })
-      } else {
-        live.pushEvent('send_channel_message', {
-          channel_id: activeChannelId,
-          body: body
-        })
-      }
+      // All messages go through send_channel_message
+      // @mentions are parsed server-side for routing
+      live.pushEvent('send_channel_message', {
+        channel_id: activeChannelId,
+        body: body
+      })
 
       messageHistory.unshift(body)
       if (messageHistory.length > 50) {
@@ -207,6 +199,14 @@
       currentDraft = ''
       inputValue = ''
       shouldAutoScroll = true
+    }
+  }
+
+  function handleAddAgent() {
+    const sessionId = addAgentSessionId.trim()
+    if (sessionId) {
+      live.pushEvent('add_agent_to_channel', { session_id: sessionId })
+      addAgentSessionId = ''
     }
   }
 
@@ -239,9 +239,13 @@
     --accent-soft: #064e3b;
   }
 
+  :global(div[id^="AgentMessagesPanel"]) {
+    height: 100%;
+  }
+
   .agent-messages-container {
     display: flex;
-    height: 100vh;
+    height: 100%;
     background-color: var(--bg-shell);
   }
 
@@ -548,11 +552,63 @@
             NATS: Live
           </span>
         </div>
+        <button
+          class="new-agent-btn"
+          style="background-color: transparent; color: var(--text-secondary); border: 1px solid var(--border-subtle);"
+          on:click={() => showMemberPanel = !showMemberPanel}
+        >
+          {channelMembers.length} members
+        </button>
         <button class="new-agent-btn" on:click={openAgentDrawer}>
           + New Agent
         </button>
       </div>
     </div>
+
+    <!-- Channel Members Panel (collapsible) -->
+    {#if showMemberPanel}
+      <div style="border-bottom: 1px solid var(--border-subtle); background-color: var(--bg-surface); padding: 0.75rem 1.5rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Channel Agents</span>
+        </div>
+
+        {#if channelMembers.length > 0}
+          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+            {#each channelMembers as member}
+              <span
+                class="badge badge-outline badge-sm session-id-badge"
+                on:click={() => handleSessionIdClick(member.session_id)}
+                on:keydown={(e) => e.key === 'Enter' && handleSessionIdClick(member.session_id)}
+                role="button"
+                tabindex="0"
+                title="Session #{member.session_id}"
+              >
+                @{member.session_id} {member.session_name || ''}
+              </span>
+            {/each}
+          </div>
+        {:else}
+          <p style="font-size: 0.75rem; color: var(--text-tertiary); margin-bottom: 0.5rem;">No agents in this channel yet</p>
+        {/if}
+
+        <!-- Add Agent Input -->
+        <form on:submit|preventDefault={handleAddAgent} style="display: flex; gap: 0.5rem;">
+          <input
+            type="text"
+            bind:value={addAgentSessionId}
+            placeholder="Session ID to add..."
+            style="flex: 1; padding: 0.375rem 0.75rem; border-radius: 0.25rem; border: 1px solid var(--border-subtle); background-color: var(--bg-shell); color: var(--text-primary); font-size: 0.8125rem;"
+          />
+          <button
+            type="submit"
+            disabled={!addAgentSessionId.trim()}
+            style="padding: 0.375rem 0.75rem; border-radius: 0.25rem; background-color: var(--accent-primary); color: white; border: none; font-size: 0.8125rem; font-weight: 600; cursor: pointer; opacity: {addAgentSessionId.trim() ? '1' : '0.5'};"
+          >
+            Add
+          </button>
+        </form>
+      </div>
+    {/if}
 
     <!-- Messages Container -->
     <div
@@ -678,7 +734,7 @@
           bind:this={inputElement}
           on:input={handleInputChange}
           on:keydown={handleInputKeydown}
-          placeholder="Send instruction to agents (use @id for direct messages)..."
+          placeholder="Message channel agents (use @id to require a response)..."
           class="message-input"
           autocomplete="off"
         />

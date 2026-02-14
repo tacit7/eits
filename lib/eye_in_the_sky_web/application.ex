@@ -25,6 +25,8 @@ defmodule EyeInTheSkyWeb.Application do
       {Registry, keys: :duplicate, name: EyeInTheSkyWeb.Claude.Registry},
       # Unique registry for agent worker naming (:via requires unique keys)
       {Registry, keys: :unique, name: EyeInTheSkyWeb.Claude.AgentRegistry},
+      # SDK registry for tracking running Claude CLI processes
+      EyeInTheSkyWeb.Claude.SDK.Registry,
       # DynamicSupervisor for per-session workers
       {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.SessionSupervisor, strategy: :one_for_one},
       # DynamicSupervisor for persistent agent workers

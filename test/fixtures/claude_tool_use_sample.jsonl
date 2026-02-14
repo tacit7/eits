@@ -1,0 +1,7 @@
+{"type":"system","subtype":"init","session_id":"tool-session-123"}
+{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tool_abc","name":"Read","input":{}}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"file"}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"_path\":\"test.txt\"}"}}}
+{"type":"stream_event","event":{"type":"content_block_stop","index":0}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tool_abc","name":"Read","input":{"file_path":"test.txt"}}],"stop_reason":"tool_use"},"session_id":"tool-session-123"}
+{"type":"result","session_id":"tool-session-123"}

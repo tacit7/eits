@@ -1,14 +1,9 @@
-defmodule EyeInTheSkyWeb.Agents.Agent do
+defmodule EyeInTheSkyWeb.ChatAgents.ChatAgent do
   @moduledoc """
-  DEPRECATED: Use EyeInTheSkyWeb.ChatAgents.ChatAgent instead.
+  Schema for chat agent identities (participants in the chat/DM system).
 
-  This is a backward compatibility schema that mirrors ChatAgent.
-  The naming has been updated:
-  - Agent (old) → ChatAgent (new) - represents chat identities/members
-  - Session (old) → Agent (new, future) - represents execution contexts
-
-  This schema will be removed in Phase 2 after all callers are updated.
-  For now, it points to the same "agents" table as ChatAgent.
+  Points to the "agents" database table but represents the conceptual
+  ChatAgent - a chat identity/member, not an execution context.
   """
 
   use Ecto.Schema
@@ -38,8 +33,8 @@ defmodule EyeInTheSkyWeb.Agents.Agent do
   end
 
   @doc false
-  def changeset(agent, attrs) do
-    agent
+  def changeset(chat_agent, attrs) do
+    chat_agent
     |> cast(attrs, [
       :uuid,
       :persona_id,

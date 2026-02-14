@@ -33,12 +33,12 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         session.id
 
       {:error, :not_found} ->
-        # Create the web UI agent first
+        # Create the web UI chat agent first
         agent =
-          case Agents.get_agent_by_uuid(@web_agent_uuid) do
+          case ChatAgents.get_chat_agent_by_uuid(@web_agent_uuid) do
             {:ok, a} -> a
             {:error, :not_found} ->
-              {:ok, a} = Agents.create_agent(%{
+              {:ok, a} = ChatAgents.create_chat_agent(%{
                 uuid: @web_agent_uuid,
                 description: "Web UI User",
                 source: "web"
@@ -102,7 +102,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
     # Get agent status counts for the project (with error handling)
     agent_status_counts =
-      case Agents.get_agent_status_counts(project_id) do
+      case ChatAgents.get_chat_agent_status_counts(project_id) do
         counts when is_map(counts) -> counts
         _ -> %{}
       end

@@ -194,17 +194,16 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
     task_prompt = "#{task.title}\n\n#{task.description || ""}" |> String.trim()
 
-    case Agents.create_agent(%{
+    case ChatAgents.create_chat_agent(%{
            uuid: agent_id,
-           name: "Agent for: #{String.slice(task.title, 0..40)}",
            description: task_prompt,
            project_id: project.id,
            git_worktree_path: project.path
          }) do
-      {:ok, agent} ->
+      {:ok, chat_agent} ->
         case Agents.create_execution_agent_with_model(%{
                uuid: session_id,
-               agent_id: agent.id,
+               agent_id: chat_agent.id,
                name: task.title,
                description: task_prompt,
                started_at: now,

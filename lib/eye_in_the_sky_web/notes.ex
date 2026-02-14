@@ -22,7 +22,7 @@ defmodule EyeInTheSkyWeb.Notes do
   """
   def list_notes_for_session(session_id) do
     # Get session to access both id and uuid
-    session = Repo.get(EyeInTheSkyWeb.ExecutionAgents.ExecutionAgent, session_id)
+    session = Repo.get(EyeInTheSkyWeb.Agents.Agent, session_id)
 
     if session do
       Note
@@ -40,7 +40,7 @@ defmodule EyeInTheSkyWeb.Notes do
   Matches on both integer ID (as string) and UUID for migration compatibility.
   """
   def count_notes_for_session(session_id) do
-    session = Repo.get(EyeInTheSkyWeb.ExecutionAgents.ExecutionAgent, session_id)
+    session = Repo.get(EyeInTheSkyWeb.Agents.Agent, session_id)
 
     if session do
       Note

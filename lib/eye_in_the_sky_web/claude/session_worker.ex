@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
 
   alias EyeInTheSkyWeb.Claude.Utils
   alias EyeInTheSkyWeb.Messages
-  alias EyeInTheSkyWeb.ExecutionAgents
+  alias EyeInTheSkyWeb.Agents
 
   @registry EyeInTheSkyWeb.Claude.Registry
   @max_queue_size 5
@@ -269,7 +269,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
   # --- Private ---
 
   defp resolve_session_int_id(session_id) do
-    case ExecutionAgents.get_execution_agent_by_uuid(session_id) do
+    case Agents.get_execution_agent_by_uuid(session_id) do
       {:ok, session} -> session.id
       {:error, _} -> nil
     end
@@ -360,9 +360,9 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
         if claude_session_id && state.session_int_id do
           Logger.info("🔄 Updating session #{state.session_int_id} with Claude session_id: #{claude_session_id}")
 
-          case ExecutionAgents.get_execution_agent(state.session_int_id) do
+          case Agents.get_execution_agent(state.session_int_id) do
             {:ok, agent} ->
-              case ExecutionAgents.update_execution_agent(agent, %{uuid: claude_session_id}) do
+              case Agents.update_execution_agent(agent, %{uuid: claude_session_id}) do
                 {:ok, _updated} ->
                   Logger.info("✅ Session UUID updated: #{state.session_id} -> #{claude_session_id}")
                   %{state | session_id: claude_session_id}

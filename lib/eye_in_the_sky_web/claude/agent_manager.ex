@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   require Logger
 
   alias EyeInTheSkyWeb.Claude.AgentWorker
-  alias EyeInTheSkyWeb.{ExecutionAgents, ChatAgents, Messages}
+  alias EyeInTheSkyWeb.{Agents, ChatAgents, Messages}
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
 
@@ -43,7 +43,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              description: description
            }),
          {:ok, session} <-
-           ExecutionAgents.create_execution_agent(%{
+           Agents.create_execution_agent(%{
              uuid: session_uuid,
              agent_id: agent.id,
              name: description,
@@ -127,7 +127,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   defp start_agent_worker(session_id) do
     Logger.info("🚀 start_agent_worker: loading session.id=#{session_id}")
 
-    with {:ok, session} <- ExecutionAgents.get_execution_agent(session_id),
+    with {:ok, session} <- Agents.get_execution_agent(session_id),
          {:ok, agent} <- ChatAgents.get_chat_agent(session.agent_id) do
       project_path = session.git_worktree_path || agent.git_worktree_path || File.cwd!()
 

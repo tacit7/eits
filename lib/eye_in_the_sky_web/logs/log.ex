@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.Logs.Log do
     field :message, :string
     field :timestamp, :string
 
-    belongs_to :session, EyeInTheSkyWeb.ExecutionAgents.ExecutionAgent, type: :integer
+    belongs_to :session, EyeInTheSkyWeb.Agents.Agent, type: :integer
   end
 
   @doc false

@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.Projects
-  alias EyeInTheSkyWeb.ExecutionAgents
+  alias EyeInTheSkyWeb.Agents
   alias EyeInTheSkyWeb.Repo
   import EyeInTheSkyWebWeb.Components.SessionCard
 
@@ -25,7 +25,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         tasks = Projects.get_project_tasks(project_id)
 
         agents =
-          ExecutionAgents.list_execution_agent_overview_rows(
+          Agents.list_execution_agent_overview_rows(
             project_id: project_id,
             limit: 50,
             search_query: ""
@@ -62,7 +62,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
     status_filter = socket.assigns.status_filter
 
     agents =
-      ExecutionAgents.list_execution_agent_overview_rows(
+      Agents.list_execution_agent_overview_rows(
         project_id: project_id,
         limit: 50,
         search_query: effective_query

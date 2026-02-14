@@ -183,7 +183,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("start_agent_for_task", %{"task_id" => task_id}, socket) do
-    alias EyeInTheSkyWeb.{ExecutionAgents, ChatAgents, Claude.SessionManager}
+    alias EyeInTheSkyWeb.{Agents, ChatAgents, Claude.SessionManager}
 
     task = Tasks.get_task_by_uuid!(task_id)
     project = socket.assigns.project
@@ -202,7 +202,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
            git_worktree_path: project.path
          }) do
       {:ok, agent} ->
-        case ExecutionAgents.create_execution_agent_with_model(%{
+        case Agents.create_execution_agent_with_model(%{
                uuid: session_id,
                agent_id: agent.id,
                name: task.title,

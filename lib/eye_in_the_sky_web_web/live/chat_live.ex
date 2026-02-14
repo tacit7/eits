@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.ChatLive do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.{ChatAgents, Channels, Messages, Projects, Prompts, ExecutionAgents}
+  alias EyeInTheSkyWeb.{ChatAgents, Channels, Messages, Projects, Prompts, Agents}
   alias EyeInTheSkyWeb.Claude.AgentManager
 
   # Deterministic UUIDs for the web UI user
@@ -26,9 +26,9 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   end
 
   defp ensure_web_session do
-    alias EyeInTheSkyWeb.{ChatAgents, ExecutionAgents}
+    alias EyeInTheSkyWeb.{ChatAgents, Agents}
 
-    case ExecutionAgents.get_execution_agent_by_uuid(@web_session_uuid) do
+    case Agents.get_execution_agent_by_uuid(@web_session_uuid) do
       {:ok, session} ->
         session.id
 
@@ -46,7 +46,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
               a
           end
 
-        {:ok, session} = ExecutionAgents.create_execution_agent(%{
+        {:ok, session} = Agents.create_execution_agent(%{
           uuid: @web_session_uuid,
           agent_id: agent.id,
           name: "Web UI",
@@ -118,7 +118,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
     # Load active sessions for @ autocomplete
     active_agents =
-      ExecutionAgents.list_active_execution_agents()
+      Agents.list_active_agents()
       |> EyeInTheSkyWeb.Repo.preload(:agent)
       |> Enum.map(fn session ->
         %{
@@ -205,7 +205,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         # 4. Auto-add mentioned agents that aren't channel members yet
         Enum.each(mentioned_ids, fn mid ->
           unless Channels.is_member?(channel_id, mid) do
-            case ExecutionAgents.get_execution_agent(mid) do
+            case Agents.get_execution_agent(mid) do
               {:ok, s} ->
                 Channels.add_member(channel_id, s.agent_id, mid)
                 Logger.info("Auto-added session=#{mid} to channel=#{channel_id}")
@@ -264,7 +264,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     channel_id = socket.assigns.active_channel_id
 
     with {session_id, ""} <- Integer.parse(session_id_str),
-         {:ok, session} <- ExecutionAgents.get_execution_agent(session_id) do
+         {:ok, session} <- Agents.get_execution_agent(session_id) do
       agent_id = session.agent_id
 
       case Channels.add_member(channel_id, agent_id, session_id) do
@@ -693,7 +693,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     Channels.list_members(channel_id)
     |> Enum.map(fn member ->
       session_data =
-        case ExecutionAgents.get_execution_agent(member.session_id) do
+        case Agents.get_execution_agent(member.session_id) do
           {:ok, s} -> s
           _ -> nil
         end

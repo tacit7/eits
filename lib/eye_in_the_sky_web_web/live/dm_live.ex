@@ -1,15 +1,15 @@
 defmodule EyeInTheSkyWebWeb.DmLive do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.{ExecutionAgents, Messages, Tasks, Commits, Logs, ChatAgents, Notes}
+  alias EyeInTheSkyWeb.{Agents, Messages, Tasks, Commits, Logs, ChatAgents, Notes}
   alias EyeInTheSkyWeb.Claude.SessionManager
 
   @impl true
   def mount(%{"session_id" => session_id_param}, _session, socket) do
     # Accept both integer ID and UUID in URL
     agent = case Integer.parse(session_id_param) do
-      {id, ""} -> ExecutionAgents.get_execution_agent!(id)
-      _ -> ExecutionAgents.get_execution_agent_by_uuid!(session_id_param)
+      {id, ""} -> Agents.get_execution_agent!(id)
+      _ -> Agents.get_execution_agent_by_uuid!(session_id_param)
     end
 
     chat_agent = ChatAgents.get_chat_agent!(agent.agent_id)

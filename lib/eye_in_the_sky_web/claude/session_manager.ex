@@ -14,7 +14,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
   require Logger
 
   alias EyeInTheSkyWeb.Claude.{SessionWorker, CLI}
-  alias EyeInTheSkyWeb.{ExecutionAgents, ChatAgents}
+  alias EyeInTheSkyWeb.{Agents, ChatAgents}
 
   @supervisor EyeInTheSkyWeb.Claude.SessionSupervisor
   @registry EyeInTheSkyWeb.Claude.Registry
@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
              description: description
            }),
          {:ok, session} <-
-           ExecutionAgents.create_execution_agent(%{
+           Agents.create_execution_agent(%{
              uuid: session_uuid,
              agent_id: agent.id,
              name: description,

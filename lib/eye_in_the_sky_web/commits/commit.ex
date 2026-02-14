@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.Commits.Commit do
     field :commit_hash, :string
     field :commit_message, :string
 
-    belongs_to :session, EyeInTheSkyWeb.ExecutionAgents.ExecutionAgent,
+    belongs_to :session, EyeInTheSkyWeb.Agents.Agent,
       define_field: false,
       foreign_key: :session_id,
       type: :integer

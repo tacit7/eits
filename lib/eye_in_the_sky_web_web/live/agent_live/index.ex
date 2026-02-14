@@ -505,9 +505,9 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
         </div>
 
         <div class="mt-6">
-          <%= if @sessions == [] do %>
+          <%= if @agents == [] do %>
             <div class="text-center py-12">
-              <h3 class="text-sm font-medium text-base-content">No sessions found</h3>
+              <h3 class="text-sm font-medium text-base-content">No agents found</h3>
               <p class="mt-1 text-sm text-base-content/60">Try adjusting your search or filters</p>
             </div>
           <% else %>

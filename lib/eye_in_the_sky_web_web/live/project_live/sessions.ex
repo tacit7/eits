@@ -68,12 +68,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         search_query: effective_query
       )
 
-    filtered_agents = apply_status_filter(sessions, status_filter)
+    filtered_agents = apply_status_filter(agents, status_filter)
 
     socket =
       socket
       |> assign(:search_query, effective_query)
-      |> assign(:sessions, filtered_agents)
+      |> assign(:agents, filtered_agents)
 
     {:noreply, socket}
   end
@@ -86,7 +86,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
     socket =
       socket
       |> assign(:status_filter, status)
-      |> assign(:sessions, filtered_agents)
+      |> assign(:agents, filtered_agents)
 
     {:noreply, socket}
   end
@@ -214,7 +214,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
           </button>
         </div>
 
-        <%= if length(@sessions) > 0 do %>
+        <%= if length(@agents) > 0 do %>
           <!-- Sessions Grid -->
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <%= for agent <- @agents do %>

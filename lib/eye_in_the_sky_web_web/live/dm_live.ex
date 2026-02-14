@@ -12,22 +12,22 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       _ -> ExecutionAgents.get_execution_agent_by_uuid!(session_id_param)
     end
 
-    agent = Agents.get_agent!(session.agent_id)
+    chat_agent = ChatAgents.get_chat_agent!(agent.agent_id)
 
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{agent.id}")
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
       send(self(), :sync_from_session_file)
     end
 
     socket =
       socket
-      |> assign(:page_title, session.name || "Session")
-      |> assign(:session_id, session.id)
-      |> assign(:session_uuid, session.uuid)
-      |> assign(:agent_id, session.agent_id)
+      |> assign(:page_title, agent.name || "Session")
+      |> assign(:session_id, agent.id)
+      |> assign(:session_uuid, agent.uuid)
+      |> assign(:agent_id, agent.agent_id)
       |> assign(:agent, agent)
-      |> assign(:agent, agent)
+      |> assign(:chat_agent, chat_agent)
       |> assign(:active_tab, "messages")
       |> assign(:session_ref, nil)
       |> assign(:processing, false)
@@ -42,7 +42,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         max_file_size: 50_000_000,
         auto_upload: true
       )
-      |> load_tab_data("messages", session.id)
+      |> load_tab_data("messages", agent.id)
 
     {:ok, socket, layout: {EyeInTheSkyWebWeb.Layouts, :app}}
   end
@@ -186,11 +186,11 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     alias EyeInTheSkyWeb.Claude.SessionReader
 
     agent = socket.assigns.agent
-    agent = socket.assigns.agent
-    session_id = socket.assigns.agent_id
-    session_uuid = socket.assigns.agent_uuid
+    chat_agent = socket.assigns.chat_agent
+    session_id = socket.assigns.session_id
+    session_uuid = socket.assigns.session_uuid
 
-    case resolve_project_path(session, agent) do
+    case resolve_project_path(agent, chat_agent) do
       {:ok, project_path} ->
         # Use last source_uuid as cursor to only read new messages
         last_uuid = Messages.get_last_source_uuid(session_id)
@@ -294,11 +294,11 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     alias EyeInTheSkyWeb.Claude.SessionReader
 
     agent = socket.assigns.agent
-    agent = socket.assigns.agent
-    session_id = socket.assigns.agent_id
-    session_uuid = socket.assigns.agent_uuid
+    chat_agent = socket.assigns.chat_agent
+    session_id = socket.assigns.session_id
+    session_uuid = socket.assigns.session_uuid
 
-    with {:ok, project_path} <- resolve_project_path(session, agent),
+    with {:ok, project_path} <- resolve_project_path(agent, chat_agent),
          last_uuid = Messages.get_last_source_uuid(session_id),
          {:ok, raw_messages} <- SessionReader.read_messages_after_uuid(session_uuid, project_path, last_uuid) do
       formatted = SessionReader.format_messages(raw_messages)
@@ -935,16 +935,16 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     end)
   end
 
-  defp resolve_project_path(session, agent) do
+  defp resolve_project_path(agent, chat_agent) do
     cond do
-      session.git_worktree_path ->
-        {:ok, session.git_worktree_path}
-
       agent.git_worktree_path ->
         {:ok, agent.git_worktree_path}
 
-      agent.project && agent.project.path ->
-        {:ok, agent.project.path}
+      chat_agent.git_worktree_path ->
+        {:ok, chat_agent.git_worktree_path}
+
+      chat_agent.project && chat_agent.project.path ->
+        {:ok, chat_agent.project.path}
 
       true ->
         {:error, :no_project_path}

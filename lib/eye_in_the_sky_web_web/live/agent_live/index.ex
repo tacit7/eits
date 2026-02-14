@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.ExecutionAgents
+  alias EyeInTheSkyWeb.{ExecutionAgents, ChatAgents}
   import EyeInTheSkyWebWeb.Helpers.ViewHelpers
   import EyeInTheSkyWebWeb.Components.Icons
 
@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       |> filter_agents_by_search(socket.assigns.search_query)
       |> sort_agents(socket.assigns.sort_by)
 
-    assign(socket, :agents, sessions)
+    assign(socket, :agents, agents)
   end
 
   defp filter_agents_by_status(sessions, filter) do
@@ -159,9 +159,9 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
           )
 
           # Continue the agent's session
-          with {:ok, session} <- EyeInTheSkyWeb.Sessions.get_session(target_session_id),
-               {:ok, agent} <- EyeInTheSkyWeb.Agents.get_agent(agent.agent_id) do
-            project_path = agent.git_worktree_path || File.cwd!()
+          with {:ok, agent} <- ExecutionAgents.get_execution_agent(target_session_id),
+               {:ok, chat_agent} <- ChatAgents.get_chat_agent(agent.agent_id) do
+            project_path = chat_agent.git_worktree_path || File.cwd!()
 
             prompt_with_reminder = """
             REMINDER: Use i-chat-send MCP tool to send your response to the channel.
@@ -230,7 +230,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     require Logger
     Logger.info("🗄️  Archive button clicked for session: #{session_id}")
 
-    with {:ok, session} <- Sessions.get_session(session_id),
+    with {:ok, agent} <- ExecutionAgents.get_execution_agent(session_id),
          {:ok, updated} <- ExecutionAgents.archive_execution_agent(agent) do
       Logger.info("✅ Session archived successfully: #{session_id}, archived_at now: #{inspect(updated.archived_at)}")
 
@@ -252,7 +252,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     require Logger
     Logger.info("🔄 Unarchive button clicked for session: #{session_id}")
 
-    with {:ok, session} <- Sessions.get_session(session_id),
+    with {:ok, agent} <- ExecutionAgents.get_execution_agent(session_id),
          {:ok, updated} <- ExecutionAgents.unarchive_execution_agent(agent) do
       Logger.info("✅ Session unarchived successfully: #{session_id}, archived_at now: #{inspect(updated.archived_at)}")
 
@@ -271,7 +271,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_event("delete_session", %{"session_id" => session_id}, socket) do
-    with {:ok, session} <- Sessions.get_session(session_id),
+    with {:ok, agent} <- ExecutionAgents.get_execution_agent(session_id),
          {:ok, _} <- ExecutionAgents.delete_execution_agent(agent) do
       socket =
         socket
@@ -578,7 +578,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                             <span>{agent.project_name}</span>
                           <% end %>
                           <span>&middot;</span>
-                          <span>{relative_time(session.started_at)}</span>
+                          <span>{relative_time(agent.started_at)}</span>
                         </div>
                       </td>
                       <td class="py-2 text-xs text-base-content/50 truncate max-w-xs">{agent.chat_agent.description}</td>

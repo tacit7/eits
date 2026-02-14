@@ -283,17 +283,6 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
     |> Enum.join(", ")
   end
 
-  defp format_timestamp(nil), do: ""
-
-  defp format_timestamp(timestamp) when is_binary(timestamp) do
-    case NaiveDateTime.from_iso8601(timestamp) do
-      {:ok, dt} -> Calendar.strftime(dt, "%Y-%m-%d %H:%M:%S")
-      _ -> timestamp
-    end
-  end
-
-  defp format_timestamp(_), do: ""
-
   defp format_due_date(nil), do: ""
 
   defp format_due_date(datetime) when is_binary(datetime) do

@@ -16,6 +16,21 @@ mix compile              # Compile only
 
 Assets: `cd assets && npm install` for JS dependencies. Esbuild and Tailwind run as Phoenix watchers.
 
+## Claude CLI & API Keys
+
+This app spawns Claude CLI processes to run agents. API key configuration:
+
+- **Environment-based**: Claude CLI uses `ANTHROPIC_API_KEY` from the system environment or `~/.config/claude/config.toml`
+- **No DB storage**: API keys are NOT stored in the database
+- **Pass-through**: The CLI module passes through all system environment variables to spawned Claude processes
+
+Common error when API key has insufficient credits:
+```json
+{"type":"assistant","message":{"content":[{"type":"text","text":"Credit balance is too low"}]},"error":"billing_error"}
+```
+
+Exit status will be 1 (error) instead of 0 (success).
+
 ## Database
 
 Single SQLite database at `~/.config/eye-in-the-sky/eits.db`. Configured in `config/dev.exs`. The Go MCP server owns the schema; this app is a read-heavy consumer.

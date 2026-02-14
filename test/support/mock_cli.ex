@@ -7,10 +7,6 @@ defmodule EyeInTheSkyWeb.Claude.MockCLI do
     spawn_mock_session(:new, prompt, opts)
   end
 
-  def continue_session(prompt, opts) do
-    spawn_mock_session(:continue, prompt, opts)
-  end
-
   def resume_session(_session_id, prompt, opts) do
     spawn_mock_session(:resume, prompt, opts)
   end

@@ -19,8 +19,6 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
 
   require Logger
 
-  alias EyeInTheSkyWeb.Settings
-
   # ---------------------------------------------------------------------------
   # Types and constants
   # ---------------------------------------------------------------------------
@@ -31,7 +29,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   @known_permission_modes ~w(acceptEdits bypassPermissions default delegate dontAsk plan)
   @default_idle_timeout_ms 300_000
   @standard_paths ["/usr/local/bin/claude", "/opt/homebrew/bin/claude", Path.expand("~/.local/bin/claude")]
-  @redacted_flags ~w(-p --system-prompt --append-system-prompt)
+  @redacted_flags ~w(--system-prompt --append-system-prompt)
   @persistent_term_key {__MODULE__, :claude_binary_path}
 
   # ---------------------------------------------------------------------------
@@ -41,25 +39,13 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   @doc """
   Spawns a new Claude session.
 
-  Generates a session_id if not provided and passes `--session-id` so
-  the UUID is controlled for future resume.
+  Does NOT pass --session-id flag. Claude will generate a UUID and return it
+  in the output. Caller should parse the session ID from Claude's response.
   """
   @spec spawn_new_session(String.t(), cli_opts()) :: spawn_result()
   def spawn_new_session(prompt, opts \\ []) do
     opts
-    |> Keyword.put_new_lazy(:session_id, &Ecto.UUID.generate/0)
     |> Keyword.put(:prompt, prompt)
-    |> spawn_cli()
-  end
-
-  @doc """
-  Continues the most recent session (passes `-c` flag).
-  """
-  @spec continue_session(String.t(), cli_opts()) :: spawn_result()
-  def continue_session(prompt, opts \\ []) do
-    opts
-    |> Keyword.put(:prompt, prompt)
-    |> Keyword.put(:continue, true)
     |> spawn_cli()
   end
 
@@ -92,13 +78,13 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
 
   - `:allowed_tools` is converted to `:allowedTools`
   - String booleans `"true"`/`"false"` are coerced to actual booleans
-    for `:skip_permissions`, `:verbose`, and `:continue`
+    for `:skip_permissions` and `:verbose`
   """
   @spec normalize_opts(cli_opts()) :: cli_opts()
   def normalize_opts(opts) do
     opts
     |> normalize_allowed_tools()
-    |> coerce_booleans([:skip_permissions, :verbose, :continue])
+    |> coerce_booleans([:skip_permissions, :verbose])
   end
 
   defp normalize_allowed_tools(opts) do
@@ -132,8 +118,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
          :ok <- validate_max_turns(opts[:max_turns]),
          :ok <- validate_permission_mode(opts[:permission_mode]),
          :ok <- validate_boolean(opts, :skip_permissions),
-         :ok <- validate_boolean(opts, :verbose),
-         :ok <- validate_boolean(opts, :continue) do
+         :ok <- validate_boolean(opts, :verbose) do
       :ok
     end
   end
@@ -176,6 +161,25 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   Flags in `#{inspect(@redacted_flags)}` have their following value replaced
   with `"[REDACTED]"`.
   """
+  @doc """
+  Returns the full CLI command as a string for debugging/inspection.
+
+  Includes the `script` wrapper, claude binary path, and all args.
+  Sensitive values are redacted.
+  """
+  @spec cmd(cli_opts()) :: {:ok, String.t()} | {:error, term()}
+  def cmd(opts \\ []) do
+    case find_claude_binary() do
+      {:ok, claude_path} ->
+        args = build_args(opts)
+        full = ["/usr/bin/script", "-q", "/dev/null", claude_path | safe_log_args(args)]
+        {:ok, Enum.join(full, " ")}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   @spec safe_log_args([String.t()]) :: [String.t()]
   def safe_log_args([]), do: []
   def safe_log_args([flag, _value | rest]) when flag in @redacted_flags, do: [flag, "[REDACTED]" | safe_log_args(rest)]
@@ -192,8 +196,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
 
     * `:prompt` (required) - the user prompt, becomes `-p <prompt>`
     * `:session_id` - `--session-id <id>` (for new sessions)
-    * `:resume` - `--resume <session_id>` (mutually exclusive with :continue)
-    * `:continue` - `-c` flag
+    * `:resume` - `--resume <session_id>`
     * `:model` - `--model <model>`
     * `:output_format` - `--output-format <fmt>` (default: "stream-json")
     * `:verbose` - `--verbose` (forced true when output_format is "stream-json")
@@ -209,21 +212,15 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   """
   @spec build_args(cli_opts()) :: [String.t()]
   def build_args(caller_opts) do
-    # Three-way merge: hardcoded fallbacks <- DB settings <- caller opts
-    # Filter nils from caller so unset keys don't override DB values
-    db_defaults = Settings.get_cli_defaults()
-    explicit = Keyword.filter(caller_opts, fn {_k, v} -> v != nil end)
-    opts = Keyword.merge(db_defaults, explicit)
+    # Filter nils from caller opts
+    opts = Keyword.filter(caller_opts, fn {_k, v} -> v != nil end)
     args = []
 
-    # Session mode flags (mutually exclusive: resume > continue > new)
+    # Session mode flags (mutually exclusive: resume > new)
     args =
       cond do
         resume_id = opts[:resume] ->
           args ++ ["--resume", to_string(resume_id)]
-
-        opts[:continue] ->
-          args ++ ["-c"]
 
         session_id = opts[:session_id] ->
           args ++ ["--session-id", to_string(session_id)]
@@ -279,11 +276,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
 
   defp spawn_cli(opts) do
     opts = normalize_opts(opts)
-
-    # Merge DB defaults before validation so invalid DB values are caught
-    db_defaults = Settings.get_cli_defaults()
-    explicit = Keyword.filter(opts, fn {_k, v} -> v != nil end)
-    merged = Keyword.merge(db_defaults, explicit)
+    merged = Keyword.filter(opts, fn {_k, v} -> v != nil end)
 
     case validate_opts(merged) do
       {:error, _} = err ->
@@ -314,7 +307,8 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
       {:ok, claude_path} ->
         args = build_args(opts)
 
-        Logger.debug("Spawning Claude in #{project_path}: #{inspect(safe_log_args(args))}")
+        cmd_string = "claude " <> Enum.join(safe_log_args(args), " ")
+        Logger.info("Spawning Claude in #{project_path}: #{cmd_string}")
 
         handler_pid =
           spawn_link(fn ->
@@ -323,22 +317,41 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
             end
           end)
 
-        script_args = ["-q", "/dev/null", claude_path] ++ args
         env = build_env(opts)
+        use_script = Keyword.get(opts, :use_script, true)
 
         port =
-          Port.open(
-            {:spawn_executable, "/usr/bin/script"},
-            [
-              :binary,
-              :exit_status,
-              :use_stdio,
-              :stderr_to_stdout,
-              {:args, script_args},
-              {:cd, project_path},
-              {:env, env}
-            ]
-          )
+          if use_script do
+            # Use script wrapper for interactive sessions (SessionWorker)
+            script_args = ["-q", "/dev/null", claude_path] ++ args
+
+            Port.open(
+              {:spawn_executable, "/usr/bin/script"},
+              [
+                :binary,
+                :exit_status,
+                :use_stdio,
+                :stderr_to_stdout,
+                {:args, script_args},
+                {:cd, project_path},
+                {:env, env}
+              ]
+            )
+          else
+            # Spawn Claude directly for background agents (AgentWorker)
+            Port.open(
+              {:spawn_executable, claude_path},
+              [
+                :binary,
+                :exit_status,
+                :use_stdio,
+                :stderr_to_stdout,
+                {:args, args},
+                {:cd, project_path},
+                {:env, env}
+              ]
+            )
+          end
 
         Port.connect(port, handler_pid)
         send(handler_pid, {:port, port})
@@ -355,8 +368,10 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   # ---------------------------------------------------------------------------
 
   defp build_env(opts) do
+    # Pass through system environment
     base_env =
-      for {key, value} <- System.get_env() do
+      for {key, value} <- System.get_env(),
+          value != "" do
         {String.to_charlist(key), String.to_charlist(value)}
       end
 
@@ -365,18 +380,6 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
       {~c"TERM", ~c"dumb"}
       | base_env
     ]
-
-    # Only trust env var if it's non-empty; otherwise fall back to DB
-    env =
-      if Enum.any?(env, fn {k, v} -> k == ~c"ANTHROPIC_API_KEY" and v != ~c"" end) do
-        env
-      else
-        case EyeInTheSkyWeb.Settings.get_setting("api_key_anthropic") do
-          nil -> env
-          "" -> env
-          key -> [{~c"ANTHROPIC_API_KEY", String.to_charlist(key)} | env]
-        end
-      end
 
     env = maybe_add_env(env, "EITS_SESSION_ID", opts[:eits_session_id])
     env = maybe_add_env(env, "EITS_AGENT_ID", opts[:eits_agent_id])

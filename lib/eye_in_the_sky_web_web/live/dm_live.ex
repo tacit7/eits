@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.{Sessions, Messages, Tasks, Commits, Logs, Agents, Notes}
-  alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Claude.SessionManager
 
   @impl true
   def mount(%{"session_id" => session_id_param}, _session, socket) do
@@ -130,9 +130,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
         Logger.info("🔍 After load_tab_data, socket.assigns[:messages] = #{length(socket.assigns[:messages] || [])}")
 
-        # Send to AgentWorker (queues if busy, processes if idle)
+        # Send via SessionManager (resume existing session)
         # Processing flag will be set when agent_working message arrives
-        session_id = socket.assigns.session_id
+        session_uuid = socket.assigns.session_uuid
 
         opts = [model: model]
         opts = if effort_level && effort_level != "" do
@@ -141,17 +141,21 @@ defmodule EyeInTheSkyWebWeb.DmLive do
           opts
         end
 
-        case AgentManager.send_message(session_id, full_body, opts) do
-          :ok ->
-            Logger.info("✅ Message sent to agent worker for processing")
+        case SessionManager.resume_session(session_uuid, full_body, opts) do
+          {:ok, session_ref} ->
+            Logger.info("✅ Message sent via SessionManager, ref=#{inspect(session_ref)}")
+            {:noreply, assign(socket, :session_ref, session_ref)}
+
+          {:ok, :queued} ->
+            Logger.info("✅ Message queued on existing SessionWorker")
             {:noreply, socket}
 
           {:error, reason} ->
-            Logger.error("❌ Failed to send to agent: #{inspect(reason)}")
+            Logger.error("❌ Failed to send message: #{inspect(reason)}")
             socket =
               socket
               |> assign(:processing, false)
-              |> put_flash(:error, "Failed to send to agent: #{inspect(reason)}")
+              |> put_flash(:error, "Failed to send message: #{inspect(reason)}")
 
             {:noreply, socket}
         end
@@ -536,7 +540,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
                           <%= if message.sender_role == "agent" && message.metadata && message.metadata["total_cost_usd"] do %>
                             <div class="text-xs text-base-content/60 mt-2 flex gap-3 flex-wrap">
                               <%= if message.metadata["total_cost_usd"] do %>
-                                <span title="Total cost">$<%= :erlang.float_to_binary(message.metadata["total_cost_usd"], decimals: 4) %></span>
+                                <span title="Total cost">$<%= :erlang.float_to_binary(message.metadata["total_cost_usd"] * 1.0, decimals: 4) %></span>
                               <% end %>
                               <%= if message.metadata["usage"] && message.metadata["usage"]["input_tokens"] do %>
                                 <span title="Input tokens"><%= message.metadata["usage"]["input_tokens"] %> in</span>
@@ -545,7 +549,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
                                 <span title="Output tokens"><%= message.metadata["usage"]["output_tokens"] %> out</span>
                               <% end %>
                               <%= if message.metadata["duration_ms"] do %>
-                                <span title="Duration"><%= :erlang.float_to_binary(message.metadata["duration_ms"] / 1000, decimals: 1) %>s</span>
+                                <span title="Duration"><%= :erlang.float_to_binary(message.metadata["duration_ms"] * 1.0 / 1000, decimals: 1) %>s</span>
                               <% end %>
                               <%= if message.metadata["num_turns"] do %>
                                 <span title="Number of turns"><%= message.metadata["num_turns"] %> turns</span>

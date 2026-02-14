@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionDrawer do
         <label for="new-session-drawer" class="drawer-overlay"></label>
         <div class="menu p-6 w-96 min-h-full bg-base-100 text-base-content">
           <div class="flex items-center justify-between mb-6">
-            <h2 class="text-xl font-semibold">New Session</h2>
+            <h2 class="text-xl font-semibold"><%= assigns[:title] || "New Session" %></h2>
             <button phx-click={@toggle_event} class="btn btn-ghost btn-sm btn-circle">✕</button>
           </div>
 
@@ -77,7 +77,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionDrawer do
               <select name="project_id" class="select select-bordered" required>
                 <option value="">Select a project...</option>
                 <%= for project <- @projects || [] do %>
-                  <option value={project.id}><%= project.name %> — <%= project.path %></option>
+                  <option value={project.id}><%= project.name %></option>
                 <% end %>
               </select>
             </div>
@@ -111,7 +111,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionDrawer do
 
             <!-- Actions -->
             <div class="flex gap-2 mt-4">
-              <button type="submit" class="btn btn-primary flex-1">Create Session</button>
+              <button type="submit" class="btn btn-primary flex-1"><%= assigns[:button_text] || "Create Session" %></button>
               <button type="button" phx-click={@toggle_event} class="btn btn-ghost flex-shrink-0">Cancel</button>
             </div>
           </form>

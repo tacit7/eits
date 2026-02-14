@@ -64,9 +64,7 @@ defmodule EyeInTheSkyWeb.Messages.JsonlStorage do
     end
   end
 
-  @doc """
-  Parses a single JSONL line into a Message struct.
-  """
+  # Parses a single JSONL line into a Message struct.
   defp parse_jsonl_line(line) do
     case Jason.decode(line) do
       {:ok, data} ->
@@ -79,9 +77,7 @@ defmodule EyeInTheSkyWeb.Messages.JsonlStorage do
     end
   end
 
-  @doc """
-  Converts a JSON object to a Message struct.
-  """
+  # Converts a JSON object to a Message struct.
   defp convert_to_message(data) do
     # Parse timestamps if they're strings
     inserted_at = parse_timestamp(data["inserted_at"] || data["timestamp"])
@@ -108,10 +104,8 @@ defmodule EyeInTheSkyWeb.Messages.JsonlStorage do
     }
   end
 
-  @doc """
-  Parses a timestamp string to DateTime.
-  Handles ISO 8601 format and Unix timestamps.
-  """
+  # Parses a timestamp string to DateTime.
+  # Handles ISO 8601 format and Unix timestamps.
   defp parse_timestamp(nil), do: nil
 
   defp parse_timestamp(timestamp) when is_binary(timestamp) do
@@ -168,9 +162,7 @@ defmodule EyeInTheSkyWeb.Messages.JsonlStorage do
     end
   end
 
-  @doc """
-  Converts a Message struct to a JSON-serializable map.
-  """
+  # Converts a Message struct to a JSON-serializable map.
   defp message_to_json_data(%Message{} = message) do
     %{
       "id" => message.id,

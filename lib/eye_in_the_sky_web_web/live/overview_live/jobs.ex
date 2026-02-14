@@ -4,6 +4,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
   alias EyeInTheSkyWeb.ScheduledJobs
   alias EyeInTheSkyWeb.ScheduledJobs.ScheduledJob
   alias EyeInTheSkyWeb.Scheduler.JobEnqueuer
+  alias EyeInTheSkyWeb.Projects
+  alias EyeInTheSkyWeb.Claude.AgentManager
 
   @impl true
   def mount(_params, _session, socket) do
@@ -23,6 +25,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
       |> assign(:form_config, %{})
       |> assign(:expanded_job_id, nil)
       |> assign(:runs, [])
+      |> assign(:show_claude_drawer, false)
+      |> assign(:claude_model, "sonnet")
+      |> assign(:web_project, Projects.get_project_by_name("EITS Web"))
 
     {:ok, socket}
   end
@@ -42,6 +47,106 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
      |> assign(:form_job_type, "shell_command")
      |> assign(:form_schedule_type, "interval")
      |> assign(:form_config, %{})}
+  end
+
+  @impl true
+  def handle_event("toggle_claude_drawer", _params, socket) do
+    {:noreply, assign(socket, :show_claude_drawer, !socket.assigns.show_claude_drawer)}
+  end
+
+  @impl true
+  def handle_event("claude_model_changed", %{"model" => model}, socket) do
+    {:noreply, assign(socket, :claude_model, model)}
+  end
+
+  @impl true
+  def handle_event("create_with_claude", params, socket) do
+    model = params["model"] || "sonnet"
+    effort_level = params["effort_level"]
+    description = params["description"]
+    project = socket.assigns.web_project
+
+    instructions = job_helper_prompt(description)
+
+    case AgentManager.create_agent(
+           model: model,
+           effort_level: effort_level,
+           project_id: project.id,
+           project_path: project.path,
+           description: "Job Helper",
+           instructions: instructions
+         ) do
+      {:ok, %{session: session}} ->
+        {:noreply,
+         socket
+         |> assign(:show_claude_drawer, false)
+         |> push_navigate(to: ~p"/dm/#{session.id}")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to start session: #{inspect(reason)}")}
+    end
+  end
+
+  defp job_helper_prompt(nil), do: job_helper_prompt("")
+
+  defp job_helper_prompt(description) do
+    user_context =
+      if description != "",
+        do: "\n\nThe user said: \"#{description}\"\nUse this to guide the conversation.\n",
+        else: ""
+
+    """
+    You are Job Helper, a scheduled job creation assistant for Eye in the Sky.#{user_context}
+
+    Your job: help the user create a scheduled job by asking what they want to automate,
+    then insert it directly into the database using Elixir code.
+
+    ## Job Types
+
+    1. **shell_command** - Run a shell command
+       Config: `{"command": "...", "working_dir": "/path", "timeout_ms": 30000}`
+
+    2. **spawn_agent** - Spawn a Claude Code agent
+       Config: `{"instructions": "...", "model": "sonnet", "project_path": "/path", "description": "..."}`
+
+    3. **mix_task** - Run an Elixir mix task
+       Config: `{"task": "task_name", "args": ["arg1"], "project_path": "/path"}`
+
+    ## Schedule Types
+
+    - **interval** - Run every N seconds. Value is seconds as string (e.g., "300" for 5 min)
+    - **cron** - Standard cron expression. All times are UTC.
+      Examples: "0 17 * * 1" = Monday 5 PM UTC, "*/5 * * * *" = every 5 min
+
+    ## Creating a Job
+
+    To create a job, write and execute an Elixir script that calls the context module:
+
+    ```elixir
+    EyeInTheSkyWeb.ScheduledJobs.create_job(%{
+      "name" => "Job Name",
+      "description" => "What it does",
+      "job_type" => "shell_command",
+      "schedule_type" => "cron",
+      "schedule_value" => "0 17 * * 1",
+      "config" => Jason.encode!(%{"command" => "echo hello", "working_dir" => "/tmp"}),
+      "enabled" => 1
+    })
+    ```
+
+    Run it with: `cd /Users/urielmaldonado/projects/eits/web && mix run -e '<code>'`
+
+    ## Conversation Flow
+
+    1. Ask what the user wants to automate
+    2. Determine the job type, schedule, and config
+    3. If using cron, confirm the timezone (user is in US Central, UTC-6)
+    4. Show the user a summary of what will be created
+    5. Create the job
+    6. Confirm it was created and tell them to check the Jobs page
+
+    Keep it concise. Don't over-explain.
+    """
   end
 
   @impl true
@@ -345,17 +450,34 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
     <div class="px-4 sm:px-6 lg:px-8 py-6">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-xl font-semibold">Scheduled Jobs</h1>
-        <button class="btn btn-primary btn-sm" phx-click="new_job">+ New Job</button>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-outline btn-sm" phx-click="toggle_claude_drawer">
+            <svg class="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-7v4h4l-5 7z" />
+            </svg>
+            Create with Claude
+          </button>
+          <button class="btn btn-primary btn-sm" phx-click="new_job">+ New Job</button>
+        </div>
       </div>
 
-      <%!-- Job Form Modal --%>
-      <%= if @show_form do %>
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div class="bg-base-100 rounded-lg shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-            <h2 class="text-lg font-semibold mb-4">
+      <%!-- Job Form Drawer --%>
+      <div class={[
+        "fixed inset-y-0 right-0 z-50 w-full max-w-md bg-base-100 shadow-xl transform transition-transform duration-200 ease-in-out overflow-y-auto",
+        if(@show_form, do: "translate-x-0", else: "translate-x-full")
+      ]}>
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold">
               <%= if @editing_job, do: "Edit Job", else: "New Job" %>
             </h2>
-            <.form for={@changeset} phx-submit="save_job" phx-change="change_job_type" class="space-y-4">
+            <button class="btn btn-ghost btn-sm btn-square" phx-click="cancel_form">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <.form for={@changeset} phx-submit="save_job" phx-change="change_job_type" class="space-y-4">
               <div class="form-control">
                 <label class="label"><span class="label-text">Name</span></label>
                 <input
@@ -521,15 +643,75 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
                 </div>
               <% end %>
 
-              <div class="flex justify-end gap-2 pt-2">
+              <div class="flex justify-end gap-2 pt-4">
                 <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_form">
                   Cancel
                 </button>
                 <button type="submit" class="btn btn-primary btn-sm">Save</button>
               </div>
             </.form>
-          </div>
         </div>
+      </div>
+      <%= if @show_form do %>
+        <div class="fixed inset-0 z-40 bg-black/30" phx-click="cancel_form"></div>
+      <% end %>
+
+      <%!-- Claude Create Drawer --%>
+      <div class={[
+        "fixed inset-y-0 right-0 z-50 w-full max-w-sm bg-base-100 shadow-xl transform transition-transform duration-200 ease-in-out overflow-y-auto",
+        if(@show_claude_drawer, do: "translate-x-0", else: "translate-x-full")
+      ]}>
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-lg font-semibold">Create Job with Claude</h2>
+            <button class="btn btn-ghost btn-sm btn-square" phx-click="toggle_claude_drawer">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <form phx-submit="create_with_claude" class="flex flex-col gap-4">
+            <div class="form-control">
+              <label class="label"><span class="label-text font-medium">Model</span></label>
+              <select name="model" class="select select-bordered w-full" phx-change="claude_model_changed">
+                <option value="opus" selected={@claude_model == "opus"}>Opus 4.6 &bull; Most capable for complex work</option>
+                <option value="sonnet" selected={@claude_model == "sonnet"}>Sonnet 4.5 &bull; Best for everyday tasks</option>
+                <option value="sonnet[1m]" selected={@claude_model == "sonnet[1m]"}>Sonnet 4.5 (1M) &bull; 1M context window</option>
+                <option value="haiku" selected={@claude_model == "haiku"}>Haiku 4.5 &bull; Fastest for quick answers</option>
+              </select>
+            </div>
+
+            <%= if @claude_model == "opus" do %>
+              <div class="form-control">
+                <label class="label"><span class="label-text font-medium">Effort Level</span></label>
+                <select name="effort_level" class="select select-bordered w-full">
+                  <option value="" selected>Default (high)</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+            <% end %>
+
+            <div class="form-control">
+              <label class="label"><span class="label-text font-medium">Description</span></label>
+              <textarea
+                name="description"
+                class="textarea textarea-bordered w-full"
+                rows="3"
+                placeholder="What kind of job do you want to create?"
+              ></textarea>
+            </div>
+
+            <div class="flex gap-2 mt-4">
+              <button type="submit" class="btn btn-primary flex-1">Start</button>
+              <button type="button" phx-click="toggle_claude_drawer" class="btn btn-ghost">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <%= if @show_claude_drawer do %>
+        <div class="fixed inset-0 z-40 bg-black/30" phx-click="toggle_claude_drawer"></div>
       <% end %>
 
       <%!-- Jobs Table --%>

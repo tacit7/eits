@@ -26,10 +26,9 @@ defmodule EyeInTheSkyWeb.Claude.CLIBuildArgsTest do
     end
 
     test "string \"true\"/\"false\" coerced to booleans" do
-      opts = CLI.normalize_opts(skip_permissions: "true", verbose: "false", continue: "true")
+      opts = CLI.normalize_opts(skip_permissions: "true", verbose: "false")
       assert opts[:skip_permissions] == true
       assert opts[:verbose] == false
-      assert opts[:continue] == true
     end
 
     test "actual booleans left unchanged" do
@@ -298,13 +297,6 @@ defmodule EyeInTheSkyWeb.Claude.CLIBuildArgsTest do
       refute "-c" in args
     end
 
-    test "continue produces -c flag" do
-      args = CLI.build_args(prompt: "x", continue: true)
-
-      assert "-c" in args
-      refute "--resume" in args
-    end
-
     test "session_id produces --session-id <id>" do
       args = CLI.build_args(prompt: "x", session_id: "sess-456")
 
@@ -313,11 +305,10 @@ defmodule EyeInTheSkyWeb.Claude.CLIBuildArgsTest do
       assert Enum.at(args, idx + 1) == "sess-456"
     end
 
-    test "resume takes priority over continue and session_id" do
-      args = CLI.build_args(prompt: "x", resume: "r-1", continue: true, session_id: "s-1")
+    test "resume takes priority over session_id" do
+      args = CLI.build_args(prompt: "x", resume: "r-1", session_id: "s-1")
 
       assert "--resume" in args
-      refute "-c" in args
       refute "--session-id" in args
     end
   end

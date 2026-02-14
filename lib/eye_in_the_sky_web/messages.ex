@@ -54,9 +54,7 @@ defmodule EyeInTheSkyWeb.Messages do
     list_messages_for_session_db(session_id)
   end
 
-  @doc """
-  Internal function: Returns the list of messages for a specific session from database.
-  """
+  # Internal function: Returns the list of messages for a specific session from database.
   defp list_messages_for_session_db(session_id) do
     QueryHelpers.for_session_direct(Message, session_id,
       order_by: [asc: :inserted_at]
@@ -290,6 +288,22 @@ defmodule EyeInTheSkyWeb.Messages do
     |> order_by([m], desc: m.inserted_at)
     |> limit(^limit)
     |> Repo.all()
+    |> Enum.reverse()
+    |> deduplicate_by_source_uuid()
+  end
+
+  # Remove duplicate messages by source_uuid, keeping the first occurrence
+  defp deduplicate_by_source_uuid(messages) do
+    messages
+    |> Enum.reduce({[], MapSet.new()}, fn msg, {acc, seen_uuids} ->
+      if msg.source_uuid && MapSet.member?(seen_uuids, msg.source_uuid) do
+        {acc, seen_uuids}
+      else
+        new_seen = if msg.source_uuid, do: MapSet.put(seen_uuids, msg.source_uuid), else: seen_uuids
+        {[msg | acc], new_seen}
+      end
+    end)
+    |> elem(0)
     |> Enum.reverse()
   end
 

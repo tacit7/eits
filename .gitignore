@@ -61,3 +61,6 @@ test_*.js
 
 # Ignore ssr build for svelte.
 /priv/svelte/
+
+.playwright/
+.playwright-mcp/

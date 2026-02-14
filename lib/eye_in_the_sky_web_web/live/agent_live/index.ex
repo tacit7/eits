@@ -291,6 +291,9 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   @impl true
+  def handle_event("noop", _params, socket), do: {:noreply, socket}
+
+  @impl true
   def handle_event("set_refresh", %{"interval" => interval}, socket) do
     socket = cancel_timer(socket)
 
@@ -317,6 +320,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_event("create_new_session", params, socket) do
+    require Logger
+
     model = params["model"]
     effort_level = params["effort_level"]
     project_id = String.to_integer(params["project_id"])
@@ -334,17 +339,23 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       instructions: description
     ]
 
-    case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
-      {:ok, _result} ->
+    Logger.info("🚀 create_new_session: model=#{model}, effort=#{inspect(effort_level)}, project_id=#{project_id}, project_path=#{project.path}")
+
+    case EyeInTheSkyWeb.Claude.SessionManager.create_agent(opts) do
+      {:ok, result} ->
+        Logger.info("✅ create_new_session: agent created - agent_id=#{result.agent.id}, session_id=#{result.session.id}, session_uuid=#{result.session.uuid}")
+
         socket =
           socket
           |> assign(:show_new_session_drawer, false)
           |> load_sessions()
           |> put_flash(:info, "Session launched")
 
+        Logger.info("📤 create_new_session: returning success response to client, closing drawer, reloading sessions")
         {:noreply, socket}
 
       {:error, reason} ->
+        Logger.error("❌ create_new_session: failed - #{inspect(reason)}")
         {:noreply, put_flash(socket, :error, "Failed to create session: #{inspect(reason)}")}
     end
   end
@@ -352,6 +363,18 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   @impl true
   def handle_info({:agent_updated, _agent}, socket) do
     {:noreply, load_sessions(socket)}
+  end
+
+  @impl true
+  def handle_info({:claude_output, _ref, _line}, socket) do
+    # Ignore Claude output - SessionWorker handles these
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:claude_exit, _ref, _status}, socket) do
+    # Ignore Claude exit - SessionWorker handles these
+    {:noreply, socket}
   end
 
   defp apply_action(socket, :index, _params) do
@@ -505,10 +528,10 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                           #{session.id}
                         </.link>
                       </td>
-                      <td class="py-2">
+                      <td class="py-2" phx-click="noop">
                         <div class="flex items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity">
                           <%= if session.id do %>
-                            <a href={~p"/dm/#{session.id}"} target="_blank" class="btn btn-ghost btn-xs btn-square" aria-label="Open DM" onclick="event.stopPropagation()">
+                            <a href={~p"/dm/#{session.id}"} target="_blank" class="btn btn-ghost btn-xs btn-square" aria-label="Open DM">
                               <.arrow_top_right_on_square class="w-3.5 h-3.5" />
                             </a>
                           <% end %>
@@ -523,18 +546,17 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                               data-agent-status={session.status}
                               class="bookmark-button btn btn-ghost btn-xs btn-square"
                               aria-label="Bookmark agent"
-                              onclick="event.stopPropagation()"
                             >
                               <.heart class="bookmark-icon w-3.5 h-3.5" />
                             </button>
                           <% end %>
                           <%= if session.uuid do %>
                             <%= if session.archived_at do %>
-                              <button type="button" phx-click="unarchive_session" phx-value-session_id={session.id} class="btn btn-ghost btn-xs btn-square" aria-label="Unarchive" onclick="event.stopPropagation()">
+                              <button type="button" phx-click="unarchive_session" phx-value-session_id={session.id} class="btn btn-ghost btn-xs btn-square" aria-label="Unarchive">
                                 <.icon name="hero-arrow-up-tray" class="size-3.5" />
                               </button>
                             <% else %>
-                              <button type="button" phx-click="archive_session" phx-value-session_id={session.id} class="btn btn-ghost btn-xs btn-square" aria-label="Archive" onclick="event.stopPropagation()">
+                              <button type="button" phx-click="archive_session" phx-value-session_id={session.id} class="btn btn-ghost btn-xs btn-square" aria-label="Archive">
                                 <.archive_box class="w-3.5 h-3.5" />
                               </button>
                             <% end %>

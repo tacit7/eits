@@ -10,20 +10,24 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   use GenServer
   require Logger
 
-  alias EyeInTheSkyWeb.Claude.CLI
+  alias EyeInTheSkyWeb.Claude.Utils
   alias EyeInTheSkyWeb.Messages
+
+  @registry EyeInTheSkyWeb.Claude.AgentRegistry
 
   # --- Client API ---
 
   def start_link(opts) do
     session_id = Keyword.fetch!(opts, :session_id)
-    name = String.to_atom("agent_worker_#{session_id}")
+    name = {:via, Registry, {@registry, {:agent, session_id}}}
     GenServer.start_link(__MODULE__, opts, name: name)
   end
 
   def process_message(session_id, message, context) do
-    name = String.to_atom("agent_worker_#{session_id}")
-    GenServer.cast(name, {:process_message, message, context})
+    case Registry.lookup(@registry, {:agent, session_id}) do
+      [{pid, _}] -> GenServer.cast(pid, {:process_message, message, context})
+      [] -> {:error, :not_found}
+    end
   end
 
   # --- Server Callbacks ---
@@ -63,8 +67,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       # Idle, spawn Claude immediately
       case spawn_claude(state, job) do
         {:ok, port, session_ref} ->
-
-          # Broadcast working state
           Phoenix.PubSub.broadcast(
             EyeInTheSkyWeb.PubSub,
             "agent:working",
@@ -74,8 +76,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
           {:noreply, %{state | port: port, current_job: job, session_ref: session_ref}}
 
         {:error, reason} ->
-          Logger.error("❌ [#{state.session_id}] Failed to spawn Claude: #{inspect(reason)}")
-          {:noreply, state}
+          Logger.error("[#{state.session_id}] Failed to spawn Claude: #{inspect(reason)}")
+          # Requeue the job instead of dropping it silently
+          {:noreply, %{state | queue: state.queue ++ [job]}}
       end
     else
       # Busy, queue the job
@@ -83,9 +86,10 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     end
   end
 
+  # Ref-guarded: only process output from the current CLI invocation
   @impl true
-  def handle_info({:claude_output, _ref, line}, state) do
-    clean_line = strip_ansi_codes(line)
+  def handle_info({:claude_output, ref, line}, %{session_ref: ref} = state) do
+    clean_line = Utils.strip_ansi_codes(line)
 
     case Jason.decode(clean_line) do
       {:ok, parsed} ->
@@ -93,17 +97,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
           handle_claude_result(parsed, state)
         rescue
           e ->
-            Logger.error("❌ [#{state.session_id}] Error handling Claude result: #{inspect(e)}")
-            # Still try to broadcast the result even if database save fails
-            result = Map.get(parsed, "result")
-            if result && is_binary(result) do
-              Logger.warning("⚠️  [#{state.session_id}] Broadcasting result without DB save")
-              Phoenix.PubSub.broadcast(
-                EyeInTheSkyWeb.PubSub,
-                "session:#{state.session_id}",
-                {:new_message, %{body: result, sender_role: "agent"}}
-              )
-            end
+            Logger.error("[#{state.session_id}] Error handling Claude result: #{inspect(e)}")
         end
 
       {:error, _reason} ->
@@ -113,9 +107,16 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     {:noreply, state}
   end
 
+  # Ignore output from stale CLI invocations
   @impl true
-  def handle_info({:claude_exit, session_ref, _exit_code}, state) when session_ref == state.session_ref do
+  def handle_info({:claude_output, _ref, _line}, state) do
+    Logger.debug("[#{state.session_id}] Ignoring output from stale CLI ref")
+    {:noreply, state}
+  end
 
+  @impl true
+  def handle_info({:claude_exit, session_ref, _exit_code}, state)
+      when session_ref == state.session_ref do
     # Broadcast stopped state
     Phoenix.PubSub.broadcast(
       EyeInTheSkyWeb.PubSub,
@@ -126,12 +127,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     # Process next job if queue not empty
     case state.queue do
       [] ->
-        # Queue empty, go idle
         {:noreply, %{state | port: nil, current_job: nil, session_ref: nil}}
 
       [next_job | rest] ->
-        # Process next job
-
         case spawn_claude(state, next_job) do
           {:ok, port, session_ref} ->
             Phoenix.PubSub.broadcast(
@@ -145,7 +143,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
           {:error, reason} ->
             Logger.error("Failed to spawn Claude for next job: #{inspect(reason)}")
-            # Requeue the job and go idle
             {:noreply, %{state | port: nil, current_job: nil, queue: [next_job | rest]}}
         end
     end
@@ -177,14 +174,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   @impl true
   def terminate(_reason, state) do
-    if state[:port] && Port.info(state.port) != nil do
-      try do
-        Port.close(state.port)
-      rescue
-        _ -> :ok
-      end
-    end
-
+    Utils.close_port_safely(state[:port])
     :ok
   end
 
@@ -198,56 +188,43 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         result = Map.get(parsed, "result") || Map.get(parsed, :result)
 
         if result && is_binary(result) && state.session_id do
-          # If response is exactly [NO_RESPONSE], skip saving and broadcasting
           if String.trim(result) == "[NO_RESPONSE]" do
             Logger.info("[#{state.session_id}] Agent responded with [NO_RESPONSE], skipping")
             {:ok, :no_response}
           else
-          message_uuid = Map.get(parsed, "uuid") || Map.get(parsed, :uuid)
-          duration_ms = Map.get(parsed, "duration_ms")
-          cost = Map.get(parsed, "total_cost_usd")
+            message_uuid = Map.get(parsed, "uuid") || Map.get(parsed, :uuid)
+            duration_ms = Map.get(parsed, "duration_ms")
+            cost = Map.get(parsed, "total_cost_usd")
 
-          metadata = %{
-            duration_ms: duration_ms,
-            total_cost_usd: cost,
-            usage: Map.get(parsed, "usage"),
-            is_error: Map.get(parsed, "is_error")
-          }
+            metadata = %{
+              duration_ms: duration_ms,
+              total_cost_usd: cost,
+              usage: Map.get(parsed, "usage"),
+              is_error: Map.get(parsed, "is_error")
+            }
 
-          # Include channel_id from current job context
-          channel_id = get_in(state, [:current_job, :context, :channel_id])
+            channel_id = get_in(state, [:current_job, :context, :channel_id])
 
-          opts = [
-            source_uuid: message_uuid,
-            metadata: metadata
-          ]
+            opts = [
+              source_uuid: message_uuid,
+              metadata: metadata
+            ]
 
-          opts = if channel_id, do: Keyword.put(opts, :channel_id, channel_id), else: opts
+            opts = if channel_id, do: Keyword.put(opts, :channel_id, channel_id), else: opts
 
-          # Try to save to database, but don't fail if we can't (e.g., in tests with sandbox)
-          case Messages.record_incoming_reply(state.session_id, "claude", result, opts) do
-            {:ok, message} ->
-              # Broadcast the message via PubSub
-              Phoenix.PubSub.broadcast(
-                EyeInTheSkyWeb.PubSub,
-                "session:#{state.session_id}",
-                {:new_message, message}
-              )
-              {:ok, message}
+            # record_incoming_reply broadcasts {:new_message} on the session topic,
+            # so we do NOT broadcast again here (was causing duplicate UI events)
+            case Messages.record_incoming_reply(state.session_id, "claude", result, opts) do
+              {:ok, _message} ->
+                {:ok, :recorded}
 
-            {:error, _reason} ->
-              # If database save fails, still broadcast via PubSub for testing
-              Logger.warning("⚠️  [#{state.session_id}] DB save failed, broadcasting result only")
-              Phoenix.PubSub.broadcast(
-                EyeInTheSkyWeb.PubSub,
-                "session:#{state.session_id}",
-                {:new_message, %{body: result, sender_role: "agent"}}
-              )
-              {:ok, :broadcast_only}
-          end
+              {:error, reason} ->
+                Logger.warning("[#{state.session_id}] DB save failed: #{inspect(reason)}")
+                {:ok, :save_failed}
+            end
           end
         else
-          Logger.warning("⚠️  [#{state.session_id}] Result has no text content")
+          Logger.warning("[#{state.session_id}] Result has no text content")
           {:ok, :no_result}
         end
 
@@ -256,25 +233,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     end
   end
 
-  defp strip_ansi_codes(text) when is_binary(text) do
-    # Remove ANSI escape sequences
-    text
-    |> String.replace(~r/\e\[[0-9;]*[a-zA-Z]/, "")
-    |> String.replace(~r/\e\][^\a]*\a/, "")
-    |> String.replace(~r/\e[^[\\]]*/, "")
-  end
-
-  defp strip_ansi_codes(text), do: text
-
   defp spawn_claude(state, job) do
     context = job.context
-
-    # Determine if resuming (has prior messages) or starting new
     has_messages = context[:has_messages] || false
     spawn_type = if has_messages, do: :resume, else: :new
     prompt = job.message
-
-    # Generate unique session_ref for this Claude invocation
     session_ref = make_ref()
 
     opts = [
@@ -284,6 +247,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       skip_permissions: true,
       session_ref: session_ref,
       caller: self(),
+      session_id: state.session_uuid,
       eits_session_id: state.session_uuid,
       eits_agent_id: state.agent_id
     ]
@@ -295,15 +259,16 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         opts
       end
 
-    # Spawn Claude directly and return port + session_ref
+    cli = Utils.cli_module()
+
     case spawn_type do
       :resume ->
         Logger.info("Resuming session #{state.session_uuid}")
-        CLI.resume_session(state.session_uuid, prompt, opts)
+        cli.resume_session(state.session_uuid, prompt, opts)
 
       :new ->
         Logger.info("Starting new session #{state.session_uuid}")
-        CLI.spawn_new_session(prompt, opts)
+        cli.spawn_new_session(prompt, opts)
     end
   end
 end

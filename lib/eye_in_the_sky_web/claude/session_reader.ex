@@ -48,6 +48,9 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
     end
   end
 
+  # NOTE: This is lossy for paths containing hyphens (e.g., /Users/foo/my-app
+  # escapes to -Users-foo-my-app, but my-app's hyphen is indistinguishable
+  # from a path separator). Fundamentally ambiguous without a lookup table.
   defp unescape_project_path(escaped_path) do
     escaped_path
     |> String.replace(~r/^-/, "/")

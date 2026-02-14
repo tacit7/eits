@@ -10,6 +10,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   alias EyeInTheSkyWeb.Claude.AgentWorker
   alias EyeInTheSkyWeb.{Sessions, Agents, Messages}
 
+  @registry EyeInTheSkyWeb.Claude.AgentRegistry
+
   @doc """
   Creates an agent + session and starts the AgentWorker with the initial message.
 
@@ -49,15 +51,19 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              git_worktree_path: opts[:project_path],
              started_at: DateTime.utc_now() |> DateTime.to_iso8601()
            }) do
-      # Start AgentWorker and send the initial message
       instructions = opts[:instructions] || description
 
-      send_message(session.id, instructions,
-        model: opts[:model],
-        effort_level: opts[:effort_level]
-      )
+      case send_message(session.id, instructions,
+             model: opts[:model],
+             effort_level: opts[:effort_level]
+           ) do
+        :ok ->
+          {:ok, %{agent: agent, session: session}}
 
-      {:ok, %{agent: agent, session: session}}
+        {:error, reason} ->
+          Logger.error("Agent created but initial message failed: #{inspect(reason)}")
+          {:error, {:send_failed, reason}}
+      end
     else
       {:error, reason} ->
         Logger.error("Failed to create agent: #{inspect(reason)}")
@@ -68,7 +74,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   def send_message(session_id, message, opts \\ []) do
     case lookup_or_start(session_id) do
       {:ok, _pid} ->
-        # Check if session has prior messages for context
         has_messages = Messages.count_messages_for_session(session_id) > 0
 
         context = %{
@@ -88,14 +93,12 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   end
 
   defp lookup_or_start(session_id) do
-    name = String.to_atom("agent_worker_#{session_id}")
-
-    case Process.whereis(name) do
-      nil ->
-        start_agent_worker(session_id)
-
-      pid ->
+    case Registry.lookup(@registry, {:agent, session_id}) do
+      [{pid, _}] ->
         {:ok, pid}
+
+      [] ->
+        start_agent_worker(session_id)
     end
   end
 

@@ -4,7 +4,10 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
 
   Delegates session lifecycle to per-session SessionWorker processes
   running under DynamicSupervisor. Registry provides O(1) lookup.
-  No output parsing or state tracking lives here.
+
+  Resume requests are deduplicated: if a worker already exists for a
+  session_id, the message is queued on the existing worker instead of
+  spawning a new one.
   """
 
   use GenServer
@@ -15,7 +18,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
   @supervisor EyeInTheSkyWeb.Claude.SessionSupervisor
   @registry EyeInTheSkyWeb.Claude.Registry
 
-  # --- Client API (unchanged signatures) ---
+  # --- Client API ---
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
@@ -30,7 +33,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
   end
 
   def resume_session(session_id, prompt, opts \\ []) do
-    GenServer.call(__MODULE__, {:spawn, :resume, session_id, prompt, opts})
+    GenServer.call(__MODULE__, {:resume_or_queue, session_id, prompt, opts})
   end
 
   def cancel_session(session_ref) do
@@ -50,21 +53,32 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
 
   @impl true
   def handle_call({:spawn, spawn_type, session_id, prompt, opts}, _from, state) do
-    session_ref = make_ref()
-    opts = Keyword.put(opts, :session_ref, session_ref)
-
-    child_spec =
-      {SessionWorker,
-       %{spawn_type: spawn_type, session_id: session_id, prompt: prompt, opts: opts}}
-
-    case DynamicSupervisor.start_child(@supervisor, child_spec) do
-      {:ok, _pid} ->
-        Logger.info("Spawned SessionWorker for #{session_id} (#{spawn_type})")
+    case spawn_worker(spawn_type, session_id, prompt, opts) do
+      {:ok, session_ref} ->
         {:reply, {:ok, session_ref}, state}
 
       {:error, reason} ->
-        Logger.error("Failed to spawn SessionWorker: #{inspect(reason)}")
         {:reply, {:error, reason}, state}
+    end
+  end
+
+  @impl true
+  def handle_call({:resume_or_queue, session_id, prompt, opts}, _from, state) do
+    case find_alive_worker(session_id) do
+      {:ok, pid} ->
+        # Worker exists, queue the message
+        SessionWorker.queue_message(pid, prompt, opts)
+        {:reply, {:ok, :queued}, state}
+
+      :not_found ->
+        # No worker, spawn a new one
+        case spawn_worker(:resume, session_id, prompt, opts) do
+          {:ok, session_ref} ->
+            {:reply, {:ok, session_ref}, state}
+
+          {:error, reason} ->
+            {:reply, {:error, reason}, state}
+        end
     end
   end
 
@@ -108,5 +122,36 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
   def handle_info(msg, state) do
     Logger.debug("Unhandled message in SessionManager: #{inspect(msg)}")
     {:noreply, state}
+  end
+
+  # --- Private ---
+
+  defp spawn_worker(spawn_type, session_id, prompt, opts) do
+    session_ref = make_ref()
+    opts = Keyword.put(opts, :session_ref, session_ref)
+
+    child_spec =
+      {SessionWorker,
+       %{spawn_type: spawn_type, session_id: session_id, prompt: prompt, opts: opts}}
+
+    case DynamicSupervisor.start_child(@supervisor, child_spec) do
+      {:ok, _pid} ->
+        Logger.info("Spawned SessionWorker for #{session_id} (#{spawn_type})")
+        {:ok, session_ref}
+
+      {:error, reason} ->
+        Logger.error("Failed to spawn SessionWorker: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  defp find_alive_worker(session_id) do
+    case Registry.lookup(@registry, {:session, session_id}) do
+      [{pid, _}] ->
+        if Process.alive?(pid), do: {:ok, pid}, else: :not_found
+
+      _ ->
+        :not_found
+    end
   end
 end

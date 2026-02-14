@@ -6,14 +6,15 @@ defmodule EyeInTheSkyWeb.SessionsTest do
 
   describe "model tracking" do
     setup do
-      agent =
-        Repo.insert!(%EyeInTheSkyWeb.Agents.Agent{
-          id: "test-agent-#{System.unique_integer()}",
+      chat_agent =
+        Repo.insert!(%EyeInTheSkyWeb.ChatAgents.ChatAgent{
+          id: System.unique_integer([:positive]),
+          uuid: Ecto.UUID.generate(),
           source: "worktree",
           bookmarked: false
         })
 
-      {:ok, agent: agent}
+      {:ok, agent: chat_agent}
     end
 
     test "create_session_with_model requires model_provider and model_name", %{agent: agent} do
@@ -185,8 +186,9 @@ defmodule EyeInTheSkyWeb.SessionsTest do
 
     test "create_session_with_model handles extraction from nested model param" do
       agent =
-        Repo.insert!(%EyeInTheSkyWeb.Agents.Agent{
-          id: "test-extract-#{System.unique_integer()}",
+        Repo.insert!(%EyeInTheSkyWeb.ChatAgents.ChatAgent{
+          id: System.unique_integer([:positive]),
+          uuid: Ecto.UUID.generate(),
           source: "worktree",
           bookmarked: false
         })

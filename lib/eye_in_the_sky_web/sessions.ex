@@ -1,12 +1,17 @@
 defmodule EyeInTheSkyWeb.Sessions do
   @moduledoc """
   The Sessions context for managing agent sessions.
+
+  NOTE: Currently migrating to ExecutionAgents context.
+  Use ExecutionAgents for new code. This module will become a backward
+  compatibility wrapper in Step 2.7 of the migration.
   """
 
   import Ecto.Query, warn: false
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Sessions.Session
   alias EyeInTheSkyWeb.Scopes.Archivable
+  alias EyeInTheSkyWeb.ExecutionAgents
 
   @doc """
   Returns the list of sessions, excluding archived sessions by default.

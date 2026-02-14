@@ -43,6 +43,31 @@ Single SQLite database at `~/.config/eye-in-the-sky/eits.db`. Configured in `con
 - `lib/eye_in_the_sky_web_web/` - Web layer (LiveViews, components, router)
 - `lib/eye_in_the_sky_web/search/fts5.ex` - Reusable FTS5 search module with LIKE fallback
 
+## UI Standards
+
+### Icons
+
+**Always use Heroicons** via the Phoenix `<.icon>` component. Never use inline SVG paths.
+
+```heex
+<!-- GOOD -->
+<.icon name="hero-folder" class="w-4 h-4" />
+<.icon name="hero-document-text" class="w-4 h-4" />
+<.icon name="hero-chevron-right" class="w-4 h-4" />
+
+<!-- BAD -->
+<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="..." />
+</svg>
+```
+
+Common icons:
+- `hero-folder` - Directories
+- `hero-document-text` - Files
+- `hero-chevron-right` - Expand/collapse indicators
+- `hero-x-mark` - Close buttons
+- `hero-pencil-square` - Edit buttons
+
 ### NATS Processing (Currently Disabled)
 
 NATS message processing is **currently disabled** to prevent duplicate messages. The following are disabled:

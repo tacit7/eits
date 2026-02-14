@@ -57,6 +57,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   @impl true
   def handle_cast({:process_message, message, context}, state) do
+    Logger.info("📨 AgentWorker.process_message: session_id=#{state.session_id}, message_length=#{String.length(message)}, has_messages=#{context.has_messages}, model=#{inspect(context.model)}")
+
     job = %{
       message: message,
       context: context,
@@ -65,8 +67,10 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
     if state.port == nil do
       # Idle, spawn Claude immediately
+      Logger.info("⚡ AgentWorker: spawning Claude immediately for session_id=#{state.session_id}")
       case spawn_claude(state, job) do
         {:ok, port, session_ref} ->
+          Logger.info("✅ AgentWorker: Claude spawned for session_id=#{state.session_id}, port=#{inspect(port)}, ref=#{inspect(session_ref)}")
           Phoenix.PubSub.broadcast(
             EyeInTheSkyWeb.PubSub,
             "agent:working",
@@ -76,12 +80,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
           {:noreply, %{state | port: port, current_job: job, session_ref: session_ref}}
 
         {:error, reason} ->
-          Logger.error("[#{state.session_id}] Failed to spawn Claude: #{inspect(reason)}")
+          Logger.error("❌ AgentWorker: failed to spawn Claude for session_id=#{state.session_id} - #{inspect(reason)}")
           # Requeue the job instead of dropping it silently
           {:noreply, %{state | queue: state.queue ++ [job]}}
       end
     else
       # Busy, queue the job
+      Logger.info("⏳ AgentWorker: busy, queueing message for session_id=#{state.session_id}, queue_length=#{length(state.queue) + 1}")
       {:noreply, %{state | queue: state.queue ++ [job]}}
     end
   end
@@ -91,17 +96,29 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   def handle_info({:claude_output, ref, line}, %{session_ref: ref} = state) do
     clean_line = Utils.strip_ansi_codes(line)
 
+    # Always log raw output at debug level so we don't miss anything
+    Logger.debug("[#{state.session_id}] Raw output: #{inspect(line, limit: 500)}")
+
     case Jason.decode(clean_line) do
       {:ok, parsed} ->
+        type = Map.get(parsed, "type") || Map.get(parsed, :type)
+        subtype = Map.get(parsed, "subtype") || Map.get(parsed, :subtype)
+        Logger.debug("📥 Claude output: session_id=#{state.session_id}, type=#{type}, subtype=#{inspect(subtype)}")
+
         try do
           handle_claude_result(parsed, state)
         rescue
           e ->
-            Logger.error("[#{state.session_id}] Error handling Claude result: #{inspect(e)}")
+            Logger.error("❌ [#{state.session_id}] Error handling Claude result: #{inspect(e)}")
         end
 
-      {:error, _reason} ->
-        :ok
+      {:error, reason} ->
+        # Always log non-JSON output, even if empty, as it might contain error messages
+        Logger.warning("⚠️  Non-JSON output from Claude [session=#{state.session_id}]:")
+        Logger.warning("   Raw: #{inspect(line, limit: 500)}")
+        Logger.warning("   Cleaned: #{inspect(clean_line, limit: 500)}")
+        Logger.warning("   Length: #{String.length(clean_line)} chars")
+        Logger.warning("   JSON decode error: #{inspect(reason)}")
     end
 
     {:noreply, state}
@@ -245,6 +262,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       project_path: state.project_path,
       output_format: "stream-json",
       skip_permissions: true,
+      use_script: false,
       session_ref: session_ref,
       caller: self(),
       session_id: state.session_uuid,

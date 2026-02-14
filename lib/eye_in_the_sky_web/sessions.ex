@@ -257,10 +257,8 @@ defmodule EyeInTheSkyWeb.Sessions do
     Repo.all(base_query)
   end
 
-  @doc """
-  Prepares a search query for FTS5 MATCH.
-  Handles basic query sanitization and wildcard support.
-  """
+  # Prepares a search query for FTS5 MATCH.
+  # Handles basic query sanitization and wildcard support.
   defp prepare_fts_query(query) do
     # Remove special FTS5 characters that could break the query
     sanitized =

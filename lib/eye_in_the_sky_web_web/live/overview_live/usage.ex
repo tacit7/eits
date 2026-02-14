@@ -19,6 +19,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
 
   @impl true
   def handle_event("recalculate", _params, socket) do
+    {ingested, skipped, errors} =
+      EyeInTheSkyWeb.Metrics.TokenIngestion.ingest_all(force: true)
+
     {totals, model_breakdown, top_sessions} = load_metrics()
 
     socket =
@@ -26,6 +29,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
       |> assign(:totals, totals)
       |> assign(:model_breakdown, model_breakdown)
       |> assign(:top_sessions, top_sessions)
+      |> put_flash(:info, "Ingested #{ingested}, skipped #{skipped}, errors #{errors}")
 
     {:noreply, socket}
   end

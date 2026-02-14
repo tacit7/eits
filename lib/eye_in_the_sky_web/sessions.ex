@@ -6,8 +6,8 @@ defmodule EyeInTheSkyWeb.Sessions do
   directly for new code. This wrapper exists only for backward compatibility
   and will be removed in a future phase.
 
-  Migration: Session → ExecutionAgent (execution context)
-             Agent → ChatAgent (chat identity)
+  Migration completed: Session → Agent (execution context)
+                       Agent → ChatAgent (chat identity)
   """
 
   alias EyeInTheSkyWeb.Agents

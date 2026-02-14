@@ -23,7 +23,8 @@ defmodule EyeInTheSkyWeb.SessionsTest do
         Sessions.create_session_with_model(%{
           id: "test-session",
           agent_id: agent.id,
-          started_at: DateTime.utc_now(),
+          uuid: Ecto.UUID.generate(),
+          started_at: DateTime.utc_now() |> DateTime.to_string(),
           model_name: "claude-3-5-sonnet"
         })
 
@@ -36,7 +37,8 @@ defmodule EyeInTheSkyWeb.SessionsTest do
         Sessions.create_session_with_model(%{
           id: "test-session-2",
           agent_id: agent.id,
-          started_at: DateTime.utc_now(),
+          uuid: Ecto.UUID.generate(),
+          started_at: DateTime.utc_now() |> DateTime.to_string(),
           model_provider: "anthropic"
         })
 
@@ -49,7 +51,8 @@ defmodule EyeInTheSkyWeb.SessionsTest do
         Sessions.create_session_with_model(%{
           id: "test-session-3",
           agent_id: agent.id,
-          started_at: DateTime.utc_now(),
+          uuid: Ecto.UUID.generate(),
+          started_at: DateTime.utc_now() |> DateTime.to_string(),
           model_provider: "anthropic",
           model_name: "claude-3-5-sonnet"
         })
@@ -63,7 +66,8 @@ defmodule EyeInTheSkyWeb.SessionsTest do
         Sessions.create_session_with_model(%{
           id: "test-session-version",
           agent_id: agent.id,
-          started_at: DateTime.utc_now(),
+          uuid: Ecto.UUID.generate(),
+          started_at: DateTime.utc_now() |> DateTime.to_string(),
           model_provider: "anthropic",
           model_name: "claude-3-5-sonnet"
           # Note: no model_version
@@ -127,27 +131,29 @@ defmodule EyeInTheSkyWeb.SessionsTest do
         Sessions.create_session_with_model(%{
           id: "test-format-1",
           agent_id: agent.id,
-          started_at: DateTime.utc_now(),
+          uuid: Ecto.UUID.generate(),
+          started_at: DateTime.utc_now() |> DateTime.to_string(),
           model_provider: "anthropic",
           model_name: "claude-3-5-sonnet",
           model_version: "20241022"
         })
 
       formatted = Sessions.format_model_info(session)
-      assert formatted == "anthropic/claude-3-5-sonnet (20241022)"
+      assert formatted == "3-5-sonnet (20241022)"
 
       # Session without version
       {:ok, session_no_version} =
         Sessions.create_session_with_model(%{
           id: "test-format-2",
           agent_id: agent.id,
-          started_at: DateTime.utc_now(),
+          uuid: Ecto.UUID.generate(),
+          started_at: DateTime.utc_now() |> DateTime.to_string(),
           model_provider: "anthropic",
           model_name: "claude-opus"
         })
 
       formatted = Sessions.format_model_info(session_no_version)
-      assert formatted == "anthropic/claude-opus"
+      assert formatted == "opus"
 
       # Session without model info (should fallback)
       formatted = %Session{model_provider: nil, model_name: nil} |> Sessions.format_model_info()
@@ -159,7 +165,8 @@ defmodule EyeInTheSkyWeb.SessionsTest do
         Sessions.create_session_with_model(%{
           id: "test-immutable",
           agent_id: agent.id,
-          started_at: DateTime.utc_now(),
+          uuid: Ecto.UUID.generate(),
+          started_at: DateTime.utc_now() |> DateTime.to_string(),
           model_provider: "anthropic",
           model_name: "claude-3-5-sonnet",
           model_version: "20241022"
@@ -207,12 +214,13 @@ defmodule EyeInTheSkyWeb.SessionsTest do
         Map.merge(extracted, %{
           id: "test-extracted-session",
           agent_id: agent.id,
-          started_at: DateTime.utc_now()
+          uuid: Ecto.UUID.generate(),
+          started_at: DateTime.utc_now() |> DateTime.to_string()
         })
 
       {:ok, session} = Sessions.create_session_with_model(session_attrs)
 
-      assert Sessions.format_model_info(session) == "anthropic/claude-3-5-sonnet (20241022)"
+      assert Sessions.format_model_info(session) == "3-5-sonnet (20241022)"
     end
   end
 end

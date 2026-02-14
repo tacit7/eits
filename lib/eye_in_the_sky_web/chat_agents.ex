@@ -23,7 +23,7 @@ defmodule EyeInTheSkyWeb.ChatAgents do
   """
   def list_chat_agents_with_sessions do
     ChatAgent
-    |> preload([:sessions, :tasks, :project])
+    |> preload([:execution_agents, :tasks, :project])
     |> order_by([a], desc: a.created_at)
     |> Repo.all()
     |> Enum.map(&populate_project_name/1)
@@ -87,7 +87,7 @@ defmodule EyeInTheSkyWeb.ChatAgents do
   """
   def get_chat_agent_with_associations!(id) do
     ChatAgent
-    |> preload([:sessions, :tasks, :project])
+    |> preload([:execution_agents, :tasks, :project])
     |> Repo.get!(id)
     |> populate_project_name()
   end
@@ -201,7 +201,7 @@ defmodule EyeInTheSkyWeb.ChatAgents do
   """
   def get_chat_agent_with_associations_by_uuid!(uuid) do
     ChatAgent
-    |> preload([:sessions, :tasks, :project])
+    |> preload([:execution_agents, :tasks, :project])
     |> Repo.get_by!(uuid: uuid)
     |> populate_project_name()
   end
@@ -211,17 +211,17 @@ defmodule EyeInTheSkyWeb.ChatAgents do
   Returns chat agent, sessions, and active session.
   """
   def get_chat_agent_dashboard_data(chat_agent_id) do
-    alias EyeInTheSkyWeb.Sessions
+    alias EyeInTheSkyWeb.ExecutionAgents
 
     chat_agent = get_chat_agent_with_associations!(chat_agent_id)
-    sessions = Sessions.list_sessions_for_agent(chat_agent_id)
-    # Most recent session
-    active_session = List.first(sessions)
+    execution_agents = ExecutionAgents.list_execution_agents_for_chat_agent(chat_agent_id)
+    # Most recent execution agent
+    active_execution_agent = List.first(execution_agents)
 
     %{
       chat_agent: chat_agent,
-      sessions: sessions,
-      active_session: active_session
+      sessions: execution_agents,
+      active_session: active_execution_agent
     }
   end
 
@@ -230,16 +230,16 @@ defmodule EyeInTheSkyWeb.ChatAgents do
   Returns chat agent, sessions, and active session.
   """
   def get_chat_agent_dashboard_data_by_uuid(uuid) do
-    alias EyeInTheSkyWeb.Sessions
+    alias EyeInTheSkyWeb.ExecutionAgents
 
     chat_agent = get_chat_agent_with_associations_by_uuid!(uuid)
-    sessions = Sessions.list_sessions_for_agent(chat_agent.id)
-    active_session = List.first(sessions)
+    execution_agents = ExecutionAgents.list_execution_agents_for_chat_agent(chat_agent.id)
+    active_execution_agent = List.first(execution_agents)
 
     %{
       chat_agent: chat_agent,
-      sessions: sessions,
-      active_session: active_session
+      sessions: execution_agents,
+      active_session: active_execution_agent
     }
   end
 end

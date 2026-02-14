@@ -24,7 +24,9 @@ defmodule EyeInTheSkyWeb.ChatAgents.ChatAgent do
 
     belongs_to :project, EyeInTheSkyWeb.Projects.Project
 
-    has_many :sessions, EyeInTheSkyWeb.Sessions.Session, foreign_key: :agent_id
+    has_many :execution_agents, EyeInTheSkyWeb.ExecutionAgents.ExecutionAgent,
+      foreign_key: :agent_id
+
     has_many :tasks, EyeInTheSkyWeb.Tasks.Task, foreign_key: :agent_id
 
     field :created_at, :string

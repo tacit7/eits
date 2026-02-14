@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.Projects
-  alias EyeInTheSkyWeb.Sessions
+  alias EyeInTheSkyWeb.ExecutionAgents
   alias EyeInTheSkyWeb.Repo
   import EyeInTheSkyWebWeb.Components.SessionCard
 
@@ -24,8 +24,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         # Load tasks manually due to type mismatch
         tasks = Projects.get_project_tasks(project_id)
 
-        sessions =
-          Sessions.list_session_overview_rows(
+        agents =
+          ExecutionAgents.list_execution_agent_overview_rows(
             project_id: project_id,
             limit: 50,
             search_query: ""
@@ -37,7 +37,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         |> assign(:tasks, tasks)
         |> assign(:search_query, "")
         |> assign(:status_filter, "all")
-        |> assign(:sessions, sessions)
+        |> assign(:agents, agents)
         |> assign(:show_new_session_drawer, false)
       else
         socket
@@ -46,8 +46,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         |> assign(:tasks, [])
         |> assign(:search_query, "")
         |> assign(:status_filter, "all")
-        |> assign(:sessions, [])
-        |> assign(:filtered_sessions, [])
+        |> assign(:agents, [])
+        |> assign(:filtered_agents, [])
         |> put_flash(:error, "Invalid project ID")
       end
 
@@ -61,19 +61,19 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
     project_id = socket.assigns.project.id
     status_filter = socket.assigns.status_filter
 
-    sessions =
-      Sessions.list_session_overview_rows(
+    agents =
+      ExecutionAgents.list_execution_agent_overview_rows(
         project_id: project_id,
         limit: 50,
         search_query: effective_query
       )
 
-    filtered_sessions = apply_status_filter(sessions, status_filter)
+    filtered_agents = apply_status_filter(sessions, status_filter)
 
     socket =
       socket
       |> assign(:search_query, effective_query)
-      |> assign(:sessions, filtered_sessions)
+      |> assign(:sessions, filtered_agents)
 
     {:noreply, socket}
   end
@@ -81,12 +81,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   @impl true
   def handle_event("filter_status", %{"status" => status}, socket) do
     # Apply status filter to current sessions
-    filtered_sessions = apply_status_filter(socket.assigns.sessions, status)
+    filtered_agents = apply_status_filter(socket.assigns.agents, status)
 
     socket =
       socket
       |> assign(:status_filter, status)
-      |> assign(:sessions, filtered_sessions)
+      |> assign(:sessions, filtered_agents)
 
     {:noreply, socket}
   end
@@ -124,12 +124,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
     {:noreply, socket}
   end
 
-  defp apply_status_filter(sessions, status_filter) do
-    Enum.filter(sessions, fn session ->
+  defp apply_status_filter(agents, status_filter) do
+    Enum.filter(agents, fn agent ->
       case status_filter do
         "all" -> true
-        "active" -> is_nil(session.ended_at) || session.ended_at == ""
-        "completed" -> session.ended_at && session.ended_at != ""
+        "active" -> is_nil(agent.ended_at) || agent.ended_at == ""
+        "completed" -> agent.ended_at && agent.ended_at != ""
         _ -> true
       end
     end)
@@ -217,8 +217,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         <%= if length(@sessions) > 0 do %>
           <!-- Sessions Grid -->
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <%= for session <- @sessions do %>
-              <.session_card session={session} show_project={false} />
+            <%= for agent <- @agents do %>
+              <.session_card session={agent} show_project={false} />
             <% end %>
           </div>
         <% else %>

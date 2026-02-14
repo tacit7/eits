@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.Projects
-  alias EyeInTheSkyWeb.Sessions
+  alias EyeInTheSkyWeb.ExecutionAgents
   alias EyeInTheSkyWeb.Notes
   alias EyeInTheSkyWeb.Repo
 
@@ -28,7 +28,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
 
         # Load active sessions for this project (max 5)
         active_sessions =
-          Sessions.list_sessions_with_agent()
+          ExecutionAgents.list_execution_agents_with_chat_agent()
           |> Enum.filter(&(is_nil(&1.ended_at) and &1.project_id == project_id))
           |> Enum.sort_by(& &1.started_at, :desc)
           |> Enum.take(5)

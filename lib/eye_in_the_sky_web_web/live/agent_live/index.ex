@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.Sessions
+  alias EyeInTheSkyWeb.ExecutionAgents
   import EyeInTheSkyWebWeb.Helpers.ViewHelpers
   import EyeInTheSkyWebWeb.Components.Icons
 
@@ -21,37 +21,37 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       |> assign(:search_query, "")
       |> assign(:sort_by, "recent")
       |> assign(:session_filter, "all")
-      |> assign(:sessions, [])
+      |> assign(:agents, [])
       |> assign(:show_new_session_drawer, false)
       |> assign(:projects, projects)
       |> assign(:refresh_interval, @default_refresh_ms)
       |> assign(:timer_ref, nil)
       |> assign(:refresh_tick, 0)
-      |> load_sessions()
+      |> load_agents()
       |> schedule_refresh()
 
     {:ok, socket}
   end
 
-  defp load_sessions(socket) do
-    db_sessions = Sessions.list_sessions_with_agent(include_archived: false)
+  defp load_agents(socket) do
+    db_agents = ExecutionAgents.list_execution_agents_with_chat_agent(include_archived: false)
 
     # Build project lookup map from assigns
     project_map =
       socket.assigns.projects
       |> Enum.into(%{}, fn p -> {p.id, p.name} end)
 
-    sessions =
-      db_sessions
+    agents =
+      db_agents
       |> Enum.map(fn s -> Map.put(s, :project_name, project_map[s.project_id]) end)
-      |> filter_sessions_by_status(socket.assigns.session_filter)
-      |> filter_sessions_by_search(socket.assigns.search_query)
-      |> sort_sessions(socket.assigns.sort_by)
+      |> filter_agents_by_status(socket.assigns.session_filter)
+      |> filter_agents_by_search(socket.assigns.search_query)
+      |> sort_agents(socket.assigns.sort_by)
 
-    assign(socket, :sessions, sessions)
+    assign(socket, :agents, sessions)
   end
 
-  defp filter_sessions_by_status(sessions, filter) do
+  defp filter_agents_by_status(sessions, filter) do
     case filter do
       "active" ->
         Enum.filter(sessions, &(&1.status in ["active", "working", nil] and is_nil(&1.archived_at)))
@@ -67,7 +67,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     end
   end
 
-  defp filter_sessions_by_search(sessions, query) do
+  defp filter_agents_by_search(sessions, query) do
     q = (query || "") |> String.trim() |> String.downcase()
 
     if q == "" do
@@ -90,7 +90,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     end
   end
 
-  defp sort_sessions(sessions, sort_by) do
+  defp sort_agents(sessions, sort_by) do
     case sort_by do
       "name" ->
         Enum.sort_by(sessions, fn s -> (s.name || "") |> String.downcase() end)
@@ -104,8 +104,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     end
   end
 
-  defp session_status_rank(session) do
-    case session.status do
+  defp session_status_rank(agent) do
+    case agent.status do
       "discovered" -> 0
       "working" -> 1
       "active" -> 1
@@ -160,7 +160,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
           # Continue the agent's session
           with {:ok, session} <- EyeInTheSkyWeb.Sessions.get_session(target_session_id),
-               {:ok, agent} <- EyeInTheSkyWeb.Agents.get_agent(session.agent_id) do
+               {:ok, agent} <- EyeInTheSkyWeb.Agents.get_agent(agent.agent_id) do
             project_path = agent.git_worktree_path || File.cwd!()
 
             prompt_with_reminder = """
@@ -200,7 +200,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     socket =
       socket
       |> assign(:search_query, effective_query)
-      |> load_sessions()
+      |> load_agents()
 
     {:noreply, socket}
   end
@@ -210,7 +210,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     socket =
       socket
       |> assign(:session_filter, filter)
-      |> load_sessions()
+      |> load_agents()
 
     {:noreply, socket}
   end
@@ -220,7 +220,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     socket =
       socket
       |> assign(:sort_by, sort_by)
-      |> load_sessions()
+      |> load_agents()
 
     {:noreply, socket}
   end
@@ -231,12 +231,12 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     Logger.info("🗄️  Archive button clicked for session: #{session_id}")
 
     with {:ok, session} <- Sessions.get_session(session_id),
-         {:ok, updated} <- Sessions.archive_session(session) do
+         {:ok, updated} <- ExecutionAgents.archive_execution_agent(agent) do
       Logger.info("✅ Session archived successfully: #{session_id}, archived_at now: #{inspect(updated.archived_at)}")
 
       socket =
         socket
-        |> load_sessions()
+        |> load_agents()
         |> put_flash(:info, "Session archived successfully")
 
       {:noreply, socket}
@@ -253,12 +253,12 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     Logger.info("🔄 Unarchive button clicked for session: #{session_id}")
 
     with {:ok, session} <- Sessions.get_session(session_id),
-         {:ok, updated} <- Sessions.unarchive_session(session) do
+         {:ok, updated} <- ExecutionAgents.unarchive_execution_agent(agent) do
       Logger.info("✅ Session unarchived successfully: #{session_id}, archived_at now: #{inspect(updated.archived_at)}")
 
       socket =
         socket
-        |> load_sessions()
+        |> load_agents()
         |> put_flash(:info, "Session unarchived successfully")
 
       {:noreply, socket}
@@ -272,10 +272,10 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   @impl true
   def handle_event("delete_session", %{"session_id" => session_id}, socket) do
     with {:ok, session} <- Sessions.get_session(session_id),
-         {:ok, _} <- Sessions.delete_session(session) do
+         {:ok, _} <- ExecutionAgents.delete_execution_agent(agent) do
       socket =
         socket
-        |> load_sessions()
+        |> load_agents()
         |> put_flash(:info, "Session deleted successfully")
 
       {:noreply, socket}
@@ -309,7 +309,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   @impl true
   def handle_info(:refresh_agents, socket) do
     tick = socket.assigns.refresh_tick + 1
-    socket = socket |> assign(:refresh_tick, tick) |> load_sessions() |> schedule_refresh()
+    socket = socket |> assign(:refresh_tick, tick) |> load_agents() |> schedule_refresh()
     {:noreply, socket}
   end
 
@@ -343,12 +343,12 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
     case EyeInTheSkyWeb.Claude.SessionManager.create_agent(opts) do
       {:ok, result} ->
-        Logger.info("✅ create_new_session: agent created - agent_id=#{result.agent.id}, session_id=#{result.session.id}, session_uuid=#{result.session.uuid}")
+        Logger.info("✅ create_new_session: agent created - agent_id=#{result.agent.id}, session_id=#{result.agent.id}, session_uuid=#{result.agent.uuid}")
 
         socket =
           socket
           |> assign(:show_new_session_drawer, false)
-          |> load_sessions()
+          |> load_agents()
           |> put_flash(:info, "Session launched")
 
         Logger.info("📤 create_new_session: returning success response to client, closing drawer, reloading sessions")
@@ -362,7 +362,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_info({:agent_updated, _agent}, socket) do
-    {:noreply, load_sessions(socket)}
+    {:noreply, load_agents(socket)}
   end
 
   @impl true
@@ -514,49 +514,49 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
             <div class="overflow-x-auto">
               <table class="table table-xs table-zebra">
                 <tbody>
-                  <%= for session <- @sessions do %>
+                  <%= for agent <- @agents do %>
                     <% {status_color, status_label} =
-                      case session.status do
+                      case agent.status do
                         "working" -> {"text-orange-500", "Working"}
                         "completed" -> {"text-red-500", "Stale"}
                         "discovered" -> {"text-green-500", "Waiting"}
                         _ -> {"text-green-500", "Waiting"}
                       end %>
-                    <tr class="hover cursor-pointer group" phx-click="navigate_dm" phx-value-id={session.id}>
+                    <tr class="hover cursor-pointer group" phx-click="navigate_dm" phx-value-id={agent.id}>
                       <td class="py-2">
-                        <.link navigate={~p"/dm/#{session.id}"} class="font-mono text-sm text-primary hover:underline" onclick="event.stopPropagation()">
-                          #{session.id}
+                        <.link navigate={~p"/dm/#{agent.id}"} class="font-mono text-sm text-primary hover:underline" onclick="event.stopPropagation()">
+                          #{agent.id}
                         </.link>
                       </td>
                       <td class="py-2" phx-click="noop">
                         <div class="flex items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <%= if session.id do %>
-                            <a href={~p"/dm/#{session.id}"} target="_blank" class="btn btn-ghost btn-xs btn-square" aria-label="Open DM">
+                          <%= if agent.id do %>
+                            <a href={~p"/dm/#{agent.id}"} target="_blank" class="btn btn-ghost btn-xs btn-square" aria-label="Open DM">
                               <.arrow_top_right_on_square class="w-3.5 h-3.5" />
                             </a>
                           <% end %>
-                          <%= if session.agent.uuid && session.uuid do %>
+                          <%= if agent.chat_agent.uuid && agent.uuid do %>
                             <button
-                              id={"bookmark-btn-#{session.uuid}"}
+                              id={"bookmark-btn-#{agent.uuid}"}
                               type="button"
                               phx-hook="BookmarkAgent"
-                              data-agent-id={session.agent.uuid}
-                              data-session-id={session.uuid}
-                              data-agent-name={session.name || session.agent.description || "Agent"}
-                              data-agent-status={session.status}
+                              data-agent-id={agent.chat_agent.uuid}
+                              data-session-id={agent.uuid}
+                              data-agent-name={agent.name || agent.chat_agent.description || "Agent"}
+                              data-agent-status={agent.status}
                               class="bookmark-button btn btn-ghost btn-xs btn-square"
                               aria-label="Bookmark agent"
                             >
                               <.heart class="bookmark-icon w-3.5 h-3.5" />
                             </button>
                           <% end %>
-                          <%= if session.uuid do %>
-                            <%= if session.archived_at do %>
-                              <button type="button" phx-click="unarchive_session" phx-value-session_id={session.id} class="btn btn-ghost btn-xs btn-square" aria-label="Unarchive">
+                          <%= if agent.uuid do %>
+                            <%= if agent.archived_at do %>
+                              <button type="button" phx-click="unarchive_session" phx-value-session_id={agent.id} class="btn btn-ghost btn-xs btn-square" aria-label="Unarchive">
                                 <.icon name="hero-arrow-up-tray" class="size-3.5" />
                               </button>
                             <% else %>
-                              <button type="button" phx-click="archive_session" phx-value-session_id={session.id} class="btn btn-ghost btn-xs btn-square" aria-label="Archive">
+                              <button type="button" phx-click="archive_session" phx-value-session_id={agent.id} class="btn btn-ghost btn-xs btn-square" aria-label="Archive">
                                 <.archive_box class="w-3.5 h-3.5" />
                               </button>
                             <% end %>
@@ -570,18 +570,18 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                         </div>
                       </td>
                       <td class="py-2">
-                        <div class="text-sm">{session.name || "Unnamed session"}</div>
+                        <div class="text-sm">{agent.name || "Unnamed session"}</div>
                         <div class="flex items-center gap-2 text-xs text-base-content/40 mt-1.5">
-                          <span class="font-mono">{Sessions.format_model_info(session)}</span>
-                          <%= if session.project_name do %>
+                          <span class="font-mono">{ExecutionAgents.format_model_info(agent)}</span>
+                          <%= if agent.project_name do %>
                             <span>&middot;</span>
-                            <span>{session.project_name}</span>
+                            <span>{agent.project_name}</span>
                           <% end %>
                           <span>&middot;</span>
                           <span>{relative_time(session.started_at)}</span>
                         </div>
                       </td>
-                      <td class="py-2 text-xs text-base-content/50 truncate max-w-xs">{session.agent.description}</td>
+                      <td class="py-2 text-xs text-base-content/50 truncate max-w-xs">{agent.chat_agent.description}</td>
                     </tr>
                   <% end %>
                 </tbody>

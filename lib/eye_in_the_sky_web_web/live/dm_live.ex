@@ -1,15 +1,15 @@
 defmodule EyeInTheSkyWebWeb.DmLive do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.{Sessions, Messages, Tasks, Commits, Logs, Agents, Notes}
+  alias EyeInTheSkyWeb.{ExecutionAgents, Messages, Tasks, Commits, Logs, ChatAgents, Notes}
   alias EyeInTheSkyWeb.Claude.SessionManager
 
   @impl true
   def mount(%{"session_id" => session_id_param}, _session, socket) do
     # Accept both integer ID and UUID in URL
-    session = case Integer.parse(session_id_param) do
-      {id, ""} -> Sessions.get_session!(id)
-      _ -> Sessions.get_session_by_uuid!(session_id_param)
+    agent = case Integer.parse(session_id_param) do
+      {id, ""} -> ExecutionAgents.get_execution_agent!(id)
+      _ -> ExecutionAgents.get_execution_agent_by_uuid!(session_id_param)
     end
 
     agent = Agents.get_agent!(session.agent_id)
@@ -27,7 +27,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:session_uuid, session.uuid)
       |> assign(:agent_id, session.agent_id)
       |> assign(:agent, agent)
-      |> assign(:session, session)
+      |> assign(:agent, agent)
       |> assign(:active_tab, "messages")
       |> assign(:session_ref, nil)
       |> assign(:processing, false)
@@ -52,7 +52,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     socket =
       socket
       |> assign(:active_tab, tab)
-      |> load_tab_data(tab, socket.assigns.session_id)
+      |> load_tab_data(tab, socket.assigns.agent_id)
 
     {:noreply, socket}
   end
@@ -111,7 +111,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
     # Create message in database
     case Messages.send_message(%{
-      session_id: socket.assigns.session_id,
+      session_id: socket.assigns.agent_id,
       sender_role: "user",
       recipient_role: "agent",
       provider: "claude",
@@ -126,13 +126,13 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         end)
 
         # Load messages to show the one we just sent
-        socket = load_tab_data(socket, "messages", socket.assigns.session_id)
+        socket = load_tab_data(socket, "messages", socket.assigns.agent_id)
 
         Logger.info("🔍 After load_tab_data, socket.assigns[:messages] = #{length(socket.assigns[:messages] || [])}")
 
         # Send via SessionManager (resume existing session)
         # Processing flag will be set when agent_working message arrives
-        session_uuid = socket.assigns.session_uuid
+        session_uuid = socket.assigns.agent_uuid
 
         opts = [model: model]
         opts = if effort_level && effort_level != "" do
@@ -185,10 +185,10 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   def handle_event("sync_from_session_file", _params, socket) do
     alias EyeInTheSkyWeb.Claude.SessionReader
 
-    session = socket.assigns.session
     agent = socket.assigns.agent
-    session_id = socket.assigns.session_id
-    session_uuid = socket.assigns.session_uuid
+    agent = socket.assigns.agent
+    session_id = socket.assigns.agent_id
+    session_uuid = socket.assigns.agent_uuid
 
     case resolve_project_path(session, agent) do
       {:ok, project_path} ->
@@ -261,15 +261,15 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     socket =
       socket
       |> assign(:message_limit, new_limit)
-      |> load_tab_data("messages", socket.assigns.session_id)
+      |> load_tab_data("messages", socket.assigns.agent_id)
 
     {:noreply, socket}
   end
 
   @impl true
   def handle_event("kill_session", _params, socket) do
-    if socket.assigns.session_ref do
-      EyeInTheSkyWeb.Claude.SessionManager.cancel_session(socket.assigns.session_ref)
+    if socket.assigns.agent_ref do
+      EyeInTheSkyWeb.Claude.SessionManager.cancel_session(socket.assigns.agent_ref)
       {:noreply, socket |> assign(:processing, false) |> assign(:session_ref, nil)}
     else
       {:noreply, socket}
@@ -282,7 +282,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
     case Notes.toggle_starred(note_id) do
       {:ok, _note} ->
-        {:noreply, load_tab_data(socket, "notes", socket.assigns.session_id)}
+        {:noreply, load_tab_data(socket, "notes", socket.assigns.agent_id)}
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Failed to toggle star")}
@@ -293,10 +293,10 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   def handle_info(:sync_from_session_file, socket) do
     alias EyeInTheSkyWeb.Claude.SessionReader
 
-    session = socket.assigns.session
     agent = socket.assigns.agent
-    session_id = socket.assigns.session_id
-    session_uuid = socket.assigns.session_uuid
+    agent = socket.assigns.agent
+    session_id = socket.assigns.agent_id
+    session_uuid = socket.assigns.agent_uuid
 
     with {:ok, project_path} <- resolve_project_path(session, agent),
          last_uuid = Messages.get_last_source_uuid(session_id),
@@ -348,7 +348,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     # Claude responded - stop processing state
     socket = socket
     |> assign(:processing, false)
-    |> load_tab_data("messages", socket.assigns.session_id)
+    |> load_tab_data("messages", socket.assigns.agent_id)
 
     {:noreply, socket}
   end
@@ -357,7 +357,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   def handle_info({:new_message, _message}, socket) do
     # New message received - reload messages
     socket = socket
-    |> load_tab_data("messages", socket.assigns.session_id)
+    |> load_tab_data("messages", socket.assigns.agent_id)
 
     {:noreply, socket}
   end
@@ -372,7 +372,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     socket = socket
     |> assign(:processing, false)
     |> assign(:session_ref, nil)
-    |> load_tab_data("messages", socket.assigns.session_id)
+    |> load_tab_data("messages", socket.assigns.agent_id)
 
     {:noreply, socket}
   end
@@ -380,7 +380,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_info({:agent_working, _session_uuid, session_id}, socket) do
     # Agent started processing - set flag only if this is our session
-    if session_id == socket.assigns.session_id do
+    if session_id == socket.assigns.agent_id do
       {:noreply, assign(socket, :processing, true)}
     else
       {:noreply, socket}
@@ -390,7 +390,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
     # Agent finished processing - clear flag only if this is our session
-    if session_id == socket.assigns.session_id do
+    if session_id == socket.assigns.agent_id do
       {:noreply, assign(socket, :processing, false)}
     else
       {:noreply, socket}

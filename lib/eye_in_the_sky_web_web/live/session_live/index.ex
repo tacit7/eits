@@ -1,17 +1,17 @@
 defmodule EyeInTheSkyWebWeb.SessionLive.Index do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.Sessions
+  alias EyeInTheSkyWeb.ExecutionAgents
   import EyeInTheSkyWebWeb.Components.SessionCard
 
   @impl true
   def mount(_params, _session, socket) do
-    sessions = Sessions.list_session_overview_rows(limit: 20)
+    agents = ExecutionAgents.list_execution_agent_overview_rows(limit: 20)
 
     socket =
       socket
       |> assign(:page_title, "Session Overview")
-      |> assign(:sessions, sessions)
+      |> assign(:agents, agents)
 
     {:ok, socket}
   end
@@ -74,8 +74,8 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
 
       <div class="mt-8">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <%= for session <- @sessions do %>
-            <.session_card session={session} />
+          <%= for agent <- @agents do %>
+            <.session_card session={agent} />
           <% end %>
         </div>
       </div>

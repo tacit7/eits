@@ -18,7 +18,7 @@ defmodule EyeInTheSkyWeb.Agents.Agent do
     field :agent_id, :integer
     field :name, :string
     field :description, :string
-    field :status, :string, default: "active"
+    field :status, :string, default: "waiting"
     field :intent, :string
     field :started_at, :string
     field :last_activity_at, :string
@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWeb.Agents.Agent do
       :git_worktree_path
     ])
     |> validate_required([:agent_id, :started_at])
-    |> validate_inclusion(:status, ["active", "idle", "completed", "failed", "archived"])
+    |> validate_inclusion(:status, ["active", "idle", "working", "waiting", "completed", "failed", "archived"])
   end
 
   @doc """

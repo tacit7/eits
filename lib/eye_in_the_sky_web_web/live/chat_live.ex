@@ -126,7 +126,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     # Load active sessions for @ autocomplete
     active_agents =
       Agents.list_active_agents()
-      |> EyeInTheSkyWeb.Repo.preload(:agent)
+      |> EyeInTheSkyWeb.Repo.preload(:chat_agent)
       |> Enum.map(fn session ->
         %{
           id: session.id,
@@ -136,8 +136,8 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
           provider: session.provider || "claude",
           model: session.model,
           agent_description:
-            if(Ecto.assoc_loaded?(session.agent) && session.agent,
-              do: session.agent.description,
+            if(Ecto.assoc_loaded?(session.chat_agent) && session.chat_agent,
+              do: session.chat_agent.description,
               else: nil
             )
         }

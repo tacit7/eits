@@ -692,7 +692,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                     <span class="text-base-content/15">/</span>
                     <span class="tabular-nums">{relative_time(agent.started_at)}</span>
                   </div>
-                  <%= if agent.chat_agent.description do %>
+                  <%= if agent.chat_agent && agent.chat_agent.description do %>
                     <p class="text-xs text-base-content/35 mt-1 truncate max-w-lg">
                       {agent.chat_agent.description}
                     </p>
@@ -714,7 +714,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                       <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
                     </a>
                   <% end %>
-                  <%= if agent.chat_agent.uuid && agent.uuid do %>
+                  <%= if agent.chat_agent && agent.chat_agent.uuid && agent.uuid do %>
                     <button
                       id={"bookmark-btn-#{agent.uuid}"}
                       type="button"

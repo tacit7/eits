@@ -33,7 +33,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     "/opt/homebrew/bin/claude",
     Path.expand("~/.local/bin/claude")
   ]
-  @redacted_flags ~w(--system-prompt --append-system-prompt)
+  @redacted_flags ~w(-p --system-prompt --append-system-prompt)
   @persistent_term_key {__MODULE__, :claude_binary_path}
 
   # ---------------------------------------------------------------------------
@@ -160,16 +160,10 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   # ---------------------------------------------------------------------------
 
   @doc """
-  Redact sensitive flag values from an args list for safe logging.
-
-  Flags in `#{inspect(@redacted_flags)}` have their following value replaced
-  with `"[REDACTED]"`.
-  """
-  @doc """
   Returns the full CLI command as a string for debugging/inspection.
 
   Includes the `script` wrapper, claude binary path, and all args.
-  Sensitive values are redacted.
+  Sensitive values (flags in `#{inspect(@redacted_flags)}`) are redacted.
   """
   @spec cmd(cli_opts()) :: {:ok, String.t()} | {:error, term()}
   def cmd(opts \\ []) do

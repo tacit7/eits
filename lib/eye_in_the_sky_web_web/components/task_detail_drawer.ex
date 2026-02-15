@@ -1,6 +1,6 @@
 defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
   @moduledoc """
-  Left-side drawer for viewing and editing task details.
+  Right-side slide-over panel for viewing and editing task details.
   """
 
   use Phoenix.LiveComponent
@@ -9,259 +9,203 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="drawer drawer-start z-50">
-      <input
-        id="task-detail-drawer"
-        type="checkbox"
-        class="drawer-toggle"
-        checked={@show}
+    <div id="task-detail-wrapper">
+    <%= if @show do %>
+      <%!-- Backdrop --%>
+      <div
+        class="fixed inset-0 z-40 bg-black/30 transition-opacity"
         phx-click={@toggle_event}
       />
-      <div class="drawer-side">
-        <label for="task-detail-drawer" class="drawer-overlay"></label>
-        <div class="menu p-0 w-[768px] min-h-full bg-base-100 text-base-content flex flex-row">
-          <%= if @task do %>
-            <!-- Main Content -->
-            <div class="flex-1 overflow-y-auto">
-              <!-- Header with close button -->
-              <div class="p-6 pb-4">
-                <div class="flex items-start justify-between mb-6">
-                  <.icon name="hero-document-text" class="w-6 h-6 text-base-content/60 mt-1" />
-                  <button
-                    phx-click={@toggle_event}
-                    class="btn btn-ghost btn-sm btn-circle -mt-2 -mr-2"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <form phx-submit={@update_event} class="space-y-6">
-                  <!-- Title -->
-                  <div>
-                    <input
-                      type="text"
-                      name="title"
-                      value={@task.title}
-                      class="text-xl font-semibold w-full bg-transparent border-none focus:outline-none focus:ring-0 p-0"
-                      placeholder="Task title"
-                      required
-                    />
-                  </div>
 
-                  <!-- Badges -->
-                  <div class="flex flex-wrap gap-2 items-center">
-                    <!-- Status Badge -->
-                    <%= if @task.state do %>
-                      <div class="badge badge-lg gap-2">
-                        <.icon name="hero-queue-list" class="w-4 h-4" />
-                        {String.capitalize(@task.state.name)}
-                      </div>
-                    <% end %>
-                    <!-- Priority Badge -->
-                    <%= if @task.priority && @task.priority > 0 do %>
-                      <div class={
-                        "badge badge-lg gap-2 " <>
-                          cond do
-                            @task.priority >= 3 -> "badge-error"
-                            @task.priority >= 2 -> "badge-warning"
-                            true -> "badge-info"
-                          end
-                      }>
-                        <.icon name="hero-flag" class="w-4 h-4" />
-                        {priority_text(@task.priority)}
-                      </div>
-                    <% end %>
-                    <!-- Due Date Badge -->
-                    <%= if @task.due_at do %>
-                      <div class="badge badge-lg gap-2">
-                        <.icon name="hero-calendar" class="w-4 h-4" />
-                        {format_due_date(@task.due_at)}
-                      </div>
-                    <% end %>
-                    <!-- Tags -->
-                    <%= if @task.tags && length(@task.tags) > 0 do %>
-                      <%= for tag <- @task.tags do %>
-                        <div class="badge badge-outline badge-lg">
-                          {tag.name}
-                        </div>
-                      <% end %>
-                    <% end %>
-                    <!-- Task ID -->
-                    <div class="badge badge-ghost badge-sm font-mono gap-1">
-                      {String.slice(@task.id, 0..7)}
-                      <button
-                        type="button"
-                        class="cursor-pointer hover:text-primary transition-colors"
-                        phx-hook="CopyToClipboard"
-                        id={"copy-task-detail-#{@task.id}"}
-                        data-copy={@task.id}
-                        onclick="event.stopPropagation(); event.preventDefault();"
-                      >
-                        <.icon name="hero-clipboard-document" class="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <!-- Description -->
-                  <div class="space-y-2">
-                    <div class="flex items-center gap-2">
-                      <.icon name="hero-bars-3-bottom-left" class="w-5 h-5 text-base-content/60" />
-                      <h3 class="font-semibold">Description</h3>
-                    </div>
-                    <textarea
-                      name="description"
-                      class="textarea textarea-bordered w-full min-h-[120px] text-sm"
-                      placeholder="Add a more detailed description..."
-                    >{@task.description}</textarea>
-                    <p class="text-xs text-base-content/50">Markdown supported</p>
-                  </div>
-
-                  <!-- Annotations -->
-                  <%= if @notes && length(@notes) > 0 do %>
-                    <div class="space-y-2">
-                      <div class="flex items-center gap-2">
-                        <.icon name="hero-document-text" class="w-5 h-5 text-base-content/60" />
-                        <h3 class="font-semibold">Annotations</h3>
-                        <span class="badge badge-sm">{length(@notes)}</span>
-                      </div>
-                      <div class="space-y-3">
-                        <%= for note <- @notes do %>
-                          <div class="border border-base-300 rounded-lg p-3 bg-base-50">
-                            <%= if note.title do %>
-                              <h4 class="font-semibold text-sm mb-2">{note.title}</h4>
-                            <% end %>
-                            <pre class="whitespace-pre-wrap text-sm text-base-content/80 font-mono leading-relaxed">{note.body}</pre>
-                            <div class="flex items-center gap-2 mt-2 text-xs text-base-content/50">
-                              <.icon name="hero-clock" class="w-3 h-3" />
-                              <span>{format_relative_time(note.created_at)}</span>
-                            </div>
-                          </div>
-                        <% end %>
-                      </div>
-                    </div>
-                  <% end %>
-
-                  <!-- Hidden form fields -->
-                  <input type="hidden" name="state_id" value={@task.state_id} />
-                  <input type="hidden" name="priority" value={@task.priority || 0} />
-                  <input type="hidden" name="due_at" value={format_date_input(@task.due_at)} />
-                  <input type="hidden" name="tags" value={format_tags(@task.tags)} />
-
-                  <!-- Metadata -->
-                  <div class="space-y-2 text-xs text-base-content/60">
-                    <div class="flex items-center gap-2">
-                      <.icon name="hero-clock" class="w-4 h-4" />
-                      <span>Created {format_relative_time(@task.created_at)}</span>
-                    </div>
-                    <%= if @task.updated_at && @task.updated_at != @task.created_at do %>
-                      <div class="flex items-center gap-2">
-                        <.icon name="hero-arrow-path" class="w-4 h-4" />
-                        <span>Updated {format_relative_time(@task.updated_at)}</span>
-                      </div>
-                    <% end %>
-                    <%= if @task.agent_id do %>
-                      <div class="flex items-center gap-2">
-                        <.icon name="hero-user" class="w-4 h-4" />
-                        <span class="font-mono">{String.slice(@task.agent_id, 0..7)}</span>
-                      </div>
-                    <% end %>
-                  </div>
-
-                  <!-- Save Button -->
-                  <div class="pt-4">
-                    <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
-                  </div>
-                </form>
+      <%!-- Panel --%>
+      <div class="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-base-100 shadow-xl overflow-y-auto">
+        <%= if @task do %>
+          <form phx-submit={@update_event} class="flex flex-col h-full">
+            <%!-- Header --%>
+            <div class="flex items-center justify-between px-6 py-4 border-b border-base-content/5">
+              <div class="flex items-center gap-2 text-xs text-base-content/30">
+                <span class="font-mono">{String.slice(@task.uuid || to_string(@task.id), 0..7)}</span>
+                <button
+                  type="button"
+                  phx-hook="CopyToClipboard"
+                  id={"copy-task-detail-#{@task.id}"}
+                  data-copy={@task.uuid || to_string(@task.id)}
+                  onclick="event.stopPropagation(); event.preventDefault();"
+                  class="hover:text-primary transition-colors"
+                >
+                  <.icon name="hero-clipboard-document" class="w-3 h-3" />
+                </button>
+                <span class="text-base-content/15">&middot;</span>
+                <span>{format_relative_time(@task.created_at)}</span>
               </div>
+              <button
+                type="button"
+                phx-click={@toggle_event}
+                class="p-1 rounded-md text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5 transition-colors"
+              >
+                <.icon name="hero-x-mark" class="w-5 h-5" />
+              </button>
             </div>
 
-            <!-- Sidebar -->
-            <div class="w-48 border-l border-base-300 p-4 space-y-4">
+            <%!-- Body --%>
+            <div class="flex-1 px-6 py-5 space-y-5 overflow-y-auto">
+              <%!-- Title --%>
+              <input
+                type="text"
+                name="title"
+                value={@task.title}
+                class="text-lg font-semibold w-full bg-transparent border-none focus:outline-none focus:ring-0 p-0 text-base-content"
+                placeholder="Task title"
+                required
+              />
+
+              <%!-- Fields grid --%>
+              <div class="grid grid-cols-2 gap-3">
+                <%!-- Status --%>
+                <div>
+                  <label class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-1.5 block">
+                    Status
+                  </label>
+                  <select
+                    name="state_id"
+                    class="select select-sm w-full bg-base-content/[0.03] border-base-content/8 text-sm focus:border-primary/30"
+                  >
+                    <%= for state <- @workflow_states do %>
+                      <option value={state.id} selected={@task.state_id == state.id}>
+                        {state.name}
+                      </option>
+                    <% end %>
+                  </select>
+                </div>
+
+                <%!-- Priority --%>
+                <div>
+                  <label class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-1.5 block">
+                    Priority
+                  </label>
+                  <select
+                    name="priority"
+                    class="select select-sm w-full bg-base-content/[0.03] border-base-content/8 text-sm focus:border-primary/30"
+                  >
+                    <option value="0" selected={@task.priority == 0 || is_nil(@task.priority)}>None</option>
+                    <option value="1" selected={@task.priority == 1}>Low</option>
+                    <option value="2" selected={@task.priority == 2}>Medium</option>
+                    <option value="3" selected={@task.priority == 3}>High</option>
+                  </select>
+                </div>
+
+                <%!-- Due date --%>
+                <div>
+                  <label class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-1.5 block">
+                    Due date
+                  </label>
+                  <input
+                    type="date"
+                    name="due_at"
+                    value={format_date_input(@task.due_at)}
+                    class="input input-sm w-full bg-base-content/[0.03] border-base-content/8 text-sm focus:border-primary/30"
+                  />
+                </div>
+
+                <%!-- Tags --%>
+                <div>
+                  <label class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-1.5 block">
+                    Tags
+                  </label>
+                  <input
+                    type="text"
+                    name="tags"
+                    value={format_tags(@task.tags)}
+                    placeholder="tag1, tag2"
+                    class="input input-sm w-full bg-base-content/[0.03] border-base-content/8 text-sm placeholder:text-base-content/20 focus:border-primary/30"
+                  />
+                </div>
+              </div>
+
+              <%!-- Description --%>
               <div>
-                <h4 class="text-xs font-semibold text-base-content/60 uppercase mb-2">Quick Edit</h4>
-                <div class="space-y-2">
-                  <!-- Note: These update the hidden fields in the main form -->
-                  <!-- Edit Status -->
-                  <div class="form-control">
-                    <label class="label py-1">
-                      <span class="label-text text-xs">Status</span>
-                    </label>
-                    <select
-                      name="sidebar_state_id"
-                      class="select select-bordered select-sm w-full"
-                      onchange="document.querySelector('input[name=state_id]').value = this.value"
-                    >
-                      <%= for state <- @workflow_states do %>
-                        <option value={state.id} selected={@task.state_id == state.id}>
-                          {String.capitalize(state.name)}
-                        </option>
-                      <% end %>
-                    </select>
+                <label class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-1.5 block">
+                  Description
+                </label>
+                <textarea
+                  name="description"
+                  class="w-full min-h-[100px] bg-base-content/[0.03] border border-base-content/8 rounded-lg px-3 py-2 text-sm focus:border-primary/30 focus:outline-none resize-y"
+                  placeholder="Add details..."
+                >{@task.description}</textarea>
+              </div>
+
+              <%!-- Annotations --%>
+              <%= if @notes && length(@notes) > 0 do %>
+                <div>
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider">
+                      Annotations
+                    </span>
+                    <span class="text-[11px] font-mono tabular-nums text-base-content/25">
+                      {length(@notes)}
+                    </span>
                   </div>
-
-                  <!-- Edit Priority -->
-                  <div class="form-control">
-                    <label class="label py-1">
-                      <span class="label-text text-xs">Priority</span>
-                    </label>
-                    <select
-                      name="sidebar_priority"
-                      class="select select-bordered select-sm w-full"
-                      onchange="document.querySelector('input[name=priority]').value = this.value"
-                    >
-                      <option value="0" selected={@task.priority == 0}>No Priority</option>
-                      <option value="1" selected={@task.priority == 1}>Low</option>
-                      <option value="2" selected={@task.priority == 2}>Medium</option>
-                      <option value="3" selected={@task.priority == 3}>High</option>
-                    </select>
+                  <div class="space-y-2">
+                    <%= for note <- @notes do %>
+                      <div class="rounded-lg bg-base-content/[0.03] px-3 py-2.5">
+                        <%= if note.title do %>
+                          <div class="text-xs font-semibold text-base-content/70 mb-1">{note.title}</div>
+                        <% end %>
+                        <pre class="whitespace-pre-wrap text-xs text-base-content/60 font-mono leading-relaxed">{note.body}</pre>
+                        <div class="mt-1.5 text-[11px] text-base-content/25">
+                          {format_relative_time(note.created_at)}
+                        </div>
+                      </div>
+                    <% end %>
                   </div>
-
-                  <!-- Due Date -->
-                  <div class="form-control">
-                    <label class="label py-1">
-                      <span class="label-text text-xs">Due Date</span>
-                    </label>
-                    <input
-                      type="date"
-                      name="sidebar_due_at"
-                      value={format_date_input(@task.due_at)}
-                      class="input input-bordered input-sm w-full"
-                      onchange="document.querySelector('input[name=due_at]').value = this.value"
-                    />
-                  </div>
-
-                  <!-- Start Agent Button -->
-                  <button
-                    type="button"
-                    phx-click="start_agent_for_task"
-                    phx-value-task_id={@task.id}
-                    class="btn btn-accent btn-sm w-full"
-                  >
-                    <.icon name="hero-play" class="w-4 h-4" />
-                    Start Agent
-                  </button>
-
-                  <!-- Delete Button -->
-                  <button
-                    type="button"
-                    phx-click={@delete_event}
-                    phx-value-task_id={@task.id}
-                    class="btn btn-error btn-outline btn-sm w-full"
-                    data-confirm="Delete this task?"
-                  >
-                    <.icon name="hero-trash" class="w-4 h-4" />
-                    Delete
-                  </button>
                 </div>
+              <% end %>
+
+              <%!-- Metadata --%>
+              <div class="flex items-center gap-3 text-[11px] text-base-content/25 pt-2">
+                <%= if @task.updated_at && @task.updated_at != @task.created_at do %>
+                  <span>Updated {format_relative_time(@task.updated_at)}</span>
+                  <span class="text-base-content/10">&middot;</span>
+                <% end %>
+                <%= if @task.agent_id do %>
+                  <span class="font-mono">Agent {String.slice(@task.agent_id, 0..7)}</span>
+                <% end %>
               </div>
             </div>
-          <% else %>
-            <!-- No task selected -->
-            <div class="flex items-center justify-center h-full p-6">
-              <p class="text-base-content/60">No task selected</p>
+
+            <%!-- Footer actions --%>
+            <div class="px-6 py-4 border-t border-base-content/5 flex items-center gap-2">
+              <button type="submit" class="btn btn-sm btn-primary text-xs px-4">
+                Save
+              </button>
+              <button
+                type="button"
+                phx-click="start_agent_for_task"
+                phx-value-task_id={@task.uuid || to_string(@task.id)}
+                class="btn btn-sm btn-ghost text-xs gap-1.5 text-base-content/50 hover:text-base-content/80"
+              >
+                <.icon name="hero-play" class="w-3.5 h-3.5" /> Start Agent
+              </button>
+              <div class="ml-auto">
+                <button
+                  type="button"
+                  phx-click={@delete_event}
+                  phx-value-task_id={@task.uuid || to_string(@task.id)}
+                  data-confirm="Delete this task?"
+                  class="btn btn-sm btn-ghost text-xs text-error/50 hover:text-error hover:bg-error/10"
+                >
+                  <.icon name="hero-trash" class="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
-          <% end %>
-        </div>
+          </form>
+        <% else %>
+          <div class="flex items-center justify-center h-full">
+            <span class="text-sm text-base-content/30">No task selected</span>
+          </div>
+        <% end %>
       </div>
+    <% end %>
     </div>
     """
   end
@@ -282,27 +226,6 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
     |> Enum.map(& &1.name)
     |> Enum.join(", ")
   end
-
-  defp format_due_date(nil), do: ""
-
-  defp format_due_date(datetime) when is_binary(datetime) do
-    case Date.from_iso8601(String.slice(datetime, 0..9)) do
-      {:ok, date} ->
-        today = Date.utc_today()
-
-        cond do
-          Date.compare(date, today) == :eq -> "Today"
-          Date.compare(date, Date.add(today, 1)) == :eq -> "Tomorrow"
-          Date.compare(date, today) == :lt -> "Overdue"
-          true -> Calendar.strftime(date, "%b %d, %Y")
-        end
-
-      _ ->
-        datetime
-    end
-  end
-
-  defp format_due_date(_), do: ""
 
   defp format_relative_time(nil), do: ""
 
@@ -326,13 +249,4 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
   end
 
   defp format_relative_time(_), do: ""
-
-  defp priority_text(priority) do
-    cond do
-      priority >= 3 -> "High"
-      priority >= 2 -> "Medium"
-      priority >= 1 -> "Low"
-      true -> "None"
-    end
-  end
 end

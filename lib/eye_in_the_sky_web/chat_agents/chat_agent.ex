@@ -45,6 +45,15 @@ defmodule EyeInTheSkyWeb.ChatAgents.ChatAgent do
       :bookmarked,
       :git_worktree_path
     ])
+    |> maybe_generate_uuid()
     |> validate_required([])
+  end
+
+  defp maybe_generate_uuid(changeset) do
+    if Ecto.Changeset.get_field(changeset, :uuid) do
+      changeset
+    else
+      Ecto.Changeset.put_change(changeset, :uuid, Ecto.UUID.generate())
+    end
   end
 end

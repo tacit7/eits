@@ -41,7 +41,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   defp load_agents(socket) do
-    db_agents = Agents.list_agents_with_chat_agent(include_archived: false)
+    include_archived = socket.assigns.session_filter == "archived"
+    db_agents = Agents.list_agents_with_chat_agent(include_archived: include_archived)
 
     # Build project lookup map from assigns
     project_map =
@@ -377,8 +378,18 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   @impl true
+  def handle_info({:agent_working, %{id: session_id}}, socket) do
+    {:noreply, update_agent_status_in_list(socket, session_id, "working")}
+  end
+
+  @impl true
   def handle_info({:agent_working, _session_uuid, session_id}, socket) do
     {:noreply, update_agent_status_in_list(socket, session_id, "working")}
+  end
+
+  @impl true
+  def handle_info({:agent_stopped, %{id: session_id, status: status}}, socket) do
+    {:noreply, update_agent_status_in_list(socket, session_id, status || "completed")}
   end
 
   @impl true
@@ -610,6 +621,17 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                   )}
               >
                 Completed
+              </button>
+              <button
+                phx-click="filter_session"
+                phx-value-filter="archived"
+                class={"px-3 py-1 rounded-md text-xs font-medium transition-all duration-150 " <>
+                  if(@session_filter == "archived",
+                    do: "bg-base-100 text-warning shadow-sm",
+                    else: "text-base-content/40 hover:text-base-content/60"
+                  )}
+              >
+                Archived
               </button>
             </div>
           </div>

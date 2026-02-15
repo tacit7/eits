@@ -48,7 +48,12 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
             git_worktree_path: params["worktree_path"]
           }
 
-          case Agents.create_execution_agent_with_model(agent_attrs) do
+          create_fn =
+            if model_name,
+              do: &Agents.create_execution_agent_with_model/1,
+              else: &Agents.create_execution_agent/1
+
+          case create_fn.(agent_attrs) do
             {:ok, agent} ->
               Phoenix.PubSub.broadcast(
                 EyeInTheSkyWeb.PubSub,

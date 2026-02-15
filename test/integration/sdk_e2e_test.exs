@@ -35,12 +35,13 @@ defmodule EyeInTheSkyWeb.SDKE2ETest do
 
   describe "SDK.start/2 - real Claude session" do
     test "spawns Claude and streams text messages" do
-      {:ok, ref} = SDK.start("Say 'hello world' and nothing else",
-        to: self(),
-        model: "haiku",
-        max_turns: 1,
-        project_path: @test_project_path
-      )
+      {:ok, ref} =
+        SDK.start("Say 'hello world' and nothing else",
+          to: self(),
+          model: "haiku",
+          max_turns: 1,
+          project_path: @test_project_path
+        )
 
       assert is_reference(ref)
 
@@ -61,12 +62,13 @@ defmodule EyeInTheSkyWeb.SDKE2ETest do
     end
 
     test "receives thinking messages when available" do
-      {:ok, ref} = SDK.start("Think about why the sky is blue, then answer",
-        to: self(),
-        model: "sonnet",
-        max_turns: 1,
-        project_path: @test_project_path
-      )
+      {:ok, ref} =
+        SDK.start("Think about why the sky is blue, then answer",
+          to: self(),
+          model: "sonnet",
+          max_turns: 1,
+          project_path: @test_project_path
+        )
 
       {messages, _session_id} = collect_all_messages(ref)
 
@@ -76,12 +78,13 @@ defmodule EyeInTheSkyWeb.SDKE2ETest do
     end
 
     test "receives usage statistics" do
-      {:ok, ref} = SDK.start("Count to 5",
-        to: self(),
-        model: "haiku",
-        max_turns: 1,
-        project_path: @test_project_path
-      )
+      {:ok, ref} =
+        SDK.start("Count to 5",
+          to: self(),
+          model: "haiku",
+          max_turns: 1,
+          project_path: @test_project_path
+        )
 
       {messages, _session_id} = collect_all_messages(ref)
 
@@ -100,21 +103,23 @@ defmodule EyeInTheSkyWeb.SDKE2ETest do
       test_file = Path.join(@test_project_path, "test.txt")
       File.write!(test_file, "Hello from E2E test")
 
-      {:ok, ref} = SDK.start("Read the file test.txt and tell me what it says",
-        to: self(),
-        model: "haiku",
-        allowedTools: "Read",
-        max_turns: 3,
-        project_path: @test_project_path
-      )
+      {:ok, ref} =
+        SDK.start("Read the file test.txt and tell me what it says",
+          to: self(),
+          model: "haiku",
+          allowedTools: "Read",
+          max_turns: 3,
+          project_path: @test_project_path
+        )
 
       {messages, _session_id} = collect_all_messages(ref)
 
       # Should have text messages with the content
-      text = messages
-             |> Enum.filter(&(&1.type == :text))
-             |> Enum.map(& &1.content)
-             |> Enum.join()
+      text =
+        messages
+        |> Enum.filter(&(&1.type == :text))
+        |> Enum.map(& &1.content)
+        |> Enum.join()
 
       assert text =~ ~r/Hello from E2E test/i
     end
@@ -123,28 +128,31 @@ defmodule EyeInTheSkyWeb.SDKE2ETest do
   describe "SDK.resume/3 - multi-turn conversations" do
     test "resumes previous session with context" do
       # First turn
-      {:ok, ref1} = SDK.start("I'm thinking of a number between 1 and 10. It's 7.",
-        to: self(),
-        model: "haiku",
-        max_turns: 1,
-        project_path: @test_project_path
-      )
+      {:ok, ref1} =
+        SDK.start("I'm thinking of a number between 1 and 10. It's 7.",
+          to: self(),
+          model: "haiku",
+          max_turns: 1,
+          project_path: @test_project_path
+        )
 
       {_messages1, session_id} = collect_all_messages(ref1)
 
       # Second turn - Claude should remember
-      {:ok, ref2} = SDK.resume(session_id, "What number was I thinking of?",
-        to: self(),
-        project_path: @test_project_path
-      )
+      {:ok, ref2} =
+        SDK.resume(session_id, "What number was I thinking of?",
+          to: self(),
+          project_path: @test_project_path
+        )
 
       {messages2, _session_id} = collect_all_messages(ref2)
 
       # Should mention 7
-      text = messages2
-             |> Enum.filter(&(&1.type == :text))
-             |> Enum.map(& &1.content)
-             |> Enum.join()
+      text =
+        messages2
+        |> Enum.filter(&(&1.type == :text))
+        |> Enum.map(& &1.content)
+        |> Enum.join()
 
       assert text =~ ~r/7/
     end
@@ -153,12 +161,13 @@ defmodule EyeInTheSkyWeb.SDKE2ETest do
   describe "SDK.cancel/1 - cancellation" do
     test "cancels a running session" do
       # Start a long-running task
-      {:ok, ref} = SDK.start("Count to 100 slowly, saying each number",
-        to: self(),
-        model: "haiku",
-        max_turns: 1,
-        project_path: @test_project_path
-      )
+      {:ok, ref} =
+        SDK.start("Count to 100 slowly, saying each number",
+          to: self(),
+          model: "haiku",
+          max_turns: 1,
+          project_path: @test_project_path
+        )
 
       # Wait for first message
       assert_receive {:claude_message, ^ref, _}, 10_000
@@ -190,12 +199,13 @@ defmodule EyeInTheSkyWeb.SDKE2ETest do
       System.put_env("ANTHROPIC_API_KEY", "sk-ant-invalid-key-123")
 
       try do
-        {:ok, ref} = SDK.start("Hello",
-          to: self(),
-          model: "haiku",
-          max_turns: 1,
-          project_path: @test_project_path
-        )
+        {:ok, ref} =
+          SDK.start("Hello",
+            to: self(),
+            model: "haiku",
+            max_turns: 1,
+            project_path: @test_project_path
+          )
 
         # Collect all messages to see what we get
         result =
@@ -242,12 +252,13 @@ defmodule EyeInTheSkyWeb.SDKE2ETest do
     test "handles billing errors gracefully" do
       # This might trigger a billing error if API key has no credits
       # Skip if we can't trigger errors reliably
-      {:ok, ref} = SDK.start("Hello",
-        to: self(),
-        model: "opus",
-        max_turns: 1,
-        project_path: @test_project_path
-      )
+      {:ok, ref} =
+        SDK.start("Hello",
+          to: self(),
+          model: "opus",
+          max_turns: 1,
+          project_path: @test_project_path
+        )
 
       receive do
         {:claude_error, ^ref, reason} ->

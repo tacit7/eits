@@ -207,10 +207,14 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
     content
     |> Enum.filter(&is_map/1)
     |> Enum.flat_map(fn
-      %{"type" => "text", "text" => text} -> [text]
+      %{"type" => "text", "text" => text} ->
+        [text]
+
       %{"type" => "tool_use", "name" => name, "input" => input} ->
         [format_tool_call(name, input)]
-      _ -> []
+
+      _ ->
+        []
     end)
     |> Enum.join("\n\n")
   end
@@ -224,10 +228,14 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
     content
     |> Enum.filter(&is_map/1)
     |> Enum.flat_map(fn
-      %{"type" => "text", "text" => text} -> [text]
+      %{"type" => "text", "text" => text} ->
+        [text]
+
       %{"type" => "tool_use", "name" => name, "input" => input} ->
         [format_tool_call(name, input)]
-      _ -> []
+
+      _ ->
+        []
     end)
     |> Enum.join("\n\n")
   end
@@ -239,20 +247,24 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
   defp format_tool_call("Write", %{"file_path" => path}), do: "> `Write` #{path}"
   defp format_tool_call("Edit", %{"file_path" => path}), do: "> `Edit` #{path}"
   defp format_tool_call("Glob", %{"pattern" => pat}), do: "> `Glob` #{pat}"
+
   defp format_tool_call("Grep", %{"pattern" => pat} = input) do
     path = input["path"] || ""
     "> `Grep` `#{pat}` #{path}"
   end
+
   defp format_tool_call("Bash", %{"command" => cmd}) do
     truncated = String.slice(cmd, 0..120)
     suffix = if String.length(cmd) > 121, do: "...", else: ""
     "> `Bash` `#{truncated}#{suffix}`"
   end
+
   defp format_tool_call("Task", %{"prompt" => prompt}) do
     truncated = String.slice(prompt, 0..80)
     suffix = if String.length(prompt) > 81, do: "...", else: ""
     "> `Task` #{truncated}#{suffix}"
   end
+
   defp format_tool_call(name, input) when is_map(input) do
     summary =
       input
@@ -264,7 +276,9 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
         "#{k}: #{val}"
       end)
       |> Enum.join(", ")
+
     "> `#{name}` #{summary}"
   end
+
   defp format_tool_call(name, _), do: "> `#{name}`"
 end

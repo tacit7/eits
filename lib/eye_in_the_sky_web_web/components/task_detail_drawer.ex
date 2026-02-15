@@ -25,6 +25,16 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
             <div class="flex items-center justify-between px-6 py-4 border-b border-base-content/5">
               <div class="flex items-center gap-2 text-xs text-base-content/30">
                 <span class="font-mono">{String.slice(@task.uuid || to_string(@task.id), 0..7)}</span>
+                <%= if @task.priority && @task.priority > 0 do %>
+                  <span class={[
+                    "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium",
+                    @task.priority >= 3 && "bg-error/10 text-error",
+                    @task.priority == 2 && "bg-warning/10 text-warning",
+                    @task.priority == 1 && "bg-info/10 text-info"
+                  ]}>
+                    {priority_label(@task.priority)}
+                  </span>
+                <% end %>
                 <button
                   type="button"
                   phx-hook="CopyToClipboard"
@@ -96,8 +106,15 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
 
                 <%!-- Due date --%>
                 <div>
-                  <label class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-1.5 block">
-                    Due date
+                  <label class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <span>Due date</span>
+                    <%= cond do %>
+                      <% is_overdue?(@task.due_at) -> %>
+                        <span class="text-error text-[10px] normal-case tracking-normal font-medium">Overdue</span>
+                      <% is_due_today?(@task.due_at) -> %>
+                        <span class="text-warning text-[10px] normal-case tracking-normal font-medium">Today</span>
+                      <% true -> %>
+                    <% end %>
                   </label>
                   <input
                     type="date"
@@ -249,4 +266,31 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
   end
 
   defp format_relative_time(_), do: ""
+
+  defp is_overdue?(nil), do: false
+
+  defp is_overdue?(datetime) when is_binary(datetime) do
+    case Date.from_iso8601(String.slice(datetime, 0..9)) do
+      {:ok, date} -> Date.compare(date, Date.utc_today()) == :lt
+      _ -> false
+    end
+  end
+
+  defp is_overdue?(_), do: false
+
+  defp is_due_today?(nil), do: false
+
+  defp is_due_today?(datetime) when is_binary(datetime) do
+    case Date.from_iso8601(String.slice(datetime, 0..9)) do
+      {:ok, date} -> Date.compare(date, Date.utc_today()) == :eq
+      _ -> false
+    end
+  end
+
+  defp is_due_today?(_), do: false
+
+  defp priority_label(p) when p >= 3, do: "High"
+  defp priority_label(2), do: "Medium"
+  defp priority_label(1), do: "Low"
+  defp priority_label(_), do: ""
 end

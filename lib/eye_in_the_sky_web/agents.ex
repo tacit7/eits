@@ -148,7 +148,11 @@ defmodule EyeInTheSkyWeb.Agents do
   """
   def unarchive_execution_agent(%Agent{} = agent) do
     require Logger
-    Logger.info("📦 Unarchiving execution agent #{agent.id}, current archived_at: #{inspect(agent.archived_at)}")
+
+    Logger.info(
+      "📦 Unarchiving execution agent #{agent.id}, current archived_at: #{inspect(agent.archived_at)}"
+    )
+
     result = update_execution_agent(agent, %{archived_at: nil})
     Logger.info("📦 Update result: #{inspect(result)}")
     result

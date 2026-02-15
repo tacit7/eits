@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.DMResponseE2ETest do
 
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Projects, Sessions}
+  alias EyeInTheSkyWeb.{Agents, ChatAgents, Channels, Messages, Projects}
   alias EyeInTheSkyWeb.Claude.SessionManager
 
   setup %{conn: conn} do
@@ -23,55 +23,63 @@ defmodule EyeInTheSkyWeb.DMResponseE2ETest do
     |> Enum.each(fn
       {_, pid, :worker, _} when is_pid(pid) ->
         DynamicSupervisor.terminate_child(supervisor, pid)
-      _ -> :ok
+
+      _ ->
+        :ok
     end)
 
     Process.sleep(50)
 
     # Create test project
-    {:ok, project} = Projects.create_project(%{
-      name: "DM Response Test",
-      slug: "dm-response-test",
-      path: "/tmp/dm-response-test",
-      active: true
-    })
+    {:ok, project} =
+      Projects.create_project(%{
+        name: "DM Response Test",
+        slug: "dm-response-test",
+        path: "/tmp/dm-response-test",
+        active: true
+      })
 
     # Create sender
-    {:ok, sender_agent} = Agents.create_agent(%{
-      uuid: "dm-resp-sender-#{System.system_time(:second)}",
-      description: "Response Test Sender",
-      source: "web",
-      project_id: project.id
-    })
+    {:ok, sender_agent} =
+      ChatAgents.create_chat_agent(%{
+        uuid: "dm-resp-sender-#{System.system_time(:second)}",
+        description: "Response Test Sender",
+        source: "web",
+        project_id: project.id
+      })
 
-    {:ok, sender_session} = Sessions.create_session(%{
-      uuid: "dm-resp-sender-session-#{System.system_time(:second)}",
-      agent_id: sender_agent.id,
-      name: "Sender",
-      started_at: DateTime.utc_now() |> DateTime.to_iso8601()
-    })
+    {:ok, sender_session} =
+      Agents.create_execution_agent(%{
+        uuid: "dm-resp-sender-session-#{System.system_time(:second)}",
+        agent_id: sender_agent.id,
+        name: "Sender",
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      })
 
     # Create recipient
-    {:ok, recipient_agent} = Agents.create_agent(%{
-      uuid: "dm-resp-recipient-#{System.system_time(:second)}",
-      description: "Response Test Recipient",
-      source: "claude",
-      project_id: project.id
-    })
+    {:ok, recipient_agent} =
+      ChatAgents.create_chat_agent(%{
+        uuid: "dm-resp-recipient-#{System.system_time(:second)}",
+        description: "Response Test Recipient",
+        source: "claude",
+        project_id: project.id
+      })
 
-    {:ok, recipient_session} = Sessions.create_session(%{
-      uuid: "dm-resp-recipient-session-#{System.system_time(:second)}",
-      agent_id: recipient_agent.id,
-      name: "Recipient",
-      started_at: DateTime.utc_now() |> DateTime.to_iso8601()
-    })
+    {:ok, recipient_session} =
+      Agents.create_execution_agent(%{
+        uuid: "dm-resp-recipient-session-#{System.system_time(:second)}",
+        agent_id: recipient_agent.id,
+        name: "Recipient",
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      })
 
-    {:ok, channel} = Channels.create_channel(%{
-      uuid: "dm-resp-channel-#{System.system_time(:second)}",
-      name: "Response Test Channel",
-      project_id: project.id,
-      session_id: sender_session.id
-    })
+    {:ok, channel} =
+      Channels.create_channel(%{
+        uuid: "dm-resp-channel-#{System.system_time(:second)}",
+        name: "Response Test Channel",
+        project_id: project.id,
+        session_id: sender_session.id
+      })
 
     %{
       conn: conn,
@@ -135,16 +143,18 @@ defmodule EyeInTheSkyWeb.DMResponseE2ETest do
     messages = Messages.list_messages_for_session(recipient.id)
 
     IO.puts("\n=== Messages for session #{recipient.id} ===")
+
     Enum.each(messages, fn m ->
       IO.puts("  #{m.sender_role}: #{inspect(String.slice(m.body || "", 0..50))}")
     end)
 
     # Filter for messages from this test run
-    agent_responses = Enum.filter(messages, fn m ->
-      m.sender_role == "agent" &&
-      m.body &&
-      String.contains?(m.body, "Sure, I can help")
-    end)
+    agent_responses =
+      Enum.filter(messages, fn m ->
+        m.sender_role == "agent" &&
+          m.body &&
+          String.contains?(m.body, "Sure, I can help")
+      end)
 
     if length(agent_responses) == 0 do
       IO.puts("\n❌ No agent responses found. All messages:")
@@ -173,11 +183,12 @@ defmodule EyeInTheSkyWeb.DMResponseE2ETest do
   test "SessionWorker parses Claude output correctly",
        %{recipient_session: recipient} do
     # Start a session directly (no UI)
-    {:ok, _ref} = SessionManager.resume_session(
-      recipient.uuid,
-      "Test prompt",
-      model: "haiku"
-    )
+    {:ok, _ref} =
+      SessionManager.resume_session(
+        recipient.uuid,
+        "Test prompt",
+        model: "haiku"
+      )
 
     {:ok, worker_pid} = await_worker(recipient.uuid, 1000)
     port = get_mock_port(worker_pid)

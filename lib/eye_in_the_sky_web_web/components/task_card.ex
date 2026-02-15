@@ -7,18 +7,52 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   import EyeInTheSkyWebWeb.CoreComponents
 
   attr :task, :map, required: true
-  attr :variant, :string, default: "kanban", values: ["kanban", "grid"]
+  attr :variant, :string, default: "kanban", values: ["kanban", "grid", "list"]
   attr :on_click, :string, default: nil
 
   def task_card(assigns) do
     ~H"""
-    <div class={card_class(@variant)}>
-      <div class={card_body_class(@variant)}>
-        <%= if @variant == "kanban" do %>
-          <.kanban_card_content task={@task} on_click={@on_click} />
-        <% else %>
-          <.grid_card_content task={@task} on_click={@on_click} />
+    <%= case @variant do %>
+      <% "list" -> %>
+        <.list_row task={@task} on_click={@on_click} />
+      <% _ -> %>
+        <div class={card_class(@variant)}>
+          <div class={card_body_class(@variant)}>
+            <%= if @variant == "kanban" do %>
+              <.kanban_card_content task={@task} on_click={@on_click} />
+            <% else %>
+              <.grid_card_content task={@task} on_click={@on_click} />
+            <% end %>
+          </div>
+        </div>
+    <% end %>
+    """
+  end
+
+  defp list_row(assigns) do
+    ~H"""
+    <div
+      class="group flex flex-col gap-1 py-3.5 cursor-pointer"
+      phx-click={@on_click}
+      phx-value-task_id={@task.uuid}
+    >
+      <span class={[
+        "text-sm font-medium truncate",
+        @task.completed_at && "text-base-content/40 line-through",
+        !@task.completed_at && "text-base-content/85 group-hover:text-base-content"
+      ]}>
+        {@task.title}
+      </span>
+      <div class="flex items-center gap-1.5 text-xs text-base-content/35">
+        <%= if @task.state do %>
+          <span class={state_text_color(@task.state_id)}>{@task.state.name}</span>
         <% end %>
+        <%= if @task.tags && length(@task.tags) > 0 do %>
+          <span class="text-base-content/15">&middot;</span>
+          <span>{Enum.map_join(Enum.take(@task.tags, 2), ", ", & &1.name)}</span>
+        <% end %>
+        <span class="text-base-content/15">&middot;</span>
+        <span class="font-mono">{String.slice(@task.uuid, 0..7)}</span>
       </div>
     </div>
     """
@@ -97,21 +131,13 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       </button>
       <%= if @task.due_at do %>
         <span class="flex items-center gap-1">
-          <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
-            <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z" />
-          </svg>
+          <.icon name="hero-calendar" class="w-3 h-3" />
           {format_date(@task.due_at)}
         </span>
       <% end %>
       <%= if @task.agent_id do %>
         <span class="flex items-center gap-1">
-          <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
-            <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" />
-            <path
-              fill-rule="evenodd"
-              d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"
-            />
-          </svg>
+          <.icon name="hero-user" class="w-3 h-3" />
           Agent #{@task.agent_id}
         </span>
       <% end %>
@@ -181,14 +207,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
 
       <%= if @task.due_at do %>
         <span class="badge badge-ghost badge-sm">
-          <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-            />
-          </svg>
+          <.icon name="hero-calendar" class="w-3 h-3 mr-1" />
           {format_date(@task.due_at)}
         </span>
       <% end %>
@@ -212,8 +231,37 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
     "card bg-base-200 border border-base-300 hover:shadow-lg transition-all group"
   end
 
+  defp card_class(_), do: ""
+
   defp card_body_class("kanban"), do: "card-body p-3"
   defp card_body_class("grid"), do: "card-body p-5"
+  defp card_body_class(_), do: ""
+
+  defp priority_dot_color(priority) when is_integer(priority) do
+    cond do
+      priority >= 70 -> "bg-error"
+      priority >= 40 -> "bg-warning"
+      priority >= 20 -> "bg-info"
+      priority > 0 -> "bg-base-content/20"
+      true -> "bg-base-content/10"
+    end
+  end
+
+  defp priority_dot_color(_), do: "bg-base-content/10"
+
+  # State ID -> badge class mapping (matches workflow_states table)
+  defp state_badge_class(1), do: "bg-base-content/[0.06] text-base-content/50"
+  defp state_badge_class(2), do: "bg-info/10 text-info"
+  defp state_badge_class(4), do: "bg-warning/10 text-warning"
+  defp state_badge_class(3), do: "bg-success/10 text-success"
+  defp state_badge_class(_), do: "bg-base-content/[0.06] text-base-content/40"
+
+  # State ID -> text color for inline list rows
+  defp state_text_color(1), do: "text-base-content/40"
+  defp state_text_color(2), do: "text-info/70"
+  defp state_text_color(4), do: "text-warning/70"
+  defp state_text_color(3), do: "text-success/70"
+  defp state_text_color(_), do: "text-base-content/35"
 
   defp priority_class(priority) do
     cond do

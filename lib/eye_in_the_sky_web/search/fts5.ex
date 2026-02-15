@@ -60,7 +60,17 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
     )
   end
 
-  defp fts5_search(table, fts_table, schema, query, join_key, sql_filter, sql_params, fallback_query, preloads) do
+  defp fts5_search(
+         table,
+         fts_table,
+         schema,
+         query,
+         join_key,
+         sql_filter,
+         sql_params,
+         fallback_query,
+         preloads
+       ) do
     # Use table alias for cleaner SQL
     alias_letter = String.first(table)
 

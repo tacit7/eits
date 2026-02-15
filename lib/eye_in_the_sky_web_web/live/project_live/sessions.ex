@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Agents
   alias EyeInTheSkyWeb.Repo
-  import EyeInTheSkyWebWeb.Components.SessionCard
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1]
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -210,9 +210,29 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         </div>
 
         <%= if length(@agents) > 0 do %>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 bg-[oklch(97%_0.005_80)] dark:bg-[oklch(18%_0.005_260)] rounded-xl shadow-sm p-4">
+          <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-5">
             <%= for agent <- @agents do %>
-              <.session_card session={agent} show_project={false} />
+              <.link
+                navigate={"/dm/#{agent.session_id}"}
+                class="group flex flex-col gap-1 py-3.5 cursor-pointer"
+              >
+                <span class="text-sm font-medium text-base-content/85 truncate group-hover:text-base-content">
+                  {agent.session_name || "Unnamed session"}
+                </span>
+                <div class="flex items-center gap-1.5 text-xs text-base-content/35">
+                  <%= if agent.ended_at && agent.ended_at != "" do %>
+                    <span>Ended</span>
+                  <% else %>
+                    <span class="text-success/70">Active</span>
+                  <% end %>
+                  <span class="text-base-content/15">&middot;</span>
+                  <span class="tabular-nums">{relative_time(agent.started_at)}</span>
+                  <%= if agent.agent_description do %>
+                    <span class="text-base-content/15">&middot;</span>
+                    <span class="truncate max-w-[200px]">{agent.agent_description}</span>
+                  <% end %>
+                </div>
+              </.link>
             <% end %>
           </div>
         <% else %>

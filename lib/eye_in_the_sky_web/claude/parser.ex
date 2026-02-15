@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.Claude.Parser do
   Returns:
   - `{:ok, %Message{}}` - successfully parsed message
   - `{:session_id, session_id}` - extracted session ID
+  - `{:result, data}` - conversation result with text, uuid, cost, duration
   - `{:complete, session_id}` - conversation complete
   - `{:error, reason}` - parse error or Claude error
   - `:skip` - line should be ignored
@@ -23,6 +24,7 @@ defmodule EyeInTheSkyWeb.Claude.Parser do
   @spec parse_stream_line(String.t()) ::
           {:ok, Message.t()}
           | {:session_id, String.t()}
+          | {:result, map()}
           | {:complete, String.t() | nil}
           | {:error, term()}
           | :skip
@@ -67,8 +69,21 @@ defmodule EyeInTheSkyWeb.Claude.Parser do
     {:error, parse_error(error)}
   end
 
-  defp parse_event(%{"type" => "result", "session_id" => session_id}) do
-    {:complete, session_id}
+  defp parse_event(%{"type" => "result"} = event) do
+    result_text = event["result"]
+
+    data = %{
+      session_id: event["session_id"],
+      result: result_text,
+      uuid: event["uuid"],
+      duration_ms: event["duration_ms"],
+      total_cost_usd: event["total_cost_usd"],
+      usage: event["usage"],
+      is_error: event["is_error"],
+      errors: event["errors"] || event["error"]
+    }
+
+    {:result, data}
   end
 
   defp parse_event(%{"error" => error}) do

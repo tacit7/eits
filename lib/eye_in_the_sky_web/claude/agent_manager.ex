@@ -32,7 +32,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
 
     description = opts[:description] || "Agent session"
 
-    Logger.info("📝 create_agent: agent_uuid=#{agent_uuid}, session_uuid=#{session_uuid}, model=#{opts[:model]}, project_id=#{opts[:project_id]}")
+    Logger.info(
+      "📝 create_agent: agent_uuid=#{agent_uuid}, session_uuid=#{session_uuid}, model=#{opts[:model]}, project_id=#{opts[:project_id]}"
+    )
 
     with {:ok, agent} <-
            ChatAgents.create_chat_agent(%{
@@ -53,7 +55,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              git_worktree_path: opts[:project_path],
              started_at: DateTime.utc_now() |> DateTime.to_iso8601()
            }) do
-      Logger.info("✅ create_agent: DB records created - agent.id=#{agent.id}, session.id=#{session.id}, session_uuid=#{session.uuid}")
+      Logger.info(
+        "✅ create_agent: DB records created - agent.id=#{agent.id}, session.id=#{session.id}, session_uuid=#{session.uuid}"
+      )
 
       instructions = opts[:instructions] || description
 
@@ -64,11 +68,17 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              effort_level: opts[:effort_level]
            ) do
         :ok ->
-          Logger.info("✅ create_agent: initial message sent successfully to session.id=#{session.id}")
+          Logger.info(
+            "✅ create_agent: initial message sent successfully to session.id=#{session.id}"
+          )
+
           {:ok, %{agent: agent, session: session}}
 
         {:error, reason} ->
-          Logger.error("❌ create_agent: initial message failed for session.id=#{session.id} - #{inspect(reason)}")
+          Logger.error(
+            "❌ create_agent: initial message failed for session.id=#{session.id} - #{inspect(reason)}"
+          )
+
           {:error, {:send_failed, reason}}
       end
     else
@@ -88,12 +98,17 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   end
 
   def send_message(session_id, message, opts \\ []) do
-    Logger.debug("send_message: session_id=#{session_id}, message_length=#{String.length(message)}")
+    Logger.debug(
+      "send_message: session_id=#{session_id}, message_length=#{String.length(message)}"
+    )
 
     case lookup_or_start(session_id) do
       {:ok, pid} ->
-        Logger.debug("send_message: worker found/started for session_id=#{session_id}, pid=#{inspect(pid)}")
-        has_messages = Messages.count_messages_for_session(session_id) > 0
+        Logger.debug(
+          "send_message: worker found/started for session_id=#{session_id}, pid=#{inspect(pid)}"
+        )
+
+        has_messages = Messages.has_inbound_claude_reply?(session_id)
 
         context = %{
           model: opts[:model],
@@ -107,7 +122,10 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
         :ok
 
       {:error, reason} ->
-        Logger.error("❌ send_message: failed to lookup/start worker for session_id=#{session_id} - #{inspect(reason)}")
+        Logger.error(
+          "❌ send_message: failed to lookup/start worker for session_id=#{session_id} - #{inspect(reason)}"
+        )
+
         {:error, reason}
     end
   end
@@ -115,11 +133,17 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   defp lookup_or_start(session_id) do
     case Registry.lookup(@registry, {:agent, session_id}) do
       [{pid, _}] ->
-        Logger.debug("lookup_or_start: found existing worker for session_id=#{session_id}, pid=#{inspect(pid)}")
+        Logger.debug(
+          "lookup_or_start: found existing worker for session_id=#{session_id}, pid=#{inspect(pid)}"
+        )
+
         {:ok, pid}
 
       [] ->
-        Logger.info("🔍 lookup_or_start: no worker found for session_id=#{session_id}, starting new worker")
+        Logger.info(
+          "🔍 lookup_or_start: no worker found for session_id=#{session_id}, starting new worker"
+        )
+
         start_agent_worker(session_id)
     end
   end
@@ -129,9 +153,18 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
 
     with {:ok, session} <- Agents.get_execution_agent(session_id),
          {:ok, agent} <- ChatAgents.get_chat_agent(session.agent_id) do
-      project_path = session.git_worktree_path || agent.git_worktree_path || File.cwd!()
+      project_path =
+        session.git_worktree_path ||
+          agent.git_worktree_path ||
+          (agent.project && agent.project.path)
 
-      Logger.info("✅ start_agent_worker: loaded session.uuid=#{session.uuid}, agent.id=#{agent.id}, project_path=#{project_path}")
+      unless project_path do
+        raise "No project_path resolved for session_id=#{session_id} agent_id=#{agent.id} — set git_worktree_path on the session or agent, or associate a project with a path"
+      end
+
+      Logger.info(
+        "✅ start_agent_worker: loaded session.uuid=#{session.uuid}, agent.id=#{agent.id}, project_path=#{project_path}"
+      )
 
       opts = [
         session_id: session.id,
@@ -145,16 +178,25 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              {AgentWorker, opts}
            ) do
         {:ok, pid} = result ->
-          Logger.info("✅ start_agent_worker: AgentWorker started for session.id=#{session_id}, pid=#{inspect(pid)}")
+          Logger.info(
+            "✅ start_agent_worker: AgentWorker started for session.id=#{session_id}, pid=#{inspect(pid)}"
+          )
+
           result
 
         {:error, reason} = error ->
-          Logger.error("❌ start_agent_worker: failed to start AgentWorker for session.id=#{session_id} - #{inspect(reason)}")
+          Logger.error(
+            "❌ start_agent_worker: failed to start AgentWorker for session.id=#{session_id} - #{inspect(reason)}"
+          )
+
           error
       end
     else
       {:error, reason} ->
-        Logger.error("❌ start_agent_worker: failed to load session/agent for session.id=#{session_id} - #{inspect(reason)}")
+        Logger.error(
+          "❌ start_agent_worker: failed to load session/agent for session.id=#{session_id} - #{inspect(reason)}"
+        )
+
         {:error, reason}
     end
   end

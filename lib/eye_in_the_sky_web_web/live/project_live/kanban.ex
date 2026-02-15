@@ -9,6 +9,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "tasks")
+    end
+
     # Parse project ID safely
     project_id =
       case Integer.parse(id) do
@@ -39,6 +43,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
         |> assign(:show_task_detail_drawer, false)
         |> assign(:selected_task, nil)
         |> assign(:task_notes, [])
+        |> assign(:quick_add_column, nil)
         |> load_tasks()
       else
         workflow_states = Tasks.list_workflow_states()
@@ -336,6 +341,94 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     end
   end
 
+  @impl true
+  def handle_info(:tasks_changed, socket) do
+    {:noreply, load_tasks(socket)}
+  end
+
+  @impl true
+  def handle_event("move_task", %{"task_id" => task_uuid, "state_id" => state_id_str}, socket) do
+    state_id = String.to_integer(state_id_str)
+    task = Tasks.get_task_by_uuid!(task_uuid)
+
+    case Tasks.update_task(task, %{
+           state_id: state_id,
+           updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
+         }) do
+      {:ok, _} ->
+        Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "tasks", :tasks_changed)
+        {:noreply, load_tasks(socket)}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to move task")}
+    end
+  end
+
+  @impl true
+  def handle_event("show_quick_add", %{"state_id" => state_id}, socket) do
+    {:noreply, assign(socket, :quick_add_column, String.to_integer(state_id))}
+  end
+
+  @impl true
+  def handle_event("hide_quick_add", _params, socket) do
+    {:noreply, assign(socket, :quick_add_column, nil)}
+  end
+
+  @impl true
+  def handle_event("quick_add_task", %{"title" => title, "state_id" => state_id_str}, socket) do
+    title = String.trim(title)
+
+    if title == "" do
+      {:noreply, assign(socket, :quick_add_column, nil)}
+    else
+      state_id = String.to_integer(state_id_str)
+      task_uuid = Ecto.UUID.generate()
+      now = DateTime.utc_now() |> DateTime.to_iso8601()
+
+      case Tasks.create_task(%{
+             uuid: task_uuid,
+             title: title,
+             state_id: state_id,
+             priority: 0,
+             project_id: socket.assigns.project_id,
+             created_at: now,
+             updated_at: now
+           }) do
+        {:ok, _task} ->
+          socket =
+            socket
+            |> assign(:quick_add_column, nil)
+            |> load_tasks()
+
+          {:noreply, socket}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Failed to create task")}
+      end
+    end
+  end
+
+  defp format_due(nil), do: ""
+
+  defp format_due(datetime) when is_binary(datetime) do
+    case Date.from_iso8601(String.slice(datetime, 0..9)) do
+      {:ok, date} ->
+        today = Date.utc_today()
+
+        cond do
+          Date.compare(date, today) == :eq -> "Today"
+          Date.compare(date, Date.add(today, 1)) == :eq -> "Tomorrow"
+          Date.compare(date, today) == :lt -> "Overdue"
+          true -> Calendar.strftime(date, "%b %d")
+        end
+
+      _ ->
+        datetime
+    end
+  end
+
+  defp format_due(_), do: ""
+
   defp load_tasks(socket) do
     project_id = socket.assigns.project_id
     query = socket.assigns.search_query
@@ -358,75 +451,182 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     |> assign(:tasks_by_state, tasks_by_state)
   end
 
+  defp state_dot_color(color) when is_binary(color), do: color
+  defp state_dot_color(_), do: "#6B7280"
+
+  defp priority_border_class(nil), do: "border-l-transparent"
+  defp priority_border_class(0), do: "border-l-transparent"
+  defp priority_border_class(priority) when priority >= 3, do: "border-l-error"
+  defp priority_border_class(2), do: "border-l-warning"
+  defp priority_border_class(1), do: "border-l-info"
+  defp priority_border_class(_), do: "border-l-transparent"
+
+  defp due_date_class(nil), do: "text-base-content/30"
+
+  defp due_date_class(datetime) when is_binary(datetime) do
+    case Date.from_iso8601(String.slice(datetime, 0..9)) do
+      {:ok, date} ->
+        today = Date.utc_today()
+
+        cond do
+          Date.compare(date, today) == :lt -> "text-error font-medium"
+          Date.compare(date, today) == :eq -> "text-warning font-medium"
+          true -> "text-base-content/30"
+        end
+
+      _ ->
+        "text-base-content/30"
+    end
+  end
+
+  defp due_date_class(_), do: "text-base-content/30"
+
+  defp first_line(nil), do: nil
+  defp first_line(""), do: nil
+
+  defp first_line(text) do
+    text
+    |> String.split(~r/[\r\n]/, parts: 2)
+    |> List.first()
+    |> String.trim()
+    |> case do
+      "" -> nil
+      line -> line
+    end
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="px-4 sm:px-6 lg:px-8 py-8">
-      <!-- Search Input and New Task Button -->
-      <div class="max-w-7xl mx-auto mb-6 flex items-center gap-4">
-        <form phx-change="search" class="flex-1 max-w-md">
-          <input
-            type="text"
-            name="query"
-            value={@search_query}
-            placeholder="Search tasks..."
-            class="input input-bordered w-full input-sm"
-            autocomplete="off"
-          />
+    <div class="px-4 sm:px-6 py-6 h-[calc(100vh-4rem)] flex flex-col">
+      <%!-- Search + New Task --%>
+      <div class="mb-4 flex items-center gap-3">
+        <form phx-change="search" class="flex-1 max-w-sm">
+          <div class="relative">
+            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
+            </div>
+            <input
+              type="text"
+              name="query"
+              value={@search_query}
+              placeholder="Search tasks..."
+              phx-debounce="300"
+              class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
+              autocomplete="off"
+            />
+          </div>
         </form>
-        <button phx-click="toggle_new_task_drawer" class="btn btn-primary btn-sm">
-          + New Task
+
+        <button
+          phx-click="toggle_new_task_drawer"
+          class="btn btn-sm btn-primary gap-1.5 min-h-0 h-7 text-xs"
+        >
+          <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Task
         </button>
       </div>
 
-      <%= if length(@tasks) > 0 do %>
-        <!-- Kanban Board -->
-        <div class="overflow-x-auto pb-4">
-          <div class="inline-flex gap-4 min-w-full px-4">
-            <%= for state <- @workflow_states do %>
-              <div class="flex-shrink-0 w-80">
-                <!-- Column Header -->
-                <div class="bg-base-200 rounded-t-lg px-4 py-3">
-                  <div class="flex items-center justify-between">
-                    <h3 class="font-semibold text-sm text-base-content">
-                      {state.name}
-                    </h3>
-                    <span class="badge badge-sm">
-                      {length(Map.get(@tasks_by_state, state.id, []))}
-                    </span>
-                  </div>
-                </div>
-                
-    <!-- Column Content -->
-                <div class="bg-base-100 rounded-b-lg border border-base-300 border-t-0 p-3 min-h-[600px]">
-                  <div class="space-y-3">
-                    <%= for task <- Map.get(@tasks_by_state, state.id, []) do %>
-                      <TaskCard.task_card
-                        task={task}
-                        variant="kanban"
-                        on_click="open_task_detail"
-                      />
-                    <% end %>
-                  </div>
+      <%!-- Kanban columns --%>
+      <div class="flex-1 min-h-0 overflow-x-auto">
+        <div class="inline-flex gap-3 h-full min-w-full pb-2">
+          <%= for state <- @workflow_states do %>
+            <% column_tasks = Map.get(@tasks_by_state, state.id, []) %>
+            <div class="flex-shrink-0 w-72 flex flex-col h-full">
+              <%!-- Column header with colored accent --%>
+              <div class="mb-2">
+                <div
+                  class="h-0.5 rounded-full mx-1 mb-2"
+                  style={"background-color: #{state_dot_color(state.color)}"}
+                />
+                <div class="flex items-center gap-2 px-3 py-1">
+                  <div
+                    class="w-2 h-2 rounded-full flex-shrink-0"
+                    style={"background-color: #{state_dot_color(state.color)}"}
+                  />
+                  <span class="text-xs font-semibold text-base-content/70 uppercase tracking-wider">
+                    {state.name}
+                  </span>
+                  <span class="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-base-content/[0.06] text-[11px] font-medium tabular-nums text-base-content/40">
+                    {length(column_tasks)}
+                  </span>
                 </div>
               </div>
-            <% end %>
-          </div>
+
+              <%!-- Column body --%>
+              <div
+                class="flex-1 min-h-0 overflow-y-auto rounded-xl bg-base-content/[0.04] p-2 space-y-1.5"
+                id={"kanban-col-#{state.id}"}
+                phx-hook="SortableKanban"
+                data-state-id={state.id}
+              >
+                <%= if column_tasks == [] do %>
+                  <div class="flex flex-col items-center justify-center h-24 border border-dashed border-base-content/8 rounded-lg pointer-events-none">
+                    <.icon name="hero-inbox" class="w-5 h-5 text-base-content/15 mb-1" />
+                    <span class="text-[11px] text-base-content/20">No tasks</span>
+                  </div>
+                <% end %>
+                <%= for task <- column_tasks do %>
+                  <div
+                    class="rounded-lg bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] px-3 py-2 cursor-pointer hover:bg-base-200/80 dark:hover:bg-[hsl(60,2%,21%)] transition-colors"
+                    phx-click="open_task_detail"
+                    phx-value-task_id={task.uuid}
+                    data-task-id={task.uuid}
+                    id={"kanban-task-#{task.id}"}
+                  >
+                    <span class={[
+                      "text-sm font-medium leading-snug",
+                      task.completed_at && "text-base-content/40 line-through",
+                      !task.completed_at && "text-base-content/85"
+                    ]}>
+                      {task.title}
+                    </span>
+                    <%= if task.due_at || (task.description && task.description != "") do %>
+                      <div class="flex items-center gap-2 mt-1.5 text-base-content/30">
+                        <%= if task.due_at do %>
+                          <span class={["flex items-center gap-1 text-[11px]", due_date_class(task.due_at)]}>
+                            <.icon name="hero-clock-mini" class="w-3.5 h-3.5" />
+                            {format_due(task.due_at)}
+                          </span>
+                        <% end %>
+                        <%= if task.description && task.description != "" do %>
+                          <.icon name="hero-bars-3-bottom-left-mini" class="w-3.5 h-3.5" />
+                        <% end %>
+                      </div>
+                    <% end %>
+                  </div>
+                <% end %>
+
+                <%!-- Quick-add --%>
+                <%= if @quick_add_column == state.id do %>
+                  <form phx-submit="quick_add_task" class="mt-1">
+                    <input type="hidden" name="state_id" value={state.id} />
+                    <input
+                      type="text"
+                      name="title"
+                      placeholder="Task title... (Esc to cancel)"
+                      autofocus
+                      phx-keydown="hide_quick_add"
+                      phx-key="Escape"
+                      class="input input-sm w-full bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] border-base-content/10 text-sm placeholder:text-base-content/25 focus:border-primary/30"
+                    />
+                  </form>
+                <% else %>
+                  <button
+                    phx-click="show_quick_add"
+                    phx-value-state_id={state.id}
+                    class="mt-1 w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] text-base-content/25 hover:text-base-content/50 hover:bg-base-content/[0.04] transition-colors"
+                  >
+                    <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+                    <span>Add task</span>
+                  </button>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
         </div>
-      <% else %>
-        <!-- Empty State -->
-        <div class="max-w-6xl mx-auto">
-          <.empty_state
-            id="project-kanban-empty"
-            icon="hero-clipboard-document-list"
-            title="No tasks yet"
-            subtitle="Tasks will appear here when agents create them for this project"
-          />
-        </div>
-      <% end %>
+      </div>
     </div>
 
-    <!-- New Task Drawer -->
     <.live_component
       module={EyeInTheSkyWebWeb.Components.NewTaskDrawer}
       id="new-task-drawer"
@@ -436,7 +636,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       submit_event="create_new_task"
     />
 
-    <!-- Task Detail Drawer -->
     <.live_component
       module={EyeInTheSkyWebWeb.Components.TaskDetailDrawer}
       id="task-detail-drawer"

@@ -47,7 +47,9 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
   def init(%{spawn_type: spawn_type, session_id: session_id, prompt: prompt, opts: opts}) do
     session_ref = Keyword.fetch!(opts, :session_ref)
 
-    Logger.info("🔧 SessionWorker.init: spawn_type=#{spawn_type}, session_id=#{session_id}, ref=#{inspect(session_ref)}")
+    Logger.info(
+      "🔧 SessionWorker.init: spawn_type=#{spawn_type}, session_id=#{session_id}, ref=#{inspect(session_ref)}"
+    )
 
     # Register under both keys for lookup flexibility
     Registry.register(@registry, {:ref, session_ref}, session_id)
@@ -63,7 +65,9 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
     # Wrapped in rescue for test environments without Repo
     session_int_id = resolve_session_int_id(session_id)
 
-    Logger.debug("SessionWorker.init: resolved session_int_id=#{inspect(session_int_id)} for session_id=#{session_id}")
+    Logger.debug(
+      "SessionWorker.init: resolved session_int_id=#{inspect(session_int_id)} for session_id=#{session_id}"
+    )
 
     case spawn_cli(spawn_type, session_id, prompt, opts) do
       {:ok, port, ^session_ref} ->
@@ -78,7 +82,9 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
           output_buffer: []
         }
 
-        Logger.info("✅ SessionWorker started for #{session_id} (spawn_type=#{spawn_type}, port=#{inspect(port)})")
+        Logger.info(
+          "✅ SessionWorker started for #{session_id} (spawn_type=#{spawn_type}, port=#{inspect(port)})"
+        )
 
         broadcast_status(session_id, :working)
 
@@ -93,7 +99,10 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
         {:ok, state}
 
       {:error, reason} ->
-        Logger.error("❌ SessionWorker.init failed for #{session_id} (spawn_type=#{spawn_type}) - #{inspect(reason)}")
+        Logger.error(
+          "❌ SessionWorker.init failed for #{session_id} (spawn_type=#{spawn_type}) - #{inspect(reason)}"
+        )
+
         {:stop, reason}
     end
   end
@@ -170,14 +179,18 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
 
     # If exit code is non-zero and we have buffered output, show it
     if exit_code != 0 && length(state.output_buffer) > 0 do
-      Logger.error("❌ Claude exited with error (code #{exit_code}), #{length(state.output_buffer)} items in output buffer:")
+      Logger.error(
+        "❌ Claude exited with error (code #{exit_code}), #{length(state.output_buffer)} items in output buffer:"
+      )
 
       state.output_buffer
       |> Enum.reverse()
       |> Enum.with_index()
       |> Enum.each(fn {line, idx} ->
         # Use custom_options to ensure we see full content
-        Logger.error("   [#{idx}] #{inspect(line, limit: :infinity, printable_limit: :infinity, width: 120)}")
+        Logger.error(
+          "   [#{idx}] #{inspect(line, limit: :infinity, printable_limit: :infinity, width: 120)}"
+        )
       end)
 
       # Also try to find any error messages
@@ -191,6 +204,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
 
       if length(errors) > 0 do
         Logger.error("🔍 Found #{length(errors)} error messages in buffer:")
+
         Enum.each(errors, fn err ->
           Logger.error("   #{inspect(err, limit: :infinity, printable_limit: :infinity)}")
         end)
@@ -345,11 +359,21 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
     subtype = Map.get(parsed, "subtype") || Map.get(parsed, :subtype)
 
     # Log all parsed output for debugging
-    content = case type do
-      "assistant" -> Map.get(parsed, "message", %{}) |> Map.get("content", "") |> inspect() |> String.slice(0..200)
-      "result" -> Map.get(parsed, "result", "") |> String.slice(0..200)
-      _ -> ""
-    end
+    content =
+      case type do
+        "assistant" ->
+          Map.get(parsed, "message", %{})
+          |> Map.get("content", "")
+          |> inspect()
+          |> String.slice(0..200)
+
+        "result" ->
+          Map.get(parsed, "result", "") |> String.slice(0..200)
+
+        _ ->
+          ""
+      end
+
     Logger.info("[#{state.session_id}] stream: type=#{type} subtype=#{subtype} #{content}")
 
     state =
@@ -358,13 +382,18 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
         claude_session_id = Map.get(parsed, "session_id") || Map.get(parsed, :session_id)
 
         if claude_session_id && state.session_int_id do
-          Logger.info("🔄 Updating session #{state.session_int_id} with Claude session_id: #{claude_session_id}")
+          Logger.info(
+            "🔄 Updating session #{state.session_int_id} with Claude session_id: #{claude_session_id}"
+          )
 
           case Agents.get_execution_agent(state.session_int_id) do
             {:ok, agent} ->
               case Agents.update_execution_agent(agent, %{uuid: claude_session_id}) do
                 {:ok, _updated} ->
-                  Logger.info("✅ Session UUID updated: #{state.session_id} -> #{claude_session_id}")
+                  Logger.info(
+                    "✅ Session UUID updated: #{state.session_id} -> #{claude_session_id}"
+                  )
+
                   %{state | session_id: claude_session_id}
 
                 {:error, reason} ->
@@ -389,7 +418,10 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
     errors = Map.get(parsed, "errors") || Map.get(parsed, :errors) || []
 
     if is_error && Enum.any?(errors, &String.contains?(&1, "No conversation found")) do
-      Logger.error("❌ Session not found for session_id=#{state.session_id}, session_int_id=#{state.session_int_id}, errors=#{inspect(errors)} - stopping worker")
+      Logger.error(
+        "❌ Session not found for session_id=#{state.session_id}, session_int_id=#{state.session_int_id}, errors=#{inspect(errors)} - stopping worker"
+      )
+
       {:stop, :session_not_found, state}
     else
       maybe_record_result(parsed, type, state)
@@ -449,8 +481,15 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
         case block_type do
           "text" ->
             text = Map.get(block, "text") || Map.get(block, :text) || ""
+
             if String.trim(text) != "" do
-              record_stream_message(state, "assistant", text, %{stream_type: "assistant"}, message_uuid)
+              record_stream_message(
+                state,
+                "assistant",
+                text,
+                %{stream_type: "assistant"},
+                message_uuid
+              )
             end
 
           "tool_use" ->
@@ -459,7 +498,14 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
             input = Map.get(block, "input") || Map.get(block, :input) || %{}
 
             body = "Tool: #{tool_name}\n#{Jason.encode!(input, pretty: true)}"
-            metadata = %{stream_type: "tool_use", tool_name: tool_name, tool_id: tool_id, input: input}
+
+            metadata = %{
+              stream_type: "tool_use",
+              tool_name: tool_name,
+              tool_id: tool_id,
+              input: input
+            }
+
             record_stream_message(state, "tool", body, metadata, message_uuid)
 
           _ ->
@@ -482,7 +528,9 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
           tool_id = Map.get(block, "tool_use_id") || Map.get(block, :tool_use_id)
           result_content = Map.get(block, "content") || Map.get(block, :content) || ""
 
-          body = if is_binary(result_content), do: result_content, else: Jason.encode!(result_content)
+          body =
+            if is_binary(result_content), do: result_content, else: Jason.encode!(result_content)
+
           body = String.slice(body, 0..4000)
 
           metadata = %{stream_type: "tool_result", tool_use_id: tool_id}
@@ -509,19 +557,24 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
     }
 
     # Use record_incoming_reply if we have source_uuid for deduplication
-    result = if source_uuid do
-      Messages.record_incoming_reply(state.session_int_id, "claude", body, [
-        source_uuid: source_uuid,
-        metadata: Map.put(metadata, :sender_role, sender_role)
-      ])
-    else
-      Messages.create_message(attrs)
-    end
+    result =
+      if source_uuid do
+        Messages.record_incoming_reply(state.session_int_id, "claude", body,
+          source_uuid: source_uuid,
+          metadata: Map.put(metadata, :sender_role, sender_role)
+        )
+      else
+        Messages.create_message(attrs)
+      end
 
     case result do
-      {:ok, _msg} -> :ok
+      {:ok, _msg} ->
+        :ok
+
       {:error, reason} ->
-        Logger.warning("[#{state.session_id}] Failed to save #{sender_role} message: #{inspect(reason)}")
+        Logger.warning(
+          "[#{state.session_id}] Failed to save #{sender_role} message: #{inspect(reason)}"
+        )
     end
   end
 end

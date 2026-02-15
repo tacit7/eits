@@ -6,6 +6,10 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "tasks")
+    end
+
     workflow_states = Tasks.list_workflow_states()
 
     socket =
@@ -42,6 +46,11 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
       |> load_tasks()
 
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info(:tasks_changed, socket) do
+    {:noreply, load_tasks(socket)}
   end
 
   defp load_tasks(socket) do
@@ -129,7 +138,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
         </div>
 
         <%= if length(@tasks) > 0 do %>
-          <div class="space-y-1 bg-[oklch(95%_0.003_80)] dark:bg-[oklch(18%_0.005_260)] rounded-xl shadow-sm p-3">
+          <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-5">
             <%= for task <- @tasks do %>
               <TaskCard.task_card task={task} variant="list" />
             <% end %>

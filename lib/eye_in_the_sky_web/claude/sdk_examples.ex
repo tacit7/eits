@@ -151,7 +151,8 @@ defmodule EyeInTheSkyWeb.Claude.SDKExamples do
     @impl true
     def handle_continue({:await_response, from, acc}, state) do
       receive do
-        {:claude_message, ref, %Message{type: :text, content: text}} when ref == state.current_ref ->
+        {:claude_message, ref, %Message{type: :text, content: text}}
+        when ref == state.current_ref ->
           {:noreply, state, {:continue, {:await_response, from, [text | acc]}}}
 
         {:claude_complete, ref, session_id} when ref == state.current_ref ->

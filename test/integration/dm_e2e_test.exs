@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.DME2ETest do
   use EyeInTheSkyWebWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Projects, Sessions}
+  alias EyeInTheSkyWeb.{Agents, ChatAgents, Channels, Messages, Projects}
   alias EyeInTheSkyWeb.Claude.SessionManager
 
   @moduletag :integration
@@ -27,50 +27,56 @@ defmodule EyeInTheSkyWeb.DME2ETest do
     end)
 
     # Create test project
-    {:ok, project} = Projects.create_project(%{
-      name: "DM E2E Test Project",
-      slug: "dm-e2e-test",
-      path: "/tmp/dm-e2e-test",
-      active: true
-    })
+    {:ok, project} =
+      Projects.create_project(%{
+        name: "DM E2E Test Project",
+        slug: "dm-e2e-test",
+        path: "/tmp/dm-e2e-test",
+        active: true
+      })
 
     # Create sender (web UI user)
-    {:ok, sender_agent} = Agents.create_agent(%{
-      uuid: "dm-sender-#{System.system_time(:second)}",
-      description: "DM Test Sender",
-      source: "web",
-      project_id: project.id
-    })
+    {:ok, sender_agent} =
+      ChatAgents.create_chat_agent(%{
+        uuid: "dm-sender-#{System.system_time(:second)}",
+        description: "DM Test Sender",
+        source: "web",
+        project_id: project.id
+      })
 
-    {:ok, sender_session} = Sessions.create_session(%{
-      uuid: "dm-sender-session-#{System.system_time(:second)}",
-      agent_id: sender_agent.id,
-      name: "Sender Session",
-      started_at: DateTime.utc_now() |> DateTime.to_iso8601()
-    })
+    {:ok, sender_session} =
+      Agents.create_execution_agent(%{
+        uuid: "dm-sender-session-#{System.system_time(:second)}",
+        agent_id: sender_agent.id,
+        name: "Sender Session",
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      })
 
     # Create recipient agent
-    {:ok, recipient_agent} = Agents.create_agent(%{
-      uuid: "dm-recipient-#{System.system_time(:second)}",
-      description: "DM Test Recipient",
-      source: "claude",
-      project_id: project.id
-    })
+    {:ok, recipient_agent} =
+      ChatAgents.create_chat_agent(%{
+        uuid: "dm-recipient-#{System.system_time(:second)}",
+        description: "DM Test Recipient",
+        source: "claude",
+        project_id: project.id
+      })
 
-    {:ok, recipient_session} = Sessions.create_session(%{
-      uuid: "dm-recipient-session-#{System.system_time(:second)}",
-      agent_id: recipient_agent.id,
-      name: "Recipient Session",
-      started_at: DateTime.utc_now() |> DateTime.to_iso8601()
-    })
+    {:ok, recipient_session} =
+      Agents.create_execution_agent(%{
+        uuid: "dm-recipient-session-#{System.system_time(:second)}",
+        agent_id: recipient_agent.id,
+        name: "Recipient Session",
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      })
 
     # Create a channel for DMs
-    {:ok, channel} = Channels.create_channel(%{
-      uuid: "dm-channel-#{System.system_time(:second)}",
-      name: "DM Test Channel",
-      project_id: project.id,
-      session_id: sender_session.id
-    })
+    {:ok, channel} =
+      Channels.create_channel(%{
+        uuid: "dm-channel-#{System.system_time(:second)}",
+        name: "DM Test Channel",
+        project_id: project.id,
+        session_id: sender_session.id
+      })
 
     %{
       conn: conn,
@@ -101,7 +107,8 @@ defmodule EyeInTheSkyWeb.DME2ETest do
       })
 
       # STEP 3: Verify message was created in database
-      Process.sleep(200)  # Brief delay for async DB write
+      # Brief delay for async DB write
+      Process.sleep(200)
 
       messages = Messages.list_messages_for_channel(channel.id)
       dm_message = Enum.find(messages, fn m -> m.body == test_message end)
@@ -142,16 +149,19 @@ defmodule EyeInTheSkyWeb.DME2ETest do
           "channel_id" => to_string(channel.id),
           "body" => msg
         })
-        Process.sleep(100)  # Small delay between sends
+
+        # Small delay between sends
+        Process.sleep(100)
       end
 
       # Verify all messages in database
       Process.sleep(200)
       db_messages = Messages.list_messages_for_channel(channel.id)
 
-      sent_messages = Enum.filter(db_messages, fn m ->
-        m.body in messages
-      end)
+      sent_messages =
+        Enum.filter(db_messages, fn m ->
+          m.body in messages
+        end)
 
       assert length(sent_messages) == 3, "All 3 DMs should be persisted"
 
@@ -187,9 +197,11 @@ defmodule EyeInTheSkyWeb.DME2ETest do
 
       # Verify the DM was stored
       messages = Messages.list_messages_for_channel(channel.id)
-      dm = Enum.find(messages, fn m ->
-        String.contains?(m.body, "Please help me")
-      end)
+
+      dm =
+        Enum.find(messages, fn m ->
+          String.contains?(m.body, "Please help me")
+        end)
 
       assert dm, "DM should be stored in database"
 
@@ -208,7 +220,8 @@ defmodule EyeInTheSkyWeb.DME2ETest do
 
       # Try to send DM to non-existent session
       render_hook(view, "send_direct_message", %{
-        "session_id" => "99999",  # Invalid ID
+        # Invalid ID
+        "session_id" => "99999",
         "channel_id" => to_string(channel.id),
         "body" => "This should fail gracefully"
       })
@@ -223,7 +236,8 @@ defmodule EyeInTheSkyWeb.DME2ETest do
       # At minimum, the LiveView should remain functional
       # Try sending a valid message after the error
       render_hook(view, "send_direct_message", %{
-        "session_id" => "1",  # Use a valid ID if it exists
+        # Use a valid ID if it exists
+        "session_id" => "1",
         "channel_id" => to_string(channel.id),
         "body" => "Recovery test"
       })
@@ -276,9 +290,11 @@ defmodule EyeInTheSkyWeb.DME2ETest do
       # Verify stored correctly
       Process.sleep(200)
       messages = Messages.list_messages_for_channel(channel.id)
-      stored_msg = Enum.find(messages, fn m ->
-        String.contains?(m.body, "Hello Agent!")
-      end)
+
+      stored_msg =
+        Enum.find(messages, fn m ->
+          String.contains?(m.body, "Hello Agent!")
+        end)
 
       assert stored_msg, "Message with special chars should be stored"
       assert stored_msg.body == special_msg, "Special characters should be preserved"
@@ -291,15 +307,16 @@ defmodule EyeInTheSkyWeb.DME2ETest do
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "channel:#{channel.id}:messages")
 
       # Send 5 DMs concurrently
-      tasks = for i <- 1..5 do
-        Task.async(fn ->
-          render_hook(view, "send_direct_message", %{
-            "session_id" => to_string(recipient.id),
-            "channel_id" => to_string(channel.id),
-            "body" => "Concurrent message #{i}"
-          })
-        end)
-      end
+      tasks =
+        for i <- 1..5 do
+          Task.async(fn ->
+            render_hook(view, "send_direct_message", %{
+              "session_id" => to_string(recipient.id),
+              "channel_id" => to_string(channel.id),
+              "body" => "Concurrent message #{i}"
+            })
+          end)
+        end
 
       Task.await_many(tasks, 5000)
 
@@ -308,9 +325,11 @@ defmodule EyeInTheSkyWeb.DME2ETest do
 
       # Verify all 5 messages stored
       messages = Messages.list_messages_for_channel(channel.id)
-      concurrent_msgs = Enum.filter(messages, fn m ->
-        String.contains?(m.body, "Concurrent message")
-      end)
+
+      concurrent_msgs =
+        Enum.filter(messages, fn m ->
+          String.contains?(m.body, "Concurrent message")
+        end)
 
       assert length(concurrent_msgs) == 5, "All concurrent DMs should be stored"
 
@@ -334,13 +353,14 @@ defmodule EyeInTheSkyWeb.DME2ETest do
       Process.sleep(300)
 
       # Check if JSONL file exists for this project
-      jsonl_path = Path.join([
-        System.user_home!(),
-        ".claude",
-        "projects",
-        "-Users-#{System.get_env("USER")}-projects-eits-web",
-        "*.jsonl"
-      ])
+      jsonl_path =
+        Path.join([
+          System.user_home!(),
+          ".claude",
+          "projects",
+          "-Users-#{System.get_env("USER")}-projects-eits-web",
+          "*.jsonl"
+        ])
 
       jsonl_files = Path.wildcard(jsonl_path)
 

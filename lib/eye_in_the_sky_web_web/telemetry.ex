@@ -75,6 +75,31 @@ defmodule EyeInTheSkyWebWeb.Telemetry do
           "The time the connection spent waiting before being checked out for the query"
       ),
 
+      # Claude SDK Metrics
+      counter("eits.sdk.start.count"),
+      counter("eits.sdk.complete.count"),
+      counter("eits.sdk.error.count"),
+      counter("eits.sdk.exit.count"),
+      counter("eits.sdk.output.count"),
+      last_value("eits.sdk.result.duration_ms"),
+      last_value("eits.sdk.result.total_cost_usd"),
+      last_value("eits.sdk.result.text_length"),
+
+      # AgentWorker Metrics
+      counter("eits.agent.job.received.count"),
+      counter("eits.agent.job.started.count"),
+      counter("eits.agent.job.queued.count"),
+      last_value("eits.agent.job.queued.queue_length"),
+      counter("eits.agent.result.saved.count"),
+      last_value("eits.agent.result.saved.text_length"),
+      counter("eits.agent.sdk.complete.count"),
+      counter("eits.agent.sdk.error.count"),
+
+      # CLI Metrics
+      counter("eits.cli.spawn.count"),
+      counter("eits.cli.exit.count"),
+      counter("eits.cli.timeout.count"),
+
       # VM Metrics
       summary("vm.memory.total", unit: {:byte, :kilobyte}),
       summary("vm.total_run_queue_lengths.total"),

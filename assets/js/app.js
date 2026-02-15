@@ -32,6 +32,7 @@ import {CommandHistory} from "./hooks/command_history"
 import {getHooks} from "live_svelte"
 import "./theme"
 import hljs from 'highlight.js'
+import Sortable from 'sortablejs'
 // highlight.js theme is handled in app.css (theme-aware)
 
 // Import Svelte components manually (esbuild doesn't support import.meta.glob)
@@ -79,6 +80,35 @@ Hooks.Highlight = {
   },
   updated() {
     hljs.highlightElement(this.el)
+  }
+}
+Hooks.SortableKanban = {
+  mounted() { this._init() },
+  updated() {
+    // Reinitialize after LiveView patches the DOM
+    if (this.sortable) this.sortable.destroy()
+    this._init()
+  },
+  _init() {
+    this.sortable = Sortable.create(this.el, {
+      group: "kanban",
+      animation: 150,
+      ghostClass: "opacity-30",
+      draggable: "[data-task-id]",
+      onEnd: (evt) => {
+        const taskId = evt.item.dataset.taskId
+        const targetCol = evt.to.closest("[data-state-id]")
+        if (taskId && targetCol) {
+          this.pushEvent("move_task", {
+            task_id: taskId,
+            state_id: targetCol.dataset.stateId
+          })
+        }
+      }
+    })
+  },
+  destroyed() {
+    if (this.sortable) this.sortable.destroy()
   }
 }
 Hooks.SidebarState = {

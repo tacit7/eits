@@ -56,9 +56,7 @@ defmodule EyeInTheSkyWeb.Messages do
 
   # Internal function: Returns the list of messages for a specific session from database.
   defp list_messages_for_session_db(session_id) do
-    QueryHelpers.for_session_direct(Message, session_id,
-      order_by: [asc: :inserted_at]
-    )
+    QueryHelpers.for_session_direct(Message, session_id, order_by: [asc: :inserted_at])
   end
 
   @doc """
@@ -299,7 +297,9 @@ defmodule EyeInTheSkyWeb.Messages do
       if msg.source_uuid && MapSet.member?(seen_uuids, msg.source_uuid) do
         {acc, seen_uuids}
       else
-        new_seen = if msg.source_uuid, do: MapSet.put(seen_uuids, msg.source_uuid), else: seen_uuids
+        new_seen =
+          if msg.source_uuid, do: MapSet.put(seen_uuids, msg.source_uuid), else: seen_uuids
+
         {[msg | acc], new_seen}
       end
     end)
@@ -377,6 +377,20 @@ defmodule EyeInTheSkyWeb.Messages do
   """
   def count_messages_for_session(session_id) do
     QueryHelpers.count_for_session(Message, session_id)
+  end
+
+  @doc """
+  Returns true when a session already has at least one inbound Claude reply.
+
+  Used to decide if the next prompt should resume an existing Claude conversation.
+  """
+  def has_inbound_claude_reply?(session_id) do
+    Message
+    |> where(
+      [m],
+      m.session_id == ^session_id and m.direction == "inbound" and m.provider == "claude"
+    )
+    |> Repo.exists?()
   end
 
   @doc """

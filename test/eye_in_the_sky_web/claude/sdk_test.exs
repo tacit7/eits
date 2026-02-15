@@ -68,6 +68,35 @@ defmodule EyeInTheSkyWeb.Claude.SDKTest do
       ref = make_ref()
       assert {:error, :not_found} = SDK.cancel(ref)
     end
+
+    test "result is_error closes stream and sends claude_error" do
+      {:ok, ref} =
+        SDK.start("hello", to: self(), cli_module: EyeInTheSkyWeb.Claude.MockCLI, model: "haiku")
+
+      mock_port = SDK.Registry.lookup(ref)
+      assert is_pid(mock_port)
+
+      send(
+        mock_port,
+        {:send_output,
+         Jason.encode!(%{
+           "type" => "result",
+           "session_id" => "session-123",
+           "is_error" => true,
+           "result" => "",
+           "errors" => ["CLI failed"]
+         })}
+      )
+
+      send(mock_port, {:exit, 1})
+
+      assert_receive {:claude_error, ^ref, {:claude_result_error, reason}}, 5_000
+      assert reason.session_id == "session-123"
+
+      # Stream should be unregistered once terminal event is handled
+      Process.sleep(50)
+      assert SDK.Registry.lookup(ref) == nil
+    end
   end
 
   # Helper to collect messages until completion or timeout

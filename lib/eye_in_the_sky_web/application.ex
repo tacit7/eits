@@ -37,6 +37,11 @@ defmodule EyeInTheSkyWeb.Application do
       {Oban, Application.fetch_env!(:eye_in_the_sky_web, Oban)},
       # Scheduled jobs enqueuer (polls due jobs, enqueues Oban workers)
       EyeInTheSkyWeb.Scheduler.JobEnqueuer,
+      # Poll for external task changes (Go MCP i-todo writes)
+      EyeInTheSkyWeb.Tasks.Poller,
+      # NATS pub/sub consumer
+      # Connects to localhost:4222, subscribes to events.>, dispatches to Handler
+      EyeInTheSkyWeb.NATS.Consumer,
       # Start to serve requests, typically the last entry
       EyeInTheSkyWebWeb.Endpoint
     ]

@@ -26,7 +26,7 @@ defmodule EyeInTheSkyWebWeb.Router do
     live "/jobs", OverviewLive.Jobs, :index
     live "/settings", OverviewLive.Settings, :index
     live "/sessions", SessionLive.Index, :index
-live "/prompts", PromptLive.Index, :index
+    live "/prompts", PromptLive.Index, :index
     live "/prompts/:id", PromptLive.Show, :show
     live "/projects/:id", ProjectLive.Show, :show
     live "/projects/:id/sessions", ProjectLive.Sessions, :show
@@ -40,10 +40,15 @@ live "/prompts", PromptLive.Index, :index
     live "/dm/:session_id", DmLive, :show
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", EyeInTheSkyWebWeb do
-  #   pipe_through :api
-  # end
+  scope "/api/v1", EyeInTheSkyWebWeb.Api.V1 do
+    pipe_through :api
+
+    post "/sessions", SessionController, :create
+    patch "/sessions/:uuid", SessionController, :update
+    post "/commits", CommitController, :create
+    post "/notes", NoteController, :create
+    post "/session-context", SessionContextController, :create
+  end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:eye_in_the_sky_web, :dev_routes) do

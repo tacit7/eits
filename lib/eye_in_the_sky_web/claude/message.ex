@@ -5,7 +5,15 @@ defmodule EyeInTheSkyWeb.Claude.Message do
   Messages can be text content, tool uses, thinking blocks, usage stats, or errors.
   """
 
-  @type message_type :: :text | :tool_use | :tool_result | :thinking | :usage | :error | :session_start
+  @type message_type ::
+          :text
+          | :tool_use
+          | :tool_result
+          | :thinking
+          | :usage
+          | :error
+          | :session_start
+          | :result
 
   @type t :: %__MODULE__{
           type: message_type(),
@@ -63,5 +71,14 @@ defmodule EyeInTheSkyWeb.Claude.Message do
   """
   def session_start(session_id) do
     %__MODULE__{type: :session_start, content: session_id}
+  end
+
+  @doc """
+  Create a result message with text content and metadata.
+
+  Metadata keys: uuid, duration_ms, total_cost_usd, usage, is_error, session_id
+  """
+  def result(text, metadata \\ %{}) do
+    %__MODULE__{type: :result, content: text, metadata: metadata}
   end
 end

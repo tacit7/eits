@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.DMNatsE2ETest do
   use EyeInTheSkyWebWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Projects, Sessions}
+  alias EyeInTheSkyWeb.{Agents, ChatAgents, Channels, Messages, Projects}
   alias EyeInTheSkyWeb.Claude.SessionManager
 
   @moduletag :integration
@@ -27,7 +27,9 @@ defmodule EyeInTheSkyWeb.DMNatsE2ETest do
 
   defp await_worker_loop(session_uuid, deadline) do
     case Registry.lookup(@registry, {:session, session_uuid}) do
-      [{pid, _}] when is_pid(pid) -> {:ok, pid}
+      [{pid, _}] when is_pid(pid) ->
+        {:ok, pid}
+
       [] ->
         if System.monotonic_time(:millisecond) < deadline do
           Process.sleep(10)
@@ -47,47 +49,53 @@ defmodule EyeInTheSkyWeb.DMNatsE2ETest do
     end)
 
     # Create test entities
-    {:ok, project} = Projects.create_project(%{
-      name: "NATS E2E Test",
-      slug: "nats-e2e-test",
-      path: "/tmp/nats-e2e-test",
-      active: true
-    })
+    {:ok, project} =
+      Projects.create_project(%{
+        name: "NATS E2E Test",
+        slug: "nats-e2e-test",
+        path: "/tmp/nats-e2e-test",
+        active: true
+      })
 
-    {:ok, sender_agent} = Agents.create_agent(%{
-      uuid: "nats-sender-#{System.system_time(:second)}",
-      description: "NATS Test Sender",
-      source: "web",
-      project_id: project.id
-    })
+    {:ok, sender_agent} =
+      ChatAgents.create_chat_agent(%{
+        uuid: "nats-sender-#{System.system_time(:second)}",
+        description: "NATS Test Sender",
+        source: "web",
+        project_id: project.id
+      })
 
-    {:ok, sender_session} = Sessions.create_session(%{
-      uuid: "nats-sender-session-#{System.system_time(:second)}",
-      agent_id: sender_agent.id,
-      name: "Sender",
-      started_at: DateTime.utc_now() |> DateTime.to_iso8601()
-    })
+    {:ok, sender_session} =
+      Agents.create_execution_agent(%{
+        uuid: "nats-sender-session-#{System.system_time(:second)}",
+        agent_id: sender_agent.id,
+        name: "Sender",
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      })
 
-    {:ok, recipient_agent} = Agents.create_agent(%{
-      uuid: "nats-recipient-#{System.system_time(:second)}",
-      description: "NATS Test Recipient",
-      source: "claude",
-      project_id: project.id
-    })
+    {:ok, recipient_agent} =
+      ChatAgents.create_chat_agent(%{
+        uuid: "nats-recipient-#{System.system_time(:second)}",
+        description: "NATS Test Recipient",
+        source: "claude",
+        project_id: project.id
+      })
 
-    {:ok, recipient_session} = Sessions.create_session(%{
-      uuid: "nats-recipient-session-#{System.system_time(:second)}",
-      agent_id: recipient_agent.id,
-      name: "Recipient",
-      started_at: DateTime.utc_now() |> DateTime.to_iso8601()
-    })
+    {:ok, recipient_session} =
+      Agents.create_execution_agent(%{
+        uuid: "nats-recipient-session-#{System.system_time(:second)}",
+        agent_id: recipient_agent.id,
+        name: "Recipient",
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      })
 
-    {:ok, channel} = Channels.create_channel(%{
-      uuid: "nats-channel-#{System.system_time(:second)}",
-      name: "NATS Test Channel",
-      project_id: project.id,
-      session_id: sender_session.id
-    })
+    {:ok, channel} =
+      Channels.create_channel(%{
+        uuid: "nats-channel-#{System.system_time(:second)}",
+        name: "NATS Test Channel",
+        project_id: project.id,
+        session_id: sender_session.id
+      })
 
     %{
       conn: conn,
@@ -145,11 +153,14 @@ defmodule EyeInTheSkyWeb.DMNatsE2ETest do
       # - SessionWorker listening for output
       # - Publisher module available
 
-      IO.puts("✓ NATS publish path verified (Publisher.publish_message will be called on response)")
+      IO.puts(
+        "✓ NATS publish path verified (Publisher.publish_message will be called on response)"
+      )
 
       # Cleanup - cancel the real Claude session
       # Find the session_ref from registry
       ref_entries = Registry.lookup(registry, {:ref, worker_info.session_ref})
+
       if length(ref_entries) > 0 do
         :ok = SessionManager.cancel_session(worker_info.session_ref)
         IO.puts("✓ Real Claude session cancelled")

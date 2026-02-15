@@ -26,8 +26,11 @@ defmodule EyeInTheSkyWeb.Notes do
 
     if session do
       Note
-      |> where([n], n.parent_type in ["session", "sessions"] and
-                    (n.parent_id == ^to_string(session_id) or n.parent_id == ^session.uuid))
+      |> where(
+        [n],
+        n.parent_type in ["session", "sessions"] and
+          (n.parent_id == ^to_string(session_id) or n.parent_id == ^session.uuid)
+      )
       |> order_by([n], desc: n.created_at)
       |> Repo.all()
     else
@@ -44,8 +47,11 @@ defmodule EyeInTheSkyWeb.Notes do
 
     if session do
       Note
-      |> where([n], n.parent_type in ["session", "sessions"] and
-                    (n.parent_id == ^to_string(session_id) or n.parent_id == ^session.uuid))
+      |> where(
+        [n],
+        n.parent_type in ["session", "sessions"] and
+          (n.parent_id == ^to_string(session_id) or n.parent_id == ^session.uuid)
+      )
       |> Repo.aggregate(:count, :id)
     else
       0
@@ -61,8 +67,11 @@ defmodule EyeInTheSkyWeb.Notes do
 
     if agent do
       Note
-      |> where([n], n.parent_type in ["agent", "agents"] and
-                    (n.parent_id == ^to_string(agent_id) or n.parent_id == ^agent.uuid))
+      |> where(
+        [n],
+        n.parent_type in ["agent", "agents"] and
+          (n.parent_id == ^to_string(agent_id) or n.parent_id == ^agent.uuid)
+      )
       |> order_by([n], desc: n.created_at)
       |> Repo.all()
     else
@@ -80,8 +89,11 @@ defmodule EyeInTheSkyWeb.Notes do
 
     if task do
       Note
-      |> where([n], n.parent_type in ["task", "tasks"] and
-                    (n.parent_id == ^to_string(task_id) or n.parent_id == ^task.uuid))
+      |> where(
+        [n],
+        n.parent_type in ["task", "tasks"] and
+          (n.parent_id == ^to_string(task_id) or n.parent_id == ^task.uuid)
+      )
       |> order_by([n], desc: n.created_at)
       |> Repo.all()
     else

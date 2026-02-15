@@ -62,7 +62,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
       phx-hook="SidebarState"
       phx-target={@myself}
       class={[
-        "flex flex-col h-full border-r border-base-content/8 bg-[oklch(95%_0.005_80)] dark:bg-[oklch(12%_0.005_260)] transition-all duration-200 flex-shrink-0 overflow-hidden",
+        "flex flex-col h-full border-r border-base-content/8 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)] transition-all duration-200 flex-shrink-0 overflow-hidden",
         if(@collapsed, do: "w-16", else: "w-60")
       ]}
     >

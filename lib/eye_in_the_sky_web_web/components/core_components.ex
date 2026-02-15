@@ -117,6 +117,42 @@ defmodule EyeInTheSkyWebWeb.CoreComponents do
   end
 
   @doc """
+  Renders a reusable empty state block for list and detail views.
+
+  ## Examples
+
+      <.empty_state
+        id="agents-empty"
+        icon="hero-users"
+        title="No agents found"
+        subtitle="Try adjusting your search filters"
+      />
+  """
+  attr :id, :string, default: nil
+  attr :icon, :string, default: nil
+  attr :title, :string, required: true
+  attr :subtitle, :string, default: nil
+  attr :class, :string, default: "py-12 text-center"
+  attr :icon_class, :string, default: "mx-auto h-12 w-12 text-base-content/40"
+  attr :title_class, :string, default: "mt-2 text-sm font-medium text-base-content"
+  attr :subtitle_class, :string, default: "mt-1 text-sm text-base-content/60"
+
+  slot :actions
+
+  def empty_state(assigns) do
+    ~H"""
+    <div id={@id} class={@class}>
+      <.icon :if={@icon} name={@icon} class={@icon_class} />
+      <h3 class={@title_class}>{@title}</h3>
+      <p :if={@subtitle} class={@subtitle_class}>{@subtitle}</p>
+      <div :if={@actions != []} class="mt-4 flex justify-center gap-2">
+        {render_slot(@actions)}
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
   Renders an input with label and error messages.
 
   A `Phoenix.HTML.FormField` may be passed as argument,

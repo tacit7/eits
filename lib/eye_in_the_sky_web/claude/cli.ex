@@ -28,7 +28,11 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
 
   @known_permission_modes ~w(acceptEdits bypassPermissions default delegate dontAsk plan)
   @default_idle_timeout_ms 300_000
-  @standard_paths ["/usr/local/bin/claude", "/opt/homebrew/bin/claude", Path.expand("~/.local/bin/claude")]
+  @standard_paths [
+    "/usr/local/bin/claude",
+    "/opt/homebrew/bin/claude",
+    Path.expand("~/.local/bin/claude")
+  ]
   @redacted_flags ~w(--system-prompt --append-system-prompt)
   @persistent_term_key {__MODULE__, :claude_binary_path}
 
@@ -182,7 +186,10 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
 
   @spec safe_log_args([String.t()]) :: [String.t()]
   def safe_log_args([]), do: []
-  def safe_log_args([flag, _value | rest]) when flag in @redacted_flags, do: [flag, "[REDACTED]" | safe_log_args(rest)]
+
+  def safe_log_args([flag, _value | rest]) when flag in @redacted_flags,
+    do: [flag, "[REDACTED]" | safe_log_args(rest)]
+
   def safe_log_args([head | rest]), do: [head | safe_log_args(rest)]
 
   # ---------------------------------------------------------------------------
@@ -356,6 +363,14 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
         Port.connect(port, handler_pid)
         send(handler_pid, {:port, port})
 
+        :telemetry.execute([:eits, :cli, :spawn], %{system_time: System.system_time()}, %{
+          project_path: project_path,
+          use_script: Keyword.get(opts, :use_script, true),
+          model: opts[:model]
+        })
+
+        Logger.info("[telemetry] cli.spawn project_path=#{project_path} model=#{opts[:model]}")
+
         {:ok, port, session_ref}
 
       {:error, reason} ->
@@ -425,11 +440,21 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
         end
 
         Logger.info("Claude process exited with status #{status}")
+        :telemetry.execute([:eits, :cli, :exit], %{exit_code: status}, %{})
+        Logger.info("[telemetry] cli.exit exit_code=#{status}")
         send(caller, {:claude_exit, session_ref, status})
         :ok
     after
       idle_timeout_ms ->
-        Logger.warning("No output from Claude after #{div(idle_timeout_ms, 60_000)} minutes, timing out")
+        Logger.warning(
+          "No output from Claude after #{div(idle_timeout_ms, 60_000)} minutes, timing out"
+        )
+
+        :telemetry.execute([:eits, :cli, :timeout], %{system_time: System.system_time()}, %{
+          timeout_ms: idle_timeout_ms
+        })
+
+        Logger.warning("[telemetry] cli.timeout after #{div(idle_timeout_ms, 1000)}s")
         Port.close(port)
         send(caller, {:claude_exit, session_ref, :timeout})
         :ok

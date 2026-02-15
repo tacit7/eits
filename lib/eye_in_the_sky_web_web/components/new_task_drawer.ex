@@ -38,8 +38,8 @@ defmodule EyeInTheSkyWebWeb.Components.NewTaskDrawer do
                 required
               />
             </div>
-
-            <!-- Description -->
+            
+    <!-- Description -->
             <div class="form-control">
               <label class="label">
                 <span class="label-text font-medium">Description</span>
@@ -50,8 +50,8 @@ defmodule EyeInTheSkyWebWeb.Components.NewTaskDrawer do
                 placeholder="Task description (optional)"
               ></textarea>
             </div>
-
-            <!-- State Selection -->
+            
+    <!-- State Selection -->
             <div class="form-control">
               <label class="label">
                 <span class="label-text font-medium">Status</span>
@@ -59,13 +59,13 @@ defmodule EyeInTheSkyWebWeb.Components.NewTaskDrawer do
               <select name="state_id" class="select select-bordered" required>
                 <%= for state <- @workflow_states do %>
                   <option value={state.id} selected={state.name == "todo"}>
-                    <%= String.capitalize(state.name) %>
+                    {String.capitalize(state.name)}
                   </option>
                 <% end %>
               </select>
             </div>
-
-            <!-- Priority -->
+            
+    <!-- Priority -->
             <div class="form-control">
               <label class="label">
                 <span class="label-text font-medium">Priority</span>
@@ -77,8 +77,8 @@ defmodule EyeInTheSkyWebWeb.Components.NewTaskDrawer do
                 <option value="3">High</option>
               </select>
             </div>
-
-            <!-- Tags -->
+            
+    <!-- Tags -->
             <div class="form-control">
               <label class="label">
                 <span class="label-text font-medium">Tags</span>
@@ -93,8 +93,8 @@ defmodule EyeInTheSkyWebWeb.Components.NewTaskDrawer do
                 <span class="label-text-alt">Comma-separated tags</span>
               </label>
             </div>
-
-            <!-- Actions -->
+            
+    <!-- Actions -->
             <div class="flex gap-2 mt-4">
               <button type="submit" class="btn btn-primary flex-1">Create Task</button>
               <button

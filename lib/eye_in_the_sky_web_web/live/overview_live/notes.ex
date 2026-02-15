@@ -122,50 +122,44 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
         </div>
 
         <%= if length(@notes) > 0 do %>
-          <div class="space-y-1 bg-[oklch(95%_0.003_80)] dark:bg-[oklch(18%_0.005_260)] rounded-xl shadow-sm p-3">
+          <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-5">
             <%= for note <- @notes do %>
-              <div class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-white dark:bg-[oklch(22%_0.005_260)] hover:border-base-content/10 transition-colors">
-                <input type="checkbox" />
-                <div class="collapse-title py-2.5 px-4 min-h-0">
-                  <div class="flex items-center gap-3">
-                    <%!-- Star button --%>
-                    <button
-                      type="button"
-                      phx-click="toggle_star"
-                      phx-value-note_id={note.id}
-                      onclick="event.stopPropagation(); event.preventDefault();"
-                      class="flex-shrink-0 p-0.5 rounded transition-transform hover:scale-110"
-                    >
-                      <.icon
-                        name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}
-                        class={"w-3.5 h-3.5 #{if note.starred == 1, do: "text-warning", else: "text-base-content/15 hover:text-base-content/30"}"}
-                      />
-                    </button>
-                    <%!-- Title --%>
-                    <div class="flex-1 min-w-0">
-                      <h3 class="text-[13px] font-medium text-base-content/85 truncate">
-                        {note.title || extract_title(note.body)}
-                      </h3>
-                    </div>
-                    <%!-- Meta inline --%>
-                    <span class="hidden sm:inline-block flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-base-content/[0.05] text-base-content/40">
-                      {note.parent_type}
-                    </span>
-                    <span class="hidden md:block flex-shrink-0 text-[11px] text-base-content/25 font-mono tabular-nums">
-                      {format_date(note.created_at)}
-                    </span>
+              <div class="collapse collapse-arrow">
+                <input type="checkbox" class="min-h-0 p-0" />
+                <div class="collapse-title py-3.5 px-0 min-h-0 flex flex-col gap-1">
+                  <span class="text-sm font-medium text-base-content/85 truncate pr-6">
+                    {note.title || extract_title(note.body)}
+                  </span>
+                  <div class="flex items-center gap-1.5 text-xs text-base-content/35">
+                    <span>{note.parent_type}</span>
+                    <span class="text-base-content/15">&middot;</span>
+                    <span class="font-mono tabular-nums">{format_date(note.created_at)}</span>
+                    <%= if note.starred == 1 do %>
+                      <span class="text-base-content/15">&middot;</span>
+                      <.icon name="hero-star-solid" class="w-3 h-3 text-warning" />
+                    <% end %>
                   </div>
                 </div>
-                <div class="collapse-content px-4 pb-4">
-                  <div class="pl-[30px]">
-                    <div
-                      id={"note-body-#{note.id}"}
-                      class="dm-markdown text-sm text-base-content/70 leading-relaxed"
-                      phx-hook="MarkdownMessage"
-                      data-raw-body={note.body}
-                    >
-                    </div>
+                <div class="collapse-content px-0 pb-4">
+                  <div
+                    id={"note-body-#{note.id}"}
+                    class="dm-markdown text-sm text-base-content/70 leading-relaxed"
+                    phx-hook="MarkdownMessage"
+                    data-raw-body={note.body}
+                  >
                   </div>
+                  <button
+                    type="button"
+                    phx-click="toggle_star"
+                    phx-value-note_id={note.id}
+                    class="mt-3 flex items-center gap-1.5 text-xs text-base-content/30 hover:text-warning transition-colors"
+                  >
+                    <.icon
+                      name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}
+                      class={"w-3.5 h-3.5 #{if note.starred == 1, do: "text-warning", else: ""}"}
+                    />
+                    {if note.starred == 1, do: "Starred", else: "Star"}
+                  </button>
                 </div>
               </div>
             <% end %>

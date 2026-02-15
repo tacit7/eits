@@ -19,7 +19,15 @@ defmodule EyeInTheSkyWeb.ScheduledJobs.JobRun do
 
   def changeset(run, attrs) do
     run
-    |> cast(attrs, [:job_id, :status, :started_at, :completed_at, :result, :session_id, :created_at])
+    |> cast(attrs, [
+      :job_id,
+      :status,
+      :started_at,
+      :completed_at,
+      :result,
+      :session_id,
+      :created_at
+    ])
     |> validate_required([:job_id, :status])
     |> validate_inclusion(:status, ["running", "completed", "failed"])
   end

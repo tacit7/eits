@@ -72,5 +72,6 @@ defmodule EyeInTheSkyWeb.Messages.Message do
     |> validate_required([:sender_role, :direction, :body])
     |> validate_inclusion(:direction, ["inbound", "outbound"])
     |> validate_inclusion(:status, ["sent", "delivered", "failed", "pending"])
+    |> unique_constraint(:source_uuid, name: "messages_source_uuid_index")
   end
 end

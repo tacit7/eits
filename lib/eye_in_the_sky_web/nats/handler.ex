@@ -50,7 +50,12 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
           git_worktree_path: payload["worktree_path"]
         }
 
-        case Agents.create_execution_agent_with_model(agent_attrs) do
+        create_fn =
+          if model_name,
+            do: &Agents.create_execution_agent_with_model/1,
+            else: &Agents.create_execution_agent/1
+
+        case create_fn.(agent_attrs) do
           {:ok, agent} ->
             Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, agent})
             Logger.info("[NATS.Handler] Session started: #{session_uuid}")

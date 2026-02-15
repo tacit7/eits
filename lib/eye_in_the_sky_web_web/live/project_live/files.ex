@@ -33,6 +33,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
         socket
         |> assign(:page_title, "Files - #{project.name}")
         |> assign(:project, project)
+        |> assign(:sidebar_tab, :files)
+        |> assign(:sidebar_project, project)
         |> assign(:tasks, tasks)
         |> assign(:file_path, nil)
         |> assign(:file_content, nil)
@@ -197,7 +199,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
             full_path = Path.join(current_path, file)
             # Filter out common ignored directories/files and binary files
             (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
-            (File.dir?(full_path) or !is_binary_file?(full_path))
+              (File.dir?(full_path) or !is_binary_file?(full_path))
           end)
           |> Enum.map(fn file ->
             full_path = Path.join(current_path, file)
@@ -240,19 +242,59 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
     # Common binary file extensions
     binary_extensions = [
       # Executables and libraries
-      ".so", ".dll", ".dylib", ".exe", ".bin", ".o", ".a", ".lib",
+      ".so",
+      ".dll",
+      ".dylib",
+      ".exe",
+      ".bin",
+      ".o",
+      ".a",
+      ".lib",
       # Archives
-      ".zip", ".tar", ".gz", ".bz2", ".xz", ".7z", ".rar",
+      ".zip",
+      ".tar",
+      ".gz",
+      ".bz2",
+      ".xz",
+      ".7z",
+      ".rar",
       # Images
-      ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".ico", ".svg", ".webp",
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".gif",
+      ".bmp",
+      ".ico",
+      ".svg",
+      ".webp",
       # Media
-      ".mp3", ".mp4", ".avi", ".mov", ".mkv", ".wav", ".flac",
+      ".mp3",
+      ".mp4",
+      ".avi",
+      ".mov",
+      ".mkv",
+      ".wav",
+      ".flac",
       # Documents
-      ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+      ".pdf",
+      ".doc",
+      ".docx",
+      ".xls",
+      ".xlsx",
+      ".ppt",
+      ".pptx",
       # Databases
-      ".db", ".sqlite", ".sqlite3", ".db-shm", ".db-wal",
+      ".db",
+      ".sqlite",
+      ".sqlite3",
+      ".db-shm",
+      ".db-wal",
       # Others
-      ".wasm", ".beam", ".class", ".jar", ".war"
+      ".wasm",
+      ".beam",
+      ".class",
+      ".jar",
+      ".war"
     ]
 
     extension = path |> Path.extname() |> String.downcase()
@@ -362,18 +404,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.Navbar}
-      id="navbar"
-      current_project={@project}
-    />
-
-    <EyeInTheSkyWebWeb.Components.ProjectNav.render
-      project={@project}
-      tasks={@tasks}
-      current_tab={:files}
-    />
-
     <!-- View Mode Toggle -->
     <div class="bg-base-100 border-b border-base-300">
       <div class="px-4 sm:px-6 lg:px-8 py-2">

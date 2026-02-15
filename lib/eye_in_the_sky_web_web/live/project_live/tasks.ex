@@ -26,6 +26,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
         socket
         |> assign(:page_title, "Tasks - #{project.name}")
         |> assign(:project, project)
+        |> assign(:sidebar_tab, :tasks)
+        |> assign(:sidebar_project, project)
         |> assign(:project_id, project_id)
         |> assign(:search_query, "")
         |> assign(:workflow_states, workflow_states)
@@ -116,7 +118,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
         {:noreply, socket}
 
       {:error, changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to create task: #{inspect(changeset.errors)}")}
+        {:noreply,
+         put_flash(socket, :error, "Failed to create task: #{inspect(changeset.errors)}")}
     end
   end
 
@@ -137,79 +140,56 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.Navbar}
-      id="navbar"
-      current_project={@project}
-    />
-
-    <EyeInTheSkyWebWeb.Components.ProjectNav.render
-      project={@project}
-      tasks={@tasks}
-      current_tab={:tasks}
-    />
-
-    <!-- Search and New Task -->
-    <div class="px-4 sm:px-6 lg:px-8 py-6">
-      <div class="flex items-center gap-4 max-w-2xl">
-        <form phx-change="search" class="flex-1">
-          <input
-            type="text"
-            name="query"
-            value={@search_query}
-            placeholder="Search tasks by title or description..."
-            class="input input-bordered w-full"
-            autocomplete="off"
-          />
-        </form>
-        <button phx-click="toggle_new_task_drawer" class="btn btn-primary btn-sm">
-          + New Task
-        </button>
-      </div>
-    </div>
-
-    <!-- Tasks Grid -->
-    <div class="px-4 sm:px-6 lg:px-8 pb-8">
-      <%= if length(@tasks) > 0 do %>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          <%= for task <- @tasks do %>
-            <TaskCard.task_card task={task} variant="grid" />
-          <% end %>
-        </div>
-      <% else %>
-        <!-- Empty State -->
-        <div class="text-center py-16">
-          <div class="mx-auto w-24 h-24 bg-base-200 rounded-full flex items-center justify-center mb-4">
-            <svg
-              class="w-12 h-12 text-base-content/40"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+    <div class="px-6 lg:px-8 py-6">
+      <div class="max-w-4xl mx-auto">
+        <%!-- Search and New Task --%>
+        <div class="mb-5 flex items-center gap-3">
+          <form phx-change="search" class="flex-1 max-w-sm">
+            <div class="relative">
+              <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
+              </div>
+              <input
+                type="text"
+                name="query"
+                value={@search_query}
+                placeholder="Search tasks..."
+                class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
+                autocomplete="off"
               />
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold text-base-content mb-2">
-            <%= if @search_query != "" do %>
-              No tasks found
-            <% else %>
-              No tasks yet
-            <% end %>
-          </h3>
-          <p class="text-sm text-base-content/60">
-            <%= if @search_query != "" do %>
-              Try adjusting your search query
-            <% else %>
-              Create a task to get started
-            <% end %>
-          </p>
+            </div>
+          </form>
+
+          <button
+            phx-click="toggle_new_task_drawer"
+            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-7 text-xs"
+          >
+            <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Task
+          </button>
         </div>
-      <% end %>
+
+        <%!-- Task count --%>
+        <div class="mb-3">
+          <span class="text-[11px] font-mono tabular-nums text-base-content/30 tracking-wider uppercase">
+            {length(@tasks)} tasks
+          </span>
+        </div>
+
+        <%= if length(@tasks) > 0 do %>
+          <div class="space-y-1 bg-[oklch(95%_0.003_80)] dark:bg-[oklch(18%_0.005_260)] rounded-xl shadow-sm p-3">
+            <%= for task <- @tasks do %>
+              <TaskCard.task_card task={task} variant="list" />
+            <% end %>
+          </div>
+        <% else %>
+          <.empty_state
+            id="project-tasks-empty"
+            icon="hero-clipboard-document-list"
+            title={if @search_query != "", do: "No tasks found", else: "No tasks yet"}
+            subtitle={if @search_query != "", do: "Try adjusting your search query", else: "Create a task to get started"}
+          />
+        <% end %>
+      </div>
     </div>
 
     <!-- New Task Drawer -->

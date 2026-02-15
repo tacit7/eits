@@ -16,6 +16,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
     socket =
       socket
       |> assign(:page_title, "Scheduled Jobs")
+      |> assign(:sidebar_tab, :jobs)
+      |> assign(:sidebar_project, nil)
       |> assign(:jobs, ScheduledJobs.list_jobs())
       |> assign(:show_form, false)
       |> assign(:editing_job, nil)
@@ -305,7 +307,16 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
   defp format_schedule(%{schedule_type: "cron", schedule_value: val}), do: describe_cron(val)
   defp format_schedule(_), do: "?"
 
-  @days_of_week %{0 => "Sun", 1 => "Mon", 2 => "Tue", 3 => "Wed", 4 => "Thu", 5 => "Fri", 6 => "Sat", 7 => "Sun"}
+  @days_of_week %{
+    0 => "Sun",
+    1 => "Mon",
+    2 => "Tue",
+    3 => "Wed",
+    4 => "Thu",
+    5 => "Fri",
+    6 => "Sat",
+    7 => "Sun"
+  }
 
   defp describe_cron(expr) do
     case String.split(String.trim(expr), ~r/\s+/) do
@@ -329,16 +340,26 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
     case {parse_cron_num(min), parse_cron_num(hour)} do
       {{:ok, m}, {:ok, h}} ->
         period = if h >= 12, do: "PM", else: "AM"
-        display_h = cond do
-          h == 0 -> 12
-          h > 12 -> h - 12
-          true -> h
-        end
-        if m == 0, do: "#{display_h} #{period}", else: "#{display_h}:#{String.pad_leading("#{m}", 2, "0")} #{period}"
 
-      {_, {:step, n}} -> "Every #{n}h"
-      {{:step, n}, _} -> "Every #{n}m"
-      _ -> nil
+        display_h =
+          cond do
+            h == 0 -> 12
+            h > 12 -> h - 12
+            true -> h
+          end
+
+        if m == 0,
+          do: "#{display_h} #{period}",
+          else: "#{display_h}:#{String.pad_leading("#{m}", 2, "0")} #{period}"
+
+      {_, {:step, n}} ->
+        "Every #{n}h"
+
+      {{:step, n}, _} ->
+        "Every #{n}m"
+
+      _ ->
+        nil
     end
   end
 
@@ -363,13 +384,19 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
 
   defp format_dow(dow) do
     cond do
-      dow == "1-5" -> "Weekdays"
-      dow == "0,6" or dow == "6,0" -> "Weekends"
+      dow == "1-5" ->
+        "Weekdays"
+
+      dow == "0,6" or dow == "6,0" ->
+        "Weekends"
+
       String.contains?(dow, ",") ->
         dow |> String.split(",") |> Enum.map_join(", ", &day_name/1)
+
       String.contains?(dow, "-") ->
         [from, to] = String.split(dow, "-", parts: 2)
         "#{day_name(from)}-#{day_name(to)}"
+
       true ->
         day_name(dow)
     end
@@ -398,6 +425,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
 
   defp parse_cron_num("*"), do: {:ok, :any}
   defp parse_cron_num("*/" <> step), do: {:step, String.to_integer(step)}
+
   defp parse_cron_num(s) do
     case Integer.parse(s) do
       {n, ""} -> {:ok, n}
@@ -444,9 +472,6 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_component module={EyeInTheSkyWebWeb.Components.Navbar} id="navbar" />
-    <EyeInTheSkyWebWeb.Components.OverviewNav.render current_tab={:jobs} />
-
     <div class="px-4 sm:px-6 lg:px-8 py-6">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-xl font-semibold">Scheduled Jobs</h1>
@@ -469,168 +494,134 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
         <div class="p-6">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold">
-              <%= if @editing_job, do: "Edit Job", else: "New Job" %>
+              {if @editing_job, do: "Edit Job", else: "New Job"}
             </h2>
             <button class="btn btn-ghost btn-sm btn-square" phx-click="cancel_form">
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
           <.form for={@changeset} phx-submit="save_job" phx-change="change_job_type" class="space-y-4">
+            <div class="form-control">
+              <label class="label"><span class="label-text">Name</span></label>
+              <input
+                type="text"
+                name="job[name]"
+                value={(@editing_job && @editing_job.name) || ""}
+                class="input input-bordered w-full"
+                required
+              />
+            </div>
+
+            <div class="form-control">
+              <label class="label"><span class="label-text">Description</span></label>
+              <input
+                type="text"
+                name="job[description]"
+                value={(@editing_job && @editing_job.description) || ""}
+                class="input input-bordered w-full"
+              />
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
               <div class="form-control">
-                <label class="label"><span class="label-text">Name</span></label>
-                <input
-                  type="text"
-                  name="job[name]"
-                  value={(@editing_job && @editing_job.name) || ""}
-                  class="input input-bordered w-full"
-                  required
-                />
+                <label class="label"><span class="label-text">Job Type</span></label>
+                <select name="job[job_type]" class="select select-bordered w-full">
+                  <option value="shell_command" selected={@form_job_type == "shell_command"}>
+                    Shell Command
+                  </option>
+                  <option value="spawn_agent" selected={@form_job_type == "spawn_agent"}>
+                    Spawn Agent
+                  </option>
+                  <option value="mix_task" selected={@form_job_type == "mix_task"}>Mix Task</option>
+                </select>
               </div>
 
               <div class="form-control">
-                <label class="label"><span class="label-text">Description</span></label>
+                <label class="label"><span class="label-text">Schedule Type</span></label>
+                <select
+                  name="job[schedule_type]"
+                  class="select select-bordered w-full"
+                  phx-change="change_schedule_type"
+                >
+                  <option value="interval" selected={@form_schedule_type == "interval"}>
+                    Interval
+                  </option>
+                  <option value="cron" selected={@form_schedule_type == "cron"}>Cron</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">
+                  {if @form_schedule_type == "interval",
+                    do: "Interval (seconds)",
+                    else: "Cron Expression"}
+                </span>
+              </label>
+              <input
+                type="text"
+                name="job[schedule_value]"
+                value={(@editing_job && @editing_job.schedule_value) || ""}
+                placeholder={if @form_schedule_type == "interval", do: "60", else: "*/5 * * * *"}
+                class="input input-bordered w-full"
+                required
+              />
+            </div>
+
+            <%!-- Conditional config fields --%>
+            <%= if @form_job_type == "shell_command" do %>
+              <div class="form-control">
+                <label class="label"><span class="label-text">Command</span></label>
                 <input
                   type="text"
-                  name="job[description]"
-                  value={(@editing_job && @editing_job.description) || ""}
+                  name="job[config_command]"
+                  value={cfg(@form_config, "command")}
+                  placeholder="echo hello"
                   class="input input-bordered w-full"
                 />
               </div>
+              <div class="form-control">
+                <label class="label"><span class="label-text">Working Directory</span></label>
+                <input
+                  type="text"
+                  name="job[config_working_dir]"
+                  value={cfg(@form_config, "working_dir")}
+                  class="input input-bordered w-full"
+                />
+              </div>
+            <% end %>
 
+            <%= if @form_job_type == "spawn_agent" do %>
+              <div class="form-control">
+                <label class="label"><span class="label-text">Instructions</span></label>
+                <textarea
+                  name="job[config_instructions]"
+                  class="textarea textarea-bordered w-full"
+                  rows="3"
+                ><%= cfg(@form_config, "instructions") %></textarea>
+              </div>
               <div class="grid grid-cols-2 gap-4">
                 <div class="form-control">
-                  <label class="label"><span class="label-text">Job Type</span></label>
-                  <select name="job[job_type]" class="select select-bordered w-full">
-                    <option value="shell_command" selected={@form_job_type == "shell_command"}>
-                      Shell Command
+                  <label class="label"><span class="label-text">Model</span></label>
+                  <select name="job[config_model]" class="select select-bordered w-full">
+                    <option value="haiku" selected={cfg(@form_config, "model") == "haiku"}>
+                      Haiku
                     </option>
-                    <option value="spawn_agent" selected={@form_job_type == "spawn_agent"}>
-                      Spawn Agent
+                    <option value="sonnet" selected={cfg(@form_config, "model") in ["sonnet", ""]}>
+                      Sonnet
                     </option>
-                    <option value="mix_task" selected={@form_job_type == "mix_task"}>Mix Task</option>
+                    <option value="opus" selected={cfg(@form_config, "model") == "opus"}>
+                      Opus
+                    </option>
                   </select>
-                </div>
-
-                <div class="form-control">
-                  <label class="label"><span class="label-text">Schedule Type</span></label>
-                  <select
-                    name="job[schedule_type]"
-                    class="select select-bordered w-full"
-                    phx-change="change_schedule_type"
-                  >
-                    <option value="interval" selected={@form_schedule_type == "interval"}>
-                      Interval
-                    </option>
-                    <option value="cron" selected={@form_schedule_type == "cron"}>Cron</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="form-control">
-                <label class="label">
-                  <span class="label-text">
-                    <%= if @form_schedule_type == "interval", do: "Interval (seconds)", else: "Cron Expression" %>
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  name="job[schedule_value]"
-                  value={(@editing_job && @editing_job.schedule_value) || ""}
-                  placeholder={if @form_schedule_type == "interval", do: "60", else: "*/5 * * * *"}
-                  class="input input-bordered w-full"
-                  required
-                />
-              </div>
-
-              <%!-- Conditional config fields --%>
-              <%= if @form_job_type == "shell_command" do %>
-                <div class="form-control">
-                  <label class="label"><span class="label-text">Command</span></label>
-                  <input
-                    type="text"
-                    name="job[config_command]"
-                    value={cfg(@form_config, "command")}
-                    placeholder="echo hello"
-                    class="input input-bordered w-full"
-                  />
-                </div>
-                <div class="form-control">
-                  <label class="label"><span class="label-text">Working Directory</span></label>
-                  <input
-                    type="text"
-                    name="job[config_working_dir]"
-                    value={cfg(@form_config, "working_dir")}
-                    class="input input-bordered w-full"
-                  />
-                </div>
-              <% end %>
-
-              <%= if @form_job_type == "spawn_agent" do %>
-                <div class="form-control">
-                  <label class="label"><span class="label-text">Instructions</span></label>
-                  <textarea
-                    name="job[config_instructions]"
-                    class="textarea textarea-bordered w-full"
-                    rows="3"
-                  ><%= cfg(@form_config, "instructions") %></textarea>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                  <div class="form-control">
-                    <label class="label"><span class="label-text">Model</span></label>
-                    <select name="job[config_model]" class="select select-bordered w-full">
-                      <option value="haiku" selected={cfg(@form_config, "model") == "haiku"}>
-                        Haiku
-                      </option>
-                      <option value="sonnet" selected={cfg(@form_config, "model") in ["sonnet", ""]}>
-                        Sonnet
-                      </option>
-                      <option value="opus" selected={cfg(@form_config, "model") == "opus"}>
-                        Opus
-                      </option>
-                    </select>
-                  </div>
-                  <div class="form-control">
-                    <label class="label"><span class="label-text">Project Path</span></label>
-                    <input
-                      type="text"
-                      name="job[config_project_path]"
-                      value={cfg(@form_config, "project_path")}
-                      class="input input-bordered w-full"
-                    />
-                  </div>
-                </div>
-                <div class="form-control">
-                  <label class="label"><span class="label-text">Agent Description</span></label>
-                  <input
-                    type="text"
-                    name="job[config_description]"
-                    value={cfg(@form_config, "description")}
-                    class="input input-bordered w-full"
-                  />
-                </div>
-              <% end %>
-
-              <%= if @form_job_type == "mix_task" do %>
-                <div class="form-control">
-                  <label class="label"><span class="label-text">Task Name</span></label>
-                  <input
-                    type="text"
-                    name="job[config_task]"
-                    value={cfg(@form_config, "task")}
-                    placeholder="help"
-                    class="input input-bordered w-full"
-                  />
-                </div>
-                <div class="form-control">
-                  <label class="label"><span class="label-text">Arguments (comma-separated)</span></label>
-                  <input
-                    type="text"
-                    name="job[config_args]"
-                    value={cfg(@form_config, "args")}
-                    class="input input-bordered w-full"
-                  />
                 </div>
                 <div class="form-control">
                   <label class="label"><span class="label-text">Project Path</span></label>
@@ -641,15 +632,58 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
                     class="input input-bordered w-full"
                   />
                 </div>
-              <% end %>
-
-              <div class="flex justify-end gap-2 pt-4">
-                <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_form">
-                  Cancel
-                </button>
-                <button type="submit" class="btn btn-primary btn-sm">Save</button>
               </div>
-            </.form>
+              <div class="form-control">
+                <label class="label"><span class="label-text">Agent Description</span></label>
+                <input
+                  type="text"
+                  name="job[config_description]"
+                  value={cfg(@form_config, "description")}
+                  class="input input-bordered w-full"
+                />
+              </div>
+            <% end %>
+
+            <%= if @form_job_type == "mix_task" do %>
+              <div class="form-control">
+                <label class="label"><span class="label-text">Task Name</span></label>
+                <input
+                  type="text"
+                  name="job[config_task]"
+                  value={cfg(@form_config, "task")}
+                  placeholder="help"
+                  class="input input-bordered w-full"
+                />
+              </div>
+              <div class="form-control">
+                <label class="label">
+                  <span class="label-text">Arguments (comma-separated)</span>
+                </label>
+                <input
+                  type="text"
+                  name="job[config_args]"
+                  value={cfg(@form_config, "args")}
+                  class="input input-bordered w-full"
+                />
+              </div>
+              <div class="form-control">
+                <label class="label"><span class="label-text">Project Path</span></label>
+                <input
+                  type="text"
+                  name="job[config_project_path]"
+                  value={cfg(@form_config, "project_path")}
+                  class="input input-bordered w-full"
+                />
+              </div>
+            <% end %>
+
+            <div class="flex justify-end gap-2 pt-4">
+              <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_form">
+                Cancel
+              </button>
+              <button type="submit" class="btn btn-primary btn-sm">Save</button>
+            </div>
+          </.form>
         </div>
       </div>
       <%= if @show_form do %>
@@ -666,18 +700,35 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
             <h2 class="text-lg font-semibold">Create Job with Claude</h2>
             <button class="btn btn-ghost btn-sm btn-square" phx-click="toggle_claude_drawer">
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
           <form phx-submit="create_with_claude" class="flex flex-col gap-4">
             <div class="form-control">
               <label class="label"><span class="label-text font-medium">Model</span></label>
-              <select name="model" class="select select-bordered w-full" phx-change="claude_model_changed">
-                <option value="opus" selected={@claude_model == "opus"}>Opus 4.6 &bull; Most capable for complex work</option>
-                <option value="sonnet" selected={@claude_model == "sonnet"}>Sonnet 4.5 &bull; Best for everyday tasks</option>
-                <option value="sonnet[1m]" selected={@claude_model == "sonnet[1m]"}>Sonnet 4.5 (1M) &bull; 1M context window</option>
-                <option value="haiku" selected={@claude_model == "haiku"}>Haiku 4.5 &bull; Fastest for quick answers</option>
+              <select
+                name="model"
+                class="select select-bordered w-full"
+                phx-change="claude_model_changed"
+              >
+                <option value="opus" selected={@claude_model == "opus"}>
+                  Opus 4.6 &bull; Most capable for complex work
+                </option>
+                <option value="sonnet" selected={@claude_model == "sonnet"}>
+                  Sonnet 4.5 &bull; Best for everyday tasks
+                </option>
+                <option value="sonnet[1m]" selected={@claude_model == "sonnet[1m]"}>
+                  Sonnet 4.5 (1M) &bull; 1M context window
+                </option>
+                <option value="haiku" selected={@claude_model == "haiku"}>
+                  Haiku 4.5 &bull; Fastest for quick answers
+                </option>
               </select>
             </div>
 
@@ -705,7 +756,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
 
             <div class="flex gap-2 mt-4">
               <button type="submit" class="btn btn-primary flex-1">Start</button>
-              <button type="button" phx-click="toggle_claude_drawer" class="btn btn-ghost">Cancel</button>
+              <button type="button" phx-click="toggle_claude_drawer" class="btn btn-ghost">
+                Cancel
+              </button>
             </div>
           </form>
         </div>
@@ -801,7 +854,12 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
                           data-confirm="Delete this job?"
                           title="Delete"
                         >
-                          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg
+                            class="w-3.5 h-3.5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
                             <path
                               stroke-linecap="round"
                               stroke-linejoin="round"

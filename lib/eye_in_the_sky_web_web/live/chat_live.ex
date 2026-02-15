@@ -21,8 +21,10 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       socket
       |> assign(:session_id, session_id)
       |> assign(:working_agents, %{})
+      |> assign(:sidebar_tab, :chat)
+      |> assign(:sidebar_project, nil)
 
-    {:ok, socket, layout: {EyeInTheSkyWebWeb.Layouts, :app}}
+    {:ok, socket}
   end
 
   defp ensure_web_session do
@@ -36,22 +38,27 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         # Create the web UI chat agent first
         agent =
           case ChatAgents.get_chat_agent_by_uuid(@web_agent_uuid) do
-            {:ok, a} -> a
+            {:ok, a} ->
+              a
+
             {:error, :not_found} ->
-              {:ok, a} = ChatAgents.create_chat_agent(%{
-                uuid: @web_agent_uuid,
-                description: "Web UI User",
-                source: "web"
-              })
+              {:ok, a} =
+                ChatAgents.create_chat_agent(%{
+                  uuid: @web_agent_uuid,
+                  description: "Web UI User",
+                  source: "web"
+                })
+
               a
           end
 
-        {:ok, session} = Agents.create_execution_agent(%{
-          uuid: @web_session_uuid,
-          agent_id: agent.id,
-          name: "Web UI",
-          started_at: DateTime.utc_now() |> DateTime.to_iso8601()
-        })
+        {:ok, session} =
+          Agents.create_execution_agent(%{
+            uuid: @web_session_uuid,
+            agent_id: agent.id,
+            name: "Web UI",
+            started_at: DateTime.utc_now() |> DateTime.to_iso8601()
+          })
 
         session.id
     end
@@ -209,7 +216,9 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
               {:ok, s} ->
                 Channels.add_member(channel_id, s.agent_id, mid)
                 Logger.info("Auto-added session=#{mid} to channel=#{channel_id}")
-              _ -> :ok
+
+              _ ->
+                :ok
             end
           end
         end)
@@ -411,7 +420,8 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         sender_role: "system",
         recipient_role: "agent",
         provider: "system",
-        body: "Creating new agent (#{model})#{if agent_name != "", do: " - #{agent_name}", else: ""}..."
+        body:
+          "Creating new agent (#{model})#{if agent_name != "", do: " - #{agent_name}", else: ""}..."
       })
 
     # Use description as initial instructions, fall back to agent name
@@ -490,7 +500,10 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   @impl true
   def handle_info({:new_message, _message}, socket) do
     require Logger
-    Logger.info("📨 Received new_message broadcast for channel #{socket.assigns.active_channel_id}")
+
+    Logger.info(
+      "📨 Received new_message broadcast for channel #{socket.assigns.active_channel_id}"
+    )
 
     # Reload messages when new message arrives via PubSub
     messages =

@@ -28,6 +28,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
         socket
         |> assign(:page_title, "Kanban - #{project.name}")
         |> assign(:project, project)
+        |> assign(:sidebar_tab, :kanban)
+        |> assign(:sidebar_project, project)
         |> assign(:project_id, project_id)
         |> assign(:search_query, "")
         |> assign(:workflow_states, workflow_states)
@@ -261,11 +263,13 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
             {:noreply, socket}
 
           {:error, changeset} ->
-            {:noreply, put_flash(socket, :error, "Failed to create session: #{inspect(changeset.errors)}")}
+            {:noreply,
+             put_flash(socket, :error, "Failed to create session: #{inspect(changeset.errors)}")}
         end
 
       {:error, changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to create agent: #{inspect(changeset.errors)}")}
+        {:noreply,
+         put_flash(socket, :error, "Failed to create agent: #{inspect(changeset.errors)}")}
     end
   end
 
@@ -327,7 +331,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
         {:noreply, socket}
 
       {:error, changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to create task: #{inspect(changeset.errors)}")}
+        {:noreply,
+         put_flash(socket, :error, "Failed to create task: #{inspect(changeset.errors)}")}
     end
   end
 
@@ -356,18 +361,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.Navbar}
-      id="navbar"
-      current_project={@project}
-    />
-
-    <EyeInTheSkyWebWeb.Components.ProjectNav.render
-      project={@project}
-      tasks={@tasks}
-      current_tab={:kanban}
-    />
-
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <!-- Search Input and New Task Button -->
       <div class="max-w-7xl mx-auto mb-6 flex items-center gap-4">
@@ -423,19 +416,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       <% else %>
         <!-- Empty State -->
         <div class="max-w-6xl mx-auto">
-          <div class="text-center py-12">
-            <svg
-              class="mx-auto h-12 w-12 text-base-content/40"
-              fill="currentColor"
-              viewBox="0 0 16 16"
-            >
-              <path d="M2.5 1.75v11.5c0 .138.112.25.25.25h3.17a.75.75 0 0 1 .75.75V16L9.4 13.571c.13-.096.289-.196.601-.196h3.249a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25H2.75a.25.25 0 0 0-.25.25Zm-1.5 0C1 .784 1.784 0 2.75 0h10.5C14.216 0 15 .784 15 1.75v11.5A1.75 1.75 0 0 1 13.25 15H10l-3.573 2.573A1.458 1.458 0 0 1 4 16.543V15H2.75A1.75 1.75 0 0 1 1 13.25Z" />
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-base-content">No tasks yet</h3>
-            <p class="mt-1 text-sm text-base-content/60">
-              Tasks will appear here when agents create them for this project
-            </p>
-          </div>
+          <.empty_state
+            id="project-kanban-empty"
+            icon="hero-clipboard-document-list"
+            title="No tasks yet"
+            subtitle="Tasks will appear here when agents create them for this project"
+          />
         </div>
       <% end %>
     </div>

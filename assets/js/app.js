@@ -81,6 +81,27 @@ Hooks.Highlight = {
     hljs.highlightElement(this.el)
   }
 }
+Hooks.SidebarState = {
+  mounted() {
+    const saved = localStorage.getItem("sidebar_collapsed")
+    if (saved === "true") {
+      this.pushEventTo(this.el, "toggle_collapsed", {})
+    }
+  }
+}
+
+// Persist sidebar collapse state on toggle
+window.addEventListener("click", (e) => {
+  const btn = e.target.closest("[phx-click='toggle_collapsed']")
+  if (btn) {
+    const sidebar = document.getElementById("app-sidebar")
+    if (sidebar) {
+      // Toggle: if currently w-60, it's about to collapse
+      const isCurrentlyExpanded = sidebar.classList.contains("w-60")
+      localStorage.setItem("sidebar_collapsed", isCurrentlyExpanded ? "true" : "false")
+    }
+  }
+})
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {

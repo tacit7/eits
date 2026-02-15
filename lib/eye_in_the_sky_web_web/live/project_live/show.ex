@@ -43,6 +43,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
         socket
         |> assign(:page_title, "Project: #{project.name}")
         |> assign(:project, project)
+        |> assign(:sidebar_tab, :overview)
+        |> assign(:sidebar_project, project)
         |> assign(:tasks, tasks)
         |> assign(:active_sessions, active_sessions)
         |> assign(:recent_notes, recent_notes)
@@ -61,18 +63,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.Navbar}
-      id="navbar"
-      current_project={@project}
-    />
-
-    <EyeInTheSkyWebWeb.Components.ProjectNav.render
-      project={@project}
-      tasks={@tasks}
-      current_tab={:overview}
-    />
-
     <div class="px-4 sm:px-6 lg:px-8 py-4">
       <div class="max-w-7xl mx-auto">
         <!-- Responsive Grid Layout -->

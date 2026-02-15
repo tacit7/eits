@@ -14,6 +14,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
       |> assign(:search_query, "")
       |> assign(:starred_filter, false)
       |> assign(:notes, [])
+      |> assign(:sidebar_tab, :notes)
+      |> assign(:sidebar_project, nil)
       |> load_notes()
 
     {:ok, socket}
@@ -77,110 +79,104 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
   @impl true
   def render(assigns) do
     ~H"""
-    <style>
-      .star-icon {
-        cursor: pointer;
-        transition: all 0.2s ease;
-        z-index: 10;
-        position: relative;
-        background: none;
-        border: none;
-        padding: 0.25rem;
-        border-radius: 0.25rem;
-      }
-      .star-icon:hover {
-        transform: scale(1.15);
-        background: rgba(0, 0, 0, 0.05);
-      }
-    </style>
-    <.live_component module={EyeInTheSkyWebWeb.Components.Navbar} id="navbar" />
-    <EyeInTheSkyWebWeb.Components.OverviewNav.render current_tab={:notes} />
-
-    <div class="px-4 sm:px-6 lg:px-8 py-8">
-      <div class="max-w-6xl mx-auto">
-        <!-- Search + Filter -->
-        <div class="mb-6 flex items-center gap-3">
-          <form phx-change="search" class="flex-1">
-            <input
-              type="text"
-              name="query"
-              value={@search_query}
-              placeholder="Search notes by content..."
-              class="input input-bordered w-full"
-              autocomplete="off"
-            />
+    <div class="px-6 lg:px-8 py-6">
+      <div class="max-w-3xl mx-auto">
+        <%!-- Search + Filter --%>
+        <div class="mb-5 flex items-center gap-3">
+          <form phx-change="search" class="flex-1 max-w-sm">
+            <div class="relative">
+              <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
+              </div>
+              <input
+                type="text"
+                name="query"
+                value={@search_query}
+                placeholder="Search notes..."
+                class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
+                autocomplete="off"
+              />
+            </div>
           </form>
           <button
             type="button"
             phx-click="toggle_starred_filter"
-            class={"btn btn-sm gap-2 #{if @starred_filter, do: "btn-warning", else: "btn-ghost"}"}
+            class={"flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all duration-150 " <>
+              if(@starred_filter,
+                do: "bg-warning/10 text-warning",
+                else: "text-base-content/35 hover:text-base-content/50 hover:bg-base-200/40"
+              )}
           >
             <.icon
               name={if @starred_filter, do: "hero-star-solid", else: "hero-star"}
-              class="w-4 h-4"
-            />
-            Starred
+              class="w-3.5 h-3.5"
+            /> Starred
           </button>
         </div>
 
+        <%!-- Notes count --%>
+        <div class="mb-3">
+          <span class="text-[11px] font-mono tabular-nums text-base-content/30 tracking-wider uppercase">
+            {length(@notes)} notes
+          </span>
+        </div>
+
         <%= if length(@notes) > 0 do %>
-          <div class="join join-vertical w-full">
+          <div class="space-y-1 bg-[oklch(95%_0.003_80)] dark:bg-[oklch(18%_0.005_260)] rounded-xl shadow-sm p-3">
             <%= for note <- @notes do %>
-              <div class="collapse collapse-arrow join-item border border-base-300">
+              <div class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-white dark:bg-[oklch(22%_0.005_260)] hover:border-base-content/10 transition-colors">
                 <input type="checkbox" />
-                <div class="collapse-title bg-base-100 hover:bg-base-100/80 transition-colors">
-                  <div class="flex items-center justify-between">
-                    <label class="flex items-center gap-3 flex-1 cursor-pointer">
-                      <.icon
-                        name="hero-document-text"
-                        class="w-4 h-4 text-base-content/60 flex-shrink-0"
-                      />
-                      <div class="flex flex-col gap-1">
-                        <h3 class="font-semibold text-sm text-base-content">
-                          {note.title || extract_title(note.body)}
-                        </h3>
-                        <div class="flex items-center gap-2 text-xs text-base-content/60">
-                          <span class="badge badge-ghost badge-xs">{note.parent_type}</span>
-                          <span class="font-mono">{String.slice(note.parent_id || "", 0..7)}</span>
-                          <span>•</span>
-                          <span>{note.created_at}</span>
-                        </div>
-                      </div>
-                    </label>
+                <div class="collapse-title py-2.5 px-4 min-h-0">
+                  <div class="flex items-center gap-3">
+                    <%!-- Star button --%>
                     <button
                       type="button"
-                      class="star-icon"
                       phx-click="toggle_star"
                       phx-value-note_id={note.id}
                       onclick="event.stopPropagation(); event.preventDefault();"
+                      class="flex-shrink-0 p-0.5 rounded transition-transform hover:scale-110"
                     >
                       <.icon
                         name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}
-                        class={"w-5 h-5 #{if note.starred == 1, do: "text-warning", else: "text-base-content/40"}"}
+                        class={"w-3.5 h-3.5 #{if note.starred == 1, do: "text-warning", else: "text-base-content/15 hover:text-base-content/30"}"}
                       />
                     </button>
+                    <%!-- Title --%>
+                    <div class="flex-1 min-w-0">
+                      <h3 class="text-[13px] font-medium text-base-content/85 truncate">
+                        {note.title || extract_title(note.body)}
+                      </h3>
+                    </div>
+                    <%!-- Meta inline --%>
+                    <span class="hidden sm:inline-block flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-base-content/[0.05] text-base-content/40">
+                      {note.parent_type}
+                    </span>
+                    <span class="hidden md:block flex-shrink-0 text-[11px] text-base-content/25 font-mono tabular-nums">
+                      {format_date(note.created_at)}
+                    </span>
                   </div>
                 </div>
-                <div class="collapse-content bg-base-50">
-                  <div
-                    id={"note-body-#{note.id}"}
-                    class="dm-markdown text-sm text-base-content leading-relaxed"
-                    phx-hook="MarkdownMessage"
-                    data-raw-body={note.body}
-                  >
+                <div class="collapse-content px-4 pb-4">
+                  <div class="pl-[30px]">
+                    <div
+                      id={"note-body-#{note.id}"}
+                      class="dm-markdown text-sm text-base-content/70 leading-relaxed"
+                      phx-hook="MarkdownMessage"
+                      data-raw-body={note.body}
+                    >
+                    </div>
                   </div>
                 </div>
               </div>
             <% end %>
           </div>
         <% else %>
-          <div class="text-center py-12">
-            <.icon name="hero-document-text" class="mx-auto h-12 w-12 text-base-content/40" />
-            <h3 class="mt-2 text-sm font-medium text-base-content">No notes yet</h3>
-            <p class="mt-1 text-sm text-base-content/60">
-              Notes from agents will appear here
-            </p>
-          </div>
+          <.empty_state
+            id="overview-notes-empty"
+            icon="hero-document-text"
+            title="No notes yet"
+            subtitle="Notes from agents will appear here"
+          />
         <% end %>
       </div>
     </div>
@@ -199,5 +195,15 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
     |> then(fn text ->
       if String.length(text) >= 50, do: text <> "...", else: text
     end)
+  end
+
+  defp format_date(nil), do: ""
+
+  defp format_date(timestamp) when is_binary(timestamp) do
+    # Extract just the date portion from various timestamp formats
+    case String.split(timestamp, [" ", "T"], parts: 2) do
+      [date | _] -> date
+      _ -> timestamp
+    end
   end
 end

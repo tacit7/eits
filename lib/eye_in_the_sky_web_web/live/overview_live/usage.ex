@@ -13,6 +13,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
       |> assign(:totals, totals)
       |> assign(:model_breakdown, model_breakdown)
       |> assign(:top_sessions, top_sessions)
+      |> assign(:sidebar_tab, :usage)
+      |> assign(:sidebar_project, nil)
 
     {:ok, socket}
   end
@@ -117,7 +119,18 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
       LIMIT 15
       """)
 
-    Enum.map(rows, fn [name, uuid, model, input, output, cache_read, cache_create, requests, subagents, cost] ->
+    Enum.map(rows, fn [
+                        name,
+                        uuid,
+                        model,
+                        input,
+                        output,
+                        cache_read,
+                        cache_create,
+                        requests,
+                        subagents,
+                        cost
+                      ] ->
       %{
         name: name || "Unnamed session",
         uuid: uuid,
@@ -133,8 +146,12 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
     end)
   end
 
-  defp format_cost(value) when is_float(value), do: "$#{:erlang.float_to_binary(value, decimals: 2)}"
-  defp format_cost(value) when is_integer(value), do: "$#{:erlang.float_to_binary(value / 1, decimals: 2)}"
+  defp format_cost(value) when is_float(value),
+    do: "$#{:erlang.float_to_binary(value, decimals: 2)}"
+
+  defp format_cost(value) when is_integer(value),
+    do: "$#{:erlang.float_to_binary(value / 1, decimals: 2)}"
+
   defp format_cost(_), do: "$0.00"
 
   defp format_number(value) when is_integer(value) do
@@ -162,15 +179,11 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_component module={EyeInTheSkyWebWeb.Components.Navbar} id="navbar" />
-    <EyeInTheSkyWebWeb.Components.OverviewNav.render current_tab={:usage} />
-
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <div class="max-w-7xl mx-auto space-y-8">
         <div class="flex justify-end">
           <button phx-click="recalculate" class="btn btn-sm btn-outline">
-            <.icon name="hero-arrow-path" class="size-4" />
-            Recalculate
+            <.icon name="hero-arrow-path" class="size-4" /> Recalculate
           </button>
         </div>
         <%!-- Top-level stat cards --%>

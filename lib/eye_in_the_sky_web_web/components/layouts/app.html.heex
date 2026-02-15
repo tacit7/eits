@@ -1,23 +1,12 @@
-<div class="flex flex-col h-full">
-  <div class="navbar bg-base-100 shadow-sm shrink-0">
-    <div class="navbar-start">
-      <a href={~p"/"} class="btn btn-ghost text-xl">
-        <img src={~p"/images/logo.svg"} width="36" /> Eye in the Sky
-      </a>
-    </div>
-    <div class="navbar-center hidden lg:flex">
-      <ul class="menu menu-horizontal px-1">
-        <li><a href={~p"/"}>Overview</a></li>
-        <li><a href={~p"/prompts"}>Prompts</a></li>
-        <li><a href={~p"/chat"}>Chat</a></li>
-      </ul>
-    </div>
-    <div class="navbar-end">
-      <.theme_toggle />
-    </div>
-  </div>
+<div class="flex h-full bg-base-100">
+  <.live_component
+    module={EyeInTheSkyWebWeb.Components.Sidebar}
+    id="app-sidebar"
+    sidebar_tab={assigns[:sidebar_tab] || :sessions}
+    sidebar_project={assigns[:sidebar_project]}
+  />
 
-  <main class="flex-1 overflow-auto">
+  <main class="flex-1 overflow-auto flex flex-col min-w-0">
     <.flash_group flash={@flash} />
     {@inner_content}
   </main>

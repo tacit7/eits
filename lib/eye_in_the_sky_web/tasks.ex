@@ -59,7 +59,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   """
   def get_task!(id) do
     Task
-    |> preload([:state, :tags, :sessions])
+    |> preload([:state, :tags])
     |> Repo.get!(id)
   end
 
@@ -70,7 +70,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   """
   def get_task_by_uuid!(uuid) do
     Task
-    |> preload([:state, :tags, :sessions])
+    |> preload([:state, :tags])
     |> Repo.get_by!(uuid: uuid)
   end
 
@@ -78,18 +78,34 @@ defmodule EyeInTheSkyWeb.Tasks do
   Creates a task.
   """
   def create_task(attrs \\ %{}) do
-    %Task{}
-    |> Task.changeset(attrs)
-    |> Repo.insert()
+    result =
+      %Task{}
+      |> Task.changeset(attrs)
+      |> Repo.insert()
+
+    case result do
+      {:ok, task} -> broadcast_change({:ok, task})
+      _ -> :ok
+    end
+
+    result
   end
 
   @doc """
   Updates a task.
   """
   def update_task(%Task{} = task, attrs) do
-    task
-    |> Task.changeset(attrs)
-    |> Repo.update()
+    result =
+      task
+      |> Task.changeset(attrs)
+      |> Repo.update()
+
+    case result do
+      {:ok, task} -> broadcast_change({:ok, task})
+      _ -> :ok
+    end
+
+    result
   end
 
   @doc """
@@ -103,7 +119,14 @@ defmodule EyeInTheSkyWeb.Tasks do
   Deletes a task.
   """
   def delete_task(%Task{} = task) do
-    Repo.delete(task)
+    result = Repo.delete(task)
+
+    case result do
+      {:ok, _} -> broadcast_change(:deleted)
+      _ -> :ok
+    end
+
+    result
   end
 
   @doc """
@@ -199,5 +222,11 @@ defmodule EyeInTheSkyWeb.Tasks do
       tag ->
         {:ok, tag}
     end
+  end
+
+  # PubSub
+
+  defp broadcast_change(_) do
+    Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "tasks", :tasks_changed)
   end
 end

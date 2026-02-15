@@ -32,6 +32,7 @@ import {CommandHistory} from "./hooks/command_history"
 import {getHooks} from "live_svelte"
 import "./theme"
 import hljs from 'highlight.js'
+import Sortable from 'sortablejs'
 // highlight.js theme is handled in app.css (theme-aware)
 
 // Import Svelte components manually (esbuild doesn't support import.meta.glob)
@@ -81,6 +82,56 @@ Hooks.Highlight = {
     hljs.highlightElement(this.el)
   }
 }
+Hooks.SortableKanban = {
+  mounted() { this._init() },
+  updated() {
+    // Reinitialize after LiveView patches the DOM
+    if (this.sortable) this.sortable.destroy()
+    this._init()
+  },
+  _init() {
+    this.sortable = Sortable.create(this.el, {
+      group: "kanban",
+      animation: 150,
+      ghostClass: "opacity-30",
+      draggable: "[data-task-id]",
+      onEnd: (evt) => {
+        const taskId = evt.item.dataset.taskId
+        const targetCol = evt.to.closest("[data-state-id]")
+        if (taskId && targetCol) {
+          this.pushEvent("move_task", {
+            task_id: taskId,
+            state_id: targetCol.dataset.stateId
+          })
+        }
+      }
+    })
+  },
+  destroyed() {
+    if (this.sortable) this.sortable.destroy()
+  }
+}
+Hooks.SidebarState = {
+  mounted() {
+    const saved = localStorage.getItem("sidebar_collapsed")
+    if (saved === "true") {
+      this.pushEventTo(this.el, "toggle_collapsed", {})
+    }
+  }
+}
+
+// Persist sidebar collapse state on toggle
+window.addEventListener("click", (e) => {
+  const btn = e.target.closest("[phx-click='toggle_collapsed']")
+  if (btn) {
+    const sidebar = document.getElementById("app-sidebar")
+    if (sidebar) {
+      // Toggle: if currently w-60, it's about to collapse
+      const isCurrentlyExpanded = sidebar.classList.contains("w-60")
+      localStorage.setItem("sidebar_collapsed", isCurrentlyExpanded ? "true" : "false")
+    }
+  }
+})
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {

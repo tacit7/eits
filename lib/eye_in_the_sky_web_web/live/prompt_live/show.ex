@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWebWeb.PromptLive.Show do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, socket}
+    {:ok, assign(socket, sidebar_tab: :prompts, sidebar_project: nil)}
   end
 
   @impl true
@@ -84,7 +84,6 @@ defmodule EyeInTheSkyWebWeb.PromptLive.Show do
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_component module={EyeInTheSkyWebWeb.Components.Navbar} id="navbar" />
     <div class="px-4 sm:px-6 lg:px-8">
       <!-- Header with back button -->
       <div class="mb-6">

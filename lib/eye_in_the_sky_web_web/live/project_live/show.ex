@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.Projects
-  alias EyeInTheSkyWeb.Sessions
+  alias EyeInTheSkyWeb.Agents
   alias EyeInTheSkyWeb.Notes
   alias EyeInTheSkyWeb.Repo
 
@@ -28,7 +28,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
 
         # Load active sessions for this project (max 5)
         active_sessions =
-          Sessions.list_sessions_with_agent()
+          Agents.list_agents_with_chat_agent()
           |> Enum.filter(&(is_nil(&1.ended_at) and &1.project_id == project_id))
           |> Enum.sort_by(& &1.started_at, :desc)
           |> Enum.take(5)
@@ -43,6 +43,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
         socket
         |> assign(:page_title, "Project: #{project.name}")
         |> assign(:project, project)
+        |> assign(:sidebar_tab, :overview)
+        |> assign(:sidebar_project, project)
         |> assign(:tasks, tasks)
         |> assign(:active_sessions, active_sessions)
         |> assign(:recent_notes, recent_notes)
@@ -61,18 +63,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.Navbar}
-      id="navbar"
-      current_project={@project}
-    />
-
-    <EyeInTheSkyWebWeb.Components.ProjectNav.render
-      project={@project}
-      tasks={@tasks}
-      current_tab={:overview}
-    />
-
     <div class="px-4 sm:px-6 lg:px-8 py-4">
       <div class="max-w-7xl mx-auto">
         <!-- Responsive Grid Layout -->

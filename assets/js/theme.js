@@ -28,6 +28,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Handle phx:set-theme events from LiveView theme toggle buttons
+  window.addEventListener('phx:set-theme', (e) => {
+    const btn = e.target.closest('[data-phx-theme]') || e.target;
+    const theme = btn.getAttribute('data-phx-theme') || 'light';
+    if (theme === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const resolvedTheme = prefersDark ? 'dark' : 'light';
+      localStorage.removeItem('theme');
+      document.documentElement.setAttribute('data-theme', resolvedTheme);
+    } else {
+      localStorage.setItem('theme', theme);
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+  });
+
   // Sync theme across browser tabs
   window.addEventListener('storage', (e) => {
     if (e.key === 'theme') {

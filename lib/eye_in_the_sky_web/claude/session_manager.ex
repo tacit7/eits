@@ -14,7 +14,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
   require Logger
 
   alias EyeInTheSkyWeb.Claude.{SessionWorker, CLI}
-  alias EyeInTheSkyWeb.{Sessions, Agents}
+  alias EyeInTheSkyWeb.{Agents, ChatAgents}
 
   @supervisor EyeInTheSkyWeb.Claude.SessionSupervisor
   @registry EyeInTheSkyWeb.Claude.Registry
@@ -56,7 +56,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
     description = opts[:description] || "Agent session"
 
     with {:ok, agent} <-
-           Agents.create_agent(%{
+           ChatAgents.create_chat_agent(%{
              uuid: agent_uuid,
              agent_type: opts[:agent_type] || "claude",
              project_id: opts[:project_id],
@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
              description: description
            }),
          {:ok, session} <-
-           Sessions.create_session(%{
+           Agents.create_execution_agent(%{
              uuid: session_uuid,
              agent_id: agent.id,
              name: description,

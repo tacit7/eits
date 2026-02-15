@@ -1,0 +1,11 @@
+{"type":"system","subtype":"init","cwd":"/tmp/test","session_id":"abc-123-def","tools":["Read","Edit","Bash"],"model":"claude-haiku-4-5-20251001","permissionMode":"default"}
+{"type":"stream_event","event":{"type":"message_start"}}
+{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"text"}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" world"}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"!"}}}
+{"type":"stream_event","event":{"type":"content_block_stop","index":0}}
+{"type":"stream_event","event":{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":5}}}
+{"type":"stream_event","event":{"type":"message_stop"}}
+{"type":"assistant","message":{"model":"claude-haiku-4-5-20251001","id":"msg_123","type":"message","role":"assistant","content":[{"type":"text","text":"Hello world!"}],"usage":{"input_tokens":10,"output_tokens":5}},"session_id":"abc-123-def"}
+{"type":"result","subtype":"success","is_error":false,"duration_ms":1234,"num_turns":1,"result":"Hello world!","session_id":"abc-123-def","usage":{"input_tokens":10,"output_tokens":5}}

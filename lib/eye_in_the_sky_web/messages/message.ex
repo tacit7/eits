@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.Messages.Message do
 
     belongs_to :project, EyeInTheSkyWeb.Projects.Project, type: :integer
 
-    belongs_to :session, EyeInTheSkyWeb.Sessions.Session,
+    belongs_to :session, EyeInTheSkyWeb.Agents.Agent,
       define_field: false,
       foreign_key: :session_id,
       type: :integer
@@ -72,5 +72,6 @@ defmodule EyeInTheSkyWeb.Messages.Message do
     |> validate_required([:sender_role, :direction, :body])
     |> validate_inclusion(:direction, ["inbound", "outbound"])
     |> validate_inclusion(:status, ["sent", "delivered", "failed", "pending"])
+    |> unique_constraint(:source_uuid, name: "messages_source_uuid_index")
   end
 end

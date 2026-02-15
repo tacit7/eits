@@ -10,6 +10,8 @@ defmodule EyeInTheSkyWebWeb.BookmarkLive.Index do
       |> assign(:page_title, "Bookmarks")
       |> assign(:filter_type, nil)
       |> assign(:filter_category, nil)
+      |> assign(:sidebar_tab, :sessions)
+      |> assign(:sidebar_project, nil)
       |> load_bookmarks()
 
     {:ok, socket}
@@ -62,8 +64,6 @@ defmodule EyeInTheSkyWebWeb.BookmarkLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_component module={EyeInTheSkyWebWeb.Components.Navbar} id="navbar" />
-
     <div class="px-4 sm:px-6 lg:px-8 py-6">
       <div class="max-w-7xl mx-auto">
         <!-- Header -->

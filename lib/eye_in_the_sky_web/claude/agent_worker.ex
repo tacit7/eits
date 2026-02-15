@@ -2,16 +2,16 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   @moduledoc """
   Persistent per-agent GenServer managing message queue and Claude lifecycle.
 
-  One AgentWorker per session (agent). Owns the Claude CLI Port when running
-  and manages a queue of pending messages. When busy, queues new messages.
-  When Claude exits, processes the next queued message automatically.
+  One AgentWorker per session (agent). Uses the Claude SDK for streaming and
+  manages a queue of pending messages. When busy, queues new messages.
+  When Claude completes, processes the next queued message automatically.
   """
 
   use GenServer
   require Logger
 
-  alias EyeInTheSkyWeb.Claude.Utils
-  alias EyeInTheSkyWeb.Messages
+  alias EyeInTheSkyWeb.Claude.{Message, SDK}
+  alias EyeInTheSkyWeb.{Agents, Messages}
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
 
@@ -43,11 +43,10 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       session_id: session_id,
       session_uuid: session_uuid,
       agent_id: agent_id,
-      port: nil,
+      sdk_ref: nil,
       current_job: nil,
       queue: [],
-      project_path: project_path,
-      session_ref: nil
+      project_path: project_path
     }
 
     Logger.info("AgentWorker started for session=#{session_id} agent=#{agent_id}")
@@ -57,7 +56,24 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   @impl true
   def handle_cast({:process_message, message, context}, state) do
-    Logger.info("📨 AgentWorker.process_message: session_id=#{state.session_id}, message_length=#{String.length(message)}, has_messages=#{context.has_messages}, model=#{inspect(context.model)}")
+    Logger.info(
+      "AgentWorker.process_message: session_id=#{state.session_id}, " <>
+        "message_length=#{String.length(message)}, has_messages=#{context.has_messages}, " <>
+        "model=#{inspect(context.model)}"
+    )
+
+    queue_len = length(state.queue)
+    has_msgs = context[:has_messages] || false
+
+    :telemetry.execute([:eits, :agent, :job, :received], %{system_time: System.system_time()}, %{
+      session_id: state.session_id,
+      queue_length: queue_len,
+      has_messages: has_msgs
+    })
+
+    Logger.info(
+      "[telemetry] agent.job.received session_id=#{state.session_id} queue=#{queue_len} has_messages=#{has_msgs}"
+    )
 
     job = %{
       message: message,
@@ -65,123 +81,154 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       queued_at: DateTime.utc_now()
     }
 
-    if state.port == nil do
-      # Idle, spawn Claude immediately
-      Logger.info("⚡ AgentWorker: spawning Claude immediately for session_id=#{state.session_id}")
-      case spawn_claude(state, job) do
-        {:ok, port, session_ref} ->
-          Logger.info("✅ AgentWorker: Claude spawned for session_id=#{state.session_id}, port=#{inspect(port)}, ref=#{inspect(session_ref)}")
+    if state.sdk_ref == nil do
+      # Idle, start SDK immediately
+      Logger.info("AgentWorker: starting SDK for session_id=#{state.session_id}")
+
+      case start_sdk(state, job) do
+        {:ok, sdk_ref} ->
+          Logger.info("AgentWorker: SDK started for session_id=#{state.session_id}")
+
+          :telemetry.execute(
+            [:eits, :agent, :job, :started],
+            %{system_time: System.system_time()},
+            %{
+              session_id: state.session_id
+            }
+          )
+
+          Logger.info("[telemetry] agent.job.started session_id=#{state.session_id}")
+
+          update_agent_status(state.session_id, "working")
+
           Phoenix.PubSub.broadcast(
             EyeInTheSkyWeb.PubSub,
             "agent:working",
             {:agent_working, state.session_uuid, state.session_id}
           )
 
-          {:noreply, %{state | port: port, current_job: job, session_ref: session_ref}}
+          {:noreply, %{state | sdk_ref: sdk_ref, current_job: job}}
 
         {:error, reason} ->
-          Logger.error("❌ AgentWorker: failed to spawn Claude for session_id=#{state.session_id} - #{inspect(reason)}")
-          # Requeue the job instead of dropping it silently
+          Logger.error(
+            "AgentWorker: failed to start SDK for session_id=#{state.session_id} - #{inspect(reason)}"
+          )
+
           {:noreply, %{state | queue: state.queue ++ [job]}}
       end
     else
       # Busy, queue the job
-      Logger.info("⏳ AgentWorker: busy, queueing message for session_id=#{state.session_id}, queue_length=#{length(state.queue) + 1}")
+      new_queue_length = length(state.queue) + 1
+
+      Logger.info(
+        "AgentWorker: busy, queueing message for session_id=#{state.session_id}, " <>
+          "queue_length=#{new_queue_length}"
+      )
+
+      :telemetry.execute([:eits, :agent, :job, :queued], %{queue_length: new_queue_length}, %{
+        session_id: state.session_id
+      })
+
+      Logger.info(
+        "[telemetry] agent.job.queued session_id=#{state.session_id} queue_length=#{new_queue_length}"
+      )
+
       {:noreply, %{state | queue: state.queue ++ [job]}}
     end
   end
 
-  # Ref-guarded: only process output from the current CLI invocation
+  # SDK result message - contains the final response text + metadata for DB storage
   @impl true
-  def handle_info({:claude_output, ref, line}, %{session_ref: ref} = state) do
-    clean_line = Utils.strip_ansi_codes(line)
+  def handle_info(
+        {:claude_message, ref, %Message{type: :result, content: text, metadata: metadata}},
+        %{sdk_ref: ref} = state
+      ) do
+    state = maybe_sync_session_uuid(state, metadata[:session_id])
+    save_result(text, metadata, state)
 
-    # Always log raw output at debug level so we don't miss anything
-    Logger.debug("[#{state.session_id}] Raw output: #{inspect(line, limit: 500)}")
+    result_len = if(is_binary(text), do: String.length(text), else: 0)
 
-    case Jason.decode(clean_line) do
-      {:ok, parsed} ->
-        type = Map.get(parsed, "type") || Map.get(parsed, :type)
-        subtype = Map.get(parsed, "subtype") || Map.get(parsed, :subtype)
-        Logger.debug("📥 Claude output: session_id=#{state.session_id}, type=#{type}, subtype=#{inspect(subtype)}")
+    :telemetry.execute(
+      [:eits, :agent, :result, :saved],
+      %{
+        text_length: result_len
+      },
+      %{session_id: state.session_id}
+    )
 
-        try do
-          handle_claude_result(parsed, state)
-        rescue
-          e ->
-            Logger.error("❌ [#{state.session_id}] Error handling Claude result: #{inspect(e)}")
-        end
-
-      {:error, reason} ->
-        # Always log non-JSON output, even if empty, as it might contain error messages
-        Logger.warning("⚠️  Non-JSON output from Claude [session=#{state.session_id}]:")
-        Logger.warning("   Raw: #{inspect(line, limit: 500)}")
-        Logger.warning("   Cleaned: #{inspect(clean_line, limit: 500)}")
-        Logger.warning("   Length: #{String.length(clean_line)} chars")
-        Logger.warning("   JSON decode error: #{inspect(reason)}")
-    end
+    Logger.info(
+      "[telemetry] agent.result.saved session_id=#{state.session_id} text_length=#{result_len}"
+    )
 
     {:noreply, state}
   end
 
-  # Ignore output from stale CLI invocations
+  # Other SDK messages (text deltas, tool use, thinking, etc.) - log and ignore
   @impl true
-  def handle_info({:claude_output, _ref, _line}, state) do
-    Logger.debug("[#{state.session_id}] Ignoring output from stale CLI ref")
+  def handle_info({:claude_message, ref, %Message{} = msg}, %{sdk_ref: ref} = state) do
+    Logger.debug("[#{state.session_id}] SDK message: type=#{msg.type}, delta=#{msg.delta}")
+
     {:noreply, state}
   end
 
+  # SDK completion - process next queued job
   @impl true
-  def handle_info({:claude_exit, session_ref, _exit_code}, state)
-      when session_ref == state.session_ref do
-    # Broadcast stopped state
+  def handle_info({:claude_complete, ref, session_id}, %{sdk_ref: ref} = state) do
+    state = maybe_sync_session_uuid(state, session_id)
+
+    Logger.info("[#{state.session_id}] SDK complete")
+
+    :telemetry.execute([:eits, :agent, :sdk, :complete], %{system_time: System.system_time()}, %{
+      session_id: state.session_id
+    })
+
+    Logger.info("[telemetry] agent.sdk.complete session_id=#{state.session_id}")
+
+    update_agent_status(state.session_id, "waiting")
+
     Phoenix.PubSub.broadcast(
       EyeInTheSkyWeb.PubSub,
       "agent:working",
       {:agent_stopped, state.session_uuid, state.session_id}
     )
 
-    # Process next job if queue not empty
-    case state.queue do
-      [] ->
-        {:noreply, %{state | port: nil, current_job: nil, session_ref: nil}}
-
-      [next_job | rest] ->
-        case spawn_claude(state, next_job) do
-          {:ok, port, session_ref} ->
-            Phoenix.PubSub.broadcast(
-              EyeInTheSkyWeb.PubSub,
-              "agent:working",
-              {:agent_working, state.session_uuid, state.session_id}
-            )
-
-            {:noreply,
-             %{state | port: port, current_job: next_job, queue: rest, session_ref: session_ref}}
-
-          {:error, reason} ->
-            Logger.error("Failed to spawn Claude for next job: #{inspect(reason)}")
-            {:noreply, %{state | port: nil, current_job: nil, queue: [next_job | rest]}}
-        end
-    end
+    process_next_job(%{state | sdk_ref: nil, current_job: nil})
   end
+
+  # SDK error
+  @impl true
+  def handle_info({:claude_error, ref, reason}, %{sdk_ref: ref} = state) do
+    Logger.error("[#{state.session_id}] SDK error: #{inspect(reason)}")
+
+    :telemetry.execute([:eits, :agent, :sdk, :error], %{system_time: System.system_time()}, %{
+      session_id: state.session_id,
+      reason: reason
+    })
+
+    Logger.error(
+      "[telemetry] agent.sdk.error session_id=#{state.session_id} reason=#{inspect(reason)}"
+    )
+
+    update_agent_status(state.session_id, "waiting")
+
+    Phoenix.PubSub.broadcast(
+      EyeInTheSkyWeb.PubSub,
+      "agent:working",
+      {:agent_stopped, state.session_uuid, state.session_id}
+    )
+
+    process_next_job(%{state | sdk_ref: nil, current_job: nil})
+  end
+
+  # Stale messages from previous SDK refs - ignore
+  @impl true
+  def handle_info({:claude_message, _ref, _msg}, state), do: {:noreply, state}
 
   @impl true
-  def handle_info({:claude_exit, _ref, _exit_code}, state) do
-    Logger.warning("Received claude_exit for mismatched session_ref, ignoring")
-    {:noreply, state}
-  end
+  def handle_info({:claude_complete, _ref, _sid}, state), do: {:noreply, state}
 
   @impl true
-  def handle_info({:claude_response, _ref, _response}, state) do
-    Logger.debug("Claude response received for agent #{state.session_id}")
-    {:noreply, state}
-  end
-
-  @impl true
-  def handle_info({:claude_error, _ref, _error}, state) do
-    Logger.warning("Claude error for agent #{state.session_id}")
-    {:noreply, state}
-  end
+  def handle_info({:claude_error, _ref, _reason}, state), do: {:noreply, state}
 
   @impl true
   def handle_info(msg, state) do
@@ -191,81 +238,81 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   @impl true
   def terminate(_reason, state) do
-    Utils.close_port_safely(state[:port])
+    if state[:sdk_ref], do: SDK.cancel(state.sdk_ref)
     :ok
   end
 
   # --- Private ---
 
-  defp handle_claude_result(parsed, state) when is_map(parsed) do
-    type = Map.get(parsed, "type") || Map.get(parsed, :type)
+  defp save_result(text, metadata, state) when is_binary(text) do
+    if String.trim(text) == "[NO_RESPONSE]" do
+      Logger.info("[#{state.session_id}] Agent responded with [NO_RESPONSE], skipping")
+    else
+      channel_id = get_in(state, [:current_job, :context, :channel_id])
 
-    case type do
-      "result" ->
-        result = Map.get(parsed, "result") || Map.get(parsed, :result)
+      db_metadata = %{
+        duration_ms: metadata[:duration_ms],
+        total_cost_usd: metadata[:total_cost_usd],
+        usage: metadata[:usage],
+        is_error: metadata[:is_error]
+      }
 
-        if result && is_binary(result) && state.session_id do
-          if String.trim(result) == "[NO_RESPONSE]" do
-            Logger.info("[#{state.session_id}] Agent responded with [NO_RESPONSE], skipping")
-            {:ok, :no_response}
-          else
-            message_uuid = Map.get(parsed, "uuid") || Map.get(parsed, :uuid)
-            duration_ms = Map.get(parsed, "duration_ms")
-            cost = Map.get(parsed, "total_cost_usd")
+      opts = [
+        source_uuid: metadata[:uuid],
+        metadata: db_metadata
+      ]
 
-            metadata = %{
-              duration_ms: duration_ms,
-              total_cost_usd: cost,
-              usage: Map.get(parsed, "usage"),
-              is_error: Map.get(parsed, "is_error")
-            }
+      opts = if channel_id, do: Keyword.put(opts, :channel_id, channel_id), else: opts
 
-            channel_id = get_in(state, [:current_job, :context, :channel_id])
+      case Messages.record_incoming_reply(state.session_id, "claude", text, opts) do
+        {:ok, _message} ->
+          :ok
 
-            opts = [
-              source_uuid: message_uuid,
-              metadata: metadata
-            ]
-
-            opts = if channel_id, do: Keyword.put(opts, :channel_id, channel_id), else: opts
-
-            # record_incoming_reply broadcasts {:new_message} on the session topic,
-            # so we do NOT broadcast again here (was causing duplicate UI events)
-            case Messages.record_incoming_reply(state.session_id, "claude", result, opts) do
-              {:ok, _message} ->
-                {:ok, :recorded}
-
-              {:error, reason} ->
-                Logger.warning("[#{state.session_id}] DB save failed: #{inspect(reason)}")
-                {:ok, :save_failed}
-            end
-          end
-        else
-          Logger.warning("[#{state.session_id}] Result has no text content")
-          {:ok, :no_result}
-        end
-
-      _ ->
-        {:ok, :other_type}
+        {:error, reason} ->
+          Logger.warning("[#{state.session_id}] DB save failed: #{inspect(reason)}")
+      end
     end
   end
 
-  defp spawn_claude(state, job) do
+  defp save_result(_text, _metadata, state) do
+    Logger.warning("[#{state.session_id}] Result has no text content")
+  end
+
+  defp process_next_job(%{queue: []} = state) do
+    {:noreply, state}
+  end
+
+  defp process_next_job(%{queue: [next_job | rest]} = state) do
+    case start_sdk(state, next_job) do
+      {:ok, sdk_ref} ->
+        update_agent_status(state.session_id, "working")
+
+        Phoenix.PubSub.broadcast(
+          EyeInTheSkyWeb.PubSub,
+          "agent:working",
+          {:agent_working, state.session_uuid, state.session_id}
+        )
+
+        {:noreply, %{state | sdk_ref: sdk_ref, current_job: next_job, queue: rest}}
+
+      {:error, reason} ->
+        Logger.error("Failed to start SDK for next job: #{inspect(reason)}")
+        {:noreply, %{state | queue: [next_job | rest]}}
+    end
+  end
+
+  defp start_sdk(state, job) do
     context = job.context
     has_messages = context[:has_messages] || false
-    spawn_type = if has_messages, do: :resume, else: :new
     prompt = job.message
-    session_ref = make_ref()
 
     opts = [
+      to: self(),
       model: context[:model],
-      project_path: state.project_path,
-      output_format: "stream-json",
-      skip_permissions: true,
-      use_script: false,
-      session_ref: session_ref,
-      caller: self(),
       session_id: state.session_uuid,
+      project_path: state.project_path,
+      skip_permissions: true,
+      use_script: true,
       eits_session_id: state.session_uuid,
       eits_agent_id: state.agent_id
     ]
@@ -277,16 +324,66 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         opts
       end
 
-    cli = Utils.cli_module()
+    if has_messages do
+      Logger.info("Resuming session #{state.session_uuid}")
+      SDK.resume(state.session_uuid, prompt, opts)
+    else
+      Logger.info("Starting new session #{state.session_uuid}")
+      SDK.start(prompt, opts)
+    end
+  end
 
-    case spawn_type do
-      :resume ->
-        Logger.info("Resuming session #{state.session_uuid}")
-        cli.resume_session(state.session_uuid, prompt, opts)
+  defp maybe_sync_session_uuid(state, claude_session_uuid)
+       when is_binary(claude_session_uuid) and claude_session_uuid != "" do
+    if state.session_uuid == claude_session_uuid do
+      state
+    else
+      case Agents.get_execution_agent(state.session_id) do
+        {:ok, execution_agent} ->
+          case Agents.update_execution_agent(execution_agent, %{uuid: claude_session_uuid}) do
+            {:ok, _updated} ->
+              Logger.info(
+                "[#{state.session_id}] Updated execution session uuid #{state.session_uuid} -> #{claude_session_uuid}"
+              )
 
-      :new ->
-        Logger.info("Starting new session #{state.session_uuid}")
-        cli.spawn_new_session(prompt, opts)
+              %{state | session_uuid: claude_session_uuid}
+
+            {:error, reason} ->
+              Logger.warning(
+                "[#{state.session_id}] Failed to update execution session uuid: #{inspect(reason)}"
+              )
+
+              state
+          end
+
+        {:error, reason} ->
+          Logger.warning(
+            "[#{state.session_id}] Failed to load execution session for uuid sync: #{inspect(reason)}"
+          )
+
+          state
+      end
+    end
+  end
+
+  defp maybe_sync_session_uuid(state, _), do: state
+
+  defp update_agent_status(session_id, status) do
+    case Agents.get_execution_agent(session_id) do
+      {:ok, agent} ->
+        attrs = %{status: status}
+
+        attrs =
+          if status == "waiting" do
+            Map.put(attrs, :last_activity_at, DateTime.utc_now() |> DateTime.to_iso8601())
+          else
+            attrs
+          end
+
+        Agents.update_execution_agent(agent, attrs)
+
+      {:error, _} ->
+        :ok
     end
   end
 end

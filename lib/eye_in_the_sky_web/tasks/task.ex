@@ -22,7 +22,7 @@ defmodule EyeInTheSkyWeb.Tasks.Task do
       foreign_key: :agent_id,
       type: :integer
 
-    many_to_many :sessions, EyeInTheSkyWeb.Sessions.Session,
+    many_to_many :agents, EyeInTheSkyWeb.Agents.Agent,
       join_through: "task_sessions",
       join_keys: [task_id: :id, session_id: :id],
       on_replace: :delete

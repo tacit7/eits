@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.Projects.Project do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, :id, autogenerate: false}
+  @primary_key {:id, :id, autogenerate: true}
   schema "projects" do
     field :name, :string
     field :path, :string

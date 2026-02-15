@@ -16,8 +16,17 @@ defmodule EyeInTheSkyWeb.Notes.Note do
   @doc false
   def changeset(note, attrs) do
     note
-    |> cast(attrs, [:uuid, :parent_type, :parent_id, :title, :body])
+    |> cast(attrs, [:uuid, :parent_type, :parent_id, :title, :body, :starred])
+    |> maybe_generate_uuid()
     |> validate_required([:parent_type, :parent_id, :body])
     |> validate_inclusion(:parent_type, ["session", "task", "agent"])
+  end
+
+  defp maybe_generate_uuid(changeset) do
+    if get_field(changeset, :uuid) do
+      changeset
+    else
+      put_change(changeset, :uuid, Ecto.UUID.generate())
+    end
   end
 end

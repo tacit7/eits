@@ -12,6 +12,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Skills do
       |> assign(:filtered_skills, skills)
       |> assign(:search, "")
       |> assign(:selected_skill, nil)
+      |> assign(:sidebar_tab, :skills)
+      |> assign(:sidebar_project, nil)
 
     {:ok, socket}
   end
@@ -142,9 +144,6 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Skills do
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_component module={EyeInTheSkyWebWeb.Components.Navbar} id="navbar" />
-    <EyeInTheSkyWebWeb.Components.OverviewNav.render current_tab={:skills} />
-
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <div class="max-w-6xl mx-auto">
         <%= if length(@skills) > 0 do %>
@@ -198,14 +197,16 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Skills do
                 <% end %>
               </div>
             </div>
-
-            <!-- Right: skill viewer -->
+            
+    <!-- Right: skill viewer -->
             <%= if @selected_skill do %>
               <div class="sticky top-20">
                 <div class="card bg-base-100 border border-base-300 shadow-sm">
                   <div class="card-body p-0">
                     <div class="flex items-center justify-between px-4 py-2 border-b border-base-300 bg-base-200/50">
-                      <code class="text-sm font-semibold text-base-content">/{@selected_skill.slug}</code>
+                      <code class="text-sm font-semibold text-base-content">
+                        /{@selected_skill.slug}
+                      </code>
                       <button phx-click="close_viewer" class="btn btn-ghost btn-xs btn-circle">
                         <.icon name="hero-x-mark" class="w-4 h-4" />
                       </button>
@@ -225,15 +226,12 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Skills do
             <% end %>
           </div>
         <% else %>
-          <div class="text-center py-12">
-            <svg class="mx-auto h-12 w-12 text-base-content/40" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M6.122.392a1.75 1.75 0 0 1 1.756 0l5.25 3.045c.54.313.872.89.872 1.514V7.25a.75.75 0 0 1-1.5 0V5.677L7.75 8.432v6.384a1 1 0 0 1-1.502.865L.872 12.563A1.75 1.75 0 0 1 0 11.049V4.951c0-.624.332-1.2.872-1.514ZM7 7.564 11.546 5 7 2.437 2.454 5Z" />
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-base-content">No skills found</h3>
-            <p class="mt-1 text-sm text-base-content/60">
-              Add .md files to ~/.claude/commands/ or ~/.claude/skills/ to create skills
-            </p>
-          </div>
+          <.empty_state
+            id="overview-skills-empty"
+            icon="hero-code-bracket"
+            title="No skills found"
+            subtitle="Add .md files to ~/.claude/commands/ or ~/.claude/skills/ to create skills"
+          />
         <% end %>
       </div>
     </div>

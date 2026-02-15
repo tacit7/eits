@@ -27,6 +27,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Config do
     socket =
       socket
       |> assign(:page_title, "Config")
+      |> assign(:sidebar_tab, :config)
+      |> assign(:sidebar_project, nil)
       |> assign(:files, files)
       |> assign(:dirs, dirs)
       |> assign(:selected_file, nil)
@@ -181,12 +183,15 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Config do
                 <span class="font-mono text-xs">{entry.name}/</span>
                 <span class="badge badge-ghost badge-xs">{length(entry.children)}</span>
               </div>
-              <.icon name="hero-chevron-right" class={"w-4 h-4 text-base-content/40 transition-transform #{if is_expanded, do: "rotate-90"}"} />
+              <.icon
+                name="hero-chevron-right"
+                class={"w-4 h-4 text-base-content/40 transition-transform #{if is_expanded, do: "rotate-90"}"}
+              />
             </div>
             <%= if is_expanded do %>
               <div class="px-2 pb-2">
                 <%= if length(entry.children) > 0 do %>
-                  <%= render_entries(assign(assigns, :entries, entry.children)) %>
+                  {render_entries(assign(assigns, :entries, entry.children))}
                 <% else %>
                   <p class="text-xs text-base-content/40 italic px-2">Empty directory</p>
                 <% end %>
@@ -212,9 +217,6 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Config do
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_component module={EyeInTheSkyWebWeb.Components.Navbar} id="navbar" />
-    <EyeInTheSkyWebWeb.Components.OverviewNav.render current_tab={:config} />
-
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <div class="max-w-6xl mx-auto">
         <div class={if @selected_file, do: "grid grid-cols-1 lg:grid-cols-2 gap-6", else: ""}>
@@ -238,7 +240,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Config do
                       <code class="text-sm font-semibold text-base-content">{file.name}</code>
                       <span class="text-xs text-base-content/40">{file.description}</span>
                       <%= if file.exists do %>
-                        <span class="text-xs text-base-content/40 ml-auto">{format_size(file.size)}</span>
+                        <span class="text-xs text-base-content/40 ml-auto">
+                          {format_size(file.size)}
+                        </span>
                       <% else %>
                         <span class="badge badge-ghost badge-xs ml-auto">missing</span>
                       <% end %>
@@ -247,8 +251,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Config do
                 </button>
               <% end %>
             </div>
-
-            <!-- Directories -->
+            
+    <!-- Directories -->
             <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">
               Directories
             </h2>
@@ -267,12 +271,15 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Config do
                       <span class="text-xs text-base-content/40">{dir.description}</span>
                       <span class="badge badge-ghost badge-xs ml-auto">{length(dir.entries)}</span>
                     </div>
-                    <.icon name="hero-chevron-right" class={"w-4 h-4 text-base-content/40 transition-transform #{if is_expanded, do: "rotate-90"}"} />
+                    <.icon
+                      name="hero-chevron-right"
+                      class={"w-4 h-4 text-base-content/40 transition-transform #{if is_expanded, do: "rotate-90"}"}
+                    />
                   </div>
                   <%= if is_expanded do %>
                     <div class="px-4 pb-3">
                       <%= if length(dir.entries) > 0 do %>
-                        <%= render_entries(assign(assigns, :entries, dir.entries)) %>
+                        {render_entries(assign(assigns, :entries, dir.entries))}
                       <% else %>
                         <p class="text-xs text-base-content/40 italic">Empty directory</p>
                       <% end %>
@@ -282,8 +289,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Config do
               <% end %>
             </div>
           </div>
-
-          <!-- Right: file viewer -->
+          
+    <!-- Right: file viewer -->
           <%= if @selected_file do %>
             <div class="sticky top-20">
               <div class="card bg-base-100 border border-base-300 shadow-sm">
@@ -291,7 +298,11 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Config do
                   <div class="flex items-center justify-between px-4 py-2 border-b border-base-300 bg-base-200/50">
                     <code class="text-sm font-semibold text-base-content">{@selected_file}</code>
                     <div class="flex items-center gap-1">
-                      <button phx-click="open_file" class="btn btn-ghost btn-xs" title="Open in editor">
+                      <button
+                        phx-click="open_file"
+                        class="btn btn-ghost btn-xs"
+                        title="Open in editor"
+                      >
                         <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit
                       </button>
                       <button phx-click="close_viewer" class="btn btn-ghost btn-xs btn-circle">
@@ -301,7 +312,11 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Config do
                   </div>
                   <div class="overflow-auto max-h-[70vh]">
                     <%= if String.ends_with?(@selected_file, ".json") do %>
-                      <pre id="json-viewer" class="p-4 text-xs font-mono whitespace-pre-wrap break-all" phx-hook="Highlight"><code class="language-json">{@file_content}</code></pre>
+                      <pre
+                        id="json-viewer"
+                        class="p-4 text-xs font-mono whitespace-pre-wrap break-all"
+                        phx-hook="Highlight"
+                      ><code class="language-json">{@file_content}</code></pre>
                     <% else %>
                       <div
                         id="config-viewer"

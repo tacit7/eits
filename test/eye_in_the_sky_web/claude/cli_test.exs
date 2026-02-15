@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.Claude.CLITest do
     test "spawns Claude process with -p (print mode)" do
       # Simple test: spawn Claude with -p flag and verify port is opened
       prompt = "hello"
+
       opts = [
         model: "sonnet",
         output_format: "stream-json",

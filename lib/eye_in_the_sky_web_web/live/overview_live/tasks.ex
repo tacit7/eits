@@ -6,6 +6,10 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "tasks")
+    end
+
     workflow_states = Tasks.list_workflow_states()
 
     socket =
@@ -15,6 +19,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
       |> assign(:workflow_states, workflow_states)
       |> assign(:state_filter, "all")
       |> assign(:tasks, [])
+      |> assign(:sidebar_tab, :tasks)
+      |> assign(:sidebar_project, nil)
       |> load_tasks()
 
     {:ok, socket}
@@ -42,6 +48,11 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_info(:tasks_changed, socket) do
+    {:noreply, load_tasks(socket)}
+  end
+
   defp load_tasks(socket) do
     query = socket.assigns.search_query
     state_filter = socket.assigns.state_filter
@@ -55,7 +66,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
 
     tasks =
       case state_filter do
-        "all" -> tasks
+        "all" ->
+          tasks
+
         state_id_str ->
           case Integer.parse(state_id_str) do
             {state_id, ""} -> Enum.filter(tasks, &(&1.state_id == state_id))
@@ -69,83 +82,76 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_component module={EyeInTheSkyWebWeb.Components.Navbar} id="navbar" />
-    <EyeInTheSkyWebWeb.Components.OverviewNav.render current_tab={:tasks} />
+    <div class="px-6 lg:px-8 py-6">
+      <div class="max-w-4xl mx-auto">
+        <%!-- Search + State filters --%>
+        <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <form phx-change="search" class="flex-1 max-w-sm">
+            <div class="relative">
+              <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
+              </div>
+              <input
+                type="text"
+                name="query"
+                value={@search_query}
+                placeholder="Search tasks..."
+                class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
+                autocomplete="off"
+              />
+            </div>
+          </form>
 
-    <div class="px-4 sm:px-6 lg:px-8 py-6">
-      <div class="flex items-center gap-4 max-w-4xl">
-        <form phx-change="search" class="flex-1">
-          <input
-            type="text"
-            name="query"
-            value={@search_query}
-            placeholder="Search tasks by title or description..."
-            class="input input-bordered w-full"
-            autocomplete="off"
-          />
-        </form>
-        <!-- State filter -->
-        <div class="btn-group">
-          <button
-            phx-click="filter_state"
-            phx-value-state="all"
-            class={"btn btn-sm #{if @state_filter == "all", do: "btn-active"}"}
-          >
-            All
-          </button>
-          <%= for state <- @workflow_states do %>
+          <div class="flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
             <button
               phx-click="filter_state"
-              phx-value-state={to_string(state.id)}
-              class={"btn btn-sm #{if @state_filter == to_string(state.id), do: "btn-active"}"}
+              phx-value-state="all"
+              class={"px-3 py-1 rounded-md text-xs font-medium transition-all duration-150 " <>
+                if(@state_filter == "all",
+                  do: "bg-base-100 text-base-content shadow-sm",
+                  else: "text-base-content/40 hover:text-base-content/60"
+                )}
             >
-              {state.name}
+              All
             </button>
-          <% end %>
-        </div>
-      </div>
-    </div>
-
-    <div class="px-4 sm:px-6 lg:px-8 pb-8">
-      <%= if length(@tasks) > 0 do %>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          <%= for task <- @tasks do %>
-            <TaskCard.task_card task={task} variant="grid" />
-          <% end %>
-        </div>
-      <% else %>
-        <div class="text-center py-16">
-          <div class="mx-auto w-24 h-24 bg-base-200 rounded-full flex items-center justify-center mb-4">
-            <svg
-              class="w-12 h-12 text-base-content/40"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-              />
-            </svg>
+            <%= for state <- @workflow_states do %>
+              <button
+                phx-click="filter_state"
+                phx-value-state={to_string(state.id)}
+                class={"px-3 py-1 rounded-md text-xs font-medium transition-all duration-150 " <>
+                  if(@state_filter == to_string(state.id),
+                    do: "bg-base-100 text-base-content shadow-sm",
+                    else: "text-base-content/40 hover:text-base-content/60"
+                  )}
+              >
+                {state.name}
+              </button>
+            <% end %>
           </div>
-          <h3 class="text-lg font-semibold text-base-content mb-2">
-            <%= if @search_query != "" do %>
-              No tasks found
-            <% else %>
-              No tasks yet
-            <% end %>
-          </h3>
-          <p class="text-sm text-base-content/60">
-            <%= if @search_query != "" do %>
-              Try adjusting your search query
-            <% else %>
-              Tasks created by agents will appear here
-            <% end %>
-          </p>
         </div>
-      <% end %>
+
+        <%!-- Task count --%>
+        <div class="mb-3">
+          <span class="text-[11px] font-mono tabular-nums text-base-content/30 tracking-wider uppercase">
+            {length(@tasks)} tasks
+          </span>
+        </div>
+
+        <%= if length(@tasks) > 0 do %>
+          <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-5">
+            <%= for task <- @tasks do %>
+              <TaskCard.task_card task={task} variant="list" />
+            <% end %>
+          </div>
+        <% else %>
+          <.empty_state
+            id="overview-tasks-empty"
+            icon="hero-clipboard-document-list"
+            title={if @search_query != "" || @state_filter != "all", do: "No tasks found", else: "No tasks yet"}
+            subtitle={if @search_query != "" || @state_filter != "all", do: "Try adjusting your search or filters", else: "Tasks created by agents will appear here"}
+          />
+        <% end %>
+      </div>
     </div>
     """
   end

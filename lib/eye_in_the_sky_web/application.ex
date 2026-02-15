@@ -25,6 +25,8 @@ defmodule EyeInTheSkyWeb.Application do
       {Registry, keys: :duplicate, name: EyeInTheSkyWeb.Claude.Registry},
       # Unique registry for agent worker naming (:via requires unique keys)
       {Registry, keys: :unique, name: EyeInTheSkyWeb.Claude.AgentRegistry},
+      # SDK registry for tracking running Claude CLI processes
+      EyeInTheSkyWeb.Claude.SDK.Registry,
       # DynamicSupervisor for per-session workers
       {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.SessionSupervisor, strategy: :one_for_one},
       # DynamicSupervisor for persistent agent workers
@@ -35,6 +37,11 @@ defmodule EyeInTheSkyWeb.Application do
       {Oban, Application.fetch_env!(:eye_in_the_sky_web, Oban)},
       # Scheduled jobs enqueuer (polls due jobs, enqueues Oban workers)
       EyeInTheSkyWeb.Scheduler.JobEnqueuer,
+      # Poll for external task changes (Go MCP i-todo writes)
+      EyeInTheSkyWeb.Tasks.Poller,
+      # NATS pub/sub consumer
+      # Connects to localhost:4222, subscribes to events.>, dispatches to Handler
+      EyeInTheSkyWeb.NATS.Consumer,
       # Start to serve requests, typically the last entry
       EyeInTheSkyWebWeb.Endpoint
     ]

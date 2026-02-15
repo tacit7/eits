@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.SessionsTest do
   use EyeInTheSkyWebWeb.ConnCase
 
   import Phoenix.LiveViewTest
-  alias EyeInTheSkyWeb.{Projects, Agents, Sessions}
+  alias EyeInTheSkyWeb.{Projects, Agents, ChatAgents}
 
   setup do
     # Create a test project
@@ -59,15 +59,15 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.SessionsTest do
       assert agent.project_id == project.id
       assert agent.git_worktree_path == project.path
 
-      # Check session was created
-      sessions = Sessions.list_sessions()
-      assert length(sessions) == 1
-      session = hd(sessions)
-      assert session.agent_id == agent.id
-      assert session.name == "Test Agent"
-      assert session.description == "Test description"
-      assert session.model_name == "sonnet"
-      assert session.model_provider == "claude"
+      # Check execution agent was created
+      execution_agents = Agents.list_agents()
+      assert length(execution_agents) == 1
+      execution_agent = hd(execution_agents)
+      assert execution_agent.agent_id == agent.id
+      assert execution_agent.name == "Test Agent"
+      assert execution_agent.description == "Test description"
+      assert execution_agent.model_name == "sonnet"
+      assert execution_agent.model_provider == "claude"
     end
 
     test "new agent appears in filtered agents list after creation", %{

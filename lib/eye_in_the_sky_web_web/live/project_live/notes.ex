@@ -27,6 +27,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
         socket
         |> assign(:page_title, "Notes - #{project.name}")
         |> assign(:project, project)
+        |> assign(:sidebar_tab, :notes)
+        |> assign(:sidebar_project, project)
         |> assign(:tasks, tasks)
         |> assign(:search_query, "")
         |> assign(:starred_filter, false)
@@ -84,11 +86,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
     project = socket.assigns.project
     agent_ids = Enum.map(project.agents, & &1.id)
 
-    # Get all session IDs for agents in this project
-    session_ids =
-      from(s in EyeInTheSkyWeb.Sessions.Session,
-        where: s.agent_id in ^agent_ids,
-        select: s.id
+    # Get all execution agent IDs for chat agents in this project
+    execution_agent_ids =
+      from(ea in EyeInTheSkyWeb.Agents.Agent,
+        where: ea.agent_id in ^agent_ids,
+        select: ea.id
       )
       |> Repo.all()
 
@@ -103,14 +105,15 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
       else
         project_id_str = to_string(project.id)
         agent_id_strs = Enum.map(agent_ids, &to_string/1)
-        session_id_strs = Enum.map(session_ids, &to_string/1)
+        execution_agent_id_strs = Enum.map(execution_agent_ids, &to_string/1)
 
         base =
           from(n in EyeInTheSkyWeb.Notes.Note,
             where:
               (n.parent_type in ["project", "projects"] and n.parent_id == ^project_id_str) or
                 (n.parent_type in ["agent", "agents"] and n.parent_id in ^agent_id_strs) or
-                (n.parent_type in ["session", "sessions"] and n.parent_id in ^session_id_strs),
+                (n.parent_type in ["session", "sessions"] and
+                   n.parent_id in ^execution_agent_id_strs),
             order_by: [desc: n.created_at]
           )
 
@@ -124,137 +127,111 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
   @impl true
   def render(assigns) do
     ~H"""
-    <style>
-      .collapse input[type="checkbox"] {
-        position: absolute;
-        opacity: 0;
-      }
-      .star-icon {
-        cursor: pointer;
-        transition: all 0.2s ease;
-        z-index: 10;
-        position: relative;
-        background: none;
-        border: none;
-        padding: 0.25rem;
-        border-radius: 0.25rem;
-      }
-      .star-icon:hover {
-        transform: scale(1.15);
-        background: rgba(0, 0, 0, 0.05);
-      }
-      .star-icon:active {
-        transform: scale(1.05);
-      }
-    </style>
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.Navbar}
-      id="navbar"
-      current_project={@project}
-    />
-
-    <EyeInTheSkyWebWeb.Components.ProjectNav.render
-      project={@project}
-      tasks={@tasks}
-      current_tab={:notes}
-    />
-
-    <div class="px-4 sm:px-6 lg:px-8 py-8">
-      <div class="max-w-6xl mx-auto">
-        <!-- Search + Filter -->
-        <div class="mb-6 flex items-center gap-3">
-          <form phx-change="search" class="flex-1">
-            <input
-              type="text"
-              name="query"
-              value={@search_query}
-              placeholder="Search notes by content..."
-              class="input input-bordered w-full"
-              autocomplete="off"
-            />
+    <div class="px-6 lg:px-8 py-6">
+      <div class="max-w-3xl mx-auto">
+        <%!-- Search + Filter --%>
+        <div class="mb-5 flex items-center gap-3">
+          <form phx-change="search" class="flex-1 max-w-sm">
+            <div class="relative">
+              <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
+              </div>
+              <input
+                type="text"
+                name="query"
+                value={@search_query}
+                placeholder="Search notes..."
+                class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
+                autocomplete="off"
+              />
+            </div>
           </form>
           <button
             type="button"
             phx-click="toggle_starred_filter"
-            class={"btn btn-sm gap-2 #{if @starred_filter, do: "btn-warning", else: "btn-ghost"}"}
+            class={"flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all duration-150 " <>
+              if(@starred_filter,
+                do: "bg-warning/10 text-warning",
+                else: "text-base-content/35 hover:text-base-content/50 hover:bg-base-200/40"
+              )}
           >
             <.icon
               name={if @starred_filter, do: "hero-star-solid", else: "hero-star"}
-              class="w-4 h-4"
-            />
-            Starred
+              class="w-3.5 h-3.5"
+            /> Starred
           </button>
         </div>
 
+        <%!-- Notes count --%>
+        <div class="mb-3">
+          <span class="text-[11px] font-mono tabular-nums text-base-content/30 tracking-wider uppercase">
+            {length(@notes)} notes
+          </span>
+        </div>
+
         <%= if length(@notes) > 0 do %>
-          <!-- Notes Accordion -->
-          <div class="join join-vertical w-full">
+          <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-5">
             <%= for note <- @notes do %>
-              <div class="collapse collapse-arrow join-item border border-base-300">
-                <!-- Collapse Title -->
-                <input type="checkbox" />
-                <div class="collapse-title bg-base-100 hover:bg-base-100/80 transition-colors">
-                  <div class="flex items-center justify-between">
-                    <label class="flex items-center gap-3 flex-1 cursor-pointer">
-                      <.icon name="hero-document-text" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
-                      <div class="flex flex-col gap-1">
-                        <h3 class="font-semibold text-sm text-base-content">
-                          {note.title || extract_title(note.body)}
-                        </h3>
-                        <div class="flex items-center gap-2 text-xs text-base-content/60">
-                          <span class="font-mono">{String.slice(note.parent_id, 0..7)}</span>
-                          <span>•</span>
-                          <span>{format_timestamp(note.created_at)}</span>
-                        </div>
-                      </div>
-                    </label>
-                    <button
-                      type="button"
-                      class="star-icon"
-                      phx-click="toggle_star"
-                      phx-value-note_id={note.id}
-                      onclick="event.stopPropagation(); event.preventDefault();"
-                    >
-                      <.icon
-                        name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}
-                        class={"w-5 h-5 #{if note.starred == 1, do: "text-warning", else: "text-base-content/40"}"}
-                      />
-                    </button>
+              <div class="collapse collapse-arrow">
+                <input type="checkbox" class="min-h-0 p-0" />
+                <div class="collapse-title py-3.5 px-0 min-h-0 flex flex-col gap-1">
+                  <span class="text-sm font-medium text-base-content/85 truncate pr-6">
+                    {note.title || extract_title(note.body)}
+                  </span>
+                  <div class="flex items-center gap-1.5 text-xs text-base-content/35">
+                    <span>{note.parent_type}</span>
+                    <span class="text-base-content/15">&middot;</span>
+                    <span class="font-mono tabular-nums">{format_date(note.created_at)}</span>
+                    <%= if note.starred == 1 do %>
+                      <span class="text-base-content/15">&middot;</span>
+                      <.icon name="hero-star-solid" class="w-3 h-3 text-warning" />
+                    <% end %>
                   </div>
                 </div>
-                
-    <!-- Collapse Content -->
-                <div class="collapse-content bg-base-50">
+                <div class="collapse-content px-0 pb-4">
                   <div
                     id={"note-body-#{note.id}"}
-                    class="dm-markdown text-sm text-base-content leading-relaxed"
+                    class="dm-markdown text-sm text-base-content/70 leading-relaxed"
                     phx-hook="MarkdownMessage"
                     data-raw-body={note.body}
-                  ></div>
+                  >
+                  </div>
+                  <button
+                    type="button"
+                    phx-click="toggle_star"
+                    phx-value-note_id={note.id}
+                    class="mt-3 flex items-center gap-1.5 text-xs text-base-content/30 hover:text-warning transition-colors"
+                  >
+                    <.icon
+                      name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}
+                      class={"w-3.5 h-3.5 #{if note.starred == 1, do: "text-warning", else: ""}"}
+                    />
+                    {if note.starred == 1, do: "Starred", else: "Star"}
+                  </button>
                 </div>
               </div>
             <% end %>
           </div>
         <% else %>
-          <!-- Empty State -->
-          <div class="text-center py-12">
-            <.icon name="hero-document-text" class="mx-auto h-12 w-12 text-base-content/40" />
-            <h3 class="mt-2 text-sm font-medium text-base-content">No notes yet</h3>
-            <p class="mt-1 text-sm text-base-content/60">
-              Notes from agents will appear here
-            </p>
-          </div>
+          <.empty_state
+            id="project-notes-empty"
+            icon="hero-document-text"
+            title="No notes yet"
+            subtitle="Notes from agents will appear here"
+          />
         <% end %>
       </div>
     </div>
     """
   end
 
-  defp format_timestamp(nil), do: ""
+  defp format_date(nil), do: ""
 
-  defp format_timestamp(timestamp) when is_binary(timestamp) do
-    # Timestamp is stored as string, just display it as-is or format as needed
-    timestamp
+  defp format_date(timestamp) when is_binary(timestamp) do
+    case String.split(timestamp, [" ", "T"], parts: 2) do
+      [date | _] -> date
+      _ -> timestamp
+    end
   end
 
   defp extract_title(body) when is_nil(body), do: "Untitled"

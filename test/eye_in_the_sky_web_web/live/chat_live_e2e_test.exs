@@ -11,13 +11,13 @@ defmodule EyeInTheSkyWebWeb.ChatLiveE2ETest do
 
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Projects, Sessions}
+  alias EyeInTheSkyWeb.{Agents, ChatAgents, Channels, Messages, Projects}
   alias EyeInTheSkyWeb.Claude.{SessionManager, SessionWorker}
 
-  @web_agent_uuid "00000000-0000-0000-0000-000000000001"
-  @web_session_uuid "00000000-0000-0000-0000-000000000002"
-  @test_agent_uuid "test-agent-e2e-uuid"
-  @test_session_uuid "test-session-e2e-uuid"
+  @web_chat_agent_uuid "00000000-0000-0000-0000-000000000001"
+  @web_execution_agent_uuid "00000000-0000-0000-0000-000000000002"
+  @test_chat_agent_uuid "test-agent-e2e-uuid"
+  @test_execution_agent_uuid "test-execution-e2e-uuid"
 
   setup %{conn: conn} do
     # Only restart SessionManager components, not PubSub (it's started by the application)
@@ -43,36 +43,36 @@ defmodule EyeInTheSkyWebWeb.ChatLiveE2ETest do
         active: true
       })
 
-    # Create web UI agent and session
-    {:ok, web_agent} =
-      Agents.create_agent(%{
-        uuid: @web_agent_uuid,
+    # Create web UI chat agent and execution agent
+    {:ok, web_chat_agent} =
+      ChatAgents.create_chat_agent(%{
+        uuid: @web_chat_agent_uuid,
         description: "Web UI User",
         source: "web",
         project_id: project.id
       })
 
-    {:ok, web_session} =
-      Sessions.create_session(%{
-        uuid: @web_session_uuid,
-        agent_id: web_agent.id,
+    {:ok, web_execution_agent} =
+      Agents.create_execution_agent(%{
+        uuid: @web_execution_agent_uuid,
+        agent_id: web_chat_agent.id,
         name: "Web UI",
         started_at: DateTime.utc_now() |> DateTime.to_iso8601()
       })
 
-    # Create test agent that will receive messages
-    {:ok, test_agent} =
-      Agents.create_agent(%{
-        uuid: @test_agent_uuid,
+    # Create test chat agent and execution agent that will receive messages
+    {:ok, test_chat_agent} =
+      ChatAgents.create_chat_agent(%{
+        uuid: @test_chat_agent_uuid,
         description: "Test Agent",
         source: "test",
         project_id: project.id
       })
 
-    {:ok, test_session} =
-      Sessions.create_session(%{
-        uuid: @test_session_uuid,
-        agent_id: test_agent.id,
+    {:ok, test_execution_agent} =
+      Agents.create_execution_agent(%{
+        uuid: @test_execution_agent_uuid,
+        agent_id: test_chat_agent.id,
         name: "Test Session",
         started_at: DateTime.utc_now() |> DateTime.to_iso8601()
       })
@@ -82,43 +82,43 @@ defmodule EyeInTheSkyWebWeb.ChatLiveE2ETest do
       Channels.create_channel(%{
         name: "E2E Test Channel",
         project_id: project.id,
-        session_id: web_session.id
+        session_id: web_execution_agent.id
       })
 
     %{
       conn: conn,
       project: project,
-      web_agent: web_agent,
-      web_session: web_session,
-      test_agent: test_agent,
-      test_session: test_session,
+      web_chat_agent: web_chat_agent,
+      web_execution_agent: web_execution_agent,
+      test_chat_agent: test_chat_agent,
+      test_execution_agent: test_execution_agent,
       channel: channel
     }
   end
 
   describe "end-to-end chat flow" do
     test "user sends message → SessionManager spawns worker → mock CLI processes → UI updates",
-         %{conn: conn, channel: channel, test_session: test_session} do
+         %{conn: conn, channel: channel, test_execution_agent: test_execution_agent} do
       # Mount the chat page
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
       # Subscribe to PubSub to verify status broadcasts
-      subscribe_session_status(test_session.uuid)
+      subscribe_session_status(test_execution_agent.uuid)
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "channel:#{channel.id}:messages")
 
       # Send a message targeting the test agent
       view
       |> form("#dm-form", %{
-        "target_id" => to_string(test_session.id),
+        "target_id" => to_string(test_execution_agent.id),
         "body" => "Hello from E2E test"
       })
       |> render_submit()
 
       # Verify SessionManager spawned a worker
-      assert {:ok, worker_pid} = await_worker(test_session.uuid, 2000)
+      assert {:ok, worker_pid} = await_worker(test_execution_agent.uuid, 2000)
 
       # Verify worker is processing
-      assert_status_broadcast(test_session.uuid, :working, 2000)
+      assert_status_broadcast(test_execution_agent.uuid, :working, 2000)
 
       # Get the mock port and send a simulated response
       port = get_mock_port(worker_pid)
@@ -160,7 +160,7 @@ defmodule EyeInTheSkyWebWeb.ChatLiveE2ETest do
       send_mock_exit(port, 0)
 
       # Verify worker goes idle
-      assert_status_broadcast(test_session.uuid, :idle, 2000)
+      assert_status_broadcast(test_execution_agent.uuid, :idle, 2000)
 
       # Verify worker is still alive but idle
       assert Process.alive?(worker_pid)
@@ -168,23 +168,27 @@ defmodule EyeInTheSkyWebWeb.ChatLiveE2ETest do
       assert info.processing == false
     end
 
-    test "multiple messages queue correctly", %{conn: conn, channel: channel, test_session: test_session} do
+    test "multiple messages queue correctly", %{
+      conn: conn,
+      channel: channel,
+      test_execution_agent: test_execution_agent
+    } do
       # Mount the chat page
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
-      subscribe_session_status(test_session.uuid)
+      subscribe_session_status(test_execution_agent.uuid)
 
       # Send first message
       view
       |> form("#dm-form", %{
-        "target_id" => to_string(test_session.id),
+        "target_id" => to_string(test_execution_agent.id),
         "body" => "First message"
       })
       |> render_submit()
 
       # Wait for worker to start
-      assert {:ok, worker_pid} = await_worker(test_session.uuid)
-      assert_status_broadcast(test_session.uuid, :working)
+      assert {:ok, worker_pid} = await_worker(test_execution_agent.uuid)
+      assert_status_broadcast(test_execution_agent.uuid, :working)
 
       # Get the mock port and make it hang (simulate slow processing)
       port = get_mock_port(worker_pid)
@@ -194,7 +198,7 @@ defmodule EyeInTheSkyWebWeb.ChatLiveE2ETest do
       for i <- 2..4 do
         view
         |> form("#dm-form", %{
-          "target_id" => to_string(test_session.id),
+          "target_id" => to_string(test_execution_agent.id),
           "body" => "Message #{i}"
         })
         |> render_submit()
@@ -206,39 +210,41 @@ defmodule EyeInTheSkyWebWeb.ChatLiveE2ETest do
       # Verify messages were queued
       info = SessionWorker.get_info(worker_pid)
       assert info.queue_depth >= 2
-      assert info.queue_depth <= 3  # Some might have been queued
+      # Some might have been queued
+      assert info.queue_depth <= 3
 
       # Verify we still have only one worker
-      assert [{^worker_pid, _}] = Registry.lookup(@registry, {:session, test_session.uuid})
+      assert [{^worker_pid, _}] =
+               Registry.lookup(@registry, {:session, test_execution_agent.uuid})
     end
 
     test "UI updates when worker broadcasts status changes", %{
       conn: conn,
       channel: channel,
-      test_session: test_session
+      test_execution_agent: test_execution_agent
     } do
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
-      subscribe_session_status(test_session.uuid)
+      subscribe_session_status(test_execution_agent.uuid)
 
       # Send a message
       view
       |> form("#dm-form", %{
-        "target_id" => to_string(test_session.id),
+        "target_id" => to_string(test_execution_agent.id),
         "body" => "Status test"
       })
       |> render_submit()
 
       # Verify working status broadcast
-      assert_status_broadcast(test_session.uuid, :working)
+      assert_status_broadcast(test_execution_agent.uuid, :working)
 
       # Get worker and complete the work
-      {:ok, worker_pid} = await_worker(test_session.uuid)
+      {:ok, worker_pid} = await_worker(test_execution_agent.uuid)
       port = get_mock_port(worker_pid)
       send_mock_exit(port, 0)
 
       # Verify idle status broadcast
-      assert_status_broadcast(test_session.uuid, :idle)
+      assert_status_broadcast(test_execution_agent.uuid, :idle)
 
       # The LiveView should have received these broadcasts and updated its state
       # In a real scenario, you'd check the HTML for status indicators
@@ -265,7 +271,7 @@ defmodule EyeInTheSkyWebWeb.ChatLiveE2ETest do
     test "channel messages are published to NATS", %{
       conn: conn,
       channel: channel,
-      web_session: web_session
+      web_execution_agent: web_execution_agent
     } do
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
@@ -287,19 +293,19 @@ defmodule EyeInTheSkyWebWeb.ChatLiveE2ETest do
     test "worker recovers from crash and allows new session", %{
       conn: conn,
       channel: channel,
-      test_session: test_session
+      test_execution_agent: test_execution_agent
     } do
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
       # Start a session
       view
       |> form("#dm-form", %{
-        "target_id" => to_string(test_session.id),
+        "target_id" => to_string(test_execution_agent.id),
         "body" => "Initial message"
       })
       |> render_submit()
 
-      {:ok, worker_pid} = await_worker(test_session.uuid)
+      {:ok, worker_pid} = await_worker(test_execution_agent.uuid)
 
       # Simulate worker crash
       monitor_ref = Process.monitor(worker_pid)
@@ -312,13 +318,13 @@ defmodule EyeInTheSkyWebWeb.ChatLiveE2ETest do
       # Send another message - should spawn new worker
       view
       |> form("#dm-form", %{
-        "target_id" => to_string(test_session.id),
+        "target_id" => to_string(test_execution_agent.id),
         "body" => "After crash"
       })
       |> render_submit()
 
       # Verify new worker was spawned
-      {:ok, new_worker_pid} = await_worker(test_session.uuid)
+      {:ok, new_worker_pid} = await_worker(test_execution_agent.uuid)
       assert new_worker_pid != worker_pid
       assert Process.alive?(new_worker_pid)
     end

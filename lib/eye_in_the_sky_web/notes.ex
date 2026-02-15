@@ -22,12 +22,15 @@ defmodule EyeInTheSkyWeb.Notes do
   """
   def list_notes_for_session(session_id) do
     # Get session to access both id and uuid
-    session = Repo.get(EyeInTheSkyWeb.Sessions.Session, session_id)
+    session = Repo.get(EyeInTheSkyWeb.Agents.Agent, session_id)
 
     if session do
       Note
-      |> where([n], n.parent_type in ["session", "sessions"] and
-                    (n.parent_id == ^to_string(session_id) or n.parent_id == ^session.uuid))
+      |> where(
+        [n],
+        n.parent_type in ["session", "sessions"] and
+          (n.parent_id == ^to_string(session_id) or n.parent_id == ^session.uuid)
+      )
       |> order_by([n], desc: n.created_at)
       |> Repo.all()
     else
@@ -40,12 +43,15 @@ defmodule EyeInTheSkyWeb.Notes do
   Matches on both integer ID (as string) and UUID for migration compatibility.
   """
   def count_notes_for_session(session_id) do
-    session = Repo.get(EyeInTheSkyWeb.Sessions.Session, session_id)
+    session = Repo.get(EyeInTheSkyWeb.Agents.Agent, session_id)
 
     if session do
       Note
-      |> where([n], n.parent_type in ["session", "sessions"] and
-                    (n.parent_id == ^to_string(session_id) or n.parent_id == ^session.uuid))
+      |> where(
+        [n],
+        n.parent_type in ["session", "sessions"] and
+          (n.parent_id == ^to_string(session_id) or n.parent_id == ^session.uuid)
+      )
       |> Repo.aggregate(:count, :id)
     else
       0
@@ -57,12 +63,15 @@ defmodule EyeInTheSkyWeb.Notes do
   Handles both "agent" and "agents" parent_type for backwards compatibility.
   """
   def list_notes_for_agent(agent_id) do
-    agent = Repo.get(EyeInTheSkyWeb.Agents.Agent, agent_id)
+    agent = Repo.get(EyeInTheSkyWeb.ChatAgents.ChatAgent, agent_id)
 
     if agent do
       Note
-      |> where([n], n.parent_type in ["agent", "agents"] and
-                    (n.parent_id == ^to_string(agent_id) or n.parent_id == ^agent.uuid))
+      |> where(
+        [n],
+        n.parent_type in ["agent", "agents"] and
+          (n.parent_id == ^to_string(agent_id) or n.parent_id == ^agent.uuid)
+      )
       |> order_by([n], desc: n.created_at)
       |> Repo.all()
     else
@@ -80,8 +89,11 @@ defmodule EyeInTheSkyWeb.Notes do
 
     if task do
       Note
-      |> where([n], n.parent_type in ["task", "tasks"] and
-                    (n.parent_id == ^to_string(task_id) or n.parent_id == ^task.uuid))
+      |> where(
+        [n],
+        n.parent_type in ["task", "tasks"] and
+          (n.parent_id == ^to_string(task_id) or n.parent_id == ^task.uuid)
+      )
       |> order_by([n], desc: n.created_at)
       |> Repo.all()
     else

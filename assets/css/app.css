@@ -48,39 +48,141 @@ input.phx-click-loading { opacity: .6 !important; pointer-events: none; }
 
 /* This file is for your main application CSS */
 
-/* Make cards, tables, modals, and navbar lighter to stand out */
-.card,
-.table,
-.modal-box,
-.navbar {
-  --tw-bg-opacity: 1;
+/* ===== Dark theme - Claude palette ===== */
+[data-theme="dark"] {
+  /* daisyUI v5 variables — mapped from Claude's bg scale */
+  --color-base-100: hsl(60, 2.7%, 14.5%);  /* page bg (Claude bg-100) */
+  --color-base-200: hsl(60, 2.1%, 18.4%);  /* elevated surface (Claude bg-000) */
+  --color-base-300: hsl(60, 2%, 23%);       /* highest surface / borders */
+  --color-base-content: oklch(93% 0 0);     /* high contrast text */
+  --color-primary: oklch(70% 0.17 55);      /* Claude orange */
+  --color-primary-content: oklch(98% 0 0);
+  /* daisyUI v4 fallbacks */
+  --b1: hsl(60, 2.7%, 14.5%);
+  --b2: hsl(60, 2.1%, 18.4%);
+  --b3: hsl(60, 2%, 23%);
+  --bc: oklch(93% 0 0);
+  --p: oklch(70% 0.17 55);       /* primary - Claude orange */
+  --pc: oklch(98% 0 0);          /* primary content */
+  --s: oklch(65% 0.15 300);      /* secondary */
+  --sc: oklch(98% 0 0);
+  --su: oklch(72% 0.19 155);     /* success - vivid green */
+  --wa: oklch(78% 0.15 75);      /* warning - warm amber */
+  --er: oklch(65% 0.2 25);       /* error - clear red */
 }
 
-/* Dark theme overrides - YouTube style elevated surfaces */
 [data-theme="dark"] .card,
-[data-theme="dark"] .table,
 [data-theme="dark"] .modal-box,
-[data-theme="dark"] .navbar,
 [data-theme="dark"] .tab-content,
 [data-theme="dark"] [role="tabpanel"] {
-  background-color: oklch(22% 0 0) !important; /* #383838 - Cards with higher contrast */
+  background-color: hsl(60, 2.1%, 18.4%) !important;
 }
 
-/* Hover states for YouTube-like interaction */
-[data-theme="dark"] .btn:hover,
-[data-theme="dark"] .menu li:hover,
-[data-theme="dark"] tr:hover {
-  background-color: oklch(28% 0 0) !important; /* #474747 - Elevated hover state */
+[data-theme="dark"] .navbar {
+  background-color: hsl(60, 2.7%, 14.5%) !important;
+  border-bottom: 1px solid hsl(60, 2%, 23%);
 }
 
-/* Light theme overrides */
+[data-theme="dark"] .table {
+  background-color: transparent !important;
+}
+
+/* ===== Light theme - warm stone surfaces ===== */
+[data-theme="light"] {
+  /* daisyUI v5 variables (--color-*) */
+  --color-base-100: oklch(92% 0.005 80);    /* page bg - light warm gray */
+  --color-base-200: oklch(83% 0.012 80);   /* borders/dividers */
+  --color-base-300: oklch(78% 0.014 80);   /* stronger borders */
+  --color-base-content: oklch(18% 0.015 260); /* rich dark text */
+  --color-primary: oklch(58% 0.17 55);    /* primary - Claude orange */
+  --color-primary-content: oklch(98% 0 0);
+  /* daisyUI v4 fallbacks */
+  --b1: oklch(92% 0.005 80);
+  --b2: oklch(97% 0.005 80);     /* surfaces - off-white, not pure white */
+  --b3: oklch(83% 0.012 80);
+  --bc: oklch(18% 0.015 260);
+  --p: oklch(58% 0.17 55);       /* primary - Claude orange */
+  --pc: oklch(98% 0 0);
+  --su: oklch(50% 0.2 155);      /* success - deeper green */
+  --wa: oklch(58% 0.18 75);      /* warning - richer amber */
+  --er: oklch(50% 0.22 25);      /* error - stronger red */
+}
+
 [data-theme="light"] .card,
-[data-theme="light"] .table,
 [data-theme="light"] .modal-box,
-[data-theme="light"] .navbar,
 [data-theme="light"] .tab-content,
 [data-theme="light"] [role="tabpanel"] {
-  background-color: oklch(91% 0 0) !important;
+  background-color: oklch(97% 0.005 80) !important;
+  box-shadow: 0 1px 3px oklch(0% 0 0 / 0.10);
+}
+
+[data-theme="light"] .navbar {
+  background-color: oklch(93% 0.008 80) !important;
+  border-bottom: 1px solid oklch(83% 0.012 80);
+}
+
+[data-theme="light"] .table {
+  background-color: transparent !important;
+}
+
+/* ===== Sidebar styles ===== */
+#app-sidebar {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+#app-sidebar:hover {
+  scrollbar-color: oklch(50% 0 0 / 0.2) transparent;
+}
+#app-sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+#app-sidebar::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 2px;
+}
+#app-sidebar:hover::-webkit-scrollbar-thumb {
+  background: oklch(50% 0 0 / 0.2);
+}
+
+/* ===== Main content scrollbar (always visible) ===== */
+main {
+  overflow-y: scroll !important;
+  scrollbar-width: thin;
+}
+[data-theme="dark"] main {
+  scrollbar-color: oklch(45% 0 0) hsl(60, 2.7%, 16%);
+}
+[data-theme="light"] main {
+  scrollbar-color: oklch(70% 0.01 80) oklch(90% 0.005 80);
+}
+main::-webkit-scrollbar {
+  width: 8px;
+  -webkit-appearance: none;
+}
+main::-webkit-scrollbar-track {
+  background: transparent;
+}
+[data-theme="dark"] main::-webkit-scrollbar-track {
+  background: hsl(60, 2.7%, 16%);
+}
+[data-theme="light"] main::-webkit-scrollbar-track {
+  background: oklch(90% 0.005 80);
+}
+[data-theme="dark"] main::-webkit-scrollbar-thumb {
+  background: oklch(35% 0 0);
+  border-radius: 4px;
+  min-height: 40px;
+}
+[data-theme="dark"] main::-webkit-scrollbar-thumb:hover {
+  background: oklch(45% 0 0);
+}
+[data-theme="light"] main::-webkit-scrollbar-thumb {
+  background: oklch(75% 0.01 80);
+  border-radius: 4px;
+  min-height: 40px;
+}
+[data-theme="light"] main::-webkit-scrollbar-thumb:hover {
+  background: oklch(65% 0.01 80);
 }
 
 /* Hide scrollbar for webkit browsers */
@@ -185,7 +287,7 @@ code.hljs { padding: 3px 5px; }
 
 .dm-markdown pre {
   border-radius: 0.5rem;
-  padding: 0.75rem 1rem;
+  padding: 0;
   margin: 0.5rem 0;
   overflow-x: auto;
   font-size: 0.8125rem;
@@ -194,7 +296,7 @@ code.hljs { padding: 3px 5px; }
 
 .dm-markdown pre code {
   background: none;
-  padding: 0;
+  padding: 1.25rem;
   border-radius: 0;
   font-size: inherit;
   color: inherit;
@@ -258,6 +360,10 @@ code.hljs { padding: 3px 5px; }
 [data-theme="dark"] .dm-markdown hr { border-top: 1px solid oklch(35% 0 0); }
 [data-theme="dark"] .dm-markdown th, [data-theme="dark"] .dm-markdown td { border: 1px solid oklch(35% 0 0); }
 [data-theme="dark"] .dm-markdown th { background: oklch(22% 0 0); }
+
+/* Notes: code blocks blend with collapse content */
+.collapse-content .dm-markdown pre { margin: 0; background: transparent; }
+.collapse-content .hljs { background: transparent; }
 
 /* DM Markdown - Light theme */
 [data-theme="light"] .dm-markdown pre { background: #f6f8fa; }

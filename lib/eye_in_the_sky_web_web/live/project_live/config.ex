@@ -24,6 +24,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
         socket
         |> assign(:page_title, "Config - #{project.name}")
         |> assign(:project, project)
+        |> assign(:sidebar_tab, :config)
+        |> assign(:sidebar_project, project)
         |> assign(:tasks, tasks)
         |> assign(:claude_dir, claude_dir)
         |> assign(:selected_file, nil)
@@ -181,6 +183,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
   defp language_class(_), do: "plaintext"
 
   attr :entry, :map, required: true
+
   defp dir_entry(assigns) do
     ~H"""
     <div class="collapse collapse-arrow border border-base-300 bg-base-100">
@@ -214,6 +217,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
   end
 
   attr :entry, :map, required: true
+
   defp file_entry(assigns) do
     ~H"""
     <button
@@ -231,18 +235,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.Navbar}
-      id="navbar"
-      current_project={@project}
-    />
-
-    <EyeInTheSkyWebWeb.Components.ProjectNav.render
-      project={@project}
-      tasks={@tasks}
-      current_tab={:config}
-    />
-
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <div class="max-w-6xl mx-auto">
         <%= if @claude_dir && File.dir?(@claude_dir) do %>
@@ -253,8 +245,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
                 <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-base-content/60" />
                 <code class="text-sm text-base-content/60">.claude/</code>
               </div>
-
-              <!-- Top-level files first -->
+              
+    <!-- Top-level files first -->
               <% {files, dirs} = Enum.split_with(@entries, &(!&1.is_dir)) %>
               <%= if length(files) > 0 do %>
                 <div class="space-y-1 mb-4">
@@ -263,16 +255,16 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
                   <% end %>
                 </div>
               <% end %>
-
-              <!-- Directories -->
+              
+    <!-- Directories -->
               <div class="space-y-3">
                 <%= for entry <- dirs do %>
                   <.dir_entry entry={entry} />
                 <% end %>
               </div>
             </div>
-
-            <!-- Right: file viewer -->
+            
+    <!-- Right: file viewer -->
             <%= if @selected_file do %>
               <div class="sticky top-20">
                 <div class="card bg-base-100 border border-base-300 shadow-sm">
@@ -280,7 +272,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
                     <div class="flex items-center justify-between px-4 py-2 border-b border-base-300 bg-base-200/50">
                       <code class="text-sm font-semibold text-base-content">{@selected_file}</code>
                       <div class="flex items-center gap-1">
-                        <button phx-click="open_file" class="btn btn-ghost btn-xs" title="Open in editor">
+                        <button
+                          phx-click="open_file"
+                          class="btn btn-ghost btn-xs"
+                          title="Open in editor"
+                        >
                           <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit
                         </button>
                         <button phx-click="close_viewer" class="btn btn-ghost btn-xs btn-circle">

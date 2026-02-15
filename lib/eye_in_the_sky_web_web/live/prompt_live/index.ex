@@ -15,6 +15,8 @@ defmodule EyeInTheSkyWebWeb.PromptLive.Index do
       |> assign(:scope_filter, "all")
       |> assign(:search_query, "")
       |> assign(:filtered_prompts, prompts)
+      |> assign(:sidebar_tab, :prompts)
+      |> assign(:sidebar_project, nil)
 
     {:ok, socket}
   end
@@ -80,8 +82,6 @@ defmodule EyeInTheSkyWebWeb.PromptLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_component module={EyeInTheSkyWebWeb.Components.Navbar} id="navbar" />
-    <EyeInTheSkyWebWeb.Components.OverviewNav.render current_tab={:prompts} />
     <div class="px-4 sm:px-6 lg:px-8">
       <div class="sm:flex sm:items-center sm:justify-between">
         <div class="sm:flex-auto">

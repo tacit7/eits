@@ -1,16 +1,18 @@
 defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.Sessions
+  alias EyeInTheSkyWeb.{Agents, ChatAgents}
+  alias EyeInTheSkyWeb.Claude.{SDK, Message}
   import EyeInTheSkyWebWeb.Helpers.ViewHelpers
   import EyeInTheSkyWebWeb.Components.Icons
 
-  @default_refresh_ms 30_000
+  @default_refresh_ms 300_000
 
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agents")
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
     end
 
     projects = EyeInTheSkyWeb.Projects.list_projects()
@@ -21,40 +23,49 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       |> assign(:search_query, "")
       |> assign(:sort_by, "recent")
       |> assign(:session_filter, "all")
-      |> assign(:sessions, [])
+      |> assign(:agents, [])
       |> assign(:show_new_session_drawer, false)
       |> assign(:projects, projects)
-      |> assign(:refresh_interval, @default_refresh_ms)
       |> assign(:timer_ref, nil)
-      |> assign(:refresh_tick, 0)
-      |> load_sessions()
+      |> assign(:show_sdk_demo, false)
+      |> assign(:sdk_ref, nil)
+      |> assign(:sdk_messages, [])
+      |> assign(:sdk_session_id, nil)
+      |> assign(:sdk_prompt, "")
+      |> assign(:sidebar_tab, :sessions)
+      |> assign(:sidebar_project, nil)
+      |> load_agents()
       |> schedule_refresh()
 
     {:ok, socket}
   end
 
-  defp load_sessions(socket) do
-    db_sessions = Sessions.list_sessions_with_agent(include_archived: false)
+  defp load_agents(socket) do
+    include_archived = socket.assigns.session_filter == "archived"
+    db_agents = Agents.list_agents_with_chat_agent(include_archived: include_archived)
 
     # Build project lookup map from assigns
     project_map =
       socket.assigns.projects
       |> Enum.into(%{}, fn p -> {p.id, p.name} end)
 
-    sessions =
-      db_sessions
+    agents =
+      db_agents
       |> Enum.map(fn s -> Map.put(s, :project_name, project_map[s.project_id]) end)
-      |> filter_sessions_by_status(socket.assigns.session_filter)
-      |> filter_sessions_by_search(socket.assigns.search_query)
-      |> sort_sessions(socket.assigns.sort_by)
+      |> filter_agents_by_status(socket.assigns.session_filter)
+      |> filter_agents_by_search(socket.assigns.search_query)
+      |> sort_agents(socket.assigns.sort_by)
 
-    assign(socket, :sessions, sessions)
+    assign(socket, :agents, agents)
   end
 
-  defp filter_sessions_by_status(sessions, filter) do
+  defp filter_agents_by_status(sessions, filter) do
     case filter do
       "active" ->
-        Enum.filter(sessions, &(&1.status in ["active", "working", nil] and is_nil(&1.archived_at)))
+        Enum.filter(
+          sessions,
+          &(&1.status in ["active", "working", nil] and is_nil(&1.archived_at))
+        )
 
       "completed" ->
         Enum.filter(sessions, &(&1.status == "completed" and is_nil(&1.archived_at)))
@@ -67,7 +78,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     end
   end
 
-  defp filter_sessions_by_search(sessions, query) do
+  defp filter_agents_by_search(sessions, query) do
     q = (query || "") |> String.trim() |> String.downcase()
 
     if q == "" do
@@ -90,7 +101,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     end
   end
 
-  defp sort_sessions(sessions, sort_by) do
+  defp sort_agents(sessions, sort_by) do
     case sort_by do
       "name" ->
         Enum.sort_by(sessions, fn s -> (s.name || "") |> String.downcase() end)
@@ -99,13 +110,17 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
         Enum.sort_by(sessions, fn s -> session_status_rank(s) end)
 
       _ ->
-        # "recent" (default)
-        Enum.sort_by(sessions, fn s -> sort_datetime(s.started_at) end, {:desc, NaiveDateTime})
+        # "recent" (default) - sort by last_activity_at, fall back to started_at
+        Enum.sort_by(
+          sessions,
+          fn s -> sort_datetime(s.last_activity_at || s.started_at) end,
+          {:desc, NaiveDateTime}
+        )
     end
   end
 
-  defp session_status_rank(session) do
-    case session.status do
+  defp session_status_rank(agent) do
+    case agent.status do
       "discovered" -> 0
       "working" -> 1
       "active" -> 1
@@ -159,9 +174,9 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
           )
 
           # Continue the agent's session
-          with {:ok, session} <- EyeInTheSkyWeb.Sessions.get_session(target_session_id),
-               {:ok, agent} <- EyeInTheSkyWeb.Agents.get_agent(session.agent_id) do
-            project_path = agent.git_worktree_path || File.cwd!()
+          with {:ok, agent} <- Agents.get_execution_agent(target_session_id),
+               {:ok, chat_agent} <- ChatAgents.get_chat_agent(agent.agent_id) do
+            project_path = chat_agent.git_worktree_path || File.cwd!()
 
             prompt_with_reminder = """
             REMINDER: Use i-chat-send MCP tool to send your response to the channel.
@@ -169,8 +184,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
             User message: #{body}
             """
 
-            EyeInTheSkyWeb.Claude.SessionManager.continue_session(
-              target_session_id,
+            EyeInTheSkyWeb.Claude.AgentManager.continue_session(
+              agent.id,
               prompt_with_reminder,
               model: "sonnet",
               project_path: project_path
@@ -200,7 +215,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     socket =
       socket
       |> assign(:search_query, effective_query)
-      |> load_sessions()
+      |> load_agents()
 
     {:noreply, socket}
   end
@@ -210,7 +225,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     socket =
       socket
       |> assign(:session_filter, filter)
-      |> load_sessions()
+      |> load_agents()
 
     {:noreply, socket}
   end
@@ -220,7 +235,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     socket =
       socket
       |> assign(:sort_by, sort_by)
-      |> load_sessions()
+      |> load_agents()
 
     {:noreply, socket}
   end
@@ -230,13 +245,15 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     require Logger
     Logger.info("🗄️  Archive button clicked for session: #{session_id}")
 
-    with {:ok, session} <- Sessions.get_session(session_id),
-         {:ok, updated} <- Sessions.archive_session(session) do
-      Logger.info("✅ Session archived successfully: #{session_id}, archived_at now: #{inspect(updated.archived_at)}")
+    with {:ok, agent} <- Agents.get_execution_agent(session_id),
+         {:ok, updated} <- Agents.archive_execution_agent(agent) do
+      Logger.info(
+        "✅ Session archived successfully: #{session_id}, archived_at now: #{inspect(updated.archived_at)}"
+      )
 
       socket =
         socket
-        |> load_sessions()
+        |> load_agents()
         |> put_flash(:info, "Session archived successfully")
 
       {:noreply, socket}
@@ -252,13 +269,15 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     require Logger
     Logger.info("🔄 Unarchive button clicked for session: #{session_id}")
 
-    with {:ok, session} <- Sessions.get_session(session_id),
-         {:ok, updated} <- Sessions.unarchive_session(session) do
-      Logger.info("✅ Session unarchived successfully: #{session_id}, archived_at now: #{inspect(updated.archived_at)}")
+    with {:ok, agent} <- Agents.get_execution_agent(session_id),
+         {:ok, updated} <- Agents.unarchive_execution_agent(agent) do
+      Logger.info(
+        "✅ Session unarchived successfully: #{session_id}, archived_at now: #{inspect(updated.archived_at)}"
+      )
 
       socket =
         socket
-        |> load_sessions()
+        |> load_agents()
         |> put_flash(:info, "Session unarchived successfully")
 
       {:noreply, socket}
@@ -271,11 +290,11 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_event("delete_session", %{"session_id" => session_id}, socket) do
-    with {:ok, session} <- Sessions.get_session(session_id),
-         {:ok, _} <- Sessions.delete_session(session) do
+    with {:ok, agent} <- Agents.get_execution_agent(session_id),
+         {:ok, _} <- Agents.delete_execution_agent(agent) do
       socket =
         socket
-        |> load_sessions()
+        |> load_agents()
         |> put_flash(:info, "Session deleted successfully")
 
       {:noreply, socket}
@@ -294,22 +313,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   def handle_event("noop", _params, socket), do: {:noreply, socket}
 
   @impl true
-  def handle_event("set_refresh", %{"interval" => interval}, socket) do
-    socket = cancel_timer(socket)
-
-    case Integer.parse(interval) do
-      {ms, _} when ms > 0 ->
-        {:noreply, socket |> assign(:refresh_interval, ms) |> schedule_refresh()}
-
-      _ ->
-        {:noreply, assign(socket, refresh_interval: nil, timer_ref: nil)}
-    end
-  end
-
-  @impl true
   def handle_info(:refresh_agents, socket) do
-    tick = socket.assigns.refresh_tick + 1
-    socket = socket |> assign(:refresh_tick, tick) |> load_sessions() |> schedule_refresh()
+    socket = socket |> load_agents() |> schedule_refresh()
     {:noreply, socket}
   end
 
@@ -339,19 +344,26 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       instructions: description
     ]
 
-    Logger.info("🚀 create_new_session: model=#{model}, effort=#{inspect(effort_level)}, project_id=#{project_id}, project_path=#{project.path}")
+    Logger.info(
+      "🚀 create_new_session: model=#{model}, effort=#{inspect(effort_level)}, project_id=#{project_id}, project_path=#{project.path}"
+    )
 
-    case EyeInTheSkyWeb.Claude.SessionManager.create_agent(opts) do
+    case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
       {:ok, result} ->
-        Logger.info("✅ create_new_session: agent created - agent_id=#{result.agent.id}, session_id=#{result.session.id}, session_uuid=#{result.session.uuid}")
+        Logger.info(
+          "✅ create_new_session: agent created - agent_id=#{result.agent.id}, session_id=#{result.agent.id}, session_uuid=#{result.agent.uuid}"
+        )
 
         socket =
           socket
           |> assign(:show_new_session_drawer, false)
-          |> load_sessions()
+          |> load_agents()
           |> put_flash(:info, "Session launched")
 
-        Logger.info("📤 create_new_session: returning success response to client, closing drawer, reloading sessions")
+        Logger.info(
+          "📤 create_new_session: returning success response to client, closing drawer, reloading sessions"
+        )
+
         {:noreply, socket}
 
       {:error, reason} ->
@@ -362,7 +374,27 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_info({:agent_updated, _agent}, socket) do
-    {:noreply, load_sessions(socket)}
+    {:noreply, load_agents(socket)}
+  end
+
+  @impl true
+  def handle_info({:agent_working, %{id: session_id}}, socket) do
+    {:noreply, update_agent_status_in_list(socket, session_id, "working")}
+  end
+
+  @impl true
+  def handle_info({:agent_working, _session_uuid, session_id}, socket) do
+    {:noreply, update_agent_status_in_list(socket, session_id, "working")}
+  end
+
+  @impl true
+  def handle_info({:agent_stopped, %{id: session_id, status: status}}, socket) do
+    {:noreply, update_agent_status_in_list(socket, session_id, status || "completed")}
+  end
+
+  @impl true
+  def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
+    {:noreply, update_agent_status_in_list(socket, session_id, "waiting")}
   end
 
   @impl true
@@ -377,15 +409,97 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     {:noreply, socket}
   end
 
+  # SDK Demo event handlers
+  @impl true
+  def handle_event("toggle_sdk_demo", _params, socket) do
+    {:noreply, assign(socket, :show_sdk_demo, !socket.assigns.show_sdk_demo)}
+  end
+
+  @impl true
+  def handle_event("sdk_send_message", %{"prompt" => prompt}, socket) do
+    case SDK.start(prompt, to: self(), model: "haiku", max_turns: 1) do
+      {:ok, ref} ->
+        socket =
+          socket
+          |> assign(:sdk_ref, ref)
+          |> assign(:sdk_prompt, "")
+          |> assign(:sdk_messages, [%{type: :user, content: prompt}])
+
+        {:noreply, socket}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "SDK error: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("sdk_clear", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:sdk_messages, [])
+     |> assign(:sdk_ref, nil)
+     |> assign(:sdk_session_id, nil)}
+  end
+
+  # SDK message handlers - only show :result, skip streaming text deltas to avoid duplicates
+  @impl true
+  def handle_info({:claude_message, ref, %Message{type: :result} = message}, socket) do
+    if socket.assigns.sdk_ref == ref do
+      messages = socket.assigns.sdk_messages ++ [%{type: :assistant, message: message}]
+      {:noreply, assign(socket, :sdk_messages, messages)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info({:claude_message, ref, %Message{}}, socket) do
+    if socket.assigns.sdk_ref == ref do
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info({:claude_complete, ref, session_id}, socket) do
+    if socket.assigns.sdk_ref == ref do
+      socket =
+        socket
+        |> assign(:sdk_ref, nil)
+        |> assign(:sdk_session_id, session_id)
+
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info({:claude_error, ref, reason}, socket) do
+    if socket.assigns.sdk_ref == ref do
+      messages =
+        socket.assigns.sdk_messages ++
+          [%{type: :error, content: "Error: #{inspect(reason)}"}]
+
+      socket =
+        socket
+        |> assign(:sdk_ref, nil)
+        |> assign(:sdk_messages, messages)
+
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
+  end
+
   defp apply_action(socket, :index, _params) do
     assign(socket, :page_title, "Agents")
   end
 
-  defp schedule_refresh(%{assigns: %{refresh_interval: nil}} = socket), do: socket
-
-  defp schedule_refresh(%{assigns: %{refresh_interval: ms}} = socket) do
+  defp schedule_refresh(socket) do
     socket = cancel_timer(socket)
-    ref = Process.send_after(self(), :refresh_agents, ms)
+    ref = Process.send_after(self(), :refresh_agents, @default_refresh_ms)
     assign(socket, :timer_ref, ref)
   end
 
@@ -396,203 +510,262 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   defp cancel_timer(socket), do: socket
 
+  defp update_agent_status_in_list(socket, session_id, new_status) do
+    now = DateTime.utc_now() |> DateTime.to_iso8601()
+
+    updated_agents =
+      socket.assigns.agents
+      |> Enum.map(fn agent ->
+        if agent.id == session_id do
+          agent = %{agent | status: new_status}
+          if new_status == "waiting", do: %{agent | last_activity_at: now}, else: agent
+        else
+          agent
+        end
+      end)
+      |> sort_agents(socket.assigns.sort_by)
+
+    assign(socket, :agents, updated_agents)
+  end
+
+  defp format_sdk_message(%Message{type: :result, content: text}), do: text
+  defp format_sdk_message(%Message{type: :text, content: text}), do: text
+  defp format_sdk_message(%Message{content: text}) when is_binary(text), do: text
+  defp format_sdk_message(%Message{type: type}), do: "[#{type}]"
+
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_component module={EyeInTheSkyWebWeb.Components.Navbar} id="navbar" />
-    <EyeInTheSkyWebWeb.Components.OverviewNav.render current_tab={:sessions} />
-    <Layouts.flash_group flash={@flash} />
-    <div class="px-6 lg:px-8">
+    <div class="bg-base-100 px-6 lg:px-8">
       <div class="max-w-3xl mx-auto">
-        <!-- Page Header -->
-        <div class="flex items-start justify-between py-6 border-b border-base-content/10">
-          <div class="flex-1"></div>
-          <div class="flex items-center gap-2 flex-shrink-0">
-            <%= if @refresh_interval do %>
-              <span
-                id="refresh-dot"
-                phx-hook="RefreshDot"
-                data-tick={@refresh_tick}
-                class="inline-flex h-2 w-2 rounded-full bg-success opacity-0 transition-opacity duration-300"
-              ></span>
-            <% end %>
-            <span class="text-xs text-base-content/50">Update every</span>
-            <select phx-change="set_refresh" name="interval" class="select select-xs select-bordered w-20">
-              <option value="0" selected={@refresh_interval == nil}>Off</option>
-              <option value="1000" selected={@refresh_interval == 1000}>1s</option>
-              <option value="5000" selected={@refresh_interval == 5000}>5s</option>
-              <option value="15000" selected={@refresh_interval == 15000}>15s</option>
-              <option value="30000" selected={@refresh_interval == 30000}>30s</option>
-              <option value="60000" selected={@refresh_interval == 60000}>1m</option>
-            </select>
-            <button phx-click="toggle_new_session_drawer" class="btn btn-primary btn-sm">
-              + New Session
+        <%!-- Toolbar: refresh + actions --%>
+        <div class="flex items-center justify-between py-5">
+          <div class="flex items-center gap-3">
+            <%!-- Agent count --%>
+            <span class="text-[11px] font-mono tabular-nums text-base-content/30 tracking-wider uppercase">
+              {length(@agents)} agents
+            </span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              phx-click="toggle_new_session_drawer"
+              class="btn btn-sm btn-primary gap-1.5 min-h-0 h-7 text-xs"
+            >
+              <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New
             </button>
-            <label class="swap swap-rotate btn btn-ghost btn-sm btn-circle">
+            <button
+              phx-click="toggle_sdk_demo"
+              class="btn btn-sm btn-ghost gap-1.5 min-h-0 h-7 text-xs text-base-content/50 hover:text-base-content"
+            >
+              <.icon name="hero-command-line-mini" class="w-3.5 h-3.5" /> SDK
+            </button>
+            <label class="swap swap-rotate btn btn-ghost btn-xs btn-circle">
               <input type="checkbox" class="theme-controller" value="dark" />
-              <svg class="swap-on h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-                />
-              </svg>
-              <svg class="swap-off h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-                />
-              </svg>
+              <.icon name="hero-sun" class="swap-on w-4 h-4" />
+              <.icon name="hero-moon" class="swap-off w-4 h-4" />
             </label>
           </div>
         </div>
-        
-    <!-- Search and Filters Toolbar -->
-        <div class="sticky top-16 z-10 bg-base-100/80 backdrop-blur border-b border-base-content/10 -mx-6 lg:-mx-8 px-6 lg:px-8 py-4 my-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-4">
-          <!-- Search -->
-          <form phx-submit="search" phx-change="search" class="flex-1 max-w-md flex gap-2">
-            <label for="search" class="sr-only">Search sessions</label>
-            <div class="relative flex-1">
-              <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path
-                    fill-rule="evenodd"
-                    d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
+
+        <%!-- Search and Filters --%>
+        <div class="sticky top-16 z-10 bg-base-100/85 backdrop-blur-md -mx-6 lg:-mx-8 px-6 lg:px-8 py-3 border-b border-base-content/5">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
+            <form phx-submit="search" phx-change="search" class="flex-1 max-w-sm">
+              <label for="search" class="sr-only">Search agents</label>
+              <div class="relative">
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                  <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
+                </div>
+                <input
+                  type="text"
+                  name="query"
+                  id="search"
+                  value={@search_query}
+                  phx-debounce="300"
+                  class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
+                  placeholder="Search..."
+                />
               </div>
-              <input
-                type="text"
-                name="query"
-                id="search"
-                value={@search_query}
-                phx-debounce="300"
-                class="input input-bordered w-full pl-10"
-                placeholder="Search sessions, projects, descriptions..."
-              />
+            </form>
+
+            <div class="flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
+              <button
+                phx-click="filter_session"
+                phx-value-filter="all"
+                class={"px-3 py-1 rounded-md text-xs font-medium transition-all duration-150 " <>
+                  if(@session_filter == "all",
+                    do: "bg-base-100 text-base-content shadow-sm",
+                    else: "text-base-content/40 hover:text-base-content/60"
+                  )}
+              >
+                All
+              </button>
+              <button
+                phx-click="filter_session"
+                phx-value-filter="active"
+                class={"px-3 py-1 rounded-md text-xs font-medium transition-all duration-150 " <>
+                  if(@session_filter == "active",
+                    do: "bg-base-100 text-success shadow-sm",
+                    else: "text-base-content/40 hover:text-base-content/60"
+                  )}
+              >
+                Active
+              </button>
+              <button
+                phx-click="filter_session"
+                phx-value-filter="completed"
+                class={"px-3 py-1 rounded-md text-xs font-medium transition-all duration-150 " <>
+                  if(@session_filter == "completed",
+                    do: "bg-base-100 text-base-content shadow-sm",
+                    else: "text-base-content/40 hover:text-base-content/60"
+                  )}
+              >
+                Completed
+              </button>
+              <button
+                phx-click="filter_session"
+                phx-value-filter="archived"
+                class={"px-3 py-1 rounded-md text-xs font-medium transition-all duration-150 " <>
+                  if(@session_filter == "archived",
+                    do: "bg-base-100 text-warning shadow-sm",
+                    else: "text-base-content/40 hover:text-base-content/60"
+                  )}
+              >
+                Archived
+              </button>
             </div>
-            <button type="submit" class="btn btn-primary btn-sm">Search</button>
-          </form>
-          
-    <!-- Session Status Filter -->
-          <div class="btn-group">
-            <button
-              phx-click="filter_session"
-              phx-value-filter="all"
-              class={"btn btn-sm #{if @session_filter == "all", do: "btn-active"}"}
-            >
-              All
-            </button>
-            <button
-              phx-click="filter_session"
-              phx-value-filter="active"
-              class={"btn btn-sm #{if @session_filter == "active", do: "btn-active"}"}
-            >
-              Active
-            </button>
-            <button
-              phx-click="filter_session"
-              phx-value-filter="completed"
-              class={"btn btn-sm #{if @session_filter == "completed", do: "btn-active"}"}
-            >
-              Completed
-            </button>
           </div>
         </div>
 
-        <div class="mt-6">
-          <%= if @sessions == [] do %>
-            <div class="text-center py-12">
-              <h3 class="text-sm font-medium text-base-content">No sessions found</h3>
-              <p class="mt-1 text-sm text-base-content/60">Try adjusting your search or filters</p>
-            </div>
+        <%!-- Agent list --%>
+        <div class="mt-2 divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-4">
+          <%= if @agents == [] do %>
+            <.empty_state
+              id="agents-empty"
+              title="No agents found"
+              subtitle="Try adjusting your search or filters"
+            />
           <% else %>
-            <div class="overflow-x-auto">
-              <table class="table table-xs table-zebra">
-                <tbody>
-                  <%= for session <- @sessions do %>
-                    <% {status_color, status_label} =
-                      case session.status do
-                        "working" -> {"text-orange-500", "Working"}
-                        "completed" -> {"text-red-500", "Stale"}
-                        "discovered" -> {"text-green-500", "Waiting"}
-                        _ -> {"text-green-500", "Waiting"}
-                      end %>
-                    <tr class="hover cursor-pointer group" phx-click="navigate_dm" phx-value-id={session.id}>
-                      <td class="py-2">
-                        <.link navigate={~p"/dm/#{session.id}"} class="font-mono text-sm text-primary hover:underline" onclick="event.stopPropagation()">
-                          #{session.id}
-                        </.link>
-                      </td>
-                      <td class="py-2" phx-click="noop">
-                        <div class="flex items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <%= if session.id do %>
-                            <a href={~p"/dm/#{session.id}"} target="_blank" class="btn btn-ghost btn-xs btn-square" aria-label="Open DM">
-                              <.arrow_top_right_on_square class="w-3.5 h-3.5" />
-                            </a>
-                          <% end %>
-                          <%= if session.agent.uuid && session.uuid do %>
-                            <button
-                              id={"bookmark-btn-#{session.uuid}"}
-                              type="button"
-                              phx-hook="BookmarkAgent"
-                              data-agent-id={session.agent.uuid}
-                              data-session-id={session.uuid}
-                              data-agent-name={session.name || session.agent.description || "Agent"}
-                              data-agent-status={session.status}
-                              class="bookmark-button btn btn-ghost btn-xs btn-square"
-                              aria-label="Bookmark agent"
-                            >
-                              <.heart class="bookmark-icon w-3.5 h-3.5" />
-                            </button>
-                          <% end %>
-                          <%= if session.uuid do %>
-                            <%= if session.archived_at do %>
-                              <button type="button" phx-click="unarchive_session" phx-value-session_id={session.id} class="btn btn-ghost btn-xs btn-square" aria-label="Unarchive">
-                                <.icon name="hero-arrow-up-tray" class="size-3.5" />
-                              </button>
-                            <% else %>
-                              <button type="button" phx-click="archive_session" phx-value-session_id={session.id} class="btn btn-ghost btn-xs btn-square" aria-label="Archive">
-                                <.archive_box class="w-3.5 h-3.5" />
-                              </button>
-                            <% end %>
-                          <% end %>
-                        </div>
-                      </td>
-                      <td class="py-2" title={status_label}>
-                        <div class="flex items-center gap-1.5">
-                          <.claude class={"w-3.5 h-3.5 " <> status_color} />
-                          <span class={"text-xs " <> status_color}>{status_label}</span>
-                        </div>
-                      </td>
-                      <td class="py-2">
-                        <div class="text-sm">{session.name || "Unnamed session"}</div>
-                        <div class="flex items-center gap-2 text-xs text-base-content/40 mt-1.5">
-                          <span class="font-mono">{Sessions.format_model_info(session)}</span>
-                          <%= if session.project_name do %>
-                            <span>&middot;</span>
-                            <span>{session.project_name}</span>
-                          <% end %>
-                          <span>&middot;</span>
-                          <span>{relative_time(session.started_at)}</span>
-                        </div>
-                      </td>
-                      <td class="py-2 text-xs text-base-content/50 truncate max-w-xs">{session.agent.description}</td>
-                    </tr>
+            <%= for agent <- @agents do %>
+              <% {status_color, status_bg, status_label, is_active} =
+                case agent.status do
+                  "working" -> {"text-success", "bg-success", "Working", true}
+                  "active" -> {"text-info", "bg-info", "Active", false}
+                  "waiting" -> {"text-base-content/25", "bg-base-content/20", "Waiting", false}
+                  "completed" -> {"text-base-content/25", "bg-base-content/20", "Done", false}
+                  "discovered" -> {"text-base-content/25", "bg-base-content/20", "Idle", false}
+                  _ -> {"text-base-content/25", "bg-base-content/20", "Idle", false}
+                end %>
+              <div
+                class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer"
+                phx-click="navigate_dm"
+                phx-value-id={agent.id}
+              >
+                <%!-- Status indicator --%>
+                <div class="flex-shrink-0 w-6 flex justify-center" title={status_label}>
+                  <%= if is_active do %>
+                    <span class="relative flex h-2 w-2">
+                      <span class={"animate-ping absolute inline-flex h-full w-full rounded-full opacity-50 " <> status_bg}></span>
+                      <span class={"relative inline-flex rounded-full h-2 w-2 " <> status_bg}></span>
+                    </span>
+                  <% else %>
+                    <span class={"inline-flex rounded-full h-2 w-2 " <> status_bg}></span>
                   <% end %>
-                </tbody>
-              </table>
-            </div>
+                </div>
+
+                <%!-- Main content --%>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-baseline gap-2">
+                    <span class="text-[13px] font-medium text-base-content/85 truncate">
+                      {agent.name || "Unnamed session"}
+                    </span>
+                    <span class={"text-[10px] font-medium uppercase tracking-wider " <> status_color}>
+                      {status_label}
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
+                    <span class="font-mono">{Agents.format_model_info(agent)}</span>
+                    <%= if agent.project_name do %>
+                      <span class="text-base-content/15">/</span>
+                      <span>{agent.project_name}</span>
+                    <% end %>
+                    <span class="text-base-content/15">/</span>
+                    <span class="tabular-nums">{relative_time(agent.started_at)}</span>
+                  </div>
+                  <%= if agent.chat_agent && agent.chat_agent.description do %>
+                    <p class="text-xs text-base-content/35 mt-1 truncate max-w-lg">
+                      {agent.chat_agent.description}
+                    </p>
+                  <% end %>
+                </div>
+
+                <%!-- Actions (visible on hover) --%>
+                <div
+                  class="flex items-center gap-0.5 flex-shrink-0"
+                  phx-click="noop"
+                >
+                  <%= if agent.id do %>
+                    <a
+                      href={~p"/dm/#{agent.id}"}
+                      target="_blank"
+                      class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-primary"
+                      aria-label="Open in new tab"
+                    >
+                      <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
+                    </a>
+                  <% end %>
+                  <%= if agent.chat_agent && agent.chat_agent.uuid && agent.uuid do %>
+                    <button
+                      id={"bookmark-btn-#{agent.uuid}"}
+                      type="button"
+                      phx-hook="BookmarkAgent"
+                      data-agent-id={agent.chat_agent.uuid}
+                      data-session-id={agent.uuid}
+                      data-agent-name={agent.name || agent.chat_agent.description || "Agent"}
+                      data-agent-status={agent.status}
+                      class="bookmark-button btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-error"
+                      aria-label="Bookmark agent"
+                    >
+                      <.heart class="bookmark-icon w-3.5 h-3.5" />
+                    </button>
+                  <% end %>
+                  <%= if agent.uuid do %>
+                    <%= if agent.archived_at do %>
+                      <button
+                        type="button"
+                        phx-click="unarchive_session"
+                        phx-value-session_id={agent.id}
+                        class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-info"
+                        aria-label="Unarchive"
+                      >
+                        <.icon name="hero-arrow-up-tray-mini" class="w-3.5 h-3.5" />
+                      </button>
+                    <% else %>
+                      <button
+                        type="button"
+                        phx-click="archive_session"
+                        phx-value-session_id={agent.id}
+                        class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-warning"
+                        aria-label="Archive"
+                      >
+                        <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
+                      </button>
+                    <% end %>
+                  <% end %>
+                </div>
+
+                <%!-- Chevron --%>
+                <div class="flex-shrink-0">
+                  <.icon name="hero-chevron-right-mini" class="w-4 h-4 text-base-content/20" />
+                </div>
+              </div>
+            <% end %>
           <% end %>
         </div>
       </div>
     </div>
 
-    <!-- New Session Drawer -->
+    <%!-- New Session Drawer --%>
     <.live_component
       module={EyeInTheSkyWebWeb.Components.NewSessionDrawer}
       id="new-session-drawer"
@@ -602,6 +775,93 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       toggle_event="toggle_new_session_drawer"
       submit_event="create_new_session"
     />
+
+    <%!-- SDK Demo Chat --%>
+    <%= if @show_sdk_demo do %>
+      <div class="fixed bottom-4 right-4 w-96 z-50 flex flex-col bg-base-100 border border-base-content/10 rounded-xl shadow-2xl max-h-[500px] overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-2.5 border-b border-base-content/5 bg-base-200/30">
+          <div class="flex items-center gap-2">
+            <.icon name="hero-command-line-mini" class="w-3.5 h-3.5 text-primary/60" />
+            <span class="text-xs font-semibold text-base-content/70">SDK Chat</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <%= if @sdk_session_id do %>
+              <span class="text-[10px] font-mono text-base-content/25 truncate max-w-[120px]">
+                {@sdk_session_id}
+              </span>
+            <% end %>
+            <button phx-click="sdk_clear" class="btn btn-ghost btn-xs btn-square text-base-content/30" title="Clear">
+              <.icon name="hero-trash-mini" class="w-3 h-3" />
+            </button>
+            <button phx-click="toggle_sdk_demo" class="btn btn-ghost btn-xs btn-square text-base-content/30" title="Close">
+              <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <div
+          id="sdk-messages"
+          phx-hook="ScrollToBottom"
+          class="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-[200px] max-h-[360px]"
+        >
+          <%= if @sdk_messages == [] do %>
+            <div class="text-center text-base-content/25 text-xs py-10">
+              Send a message to test the SDK pipeline
+            </div>
+          <% else %>
+            <%= for msg <- @sdk_messages do %>
+              <%= case msg.type do %>
+                <% :user -> %>
+                  <div class="flex justify-end">
+                    <div class="bg-primary/90 text-primary-content rounded-xl rounded-br-sm px-3 py-2 text-sm max-w-[80%]">
+                      {msg.content}
+                    </div>
+                  </div>
+                <% :assistant -> %>
+                  <div class="flex justify-start">
+                    <div class="bg-base-200/60 rounded-xl rounded-bl-sm px-3 py-2 text-sm max-w-[80%] whitespace-pre-wrap">
+                      {format_sdk_message(msg.message)}
+                    </div>
+                  </div>
+                <% :error -> %>
+                  <div class="flex justify-start">
+                    <div class="bg-error/10 text-error rounded-xl px-3 py-2 text-sm max-w-[80%]">
+                      {msg.content}
+                    </div>
+                  </div>
+                <% _ -> %>
+              <% end %>
+            <% end %>
+          <% end %>
+          <%= if @sdk_ref do %>
+            <div class="flex justify-start">
+              <span class="loading loading-dots loading-xs text-base-content/30"></span>
+            </div>
+          <% end %>
+        </div>
+
+        <form phx-submit="sdk_send_message" class="px-3 py-2.5 border-t border-base-content/5">
+          <div class="flex gap-2">
+            <input
+              type="text"
+              name="prompt"
+              value={@sdk_prompt}
+              placeholder="Type a message..."
+              class="input input-sm flex-1 bg-base-200/50 border-base-content/8 text-sm placeholder:text-base-content/25"
+              autocomplete="off"
+              disabled={@sdk_ref != nil}
+            />
+            <button
+              type="submit"
+              class="btn btn-primary btn-sm btn-square"
+              disabled={@sdk_ref != nil}
+            >
+              <.icon name="hero-paper-airplane-mini" class="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </form>
+      </div>
+    <% end %>
     """
   end
 end

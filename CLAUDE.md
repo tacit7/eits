@@ -16,6 +16,14 @@ mix compile              # Compile only
 
 Assets: `cd assets && npm install` for JS dependencies. Esbuild and Tailwind run as Phoenix watchers.
 
+## Development Workflow
+
+**Before committing:** Always run `mix compile` to ensure the project compiles without errors. Only warnings are acceptable.
+
+## REST API
+
+JSON API at `/api/v1` for Claude Code hooks and external integrations. See [docs/REST_API.md](docs/REST_API.md) for full endpoint reference, request/response formats, and PubSub broadcast details.
+
 ## Claude CLI & API Keys
 
 This app spawns Claude CLI processes to run agents. API key configuration:

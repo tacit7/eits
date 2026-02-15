@@ -26,6 +26,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Prompts do
         socket
         |> assign(:page_title, "Prompts - #{project.name}")
         |> assign(:project, project)
+        |> assign(:sidebar_tab, :prompts)
+        |> assign(:sidebar_project, project)
         |> assign(:tasks, tasks)
         |> assign(:project_id, project_id)
         |> assign(:search_query, "")
@@ -74,18 +76,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Prompts do
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.Navbar}
-      id="navbar"
-      current_project={@project}
-    />
-
-    <EyeInTheSkyWebWeb.Components.ProjectNav.render
-      project={@project}
-      tasks={@tasks}
-      current_tab={:prompts}
-    />
-
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <div class="max-w-6xl mx-auto">
         <!-- Search Input -->
@@ -172,19 +162,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Prompts do
           </div>
         <% else %>
           <!-- Empty State -->
-          <div class="text-center py-12">
-            <svg
-              class="mx-auto h-12 w-12 text-base-content/40"
-              fill="currentColor"
-              viewBox="0 0 16 16"
-            >
-              <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v9.5A1.75 1.75 0 0 1 14.25 13H8.06l-2.573 2.573A1.458 1.458 0 0 1 3 14.543V13H1.75A1.75 1.75 0 0 1 0 11.25Zm1.75-.25a.25.25 0 0 0-.25.25v9.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h6.5a.25.25 0 0 0 .25-.25v-9.5a.25.25 0 0 0-.25-.25Z" />
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-base-content">No prompts yet</h3>
-            <p class="mt-1 text-sm text-base-content/60">
-              Create project-specific prompts to use with your agents
-            </p>
-          </div>
+          <.empty_state
+            id="project-prompts-empty"
+            icon="hero-chat-bubble-left-right"
+            title="No prompts yet"
+            subtitle="Create project-specific prompts to use with your agents"
+          />
         <% end %>
       </div>
     </div>

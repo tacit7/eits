@@ -14,7 +14,7 @@ defmodule EyeInTheSkyWeb.Scheduler.AgentStatus do
 
   import Ecto.Query
 
-  alias EyeInTheSkyWeb.{Agents, Repo}
+  alias EyeInTheSkyWeb.{ChatAgents, Repo}
 
   # 5 minutes in milliseconds
   @interval 5 * 60 * 1000
@@ -46,7 +46,7 @@ defmodule EyeInTheSkyWeb.Scheduler.AgentStatus do
 
       # Get all agents except completed/failed
       agents =
-        from(a in Agents.Agent,
+        from(a in ChatAgents.ChatAgent,
           where: a.status not in ["completed", "failed"]
         )
         |> Repo.all()
@@ -64,15 +64,15 @@ defmodule EyeInTheSkyWeb.Scheduler.AgentStatus do
     cond do
       # Unknown: no activity in over 1 day
       is_too_old(agent.last_activity_at, now) ->
-        Agents.update_agent_status(agent, "unknown")
+        ChatAgents.update_chat_agent_status(agent, "unknown")
 
       # Stale: inactive for more than 1 hour
       is_stale(agent.last_activity_at, now) ->
-        Agents.update_agent_status(agent, "stale")
+        ChatAgents.update_chat_agent_status(agent, "stale")
 
       # Waiting: active but created less than 1 hour ago
       is_waiting(agent.created_at, now) ->
-        Agents.update_agent_status(agent, "waiting")
+        ChatAgents.update_chat_agent_status(agent, "waiting")
 
       # Active: recent activity or just created
       true ->

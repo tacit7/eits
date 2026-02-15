@@ -45,11 +45,12 @@ defmodule EyeInTheSkyWeb.Claude.SimpleWorker do
       caller: self()
     ]
 
-    spawn_result = if session_id do
-      CLI.resume_session(session_id, prompt, cli_opts)
-    else
-      CLI.spawn_new_session(prompt, cli_opts)
-    end
+    spawn_result =
+      if session_id do
+        CLI.resume_session(session_id, prompt, cli_opts)
+      else
+        CLI.spawn_new_session(prompt, cli_opts)
+      end
 
     case spawn_result do
       {:ok, port, ref} ->

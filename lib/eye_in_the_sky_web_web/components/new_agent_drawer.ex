@@ -35,8 +35,8 @@ defmodule EyeInTheSkyWebWeb.Components.NewAgentDrawer do
                 <option value="codex">Codex</option>
               </select>
             </div>
-
-            <!-- Model Selection Dropdown -->
+            
+    <!-- Model Selection Dropdown -->
             <div class="form-control">
               <label class="label">
                 <span class="label-text font-medium">Model</span>
@@ -48,8 +48,8 @@ defmodule EyeInTheSkyWebWeb.Components.NewAgentDrawer do
                 <option value="haiku">Haiku 4.5 • Fastest for quick answers</option>
               </select>
             </div>
-
-            <!-- Effort Level (Opus & Sonnet) -->
+            
+    <!-- Effort Level (Opus & Sonnet) -->
             <div class="form-control">
               <label class="label">
                 <span class="label-text font-medium">Effort Level</span>
@@ -62,8 +62,8 @@ defmodule EyeInTheSkyWebWeb.Components.NewAgentDrawer do
                 <option value="high">High • Deeper reasoning (default)</option>
               </select>
             </div>
-
-            <!-- Prompt Template -->
+            
+    <!-- Prompt Template -->
             <div class="form-control">
               <label class="label">
                 <span class="label-text font-medium">Prompt Template</span>
@@ -72,12 +72,12 @@ defmodule EyeInTheSkyWebWeb.Components.NewAgentDrawer do
               <select name="prompt_id" class="select select-bordered">
                 <option value="">-- None (Custom Instructions) --</option>
                 <%= for prompt <- @prompts do %>
-                  <option value={prompt.id}><%= prompt.name %></option>
+                  <option value={prompt.id}>{prompt.name}</option>
                 <% end %>
               </select>
             </div>
-
-            <!-- Agent Name / Nickname -->
+            
+    <!-- Agent Name / Nickname -->
             <div class="form-control">
               <label class="label">
                 <span class="label-text font-medium">Agent Name / Nickname</span>
@@ -89,8 +89,8 @@ defmodule EyeInTheSkyWebWeb.Components.NewAgentDrawer do
                 placeholder="e.g., Code Reviewer, Bug Fixer..."
               />
             </div>
-
-            <!-- Instructions -->
+            
+    <!-- Instructions -->
             <div class="form-control">
               <label class="label">
                 <span class="label-text font-medium">Instructions</span>
@@ -102,8 +102,8 @@ defmodule EyeInTheSkyWebWeb.Components.NewAgentDrawer do
                 required
               ></textarea>
             </div>
-
-            <!-- Actions -->
+            
+    <!-- Actions -->
             <div class="flex gap-2 mt-4">
               <button type="submit" class="btn btn-primary flex-1">Create Agent</button>
               <button type="button" phx-click={@toggle_event} class="btn btn-ghost flex-shrink-0">

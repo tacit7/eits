@@ -38,7 +38,8 @@ config :phoenix_live_view,
 
 # Use mock CLI module for testing
 config :eye_in_the_sky_web,
-  cli_module: EyeInTheSkyWeb.Claude.MockCLI
+  cli_module: EyeInTheSkyWeb.Claude.MockCLI,
+  codex_cli_module: EyeInTheSkyWeb.Claude.MockCLI
 
 # Disable Oban queues in test (use Oban.Testing for manual testing)
 config :eye_in_the_sky_web, Oban, testing: :inline

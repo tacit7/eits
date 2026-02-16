@@ -52,4 +52,12 @@ defmodule EyeInTheSkyWeb.Claude.Utils do
   def cli_module do
     Application.get_env(:eye_in_the_sky_web, :cli_module, EyeInTheSkyWeb.Claude.CLI)
   end
+
+  @doc """
+  Returns the configured Codex CLI module (real or mock for tests).
+  """
+  @spec codex_cli_module() :: module()
+  def codex_cli_module do
+    Application.get_env(:eye_in_the_sky_web, :codex_cli_module, EyeInTheSkyWeb.Codex.CLI)
+  end
 end

@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "codex-exec-jsonl-event",
+  "title": "Codex exec --json JSONL Event",
+  "description": "Schema for events emitted by `codex exec --json`. Each line of stdout is one of these event objects.",
+  "oneOf": [
+    { "$ref": "#/$defs/thread_started" },
+    { "$ref": "#/$defs/turn_started" },
+    { "$ref": "#/$defs/turn_completed" },
+    { "$ref": "#/$defs/turn_failed" },
+    { "$ref": "#/$defs/item_started" },
+    { "$ref": "#/$defs/item_completed" },
+    { "$ref": "#/$defs/error" }
+  ],
+  "$defs": {
+    "thread_started": {
+      "type": "object",
+      "required": ["type", "thread_id"],
+      "properties": {
+        "type": { "const": "thread.started" },
+        "thread_id": {
+          "type": "string",
+          "description": "UUID identifying the conversation thread"
+        }
+      }
+    },
+
+    "turn_started": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "turn.started" }
+      }
+    },
+
+    "turn_completed": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "turn.completed" },
+        "thread_id": {
+          "type": "string",
+          "description": "Thread UUID (may be present)"
+        },
+        "usage": { "$ref": "#/$defs/usage" }
+      }
+    },
+
+    "turn_failed": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "turn.failed" },
+        "message": { "type": "string" },
+        "error": { "type": "string" }
+      }
+    },
+
+    "item_started": {
+      "type": "object",
+      "required": ["type", "item"],
+      "properties": {
+        "type": { "const": "item.started" },
+        "item": { "$ref": "#/$defs/item" }
+      }
+    },
+
+    "item_completed": {
+      "type": "object",
+      "required": ["type", "item"],
+      "properties": {
+        "type": { "const": "item.completed" },
+        "item": { "$ref": "#/$defs/item" }
+      }
+    },
+
+    "error": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "error" },
+        "message": { "type": "string" },
+        "error": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "properties": {
+                "message": { "type": "string" }
+              }
+            }
+          ]
+        }
+      }
+    },
+
+    "item": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Sequential item identifier (e.g. item_1, item_2)"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "agent_message",
+            "reasoning",
+            "command_execution",
+            "file_changes",
+            "mcp_tool_calls",
+            "web_search",
+            "web_searches",
+            "plan_update",
+            "plan_updates"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["in_progress", "completed"],
+          "description": "Present on item.started events"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "enum": ["agent_message", "reasoning"] } }
+          },
+          "then": {
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "Plain text content"
+              },
+              "content": {
+                "type": "array",
+                "description": "Structured content blocks (alternative to text)",
+                "items": { "$ref": "#/$defs/content_block" }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "command_execution" } }
+          },
+          "then": {
+            "properties": {
+              "command": {
+                "type": "string",
+                "description": "Shell command string (e.g. 'bash -lc ls')"
+              },
+              "call": {
+                "type": "string",
+                "description": "Alternative field for command string"
+              },
+              "exit_code": {
+                "type": ["integer", "null"],
+                "description": "Process exit code (0 = success, null when in_progress)"
+              },
+              "aggregated_output": {
+                "type": "string",
+                "description": "Command stdout/stderr output (primary field)"
+              },
+              "output": {
+                "type": "string",
+                "description": "Command output (legacy/alternative field)"
+              },
+              "working_directory": {
+                "type": "string",
+                "description": "Directory the command ran in"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "file_changes" } }
+          },
+          "then": {
+            "properties": {
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": { "type": "string" },
+                    "action": {
+                      "type": "string",
+                      "enum": ["created", "modified", "deleted"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "mcp_tool_calls" } }
+          },
+          "then": {
+            "properties": {
+              "tool": {
+                "type": "string",
+                "description": "MCP tool name"
+              },
+              "args": {
+                "type": "object",
+                "description": "Tool arguments"
+              }
+            }
+          }
+        }
+      ]
+    },
+
+    "content_block": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["text", "output_text"]
+        },
+        "text": { "type": "string" }
+      }
+    },
+
+    "usage": {
+      "type": "object",
+      "properties": {
+        "input_tokens": {
+          "type": "integer",
+          "description": "Total input tokens consumed"
+        },
+        "cached_input_tokens": {
+          "type": "integer",
+          "description": "Input tokens served from cache"
+        },
+        "output_tokens": {
+          "type": "integer",
+          "description": "Output tokens generated"
+        },
+        "total_tokens": {
+          "type": "integer",
+          "description": "Sum of input + output tokens"
+        }
+      }
+    }
+  }
+}

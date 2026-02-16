@@ -11,6 +11,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   alias EyeInTheSkyWeb.{Agents, ChatAgents, Messages}
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
+  @default_provider "claude"
+  @supported_providers ["claude", "codex"]
 
   @doc """
   Creates an agent + session and starts the AgentWorker with the initial message.
@@ -36,6 +38,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
       "📝 create_agent: agent_uuid=#{agent_uuid}, session_uuid=#{session_uuid}, model=#{opts[:model]}, project_id=#{opts[:project_id]}"
     )
 
+    provider = if opts[:agent_type] == "codex", do: "codex", else: "claude"
+
     with {:ok, agent} <-
            ChatAgents.create_chat_agent(%{
              uuid: agent_uuid,
@@ -51,7 +55,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              name: description,
              description: "session-id #{session_uuid} agent-id #{agent_uuid}",
              model: opts[:model],
-             provider: "claude",
+             provider: provider,
              git_worktree_path: opts[:project_path],
              started_at: DateTime.utc_now() |> DateTime.to_iso8601()
            }) do
@@ -104,7 +108,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
     AgentWorker.cancel(session_id)
   end
 
-  def send_message(session_id, message, opts \\ []) do
+  def send_message(session_id, message, opts \\ [])
+
+  def send_message(session_id, message, opts) when is_binary(message) do
     Logger.debug(
       "send_message: session_id=#{session_id}, message_length=#{String.length(message)}"
     )
@@ -115,7 +121,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
           "send_message: worker found/started for session_id=#{session_id}, pid=#{inspect(pid)}"
         )
 
-        has_messages = Messages.has_inbound_claude_reply?(session_id)
+        provider = resolve_provider(session_id, opts)
+        has_messages = Messages.has_inbound_reply?(session_id, provider)
 
         context = %{
           model: opts[:model],
@@ -124,9 +131,18 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
           channel_id: opts[:channel_id]
         }
 
-        AgentWorker.process_message(session_id, message, context)
-        Logger.debug("send_message: message queued for session_id=#{session_id}")
-        :ok
+        case AgentWorker.process_message(session_id, message, context) do
+          :ok ->
+            Logger.debug("send_message: message queued for session_id=#{session_id}")
+            :ok
+
+          {:error, reason} ->
+            Logger.error(
+              "❌ send_message: failed to queue message for session_id=#{session_id} - #{inspect(reason)}"
+            )
+
+            {:error, reason}
+        end
 
       {:error, reason} ->
         Logger.error(
@@ -137,14 +153,23 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
     end
   end
 
+  def send_message(session_id, _message, _opts) do
+    Logger.warning("send_message: invalid message payload for session_id=#{session_id}")
+    {:error, :invalid_message}
+  end
+
   defp lookup_or_start(session_id) do
     case Registry.lookup(@registry, {:agent, session_id}) do
       [{pid, _}] ->
-        Logger.debug(
-          "lookup_or_start: found existing worker for session_id=#{session_id}, pid=#{inspect(pid)}"
-        )
+        if Process.alive?(pid) do
+          Logger.debug(
+            "lookup_or_start: found existing worker for session_id=#{session_id}, pid=#{inspect(pid)}"
+          )
 
-        {:ok, pid}
+          {:ok, pid}
+        else
+          start_agent_worker(session_id)
+        end
 
       [] ->
         Logger.info(
@@ -160,24 +185,33 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
 
     with {:ok, session} <- Agents.get_execution_agent(session_id),
          {:ok, agent} <- ChatAgents.get_chat_agent(session.agent_id) do
+      project_path_from_project = if agent.project, do: agent.project.path, else: nil
+
       project_path =
         session.git_worktree_path ||
           agent.git_worktree_path ||
-          (agent.project && agent.project.path)
+          project_path_from_project ||
+          File.cwd!()
 
-      unless project_path do
-        raise "No project_path resolved for session_id=#{session_id} agent_id=#{agent.id} — set git_worktree_path on the session or agent, or associate a project with a path"
+      if is_nil(session.git_worktree_path) && is_nil(agent.git_worktree_path) &&
+           is_nil(project_path_from_project) do
+        Logger.warning(
+          "start_agent_worker: no explicit project_path for session.id=#{session_id}; defaulting to cwd=#{project_path}"
+        )
       end
 
       Logger.info(
         "✅ start_agent_worker: loaded session.uuid=#{session.uuid}, agent.id=#{agent.id}, project_path=#{project_path}"
       )
 
+      provider = normalize_provider(session.provider) || "claude"
+
       opts = [
         session_id: session.id,
         session_uuid: session.uuid,
         agent_id: agent.id,
-        project_path: project_path
+        project_path: project_path,
+        provider: provider
       ]
 
       case DynamicSupervisor.start_child(
@@ -190,6 +224,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
           )
 
           result
+
+        {:error, {:already_started, pid}} ->
+          Logger.info(
+            "start_agent_worker: worker already started for session.id=#{session_id}, pid=#{inspect(pid)}"
+          )
+
+          {:ok, pid}
 
         {:error, reason} = error ->
           Logger.error(
@@ -207,4 +248,22 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
         {:error, reason}
     end
   end
+
+  defp resolve_provider(session_id, opts) do
+    opts[:provider]
+    |> normalize_provider()
+    |> case do
+      nil ->
+        case Agents.get_execution_agent(session_id) do
+          {:ok, session} -> normalize_provider(session.provider) || @default_provider
+          _ -> @default_provider
+        end
+
+      provider ->
+        provider
+    end
+  end
+
+  defp normalize_provider(provider) when provider in @supported_providers, do: provider
+  defp normalize_provider(_provider), do: nil
 end

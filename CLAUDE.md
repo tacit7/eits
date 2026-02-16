@@ -158,3 +158,16 @@ The `workflow_states` table defines kanban columns. Current states:
 
 - Project PK is integer (`@primary_key {:id, :id, autogenerate: false}`) but Go MCP writes some foreign keys as text. Task `project_id` uses `type: :string` in the Ecto association to handle this.
 - Agent `project_name` is a real DB column (not virtual), populated by Go.
+
+### Schema Naming Confusion
+
+**IMPORTANT:** Two different schemas both named "Agent" cause confusion:
+
+- **`ChatAgent` schema** (`lib/eye_in_the_sky_web/chat_agents/chat_agent.ex`) → maps to **`agents` DB table** (chat identity/participant)
+- **`Agent` schema** (`lib/eye_in_the_sky_web/sessions/agent.ex`) → maps to **`sessions` DB table** (execution session)
+
+In LiveViews and components:
+- `@session` typically refers to an `Agent` struct (from sessions table)
+- When passing to components that expect chat agent data, use `agent={@session}` (the session IS the agent in this context)
+
+**Recent fix:** DmLive was passing `session={@session}` to DmPage component, but DmPage expected `agent={@agent}`. Fixed by changing DmLive render to pass `agent={@session}`.

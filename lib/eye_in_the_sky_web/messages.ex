@@ -389,17 +389,29 @@ defmodule EyeInTheSkyWeb.Messages do
   end
 
   @doc """
+  Returns true when a session already has at least one inbound reply
+  for the given provider.
+
+  Used to decide if the next prompt should resume an existing conversation.
+  """
+  def has_inbound_reply?(session_id, provider) when is_binary(provider) do
+    Message
+    |> where(
+      [m],
+      m.session_id == ^session_id and m.direction == "inbound" and m.provider == ^provider
+    )
+    |> Repo.exists?()
+  end
+
+  def has_inbound_reply?(session_id, _provider), do: has_inbound_reply?(session_id, "claude")
+
+  @doc """
   Returns true when a session already has at least one inbound Claude reply.
 
   Used to decide if the next prompt should resume an existing Claude conversation.
   """
   def has_inbound_claude_reply?(session_id) do
-    Message
-    |> where(
-      [m],
-      m.session_id == ^session_id and m.direction == "inbound" and m.provider == "claude"
-    )
-    |> Repo.exists?()
+    has_inbound_reply?(session_id, "claude")
   end
 
   @doc """

@@ -7,12 +7,32 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
   use Phoenix.LiveComponent
   import EyeInTheSkyWebWeb.CoreComponents, only: [icon: 1]
 
+  @claude_models [
+    {"sonnet", "Sonnet 4.5"},
+    {"opus", "Opus 4.6"},
+    {"sonnet[1m]", "Sonnet 4.5 (1M)"},
+    {"haiku", "Haiku 4.5"}
+  ]
+
+  @codex_models [
+    {"gpt-5.3-codex", "GPT-5.3 Codex"},
+    {"gpt-5.2-codex", "GPT-5.2 Codex"},
+    {"gpt-5.2", "GPT-5.2"},
+    {"gpt-5.1", "GPT-5.1"},
+    {"gpt-5-codex-mini", "GPT-5 Codex Mini"}
+  ]
+
   @impl true
   def mount(socket) do
-    {:ok, assign(socket, :selected_model, "sonnet")}
+    {:ok, assign(socket, selected_model: "sonnet", selected_provider: "claude")}
   end
 
   @impl true
+  def handle_event("provider_changed", %{"agent_type" => provider}, socket) do
+    default_model = if provider == "codex", do: "gpt-5.3-codex", else: "sonnet"
+    {:noreply, assign(socket, selected_provider: provider, selected_model: default_model)}
+  end
+
   def handle_event("model_changed", %{"model" => model}, socket) do
     {:noreply, assign(socket, :selected_model, model)}
   end
@@ -31,6 +51,20 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
           </div>
 
           <form phx-submit={@submit_event} class="flex flex-col gap-4">
+            <%!-- Agent Type --%>
+            <div>
+              <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Provider</label>
+              <select
+                name="agent_type"
+                class="select select-bordered w-full"
+                phx-change="provider_changed"
+                phx-target={@myself}
+              >
+                <option value="claude" selected={@selected_provider == "claude"}>Claude</option>
+                <option value="codex" selected={@selected_provider == "codex"}>Codex</option>
+              </select>
+            </div>
+
             <%!-- Description --%>
             <div>
               <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Description</label>
@@ -76,23 +110,14 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
                 phx-change="model_changed"
                 phx-target={@myself}
               >
-                <option value="sonnet" selected={@selected_model == "sonnet"}>
-                  Sonnet 4.5
-                </option>
-                <option value="opus" selected={@selected_model == "opus"}>
-                  Opus 4.6
-                </option>
-                <option value="sonnet[1m]" selected={@selected_model == "sonnet[1m]"}>
-                  Sonnet 4.5 (1M)
-                </option>
-                <option value="haiku" selected={@selected_model == "haiku"}>
-                  Haiku 4.5
-                </option>
+                <%= for {value, label} <- models_for_provider(@selected_provider) do %>
+                  <option value={value} selected={@selected_model == value}>{label}</option>
+                <% end %>
               </select>
             </div>
 
-            <%!-- Effort (Opus only) --%>
-            <%= if @selected_model == "opus" do %>
+            <%!-- Effort (Claude Opus only) --%>
+            <%= if @selected_provider == "claude" and @selected_model == "opus" do %>
               <div>
                 <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Effort</label>
                 <select name="effort_level" class="select select-bordered w-full">
@@ -115,4 +140,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
     </div>
     """
   end
+
+  defp models_for_provider("codex"), do: @codex_models
+  defp models_for_provider(_), do: @claude_models
 end

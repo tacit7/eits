@@ -271,6 +271,15 @@ defmodule EyeInTheSkyWeb.Messages do
   end
 
   @doc """
+  Deletes all messages for a session. Used for full reload from JSONL file.
+  """
+  def delete_session_messages(session_id) do
+    Message
+    |> where([m], m.session_id == ^session_id)
+    |> Repo.delete_all()
+  end
+
+  @doc """
   Returns an `%Ecto.Changeset{}` for tracking message changes.
   """
   def change_message(%Message{} = message, attrs \\ %{}) do

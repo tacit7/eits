@@ -1,7 +1,7 @@
 export const CopyToClipboard = {
   mounted() {
     this.handleClick = () => {
-      const id = this.el.dataset.sessionId
+      const id = this.el.dataset.copy || this.el.dataset.sessionId
       if (!id) return
 
       if (navigator.clipboard?.writeText) {

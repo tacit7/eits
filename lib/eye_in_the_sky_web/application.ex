@@ -42,6 +42,9 @@ defmodule EyeInTheSkyWeb.Application do
       # NATS pub/sub consumer
       # Connects to localhost:4222, subscribes to events.>, dispatches to Handler
       EyeInTheSkyWeb.NATS.Consumer,
+      # MCP Server (Anubis) — Streamable HTTP at /mcp
+      Anubis.Server.Registry,
+      {EyeInTheSkyWeb.MCP.Server, transport: :streamable_http},
       # Start to serve requests, typically the last entry
       EyeInTheSkyWebWeb.Endpoint
     ]

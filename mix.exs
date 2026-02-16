@@ -68,7 +68,8 @@ defmodule EyeInTheSkyWeb.MixProject do
       {:bandit, "~> 1.5"},
       {:oban, "~> 2.19"},
       {:crontab, "~> 1.1"},
-      {:gnat, "~> 1.8"}
+      {:gnat, "~> 1.8"},
+      {:anubis_mcp, "~> 0.17"}
     ]
   end
 

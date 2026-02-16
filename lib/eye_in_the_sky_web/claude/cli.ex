@@ -248,6 +248,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     verbose = opts[:verbose] || opts[:output_format] == "stream-json"
     args = if verbose, do: args ++ ["--verbose"], else: args
     args = if opts[:skip_permissions], do: args ++ ["--dangerously-skip-permissions"], else: args
+    args = if opts[:include_partial_messages], do: args ++ ["--include-partial-messages"], else: args
 
     args
   end

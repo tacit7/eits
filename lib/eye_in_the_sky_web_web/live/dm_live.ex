@@ -25,6 +25,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{agent.id}")
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "dm:#{agent.id}:stream")
       send(self(), :sync_from_session_file)
     end
 
@@ -46,6 +47,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:selected_model, "opus")
       |> assign(:selected_effort, "")
       |> assign(:show_model_menu, false)
+      |> assign(:show_live_stream, false)
+      |> assign(:stream_content, "")
+      |> assign(:stream_tool, nil)
       |> allow_upload(:files,
         accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
         max_entries: 10,
@@ -84,7 +88,26 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_event("toggle_live_stream", params, socket) do
+    enabled = case params do
+      %{"enabled" => true} -> true
+      %{"enabled" => "true"} -> true
+      _ -> !socket.assigns.show_live_stream
+    end
+
+    {:noreply, assign(socket, :show_live_stream, enabled)}
+  end
+
+  @impl true
   def handle_event("send_message", %{"body" => body}, socket) when body != "" do
+    if socket.assigns.processing do
+      {:noreply, socket}
+    else
+      handle_send_message(body, socket)
+    end
+  end
+
+  defp handle_send_message(body, socket) do
     model = socket.assigns.selected_model
     effort_level = socket.assigns.selected_effort
 
@@ -110,7 +133,11 @@ defmodule EyeInTheSkyWebWeb.DmLive do
              ) do
           :ok ->
             Logger.info("Message forwarded to AgentManager for session=#{session_id}")
-            {:noreply, socket}
+
+            {:noreply,
+             socket
+             |> assign(:processing, true)
+             |> push_event("clear-input", %{})}
 
           {:error, reason} ->
             Logger.error("Failed to send message via AgentManager: #{inspect(reason)}")
@@ -144,12 +171,20 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     {:noreply, socket}
   end
 
-  @impl true
-  def handle_event("sync_from_session_file", _params, socket) do
-    case sync_messages_from_session_file(socket) do
-      {:ok, socket, imported} ->
-        {:noreply, put_flash(socket, :info, "Synced #{imported} new messages from session file")}
 
+  @impl true
+  def handle_event("reload_from_session_file", _params, socket) do
+    session_id = socket.assigns.session_id
+    session_uuid = socket.assigns.session_uuid
+
+    with {:ok, project_path} <-
+           resolve_project_path(socket.assigns.agent, socket.assigns.chat_agent),
+         {:ok, raw_messages} <- SessionReader.read_messages_after_uuid(session_uuid, project_path, nil) do
+      Messages.delete_session_messages(session_id)
+      imported = import_session_messages(raw_messages, session_id)
+      socket = load_tab_data(socket, "messages", session_id)
+      {:noreply, put_flash(socket, :info, "Reloaded #{imported} messages from session file")}
+    else
       {:error, :not_found} ->
         {:noreply, put_flash(socket, :error, "No session file found for this session")}
 
@@ -157,7 +192,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         {:noreply, put_flash(socket, :error, "No project path configured")}
 
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to read session file: #{inspect(reason)}")}
+        {:noreply, put_flash(socket, :error, "Failed to reload: #{inspect(reason)}")}
     end
   end
 
@@ -175,7 +210,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_event("kill_session", _params, socket) do
-    # TODO: expose cancel via AgentManager
+    AgentManager.cancel_session(socket.assigns.session_id)
     {:noreply, assign(socket, :processing, false)}
   end
 
@@ -241,8 +276,17 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_info({:agent_working, _session_uuid, session_id}, socket) do
-    # Agent started processing - set flag only if this is our session
     if session_id == socket.assigns.session_id do
+      {:noreply, assign(socket, :processing, true)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  # NATS handler broadcasts {agent_working, %Agent{}} — match by agent struct
+  @impl true
+  def handle_info({:agent_working, %{id: id}}, socket) do
+    if id == socket.assigns.session_id do
       {:noreply, assign(socket, :processing, true)}
     else
       {:noreply, socket}
@@ -251,12 +295,73 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
-    # Agent finished processing - clear flag only if this is our session
     if session_id == socket.assigns.session_id do
       {:noreply, assign(socket, :processing, false)}
     else
       {:noreply, socket}
     end
+  end
+
+  # NATS handler broadcasts {agent_stopped, %Agent{}}
+  @impl true
+  def handle_info({:agent_stopped, %{id: id}}, socket) do
+    if id == socket.assigns.session_id do
+      {:noreply, assign(socket, :processing, false)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  # NATS handler broadcasts tool events on "session:#{agent.id}"
+  @impl true
+  def handle_info({:tool_use, tool_name, _params}, socket) do
+    {:noreply, assign(socket, :stream_tool, tool_name)}
+  end
+
+  @impl true
+  def handle_info({:tool_result, _tool_name, _is_error}, socket) do
+    # Tool finished — reload messages to show the new tool messages
+    socket =
+      socket
+      |> assign(:stream_tool, nil)
+      |> load_tab_data("messages", socket.assigns.session_id)
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:stream_delta, :text, text}, socket) do
+    new_content = socket.assigns.stream_content <> text
+    Logger.info("[DmLive] stream_delta text, total_len=#{String.length(new_content)}, show=#{socket.assigns.show_live_stream}")
+    {:noreply, assign(socket, :stream_content, new_content)}
+  end
+
+  @impl true
+  def handle_info({:stream_replace, :text, text}, socket) do
+    Logger.info("[DmLive] stream_replace text, len=#{String.length(text)}, show=#{socket.assigns.show_live_stream}")
+    {:noreply, assign(socket, :stream_content, text)}
+  end
+
+  @impl true
+  def handle_info({:stream_delta, :tool_use, name}, socket) do
+    Logger.info("[DmLive] stream_delta tool_use=#{name}, show=#{socket.assigns.show_live_stream}")
+    {:noreply, assign(socket, :stream_tool, name)}
+  end
+
+  @impl true
+  def handle_info({:stream_delta, :thinking, _}, socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info(:stream_clear, socket) do
+    Logger.info("[DmLive] stream_clear")
+    socket =
+      socket
+      |> assign(:stream_content, "")
+      |> assign(:stream_tool, nil)
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -476,6 +581,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       selected_effort={@selected_effort}
       show_model_menu={@show_model_menu}
       processing={@processing}
+      show_live_stream={@show_live_stream}
+      stream_content={@stream_content}
+      stream_tool={@stream_tool}
       tasks={@tasks}
       commits={@commits}
       logs={@logs}

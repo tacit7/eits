@@ -97,6 +97,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
     send_message(session_id, prompt, opts)
   end
 
+  @doc """
+  Cancels the currently running SDK process for a session.
+  """
+  def cancel_session(session_id) do
+    AgentWorker.cancel(session_id)
+  end
+
   def send_message(session_id, message, opts \\ []) do
     Logger.debug(
       "send_message: session_id=#{session_id}, message_length=#{String.length(message)}"

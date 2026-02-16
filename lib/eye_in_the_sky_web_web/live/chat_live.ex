@@ -161,6 +161,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       |> assign(:active_agents, active_agents)
       |> assign(:channel_members, channel_members)
       |> assign(:show_agent_drawer, false)
+      |> assign(:show_members, false)
 
     {:noreply, socket}
   end
@@ -378,6 +379,24 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   end
 
   @impl true
+  def handle_event("delete_message", %{"id" => id_str}, socket) do
+    {id, ""} = Integer.parse(id_str)
+    message = Messages.get_message!(id)
+    {:ok, _} = Messages.delete_message(message)
+
+    messages =
+      Messages.list_messages_for_channel(socket.assigns.active_channel_id)
+      |> serialize_messages()
+
+    {:noreply, assign(socket, :messages, messages)}
+  end
+
+  @impl true
+  def handle_event("toggle_members", _params, socket) do
+    {:noreply, assign(socket, :show_members, !socket.assigns.show_members)}
+  end
+
+  @impl true
   def handle_event("toggle_agent_drawer", _params, socket) do
     {:noreply, assign(socket, :show_agent_drawer, !socket.assigns.show_agent_drawer)}
   end
@@ -482,17 +501,25 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
   @impl true
   def handle_info({:agent_working, _session_uuid, session_int_id}, socket) do
-    require Logger
-    Logger.info("🔔 ChatLive received agent_working for session_int_id=#{session_int_id}")
     working_agents = Map.put(socket.assigns.working_agents, session_int_id, true)
-    Logger.info("🗂️ Updated working_agents: #{inspect(working_agents)}")
+    {:noreply, assign(socket, :working_agents, working_agents)}
+  end
+
+  # Handle struct variant from PubSub
+  @impl true
+  def handle_info({:agent_working, %{id: session_int_id}}, socket) do
+    working_agents = Map.put(socket.assigns.working_agents, session_int_id, true)
     {:noreply, assign(socket, :working_agents, working_agents)}
   end
 
   @impl true
   def handle_info({:agent_stopped, _session_uuid, session_int_id}, socket) do
-    require Logger
-    Logger.info("🛑 ChatLive received agent_stopped for session_int_id=#{session_int_id}")
+    working_agents = Map.delete(socket.assigns.working_agents, session_int_id)
+    {:noreply, assign(socket, :working_agents, working_agents)}
+  end
+
+  @impl true
+  def handle_info({:agent_stopped, %{id: session_int_id}}, socket) do
     working_agents = Map.delete(socket.assigns.working_agents, session_int_id)
     {:noreply, assign(socket, :working_agents, working_agents)}
   end
@@ -531,35 +558,134 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
   @impl true
   def render(assigns) do
+    active_channel =
+      Enum.find(assigns.channels, fn c -> to_string(c.id) == to_string(assigns.active_channel_id) end)
+
+    assigns = assign(assigns, :active_channel, active_channel)
+
     ~H"""
-    <div class="h-full">
-      <.svelte
-        name="AgentMessagesPanel"
-        props={
-          %{
-            channels: @channels,
-            activeChannelId: @active_channel_id,
-            messages: @messages,
-            unreadCounts: @unread_counts,
-            activeThread: @active_thread,
-            agentStatusCounts: @agent_status_counts,
-            prompts: @prompts,
-            activeAgents: @active_agents,
-            channelMembers: @channel_members,
-            workingAgents: @working_agents
+    <div class="flex flex-col h-[calc(100vh-2rem)] px-4 sm:px-6 lg:px-8 py-4">
+      <%!-- Header card --%>
+      <div class="max-w-6xl mx-auto w-full bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0" id="chat-header-card">
+        <div class="px-5 py-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-2 h-2 rounded-full flex-shrink-0 bg-success animate-pulse" />
+              <h1 class="text-lg font-bold text-base-content">
+                <%= if @active_channel do %>
+                  <span class="text-base-content/30 mr-0.5">#</span>{@active_channel.name || "Channel"}
+                <% else %>
+                  Chat
+                <% end %>
+              </h1>
+              <%= if @active_channel && @active_channel[:description] do %>
+                <span class="text-xs text-base-content/30">{@active_channel.description}</span>
+              <% end %>
+            </div>
+            <div class="flex items-center gap-2">
+              <%!-- Status pills --%>
+              <%= if @agent_status_counts[:active] do %>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 text-[11px] font-mono text-success">
+                  <span class="w-1.5 h-1.5 rounded-full bg-success"></span>
+                  {@agent_status_counts.active} active
+                </span>
+              <% end %>
+              <%= if @agent_status_counts[:working] do %>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-warning/10 text-[11px] font-mono text-warning">
+                  <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse"></span>
+                  {@agent_status_counts.working} running
+                </span>
+              <% end %>
+              <button
+                phx-click="toggle_members"
+                class={[
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors",
+                  if(@show_members,
+                    do: "text-primary bg-primary/10 hover:bg-primary/15",
+                    else: "text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5"
+                  )
+                ]}
+              >
+                <.icon name="hero-user-group-mini" class="w-3.5 h-3.5" />
+                {length(@channel_members)} members
+              </button>
+              <button
+                phx-click="toggle_agent_drawer"
+                class="btn btn-xs btn-primary gap-1"
+              >
+                <.icon name="hero-plus-mini" class="w-3 h-3" /> Agent
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <%!-- Members panel (collapsible, server-rendered) --%>
+        <%= if @show_members do %>
+          <div class="px-5 pb-3 border-t border-base-content/5 pt-3" id="chat-members-panel">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] uppercase tracking-wider font-medium text-base-content/30">Channel Agents</span>
+            </div>
+
+            <%= if @channel_members != [] do %>
+              <div class="flex flex-wrap gap-1.5 mb-3">
+                <%= for member <- @channel_members do %>
+                  <a
+                    href={~p"/dm/#{member.session_id}"}
+                    class="inline-flex items-center gap-1 font-mono text-[11px] font-medium px-2 py-0.5 rounded bg-base-content/[0.04] text-base-content/50 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
+                    title={"Session ##{member.session_id}"}
+                  >
+                    @{member.session_id}
+                    <%= if member.session_name do %>
+                      <span class="text-base-content/35">{String.slice(member.session_name, 0, 15)}<%= if String.length(member.session_name) > 15, do: "…" %></span>
+                    <% end %>
+                  </a>
+                <% end %>
+              </div>
+            <% else %>
+              <p class="text-xs text-base-content/30 mb-3">No agents in this channel yet. Add one by session ID or spawn a new one.</p>
+            <% end %>
+
+            <%!-- Add agent by session ID --%>
+            <form phx-submit="add_agent_to_channel" class="flex gap-1.5" id="add-agent-form">
+              <input
+                type="text"
+                name="session_id"
+                placeholder="Session ID to add..."
+                class="flex-1 input input-xs bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 font-mono text-xs"
+                autocomplete="off"
+                id="add-agent-session-id"
+              />
+              <button type="submit" class="btn btn-xs btn-primary">Add</button>
+            </form>
+          </div>
+        <% end %>
+      </div>
+
+      <%!-- Messages panel (Svelte: messages + @autocomplete input only) --%>
+      <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full overflow-hidden">
+        <.svelte
+          name="AgentMessagesPanel"
+          props={
+            %{
+              activeChannelId: @active_channel_id,
+              messages: @messages,
+              activeAgents: @active_agents,
+              workingAgents: @working_agents
+            }
           }
-        }
-        socket={@socket}
-      />
+          socket={@socket}
+        />
+      </div>
     </div>
 
     <.live_component
-      module={EyeInTheSkyWebWeb.Components.NewSessionDrawer}
-      id="new-session-drawer"
+      module={EyeInTheSkyWebWeb.Components.NewSessionModal}
+      id="new-session-modal"
       show={@show_agent_drawer}
       toggle_event="toggle_agent_drawer"
       submit_event="create_agent"
       projects={@all_projects}
+      current_project={nil}
     />
     """
   end

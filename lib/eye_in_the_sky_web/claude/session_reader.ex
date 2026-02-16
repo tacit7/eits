@@ -145,12 +145,18 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
       {:ok, content} ->
         lines = String.split(content, "\n", trim: true)
 
-        messages =
+        all_messages =
           lines
           |> Enum.map(&parse_line/1)
           |> Enum.filter(&is_conversation_message?/1)
-          |> Enum.drop_while(fn msg -> msg["uuid"] != after_uuid end)
-          |> Enum.drop(1)
+
+        # Find cursor position; if UUID not found (e.g. after context compaction),
+        # fall back to returning all messages rather than returning empty.
+        messages =
+          case Enum.find_index(all_messages, fn msg -> msg["uuid"] == after_uuid end) do
+            nil -> all_messages
+            idx -> Enum.drop(all_messages, idx + 1)
+          end
 
         {:ok, messages}
 

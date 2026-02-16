@@ -25,36 +25,54 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :commits, :list, default: []
   attr :logs, :list, default: []
   attr :notes, :list, default: []
+  attr :show_live_stream, :boolean, default: false
+  attr :stream_content, :string, default: ""
+  attr :stream_tool, :string, default: nil
 
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
 
     ~H"""
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col h-[calc(100vh-4rem)]" id="dm-page">
+    <div class="flex flex-col h-[calc(100vh-2rem)] px-4 sm:px-6 lg:px-8 py-4" id="dm-page">
       <%!-- Header card --%>
-      <div class="bg-white dark:bg-[hsl(60,2%,23%)] rounded-xl border border-base-content/5 shadow-sm mb-4" id="dm-header-card">
-        <div class="px-5 py-4" id="dm-header">
+      <div class="max-w-6xl mx-auto w-full bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0" id="dm-header-card">
+        <div class="px-5 py-3" id="dm-header">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">
               <div class={"w-2 h-2 rounded-full flex-shrink-0 " <> if(is_nil(@agent.ended_at) || @agent.ended_at == "", do: "bg-success animate-pulse", else: "bg-base-content/20")} />
               <h1 class="text-lg font-bold text-base-content">{@agent.name || "Session"}</h1>
               <button
                 type="button"
-                class="text-[11px] font-mono text-base-content/30 bg-base-content/5 px-2 py-0.5 rounded hover:text-base-content/50 hover:bg-base-content/8 transition-colors cursor-pointer"
+                class="flex items-center gap-1 text-[11px] font-mono text-base-content/30 bg-base-content/5 px-2 py-0.5 rounded hover:text-base-content/50 hover:bg-base-content/8 transition-colors cursor-pointer"
                 phx-hook="CopyToClipboard"
                 id="copy-session-uuid"
                 data-copy={@session_uuid}
               >
                 {String.slice(@session_uuid, 0..7)}
+                <.icon name="hero-clipboard-document" class="w-3 h-3" />
               </button>
             </div>
             <div class="flex items-center gap-2">
               <button
-                phx-click="sync_from_session_file"
-                class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
-                id="dm-sync-button"
+                phx-click="toggle_live_stream"
+                phx-hook="LiveStreamToggle"
+                id="dm-live-stream-toggle"
+                class={[
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors",
+                  @show_live_stream && "text-primary bg-primary/10 hover:bg-primary/15",
+                  !@show_live_stream && "text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5"
+                ]}
               >
-                <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Sync
+                <.icon name={if @show_live_stream, do: "hero-signal-solid", else: "hero-signal"} class="w-3.5 h-3.5" />
+                Live
+              </button>
+              <button
+                phx-click="reload_from_session_file"
+                data-confirm="This will delete all messages and re-import from the JSONL file. Continue?"
+                class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+                id="dm-reload-button"
+              >
+                <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Reload
               </button>
             </div>
           </div>
@@ -67,7 +85,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               <button
                 class={[
                   "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150",
-                  @active_tab == tab && "bg-white dark:bg-[hsl(60,2%,27%)] text-base-content shadow-sm",
+                  @active_tab == tab && "bg-base-100 text-base-content shadow-sm",
                   @active_tab != tab && "text-base-content/40 hover:text-base-content/60"
                 ]}
                 phx-click="change_tab"
@@ -83,17 +101,15 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
       </div>
 
       <%!-- Tab content --%>
-      <div class="flex-1 min-h-0" id="dm-tab-content">
+      <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full" id="dm-tab-content">
         <%= case @active_tab do %>
           <% "messages" -> %>
             <.messages_tab
               messages={@messages}
               has_more_messages={@has_more_messages}
-              uploads={@uploads}
-              selected_model={@selected_model}
-              selected_effort={@selected_effort}
-              show_model_menu={@show_model_menu}
-              processing={@processing}
+              show_live_stream={@show_live_stream}
+              stream_content={@stream_content}
+              stream_tool={@stream_tool}
             />
           <% "tasks" -> %>
             <.tasks_tab tasks={@tasks} />
@@ -107,37 +123,39 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             <.messages_tab
               messages={@messages}
               has_more_messages={@has_more_messages}
-              uploads={@uploads}
-              selected_model={@selected_model}
-              selected_effort={@selected_effort}
-              show_model_menu={@show_model_menu}
-              processing={@processing}
+              show_live_stream={@show_live_stream}
+              stream_content={@stream_content}
+              stream_tool={@stream_tool}
             />
         <% end %>
       </div>
+
+      <%!-- Composer (pinned to bottom) --%>
+      <%= if @active_tab in ["messages", nil] do %>
+        <div class="flex-shrink-0 max-w-4xl mx-auto w-full pt-2">
+          <.message_form
+            uploads={@uploads}
+            selected_model={@selected_model}
+            selected_effort={@selected_effort}
+            show_model_menu={@show_model_menu}
+            processing={@processing}
+          />
+        </div>
+      <% end %>
     </div>
     """
   end
 
   attr :messages, :list, default: []
   attr :has_more_messages, :boolean, default: false
-  attr :uploads, :map, required: true
-  attr :selected_model, :string, default: "opus"
-  attr :selected_effort, :string, default: ""
-  attr :show_model_menu, :boolean, default: false
-  attr :processing, :boolean, default: false
+  attr :show_live_stream, :boolean, default: false
+  attr :stream_content, :string, default: ""
+  attr :stream_tool, :string, default: nil
 
   defp messages_tab(assigns) do
     ~H"""
-    <div class="flex h-full flex-col gap-3" id="dm-messages-tab">
-      <%!-- Messages area --%>
+    <div class="flex h-full flex-col" id="dm-messages-tab">
       <div class="flex-1 min-h-0 flex flex-col">
-        <div class="flex items-center justify-between px-4 py-2.5 border-b border-base-content/5 flex-shrink-0">
-          <span class="text-[11px] font-mono tabular-nums text-base-content/30 tracking-wider uppercase">
-            {length(@messages)} messages
-          </span>
-        </div>
-
         <div
           class="px-4 py-2 overflow-y-auto flex-1 min-h-0"
           id="messages-container"
@@ -151,8 +169,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               <p class="mt-1 text-xs text-base-content/25">Send a message to start the conversation</p>
             </div>
           <% else %>
-            <%= if @has_more_messages do %>
-              <div class="py-2 text-center">
+            <div class="py-2 flex items-center justify-center gap-3">
+              <%= if @has_more_messages do %>
                 <button
                   phx-click="load_more_messages"
                   class="text-xs text-base-content/35 hover:text-primary transition-colors"
@@ -160,26 +178,39 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 >
                   Load older messages
                 </button>
-              </div>
-            <% end %>
+              <% end %>
+            </div>
 
-            <div class="divide-y divide-base-content/[0.04]">
+            <div class="space-y-4">
               <%= for message <- @messages do %>
                 <.message_item message={message} />
               <% end %>
             </div>
+
+            <%!-- Live streaming bubble --%>
+            <%= if @show_live_stream && (@stream_content != "" || @stream_tool) do %>
+              <div class="py-3 px-2" id="live-stream-bubble">
+                <div class="flex items-start gap-2.5">
+                  <img src="/images/claude.svg" class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse" alt="Claude" />
+                  <div class="min-w-0 flex-1">
+                    <span class="text-[13px] font-semibold text-primary/80">Agent</span>
+                    <%= if @stream_tool do %>
+                      <div class="text-xs text-base-content/40 font-mono mt-1">
+                        Using {@stream_tool}...
+                      </div>
+                    <% end %>
+                    <%= if @stream_content != "" do %>
+                      <div class="mt-1 text-sm text-base-content/60 whitespace-pre-wrap">
+                        {@stream_content}
+                      </div>
+                    <% end %>
+                  </div>
+                </div>
+              </div>
+            <% end %>
           <% end %>
         </div>
       </div>
-
-      <%!-- Composer card --%>
-      <.message_form
-        uploads={@uploads}
-        selected_model={@selected_model}
-        selected_effort={@selected_effort}
-        show_model_menu={@show_model_menu}
-        processing={@processing}
-      />
     </div>
     """
   end
@@ -194,28 +225,32 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
     <div
       class={[
         "py-3 px-2 -mx-2 rounded-lg transition-colors",
-        @is_user && "bg-primary/[0.03]",
-        !@is_user && "hover:bg-base-content/[0.02]"
+        !@is_user && "bg-primary/[0.03]",
+        @is_user && "hover:bg-base-content/[0.02]"
       ]}
       id={"dm-message-#{@message.id}"}
     >
       <div class="flex items-start gap-2.5">
-        <%!-- Sender dot --%>
-        <div class={[
-          "w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0",
-          @is_user && "bg-primary",
-          !@is_user && "bg-success"
-        ]} />
+        <%!-- Sender icon --%>
+        <%= if @is_user do %>
+          <div class="w-4 h-4 rounded-full mt-1 flex-shrink-0 bg-success/20 flex items-center justify-center">
+            <div class="w-1.5 h-1.5 rounded-full bg-success" />
+          </div>
+        <% else %>
+          <img src={provider_icon(@message.provider)} class="w-4 h-4 mt-1 flex-shrink-0" alt={@message.provider || "Agent"} />
+        <% end %>
 
         <div class="min-w-0 flex-1">
           <div class="flex items-baseline gap-2">
             <span class={[
               "text-[13px] font-semibold",
-              @is_user && "text-primary/80",
-              !@is_user && "text-base-content/70"
+              !@is_user && "text-primary/80",
+              @is_user && "text-base-content/70"
             ]}>
               {message_sender_name(@message)}
             </span>
+            <span :if={!@is_user && message_model(@message)} class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/35">{message_model(@message)}</span>
+            <span :if={!@is_user && message_cost(@message)} class="text-[11px] font-mono text-base-content/30">${:erlang.float_to_binary(message_cost(@message) * 1.0, decimals: 4)}</span>
             <span class="text-[11px] text-base-content/25">{format_time(@message.inserted_at)}</span>
           </div>
 
@@ -304,12 +339,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
     <form
       phx-submit="send_message"
       phx-change="validate_upload"
-      class="bg-white dark:bg-[hsl(60,2%,23%)] rounded-xl border border-base-content/5 shadow-sm p-4"
+      class="rounded-2xl border border-base-content/10 bg-base-100 shadow-sm"
       id="message-form"
     >
       <%!-- Upload previews --%>
       <%= if @uploads.files.entries != [] do %>
-        <div class="mb-3 flex flex-wrap gap-2" id="upload-preview-list">
+        <div class="px-4 pt-3 flex flex-wrap gap-2" id="upload-preview-list">
           <%= for entry <- @uploads.files.entries do %>
             <div class="flex items-center gap-2 rounded-lg bg-base-content/[0.04] px-3 py-1.5 text-xs">
               <.icon name="hero-paper-clip" class="w-3.5 h-3.5 text-base-content/40" />
@@ -329,187 +364,120 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         </div>
       <% end %>
 
-      <%!-- Model + effort chips --%>
-      <div class="mb-3 flex items-center gap-2" id="model-controls">
-        <div class="dropdown dropdown-top" phx-click="toggle_model_menu" id="model-selector-dropdown">
-          <button
-            type="button"
-            tabindex="0"
-            class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-base-content/[0.04] text-xs text-base-content/50 hover:text-base-content/70 hover:bg-base-content/[0.07] transition-colors"
-            id="model-selector-button"
-          >
-            <.icon name="hero-bolt-mini" class="w-3.5 h-3.5" />
-            <span class="font-medium">{@selected_model}</span>
-          </button>
+      <%!-- Textarea --%>
+      <div class="px-4 pt-3 pb-1">
+        <textarea
+          name="body"
+          rows="1"
+          placeholder={if @processing, do: "Agent is working...", else: "Reply..."}
+          class="w-full bg-transparent border-0 outline-none focus:ring-0 text-sm resize-none min-h-[28px] max-h-40 overflow-y-hidden placeholder:text-base-content/30 p-0"
+          autocomplete="off"
+          disabled={@processing}
+          phx-hook="CommandHistory"
+          id="message-input"
+        ></textarea>
+      </div>
 
-          <%= if @show_model_menu do %>
-            <ul
-              tabindex="0"
-              class="dropdown-content menu z-[1] w-64 rounded-xl border border-base-content/8 bg-white dark:bg-[hsl(60,2%,23%)] p-1.5 shadow-lg"
-              id="model-selector-menu"
-            >
-              <li>
-                <a
-                  phx-click="select_model"
-                  phx-value-model="opus"
-                  phx-value-effort=""
-                  class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
-                >
-                  <.icon name="hero-bolt" class="w-4 h-4 text-warning" />
-                  <div>
-                    <div class="text-sm font-semibold text-base-content/80">Opus 4.6</div>
-                    <div class="text-[11px] text-base-content/40">Most capable for complex work</div>
-                  </div>
-                </a>
-              </li>
-              <li>
-                <a
-                  phx-click="select_model"
-                  phx-value-model="sonnet"
-                  phx-value-effort=""
-                  class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
-                >
-                  <.icon name="hero-bolt" class="w-4 h-4 text-info" />
-                  <div>
-                    <div class="text-sm font-semibold text-base-content/80">Sonnet 4.5</div>
-                    <div class="text-[11px] text-base-content/40">Best for everyday tasks</div>
-                  </div>
-                </a>
-              </li>
-              <li>
-                <a
-                  phx-click="select_model"
-                  phx-value-model="haiku"
-                  phx-value-effort=""
-                  class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
-                >
-                  <.icon name="hero-bolt" class="w-4 h-4 text-success" />
-                  <div>
-                    <div class="text-sm font-semibold text-base-content/80">Haiku 4.5</div>
-                    <div class="text-[11px] text-base-content/40">Fastest for quick answers</div>
-                  </div>
-                </a>
-              </li>
-            </ul>
-          <% end %>
+      <%!-- Bottom toolbar --%>
+      <div class="flex items-center justify-between px-3 pb-3 pt-1" id="dm-composer-toolbar">
+        <%!-- Left: upload button --%>
+        <div class="flex items-center">
+          <label
+            for={@uploads.files.ref}
+            phx-drop-target={@uploads.files.ref}
+            class="flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5 transition-colors"
+          >
+            <.icon name="hero-plus" class="w-5 h-5" />
+          </label>
+          <.live_file_input upload={@uploads.files} class="hidden" />
         </div>
 
-        <%= if @selected_model in ["opus", "sonnet"] do %>
-          <div
-            class="dropdown dropdown-top"
-            phx-click="toggle_model_menu"
-            id="effort-selector-dropdown"
-          >
+        <%!-- Right: model selector + send/stop --%>
+        <div class="flex items-center gap-2">
+          <%!-- Model selector --%>
+          <div class="dropdown dropdown-top dropdown-end" phx-click="toggle_model_menu" id="model-selector-dropdown">
             <button
               type="button"
               tabindex="0"
-              class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-base-content/[0.04] text-xs text-base-content/50 hover:text-base-content/70 hover:bg-base-content/[0.07] transition-colors"
-              id="effort-selector-button"
+              class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-base-content/50 hover:text-base-content/70 transition-colors"
+              id="model-selector-button"
             >
-              <.icon name="hero-adjustments-horizontal-mini" class="w-3.5 h-3.5" />
-              <span class="font-medium">
-                {if @selected_effort != "", do: @selected_effort, else: "high"}
-              </span>
+              <span class="font-medium">{model_display_name(@selected_model)}</span>
+              <.icon name="hero-chevron-down-mini" class="w-3.5 h-3.5" />
             </button>
 
             <%= if @show_model_menu do %>
               <ul
                 tabindex="0"
-                class="dropdown-content menu z-[1] w-52 rounded-xl border border-base-content/8 bg-white dark:bg-[hsl(60,2%,23%)] p-1.5 shadow-lg"
-                id="effort-selector-menu"
+                class="dropdown-content menu z-[1] w-64 rounded-xl border border-base-content/8 bg-base-100 p-1.5 shadow-lg"
+                id="model-selector-menu"
               >
-                <li class="px-3 py-1.5 text-[11px] font-medium tracking-wider uppercase text-base-content/30">
-                  Effort Level
-                </li>
                 <li>
                   <a
                     phx-click="select_model"
-                    phx-value-model={@selected_model}
+                    phx-value-model="opus"
                     phx-value-effort=""
-                    class="rounded-lg px-3 py-2 text-sm hover:bg-base-content/[0.04]"
+                    class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
                   >
-                    Default (high)
+                    <.icon name="hero-bolt" class="w-4 h-4 text-warning" />
+                    <div>
+                      <div class="text-sm font-semibold text-base-content/80">Opus 4.6</div>
+                      <div class="text-[11px] text-base-content/40">Most capable</div>
+                    </div>
                   </a>
                 </li>
                 <li>
                   <a
                     phx-click="select_model"
-                    phx-value-model={@selected_model}
-                    phx-value-effort="low"
-                    class="rounded-lg px-3 py-2 text-sm hover:bg-base-content/[0.04]"
+                    phx-value-model="sonnet"
+                    phx-value-effort=""
+                    class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
                   >
-                    Low (faster, cheaper)
+                    <.icon name="hero-bolt" class="w-4 h-4 text-info" />
+                    <div>
+                      <div class="text-sm font-semibold text-base-content/80">Sonnet 4.5</div>
+                      <div class="text-[11px] text-base-content/40">Everyday tasks</div>
+                    </div>
                   </a>
                 </li>
                 <li>
                   <a
                     phx-click="select_model"
-                    phx-value-model={@selected_model}
-                    phx-value-effort="medium"
-                    class="rounded-lg px-3 py-2 text-sm hover:bg-base-content/[0.04]"
+                    phx-value-model="haiku"
+                    phx-value-effort=""
+                    class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
                   >
-                    Medium (balanced)
-                  </a>
-                </li>
-                <li>
-                  <a
-                    phx-click="select_model"
-                    phx-value-model={@selected_model}
-                    phx-value-effort="high"
-                    class="rounded-lg px-3 py-2 text-sm hover:bg-base-content/[0.04]"
-                  >
-                    High (deeper reasoning)
+                    <.icon name="hero-bolt" class="w-4 h-4 text-success" />
+                    <div>
+                      <div class="text-sm font-semibold text-base-content/80">Haiku 4.5</div>
+                      <div class="text-[11px] text-base-content/40">Fast answers</div>
+                    </div>
                   </a>
                 </li>
               </ul>
             <% end %>
           </div>
-        <% end %>
-      </div>
 
-      <%!-- Input row --%>
-      <div class="flex gap-2" id="dm-composer-row">
-        <div class="relative flex-1">
-          <input
-            type="text"
-            name="body"
-            placeholder="Type a message..."
-            class="input input-sm w-full bg-base-content/[0.03] border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm h-10"
-            autocomplete="off"
-            phx-hook="CommandHistory"
-            id="message-input"
-          />
-
-          <label
-            for={@uploads.files.ref}
-            phx-drop-target={@uploads.files.ref}
-            class="absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer"
-          >
-            <.icon name="hero-paper-clip" class="w-4 h-4 text-base-content/25 hover:text-base-content/50 transition-colors" />
-          </label>
-
-          <.live_file_input upload={@uploads.files} class="hidden" />
+          <%!-- Send / Stop button --%>
+          <%= if @processing do %>
+            <button
+              type="button"
+              phx-click="kill_session"
+              class="flex items-center justify-center w-8 h-8 rounded-lg bg-error/80 text-error-content hover:bg-error transition-colors"
+              id="dm-stop-button"
+            >
+              <.icon name="hero-stop-solid" class="w-4 h-4" />
+            </button>
+          <% else %>
+            <button
+              type="submit"
+              class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/70 text-primary-content hover:bg-primary transition-colors"
+              id="dm-send-button"
+            >
+              <.icon name="hero-arrow-up-mini" class="w-5 h-5" />
+            </button>
+          <% end %>
         </div>
-
-        <%= if @processing do %>
-          <button
-            type="button"
-            phx-click="kill_session"
-            class="btn btn-sm btn-error gap-1.5 min-h-0 h-10 px-4"
-            id="dm-stop-button"
-          >
-            <span class="loading loading-spinner loading-xs"></span> Stop
-          </button>
-        <% else %>
-          <button
-            type="submit"
-            class="btn btn-sm btn-primary min-h-0 h-10 px-5"
-            phx-disable-with="Sending..."
-            id="dm-send-button"
-          >
-            <.icon name="hero-paper-airplane-mini" class="w-4 h-4" />
-          </button>
-        <% end %>
       </div>
     </form>
     """
@@ -527,10 +495,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         subtitle="Tasks from this session will appear here"
       />
     <% else %>
-      <div class="space-y-1 bg-[oklch(95%_0.003_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4" id="dm-task-list">
+      <div class="space-y-1 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4" id="dm-task-list">
         <%= for task <- @tasks do %>
           <div
-            class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-white dark:bg-[hsl(60,2%,23%)] hover:border-base-content/10 transition-colors"
+            class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] hover:border-base-content/10 transition-colors"
             id={"dm-task-#{task.id}"}
           >
             <input type="checkbox" />
@@ -580,10 +548,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         subtitle="Commits from this session will appear here"
       />
     <% else %>
-      <div class="space-y-1 bg-[oklch(95%_0.003_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4" id="dm-commit-list">
+      <div class="space-y-1 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4" id="dm-commit-list">
         <%= for commit <- @commits do %>
           <div
-            class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-white dark:bg-[hsl(60,2%,23%)] hover:border-base-content/10 transition-colors"
+            class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] hover:border-base-content/10 transition-colors"
             id={"dm-commit-#{commit.id}"}
           >
             <input type="checkbox" />
@@ -626,10 +594,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         subtitle="Logs from this session will appear here"
       />
     <% else %>
-      <div class="space-y-1 bg-[oklch(95%_0.003_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4" id="dm-log-list">
+      <div class="space-y-1 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4" id="dm-log-list">
         <%= for log <- @logs do %>
           <div
-            class="rounded-lg border border-base-content/5 bg-white dark:bg-[hsl(60,2%,23%)] px-4 py-3"
+            class="rounded-lg border border-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] px-4 py-3"
             id={"dm-log-#{log.id}"}
           >
             <div class="text-sm text-base-content/70 font-mono">{log.message}</div>
@@ -652,10 +620,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         subtitle="Notes from this session will appear here"
       />
     <% else %>
-      <div class="space-y-1 bg-[oklch(95%_0.003_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4" id="dm-note-list">
+      <div class="space-y-1 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4" id="dm-note-list">
         <%= for note <- @notes do %>
           <div
-            class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-white dark:bg-[hsl(60,2%,23%)] hover:border-base-content/10 transition-colors"
+            class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] hover:border-base-content/10 transition-colors"
             id={"dm-note-#{note.id}"}
           >
             <input type="checkbox" />
@@ -723,6 +691,33 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   defp message_sender_name(%{sender_role: "user"}), do: "You"
   defp message_sender_name(message), do: message.provider || "Agent"
 
+  defp provider_icon("openai"), do: "/images/openai.svg"
+  defp provider_icon("codex"), do: "/images/codex.svg"
+  defp provider_icon(_), do: "/images/claude.svg"
+
+  defp message_model(%{metadata: %{"model_usage" => model_usage}}) when is_map(model_usage) do
+    case Map.keys(model_usage) do
+      [model_id | _] -> format_model_id(model_id)
+      _ -> nil
+    end
+  end
+
+  defp message_model(_), do: nil
+
+  defp message_cost(%{metadata: %{"total_cost_usd" => cost}}) when is_number(cost), do: cost
+  defp message_cost(_), do: nil
+
+  defp format_model_id(id) when is_binary(id) do
+    cond do
+      String.contains?(id, "opus") -> "opus"
+      String.contains?(id, "sonnet") -> "sonnet"
+      String.contains?(id, "haiku") -> "haiku"
+      true -> id |> String.split("-") |> Enum.take(2) |> Enum.join("-")
+    end
+  end
+
+  defp format_model_id(_), do: nil
+
   defp show_message_metrics?(message) do
     message.sender_role == "agent" and is_map(message.metadata) and
       not is_nil(message.metadata["total_cost_usd"])
@@ -754,6 +749,11 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   end
 
   defp format_time(_), do: ""
+
+  defp model_display_name("opus"), do: "Opus 4.6"
+  defp model_display_name("sonnet"), do: "Sonnet 4.5"
+  defp model_display_name("haiku"), do: "Haiku 4.5"
+  defp model_display_name(other), do: other
 
   defp format_size(bytes) when bytes < 1024, do: "#{bytes} B"
   defp format_size(bytes) when bytes < 1_048_576, do: "#{Float.round(bytes / 1024, 1)} KB"

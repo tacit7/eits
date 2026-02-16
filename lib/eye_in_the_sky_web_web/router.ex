@@ -40,6 +40,12 @@ defmodule EyeInTheSkyWebWeb.Router do
     live "/dm/:session_id", DmLive, :show
   end
 
+  # MCP Server — Streamable HTTP
+  scope "/mcp" do
+    forward "/", Anubis.Server.Transport.StreamableHTTP.Plug,
+      server: EyeInTheSkyWeb.MCP.Server
+  end
+
   scope "/api/v1", EyeInTheSkyWebWeb.Api.V1 do
     pipe_through :api
 

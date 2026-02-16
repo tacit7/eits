@@ -60,9 +60,19 @@ defmodule EyeInTheSkyWeb.Claude.Parser do
   end
 
   defp parse_event(%{"type" => "assistant", "message" => %{"content" => content}}) do
-    # Final message - extract text
     text = extract_text_from_content(content)
-    {:ok, Message.text(text, false)}
+    tool_name = extract_tool_from_content(content)
+
+    cond do
+      tool_name ->
+        {:ok, Message.tool_use(tool_name, %{}, %{text: text})}
+
+      text != "" ->
+        {:ok, Message.text(text, false)}
+
+      true ->
+        :skip
+    end
   end
 
   defp parse_event(%{"type" => "error", "error" => error}) do
@@ -79,6 +89,8 @@ defmodule EyeInTheSkyWeb.Claude.Parser do
       duration_ms: event["duration_ms"],
       total_cost_usd: event["total_cost_usd"],
       usage: event["usage"],
+      model_usage: event["modelUsage"],
+      num_turns: event["num_turns"],
       is_error: event["is_error"],
       errors: event["errors"] || event["error"]
     }
@@ -143,7 +155,10 @@ defmodule EyeInTheSkyWeb.Claude.Parser do
   end
 
   defp parse_stream_event(%{"type" => "message_stop"}) do
-    {:complete, nil}
+    # message_stop within a stream_event means one assistant message ended,
+    # NOT that the whole conversation is done. The actual end is signaled by
+    # the top-level "result" event or process exit.
+    :skip
   end
 
   defp parse_stream_event(_other) do
@@ -158,6 +173,15 @@ defmodule EyeInTheSkyWeb.Claude.Parser do
   end
 
   defp extract_text_from_content(_), do: ""
+
+  defp extract_tool_from_content(content) when is_list(content) do
+    Enum.find_value(content, fn
+      %{"type" => "tool_use", "name" => name} -> name
+      _ -> nil
+    end)
+  end
+
+  defp extract_tool_from_content(_), do: nil
 
   # Parse error objects
   defp parse_error(%{"type" => type, "message" => message}) do

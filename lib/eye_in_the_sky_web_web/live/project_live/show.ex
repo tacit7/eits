@@ -128,23 +128,19 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
                             {String.slice(session.uuid || to_string(session.id), 0..7)}
                           </code>
                           <span class="text-sm text-base-content/80 truncate">
-                            {session.name || session.agent.description || "Unnamed"}
+                            {session.name || (session.chat_agent && session.chat_agent.description) || "Unnamed"}
                           </span>
                         </div>
                       </div>
                       <%= if session.id do %>
-                        <button
-                          type="button"
-                          phx-click="send_direct_message"
-                          phx-value-session_id={session.uuid}
+                        <.link
+                          navigate={~p"/dm/#{session.id}"}
                           class="btn btn-ghost btn-xs text-base-content/60 hover:text-primary transition-colors"
                           title="Direct message"
                           onclick="event.stopPropagation()"
                         >
-                          <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" />
-                          </svg>
-                        </button>
+                          <.icon name="hero-chat-bubble-left-right" class="w-4 h-4" />
+                        </.link>
                       <% end %>
                     </div>
                   <% end %>

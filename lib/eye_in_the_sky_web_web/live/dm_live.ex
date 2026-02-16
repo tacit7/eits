@@ -312,6 +312,12 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     end
   end
 
+  # DM received via MCP i-dm tool
+  @impl true
+  def handle_info({:new_dm, _msg}, socket) do
+    {:noreply, load_tab_data(socket, "messages", socket.assigns.session_id)}
+  end
+
   # NATS handler broadcasts tool events on "session:#{agent.id}"
   @impl true
   def handle_info({:tool_use, tool_name, _params}, socket) do

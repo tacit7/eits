@@ -150,10 +150,18 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
         %{"session_id" => target_session_id, "body" => body},
         socket
       ) do
-    # Get the global channel for this project
-    # Default project
-    project_id = 1
-    channels = EyeInTheSkyWeb.Channels.list_channels_for_project(project_id)
+    # Get the global channel — try agent's project first, fall back to all channels
+    project_id =
+      case Agents.get_execution_agent(target_session_id) do
+        {:ok, agent} -> agent.project_id
+        _ -> nil
+      end
+
+    channels =
+      if project_id,
+        do: EyeInTheSkyWeb.Channels.list_channels_for_project(project_id),
+        else: EyeInTheSkyWeb.Channels.list_channels()
+
     global_channel = Enum.find(channels, fn c -> c.name == "#global" end)
 
     if global_channel do

@@ -9,7 +9,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     projects = Projects.list_projects()
 
     channels =
-      case Channels.list_channels_for_project(1) do
+      case Channels.list_channels() do
         channels when is_list(channels) -> channels
         _ -> []
       end
@@ -80,18 +80,19 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     name = (socket.assigns.new_channel_name || "") |> String.trim()
 
     if name != "" do
-      channel_id = Channel.generate_id(1, name)
+      project_id = get_in(socket.assigns, [:sidebar_project, Access.key(:id)]) || 1
+      channel_id = Channel.generate_id(project_id, name)
 
       case Channels.create_channel(%{
              id: channel_id,
              uuid: Ecto.UUID.generate(),
              name: name,
              channel_type: "public",
-             project_id: 1
+             project_id: project_id
            }) do
         {:ok, _channel} ->
           channels =
-            case Channels.list_channels_for_project(1) do
+            case Channels.list_channels() do
               channels when is_list(channels) -> channels
               _ -> []
             end

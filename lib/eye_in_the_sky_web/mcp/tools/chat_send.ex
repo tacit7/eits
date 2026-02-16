@@ -32,10 +32,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.ChatSend do
     result =
       case Messages.create_channel_message(attrs) do
         {:ok, msg} ->
-          # Broadcast via PubSub so LiveViews update
+          # Broadcast via PubSub so LiveViews update (ChatLive subscribes to channel:<id>:messages)
           Phoenix.PubSub.broadcast(
             EyeInTheSkyWeb.PubSub,
-            "channel:#{params["channel_id"]}",
+            "channel:#{params["channel_id"]}:messages",
             {:new_message, msg}
           )
 

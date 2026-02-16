@@ -8,6 +8,24 @@ defmodule EyeInTheSkyWeb.Channels do
   alias EyeInTheSkyWeb.Channels.{Channel, ChannelMember}
 
   @doc """
+  Returns all channels (no project filter).
+  """
+  def list_channels(opts \\ []) do
+    include_archived = Keyword.get(opts, :include_archived, false)
+
+    query = from c in Channel, order_by: [asc: c.inserted_at]
+
+    query =
+      if include_archived do
+        query
+      else
+        from c in query, where: is_nil(c.archived_at)
+      end
+
+    Repo.all(query)
+  end
+
+  @doc """
   Returns the list of channels for a specific project, including global channels (project_id is NULL).
   """
   def list_channels_for_project(project_id, opts \\ []) do

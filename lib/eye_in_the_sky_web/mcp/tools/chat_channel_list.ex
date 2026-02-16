@@ -17,8 +17,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.ChatChannelList do
       if params["project_id"] do
         Channels.list_channels_for_project(params["project_id"])
       else
-        # List all channels by passing nil project_id
-        Channels.list_channels_for_project(nil)
+        Channels.list_channels()
       end
 
     result = %{

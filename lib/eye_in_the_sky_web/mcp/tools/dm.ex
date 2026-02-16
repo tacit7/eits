@@ -14,36 +14,45 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Dm do
 
   @impl true
   def execute(params, frame) do
-    alias EyeInTheSkyWeb.Messages
+    alias EyeInTheSkyWeb.{Agents, Messages}
 
-    # Store the DM as a message
-    attrs = %{
-      session_id: params["target_session_id"],
-      body: params["message"],
-      sender_role: "agent",
-      recipient_role: "agent",
-      direction: "inbound",
-      status: "pending",
-      metadata: %{
-        sender_id: params["sender_id"],
-        response_required: params["response_required"] || false
-      }
-    }
+    target_uuid = params["target_session_id"]
 
+    # Resolve UUID to internal integer session_id
     result =
-      case Messages.create_message(attrs) do
-        {:ok, _msg} ->
-          # Broadcast so DmLive picks it up
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "dm:#{params["target_session_id"]}",
-            {:new_dm, params["message"]}
-          )
+      case Agents.get_execution_agent_by_uuid(target_uuid) do
+        {:ok, agent} ->
+          attrs = %{
+            session_id: agent.id,
+            body: params["message"],
+            sender_role: "agent",
+            recipient_role: "agent",
+            direction: "inbound",
+            status: "delivered",
+            provider: "claude",
+            metadata: %{
+              sender_id: params["sender_id"],
+              response_required: params["response_required"] || false
+            }
+          }
 
-          %{success: true, message: "DM delivered to #{params["target_session_id"]}"}
+          case Messages.create_message(attrs) do
+            {:ok, msg} ->
+              # Broadcast on the topics DmLive subscribes to
+              Phoenix.PubSub.broadcast(
+                EyeInTheSkyWeb.PubSub,
+                "session:#{agent.id}",
+                {:new_dm, msg}
+              )
 
-        {:error, cs} ->
-          %{success: false, message: "Failed: #{inspect(cs.errors)}"}
+              %{success: true, message: "DM delivered to session #{agent.id}"}
+
+            {:error, cs} ->
+              %{success: false, message: "Failed: #{inspect(cs.errors)}"}
+          end
+
+        {:error, :not_found} ->
+          %{success: false, message: "Target session not found: #{target_uuid}"}
       end
 
     response = Response.tool() |> Response.json(result)

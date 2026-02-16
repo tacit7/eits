@@ -205,7 +205,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
             phx-click="toggle_new_session_drawer"
             class="btn btn-sm btn-primary gap-1.5 min-h-0 h-7 text-xs"
           >
-            <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Session
+            <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Agent
           </button>
         </div>
 
@@ -255,8 +255,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
     </div>
 
     <.live_component
-      module={EyeInTheSkyWebWeb.Components.NewSessionDrawer}
-      id="new-session-drawer-project"
+      module={EyeInTheSkyWebWeb.Components.NewSessionModal}
+      id="new-session-modal-project"
       show={@show_new_session_drawer}
       projects={nil}
       current_project={@project}

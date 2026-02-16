@@ -10,13 +10,14 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
     events.session.context  - Save session context
     events.commits          - Track git commits
     events.notes            - Add notes
-    events.tool.use         - PostToolUse for Bash/Write/Edit
+    events.tool.pre         - PreToolUse: tool name + params, writes to messages
+    events.tool.post        - PostToolUse: tool result + error status, writes to messages
     events.todo             - Task management operations
   """
 
   require Logger
 
-  alias EyeInTheSkyWeb.{Agents, ChatAgents, Commits, Contexts, Notes, Projects, Tasks}
+  alias EyeInTheSkyWeb.{Agents, ChatAgents, Commits, Contexts, Messages, Notes, Projects, Tasks}
 
   def handle("events.session.start", payload) do
     session_uuid = payload["session_id"]
@@ -33,7 +34,7 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
         source: "hook"
       }
 
-      with {:ok, chat_agent} <- ChatAgents.create_chat_agent(chat_agent_attrs) do
+      with {:ok, chat_agent} <- find_or_create_chat_agent(chat_agent_attrs) do
         {model_provider, model_name} = parse_model(payload["model"])
 
         agent_attrs = %{
@@ -50,18 +51,35 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
           git_worktree_path: payload["worktree_path"]
         }
 
-        create_fn =
-          if model_name,
-            do: &Agents.create_execution_agent_with_model/1,
-            else: &Agents.create_execution_agent/1
+        case Agents.get_execution_agent_by_uuid(session_uuid) do
+          {:ok, existing} ->
+            # Session already exists — update it (e.g., resumed session)
+            case Agents.update_execution_agent(existing, %{
+              status: "working",
+              last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()
+            }) do
+              {:ok, updated} ->
+                Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, updated})
+                Logger.info("[NATS.Handler] Session resumed: #{session_uuid}")
 
-        case create_fn.(agent_attrs) do
-          {:ok, agent} ->
-            Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, agent})
-            Logger.info("[NATS.Handler] Session started: #{session_uuid}")
+              {:error, reason} ->
+                Logger.error("[NATS.Handler] Failed to update existing agent: #{inspect(reason)}")
+            end
 
-          {:error, reason} ->
-            Logger.error("[NATS.Handler] Failed to create agent: #{inspect(reason)}")
+          {:error, :not_found} ->
+            create_fn =
+              if model_name,
+                do: &Agents.create_execution_agent_with_model/1,
+                else: &Agents.create_execution_agent/1
+
+            case create_fn.(agent_attrs) do
+              {:ok, agent} ->
+                Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, agent})
+                Logger.info("[NATS.Handler] Session started: #{session_uuid}")
+
+              {:error, reason} ->
+                Logger.error("[NATS.Handler] Failed to create agent: #{inspect(reason)}")
+            end
         end
       else
         {:error, reason} ->
@@ -166,29 +184,88 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
     end
   end
 
-  def handle("events.tool.use", payload) do
-    # PostToolUse hook data - log tool usage for the session
+  def handle("events.tool.pre", payload) do
     session_uuid = payload["session_id"]
     tool_name = payload["tool_name"]
+    tool_input = payload["tool_input"] || payload["params"] || %{}
 
     with {:ok, agent} <- Agents.get_execution_agent_by_uuid(session_uuid) do
-      # Update last_activity_at to track liveness
       Agents.update_execution_agent(agent, %{
         last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()
       })
 
-      Phoenix.PubSub.broadcast(
-        EyeInTheSkyWeb.PubSub,
-        "agent:working",
-        {:agent_working, agent}
-      )
+      input_json = Jason.encode!(tool_input)
+      body = "Tool: #{tool_name}\n#{input_json}" |> String.slice(0..3999)
 
-      Logger.debug("[NATS.Handler] Tool use: #{tool_name} in #{session_uuid}")
+      metadata = %{
+        "stream_type" => "tool_use",
+        "tool_name" => tool_name,
+        "input" => tool_input
+      }
+
+      Messages.create_message(%{
+        uuid: Ecto.UUID.generate(),
+        session_id: agent.id,
+        sender_role: "tool",
+        recipient_role: "user",
+        direction: "inbound",
+        body: body,
+        status: "delivered",
+        provider: "claude",
+        metadata: metadata
+      })
+
+      Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agent:working", {:agent_working, agent})
+      Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "session:#{agent.id}", {:tool_use, tool_name, tool_input})
+
+      Logger.debug("[NATS.Handler] Tool pre: #{tool_name} in #{session_uuid}")
     else
       {:error, :not_found} ->
-        Logger.debug("[NATS.Handler] Session not found for tool.use: #{session_uuid}")
+        Logger.debug("[NATS.Handler] Session not found for tool.pre: #{session_uuid}")
     end
   end
+
+  def handle("events.tool.post", payload) do
+    session_uuid = payload["session_id"]
+    tool_name = payload["tool_name"]
+    tool_input = payload["tool_input"] || %{}
+
+    with {:ok, agent} <- Agents.get_execution_agent_by_uuid(session_uuid) do
+      Agents.update_execution_agent(agent, %{
+        last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      })
+
+      input_json = Jason.encode!(tool_input)
+      body = "Tool: #{tool_name} (completed)\n#{input_json}" |> String.slice(0..3999)
+
+      metadata = %{
+        "stream_type" => "tool_result",
+        "tool_name" => tool_name
+      }
+
+      Messages.create_message(%{
+        uuid: Ecto.UUID.generate(),
+        session_id: agent.id,
+        sender_role: "tool",
+        recipient_role: "user",
+        direction: "inbound",
+        body: body,
+        status: "delivered",
+        provider: "claude",
+        metadata: metadata
+      })
+
+      Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "session:#{agent.id}", {:tool_result, tool_name, false})
+
+      Logger.debug("[NATS.Handler] Tool post: #{tool_name} in #{session_uuid}")
+    else
+      {:error, :not_found} ->
+        Logger.debug("[NATS.Handler] Session not found for tool.post: #{session_uuid}")
+    end
+  end
+
+  # Legacy subject - redirect to new handler
+  def handle("events.tool.use", payload), do: handle("events.tool.pre", payload)
 
   def handle("events.todo", payload) do
     command = payload["command"]
@@ -243,6 +320,13 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
   end
 
   # --- Private helpers (shared with REST controllers) ---
+
+  defp find_or_create_chat_agent(%{uuid: uuid} = attrs) do
+    case ChatAgents.get_chat_agent_by_uuid(uuid) do
+      {:ok, existing} -> {:ok, existing}
+      {:error, :not_found} -> ChatAgents.create_chat_agent(attrs)
+    end
+  end
 
   defp resolve_project_id(params) do
     cond do

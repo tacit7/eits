@@ -34,6 +34,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       |> assign(:sdk_prompt, "")
       |> assign(:sidebar_tab, :sessions)
       |> assign(:sidebar_project, nil)
+      |> assign(:selected_ids, MapSet.new())
       |> load_agents()
       |> schedule_refresh()
 
@@ -149,10 +150,18 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
         %{"session_id" => target_session_id, "body" => body},
         socket
       ) do
-    # Get the global channel for this project
-    # Default project
-    project_id = 1
-    channels = EyeInTheSkyWeb.Channels.list_channels_for_project(project_id)
+    # Get the global channel — try agent's project first, fall back to all channels
+    project_id =
+      case Agents.get_execution_agent(target_session_id) do
+        {:ok, agent} -> agent.project_id
+        _ -> nil
+      end
+
+    channels =
+      if project_id,
+        do: EyeInTheSkyWeb.Channels.list_channels_for_project(project_id),
+        else: EyeInTheSkyWeb.Channels.list_channels()
+
     global_channel = Enum.find(channels, fn c -> c.name == "#global" end)
 
     if global_channel do
@@ -225,6 +234,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     socket =
       socket
       |> assign(:session_filter, filter)
+      |> assign(:selected_ids, MapSet.new())
       |> load_agents()
 
     {:noreply, socket}
@@ -305,6 +315,53 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   @impl true
+  def handle_event("toggle_select", %{"id" => id}, socket) do
+    selected =
+      if MapSet.member?(socket.assigns.selected_ids, id),
+        do: MapSet.delete(socket.assigns.selected_ids, id),
+        else: MapSet.put(socket.assigns.selected_ids, id)
+
+    {:noreply, assign(socket, :selected_ids, selected)}
+  end
+
+  @impl true
+  def handle_event("toggle_select_all", _params, socket) do
+    all_ids = MapSet.new(socket.assigns.agents, &to_string(&1.id))
+
+    selected =
+      if MapSet.equal?(socket.assigns.selected_ids, all_ids),
+        do: MapSet.new(),
+        else: all_ids
+
+    {:noreply, assign(socket, :selected_ids, selected)}
+  end
+
+  @impl true
+  def handle_event("delete_selected", _params, socket) do
+    ids = socket.assigns.selected_ids
+
+    results =
+      Enum.map(ids, fn id ->
+        with {:ok, agent} <- Agents.get_execution_agent(id),
+             {:ok, _} <- Agents.delete_execution_agent(agent) do
+          :ok
+        else
+          _ -> :error
+        end
+      end)
+
+    deleted = Enum.count(results, &(&1 == :ok))
+
+    socket =
+      socket
+      |> assign(:selected_ids, MapSet.new())
+      |> load_agents()
+      |> put_flash(:info, "Deleted #{deleted} session#{if deleted != 1, do: "s"}")
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("navigate_dm", %{"id" => id}, socket) do
     {:noreply, push_navigate(socket, to: ~p"/dm/#{id}")}
   end
@@ -331,7 +388,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     effort_level = params["effort_level"]
     project_id = String.to_integer(params["project_id"])
     description = params["description"]
-    agent_name = params["agent_name"]
+    agent_name = params["agent_name"] || String.slice(description || "", 0, 60)
 
     project = EyeInTheSkyWeb.Projects.get_project!(project_id)
 
@@ -340,7 +397,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       effort_level: effort_level,
       project_id: project_id,
       project_path: project.path,
-      description: agent_name || description,
+      description: agent_name,
       instructions: description
     ]
 
@@ -551,7 +608,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
               phx-click="toggle_new_session_drawer"
               class="btn btn-sm btn-primary gap-1.5 min-h-0 h-7 text-xs"
             >
-              <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New
+              <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Agent
             </button>
             <button
               phx-click="toggle_sdk_demo"
@@ -637,6 +694,31 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
           </div>
         </div>
 
+        <%!-- Selection toolbar (archived view) --%>
+        <%= if @session_filter == "archived" && @agents != [] do %>
+          <div class="mt-2 flex items-center gap-3 px-2 py-1.5">
+            <input
+              type="checkbox"
+              checked={MapSet.size(@selected_ids) == length(@agents) && @agents != []}
+              phx-click="toggle_select_all"
+              class="checkbox checkbox-xs checkbox-primary"
+            />
+            <%= if MapSet.size(@selected_ids) > 0 do %>
+              <span class="text-[11px] text-base-content/50 font-medium">
+                {MapSet.size(@selected_ids)} selected
+              </span>
+              <button
+                phx-click="delete_selected"
+                class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1"
+              >
+                <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
+              </button>
+            <% else %>
+              <span class="text-[11px] text-base-content/30">{length(@agents)} archived</span>
+            <% end %>
+          </div>
+        <% end %>
+
         <%!-- Agent list --%>
         <div class="mt-2 divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-4">
           <%= if @agents == [] do %>
@@ -661,17 +743,29 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                 phx-click="navigate_dm"
                 phx-value-id={agent.id}
               >
-                <%!-- Status indicator --%>
-                <div class="flex-shrink-0 w-6 flex justify-center" title={status_label}>
-                  <%= if is_active do %>
-                    <span class="relative flex h-2 w-2">
-                      <span class={"animate-ping absolute inline-flex h-full w-full rounded-full opacity-50 " <> status_bg}></span>
-                      <span class={"relative inline-flex rounded-full h-2 w-2 " <> status_bg}></span>
-                    </span>
-                  <% else %>
-                    <span class={"inline-flex rounded-full h-2 w-2 " <> status_bg}></span>
-                  <% end %>
-                </div>
+                <%!-- Status indicator / checkbox --%>
+                <%= if @session_filter == "archived" do %>
+                  <div class="flex-shrink-0 w-6 flex justify-center">
+                    <input
+                      type="checkbox"
+                      checked={MapSet.member?(@selected_ids, to_string(agent.id))}
+                      phx-click="toggle_select"
+                      phx-value-id={agent.id}
+                      class="checkbox checkbox-xs checkbox-primary"
+                    />
+                  </div>
+                <% else %>
+                  <div class="flex-shrink-0 w-6 flex justify-center" title={status_label}>
+                    <%= if is_active do %>
+                      <span class="relative flex h-2 w-2">
+                        <span class={"animate-ping absolute inline-flex h-full w-full rounded-full opacity-50 " <> status_bg}></span>
+                        <span class={"relative inline-flex rounded-full h-2 w-2 " <> status_bg}></span>
+                      </span>
+                    <% else %>
+                      <span class={"inline-flex rounded-full h-2 w-2 " <> status_bg}></span>
+                    <% end %>
+                  </div>
+                <% end %>
 
                 <%!-- Main content --%>
                 <div class="flex-1 min-w-0">
@@ -740,6 +834,15 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                       >
                         <.icon name="hero-arrow-up-tray-mini" class="w-3.5 h-3.5" />
                       </button>
+                      <button
+                        type="button"
+                        phx-click="delete_session"
+                        phx-value-session_id={agent.id}
+                        class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-error"
+                        aria-label="Delete"
+                      >
+                        <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
+                      </button>
                     <% else %>
                       <button
                         type="button"
@@ -765,10 +868,10 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       </div>
     </div>
 
-    <%!-- New Session Drawer --%>
+    <%!-- New Session Modal --%>
     <.live_component
-      module={EyeInTheSkyWebWeb.Components.NewSessionDrawer}
-      id="new-session-drawer"
+      module={EyeInTheSkyWebWeb.Components.NewSessionModal}
+      id="new-session-modal"
       show={@show_new_session_drawer}
       projects={@projects}
       current_project={nil}

@@ -7,11 +7,14 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
   @impl true
   def mount(_params, _session, socket) do
     agents = Agents.list_execution_agent_overview_rows(limit: 20)
+    projects = EyeInTheSkyWeb.Projects.list_projects()
 
     socket =
       socket
       |> assign(:page_title, "Session Overview")
       |> assign(:agents, agents)
+      |> assign(:projects, projects)
+      |> assign(:show_new_session_modal, false)
       |> assign(:sidebar_tab, :sessions)
       |> assign(:sidebar_project, nil)
 
@@ -20,13 +23,48 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
 
   @impl true
   def handle_event("start_session", %{"agent_id" => _agent_id}, socket) do
-    # Mocked button - just show a message for now
     {:noreply, socket}
   end
 
   @impl true
-  def handle_event("start_session_global", _params, socket) do
-    {:noreply, push_navigate(socket, to: ~p"/")}
+  def handle_event("toggle_new_session_modal", _params, socket) do
+    {:noreply, assign(socket, :show_new_session_modal, !socket.assigns.show_new_session_modal)}
+  end
+
+  @impl true
+  def handle_event("create_new_session", params, socket) do
+    model = params["model"]
+    effort_level = params["effort_level"]
+    project_id = String.to_integer(params["project_id"])
+    description = params["description"]
+    agent_name = String.slice(description || "", 0, 60)
+
+    project = EyeInTheSkyWeb.Projects.get_project!(project_id)
+
+    opts = [
+      model: model,
+      effort_level: effort_level,
+      project_id: project_id,
+      project_path: project.path,
+      description: agent_name,
+      instructions: description
+    ]
+
+    case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
+      {:ok, _result} ->
+        agents = Agents.list_execution_agent_overview_rows(limit: 20)
+
+        socket =
+          socket
+          |> assign(:show_new_session_modal, false)
+          |> assign(:agents, agents)
+          |> put_flash(:info, "Session launched")
+
+        {:noreply, socket}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to create session: #{inspect(reason)}")}
+    end
   end
 
   @impl true
@@ -43,10 +81,10 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
           </div>
           <div class="flex items-center gap-2">
             <button
-              phx-click="start_session_global"
+              phx-click="toggle_new_session_modal"
               class="btn btn-sm btn-primary gap-1.5 min-h-0 h-7 text-xs"
             >
-              <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Session
+              <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Agent
             </button>
             <label class="swap swap-rotate btn btn-ghost btn-xs btn-circle">
               <input type="checkbox" class="theme-controller" value="dark" />
@@ -63,6 +101,16 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
         </div>
       </div>
     </div>
+
+    <.live_component
+      module={EyeInTheSkyWebWeb.Components.NewSessionModal}
+      id="new-session-modal"
+      show={@show_new_session_modal}
+      projects={@projects}
+      current_project={nil}
+      toggle_event="toggle_new_session_modal"
+      submit_event="create_new_session"
+    />
     """
   end
 end

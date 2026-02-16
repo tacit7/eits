@@ -103,6 +103,7 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
       opts
       |> Keyword.put(:output_format, "stream-json")
       |> Keyword.put(:verbose, true)
+      |> Keyword.put(:include_partial_messages, true)
       |> Keyword.put(:caller, handler_pid)
       |> Keyword.delete(:to)
       |> Keyword.delete(:cli_module)
@@ -160,6 +161,7 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
       opts
       |> Keyword.put(:output_format, "stream-json")
       |> Keyword.put(:verbose, true)
+      |> Keyword.put(:include_partial_messages, true)
       |> Keyword.put(:caller, handler_pid)
       |> Keyword.delete(:to)
       |> Keyword.delete(:cli_module)

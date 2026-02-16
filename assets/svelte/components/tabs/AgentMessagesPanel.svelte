@@ -1,32 +1,13 @@
 <script>
-  import { onMount } from 'svelte'
-  import ChannelsSidebar from '../ChannelsSidebar.svelte'
   import { formatTime, formatDateRelative } from '../../utils/datetime.js'
   import { autoScroll } from '../../actions/autoScroll.js'
 
-  // Heroicons
-  import ChatBubbleLeftSvg from 'heroicons/24/outline/chat-bubble-left.svg'
-
-  export let channels = []
   export let activeChannelId = null
   export let messages = []
-  export let unreadCounts = {}
-  export let agentStatusCounts = {}
-  export let prompts = []
   export let activeAgents = []
-  export let channelMembers = []
   export let workingAgents = {}
   export let live
 
-  // Add agent input state
-  let addAgentSessionId = ''
-  let showMemberPanel = false
-
-  // Debug working agents
-  $: if (workingAgents) {
-    console.log('🔍 workingAgents updated:', workingAgents)
-    console.log('🔍 workingAgents keys:', Object.keys(workingAgents))
-  }
   let inputValue = ''
   let inputElement
 
@@ -40,13 +21,20 @@
   let historyIndex = -1
   let currentDraft = ''
 
-  function openAgentDrawer() {
-    live.pushEvent('toggle_agent_drawer', {})
+  function getProviderIcon(message) {
+    if (message.sender_role === 'user') return null
+    const p = (message.provider || '').toLowerCase()
+    if (p === 'openai') return '/images/openai.svg'
+    if (p === 'codex') return '/images/codex.svg'
+    return '/images/claude.svg'
   }
 
-  function handleSessionIdClick(sessionId) {
-    console.log('🔍 Badge clicked, session_id:', sessionId)
-    // Navigate to DM page for this session
+  function truncate(str, max = 10) {
+    if (!str) return str
+    return str.length > max ? str.slice(0, max) + '…' : str
+  }
+
+  function navigateToDm(sessionId) {
     window.location.href = `/dm/${sessionId}`
   }
 
@@ -63,7 +51,6 @@
 
       // Check if we're still typing the mention (no space after @)
       if (!textAfterAt.includes(' ')) {
-        // Use activeAgents prop (queried from DB) for autocomplete
         const searchTerm = textAfterAt.toLowerCase()
 
         const filtered = activeAgents
@@ -92,7 +79,6 @@
             model: a.model,
             description: a.agent_description
           })) : filtered
-          // Show @all if search term is empty or matches "all"
           const showAll = searchTerm === '' || 'all'.includes(searchTerm)
           autocompleteOptions = showAll ? [allOption, ...agentOptions] : agentOptions
           selectedAutocompleteIndex = 0
@@ -130,17 +116,15 @@
       }
     }
 
-    // Handle message history navigation (up/down arrows or Ctrl+P/N when autocomplete is NOT shown)
+    // Handle message history navigation
     if (e.key === 'ArrowUp' || (e.ctrlKey && e.key === 'p')) {
       e.preventDefault()
       if (messageHistory.length === 0) return
 
-      // Save current draft when starting to navigate history
       if (historyIndex === -1) {
         currentDraft = inputValue
       }
 
-      // Move up in history (towards older messages)
       if (historyIndex < messageHistory.length - 1) {
         historyIndex++
         inputValue = messageHistory[historyIndex]
@@ -149,10 +133,8 @@
       e.preventDefault()
       if (historyIndex === -1) return
 
-      // Move down in history (towards newer messages)
       historyIndex--
       if (historyIndex === -1) {
-        // Back to current draft
         inputValue = currentDraft
         currentDraft = ''
       } else {
@@ -167,7 +149,6 @@
     const textAfterCursor = inputValue.substring(cursorPos)
     const lastAtIndex = textBeforeCursor.lastIndexOf('@')
 
-    // Handle @all vs numeric session IDs
     const mentionText = sessionId === 'all' ? 'all' : String(sessionId)
     inputValue = textBeforeCursor.substring(0, lastAtIndex) + `@${mentionText} ` + textAfterCursor
     showAutocomplete = false
@@ -183,8 +164,6 @@
     const body = inputValue.trim()
 
     if (body) {
-      // All messages go through send_channel_message
-      // @mentions are parsed server-side for routing
       live.pushEvent('send_channel_message', {
         channel_id: activeChannelId,
         body: body
@@ -202,566 +181,207 @@
     }
   }
 
-  function handleAddAgent() {
-    const sessionId = addAgentSessionId.trim()
-    if (sessionId) {
-      live.pushEvent('add_agent_to_channel', { session_id: sessionId })
-      addAgentSessionId = ''
-    }
-  }
-
-
 </script>
 
 <style>
-  /* Theme colors */
-  :global(:root) {
-    --bg-shell: #f8f8f8;
-    --bg-surface: #ffffff;
-    --bg-sidebar: #111827;
-    --text-primary: #1d1c1d;
-    --text-secondary: #616061;
-    --text-tertiary: #9ca3af;
-    --border-subtle: #dddddd;
-    --accent-primary: #0f766e;
-    --accent-soft: #e0f2f1;
-  }
-
-  :global([data-theme="dark"]) {
-    --bg-shell: #1a1d21;
-    --bg-surface: #222529;
-    --bg-sidebar: #1a1d21;
-    --text-primary: #f8f8f8;
-    --text-secondary: #dcddde;
-    --text-tertiary: #9ca3af;
-    --border-subtle: #2f3437;
-    --accent-primary: #14b8a6;
-    --accent-soft: #064e3b;
-  }
-
   :global(div[id^="AgentMessagesPanel"]) {
     height: 100%;
   }
-
-  .agent-messages-container {
-    display: flex;
-    height: 100%;
-    background-color: var(--bg-shell);
-  }
-
-  .main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .channel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid var(--border-subtle);
-    background-color: var(--bg-surface);
-  }
-
-  .channel-title {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: var(--text-primary);
-  }
-
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .agent-status {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    font-size: 0.875rem;
-  }
-
-  .new-agent-btn {
-    padding: 0.5rem 1rem;
-    background-color: var(--accent-primary);
-    color: white;
-    border: none;
-    border-radius: 0.375rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity 0.15s;
-    white-space: nowrap;
-  }
-
-  .new-agent-btn:hover {
-    opacity: 0.9;
-  }
-
-  .status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.25rem 0.75rem;
-    border-radius: 0.375rem;
-    font-weight: 600;
-  }
-
-  .status-badge.status-active {
-    background-color: #d1fae5;
-    color: #065f46;
-  }
-
-  :global(.dark) .status-badge.status-active {
-    background-color: #064e3b;
-    color: #6ee7b7;
-  }
-
-  .status-badge.status-idle {
-    background-color: #dbeafe;
-    color: #1e40af;
-  }
-
-  :global(.dark) .status-badge.status-idle {
-    background-color: #1e3a8a;
-    color: #93c5fd;
-  }
-
-  .status-badge.status-working {
-    background-color: #fed7aa;
-    color: #92400e;
-  }
-
-  :global(.dark) .status-badge.status-working {
-    background-color: #78350f;
-    color: #fcd34d;
-  }
-
-  .status-badge.status-nats {
-    background-color: #e0e7ff;
-    color: #3730a3;
-  }
-
-  :global(.dark) .status-badge.status-nats {
-    background-color: #312e81;
-    color: #a5b4fc;
-  }
-
-  .status-separator {
-    color: var(--text-tertiary);
-  }
-
-  .messages-scroll {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1rem 1.5rem;
-  }
-
-  /* Date separator */
-  .date-separator {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 1.5rem 0;
-  }
-
-  .date-badge {
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 0.25rem 0.75rem;
-  }
-
-  .session-id-badge {
-    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-    cursor: pointer;
-    transition: all 0.15s;
-    position: relative;
-    z-index: 10;
-    pointer-events: auto;
-  }
-
-  .session-id-badge:hover {
-    transform: scale(1.05);
-    background-color: var(--accent-soft);
-  }
-
-  .input-area {
-    border-top: 1px solid var(--border-subtle);
-    background-color: var(--bg-surface);
-    padding: 1rem 1.5rem;
-  }
-
-  .input-form {
-    display: flex;
-    align-items: flex-end;
-    gap: 0.5rem;
-  }
-
-  .message-input {
-    flex: 1;
-    padding: 0.75rem 1rem;
-    border-radius: 0.375rem;
-    background-color: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    font-size: 0.9375rem;
-    color: var(--text-primary);
-  }
-
-  .message-input:focus {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: 0;
-    border-color: transparent;
-  }
-
-  .send-button {
-    padding: 0.75rem 1.5rem;
-    border-radius: 0.375rem;
-    background-color: var(--accent-primary);
-    border: none;
-    color: white;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.15s, opacity 0.15s;
-  }
-
-  .send-button:hover:not(:disabled) {
-    opacity: 0.9;
-  }
-
-  .send-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  /* Autocomplete Dropdown */
-  .autocomplete-dropdown {
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    right: 4.5rem;
-    margin-bottom: 0.5rem;
-    background-color: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    border-radius: 0.375rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    max-height: 200px;
-    overflow-y: auto;
-    z-index: 50;
-  }
-
-  .autocomplete-item {
-    width: 100%;
-    padding: 0.5rem 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: none;
-    border: none;
-    text-align: left;
-    cursor: pointer;
-    transition: background-color 0.15s;
-    color: var(--text-primary);
-  }
-
-  .autocomplete-item:hover,
-  .autocomplete-item.selected {
-    background-color: var(--bg-shell);
-  }
-
-  .autocomplete-id {
-    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .autocomplete-name {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    margin-left: 0.5rem;
-  }
-
-  .autocomplete-provider {
-    font-size: 0.75rem;
-    color: var(--text-tertiary);
-    margin-left: auto;
-  }
-
-  .empty-state {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-  }
-
-  .empty-state-content {
-    text-align: center;
-  }
-
-  .empty-icon {
-    width: 5rem;
-    height: 5rem;
-    margin: 0 auto 1rem;
-    border-radius: 50%;
-    background-color: #e5e7eb;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  :global(.dark) .empty-icon {
-    background-color: #374151;
-  }
 </style>
 
-<div class="agent-messages-container">
-  <!-- Channels Sidebar -->
-  <ChannelsSidebar
-    {channels}
-    {activeChannelId}
-    {unreadCounts}
-    {live}
-  />
-
-  <!-- Main Content -->
-  <div class="main-content">
-    <!-- Channel Header -->
-    <div class="channel-header">
-      <div class="channel-title">
-        {#if activeChannelId}
-          {channels.find(c => c.id === activeChannelId)?.name || 'Project'}
-        {:else}
-          Select a project
-        {/if}
-      </div>
-      <div class="header-right">
-        <div class="agent-status">
-          <span class="status-badge status-active">
-            {agentStatusCounts.active || 0} active
-          </span>
-          <span class="status-badge status-idle">
-            {agentStatusCounts.idle || 0} idle
-          </span>
-          <span class="status-badge status-working">
-            {agentStatusCounts.working || 0} running
-          </span>
-          <span class="status-separator">·</span>
-          <span class="status-badge status-nats">
-            NATS: Live
-          </span>
-        </div>
-        <button
-          class="new-agent-btn"
-          style="background-color: transparent; color: var(--text-secondary); border: 1px solid var(--border-subtle);"
-          on:click={() => showMemberPanel = !showMemberPanel}
-        >
-          {channelMembers.length} members
-        </button>
-        <button class="new-agent-btn" on:click={openAgentDrawer}>
-          + New Agent
-        </button>
-      </div>
-    </div>
-
-    <!-- Channel Members Panel (collapsible) -->
-    {#if showMemberPanel}
-      <div style="border-bottom: 1px solid var(--border-subtle); background-color: var(--bg-surface); padding: 0.75rem 1.5rem;">
-        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-          <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Channel Agents</span>
-        </div>
-
-        {#if channelMembers.length > 0}
-          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
-            {#each channelMembers as member}
-              <span
-                class="badge badge-outline badge-sm session-id-badge"
-                on:click={() => handleSessionIdClick(member.session_id)}
-                on:keydown={(e) => e.key === 'Enter' && handleSessionIdClick(member.session_id)}
-                role="button"
-                tabindex="0"
-                title="Session #{member.session_id}"
-              >
-                @{member.session_id} {member.session_name || ''}
-              </span>
-            {/each}
-          </div>
-        {:else}
-          <p style="font-size: 0.75rem; color: var(--text-tertiary); margin-bottom: 0.5rem;">No agents in this channel yet</p>
-        {/if}
-
-        <!-- Add Agent Input -->
-        <form on:submit|preventDefault={handleAddAgent} style="display: flex; gap: 0.5rem;">
-          <input
-            type="text"
-            bind:value={addAgentSessionId}
-            placeholder="Session ID to add..."
-            style="flex: 1; padding: 0.375rem 0.75rem; border-radius: 0.25rem; border: 1px solid var(--border-subtle); background-color: var(--bg-shell); color: var(--text-primary); font-size: 0.8125rem;"
-          />
-          <button
-            type="submit"
-            disabled={!addAgentSessionId.trim()}
-            style="padding: 0.375rem 0.75rem; border-radius: 0.25rem; background-color: var(--accent-primary); color: white; border: none; font-size: 0.8125rem; font-weight: 600; cursor: pointer; opacity: {addAgentSessionId.trim() ? '1' : '0.5'};"
-          >
-            Add
-          </button>
-        </form>
+<div class="flex flex-col h-full">
+  <!-- Messages Container -->
+  <div
+    use:autoScroll={{ trigger: messages?.length }}
+    class="flex-1 overflow-y-auto px-4 py-2"
+    style="scrollbar-width: none; -ms-overflow-style: none;"
+  >
+    <!-- Working Agents Indicator -->
+    {#if workingAgents && Object.keys(workingAgents).length > 0}
+      <div class="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-warning/10 border border-warning/10 text-xs text-warning">
+        <span class="w-2 h-2 rounded-full bg-warning animate-pulse flex-shrink-0"></span>
+        <span>
+          {#each Object.entries(workingAgents) as [sessionId, isWorking]}
+            {#if isWorking}
+              {@const agent = activeAgents.find(a => a.id == sessionId)}
+              {#if agent}
+                @{sessionId} ({agent.name || agent.description || 'unknown'}) working
+              {:else}
+                @{sessionId} working
+              {/if}
+            {/if}
+          {/each}
+        </span>
       </div>
     {/if}
 
-    <!-- Messages Container -->
-    <div
-      use:autoScroll={{ trigger: messages?.length }}
-      class="messages-scroll"
-    >
-      <!-- Working Agents Indicator -->
-      {#if workingAgents && Object.keys(workingAgents).length > 0}
-        <div class="alert alert-info mb-3">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6 animate-pulse"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          <span>
-            {#each Object.entries(workingAgents) as [sessionId, isWorking]}
-              {#if isWorking}
-                {@const agent = activeAgents.find(a => a.id == sessionId)}
-                {#if agent}
-                  Agent @{sessionId} ({agent.name || agent.description || 'unknown'}) is working...
-                {:else}
-                  Agent @{sessionId} is working...
-                {/if}
-              {/if}
-            {/each}
-          </span>
-        </div>
-      {/if}
-
-      {#if messages && messages.length > 0}
+    {#if messages && messages.length > 0}
+      <div class="space-y-0">
         {#each messages as message, idx}
           <!-- Date separator -->
           {#if idx === 0 || formatDateRelative(messages[idx - 1].inserted_at) !== formatDateRelative(message.inserted_at)}
-            <div class="date-separator">
-              <div class="badge badge-ghost badge-sm date-badge">
-                {formatDateRelative(message.inserted_at)}
-              </div>
+            <div class="flex items-center gap-3 my-4">
+              <div class="flex-1 h-px bg-base-content/5"></div>
+              <span class="text-[10px] uppercase tracking-wider font-medium text-base-content/25 whitespace-nowrap">{formatDateRelative(message.inserted_at)}</span>
+              <div class="flex-1 h-px bg-base-content/5"></div>
             </div>
           {/if}
 
-          <!-- Message bubble (DM-style) -->
-          <div class="group hover:bg-base-300/30 px-2 py-1.5 -mx-2 rounded mb-1">
-            <div class="flex gap-3">
-              <div class="flex-shrink-0">
-                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
-                  {message.sender_role === 'user' ? 'U' : (message.provider ? message.provider.charAt(0).toUpperCase() : 'A')}
-                </div>
+          <!-- Message -->
+          <div
+            class="group py-3 px-2 -mx-2 rounded-lg transition-colors {message.sender_role === 'system' ? '' : message.sender_role === 'agent' ? 'bg-primary/[0.03]' : 'hover:bg-base-content/[0.02]'}"
+          >
+            {#if message.sender_role === 'system'}
+              <!-- System message -->
+              <div class="flex items-center gap-2 text-xs text-base-content/30 italic px-1">
+                <span class="w-1 h-1 rounded-full bg-base-content/20 flex-shrink-0"></span>
+                <span class="flex-1">{message.body}</span>
+                <button
+                  class="opacity-0 group-hover:opacity-100 text-base-content/20 hover:text-error transition-all cursor-pointer"
+                  on:click={() => live.pushEvent('delete_message', { id: String(message.id) })}
+                  title="Delete message"
+                >
+                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                </button>
               </div>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-baseline gap-2">
-                  <span class={"font-semibold text-sm " + (message.sender_role === 'user' ? 'text-primary' : 'text-accent')}>
-                    {message.sender_role === 'user' ? 'You' : (message.provider || 'Agent')}
-                  </span>
-                  <time class="text-xs text-base-content/40">{formatTime(message.inserted_at)}</time>
-                  {#if message.sender_role === 'agent' && message.session_id}
-                    <span
-                      class="text-xs text-base-content/50 font-mono cursor-pointer hover:text-primary transition-colors"
-                      on:click={() => handleSessionIdClick(message.session_id)}
-                      on:keydown={(e) => e.key === 'Enter' && handleSessionIdClick(message.session_id)}
-                      role="button"
-                      tabindex="0"
-                    >
-                      @{message.session_id}
-                    </span>
-                  {/if}
-                  {#if message.sender_role === 'agent' && message.session_id}
-                    {@const agent = activeAgents.find(a => a.id === message.session_id)}
-                    <span
-                      class="badge badge-xs badge-outline session-id-badge ml-auto"
-                      on:click={() => handleSessionIdClick(message.session_id)}
-                      on:keydown={(e) => e.key === 'Enter' && handleSessionIdClick(message.session_id)}
-                      role="button"
-                      tabindex="0"
-                      title={agent ? `Session #${message.session_id}` : String(message.session_id)}
-                    >
-                      {agent?.name || message.session_name || `#${message.session_id}`}
-                    </span>
-                  {/if}
-                </div>
-                <p class="text-sm text-base-content mt-0.5 leading-relaxed whitespace-pre-wrap">{message.body}</p>
-
-                <!-- Usage metadata for agent messages -->
-                {#if message.sender_role === 'agent' && message.metadata && message.metadata.total_cost_usd}
-                  <div class="text-xs text-base-content/60 mt-2 flex gap-3 flex-wrap">
-                    {#if message.metadata.total_cost_usd}
-                      <span title="Total cost">${message.metadata.total_cost_usd.toFixed(4)}</span>
-                    {/if}
-                    {#if message.metadata.usage?.input_tokens}
-                      <span title="Input tokens">{message.metadata.usage.input_tokens} in</span>
-                    {/if}
-                    {#if message.metadata.usage?.output_tokens}
-                      <span title="Output tokens">{message.metadata.usage.output_tokens} out</span>
-                    {/if}
-                    {#if message.metadata.duration_ms}
-                      <span title="Duration">{(message.metadata.duration_ms / 1000).toFixed(1)}s</span>
-                    {/if}
-                    {#if message.metadata.num_turns}
-                      <span title="Number of turns">{message.metadata.num_turns} turns</span>
-                    {/if}
+            {:else}
+              <div class="flex items-start gap-2.5">
+                <!-- Sender icon -->
+                {#if message.sender_role === 'user'}
+                  <div class="w-4 h-4 rounded-full mt-1 flex-shrink-0 bg-success/20 flex items-center justify-center">
+                    <div class="w-1.5 h-1.5 rounded-full bg-success"></div>
                   </div>
+                {:else}
+                  <img src={getProviderIcon(message)} class="w-4 h-4 mt-1 flex-shrink-0" alt={message.provider || 'Agent'} />
                 {/if}
+
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-baseline gap-2 flex-wrap">
+                    <span class="text-[13px] font-semibold {message.sender_role === 'user' ? 'text-base-content/70' : 'text-primary/80'}">
+                      {message.sender_role === 'user' ? 'You' : (message.provider || 'Agent')}
+                    </span>
+
+                    {#if message.sender_role === 'agent' && message.session_id}
+                      {@const agent = activeAgents.find(a => a.id === message.session_id)}
+                      <button
+                        class="font-mono text-[11px] px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/35 hover:text-primary hover:bg-primary/5 transition-colors cursor-pointer"
+                        on:click={() => navigateToDm(message.session_id)}
+                        title="Session #{message.session_id}"
+                      >
+                        {truncate(agent?.name || message.session_name) || `@${message.session_id}`}
+                      </button>
+                    {/if}
+
+                    <span class="text-[11px] text-base-content/25">{formatTime(message.inserted_at)}</span>
+                    <button
+                      class="opacity-0 group-hover:opacity-100 ml-auto text-base-content/20 hover:text-error transition-all cursor-pointer"
+                      on:click={() => live.pushEvent('delete_message', { id: String(message.id) })}
+                      title="Delete message"
+                    >
+                      <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                    </button>
+                  </div>
+
+                  <p class="mt-1 text-sm leading-relaxed text-base-content/85 whitespace-pre-wrap break-words">{message.body}</p>
+
+                  <!-- Usage metadata for agent messages -->
+                  {#if message.sender_role === 'agent' && message.metadata && message.metadata.total_cost_usd}
+                    <div class="mt-2 flex flex-wrap gap-1.5">
+                      {#if message.metadata.total_cost_usd}
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
+                          ${message.metadata.total_cost_usd.toFixed(4)}
+                        </span>
+                      {/if}
+                      {#if message.metadata.usage?.input_tokens}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
+                          {message.metadata.usage.input_tokens} in
+                        </span>
+                      {/if}
+                      {#if message.metadata.usage?.output_tokens}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
+                          {message.metadata.usage.output_tokens} out
+                        </span>
+                      {/if}
+                      {#if message.metadata.duration_ms}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
+                          {(message.metadata.duration_ms / 1000).toFixed(1)}s
+                        </span>
+                      {/if}
+                      {#if message.metadata.num_turns}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
+                          {message.metadata.num_turns} turns
+                        </span>
+                      {/if}
+                    </div>
+                  {/if}
+                </div>
               </div>
-            </div>
+            {/if}
           </div>
         {/each}
-      {:else}
-        <div class="empty-state">
-          <div class="empty-state-content">
-            <div class="empty-icon">
-              <span style="width: 2.5rem; height: 2.5rem; color: #9ca3af; display: block;">{@html ChatBubbleLeftSvg}</span>
-            </div>
-            <h3 style="font-size: 1.125rem; font-weight: 600; color: #374151;">No messages yet</h3>
-            <p style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">
-              Messages from agents will appear here
-            </p>
-          </div>
+      </div>
+    {:else}
+      <div class="flex flex-col items-center justify-center h-full text-center py-16">
+        <div class="w-16 h-16 rounded-2xl bg-base-content/[0.03] border border-base-content/5 flex items-center justify-center mb-4">
+          <svg class="w-7 h-7 text-base-content/15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
         </div>
-      {/if}
-    </div>
+        <p class="text-sm font-semibold text-base-content/60">No messages yet</p>
+        <p class="mt-1 text-xs text-base-content/30">Messages from agents will appear here</p>
+      </div>
+    {/if}
+  </div>
 
-    <!-- Input Area -->
-    <div class="input-area">
-      <form on:submit|preventDefault={handleSubmit} class="input-form" style="position: relative;">
-        <input
-          type="text"
-          bind:value={inputValue}
-          bind:this={inputElement}
-          on:input={handleInputChange}
-          on:keydown={handleInputKeydown}
-          placeholder="Message channel agents (use @id to require a response)..."
-          class="message-input"
-          autocomplete="off"
-        />
+  <!-- Composer (matches DM page card style) -->
+  <div class="flex-shrink-0 pt-2">
+    <form
+      on:submit|preventDefault={handleSubmit}
+      class="relative bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm p-4 flex flex-col"
+    >
+      <div class="flex gap-2">
+        <div class="relative flex-1">
+          <input
+            type="text"
+            bind:value={inputValue}
+            bind:this={inputElement}
+            on:input={handleInputChange}
+            on:keydown={handleInputKeydown}
+            placeholder="Message agents... use @id to mention"
+            class="input input-sm w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm h-10"
+            autocomplete="off"
+          />
 
-        <!-- Autocomplete Dropdown -->
-        {#if showAutocomplete && autocompleteOptions.length > 0}
-          <div class="autocomplete-dropdown">
-            {#each autocompleteOptions as option, idx}
-              <button
-                type="button"
-                class="autocomplete-item"
-                class:selected={idx === selectedAutocompleteIndex}
-                on:click={() => selectAutocomplete(option.id)}
-                on:mouseenter={() => selectedAutocompleteIndex = idx}
-              >
-                <span class="autocomplete-id">@{option.id}</span>
-                <span class="autocomplete-name">{option.name}</span>
-                <span class="autocomplete-provider">{option.provider}{option.model ? ` / ${option.model}` : ''}</span>
-              </button>
-            {/each}
-          </div>
-        {/if}
+          <!-- Autocomplete Dropdown -->
+          {#if showAutocomplete && autocompleteOptions.length > 0}
+            <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] border border-base-content/8 rounded-xl shadow-lg max-h-56 overflow-y-auto z-50 p-1">
+              {#each autocompleteOptions as option, idx}
+                <button
+                  type="button"
+                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors {idx === selectedAutocompleteIndex ? 'bg-base-content/[0.06]' : 'hover:bg-base-content/[0.04]'}"
+                  on:click={() => selectAutocomplete(option.id)}
+                  on:mouseenter={() => selectedAutocompleteIndex = idx}
+                >
+                  <span class="font-mono text-[13px] font-semibold text-base-content/80">@{option.id}</span>
+                  <span class="text-[13px] text-base-content/50 flex-1 truncate">{option.name}</span>
+                  <span class="font-mono text-[11px] text-base-content/30">{option.provider}{option.model ? ` / ${option.model}` : ''}</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
 
-        <button type="submit" class="send-button" disabled={!inputValue || inputValue.trim() === ''}>
-          Send
+        <button
+          type="submit"
+          class="btn btn-sm btn-primary min-h-0 h-10 px-5"
+          disabled={!inputValue || inputValue.trim() === ''}
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
         </button>
-      </form>
-    </div>
+      </div>
+    </form>
   </div>
 </div>

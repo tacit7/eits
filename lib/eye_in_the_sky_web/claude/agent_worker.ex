@@ -30,6 +30,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     end
   end
 
+  def cancel(session_id) do
+    case Registry.lookup(@registry, {:agent, session_id}) do
+      [{pid, _}] -> GenServer.cast(pid, :cancel)
+      [] -> {:error, :not_found}
+    end
+  end
+
   # --- Server Callbacks ---
 
   @impl true
@@ -137,6 +144,17 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     end
   end
 
+  @impl true
+  def handle_cast(:cancel, %{sdk_ref: nil} = state) do
+    {:noreply, state}
+  end
+
+  def handle_cast(:cancel, %{sdk_ref: ref} = state) do
+    Logger.info("[#{state.session_id}] Cancelling SDK process")
+    SDK.cancel(ref)
+    {:noreply, state}
+  end
+
   # SDK result message - contains the final response text + metadata for DB storage
   @impl true
   def handle_info(
@@ -163,11 +181,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     {:noreply, state}
   end
 
-  # Other SDK messages (text deltas, tool use, thinking, etc.) - log and ignore
+  # Other SDK messages (text deltas, tool use, thinking, etc.) - broadcast for live streaming
   @impl true
   def handle_info({:claude_message, ref, %Message{} = msg}, %{sdk_ref: ref} = state) do
-    Logger.debug("[#{state.session_id}] SDK message: type=#{msg.type}, delta=#{msg.delta}")
-
+    Logger.info("[#{state.session_id}] SDK stream message: type=#{msg.type}, delta=#{msg.delta}, content_type=#{msg.content |> inspect() |> String.slice(0..80)}")
+    broadcast_stream_event(msg, state)
     {:noreply, state}
   end
 
@@ -175,6 +193,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   @impl true
   def handle_info({:claude_complete, ref, session_id}, %{sdk_ref: ref} = state) do
     state = maybe_sync_session_uuid(state, session_id)
+    broadcast_stream_clear(state)
 
     Logger.info("[#{state.session_id}] SDK complete")
 
@@ -198,6 +217,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   # SDK error
   @impl true
   def handle_info({:claude_error, ref, reason}, %{sdk_ref: ref} = state) do
+    broadcast_stream_clear(state)
     Logger.error("[#{state.session_id}] SDK error: #{inspect(reason)}")
 
     :telemetry.execute([:eits, :agent, :sdk, :error], %{system_time: System.system_time()}, %{
@@ -254,6 +274,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         duration_ms: metadata[:duration_ms],
         total_cost_usd: metadata[:total_cost_usd],
         usage: metadata[:usage],
+        model_usage: metadata[:model_usage],
+        num_turns: metadata[:num_turns],
         is_error: metadata[:is_error]
       }
 
@@ -367,6 +389,64 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   end
 
   defp maybe_sync_session_uuid(state, _), do: state
+
+  # Text delta (from stream_event with --include-partial-messages)
+  defp broadcast_stream_event(%Message{type: :text, content: text, delta: true}, state)
+       when is_binary(text) do
+    Phoenix.PubSub.broadcast(
+      EyeInTheSkyWeb.PubSub,
+      "dm:#{state.session_id}:stream",
+      {:stream_delta, :text, text}
+    )
+  end
+
+  # Cumulative assistant text (full replacement, not delta)
+  defp broadcast_stream_event(%Message{type: :text, content: text, delta: false}, state)
+       when is_binary(text) and text != "" do
+    Phoenix.PubSub.broadcast(
+      EyeInTheSkyWeb.PubSub,
+      "dm:#{state.session_id}:stream",
+      {:stream_replace, :text, text}
+    )
+  end
+
+  # Tool use with name in content map
+  defp broadcast_stream_event(%Message{type: :tool_use, content: %{name: name}}, state)
+       when is_binary(name) do
+    Phoenix.PubSub.broadcast(
+      EyeInTheSkyWeb.PubSub,
+      "dm:#{state.session_id}:stream",
+      {:stream_delta, :tool_use, name}
+    )
+  end
+
+  # Tool use with name as string content (from content_block_start)
+  defp broadcast_stream_event(%Message{type: :tool_use, content: name}, state)
+       when is_binary(name) do
+    Phoenix.PubSub.broadcast(
+      EyeInTheSkyWeb.PubSub,
+      "dm:#{state.session_id}:stream",
+      {:stream_delta, :tool_use, name}
+    )
+  end
+
+  defp broadcast_stream_event(%Message{type: :thinking, delta: true}, state) do
+    Phoenix.PubSub.broadcast(
+      EyeInTheSkyWeb.PubSub,
+      "dm:#{state.session_id}:stream",
+      {:stream_delta, :thinking, nil}
+    )
+  end
+
+  defp broadcast_stream_event(_msg, _state), do: :ok
+
+  defp broadcast_stream_clear(state) do
+    Phoenix.PubSub.broadcast(
+      EyeInTheSkyWeb.PubSub,
+      "dm:#{state.session_id}:stream",
+      :stream_clear
+    )
+  end
 
   defp update_agent_status(session_id, status) do
     case Agents.get_execution_agent(session_id) do

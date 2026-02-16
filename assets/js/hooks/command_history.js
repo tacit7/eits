@@ -5,6 +5,22 @@ export const CommandHistory = {
     this.currentInput = ''
 
     this.el.addEventListener('keydown', (e) => {
+      // Shift+Enter - insert newline (default textarea behavior, just auto-resize)
+      if (e.key === 'Enter' && e.shiftKey) {
+        // Let default happen (inserts newline), then resize
+        requestAnimationFrame(() => this.autoResize())
+        return
+      }
+      // Enter - submit form
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        const value = this.el.value.trim()
+        if (value) {
+          this.addToHistory(value)
+          this.el.form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+        }
+        return
+      }
       // Ctrl+P or Up Arrow - Previous command
       if ((e.ctrlKey && e.key === 'p') || e.key === 'ArrowUp') {
         e.preventDefault()
@@ -15,22 +31,24 @@ export const CommandHistory = {
         e.preventDefault()
         this.navigateHistory('next')
       }
-      // Enter - Save to history before form submits
-      else if (e.key === 'Enter' && !e.shiftKey) {
-        const value = this.el.value.trim()
-        if (value) {
-          this.addToHistory(value)
-        }
-        // Don't prevent default - let form submit naturally
-      }
     })
+
+    // Auto-resize on input
+    this.el.addEventListener('input', () => this.autoResize())
 
     // Listen for clear-input event from server
     this.handleEvent('clear-input', () => {
       this.el.value = ''
       this.historyIndex = -1
       this.currentInput = ''
+      this.autoResize()
+      this.el.focus()
     })
+  },
+
+  autoResize() {
+    this.el.style.height = 'auto'
+    this.el.style.height = Math.min(this.el.scrollHeight, 160) + 'px'
   },
 
   navigateHistory(direction) {
@@ -59,6 +77,7 @@ export const CommandHistory = {
 
     // Move cursor to end
     this.el.setSelectionRange(this.el.value.length, this.el.value.length)
+    this.autoResize()
   },
 
   addToHistory(command) {

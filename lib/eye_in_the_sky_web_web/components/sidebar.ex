@@ -19,7 +19,6 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
        projects: projects,
        channels: channels,
        collapsed: false,
-       expanded_projects: MapSet.new(),
        expanded_chat: false,
        new_channel_name: nil
      )}
@@ -28,14 +27,6 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   @impl true
   def update(assigns, socket) do
     sidebar_project = assigns[:sidebar_project]
-
-    # Auto-expand the active project
-    expanded =
-      if sidebar_project do
-        MapSet.put(socket.assigns.expanded_projects, sidebar_project.id)
-      else
-        socket.assigns.expanded_projects
-      end
 
     # Auto-expand chat when on chat page
     sidebar_tab = assigns[:sidebar_tab] || :sessions
@@ -46,8 +37,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
      |> assign(:sidebar_tab, sidebar_tab)
      |> assign(:sidebar_project, sidebar_project)
      |> assign(:active_channel_id, assigns[:active_channel_id])
-     |> assign(:expanded_chat, expanded_chat)
-     |> assign(:expanded_projects, expanded)}
+     |> assign(:expanded_chat, expanded_chat)}
   end
 
   @impl true
@@ -110,20 +100,6 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     end
   end
 
-  @impl true
-  def handle_event("toggle_project", %{"id" => id_str}, socket) do
-    id = String.to_integer(id_str)
-    expanded = socket.assigns.expanded_projects
-
-    expanded =
-      if MapSet.member?(expanded, id) do
-        MapSet.delete(expanded, id)
-      else
-        MapSet.put(expanded, id)
-      end
-
-    {:noreply, assign(socket, :expanded_projects, expanded)}
-  end
 
   @impl true
   def render(assigns) do
@@ -132,6 +108,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
       id="app-sidebar"
       phx-hook="SidebarState"
       phx-target={@myself}
+      data-active-project-id={@sidebar_project && @sidebar_project.id}
       class={[
         "flex flex-col h-full border-r border-base-content/8 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)] transition-all duration-200 flex-shrink-0 overflow-hidden",
         if(@collapsed, do: "w-16", else: "w-60")
@@ -139,7 +116,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     >
       <%!-- Branding --%>
       <div class="flex items-center gap-2 px-3 py-3 border-b border-base-content/5">
-        <a href="/" class="flex items-center gap-2 min-w-0">
+        <.link navigate="/" class="flex items-center gap-2 min-w-0">
           <img src="/images/logo.svg" class="w-7 h-7 flex-shrink-0" />
           <span class={[
             "text-sm font-semibold text-base-content/80 truncate",
@@ -147,7 +124,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           ]}>
             Eye in the Sky
           </span>
-        </a>
+        </.link>
       </div>
 
       <%!-- Scrollable nav --%>
@@ -226,8 +203,8 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           <%= if @expanded_chat && !@collapsed do %>
             <div class="ml-5 border-l border-base-content/8">
               <%= for channel <- @channels do %>
-                <a
-                  href={~p"/chat?channel_id=#{channel.id}"}
+                <.link
+                  navigate={~p"/chat?channel_id=#{channel.id}"}
                   class={[
                     "block pl-4 pr-3 py-1 text-xs transition-colors",
                     if(@active_channel_id && to_string(@active_channel_id) == to_string(channel.id),
@@ -237,7 +214,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
                   ]}
                 >
                   <span class="text-base-content/30 mr-0.5">#</span>{channel.name}
-                </a>
+                </.link>
               <% end %>
 
               <%!-- New channel inline form or button --%>
@@ -275,13 +252,10 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
         <.section_label collapsed={@collapsed} label="Projects" />
         <%= for project <- @projects do %>
           <% is_active_project = @sidebar_project && @sidebar_project.id == project.id %>
-          <% is_expanded = MapSet.member?(@expanded_projects, project.id) %>
-          <div>
-            <%!-- Project row --%>
+          <div data-project-id={project.id}>
+            <%!-- Project row — toggled by JS hook --%>
             <button
-              phx-click="toggle_project"
-              phx-value-id={project.id}
-              phx-target={@myself}
+              data-project-toggle={project.id}
               class={[
                 "flex items-center gap-2 w-full text-left text-sm transition-colors",
                 if(@collapsed, do: "px-4 py-1.5 justify-center", else: "px-3 py-1.5"),
@@ -293,65 +267,67 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
               title={project.name}
             >
               <%= if !@collapsed do %>
-                <.icon
-                  name={if is_expanded, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"}
-                  class="w-3.5 h-3.5 flex-shrink-0"
-                />
+                <%!-- Chevron managed by JS via data-project-chevron --%>
+                <span data-project-chevron={project.id}>
+                  <.icon name="hero-chevron-right-mini" class="w-3.5 h-3.5 flex-shrink-0" />
+                </span>
               <% end %>
               <.icon name="hero-folder" class="w-4 h-4 flex-shrink-0" />
               <span class={["truncate", if(@collapsed, do: "hidden")]}>{project.name}</span>
             </button>
 
-            <%!-- Sub-items (when expanded and not collapsed) --%>
-            <%= if is_expanded && !@collapsed do %>
-              <div class="ml-5 border-l border-base-content/8">
-                <.project_sub_item
-                  href={~p"/projects/#{project.id}"}
-                  label="Overview"
-                  active={is_active_project && @sidebar_tab == :overview}
-                />
-                <.project_sub_item
-                  href={~p"/projects/#{project.id}/sessions"}
-                  label="Sessions"
-                  active={is_active_project && @sidebar_tab == :sessions}
-                />
-                <.project_sub_item
-                  href={~p"/projects/#{project.id}/tasks"}
-                  label="Tasks"
-                  active={is_active_project && @sidebar_tab == :tasks}
-                />
-                <.project_sub_item
-                  href={~p"/projects/#{project.id}/kanban"}
-                  label="Kanban"
-                  active={is_active_project && @sidebar_tab == :kanban}
-                />
-                <.project_sub_item
-                  href={~p"/projects/#{project.id}/notes"}
-                  label="Notes"
-                  active={is_active_project && @sidebar_tab == :notes}
-                />
-                <.project_sub_item
-                  href={~p"/projects/#{project.id}/prompts"}
-                  label="Prompts"
-                  active={is_active_project && @sidebar_tab == :prompts}
-                />
-                <.project_sub_item
-                  href={~p"/projects/#{project.id}/files"}
-                  label="Files"
-                  active={is_active_project && @sidebar_tab == :files}
-                />
-                <.project_sub_item
-                  href={~p"/projects/#{project.id}/config"}
-                  label="Config"
-                  active={is_active_project && @sidebar_tab == :config}
-                />
-                <.project_sub_item
-                  href={~p"/projects/#{project.id}/agents"}
-                  label="Agents"
-                  active={is_active_project && @sidebar_tab == :agents}
-                />
-              </div>
-            <% end %>
+            <%!-- Sub-items — always rendered, shown/hidden by JS --%>
+            <div
+              id={"project-sub-#{project.id}"}
+              class={["ml-5 border-l border-base-content/8", if(@collapsed, do: "hidden")]}
+              style="display: none;"
+            >
+              <.project_sub_item
+                href={~p"/projects/#{project.id}"}
+                label="Overview"
+                active={is_active_project && @sidebar_tab == :overview}
+              />
+              <.project_sub_item
+                href={~p"/projects/#{project.id}/sessions"}
+                label="Sessions"
+                active={is_active_project && @sidebar_tab == :sessions}
+              />
+              <.project_sub_item
+                href={~p"/projects/#{project.id}/tasks"}
+                label="Tasks"
+                active={is_active_project && @sidebar_tab == :tasks}
+              />
+              <.project_sub_item
+                href={~p"/projects/#{project.id}/kanban"}
+                label="Kanban"
+                active={is_active_project && @sidebar_tab == :kanban}
+              />
+              <.project_sub_item
+                href={~p"/projects/#{project.id}/notes"}
+                label="Notes"
+                active={is_active_project && @sidebar_tab == :notes}
+              />
+              <.project_sub_item
+                href={~p"/projects/#{project.id}/prompts"}
+                label="Prompts"
+                active={is_active_project && @sidebar_tab == :prompts}
+              />
+              <.project_sub_item
+                href={~p"/projects/#{project.id}/files"}
+                label="Files"
+                active={is_active_project && @sidebar_tab == :files}
+              />
+              <.project_sub_item
+                href={~p"/projects/#{project.id}/config"}
+                label="Config"
+                active={is_active_project && @sidebar_tab == :config}
+              />
+              <.project_sub_item
+                href={~p"/projects/#{project.id}/agents"}
+                label="Agents"
+                active={is_active_project && @sidebar_tab == :agents}
+              />
+            </div>
           </div>
         <% end %>
 
@@ -432,8 +408,8 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
 
   defp nav_item(assigns) do
     ~H"""
-    <a
-      href={@href}
+    <.link
+      navigate={@href}
       class={[
         "flex items-center gap-2.5 text-[13px] transition-colors",
         if(@collapsed, do: "px-4 py-1.5 justify-center", else: "px-3 py-1.5"),
@@ -446,7 +422,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     >
       <.icon name={@icon} class="w-4 h-4 flex-shrink-0" />
       <span class={["truncate", if(@collapsed, do: "hidden")]}>{@label}</span>
-    </a>
+    </.link>
     """
   end
 
@@ -456,8 +432,8 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
 
   defp project_sub_item(assigns) do
     ~H"""
-    <a
-      href={@href}
+    <.link
+      navigate={@href}
       class={[
         "block pl-4 pr-3 py-1 text-xs transition-colors",
         if(@active,
@@ -467,7 +443,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
       ]}
     >
       {@label}
-    </a>
+    </.link>
     """
   end
 

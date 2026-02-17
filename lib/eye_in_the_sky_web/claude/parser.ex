@@ -31,13 +31,18 @@ defmodule EyeInTheSkyWeb.Claude.Parser do
   def parse_stream_line(line) when is_binary(line) do
     line = String.trim(line)
 
-    if line == "" do
-      :skip
-    else
-      case Jason.decode(line) do
-        {:ok, json} -> parse_event(json)
-        {:error, reason} -> {:error, {:json_decode_error, reason}}
-      end
+    cond do
+      line == "" ->
+        :skip
+
+      String.starts_with?(line, "Error:") ->
+        {:error, {:cli_error, line}}
+
+      true ->
+        case Jason.decode(line) do
+          {:ok, json} -> parse_event(json)
+          {:error, _reason} -> :skip
+        end
     end
   end
 

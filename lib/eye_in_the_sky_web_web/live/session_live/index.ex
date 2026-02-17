@@ -2,11 +2,12 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.Agents
+  alias EyeInTheSkyWeb.Sessions
   import EyeInTheSkyWebWeb.Components.SessionCard
 
   @impl true
   def mount(_params, _session, socket) do
-    agents = Agents.list_execution_agent_overview_rows(limit: 20)
+    agents = Sessions.list_session_overview_rows(limit: 20)
     projects = EyeInTheSkyWeb.Projects.list_projects()
 
     socket =
@@ -52,7 +53,7 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
 
     case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
       {:ok, _result} ->
-        agents = Agents.list_execution_agent_overview_rows(limit: 20)
+        agents = Sessions.list_session_overview_rows(limit: 20)
 
         socket =
           socket

@@ -4,19 +4,20 @@ defmodule EyeInTheSkyWeb.MCP.Tools.EndSession do
   use Anubis.Server.Component, type: :tool
 
   alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.Sessions
 
   schema do
     field :agent_id, :string, required: true, description: "Agent UUID identifier"
     field :summary, :string, description: "Summary of work completed"
-    field :final_status, :string, description: "Either 'completed' or 'failed' (default: completed)"
+
+    field :final_status, :string,
+      description: "Either 'completed' or 'failed' (default: completed)"
   end
 
   @impl true
   def execute(%{"agent_id" => agent_id} = _params, frame) do
-    alias EyeInTheSkyWeb.Agents
-
     result =
-      case Agents.get_execution_agent_by_uuid(agent_id) do
+      case Sessions.get_session_by_uuid(agent_id) do
         {:ok, agent} ->
           case Agents.end_execution_agent(agent) do
             {:ok, _} -> %{success: true, message: "Session ended successfully"}

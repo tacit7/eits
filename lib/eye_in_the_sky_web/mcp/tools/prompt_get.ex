@@ -8,7 +8,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.PromptGet do
   schema do
     field :id, :string, description: "Prompt ID"
     field :slug, :string, description: "Prompt slug"
-    field :project_id, :string, description: "Project context for slug lookup (checks project-scoped first, falls back to global)"
+
+    field :project_id, :string,
+      description:
+        "Project context for slug lookup (checks project-scoped first, falls back to global)"
+
     field :include_text, :boolean, description: "Include prompt_text in response (default: true)"
   end
 

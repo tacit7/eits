@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   require Logger
 
   alias EyeInTheSkyWeb.Claude.AgentWorker
-  alias EyeInTheSkyWeb.{Agents, ChatAgents, Messages}
+  alias EyeInTheSkyWeb.{Agents, Messages, Sessions}
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
   @default_provider "claude"
@@ -41,7 +41,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
     provider = if opts[:agent_type] == "codex", do: "codex", else: "claude"
 
     with {:ok, agent} <-
-           ChatAgents.create_chat_agent(%{
+           Agents.create_agent(%{
              uuid: agent_uuid,
              agent_type: opts[:agent_type] || "claude",
              project_id: opts[:project_id],
@@ -49,7 +49,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              description: description
            }),
          {:ok, session} <-
-           Agents.create_execution_agent(%{
+           Sessions.create_session(%{
              uuid: session_uuid,
              agent_id: agent.id,
              name: description,
@@ -183,8 +183,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   defp start_agent_worker(session_id) do
     Logger.info("🚀 start_agent_worker: loading session.id=#{session_id}")
 
-    with {:ok, session} <- Agents.get_execution_agent(session_id),
-         {:ok, agent} <- ChatAgents.get_chat_agent(session.agent_id) do
+    with {:ok, session} <- Sessions.get_session(session_id),
+         {:ok, agent} <- Agents.get_agent(session.agent_id) do
       project_path_from_project = if agent.project, do: agent.project.path, else: nil
 
       project_path =
@@ -254,7 +254,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
     |> normalize_provider()
     |> case do
       nil ->
-        case Agents.get_execution_agent(session_id) do
+        case Sessions.get_session(session_id) do
           {:ok, session} -> normalize_provider(session.provider) || @default_provider
           _ -> @default_provider
         end

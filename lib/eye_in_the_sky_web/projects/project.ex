@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.Projects.Project do
     field :remote_url, :string
 
     has_many :agents, EyeInTheSkyWeb.Agents.Agent
+    has_many :sessions, EyeInTheSkyWeb.Sessions.Session
     # Note: commits now use session_id as primary key (session-centric model)
     # Use Commits.list_commits_for_session/1 instead
   end

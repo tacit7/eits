@@ -11,8 +11,12 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Speak do
 
   schema do
     field :message, :string, required: true, description: "Message to speak aloud"
-    field :voice, :string, description: "Premium voice to use (Ava, Isha, Lee, Jamie, Serena). Defaults to Ava"
-    field :rate, :integer, description: "Speaking rate in words per minute (90-450). Defaults to 200"
+
+    field :voice, :string,
+      description: "Premium voice to use (Ava, Isha, Lee, Jamie, Serena). Defaults to Ava"
+
+    field :rate, :integer,
+      description: "Speaking rate in words per minute (90-450). Defaults to 200"
   end
 
   @impl true

@@ -7,7 +7,9 @@ defmodule EyeInTheSkyWeb.MCP.Tools.LoadSessionContext do
 
   schema do
     field :agent_id, :string, required: true, description: "Agent UUID identifier"
-    field :session_id, :string, description: "Specific session ID (optional, loads latest if omitted)"
+
+    field :session_id, :string,
+      description: "Specific session ID (optional, loads latest if omitted)"
   end
 
   @impl true

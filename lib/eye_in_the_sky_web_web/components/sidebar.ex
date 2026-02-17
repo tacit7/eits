@@ -141,7 +141,10 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
       <div class="flex items-center gap-2 px-3 py-3 border-b border-base-content/5">
         <a href="/" class="flex items-center gap-2 min-w-0">
           <img src="/images/logo.svg" class="w-7 h-7 flex-shrink-0" />
-          <span class={["text-sm font-semibold text-base-content/80 truncate", if(@collapsed, do: "hidden")]}>
+          <span class={[
+            "text-sm font-semibold text-base-content/80 truncate",
+            if(@collapsed, do: "hidden")
+          ]}>
             Eye in the Sky
           </span>
         </a>
@@ -151,12 +154,48 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
       <nav class="flex-1 overflow-y-auto overflow-x-hidden py-2">
         <%!-- Overview section --%>
         <.section_label collapsed={@collapsed} label="Overview" />
-        <.nav_item href="/" icon="hero-cpu-chip" label="Sessions" active={@sidebar_tab == :sessions && is_nil(@sidebar_project)} collapsed={@collapsed} />
-        <.nav_item href="/notes" icon="hero-document-text" label="Notes" active={@sidebar_tab == :notes && is_nil(@sidebar_project)} collapsed={@collapsed} />
-        <.nav_item href="/tasks" icon="hero-clipboard-document-list" label="Tasks" active={@sidebar_tab == :tasks && is_nil(@sidebar_project)} collapsed={@collapsed} />
-        <.nav_item href="/usage" icon="hero-chart-bar" label="Usage" active={@sidebar_tab == :usage} collapsed={@collapsed} />
-        <.nav_item href="/prompts" icon="hero-chat-bubble-left-right" label="Prompts" active={@sidebar_tab == :prompts && is_nil(@sidebar_project)} collapsed={@collapsed} />
-        <.nav_item href="/skills" icon="hero-bolt" label="Skills" active={@sidebar_tab == :skills} collapsed={@collapsed} />
+        <.nav_item
+          href="/"
+          icon="hero-cpu-chip"
+          label="Sessions"
+          active={@sidebar_tab == :sessions && is_nil(@sidebar_project)}
+          collapsed={@collapsed}
+        />
+        <.nav_item
+          href="/notes"
+          icon="hero-document-text"
+          label="Notes"
+          active={@sidebar_tab == :notes && is_nil(@sidebar_project)}
+          collapsed={@collapsed}
+        />
+        <.nav_item
+          href="/tasks"
+          icon="hero-clipboard-document-list"
+          label="Tasks"
+          active={@sidebar_tab == :tasks && is_nil(@sidebar_project)}
+          collapsed={@collapsed}
+        />
+        <.nav_item
+          href="/usage"
+          icon="hero-chart-bar"
+          label="Usage"
+          active={@sidebar_tab == :usage}
+          collapsed={@collapsed}
+        />
+        <.nav_item
+          href="/prompts"
+          icon="hero-chat-bubble-left-right"
+          label="Prompts"
+          active={@sidebar_tab == :prompts && is_nil(@sidebar_project)}
+          collapsed={@collapsed}
+        />
+        <.nav_item
+          href="/skills"
+          icon="hero-bolt"
+          label="Skills"
+          active={@sidebar_tab == :skills}
+          collapsed={@collapsed}
+        />
         <%!-- Chat (expandable with channels) --%>
         <div>
           <button
@@ -174,7 +213,9 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           >
             <%= if !@collapsed do %>
               <.icon
-                name={if @expanded_chat, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"}
+                name={
+                  if @expanded_chat, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"
+                }
                 class="w-3.5 h-3.5 flex-shrink-0"
               />
             <% end %>
@@ -304,6 +345,11 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
                   label="Config"
                   active={is_active_project && @sidebar_tab == :config}
                 />
+                <.project_sub_item
+                  href={~p"/projects/#{project.id}/agents"}
+                  label="Agents"
+                  active={is_active_project && @sidebar_tab == :agents}
+                />
               </div>
             <% end %>
           </div>
@@ -311,9 +357,27 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
 
         <%!-- System section --%>
         <.section_label collapsed={@collapsed} label="System" />
-        <.nav_item href="/config" icon="hero-cog-6-tooth" label="Claude Config" active={@sidebar_tab == :config && is_nil(@sidebar_project)} collapsed={@collapsed} />
-        <.nav_item href="/jobs" icon="hero-calendar-days" label="Jobs" active={@sidebar_tab == :jobs} collapsed={@collapsed} />
-        <.nav_item href="/settings" icon="hero-cog-8-tooth" label="Settings" active={@sidebar_tab == :settings} collapsed={@collapsed} />
+        <.nav_item
+          href="/config"
+          icon="hero-cog-6-tooth"
+          label="Claude Config"
+          active={@sidebar_tab == :config && is_nil(@sidebar_project)}
+          collapsed={@collapsed}
+        />
+        <.nav_item
+          href="/jobs"
+          icon="hero-calendar-days"
+          label="Jobs"
+          active={@sidebar_tab == :jobs}
+          collapsed={@collapsed}
+        />
+        <.nav_item
+          href="/settings"
+          icon="hero-cog-8-tooth"
+          label="Settings"
+          active={@sidebar_tab == :settings}
+          collapsed={@collapsed}
+        />
       </nav>
 
       <%!-- Bottom controls --%>
@@ -330,7 +394,11 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           title={if @collapsed, do: "Expand sidebar", else: "Collapse sidebar"}
         >
           <.icon
-            name={if @collapsed, do: "hero-chevron-double-right-mini", else: "hero-chevron-double-left-mini"}
+            name={
+              if @collapsed,
+                do: "hero-chevron-double-right-mini",
+                else: "hero-chevron-double-left-mini"
+            }
             class="w-4 h-4"
           />
         </button>

@@ -35,7 +35,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
     ~H"""
     <div class="flex flex-col h-[calc(100vh-2rem)] px-4 sm:px-6 lg:px-8 py-4" id="dm-page">
       <%!-- Header card --%>
-      <div class="max-w-6xl mx-auto w-full bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0" id="dm-header-card">
+      <div
+        class="max-w-6xl mx-auto w-full bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0"
+        id="dm-header-card"
+      >
         <div class="px-5 py-3" id="dm-header">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">
@@ -60,11 +63,14 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 class={[
                   "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors",
                   @show_live_stream && "text-primary bg-primary/10 hover:bg-primary/15",
-                  !@show_live_stream && "text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5"
+                  !@show_live_stream &&
+                    "text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5"
                 ]}
               >
-                <.icon name={if @show_live_stream, do: "hero-signal-solid", else: "hero-signal"} class="w-3.5 h-3.5" />
-                Live
+                <.icon
+                  name={if @show_live_stream, do: "hero-signal-solid", else: "hero-signal"}
+                  class="w-3.5 h-3.5"
+                /> Live
               </button>
               <button
                 phx-click="reload_from_session_file"
@@ -166,7 +172,9 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             <div class="flex flex-col items-center justify-center py-16 text-center">
               <.icon name="hero-chat-bubble-left-right" class="w-8 h-8 text-base-content/15 mb-3" />
               <p class="text-sm text-base-content/40">No messages yet</p>
-              <p class="mt-1 text-xs text-base-content/25">Send a message to start the conversation</p>
+              <p class="mt-1 text-xs text-base-content/25">
+                Send a message to start the conversation
+              </p>
             </div>
           <% else %>
             <div class="py-2 flex items-center justify-center gap-3">
@@ -191,7 +199,11 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             <%= if @show_live_stream && (@stream_content != "" || @stream_tool) do %>
               <div class="py-3 px-2" id="live-stream-bubble">
                 <div class="flex items-start gap-2.5">
-                  <img src="/images/claude.svg" class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse" alt="Claude" />
+                  <img
+                    src="/images/claude.svg"
+                    class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
+                    alt="Claude"
+                  />
                   <div class="min-w-0 flex-1">
                     <span class="text-[13px] font-semibold text-primary/80">Agent</span>
                     <%= if @stream_tool do %>
@@ -237,7 +249,11 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             <div class="w-1.5 h-1.5 rounded-full bg-success" />
           </div>
         <% else %>
-          <img src={provider_icon(@message.provider)} class="w-4 h-4 mt-1 flex-shrink-0" alt={@message.provider || "Agent"} />
+          <img
+            src={provider_icon(@message.provider)}
+            class="w-4 h-4 mt-1 flex-shrink-0"
+            alt={@message.provider || "Agent"}
+          />
         <% end %>
 
         <div class="min-w-0 flex-1">
@@ -249,8 +265,18 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             ]}>
               {message_sender_name(@message)}
             </span>
-            <span :if={!@is_user && message_model(@message)} class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/35">{message_model(@message)}</span>
-            <span :if={!@is_user && message_cost(@message)} class="text-[11px] font-mono text-base-content/30">${:erlang.float_to_binary(message_cost(@message) * 1.0, decimals: 4)}</span>
+            <span
+              :if={!@is_user && message_model(@message)}
+              class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/35"
+            >
+              {message_model(@message)}
+            </span>
+            <span
+              :if={!@is_user && message_cost(@message)}
+              class="text-[11px] font-mono text-base-content/30"
+            >
+              ${:erlang.float_to_binary(message_cost(@message) * 1.0, decimals: 4)}
+            </span>
             <span class="text-[11px] text-base-content/25">{format_time(@message.inserted_at)}</span>
           </div>
 
@@ -276,33 +302,48 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
     ~H"""
     <div class="mt-2 flex flex-wrap gap-1.5">
       <%= if @message.metadata["total_cost_usd"] do %>
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40" title="Total cost">
+        <span
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40"
+          title="Total cost"
+        >
           <.icon name="hero-currency-dollar-mini" class="w-3 h-3" />
           {:erlang.float_to_binary(@message.metadata["total_cost_usd"] * 1.0, decimals: 4)}
         </span>
       <% end %>
 
       <%= if @message.metadata["usage"] && @message.metadata["usage"]["input_tokens"] do %>
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40" title="Input tokens">
+        <span
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40"
+          title="Input tokens"
+        >
           {@message.metadata["usage"]["input_tokens"]} in
         </span>
       <% end %>
 
       <%= if @message.metadata["usage"] && @message.metadata["usage"]["output_tokens"] do %>
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40" title="Output tokens">
+        <span
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40"
+          title="Output tokens"
+        >
           {@message.metadata["usage"]["output_tokens"]} out
         </span>
       <% end %>
 
       <%= if @message.metadata["duration_ms"] do %>
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40" title="Duration">
+        <span
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40"
+          title="Duration"
+        >
           <.icon name="hero-clock-mini" class="w-3 h-3" />
           {:erlang.float_to_binary(@message.metadata["duration_ms"] * 1.0 / 1000, decimals: 1)}s
         </span>
       <% end %>
 
       <%= if @message.metadata["num_turns"] do %>
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40" title="Number of turns">
+        <span
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40"
+          title="Number of turns"
+        >
           {@message.metadata["num_turns"]} turns
         </span>
       <% end %>
@@ -395,7 +436,11 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         <%!-- Right: model selector + send/stop --%>
         <div class="flex items-center gap-2">
           <%!-- Model selector --%>
-          <div class="dropdown dropdown-top dropdown-end" phx-click="toggle_model_menu" id="model-selector-dropdown">
+          <div
+            class="dropdown dropdown-top dropdown-end"
+            phx-click="toggle_model_menu"
+            id="model-selector-dropdown"
+          >
             <button
               type="button"
               tabindex="0"
@@ -495,7 +540,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         subtitle="Tasks from this session will appear here"
       />
     <% else %>
-      <div class="space-y-1 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4" id="dm-task-list">
+      <div
+        class="space-y-1 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4"
+        id="dm-task-list"
+      >
         <%= for task <- @tasks do %>
           <div
             class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] hover:border-base-content/10 transition-colors"
@@ -509,7 +557,9 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                   class="h-4 w-4 flex-shrink-0 text-base-content/30"
                 />
                 <div class="flex-1 min-w-0">
-                  <h3 class="text-[13px] font-semibold text-base-content/85 truncate">{task.title}</h3>
+                  <h3 class="text-[13px] font-semibold text-base-content/85 truncate">
+                    {task.title}
+                  </h3>
                   <div class="flex items-center gap-1.5 mt-0.5 text-[11px] text-base-content/30">
                     <span class="font-mono">
                       {String.slice(task.uuid || to_string(task.id), 0..7)}
@@ -548,7 +598,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         subtitle="Commits from this session will appear here"
       />
     <% else %>
-      <div class="space-y-1 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4" id="dm-commit-list">
+      <div
+        class="space-y-1 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4"
+        id="dm-commit-list"
+      >
         <%= for commit <- @commits do %>
           <div
             class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] hover:border-base-content/10 transition-colors"
@@ -594,7 +647,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         subtitle="Logs from this session will appear here"
       />
     <% else %>
-      <div class="space-y-1 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4" id="dm-log-list">
+      <div
+        class="space-y-1 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4"
+        id="dm-log-list"
+      >
         <%= for log <- @logs do %>
           <div
             class="rounded-lg border border-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] px-4 py-3"
@@ -620,7 +676,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         subtitle="Notes from this session will appear here"
       />
     <% else %>
-      <div class="space-y-1 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4" id="dm-note-list">
+      <div
+        class="space-y-1 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4"
+        id="dm-note-list"
+      >
         <%= for note <- @notes do %>
           <div
             class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] hover:border-base-content/10 transition-colors"

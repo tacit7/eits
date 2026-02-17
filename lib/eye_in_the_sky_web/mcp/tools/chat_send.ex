@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.ChatSend do
   use Anubis.Server.Component, type: :tool
 
   alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.Sessions
 
   schema do
     field :channel_id, :string, required: true, description: "Channel ID to send message to"
@@ -60,8 +61,6 @@ defmodule EyeInTheSkyWeb.MCP.Tools.ChatSend do
   defp resolve_session_id(nil), do: {:error, "session_id is required"}
 
   defp resolve_session_id(raw) when is_binary(raw) do
-    alias EyeInTheSkyWeb.Agents
-
     # Try integer parse first (already resolved)
     case Integer.parse(raw) do
       {int_id, ""} ->
@@ -69,7 +68,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.ChatSend do
 
       _ ->
         # Try UUID lookup
-        case Agents.get_execution_agent_by_uuid(raw) do
+        case Sessions.get_session_by_uuid(raw) do
           {:ok, agent} -> {:ok, agent.id}
           {:error, :not_found} -> {:error, "Session not found: #{raw}"}
         end

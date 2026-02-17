@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
   use Anubis.Server.Component, type: :tool
 
   alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.Sessions
 
   schema do
     field :agent_id, :string, required: true, description: "Agent identifier"
@@ -14,7 +15,6 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
   @impl true
   def execute(params, frame) do
     alias EyeInTheSkyWeb.Commits
-    alias EyeInTheSkyWeb.Agents
 
     agent_id = params["agent_id"]
     hashes = params["commit_hashes"] || []
@@ -22,7 +22,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
 
     # Resolve agent integer ID
     agent_int_id =
-      case Agents.get_execution_agent_by_uuid(agent_id) do
+      case Sessions.get_session_by_uuid(agent_id) do
         {:ok, agent} -> agent.id
         _ -> nil
       end

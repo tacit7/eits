@@ -6,7 +6,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
   alias Anubis.Server.Response
 
   schema do
-    field :instructions, :string, required: true, description: "Task instructions for the agent (required)"
+    field :instructions, :string,
+      required: true,
+      description: "Task instructions for the agent (required)"
+
     field :model, :string, description: "Model to use (haiku, sonnet, opus). Default: haiku"
     field :project_path, :string, description: "Working directory. Default: current directory"
     field :skip_permissions, :boolean, description: "Skip permission prompts (default: true)"

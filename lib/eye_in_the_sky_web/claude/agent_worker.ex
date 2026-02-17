@@ -12,7 +12,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   alias EyeInTheSkyWeb.Claude.{Message, SDK}
   alias EyeInTheSkyWeb.Codex
-  alias EyeInTheSkyWeb.{Agents, Messages}
+  alias EyeInTheSkyWeb.{Agents, Messages, Sessions}
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
   @retry_start_ms 1_000
@@ -467,9 +467,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     if state.session_uuid == claude_session_uuid do
       state
     else
-      case Agents.get_execution_agent(state.session_id) do
+      case Sessions.get_session(state.session_id) do
         {:ok, execution_agent} ->
-          case Agents.update_execution_agent(execution_agent, %{uuid: claude_session_uuid}) do
+          case Sessions.update_session(execution_agent, %{uuid: claude_session_uuid}) do
             {:ok, _updated} ->
               Logger.info(
                 "[#{state.session_id}] Updated execution session uuid #{state.session_uuid} -> #{claude_session_uuid}"
@@ -566,7 +566,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   end
 
   defp update_agent_status(session_id, status) do
-    case Agents.get_execution_agent(session_id) do
+    case Sessions.get_session(session_id) do
       {:ok, agent} ->
         attrs = %{status: status}
 
@@ -577,7 +577,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
             attrs
           end
 
-        Agents.update_execution_agent(agent, attrs)
+        Sessions.update_session(agent, attrs)
 
       {:error, _} ->
         :ok

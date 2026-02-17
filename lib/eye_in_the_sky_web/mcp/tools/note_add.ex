@@ -6,8 +6,14 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NoteAdd do
   alias Anubis.Server.Response
 
   schema do
-    field :parent_id, :string, required: true, description: "Parent entity identifier (session, agent, context, etc)"
-    field :parent_type, :string, required: true, description: "Parent entity type (sessions, agents, contexts, etc)"
+    field :parent_id, :string,
+      required: true,
+      description: "Parent entity identifier (session, agent, context, etc)"
+
+    field :parent_type, :string,
+      required: true,
+      description: "Parent entity type (sessions, agents, contexts, etc)"
+
     field :body, :string, required: true, description: "Note content"
     field :title, :string, description: "Note title (optional)"
     field :starred, :integer, description: "Starred flag (0 or 1, default 0)"

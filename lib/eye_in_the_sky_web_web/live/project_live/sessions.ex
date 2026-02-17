@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Agents
   alias EyeInTheSkyWeb.Repo
+  alias EyeInTheSkyWeb.Sessions
   import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1]
 
   @impl true
@@ -25,7 +26,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         tasks = Projects.get_project_tasks(project_id)
 
         agents =
-          Agents.list_execution_agent_overview_rows(
+          Sessions.list_session_overview_rows(
             project_id: project_id,
             limit: 50,
             search_query: ""
@@ -64,7 +65,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
     status_filter = socket.assigns.status_filter
 
     agents =
-      Agents.list_execution_agent_overview_rows(
+      Sessions.list_session_overview_rows(
         project_id: project_id,
         limit: 50,
         search_query: effective_query

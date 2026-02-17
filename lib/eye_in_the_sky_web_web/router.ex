@@ -36,14 +36,14 @@ defmodule EyeInTheSkyWebWeb.Router do
     live "/projects/:id/notes", ProjectLive.Notes, :show
     live "/projects/:id/files", ProjectLive.Files, :show
     live "/projects/:id/config", ProjectLive.Config, :show
+    live "/projects/:id/agents", ProjectLive.Agents, :show
     live "/chat", ChatLive, :index
     live "/dm/:session_id", DmLive, :show
   end
 
   # MCP Server — Streamable HTTP
   scope "/mcp" do
-    forward "/", Anubis.Server.Transport.StreamableHTTP.Plug,
-      server: EyeInTheSkyWeb.MCP.Server
+    forward "/", Anubis.Server.Transport.StreamableHTTP.Plug, server: EyeInTheSkyWeb.MCP.Server
   end
 
   scope "/api/v1", EyeInTheSkyWebWeb.Api.V1 do

@@ -195,7 +195,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
             id="project-tasks-empty"
             icon="hero-clipboard-document-list"
             title={if @search_query != "", do: "No tasks found", else: "No tasks yet"}
-            subtitle={if @search_query != "", do: "Try adjusting your search query", else: "Create a task to get started"}
+            subtitle={
+              if @search_query != "",
+                do: "Try adjusting your search query",
+                else: "Create a task to get started"
+            }
           />
         <% end %>
       </div>

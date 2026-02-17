@@ -6,10 +6,17 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NatsSend do
   alias Anubis.Server.Response
 
   schema do
-    field :sender_id, :string, required: true, description: "Your session_id (identifies who is sending)"
-    field :receiver_id, :string, description: "Target session_id for targeted delivery. Empty = broadcast"
+    field :sender_id, :string,
+      required: true,
+      description: "Your session_id (identifies who is sending)"
+
+    field :receiver_id, :string,
+      description: "Target session_id for targeted delivery. Empty = broadcast"
+
     field :message, :string, required: true, description: "The message content"
-    field :subject, :string, description: "Message subject. Auto-prefixed with events. if not present"
+
+    field :subject, :string,
+      description: "Message subject. Auto-prefixed with events. if not present"
   end
 
   @impl true

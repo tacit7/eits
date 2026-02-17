@@ -4,6 +4,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Tasks
   alias EyeInTheSkyWeb.Notes
+  alias EyeInTheSkyWeb.Agents
+  alias EyeInTheSkyWeb.Sessions
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWebWeb.Components.TaskCard
 
@@ -201,16 +203,16 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
     task_prompt = "#{task.title}\n\n#{task.description || ""}" |> String.trim()
 
-    case ChatAgents.create_chat_agent(%{
+    case Agents.create_agent(%{
            uuid: agent_id,
            description: task_prompt,
            project_id: project.id,
            git_worktree_path: project.path
          }) do
-      {:ok, chat_agent} ->
-        case Agents.create_execution_agent_with_model(%{
+      {:ok, agent} ->
+        case Sessions.create_session_with_model(%{
                uuid: session_id,
-               agent_id: chat_agent.id,
+               agent_id: agent.id,
                name: task.title,
                description: task_prompt,
                started_at: now,
@@ -583,7 +585,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                     <%= if task.due_at || (task.description && task.description != "") do %>
                       <div class="flex items-center gap-2 mt-1.5 text-base-content/30">
                         <%= if task.due_at do %>
-                          <span class={["flex items-center gap-1 text-[11px]", due_date_class(task.due_at)]}>
+                          <span class={[
+                            "flex items-center gap-1 text-[11px]",
+                            due_date_class(task.due_at)
+                          ]}>
                             <.icon name="hero-clock-mini" class="w-3.5 h-3.5" />
                             {format_due(task.due_at)}
                           </span>

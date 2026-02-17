@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
   alias EyeInTheSkyWeb.Agents
   alias EyeInTheSkyWeb.Notes
   alias EyeInTheSkyWeb.Repo
+  alias EyeInTheSkyWeb.Sessions
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -28,7 +29,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
 
         # Load active sessions for this project (max 5)
         active_sessions =
-          Agents.list_agents_with_chat_agent()
+          Sessions.list_sessions_with_agent()
           |> Enum.filter(&(is_nil(&1.ended_at) and &1.project_id == project_id))
           |> Enum.sort_by(& &1.started_at, :desc)
           |> Enum.take(5)
@@ -128,7 +129,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
                             {String.slice(session.uuid || to_string(session.id), 0..7)}
                           </code>
                           <span class="text-sm text-base-content/80 truncate">
-                            {session.name || (session.chat_agent && session.chat_agent.description) || "Unnamed"}
+                            {session.name || (session.chat_agent && session.chat_agent.description) ||
+                              "Unnamed"}
                           </span>
                         </div>
                       </div>

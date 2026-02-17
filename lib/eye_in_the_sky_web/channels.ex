@@ -147,7 +147,7 @@ defmodule EyeInTheSkyWeb.Channels do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     session_uuid =
-      case Agents.get_execution_agent(session_id) do
+      case Sessions.get_session(session_id) do
         {:ok, s} -> s.uuid
         _ -> Ecto.UUID.generate()
       end

@@ -137,8 +137,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       <% end %>
       <%= if @task.agent_id do %>
         <span class="flex items-center gap-1">
-          <.icon name="hero-user" class="w-3 h-3" />
-          Agent #{@task.agent_id}
+          <.icon name="hero-user" class="w-3 h-3" /> Agent #{@task.agent_id}
         </span>
       <% end %>
       <%= if @task.tags && length(@task.tags) > 0 do %>

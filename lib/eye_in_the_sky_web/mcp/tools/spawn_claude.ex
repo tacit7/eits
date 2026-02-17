@@ -7,7 +7,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnClaude do
 
   schema do
     field :prompt, :string, required: true, description: "Prompt to send to Claude Code"
-    field :model, :string, required: true, description: "Model to use (haiku, sonnet, opus, or full model ID)"
+
+    field :model, :string,
+      required: true,
+      description: "Model to use (haiku, sonnet, opus, or full model ID)"
+
     field :project_path, :string, description: "Working directory for Claude Code"
   end
 

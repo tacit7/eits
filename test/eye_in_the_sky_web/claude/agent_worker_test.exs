@@ -9,6 +9,16 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
+
+    on_exit(fn ->
+      EyeInTheSkyWeb.Claude.AgentSupervisor
+      |> DynamicSupervisor.which_children()
+      |> Enum.each(fn
+        {_, pid, :worker, _} when is_pid(pid) -> Process.exit(pid, :kill)
+        _ -> :ok
+      end)
+    end)
+
     :ok
   end
 
@@ -44,18 +54,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
 
     assert result == :ok
 
-    # Give AgentWorker time to start SDK and spawn mock port
-    Process.sleep(200)
-
-    # Get the mock port from SDK Registry via AgentWorker state
-    [{worker_pid, _}] =
-      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, execution_agent.id})
-
-    worker_state = :sys.get_state(worker_pid)
-    sdk_ref = worker_state.sdk_ref
-    assert sdk_ref != nil, "SDK ref should be set after starting"
-
-    mock_port = SDK.Registry.lookup(sdk_ref)
+    mock_port = wait_for_mock_port(execution_agent.id)
     assert mock_port != nil, "Mock port should be registered in SDK Registry"
 
     # Simulate Claude sending a result event
@@ -115,13 +114,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     prompt = "Say hello"
     assert :ok == EyeInTheSkyWeb.Claude.AgentManager.send_message(execution_agent.id, prompt)
 
-    Process.sleep(200)
-
-    [{worker_pid, _}] =
-      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, execution_agent.id})
-
-    sdk_ref = :sys.get_state(worker_pid).sdk_ref
-    mock_port = SDK.Registry.lookup(sdk_ref)
+    mock_port = wait_for_mock_port(execution_agent.id)
+    assert mock_port != nil, "Mock port should be registered in SDK Registry"
 
     result_json =
       Jason.encode!(%{
@@ -180,5 +174,101 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
 
     worker_state = :sys.get_state(worker_pid)
     assert worker_state.current_job.context.has_messages == false
+  end
+
+  test "AgentManager returns error for invalid message payload" do
+    assert {:error, :invalid_message} =
+             EyeInTheSkyWeb.Claude.AgentManager.send_message(123_456, nil)
+  end
+
+  test "Messages tracks inbound history per provider" do
+    {:ok, chat_agent} =
+      ChatAgents.create_chat_agent(%{
+        uuid: Ecto.UUID.generate(),
+        description: "Codex Session",
+        source: "test"
+      })
+
+    {:ok, execution_agent} =
+      Agents.create_execution_agent(%{
+        uuid: Ecto.UUID.generate(),
+        agent_id: chat_agent.id,
+        provider: "codex",
+        name: "Codex Session",
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      })
+
+    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
+
+    {:ok, _reply} =
+      Messages.record_incoming_reply(execution_agent.id, "codex", "prior codex reply")
+
+    {:ok, refreshed_session} = Agents.get_execution_agent(execution_agent.id)
+    assert refreshed_session.provider == "codex"
+    assert Messages.has_inbound_reply?(execution_agent.id, "codex")
+    refute Messages.has_inbound_reply?(execution_agent.id, "claude")
+  end
+
+  test "AgentManager falls back to cwd project path when no worktree path is configured" do
+    {:ok, chat_agent} =
+      ChatAgents.create_chat_agent(%{
+        uuid: Ecto.UUID.generate(),
+        description: "No Path Session",
+        source: "test"
+      })
+
+    {:ok, execution_agent} =
+      Agents.create_execution_agent(%{
+        uuid: Ecto.UUID.generate(),
+        agent_id: chat_agent.id,
+        name: "No Path Session",
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      })
+
+    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
+
+    assert :ok == EyeInTheSkyWeb.Claude.AgentManager.send_message(execution_agent.id, "hello")
+
+    Process.sleep(200)
+
+    [{worker_pid, _}] =
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, execution_agent.id})
+
+    worker_state = :sys.get_state(worker_pid)
+    assert worker_state.project_path == File.cwd!()
+  end
+
+  defp wait_for_mock_port(session_id, attempts \\ 20)
+
+  defp wait_for_mock_port(_session_id, 0), do: nil
+
+  defp wait_for_mock_port(session_id, attempts) do
+    case Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session_id}) do
+      [{worker_pid, _}] when is_pid(worker_pid) ->
+        if Process.alive?(worker_pid) do
+          mock_port =
+            try do
+              worker_state = :sys.get_state(worker_pid)
+              sdk_ref = worker_state.sdk_ref
+              if sdk_ref, do: SDK.Registry.lookup(sdk_ref), else: nil
+            catch
+              :exit, _ -> nil
+            end
+
+          if mock_port do
+            mock_port
+          else
+            Process.sleep(50)
+            wait_for_mock_port(session_id, attempts - 1)
+          end
+        else
+          Process.sleep(50)
+          wait_for_mock_port(session_id, attempts - 1)
+        end
+
+      [] ->
+        Process.sleep(50)
+        wait_for_mock_port(session_id, attempts - 1)
+    end
   end
 end

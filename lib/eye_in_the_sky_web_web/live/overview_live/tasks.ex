@@ -147,8 +147,16 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
           <.empty_state
             id="overview-tasks-empty"
             icon="hero-clipboard-document-list"
-            title={if @search_query != "" || @state_filter != "all", do: "No tasks found", else: "No tasks yet"}
-            subtitle={if @search_query != "" || @state_filter != "all", do: "Try adjusting your search or filters", else: "Tasks created by agents will appear here"}
+            title={
+              if @search_query != "" || @state_filter != "all",
+                do: "No tasks found",
+                else: "No tasks yet"
+            }
+            subtitle={
+              if @search_query != "" || @state_filter != "all",
+                do: "Try adjusting your search or filters",
+                else: "Tasks created by agents will appear here"
+            }
           />
         <% end %>
       </div>

@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.DmLive do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.{Agents, ChatAgents, Commits, Logs, Messages, Notes, Repo, Tasks}
+  alias EyeInTheSkyWeb.{Sessions, Agents, Commits, Logs, Messages, Notes, Repo, Tasks}
   alias EyeInTheSkyWeb.Claude.{AgentManager, SessionReader}
   alias EyeInTheSkyWeb.FileAttachments
   alias EyeInTheSkyWebWeb.Components.DmPage
@@ -14,37 +14,37 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def mount(%{"session_id" => session_id_param}, _session, socket) do
     # Accept both integer ID and UUID in URL
-    agent =
+    session =
       case Integer.parse(session_id_param) do
-        {id, ""} -> Agents.get_execution_agent!(id)
-        _ -> Agents.get_execution_agent_by_uuid!(session_id_param)
+        {id, ""} -> Sessions.get_session!(id)
+        _ -> Sessions.get_session_by_uuid!(session_id_param)
       end
 
-    chat_agent = ChatAgents.get_chat_agent!(agent.agent_id)
+    agent = Agents.get_agent!(session.agent_id)
 
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{agent.id}")
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "dm:#{agent.id}:stream")
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "dm:#{session.id}:stream")
       send(self(), :sync_from_session_file)
     end
 
     socket =
       socket
-      |> assign(:page_title, agent.name || "Session")
+      |> assign(:page_title, session.name || "Session")
       |> assign(:sidebar_tab, :chat)
       |> assign(:sidebar_project, nil)
-      |> assign(:session_id, agent.id)
-      |> assign(:session_uuid, agent.uuid)
-      |> assign(:agent_id, agent.agent_id)
+      |> assign(:session_id, session.id)
+      |> assign(:session_uuid, session.uuid)
+      |> assign(:agent_id, session.agent_id)
+      |> assign(:session, session)
       |> assign(:agent, agent)
-      |> assign(:chat_agent, chat_agent)
       |> assign(:active_tab, "messages")
       |> assign(:session_ref, nil)
       |> assign(:processing, false)
       |> assign(:message_limit, @default_message_limit)
       |> assign(:has_more_messages, false)
-      |> assign(:selected_model, "opus")
+      |> assign(:selected_model, session.model || "opus")
       |> assign(:selected_effort, "")
       |> assign(:show_model_menu, false)
       |> assign(:show_live_stream, false)
@@ -56,7 +56,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         max_file_size: 50_000_000,
         auto_upload: true
       )
-      |> load_tab_data("messages", agent.id)
+      |> load_tab_data("messages", session.id)
 
     {:ok, socket}
   end
@@ -78,6 +78,10 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_event("select_model", %{"model" => model, "effort" => effort}, socket) do
+    # Persist model selection to database
+    session = socket.assigns.session
+    Sessions.update_session(session, %{model: model})
+
     socket =
       socket
       |> assign(:selected_model, model)
@@ -89,11 +93,12 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_event("toggle_live_stream", params, socket) do
-    enabled = case params do
-      %{"enabled" => true} -> true
-      %{"enabled" => "true"} -> true
-      _ -> !socket.assigns.show_live_stream
-    end
+    enabled =
+      case params do
+        %{"enabled" => true} -> true
+        %{"enabled" => "true"} -> true
+        _ -> !socket.assigns.show_live_stream
+      end
 
     {:noreply, assign(socket, :show_live_stream, enabled)}
   end
@@ -171,15 +176,15 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     {:noreply, socket}
   end
 
-
   @impl true
   def handle_event("reload_from_session_file", _params, socket) do
     session_id = socket.assigns.session_id
     session_uuid = socket.assigns.session_uuid
 
     with {:ok, project_path} <-
-           resolve_project_path(socket.assigns.agent, socket.assigns.chat_agent),
-         {:ok, raw_messages} <- SessionReader.read_messages_after_uuid(session_uuid, project_path, nil) do
+           resolve_project_path(socket.assigns.session, socket.assigns.agent),
+         {:ok, raw_messages} <-
+           SessionReader.read_messages_after_uuid(session_uuid, project_path, nil) do
       Messages.delete_session_messages(session_id)
       imported = import_session_messages(raw_messages, session_id)
       socket = load_tab_data(socket, "messages", session_id)
@@ -338,13 +343,20 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_info({:stream_delta, :text, text}, socket) do
     new_content = socket.assigns.stream_content <> text
-    Logger.info("[DmLive] stream_delta text, total_len=#{String.length(new_content)}, show=#{socket.assigns.show_live_stream}")
+
+    Logger.info(
+      "[DmLive] stream_delta text, total_len=#{String.length(new_content)}, show=#{socket.assigns.show_live_stream}"
+    )
+
     {:noreply, assign(socket, :stream_content, new_content)}
   end
 
   @impl true
   def handle_info({:stream_replace, :text, text}, socket) do
-    Logger.info("[DmLive] stream_replace text, len=#{String.length(text)}, show=#{socket.assigns.show_live_stream}")
+    Logger.info(
+      "[DmLive] stream_replace text, len=#{String.length(text)}, show=#{socket.assigns.show_live_stream}"
+    )
+
     {:noreply, assign(socket, :stream_content, text)}
   end
 
@@ -362,6 +374,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_info(:stream_clear, socket) do
     Logger.info("[DmLive] stream_clear")
+
     socket =
       socket
       |> assign(:stream_content, "")
@@ -442,7 +455,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     session_uuid = socket.assigns.session_uuid
 
     with {:ok, project_path} <-
-           resolve_project_path(socket.assigns.agent, socket.assigns.chat_agent),
+           resolve_project_path(socket.assigns.session, socket.assigns.agent),
          {:ok, raw_messages} <- read_session_messages(session_uuid, project_path, session_id) do
       imported = import_session_messages(raw_messages, session_id)
       {:ok, load_tab_data(socket, "messages", session_id), imported}
@@ -577,7 +590,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   def render(assigns) do
     ~H"""
     <DmPage.dm_page
-      agent={@agent}
+      agent={@session}
       session_uuid={@session_uuid}
       active_tab={@active_tab}
       messages={@messages}
@@ -598,16 +611,16 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     """
   end
 
-  defp resolve_project_path(agent, chat_agent) do
+  defp resolve_project_path(session, agent) do
     cond do
+      session.git_worktree_path ->
+        {:ok, session.git_worktree_path}
+
       agent.git_worktree_path ->
         {:ok, agent.git_worktree_path}
 
-      chat_agent.git_worktree_path ->
-        {:ok, chat_agent.git_worktree_path}
-
-      chat_agent.project && chat_agent.project.path ->
-        {:ok, chat_agent.project.path}
+      agent.project && agent.project.path ->
+        {:ok, agent.project.path}
 
       true ->
         {:error, :no_project_path}

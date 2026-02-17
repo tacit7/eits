@@ -27,7 +27,8 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
         "absolute top-0 left-0 right-0 h-[2px] transition-all duration-300",
         if(@status == "Active",
           do: "bg-gradient-to-r from-success/60 via-success to-success/60",
-          else: "bg-gradient-to-r from-transparent via-base-content/6 to-transparent group-hover:via-primary/20"
+          else:
+            "bg-gradient-to-r from-transparent via-base-content/6 to-transparent group-hover:via-primary/20"
         )
       ]} />
 
@@ -37,16 +38,21 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
           <div class="flex items-center gap-2">
             <%= if @status == "Active" do %>
               <span class="relative flex h-2 w-2">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-60"></span>
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-60">
+                </span>
                 <span class="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
               </span>
-              <span class="text-[11px] font-semibold tracking-wide uppercase text-success/80">Live</span>
+              <span class="text-[11px] font-semibold tracking-wide uppercase text-success/80">
+                Live
+              </span>
             <% else %>
               <span class="inline-flex rounded-full h-2 w-2 bg-base-content/15"></span>
               <span class="text-[11px] tracking-wide uppercase text-base-content/30">Ended</span>
             <% end %>
           </div>
-          <span class="text-[11px] tabular-nums text-base-content/35">{relative_time(@session.started_at)}</span>
+          <span class="text-[11px] tabular-nums text-base-content/35">
+            {relative_time(@session.started_at)}
+          </span>
         </div>
 
         <%!-- Session name --%>

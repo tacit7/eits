@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.ChatLive do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.{ChatAgents, Channels, Messages, Projects, Prompts, Agents}
+  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Projects, Prompts, Sessions}
   alias EyeInTheSkyWeb.Claude.AgentManager
 
   # Deterministic UUIDs for the web UI user
@@ -28,22 +28,22 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   end
 
   defp ensure_web_session do
-    alias EyeInTheSkyWeb.{ChatAgents, Agents}
+    alias EyeInTheSkyWeb.{Agents, Sessions}
 
-    case Agents.get_execution_agent_by_uuid(@web_session_uuid) do
+    case Sessions.get_session_by_uuid(@web_session_uuid) do
       {:ok, session} ->
         session.id
 
       {:error, :not_found} ->
-        # Create the web UI chat agent first
+        # Create the web UI agent first
         agent =
-          case ChatAgents.get_chat_agent_by_uuid(@web_agent_uuid) do
+          case Agents.get_agent_by_uuid(@web_agent_uuid) do
             {:ok, a} ->
               a
 
             {:error, :not_found} ->
               {:ok, a} =
-                ChatAgents.create_chat_agent(%{
+                Agents.create_agent(%{
                   uuid: @web_agent_uuid,
                   description: "Web UI User",
                   source: "web"
@@ -53,7 +53,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
           end
 
         {:ok, session} =
-          Agents.create_execution_agent(%{
+          Sessions.create_session(%{
             uuid: @web_session_uuid,
             agent_id: agent.id,
             name: "Web UI",
@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
     # Get agent status counts for the project (with error handling)
     agent_status_counts =
-      case ChatAgents.get_chat_agent_status_counts(project_id) do
+      case Agents.get_agent_status_counts(project_id) do
         counts when is_map(counts) -> counts
         _ -> %{}
       end
@@ -124,9 +124,9 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     channel_members = load_channel_members(channel_id)
 
     # Load active sessions for @ autocomplete
-    active_agents =
-      Agents.list_active_agents()
-      |> EyeInTheSkyWeb.Repo.preload(:chat_agent)
+    active_sessions =
+      Sessions.list_active_sessions()
+      |> EyeInTheSkyWeb.Repo.preload(:agent)
       |> Enum.map(fn session ->
         %{
           id: session.id,
@@ -136,8 +136,8 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
           provider: session.provider || "claude",
           model: session.model,
           agent_description:
-            if(Ecto.assoc_loaded?(session.chat_agent) && session.chat_agent,
-              do: session.chat_agent.description,
+            if(Ecto.assoc_loaded?(session.agent) && session.agent,
+              do: session.agent.description,
               else: nil
             )
         }
@@ -158,7 +158,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       |> assign(:active_thread, active_thread)
       |> assign(:agent_status_counts, agent_status_counts)
       |> assign(:prompts, prompts)
-      |> assign(:active_agents, active_agents)
+      |> assign(:active_agents, active_sessions)
       |> assign(:channel_members, channel_members)
       |> assign(:show_agent_drawer, false)
       |> assign(:show_members, false)
@@ -210,10 +210,10 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
           |> Enum.reject(&is_nil/1)
           |> Enum.uniq()
 
-        # 4. Auto-add mentioned agents that aren't channel members yet
+        # 4. Auto-add mentioned sessions that aren't channel members yet
         Enum.each(mentioned_ids, fn mid ->
           unless Channels.is_member?(channel_id, mid) do
-            case Agents.get_execution_agent(mid) do
+            case Sessions.get_session(mid) do
               {:ok, s} ->
                 Channels.add_member(channel_id, s.agent_id, mid)
                 Logger.info("Auto-added session=#{mid} to channel=#{channel_id}")
@@ -274,7 +274,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     channel_id = socket.assigns.active_channel_id
 
     with {session_id, ""} <- Integer.parse(session_id_str),
-         {:ok, session} <- Agents.get_execution_agent(session_id) do
+         {:ok, session} <- Sessions.get_session(session_id) do
       agent_id = session.agent_id
 
       case Channels.add_member(channel_id, agent_id, session_id) do
@@ -447,8 +447,10 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     instructions = if description != "", do: description, else: agent_description
 
     # Delegate to AgentManager for full lifecycle
+    agent_type = params["agent_type"] || "claude"
+
     opts = [
-      agent_type: "claude",
+      agent_type: agent_type,
       model: model,
       effort_level: effort_level,
       project_id: selected_project_id,
@@ -559,14 +561,19 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   @impl true
   def render(assigns) do
     active_channel =
-      Enum.find(assigns.channels, fn c -> to_string(c.id) == to_string(assigns.active_channel_id) end)
+      Enum.find(assigns.channels, fn c ->
+        to_string(c.id) == to_string(assigns.active_channel_id)
+      end)
 
     assigns = assign(assigns, :active_channel, active_channel)
 
     ~H"""
     <div class="flex flex-col h-[calc(100vh-2rem)] px-4 sm:px-6 lg:px-8 py-4">
       <%!-- Header card --%>
-      <div class="max-w-6xl mx-auto w-full bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0" id="chat-header-card">
+      <div
+        class="max-w-6xl mx-auto w-full bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0"
+        id="chat-header-card"
+      >
         <div class="px-5 py-3">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">
@@ -623,7 +630,9 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         <%= if @show_members do %>
           <div class="px-5 pb-3 border-t border-base-content/5 pt-3" id="chat-members-panel">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-[10px] uppercase tracking-wider font-medium text-base-content/30">Channel Agents</span>
+              <span class="text-[10px] uppercase tracking-wider font-medium text-base-content/30">
+                Channel Agents
+              </span>
             </div>
 
             <%= if @channel_members != [] do %>
@@ -636,13 +645,19 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
                   >
                     @{member.session_id}
                     <%= if member.session_name do %>
-                      <span class="text-base-content/35">{String.slice(member.session_name, 0, 15)}<%= if String.length(member.session_name) > 15, do: "…" %></span>
+                      <span class="text-base-content/35">
+                        {String.slice(member.session_name, 0, 15)}{if String.length(
+                                                                        member.session_name
+                                                                      ) > 15, do: "…"}
+                      </span>
                     <% end %>
                   </a>
                 <% end %>
               </div>
             <% else %>
-              <p class="text-xs text-base-content/30 mb-3">No agents in this channel yet. Add one by session ID or spawn a new one.</p>
+              <p class="text-xs text-base-content/30 mb-3">
+                No agents in this channel yet. Add one by session ID or spawn a new one.
+              </p>
             <% end %>
 
             <%!-- Add agent by session ID --%>
@@ -832,7 +847,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     Channels.list_members(channel_id)
     |> Enum.map(fn member ->
       session_data =
-        case Agents.get_execution_agent(member.session_id) do
+        case Sessions.get_session(member.session_id) do
           {:ok, s} -> s
           _ -> nil
         end

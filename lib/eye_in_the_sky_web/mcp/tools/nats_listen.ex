@@ -6,7 +6,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NatsListen do
   alias Anubis.Server.Response
 
   schema do
-    field :session_id, :string, required: true, description: "Your session ID (used to filter targeted messages)"
+    field :session_id, :string,
+      required: true,
+      description: "Your session ID (used to filter targeted messages)"
+
     field :last_sequence, :integer, description: "Last processed sequence number"
     field :max_messages, :integer, description: "Maximum messages to fetch (default: 10)"
   end

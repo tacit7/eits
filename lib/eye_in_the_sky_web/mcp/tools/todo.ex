@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
   use Anubis.Server.Component, type: :tool
 
   alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.Sessions
 
   schema do
     field :command, :string, required: true, description: "Command to execute"
@@ -215,7 +216,9 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
   end
 
   def execute(%{"command" => cmd}, frame) do
-    response = Response.tool() |> Response.text("Command '#{cmd}' acknowledged (no-op in Phoenix MCP)")
+    response =
+      Response.tool() |> Response.text("Command '#{cmd}' acknowledged (no-op in Phoenix MCP)")
+
     {:reply, response, frame}
   end
 
@@ -248,7 +251,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
   defp resolve_agent_int_id(nil), do: nil
 
   defp resolve_agent_int_id(uuid) do
-    case EyeInTheSkyWeb.Agents.get_execution_agent_by_uuid(uuid) do
+    case EyeInTheSkyWeb.Sessions.get_session_by_uuid(uuid) do
       {:ok, agent} -> agent.id
       _ -> nil
     end

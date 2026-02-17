@@ -119,19 +119,19 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
   def build_args(caller_opts) do
     opts = Keyword.filter(caller_opts, fn {_k, v} -> v != nil end)
 
-    # Start with subcommand
-    args = ["exec"]
+    resume_id = opts[:resume]
+
+    # Resume uses a subcommand: codex exec resume <session_id> [flags] [prompt]
+    # New session uses: codex exec [flags] [prompt]
+    base_args =
+      if resume_id do
+        ["exec", "resume", to_string(resume_id)]
+      else
+        ["exec"]
+      end
 
     # JSON output
-    args = args ++ ["--json"]
-
-    # Resume flag
-    args =
-      if resume_id = opts[:resume] do
-        args ++ ["--resume", to_string(resume_id)]
-      else
-        args
-      end
+    args = base_args ++ ["--json"]
 
     # Model
     args =

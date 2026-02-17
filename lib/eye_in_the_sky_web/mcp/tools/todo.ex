@@ -24,23 +24,26 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
   end
 
   @impl true
-  def execute(%{"command" => "create"} = params, frame) do
+  def execute(%{command: "create"} = params, frame) do
     alias EyeInTheSkyWeb.Tasks
 
     attrs = %{
-      title: params["title"],
-      description: params["description"],
-      priority: params["priority"],
-      state_id: params["state_id"] || 1,
-      project_id: params["project_id"],
-      agent_id: resolve_agent_int_id(params["agent_id"]),
-      due_at: params["due_at"]
+      uuid: Ecto.UUID.generate(),
+      title: params[:title],
+      description: params[:description],
+      priority: params[:priority],
+      state_id: params[:state_id] || 1,
+      project_id: params[:project_id],
+      agent_id: resolve_agent_int_id(params[:agent_id]),
+      due_at: params[:due_at],
+      created_at: DateTime.utc_now() |> DateTime.to_iso8601()
     }
 
     result =
       case Tasks.create_task(attrs) do
         {:ok, task} ->
-          maybe_add_tags(task, params["tags"])
+          maybe_add_tags(task, params[:tags])
+          maybe_link_session(task.id, params[:session_id])
           %{success: true, message: "Task created", task_id: to_string(task.id)}
 
         {:error, cs} ->
@@ -51,19 +54,19 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
     {:reply, response, frame}
   end
 
-  def execute(%{"command" => "list"} = params, frame) do
+  def execute(%{command: "list"} = params, frame) do
     alias EyeInTheSkyWeb.Tasks
 
     tasks =
-      if params["project_id"] do
+      if params[:project_id] do
         EyeInTheSkyWeb.Projects.get_project_tasks(%EyeInTheSkyWeb.Projects.Project{
-          id: params["project_id"]
+          id: params[:project_id]
         })
       else
         Tasks.list_tasks()
       end
 
-    limit = params["limit"] || 50
+    limit = params[:limit] || 50
     tasks = Enum.take(tasks, limit)
 
     result = %{
@@ -76,10 +79,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
     {:reply, response, frame}
   end
 
-  def execute(%{"command" => "list-agent"} = params, frame) do
+  def execute(%{command: "list-agent"} = params, frame) do
     alias EyeInTheSkyWeb.Tasks
 
-    agent_id = resolve_agent_int_id(params["agent_id"])
+    agent_id = resolve_agent_int_id(params[:agent_id])
     tasks = if agent_id, do: Tasks.list_tasks_for_agent(agent_id), else: []
 
     result = %{
@@ -92,10 +95,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
     {:reply, response, frame}
   end
 
-  def execute(%{"command" => "list-session"} = params, frame) do
+  def execute(%{command: "list-session"} = params, frame) do
     alias EyeInTheSkyWeb.Tasks
 
-    tasks = Tasks.list_tasks_for_session(params["session_id"])
+    tasks = Tasks.list_tasks_for_session(params[:session_id])
 
     result = %{
       success: true,
@@ -107,12 +110,12 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
     {:reply, response, frame}
   end
 
-  def execute(%{"command" => "search"} = params, frame) do
+  def execute(%{command: "search"} = params, frame) do
     alias EyeInTheSkyWeb.Tasks
 
-    query = params["query"] || ""
+    query = params[:query] || ""
     tasks = Tasks.search_tasks(query)
-    limit = params["limit"] || 50
+    limit = params[:limit] || 50
     tasks = Enum.take(tasks, limit)
 
     result = %{
@@ -125,15 +128,15 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
     {:reply, response, frame}
   end
 
-  def execute(%{"command" => "done", "task_id" => task_id}, frame) do
+  def execute(%{command: "done", task_id: task_id}, frame) do
     update_task_state(task_id, "Done", frame)
   end
 
-  def execute(%{"command" => "start", "task_id" => task_id}, frame) do
+  def execute(%{command: "start", task_id: task_id}, frame) do
     update_task_state(task_id, "In Progress", frame)
   end
 
-  def execute(%{"command" => "status", "task_id" => task_id} = params, frame) do
+  def execute(%{command: "status", task_id: task_id} = params, frame) do
     alias EyeInTheSkyWeb.Tasks
 
     result =
@@ -143,10 +146,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
         update_attrs =
           %{}
           |> then(fn m ->
-            if params["state_id"], do: Map.put(m, :state_id, params["state_id"]), else: m
+            if params[:state_id], do: Map.put(m, :state_id, params[:state_id]), else: m
           end)
           |> then(fn m ->
-            if params["priority"], do: Map.put(m, :priority, params["priority"]), else: m
+            if params[:priority], do: Map.put(m, :priority, params[:priority]), else: m
           end)
 
         case Tasks.update_task(task, update_attrs) do
@@ -161,7 +164,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
     {:reply, response, frame}
   end
 
-  def execute(%{"command" => "delete", "task_id" => task_id}, frame) do
+  def execute(%{command: "delete", task_id: task_id}, frame) do
     alias EyeInTheSkyWeb.Tasks
 
     result =
@@ -180,15 +183,15 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
     {:reply, response, frame}
   end
 
-  def execute(%{"command" => "annotate", "task_id" => task_id} = params, frame) do
+  def execute(%{command: "annotate", task_id: task_id} = params, frame) do
     alias EyeInTheSkyWeb.Notes
 
     result =
       case Notes.create_note(%{
              parent_id: task_id,
-             parent_type: "tasks",
-             body: params["body"] || "",
-             title: params["title"]
+             parent_type: "task",
+             body: params[:body] || "",
+             title: params[:title]
            }) do
         {:ok, note} -> %{success: true, message: "Annotation added", note_id: note.id}
         {:error, cs} -> %{success: false, message: "Failed: #{inspect(cs.errors)}"}
@@ -198,13 +201,13 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
     {:reply, response, frame}
   end
 
-  def execute(%{"command" => "tag", "task_id" => task_id} = params, frame) do
+  def execute(%{command: "tag", task_id: task_id} = params, frame) do
     alias EyeInTheSkyWeb.Tasks
 
     result =
       try do
         task = Tasks.get_task!(task_id)
-        tags = params["tags"] || []
+        tags = params[:tags] || []
         Enum.each(tags, fn tag_name -> Tasks.get_or_create_tag(tag_name) end)
         %{success: true, message: "Tags updated for task #{task.id}"}
       rescue
@@ -215,7 +218,22 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
     {:reply, response, frame}
   end
 
-  def execute(%{"command" => cmd}, frame) do
+  def execute(%{command: "add-session", task_id: task_id} = params, frame) do
+    result =
+      case params[:session_id] do
+        nil ->
+          %{success: false, message: "session_id required"}
+
+        session_id ->
+          maybe_link_session(task_id, session_id)
+          %{success: true, message: "Session linked to task #{task_id}"}
+      end
+
+    response = Response.tool() |> Response.json(result)
+    {:reply, response, frame}
+  end
+
+  def execute(%{command: cmd}, frame) do
     response =
       Response.tool() |> Response.text("Command '#{cmd}' acknowledged (no-op in Phoenix MCP)")
 
@@ -248,10 +266,36 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
     {:reply, response, frame}
   end
 
+  defp maybe_link_session(_task_id, nil), do: :ok
+
+  defp maybe_link_session(task_id, session_id) when is_binary(session_id) do
+    # session_id may be a UUID or integer string — resolve to integer FK
+    int_id =
+      case Integer.parse(session_id) do
+        {n, ""} ->
+          n
+
+        _ ->
+          case Sessions.get_session_by_uuid(session_id) do
+            {:ok, s} -> s.id
+            _ -> nil
+          end
+      end
+
+    if int_id do
+      EyeInTheSkyWeb.Repo.query(
+        "INSERT OR IGNORE INTO task_sessions (task_id, session_id) VALUES (?, ?)",
+        [task_id, int_id]
+      )
+    end
+
+    :ok
+  end
+
   defp resolve_agent_int_id(nil), do: nil
 
   defp resolve_agent_int_id(uuid) do
-    case EyeInTheSkyWeb.Sessions.get_session_by_uuid(uuid) do
+    case Sessions.get_session_by_uuid(uuid) do
       {:ok, agent} -> agent.id
       _ -> nil
     end

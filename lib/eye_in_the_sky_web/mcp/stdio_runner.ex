@@ -49,8 +49,33 @@ defmodule EyeInTheSkyWeb.MCP.StdioRunner do
         handle_message(message)
 
       {:ok, messages} when is_list(messages) ->
-        # Handle batch of messages
-        Enum.each(messages, &handle_message/1)
+        # JSON-RPC batch: collect all responses and emit as a single array
+        responses =
+          messages
+          |> Enum.filter(&is_map/1)
+          |> Enum.filter(&Map.has_key?(&1, "id"))
+          |> Enum.map(fn msg ->
+            case route_message(msg) do
+              {:ok, result} ->
+                %{jsonrpc: "2.0", id: msg["id"], result: result}
+
+              {:error, error} ->
+                %{
+                  jsonrpc: "2.0",
+                  id: msg["id"],
+                  error: %{code: error["code"] || -32603, message: error["message"] || "Error"}
+                }
+            end
+          end)
+
+        unless responses == [] do
+          IO.puts(Jason.encode!(responses))
+        end
+
+        # Fire notifications (no id) separately — no response needed
+        messages
+        |> Enum.reject(&Map.has_key?(&1, "id"))
+        |> Enum.each(&route_message/1)
 
       {:error, reason} ->
         Logger.error("Failed to parse JSON: #{inspect(reason)}")
@@ -99,20 +124,13 @@ defmodule EyeInTheSkyWeb.MCP.StdioRunner do
   end
 
   defp route_message(%{"method" => "tools/list", "id" => _id}) do
-    # List all available tools
     tools =
-      Anubis.Server.list_components(EyeInTheSkyWeb.MCP.Server, :tool)
-      |> Enum.map(fn {name, module} ->
-        schema = module.__schema__()
-
+      EyeInTheSkyWeb.MCP.Server.__components__(:tool)
+      |> Enum.map(fn tool ->
         %{
-          name: name,
-          description: module.__moduledoc__() || "",
-          inputSchema: %{
-            type: "object",
-            properties: schema_to_json_schema(schema),
-            required: required_fields(schema)
-          }
+          name: tool.name,
+          description: tool.description || "",
+          inputSchema: tool.input_schema || %{type: "object", properties: %{}}
         }
       end)
 
@@ -123,17 +141,23 @@ defmodule EyeInTheSkyWeb.MCP.StdioRunner do
     tool_name = params["name"]
     arguments = params["arguments"] || %{}
 
-    case Anubis.Server.call_component(
-           EyeInTheSkyWeb.MCP.Server,
-           tool_name,
-           arguments,
-           %{type: :stdio}
-         ) do
-      {:ok, result} ->
-        {:ok, %{content: [%{type: "text", text: format_result(result)}]}}
+    tool =
+      EyeInTheSkyWeb.MCP.Server.__components__(:tool)
+      |> Enum.find(&(&1.name == tool_name))
 
-      {:error, reason} ->
-        {:error, %{"code" => -32603, "message" => inspect(reason)}}
+    if tool do
+      atom_params = atomize_keys(arguments)
+      frame = Anubis.Server.Frame.new()
+
+      case tool.handler.execute(atom_params, frame) do
+        {:reply, response, _frame} ->
+          {:ok, %{content: [%{type: "text", text: format_result(response)}]}}
+
+        {:error, reason} ->
+          {:error, %{"code" => -32603, "message" => inspect(reason)}}
+      end
+    else
+      {:error, %{"code" => -32601, "message" => "Tool not found: #{tool_name}"}}
     end
   end
 
@@ -167,25 +191,11 @@ defmodule EyeInTheSkyWeb.MCP.StdioRunner do
     IO.puts(json)
   end
 
-  defp schema_to_json_schema(schema) do
-    Enum.reduce(schema, %{}, fn {name, field_schema}, acc ->
-      Map.put(acc, name, %{
-        type: elixir_type_to_json_type(field_schema[:type]),
-        description: field_schema[:description] || ""
-      })
-    end)
+  defp atomize_keys(map) when is_map(map) do
+    Map.new(map, fn {k, v} -> {String.to_existing_atom(k), v} end)
+  rescue
+    ArgumentError -> Map.new(map, fn {k, v} -> {String.to_atom(k), v} end)
   end
-
-  defp required_fields(schema) do
-    schema
-    |> Enum.filter(fn {_name, field_schema} -> field_schema[:required] end)
-    |> Enum.map(fn {name, _} -> to_string(name) end)
-  end
-
-  defp elixir_type_to_json_type(:string), do: "string"
-  defp elixir_type_to_json_type(:integer), do: "integer"
-  defp elixir_type_to_json_type(:boolean), do: "boolean"
-  defp elixir_type_to_json_type(_), do: "string"
 
   defp format_result(result) when is_binary(result), do: result
   defp format_result(result) when is_map(result), do: Jason.encode!(result)

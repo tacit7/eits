@@ -49,6 +49,7 @@ defmodule EyeInTheSkyWeb.Sessions.Session do
       :uuid,
       :agent_id,
       :name,
+      :description,
       :status,
       :intent,
       :started_at,

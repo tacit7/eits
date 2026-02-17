@@ -25,7 +25,7 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
     unless is_nil(session_uuid) or session_uuid == "" do
       project_id = resolve_project_id(payload)
 
-      chat_agent_attrs = %{
+      agent_identity_attrs = %{
         uuid: payload["agent_id"] || session_uuid,
         description: payload["agent_description"] || payload["description"],
         project_id: project_id,
@@ -34,12 +34,12 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
         source: "hook"
       }
 
-      with {:ok, chat_agent} <- find_or_create_chat_agent(chat_agent_attrs) do
+      with {:ok, agent} <- find_or_create_agent(agent_identity_attrs) do
         {model_provider, model_name} = parse_model(payload["model"])
 
-        agent_attrs = %{
+        session_attrs = %{
           uuid: session_uuid,
-          agent_id: chat_agent.id,
+          agent_id: agent.id,
           name: payload["name"] || payload["description"],
           status: "working",
           started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -77,18 +77,18 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
                 do: &Sessions.create_session_with_model/1,
                 else: &Sessions.create_session/1
 
-            case create_fn.(agent_attrs) do
-              {:ok, agent} ->
-                Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, agent})
+            case create_fn.(session_attrs) do
+              {:ok, session} ->
+                Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, session})
                 Logger.info("[NATS.Handler] Session started: #{session_uuid}")
 
               {:error, reason} ->
-                Logger.error("[NATS.Handler] Failed to create agent: #{inspect(reason)}")
+                Logger.error("[NATS.Handler] Failed to create session: #{inspect(reason)}")
             end
         end
       else
         {:error, reason} ->
-          Logger.error("[NATS.Handler] Failed to create chat agent: #{inspect(reason)}")
+          Logger.error("[NATS.Handler] Failed to create agent: #{inspect(reason)}")
       end
     end
   end
@@ -348,11 +348,33 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
 
   # --- Private helpers (shared with REST controllers) ---
 
-  defp find_or_create_chat_agent(%{uuid: uuid} = attrs) do
+  defp find_or_create_agent(%{uuid: uuid} = attrs) do
     case Agents.get_agent_by_uuid(uuid) do
-      {:ok, existing} -> {:ok, existing}
-      {:error, :not_found} -> Agents.create_agent(attrs)
+      {:ok, existing} ->
+        {:ok, existing}
+
+      {:error, :not_found} ->
+        case Agents.create_agent(attrs) do
+          {:ok, agent} ->
+            {:ok, agent}
+
+          {:error, %Ecto.Changeset{}} = err ->
+            err
+
+          # Race: another process inserted between our check and insert
+          _ ->
+            case Agents.get_agent_by_uuid(uuid) do
+              {:ok, existing} -> {:ok, existing}
+              err -> err
+            end
+        end
     end
+  rescue
+    Ecto.ConstraintError ->
+      case Agents.get_agent_by_uuid(uuid) do
+        {:ok, existing} -> {:ok, existing}
+        _ -> {:error, :constraint_race}
+      end
   end
 
   defp resolve_project_id(params) do

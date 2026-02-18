@@ -192,7 +192,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("start_agent_for_task", %{"task_id" => task_id}, socket) do
-    alias EyeInTheSkyWeb.{Agents, ChatAgents, Claude.SessionManager}
+    alias EyeInTheSkyWeb.{Agents, Claude.SessionManager}
 
     task = Tasks.get_task_by_uuid!(task_id)
     project = socket.assigns.project

@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
              uuid: agent_uuid,
              agent_type: opts[:agent_type] || "claude",
              project_id: opts[:project_id],
-             status: "active",
+             status: "working",
              description: description
            }),
          {:ok, session} <-

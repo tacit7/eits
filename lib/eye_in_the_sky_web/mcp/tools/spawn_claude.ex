@@ -20,12 +20,12 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnClaude do
     alias EyeInTheSkyWeb.Claude.SDK
 
     opts = [
-      model: params["model"],
-      project_path: params["project_path"]
+      model: params[:model],
+      project_path: params[:project_path]
     ]
 
     result =
-      case SDK.start(params["prompt"], [to: self()] ++ opts) do
+      case SDK.start(params[:prompt], [to: self()] ++ opts) do
         {:ok, _ref} ->
           %{
             success: true,

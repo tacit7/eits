@@ -6,7 +6,10 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
 
   Subjects:
     events.session.start    - Register new session
-    events.session.update   - Update session status (end/stop/compact)
+    events.session.update   - Update session status directly
+    events.session.stop     - Session turn complete (idle) — delegates to update
+    events.session.end      - Session terminated (completed) — delegates to update
+    events.session.compact  - Compaction status change — delegates to update
     events.session.context  - Save session context
     events.commits          - Track git commits
     events.notes            - Add notes
@@ -287,6 +290,20 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
       {:error, :not_found} ->
         Logger.debug("[NATS.Handler] Session not found for tool.post: #{session_uuid}")
     end
+  end
+
+  # session.stop / session.end / session.compact — status is nested under data.status
+  # Normalize and delegate to the update handler
+  def handle("events.session.stop", %{"session_id" => sid, "data" => %{"status" => status}} = _payload) do
+    handle("events.session.update", %{"session_id" => sid, "status" => status})
+  end
+
+  def handle("events.session.end", %{"session_id" => sid, "data" => %{"status" => status}} = _payload) do
+    handle("events.session.update", %{"session_id" => sid, "status" => status})
+  end
+
+  def handle("events.session.compact", %{"session_id" => sid, "data" => %{"status" => status}} = _payload) do
+    handle("events.session.update", %{"session_id" => sid, "status" => status})
   end
 
   # Legacy subject - redirect to new handler

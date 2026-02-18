@@ -10,7 +10,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NoteGet do
   end
 
   @impl true
-  def execute(%{"note_id" => note_id}, frame) do
+  def execute(%{note_id: note_id}, frame) do
     alias EyeInTheSkyWeb.Notes
 
     result =
@@ -24,7 +24,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NoteGet do
           title: note.title,
           body: note.body,
           starred: note.starred || 0,
-          created_at: to_string(note.inserted_at)
+          created_at: to_string(note.created_at)
         }
       rescue
         Ecto.NoResultsError ->

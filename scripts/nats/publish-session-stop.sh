@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Publish session stop event to NATS
-# Args: $1 = session_id, $2 = status (default: waiting)
+# Args: $1 = session_id, $2 = status (default: idle)
 set -euo pipefail
 
 session_id="${1:-}"
-status="${2:-waiting}"
+status="${2:-idle}"
 
 [ -z "$session_id" ] && exit 0
 

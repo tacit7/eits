@@ -3,7 +3,7 @@
 # Fires on SessionStart (startup, resume)
 # Injects context to prompt session initialization via MCP tools
 
-set -e
+set -uo pipefail
 
 EITS_DB="$HOME/.config/eye-in-the-sky/eits.db"
 MAPPING_FILE="$HOME/.claude/hooks/session_agent_map.json"
@@ -25,6 +25,10 @@ fi
 # Determine project context
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 PROJECT_NAME=$(basename "$PROJECT_DIR")
+
+# Sanitize for SQLite string interpolation: escape single quotes as ''
+PROJECT_DIR_SQL="${PROJECT_DIR//\'/\'\'}"
+PROJECT_NAME_SQL="${PROJECT_NAME//\'/\'\'}"
 
 # Check if session already exists in database
 AGENT_ID=""
@@ -69,14 +73,14 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   fi
 
   # Resolve or create project by path
-  PROJECT_ID=$(sqlite3 "$EITS_DB" "SELECT id FROM projects WHERE path = '$PROJECT_DIR' LIMIT 1;" 2>/dev/null || true)
+  PROJECT_ID=$(sqlite3 "$EITS_DB" "SELECT id FROM projects WHERE path = '$PROJECT_DIR_SQL' LIMIT 1;" 2>/dev/null || true)
 
   if [ -z "$PROJECT_ID" ]; then
     # Project doesn't exist, create it
     echo "[EITS] Creating new project: $PROJECT_NAME at $PROJECT_DIR" >&2
     sqlite3 "$EITS_DB" "
       INSERT INTO projects (name, path, active, inserted_at, updated_at)
-      VALUES ('$PROJECT_NAME', '$PROJECT_DIR', 1, datetime('now'), datetime('now'));
+      VALUES ('$PROJECT_NAME_SQL', '$PROJECT_DIR_SQL', 1, datetime('now'), datetime('now'));
     " 2>/dev/null || true
     PROJECT_ID=$(sqlite3 "$EITS_DB" "SELECT last_insert_rowid();" 2>/dev/null || true)
   fi
@@ -85,7 +89,7 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
     # Update session with project_id if it's NULL
     if [ -n "$EXISTING_SESSION" ]; then
       sqlite3 "$EITS_DB" "
-        UPDATE sessions SET project_id = $PROJECT_ID, git_worktree_path = '$PROJECT_DIR'
+        UPDATE sessions SET project_id = $PROJECT_ID, git_worktree_path = '$PROJECT_DIR_SQL'
         WHERE uuid = '$SESSION_ID' AND project_id IS NULL;
       " 2>/dev/null || true
     fi

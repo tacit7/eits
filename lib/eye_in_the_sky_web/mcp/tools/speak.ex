@@ -21,9 +21,9 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Speak do
 
   @impl true
   def execute(params, frame) do
-    message = params["message"]
-    voice = validate_voice(params["voice"])
-    rate = validate_rate(params["rate"])
+    message = params[:message]
+    voice = validate_voice(params[:voice])
+    rate = validate_rate(params[:rate])
 
     # Use premium voice variant
     voice_arg = "#{voice} (Premium)"

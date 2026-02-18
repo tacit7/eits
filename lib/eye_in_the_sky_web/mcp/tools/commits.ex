@@ -16,9 +16,9 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
   def execute(params, frame) do
     alias EyeInTheSkyWeb.Commits
 
-    agent_id = params["agent_id"]
-    hashes = params["commit_hashes"] || []
-    messages = params["commit_messages"] || []
+    agent_id = params[:agent_id]
+    hashes = params[:commit_hashes] || []
+    messages = params[:commit_messages] || []
 
     # Resolve agent integer ID
     agent_int_id =
@@ -34,9 +34,9 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
         message = Enum.at(messages, idx, "")
 
         case Commits.create_commit(%{
-               hash: hash,
-               message: message,
-               agent_id: agent_int_id
+               commit_hash: hash,
+               commit_message: message,
+               session_id: agent_int_id
              }) do
           {:ok, _} -> :ok
           {:error, _} -> :error

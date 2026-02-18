@@ -14,7 +14,7 @@ defmodule EyeInTheSkyWeb.Sessions.Session do
     field :agent_id, :integer
     field :name, :string
     field :description, :string
-    field :status, :string, default: "waiting"
+    field :status, :string, default: "idle"
     field :intent, :string
     field :started_at, :string
     field :last_activity_at, :string
@@ -66,10 +66,9 @@ defmodule EyeInTheSkyWeb.Sessions.Session do
     ])
     |> validate_required([:agent_id, :started_at])
     |> validate_inclusion(:status, [
-      "active",
       "idle",
       "working",
-      "waiting",
+      "compacting",
       "completed",
       "failed",
       "archived"

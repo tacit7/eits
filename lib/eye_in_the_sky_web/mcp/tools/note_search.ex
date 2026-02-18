@@ -14,15 +14,15 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NoteSearch do
   def execute(params, frame) do
     alias EyeInTheSkyWeb.Notes
 
-    query = params["query"]
+    query = params[:query] || ""
     notes = Notes.search_notes(query)
 
-    limit = params["limit"] || 20
+    limit = params[:limit] || 20
     notes = Enum.take(notes, limit)
 
     result = %{
       success: true,
-      message: "Found #{length(notes)} note(s) matching '#{query}'",
+      message: "Found #{length(notes)} note(s) matching '#{params[:query]}'",
       results:
         Enum.map(notes, fn n ->
           %{

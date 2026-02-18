@@ -20,18 +20,18 @@ defmodule EyeInTheSkyWeb.MCP.Tools.ChatSend do
     alias EyeInTheSkyWeb.{Agents, Messages}
 
     # Resolve session_id: try UUID lookup first, fall back to integer string parse
-    resolved_session_id = resolve_session_id(params["session_id"])
+    resolved_session_id = resolve_session_id(params[:session_id])
 
     result =
       case resolved_session_id do
         {:ok, int_id} ->
           attrs = %{
-            channel_id: params["channel_id"],
+            channel_id: params[:channel_id],
             session_id: int_id,
-            body: params["body"],
-            sender_role: params["sender_role"] || "agent",
-            recipient_role: params["recipient_role"] || "user",
-            provider: params["provider"] || "claude",
+            body: params[:body],
+            sender_role: params[:sender_role] || "agent",
+            recipient_role: params[:recipient_role] || "user",
+            provider: params[:provider] || "claude",
             direction: "outbound",
             status: "sent"
           }
@@ -40,7 +40,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.ChatSend do
             {:ok, msg} ->
               Phoenix.PubSub.broadcast(
                 EyeInTheSkyWeb.PubSub,
-                "channel:#{params["channel_id"]}:messages",
+                "channel:#{params[:channel_id]}:messages",
                 {:new_message, msg}
               )
 

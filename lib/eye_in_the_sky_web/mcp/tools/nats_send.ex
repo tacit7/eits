@@ -21,12 +21,12 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NatsSend do
 
   @impl true
   def execute(params, frame) do
-    subject = normalize_subject(params["subject"])
+    subject = normalize_subject(params[:subject])
 
     payload = %{
-      sender_id: params["sender_id"],
-      receiver_id: params["receiver_id"] || "",
-      message: params["message"],
+      sender_id: params[:sender_id],
+      receiver_id: params[:receiver_id] || "",
+      message: params[:message],
       timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
     }
 

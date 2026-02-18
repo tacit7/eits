@@ -29,6 +29,7 @@ defmodule EyeInTheSkyWeb.Agents.Agent do
     field :created_at, :string
     field :archived_at, :string
     field :project_name, :string
+    field :last_activity_at, :naive_datetime
   end
 
   @doc false

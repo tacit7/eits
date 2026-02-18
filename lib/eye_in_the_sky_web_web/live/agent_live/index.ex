@@ -66,7 +66,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       "active" ->
         Enum.filter(
           sessions,
-          &(&1.status in ["active", "working", nil] and is_nil(&1.archived_at))
+          &(&1.status in ["working", "idle", nil] and is_nil(&1.archived_at))
         )
 
       "completed" ->
@@ -125,7 +125,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     case agent.status do
       "discovered" -> 0
       "working" -> 1
-      "active" -> 1
+      "idle" -> 1
       "completed" -> 2
       nil -> 1
       _ -> 2
@@ -454,7 +454,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
-    {:noreply, update_agent_status_in_list(socket, session_id, "waiting")}
+    {:noreply, update_agent_status_in_list(socket, session_id, "idle")}
   end
 
   @impl true
@@ -578,7 +578,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       |> Enum.map(fn agent ->
         if agent.id == session_id do
           agent = %{agent | status: new_status}
-          if new_status == "waiting", do: %{agent | last_activity_at: now}, else: agent
+          if new_status == "idle", do: %{agent | last_activity_at: now}, else: agent
         else
           agent
         end
@@ -732,13 +732,15 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
             />
           <% else %>
             <%= for agent <- @agents do %>
+              <% display_status = EyeInTheSkyWebWeb.Helpers.ViewHelpers.derive_display_status(agent) %>
               <% {status_color, status_bg, status_label, is_active} =
-                case agent.status do
+                case display_status do
                   "working" -> {"text-success", "bg-success", "Working", true}
-                  "active" -> {"text-info", "bg-info", "Active", false}
-                  "waiting" -> {"text-base-content/25", "bg-base-content/20", "Waiting", false}
+                  "compacting" -> {"text-warning", "bg-warning", "Compacting", true}
+                  "idle" -> {"text-base-content/25", "bg-base-content/20", "Idle", false}
+                  "idle_stale" -> {"text-warning", "bg-warning", "Idle", false}
+                  "idle_dead" -> {"text-error", "bg-error", "Idle", false}
                   "completed" -> {"text-base-content/25", "bg-base-content/20", "Done", false}
-                  "discovered" -> {"text-base-content/25", "bg-base-content/20", "Idle", false}
                   _ -> {"text-base-content/25", "bg-base-content/20", "Idle", false}
                 end %>
               <div

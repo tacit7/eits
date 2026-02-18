@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
   @doc """
   POST /api/v1/sessions - Register a new session (SessionStart hook).
 
-  Creates a ChatAgent (chat identity) and an Agent (execution session).
+  Creates an Agent (identity) and a Session (execution session).
   Mirrors the i-start-session MCP tool flow.
   """
   def create(conn, params) do
@@ -18,8 +18,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
       # Resolve project_id from project_name if needed
       project_id = resolve_project_id(params)
 
-      # Build ChatAgent (agents table) attrs
-      chat_agent_attrs = %{
+      # Build Agent (agents table) attrs
+      agent_attrs = %{
         uuid: params["agent_id"] || session_uuid,
         description: params["agent_description"] || params["description"],
         project_id: project_id,
@@ -28,7 +28,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
         source: "hook"
       }
 
-      case Agents.create_agent(chat_agent_attrs) do
+      case Agents.create_agent(agent_attrs) do
         {:ok, agent} ->
           # Parse model info
           {model_provider, model_name} = parse_model(params["model"])

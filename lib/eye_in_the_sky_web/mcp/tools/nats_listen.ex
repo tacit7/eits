@@ -24,7 +24,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NatsListen do
       message: "NATS listen not yet implemented in Phoenix MCP server",
       messages: [],
       count: 0,
-      last_sequence: params["last_sequence"] || 0
+      last_sequence: params[:last_sequence] || 0
     }
 
     response = Response.tool() |> Response.json(result)

@@ -21,14 +21,14 @@ defmodule EyeInTheSkyWeb.MCP.Tools.ProjectAdd do
     alias EyeInTheSkyWeb.Projects
 
     attrs = %{
-      name: params["name"],
-      slug: params["slug"],
-      path: params["path"],
-      remote_url: params["remote_url"],
-      git_remote: params["git_remote"],
-      repo_url: params["repo_url"],
-      branch: params["branch"],
-      active: if(params["active"] == false, do: false, else: true)
+      name: params[:name],
+      slug: params[:slug],
+      path: params[:path],
+      remote_url: params[:remote_url],
+      git_remote: params[:git_remote],
+      repo_url: params[:repo_url],
+      branch: params[:branch],
+      active: if(params[:active] == false, do: false, else: true)
     }
 
     result =

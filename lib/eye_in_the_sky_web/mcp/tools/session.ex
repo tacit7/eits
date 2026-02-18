@@ -35,23 +35,22 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
   end
 
   @impl true
-  def execute(%{"command" => "start"} = params, frame) do
+  def execute(%{command: "start"} = params, frame) do
     attrs = %{
-      "uuid" => params["session_id"],
-      "name" => params["name"],
-      "description" => params["description"],
-      "project_name" => params["project_name"],
-      "worktree_path" => params["worktree_path"],
-      "status" => "active"
+      uuid: params[:session_id],
+      name: params[:name],
+      description: params[:description],
+      project_name: params[:project_name],
+      worktree_path: params[:worktree_path],
+      status: "working"
     }
 
-    # Create or find the agent
     agent_attrs = %{
-      "uuid" => params["agent_id"] || params["session_id"],
-      "description" => params["agent_description"] || params["description"],
-      "status" => "active",
-      "model" => params["model"],
-      "provider" => params["provider"] || "claude"
+      uuid: params[:agent_id] || params[:session_id],
+      description: params[:agent_description] || params[:description],
+      status: "working",
+      model: params[:model],
+      provider: params[:provider] || "claude"
     }
 
     result = create_or_find_session(attrs, agent_attrs)
@@ -59,43 +58,43 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
     {:reply, response, frame}
   end
 
-  def execute(%{"command" => "end"} = params, frame) do
+  def execute(%{command: "end"} = params, frame) do
     result = end_session(params)
     response = Response.tool() |> Response.json(result)
     {:reply, response, frame}
   end
 
-  def execute(%{"command" => "update"} = params, frame) do
+  def execute(%{command: "update"} = params, frame) do
     result = update_session(params)
     response = Response.tool() |> Response.json(result)
     {:reply, response, frame}
   end
 
-  def execute(%{"command" => "info"} = params, frame) do
+  def execute(%{command: "info"} = params, frame) do
     result = get_session_info(params)
     response = Response.tool() |> Response.json(result)
     {:reply, response, frame}
   end
 
-  def execute(%{"command" => "search"} = params, frame) do
+  def execute(%{command: "search"} = params, frame) do
     result = search_sessions(params)
     response = Response.tool() |> Response.json(result)
     {:reply, response, frame}
   end
 
-  def execute(%{"command" => "save-context"} = params, frame) do
+  def execute(%{command: "save-context"} = params, frame) do
     result = save_context(params)
     response = Response.tool() |> Response.json(result)
     {:reply, response, frame}
   end
 
-  def execute(%{"command" => "load-context"} = params, frame) do
+  def execute(%{command: "load-context"} = params, frame) do
     result = load_context(params)
     response = Response.tool() |> Response.json(result)
     {:reply, response, frame}
   end
 
-  def execute(%{"command" => cmd}, frame) do
+  def execute(%{command: cmd}, frame) do
     response = Response.tool() |> Response.error("Unknown command: #{cmd}")
     {:reply, response, frame}
   end
@@ -105,8 +104,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
   defp create_or_find_session(attrs, agent_attrs) do
     alias EyeInTheSkyWeb.Agents
 
-    # Find or create session
-    session_uuid = attrs["uuid"]
+    session_uuid = attrs[:uuid]
 
     session_result =
       case Sessions.get_session_by_uuid(session_uuid) do
@@ -114,11 +112,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
           {:ok, session}
 
         {:error, :not_found} ->
-          # Create an agent first if needed, then session
           agent =
             case Agents.list_active_agents() |> List.first() do
               nil ->
-                {:ok, a} = Agents.create_agent(%{name: "default", status: "active"})
+                {:ok, a} = Agents.create_agent(%{name: "default", status: "working"})
                 a
 
               a ->
@@ -127,10 +124,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
 
           Sessions.create_session(%{
             uuid: session_uuid,
-            description: agent_attrs["description"],
-            status: agent_attrs["status"] || "active",
+            description: agent_attrs[:description],
+            status: agent_attrs[:status] || "working",
             agent_id: agent.id,
-            project_name: attrs["project_name"]
+            project_name: attrs[:project_name],
+            started_at: DateTime.utc_now() |> DateTime.to_iso8601()
           })
       end
 
@@ -138,8 +136,8 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
       {:ok, session} ->
         %{
           success: true,
-          message: "Session #{attrs["uuid"]} ready",
-          session_id: attrs["uuid"],
+          message: "Session #{attrs[:uuid]} ready",
+          session_id: attrs[:uuid],
           agent_id: session.agent_id,
           session_int_id: session.id
         }
@@ -150,7 +148,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
   end
 
   defp end_session(params) do
-    case Sessions.get_session_by_uuid(params["agent_id"] || params["session_id"]) do
+    case Sessions.get_session_by_uuid(params[:agent_id] || params[:session_id]) do
       {:ok, session} ->
         case Sessions.end_session(session) do
           {:ok, _} ->
@@ -166,15 +164,15 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
   end
 
   defp update_session(params) do
-    uuid = params["session_id"] || params["agent_id"]
+    uuid = params[:session_id] || params[:agent_id]
 
     case Sessions.get_session_by_uuid(uuid) do
       {:ok, session} ->
         update_attrs =
           %{}
-          |> maybe_put("name", params["name"])
-          |> maybe_put("status", params["status"])
-          |> maybe_put("description", params["description"])
+          |> maybe_put(:name, params[:name])
+          |> maybe_put(:status, params[:status])
+          |> maybe_put(:description, params[:description])
 
         case Sessions.update_session(session, update_attrs) do
           {:ok, _} -> %{success: true, message: "Session updated"}
@@ -187,7 +185,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
   end
 
   defp get_session_info(params) do
-    uuid = params["session_id"] || params["agent_id"]
+    uuid = params[:session_id] || params[:agent_id]
 
     if uuid do
       case Sessions.get_session_by_uuid(uuid) do
@@ -209,8 +207,8 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
   end
 
   defp search_sessions(params) do
-    query = params["query"] || ""
-    results = Sessions.list_sessions_filtered(%{"search" => query})
+    query = params[:query] || ""
+    results = Sessions.list_sessions_filtered(search_query: query)
 
     %{
       success: true,
@@ -226,8 +224,8 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
     alias EyeInTheSkyWeb.Contexts
 
     case Contexts.upsert_session_context(%{
-           session_id: params["session_id"],
-           context: params["context"]
+           session_id: params[:session_id],
+           context: params[:context]
          }) do
       {:ok, _} -> %{success: true, message: "Context saved"}
       {:error, cs} -> %{success: false, message: "Save failed: #{inspect(cs.errors)}"}
@@ -237,7 +235,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
   defp load_context(params) do
     alias EyeInTheSkyWeb.Contexts
 
-    case Contexts.get_session_context(params["session_id"]) do
+    case Contexts.get_session_context(params[:session_id]) do
       nil ->
         %{success: false, message: "No context found"}
 

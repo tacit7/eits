@@ -19,23 +19,24 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Dm do
   def execute(params, frame) do
     alias EyeInTheSkyWeb.Messages
 
-    target_uuid = params["target_session_id"]
+    target_uuid = params[:target_session_id]
 
     # Resolve UUID to internal integer session_id
     result =
       case Sessions.get_session_by_uuid(target_uuid) do
         {:ok, agent} ->
           attrs = %{
+            uuid: Ecto.UUID.generate(),
             session_id: agent.id,
-            body: params["message"],
+            body: params[:message],
             sender_role: "agent",
             recipient_role: "agent",
             direction: "inbound",
             status: "delivered",
             provider: "claude",
             metadata: %{
-              sender_id: params["sender_id"],
-              response_required: params["response_required"] || false
+              sender_id: params[:sender_id],
+              response_required: params[:response_required] || false
             }
           }
 

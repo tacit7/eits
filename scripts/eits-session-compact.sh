@@ -1,9 +1,9 @@
 #!/bin/bash
 # EITS Session Compaction Hook (Go MCP Server)
-# Fires on SessionStart(compact)
-# Marks old session as compacted, removes from mapping
+# Fires on SessionStart(compact) — compaction is complete at this point.
+# Sets status back to working; PreCompact hook set it to compacting.
 
-set -e
+set -uo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MAPPING_FILE="$HOME/.claude/hooks/session_agent_map.json"
@@ -25,13 +25,13 @@ fi
 # Log what we found
 echo "$(date -Iseconds) COMPACT: session=$SESSION_ID" >> "$LOG_FILE"
 
-# Mark old session as compacted (SQL)
-"$HOOK_DIR/sql/update-session-status.sh" "$SESSION_ID" "compacted"
+# Compaction done — set status back to working
+"$HOOK_DIR/sql/update-session-status.sh" "$SESSION_ID" "working"
 
-echo "[EITS] Compact: marked session $SESSION_ID as compacted" >&2
+echo "[EITS] Compact: done, session $SESSION_ID back to working" >&2
 
 # Publish to NATS
-"$HOOK_DIR/nats/publish-session-compact.sh" "$SESSION_ID" "compacted"
+"$HOOK_DIR/nats/publish-session-compact.sh" "$SESSION_ID" "working"
 
 # Remove old mapping so init hook can register fresh session
 if [ -f "$MAPPING_FILE" ]; then

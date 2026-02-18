@@ -24,11 +24,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NoteAdd do
     alias EyeInTheSkyWeb.Notes
 
     attrs = %{
-      parent_id: params["parent_id"],
-      parent_type: params["parent_type"],
-      body: params["body"],
-      title: params["title"],
-      starred: params["starred"] || 0
+      parent_id: params[:parent_id],
+      parent_type: params[:parent_type],
+      body: params[:body],
+      title: params[:title],
+      starred: params[:starred] || 0
     }
 
     result =

@@ -129,7 +129,7 @@ defmodule EyeInTheSkyWeb.Sessions do
   Ends a session by setting ended_at timestamp.
   """
   def end_session(%Session{} = session) do
-    update_session(session, %{ended_at: DateTime.utc_now()})
+    update_session(session, %{ended_at: DateTime.utc_now() |> DateTime.to_iso8601()})
   end
 
   @doc """

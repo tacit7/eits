@@ -674,7 +674,21 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             class="rounded-lg border border-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] px-4 py-3"
             id={"dm-log-#{log.id}"}
           >
-            <div class="text-sm text-base-content/70 font-mono">{log.message}</div>
+            <div class="flex items-start gap-2">
+              <%= if Map.has_key?(log, :type) && log.type do %>
+                <span class="flex-shrink-0 mt-0.5 text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-base-content/8 text-base-content/50 uppercase tracking-wide">
+                  {log.type}
+                </span>
+              <% end %>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm text-base-content/70 font-mono truncate">{log.message}</div>
+                <%= if Map.has_key?(log, :timestamp) && log.timestamp do %>
+                  <div class="text-[11px] text-base-content/30 tabular-nums mt-0.5">
+                    {format_note_timestamp(log.timestamp)}
+                  </div>
+                <% end %>
+              </div>
+            </div>
           </div>
         <% end %>
       </div>

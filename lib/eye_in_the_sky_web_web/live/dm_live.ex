@@ -440,7 +440,16 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     |> assign(
       :logs,
       maybe_load_tab_data(tab, "logs", socket.assigns[:logs], fn ->
-        Logs.list_logs_for_session(session_id)
+        case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+          {:ok, project_path} ->
+            case SessionReader.read_tool_events(socket.assigns.session_uuid, project_path) do
+              {:ok, events} -> events
+              _ -> Logs.list_logs_for_session(session_id)
+            end
+
+          _ ->
+            Logs.list_logs_for_session(session_id)
+        end
       end)
     )
     |> assign(

@@ -177,6 +177,61 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
   defp is_conversation_message?(_), do: false
 
   @doc """
+  Reads tool_use events from a Claude session JSONL file.
+  Returns {:ok, list} where each entry is:
+    %{id: String.t(), type: String.t(), message: String.t(), timestamp: String.t() | nil}
+  """
+  def read_tool_events(session_id, project_path) do
+    case find_session_file(session_id, project_path) do
+      {:ok, file_path} ->
+        case File.read(file_path) do
+          {:ok, content} ->
+            events =
+              content
+              |> String.split("\n", trim: true)
+              |> Enum.map(&parse_line/1)
+              |> Enum.reject(&is_nil/1)
+              |> Enum.filter(&is_assistant_with_tools?/1)
+              |> Enum.flat_map(&extract_tool_events/1)
+
+            {:ok, events}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  defp is_assistant_with_tools?(%{"type" => "assistant", "message" => %{"content" => content}})
+       when is_list(content) do
+    Enum.any?(content, &match?(%{"type" => "tool_use"}, &1))
+  end
+
+  defp is_assistant_with_tools?(_), do: false
+
+  defp extract_tool_events(%{"message" => %{"content" => content}} = entry) do
+    ts = Map.get(entry, "timestamp")
+
+    content
+    |> Enum.filter(&match?(%{"type" => "tool_use"}, &1))
+    |> Enum.map(fn %{"name" => name, "id" => tool_id} = item ->
+      input = Map.get(item, "input", %{})
+
+      %{
+        id: tool_id,
+        type: name,
+        message: format_tool_call(name, input),
+        timestamp: ts
+      }
+    end)
+  end
+
+  defp extract_tool_events(_), do: []
+
+  @doc """
   Formats messages for the UI.
   Extracts role, content, and timestamp from Claude session JSON.
   Filters out messages with empty content (tool results).

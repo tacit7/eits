@@ -52,6 +52,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:stream_tool, nil)
       |> assign(:slash_items, build_slash_items())
       |> assign(:diff_cache, %{})
+      |> assign(:show_new_task_drawer, false)
+      |> assign(:workflow_states, Tasks.list_workflow_states())
       |> allow_upload(:files,
         accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
         max_entries: 10,
@@ -76,6 +78,80 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_event("toggle_model_menu", _params, socket) do
     {:noreply, assign(socket, :show_model_menu, !socket.assigns.show_model_menu)}
+  end
+
+  @impl true
+  def handle_event("toggle_new_task_drawer", _params, socket) do
+    {:noreply, assign(socket, :show_new_task_drawer, !socket.assigns.show_new_task_drawer)}
+  end
+
+  @impl true
+  def handle_event("keydown", %{"key" => "k", "ctrlKey" => true}, socket) do
+    {:noreply, assign(socket, :show_new_task_drawer, !socket.assigns.show_new_task_drawer)}
+  end
+
+  def handle_event("keydown", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_event("create_new_task", params, socket) do
+    title = params["title"]
+    description = params["description"]
+    state_id = String.to_integer(params["state_id"])
+    priority = String.to_integer(params["priority"] || "1")
+    tags_string = params["tags"] || ""
+    session_id = socket.assigns.session_id
+
+    tag_names =
+      tags_string
+      |> String.split(",")
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+
+    task_id = String.upcase(Ecto.UUID.generate())
+    now = DateTime.utc_now() |> DateTime.to_iso8601()
+
+    case Tasks.create_task(%{
+           id: task_id,
+           title: title,
+           description: description,
+           state_id: state_id,
+           priority: priority,
+           created_at: now,
+           updated_at: now
+         }) do
+      {:ok, task} ->
+        Repo.query(
+          "INSERT OR IGNORE INTO task_sessions (task_id, session_id) VALUES (?, ?)",
+          [task.id, session_id]
+        )
+
+        if length(tag_names) > 0 do
+          Enum.each(tag_names, fn tag_name ->
+            case Tasks.get_or_create_tag(tag_name) do
+              {:ok, tag} ->
+                Repo.query(
+                  "INSERT INTO task_tags (task_id, tag_id) VALUES (?, ?)",
+                  [task.id, tag.id]
+                )
+
+              _ ->
+                :ok
+            end
+          end)
+        end
+
+        socket =
+          socket
+          |> assign(:show_new_task_drawer, false)
+          |> load_tab_data("tasks", session_id)
+          |> put_flash(:info, "Task created")
+
+        {:noreply, socket}
+
+      {:error, changeset} ->
+        {:noreply,
+         put_flash(socket, :error, "Failed to create task: #{inspect(changeset.errors)}")}
+    end
   end
 
   @impl true
@@ -627,27 +703,31 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <DmPage.dm_page
-      agent={@session}
-      session_uuid={@session_uuid}
-      active_tab={@active_tab}
-      messages={@messages}
-      has_more_messages={@has_more_messages}
-      uploads={@uploads}
-      selected_model={@selected_model}
-      selected_effort={@selected_effort}
-      show_model_menu={@show_model_menu}
-      processing={@processing}
-      show_live_stream={@show_live_stream}
-      stream_content={@stream_content}
-      stream_tool={@stream_tool}
-      tasks={@tasks}
-      commits={@commits}
-      diff_cache={@diff_cache}
-      logs={@logs}
-      notes={@notes}
-      slash_items={@slash_items}
-    />
+    <div id="dm-live-root" phx-hook="GlobalKeydown">
+      <DmPage.dm_page
+        agent={@session}
+        session_uuid={@session_uuid}
+        active_tab={@active_tab}
+        messages={@messages}
+        has_more_messages={@has_more_messages}
+        uploads={@uploads}
+        selected_model={@selected_model}
+        selected_effort={@selected_effort}
+        show_model_menu={@show_model_menu}
+        processing={@processing}
+        show_live_stream={@show_live_stream}
+        stream_content={@stream_content}
+        stream_tool={@stream_tool}
+        tasks={@tasks}
+        commits={@commits}
+        diff_cache={@diff_cache}
+        logs={@logs}
+        notes={@notes}
+        slash_items={@slash_items}
+        show_new_task_drawer={@show_new_task_drawer}
+        workflow_states={@workflow_states}
+      />
+    </div>
     """
   end
 

@@ -125,6 +125,32 @@ Hooks.LiveStreamToggle = {
     })
   }
 }
+Hooks.ModalDialog = {
+  mounted() { this._sync() },
+  updated() { this._sync() },
+  _sync() {
+    const open = this.el.dataset.open === "true"
+    if (open && !this.el.open) {
+      this.el.showModal()
+    } else if (!open && this.el.open) {
+      this.el.close()
+    }
+  }
+}
+Hooks.GlobalKeydown = {
+  mounted() {
+    this._handler = (e) => {
+      if (e.ctrlKey && e.key === "k") {
+        e.preventDefault()
+        this.pushEvent("keydown", {key: "k", ctrlKey: true})
+      }
+    }
+    window.addEventListener("keydown", this._handler)
+  },
+  destroyed() {
+    window.removeEventListener("keydown", this._handler)
+  }
+}
 Hooks.SidebarState = {
   mounted() {
     // Restore collapsed state

@@ -39,6 +39,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     end
   end
 
+  def is_processing?(session_id) do
+    case Registry.lookup(@registry, {:agent, session_id}) do
+      [{pid, _}] -> GenServer.call(pid, :is_processing?)
+      [] -> false
+    end
+  end
+
   # --- Server Callbacks ---
 
   @impl true
@@ -66,6 +73,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     )
 
     {:ok, state}
+  end
+
+  @impl true
+  def handle_call(:is_processing?, _from, state) do
+    {:reply, not is_nil(state.current_job), state}
   end
 
   @impl true
@@ -223,7 +235,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
     Logger.info("[telemetry] agent.sdk.complete session_id=#{state.session_id}")
 
-    update_agent_status(state.session_id, "waiting")
+    update_agent_status(state.session_id, "idle")
 
     Phoenix.PubSub.broadcast(
       EyeInTheSkyWeb.PubSub,
@@ -249,7 +261,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       "[telemetry] agent.sdk.error session_id=#{state.session_id} reason=#{inspect(reason)}"
     )
 
-    update_agent_status(state.session_id, "waiting")
+    update_agent_status(state.session_id, "idle")
 
     Phoenix.PubSub.broadcast(
       EyeInTheSkyWeb.PubSub,
@@ -295,8 +307,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   # --- Private ---
 
   defp save_result(text, metadata, state) when is_binary(text) do
-    if String.trim(text) == "[NO_RESPONSE]" do
-      Logger.info("[#{state.session_id}] Agent responded with [NO_RESPONSE], skipping")
+    if String.trim(text) in ["", "[NO_RESPONSE]"] do
+      Logger.info("[#{state.session_id}] Skipping DB save — empty or suppressed response")
     else
       channel_id = get_in(state, [:current_job, :context, :channel_id])
 
@@ -571,7 +583,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         attrs = %{status: status}
 
         attrs =
-          if status == "waiting" do
+          if status == "idle" do
             Map.put(attrs, :last_activity_at, DateTime.utc_now() |> DateTime.to_iso8601())
           else
             attrs

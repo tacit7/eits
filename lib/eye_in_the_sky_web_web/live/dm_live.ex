@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.{Sessions, Agents, Commits, Logs, Messages, Notes, Repo, Tasks}
-  alias EyeInTheSkyWeb.Claude.{AgentManager, SessionReader}
+  alias EyeInTheSkyWeb.Claude.{AgentManager, AgentWorker, SessionReader}
   alias EyeInTheSkyWeb.FileAttachments
   alias EyeInTheSkyWebWeb.Components.DmPage
 
@@ -41,7 +41,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:agent, agent)
       |> assign(:active_tab, "messages")
       |> assign(:session_ref, nil)
-      |> assign(:processing, false)
+      |> assign(:processing, AgentWorker.is_processing?(session.id))
       |> assign(:message_limit, @default_message_limit)
       |> assign(:has_more_messages, false)
       |> assign(:selected_model, session.model || "opus")
@@ -50,6 +50,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:show_live_stream, false)
       |> assign(:stream_content, "")
       |> assign(:stream_tool, nil)
+      |> assign(:slash_items, build_slash_items())
       |> allow_upload(:files,
         accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
         max_entries: 10,
@@ -251,6 +252,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       socket
       |> assign(:processing, false)
       |> load_tab_data("messages", socket.assigns.session_id)
+      |> push_event("focus-input", %{})
 
     {:noreply, socket}
   end
@@ -275,6 +277,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:processing, false)
       |> assign(:session_ref, nil)
       |> load_tab_data("messages", socket.assigns.session_id)
+      |> push_event("focus-input", %{})
 
     {:noreply, socket}
   end
@@ -301,7 +304,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
     if session_id == socket.assigns.session_id do
-      {:noreply, assign(socket, :processing, false)}
+      {:noreply, socket |> assign(:processing, false) |> push_event("focus-input", %{})}
     else
       {:noreply, socket}
     end
@@ -311,7 +314,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_info({:agent_stopped, %{id: id}}, socket) do
     if id == socket.assigns.session_id do
-      {:noreply, assign(socket, :processing, false)}
+      {:noreply, socket |> assign(:processing, false) |> push_event("focus-input", %{})}
     else
       {:noreply, socket}
     end
@@ -607,8 +610,13 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       commits={@commits}
       logs={@logs}
       notes={@notes}
+      slash_items={@slash_items}
     />
     """
+  end
+
+  defp build_slash_items do
+    EyeInTheSkyWebWeb.Helpers.SlashItems.build()
   end
 
   defp resolve_project_path(session, agent) do

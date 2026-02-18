@@ -129,8 +129,6 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
 
       <%!-- Scrollable nav --%>
       <nav class="flex-1 overflow-y-auto overflow-x-hidden py-2">
-        <%!-- Overview section --%>
-        <.section_label collapsed={@collapsed} label="Overview" />
         <.nav_item
           href="/"
           icon="hero-cpu-chip"
@@ -139,17 +137,17 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           collapsed={@collapsed}
         />
         <.nav_item
-          href="/notes"
-          icon="hero-document-text"
-          label="Notes"
-          active={@sidebar_tab == :notes && is_nil(@sidebar_project)}
-          collapsed={@collapsed}
-        />
-        <.nav_item
           href="/tasks"
           icon="hero-clipboard-document-list"
           label="Tasks"
           active={@sidebar_tab == :tasks && is_nil(@sidebar_project)}
+          collapsed={@collapsed}
+        />
+        <.nav_item
+          href="/notes"
+          icon="hero-document-text"
+          label="Notes"
+          active={@sidebar_tab == :notes && is_nil(@sidebar_project)}
           collapsed={@collapsed}
         />
         <.nav_item
@@ -180,7 +178,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
             phx-target={@myself}
             class={[
               "flex items-center gap-2.5 w-full text-left text-[13px] transition-colors",
-              if(@collapsed, do: "px-4 py-1.5 justify-center", else: "px-3 py-1.5"),
+              if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
               if(@sidebar_tab == :chat,
                 do: "text-primary bg-primary/10 border-l-2 border-primary font-medium",
                 else: "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5"
@@ -253,28 +251,41 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
         <%= for project <- @projects do %>
           <% is_active_project = @sidebar_project && @sidebar_project.id == project.id %>
           <div data-project-id={project.id}>
-            <%!-- Project row — toggled by JS hook --%>
-            <button
-              data-project-toggle={project.id}
-              class={[
-                "flex items-center gap-2 w-full text-left text-sm transition-colors",
-                if(@collapsed, do: "px-4 py-1.5 justify-center", else: "px-3 py-1.5"),
-                if(is_active_project,
-                  do: "text-primary bg-primary/10 border-l-2 border-primary",
-                  else: "text-base-content/60 hover:text-base-content/80 hover:bg-base-content/5"
-                )
-              ]}
-              title={project.name}
-            >
+            <%!-- Project row --%>
+            <div class={[
+              "flex items-center transition-colors",
+              if(is_active_project,
+                do: "bg-primary/10 border-l-2 border-primary",
+                else: "hover:bg-base-content/5"
+              )
+            ]}>
               <%= if !@collapsed do %>
-                <%!-- Chevron managed by JS via data-project-chevron --%>
-                <span data-project-chevron={project.id}>
-                  <.icon name="hero-chevron-right-mini" class="w-3.5 h-3.5 flex-shrink-0" />
-                </span>
+                <button
+                  data-project-toggle={project.id}
+                  class="pl-3 pr-1 py-1 text-base-content/40 hover:text-base-content/70 flex-shrink-0"
+                  title="Expand"
+                >
+                  <span data-project-chevron={project.id}>
+                    <.icon name="hero-chevron-right-mini" class="w-3.5 h-3.5" />
+                  </span>
+                </button>
               <% end %>
-              <.icon name="hero-folder" class="w-4 h-4 flex-shrink-0" />
-              <span class={["truncate", if(@collapsed, do: "hidden")]}>{project.name}</span>
-            </button>
+              <.link
+                navigate={~p"/projects/#{project.id}"}
+                class={[
+                  "flex items-center gap-2 flex-1 min-w-0 text-sm py-1 transition-colors",
+                  if(@collapsed, do: "px-4 justify-center", else: "pr-3"),
+                  if(is_active_project,
+                    do: "text-primary font-medium",
+                    else: "text-base-content/60 hover:text-base-content/80"
+                  )
+                ]}
+                title={project.name}
+              >
+                <.icon name="hero-folder" class="w-4 h-4 flex-shrink-0" />
+                <span class={["truncate", if(@collapsed, do: "hidden")]}>{project.name}</span>
+              </.link>
+            </div>
 
             <%!-- Sub-items — always rendered, shown/hidden by JS --%>
             <div
@@ -282,11 +293,6 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
               class={["ml-5 border-l border-base-content/8", if(@collapsed, do: "hidden")]}
               style="display: none;"
             >
-              <.project_sub_item
-                href={~p"/projects/#{project.id}"}
-                label="Overview"
-                active={is_active_project && @sidebar_tab == :overview}
-              />
               <.project_sub_item
                 href={~p"/projects/#{project.id}/sessions"}
                 label="Sessions"
@@ -388,7 +394,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
 
   defp section_label(assigns) do
     ~H"""
-    <div class={["mt-4 mb-1", if(@collapsed, do: "px-2", else: "px-3")]}>
+    <div class={["mt-3 mb-0.5", if(@collapsed, do: "px-2", else: "px-3")]}>
       <span class={[
         "text-[10px] uppercase tracking-wider font-medium text-base-content/30",
         if(@collapsed, do: "hidden")
@@ -412,7 +418,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
       navigate={@href}
       class={[
         "flex items-center gap-2.5 text-[13px] transition-colors",
-        if(@collapsed, do: "px-4 py-1.5 justify-center", else: "px-3 py-1.5"),
+        if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
         if(@active,
           do: "text-primary bg-primary/10 border-l-2 border-primary font-medium",
           else: "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5"
@@ -435,7 +441,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     <.link
       navigate={@href}
       class={[
-        "block pl-4 pr-3 py-1 text-xs transition-colors",
+        "block pl-4 pr-3 py-0.5 text-xs transition-colors",
         if(@active,
           do: "text-primary font-medium bg-primary/5",
           else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/5"

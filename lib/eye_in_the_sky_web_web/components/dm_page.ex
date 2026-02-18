@@ -28,6 +28,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :show_live_stream, :boolean, default: false
   attr :stream_content, :string, default: ""
   attr :stream_tool, :string, default: nil
+  attr :slash_items, :list, default: []
 
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
@@ -36,7 +37,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
     <div class="flex flex-col h-[calc(100vh-2rem)] px-4 sm:px-6 lg:px-8 py-4" id="dm-page">
       <%!-- Header card --%>
       <div
-        class="max-w-6xl mx-auto w-full bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0"
+        class="max-w-6xl mx-auto w-full bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0"
         id="dm-header-card"
       >
         <div class="px-5 py-3" id="dm-header">
@@ -91,7 +92,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               <button
                 class={[
                   "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150",
-                  @active_tab == tab && "bg-base-100 text-base-content shadow-sm",
+                  @active_tab == tab && "bg-base-200 text-base-content shadow-sm",
                   @active_tab != tab && "text-base-content/40 hover:text-base-content/60"
                 ]}
                 phx-click="change_tab"
@@ -145,6 +146,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             selected_effort={@selected_effort}
             show_model_menu={@show_model_menu}
             processing={@processing}
+            slash_items={@slash_items}
           />
         </div>
       <% end %>
@@ -251,7 +253,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         <% else %>
           <img
             src={provider_icon(@message.provider)}
-            class="w-4 h-4 mt-1 flex-shrink-0"
+            class={"w-4 h-4 mt-1 flex-shrink-0 #{provider_icon_class(@message.provider)}"}
             alt={@message.provider || "Agent"}
           />
         <% end %>
@@ -374,14 +376,16 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :selected_effort, :string, default: ""
   attr :show_model_menu, :boolean, default: false
   attr :processing, :boolean, default: false
+  attr :slash_items, :list, default: []
 
   defp message_form(assigns) do
     ~H"""
     <form
       phx-submit="send_message"
       phx-change="validate_upload"
-      class="rounded-2xl border border-base-content/10 bg-base-100 shadow-sm"
+      class="rounded-2xl border border-base-content/10 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] shadow-sm"
       id="message-form"
+      data-slash-items={Jason.encode!(@slash_items)}
     >
       <%!-- Upload previews --%>
       <%= if @uploads.files.entries != [] do %>
@@ -751,8 +755,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   defp message_sender_name(message), do: message.provider || "Agent"
 
   defp provider_icon("openai"), do: "/images/openai.svg"
-  defp provider_icon("codex"), do: "/images/codex.svg"
+  defp provider_icon("codex"), do: "/images/openai.svg"
   defp provider_icon(_), do: "/images/claude.svg"
+
+  defp provider_icon_class("openai"), do: "dark:invert"
+  defp provider_icon_class("codex"), do: "dark:invert"
+  defp provider_icon_class(_), do: ""
 
   defp message_model(%{metadata: %{"model_usage" => model_usage}}) when is_map(model_usage) do
     case Map.keys(model_usage) do

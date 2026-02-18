@@ -20,11 +20,22 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
     hashes = params[:commit_hashes] || []
     messages = params[:commit_messages] || []
 
-    # Resolve agent integer ID
-    agent_int_id =
-      case Sessions.get_session_by_uuid(agent_id) do
-        {:ok, agent} -> agent.id
-        _ -> nil
+    # Resolve session ID — agent_id may be an integer agent ID or a session UUID
+    session_int_id =
+      case Integer.parse(to_string(agent_id)) do
+        {int_id, ""} ->
+          # It's an integer agent ID — get the most recent session for this agent
+          case Sessions.list_sessions_for_agent(int_id) do
+            [session | _] -> session.id
+            _ -> nil
+          end
+
+        _ ->
+          # Try as session UUID
+          case Sessions.get_session_by_uuid(agent_id) do
+            {:ok, session} -> session.id
+            _ -> nil
+          end
       end
 
     results =
@@ -36,7 +47,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
         case Commits.create_commit(%{
                commit_hash: hash,
                commit_message: message,
-               session_id: agent_int_id
+               session_id: session_int_id
              }) do
           {:ok, _} -> :ok
           {:error, _} -> :error

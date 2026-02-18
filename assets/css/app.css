@@ -2,6 +2,7 @@
    https://tailwindcss.com/docs/configuration */
 
 @import "tailwindcss" source(none);
+@import "diff2html/bundles/css/diff2html.min.css";
 /* highlight.js theme-aware styles are defined below under [data-theme] selectors */
 @source "../css";
 @source "../js";

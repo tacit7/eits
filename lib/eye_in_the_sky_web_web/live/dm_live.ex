@@ -51,6 +51,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:stream_content, "")
       |> assign(:stream_tool, nil)
       |> assign(:slash_items, build_slash_items())
+      |> assign(:diff_cache, %{})
       |> allow_upload(:files,
         accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
         max_entries: 10,
@@ -165,6 +166,31 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_event("send_message", _params, socket) do
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("load_diff", %{"hash" => hash}, socket) do
+    # Skip if already cached
+    if Map.has_key?(socket.assigns.diff_cache, hash) do
+      {:noreply, socket}
+    else
+      diff =
+        case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+          {:ok, project_path} ->
+            case System.cmd("git", ["-C", project_path, "show", hash, "--unified=5"],
+                   stderr_to_stdout: false
+                 ) do
+              {output, 0} -> output
+              _ -> :error
+            end
+
+          _ ->
+            :error
+        end
+
+      cache = Map.put(socket.assigns.diff_cache, hash, diff)
+      {:noreply, assign(socket, :diff_cache, cache)}
+    end
   end
 
   @impl true
@@ -608,6 +634,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       stream_tool={@stream_tool}
       tasks={@tasks}
       commits={@commits}
+      diff_cache={@diff_cache}
       logs={@logs}
       notes={@notes}
       slash_items={@slash_items}

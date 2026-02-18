@@ -29,6 +29,7 @@ import {BookmarkAgent} from "./hooks/bookmark_agent"
 import {ScrollToBottom} from "./hooks/scroll_to_bottom"
 import {MarkdownMessage} from "./hooks/markdown_message"
 import {CommandHistory} from "./hooks/command_history"
+import {DiffViewer} from "./hooks/diff_viewer"
 import {getHooks} from "live_svelte"
 import "./theme"
 import hljs from 'highlight.js'
@@ -65,6 +66,7 @@ Hooks.BookmarkAgent = BookmarkAgent
 Hooks.ScrollToBottom = ScrollToBottom
 Hooks.CommandHistory = CommandHistory
 Hooks.MarkdownMessage = MarkdownMessage
+Hooks.DiffViewer = DiffViewer
 Hooks.RefreshDot = {
   mounted() { this._flash() },
   updated() { this._flash() },

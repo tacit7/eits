@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.{Agents, Channels, Messages, Projects, Prompts, Sessions}
-  alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Claude.{AgentManager, ChannelProtocol}
 
   # Deterministic UUIDs for the web UI user
   @web_agent_uuid "00000000-0000-0000-0000-000000000001"
@@ -162,6 +162,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       |> assign(:channel_members, channel_members)
       |> assign(:show_agent_drawer, false)
       |> assign(:show_members, false)
+      |> assign(:slash_items, EyeInTheSkyWebWeb.Helpers.SlashItems.build())
 
     {:noreply, socket}
   end
@@ -196,21 +197,9 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         # Mark channel as read
         Channels.mark_as_read(channel_id, session_id)
 
-        # 3. Parse @mentions from body
-        mention_all = Regex.match?(~r/@all\b/i, body)
+        # 3. Parse mentions and auto-add mentioned sessions not yet in channel
+        {_mode, mentioned_ids, _mention_all} = ChannelProtocol.parse_routing(body, -1)
 
-        mentioned_ids =
-          Regex.scan(~r/@(\d+)/, body)
-          |> Enum.map(fn [_, id_str] ->
-            case Integer.parse(id_str) do
-              {id, ""} -> id
-              _ -> nil
-            end
-          end)
-          |> Enum.reject(&is_nil/1)
-          |> Enum.uniq()
-
-        # 4. Auto-add mentioned sessions that aren't channel members yet
         Enum.each(mentioned_ids, fn mid ->
           unless Channels.is_member?(channel_id, mid) do
             case Sessions.get_session(mid) do
@@ -224,23 +213,18 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
           end
         end)
 
-        # 5. Get all agent members of this channel (now includes auto-added)
+        # 4. Get all agent members (now includes auto-added)
         agent_members = Channels.list_members(channel_id)
 
-        # 6. Route message to each agent member (skip the sending user to avoid spam)
+        # 5. Route message to each member using ChannelProtocol
         Enum.each(agent_members, fn member ->
-          unless member.session_id == session_id do
-            is_mentioned = mention_all or member.session_id in mentioned_ids
+          unless ChannelProtocol.skip?(member.session_id, session_id) do
+            {mode, _mentioned_ids, _mention_all} =
+              ChannelProtocol.parse_routing(body, member.session_id)
 
-            prompt =
-              if is_mentioned do
-                "CHANNEL_RESPOND: You were @mentioned. Respond to: #{body}"
-              else
-                "CHANNEL_OBSERVE: Only respond if you have relevant input. If nothing to add, respond with exactly [NO_RESPONSE]. Message: #{body}"
-              end
+            prompt = ChannelProtocol.build_prompt(mode, body)
 
-            # Save a copy of the user's message to the agent's session
-            # so the DM page shows the full conversation
+            # Mirror the user message into the agent's session so DM page shows context
             Messages.send_message(%{
               session_id: member.session_id,
               channel_id: channel_id,
@@ -250,7 +234,9 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
               body: body
             })
 
-            Logger.info("Routing to agent session=#{member.session_id} mentioned=#{is_mentioned}")
+            Logger.info(
+              "Routing to session=#{member.session_id} mode=#{mode}"
+            )
 
             AgentManager.send_message(member.session_id, prompt,
               model: "sonnet",
@@ -306,6 +292,41 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
           Logger.warning("Failed to add member: #{inspect(changeset)}")
           {:noreply, put_flash(socket, :error, "Agent already in channel or invalid")}
       end
+    else
+      _ ->
+        {:noreply, put_flash(socket, :error, "Invalid session ID")}
+    end
+  end
+
+  @impl true
+  def handle_event("remove_agent_from_channel", %{"session_id" => session_id_str}, socket) do
+    require Logger
+    channel_id = socket.assigns.active_channel_id
+
+    with {session_id, ""} <- Integer.parse(session_id_str),
+         {:ok, session} <- Sessions.get_session(session_id) do
+      Channels.remove_member(channel_id, session_id)
+
+      {:ok, sys_msg} =
+        Messages.send_channel_message(%{
+          channel_id: channel_id,
+          session_id: nil,
+          sender_role: "system",
+          recipient_role: "agent",
+          provider: "system",
+          body: "Agent @#{session_id} (#{session.name || "unnamed"}) left the channel"
+        })
+
+      Phoenix.PubSub.broadcast(
+        EyeInTheSkyWeb.PubSub,
+        "channel:#{channel_id}:messages",
+        {:new_message, sys_msg}
+      )
+
+      Logger.info("Removed agent session=#{session_id} from channel=#{channel_id}")
+
+      channel_members = load_channel_members(channel_id)
+      {:noreply, assign(socket, :channel_members, channel_members)}
     else
       _ ->
         {:noreply, put_flash(socket, :error, "Invalid session ID")}
@@ -638,20 +659,30 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
             <%= if @channel_members != [] do %>
               <div class="flex flex-wrap gap-1.5 mb-3">
                 <%= for member <- @channel_members do %>
-                  <a
-                    href={~p"/dm/#{member.session_id}"}
-                    class="inline-flex items-center gap-1 font-mono text-[11px] font-medium px-2 py-0.5 rounded bg-base-content/[0.04] text-base-content/50 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
-                    title={"Session ##{member.session_id}"}
-                  >
-                    @{member.session_id}
-                    <%= if member.session_name do %>
-                      <span class="text-base-content/35">
-                        {String.slice(member.session_name, 0, 15)}{if String.length(
-                                                                        member.session_name
-                                                                      ) > 15, do: "…"}
-                      </span>
-                    <% end %>
-                  </a>
+                  <div class="inline-flex items-center gap-0.5 group">
+                    <a
+                      href={~p"/dm/#{member.session_id}"}
+                      class="inline-flex items-center gap-1 font-mono text-[11px] font-medium px-2 py-0.5 rounded-l bg-base-content/[0.04] text-base-content/50 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
+                      title={"Session ##{member.session_id}"}
+                    >
+                      @{member.session_id}
+                      <%= if member.session_name do %>
+                        <span class="text-base-content/35">
+                          {String.slice(member.session_name, 0, 15)}{if String.length(
+                                                                          member.session_name
+                                                                        ) > 15, do: "…"}
+                        </span>
+                      <% end %>
+                    </a>
+                    <button
+                      phx-click="remove_agent_from_channel"
+                      phx-value-session_id={member.session_id}
+                      class="inline-flex items-center px-1 py-0.5 rounded-r bg-base-content/[0.04] text-base-content/20 hover:text-error hover:bg-error/10 transition-colors border border-transparent opacity-0 group-hover:opacity-100"
+                      title="Remove from channel"
+                    >
+                      <.icon name="hero-x-mark" class="w-2.5 h-2.5" />
+                    </button>
+                  </div>
                 <% end %>
               </div>
             <% else %>
@@ -685,7 +716,8 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
               activeChannelId: @active_channel_id,
               messages: @messages,
               activeAgents: @active_agents,
-              workingAgents: @working_agents
+              workingAgents: @working_agents,
+              slashItems: @slash_items
             }
           }
           socket={@socket}

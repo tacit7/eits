@@ -8,18 +8,26 @@ defmodule EyeInTheSkyWebWeb.Helpers.SlashItems do
   @doc """
   Returns a flat list of slash-completable items from all sources:
   - Skills and commands from disk (~/.claude/skills/, ~/.claude/commands/)
+  - Plugin skills from ~/.claude/plugins/cache/ (enabled in settings.json)
+  - Project-level skills from <project>/.claude/skills/
   - Agents from the database
   - Prompts from the database
   """
   def build(opts \\ []) do
     commands_dir = Keyword.get(opts, :commands_dir, Path.expand("~/.claude/commands"))
     skills_dir = Keyword.get(opts, :skills_dir, Path.expand("~/.claude/skills"))
+    plugins_dir = Keyword.get(opts, :plugins_dir, Path.expand("~/.claude/plugins"))
+    settings_path = Keyword.get(opts, :settings_path, Path.expand("~/.claude/settings.json"))
+    project_path = Keyword.get(opts, :project_path, nil)
 
     skills = load_skills(commands_dir, skills_dir)
+    plugin_skills = load_plugin_skills(plugins_dir, settings_path)
+    project_skills = load_project_skills(project_path)
     agents = load_agents()
     prompts = load_prompts()
 
-    skills ++ agents ++ prompts
+    (skills ++ plugin_skills ++ project_skills ++ agents ++ prompts)
+    |> Enum.uniq_by(& &1.slug)
   end
 
   @doc false
@@ -75,6 +83,86 @@ defmodule EyeInTheSkyWebWeb.Helpers.SlashItems do
     else
       []
     end
+  end
+
+  @doc false
+  def load_plugin_skills(plugins_dir, settings_path) do
+    enabled = read_enabled_plugins(settings_path)
+
+    if map_size(enabled) == 0 do
+      []
+    else
+      cache_dir = Path.join(plugins_dir, "cache")
+
+      if File.dir?(cache_dir) do
+        enabled
+        |> Enum.flat_map(fn {key, true} ->
+          # Key format: "plugin-name@registry-name"
+          case String.split(key, "@", parts: 2) do
+            [plugin_name, registry] ->
+              registry_dir = Path.join(cache_dir, registry)
+              plugin_dir = Path.join(registry_dir, plugin_name)
+
+              if File.dir?(plugin_dir) do
+                # Find the first version dir that has skills
+                plugin_dir
+                |> File.ls!()
+                |> Enum.flat_map(fn version ->
+                  skills_dir = Path.join([plugin_dir, version, "skills"])
+
+                  if File.dir?(skills_dir) do
+                    skills_dir
+                    |> File.ls!()
+                    |> Enum.filter(fn skill_name ->
+                      Path.join([skills_dir, skill_name, "SKILL.md"]) |> File.exists?()
+                    end)
+                    |> Enum.map(fn skill_name ->
+                      content = File.read!(Path.join([skills_dir, skill_name, "SKILL.md"]))
+                      slug = "#{plugin_name}:#{skill_name}"
+
+                      %{slug: slug, type: "skill", description: extract_description(content)}
+                    end)
+                  else
+                    []
+                  end
+                end)
+                |> Enum.uniq_by(& &1.slug)
+              else
+                []
+              end
+
+            _ ->
+              []
+          end
+        end)
+      else
+        []
+      end
+    end
+  end
+
+  defp read_enabled_plugins(settings_path) do
+    case File.read(settings_path) do
+      {:ok, content} ->
+        case Jason.decode(content) do
+          {:ok, %{"enabledPlugins" => plugins}} when is_map(plugins) ->
+            plugins |> Enum.filter(fn {_k, v} -> v == true end) |> Map.new()
+
+          _ ->
+            %{}
+        end
+
+      _ ->
+        %{}
+    end
+  end
+
+  @doc false
+  def load_project_skills(nil), do: []
+
+  def load_project_skills(project_path) do
+    skills_dir = Path.join([project_path, ".claude", "skills"])
+    load_skill_dirs(skills_dir)
   end
 
   @doc false

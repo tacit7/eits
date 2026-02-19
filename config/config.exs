@@ -59,6 +59,11 @@ config :eye_in_the_sky_web, Oban,
   queues: [jobs: 5],
   repo: EyeInTheSkyWeb.Repo
 
+# Anubis MCP session store — ETS-backed, survives session agent crashes
+config :anubis_mcp, :session_store,
+  enabled: true,
+  adapter: EyeInTheSkyWeb.MCP.SessionStore
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

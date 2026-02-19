@@ -562,7 +562,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                 data-state-id={state.id}
               >
                 <%= if column_tasks == [] do %>
-                  <div class="flex flex-col items-center justify-center h-24 border border-dashed border-base-content/8 rounded-lg pointer-events-none">
+                  <div data-empty-placeholder class="flex flex-col items-center justify-center h-24 border border-dashed border-base-content/8 rounded-lg pointer-events-none">
                     <.icon name="hero-inbox" class="w-5 h-5 text-base-content/15 mb-1" />
                     <span class="text-[11px] text-base-content/20">No tasks</span>
                   </div>

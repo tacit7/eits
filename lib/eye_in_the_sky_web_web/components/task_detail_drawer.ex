@@ -195,7 +195,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                     <span class="text-base-content/10">&middot;</span>
                   <% end %>
                   <%= if @task.agent_id do %>
-                    <span class="font-mono">Agent {String.slice(@task.agent_id, 0..7)}</span>
+                    <span class="font-mono">Agent {String.slice(to_string(@task.agent_id), 0..7)}</span>
                   <% end %>
                 </div>
               </div>

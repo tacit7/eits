@@ -143,6 +143,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         socket =
           socket
           |> assign(:show_new_task_drawer, false)
+          |> assign(:active_tab, "tasks")
           |> load_tab_data("tasks", session_id)
           |> put_flash(:info, "Task created")
 

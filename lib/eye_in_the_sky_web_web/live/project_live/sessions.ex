@@ -327,7 +327,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="bg-base-100 px-6 lg:px-8">
+    <div class="bg-base-100 min-h-screen px-6 lg:px-8">
       <div class="max-w-3xl mx-auto">
         <%!-- Toolbar --%>
         <div class="flex items-center justify-between py-5">

@@ -28,6 +28,7 @@ defmodule EyeInTheSkyWebWeb.Router do
       live "/settings", OverviewLive.Settings, :index
       live "/sessions", SessionLive.Index, :index
       live "/prompts", PromptLive.Index, :index
+      live "/prompts/new", PromptLive.New, :new
       live "/prompts/:id", PromptLive.Show, :show
       live "/projects/:id", ProjectLive.Show, :show
       live "/projects/:id/sessions", ProjectLive.Sessions, :show
@@ -55,6 +56,7 @@ defmodule EyeInTheSkyWebWeb.Router do
     patch "/sessions/:uuid", SessionController, :update
     post "/commits", CommitController, :create
     post "/notes", NoteController, :create
+    post "/prompts", PromptController, :create
     post "/session-context", SessionContextController, :create
   end
 

@@ -73,11 +73,16 @@ defmodule EyeInTheSkyWeb.Prompts do
   end
 
   @doc """
-  Creates a prompt.
+  Creates a prompt. Auto-generates UUID and timestamps if not provided.
   """
   def create_prompt(attrs \\ %{}) do
+    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
     %Prompt{}
     |> Prompt.changeset(attrs)
+    |> Ecto.Changeset.put_change(:uuid, Ecto.UUID.generate())
+    |> Ecto.Changeset.put_change(:created_at, now)
+    |> Ecto.Changeset.put_change(:updated_at, now)
     |> Repo.insert()
   end
 
@@ -85,8 +90,11 @@ defmodule EyeInTheSkyWeb.Prompts do
   Updates a prompt.
   """
   def update_prompt(%Prompt{} = prompt, attrs) do
+    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
     prompt
     |> Prompt.changeset(attrs)
+    |> Ecto.Changeset.put_change(:updated_at, now)
     |> Repo.update()
   end
 

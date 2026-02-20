@@ -120,6 +120,13 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       Prompts.list_prompts(project_id: project_id)
       |> serialize_prompts()
 
+    # Load recent agents with descriptions for the new agent modal template picker
+    agent_templates =
+      Agents.list_active_agents()
+      |> Enum.filter(fn a -> a.description && a.description != "" end)
+      |> Enum.take(50)
+      |> Enum.map(fn a -> %{id: a.id, description: a.description} end)
+
     # Load channel members
     channel_members = load_channel_members(channel_id)
 
@@ -158,6 +165,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       |> assign(:active_thread, active_thread)
       |> assign(:agent_status_counts, agent_status_counts)
       |> assign(:prompts, prompts)
+      |> assign(:agent_templates, agent_templates)
       |> assign(:active_agents, active_sessions)
       |> assign(:channel_members, channel_members)
       |> assign(:show_agent_drawer, false)
@@ -733,6 +741,8 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       submit_event="create_agent"
       projects={@all_projects}
       current_project={nil}
+      prompts={@prompts}
+      agent_templates={@agent_templates}
     />
     """
   end

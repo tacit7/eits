@@ -285,7 +285,7 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
   end
 
   defp maybe_log_raw_line(session_id, line) do
-    if Application.get_env(:eye_in_the_sky_web, :log_codex_raw, false) do
+    if EyeInTheSkyWeb.Settings.get_boolean("log_codex_raw") do
       label = session_id || "unknown"
       Logger.info("[codex.raw] session_id=#{label} line=#{inspect(line, limit: 1_000)}")
     end

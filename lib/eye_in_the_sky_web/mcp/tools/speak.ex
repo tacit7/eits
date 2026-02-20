@@ -6,8 +6,6 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Speak do
   alias Anubis.Server.Response
 
   @valid_voices ~w(Ava Isha Lee Jamie Serena)
-  @default_voice "Ava"
-  @default_rate 200
 
   schema do
     field :message, :string, required: true, description: "Message to speak aloud"
@@ -54,11 +52,17 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Speak do
     end
   end
 
-  defp validate_voice(nil), do: @default_voice
+  defp validate_voice(nil), do: EyeInTheSkyWeb.Settings.get("tts_voice") || "Ava"
   defp validate_voice(v) when v in @valid_voices, do: v
-  defp validate_voice(_), do: @default_voice
+  defp validate_voice(_), do: EyeInTheSkyWeb.Settings.get("tts_voice") || "Ava"
 
-  defp validate_rate(nil), do: @default_rate
+  defp validate_rate(nil) do
+    EyeInTheSkyWeb.Settings.get_integer("tts_rate") || 200
+  end
+
   defp validate_rate(r) when is_integer(r) and r >= 90 and r <= 450, do: r
-  defp validate_rate(_), do: @default_rate
+
+  defp validate_rate(_) do
+    EyeInTheSkyWeb.Settings.get_integer("tts_rate") || 200
+  end
 end

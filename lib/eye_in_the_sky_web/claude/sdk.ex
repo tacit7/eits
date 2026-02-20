@@ -366,7 +366,7 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
   end
 
   defp maybe_log_raw_line(session_id, line) do
-    if Application.get_env(:eye_in_the_sky_web, :log_claude_raw, false) do
+    if EyeInTheSkyWeb.Settings.get_boolean("log_claude_raw") do
       label = session_id || "unknown"
       Logger.info("[claude.raw] session_id=#{label} line=#{inspect(line, limit: 1_000)}")
     end

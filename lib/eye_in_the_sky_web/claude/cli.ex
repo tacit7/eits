@@ -27,7 +27,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   @type spawn_result :: {:ok, port(), reference()} | {:error, term()}
 
   @known_permission_modes ~w(acceptEdits bypassPermissions default delegate dontAsk plan)
-  @default_idle_timeout_ms 300_000
+  @fallback_idle_timeout_ms 300_000
   @standard_paths [
     "/usr/local/bin/claude",
     "/opt/homebrew/bin/claude",
@@ -331,10 +331,12 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     caller = Keyword.get(opts, :caller, self())
     session_ref = Keyword.get(opts, :session_ref, make_ref())
 
+    default_timeout = EyeInTheSkyWeb.Settings.get_integer("cli_idle_timeout_ms") || @fallback_idle_timeout_ms
+
     idle_timeout_ms =
-      case Keyword.get(opts, :idle_timeout_ms, @default_idle_timeout_ms) do
+      case Keyword.get(opts, :idle_timeout_ms, default_timeout) do
         n when is_integer(n) and n > 0 -> n
-        _ -> @default_idle_timeout_ms
+        _ -> default_timeout
       end
 
     case find_claude_binary() do

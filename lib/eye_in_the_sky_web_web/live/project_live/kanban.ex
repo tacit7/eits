@@ -569,14 +569,14 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                 <% end %>
                 <%= for task <- column_tasks do %>
                   <div
-                    class="rounded-lg bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] px-3 py-2 cursor-pointer hover:bg-base-200/80 dark:hover:bg-[hsl(60,2%,21%)] transition-colors"
+                    class="group/card relative rounded-lg bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] px-3 py-2 cursor-pointer hover:bg-base-200/80 dark:hover:bg-[hsl(60,2%,21%)] transition-colors"
                     phx-click="open_task_detail"
                     phx-value-task_id={task.uuid}
                     data-task-id={task.uuid}
                     id={"kanban-task-#{task.id}"}
                   >
                     <span class={[
-                      "text-sm font-medium leading-snug",
+                      "text-sm font-medium leading-snug pr-5",
                       task.completed_at && "text-base-content/40 line-through",
                       !task.completed_at && "text-base-content/85"
                     ]}>
@@ -598,6 +598,15 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                         <% end %>
                       </div>
                     <% end %>
+                    <button
+                      type="button"
+                      phx-click="delete_task"
+                      phx-value-task_id={task.uuid}
+                      data-confirm="Delete this task?"
+                      class="absolute top-1.5 right-1.5 opacity-0 group-hover/card:opacity-100 w-5 h-5 flex items-center justify-center rounded text-base-content/25 hover:text-error hover:bg-error/10 transition-all"
+                    >
+                      <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 <% end %>
 

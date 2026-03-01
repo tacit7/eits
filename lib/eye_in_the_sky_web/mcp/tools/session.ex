@@ -115,21 +115,27 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
           agent =
             case Agents.list_active_agents() |> List.first() do
               nil ->
-                {:ok, a} = Agents.create_agent(%{name: "default", status: "working"})
-                a
+                case Agents.create_agent(%{name: "default", status: "working"}) do
+                  {:ok, a} -> a
+                  {:error, _} -> nil
+                end
 
               a ->
                 a
             end
 
-          Sessions.create_session(%{
-            uuid: session_uuid,
-            description: agent_attrs[:description],
-            status: agent_attrs[:status] || "working",
-            agent_id: agent.id,
-            project_name: attrs[:project_name],
-            started_at: DateTime.utc_now() |> DateTime.to_iso8601()
-          })
+          if is_nil(agent) do
+            {:error, %{errors: [agent: {"could not create default agent", []}]}}
+          else
+            Sessions.create_session(%{
+              uuid: session_uuid,
+              description: agent_attrs[:description],
+              status: agent_attrs[:status] || "working",
+              agent_id: agent.id,
+              project_name: attrs[:project_name],
+              started_at: DateTime.utc_now() |> DateTime.to_iso8601()
+            })
+          end
       end
 
     case session_result do

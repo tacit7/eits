@@ -45,8 +45,9 @@ defmodule EyeInTheSkyWebWeb.Router do
   end
 
   # MCP Server — Streamable HTTP
+  # Wrapped in MCPPlug to catch (EXIT) shutdown from hot-reload-induced transport restarts
   scope "/mcp" do
-    forward "/", Anubis.Server.Transport.StreamableHTTP.Plug, server: EyeInTheSkyWeb.MCP.Server
+    forward "/", EyeInTheSkyWebWeb.MCPPlug, server: EyeInTheSkyWeb.MCP.Server
   end
 
   scope "/api/v1", EyeInTheSkyWebWeb.Api.V1 do

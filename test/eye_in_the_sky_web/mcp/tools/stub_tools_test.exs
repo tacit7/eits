@@ -76,40 +76,44 @@ defmodule EyeInTheSkyWeb.MCP.Tools.StubToolsTest do
   end
 
   describe "Speak tool" do
-    test "returns a response without crashing" do
-      # Will actually invoke macOS `say` - succeeds on macOS, fails elsewhere
+    setup do
+      # Inject a no-op `say` so tests never invoke macOS TTS
+      tmp = System.tmp_dir!()
+      fake_say = Path.join(tmp, "say")
+      File.write!(fake_say, "#!/bin/sh\nexit 0\n")
+      File.chmod!(fake_say, 0o755)
+      original_path = System.get_env("PATH", "")
+      System.put_env("PATH", tmp <> ":" <> original_path)
+      on_exit(fn -> System.put_env("PATH", original_path) end)
+      :ok
+    end
+
+    test "returns a well-formed tool response" do
       {:reply, response, @frame} = Speak.execute(%{message: "test"}, @frame)
 
       assert %Anubis.Server.Response{type: :tool} = response
+      assert length(response.content) == 1
     end
 
     test "uses default voice when not specified" do
       result = Speak.execute(%{message: "hello"}, @frame) |> decode()
 
-      assert Map.has_key?(result, :success)
-      # If success, voice_used should be the default Ava
-      if result.success do
-        assert result.voice_used == "Ava"
-      end
+      assert result.success == true
+      assert result.voice_used == "Ava"
     end
 
     test "uses specified valid voice" do
       result = Speak.execute(%{message: "hello", voice: "Lee"}, @frame) |> decode()
 
-      assert Map.has_key?(result, :success)
-      if result.success do
-        assert result.voice_used == "Lee"
-      end
+      assert result.success == true
+      assert result.voice_used == "Lee"
     end
 
     test "falls back to default for invalid voice" do
       result = Speak.execute(%{message: "hello", voice: "InvalidVoice"}, @frame) |> decode()
 
-      assert Map.has_key?(result, :success)
-      # Invalid voice triggers fallback to default Ava
-      if result.success do
-        assert result.voice_used == "Ava"
-      end
+      assert result.success == true
+      assert result.voice_used == "Ava"
     end
   end
 end

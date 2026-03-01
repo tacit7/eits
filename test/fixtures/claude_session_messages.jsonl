@@ -1,0 +1,8 @@
+{"type":"user","uuid":"user-msg-001","message":{"role":"user","content":"Hello, can you help me?"},"timestamp":"2026-03-01T10:00:00Z"}
+{"type":"assistant","uuid":"asst-msg-001","message":{"role":"assistant","content":[{"type":"text","text":"Sure, I can help you with that."}]},"timestamp":"2026-03-01T10:00:01Z"}
+{"type":"user","uuid":"user-msg-002","message":{"role":"user","content":"Read the file foo.txt"},"timestamp":"2026-03-01T10:00:02Z"}
+{"type":"assistant","uuid":"asst-msg-002","message":{"role":"assistant","content":[{"type":"tool_use","id":"tool_read_1","name":"Read","input":{"file_path":"/tmp/foo.txt"}}]},"timestamp":"2026-03-01T10:00:03Z"}
+{"type":"assistant","uuid":"asst-msg-003","message":{"role":"assistant","content":[{"type":"text","text":"Here is the file content."}]},"timestamp":"2026-03-01T10:00:04Z"}
+{"type":"system","subtype":"init","session_id":"sess-999"}
+{"type":"user","uuid":"user-msg-003","message":{"role":"user","content":"Now edit it"},"timestamp":"2026-03-01T10:00:05Z"}
+{"type":"assistant","uuid":"asst-msg-004","message":{"role":"assistant","content":[{"type":"tool_use","id":"tool_edit_1","name":"Edit","input":{"file_path":"/tmp/foo.txt"}},{"type":"tool_use","id":"tool_bash_1","name":"Bash","input":{"command":"echo done"}}]},"timestamp":"2026-03-01T10:00:06Z"}

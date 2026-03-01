@@ -14,12 +14,12 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionToolTest do
   end
 
   defp new_session do
-    {:ok, agent} = Agents.create_agent(%{name: "test-agent-#{uniq()}", status: "active"})
+    {:ok, agent} = Agents.create_agent(%{name: "test-agent-#{uniq()}", status: "working"})
     {:ok, session} = Sessions.create_session(%{
       uuid: "sess-#{uniq()}",
       agent_id: agent.id,
       started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-      status: "active"
+      status: "working"
     })
     session
   end
@@ -30,6 +30,18 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionToolTest do
 
   test "start: creates a new session" do
     uuid = "new-#{uniq()}"
+    r = SessionTool.execute(%{command: "start", session_id: uuid}, @frame) |> json_result()
+    assert r.success == true
+    assert r.session_id == uuid
+    assert is_integer(r.session_int_id)
+  end
+
+  test "start: creates default agent when no agents exist (nil-agent fallback path)" do
+    # This exercises the create_or_find_session fallback: Agents.list_active_agents()
+    # returns [] in a clean sandbox, so the tool must create a default agent.
+    # Before the fix, Agents.create_agent returning {:error, _} would crash
+    # the GenServer via a bare pattern match; now it returns a graceful error.
+    uuid = "nil-agent-#{uniq()}"
     r = SessionTool.execute(%{command: "start", session_id: uuid}, @frame) |> json_result()
     assert r.success == true
     assert r.session_id == uuid

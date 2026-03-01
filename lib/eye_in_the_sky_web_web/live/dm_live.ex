@@ -407,7 +407,11 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
     if session_id == socket.assigns.session_id do
-      {:noreply, socket |> assign(:processing, false) |> push_event("focus-input", %{})}
+      {:noreply,
+       socket
+       |> assign(:processing, false)
+       |> load_tab_data("messages", socket.assigns.session_id)
+       |> push_event("focus-input", %{})}
     else
       {:noreply, socket}
     end

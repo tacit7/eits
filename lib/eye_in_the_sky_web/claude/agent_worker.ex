@@ -350,7 +350,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       opts = if channel_id, do: Keyword.put(opts, :channel_id, channel_id), else: opts
 
       case Messages.record_incoming_reply(state.session_id, state.provider, text, opts) do
-        {:ok, _message} ->
+        {:ok, message} ->
+          Phoenix.PubSub.broadcast(
+            EyeInTheSkyWeb.PubSub,
+            "session:#{state.session_id}",
+            {:new_message, message}
+          )
+
           :ok
 
         {:error, reason} ->

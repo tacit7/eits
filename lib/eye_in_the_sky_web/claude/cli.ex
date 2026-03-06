@@ -27,7 +27,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   @type spawn_result :: {:ok, port(), reference()} | {:error, term()}
 
   @known_permission_modes ~w(acceptEdits bypassPermissions default delegate dontAsk plan)
-  @default_idle_timeout_ms 300_000
+  @fallback_idle_timeout_ms 300_000
   @standard_paths [
     "/usr/local/bin/claude",
     "/opt/homebrew/bin/claude",
@@ -272,13 +272,16 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     args = maybe_flag(args, "--allowedTools", opts[:allowedTools])
     args = maybe_flag(args, "--permission-mode", opts[:permission_mode])
     args = maybe_flag(args, "--mcp-config", opts[:mcp_config])
+    args = maybe_flag(args, "--worktree", opts[:worktree])
 
     # Boolean flags
     # stream-json requires --verbose for proper output parsing
     verbose = opts[:verbose] || opts[:output_format] == "stream-json"
     args = if verbose, do: args ++ ["--verbose"], else: args
     args = if opts[:skip_permissions], do: args ++ ["--dangerously-skip-permissions"], else: args
-    args = if opts[:include_partial_messages], do: args ++ ["--include-partial-messages"], else: args
+
+    args =
+      if opts[:include_partial_messages], do: args ++ ["--include-partial-messages"], else: args
 
     args
   end
@@ -329,10 +332,13 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     caller = Keyword.get(opts, :caller, self())
     session_ref = Keyword.get(opts, :session_ref, make_ref())
 
+    raw_timeout = EyeInTheSkyWeb.Settings.get_integer("cli_idle_timeout_ms")
+    default_timeout = if is_integer(raw_timeout) and raw_timeout > 0, do: raw_timeout, else: @fallback_idle_timeout_ms
+
     idle_timeout_ms =
-      case Keyword.get(opts, :idle_timeout_ms, @default_idle_timeout_ms) do
+      case Keyword.get(opts, :idle_timeout_ms, default_timeout) do
         n when is_integer(n) and n > 0 -> n
-        _ -> @default_idle_timeout_ms
+        _ -> default_timeout
       end
 
     case find_claude_binary() do

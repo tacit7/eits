@@ -86,11 +86,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
     project = socket.assigns.project
     agent_ids = Enum.map(project.agents, & &1.id)
 
-    # Get all execution agent IDs for chat agents in this project
-    execution_agent_ids =
-      from(ea in EyeInTheSkyWeb.Agents.Agent,
-        where: ea.agent_id in ^agent_ids,
-        select: ea.id
+    # Get all session IDs for agents in this project
+    session_ids =
+      from(s in EyeInTheSkyWeb.Sessions.Session,
+        where: s.agent_id in ^agent_ids,
+        select: s.id
       )
       |> Repo.all()
 
@@ -105,7 +105,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
       else
         project_id_str = to_string(project.id)
         agent_id_strs = Enum.map(agent_ids, &to_string/1)
-        execution_agent_id_strs = Enum.map(execution_agent_ids, &to_string/1)
+        session_id_strs = Enum.map(session_ids, &to_string/1)
 
         base =
           from(n in EyeInTheSkyWeb.Notes.Note,
@@ -113,7 +113,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
               (n.parent_type in ["project", "projects"] and n.parent_id == ^project_id_str) or
                 (n.parent_type in ["agent", "agents"] and n.parent_id in ^agent_id_strs) or
                 (n.parent_type in ["session", "sessions"] and
-                   n.parent_id in ^execution_agent_id_strs),
+                   n.parent_id in ^session_id_strs),
             order_by: [desc: n.created_at]
           )
 

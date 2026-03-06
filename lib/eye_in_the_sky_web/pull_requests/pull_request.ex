@@ -9,7 +9,7 @@ defmodule EyeInTheSkyWeb.PullRequests.PullRequest do
     field :base_branch, :string
     field :head_branch, :string
 
-    belongs_to :session, EyeInTheSkyWeb.Agents.Agent,
+    belongs_to :session, EyeInTheSkyWeb.Sessions.Session,
       define_field: false,
       foreign_key: :session_id,
       type: :integer

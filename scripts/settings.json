@@ -1,0 +1,106 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-init.sh"
+          },
+          {
+            "type": "command",
+            "command": "/Users/urielmaldonado/.claude/hooks/eits-agent-working.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-init.sh"
+          },
+          {
+            "type": "command",
+            "command": "/Users/urielmaldonado/.claude/hooks/eits-agent-working.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-compact.sh"
+          },
+          {
+            "type": "command",
+            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-init.sh"
+          },
+          {
+            "type": "command",
+            "command": "/Users/urielmaldonado/.claude/hooks/eits-agent-working.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-compact.sh"
+          },
+          {
+            "type": "command",
+            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-init.sh"
+          },
+          {
+            "type": "command",
+            "command": "/Users/urielmaldonado/.claude/hooks/eits-agent-working.sh"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-end.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-stop.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/urielmaldonado/.claude/hooks/eits-pre-tool-use.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/urielmaldonado/.claude/hooks/eits-post-tool-use.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

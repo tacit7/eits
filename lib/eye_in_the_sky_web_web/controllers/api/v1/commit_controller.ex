@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.CommitController do
   use EyeInTheSkyWebWeb, :controller
 
-  alias EyeInTheSkyWeb.{Agents, Commits}
+  alias EyeInTheSkyWeb.{Commits, Sessions}
 
   @doc """
   POST /api/v1/commits - Track one or more git commits.
@@ -22,7 +22,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.CommitController do
         conn |> put_status(:bad_request) |> json(%{error: "commit_hashes is required"})
 
       true ->
-        case Agents.get_execution_agent_by_uuid(agent_uuid) do
+        case Sessions.get_session_by_uuid(agent_uuid) do
           {:ok, agent} ->
             results =
               hashes
@@ -39,7 +39,11 @@ defmodule EyeInTheSkyWebWeb.Api.V1.CommitController do
               results
               |> Enum.filter(&match?({:ok, _}, &1))
               |> Enum.map(fn {:ok, commit} ->
-                %{id: commit.id, commit_hash: commit.commit_hash, commit_message: commit.commit_message}
+                %{
+                  id: commit.id,
+                  commit_hash: commit.commit_hash,
+                  commit_message: commit.commit_message
+                }
               end)
 
             errors =

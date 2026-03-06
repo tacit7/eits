@@ -17,12 +17,12 @@ defmodule EyeInTheSkyWeb.Tasks.Task do
     belongs_to :state, EyeInTheSkyWeb.Tasks.WorkflowState, foreign_key: :state_id, type: :integer
     belongs_to :project, EyeInTheSkyWeb.Projects.Project, foreign_key: :project_id, type: :integer
 
-    belongs_to :agent, EyeInTheSkyWeb.Agents.Agent,
+    belongs_to :agent, EyeInTheSkyWeb.Sessions.Session,
       define_field: false,
       foreign_key: :agent_id,
       type: :integer
 
-    many_to_many :agents, EyeInTheSkyWeb.Agents.Agent,
+    many_to_many :agents, EyeInTheSkyWeb.Sessions.Session,
       join_through: "task_sessions",
       join_keys: [task_id: :id, session_id: :id],
       on_replace: :delete

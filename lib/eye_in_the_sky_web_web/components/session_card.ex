@@ -14,8 +14,16 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
   attr :show_project, :boolean, default: true
 
   def session_card(assigns) do
-    status = session_status(assigns.session.started_at, assigns.session.ended_at)
-    assigns = assign(assigns, :status, status)
+    status = session_status(assigns.session)
+    active_task = Map.get(assigns.session, :active_task)
+    intent = Map.get(assigns.session, :intent)
+    subtitle = pick_subtitle(active_task, intent, Map.get(assigns.session, :agent_description))
+
+    assigns =
+      assigns
+      |> assign(:status, status)
+      |> assign(:active_task, if(is_binary(active_task) && active_task != "", do: active_task))
+      |> assign(:subtitle, subtitle)
 
     ~H"""
     <.link
@@ -25,39 +33,60 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
       <%!-- Subtle top accent line --%>
       <div class={[
         "absolute top-0 left-0 right-0 h-[2px] transition-all duration-300",
-        if(@status == "Active",
-          do: "bg-gradient-to-r from-success/60 via-success to-success/60",
-          else: "bg-gradient-to-r from-transparent via-base-content/6 to-transparent group-hover:via-primary/20"
-        )
+        case @status do
+          :working -> "bg-gradient-to-r from-success/60 via-success to-success/60"
+          :compacting -> "bg-gradient-to-r from-warning/60 via-warning to-warning/60"
+          :idle -> "bg-gradient-to-r from-transparent via-base-content/6 to-transparent group-hover:via-primary/20"
+          _ -> "bg-gradient-to-r from-transparent via-base-content/6 to-transparent group-hover:via-primary/20"
+        end
       ]} />
 
       <div class="p-4 pt-5 space-y-3">
-        <%!-- Top row: status + time --%>
+        <%!-- Top row: status badge + time --%>
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <%= if @status == "Active" do %>
-              <span class="relative flex h-2 w-2">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-60"></span>
-                <span class="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
-              </span>
-              <span class="text-[11px] font-semibold tracking-wide uppercase text-success/80">Live</span>
-            <% else %>
-              <span class="inline-flex rounded-full h-2 w-2 bg-base-content/15"></span>
-              <span class="text-[11px] tracking-wide uppercase text-base-content/30">Ended</span>
+            <%= case @status do %>
+              <% :working -> %>
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-60"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
+                </span>
+                <span class="text-[11px] font-semibold tracking-wide uppercase text-success/80">Working</span>
+              <% :compacting -> %>
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-warning opacity-60"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-warning"></span>
+                </span>
+                <span class="text-[11px] font-semibold tracking-wide uppercase text-warning/80">Compacting</span>
+              <% :idle -> %>
+                <span class="inline-flex rounded-full h-2 w-2 bg-base-content/25"></span>
+                <span class="text-[11px] tracking-wide uppercase text-base-content/40">Idle</span>
+              <% _ -> %>
+                <span class="inline-flex rounded-full h-2 w-2 bg-base-content/15"></span>
+                <span class="text-[11px] tracking-wide uppercase text-base-content/30">Ended</span>
             <% end %>
           </div>
-          <span class="text-[11px] tabular-nums text-base-content/35">{relative_time(@session.started_at)}</span>
+          <span class="text-[11px] tabular-nums text-base-content/35">
+            {relative_time(@session.started_at)}
+          </span>
         </div>
 
-        <%!-- Session name --%>
+        <%!-- Session name + active task / subtitle --%>
         <div class="min-h-[2.5rem]">
           <p class="text-[13px] font-semibold text-base-content/90 line-clamp-1 group-hover:text-primary transition-colors duration-200">
             {@session.session_name || "Unnamed session"}
           </p>
-          <%= if Map.get(@session, :agent_description) do %>
-            <p class="text-xs text-base-content/40 mt-1 line-clamp-2 leading-relaxed">
-              {@session.agent_description}
+          <%= if @active_task do %>
+            <p class="text-xs text-base-content/50 mt-1 line-clamp-1 leading-relaxed flex items-center gap-1">
+              <.icon name="hero-check-circle-mini" class="w-3 h-3 text-success/60 shrink-0" />
+              <span class="truncate">{@active_task}</span>
             </p>
+          <% else %>
+            <%= if @subtitle do %>
+              <p class="text-xs text-base-content/40 mt-1 line-clamp-2 leading-relaxed">
+                {@subtitle}
+              </p>
+            <% end %>
           <% end %>
         </div>
 
@@ -92,9 +121,15 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
     """
   end
 
-  defp session_status(started_at, ended_at) when is_binary(started_at) do
-    if ended_at && ended_at != "", do: "Ended", else: "Active"
-  end
+  defp session_status(%{ended_at: ended_at}) when is_binary(ended_at) and ended_at != "", do: :ended
 
-  defp session_status(_, _), do: "—"
+  defp session_status(%{status: "working"}), do: :working
+  defp session_status(%{status: "compacting"}), do: :compacting
+  defp session_status(%{status: "idle"}), do: :idle
+  defp session_status(_), do: :ended
+
+  defp pick_subtitle(active_task, _intent, _desc) when is_binary(active_task) and active_task != "", do: nil
+  defp pick_subtitle(_active_task, intent, _desc) when is_binary(intent) and intent != "", do: intent
+  defp pick_subtitle(_active_task, _intent, desc) when is_binary(desc) and desc != "", do: desc
+  defp pick_subtitle(_, _, _), do: nil
 end

@@ -1,8 +1,9 @@
 defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.{Agents, ChatAgents}
+  alias EyeInTheSkyWeb.Agents
   alias EyeInTheSkyWeb.Claude.{SDK, Message}
+  alias EyeInTheSkyWeb.Sessions
   import EyeInTheSkyWebWeb.Helpers.ViewHelpers
   import EyeInTheSkyWebWeb.Components.Icons
 
@@ -43,7 +44,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   defp load_agents(socket) do
     include_archived = socket.assigns.session_filter == "archived"
-    db_agents = Agents.list_agents_with_chat_agent(include_archived: include_archived)
+    db_agents = Sessions.list_sessions_with_agent(include_archived: include_archived)
 
     # Build project lookup map from assigns
     project_map =
@@ -65,7 +66,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       "active" ->
         Enum.filter(
           sessions,
-          &(&1.status in ["active", "working", nil] and is_nil(&1.archived_at))
+          &(&1.status in ["working", "idle", nil] and is_nil(&1.archived_at))
         )
 
       "completed" ->
@@ -124,7 +125,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     case agent.status do
       "discovered" -> 0
       "working" -> 1
-      "active" -> 1
+      "idle" -> 1
       "completed" -> 2
       nil -> 1
       _ -> 2
@@ -152,7 +153,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       ) do
     # Get the global channel — try agent's project first, fall back to all channels
     project_id =
-      case Agents.get_execution_agent(target_session_id) do
+      case Sessions.get_session(target_session_id) do
         {:ok, agent} -> agent.project_id
         _ -> nil
       end
@@ -183,8 +184,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
           )
 
           # Continue the agent's session
-          with {:ok, agent} <- Agents.get_execution_agent(target_session_id),
-               {:ok, chat_agent} <- ChatAgents.get_chat_agent(agent.agent_id) do
+          with {:ok, agent} <- Sessions.get_session(target_session_id),
+               {:ok, chat_agent} <- Agents.get_agent(agent.agent_id) do
             project_path = chat_agent.git_worktree_path || File.cwd!()
 
             prompt_with_reminder = """
@@ -255,8 +256,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     require Logger
     Logger.info("🗄️  Archive button clicked for session: #{session_id}")
 
-    with {:ok, agent} <- Agents.get_execution_agent(session_id),
-         {:ok, updated} <- Agents.archive_execution_agent(agent) do
+    with {:ok, agent} <- Sessions.get_session(session_id),
+         {:ok, updated} <- Sessions.archive_session(agent) do
       Logger.info(
         "✅ Session archived successfully: #{session_id}, archived_at now: #{inspect(updated.archived_at)}"
       )
@@ -279,8 +280,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     require Logger
     Logger.info("🔄 Unarchive button clicked for session: #{session_id}")
 
-    with {:ok, agent} <- Agents.get_execution_agent(session_id),
-         {:ok, updated} <- Agents.unarchive_execution_agent(agent) do
+    with {:ok, agent} <- Sessions.get_session(session_id),
+         {:ok, updated} <- Sessions.unarchive_session(agent) do
       Logger.info(
         "✅ Session unarchived successfully: #{session_id}, archived_at now: #{inspect(updated.archived_at)}"
       )
@@ -300,8 +301,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_event("delete_session", %{"session_id" => session_id}, socket) do
-    with {:ok, agent} <- Agents.get_execution_agent(session_id),
-         {:ok, _} <- Agents.delete_execution_agent(agent) do
+    with {:ok, agent} <- Sessions.get_session(session_id),
+         {:ok, _} <- Sessions.delete_session(agent) do
       socket =
         socket
         |> load_agents()
@@ -342,8 +343,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
     results =
       Enum.map(ids, fn id ->
-        with {:ok, agent} <- Agents.get_execution_agent(id),
-             {:ok, _} <- Agents.delete_execution_agent(agent) do
+        with {:ok, agent} <- Sessions.get_session(id),
+             {:ok, _} <- Sessions.delete_session(agent) do
           :ok
         else
           _ -> :error
@@ -384,6 +385,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   def handle_event("create_new_session", params, socket) do
     require Logger
 
+    agent_type = params["agent_type"] || "claude"
     model = params["model"]
     effort_level = params["effort_level"]
     project_id = String.to_integer(params["project_id"])
@@ -392,13 +394,21 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
     project = EyeInTheSkyWeb.Projects.get_project!(project_id)
 
+    worktree = case params["worktree"] do
+      nil -> nil
+      "" -> nil
+      v -> String.trim(v)
+    end
+
     opts = [
+      agent_type: agent_type,
       model: model,
       effort_level: effort_level,
       project_id: project_id,
       project_path: project.path,
       description: agent_name,
-      instructions: description
+      instructions: description,
+      worktree: worktree
     ]
 
     Logger.info(
@@ -451,7 +461,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
-    {:noreply, update_agent_status_in_list(socket, session_id, "waiting")}
+    {:noreply, update_agent_status_in_list(socket, session_id, "idle")}
   end
 
   @impl true
@@ -575,7 +585,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       |> Enum.map(fn agent ->
         if agent.id == session_id do
           agent = %{agent | status: new_status}
-          if new_status == "waiting", do: %{agent | last_activity_at: now}, else: agent
+          if new_status == "idle", do: %{agent | last_activity_at: now}, else: agent
         else
           agent
         end
@@ -729,13 +739,15 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
             />
           <% else %>
             <%= for agent <- @agents do %>
+              <% display_status = EyeInTheSkyWebWeb.Helpers.ViewHelpers.derive_display_status(agent) %>
               <% {status_color, status_bg, status_label, is_active} =
-                case agent.status do
+                case display_status do
                   "working" -> {"text-success", "bg-success", "Working", true}
-                  "active" -> {"text-info", "bg-info", "Active", false}
-                  "waiting" -> {"text-base-content/25", "bg-base-content/20", "Waiting", false}
+                  "compacting" -> {"text-warning", "bg-warning", "Compacting", true}
+                  "idle" -> {"text-base-content/25", "bg-base-content/20", "Idle", false}
+                  "idle_stale" -> {"text-warning", "bg-warning", "Idle", false}
+                  "idle_dead" -> {"text-error", "bg-error", "Idle", false}
                   "completed" -> {"text-base-content/25", "bg-base-content/20", "Done", false}
-                  "discovered" -> {"text-base-content/25", "bg-base-content/20", "Idle", false}
                   _ -> {"text-base-content/25", "bg-base-content/20", "Idle", false}
                 end %>
               <div
@@ -758,8 +770,10 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                   <div class="flex-shrink-0 w-6 flex justify-center" title={status_label}>
                     <%= if is_active do %>
                       <span class="relative flex h-2 w-2">
-                        <span class={"animate-ping absolute inline-flex h-full w-full rounded-full opacity-50 " <> status_bg}></span>
-                        <span class={"relative inline-flex rounded-full h-2 w-2 " <> status_bg}></span>
+                        <span class={"animate-ping absolute inline-flex h-full w-full rounded-full opacity-50 " <> status_bg}>
+                        </span>
+                        <span class={"relative inline-flex rounded-full h-2 w-2 " <> status_bg}>
+                        </span>
                       </span>
                     <% else %>
                       <span class={"inline-flex rounded-full h-2 w-2 " <> status_bg}></span>
@@ -778,7 +792,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                     </span>
                   </div>
                   <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
-                    <span class="font-mono">{Agents.format_model_info(agent)}</span>
+                    <span class="font-mono">{Sessions.format_model_info(agent)}</span>
                     <%= if agent.project_name do %>
                       <span class="text-base-content/15">/</span>
                       <span>{agent.project_name}</span>
@@ -786,9 +800,9 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                     <span class="text-base-content/15">/</span>
                     <span class="tabular-nums">{relative_time(agent.started_at)}</span>
                   </div>
-                  <%= if agent.chat_agent && agent.chat_agent.description do %>
+                  <%= if agent.agent && agent.agent.description do %>
                     <p class="text-xs text-base-content/35 mt-1 truncate max-w-lg">
-                      {agent.chat_agent.description}
+                      {agent.agent.description}
                     </p>
                   <% end %>
                 </div>
@@ -808,14 +822,14 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                       <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
                     </a>
                   <% end %>
-                  <%= if agent.chat_agent && agent.chat_agent.uuid && agent.uuid do %>
+                  <%= if agent.agent && agent.agent.uuid && agent.uuid do %>
                     <button
                       id={"bookmark-btn-#{agent.uuid}"}
                       type="button"
                       phx-hook="BookmarkAgent"
-                      data-agent-id={agent.chat_agent.uuid}
+                      data-agent-id={agent.agent.uuid}
                       data-session-id={agent.uuid}
-                      data-agent-name={agent.name || agent.chat_agent.description || "Agent"}
+                      data-agent-name={agent.name || agent.agent.description || "Agent"}
                       data-agent-status={agent.status}
                       class="bookmark-button btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-error"
                       aria-label="Bookmark agent"
@@ -893,10 +907,18 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                 {@sdk_session_id}
               </span>
             <% end %>
-            <button phx-click="sdk_clear" class="btn btn-ghost btn-xs btn-square text-base-content/30" title="Clear">
+            <button
+              phx-click="sdk_clear"
+              class="btn btn-ghost btn-xs btn-square text-base-content/30"
+              title="Clear"
+            >
               <.icon name="hero-trash-mini" class="w-3 h-3" />
             </button>
-            <button phx-click="toggle_sdk_demo" class="btn btn-ghost btn-xs btn-square text-base-content/30" title="Close">
+            <button
+              phx-click="toggle_sdk_demo"
+              class="btn btn-ghost btn-xs btn-square text-base-content/30"
+              title="Close"
+            >
               <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
             </button>
           </div>

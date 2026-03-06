@@ -43,3 +43,6 @@ config :eye_in_the_sky_web,
 
 # Disable Oban queues in test (use Oban.Testing for manual testing)
 config :eye_in_the_sky_web, Oban, testing: :inline
+
+# Disable message broadcaster polling in test (tested manually via handle_info)
+config :eye_in_the_sky_web, EyeInTheSkyWeb.Messages.Broadcaster, enabled: false

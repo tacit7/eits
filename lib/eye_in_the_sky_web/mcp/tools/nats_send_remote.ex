@@ -15,14 +15,14 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NatsSendRemote do
 
   @impl true
   def execute(params, frame) do
-    server_url = params["server_url"]
-    subject = normalize_subject(params["subject"])
+    server_url = params[:server_url]
+    subject = normalize_subject(params[:subject])
 
     payload =
       Jason.encode!(%{
-        sender_id: params["sender_id"],
-        receiver_id: params["receiver_id"] || "",
-        message: params["message"],
+        sender_id: params[:sender_id],
+        receiver_id: params[:receiver_id] || "",
+        message: params[:message],
         timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
       })
 

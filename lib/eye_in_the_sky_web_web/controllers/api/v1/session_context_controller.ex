@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.SessionContextController do
   use EyeInTheSkyWebWeb, :controller
 
-  alias EyeInTheSkyWeb.{Agents, Contexts}
+  alias EyeInTheSkyWeb.{Contexts, Sessions}
 
   @doc """
   POST /api/v1/session-context - Save session context (markdown).
@@ -21,7 +21,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionContextController do
         conn |> put_status(:bad_request) |> json(%{error: "context is required"})
 
       true ->
-        case Agents.get_execution_agent_by_uuid(agent_uuid) do
+        case Sessions.get_session_by_uuid(agent_uuid) do
           {:ok, agent} ->
             attrs = %{
               agent_id: agent.agent_id,

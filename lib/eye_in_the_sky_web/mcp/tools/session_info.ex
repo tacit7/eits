@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionInfo do
   use Anubis.Server.Component, type: :tool
 
   alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.Sessions
 
   schema do
     field :session_id, :string, description: "Session UUID to look up"
@@ -11,19 +12,19 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionInfo do
 
   @impl true
   def execute(params, frame) do
-    alias EyeInTheSkyWeb.Agents
-
-    uuid = params["session_id"]
+    uuid = params[:session_id]
 
     result =
       if uuid do
-        case Agents.get_execution_agent_by_uuid(uuid) do
-          {:ok, agent} ->
+        case Sessions.get_session_by_uuid(uuid) do
+          {:ok, session} ->
+            agent_uuid = resolve_agent_uuid(session.agent_id)
+
             %{
-              agent_id: agent.uuid,
+              agent_id: agent_uuid,
               session_id: uuid,
-              project_name: agent.project_name,
-              status: agent.status,
+              project_id: session.project_id,
+              status: session.status,
               initialized: true
             }
 
@@ -36,5 +37,16 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionInfo do
 
     response = Response.tool() |> Response.json(result)
     {:reply, response, frame}
+  end
+
+  defp resolve_agent_uuid(nil), do: nil
+
+  defp resolve_agent_uuid(agent_int_id) do
+    alias EyeInTheSkyWeb.Agents
+
+    case Agents.get_agent(agent_int_id) do
+      {:ok, agent} -> agent.uuid
+      _ -> nil
+    end
   end
 end

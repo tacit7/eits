@@ -4,35 +4,39 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Dm do
   use Anubis.Server.Component, type: :tool
 
   alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.Sessions
 
   schema do
     field :sender_id, :string, required: true, description: "Your session ID"
     field :target_session_id, :string, required: true, description: "Target agent's session ID"
     field :message, :string, required: true, description: "Message body to send"
-    field :response_required, :boolean, description: "Whether response is required (default: false)"
+
+    field :response_required, :boolean,
+      description: "Whether response is required (default: false)"
   end
 
   @impl true
   def execute(params, frame) do
-    alias EyeInTheSkyWeb.{Agents, Messages}
+    alias EyeInTheSkyWeb.Messages
 
-    target_uuid = params["target_session_id"]
+    target_uuid = params[:target_session_id]
 
     # Resolve UUID to internal integer session_id
     result =
-      case Agents.get_execution_agent_by_uuid(target_uuid) do
+      case Sessions.get_session_by_uuid(target_uuid) do
         {:ok, agent} ->
           attrs = %{
+            uuid: Ecto.UUID.generate(),
             session_id: agent.id,
-            body: params["message"],
+            body: params[:message],
             sender_role: "agent",
             recipient_role: "agent",
             direction: "inbound",
             status: "delivered",
             provider: "claude",
             metadata: %{
-              sender_id: params["sender_id"],
-              response_required: params["response_required"] || false
+              sender_id: params[:sender_id],
+              response_required: params[:response_required] || false
             }
           }
 

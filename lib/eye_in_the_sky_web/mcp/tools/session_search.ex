@@ -12,23 +12,23 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionSearch do
 
   @impl true
   def execute(params, frame) do
-    alias EyeInTheSkyWeb.Agents
+    alias EyeInTheSkyWeb.Sessions
 
-    query = params["query"]
-    limit = params["limit"] || 20
-    results = Agents.list_agents_filtered(%{"search" => query})
+    query = params[:query] || ""
+    limit = params[:limit] || 20
+    results = Sessions.list_sessions_filtered(search_query: query)
     results = Enum.take(results, limit)
 
     result = %{
       success: true,
       message: "Found #{length(results)} session(s) matching '#{query}'",
       results:
-        Enum.map(results, fn a ->
+        Enum.map(results, fn s ->
           %{
-            id: a.id,
-            uuid: a.uuid,
-            description: a.description,
-            status: a.status
+            id: s.id,
+            uuid: s.uuid,
+            description: s.description,
+            status: s.status
           }
         end)
     }

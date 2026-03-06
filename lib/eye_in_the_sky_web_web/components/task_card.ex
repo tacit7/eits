@@ -9,12 +9,13 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   attr :task, :map, required: true
   attr :variant, :string, default: "kanban", values: ["kanban", "grid", "list"]
   attr :on_click, :string, default: nil
+  attr :on_delete, :string, default: nil
 
   def task_card(assigns) do
     ~H"""
     <%= case @variant do %>
       <% "list" -> %>
-        <.list_row task={@task} on_click={@on_click} />
+        <.list_row task={@task} on_click={@on_click} on_delete={@on_delete} />
       <% _ -> %>
         <div class={card_class(@variant)}>
           <div class={card_body_class(@variant)}>
@@ -32,28 +33,41 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   defp list_row(assigns) do
     ~H"""
     <div
-      class="group flex flex-col gap-1 py-3.5 cursor-pointer"
+      class="group flex items-center gap-2 py-3.5 cursor-pointer"
       phx-click={@on_click}
       phx-value-task_id={@task.uuid}
     >
-      <span class={[
-        "text-sm font-medium truncate",
-        @task.completed_at && "text-base-content/40 line-through",
-        !@task.completed_at && "text-base-content/85 group-hover:text-base-content"
-      ]}>
-        {@task.title}
-      </span>
-      <div class="flex items-center gap-1.5 text-xs text-base-content/35">
-        <%= if @task.state do %>
-          <span class={state_text_color(@task.state_id)}>{@task.state.name}</span>
-        <% end %>
-        <%= if @task.tags && length(@task.tags) > 0 do %>
+      <div class="flex flex-col gap-1 flex-1 min-w-0">
+        <span class={[
+          "text-sm font-medium truncate",
+          @task.completed_at && "text-base-content/40 line-through",
+          !@task.completed_at && "text-base-content/85 group-hover:text-base-content"
+        ]}>
+          {@task.title}
+        </span>
+        <div class="flex items-center gap-1.5 text-xs text-base-content/35">
+          <%= if @task.state do %>
+            <span class={state_text_color(@task.state_id)}>{@task.state.name}</span>
+          <% end %>
+          <%= if @task.tags && length(@task.tags) > 0 do %>
+            <span class="text-base-content/15">&middot;</span>
+            <span>{Enum.map_join(Enum.take(@task.tags, 2), ", ", & &1.name)}</span>
+          <% end %>
           <span class="text-base-content/15">&middot;</span>
-          <span>{Enum.map_join(Enum.take(@task.tags, 2), ", ", & &1.name)}</span>
-        <% end %>
-        <span class="text-base-content/15">&middot;</span>
-        <span class="font-mono">{String.slice(@task.uuid, 0..7)}</span>
+          <span class="font-mono">{String.slice(@task.uuid, 0..7)}</span>
+        </div>
       </div>
+      <%= if @on_delete do %>
+        <button
+          type="button"
+          phx-click={@on_delete}
+          phx-value-task_id={@task.uuid}
+          data-confirm="Delete this task?"
+          class="flex-shrink-0 opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-base-content/25 hover:text-error hover:bg-error/10 transition-all"
+        >
+          <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
+        </button>
+      <% end %>
     </div>
     """
   end
@@ -137,8 +151,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       <% end %>
       <%= if @task.agent_id do %>
         <span class="flex items-center gap-1">
-          <.icon name="hero-user" class="w-3 h-3" />
-          Agent #{@task.agent_id}
+          <.icon name="hero-user" class="w-3 h-3" /> Agent #{@task.agent_id}
         </span>
       <% end %>
       <%= if @task.tags && length(@task.tags) > 0 do %>

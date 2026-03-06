@@ -127,50 +127,95 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
   Render status badge component with proper styling.
   """
   def render_status_badge(assigns, agent) do
-    status = derive_display_status(agent)
-    badge_variant = status_to_badge(status)
-    assigns = Map.merge(assigns, %{status: status, badge_variant: badge_variant})
+    display_status = derive_display_status(agent)
+    badge_variant = status_to_badge(display_status)
+    label = status_label(display_status)
+    assigns = Map.merge(assigns, %{status: display_status, badge_variant: badge_variant, label: label})
 
     ~H"""
     <span class={"badge #{@badge_variant}"}>
-      {@status}
+      {@label}
     </span>
     """
   end
 
   @doc """
-  Derive display status considering staleness.
+  Derive display status with idle staleness tiers.
+  Returns one of: working | compacting | idle | idle_stale | idle_dead | completed | failed
   """
-  def derive_display_status(agent, stale_threshold_hours \\ 24) do
-    status = agent[:status] || agent.status
+  def derive_display_status(agent, _stale_threshold_hours \\ 24) do
+    status = Map.get(agent, :status)
 
-    if status in ["active", "working"] && is_stale?(agent, stale_threshold_hours) do
-      "stale"
+    if status == "idle" do
+      idle_tier(agent)
     else
       status
     end
   end
 
   @doc """
-  Check if agent is stale based on updated_at timestamp.
+  Compute idle staleness tier based on last_activity_at.
+  Returns :idle | :idle_stale | :idle_dead
   """
-  def is_stale?(agent, stale_threshold_hours \\ 24) do
-    case parse_updated_at(agent) do
-      %DateTime{} = updated_at ->
-        status = agent[:status] || agent.status
-        diff_hours = DateTime.diff(DateTime.utc_now(), updated_at, :hour)
-        diff_hours >= stale_threshold_hours && status in ["active", "working"]
+  def idle_tier(agent) do
+    activity_at = Map.get(agent, :last_activity_at)
 
-      _ ->
-        false
+    hours_since =
+      case activity_at do
+        nil ->
+          nil
+
+        %DateTime{} = dt ->
+          DateTime.diff(DateTime.utc_now(), dt, :hour)
+
+        str when is_binary(str) ->
+          dt =
+            case DateTime.from_iso8601(str) do
+              {:ok, dt, _} -> dt
+              _ ->
+                case parse_datetime(str) do
+                  {:ok, dt} -> dt
+                  :error -> nil
+                end
+            end
+
+          if dt, do: DateTime.diff(DateTime.utc_now(), dt, :hour), else: nil
+
+        _ ->
+          nil
+      end
+
+    cond do
+      is_nil(hours_since) -> "idle"
+      hours_since >= 24 -> "idle_dead"
+      hours_since >= 1 -> "idle_stale"
+      true -> "idle"
     end
   end
 
+  @doc """
+  Check if agent is stale (idle >= 1h).
+  """
+  def is_stale?(agent, _stale_threshold_hours \\ 1) do
+    idle_tier(agent) in ["idle_stale", "idle_dead"]
+  end
+
+  # Human-readable labels
+  defp status_label("working"), do: "Working"
+  defp status_label("compacting"), do: "Compacting"
+  defp status_label("idle"), do: "Idle"
+  defp status_label("idle_stale"), do: "Idle"
+  defp status_label("idle_dead"), do: "Idle"
+  defp status_label("completed"), do: "Done"
+  defp status_label("failed"), do: "Failed"
+  defp status_label(s), do: s
+
   # Map status to Daisy UI badge variants
-  defp status_to_badge("active"), do: "badge-success"
-  defp status_to_badge("working"), do: "badge-warning"
-  defp status_to_badge("idle"), do: "badge-info"
-  defp status_to_badge("stale"), do: "badge-warning badge-outline"
+  defp status_to_badge("working"), do: "badge-success"
+  defp status_to_badge("compacting"), do: "badge-warning"
+  defp status_to_badge("idle"), do: "badge-ghost"
+  defp status_to_badge("idle_stale"), do: "badge-warning badge-outline"
+  defp status_to_badge("idle_dead"), do: "badge-error badge-outline"
   defp status_to_badge("completed"), do: "badge-ghost"
   defp status_to_badge("failed"), do: "badge-error"
   defp status_to_badge(_), do: "badge-ghost"

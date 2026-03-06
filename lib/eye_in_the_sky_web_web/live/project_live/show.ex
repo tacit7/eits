@@ -5,6 +5,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
   alias EyeInTheSkyWeb.Agents
   alias EyeInTheSkyWeb.Notes
   alias EyeInTheSkyWeb.Repo
+  alias EyeInTheSkyWeb.Sessions
+  alias EyeInTheSkyWeb.Commits
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -28,7 +30,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
 
         # Load active sessions for this project (max 5)
         active_sessions =
-          Agents.list_agents_with_chat_agent()
+          Sessions.list_sessions_with_agent()
           |> Enum.filter(&(is_nil(&1.ended_at) and &1.project_id == project_id))
           |> Enum.sort_by(& &1.started_at, :desc)
           |> Enum.take(5)
@@ -40,6 +42,25 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
           |> Enum.sort_by(& &1.inserted_at, :desc)
           |> Enum.take(5)
 
+        # Load agents for this project
+        project_agents = Agents.list_agents_by_project(project_id)
+
+        # Load all sessions for count
+        all_sessions =
+          Sessions.list_sessions_with_agent(project_id: project_id)
+
+        # Load recent commits via project sessions
+        recent_commits =
+          all_sessions
+          |> Enum.flat_map(&Commits.list_commits_for_session(&1.id, limit: 5))
+          |> Enum.sort_by(& &1.created_at, :desc)
+          |> Enum.uniq_by(& &1.commit_hash)
+          |> Enum.take(10)
+
+        # Task stats
+        open_tasks = Enum.count(tasks, &is_nil(&1.completed_at))
+        done_tasks = Enum.count(tasks, & &1.completed_at)
+
         socket
         |> assign(:page_title, "Project: #{project.name}")
         |> assign(:project, project)
@@ -48,6 +69,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
         |> assign(:tasks, tasks)
         |> assign(:active_sessions, active_sessions)
         |> assign(:recent_notes, recent_notes)
+        |> assign(:project_agents, project_agents)
+        |> assign(:all_sessions, all_sessions)
+        |> assign(:recent_commits, recent_commits)
+        |> assign(:open_tasks, open_tasks)
+        |> assign(:done_tasks, done_tasks)
       else
         # Invalid project ID - show error
         socket
@@ -65,6 +91,40 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-4">
       <div class="max-w-7xl mx-auto">
+        <!-- Stats bar -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body p-3">
+              <p class="text-xs text-base-content/50 uppercase tracking-wider">Sessions</p>
+              <p class="text-2xl font-semibold text-base-content">{length(@all_sessions)}</p>
+              <p class="text-xs text-base-content/40">{length(@active_sessions)} active</p>
+            </div>
+          </div>
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body p-3">
+              <p class="text-xs text-base-content/50 uppercase tracking-wider">Tasks</p>
+              <p class="text-2xl font-semibold text-base-content">{length(@tasks)}</p>
+              <p class="text-xs text-base-content/40">{@open_tasks} open · {@done_tasks} done</p>
+            </div>
+          </div>
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body p-3">
+              <p class="text-xs text-base-content/50 uppercase tracking-wider">Agents</p>
+              <p class="text-2xl font-semibold text-base-content">{length(@project_agents)}</p>
+              <p class="text-xs text-base-content/40">
+                {Enum.count(@project_agents, &(&1.status == "working"))} running
+              </p>
+            </div>
+          </div>
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body p-3">
+              <p class="text-xs text-base-content/50 uppercase tracking-wider">Commits</p>
+              <p class="text-2xl font-semibold text-base-content">{length(@recent_commits)}</p>
+              <p class="text-xs text-base-content/40">recent</p>
+            </div>
+          </div>
+        </div>
+
         <!-- Responsive Grid Layout -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <!-- Quick Access -->
@@ -128,7 +188,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
                             {String.slice(session.uuid || to_string(session.id), 0..7)}
                           </code>
                           <span class="text-sm text-base-content/80 truncate">
-                            {session.name || (session.chat_agent && session.chat_agent.description) || "Unnamed"}
+                            {session.name || (session.agent && session.agent.description) ||
+                              "Unnamed"}
                           </span>
                         </div>
                       </div>
@@ -200,6 +261,29 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
                         <% end %>
                       </p>
                       <p class="text-sm text-base-content line-clamp-3">{note.body}</p>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          <% end %>
+          <!-- Recent Commits -->
+          <%= if length(@recent_commits) > 0 do %>
+            <div class="card bg-base-100 shadow-sm">
+              <div class="card-body p-4">
+                <h2 class="card-title text-base mb-2">Recent Commits</h2>
+                <div class="space-y-1">
+                  <%= for commit <- @recent_commits do %>
+                    <div class="flex items-start gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors">
+                      <.icon name="hero-code-bracket" class="w-3.5 h-3.5 text-base-content/30 flex-shrink-0 mt-0.5" />
+                      <div class="flex-1 min-w-0">
+                        <p class="text-xs font-mono text-base-content/40 mb-0.5">
+                          {String.slice(commit.commit_hash || "", 0, 7)}
+                        </p>
+                        <p class="text-sm text-base-content truncate">
+                          {commit.commit_message}
+                        </p>
+                      </div>
                     </div>
                   <% end %>
                 </div>

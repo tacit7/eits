@@ -7,6 +7,8 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
   use Phoenix.LiveComponent
   import EyeInTheSkyWebWeb.CoreComponents, only: [icon: 1]
 
+  alias EyeInTheSkyWeb.Agents
+
   @claude_models [
     {"sonnet", "Sonnet 4.5"},
     {"opus", "Opus 4.6"},
@@ -24,7 +26,20 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
 
   @impl true
   def mount(socket) do
-    {:ok, assign(socket, selected_model: "sonnet", selected_provider: "claude")}
+    agent_templates =
+      Agents.list_active_agents()
+      |> Enum.filter(fn a -> a.description && a.description != "" end)
+      |> Enum.take(50)
+      |> Enum.map(fn a -> %{id: a.id, description: a.description} end)
+
+    {:ok, assign(socket,
+      selected_model: "sonnet",
+      selected_provider: "claude",
+      selected_prompt_id: nil,
+      selected_agent_id: nil,
+      prefill_text: "",
+      agent_templates: agent_templates
+    )}
   end
 
   @impl true
@@ -35,6 +50,30 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
 
   def handle_event("model_changed", %{"model" => model}, socket) do
     {:noreply, assign(socket, :selected_model, model)}
+  end
+
+  def handle_event("prompt_selected", %{"prompt_id" => ""}, socket) do
+    {:noreply, assign(socket, selected_prompt_id: nil, prefill_text: "")}
+  end
+
+  def handle_event("prompt_selected", %{"prompt_id" => prompt_id}, socket) do
+    prompts = socket.assigns[:prompts] || []
+    prompt = Enum.find(prompts, fn p -> to_string(p.id) == prompt_id end)
+
+    prefill = if prompt, do: prompt.prompt_text || "", else: ""
+    {:noreply, assign(socket, selected_prompt_id: prompt_id, selected_agent_id: nil, prefill_text: prefill)}
+  end
+
+  def handle_event("agent_template_selected", %{"agent_id" => ""}, socket) do
+    {:noreply, assign(socket, selected_agent_id: nil, prefill_text: "")}
+  end
+
+  def handle_event("agent_template_selected", %{"agent_id" => agent_id}, socket) do
+    agents = socket.assigns[:agent_templates] || []
+    agent = Enum.find(agents, fn a -> to_string(a.id) == agent_id end)
+
+    prefill = if agent, do: agent.description || "", else: ""
+    {:noreply, assign(socket, selected_agent_id: agent_id, selected_prompt_id: nil, prefill_text: prefill)}
   end
 
   @impl true
@@ -65,17 +104,58 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
               </select>
             </div>
 
+            <%!-- Copy from Agent --%>
+            <%= if length(assigns[:agent_templates] || []) > 0 do %>
+              <div>
+                <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Copy from Agent</label>
+                <select
+                  name="agent_id"
+                  class="select select-bordered w-full"
+                  phx-change="agent_template_selected"
+                  phx-target={@myself}
+                >
+                  <option value="">-- None --</option>
+                  <%= for agent <- @agent_templates do %>
+                    <option value={agent.id} selected={to_string(@selected_agent_id) == to_string(agent.id)}>
+                      {agent.description}
+                    </option>
+                  <% end %>
+                </select>
+              </div>
+            <% end %>
+
+            <%!-- Agent Prompt (when prompts exist) --%>
+            <%= if length(assigns[:prompts] || []) > 0 do %>
+              <div>
+                <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Agent Prompt</label>
+                <select
+                  name="prompt_id"
+                  class="select select-bordered w-full"
+                  phx-change="prompt_selected"
+                  phx-target={@myself}
+                >
+                  <option value="">-- None --</option>
+                  <%= for prompt <- @prompts do %>
+                    <option value={prompt.id} selected={to_string(@selected_prompt_id) == to_string(prompt.id)}>
+                      {prompt.name}
+                    </option>
+                  <% end %>
+                </select>
+              </div>
+            <% end %>
+
             <%!-- Description --%>
             <div>
               <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Description</label>
               <textarea
+                id={"desc-#{@selected_agent_id || @selected_prompt_id || "none"}"}
                 name="description"
                 class="textarea textarea-bordered w-full h-20 text-sm"
                 placeholder="What should this agent work on?"
                 required
                 autofocus
                 phx-mounted={Phoenix.LiveView.JS.dispatch("focus")}
-              ></textarea>
+              >{@prefill_text}</textarea>
             </div>
 
             <%!-- Project --%>
@@ -128,6 +208,23 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
                 </select>
               </div>
             <% end %>
+
+            <%!-- Worktree Branch (optional) --%>
+            <div>
+              <label class="text-sm font-medium text-base-content/70 mb-1.5 block">
+                Worktree Branch
+                <span class="text-xs font-normal text-base-content/40 ml-1">Optional</span>
+              </label>
+              <input
+                type="text"
+                name="worktree"
+                class="input input-bordered w-full font-mono text-sm"
+                placeholder="e.g., fix-login-bug"
+              />
+              <p class="text-xs text-base-content/35 mt-1">
+                Isolates work in its own branch (worktree-&lt;name&gt;) and enables automatic PR creation.
+              </p>
+            </div>
 
             <%!-- Submit --%>
             <button type="submit" class="btn btn-primary w-full mt-2">

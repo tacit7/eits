@@ -14,8 +14,8 @@ defmodule EyeInTheSkyWeb.MCP.Tools.ChatChannelList do
     alias EyeInTheSkyWeb.Channels
 
     channels =
-      if params["project_id"] do
-        Channels.list_channels_for_project(params["project_id"])
+      if params[:project_id] do
+        Channels.list_channels_for_project(params[:project_id])
       else
         Channels.list_channels()
       end

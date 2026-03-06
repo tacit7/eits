@@ -1,12 +1,12 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
   use EyeInTheSkyWebWeb, :controller
 
-  alias EyeInTheSkyWeb.{Agents, ChatAgents, Projects}
+  alias EyeInTheSkyWeb.{Agents, Sessions, Projects}
 
   @doc """
   POST /api/v1/sessions - Register a new session (SessionStart hook).
 
-  Creates a ChatAgent (chat identity) and an Agent (execution session).
+  Creates an Agent (identity) and a Session (execution session).
   Mirrors the i-start-session MCP tool flow.
   """
   def create(conn, params) do
@@ -18,8 +18,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
       # Resolve project_id from project_name if needed
       project_id = resolve_project_id(params)
 
-      # Build ChatAgent (agents table) attrs
-      chat_agent_attrs = %{
+      # Build Agent (agents table) attrs
+      agent_attrs = %{
         uuid: params["agent_id"] || session_uuid,
         description: params["agent_description"] || params["description"],
         project_id: project_id,
@@ -28,15 +28,15 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
         source: "hook"
       }
 
-      case ChatAgents.create_chat_agent(chat_agent_attrs) do
-        {:ok, chat_agent} ->
+      case Agents.create_agent(agent_attrs) do
+        {:ok, agent} ->
           # Parse model info
           {model_provider, model_name} = parse_model(params["model"])
 
-          # Build Agent (sessions table) attrs
-          agent_attrs = %{
+          # Build Session (sessions table) attrs
+          session_attrs = %{
             uuid: session_uuid,
-            agent_id: chat_agent.id,
+            agent_id: agent.id,
             name: params["name"] || params["description"],
             status: "working",
             started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -50,25 +50,25 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
 
           create_fn =
             if model_name,
-              do: &Agents.create_execution_agent_with_model/1,
-              else: &Agents.create_execution_agent/1
+              do: &Sessions.create_session_with_model/1,
+              else: &Sessions.create_session/1
 
-          case create_fn.(agent_attrs) do
-            {:ok, agent} ->
+          case create_fn.(session_attrs) do
+            {:ok, session} ->
               Phoenix.PubSub.broadcast(
                 EyeInTheSkyWeb.PubSub,
                 "agents",
-                {:agent_updated, agent}
+                {:agent_updated, session}
               )
 
               conn
               |> put_status(:created)
               |> json(%{
-                id: agent.id,
-                uuid: agent.uuid,
-                agent_id: chat_agent.id,
-                chat_agent_uuid: chat_agent.uuid,
-                status: agent.status
+                id: session.id,
+                uuid: session.uuid,
+                agent_id: agent.id,
+                agent_uuid: agent.uuid,
+                status: session.status
               })
 
             {:error, changeset} ->
@@ -89,24 +89,29 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
   PATCH /api/v1/sessions/:uuid - Update session status (SessionEnd, Stop, Compact hooks).
   """
   def update(conn, %{"uuid" => uuid} = params) do
-    case Agents.get_execution_agent_by_uuid(uuid) do
-      {:ok, agent} ->
+    case Sessions.get_session_by_uuid(uuid) do
+      {:ok, session} ->
         status = params["status"]
 
         attrs =
           %{}
           |> maybe_put(:status, status)
+          |> maybe_put(:intent, params["intent"])
           |> maybe_put(:last_activity_at, DateTime.utc_now() |> DateTime.to_iso8601())
 
         # For terminal states, set ended_at
         attrs =
           if status in ["completed", "failed"] do
-            Map.put(attrs, :ended_at, params["ended_at"] || DateTime.utc_now() |> DateTime.to_iso8601())
+            Map.put(
+              attrs,
+              :ended_at,
+              params["ended_at"] || DateTime.utc_now() |> DateTime.to_iso8601()
+            )
           else
             attrs
           end
 
-        case Agents.update_execution_agent(agent, attrs) do
+        case Sessions.update_session(session, attrs) do
           {:ok, updated} ->
             # Broadcast status change
             topic =
@@ -160,11 +165,15 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
 
   defp parse_model(model) when is_binary(model) do
     cond do
-      String.starts_with?(model, "claude-") -> {"anthropic", model}
+      String.starts_with?(model, "claude-") ->
+        {"anthropic", model}
+
       String.contains?(model, "/") ->
         [provider | rest] = String.split(model, "/", parts: 2)
         {provider, Enum.join(rest, "/")}
-      true -> {"anthropic", model}
+
+      true ->
+        {"anthropic", model}
     end
   end
 

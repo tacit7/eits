@@ -2,6 +2,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.Tasks
+  alias EyeInTheSkyWeb.Notes
+  alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWebWeb.Components.TaskCard
 
   @impl true
@@ -21,6 +23,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
       |> assign(:tasks, [])
       |> assign(:sidebar_tab, :tasks)
       |> assign(:sidebar_project, nil)
+      |> assign(:show_task_detail_drawer, false)
+      |> assign(:selected_task, nil)
+      |> assign(:task_notes, [])
       |> load_tasks()
 
     {:ok, socket}
@@ -46,6 +51,111 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
       |> load_tasks()
 
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("open_task_detail", %{"task_id" => task_id}, socket) do
+    task = Tasks.get_task_by_uuid!(task_id)
+    notes = Notes.list_notes_for_task(task.id)
+
+    socket =
+      socket
+      |> assign(:selected_task, task)
+      |> assign(:task_notes, notes)
+      |> assign(:show_task_detail_drawer, true)
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("toggle_task_detail_drawer", _params, socket) do
+    {:noreply, assign(socket, :show_task_detail_drawer, !socket.assigns.show_task_detail_drawer)}
+  end
+
+  @impl true
+  def handle_event("update_task", params, socket) do
+    task = socket.assigns.selected_task
+    title = params["title"]
+    description = params["description"]
+    state_id = String.to_integer(params["state_id"])
+    priority = String.to_integer(params["priority"] || "0")
+    due_at = if params["due_at"] != "", do: params["due_at"], else: nil
+    tags_string = params["tags"] || ""
+
+    tag_names =
+      tags_string
+      |> String.split(",")
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+
+    case Tasks.update_task(task, %{
+           title: title,
+           description: description,
+           state_id: state_id,
+           priority: priority,
+           due_at: due_at,
+           updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
+         }) do
+      {:ok, updated_task} ->
+        if length(tag_names) > 0 do
+          Repo.query("DELETE FROM task_tags WHERE task_id = ?", [task.id])
+
+          Enum.each(tag_names, fn tag_name ->
+            case Tasks.get_or_create_tag(tag_name) do
+              {:ok, tag} ->
+                Repo.query("INSERT INTO task_tags (task_id, tag_id) VALUES (?, ?)", [
+                  task.id,
+                  tag.id
+                ])
+
+              _ ->
+                :ok
+            end
+          end)
+        end
+
+        updated_task = Tasks.get_task!(updated_task.id)
+
+        socket =
+          socket
+          |> assign(:selected_task, updated_task)
+          |> load_tasks()
+          |> put_flash(:info, "Task updated")
+
+        {:noreply, socket}
+
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, "Failed to update task")}
+    end
+  end
+
+  @impl true
+  def handle_event("delete_task", %{"task_id" => task_id}, socket) do
+    task = Tasks.get_task_by_uuid!(task_id)
+
+    Repo.query("DELETE FROM task_tags WHERE task_id = ?", [task.id])
+    Repo.query("DELETE FROM task_sessions WHERE task_id = ?", [task.id])
+    Repo.query("DELETE FROM commit_tasks WHERE task_id = ?", [task.id])
+
+    case Tasks.delete_task(task) do
+      {:ok, _} ->
+        socket =
+          socket
+          |> assign(:show_task_detail_drawer, false)
+          |> assign(:selected_task, nil)
+          |> load_tasks()
+          |> put_flash(:info, "Task deleted")
+
+        {:noreply, socket}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to delete task")}
+    end
+  end
+
+  @impl true
+  def handle_event("start_agent_for_task", _params, socket) do
+    {:noreply, put_flash(socket, :info, "Open the project Kanban board to start agents")}
   end
 
   @impl true
@@ -140,19 +250,40 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
         <%= if length(@tasks) > 0 do %>
           <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-5">
             <%= for task <- @tasks do %>
-              <TaskCard.task_card task={task} variant="list" />
+              <TaskCard.task_card task={task} variant="list" on_click="open_task_detail" on_delete="delete_task" />
             <% end %>
           </div>
         <% else %>
           <.empty_state
             id="overview-tasks-empty"
             icon="hero-clipboard-document-list"
-            title={if @search_query != "" || @state_filter != "all", do: "No tasks found", else: "No tasks yet"}
-            subtitle={if @search_query != "" || @state_filter != "all", do: "Try adjusting your search or filters", else: "Tasks created by agents will appear here"}
+            title={
+              if @search_query != "" || @state_filter != "all",
+                do: "No tasks found",
+                else: "No tasks yet"
+            }
+            subtitle={
+              if @search_query != "" || @state_filter != "all",
+                do: "Try adjusting your search or filters",
+                else: "Tasks created by agents will appear here"
+            }
           />
         <% end %>
       </div>
     </div>
+
+    <!-- Task Detail Drawer -->
+    <.live_component
+      module={EyeInTheSkyWebWeb.Components.TaskDetailDrawer}
+      id="task-detail-drawer"
+      show={@show_task_detail_drawer}
+      task={@selected_task}
+      notes={@task_notes}
+      workflow_states={@workflow_states}
+      toggle_event="toggle_task_detail_drawer"
+      update_event="update_task"
+      delete_event="delete_task"
+    />
     """
   end
 end

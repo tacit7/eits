@@ -8,7 +8,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.PromptGet do
   schema do
     field :id, :string, description: "Prompt ID"
     field :slug, :string, description: "Prompt slug"
-    field :project_id, :string, description: "Project context for slug lookup (checks project-scoped first, falls back to global)"
+
+    field :project_id, :string,
+      description:
+        "Project context for slug lookup (checks project-scoped first, falls back to global)"
+
     field :include_text, :boolean, description: "Include prompt_text in response (default: true)"
   end
 
@@ -16,32 +20,32 @@ defmodule EyeInTheSkyWeb.MCP.Tools.PromptGet do
   def execute(params, frame) do
     alias EyeInTheSkyWeb.Prompts
 
-    include_text = params["include_text"] != false
+    include_text = params[:include_text] != false
 
     result =
       cond do
-        params["id"] ->
+        params[:id] ->
           try do
-            prompt = Prompts.get_prompt!(params["id"])
+            prompt = Prompts.get_prompt!(params[:id])
             format_prompt(prompt, include_text)
           rescue
             Ecto.NoResultsError -> %{success: false, message: "Prompt not found"}
           end
 
-        params["slug"] ->
+        params[:slug] ->
           # Project-aware: check project scope first, fall back to global
           prompt =
-            if params["project_id"] do
-              Prompts.get_prompt_by_slug(params["slug"], params["project_id"]) ||
-                Prompts.get_prompt_by_slug(params["slug"], nil)
+            if params[:project_id] do
+              Prompts.get_prompt_by_slug(params[:slug], params[:project_id]) ||
+                Prompts.get_prompt_by_slug(params[:slug], nil)
             else
-              Prompts.get_prompt_by_slug(params["slug"], nil)
+              Prompts.get_prompt_by_slug(params[:slug], nil)
             end
 
           if prompt do
             format_prompt(prompt, include_text)
           else
-            %{success: false, message: "Prompt not found for slug: #{params["slug"]}"}
+            %{success: false, message: "Prompt not found for slug: #{params[:slug]}"}
           end
 
         true ->

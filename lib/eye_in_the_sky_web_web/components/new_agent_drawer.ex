@@ -103,7 +103,24 @@ defmodule EyeInTheSkyWebWeb.Components.NewAgentDrawer do
               ></textarea>
             </div>
             
-    <!-- Actions -->
+    <!-- Worktree / Branch -->
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text font-medium">Worktree Branch</span>
+                <span class="label-text-alt text-xs">Optional — isolates work + enables PR</span>
+              </label>
+              <input
+                type="text"
+                name="worktree"
+                class="input input-bordered font-mono text-sm"
+                placeholder="e.g., fix-login-bug"
+              />
+              <label class="label">
+                <span class="label-text-alt text-base-content/40">Branch: worktree-&lt;name&gt;</span>
+              </label>
+            </div>
+
+            <!-- Actions -->
             <div class="flex gap-2 mt-4">
               <button type="submit" class="btn btn-primary flex-1">Create Agent</button>
               <button type="button" phx-click={@toggle_event} class="btn btn-ghost flex-shrink-0">

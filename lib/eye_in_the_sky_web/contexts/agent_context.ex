@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.Contexts.AgentContext do
     field :updated_at, :utc_datetime
 
     belongs_to :agent, EyeInTheSkyWeb.Agents.Agent, primary_key: true, type: :integer
+    belongs_to :session, EyeInTheSkyWeb.Sessions.Session, primary_key: true, type: :integer
     belongs_to :project, EyeInTheSkyWeb.Projects.Project, primary_key: true
   end
 

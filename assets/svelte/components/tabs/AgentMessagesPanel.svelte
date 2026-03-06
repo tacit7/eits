@@ -6,20 +6,54 @@
   export let messages = []
   export let activeAgents = []
   export let workingAgents = {}
+  export let slashItems = []
   export let live
 
   let inputValue = ''
   let inputElement
 
-  // Autocomplete state
+  // @ mention autocomplete state
   let showAutocomplete = false
   let autocompleteOptions = []
   let selectedAutocompleteIndex = 0
+
+  // / slash command autocomplete state
+  let showSlashAutocomplete = false
+  let slashOptions = []
+  let selectedSlashIndex = 0
+  let slashTriggerPos = -1
 
   // Message history for up/down navigation
   let messageHistory = []
   let historyIndex = -1
   let currentDraft = ''
+
+  const typeBadges = {
+    skill:   { label: 'skill',  cls: 'bg-primary/10 text-primary' },
+    command: { label: 'cmd',    cls: 'bg-secondary/10 text-secondary' },
+    agent:   { label: 'agent',  cls: 'bg-accent/10 text-accent' },
+    prompt:  { label: 'prompt', cls: 'bg-warning/10 text-warning' },
+  }
+  const typeOrder = ['skill', 'command', 'agent', 'prompt']
+
+  function groupSlashItems(items) {
+    const groups = {}
+    for (const item of items) {
+      const t = item.type || 'other'
+      if (!groups[t]) groups[t] = []
+      groups[t].push(item)
+    }
+    const ordered = []
+    const allTypes = [...typeOrder, ...Object.keys(groups).filter(t => !typeOrder.includes(t))]
+    for (const type of allTypes) {
+      if (!groups[type]) continue
+      ordered.push({ header: true, type })
+      for (const item of groups[type]) {
+        ordered.push({ header: false, ...item })
+      }
+    }
+    return ordered
+  }
 
   function getProviderIcon(message) {
     if (message.sender_role === 'user') return null
@@ -38,9 +72,44 @@
     window.location.href = `/dm/${sessionId}`
   }
 
+  function checkSlashTrigger(value, cursorPos) {
+    // Find last '/' before cursor that's at start or after space/newline
+    for (let i = cursorPos - 1; i >= 0; i--) {
+      if (value[i] === '/') {
+        const before = i === 0 ? '' : value[i - 1]
+        if (i === 0 || before === ' ' || before === '\n') {
+          return i
+        }
+        return -1
+      }
+      if (value[i] === ' ' || value[i] === '\n') return -1
+    }
+    return -1
+  }
+
   function handleInputChange(e) {
     const value = e.target.value
     const cursorPos = e.target.selectionStart
+
+    // Check / slash trigger first
+    const triggerPos = checkSlashTrigger(value, cursorPos)
+    if (triggerPos !== -1) {
+      const query = value.slice(triggerPos + 1, cursorPos).toLowerCase()
+      const filtered = slashItems.filter(item =>
+        item.slug.toLowerCase().includes(query) ||
+        (item.description || '').toLowerCase().includes(query) ||
+        (item.type || '').toLowerCase().includes(query)
+      )
+      if (filtered.length > 0) {
+        slashTriggerPos = triggerPos
+        slashOptions = filtered
+        selectedSlashIndex = 0
+        showSlashAutocomplete = true
+        showAutocomplete = false
+        return
+      }
+    }
+    showSlashAutocomplete = false
 
     // Find @ mentions that are being typed
     const textBeforeCursor = value.substring(0, cursorPos)
@@ -92,7 +161,28 @@
   }
 
   function handleInputKeydown(e) {
-    // Handle autocomplete navigation if autocomplete is shown
+    // Handle slash autocomplete navigation
+    if (showSlashAutocomplete) {
+      const selectableItems = slashOptions.length
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        selectedSlashIndex = (selectedSlashIndex + 1) % selectableItems
+        return
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        selectedSlashIndex = selectedSlashIndex === 0 ? selectableItems - 1 : selectedSlashIndex - 1
+        return
+      } else if (e.key === 'Tab' || e.key === 'Enter') {
+        e.preventDefault()
+        selectSlashItem(slashOptions[selectedSlashIndex])
+        return
+      } else if (e.key === 'Escape') {
+        showSlashAutocomplete = false
+        return
+      }
+    }
+
+    // Handle @ autocomplete navigation if autocomplete is shown
     if (showAutocomplete) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -155,6 +245,23 @@
 
     setTimeout(() => {
       const newPos = lastAtIndex + mentionText.length + 2
+      inputElement.setSelectionRange(newPos, newPos)
+      inputElement.focus()
+    }, 0)
+  }
+
+  function selectSlashItem(item) {
+    if (!item) return
+    const cursorPos = inputElement.selectionStart
+    const prefix = inputValue.slice(0, slashTriggerPos)
+    const suffix = inputValue.slice(cursorPos)
+    const insertion = item.type === 'agent' ? `@${item.slug} ` : `/${item.slug} `
+
+    inputValue = prefix + insertion + suffix
+    showSlashAutocomplete = false
+
+    setTimeout(() => {
+      const newPos = prefix.length + insertion.length
       inputElement.setSelectionRange(newPos, newPos)
       inputElement.focus()
     }, 0)
@@ -347,12 +454,12 @@
             bind:this={inputElement}
             on:input={handleInputChange}
             on:keydown={handleInputKeydown}
-            placeholder="Message agents... use @id to mention"
+            placeholder="Message agents... @id to mention, /skill for commands"
             class="input input-sm w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm h-10"
             autocomplete="off"
           />
 
-          <!-- Autocomplete Dropdown -->
+          <!-- @ Autocomplete Dropdown -->
           {#if showAutocomplete && autocompleteOptions.length > 0}
             <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] border border-base-content/8 rounded-xl shadow-lg max-h-56 overflow-y-auto z-50 p-1">
               {#each autocompleteOptions as option, idx}
@@ -366,6 +473,41 @@
                   <span class="text-[13px] text-base-content/50 flex-1 truncate">{option.name}</span>
                   <span class="font-mono text-[11px] text-base-content/30">{option.provider}{option.model ? ` / ${option.model}` : ''}</span>
                 </button>
+              {/each}
+            </div>
+          {/if}
+
+          <!-- / Slash Command Autocomplete Dropdown -->
+          {#if showSlashAutocomplete && slashOptions.length > 0}
+            <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-base-100 border border-base-content/10 rounded-xl shadow-xl max-h-[280px] overflow-y-auto z-50">
+              {#each groupSlashItems(slashOptions) as entry, idx}
+                {#if entry.header}
+                  <div class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-base-content/40 bg-base-content/[0.02] sticky top-0">
+                    {{ skill: 'Skills', command: 'Commands', agent: 'Agents', prompt: 'Prompts' }[entry.type] || entry.type}
+                  </div>
+                {:else}
+                  {@const flatIdx = slashOptions.indexOf(entry)}
+                  <button
+                    type="button"
+                    class="w-full flex items-start gap-3 px-3 py-2 text-left transition-colors text-sm {flatIdx === selectedSlashIndex ? 'bg-base-content/[0.06]' : 'hover:bg-base-content/[0.04]'}"
+                    on:click={() => selectSlashItem(entry)}
+                    on:mouseenter={() => { selectedSlashIndex = flatIdx }}
+                  >
+                    {#if typeBadges[entry.type]}
+                      <span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium {typeBadges[entry.type].cls}">
+                        {typeBadges[entry.type].label}
+                      </span>
+                    {/if}
+                    <span class="min-w-0 flex-1">
+                      <span class="flex items-center gap-2">
+                        <span class="font-medium text-base-content">{entry.type === 'agent' ? '@' : '/'}{entry.slug}</span>
+                      </span>
+                      {#if entry.description}
+                        <span class="text-xs text-base-content/50 truncate block">{entry.description}</span>
+                      {/if}
+                    </span>
+                  </button>
+                {/if}
               {/each}
             </div>
           {/if}

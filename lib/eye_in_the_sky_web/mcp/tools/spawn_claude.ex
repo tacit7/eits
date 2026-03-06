@@ -7,7 +7,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnClaude do
 
   schema do
     field :prompt, :string, required: true, description: "Prompt to send to Claude Code"
-    field :model, :string, required: true, description: "Model to use (haiku, sonnet, opus, or full model ID)"
+
+    field :model, :string,
+      required: true,
+      description: "Model to use (haiku, sonnet, opus, or full model ID)"
+
     field :project_path, :string, description: "Working directory for Claude Code"
   end
 
@@ -16,12 +20,12 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnClaude do
     alias EyeInTheSkyWeb.Claude.SDK
 
     opts = [
-      model: params["model"],
-      project_path: params["project_path"]
+      model: params[:model],
+      project_path: params[:project_path]
     ]
 
     result =
-      case SDK.start(params["prompt"], [to: self()] ++ opts) do
+      case SDK.start(params[:prompt], [to: self()] ++ opts) do
         {:ok, _ref} ->
           %{
             success: true,

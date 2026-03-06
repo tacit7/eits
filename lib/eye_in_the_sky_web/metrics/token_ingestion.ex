@@ -7,13 +7,7 @@ defmodule EyeInTheSkyWeb.Metrics.TokenIngestion do
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Claude.SessionReader
   alias EyeInTheSkyWeb.Metrics.TokenParser
-
-  # Pricing per 1M tokens (USD)
-  @pricing %{
-    "opus" => %{input: 15.0, output: 75.0, cache_read: 3.75, cache_creation: 18.75},
-    "sonnet" => %{input: 3.0, output: 15.0, cache_read: 0.30, cache_creation: 3.75},
-    "haiku" => %{input: 0.80, output: 4.0, cache_read: 0.08, cache_creation: 1.00}
-  }
+  alias EyeInTheSkyWeb.Settings
 
   @doc """
   Ingest token usage for all discovered sessions.
@@ -177,8 +171,9 @@ defmodule EyeInTheSkyWeb.Metrics.TokenIngestion do
 
   @doc false
   def calculate_cost(usage, model_name) do
+    pricing = Settings.pricing()
     tier = detect_pricing_tier(model_name)
-    prices = Map.get(@pricing, tier, @pricing["sonnet"])
+    prices = Map.get(pricing, tier, pricing["sonnet"])
 
     input_cost = usage.input_tokens * prices.input / 1_000_000
     output_cost = usage.output_tokens * prices.output / 1_000_000

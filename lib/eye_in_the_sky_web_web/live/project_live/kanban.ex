@@ -4,6 +4,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Tasks
   alias EyeInTheSkyWeb.Notes
+  alias EyeInTheSkyWeb.Agents
+  alias EyeInTheSkyWeb.Sessions
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWebWeb.Components.TaskCard
 
@@ -190,7 +192,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("start_agent_for_task", %{"task_id" => task_id}, socket) do
-    alias EyeInTheSkyWeb.{Agents, ChatAgents, Claude.SessionManager}
+    alias EyeInTheSkyWeb.{Agents, Claude.SessionManager}
 
     task = Tasks.get_task_by_uuid!(task_id)
     project = socket.assigns.project
@@ -201,16 +203,16 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
     task_prompt = "#{task.title}\n\n#{task.description || ""}" |> String.trim()
 
-    case ChatAgents.create_chat_agent(%{
+    case Agents.create_agent(%{
            uuid: agent_id,
            description: task_prompt,
            project_id: project.id,
            git_worktree_path: project.path
          }) do
-      {:ok, chat_agent} ->
-        case Agents.create_execution_agent_with_model(%{
+      {:ok, agent} ->
+        case Sessions.create_session_with_model(%{
                uuid: session_id,
-               agent_id: chat_agent.id,
+               agent_id: agent.id,
                name: task.title,
                description: task_prompt,
                started_at: now,
@@ -560,21 +562,21 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                 data-state-id={state.id}
               >
                 <%= if column_tasks == [] do %>
-                  <div class="flex flex-col items-center justify-center h-24 border border-dashed border-base-content/8 rounded-lg pointer-events-none">
+                  <div data-empty-placeholder class="flex flex-col items-center justify-center h-24 border border-dashed border-base-content/8 rounded-lg pointer-events-none">
                     <.icon name="hero-inbox" class="w-5 h-5 text-base-content/15 mb-1" />
                     <span class="text-[11px] text-base-content/20">No tasks</span>
                   </div>
                 <% end %>
                 <%= for task <- column_tasks do %>
                   <div
-                    class="rounded-lg bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] px-3 py-2 cursor-pointer hover:bg-base-200/80 dark:hover:bg-[hsl(60,2%,21%)] transition-colors"
+                    class="group/card relative rounded-lg bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] px-3 py-2 cursor-pointer hover:bg-base-200/80 dark:hover:bg-[hsl(60,2%,21%)] transition-colors"
                     phx-click="open_task_detail"
                     phx-value-task_id={task.uuid}
                     data-task-id={task.uuid}
                     id={"kanban-task-#{task.id}"}
                   >
                     <span class={[
-                      "text-sm font-medium leading-snug",
+                      "text-sm font-medium leading-snug pr-5",
                       task.completed_at && "text-base-content/40 line-through",
                       !task.completed_at && "text-base-content/85"
                     ]}>
@@ -583,7 +585,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                     <%= if task.due_at || (task.description && task.description != "") do %>
                       <div class="flex items-center gap-2 mt-1.5 text-base-content/30">
                         <%= if task.due_at do %>
-                          <span class={["flex items-center gap-1 text-[11px]", due_date_class(task.due_at)]}>
+                          <span class={[
+                            "flex items-center gap-1 text-[11px]",
+                            due_date_class(task.due_at)
+                          ]}>
                             <.icon name="hero-clock-mini" class="w-3.5 h-3.5" />
                             {format_due(task.due_at)}
                           </span>
@@ -593,6 +598,15 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                         <% end %>
                       </div>
                     <% end %>
+                    <button
+                      type="button"
+                      phx-click="delete_task"
+                      phx-value-task_id={task.uuid}
+                      data-confirm="Delete this task?"
+                      class="absolute top-1.5 right-1.5 opacity-0 group-hover/card:opacity-100 w-5 h-5 flex items-center justify-center rounded text-base-content/25 hover:text-error hover:bg-error/10 transition-all"
+                    >
+                      <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 <% end %>
 

@@ -6,7 +6,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
   alias Anubis.Server.Response
 
   schema do
-    field :instructions, :string, required: true, description: "Task instructions for the agent (required)"
+    field :instructions, :string,
+      required: true,
+      description: "Task instructions for the agent (required)"
+
     field :model, :string, description: "Model to use (haiku, sonnet, opus). Default: haiku"
     field :project_path, :string, description: "Working directory. Default: current directory"
     field :skip_permissions, :boolean, description: "Skip permission prompts (default: true)"
@@ -20,12 +23,12 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
     alias EyeInTheSkyWeb.Claude.AgentManager
 
     opts = [
-      instructions: params["instructions"],
-      model: params["model"] || "haiku",
-      project_path: params["project_path"],
-      description: params["instructions"],
-      parent_agent_id: params["parent_agent_id"],
-      parent_session_id: params["parent_session_id"]
+      instructions: params[:instructions],
+      model: params[:model] || "haiku",
+      project_path: params[:project_path],
+      description: params[:instructions],
+      parent_agent_id: params[:parent_agent_id],
+      parent_session_id: params[:parent_session_id]
     ]
 
     result =

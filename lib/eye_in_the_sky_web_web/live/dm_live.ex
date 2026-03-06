@@ -1,8 +1,8 @@
 defmodule EyeInTheSkyWebWeb.DmLive do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.{Agents, ChatAgents, Commits, Logs, Messages, Notes, Repo, Tasks}
-  alias EyeInTheSkyWeb.Claude.{AgentManager, SessionReader}
+  alias EyeInTheSkyWeb.{Sessions, Agents, Commits, Logs, Messages, Notes, Repo, Tasks}
+  alias EyeInTheSkyWeb.Claude.{AgentManager, AgentWorker, SessionReader}
   alias EyeInTheSkyWeb.FileAttachments
   alias EyeInTheSkyWebWeb.Components.DmPage
 
@@ -14,49 +14,53 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def mount(%{"session_id" => session_id_param}, _session, socket) do
     # Accept both integer ID and UUID in URL
-    agent =
+    session =
       case Integer.parse(session_id_param) do
-        {id, ""} -> Agents.get_execution_agent!(id)
-        _ -> Agents.get_execution_agent_by_uuid!(session_id_param)
+        {id, ""} -> Sessions.get_session!(id)
+        _ -> Sessions.get_session_by_uuid!(session_id_param)
       end
 
-    chat_agent = ChatAgents.get_chat_agent!(agent.agent_id)
+    agent = Agents.get_agent!(session.agent_id)
 
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{agent.id}")
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "dm:#{agent.id}:stream")
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "dm:#{session.id}:stream")
       send(self(), :sync_from_session_file)
     end
 
     socket =
       socket
-      |> assign(:page_title, agent.name || "Session")
+      |> assign(:page_title, session.name || "Session")
       |> assign(:sidebar_tab, :chat)
       |> assign(:sidebar_project, nil)
-      |> assign(:session_id, agent.id)
-      |> assign(:session_uuid, agent.uuid)
-      |> assign(:agent_id, agent.agent_id)
+      |> assign(:session_id, session.id)
+      |> assign(:session_uuid, session.uuid)
+      |> assign(:agent_id, session.agent_id)
+      |> assign(:session, session)
       |> assign(:agent, agent)
-      |> assign(:chat_agent, chat_agent)
       |> assign(:active_tab, "messages")
       |> assign(:session_ref, nil)
-      |> assign(:processing, false)
+      |> assign(:processing, AgentWorker.is_processing?(session.id))
       |> assign(:message_limit, @default_message_limit)
       |> assign(:has_more_messages, false)
-      |> assign(:selected_model, "opus")
+      |> assign(:selected_model, session.model || "opus")
       |> assign(:selected_effort, "")
       |> assign(:show_model_menu, false)
       |> assign(:show_live_stream, false)
       |> assign(:stream_content, "")
       |> assign(:stream_tool, nil)
+      |> assign(:slash_items, build_slash_items())
+      |> assign(:diff_cache, %{})
+      |> assign(:show_new_task_drawer, false)
+      |> assign(:workflow_states, Tasks.list_workflow_states())
       |> allow_upload(:files,
         accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
         max_entries: 10,
         max_file_size: 50_000_000,
         auto_upload: true
       )
-      |> load_tab_data("messages", agent.id)
+      |> load_tab_data("messages", session.id)
 
     {:ok, socket}
   end
@@ -77,7 +81,86 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_event("toggle_new_task_drawer", _params, socket) do
+    {:noreply, assign(socket, :show_new_task_drawer, !socket.assigns.show_new_task_drawer)}
+  end
+
+  @impl true
+  def handle_event("keydown", %{"key" => "k", "ctrlKey" => true}, socket) do
+    {:noreply, assign(socket, :show_new_task_drawer, !socket.assigns.show_new_task_drawer)}
+  end
+
+  def handle_event("keydown", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_event("create_new_task", params, socket) do
+    title = params["title"]
+    description = params["description"]
+    state_id = String.to_integer(params["state_id"])
+    priority = String.to_integer(params["priority"] || "1")
+    tags_string = params["tags"] || ""
+    session_id = socket.assigns.session_id
+
+    tag_names =
+      tags_string
+      |> String.split(",")
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+
+    task_id = String.upcase(Ecto.UUID.generate())
+    now = DateTime.utc_now() |> DateTime.to_iso8601()
+
+    case Tasks.create_task(%{
+           id: task_id,
+           title: title,
+           description: description,
+           state_id: state_id,
+           priority: priority,
+           created_at: now,
+           updated_at: now
+         }) do
+      {:ok, task} ->
+        Repo.query(
+          "INSERT OR IGNORE INTO task_sessions (task_id, session_id) VALUES (?, ?)",
+          [task.id, session_id]
+        )
+
+        if length(tag_names) > 0 do
+          Enum.each(tag_names, fn tag_name ->
+            case Tasks.get_or_create_tag(tag_name) do
+              {:ok, tag} ->
+                Repo.query(
+                  "INSERT INTO task_tags (task_id, tag_id) VALUES (?, ?)",
+                  [task.id, tag.id]
+                )
+
+              _ ->
+                :ok
+            end
+          end)
+        end
+
+        socket =
+          socket
+          |> assign(:show_new_task_drawer, false)
+          |> assign(:active_tab, "tasks")
+          |> load_tab_data("tasks", session_id)
+          |> put_flash(:info, "Task created")
+
+        {:noreply, socket}
+
+      {:error, changeset} ->
+        {:noreply,
+         put_flash(socket, :error, "Failed to create task: #{inspect(changeset.errors)}")}
+    end
+  end
+
+  @impl true
   def handle_event("select_model", %{"model" => model, "effort" => effort}, socket) do
+    # Persist model selection to database
+    session = socket.assigns.session
+    Sessions.update_session(session, %{model: model})
+
     socket =
       socket
       |> assign(:selected_model, model)
@@ -89,11 +172,12 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_event("toggle_live_stream", params, socket) do
-    enabled = case params do
-      %{"enabled" => true} -> true
-      %{"enabled" => "true"} -> true
-      _ -> !socket.assigns.show_live_stream
-    end
+    enabled =
+      case params do
+        %{"enabled" => true} -> true
+        %{"enabled" => "true"} -> true
+        _ -> !socket.assigns.show_live_stream
+      end
 
     {:noreply, assign(socket, :show_live_stream, enabled)}
   end
@@ -162,6 +246,31 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_event("load_diff", %{"hash" => hash}, socket) do
+    # Skip if already cached
+    if Map.has_key?(socket.assigns.diff_cache, hash) do
+      {:noreply, socket}
+    else
+      diff =
+        case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+          {:ok, project_path} ->
+            case System.cmd("git", ["-C", project_path, "show", hash, "--unified=5"],
+                   stderr_to_stdout: false
+                 ) do
+              {output, 0} -> output
+              _ -> :error
+            end
+
+          _ ->
+            :error
+        end
+
+      cache = Map.put(socket.assigns.diff_cache, hash, diff)
+      {:noreply, assign(socket, :diff_cache, cache)}
+    end
+  end
+
+  @impl true
   def handle_event("cancel_upload", %{"ref" => ref}, socket) do
     {:noreply, cancel_upload(socket, :files, ref)}
   end
@@ -171,15 +280,15 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     {:noreply, socket}
   end
 
-
   @impl true
   def handle_event("reload_from_session_file", _params, socket) do
     session_id = socket.assigns.session_id
     session_uuid = socket.assigns.session_uuid
 
     with {:ok, project_path} <-
-           resolve_project_path(socket.assigns.agent, socket.assigns.chat_agent),
-         {:ok, raw_messages} <- SessionReader.read_messages_after_uuid(session_uuid, project_path, nil) do
+           resolve_project_path(socket.assigns.session, socket.assigns.agent),
+         {:ok, raw_messages} <-
+           SessionReader.read_messages_after_uuid(session_uuid, project_path, nil) do
       Messages.delete_session_messages(session_id)
       imported = import_session_messages(raw_messages, session_id)
       socket = load_tab_data(socket, "messages", session_id)
@@ -246,6 +355,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       socket
       |> assign(:processing, false)
       |> load_tab_data("messages", socket.assigns.session_id)
+      |> push_event("focus-input", %{})
 
     {:noreply, socket}
   end
@@ -270,6 +380,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:processing, false)
       |> assign(:session_ref, nil)
       |> load_tab_data("messages", socket.assigns.session_id)
+      |> push_event("focus-input", %{})
 
     {:noreply, socket}
   end
@@ -296,7 +407,11 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
     if session_id == socket.assigns.session_id do
-      {:noreply, assign(socket, :processing, false)}
+      {:noreply,
+       socket
+       |> assign(:processing, false)
+       |> load_tab_data("messages", socket.assigns.session_id)
+       |> push_event("focus-input", %{})}
     else
       {:noreply, socket}
     end
@@ -306,7 +421,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_info({:agent_stopped, %{id: id}}, socket) do
     if id == socket.assigns.session_id do
-      {:noreply, assign(socket, :processing, false)}
+      {:noreply, socket |> assign(:processing, false) |> push_event("focus-input", %{})}
     else
       {:noreply, socket}
     end
@@ -338,13 +453,20 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_info({:stream_delta, :text, text}, socket) do
     new_content = socket.assigns.stream_content <> text
-    Logger.info("[DmLive] stream_delta text, total_len=#{String.length(new_content)}, show=#{socket.assigns.show_live_stream}")
+
+    Logger.info(
+      "[DmLive] stream_delta text, total_len=#{String.length(new_content)}, show=#{socket.assigns.show_live_stream}"
+    )
+
     {:noreply, assign(socket, :stream_content, new_content)}
   end
 
   @impl true
   def handle_info({:stream_replace, :text, text}, socket) do
-    Logger.info("[DmLive] stream_replace text, len=#{String.length(text)}, show=#{socket.assigns.show_live_stream}")
+    Logger.info(
+      "[DmLive] stream_replace text, len=#{String.length(text)}, show=#{socket.assigns.show_live_stream}"
+    )
+
     {:noreply, assign(socket, :stream_content, text)}
   end
 
@@ -362,6 +484,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_info(:stream_clear, socket) do
     Logger.info("[DmLive] stream_clear")
+
     socket =
       socket
       |> assign(:stream_content, "")
@@ -398,7 +521,16 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     |> assign(
       :logs,
       maybe_load_tab_data(tab, "logs", socket.assigns[:logs], fn ->
-        Logs.list_logs_for_session(session_id)
+        case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+          {:ok, project_path} ->
+            case SessionReader.read_tool_events(socket.assigns.session_uuid, project_path) do
+              {:ok, events} -> events
+              _ -> Logs.list_logs_for_session(session_id)
+            end
+
+          _ ->
+            Logs.list_logs_for_session(session_id)
+        end
       end)
     )
     |> assign(
@@ -442,7 +574,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     session_uuid = socket.assigns.session_uuid
 
     with {:ok, project_path} <-
-           resolve_project_path(socket.assigns.agent, socket.assigns.chat_agent),
+           resolve_project_path(socket.assigns.session, socket.assigns.agent),
          {:ok, raw_messages} <- read_session_messages(session_uuid, project_path, session_id) do
       imported = import_session_messages(raw_messages, session_id)
       {:ok, load_tab_data(socket, "messages", session_id), imported}
@@ -576,38 +708,48 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <DmPage.dm_page
-      agent={@agent}
-      session_uuid={@session_uuid}
-      active_tab={@active_tab}
-      messages={@messages}
-      has_more_messages={@has_more_messages}
-      uploads={@uploads}
-      selected_model={@selected_model}
-      selected_effort={@selected_effort}
-      show_model_menu={@show_model_menu}
-      processing={@processing}
-      show_live_stream={@show_live_stream}
-      stream_content={@stream_content}
-      stream_tool={@stream_tool}
-      tasks={@tasks}
-      commits={@commits}
-      logs={@logs}
-      notes={@notes}
-    />
+    <div id="dm-live-root" phx-hook="GlobalKeydown">
+      <DmPage.dm_page
+        agent={@session}
+        session_uuid={@session_uuid}
+        active_tab={@active_tab}
+        messages={@messages}
+        has_more_messages={@has_more_messages}
+        uploads={@uploads}
+        selected_model={@selected_model}
+        selected_effort={@selected_effort}
+        show_model_menu={@show_model_menu}
+        processing={@processing}
+        show_live_stream={@show_live_stream}
+        stream_content={@stream_content}
+        stream_tool={@stream_tool}
+        tasks={@tasks}
+        commits={@commits}
+        diff_cache={@diff_cache}
+        logs={@logs}
+        notes={@notes}
+        slash_items={@slash_items}
+        show_new_task_drawer={@show_new_task_drawer}
+        workflow_states={@workflow_states}
+      />
+    </div>
     """
   end
 
-  defp resolve_project_path(agent, chat_agent) do
+  defp build_slash_items do
+    EyeInTheSkyWebWeb.Helpers.SlashItems.build()
+  end
+
+  defp resolve_project_path(session, agent) do
     cond do
+      session.git_worktree_path ->
+        {:ok, session.git_worktree_path}
+
       agent.git_worktree_path ->
         {:ok, agent.git_worktree_path}
 
-      chat_agent.git_worktree_path ->
-        {:ok, chat_agent.git_worktree_path}
-
-      chat_agent.project && chat_agent.project.path ->
-        {:ok, chat_agent.project.path}
+      agent.project && agent.project.path ->
+        {:ok, agent.project.path}
 
       true ->
         {:error, :no_project_path}

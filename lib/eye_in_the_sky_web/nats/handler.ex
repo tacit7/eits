@@ -6,7 +6,10 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
 
   Subjects:
     events.session.start    - Register new session
-    events.session.update   - Update session status (end/stop/compact)
+    events.session.update   - Update session status directly
+    events.session.stop     - Session turn complete (idle) — delegates to update
+    events.session.end      - Session terminated (completed) — delegates to update
+    events.session.compact  - Compaction status change — delegates to update
     events.session.context  - Save session context
     events.commits          - Track git commits
     events.notes            - Add notes
@@ -17,7 +20,7 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
 
   require Logger
 
-  alias EyeInTheSkyWeb.{Agents, ChatAgents, Commits, Contexts, Messages, Notes, Projects, Tasks}
+  alias EyeInTheSkyWeb.{Agents, Commits, Contexts, Messages, Notes, Projects, Sessions, Tasks}
 
   def handle("events.session.start", payload) do
     session_uuid = payload["session_id"]
@@ -25,7 +28,7 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
     unless is_nil(session_uuid) or session_uuid == "" do
       project_id = resolve_project_id(payload)
 
-      chat_agent_attrs = %{
+      agent_identity_attrs = %{
         uuid: payload["agent_id"] || session_uuid,
         description: payload["agent_description"] || payload["description"],
         project_id: project_id,
@@ -34,12 +37,12 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
         source: "hook"
       }
 
-      with {:ok, chat_agent} <- find_or_create_chat_agent(chat_agent_attrs) do
+      with {:ok, agent} <- find_or_create_agent(agent_identity_attrs) do
         {model_provider, model_name} = parse_model(payload["model"])
 
-        agent_attrs = %{
+        session_attrs = %{
           uuid: session_uuid,
-          agent_id: chat_agent.id,
+          agent_id: agent.id,
           name: payload["name"] || payload["description"],
           status: "working",
           started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -51,15 +54,20 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
           git_worktree_path: payload["worktree_path"]
         }
 
-        case Agents.get_execution_agent_by_uuid(session_uuid) do
+        case Sessions.get_session_by_uuid(session_uuid) do
           {:ok, existing} ->
             # Session already exists — update it (e.g., resumed session)
-            case Agents.update_execution_agent(existing, %{
-              status: "working",
-              last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()
-            }) do
+            case Sessions.update_session(existing, %{
+                   status: "working",
+                   last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()
+                 }) do
               {:ok, updated} ->
-                Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, updated})
+                Phoenix.PubSub.broadcast(
+                  EyeInTheSkyWeb.PubSub,
+                  "agents",
+                  {:agent_updated, updated}
+                )
+
                 Logger.info("[NATS.Handler] Session resumed: #{session_uuid}")
 
               {:error, reason} ->
@@ -69,21 +77,21 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
           {:error, :not_found} ->
             create_fn =
               if model_name,
-                do: &Agents.create_execution_agent_with_model/1,
-                else: &Agents.create_execution_agent/1
+                do: &Sessions.create_session_with_model/1,
+                else: &Sessions.create_session/1
 
-            case create_fn.(agent_attrs) do
-              {:ok, agent} ->
-                Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, agent})
+            case create_fn.(session_attrs) do
+              {:ok, session} ->
+                Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, session})
                 Logger.info("[NATS.Handler] Session started: #{session_uuid}")
 
               {:error, reason} ->
-                Logger.error("[NATS.Handler] Failed to create agent: #{inspect(reason)}")
+                Logger.error("[NATS.Handler] Failed to create session: #{inspect(reason)}")
             end
         end
       else
         {:error, reason} ->
-          Logger.error("[NATS.Handler] Failed to create chat agent: #{inspect(reason)}")
+          Logger.error("[NATS.Handler] Failed to create agent: #{inspect(reason)}")
       end
     end
   end
@@ -92,21 +100,29 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
     uuid = payload["session_id"] || payload["uuid"]
     status = payload["status"]
 
-    with {:ok, agent} <- Agents.get_execution_agent_by_uuid(uuid) do
+    with {:ok, agent} <- Sessions.get_session_by_uuid(uuid) do
       attrs =
         %{last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()}
         |> maybe_put(:status, status)
 
       attrs =
         if status in ["completed", "failed"] do
-          Map.put(attrs, :ended_at, payload["ended_at"] || DateTime.utc_now() |> DateTime.to_iso8601())
+          Map.put(
+            attrs,
+            :ended_at,
+            payload["ended_at"] || DateTime.utc_now() |> DateTime.to_iso8601()
+          )
         else
           attrs
         end
 
-      case Agents.update_execution_agent(agent, attrs) do
+      case Sessions.update_session(agent, attrs) do
         {:ok, updated} ->
-          topic = if status in ["completed", "failed"], do: {:agent_stopped, updated}, else: {:agent_working, updated}
+          topic =
+            if status in ["completed", "failed"],
+              do: {:agent_stopped, updated},
+              else: {:agent_working, updated}
+
           Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agent:working", topic)
           Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, updated})
           Logger.info("[NATS.Handler] Session updated: #{uuid} -> #{status}")
@@ -124,7 +140,7 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
     agent_uuid = payload["agent_id"]
     context = payload["context"]
 
-    with {:ok, agent} <- Agents.get_execution_agent_by_uuid(agent_uuid) do
+    with {:ok, agent} <- Sessions.get_session_by_uuid(agent_uuid) do
       attrs = %{agent_id: agent.agent_id, session_id: agent.id, context: context}
 
       case Contexts.upsert_session_context(attrs) do
@@ -145,15 +161,18 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
     hashes = payload["commit_hashes"] || []
     messages = payload["commit_messages"] || []
 
-    with {:ok, agent} <- Agents.get_execution_agent_by_uuid(agent_uuid) do
+    with {:ok, agent} <- Sessions.get_session_by_uuid(agent_uuid) do
       Enum.with_index(hashes, fn hash, idx ->
         case Commits.create_commit(%{
                session_id: agent.id,
                commit_hash: hash,
                commit_message: Enum.at(messages, idx)
              }) do
-          {:ok, _} -> :ok
-          {:error, reason} -> Logger.error("[NATS.Handler] Failed to create commit #{hash}: #{inspect(reason)}")
+          {:ok, _} ->
+            :ok
+
+          {:error, reason} ->
+            Logger.error("[NATS.Handler] Failed to create commit #{hash}: #{inspect(reason)}")
         end
       end)
 
@@ -189,8 +208,8 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
     tool_name = payload["tool_name"]
     tool_input = payload["tool_input"] || payload["params"] || %{}
 
-    with {:ok, agent} <- Agents.get_execution_agent_by_uuid(session_uuid) do
-      Agents.update_execution_agent(agent, %{
+    with {:ok, agent} <- Sessions.get_session_by_uuid(session_uuid) do
+      Sessions.update_session(agent, %{
         last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()
       })
 
@@ -216,7 +235,12 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
       })
 
       Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agent:working", {:agent_working, agent})
-      Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "session:#{agent.id}", {:tool_use, tool_name, tool_input})
+
+      Phoenix.PubSub.broadcast(
+        EyeInTheSkyWeb.PubSub,
+        "session:#{agent.id}",
+        {:tool_use, tool_name, tool_input}
+      )
 
       Logger.debug("[NATS.Handler] Tool pre: #{tool_name} in #{session_uuid}")
     else
@@ -230,8 +254,8 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
     tool_name = payload["tool_name"]
     tool_input = payload["tool_input"] || %{}
 
-    with {:ok, agent} <- Agents.get_execution_agent_by_uuid(session_uuid) do
-      Agents.update_execution_agent(agent, %{
+    with {:ok, agent} <- Sessions.get_session_by_uuid(session_uuid) do
+      Sessions.update_session(agent, %{
         last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()
       })
 
@@ -255,13 +279,31 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
         metadata: metadata
       })
 
-      Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "session:#{agent.id}", {:tool_result, tool_name, false})
+      Phoenix.PubSub.broadcast(
+        EyeInTheSkyWeb.PubSub,
+        "session:#{agent.id}",
+        {:tool_result, tool_name, false}
+      )
 
       Logger.debug("[NATS.Handler] Tool post: #{tool_name} in #{session_uuid}")
     else
       {:error, :not_found} ->
         Logger.debug("[NATS.Handler] Session not found for tool.post: #{session_uuid}")
     end
+  end
+
+  # session.stop / session.end / session.compact — status is nested under data.status
+  # Normalize and delegate to the update handler
+  def handle("events.session.stop", %{"session_id" => sid, "data" => %{"status" => status}} = _payload) do
+    handle("events.session.update", %{"session_id" => sid, "status" => status})
+  end
+
+  def handle("events.session.end", %{"session_id" => sid, "data" => %{"status" => status}} = _payload) do
+    handle("events.session.update", %{"session_id" => sid, "status" => status})
+  end
+
+  def handle("events.session.compact", %{"session_id" => sid, "data" => %{"status" => status}} = _payload) do
+    handle("events.session.update", %{"session_id" => sid, "status" => status})
   end
 
   # Legacy subject - redirect to new handler
@@ -302,7 +344,9 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
                 Logger.info("[NATS.Handler] Task #{task_id} -> #{cmd}")
 
               {:error, reason} ->
-                Logger.error("[NATS.Handler] Failed to update task #{task_id}: #{inspect(reason)}")
+                Logger.error(
+                  "[NATS.Handler] Failed to update task #{task_id}: #{inspect(reason)}"
+                )
             end
           rescue
             Ecto.NoResultsError ->
@@ -321,22 +365,48 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
 
   # --- Private helpers (shared with REST controllers) ---
 
-  defp find_or_create_chat_agent(%{uuid: uuid} = attrs) do
-    case ChatAgents.get_chat_agent_by_uuid(uuid) do
-      {:ok, existing} -> {:ok, existing}
-      {:error, :not_found} -> ChatAgents.create_chat_agent(attrs)
+  defp find_or_create_agent(%{uuid: uuid} = attrs) do
+    case Agents.get_agent_by_uuid(uuid) do
+      {:ok, existing} ->
+        {:ok, existing}
+
+      {:error, :not_found} ->
+        case Agents.create_agent(attrs) do
+          {:ok, agent} ->
+            {:ok, agent}
+
+          {:error, %Ecto.Changeset{}} = err ->
+            err
+
+          # Race: another process inserted between our check and insert
+          _ ->
+            case Agents.get_agent_by_uuid(uuid) do
+              {:ok, existing} -> {:ok, existing}
+              err -> err
+            end
+        end
     end
+  rescue
+    Ecto.ConstraintError ->
+      case Agents.get_agent_by_uuid(uuid) do
+        {:ok, existing} -> {:ok, existing}
+        _ -> {:error, :constraint_race}
+      end
   end
 
   defp resolve_project_id(params) do
     cond do
-      params["project_id"] -> params["project_id"]
+      params["project_id"] ->
+        params["project_id"]
+
       params["project_name"] ->
         case Projects.get_project_by_name(params["project_name"]) do
           %{id: id} -> id
           nil -> nil
         end
-      true -> nil
+
+      true ->
+        nil
     end
   end
 
@@ -345,11 +415,15 @@ defmodule EyeInTheSkyWeb.NATS.Handler do
 
   defp parse_model(model) when is_binary(model) do
     cond do
-      String.starts_with?(model, "claude-") -> {"anthropic", model}
+      String.starts_with?(model, "claude-") ->
+        {"anthropic", model}
+
       String.contains?(model, "/") ->
         [provider | rest] = String.split(model, "/", parts: 2)
         {provider, Enum.join(rest, "/")}
-      true -> {"anthropic", model}
+
+      true ->
+        {"anthropic", model}
     end
   end
 

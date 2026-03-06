@@ -15,12 +15,19 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
       |> assign(:top_sessions, top_sessions)
       |> assign(:sidebar_tab, :usage)
       |> assign(:sidebar_project, nil)
+      |> assign(:recalculating, false)
 
     {:ok, socket}
   end
 
   @impl true
   def handle_event("recalculate", _params, socket) do
+    send(self(), :do_recalculate)
+    {:noreply, assign(socket, :recalculating, true)}
+  end
+
+  @impl true
+  def handle_info(:do_recalculate, socket) do
     {ingested, skipped, errors} =
       EyeInTheSkyWeb.Metrics.TokenIngestion.ingest_all(force: true)
 
@@ -31,6 +38,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
       |> assign(:totals, totals)
       |> assign(:model_breakdown, model_breakdown)
       |> assign(:top_sessions, top_sessions)
+      |> assign(:recalculating, false)
       |> put_flash(:info, "Ingested #{ingested}, skipped #{skipped}, errors #{errors}")
 
     {:noreply, socket}
@@ -182,42 +190,52 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <div class="max-w-7xl mx-auto space-y-8">
         <div class="flex justify-end">
-          <button phx-click="recalculate" class="btn btn-sm btn-outline">
-            <.icon name="hero-arrow-path" class="size-4" /> Recalculate
+          <button phx-click="recalculate" disabled={@recalculating} class="btn btn-sm btn-outline">
+            <.icon name="hero-arrow-path" class={if @recalculating, do: "size-4 animate-spin", else: "size-4"} />
+            {if @recalculating, do: "Recalculating...", else: "Recalculate"}
           </button>
         </div>
         <%!-- Top-level stat cards --%>
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          <div class="card bg-base-100 border border-base-300 shadow-sm">
-            <div class="card-body p-4 text-center">
-              <p class="text-xs text-base-content/60 uppercase tracking-wider">Total Cost</p>
-              <p class="text-3xl font-bold text-warning">{format_cost(@totals.cost)}</p>
+          <%= if @recalculating do %>
+            <div :for={_ <- 1..5} class="card bg-base-100 border border-base-300 shadow-sm">
+              <div class="card-body p-4 text-center space-y-2">
+                <div class="skeleton h-3 w-20 mx-auto"></div>
+                <div class="skeleton h-8 w-24 mx-auto"></div>
+              </div>
             </div>
-          </div>
-          <div class="card bg-base-100 border border-base-300 shadow-sm">
-            <div class="card-body p-4 text-center">
-              <p class="text-xs text-base-content/60 uppercase tracking-wider">Total Tokens</p>
-              <p class="text-3xl font-bold text-base-content">{format_number(@totals.tokens)}</p>
+          <% else %>
+            <div class="card bg-base-100 border border-base-300 shadow-sm">
+              <div class="card-body p-4 text-center">
+                <p class="text-xs text-base-content/60 uppercase tracking-wider">Total Cost</p>
+                <p class="text-3xl font-bold text-warning">{format_cost(@totals.cost)}</p>
+              </div>
             </div>
-          </div>
-          <div class="card bg-base-100 border border-base-300 shadow-sm">
-            <div class="card-body p-4 text-center">
-              <p class="text-xs text-base-content/60 uppercase tracking-wider">Total Requests</p>
-              <p class="text-3xl font-bold text-base-content">{format_number(@totals.requests)}</p>
+            <div class="card bg-base-100 border border-base-300 shadow-sm">
+              <div class="card-body p-4 text-center">
+                <p class="text-xs text-base-content/60 uppercase tracking-wider">Total Tokens</p>
+                <p class="text-3xl font-bold text-base-content">{format_number(@totals.tokens)}</p>
+              </div>
             </div>
-          </div>
-          <div class="card bg-base-100 border border-base-300 shadow-sm">
-            <div class="card-body p-4 text-center">
-              <p class="text-xs text-base-content/60 uppercase tracking-wider">Sessions w/ Metrics</p>
-              <p class="text-3xl font-bold text-info">{format_number(@totals.sessions)}</p>
+            <div class="card bg-base-100 border border-base-300 shadow-sm">
+              <div class="card-body p-4 text-center">
+                <p class="text-xs text-base-content/60 uppercase tracking-wider">Total Requests</p>
+                <p class="text-3xl font-bold text-base-content">{format_number(@totals.requests)}</p>
+              </div>
             </div>
-          </div>
-          <div class="card bg-base-100 border border-base-300 shadow-sm">
-            <div class="card-body p-4 text-center">
-              <p class="text-xs text-base-content/60 uppercase tracking-wider">Total Subagents</p>
-              <p class="text-3xl font-bold text-base-content">{format_number(@totals.subagents)}</p>
+            <div class="card bg-base-100 border border-base-300 shadow-sm">
+              <div class="card-body p-4 text-center">
+                <p class="text-xs text-base-content/60 uppercase tracking-wider">Sessions w/ Metrics</p>
+                <p class="text-3xl font-bold text-info">{format_number(@totals.sessions)}</p>
+              </div>
             </div>
-          </div>
+            <div class="card bg-base-100 border border-base-300 shadow-sm">
+              <div class="card-body p-4 text-center">
+                <p class="text-xs text-base-content/60 uppercase tracking-wider">Total Subagents</p>
+                <p class="text-3xl font-bold text-base-content">{format_number(@totals.subagents)}</p>
+              </div>
+            </div>
+          <% end %>
         </div>
 
         <%!-- Model Breakdown --%>
@@ -240,17 +258,23 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
                   </tr>
                 </thead>
                 <tbody>
-                  <tr :for={row <- @model_breakdown} class="hover">
-                    <td class="font-medium">{short_model(row.model)}</td>
-                    <td class="text-right">{format_number(row.sessions)}</td>
-                    <td class="text-right">{format_number(row.input_tokens)}</td>
-                    <td class="text-right">{format_number(row.output_tokens)}</td>
-                    <td class="text-right">{format_number(row.cache_read)}</td>
-                    <td class="text-right">{format_number(row.cache_create)}</td>
-                    <td class="text-right">{format_number(row.requests)}</td>
-                    <td class="text-right font-medium text-warning">{format_cost(row.cost)}</td>
-                    <td class="text-right">{format_cost(row.avg_cost)}</td>
-                  </tr>
+                  <%= if @recalculating do %>
+                    <tr :for={_ <- 1..5} class="hover">
+                      <td :for={_ <- 1..9}><div class="skeleton h-4 w-full"></div></td>
+                    </tr>
+                  <% else %>
+                    <tr :for={row <- @model_breakdown} class="hover">
+                      <td class="font-medium">{short_model(row.model)}</td>
+                      <td class="text-right">{format_number(row.sessions)}</td>
+                      <td class="text-right">{format_number(row.input_tokens)}</td>
+                      <td class="text-right">{format_number(row.output_tokens)}</td>
+                      <td class="text-right">{format_number(row.cache_read)}</td>
+                      <td class="text-right">{format_number(row.cache_create)}</td>
+                      <td class="text-right">{format_number(row.requests)}</td>
+                      <td class="text-right font-medium text-warning">{format_cost(row.cost)}</td>
+                      <td class="text-right">{format_cost(row.avg_cost)}</td>
+                    </tr>
+                  <% end %>
                 </tbody>
               </table>
             </div>
@@ -277,21 +301,27 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
                   </tr>
                 </thead>
                 <tbody>
-                  <tr :for={row <- @top_sessions} class="hover">
-                    <td class="max-w-xs truncate">
-                      <a href={"/dm/#{row.uuid}"} class="link link-hover link-primary">
-                        {row.name}
-                      </a>
-                    </td>
-                    <td class="whitespace-nowrap">{short_model(row.model)}</td>
-                    <td class="text-right">{format_number(row.input_tokens)}</td>
-                    <td class="text-right">{format_number(row.output_tokens)}</td>
-                    <td class="text-right">{format_number(row.cache_read)}</td>
-                    <td class="text-right">{format_number(row.cache_create)}</td>
-                    <td class="text-right">{format_number(row.requests)}</td>
-                    <td class="text-right">{format_number(row.subagents)}</td>
-                    <td class="text-right font-medium text-warning">{format_cost(row.cost)}</td>
-                  </tr>
+                  <%= if @recalculating do %>
+                    <tr :for={_ <- 1..10} class="hover">
+                      <td :for={_ <- 1..9}><div class="skeleton h-4 w-full"></div></td>
+                    </tr>
+                  <% else %>
+                    <tr :for={row <- @top_sessions} class="hover">
+                      <td class="max-w-xs truncate">
+                        <a href={"/dm/#{row.uuid}"} class="link link-hover link-primary">
+                          {row.name}
+                        </a>
+                      </td>
+                      <td class="whitespace-nowrap">{short_model(row.model)}</td>
+                      <td class="text-right">{format_number(row.input_tokens)}</td>
+                      <td class="text-right">{format_number(row.output_tokens)}</td>
+                      <td class="text-right">{format_number(row.cache_read)}</td>
+                      <td class="text-right">{format_number(row.cache_create)}</td>
+                      <td class="text-right">{format_number(row.requests)}</td>
+                      <td class="text-right">{format_number(row.subagents)}</td>
+                      <td class="text-right font-medium text-warning">{format_cost(row.cost)}</td>
+                    </tr>
+                  <% end %>
                 </tbody>
               </table>
             </div>

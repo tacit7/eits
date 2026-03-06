@@ -6,20 +6,27 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NatsSend do
   alias Anubis.Server.Response
 
   schema do
-    field :sender_id, :string, required: true, description: "Your session_id (identifies who is sending)"
-    field :receiver_id, :string, description: "Target session_id for targeted delivery. Empty = broadcast"
+    field :sender_id, :string,
+      required: true,
+      description: "Your session_id (identifies who is sending)"
+
+    field :receiver_id, :string,
+      description: "Target session_id for targeted delivery. Empty = broadcast"
+
     field :message, :string, required: true, description: "The message content"
-    field :subject, :string, description: "Message subject. Auto-prefixed with events. if not present"
+
+    field :subject, :string,
+      description: "Message subject. Auto-prefixed with events. if not present"
   end
 
   @impl true
   def execute(params, frame) do
-    subject = normalize_subject(params["subject"])
+    subject = normalize_subject(params[:subject])
 
     payload = %{
-      sender_id: params["sender_id"],
-      receiver_id: params["receiver_id"] || "",
-      message: params["message"],
+      sender_id: params[:sender_id],
+      receiver_id: params[:receiver_id] || "",
+      message: params[:message],
       timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
     }
 

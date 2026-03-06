@@ -25,12 +25,16 @@ defmodule EyeInTheSkyWeb.Application do
       {Registry, keys: :duplicate, name: EyeInTheSkyWeb.Claude.Registry},
       # Unique registry for agent worker naming (:via requires unique keys)
       {Registry, keys: :unique, name: EyeInTheSkyWeb.Claude.AgentRegistry},
+      # Unique registry for chat worker naming (one per channel)
+      {Registry, keys: :unique, name: EyeInTheSkyWeb.Claude.ChatRegistry},
       # SDK registry for tracking running Claude CLI processes
       EyeInTheSkyWeb.Claude.SDK.Registry,
       # DynamicSupervisor for per-session workers
       {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.SessionSupervisor, strategy: :one_for_one},
       # DynamicSupervisor for persistent agent workers
       {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.AgentSupervisor, strategy: :one_for_one},
+      # DynamicSupervisor for per-channel chat workers
+      {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.ChatSupervisor, strategy: :one_for_one},
       # Claude CLI session coordinator
       EyeInTheSkyWeb.Claude.SessionManager,
       # Oban job processing
@@ -39,10 +43,13 @@ defmodule EyeInTheSkyWeb.Application do
       EyeInTheSkyWeb.Scheduler.JobEnqueuer,
       # Poll for external task changes (Go MCP i-todo writes)
       EyeInTheSkyWeb.Tasks.Poller,
+      # Poll for external message writes (Go MCP, spawned agents)
+      EyeInTheSkyWeb.Messages.Broadcaster,
       # NATS pub/sub consumer
       # Connects to localhost:4222, subscribes to events.>, dispatches to Handler
       EyeInTheSkyWeb.NATS.Consumer,
       # MCP Server (Anubis) — Streamable HTTP at /mcp
+      # SessionStore is started by Anubis automatically via :session_store config (enabled: true)
       Anubis.Server.Registry,
       {EyeInTheSkyWeb.MCP.Server, transport: :streamable_http},
       # Start to serve requests, typically the last entry

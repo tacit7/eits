@@ -12,7 +12,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   alias EyeInTheSkyWeb.Claude.{Message, SDK}
   alias EyeInTheSkyWeb.Codex
-  alias EyeInTheSkyWeb.{Agents, Messages}
+  alias EyeInTheSkyWeb.{Agents, Messages, Sessions}
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
   @retry_start_ms 1_000
@@ -39,6 +39,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     end
   end
 
+  def is_processing?(session_id) do
+    case Registry.lookup(@registry, {:agent, session_id}) do
+      [{pid, _}] -> GenServer.call(pid, :is_processing?)
+      [] -> false
+    end
+  end
+
   # --- Server Callbacks ---
 
   @impl true
@@ -48,6 +55,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     agent_id = Keyword.fetch!(opts, :agent_id)
     project_path = Keyword.get(opts, :project_path, File.cwd!())
     provider = Keyword.get(opts, :provider, "claude")
+    worktree = Keyword.get(opts, :worktree)
 
     state = %{
       session_id: session_id,
@@ -58,6 +66,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       queue: [],
       project_path: project_path,
       provider: provider,
+      worktree: worktree,
       retry_timer_ref: nil
     }
 
@@ -66,6 +75,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     )
 
     {:ok, state}
+  end
+
+  @impl true
+  def handle_call(:is_processing?, _from, state) do
+    {:reply, not is_nil(state.current_job), state}
   end
 
   @impl true
@@ -223,7 +237,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
     Logger.info("[telemetry] agent.sdk.complete session_id=#{state.session_id}")
 
-    update_agent_status(state.session_id, "waiting")
+    update_agent_status(state.session_id, "idle")
 
     Phoenix.PubSub.broadcast(
       EyeInTheSkyWeb.PubSub,
@@ -234,30 +248,51 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     process_next_job(%{state | sdk_ref: nil, current_job: nil})
   end
 
+  # Stale Claude session — retry current job as a fresh start
+  @impl true
+  def handle_info(
+        {:claude_error, ref, {:claude_result_error, %{errors: errors}} = reason},
+        %{sdk_ref: ref, current_job: job} = state
+      )
+      when is_list(errors) do
+    broadcast_stream_clear(state)
+
+    if Enum.any?(errors, &String.contains?(&1, "No conversation found")) && not is_nil(job) do
+      Logger.warning(
+        "[#{state.session_id}] Stale Claude session UUID=#{state.session_uuid}, retrying as new session"
+      )
+
+      fresh_job = put_in(job, [:context, :has_messages], false)
+
+      case start_sdk(state, fresh_job) do
+        {:ok, sdk_ref} ->
+          {:noreply, %{state | sdk_ref: sdk_ref, current_job: fresh_job}}
+
+        {:error, start_reason} ->
+          Logger.error(
+            "[#{state.session_id}] Failed to restart fresh SDK: #{inspect(start_reason)}"
+          )
+
+          update_agent_status(state.session_id, "idle")
+
+          Phoenix.PubSub.broadcast(
+            EyeInTheSkyWeb.PubSub,
+            "agent:working",
+            {:agent_stopped, state.session_uuid, state.session_id}
+          )
+
+          process_next_job(%{state | sdk_ref: nil, current_job: nil})
+      end
+    else
+      do_handle_sdk_error(reason, state)
+    end
+  end
+
   # SDK error
   @impl true
   def handle_info({:claude_error, ref, reason}, %{sdk_ref: ref} = state) do
     broadcast_stream_clear(state)
-    Logger.error("[#{state.session_id}] SDK error: #{inspect(reason)}")
-
-    :telemetry.execute([:eits, :agent, :sdk, :error], %{system_time: System.system_time()}, %{
-      session_id: state.session_id,
-      reason: reason
-    })
-
-    Logger.error(
-      "[telemetry] agent.sdk.error session_id=#{state.session_id} reason=#{inspect(reason)}"
-    )
-
-    update_agent_status(state.session_id, "waiting")
-
-    Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
-      "agent:working",
-      {:agent_stopped, state.session_uuid, state.session_id}
-    )
-
-    process_next_job(%{state | sdk_ref: nil, current_job: nil})
+    do_handle_sdk_error(reason, state)
   end
 
   # Stale messages from previous SDK refs - ignore
@@ -295,8 +330,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   # --- Private ---
 
   defp save_result(text, metadata, state) when is_binary(text) do
-    if String.trim(text) == "[NO_RESPONSE]" do
-      Logger.info("[#{state.session_id}] Agent responded with [NO_RESPONSE], skipping")
+    if String.trim(text) in ["", "[NO_RESPONSE]"] do
+      Logger.info("[#{state.session_id}] Skipping DB save — empty or suppressed response")
     else
       channel_id = get_in(state, [:current_job, :context, :channel_id])
 
@@ -375,7 +410,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       skip_permissions: true,
       use_script: true,
       eits_session_id: state.session_uuid,
-      eits_agent_id: state.agent_id
+      eits_agent_id: state.agent_id,
+      worktree: state.worktree
     ]
 
     opts =
@@ -467,9 +503,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     if state.session_uuid == claude_session_uuid do
       state
     else
-      case Agents.get_execution_agent(state.session_id) do
+      case Sessions.get_session(state.session_id) do
         {:ok, execution_agent} ->
-          case Agents.update_execution_agent(execution_agent, %{uuid: claude_session_uuid}) do
+          case Sessions.update_session(execution_agent, %{uuid: claude_session_uuid}) do
             {:ok, _updated} ->
               Logger.info(
                 "[#{state.session_id}] Updated execution session uuid #{state.session_uuid} -> #{claude_session_uuid}"
@@ -565,19 +601,42 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     )
   end
 
+  defp do_handle_sdk_error(reason, state) do
+    Logger.error("[#{state.session_id}] SDK error: #{inspect(reason)}")
+
+    :telemetry.execute([:eits, :agent, :sdk, :error], %{system_time: System.system_time()}, %{
+      session_id: state.session_id,
+      reason: reason
+    })
+
+    Logger.error(
+      "[telemetry] agent.sdk.error session_id=#{state.session_id} reason=#{inspect(reason)}"
+    )
+
+    update_agent_status(state.session_id, "idle")
+
+    Phoenix.PubSub.broadcast(
+      EyeInTheSkyWeb.PubSub,
+      "agent:working",
+      {:agent_stopped, state.session_uuid, state.session_id}
+    )
+
+    process_next_job(%{state | sdk_ref: nil, current_job: nil})
+  end
+
   defp update_agent_status(session_id, status) do
-    case Agents.get_execution_agent(session_id) do
+    case Sessions.get_session(session_id) do
       {:ok, agent} ->
         attrs = %{status: status}
 
         attrs =
-          if status == "waiting" do
+          if status == "idle" do
             Map.put(attrs, :last_activity_at, DateTime.utc_now() |> DateTime.to_iso8601())
           else
             attrs
           end
 
-        Agents.update_execution_agent(agent, attrs)
+        Sessions.update_session(agent, attrs)
 
       {:error, _} ->
         :ok

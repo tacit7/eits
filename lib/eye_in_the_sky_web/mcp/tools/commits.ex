@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
   use Anubis.Server.Component, type: :tool
 
   alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.Sessions
 
   schema do
     field :agent_id, :string, required: true, description: "Agent identifier"
@@ -14,17 +15,27 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
   @impl true
   def execute(params, frame) do
     alias EyeInTheSkyWeb.Commits
-    alias EyeInTheSkyWeb.Agents
 
-    agent_id = params["agent_id"]
-    hashes = params["commit_hashes"] || []
-    messages = params["commit_messages"] || []
+    agent_id = params[:agent_id]
+    hashes = params[:commit_hashes] || []
+    messages = params[:commit_messages] || []
 
-    # Resolve agent integer ID
-    agent_int_id =
-      case Agents.get_execution_agent_by_uuid(agent_id) do
-        {:ok, agent} -> agent.id
-        _ -> nil
+    # Resolve session ID — agent_id may be an integer agent ID or a session UUID
+    session_int_id =
+      case Integer.parse(to_string(agent_id)) do
+        {int_id, ""} ->
+          # It's an integer agent ID — get the most recent session for this agent
+          case Sessions.list_sessions_for_agent(int_id) do
+            [session | _] -> session.id
+            _ -> nil
+          end
+
+        _ ->
+          # Try as session UUID
+          case Sessions.get_session_by_uuid(agent_id) do
+            {:ok, session} -> session.id
+            _ -> nil
+          end
       end
 
     results =
@@ -34,9 +45,9 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
         message = Enum.at(messages, idx, "")
 
         case Commits.create_commit(%{
-               hash: hash,
-               message: message,
-               agent_id: agent_int_id
+               commit_hash: hash,
+               commit_message: message,
+               session_id: session_int_id
              }) do
           {:ok, _} -> :ok
           {:error, _} -> :error

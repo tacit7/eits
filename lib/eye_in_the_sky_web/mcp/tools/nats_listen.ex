@@ -6,7 +6,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NatsListen do
   alias Anubis.Server.Response
 
   schema do
-    field :session_id, :string, required: true, description: "Your session ID (used to filter targeted messages)"
+    field :session_id, :string,
+      required: true,
+      description: "Your session ID (used to filter targeted messages)"
+
     field :last_sequence, :integer, description: "Last processed sequence number"
     field :max_messages, :integer, description: "Maximum messages to fetch (default: 10)"
   end
@@ -21,7 +24,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NatsListen do
       message: "NATS listen not yet implemented in Phoenix MCP server",
       messages: [],
       count: 0,
-      last_sequence: params["last_sequence"] || 0
+      last_sequence: params[:last_sequence] || 0
     }
 
     response = Response.tool() |> Response.json(result)

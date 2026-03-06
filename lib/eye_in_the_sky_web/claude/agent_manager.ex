@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   require Logger
 
   alias EyeInTheSkyWeb.Claude.AgentWorker
-  alias EyeInTheSkyWeb.{Agents, ChatAgents, Messages}
+  alias EyeInTheSkyWeb.{Agents, Messages, Sessions}
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
   @default_provider "claude"
@@ -41,15 +41,15 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
     provider = if opts[:agent_type] == "codex", do: "codex", else: "claude"
 
     with {:ok, agent} <-
-           ChatAgents.create_chat_agent(%{
+           Agents.create_agent(%{
              uuid: agent_uuid,
              agent_type: opts[:agent_type] || "claude",
              project_id: opts[:project_id],
-             status: "active",
+             status: "working",
              description: description
            }),
          {:ok, session} <-
-           Agents.create_execution_agent(%{
+           Sessions.create_session(%{
              uuid: session_uuid,
              agent_id: agent.id,
              name: description,
@@ -63,13 +63,34 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
         "✅ create_agent: DB records created - agent.id=#{agent.id}, session.id=#{session.id}, session_uuid=#{session.uuid}"
       )
 
-      instructions = opts[:instructions] || description
+      instructions =
+        case opts[:worktree] do
+          nil ->
+            opts[:instructions] || description
+
+          worktree ->
+            base = opts[:instructions] || description
+            branch = "worktree-#{worktree}"
+
+            base <>
+              """
+
+
+              ---
+              When your work is complete:
+              1. Commit all changes with a clear message describing what was done.
+              2. Push your branch: git push gitea #{branch}
+              3. Create a pull request: tea pr create --login claude --repo eits-web --base main --head #{branch} --title "<your task summary>" --description "<what you did and why>"
+              4. Call i-end-session to mark your session complete.
+              """
+        end
 
       Logger.info("📤 create_agent: sending initial message to session.id=#{session.id}")
 
       case send_message(session.id, instructions,
              model: opts[:model],
-             effort_level: opts[:effort_level]
+             effort_level: opts[:effort_level],
+             worktree: opts[:worktree]
            ) do
         :ok ->
           Logger.info(
@@ -115,7 +136,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
       "send_message: session_id=#{session_id}, message_length=#{String.length(message)}"
     )
 
-    case lookup_or_start(session_id) do
+    case lookup_or_start(session_id, opts) do
       {:ok, pid} ->
         Logger.debug(
           "send_message: worker found/started for session_id=#{session_id}, pid=#{inspect(pid)}"
@@ -158,7 +179,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
     {:error, :invalid_message}
   end
 
-  defp lookup_or_start(session_id) do
+  defp lookup_or_start(session_id, extra_opts \\ []) do
     case Registry.lookup(@registry, {:agent, session_id}) do
       [{pid, _}] ->
         if Process.alive?(pid) do
@@ -168,7 +189,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
 
           {:ok, pid}
         else
-          start_agent_worker(session_id)
+          start_agent_worker(session_id, extra_opts)
         end
 
       [] ->
@@ -176,15 +197,15 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
           "🔍 lookup_or_start: no worker found for session_id=#{session_id}, starting new worker"
         )
 
-        start_agent_worker(session_id)
+        start_agent_worker(session_id, extra_opts)
     end
   end
 
-  defp start_agent_worker(session_id) do
+  defp start_agent_worker(session_id, extra_opts \\ []) do
     Logger.info("🚀 start_agent_worker: loading session.id=#{session_id}")
 
-    with {:ok, session} <- Agents.get_execution_agent(session_id),
-         {:ok, agent} <- ChatAgents.get_chat_agent(session.agent_id) do
+    with {:ok, session} <- Sessions.get_session(session_id),
+         {:ok, agent} <- Agents.get_agent(session.agent_id) do
       project_path_from_project = if agent.project, do: agent.project.path, else: nil
 
       project_path =
@@ -211,7 +232,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
         session_uuid: session.uuid,
         agent_id: agent.id,
         project_path: project_path,
-        provider: provider
+        provider: provider,
+        worktree: extra_opts[:worktree]
       ]
 
       case DynamicSupervisor.start_child(
@@ -254,7 +276,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
     |> normalize_provider()
     |> case do
       nil ->
-        case Agents.get_execution_agent(session_id) do
+        case Sessions.get_session(session_id) do
           {:ok, session} -> normalize_provider(session.provider) || @default_provider
           _ -> @default_provider
         end

@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.Messages.Message do
 
     belongs_to :project, EyeInTheSkyWeb.Projects.Project, type: :integer
 
-    belongs_to :session, EyeInTheSkyWeb.Agents.Agent,
+    belongs_to :session, EyeInTheSkyWeb.Sessions.Session,
       define_field: false,
       foreign_key: :session_id,
       type: :integer

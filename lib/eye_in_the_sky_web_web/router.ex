@@ -17,33 +17,37 @@ defmodule EyeInTheSkyWebWeb.Router do
   scope "/", EyeInTheSkyWebWeb do
     pipe_through :browser
 
-    live "/", AgentLive.Index, :index
-    live "/notes", OverviewLive.Notes, :index
-    live "/tasks", OverviewLive.Tasks, :index
-    live "/usage", OverviewLive.Usage, :index
-    live "/skills", OverviewLive.Skills, :index
-    live "/config", OverviewLive.Config, :index
-    live "/jobs", OverviewLive.Jobs, :index
-    live "/settings", OverviewLive.Settings, :index
-    live "/sessions", SessionLive.Index, :index
-    live "/prompts", PromptLive.Index, :index
-    live "/prompts/:id", PromptLive.Show, :show
-    live "/projects/:id", ProjectLive.Show, :show
-    live "/projects/:id/sessions", ProjectLive.Sessions, :show
-    live "/projects/:id/prompts", ProjectLive.Prompts, :show
-    live "/projects/:id/tasks", ProjectLive.Tasks, :show
-    live "/projects/:id/kanban", ProjectLive.Kanban, :show
-    live "/projects/:id/notes", ProjectLive.Notes, :show
-    live "/projects/:id/files", ProjectLive.Files, :show
-    live "/projects/:id/config", ProjectLive.Config, :show
-    live "/chat", ChatLive, :index
-    live "/dm/:session_id", DmLive, :show
+    live_session :app do
+      live "/", AgentLive.Index, :index
+      live "/notes", OverviewLive.Notes, :index
+      live "/tasks", OverviewLive.Tasks, :index
+      live "/usage", OverviewLive.Usage, :index
+      live "/skills", OverviewLive.Skills, :index
+      live "/config", OverviewLive.Config, :index
+      live "/jobs", OverviewLive.Jobs, :index
+      live "/settings", OverviewLive.Settings, :index
+      live "/sessions", SessionLive.Index, :index
+      live "/prompts", PromptLive.Index, :index
+      live "/prompts/new", PromptLive.New, :new
+      live "/prompts/:id", PromptLive.Show, :show
+      live "/projects/:id", ProjectLive.Show, :show
+      live "/projects/:id/sessions", ProjectLive.Sessions, :show
+      live "/projects/:id/prompts", ProjectLive.Prompts, :show
+      live "/projects/:id/tasks", ProjectLive.Tasks, :show
+      live "/projects/:id/kanban", ProjectLive.Kanban, :show
+      live "/projects/:id/notes", ProjectLive.Notes, :show
+      live "/projects/:id/files", ProjectLive.Files, :show
+      live "/projects/:id/config", ProjectLive.Config, :show
+      live "/projects/:id/agents", ProjectLive.Agents, :show
+      live "/chat", ChatLive, :index
+      live "/dm/:session_id", DmLive, :show
+    end
   end
 
   # MCP Server — Streamable HTTP
+  # Wrapped in MCPPlug to catch (EXIT) shutdown from hot-reload-induced transport restarts
   scope "/mcp" do
-    forward "/", Anubis.Server.Transport.StreamableHTTP.Plug,
-      server: EyeInTheSkyWeb.MCP.Server
+    forward "/", EyeInTheSkyWebWeb.MCPPlug, server: EyeInTheSkyWeb.MCP.Server
   end
 
   scope "/api/v1", EyeInTheSkyWebWeb.Api.V1 do
@@ -53,6 +57,7 @@ defmodule EyeInTheSkyWebWeb.Router do
     patch "/sessions/:uuid", SessionController, :update
     post "/commits", CommitController, :create
     post "/notes", NoteController, :create
+    post "/prompts", PromptController, :create
     post "/session-context", SessionContextController, :create
   end
 

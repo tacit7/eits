@@ -31,7 +31,7 @@ defmodule EyeInTheSkyWeb.MCP.SessionStore do
   @impl Anubis.Server.Session.Store
   def load(session_id, _opts) do
     case :ets.lookup(@table, session_id) do
-      [{^session_id, state, _ts}] -> {:ok, state}
+      [{^session_id, state, _ts}] -> {:ok, Map.put_new(state, :log_level, "info")}
       [] -> {:error, :not_found}
     end
   end

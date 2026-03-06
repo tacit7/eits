@@ -67,3 +67,4 @@ test_*.js
 
 # Git worktrees managed by Claude Code
 .claude/worktrees/
+priv/cert/

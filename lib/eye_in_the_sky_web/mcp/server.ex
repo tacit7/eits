@@ -10,7 +10,8 @@ defmodule EyeInTheSkyWeb.MCP.Server do
   use Anubis.Server,
     name: "eits",
     version: "1.0.0",
-    capabilities: [:tools]
+    capabilities: [:tools],
+    protocol_versions: ["2024-11-05", "2025-03-26", "2025-06-18"]
 
   # Phase 1 — Core DB tools
   component(EyeInTheSkyWeb.MCP.Tools.Session, name: "i-session")

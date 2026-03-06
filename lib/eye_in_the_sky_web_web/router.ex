@@ -17,7 +17,7 @@ defmodule EyeInTheSkyWebWeb.Router do
   scope "/", EyeInTheSkyWebWeb do
     pipe_through :browser
 
-    live_session :app do
+    live_session :app, on_mount: [EyeInTheSkyWebWeb.FabHook] do
       live "/", AgentLive.Index, :index
       live "/notes", OverviewLive.Notes, :index
       live "/tasks", OverviewLive.Tasks, :index

@@ -26,6 +26,7 @@ import topbar from "../vendor/topbar"
 import {CopyToClipboard} from "./hooks/copy_to_clipboard"
 import {CopySessionId} from "./hooks/copy_session_id"
 import {BookmarkAgent} from "./hooks/bookmark_agent"
+import {FavoriteFab} from "./hooks/favorite_fab"
 import {ScrollToBottom} from "./hooks/scroll_to_bottom"
 import {MarkdownMessage} from "./hooks/markdown_message"
 import {CommandHistory} from "./hooks/command_history"
@@ -63,6 +64,7 @@ let Hooks = getHooks({
 Hooks.CopyToClipboard = CopyToClipboard
 Hooks.CopySessionId = CopySessionId
 Hooks.BookmarkAgent = BookmarkAgent
+Hooks.FavoriteFab = FavoriteFab
 Hooks.ScrollToBottom = ScrollToBottom
 Hooks.CommandHistory = CommandHistory
 Hooks.MarkdownMessage = MarkdownMessage
@@ -146,6 +148,8 @@ Hooks.GlobalKeydown = {
     console.log("[GlobalKeydown] mounted on", this.el.id)
     this._handler = (e) => {
       if (e.ctrlKey && e.key === "k") {
+        const tag = document.activeElement?.tagName
+        if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement?.isContentEditable) return
         e.preventDefault()
         console.log("[GlobalKeydown] Ctrl+K fired, pushing event")
         this.pushEvent("keydown", {key: "k", ctrlKey: true})
@@ -258,7 +262,6 @@ window.addEventListener("click", (e) => {
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
-  longPollFallbackMs: 5000,
   params: {_csrf_token: csrfToken},
   hooks: Hooks,
 })

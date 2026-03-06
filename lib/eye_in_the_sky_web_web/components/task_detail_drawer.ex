@@ -80,7 +80,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                     </label>
                     <select
                       name="state_id"
-                      class="select select-sm w-full bg-base-content/[0.03] border-base-content/8 text-sm focus:border-primary/30"
+                      class="select select-sm w-full bg-base-200 border-base-300 text-sm focus:border-primary/30"
                     >
                       <%= for state <- @workflow_states do %>
                         <option value={state.id} selected={@task.state_id == state.id}>
@@ -97,7 +97,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                     </label>
                     <select
                       name="priority"
-                      class="select select-sm w-full bg-base-content/[0.03] border-base-content/8 text-sm focus:border-primary/30"
+                      class="select select-sm w-full bg-base-200 border-base-300 text-sm focus:border-primary/30"
                     >
                       <option value="0" selected={@task.priority == 0 || is_nil(@task.priority)}>
                         None
@@ -128,7 +128,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                       type="date"
                       name="due_at"
                       value={format_date_input(@task.due_at)}
-                      class="input input-sm w-full bg-base-content/[0.03] border-base-content/8 text-sm focus:border-primary/30"
+                      class="input input-sm w-full bg-base-200 border-base-300 text-sm focus:border-primary/30"
                     />
                   </div>
 
@@ -142,7 +142,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                       name="tags"
                       value={format_tags(@task.tags)}
                       placeholder="tag1, tag2"
-                      class="input input-sm w-full bg-base-content/[0.03] border-base-content/8 text-sm placeholder:text-base-content/20 focus:border-primary/30"
+                      class="input input-sm w-full bg-base-200 border-base-300 text-sm placeholder:text-base-content/20 focus:border-primary/30"
                     />
                   </div>
                 </div>
@@ -154,7 +154,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                   </label>
                   <textarea
                     name="description"
-                    class="w-full min-h-[100px] bg-base-content/[0.03] border border-base-content/8 rounded-lg px-3 py-2 text-sm focus:border-primary/30 focus:outline-none resize-y"
+                    class="w-full min-h-[100px] bg-base-200 border border-base-300 rounded-lg px-3 py-2 text-sm focus:border-primary/30 focus:outline-none resize-y"
                     placeholder="Add details..."
                   >{@task.description}</textarea>
                 </div>
@@ -172,7 +172,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                     </div>
                     <div class="space-y-2">
                       <%= for note <- @notes do %>
-                        <div class="rounded-lg bg-base-content/[0.03] px-3 py-2.5">
+                        <div class="rounded-lg bg-base-200 px-3 py-2.5">
                           <%= if note.title do %>
                             <div class="text-xs font-semibold text-base-content/70 mb-1">
                               {note.title}

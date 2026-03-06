@@ -96,6 +96,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
         attrs =
           %{}
           |> maybe_put(:status, status)
+          |> maybe_put(:intent, params["intent"])
           |> maybe_put(:last_activity_at, DateTime.utc_now() |> DateTime.to_iso8601())
 
         # For terminal states, set ended_at

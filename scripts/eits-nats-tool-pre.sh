@@ -22,6 +22,14 @@ tool_input=$(echo "$input_json" | jq -c '.tool_input // {}' 2>/dev/null) || tool
 # Publish EITS domain tools to NATS (input-dependent)
 # Matches both Phoenix (eye-in-the-sky) and Go fallback (eits-go) server prefixes
 case "$tool_name" in
+  Edit|Write)
+    file_path=$(echo "$tool_input" | jq -r '.file_path // empty' 2>/dev/null) || file_path=""
+    if [ -n "$file_path" ]; then
+      action=$([ "$tool_name" = "Write" ] && echo "Writing" || echo "Editing")
+      basename=$(basename "$file_path")
+      "$HOOK_DIR/sql/update-session-intent.sh" "$session_id" "$action $basename"
+    fi
+    ;;
   mcp__eye-in-the-sky__i-commits|mcp__eits-go__i-commits)
     payload=$(echo "$tool_input" | jq -c \
       --arg agent_id "$session_id" \

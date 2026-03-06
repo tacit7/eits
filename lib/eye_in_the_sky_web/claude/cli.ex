@@ -272,6 +272,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     args = maybe_flag(args, "--allowedTools", opts[:allowedTools])
     args = maybe_flag(args, "--permission-mode", opts[:permission_mode])
     args = maybe_flag(args, "--mcp-config", opts[:mcp_config])
+    args = maybe_flag(args, "--worktree", opts[:worktree])
 
     # Boolean flags
     # stream-json requires --verbose for proper output parsing
@@ -331,7 +332,8 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     caller = Keyword.get(opts, :caller, self())
     session_ref = Keyword.get(opts, :session_ref, make_ref())
 
-    default_timeout = EyeInTheSkyWeb.Settings.get_integer("cli_idle_timeout_ms") || @fallback_idle_timeout_ms
+    raw_timeout = EyeInTheSkyWeb.Settings.get_integer("cli_idle_timeout_ms")
+    default_timeout = if is_integer(raw_timeout) and raw_timeout > 0, do: raw_timeout, else: @fallback_idle_timeout_ms
 
     idle_timeout_ms =
       case Keyword.get(opts, :idle_timeout_ms, default_timeout) do

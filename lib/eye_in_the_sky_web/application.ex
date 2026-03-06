@@ -43,6 +43,8 @@ defmodule EyeInTheSkyWeb.Application do
       EyeInTheSkyWeb.Scheduler.JobEnqueuer,
       # Poll for external task changes (Go MCP i-todo writes)
       EyeInTheSkyWeb.Tasks.Poller,
+      # Poll for external message writes (Go MCP, spawned agents)
+      EyeInTheSkyWeb.Messages.Broadcaster,
       # NATS pub/sub consumer
       # Connects to localhost:4222, subscribes to events.>, dispatches to Handler
       EyeInTheSkyWeb.NATS.Consumer,

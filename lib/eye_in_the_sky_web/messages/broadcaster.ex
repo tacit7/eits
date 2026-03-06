@@ -1,7 +1,19 @@
 defmodule EyeInTheSkyWeb.Messages.Broadcaster do
   @moduledoc """
-  GenServer that polls for new messages inserted by external tools (like Go MCP i-chat-send)
-  and broadcasts them via Phoenix PubSub.
+  Polls for new messages written directly to SQLite by external processes
+  (Go MCP server, spawned agents, CLI tools) and broadcasts via PubSub.
+
+  Internal Phoenix code paths (Messages.send_message, record_incoming_reply)
+  already broadcast. This catches everything else. Double broadcasts are
+  harmless; the LiveView handler just reloads from DB.
+
+  Disable in test config:
+
+      config :eye_in_the_sky_web, EyeInTheSkyWeb.Messages.Broadcaster, enabled: false
+
+  Broadcasts:
+    - `{:new_message, msg}` on `"session:<id>"` for session messages
+    - `{:new_message, msg}` on `"channel:<id>:messages"` for channel messages
   """
 
   use GenServer
@@ -10,8 +22,7 @@ defmodule EyeInTheSkyWeb.Messages.Broadcaster do
   alias EyeInTheSkyWeb.Messages.Message
   import Ecto.Query
 
-  # Poll every 1 second
-  @poll_interval 1_000
+  @poll_interval 2_000
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
@@ -19,102 +30,89 @@ defmodule EyeInTheSkyWeb.Messages.Broadcaster do
 
   @impl true
   def init(_opts) do
-    # Track the last message ID we've seen
-    last_id = get_latest_message_id()
-    schedule_poll()
-    {:ok, %{last_id: last_id}}
+    if enabled?() do
+      last_id = get_max_id()
+      schedule_poll()
+      {:ok, %{last_id: last_id, enabled: true}}
+    else
+      {:ok, %{last_id: nil, enabled: false}}
+    end
   end
 
   @impl true
+  def handle_info(:poll, %{enabled: false} = state), do: {:noreply, state}
+
   def handle_info(:poll, state) do
-    # Check for new messages since last poll
-    new_messages = get_new_messages_since(state.last_id)
+    current_max = get_max_id()
 
-    # Broadcast each new message
-    Enum.each(new_messages, fn message ->
-      broadcast_message(message)
-    end)
+    state =
+      if current_max != state.last_id do
+        new_messages = get_messages_after(state.last_id)
+        Enum.each(new_messages, &broadcast_message/1)
 
-    # Update last_id if we found new messages
-    new_last_id =
-      case List.last(new_messages) do
-        nil -> state.last_id
-        msg -> msg.id
+        new_last =
+          case List.last(new_messages) do
+            nil -> current_max
+            msg -> msg.id
+          end
+
+        %{state | last_id: new_last}
+      else
+        state
       end
 
     schedule_poll()
-    {:noreply, %{state | last_id: new_last_id}}
+    {:noreply, state}
+  end
+
+  defp enabled? do
+    Application.get_env(:eye_in_the_sky_web, __MODULE__, [])
+    |> Keyword.get(:enabled, true)
   end
 
   defp schedule_poll do
     Process.send_after(self(), :poll, @poll_interval)
   end
 
-  defp get_latest_message_id do
+  defp get_max_id do
     Message
-    |> order_by([m], desc: m.inserted_at)
-    |> limit(1)
-    |> select([m], m.id)
+    |> select([m], max(m.id))
     |> Repo.one()
   end
 
-  defp get_new_messages_since(nil) do
-    # First run - don't broadcast existing messages
-    []
+  defp get_messages_after(nil), do: []
+
+  defp get_messages_after(last_id) do
+    Message
+    |> where([m], m.id > ^last_id)
+    |> order_by([m], asc: m.id)
+    |> limit(50)
+    |> Repo.all()
   end
 
-  defp get_new_messages_since(last_id) do
-    # Get messages inserted after last_id
-    # Use inserted_at comparison since IDs are UUIDs (not sequential)
-    last_message = Repo.get(Message, last_id)
+  defp broadcast_message(%Message{session_id: sid} = msg) when not is_nil(sid) do
+    Phoenix.PubSub.broadcast(
+      EyeInTheSkyWeb.PubSub,
+      "session:#{sid}",
+      {:new_message, msg}
+    )
 
-    case last_message do
-      nil ->
-        # Last ID not found, might have been deleted - get recent messages
-        Message
-        |> where([m], not is_nil(m.channel_id))
-        |> order_by([m], asc: m.inserted_at)
-        |> limit(10)
-        |> Repo.all()
-
-      %Message{inserted_at: last_time} ->
-        # Parse last_time if it's a string (from database)
-        last_datetime =
-          case last_time do
-            %DateTime{} ->
-              last_time
-
-            binary when is_binary(binary) ->
-              case DateTime.from_iso8601(binary) do
-                {:ok, dt, _offset} -> dt
-                _ -> last_time
-              end
-
-            _ ->
-              last_time
-          end
-
-        Message
-        |> where(
-          [m],
-          fragment("datetime(?) > datetime(?)", m.inserted_at, ^last_datetime) and
-            not is_nil(m.channel_id)
-        )
-        |> order_by([m], asc: m.inserted_at)
-        |> Repo.all()
+    if msg.channel_id do
+      Phoenix.PubSub.broadcast(
+        EyeInTheSkyWeb.PubSub,
+        "channel:#{msg.channel_id}:messages",
+        {:new_message, msg}
+      )
     end
   end
 
-  defp broadcast_message(%Message{channel_id: nil}), do: :ok
-
-  defp broadcast_message(%Message{channel_id: channel_id} = message) do
-    Logger.info("Broadcasting new message #{message.id} to channel #{channel_id}")
-
-    # Broadcast to channel subscribers
+  defp broadcast_message(%Message{channel_id: cid}) when not is_nil(cid) do
     Phoenix.PubSub.broadcast(
       EyeInTheSkyWeb.PubSub,
-      "channel:#{channel_id}:messages",
-      {:new_message, message}
+      "channel:#{cid}:messages",
+      {:new_message, %{channel_id: cid}}
     )
   end
+
+  defp broadcast_message(_), do: :ok
 end

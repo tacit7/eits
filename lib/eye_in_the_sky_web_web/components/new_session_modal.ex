@@ -209,6 +209,23 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
               </div>
             <% end %>
 
+            <%!-- Worktree Branch (optional) --%>
+            <div>
+              <label class="text-sm font-medium text-base-content/70 mb-1.5 block">
+                Worktree Branch
+                <span class="text-xs font-normal text-base-content/40 ml-1">Optional</span>
+              </label>
+              <input
+                type="text"
+                name="worktree"
+                class="input input-bordered w-full font-mono text-sm"
+                placeholder="e.g., fix-login-bug"
+              />
+              <p class="text-xs text-base-content/35 mt-1">
+                Isolates work in its own branch (worktree-&lt;name&gt;) and enables automatic PR creation.
+              </p>
+            </div>
+
             <%!-- Submit --%>
             <button type="submit" class="btn btn-primary w-full mt-2">
               {assigns[:button_text] || "Create Agent"}

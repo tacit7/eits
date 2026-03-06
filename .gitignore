@@ -64,3 +64,6 @@ test_*.js
 
 .playwright/
 .playwright-mcp/
+
+# Git worktrees managed by Claude Code
+.claude/worktrees/

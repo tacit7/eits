@@ -316,7 +316,13 @@ defmodule EyeInTheSkyWeb.Sessions do
           agent_description: a.description,
           project_name: p.name,
           started_at: s.started_at,
-          ended_at: s.ended_at
+          ended_at: s.ended_at,
+          status: s.status,
+          intent: s.intent,
+          active_task: fragment(
+            "(SELECT t.title FROM tasks t JOIN task_sessions ts ON t.id = ts.task_id WHERE ts.session_id = ? AND t.state_id = 2 AND t.archived = 0 ORDER BY t.updated_at DESC LIMIT 1)",
+            s.id
+          )
         }
       )
 

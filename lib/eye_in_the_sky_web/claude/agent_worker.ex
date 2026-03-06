@@ -55,6 +55,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     agent_id = Keyword.fetch!(opts, :agent_id)
     project_path = Keyword.get(opts, :project_path, File.cwd!())
     provider = Keyword.get(opts, :provider, "claude")
+    worktree = Keyword.get(opts, :worktree)
 
     state = %{
       session_id: session_id,
@@ -65,6 +66,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       queue: [],
       project_path: project_path,
       provider: provider,
+      worktree: worktree,
       retry_timer_ref: nil
     }
 
@@ -350,13 +352,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       opts = if channel_id, do: Keyword.put(opts, :channel_id, channel_id), else: opts
 
       case Messages.record_incoming_reply(state.session_id, state.provider, text, opts) do
-        {:ok, message} ->
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "session:#{state.session_id}",
-            {:new_message, message}
-          )
-
+        {:ok, _message} ->
           :ok
 
         {:error, reason} ->
@@ -414,7 +410,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       skip_permissions: true,
       use_script: true,
       eits_session_id: state.session_uuid,
-      eits_agent_id: state.agent_id
+      eits_agent_id: state.agent_id,
+      worktree: state.worktree
     ]
 
     opts =

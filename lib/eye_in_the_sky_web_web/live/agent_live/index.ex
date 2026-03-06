@@ -394,6 +394,12 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
     project = EyeInTheSkyWeb.Projects.get_project!(project_id)
 
+    worktree = case params["worktree"] do
+      nil -> nil
+      "" -> nil
+      v -> String.trim(v)
+    end
+
     opts = [
       agent_type: agent_type,
       model: model,
@@ -401,7 +407,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       project_id: project_id,
       project_path: project.path,
       description: agent_name,
-      instructions: description
+      instructions: description,
+      worktree: worktree
     ]
 
     Logger.info(

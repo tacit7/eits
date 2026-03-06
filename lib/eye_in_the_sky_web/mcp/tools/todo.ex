@@ -59,9 +59,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
 
     tasks =
       if params[:project_id] do
-        EyeInTheSkyWeb.Projects.get_project_tasks(%EyeInTheSkyWeb.Projects.Project{
-          id: params[:project_id]
-        })
+        EyeInTheSkyWeb.Projects.get_project_tasks(params[:project_id])
       else
         Tasks.list_tasks()
       end

@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# i-project - Project management
+# Usage:
+#   i-project add --name STR [--slug STR] [--path STR] [--remote_url STR] [--branch STR]
+#   i-project list
+#   i-project get PROJECT_ID
+
+set -euo pipefail
+
+BASE=${EITS_API_URL:-https://localhost:4000/api/v1}
+
+_curl() { curl -sk "$@"; }
+_ok() { local r="$1"; echo "$r" | jq .; if echo "$r" | jq -e '.error' &>/dev/null; then exit 1; fi; }
+
+cmd="${1:-list}"
+shift || true
+
+case "$cmd" in
+  add)
+    body="{}"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --name)       body=$(echo "$body" | jq --arg v "$2" '. + {name: $v}'); shift 2 ;;
+        --slug)       body=$(echo "$body" | jq --arg v "$2" '. + {slug: $v}'); shift 2 ;;
+        --path)       body=$(echo "$body" | jq --arg v "$2" '. + {path: $v}'); shift 2 ;;
+        --remote_url) body=$(echo "$body" | jq --arg v "$2" '. + {remote_url: $v}'); shift 2 ;;
+        --git_remote) body=$(echo "$body" | jq --arg v "$2" '. + {git_remote: $v}'); shift 2 ;;
+        --repo_url)   body=$(echo "$body" | jq --arg v "$2" '. + {repo_url: $v}'); shift 2 ;;
+        --branch)     body=$(echo "$body" | jq --arg v "$2" '. + {branch: $v}'); shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    _ok "$(_curl -X POST "$BASE/projects" -H 'Content-Type: application/json' -d "$body")"
+    ;;
+
+  list)
+    # Projects list not yet in REST API — query DB directly as fallback
+    sqlite3 "${EITS_DB:-$HOME/.config/eye-in-the-sky/eits.db}" \
+      "SELECT json_object('id',id,'name',name,'path',path,'active',active) FROM projects ORDER BY id;" \
+      | jq -s '{success:true, projects:.}'
+    ;;
+
+  get)
+    id="${1:?project id required}"
+    sqlite3 "${EITS_DB:-$HOME/.config/eye-in-the-sky/eits.db}" \
+      "SELECT json_object('id',id,'name',name,'path',path,'slug',slug,'active',active) FROM projects WHERE id=$id LIMIT 1;" \
+      | jq '{success:true, project:.}'
+    ;;
+
+  *)
+    echo "Usage: i-project <add|list|get> [args...]" >&2
+    exit 1
+    ;;
+esac

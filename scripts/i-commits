@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# i-commits - Log git commits for a session
+# Usage:
+#   i-commits HASH1 [HASH2 ...] [--agent_id UUID]
+#   i-commits --agent_id UUID --hashes HASH1,HASH2
+
+set -euo pipefail
+
+BASE=${EITS_API_URL:-https://localhost:4000/api/v1}
+SESSION_ID=${EITS_SESSION_ID:-}
+
+_curl() { curl -sk "$@"; }
+_ok() { local r="$1"; echo "$r" | jq .; if echo "$r" | jq -e '.error' &>/dev/null; then exit 1; fi; }
+
+agent_id="$SESSION_ID"
+hashes=()
+messages=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --agent_id) agent_id="$2"; shift 2 ;;
+    --hashes)   IFS=',' read -ra hashes <<< "$2"; shift 2 ;;
+    --message)  messages+=("$2"); shift 2 ;;
+    *)          hashes+=("$1"); shift ;;
+  esac
+done
+
+[[ -z "$agent_id" ]] && { echo "Error: agent_id required (or set EITS_SESSION_ID)" >&2; exit 1; }
+[[ ${#hashes[@]} -eq 0 ]] && { echo "Error: at least one commit hash required" >&2; exit 1; }
+
+hashes_json=$(printf '%s\n' "${hashes[@]}" | jq -R . | jq -s .)
+messages_json=$(printf '%s\n' "${messages[@]}" | jq -R . | jq -s .)
+
+body=$(jq -n \
+  --arg aid "$agent_id" \
+  --argjson h "$hashes_json" \
+  --argjson m "$messages_json" \
+  '{agent_id: $aid, commit_hashes: $h, commit_messages: $m}')
+
+_ok "$(_curl -X POST "$BASE/commits" -H 'Content-Type: application/json' -d "$body")"

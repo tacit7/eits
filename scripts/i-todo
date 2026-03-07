@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# i-todo - Task management
+# Usage:
+#   i-todo list [--project_id N] [--agent_id UUID] [--session_id UUID] [--limit N]
+#   i-todo get TASK_ID
+#   i-todo create --title STR [--description STR] [--priority N] [--project_id N]
+#   i-todo start TASK_ID
+#   i-todo done TASK_ID
+#   i-todo status TASK_ID [--state_id N] [--priority N]
+#   i-todo annotate TASK_ID --body STR [--title STR]
+#   i-todo delete TASK_ID
+#   i-todo search QUERY [--limit N]
+#   i-todo add-session TASK_ID --session_id UUID
+
+set -euo pipefail
+
+BASE=${EITS_API_URL:-https://localhost:4000/api/v1}
+SESSION_ID=${EITS_SESSION_ID:-}
+PROJECT_ID=${EITS_PROJECT_ID:-}
+
+_curl() { curl -sk "$@"; }
+_ok() { local r="$1"; echo "$r" | jq .; if echo "$r" | jq -e '.error' &>/dev/null; then exit 1; fi; }
+
+cmd="${1:-list}"
+shift || true
+
+case "$cmd" in
+  list)
+    params=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --project_id) params="${params}&project_id=$2"; shift 2 ;;
+        --agent_id)   params="${params}&agent_id=$2"; shift 2 ;;
+        --session_id) params="${params}&session_id=$2"; shift 2 ;;
+        --limit)      params="${params}&limit=$2"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    [[ -n "$PROJECT_ID" && "$params" != *project_id* ]] && params="${params}&project_id=$PROJECT_ID"
+    _ok "$(_curl "$BASE/tasks?${params#&}")"
+    ;;
+
+  get)
+    id="${1:?task id required}"
+    _ok "$(_curl "$BASE/tasks/$id")"
+    ;;
+
+  create)
+    body="{}"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --title)       body=$(echo "$body" | jq --arg v "$2" '. + {title: $v}'); shift 2 ;;
+        --description) body=$(echo "$body" | jq --arg v "$2" '. + {description: $v}'); shift 2 ;;
+        --priority)    body=$(echo "$body" | jq --argjson v "$2" '. + {priority: $v}'); shift 2 ;;
+        --state_id)    body=$(echo "$body" | jq --argjson v "$2" '. + {state_id: $v}'); shift 2 ;;
+        --project_id)  body=$(echo "$body" | jq --argjson v "$2" '. + {project_id: $v}'); shift 2 ;;
+        --session_id)  body=$(echo "$body" | jq --arg v "$2" '. + {session_id: $v}'); shift 2 ;;
+        --due_at)      body=$(echo "$body" | jq --arg v "$2" '. + {due_at: $v}'); shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    [[ -n "$SESSION_ID" ]] && body=$(echo "$body" | jq --arg v "$SESSION_ID" 'if .session_id then . else . + {session_id: $v} end')
+    [[ -n "$PROJECT_ID" ]] && body=$(echo "$body" | jq --argjson v "$PROJECT_ID" 'if .project_id then . else . + {project_id: $v} end')
+    _ok "$(_curl -X POST "$BASE/tasks" -H 'Content-Type: application/json' -d "$body")"
+    ;;
+
+  start)
+    id="${1:?task id required}"
+    _ok "$(_curl -X PATCH "$BASE/tasks/$id" -H 'Content-Type: application/json' -d '{"state":"start"}')"
+    ;;
+
+  done)
+    id="${1:?task id required}"
+    _ok "$(_curl -X PATCH "$BASE/tasks/$id" -H 'Content-Type: application/json' -d '{"state":"done"}')"
+    ;;
+
+  status)
+    id="${1:?task id required}"; shift
+    body="{}"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --state_id) body=$(echo "$body" | jq --argjson v "$2" '. + {state_id: $v}'); shift 2 ;;
+        --priority) body=$(echo "$body" | jq --argjson v "$2" '. + {priority: $v}'); shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    _ok "$(_curl -X PATCH "$BASE/tasks/$id" -H 'Content-Type: application/json' -d "$body")"
+    ;;
+
+  annotate)
+    id="${1:?task id required}"; shift
+    body="{}"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --body)  body=$(echo "$body" | jq --arg v "$2" '. + {body: $v}'); shift 2 ;;
+        --title) body=$(echo "$body" | jq --arg v "$2" '. + {title: $v}'); shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    _ok "$(_curl -X POST "$BASE/tasks/$id/annotate" -H 'Content-Type: application/json' -d "$body")"
+    ;;
+
+  delete)
+    id="${1:?task id required}"
+    _ok "$(_curl -X DELETE "$BASE/tasks/$id")"
+    ;;
+
+  search)
+    q="${1:?query required}"; shift
+    limit="50"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in --limit) limit="$2"; shift 2 ;; *) shift ;; esac
+    done
+    q_enc=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$q")
+    _ok "$(_curl "$BASE/tasks?q=$q_enc&limit=$limit")"
+    ;;
+
+  add-session)
+    id="${1:?task id required}"; shift
+    sid="$SESSION_ID"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in --session_id) sid="$2"; shift 2 ;; *) shift ;; esac
+    done
+    _ok "$(_curl -X POST "$BASE/tasks/$id/sessions" -H 'Content-Type: application/json' -d "{\"session_id\":\"$sid\"}")"
+    ;;
+
+  *)
+    echo "Usage: i-todo <list|get|create|start|done|status|annotate|delete|search|add-session> [args...]" >&2
+    exit 1
+    ;;
+esac

@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# i-session - Session management
+# Usage:
+#   i-session start --session_id UUID [--description STR] [--project_name STR] [--model STR]
+#   i-session info UUID
+#   i-session update UUID --status STATUS
+#   i-session search QUERY [--limit N]
+#   i-session end UUID [--status completed|failed]
+
+set -euo pipefail
+
+BASE=${EITS_API_URL:-https://localhost:4000/api/v1}
+SESSION_ID=${EITS_SESSION_ID:-}
+
+_curl() { curl -sk "$@"; }
+_ok() { local r="$1"; echo "$r" | jq .; if echo "$r" | jq -e '.error' &>/dev/null; then exit 1; fi; }
+
+cmd="${1:-info}"
+shift || true
+
+case "$cmd" in
+  start)
+    body="{}"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --session_id)    body=$(echo "$body" | jq --arg v "$2" '. + {session_id: $v}'); shift 2 ;;
+        --agent_id)      body=$(echo "$body" | jq --arg v "$2" '. + {agent_id: $v}'); shift 2 ;;
+        --description)   body=$(echo "$body" | jq --arg v "$2" '. + {description: $v}'); shift 2 ;;
+        --name)          body=$(echo "$body" | jq --arg v "$2" '. + {name: $v}'); shift 2 ;;
+        --project_name)  body=$(echo "$body" | jq --arg v "$2" '. + {project_name: $v}'); shift 2 ;;
+        --project_id)    body=$(echo "$body" | jq --arg v "$2" '. + {project_id: $v}'); shift 2 ;;
+        --model)         body=$(echo "$body" | jq --arg v "$2" '. + {model: $v}'); shift 2 ;;
+        --worktree_path) body=$(echo "$body" | jq --arg v "$2" '. + {worktree_path: $v}'); shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    _ok "$(_curl -X POST "$BASE/sessions" -H 'Content-Type: application/json' -d "$body")"
+    ;;
+
+  info)
+    uuid="${1:-$SESSION_ID}"
+    [[ -z "$uuid" ]] && { echo "Usage: i-session info UUID" >&2; exit 1; }
+    _ok "$(_curl "$BASE/sessions/$uuid")"
+    ;;
+
+  update)
+    uuid="${1:?session uuid required}"; shift
+    body="{}"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --status) body=$(echo "$body" | jq --arg v "$2" '. + {status: $v}'); shift 2 ;;
+        --intent) body=$(echo "$body" | jq --arg v "$2" '. + {intent: $v}'); shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    _ok "$(_curl -X PATCH "$BASE/sessions/$uuid" -H 'Content-Type: application/json' -d "$body")"
+    ;;
+
+  search)
+    q="${1:?query required}"; shift
+    limit="20"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in --limit) limit="$2"; shift 2 ;; *) shift ;; esac
+    done
+    q_enc=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$q")
+    _ok "$(_curl "$BASE/sessions?q=$q_enc&limit=$limit")"
+    ;;
+
+  end)
+    uuid="${1:-$SESSION_ID}"; shift || true
+    status="completed"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in --status) status="$2"; shift 2 ;; *) shift ;; esac
+    done
+    _ok "$(_curl -X PATCH "$BASE/sessions/$uuid" -H 'Content-Type: application/json' -d "{\"status\":\"$status\"}")"
+    ;;
+
+  *)
+    echo "Usage: i-session <start|info|update|search|end> [args...]" >&2
+    exit 1
+    ;;
+esac

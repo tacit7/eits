@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# i-dm - Send a direct message to an agent session
+# Usage: i-dm TARGET_SESSION_UUID MESSAGE [--sender_id UUID] [--response_required]
+
+set -euo pipefail
+
+BASE=${EITS_API_URL:-https://localhost:4000/api/v1}
+SESSION_ID=${EITS_SESSION_ID:-}
+
+_curl() { curl -sk "$@"; }
+_ok() { local r="$1"; echo "$r" | jq .; if echo "$r" | jq -e '.error' &>/dev/null; then exit 1; fi; }
+
+target="${1:?target session UUID required}"; shift
+message="${1:?message required}"; shift
+
+sender_id="$SESSION_ID"
+response_required="false"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --sender_id)         sender_id="$2"; shift 2 ;;
+    --response_required) response_required="true"; shift ;;
+    *) shift ;;
+  esac
+done
+
+body=$(jq -n \
+  --arg sid "$sender_id" \
+  --arg tid "$target" \
+  --arg msg "$message" \
+  --argjson rr "$response_required" \
+  '{sender_id: $sid, target_session_id: $tid, message: $msg, response_required: $rr}')
+
+_ok "$(_curl -X POST "$BASE/dm" -H 'Content-Type: application/json' -d "$body")"

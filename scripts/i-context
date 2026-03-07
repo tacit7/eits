@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# i-context - Session context save/load
+# Usage:
+#   i-context save [--agent_id UUID] --context STR
+#   i-context save [--agent_id UUID]   (reads context from stdin)
+#   i-context load [UUID]
+
+set -euo pipefail
+
+BASE=${EITS_API_URL:-https://localhost:4000/api/v1}
+SESSION_ID=${EITS_SESSION_ID:-}
+
+_curl() { curl -sk "$@"; }
+_ok() { local r="$1"; echo "$r" | jq .; if echo "$r" | jq -e '.error' &>/dev/null; then exit 1; fi; }
+
+cmd="${1:-load}"
+shift || true
+
+case "$cmd" in
+  save)
+    agent_id="$SESSION_ID"
+    context=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --agent_id) agent_id="$2"; shift 2 ;;
+        --context)  context="$2"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    [[ -z "$context" && ! -t 0 ]] && context=$(cat)
+    [[ -z "$agent_id" ]] && { echo "Error: agent_id required (or set EITS_SESSION_ID)" >&2; exit 1; }
+    [[ -z "$context" ]] && { echo "Error: context is required" >&2; exit 1; }
+    body=$(jq -n --arg aid "$agent_id" --arg ctx "$context" '{agent_id: $aid, context: $ctx}')
+    _ok "$(_curl -X POST "$BASE/session-context" -H 'Content-Type: application/json' -d "$body")"
+    ;;
+
+  load)
+    uuid="${1:-$SESSION_ID}"
+    [[ -z "$uuid" ]] && { echo "Usage: i-context load UUID" >&2; exit 1; }
+    _ok "$(_curl "$BASE/session-context/$uuid")"
+    ;;
+
+  *)
+    echo "Usage: i-context <save|load> [args...]" >&2
+    exit 1
+    ;;
+esac

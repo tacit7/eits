@@ -18,6 +18,7 @@ defmodule EyeInTheSkyWebWeb.MCPPlug do
 
   @impl Plug
   def call(conn, opts) do
+    conn = ensure_json_accept(conn)
     StreamableHTTP.Plug.call(conn, opts)
   catch
     :exit, reason ->
@@ -32,5 +33,18 @@ defmodule EyeInTheSkyWebWeb.MCPPlug do
         },
         id: nil
       }))
+  end
+
+  # Anubis requires Accept to include application/json. Claude Code sends only
+  # text/event-stream. Inject application/json if it's missing so both clients work.
+  defp ensure_json_accept(conn) do
+    accept = Plug.Conn.get_req_header(conn, "accept") |> Enum.join(", ")
+
+    if String.contains?(accept, "application/json") do
+      conn
+    else
+      merged = if accept == "", do: "application/json", else: "#{accept}, application/json"
+      %{conn | req_headers: List.keystore(conn.req_headers, "accept", 0, {"accept", merged})}
+    end
   end
 end

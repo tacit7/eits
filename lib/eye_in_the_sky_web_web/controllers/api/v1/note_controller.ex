@@ -8,9 +8,17 @@ defmodule EyeInTheSkyWebWeb.Api.V1.NoteController do
   Query params: q, limit (default 20)
   """
   def index(conn, params) do
-    query = params["q"] || ""
     limit = parse_int(params["limit"], 20)
-    notes = Notes.search_notes(query) |> Enum.take(limit)
+
+    notes =
+      cond do
+        params["session_id"] ->
+          Notes.list_notes_for_session(params["session_id"]) |> Enum.take(limit)
+
+        true ->
+          query = params["q"] || ""
+          Notes.search_notes(query) |> Enum.take(limit)
+      end
 
     json(conn, %{
       success: true,
@@ -89,6 +97,48 @@ defmodule EyeInTheSkyWebWeb.Api.V1.NoteController do
         |> json(%{error: "Failed to create note", details: translate_errors(changeset)})
     end
   end
+
+  @doc """
+  PATCH /api/v1/notes/:id - Update a note (body, title, starred).
+  """
+  def update(conn, %{"id" => note_id} = params) do
+    try do
+      note = Notes.get_note!(note_id)
+
+      cond do
+        params["starred"] != nil ->
+          Notes.toggle_starred(note_id)
+          json(conn, %{success: true, message: "Note updated"})
+
+        true ->
+          # Direct update via Repo for body/title
+          attrs =
+            %{}
+            |> maybe_put(:body, params["body"])
+            |> maybe_put(:title, params["title"])
+
+          case EyeInTheSkyWeb.Repo.update(Ecto.Changeset.change(note, attrs)) do
+            {:ok, updated} ->
+              json(conn, %{
+                success: true,
+                id: updated.id,
+                body: updated.body,
+                title: updated.title,
+                starred: updated.starred || 0
+              })
+
+            {:error, cs} ->
+              conn |> put_status(:unprocessable_entity) |> json(%{error: "Failed", details: translate_errors(cs)})
+          end
+      end
+    rescue
+      Ecto.NoResultsError ->
+        conn |> put_status(:not_found) |> json(%{error: "Note not found"})
+    end
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   # Normalize plural parent_type to singular for schema validation
   defp normalize_parent_type("sessions"), do: "session"

@@ -4,6 +4,31 @@ defmodule EyeInTheSkyWebWeb.Api.V1.PromptController do
   alias EyeInTheSkyWeb.Prompts
 
   @doc """
+  GET /api/v1/prompts - List prompts. Supports ?query= for search, ?project_id= for scoping.
+  """
+  def index(conn, params) do
+    prompts =
+      cond do
+        params["query"] && params["query"] != "" ->
+          Prompts.search_prompts(params["query"], params["project_id"])
+
+        params["project_id"] ->
+          Prompts.list_project_prompts(params["project_id"])
+
+        true ->
+          Prompts.list_global_prompts()
+      end
+
+    json(conn, %{
+      success: true,
+      prompts:
+        Enum.map(prompts, fn p ->
+          %{id: p.id, uuid: p.uuid, name: p.name, slug: p.slug, description: p.description, project_id: p.project_id, active: p.active}
+        end)
+    })
+  end
+
+  @doc """
   GET /api/v1/prompts/:id - Get a prompt by ID or slug.
   Query params: project_id (for slug scope), include_text (default true)
   """

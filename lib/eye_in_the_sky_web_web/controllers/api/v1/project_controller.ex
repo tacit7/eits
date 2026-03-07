@@ -4,6 +4,37 @@ defmodule EyeInTheSkyWebWeb.Api.V1.ProjectController do
   alias EyeInTheSkyWeb.Projects
 
   @doc """
+  GET /api/v1/projects - List all projects.
+  """
+  def index(conn, _params) do
+    projects = Projects.list_projects()
+
+    json(conn, %{
+      success: true,
+      projects:
+        Enum.map(projects, fn p ->
+          %{id: p.id, name: p.name, path: p.path, slug: p.slug, active: p.active}
+        end)
+    })
+  end
+
+  @doc """
+  GET /api/v1/projects/:id - Get a project by ID.
+  """
+  def show(conn, %{"id" => id}) do
+    try do
+      project = Projects.get_project!(id)
+      json(conn, %{
+        success: true,
+        project: %{id: project.id, name: project.name, path: project.path, slug: project.slug, active: project.active}
+      })
+    rescue
+      Ecto.NoResultsError ->
+        conn |> put_status(:not_found) |> json(%{error: "Project not found"})
+    end
+  end
+
+  @doc """
   POST /api/v1/projects - Create a new project.
   """
   def create(conn, params) do

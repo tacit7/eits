@@ -29,6 +29,13 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
           Tasks.list_tasks() |> Enum.take(limit)
       end
 
+    tasks =
+      if state_id = parse_int(params["state_id"], nil) do
+        Enum.filter(tasks, &(&1.state_id == state_id))
+      else
+        tasks
+      end
+
     json(conn, %{
       success: true,
       message: "#{length(tasks)} task(s)",
@@ -74,7 +81,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
   def show(conn, %{"id" => id}) do
     try do
       task = Tasks.get_task!(id)
-      json(conn, %{success: true, task: format_task(task)})
+      annotations = Notes.list_notes_for_task(id)
+      json(conn, %{success: true, task: format_task(task), annotations: Enum.map(annotations, &format_note/1)})
     rescue
       Ecto.NoResultsError ->
         conn |> put_status(:not_found) |> json(%{error: "Task not found"})
@@ -158,7 +166,6 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
 
   @doc """
   POST /api/v1/tasks/:id/sessions - Link a session to a task.
-  Body: session_id (UUID or integer string)
   """
   def link_session(conn, %{"id" => task_id} = params) do
     case params["session_id"] do
@@ -171,6 +178,31 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
     end
   end
 
+  @doc """
+  DELETE /api/v1/tasks/:id/sessions/:uuid - Unlink a session from a task.
+  """
+  def unlink_session(conn, %{"id" => task_id, "uuid" => session_uuid}) do
+    int_id =
+      case Integer.parse(session_uuid) do
+        {n, ""} -> n
+        _ ->
+          case Sessions.get_session_by_uuid(session_uuid) do
+            {:ok, s} -> s.id
+            _ -> nil
+          end
+      end
+
+    if int_id do
+      EyeInTheSkyWeb.Repo.query(
+        "DELETE FROM task_sessions WHERE task_id = ? AND session_id = ?",
+        [task_id, int_id]
+      )
+      json(conn, %{success: true, message: "Session unlinked from task #{task_id}"})
+    else
+      conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+    end
+  end
+
   # Helpers
 
   defp format_task(task) do
@@ -180,8 +212,13 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
       description: task.description,
       priority: task.priority,
       state: if(Ecto.assoc_loaded?(task.state) && task.state, do: task.state.name),
-      state_id: task.state_id
+      state_id: task.state_id,
+      due_at: task.due_at
     }
+  end
+
+  defp format_note(note) do
+    %{id: note.id, title: note.title, body: note.body, starred: note.starred || 0}
   end
 
   defp move_to_state(task, state_name) do
@@ -199,6 +236,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
       %{}
       |> maybe_put(:state_id, params["state_id"])
       |> maybe_put(:priority, params["priority"])
+      |> maybe_put(:description, params["description"])
+      |> maybe_put(:due_at, params["due_at"])
 
     Tasks.update_task(task, attrs)
   end

@@ -58,20 +58,26 @@ defmodule EyeInTheSkyWebWeb.Router do
     post "/sessions", SessionController, :create
     get "/sessions/:uuid", SessionController, :show
     patch "/sessions/:uuid", SessionController, :update
+    post "/sessions/:uuid/end", SessionController, :end_session
+    get "/sessions/:uuid/context", SessionController, :get_context
+    patch "/sessions/:uuid/context", SessionController, :update_context
 
     # Commits
+    get "/commits", CommitController, :index
     post "/commits", CommitController, :create
 
     # Notes
     get "/notes", NoteController, :index
     post "/notes", NoteController, :create
     get "/notes/:id", NoteController, :show
+    patch "/notes/:id", NoteController, :update
 
     # Prompts
+    get "/prompts", PromptController, :index
     post "/prompts", PromptController, :create
     get "/prompts/:id", PromptController, :show
 
-    # Session context
+    # Session context (legacy routes kept for hook compat)
     get "/session-context/:uuid", SessionContextController, :show
     post "/session-context", SessionContextController, :create
 
@@ -81,19 +87,24 @@ defmodule EyeInTheSkyWebWeb.Router do
     get "/tasks/:id", TaskController, :show
     patch "/tasks/:id", TaskController, :update
     delete "/tasks/:id", TaskController, :delete
-    post "/tasks/:id/annotate", TaskController, :annotate
+    post "/tasks/:id/annotations", TaskController, :annotate
     post "/tasks/:id/sessions", TaskController, :link_session
+    delete "/tasks/:id/sessions/:uuid", TaskController, :unlink_session
 
     # Projects
+    get "/projects", ProjectController, :index
     post "/projects", ProjectController, :create
+    get "/projects/:id", ProjectController, :show
+
+    # Agents
+    get "/agents", AgentController, :index
+    post "/agents", AgentController, :create
+    get "/agents/:id", AgentController, :show
 
     # Messaging
     post "/dm", MessagingController, :dm
     get "/channels", MessagingController, :list_channels
     post "/channels/:channel_id/messages", MessagingController, :send_channel_message
-
-    # Spawn
-    post "/agents/spawn", SpawnController, :spawn_agent
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

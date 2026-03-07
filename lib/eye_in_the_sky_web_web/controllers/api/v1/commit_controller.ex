@@ -4,6 +4,40 @@ defmodule EyeInTheSkyWebWeb.Api.V1.CommitController do
   alias EyeInTheSkyWeb.{Commits, Sessions}
 
   @doc """
+  GET /api/v1/commits - List commits for a session or agent.
+  Query params: session_id (UUID), agent_id (UUID), limit (default 20)
+  """
+  def index(conn, params) do
+    limit = parse_int(params["limit"], 20)
+
+    commits =
+      cond do
+        params["session_id"] ->
+          case Sessions.get_session_by_uuid(params["session_id"]) do
+            {:ok, session} -> Commits.list_commits_for_session(session.id, limit: limit)
+            _ -> []
+          end
+
+        params["agent_id"] ->
+          case Sessions.get_session_by_uuid(params["agent_id"]) do
+            {:ok, session} -> Commits.list_recent_commits(session.id, limit)
+            _ -> []
+          end
+
+        true ->
+          Commits.list_commits() |> Enum.take(limit)
+      end
+
+    json(conn, %{
+      success: true,
+      commits:
+        Enum.map(commits, fn c ->
+          %{id: c.id, commit_hash: c.commit_hash, commit_message: c.commit_message}
+        end)
+    })
+  end
+
+  @doc """
   POST /api/v1/commits - Track one or more git commits.
 
   Accepts agent_id (UUID), commit_hashes (list), commit_messages (optional list).
@@ -60,6 +94,16 @@ defmodule EyeInTheSkyWebWeb.Api.V1.CommitController do
           {:error, :not_found} ->
             conn |> put_status(:not_found) |> json(%{error: "Agent not found"})
         end
+    end
+  end
+
+  defp parse_int(nil, default), do: default
+  defp parse_int(val, _default) when is_integer(val), do: val
+
+  defp parse_int(val, default) when is_binary(val) do
+    case Integer.parse(val) do
+      {n, ""} -> n
+      _ -> default
     end
   end
 

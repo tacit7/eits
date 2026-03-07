@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
   use EyeInTheSkyWebWeb, :controller
 
-  alias EyeInTheSkyWeb.{Agents, Sessions, Projects}
+  alias EyeInTheSkyWeb.{Agents, Contexts, Sessions, Projects}
 
   @doc """
   POST /api/v1/sessions - Register a new session (SessionStart hook).
@@ -149,7 +149,12 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
   def index(conn, params) do
     query = params["q"] || ""
     limit = parse_int(params["limit"], 20)
-    results = Sessions.list_sessions_filtered(search_query: query) |> Enum.take(limit)
+
+    opts = [search_query: query]
+    opts = if params["project_id"], do: Keyword.put(opts, :project_id, parse_int(params["project_id"], nil)), else: opts
+    opts = if params["status"], do: Keyword.put(opts, :status, params["status"]), else: opts
+
+    results = Sessions.list_sessions_filtered(opts) |> Enum.take(limit)
 
     json(conn, %{
       success: true,
@@ -179,6 +184,84 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
 
       {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+    end
+  end
+
+  @doc """
+  POST /api/v1/sessions/:uuid/end - End a session with optional summary and final status.
+  """
+  def end_session(conn, %{"uuid" => uuid} = params) do
+    case Sessions.get_session_by_uuid(uuid) do
+      {:ok, session} ->
+        status = params["final_status"] || "completed"
+
+        attrs = %{
+          status: status,
+          ended_at: DateTime.utc_now() |> DateTime.to_iso8601()
+        }
+
+        case Sessions.update_session(session, attrs) do
+          {:ok, updated} ->
+            Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agent:working", {:agent_stopped, updated})
+            Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, updated})
+            json(conn, %{success: true, message: "Session ended", status: updated.status})
+
+          {:error, cs} ->
+            conn |> put_status(:unprocessable_entity) |> json(%{error: "Failed", details: translate_errors(cs)})
+        end
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+    end
+  end
+
+  @doc """
+  GET /api/v1/sessions/:uuid/context - Load session context.
+  """
+  def get_context(conn, %{"uuid" => uuid}) do
+    case Sessions.get_session_by_uuid(uuid) do
+      {:ok, session} ->
+        case Contexts.get_session_context(session.id) do
+          nil ->
+            conn |> put_status(:not_found) |> json(%{error: "No context found"})
+
+          ctx ->
+            json(conn, %{
+              success: true,
+              context: ctx.context,
+              updated_at: to_string(ctx.updated_at)
+            })
+        end
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+    end
+  end
+
+  @doc """
+  PATCH /api/v1/sessions/:uuid/context - Save/update session context.
+  """
+  def update_context(conn, %{"uuid" => uuid} = params) do
+    context = params["context"]
+
+    if is_nil(context) or context == "" do
+      conn |> put_status(:bad_request) |> json(%{error: "context is required"})
+    else
+      case Sessions.get_session_by_uuid(uuid) do
+        {:ok, session} ->
+          attrs = %{agent_id: session.agent_id, session_id: session.id, context: context}
+
+          case Contexts.upsert_session_context(attrs) do
+            {:ok, sc} ->
+              json(conn, %{success: true, context: sc.context})
+
+            {:error, cs} ->
+              conn |> put_status(:unprocessable_entity) |> json(%{error: "Failed", details: translate_errors(cs)})
+          end
+
+        {:error, :not_found} ->
+          conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+      end
     end
   end
 

@@ -75,6 +75,18 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TodoToolTest do
     assert length(r.tasks) >= 1
   end
 
+  test "list: filters by project_id without crashing" do
+    {:ok, project} = EyeInTheSkyWeb.Projects.create_project(%{
+      name: "proj-#{uniq()}",
+      path: "/tmp/proj-#{uniq()}"
+    })
+    make_task(%{project_id: to_string(project.id)})
+    r = Todo.execute(%{command: "list", project_id: project.id}, @frame) |> json_result()
+    assert r.success == true
+    assert is_list(r.tasks)
+    assert length(r.tasks) >= 1
+  end
+
   # ---- list-agent ----
 
   test "list-agent: returns empty list for unknown agent UUID" do

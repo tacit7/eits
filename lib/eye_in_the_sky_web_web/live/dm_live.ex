@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @default_message_limit 20
   @message_page_size 20
+  @sync_interval 3_000
 
   @impl true
   def mount(%{"session_id" => session_id_param}, _session, socket) do
@@ -54,6 +55,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:diff_cache, %{})
       |> assign(:show_new_task_drawer, false)
       |> assign(:workflow_states, Tasks.list_workflow_states())
+      |> assign(:sync_timer, nil)
       |> allow_upload(:files,
         accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
         max_entries: 10,
@@ -221,6 +223,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
             {:noreply,
              socket
              |> assign(:processing, true)
+             |> start_sync_timer()
              |> push_event("clear-input", %{})}
 
           {:error, reason} ->
@@ -345,16 +348,31 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_info(:periodic_sync, socket) do
+    if socket.assigns.processing do
+      case sync_messages_from_session_file(socket) do
+        {:ok, socket, _imported} ->
+          {:noreply, start_sync_timer(socket)}
+
+        {:error, _reason} ->
+          {:noreply, start_sync_timer(socket)}
+      end
+    else
+      {:noreply, assign(socket, :sync_timer, nil)}
+    end
+  end
+
+  @impl true
   def handle_info({:claude_response, session_ref, response}, socket) do
     Logger.info(
       "Claude response received ref=#{inspect(session_ref)} type=#{inspect(response["type"])}"
     )
 
-    # Claude responded - stop processing state
     socket =
       socket
       |> assign(:processing, false)
-      |> load_tab_data("messages", socket.assigns.session_id)
+      |> stop_sync_timer()
+      |> sync_and_reload()
       |> push_event("focus-input", %{})
 
     {:noreply, socket}
@@ -374,12 +392,12 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   def handle_info({:claude_complete, session_ref, exit_code}, socket) do
     Logger.info("Claude session completed ref=#{inspect(session_ref)} exit=#{exit_code}")
 
-    # Claude session completed - stop processing state
     socket =
       socket
       |> assign(:processing, false)
       |> assign(:session_ref, nil)
-      |> load_tab_data("messages", socket.assigns.session_id)
+      |> stop_sync_timer()
+      |> sync_and_reload()
       |> push_event("focus-input", %{})
 
     {:noreply, socket}
@@ -388,7 +406,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_info({:agent_working, _session_uuid, session_id}, socket) do
     if session_id == socket.assigns.session_id do
-      {:noreply, assign(socket, :processing, true)}
+      {:noreply, socket |> assign(:processing, true) |> start_sync_timer()}
     else
       {:noreply, socket}
     end
@@ -398,7 +416,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_info({:agent_working, %{id: id}}, socket) do
     if id == socket.assigns.session_id do
-      {:noreply, assign(socket, :processing, true)}
+      {:noreply, socket |> assign(:processing, true) |> start_sync_timer()}
     else
       {:noreply, socket}
     end
@@ -410,7 +428,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       {:noreply,
        socket
        |> assign(:processing, false)
-       |> load_tab_data("messages", socket.assigns.session_id)
+       |> stop_sync_timer()
+       |> sync_and_reload()
        |> push_event("focus-input", %{})}
     else
       {:noreply, socket}
@@ -421,7 +440,12 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_info({:agent_stopped, %{id: id}}, socket) do
     if id == socket.assigns.session_id do
-      {:noreply, socket |> assign(:processing, false) |> push_event("focus-input", %{})}
+      {:noreply,
+       socket
+       |> assign(:processing, false)
+       |> stop_sync_timer()
+       |> sync_and_reload()
+       |> push_event("focus-input", %{})}
     else
       {:noreply, socket}
     end
@@ -738,6 +762,29 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   defp build_slash_items do
     EyeInTheSkyWebWeb.Helpers.SlashItems.build()
+  end
+
+  defp sync_and_reload(socket) do
+    socket =
+      case sync_messages_from_session_file(socket) do
+        {:ok, socket, _imported} -> socket
+        {:error, _reason} -> socket
+      end
+
+    load_tab_data(socket, "messages", socket.assigns.session_id)
+  end
+
+  defp start_sync_timer(socket) do
+    timer = Process.send_after(self(), :periodic_sync, @sync_interval)
+    assign(socket, :sync_timer, timer)
+  end
+
+  defp stop_sync_timer(socket) do
+    if socket.assigns.sync_timer do
+      Process.cancel_timer(socket.assigns.sync_timer)
+    end
+
+    assign(socket, :sync_timer, nil)
   end
 
   defp resolve_project_path(session, agent) do

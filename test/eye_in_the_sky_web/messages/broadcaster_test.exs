@@ -132,18 +132,31 @@ defmodule EyeInTheSkyWeb.Messages.BroadcasterTest do
     assert new_state == state
   end
 
-  test "poll from nil last_id does not broadcast existing" do
+  test "poll from zero last_id does not broadcast existing" do
     session = create_session()
     insert_message(session.id, "pre-existing")
 
     Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
 
-    # nil last_id means first run; get_messages_after(nil) returns []
-    state = %{last_id: nil, enabled: true}
+    # 0 last_id means first run; get_messages_after(0) returns []
+    state = %{last_id: 0, enabled: true}
     {:noreply, new_state} = Broadcaster.handle_info(:poll, state)
 
     refute_receive {:new_message, _}, 200
     # But last_id should advance to current max
+    assert new_state.last_id > 0
+  end
+
+  test "poll from nil last_id also does not broadcast" do
+    session = create_session()
+    insert_message(session.id, "pre-existing")
+
+    Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
+
+    state = %{last_id: nil, enabled: true}
+    {:noreply, new_state} = Broadcaster.handle_info(:poll, state)
+
+    refute_receive {:new_message, _}, 200
     assert new_state.last_id != nil
   end
 end

@@ -77,10 +77,10 @@ defmodule EyeInTheSkyWeb.Messages.Broadcaster do
   defp get_max_id do
     Message
     |> select([m], max(m.id))
-    |> Repo.one()
+    |> Repo.one() || 0
   end
 
-  defp get_messages_after(nil), do: []
+  defp get_messages_after(last_id) when last_id in [nil, 0], do: []
 
   defp get_messages_after(last_id) do
     Message

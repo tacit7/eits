@@ -26,11 +26,11 @@ defmodule EyeInTheSkyWeb.Commits do
   end
 
   @doc """
-  Returns recent commits for an agent with a limit.
+  Returns recent commits for a session with a limit.
   """
-  def list_recent_commits(agent_id, limit \\ 10) do
+  def list_recent_commits(session_id, limit \\ 10) do
     Commit
-    |> where([c], c.agent_id == ^agent_id)
+    |> where([c], c.session_id == ^session_id)
     |> order_by([c], desc: c.created_at)
     |> limit(^limit)
     |> Repo.all()

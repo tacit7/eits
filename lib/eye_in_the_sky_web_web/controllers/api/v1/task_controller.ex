@@ -16,7 +16,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
           Tasks.search_tasks(params["q"]) |> Enum.take(limit)
 
         params["session_id"] ->
-          Tasks.list_tasks_for_session(params["session_id"]) |> Enum.take(limit)
+          session_int_id = resolve_session_int_id(params["session_id"])
+          if session_int_id, do: Tasks.list_tasks_for_session(session_int_id) |> Enum.take(limit), else: []
 
         params["agent_id"] ->
           agent_int_id = resolve_agent_int_id(params["agent_id"])
@@ -273,6 +274,19 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
     case Sessions.get_session_by_uuid(uuid) do
       {:ok, agent} -> agent.id
       _ -> nil
+    end
+  end
+
+  defp resolve_session_int_id(nil), do: nil
+
+  defp resolve_session_int_id(val) do
+    case Integer.parse(val) do
+      {n, ""} -> n
+      _ ->
+        case Sessions.get_session_by_uuid(val) do
+          {:ok, s} -> s.id
+          _ -> nil
+        end
     end
   end
 

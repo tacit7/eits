@@ -5,8 +5,13 @@ defmodule EyeInTheSkyWeb.Projects.Project do
   @primary_key {:id, :id, autogenerate: true}
   schema "projects" do
     field :name, :string
+    field :slug, :string
     field :path, :string
     field :remote_url, :string
+    field :git_remote, :string
+    field :repo_url, :string
+    field :branch, :string
+    field :active, :boolean, default: true
 
     has_many :agents, EyeInTheSkyWeb.Agents.Agent
     has_many :sessions, EyeInTheSkyWeb.Sessions.Session
@@ -20,7 +25,7 @@ defmodule EyeInTheSkyWeb.Projects.Project do
   @doc false
   def changeset(project, attrs) do
     project
-    |> cast(attrs, [:name, :path, :remote_url])
+    |> cast(attrs, [:name, :slug, :path, :remote_url, :git_remote, :repo_url, :branch, :active])
     |> validate_required([:name])
     |> unique_constraint(:path)
   end

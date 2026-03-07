@@ -21,15 +21,21 @@ defmodule EyeInTheSkyWeb.Notes do
   Matches on both integer ID (as string) and UUID for migration compatibility.
   """
   def list_notes_for_session(session_id) do
-    # Get session to access both id and uuid
-    session = Repo.get(EyeInTheSkyWeb.Sessions.Session, session_id)
+    # session_id can be a UUID string or an integer string
+    session =
+      case Integer.parse(to_string(session_id)) do
+        {int_id, ""} -> Repo.get(EyeInTheSkyWeb.Sessions.Session, int_id)
+        _ -> Repo.get_by(EyeInTheSkyWeb.Sessions.Session, uuid: session_id)
+      end
 
     if session do
+      session_int_str = to_string(session.id)
+
       Note
       |> where(
         [n],
         n.parent_type in ["session", "sessions"] and
-          (n.parent_id == ^to_string(session_id) or n.parent_id == ^session.uuid)
+          (n.parent_id == ^session_int_str or n.parent_id == ^session.uuid)
       )
       |> order_by([n], desc: n.created_at)
       |> Repo.all()
@@ -145,7 +151,7 @@ defmodule EyeInTheSkyWeb.Notes do
 
     fallback_query =
       from n in Note,
-        where: ilike(n.body, ^pattern)
+        where: like(n.body, ^pattern)
 
     fallback_query =
       if length(agent_ids) > 0 do

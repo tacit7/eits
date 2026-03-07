@@ -4,6 +4,72 @@ defmodule EyeInTheSkyWebWeb.Api.V1.PromptController do
   alias EyeInTheSkyWeb.Prompts
 
   @doc """
+  GET /api/v1/prompts/:id - Get a prompt by ID or slug.
+  Query params: project_id (for slug scope), include_text (default true)
+  """
+  def show(conn, %{"id" => id} = params) do
+    include_text = params["include_text"] != "false"
+
+    result =
+      cond do
+        # If it looks like a UUID or integer, try by ID first
+        Regex.match?(~r/^\d+$/, id) ->
+          try do
+            {:ok, Prompts.get_prompt!(id)}
+          rescue
+            Ecto.NoResultsError -> {:error, :not_found}
+          end
+
+        Regex.match?(~r/^[0-9a-f-]{36}$/, id) ->
+          try do
+            {:ok, Prompts.get_prompt!(id)}
+          rescue
+            Ecto.NoResultsError -> {:error, :not_found}
+          end
+
+        # Otherwise treat as slug
+        true ->
+          prompt =
+            if params["project_id"] do
+              Prompts.get_prompt_by_slug(id, params["project_id"]) ||
+                Prompts.get_prompt_by_slug(id, nil)
+            else
+              Prompts.get_prompt_by_slug(id, nil)
+            end
+
+          if prompt, do: {:ok, prompt}, else: {:error, :not_found}
+      end
+
+    case result do
+      {:ok, prompt} ->
+        base = %{
+          success: true,
+          prompt: %{
+            id: prompt.id,
+            uuid: prompt.uuid,
+            name: prompt.name,
+            slug: prompt.slug,
+            description: prompt.description,
+            project_id: prompt.project_id,
+            active: prompt.active
+          }
+        }
+
+        response =
+          if include_text do
+            put_in(base, [:prompt, :prompt_text], prompt.prompt_text)
+          else
+            base
+          end
+
+        json(conn, response)
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "Prompt not found"})
+    end
+  end
+
+  @doc """
   POST /api/v1/prompts - Create a new prompt.
 
   Required: name, slug, prompt_text

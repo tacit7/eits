@@ -53,12 +53,39 @@ defmodule EyeInTheSkyWebWeb.Router do
   scope "/api/v1", EyeInTheSkyWebWeb.Api.V1 do
     pipe_through :api
 
+    # Sessions
+    get "/sessions", SessionController, :index
     post "/sessions", SessionController, :create
+    get "/sessions/:uuid", SessionController, :show
     patch "/sessions/:uuid", SessionController, :update
+
+    # Commits
     post "/commits", CommitController, :create
+
+    # Notes
+    get "/notes", NoteController, :index
     post "/notes", NoteController, :create
+    get "/notes/:id", NoteController, :show
+
+    # Prompts
     post "/prompts", PromptController, :create
+    get "/prompts/:id", PromptController, :show
+
+    # Session context
+    get "/session-context/:uuid", SessionContextController, :show
     post "/session-context", SessionContextController, :create
+
+    # Tasks
+    get "/tasks", TaskController, :index
+    post "/tasks", TaskController, :create
+    get "/tasks/:id", TaskController, :show
+    patch "/tasks/:id", TaskController, :update
+    delete "/tasks/:id", TaskController, :delete
+    post "/tasks/:id/annotate", TaskController, :annotate
+    post "/tasks/:id/sessions", TaskController, :link_session
+
+    # Projects
+    post "/projects", ProjectController, :create
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

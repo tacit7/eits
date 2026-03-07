@@ -142,6 +142,46 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
     end
   end
 
+  @doc """
+  GET /api/v1/sessions - Search sessions.
+  Query params: q, limit (default 20)
+  """
+  def index(conn, params) do
+    query = params["q"] || ""
+    limit = parse_int(params["limit"], 20)
+    results = Sessions.list_sessions_filtered(search_query: query) |> Enum.take(limit)
+
+    json(conn, %{
+      success: true,
+      message: "Found #{length(results)} session(s)",
+      results:
+        Enum.map(results, fn s ->
+          %{id: s.id, uuid: s.uuid, description: s.description, status: s.status}
+        end)
+    })
+  end
+
+  @doc """
+  GET /api/v1/sessions/:uuid - Get session info.
+  """
+  def show(conn, %{"uuid" => uuid}) do
+    case Sessions.get_session_by_uuid(uuid) do
+      {:ok, session} ->
+        agent_uuid = resolve_agent_uuid(session.agent_id)
+
+        json(conn, %{
+          agent_id: agent_uuid,
+          session_id: uuid,
+          project_id: session.project_id,
+          status: session.status,
+          initialized: true
+        })
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+    end
+  end
+
   # Resolve project_id from project_name or direct project_id param
   defp resolve_project_id(params) do
     cond do
@@ -174,6 +214,25 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
 
       true ->
         {"anthropic", model}
+    end
+  end
+
+  defp resolve_agent_uuid(nil), do: nil
+
+  defp resolve_agent_uuid(agent_int_id) do
+    case EyeInTheSkyWeb.Agents.get_agent(agent_int_id) do
+      {:ok, agent} -> agent.uuid
+      _ -> nil
+    end
+  end
+
+  defp parse_int(nil, default), do: default
+  defp parse_int(val, _default) when is_integer(val), do: val
+
+  defp parse_int(val, default) when is_binary(val) do
+    case Integer.parse(val) do
+      {n, ""} -> n
+      _ -> default
     end
   end
 

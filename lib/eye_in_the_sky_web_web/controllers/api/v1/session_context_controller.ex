@@ -4,6 +4,30 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionContextController do
   alias EyeInTheSkyWeb.{Contexts, Sessions}
 
   @doc """
+  GET /api/v1/session-context/:uuid - Load session context by session UUID.
+  """
+  def show(conn, %{"uuid" => uuid}) do
+    case Sessions.get_session_by_uuid(uuid) do
+      {:ok, session} ->
+        case Contexts.get_session_context(session.id) do
+          nil ->
+            conn |> put_status(:not_found) |> json(%{error: "No context found for session"})
+
+          ctx ->
+            json(conn, %{
+              success: true,
+              context: ctx.context,
+              created_at: to_string(ctx.created_at),
+              updated_at: to_string(ctx.updated_at)
+            })
+        end
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+    end
+  end
+
+  @doc """
   POST /api/v1/session-context - Save session context (markdown).
 
   Accepts agent_id (UUID), session_id (optional UUID), context (markdown string).

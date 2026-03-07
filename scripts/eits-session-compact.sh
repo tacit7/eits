@@ -25,8 +25,12 @@ fi
 # Log what we found
 echo "$(date -Iseconds) COMPACT: session=$SESSION_ID" >> "$LOG_FILE"
 
-# Compaction done — set status back to working
-"$HOOK_DIR/sql/update-session-status.sh" "$SESSION_ID" "working"
+BASE=${EITS_API_URL:-https://localhost:4000/api/v1}
+
+# Compaction done — set status back to working via REST
+curl -sk -X PATCH "$BASE/sessions/$SESSION_ID" \
+  -H 'Content-Type: application/json' \
+  -d '{"status":"working"}' >/dev/null 2>&1
 
 echo "[EITS] Compact: done, session $SESSION_ID back to working" >&2
 

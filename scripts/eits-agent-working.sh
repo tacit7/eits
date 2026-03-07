@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Hook: Set session status to "working" on SessionStart
-# Uses SQLite directly (Go MCP server version)
 set -uo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE=${EITS_API_URL:-https://localhost:4000/api/v1}
 
 # Parse stdin JSON for session info
 input_json=$(timeout 2 cat 2>/dev/null) || exit 0
@@ -13,8 +13,10 @@ input_json=$(timeout 2 cat 2>/dev/null) || exit 0
 session_id=$(echo "$input_json" | jq -r '.session_id // empty' 2>/dev/null) || exit 0
 [ -z "$session_id" ] && exit 0
 
-# Update session to working (SQL - only if not already working)
-"$HOOK_DIR/sql/update-session-to-working.sh" "$session_id"
+# Update session to working via REST
+curl -sk -X PATCH "$BASE/sessions/$session_id" \
+  -H 'Content-Type: application/json' \
+  -d '{"status":"working"}' >/dev/null 2>&1 &
 
 # Publish to NATS
 "$HOOK_DIR/nats/publish-session-start.sh" "$session_id" "working"

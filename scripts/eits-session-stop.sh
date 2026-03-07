@@ -16,8 +16,12 @@ stop_hook_active=$(echo "$input_json" | jq -r '.stop_hook_active // false' 2>/de
 session_id=$(echo "$input_json" | jq -r '.session_id // empty' 2>/dev/null) || exit 0
 [ -z "$session_id" ] && exit 0
 
-# Update session status to idle (between turns)
-"$HOOK_DIR/sql/update-session-status.sh" "$session_id" "idle"
+BASE=${EITS_API_URL:-https://localhost:4000/api/v1}
+
+# Update session status to idle via REST (fire-and-forget)
+curl -sk -X PATCH "$BASE/sessions/$session_id" \
+  -H 'Content-Type: application/json' \
+  -d '{"status":"idle"}' >/dev/null 2>&1 &
 
 # Publish to NATS
 "$HOOK_DIR/nats/publish-session-stop.sh" "$session_id" "idle"

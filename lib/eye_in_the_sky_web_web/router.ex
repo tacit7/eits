@@ -86,6 +86,14 @@ defmodule EyeInTheSkyWebWeb.Router do
 
     # Projects
     post "/projects", ProjectController, :create
+
+    # Messaging
+    post "/dm", MessagingController, :dm
+    get "/channels", MessagingController, :list_channels
+    post "/channels/:channel_id/messages", MessagingController, :send_channel_message
+
+    # Spawn
+    post "/agents/spawn", SpawnController, :spawn_agent
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

@@ -6,11 +6,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-init.sh"
+            "command": "/path/to/eits/web/priv/scripts/eits-session-init.sh"
           },
           {
             "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-agent-working.sh"
+            "command": "/path/to/eits/web/priv/scripts/eits-agent-working.sh"
           }
         ]
       },
@@ -19,11 +19,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-init.sh"
+            "command": "/path/to/eits/web/priv/scripts/eits-session-init.sh"
           },
           {
             "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-agent-working.sh"
+            "command": "/path/to/eits/web/priv/scripts/eits-agent-working.sh"
           }
         ]
       },
@@ -32,15 +32,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-compact.sh"
+            "command": "/path/to/eits/web/priv/scripts/eits-session-compact.sh"
           },
           {
             "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-init.sh"
+            "command": "/path/to/eits/web/priv/scripts/eits-session-init.sh"
           },
           {
             "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-agent-working.sh"
+            "command": "/path/to/eits/web/priv/scripts/eits-agent-working.sh"
           }
         ]
       },
@@ -49,45 +49,31 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-compact.sh"
+            "command": "/path/to/eits/web/priv/scripts/eits-session-init.sh"
           },
           {
             "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-init.sh"
-          },
-          {
-            "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-agent-working.sh"
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-end.sh"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-stop.sh"
+            "command": "/path/to/eits/web/priv/scripts/eits-agent-working.sh"
           }
         ]
       }
     ],
     "PreToolUse": [
       {
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-pre-tool-use.sh"
+            "command": "/path/to/eits/web/priv/scripts/eits-pre-tool-use.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/eits/web/priv/scripts/eits-nats-tool-pre.sh",
+            "async": true
           }
         ]
       }
@@ -97,7 +83,49 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-post-tool-use.sh"
+            "command": "/path/to/eits/web/priv/scripts/eits-post-tool-use.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/eits/web/priv/scripts/eits-prompt-submit.sh",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/eits/web/priv/scripts/eits-pre-compact.sh",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/eits/web/priv/scripts/eits-session-end.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/eits/web/priv/scripts/eits-session-stop.sh"
           }
         ]
       }

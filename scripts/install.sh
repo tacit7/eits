@@ -1,46 +1,118 @@
 #!/usr/bin/env bash
-# Install EITS Claude Code hooks to ~/.claude/hooks/
-# Run this script after updating hooks to deploy them globally
+# Configure EITS Claude Code hooks in ~/.claude/settings.json
+# Hook scripts live in priv/scripts/ — no copying needed.
+# Run this script to generate the settings.json snippet with the correct paths.
 
 set -e
 
-HOOKS_DIR="$HOME/.claude/hooks"
-SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HOOKS_DIR="$REPO_DIR/priv/scripts"
 SETTINGS_FILE="$HOME/.claude/settings.json"
-SETTINGS_TEMPLATE="$SCRIPTS_DIR/settings.json"
 
-echo "==> Installing EITS Claude Code hooks"
+echo "==> EITS Hook Configuration"
+echo ""
+echo "Hook scripts location: $HOOKS_DIR"
+echo ""
 
-# Create hooks directory if it doesn't exist
-mkdir -p "$HOOKS_DIR"
-
-# Copy all hook scripts
-echo "Copying hook scripts to $HOOKS_DIR..."
-for hook in "$SCRIPTS_DIR"/eits-*.sh; do
-    if [ -f "$hook" ]; then
-        cp "$hook" "$HOOKS_DIR/"
-        chmod +x "$HOOKS_DIR/$(basename "$hook")"
-        echo "  ✓ $(basename "$hook")"
+# Verify hooks exist and are executable
+for hook in eits-session-init.sh eits-agent-working.sh eits-session-end.sh eits-session-stop.sh eits-session-compact.sh eits-pre-tool-use.sh eits-post-tool-use.sh eits-nats-tool-pre.sh eits-prompt-submit.sh eits-pre-compact.sh; do
+    if [ -f "$HOOKS_DIR/$hook" ]; then
+        chmod +x "$HOOKS_DIR/$hook"
+        echo "  ✓ $hook"
+    else
+        echo "  ✗ MISSING: $hook" >&2
     fi
 done
 
 echo ""
-echo "==> Hook installation complete!"
+echo "==> Add the following hooks section to $SETTINGS_FILE"
 echo ""
-echo "Next steps:"
-echo "1. Merge the hook configuration into ~/.claude/settings.json"
-echo "   Template available at: $SETTINGS_TEMPLATE"
-echo ""
-echo "2. Or manually add the hooks section from settings.json to your ~/.claude/settings.json"
-echo ""
-echo "Installed hooks:"
-echo "  - eits-session-init.sh (SessionStart)"
-echo "  - eits-agent-working.sh (SessionStart)"
-echo "  - eits-session-end.sh (SessionEnd)"
-echo "  - eits-session-stop.sh (Stop)"
-echo "  - eits-session-compact.sh (SessionStart compact)"
-echo "  - eits-pre-tool-use.sh (PreToolUse)"
-echo "  - eits-post-tool-use.sh (PostToolUse)"
+cat <<EOF
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {"type": "command", "command": "$HOOKS_DIR/eits-session-init.sh"},
+          {"type": "command", "command": "$HOOKS_DIR/eits-agent-working.sh"}
+        ]
+      },
+      {
+        "matcher": "resume",
+        "hooks": [
+          {"type": "command", "command": "$HOOKS_DIR/eits-session-init.sh"},
+          {"type": "command", "command": "$HOOKS_DIR/eits-agent-working.sh"}
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {"type": "command", "command": "$HOOKS_DIR/eits-session-compact.sh"},
+          {"type": "command", "command": "$HOOKS_DIR/eits-session-init.sh"},
+          {"type": "command", "command": "$HOOKS_DIR/eits-agent-working.sh"}
+        ]
+      },
+      {
+        "matcher": "clear",
+        "hooks": [
+          {"type": "command", "command": "$HOOKS_DIR/eits-session-init.sh"},
+          {"type": "command", "command": "$HOOKS_DIR/eits-agent-working.sh"}
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {"type": "command", "command": "$HOOKS_DIR/eits-pre-tool-use.sh"}
+        ]
+      },
+      {
+        "hooks": [
+          {"type": "command", "command": "$HOOKS_DIR/eits-nats-tool-pre.sh", "async": true}
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {"type": "command", "command": "$HOOKS_DIR/eits-post-tool-use.sh"}
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {"type": "command", "command": "$HOOKS_DIR/eits-prompt-submit.sh", "async": true}
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {"type": "command", "command": "$HOOKS_DIR/eits-pre-compact.sh", "async": true}
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {"type": "command", "command": "$HOOKS_DIR/eits-session-end.sh"}
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {"type": "command", "command": "$HOOKS_DIR/eits-session-stop.sh"}
+        ]
+      }
+    ]
+  }
+}
+EOF
+
 echo ""
 echo "Database: ~/.config/eye-in-the-sky/eits.db"
 echo "Mapping file: ~/.claude/hooks/session_agent_map.json"

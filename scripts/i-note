@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-BASE=${EITS_API_URL:-https://localhost:4000/api/v1}
+BASE=${EITS_API_URL:-http://localhost:5001/api/v1}
 
 _curl() { curl -sk "$@"; }
 _ok() { local r="$1"; echo "$r" | jq .; if echo "$r" | jq -e '.error' &>/dev/null; then exit 1; fi; }

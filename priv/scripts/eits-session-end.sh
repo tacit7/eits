@@ -3,7 +3,7 @@
 set -uo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE=${EITS_API_URL:-https://localhost:4000/api/v1}
+BASE=${EITS_API_URL:-http://localhost:5001/api/v1}
 MCP_BIN="$HOME/projects/eits/core/bin/eits-mcp-server"
 EITS_DB="$HOME/.config/eye-in-the-sky/eits.db"
 

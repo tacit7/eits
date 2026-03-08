@@ -3,7 +3,7 @@
 set -uo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE=${EITS_API_URL:-https://localhost:4000/api/v1}
+BASE=${EITS_API_URL:-http://localhost:5001/api/v1}
 
 # Parse stdin JSON for session info
 input_json=$(timeout 2 cat 2>/dev/null) || exit 0

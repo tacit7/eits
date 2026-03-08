@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-BASE=${EITS_API_URL:-https://localhost:4000/api/v1}
+BASE=${EITS_API_URL:-http://localhost:5001/api/v1}
 SESSION_ID=${EITS_SESSION_ID:-}
 
 _curl() { curl -sk "$@"; }

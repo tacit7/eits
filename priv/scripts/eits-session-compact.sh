@@ -25,7 +25,7 @@ fi
 # Log what we found
 echo "$(date -Iseconds) COMPACT: session=$SESSION_ID" >> "$LOG_FILE"
 
-BASE=${EITS_API_URL:-https://localhost:4000/api/v1}
+BASE=${EITS_API_URL:-http://localhost:5001/api/v1}
 
 # Compaction done — set status back to working via REST
 curl -sk -X PATCH "$BASE/sessions/$SESSION_ID" \

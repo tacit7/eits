@@ -2,6 +2,8 @@
 
 Complete hook suite for integrating Claude Code sessions with EITS tracking.
 
+Hook scripts live in `priv/scripts/` and are referenced directly from `~/.claude/settings.json` — no copying required.
+
 ## Hook Overview
 
 | Event | Script | Purpose |
@@ -10,40 +12,29 @@ Complete hook suite for integrating Claude Code sessions with EITS tracking.
 | SessionStart | `eits-agent-working.sh` | Set agent status to "working" |
 | SessionEnd | `eits-session-end.sh` | Mark session completed |
 | Stop | `eits-session-stop.sh` | Set session status to "waiting" on interrupt |
-| PreToolUse | `eits-pre-tool-use.sh` | Log tool calls before execution |
+| PreToolUse (Edit\|Write) | `eits-pre-tool-use.sh` | Enforce session name + active todo before edits |
+| PreToolUse (all) | `eits-nats-tool-pre.sh` | Publish tool events to NATS (async) |
 | PostToolUse | `eits-post-tool-use.sh` | Log tool results/errors after execution |
+| UserPromptSubmit | `eits-prompt-submit.sh` | Update session status on each prompt (async) |
+| PreCompact | `eits-pre-compact.sh` | Mark session as compacting (async) |
 | SessionStart (compact) | `eits-session-compact.sh` | Handle context compaction |
 
-## Quick Installation
+## Installation
 
-Run the install script:
+Run the install script to verify hooks and print the correct settings snippet:
 
 ```bash
-./scripts/hooks/install.sh
+./scripts/install.sh
 ```
 
 This will:
-- Copy all `eits-*.sh` hooks to `~/.claude/hooks/`
+- Verify all hook scripts exist in `priv/scripts/`
 - Make them executable
-- Provide instructions for settings.json configuration
-
-### Manual Installation
-
-If you prefer manual installation:
-
-```bash
-# Copy hooks
-cp scripts/hooks/eits-*.sh ~/.claude/hooks/
-chmod +x ~/.claude/hooks/eits-*.sh
-
-# Merge settings (or manually edit ~/.claude/settings.json)
-jq -s '.[0] * .[1]' ~/.claude/settings.json scripts/hooks/settings.json > /tmp/merged.json
-mv /tmp/merged.json ~/.claude/settings.json
-```
+- Print the `hooks` JSON block to add to `~/.claude/settings.json`
 
 ### Settings Configuration
 
-Add to the `hooks` section in `~/.claude/settings.json`:
+Add to the `hooks` section in `~/.claude/settings.json`, replacing `/path/to/eits/web` with the absolute path to this repo:
 
 ```json
 {
@@ -52,84 +43,78 @@ Add to the `hooks` section in `~/.claude/settings.json`:
       {
         "matcher": "startup",
         "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-init.sh"
-          },
-          {
-            "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-agent-working.sh"
-          }
+          {"type": "command", "command": "/path/to/eits/web/priv/scripts/eits-session-init.sh"},
+          {"type": "command", "command": "/path/to/eits/web/priv/scripts/eits-agent-working.sh"}
         ]
       },
       {
         "matcher": "resume",
         "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-init.sh"
-          },
-          {
-            "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-agent-working.sh"
-          }
+          {"type": "command", "command": "/path/to/eits/web/priv/scripts/eits-session-init.sh"},
+          {"type": "command", "command": "/path/to/eits/web/priv/scripts/eits-agent-working.sh"}
         ]
       },
       {
         "matcher": "compact",
         "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-compact.sh"
-          },
-          {
-            "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-init.sh"
-          },
-          {
-            "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-agent-working.sh"
-          }
+          {"type": "command", "command": "/path/to/eits/web/priv/scripts/eits-session-compact.sh"},
+          {"type": "command", "command": "/path/to/eits/web/priv/scripts/eits-session-init.sh"},
+          {"type": "command", "command": "/path/to/eits/web/priv/scripts/eits-agent-working.sh"}
         ]
-      }
-    ],
-    "SessionEnd": [
+      },
       {
+        "matcher": "clear",
         "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-end.sh"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-session-stop.sh"
-          }
+          {"type": "command", "command": "/path/to/eits/web/priv/scripts/eits-session-init.sh"},
+          {"type": "command", "command": "/path/to/eits/web/priv/scripts/eits-agent-working.sh"}
         ]
       }
     ],
     "PreToolUse": [
       {
+        "matcher": "Edit|Write",
         "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-pre-tool-use.sh"
-          }
+          {"type": "command", "command": "/path/to/eits/web/priv/scripts/eits-pre-tool-use.sh"}
+        ]
+      },
+      {
+        "hooks": [
+          {"type": "command", "command": "/path/to/eits/web/priv/scripts/eits-nats-tool-pre.sh", "async": true}
         ]
       }
     ],
     "PostToolUse": [
       {
         "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/urielmaldonado/.claude/hooks/eits-post-tool-use.sh"
-          }
+          {"type": "command", "command": "/path/to/eits/web/priv/scripts/eits-post-tool-use.sh"}
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {"type": "command", "command": "/path/to/eits/web/priv/scripts/eits-prompt-submit.sh", "async": true}
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {"type": "command", "command": "/path/to/eits/web/priv/scripts/eits-pre-compact.sh", "async": true}
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {"type": "command", "command": "/path/to/eits/web/priv/scripts/eits-session-end.sh"}
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {"type": "command", "command": "/path/to/eits/web/priv/scripts/eits-session-stop.sh"}
         ]
       }
     ]

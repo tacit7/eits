@@ -157,11 +157,10 @@ defmodule EyeInTheSkyWeb.Tasks do
 
     FTS5.search(
       table: "tasks",
-      fts_table: "task_search",
       schema: Task,
       query: query,
-      join_key: "rowid",
-      sql_filter: if(project_id, do: "AND t.project_id = ?", else: ""),
+      search_columns: ["title", "description"],
+      sql_filter: if(project_id, do: "AND t.project_id = $2", else: ""),
       sql_params: if(project_id, do: [project_id], else: []),
       fallback_query: fallback_query,
       preload: [:state, :tags]

@@ -55,7 +55,7 @@ config :phoenix, :json_library, Jason
 
 # Oban job processing
 config :eye_in_the_sky_web, Oban,
-  engine: Oban.Engines.Lite,
+  engine: Oban.Engines.Basic,
   queues: [jobs: 5],
   repo: EyeInTheSkyWeb.Repo
 

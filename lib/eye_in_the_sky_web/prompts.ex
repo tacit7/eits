@@ -162,12 +162,12 @@ defmodule EyeInTheSkyWeb.Prompts do
 
     FTS5.search(
       table: "subagent_prompts",
-      fts_table: "prompt_search",
       schema: Prompt,
       query: query,
+      search_columns: ["name", "description", "prompt_text"],
       sql_filter: """
-      #{if project_id, do: "AND (p.project_id = ? OR p.project_id IS NULL)", else: ""}
-      AND p.active = 1
+      #{if project_id, do: "AND (s.project_id = $2 OR s.project_id IS NULL)", else: ""}
+      AND s.active = true
       """,
       sql_params: if(project_id, do: [project_id], else: []),
       fallback_query: fallback_query

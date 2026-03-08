@@ -161,10 +161,15 @@ defmodule EyeInTheSkyWeb.Notes do
       end
       |> order_by([n], desc: n.created_at)
 
-    # Build SQL filter for agent_ids
+    # Build SQL filter for agent_ids (params start at $2 since $1 is the search query)
     {sql_filter, sql_params} =
       if length(agent_ids) > 0 do
-        placeholders = Enum.map(agent_ids, fn _ -> "?" end) |> Enum.join(",")
+        placeholders =
+          agent_ids
+          |> Enum.with_index(2)
+          |> Enum.map(fn {_, i} -> "$#{i}" end)
+          |> Enum.join(",")
+
         {"AND n.parent_type = 'agent' AND n.parent_id IN (#{placeholders})", agent_ids}
       else
         {"", []}
@@ -172,10 +177,9 @@ defmodule EyeInTheSkyWeb.Notes do
 
     FTS5.search(
       table: "notes",
-      fts_table: "notes_fts",
       schema: Note,
       query: query,
-      join_key: "rowid",
+      search_columns: ["title", "body"],
       sql_filter: sql_filter,
       sql_params: sql_params,
       fallback_query: fallback_query

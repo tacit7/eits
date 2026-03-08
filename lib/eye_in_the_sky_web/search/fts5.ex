@@ -1,36 +1,41 @@
 defmodule EyeInTheSkyWeb.Search.FTS5 do
   @moduledoc """
-  Reusable FTS5 full-text search with LIKE fallback.
+  Reusable full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback.
 
-  Extracts common pattern used across prompts, tasks, and notes contexts.
+  Replaces the previous SQLite FTS5 implementation. Uses plainto_tsquery for
+  user-friendly search (no special syntax required) and ts_rank for relevance ordering.
   """
 
   import Ecto.Query, warn: false
   alias EyeInTheSkyWeb.Repo
 
   @doc """
-  Performs FTS5 search with fallback to LIKE queries.
+  Performs PostgreSQL full-text search with fallback to ILIKE queries.
 
   ## Options
 
   - `:table` - Main table name (required)
-  - `:fts_table` - FTS5 search table name (required)
   - `:schema` - Ecto schema module (required)
   - `:query` - Search query string (required)
-  - `:join_key` - FTS column to join on main table id (e.g. "task_id"). Defaults to "rowid"
-  - `:sql_filter` - Additional SQL WHERE clause (optional)
+  - `:search_columns` - List of column names to search (required)
+  - `:sql_filter` - Additional SQL WHERE clause (optional, use $N params starting after search param)
   - `:sql_params` - Parameters for SQL filter (optional, default: [])
-  - `:fallback_query` - Ecto query for LIKE fallback (required)
+  - `:fallback_query` - Ecto query for ILIKE fallback (required)
   - `:preload` - Associations to preload (optional, default: [])
+
+  ## Deprecated Options (ignored, kept for backwards compatibility)
+
+  - `:fts_table` - No longer used (PostgreSQL doesn't need separate FTS tables)
+  - `:join_key` - No longer used
 
   ## Examples
 
       FTS5.search(
         table: "tasks",
-        fts_table: "task_search",
         schema: Task,
         query: "bug fix",
-        sql_filter: "AND t.project_id = ?",
+        search_columns: ["title", "description"],
+        sql_filter: "AND t.project_id = $2",
         sql_params: [project_id],
         fallback_query: from(t in Task, where: ilike(t.title, ^pattern)),
         preload: [:state, :tags]
@@ -38,49 +43,32 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
   """
   def search(opts) do
     table = Keyword.fetch!(opts, :table)
-    fts_table = Keyword.fetch!(opts, :fts_table)
     schema = Keyword.fetch!(opts, :schema)
     query = Keyword.fetch!(opts, :query)
-    join_key = Keyword.get(opts, :join_key, "rowid")
+    search_columns = Keyword.fetch!(opts, :search_columns)
     sql_filter = Keyword.get(opts, :sql_filter, "")
     sql_params = Keyword.get(opts, :sql_params, [])
     fallback_query = Keyword.fetch!(opts, :fallback_query)
     preloads = Keyword.get(opts, :preload, [])
 
-    fts5_search(
-      table,
-      fts_table,
-      schema,
-      query,
-      join_key,
-      sql_filter,
-      sql_params,
-      fallback_query,
-      preloads
-    )
+    pg_fts_search(table, schema, query, search_columns, sql_filter, sql_params, fallback_query, preloads)
   end
 
-  defp fts5_search(
-         table,
-         fts_table,
-         schema,
-         query,
-         join_key,
-         sql_filter,
-         sql_params,
-         fallback_query,
-         preloads
-       ) do
-    # Use table alias for cleaner SQL
+  defp pg_fts_search(table, schema, query, search_columns, sql_filter, sql_params, fallback_query, preloads) do
     alias_letter = String.first(table)
+
+    # Build tsvector expression from search columns: to_tsvector('english', coalesce(col1,'') || ' ' || coalesce(col2,''))
+    tsvector_expr =
+      search_columns
+      |> Enum.map(fn col -> "coalesce(#{alias_letter}.#{col}, '')" end)
+      |> Enum.join(" || ' ' || ")
 
     sql = """
     SELECT #{alias_letter}.*
     FROM #{table} #{alias_letter}
-    JOIN #{fts_table} fts ON #{alias_letter}.id = fts.#{join_key}
-    WHERE fts.#{fts_table} MATCH ?
+    WHERE to_tsvector('english', #{tsvector_expr}) @@ plainto_tsquery('english', $1)
     #{sql_filter}
-    ORDER BY fts.rank
+    ORDER BY ts_rank(to_tsvector('english', #{tsvector_expr}), plainto_tsquery('english', $1)) DESC
     LIMIT 50
     """
 
@@ -103,7 +91,7 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
         end
 
       {:error, _} ->
-        # Fallback to LIKE search
+        # Fallback to ILIKE search
         query_result =
           fallback_query
           |> limit(50)

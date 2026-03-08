@@ -51,7 +51,14 @@ export const CommandHistory = {
         const value = this.el.value.trim()
         if (value) {
           this.addToHistory(value)
-          this.el.form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+          const form = this.el.form || this.el.closest('form')
+          if (form) {
+            if (form.requestSubmit) {
+              form.requestSubmit()
+            } else {
+              form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+            }
+          }
         }
         return
       }
@@ -70,6 +77,7 @@ export const CommandHistory = {
     // Auto-resize and slash detection on input
     this.el.addEventListener('input', () => {
       this.autoResize()
+      this.loadSlashItems()
       this.checkSlashTrigger()
     })
 
@@ -116,6 +124,15 @@ export const CommandHistory = {
       this.slashItems = JSON.parse(raw)
     } catch (e) {
       this.slashItems = []
+    }
+
+    // If the popup was detached by a LiveView DOM patch while open,
+    // the popup element is gone but slashOpen may still be true.
+    // Reset popup state to match reality.
+    if (this.slashOpen && !document.contains(this.popup)) {
+      this.slashOpen = false
+      this.slashTriggerPos = -1
+      this.slashOrdered = []
     }
   },
 
@@ -186,6 +203,14 @@ export const CommandHistory = {
   },
 
   renderPopup(query) {
+    // Re-attach popup if LiveView's DOM patch removed it
+    if (!document.contains(this.popup)) {
+      const form = this.el.closest('form')
+      if (form) {
+        form.style.position = 'relative'
+        form.appendChild(this.popup)
+      }
+    }
     this.popup.innerHTML = ''
 
     // Build groups in typeOrder — this determines DOM order

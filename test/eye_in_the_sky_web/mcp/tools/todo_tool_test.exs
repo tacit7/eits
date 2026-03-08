@@ -103,7 +103,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TodoToolTest do
       uuid: "ss-#{uniq()}",
       agent_id: agent.id,
       started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-      status: "active"
+      status: "working"
     })
     r = Todo.execute(%{command: "list-session", session_id: session.uuid}, @frame) |> json_result()
     assert r.success == true

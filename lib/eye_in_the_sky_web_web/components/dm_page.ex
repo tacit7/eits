@@ -37,7 +37,24 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
     assigns = assign(assigns, :tabs, @tabs)
 
     ~H"""
-    <div class="flex flex-col h-[calc(100vh-2rem)] px-4 sm:px-6 lg:px-8 py-4" id="dm-page">
+    <div
+      class="flex flex-col h-[calc(100vh-2rem)] px-4 sm:px-6 lg:px-8 py-4 relative"
+      id="dm-page"
+      phx-drop-target={@uploads.files.ref}
+      phx-hook="DragUpload"
+    >
+      <%!-- Drag overlay --%>
+      <div
+        id="drag-overlay"
+        class="absolute inset-0 z-50 hidden pointer-events-none rounded-xl"
+      >
+        <div class="absolute inset-3 rounded-xl border-2 border-dashed border-primary/40 bg-primary/[0.04] flex items-center justify-center">
+          <div class="text-center">
+            <.icon name="hero-arrow-up-tray" class="w-10 h-10 text-primary/50 mx-auto mb-2" />
+            <p class="text-sm font-medium text-primary/60">Drop files to attach</p>
+          </div>
+        </div>
+      </div>
       <%!-- Header card --%>
       <div
         class="max-w-6xl mx-auto w-full bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0"

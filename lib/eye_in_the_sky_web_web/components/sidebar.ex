@@ -102,6 +102,27 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
 
 
   @impl true
+  def handle_event("pick_project_folder", _params, socket) do
+    case System.cmd("osascript", ["-e", "POSIX path of (choose folder)"]) do
+      {path, 0} ->
+        path = String.trim(path)
+        name = path |> String.split("/") |> Enum.reject(&(&1 == "")) |> List.last() || path
+
+        case Projects.create_project(%{name: name, path: path}) do
+          {:ok, _project} ->
+            {:noreply, assign(socket, :projects, Projects.list_projects())}
+
+          {:error, _} ->
+            {:noreply, socket}
+        end
+
+      {_err, _code} ->
+        # User cancelled the dialog
+        {:noreply, socket}
+    end
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <aside
@@ -247,7 +268,25 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
         </div>
 
         <%!-- Projects section --%>
-        <.section_label collapsed={@collapsed} label="Projects" />
+        <div class={["mt-3 mb-0.5 flex items-center justify-between", if(@collapsed, do: "px-2", else: "px-3")]}>
+          <span class={[
+            "text-[10px] uppercase tracking-wider font-medium text-base-content/30",
+            if(@collapsed, do: "hidden")
+          ]}>
+            Projects
+          </span>
+          <div class={["border-t border-base-content/8 mt-1 flex-1", if(!@collapsed, do: "hidden")]} />
+          <%= if !@collapsed do %>
+            <button
+              phx-click="pick_project_folder"
+              phx-target={@myself}
+              class="text-base-content/30 hover:text-base-content/60 transition-colors"
+              title="New Project"
+            >
+              <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+            </button>
+          <% end %>
+        </div>
         <%= for project <- @projects do %>
           <% is_active_project = @sidebar_project && @sidebar_project.id == project.id %>
           <div data-project-id={project.id}>

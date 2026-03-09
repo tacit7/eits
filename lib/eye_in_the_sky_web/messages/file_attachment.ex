@@ -27,6 +27,7 @@ defmodule EyeInTheSkyWeb.Messages.FileAttachment do
   def changeset(attachment, attrs) do
     attachment
     |> cast(attrs, [
+      :uuid,
       :message_id,
       :filename,
       :original_filename,
@@ -38,11 +39,11 @@ defmodule EyeInTheSkyWeb.Messages.FileAttachment do
       :updated_at
     ])
     |> validate_required([
+      :uuid,
       :message_id,
       :filename,
       :original_filename,
-      :storage_path,
-      :upload_session_id
+      :storage_path
     ])
     # 50MB max
     |> validate_number(:size_bytes, greater_than: 0, less_than_or_equal_to: 52_428_800)

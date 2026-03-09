@@ -667,6 +667,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       {:ok,
        %{
          storage_path: destination,
+         filename: Path.basename(destination),
          original_filename: entry.client_name,
          content_type: entry.client_type,
          size_bytes: entry.client_size

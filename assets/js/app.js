@@ -161,6 +161,45 @@ Hooks.GlobalKeydown = {
     window.removeEventListener("keydown", this._handler)
   }
 }
+Hooks.DragUpload = {
+  mounted() {
+    this._count = 0
+    this._overlay = this.el.querySelector('#drag-overlay')
+
+    this._onDragEnter = (e) => {
+      if (!e.dataTransfer?.types?.includes('Files')) return
+      this._count++
+      if (this._count === 1) this._overlay?.classList.remove('hidden')
+    }
+
+    this._onDragLeave = (e) => {
+      if (!e.dataTransfer?.types?.includes('Files')) return
+      this._count--
+      if (this._count <= 0) {
+        this._count = 0
+        this._overlay?.classList.add('hidden')
+      }
+    }
+
+    this._onDrop = () => {
+      this._count = 0
+      this._overlay?.classList.add('hidden')
+    }
+
+    this._onDragOver = (e) => e.preventDefault()
+
+    this.el.addEventListener('dragenter', this._onDragEnter)
+    this.el.addEventListener('dragleave', this._onDragLeave)
+    this.el.addEventListener('drop', this._onDrop)
+    this.el.addEventListener('dragover', this._onDragOver)
+  },
+  destroyed() {
+    this.el.removeEventListener('dragenter', this._onDragEnter)
+    this.el.removeEventListener('dragleave', this._onDragLeave)
+    this.el.removeEventListener('drop', this._onDrop)
+    this.el.removeEventListener('dragover', this._onDragOver)
+  }
+}
 Hooks.SidebarState = {
   mounted() {
     // Restore collapsed state

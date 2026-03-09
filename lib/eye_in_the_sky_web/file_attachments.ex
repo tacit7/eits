@@ -159,11 +159,15 @@ defmodule EyeInTheSkyWeb.FileAttachments do
   Creates a file attachment record from a map of attributes.
   """
   def create_attachment(attrs) do
-    now = DateTime.utc_now() |> DateTime.to_string()
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    attrs = Map.merge(attrs, %{inserted_at: now, updated_at: now})
+    attrs =
+      attrs
+      |> Map.put_new(:uuid, Ecto.UUID.generate())
+      |> Map.put(:inserted_at, now)
+      |> Map.put(:updated_at, now)
 
-    %FileAttachment{id: Ecto.UUID.generate()}
+    %FileAttachment{}
     |> FileAttachment.changeset(attrs)
     |> Repo.insert()
   end

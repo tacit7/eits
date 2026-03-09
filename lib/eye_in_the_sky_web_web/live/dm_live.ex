@@ -122,18 +122,16 @@ defmodule EyeInTheSkyWebWeb.DmLive do
            updated_at: now
          }) do
       {:ok, task} ->
-        Repo.query(
-          "INSERT OR IGNORE INTO task_sessions (task_id, session_id) VALUES (?, ?)",
-          [task.id, session_id]
+        Repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_id}],
+          on_conflict: :nothing
         )
 
         if length(tag_names) > 0 do
           Enum.each(tag_names, fn tag_name ->
             case Tasks.get_or_create_tag(tag_name) do
               {:ok, tag} ->
-                Repo.query(
-                  "INSERT INTO task_tags (task_id, tag_id) VALUES (?, ?)",
-                  [task.id, tag.id]
+                Repo.insert_all("task_tags", [%{task_id: task.id, tag_id: tag.id}],
+                  on_conflict: :nothing
                 )
 
               _ ->

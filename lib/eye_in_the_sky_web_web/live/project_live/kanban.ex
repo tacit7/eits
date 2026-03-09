@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   use EyeInTheSkyWebWeb, :live_view
 
+  import Ecto.Query, only: [from: 2]
+
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Tasks
   alias EyeInTheSkyWeb.Notes
@@ -132,16 +134,15 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
         # Handle tags
         if length(tag_names) > 0 do
           # Delete existing tags
-          Repo.query("DELETE FROM task_tags WHERE task_id = ?", [task.id])
+          Repo.delete_all(from t in "task_tags", where: t.task_id == ^task.id)
 
           # Add new tags
           Enum.each(tag_names, fn tag_name ->
             case Tasks.get_or_create_tag(tag_name) do
               {:ok, tag} ->
-                Repo.query("INSERT INTO task_tags (task_id, tag_id) VALUES (?, ?)", [
-                  task.id,
-                  tag.id
-                ])
+                Repo.insert_all("task_tags", [%{task_id: task.id, tag_id: tag.id}],
+                  on_conflict: :nothing
+                )
 
               _ ->
                 :ok
@@ -170,9 +171,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     task = Tasks.get_task_by_uuid!(task_id)
 
     # Delete related records first to avoid foreign key constraint errors
-    Repo.query("DELETE FROM task_tags WHERE task_id = ?", [task.id])
-    Repo.query("DELETE FROM task_sessions WHERE task_id = ?", [task.id])
-    Repo.query("DELETE FROM commit_tasks WHERE task_id = ?", [task.id])
+    Repo.delete_all(from t in "task_tags", where: t.task_id == ^task.id)
+    Repo.delete_all(from t in "task_sessions", where: t.task_id == ^task.id)
+    Repo.delete_all(from t in "commit_tasks", where: t.task_id == ^task.id)
 
     case Tasks.delete_task(task) do
       {:ok, _} ->
@@ -221,9 +222,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
              }) do
           {:ok, session} ->
             # Link task to session
-            Repo.query(
-              "INSERT INTO task_sessions (task_id, session_id) VALUES (?, ?)",
-              [task.id, session.id]
+            Repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session.id}],
+              on_conflict: :nothing
             )
 
             init_prompt = """
@@ -317,10 +317,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
           Enum.each(tag_names, fn tag_name ->
             case Tasks.get_or_create_tag(tag_name) do
               {:ok, tag} ->
-                # Insert into task_tags join table
-                Repo.query(
-                  "INSERT INTO task_tags (task_id, tag_id) VALUES (?, ?)",
-                  [task.id, tag.id]
+                Repo.insert_all("task_tags", [%{task_id: task.id, tag_id: tag.id}],
+                  on_conflict: :nothing
                 )
 
               _ ->

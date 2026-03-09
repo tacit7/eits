@@ -281,9 +281,8 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
       end
 
     if int_id do
-      EyeInTheSkyWeb.Repo.query(
-        "INSERT OR IGNORE INTO task_sessions (task_id, session_id) VALUES (?, ?)",
-        [task_id, int_id]
+      EyeInTheSkyWeb.Repo.insert_all("task_sessions", [%{task_id: task_id, session_id: int_id}],
+        on_conflict: :nothing
       )
     end
 

@@ -219,19 +219,17 @@ defmodule EyeInTheSkyWeb.Sessions do
         limit: ^limit,
         offset: ^offset
 
-    # Apply FTS5 search filter
+    # Apply full-text search filter
     base_query =
       if search_query != "" do
-        # Use FTS5 MATCH query for full-text search
-        fts_query = prepare_fts_query(search_query)
-
         where(
           base_query,
           [s, a],
           fragment(
-            "EXISTS (SELECT 1 FROM sessions_fts WHERE sessions_fts.rowid = ?.rowid AND sessions_fts MATCH ?)",
+            "to_tsvector('english', coalesce(?.name, '') || ' ' || coalesce(?.description, '')) @@ plainto_tsquery('english', ?)",
             s,
-            ^fts_query
+            s,
+            ^search_query
           )
         )
       else
@@ -263,25 +261,6 @@ defmodule EyeInTheSkyWeb.Sessions do
     Repo.all(base_query)
   end
 
-  # Prepares a search query for FTS5 MATCH.
-  # Handles basic query sanitization and wildcard support.
-  defp prepare_fts_query(query) do
-    # Remove special FTS5 characters that could break the query
-    sanitized =
-      query
-      |> String.replace(~r/[^\w\s\-]/, "")
-      |> String.trim()
-
-    # Split into tokens and add prefix matching with *
-    tokens =
-      sanitized
-      |> String.split(~r/\s+/)
-      |> Enum.filter(&(&1 != ""))
-      |> Enum.map(&"#{&1}*")
-
-    # Join with OR for broader matching
-    Enum.join(tokens, " OR ")
-  end
 
   @doc """
   Returns session overview rows for the sessions table.
@@ -320,7 +299,7 @@ defmodule EyeInTheSkyWeb.Sessions do
           status: s.status,
           intent: s.intent,
           active_task: fragment(
-            "(SELECT t.title FROM tasks t JOIN task_sessions ts ON t.id = ts.task_id WHERE ts.session_id = ? AND t.state_id = 2 AND t.archived = 0 ORDER BY t.updated_at DESC LIMIT 1)",
+            "(SELECT t.title FROM tasks t JOIN task_sessions ts ON t.id = ts.task_id WHERE ts.session_id = ? AND t.state_id = 2 AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)",
             s.id
           )
         }
@@ -340,18 +319,17 @@ defmodule EyeInTheSkyWeb.Sessions do
         query
       end
 
-    # Apply FTS5 search if query provided
+    # Apply full-text search if query provided
     query =
       if search_query != "" do
-        fts_query = prepare_fts_query(search_query)
-
         where(
           query,
           [s],
           fragment(
-            "EXISTS (SELECT 1 FROM sessions_fts WHERE sessions_fts.rowid = ?.rowid AND sessions_fts MATCH ?)",
+            "to_tsvector('english', coalesce(?.name, '') || ' ' || coalesce(?.description, '')) @@ plainto_tsquery('english', ?)",
             s,
-            ^fts_query
+            s,
+            ^search_query
           )
         )
       else
@@ -386,11 +364,11 @@ defmodule EyeInTheSkyWeb.Sessions do
   def get_session_counts(session_id) do
     sql = """
     SELECT
-      (SELECT COUNT(*) FROM task_sessions WHERE session_id = ?1),
-      (SELECT COUNT(*) FROM commits WHERE session_id = ?1),
-      (SELECT COUNT(*) FROM logs WHERE session_id = ?1),
-      (SELECT COUNT(*) FROM notes WHERE parent_type IN ('session','sessions') AND parent_id = ?1),
-      (SELECT COUNT(*) FROM messages WHERE session_id = ?1)
+      (SELECT COUNT(*) FROM task_sessions WHERE session_id = $1),
+      (SELECT COUNT(*) FROM commits WHERE session_id = $1),
+      (SELECT COUNT(*) FROM logs WHERE session_id = $1),
+      (SELECT COUNT(*) FROM notes WHERE parent_type IN ('session','sessions') AND parent_id = $1),
+      (SELECT COUNT(*) FROM messages WHERE session_id = $1)
     """
 
     case Repo.query(sql, [session_id]) do

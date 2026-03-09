@@ -37,7 +37,7 @@ defmodule EyeInTheSkyWeb.Settings do
   def get(key) when is_binary(key) do
     meta_key = @prefix <> key
 
-    case Repo.query("SELECT value FROM meta WHERE key = ?1", [meta_key]) do
+    case Repo.query("SELECT value FROM meta WHERE key = $1", [meta_key]) do
       {:ok, %{rows: [[value]]}} -> value
       _ -> Map.get(@defaults, key)
     end
@@ -67,7 +67,7 @@ defmodule EyeInTheSkyWeb.Settings do
   @doc "Get all settings as a map with defaults merged."
   def all do
     stored =
-      case Repo.query("SELECT key, value FROM meta WHERE key LIKE ?1", [@prefix <> "%"]) do
+      case Repo.query("SELECT key, value FROM meta WHERE key LIKE $1", [@prefix <> "%"]) do
         {:ok, %{rows: rows}} ->
           rows
           |> Enum.map(fn [k, v] -> {String.replace_prefix(k, @prefix, ""), v} end)
@@ -88,8 +88,8 @@ defmodule EyeInTheSkyWeb.Settings do
     Repo.query!(
       """
       INSERT INTO meta (key, value, updated_at)
-      VALUES (?1, ?2, CURRENT_TIMESTAMP)
-      ON CONFLICT(key) DO UPDATE SET value = ?2, updated_at = CURRENT_TIMESTAMP
+      VALUES ($1, $2, CURRENT_TIMESTAMP)
+      ON CONFLICT(key) DO UPDATE SET value = $2, updated_at = CURRENT_TIMESTAMP
       """,
       [meta_key, val]
     )
@@ -112,7 +112,7 @@ defmodule EyeInTheSkyWeb.Settings do
   @doc "Reset a setting to its default."
   def reset(key) when is_binary(key) do
     meta_key = @prefix <> key
-    Repo.query!("DELETE FROM meta WHERE key = ?1", [meta_key])
+    Repo.query!("DELETE FROM meta WHERE key = $1", [meta_key])
 
     Phoenix.PubSub.broadcast(
       EyeInTheSkyWeb.PubSub,

@@ -2,14 +2,13 @@ import Config
 
 # Configure your database
 config :eye_in_the_sky_web, EyeInTheSkyWeb.Repo,
-  database: Path.expand("~/.config/eye-in-the-sky/eits.db"),
-  journal_mode: :wal,
-  temp_store: :memory,
-  foreign_keys: :on,
-  busy_timeout: 5000,
-  pool_size: 10,
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost",
+  database: "eits_dev",
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
+  pool_size: 10,
   log: false
 
 # For development, we disable any cache and enable

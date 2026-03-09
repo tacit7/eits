@@ -106,7 +106,7 @@ defmodule EyeInTheSkyWeb.Metrics.TokenIngestion do
       session_id, agent_id, tokens_used, tokens_budget, tokens_remaining,
       input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens,
       estimated_cost_usd, model_name, request_count, subagent_count, notes, timestamp
-    ) VALUES (?1, ?2, ?3, 0, 0, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, datetime('now'))
+    ) VALUES ($1, $2, $3, 0, 0, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
     ON CONFLICT(session_id) DO UPDATE SET
       agent_id = excluded.agent_id,
       tokens_used = excluded.tokens_used,
@@ -139,7 +139,7 @@ defmodule EyeInTheSkyWeb.Metrics.TokenIngestion do
   end
 
   defp lookup_session_by_uuid(uuid) do
-    result = Repo.query!("SELECT id, agent_id FROM sessions WHERE uuid = ?1", [uuid])
+    result = Repo.query!("SELECT id, agent_id FROM sessions WHERE uuid = $1", [uuid])
 
     case result.rows do
       [[id, agent_id] | _] -> %{id: id, agent_id: agent_id}

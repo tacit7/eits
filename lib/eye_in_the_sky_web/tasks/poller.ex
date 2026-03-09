@@ -1,6 +1,6 @@
 defmodule EyeInTheSkyWeb.Tasks.Poller do
   @moduledoc """
-  GenServer that polls for task changes in SQLite and broadcasts via PubSub.
+  GenServer that polls for task changes and broadcasts via PubSub.
   Catches external writes from Go MCP i-todo commands and other agents.
   """
 

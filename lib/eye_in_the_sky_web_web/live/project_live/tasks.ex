@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
   use EyeInTheSkyWebWeb, :live_view
 
+  import Ecto.Query, only: [from: 2]
+
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Tasks
   alias EyeInTheSkyWeb.Notes
@@ -129,15 +131,14 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
          }) do
       {:ok, updated_task} ->
         if length(tag_names) > 0 do
-          Repo.query("DELETE FROM task_tags WHERE task_id = ?", [task.id])
+          Repo.delete_all(from t in "task_tags", where: t.task_id == ^task.id)
 
           Enum.each(tag_names, fn tag_name ->
             case Tasks.get_or_create_tag(tag_name) do
               {:ok, tag} ->
-                Repo.query("INSERT INTO task_tags (task_id, tag_id) VALUES (?, ?)", [
-                  task.id,
-                  tag.id
-                ])
+                Repo.insert_all("task_tags", [%{task_id: task.id, tag_id: tag.id}],
+                  on_conflict: :nothing
+                )
 
               _ ->
                 :ok
@@ -164,9 +165,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
   def handle_event("delete_task", %{"task_id" => task_id}, socket) do
     task = Tasks.get_task_by_uuid!(task_id)
 
-    Repo.query("DELETE FROM task_tags WHERE task_id = ?", [task.id])
-    Repo.query("DELETE FROM task_sessions WHERE task_id = ?", [task.id])
-    Repo.query("DELETE FROM commit_tasks WHERE task_id = ?", [task.id])
+    Repo.delete_all(from t in "task_tags", where: t.task_id == ^task.id)
+    Repo.delete_all(from t in "task_sessions", where: t.task_id == ^task.id)
+    Repo.delete_all(from t in "commit_tasks", where: t.task_id == ^task.id)
 
     case Tasks.delete_task(task) do
       {:ok, _} ->
@@ -221,9 +222,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
           Enum.each(tag_names, fn tag_name ->
             case Tasks.get_or_create_tag(tag_name) do
               {:ok, tag} ->
-                Repo.query(
-                  "INSERT INTO task_tags (task_id, tag_id) VALUES (?, ?)",
-                  [task.id, tag.id]
+                Repo.insert_all("task_tags", [%{task_id: task.id, tag_id: tag.id}],
+                  on_conflict: :nothing
                 )
 
               _ ->

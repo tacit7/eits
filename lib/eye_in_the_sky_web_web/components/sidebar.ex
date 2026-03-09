@@ -26,6 +26,10 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   end
 
   @impl true
+  def update(%{notification_count: :refresh}, socket) do
+    {:ok, assign(socket, :notification_count, Notifications.unread_count())}
+  end
+
   def update(assigns, socket) do
     sidebar_project = assigns[:sidebar_project]
 

@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   use EyeInTheSkyWebWeb, :live_component
 
-  alias EyeInTheSkyWeb.{Projects, Channels}
+  alias EyeInTheSkyWeb.{Projects, Channels, Notifications}
   alias EyeInTheSkyWeb.Channels.Channel
 
   @impl true
@@ -20,7 +20,8 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
        channels: channels,
        collapsed: false,
        expanded_chat: false,
-       new_channel_name: nil
+       new_channel_name: nil,
+       notification_count: Notifications.unread_count()
      )}
   end
 
@@ -37,7 +38,8 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
      |> assign(:sidebar_tab, sidebar_tab)
      |> assign(:sidebar_project, sidebar_project)
      |> assign(:active_channel_id, assigns[:active_channel_id])
-     |> assign(:expanded_chat, expanded_chat)}
+     |> assign(:expanded_chat, expanded_chat)
+     |> assign(:notification_count, Notifications.unread_count())}
   end
 
   @impl true
@@ -192,6 +194,13 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           active={@sidebar_tab == :skills}
           collapsed={@collapsed}
         />
+        <.notification_nav_item
+          href="/notifications"
+          active={@sidebar_tab == :notifications}
+          collapsed={@collapsed}
+          count={@notification_count}
+        />
+
         <%!-- Chat (expandable with channels) --%>
         <div>
           <button
@@ -437,6 +446,38 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
         </button>
       </div>
     </aside>
+    """
+  end
+
+  attr :href, :string, required: true
+  attr :active, :boolean, default: false
+  attr :collapsed, :boolean, default: false
+  attr :count, :integer, default: 0
+
+  defp notification_nav_item(assigns) do
+    ~H"""
+    <.link
+      navigate={@href}
+      class={[
+        "flex items-center gap-2.5 text-[13px] transition-colors",
+        if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
+        if(@active,
+          do: "text-primary bg-primary/10 border-l-2 border-primary font-medium",
+          else: "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5"
+        )
+      ]}
+      title="Notifications"
+    >
+      <div class="relative">
+        <.icon name="hero-bell" class="w-4 h-4 flex-shrink-0" />
+        <%= if @count > 0 do %>
+          <span class="absolute -top-1.5 -right-1.5 badge badge-xs badge-primary text-[9px] min-w-[14px] h-[14px] p-0">
+            {if @count > 99, do: "99+", else: @count}
+          </span>
+        <% end %>
+      </div>
+      <span class={["truncate", if(@collapsed, do: "hidden")]}>Notifications</span>
+    </.link>
     """
   end
 

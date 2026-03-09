@@ -25,6 +25,7 @@ defmodule EyeInTheSkyWebWeb.Router do
       live "/skills", OverviewLive.Skills, :index
       live "/config", OverviewLive.Config, :index
       live "/jobs", OverviewLive.Jobs, :index
+      live "/notifications", OverviewLive.Notifications, :index
       live "/settings", OverviewLive.Settings, :index
       live "/sessions", SessionLive.Index, :index
       live "/prompts", PromptLive.Index, :index

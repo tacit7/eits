@@ -55,7 +55,16 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
 
     result = create_or_find_session(attrs, agent_attrs)
     response = Response.tool() |> Response.json(result)
-    {:reply, response, frame}
+    # Store EITS session UUID in frame assigns so other tools (e.g. i-todo) can
+    # auto-link to this session without requiring an explicit session_id param.
+    updated_frame =
+      if params[:session_id] && is_struct(frame) do
+        Anubis.Server.Frame.assign(frame, :eits_session_id, params[:session_id])
+      else
+        frame
+      end
+
+    {:reply, response, updated_frame}
   end
 
   def execute(%{command: "end"} = params, frame) do

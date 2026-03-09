@@ -56,8 +56,15 @@ config :phoenix, :json_library, Jason
 # Oban job processing
 config :eye_in_the_sky_web, Oban,
   engine: Oban.Engines.Basic,
-  queues: [jobs: 5],
-  repo: EyeInTheSkyWeb.Repo
+  notifier: Oban.Notifiers.PG,
+  queues: [jobs: 5, default: 5],
+  repo: EyeInTheSkyWeb.Repo,
+  plugins: [
+    {Oban.Plugins.Cron,
+     crontab: [
+       {"* * * * *", EyeInTheSkyWeb.Workers.JobDispatcherWorker}
+     ]}
+  ]
 
 # Anubis MCP session store — ETS-backed, survives session agent crashes
 config :anubis_mcp, :session_store,

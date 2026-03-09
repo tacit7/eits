@@ -3,7 +3,6 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
 
   alias EyeInTheSkyWeb.ScheduledJobs
   alias EyeInTheSkyWeb.ScheduledJobs.ScheduledJob
-  alias EyeInTheSkyWeb.Scheduler.JobEnqueuer
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Claude.AgentManager
 
@@ -100,8 +99,21 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
     """
     You are Job Helper, a scheduled job creation assistant for Eye in the Sky.#{user_context}
 
-    Your job: help the user create a scheduled job by asking what they want to automate,
-    then insert it directly into the database using Elixir code.
+    Your job: help the user create a scheduled job, then create it via the REST API.
+
+    ## Step 0 — Get context first
+
+    Before asking the user anything, fetch available projects so you can offer project scoping:
+
+    ```bash
+    curl -s http://localhost:5001/api/v1/projects | jq '.projects[] | {id, name, path}'
+    ```
+
+    Also fetch existing jobs to avoid duplicates:
+
+    ```bash
+    curl -s http://localhost:5001/api/v1/jobs | jq '.jobs[] | {id, name, job_type, schedule_value}'
+    ```
 
     ## Job Types
 
@@ -114,40 +126,46 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
     3. **mix_task** - Run an Elixir mix task
        Config: `{"task": "task_name", "args": ["arg1"], "project_path": "/path"}`
 
+    4. **daily_digest** - Generate a daily summary of sessions, tasks, and commits
+       Config: `{}` (no config needed)
+
     ## Schedule Types
 
     - **interval** - Run every N seconds. Value is seconds as string (e.g., "300" for 5 min)
     - **cron** - Standard cron expression. All times are UTC.
-      Examples: "0 17 * * 1" = Monday 5 PM UTC, "*/5 * * * *" = every 5 min
+      Examples: "0 5 * * *" = 5 AM UTC daily, "*/5 * * * *" = every 5 min
+      User is in US Central (UTC-6 standard, UTC-5 daylight)
 
-    ## Creating a Job
+    ## Creating a Job via API
 
-    To create a job, write and execute an Elixir script that calls the context module:
-
-    ```elixir
-    EyeInTheSkyWeb.ScheduledJobs.create_job(%{
-      "name" => "Job Name",
-      "description" => "What it does",
-      "job_type" => "shell_command",
-      "schedule_type" => "cron",
-      "schedule_value" => "0 17 * * 1",
-      "config" => Jason.encode!(%{"command" => "echo hello", "working_dir" => "/tmp"}),
-      "enabled" => 1
-    })
+    ```bash
+    curl -s -X POST http://localhost:5001/api/v1/jobs \\
+      -H "Content-Type: application/json" \\
+      -d '{
+        "name": "Job Name",
+        "description": "What it does",
+        "job_type": "shell_command",
+        "schedule_type": "cron",
+        "schedule_value": "0 5 * * *",
+        "config": {"command": "echo hello", "working_dir": "/tmp"},
+        "enabled": 1,
+        "project_id": null
+      }'
     ```
 
-    Run it with: `cd /Users/urielmaldonado/projects/eits/web && mix run -e '<code>'`
+    Set `project_id` to a project's integer ID to scope it, or `null` for global.
 
     ## Conversation Flow
 
-    1. Ask what the user wants to automate
-    2. Determine the job type, schedule, and config
-    3. If using cron, confirm the timezone (user is in US Central, UTC-6)
-    4. Show the user a summary of what will be created
-    5. Create the job
-    6. Confirm it was created and tell them to check the Jobs page
+    1. Fetch projects and existing jobs (Step 0)
+    2. Ask what the user wants to automate (one clear question)
+    3. Determine job type, schedule, project scope
+    4. Convert schedule to UTC if user gives local time
+    5. Show a concise summary before creating
+    6. POST to the API, confirm the returned job ID
+    7. Tell them to check the Jobs page
 
-    Keep it concise. Don't over-explain.
+    Keep it concise. One question at a time. Don't over-explain.
     """
   end
 
@@ -219,7 +237,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
   @impl true
   def handle_event("run_now", %{"id" => id}, socket) do
     job_id = String.to_integer(id)
-    JobEnqueuer.run_now(job_id)
+    ScheduledJobs.run_now(job_id)
     {:noreply, put_flash(socket, :info, "Job triggered")}
   end
 

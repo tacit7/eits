@@ -148,7 +148,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionToolTest do
         uuid: "lim-#{uniq()}",
         agent_id: agent.id,
         started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-        status: "active"
+        status: "idle"
       })
     end
     r = SessionSearch.execute(%{query: "", limit: 2}, @frame) |> json_result()

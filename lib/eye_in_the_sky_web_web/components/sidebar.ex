@@ -372,6 +372,11 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
                 label="Agents"
                 active={is_active_project && @sidebar_tab == :agents}
               />
+              <.project_sub_item
+                href={~p"/projects/#{project.id}/jobs"}
+                label="Jobs"
+                active={is_active_project && @sidebar_tab == :jobs}
+              />
             </div>
           </div>
         <% end %>
@@ -390,6 +395,13 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           icon="hero-calendar-days"
           label="Jobs"
           active={@sidebar_tab == :jobs}
+          collapsed={@collapsed}
+        />
+        <.nav_item
+          href="/oban"
+          icon="hero-queue-list"
+          label="Oban"
+          active={false}
           collapsed={@collapsed}
         />
         <.nav_item

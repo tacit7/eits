@@ -75,6 +75,14 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 {String.slice(@session_uuid, 0..7)}
                 <.icon name="hero-clipboard-document" class="w-3 h-3" />
               </button>
+              <button
+                type="button"
+                phx-click="open_iterm"
+                title="Open in iTerm"
+                class="flex items-center gap-1 text-[11px] text-base-content/30 bg-base-content/5 px-2 py-0.5 rounded hover:text-base-content/50 hover:bg-base-content/8 transition-colors cursor-pointer"
+              >
+                <.icon name="hero-command-line" class="w-3 h-3" />
+              </button>
             </div>
             <div class="flex items-center gap-2">
               <button

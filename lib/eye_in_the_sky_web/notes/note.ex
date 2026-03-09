@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.Notes.Note do
     |> cast(attrs, [:uuid, :parent_type, :parent_id, :title, :body, :starred])
     |> maybe_generate_uuid()
     |> validate_required([:parent_type, :parent_id, :body])
-    |> validate_inclusion(:parent_type, ["session", "task", "agent"])
+    |> validate_inclusion(:parent_type, ["session", "task", "agent", "system"])
   end
 
   defp maybe_generate_uuid(changeset) do

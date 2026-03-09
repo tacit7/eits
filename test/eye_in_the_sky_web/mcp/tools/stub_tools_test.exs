@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.MCP.Tools.StubToolsTest do
   # These tools are either stubs, system calls, or external service calls.
   # Tests verify they return properly structured responses without crashing.
-  use ExUnit.Case, async: true
+  use EyeInTheSkyWeb.DataCase, async: true
 
   alias EyeInTheSkyWeb.MCP.Tools.NatsListen
   alias EyeInTheSkyWeb.MCP.Tools.NatsListenRemote

@@ -42,7 +42,7 @@ config :eye_in_the_sky_web,
   codex_cli_module: EyeInTheSkyWeb.Claude.MockCLI
 
 # Disable Oban queues in test (use Oban.Testing for manual testing)
-config :eye_in_the_sky_web, Oban, testing: :inline
+config :eye_in_the_sky_web, Oban, testing: :manual
 
 # Disable message broadcaster polling in test (tested manually via handle_info)
 config :eye_in_the_sky_web, EyeInTheSkyWeb.Messages.Broadcaster, enabled: false

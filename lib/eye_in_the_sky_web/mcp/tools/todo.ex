@@ -39,11 +39,16 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
       created_at: DateTime.utc_now() |> DateTime.to_iso8601()
     }
 
+    # Explicit session_id param takes precedence; fall back to the EITS session
+    # UUID stored in frame assigns by i-session start.
+    frame_session_id = if is_struct(frame), do: frame.assigns[:eits_session_id], else: nil
+    session_id = params[:session_id] || frame_session_id
+
     result =
       case Tasks.create_task(attrs) do
         {:ok, task} ->
           maybe_add_tags(task, params[:tags])
-          maybe_link_session(task.id, params[:session_id])
+          maybe_link_session(task.id, session_id)
           %{success: true, message: "Task created", task_id: to_string(task.id)}
 
         {:error, cs} ->
@@ -96,7 +101,8 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
   def execute(%{command: "list-session"} = params, frame) do
     alias EyeInTheSkyWeb.Tasks
 
-    tasks = Tasks.list_tasks_for_session(params[:session_id])
+    session_int_id = resolve_session_int_id(params[:session_id])
+    tasks = if session_int_id, do: Tasks.list_tasks_for_session(session_int_id), else: []
 
     result = %{
       success: true,
@@ -267,26 +273,49 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
   defp maybe_link_session(_task_id, nil), do: :ok
 
   defp maybe_link_session(task_id, session_id) when is_binary(session_id) do
-    # session_id may be a UUID or integer string — resolve to integer FK
+    # Try UUID lookup first; fall back to treating it as an integer PK string
     int_id =
-      case Integer.parse(session_id) do
-        {n, ""} ->
-          n
+      case Sessions.get_session_by_uuid(session_id) do
+        {:ok, s} ->
+          s.id
 
         _ ->
-          case Sessions.get_session_by_uuid(session_id) do
-            {:ok, s} -> s.id
+          case Integer.parse(session_id) do
+            {n, ""} -> n
             _ -> nil
           end
       end
 
+    task_int_id =
+      case task_id do
+        id when is_integer(id) -> id
+        id when is_binary(id) -> String.to_integer(id)
+      end
+
     if int_id do
-      EyeInTheSkyWeb.Repo.insert_all("task_sessions", [%{task_id: task_id, session_id: int_id}],
+      EyeInTheSkyWeb.Repo.insert_all("task_sessions", [%{task_id: task_int_id, session_id: int_id}],
         on_conflict: :nothing
       )
     end
 
     :ok
+  end
+
+  defp resolve_session_int_id(nil), do: nil
+
+  defp resolve_session_int_id(session_id) when is_integer(session_id), do: session_id
+
+  defp resolve_session_int_id(session_id) when is_binary(session_id) do
+    case Integer.parse(session_id) do
+      {n, ""} ->
+        n
+
+      _ ->
+        case Sessions.get_session_by_uuid(session_id) do
+          {:ok, s} -> s.id
+          _ -> nil
+        end
+    end
   end
 
   defp resolve_agent_int_id(nil), do: nil

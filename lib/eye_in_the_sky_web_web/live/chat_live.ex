@@ -263,6 +263,48 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   end
 
   @impl true
+  def handle_event(
+        "send_direct_message",
+        %{"session_id" => target_session_id_str, "body" => body} = params,
+        socket
+      ) do
+    require Logger
+    session_id = get_session_id(socket)
+    channel_id = params["channel_id"] || socket.assigns.active_channel_id
+    target_session_id =
+      case Integer.parse(to_string(target_session_id_str)) do
+        {n, ""} -> n
+        _ -> nil
+      end
+
+    case Messages.send_channel_message(%{
+           channel_id: channel_id,
+           session_id: session_id,
+           sender_role: "user",
+           recipient_role: "agent",
+           provider: "claude",
+           body: body
+         }) do
+      {:ok, message} ->
+        Phoenix.PubSub.broadcast(
+          EyeInTheSkyWeb.PubSub,
+          "channel:#{channel_id}:messages",
+          {:new_message, message}
+        )
+
+        if target_session_id do
+          prompt = ChannelProtocol.build_prompt(:direct, body)
+          AgentManager.send_message(target_session_id, prompt, channel_id: channel_id)
+        end
+
+        {:noreply, socket}
+
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, "Failed to send message")}
+    end
+  end
+
+  @impl true
   def handle_event("add_agent_to_channel", %{"session_id" => session_id_str}, socket) do
     require Logger
     channel_id = socket.assigns.active_channel_id

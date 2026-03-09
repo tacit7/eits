@@ -641,5 +641,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       {:error, _} ->
         :ok
     end
+  rescue
+    _ -> :ok
   end
 end

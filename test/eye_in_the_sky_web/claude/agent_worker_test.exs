@@ -1,29 +1,40 @@
 defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
-  use ExUnit.Case, async: false
+  use EyeInTheSkyWeb.DataCase, async: false
   require Logger
 
   @moduletag :capture_log
 
   alias EyeInTheSkyWeb.Claude.SDK
-  alias EyeInTheSkyWeb.{Agents, Messages, Repo, Sessions}
+  alias EyeInTheSkyWeb.{Agents, Messages, Sessions}
 
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
+    # Track sessions created in this test so we can clean up only those workers
+    test_pid = self()
+    # Use start (not start_link) so the Agent survives the test process exit
+    # and is still accessible from on_exit, which runs in a separate process.
+    Agent.start(fn -> [] end, name: :"test_sessions_#{inspect(test_pid)}")
 
     on_exit(fn ->
-      EyeInTheSkyWeb.Claude.AgentSupervisor
-      |> DynamicSupervisor.which_children()
-      |> Enum.each(fn
-        {_, pid, :worker, _} when is_pid(pid) -> Process.exit(pid, :kill)
-        _ -> :ok
+      session_ids = Agent.get(:"test_sessions_#{inspect(test_pid)}", & &1)
+
+      Enum.each(session_ids, fn session_id ->
+        case Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session_id}) do
+          [{pid, _}] when is_pid(pid) ->
+            DynamicSupervisor.terminate_child(EyeInTheSkyWeb.Claude.AgentSupervisor, pid)
+
+          _ ->
+            :ok
+        end
       end)
+
+      Agent.stop(:"test_sessions_#{inspect(test_pid)}", :normal, 1000)
     end)
 
-    :ok
+    {:ok, track: :"test_sessions_#{inspect(test_pid)}"}
   end
 
   # Helper to create an agent + session pair for tests
-  defp create_test_agent_and_session(opts \\ %{}) do
+  defp create_test_agent_and_session(opts \\ %{}, ctx \\ %{}) do
     agent_attrs = %{
       uuid: Ecto.UUID.generate(),
       description: Map.get(opts, :description, "Test Agent"),
@@ -42,6 +53,10 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
 
     {:ok, session} = Sessions.create_session(session_attrs)
 
+    if track = ctx[:track] do
+      Agent.update(track, fn ids -> [session.id | ids] end)
+    end
+
     {agent, session}
   end
 
@@ -49,7 +64,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     {_agent, session} = create_test_agent_and_session()
 
     # Allow sandbox for dynamically started processes
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
 
     # Subscribe to session messages via PubSub
     Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
@@ -109,7 +123,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
         session_uuid: original_uuid
       })
 
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
 
     prompt = "Say hello"
     assert :ok == EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, prompt)
@@ -145,7 +158,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
         session_name: "Outbound-only"
       })
 
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
 
     {:ok, _user_message} =
       Messages.send_message(%{
@@ -180,7 +192,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
         provider: "codex"
       })
 
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
 
     {:ok, _reply} =
       Messages.record_incoming_reply(session.id, "codex", "prior codex reply")
@@ -198,7 +209,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
         session_name: "No Path Session"
       })
 
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
 
     assert :ok == EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, "hello")
 
@@ -220,7 +230,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
         session_name: "PubSub Working"
       })
 
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
 
     # Subscribe to the agent:working topic
     Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
@@ -247,7 +256,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
         session_name: "PubSub Stopped"
       })
 
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
 
     # Subscribe to the agent:working topic
     Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
@@ -295,7 +303,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
         session_name: "PubSub New Message"
       })
 
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
 
     # Subscribe to session-specific messages topic
     Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
@@ -336,7 +343,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
         session_name: "PubSub Error Stop"
       })
 
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
 
     Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
 

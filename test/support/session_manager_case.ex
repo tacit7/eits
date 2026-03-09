@@ -19,7 +19,9 @@ defmodule EyeInTheSkyWeb.SessionManagerCase do
     Application.put_env(:eye_in_the_sky_web, :cli_module, EyeInTheSkyWeb.Claude.MockCLI)
 
     on_exit(fn ->
-      Application.delete_env(:eye_in_the_sky_web, :cli_module)
+      # Restore to MockCLI (test default from config/test.exs) rather than deleting,
+      # so subsequent tests aren't left with nil after delete_env removes the key.
+      Application.put_env(:eye_in_the_sky_web, :cli_module, EyeInTheSkyWeb.Claude.MockCLI)
     end)
 
     :ok

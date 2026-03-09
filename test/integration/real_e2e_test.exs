@@ -14,7 +14,7 @@ defmodule EyeInTheSkyWeb.RealE2ETest do
   use EyeInTheSkyWebWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSkyWeb.{Agents, ChatAgents, Channels, Messages, Projects}
+  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Projects, Sessions}
   alias EyeInTheSkyWeb.Claude.SessionManager
 
   @moduletag :integration
@@ -30,6 +30,20 @@ defmodule EyeInTheSkyWeb.RealE2ETest do
 
     on_exit(fn ->
       Application.put_env(:eye_in_the_sky_web, :cli_module, EyeInTheSkyWeb.Claude.MockCLI)
+
+      supervisor = EyeInTheSkyWeb.Claude.AgentSupervisor
+
+      supervisor
+      |> DynamicSupervisor.which_children()
+      |> Enum.each(fn
+        {_, pid, :worker, _} when is_pid(pid) ->
+          DynamicSupervisor.terminate_child(supervisor, pid)
+
+        _ ->
+          :ok
+      end)
+
+      Process.sleep(200)
     end)
 
     # Ensure test project directory exists
@@ -46,7 +60,7 @@ defmodule EyeInTheSkyWeb.RealE2ETest do
 
     # Create test agent
     {:ok, agent} =
-      ChatAgents.create_chat_agent(%{
+      Agents.create_agent(%{
         uuid: "e2e-agent-#{System.system_time(:second)}",
         description: "E2E Test Agent",
         source: "test",
@@ -55,7 +69,7 @@ defmodule EyeInTheSkyWeb.RealE2ETest do
 
     # Create test session (this will be used by CLI with --session flag)
     {:ok, session} =
-      Agents.create_execution_agent(%{
+      Sessions.create_session(%{
         uuid: @test_session_uuid,
         agent_id: agent.id,
         name: "E2E Test Session",
@@ -73,7 +87,7 @@ defmodule EyeInTheSkyWeb.RealE2ETest do
 
     # Create web UI agent/session for sending messages (with unique UUIDs)
     {:ok, web_agent} =
-      ChatAgents.create_chat_agent(%{
+      Agents.create_agent(%{
         uuid: "e2e-web-agent-#{System.system_time(:second)}",
         description: "Web UI User",
         source: "web",
@@ -81,7 +95,7 @@ defmodule EyeInTheSkyWeb.RealE2ETest do
       })
 
     {:ok, web_session} =
-      Agents.create_execution_agent(%{
+      Sessions.create_session(%{
         uuid: "e2e-web-session-#{System.system_time(:second)}",
         agent_id: web_agent.id,
         name: "Web UI",

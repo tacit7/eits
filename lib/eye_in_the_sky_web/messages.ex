@@ -435,7 +435,7 @@ defmodule EyeInTheSkyWeb.Messages do
     # Get the last N messages by ordering DESC, then reverse for chronological display
     Message
     |> where([m], m.channel_id == ^channel_id and is_nil(m.parent_message_id))
-    |> order_by([m], desc: m.inserted_at)
+    |> order_by([m], [desc: m.inserted_at, desc: m.id])
     |> limit(^limit)
     |> preload([:reactions, :attachments, :session])
     |> Repo.all()

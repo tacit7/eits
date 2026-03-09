@@ -6,5 +6,5 @@ unless EyeInTheSkyWeb.SchemaLoader.schema_loaded?() do
   IO.puts("✓ Schema loaded successfully\n")
 end
 
-ExUnit.start()
+ExUnit.start(exclude: [:sdk_e2e])
 Ecto.Adapters.SQL.Sandbox.mode(EyeInTheSkyWeb.Repo, :manual)

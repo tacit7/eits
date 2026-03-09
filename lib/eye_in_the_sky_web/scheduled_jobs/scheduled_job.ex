@@ -18,6 +18,7 @@ defmodule EyeInTheSkyWeb.ScheduledJobs.ScheduledJob do
     field :run_count, :integer, default: 0
     field :created_at, :string
     field :updated_at, :string
+    field :project_id, :integer
 
     has_many :runs, EyeInTheSkyWeb.ScheduledJobs.JobRun, foreign_key: :job_id
   end
@@ -37,10 +38,11 @@ defmodule EyeInTheSkyWeb.ScheduledJobs.ScheduledJob do
       :next_run_at,
       :run_count,
       :created_at,
-      :updated_at
+      :updated_at,
+      :project_id
     ])
     |> validate_required([:name, :job_type, :schedule_type, :schedule_value])
-    |> validate_inclusion(:job_type, ["spawn_agent", "shell_command", "mix_task"])
+    |> validate_inclusion(:job_type, ["spawn_agent", "shell_command", "mix_task", "daily_digest"])
     |> validate_inclusion(:origin, ["system", "user"])
     |> validate_inclusion(:schedule_type, ["interval", "cron"])
   end

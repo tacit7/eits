@@ -39,9 +39,17 @@ defmodule EyeInTheSkyWebWeb.Router do
       live "/projects/:id/files", ProjectLive.Files, :show
       live "/projects/:id/config", ProjectLive.Config, :show
       live "/projects/:id/agents", ProjectLive.Agents, :show
+      live "/projects/:id/jobs", ProjectLive.Jobs, :show
       live "/chat", ChatLive, :index
       live "/dm/:session_id", DmLive, :show
     end
+  end
+
+  import Oban.Web.Router
+
+  scope "/oban" do
+    pipe_through :browser
+    oban_dashboard("/")
   end
 
   # MCP Server — Streamable HTTP
@@ -90,6 +98,14 @@ defmodule EyeInTheSkyWebWeb.Router do
     post "/tasks/:id/annotations", TaskController, :annotate
     post "/tasks/:id/sessions", TaskController, :link_session
     delete "/tasks/:id/sessions/:uuid", TaskController, :unlink_session
+
+    # Scheduled Jobs
+    get "/jobs", JobController, :index
+    post "/jobs", JobController, :create
+    get "/jobs/:id", JobController, :show
+    patch "/jobs/:id", JobController, :update
+    delete "/jobs/:id", JobController, :delete
+    post "/jobs/:id/run", JobController, :run
 
     # Projects
     get "/projects", ProjectController, :index

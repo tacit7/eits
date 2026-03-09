@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Dm do
   alias EyeInTheSkyWeb.Sessions
 
   schema do
-    field :sender_id, :string, required: true, description: "Your session ID"
+    field :sender_id, :string, description: "Your session ID. Defaults to current session."
     field :target_session_id, :string, required: true, description: "Target agent's session ID"
     field :message, :string, required: true, description: "Message body to send"
 
@@ -19,6 +19,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Dm do
   def execute(params, frame) do
     alias EyeInTheSkyWeb.Messages
 
+    sender_id = params[:sender_id] || frame.assigns[:eits_session_id]
     target_uuid = params[:target_session_id]
 
     # Resolve UUID to internal integer session_id
@@ -35,7 +36,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Dm do
             status: "delivered",
             provider: "claude",
             metadata: %{
-              sender_id: params[:sender_id],
+              sender_id: sender_id,
               response_required: params[:response_required] || false
             }
           }

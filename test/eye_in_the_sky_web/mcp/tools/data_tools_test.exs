@@ -18,7 +18,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.DataToolsTest do
       uuid: "dt-#{uniq()}",
       agent_id: agent.id,
       started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-      status: "active"
+      status: "idle"
     })
     session
   end

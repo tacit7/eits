@@ -243,8 +243,15 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   """
   @spec build_args(cli_opts()) :: [String.t()]
   def build_args(caller_opts) do
-    # Filter nils from caller opts
-    opts = Keyword.filter(caller_opts, fn {_k, v} -> v != nil end)
+    # Filter nils from caller opts (nil = "not specified", allows DB/fallback to win)
+    caller = Keyword.filter(caller_opts, fn {_k, v} -> v != nil end)
+
+    # Three-way merge: hardcoded fallbacks < DB settings < caller opts
+    opts =
+      [output_format: "stream-json"]
+      |> Keyword.merge(cli_db_defaults())
+      |> Keyword.merge(caller)
+
     args = []
 
     # Session mode flags (mutually exclusive: resume > new)
@@ -289,6 +296,35 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   defp maybe_flag(args, _flag, nil), do: args
   defp maybe_flag(args, _flag, ""), do: args
   defp maybe_flag(args, flag, value), do: args ++ [flag, to_string(value)]
+
+  defp cli_db_defaults do
+    alias EyeInTheSkyWeb.Settings
+
+    [
+      model: Settings.get("model"),
+      permission_mode: Settings.get("permission_mode"),
+      max_turns: parse_setting_integer(Settings.get("max_turns")),
+      output_format: Settings.get("output_format"),
+      skip_permissions: parse_setting_boolean(Settings.get("skip_permissions"))
+    ]
+    |> Keyword.filter(fn {_k, v} -> v != nil end)
+  rescue
+    _ -> []
+  end
+
+  defp parse_setting_integer(nil), do: nil
+
+  defp parse_setting_integer(s) when is_binary(s) do
+    case Integer.parse(s) do
+      {n, ""} -> n
+      _ -> nil
+    end
+  end
+
+  defp parse_setting_boolean(nil), do: nil
+  defp parse_setting_boolean("true"), do: true
+  defp parse_setting_boolean("false"), do: false
+  defp parse_setting_boolean(_), do: nil
 
   # ---------------------------------------------------------------------------
   # Binary cache

@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
   alias EyeInTheSkyWeb.Sessions
 
   schema do
-    field :agent_id, :string, required: true, description: "Agent identifier"
+    field :agent_id, :string, description: "Agent/session identifier. Defaults to current session."
     field :commit_hashes, {:list, :string}, required: true, description: "List of commit hashes"
     field :commit_messages, {:list, :string}, description: "List of commit messages"
   end
@@ -16,7 +16,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
   def execute(params, frame) do
     alias EyeInTheSkyWeb.Commits
 
-    agent_id = params[:agent_id]
+    agent_id = params[:agent_id] || frame.assigns[:eits_session_id]
     hashes = params[:commit_hashes] || []
     messages = params[:commit_messages] || []
 

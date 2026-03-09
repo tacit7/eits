@@ -41,6 +41,8 @@ defmodule EyeInTheSkyWeb.Settings do
       {:ok, %{rows: [[value]]}} -> value
       _ -> Map.get(@defaults, key)
     end
+  rescue
+    _ -> Map.get(@defaults, key)
   end
 
   @doc "Get a setting as a float."
@@ -108,6 +110,9 @@ defmodule EyeInTheSkyWeb.Settings do
     Enum.each(settings, fn {k, v} -> put(k, v) end)
     :ok
   end
+
+  @doc "Set CLI defaults. Alias for put_many/1."
+  def set_cli_defaults(settings) when is_map(settings), do: put_many(settings)
 
   @doc "Reset a setting to its default."
   def reset(key) when is_binary(key) do

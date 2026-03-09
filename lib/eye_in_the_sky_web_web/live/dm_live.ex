@@ -282,6 +282,28 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_event("open_iterm", _params, socket) do
+    dir =
+      case socket.assigns.session.git_worktree_path do
+        path when is_binary(path) and path != "" -> path
+        _ -> "~"
+      end
+
+    script = """
+    tell application "iTerm"
+      activate
+      set newWindow to (create window with default profile)
+      tell current session of newWindow
+        write text "cd #{dir}"
+      end tell
+    end tell
+    """
+
+    System.cmd("osascript", ["-e", script], stderr_to_stdout: true)
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("reload_from_session_file", _params, socket) do
     session_id = socket.assigns.session_id
     session_uuid = socket.assigns.session_uuid

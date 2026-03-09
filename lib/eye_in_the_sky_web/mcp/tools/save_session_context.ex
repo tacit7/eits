@@ -7,14 +7,14 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SaveSessionContext do
   alias EyeInTheSkyWeb.{Contexts, Sessions}
 
   schema do
-    field :agent_id, :string, required: true, description: "Session UUID (Claude Code session ID)"
+    field :agent_id, :string, description: "Session UUID (Claude Code session ID). Defaults to current session."
     field :session_id, :string, description: "Session UUID — alias for agent_id, takes precedence if provided"
     field :context, :string, required: true, description: "Markdown formatted context"
   end
 
   @impl true
   def execute(params, frame) do
-    session_uuid = params[:session_id] || params[:agent_id]
+    session_uuid = params[:session_id] || params[:agent_id] || frame.assigns[:eits_session_id]
 
     result =
       case Sessions.get_session_by_uuid(session_uuid) do

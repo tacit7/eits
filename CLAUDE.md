@@ -49,7 +49,7 @@ PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. Mig
 
 - `lib/eye_in_the_sky_web/` - Contexts (Sessions, Tasks, Agents, Projects, Notes, Prompts, Commits)
 - `lib/eye_in_the_sky_web_web/` - Web layer (LiveViews, components, router)
-- `lib/eye_in_the_sky_web/search/fts5.ex` - Reusable FTS5 search module with LIKE fallback
+- `lib/eye_in_the_sky_web/search/fts5.ex` - Full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback (module name is legacy from SQLite era)
 
 ## UI Standards
 
@@ -86,6 +86,8 @@ NATS message processing is **currently disabled** to prevent duplicate messages.
 Original code is kept as comments for future re-enablement when proper deduplication is implemented.
 
 ### FTS5 Full-Text Search
+
+> **Note:** The FTS5 section below documents the old SQLite implementation. We currently use PostgreSQL with `tsvector/tsquery` via `lib/eye_in_the_sky_web/search/fts5.ex` (despite the filename, it now wraps PG full-text search with an ILIKE fallback). The virtual tables and triggers below no longer apply.
 
 Three FTS5 virtual tables in eits.db provide full-text search using **external content tables** (stores only the index, not duplicate data). Triggers keep them in sync.
 

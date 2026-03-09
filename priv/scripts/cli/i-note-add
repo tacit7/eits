@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# i-note-add - Add a note attached to a session, agent, or task
+# Usage:
+#   i-note-add --parent_type TYPE --parent_id ID --body STR [--title STR] [--starred 0|1]
+
+set -euo pipefail
+
+BASE_URL="${EITS_BASE_URL:-http://localhost:5001}"
+CURL="curl -sk"
+
+body="{}"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --parent_type) body=$(echo "$body" | jq --arg v "$2" '. + {parent_type: $v}'); shift 2 ;;
+    --parent_id)   body=$(echo "$body" | jq --arg v "$2" '. + {parent_id: $v}'); shift 2 ;;
+    --body)        body=$(echo "$body" | jq --arg v "$2" '. + {body: $v}'); shift 2 ;;
+    --title)       body=$(echo "$body" | jq --arg v "$2" '. + {title: $v}'); shift 2 ;;
+    --starred)     body=$(echo "$body" | jq --argjson v "$2" '. + {starred: $v}'); shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+$CURL -X POST "$BASE_URL/api/v1/notes" \
+  -H 'Content-Type: application/json' \
+  -d "$body"

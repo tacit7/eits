@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# i-note-search - Full-text search across notes
+# Usage: i-note-search QUERY [--limit N]
+
+set -euo pipefail
+
+BASE_URL="${EITS_BASE_URL:-http://localhost:5001}"
+CURL="curl -sk"
+
+query="${1:-}"
+shift || true
+
+limit="20"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --limit) limit="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+q_enc=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$query")
+$CURL "$BASE_URL/api/v1/notes?q=$q_enc&limit=$limit"

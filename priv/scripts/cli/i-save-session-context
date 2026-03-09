@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# i-save-session-context - Save or update session context (markdown)
+# Usage:
+#   i-save-session-context --agent_id UUID --context STR
+#   i-save-session-context --agent_id UUID  (reads context from stdin)
+
+set -euo pipefail
+
+BASE_URL="${EITS_BASE_URL:-http://localhost:5001}"
+CURL="curl -sk"
+
+agent_id="${EITS_SESSION_ID:-}"
+context=""
+read_stdin=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --agent_id)  agent_id="$2"; shift 2 ;;
+    --context)   context="$2"; shift 2 ;;
+    --stdin)     read_stdin=true; shift ;;
+    *) shift ;;
+  esac
+done
+
+if [[ -z "$agent_id" ]]; then
+  echo "Error: agent_id required (or set EITS_SESSION_ID)" >&2
+  exit 1
+fi
+
+if [[ "$read_stdin" == true ]] || [[ -z "$context" && ! -t 0 ]]; then
+  context=$(cat)
+fi
+
+if [[ -z "$context" ]]; then
+  echo "Error: context is required" >&2
+  exit 1
+fi
+
+body=$(jq -n --arg aid "$agent_id" --arg ctx "$context" '{agent_id: $aid, context: $ctx}')
+
+$CURL -X POST "$BASE_URL/api/v1/session-context" \
+  -H 'Content-Type: application/json' \
+  -d "$body"

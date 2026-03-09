@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# i-note - Notes management
+# Usage:
+#   i-note add --parent_type TYPE --parent_id ID --body STR [--title STR] [--starred 0|1]
+#   i-note get NOTE_ID
+#   i-note search QUERY [--limit N]
+
+set -euo pipefail
+
+BASE=${EITS_API_URL:-http://localhost:5001/api/v1}
+
+_curl() { curl -sk "$@"; }
+_ok() { local r="$1"; echo "$r" | jq .; if echo "$r" | jq -e '.error' &>/dev/null; then exit 1; fi; }
+
+cmd="${1:-search}"
+shift || true
+
+case "$cmd" in
+  add)
+    body="{}"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --parent_type) body=$(echo "$body" | jq --arg v "$2" '. + {parent_type: $v}'); shift 2 ;;
+        --parent_id)   body=$(echo "$body" | jq --arg v "$2" '. + {parent_id: $v}'); shift 2 ;;
+        --body)        body=$(echo "$body" | jq --arg v "$2" '. + {body: $v}'); shift 2 ;;
+        --title)       body=$(echo "$body" | jq --arg v "$2" '. + {title: $v}'); shift 2 ;;
+        --starred)     body=$(echo "$body" | jq --argjson v "$2" '. + {starred: $v}'); shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    _ok "$(_curl -X POST "$BASE/notes" -H 'Content-Type: application/json' -d "$body")"
+    ;;
+
+  get)
+    id="${1:?note id required}"
+    _ok "$(_curl "$BASE/notes/$id")"
+    ;;
+
+  search)
+    q="${1:-}"; shift || true
+    limit="20"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in --limit) limit="$2"; shift 2 ;; *) shift ;; esac
+    done
+    q_enc=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$q")
+    _ok "$(_curl "$BASE/notes?q=$q_enc&limit=$limit")"
+    ;;
+
+  *)
+    echo "Usage: i-note <add|get|search> [args...]" >&2
+    exit 1
+    ;;
+esac

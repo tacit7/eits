@@ -175,7 +175,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
         agent_uuid = resolve_agent_uuid(session.agent_id)
 
         json(conn, %{
+          id: session.id,
           agent_id: agent_uuid,
+          agent_int_id: session.agent_id,
           session_id: uuid,
           project_id: session.project_id,
           status: session.status,

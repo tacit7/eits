@@ -30,17 +30,32 @@ PROJECT_NAME=$(basename "$PROJECT_DIR")
 PROJECT_DIR_SQL="${PROJECT_DIR//\'/\'\'}"
 PROJECT_NAME_SQL="${PROJECT_NAME//\'/\'\'}"
 
-# Check if session already exists in database
+# Check if session already exists — try API first, fall back to sqlite3
 AGENT_ID=""
-EXISTING_SESSION=$(sqlite3 "$EITS_DB" "SELECT agent_id FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1;" 2>/dev/null || true)
-SESSION_INT_ID=$(sqlite3 "$EITS_DB" "SELECT id FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1;" 2>/dev/null || true)
+AGENT_INT_ID=""
+SESSION_INT_ID=""
+EITS_BASE="${EITS_API_URL:-http://localhost:5001/api/v1}"
 
-if [ -n "$EXISTING_SESSION" ]; then
-  # Session exists, get agent_id UUID for NATS/mapping; integer is EXISTING_SESSION
-  AGENT_ID=$(sqlite3 "$EITS_DB" "SELECT uuid FROM agents WHERE id = $EXISTING_SESSION LIMIT 1;" 2>/dev/null || true)
-  AGENT_INT_ID="$EXISTING_SESSION"
-  echo "[EITS] Session already registered: $SESSION_ID -> $AGENT_ID (int: $AGENT_INT_ID, session int: $SESSION_INT_ID)" >&2
+SESSION_INFO=$(curl -sf "$EITS_BASE/sessions/$SESSION_ID" 2>/dev/null || true)
 
+if [ -n "$SESSION_INFO" ] && echo "$SESSION_INFO" | jq -e '.initialized == true' >/dev/null 2>&1; then
+  SESSION_INT_ID=$(echo "$SESSION_INFO" | jq -r '.id // empty')
+  AGENT_INT_ID=$(echo "$SESSION_INFO" | jq -r '.agent_int_id // empty')
+  AGENT_ID=$(echo "$SESSION_INFO" | jq -r '.agent_id // empty')
+  echo "[EITS] Session resolved via API: session_int=$SESSION_INT_ID agent_int=$AGENT_INT_ID" >&2
+else
+  # Fall back to sqlite3
+  SESSION_INT_ID=$(sqlite3 "$EITS_DB" "SELECT id FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1;" 2>/dev/null || true)
+  EXISTING_AGENT=$(sqlite3 "$EITS_DB" "SELECT agent_id FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1;" 2>/dev/null || true)
+  if [ -n "$EXISTING_AGENT" ]; then
+    AGENT_INT_ID="$EXISTING_AGENT"
+    AGENT_ID=$(sqlite3 "$EITS_DB" "SELECT uuid FROM agents WHERE id = $EXISTING_AGENT LIMIT 1;" 2>/dev/null || true)
+  fi
+  echo "[EITS] Session resolved via sqlite: session_int=$SESSION_INT_ID agent_int=$AGENT_INT_ID" >&2
+fi
+
+if [ -n "$SESSION_INT_ID" ]; then
+  echo "[EITS] Session already registered: $SESSION_ID -> agent=$AGENT_ID (int: $AGENT_INT_ID, session int: $SESSION_INT_ID)" >&2
   # Update mapping file
   if [ -n "$AGENT_ID" ]; then
     if [ -f "$MAPPING_FILE" ]; then
@@ -51,26 +66,41 @@ if [ -n "$EXISTING_SESSION" ]; then
     echo "$UPDATED" > "$MAPPING_FILE"
   fi
 else
-  # Check mapping file for cached agent_id
-  if [ -f "$MAPPING_FILE" ]; then
-    AGENT_ID=$(jq -r ".\"$SESSION_ID\" // empty" "$MAPPING_FILE" 2>/dev/null || echo "")
-  fi
-
-  if [ -z "$AGENT_ID" ]; then
-    AGENT_INT_ID=""
-    echo "[EITS] New session detected, will prompt MCP initialization" >&2
-  fi
+  echo "[EITS] New session detected, will prompt MCP initialization" >&2
 fi
 
 # Write env vars via CLAUDE_ENV_FILE so MCP server picks them up
-if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
-  echo "EITS_API_URL=http://localhost:5001/api/v1" >> "$CLAUDE_ENV_FILE"
-  echo "EITS_SESSION_ID=${SESSION_INT_ID:-$SESSION_ID}" >> "$CLAUDE_ENV_FILE"
+# On resume: overwrite SESSION_ID and AGENT_ID with the resumed session's values (sed in-place)
+# On startup: write only if not already set
+_eits_set_var() {
+  local key="$1" val="$2" file="$3"
+  if grep -q "^${key}=" "$file" 2>/dev/null; then
+    sed -i '' "s|^${key}=.*|${key}=${val}|" "$file"
+  else
+    echo "${key}=${val}" >> "$file"
+  fi
+}
 
-  if [ -n "${AGENT_INT_ID:-}" ]; then
-    echo "EITS_AGENT_ID=$AGENT_INT_ID" >> "$CLAUDE_ENV_FILE"
-  elif [ -n "$AGENT_ID" ]; then
-    echo "EITS_AGENT_ID=$AGENT_ID" >> "$CLAUDE_ENV_FILE"
+if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
+  grep -q "^EITS_API_URL=" "$CLAUDE_ENV_FILE" 2>/dev/null || echo "EITS_API_URL=http://localhost:5001/api/v1" >> "$CLAUDE_ENV_FILE"
+
+  if [ "$SOURCE" = "resume" ]; then
+    # Resume always wins — overwrite with the actual resumed session's IDs
+    _eits_set_var "EITS_SESSION_ID" "${SESSION_INT_ID:-$SESSION_ID}" "$CLAUDE_ENV_FILE"
+    if [ -n "${AGENT_INT_ID:-}" ]; then
+      _eits_set_var "EITS_AGENT_ID" "$AGENT_INT_ID" "$CLAUDE_ENV_FILE"
+    elif [ -n "$AGENT_ID" ]; then
+      _eits_set_var "EITS_AGENT_ID" "$AGENT_ID" "$CLAUDE_ENV_FILE"
+    fi
+  else
+    grep -q "^EITS_SESSION_ID=" "$CLAUDE_ENV_FILE" 2>/dev/null || echo "EITS_SESSION_ID=${SESSION_INT_ID:-$SESSION_ID}" >> "$CLAUDE_ENV_FILE"
+    if ! grep -q "^EITS_AGENT_ID=" "$CLAUDE_ENV_FILE" 2>/dev/null; then
+      if [ -n "${AGENT_INT_ID:-}" ]; then
+        echo "EITS_AGENT_ID=$AGENT_INT_ID" >> "$CLAUDE_ENV_FILE"
+      elif [ -n "$AGENT_ID" ]; then
+        echo "EITS_AGENT_ID=$AGENT_ID" >> "$CLAUDE_ENV_FILE"
+      fi
+    fi
   fi
 
   # Resolve or create project by path
@@ -95,7 +125,7 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
       " 2>/dev/null || true
     fi
 
-    echo "EITS_PROJECT_ID=$PROJECT_ID" >> "$CLAUDE_ENV_FILE"
+    grep -q "^EITS_PROJECT_ID=" "$CLAUDE_ENV_FILE" 2>/dev/null || echo "EITS_PROJECT_ID=$PROJECT_ID" >> "$CLAUDE_ENV_FILE"
     echo "[EITS] Project ID: $PROJECT_ID" >&2
   fi
 

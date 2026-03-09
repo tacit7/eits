@@ -23,33 +23,17 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Speak do
     voice = validate_voice(params[:voice])
     rate = validate_rate(params[:rate])
 
-    # Use premium voice variant
-    voice_arg = "#{voice} (Premium)"
+    result =
+      %{"message" => message, "voice" => voice, "rate" => rate}
+      |> EyeInTheSkyWeb.Workers.SpeakWorker.new()
+      |> Oban.insert()
+      |> case do
+        {:ok, _job} -> %{success: true, message: "Queued for TTS", voice_used: voice}
+        {:error, reason} -> %{success: false, message: "Failed to queue TTS: #{inspect(reason)}"}
+      end
 
-    case System.cmd("say", ["-v", voice_arg, "-r", to_string(rate), message],
-           stderr_to_stdout: true
-         ) do
-      {_, 0} ->
-        result = %{success: true, message: "Spoken aloud", voice_used: voice}
-        response = Response.tool() |> Response.json(result)
-        {:reply, response, frame}
-
-      {output, _} ->
-        # Fall back to non-premium voice
-        case System.cmd("say", ["-v", voice, "-r", to_string(rate), message],
-               stderr_to_stdout: true
-             ) do
-          {_, 0} ->
-            result = %{success: true, message: "Spoken aloud (standard voice)", voice_used: voice}
-            response = Response.tool() |> Response.json(result)
-            {:reply, response, frame}
-
-          {err, _} ->
-            result = %{success: false, message: "TTS failed: #{output || err}"}
-            response = Response.tool() |> Response.json(result)
-            {:reply, response, frame}
-        end
-    end
+    response = Response.tool() |> Response.json(result)
+    {:reply, response, frame}
   end
 
   defp validate_voice(nil), do: EyeInTheSkyWeb.Settings.get("tts_voice") || "Ava"

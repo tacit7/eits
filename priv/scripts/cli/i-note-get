@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# i-note-get - Retrieve a note by ID
+# Usage: i-note-get NOTE_ID
+
+set -euo pipefail
+
+BASE_URL="${EITS_BASE_URL:-http://localhost:5001}"
+CURL="curl -sk"
+
+note_id="${1:-}"
+if [[ -z "$note_id" ]]; then
+  echo "Usage: i-note-get NOTE_ID" >&2
+  exit 1
+fi
+
+$CURL "$BASE_URL/api/v1/notes/$note_id"

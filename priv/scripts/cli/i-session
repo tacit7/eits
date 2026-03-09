@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# i-session - Create or update a session
+# Usage:
+#   i-session create --session_id UUID [--description STR] [--agent_id UUID] [--project_name STR] [--model STR]
+#   i-session update UUID --status STATUS
+#   i-session info UUID
+
+set -euo pipefail
+
+BASE_URL="${EITS_BASE_URL:-http://localhost:5001}"
+CURL="curl -sk"
+
+cmd="${1:-}"
+shift || true
+
+case "$cmd" in
+  create)
+    body="{}"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --session_id)   body=$(echo "$body" | jq --arg v "$2" '. + {session_id: $v}'); shift 2 ;;
+        --description)  body=$(echo "$body" | jq --arg v "$2" '. + {description: $v}'); shift 2 ;;
+        --agent_id)     body=$(echo "$body" | jq --arg v "$2" '. + {agent_id: $v}'); shift 2 ;;
+        --project_name) body=$(echo "$body" | jq --arg v "$2" '. + {project_name: $v}'); shift 2 ;;
+        --project_id)   body=$(echo "$body" | jq --arg v "$2" '. + {project_id: $v}'); shift 2 ;;
+        --model)        body=$(echo "$body" | jq --arg v "$2" '. + {model: $v}'); shift 2 ;;
+        --name)         body=$(echo "$body" | jq --arg v "$2" '. + {name: $v}'); shift 2 ;;
+        --worktree_path) body=$(echo "$body" | jq --arg v "$2" '. + {worktree_path: $v}'); shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    $CURL -X POST "$BASE_URL/api/v1/sessions" \
+      -H 'Content-Type: application/json' \
+      -d "$body"
+    ;;
+
+  update)
+    uuid="${1:-}"
+    shift
+    body="{}"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --status)  body=$(echo "$body" | jq --arg v "$2" '. + {status: $v}'); shift 2 ;;
+        --intent)  body=$(echo "$body" | jq --arg v "$2" '. + {intent: $v}'); shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    $CURL -X PATCH "$BASE_URL/api/v1/sessions/$uuid" \
+      -H 'Content-Type: application/json' \
+      -d "$body"
+    ;;
+
+  info)
+    uuid="${1:-}"
+    $CURL "$BASE_URL/api/v1/sessions/$uuid"
+    ;;
+
+  search)
+    q="${1:-}"
+    limit="${2:-20}"
+    $CURL "$BASE_URL/api/v1/sessions?q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$q")&limit=$limit"
+    ;;
+
+  end)
+    uuid="${1:-}"
+    status="${2:-completed}"
+    $CURL -X PATCH "$BASE_URL/api/v1/sessions/$uuid" \
+      -H 'Content-Type: application/json' \
+      -d "{\"status\": \"$status\"}"
+    ;;
+
+  *)
+    echo "Usage: i-session <create|update|info|search|end> [args...]" >&2
+    exit 1
+    ;;
+esac

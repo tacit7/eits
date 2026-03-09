@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+# i-todo - Task management
+# Usage:
+#   i-todo create --title STR [--description STR] [--priority N] [--project_id N] [--session_id UUID]
+#   i-todo list [--project_id N] [--agent_id UUID] [--session_id UUID] [--limit N]
+#   i-todo search QUERY [--limit N]
+#   i-todo show TASK_ID
+#   i-todo done TASK_ID
+#   i-todo start TASK_ID
+#   i-todo status TASK_ID [--state_id N] [--priority N]
+#   i-todo delete TASK_ID
+#   i-todo annotate TASK_ID --body STR [--title STR]
+#   i-todo add-session TASK_ID --session_id UUID
+
+set -euo pipefail
+
+BASE_URL="${EITS_BASE_URL:-http://localhost:5001}"
+CURL="curl -sk"
+
+cmd="${1:-}"
+shift || true
+
+case "$cmd" in
+  create)
+    body="{}"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --title)       body=$(echo "$body" | jq --arg v "$2" '. + {title: $v}'); shift 2 ;;
+        --description) body=$(echo "$body" | jq --arg v "$2" '. + {description: $v}'); shift 2 ;;
+        --priority)    body=$(echo "$body" | jq --argjson v "$2" '. + {priority: $v}'); shift 2 ;;
+        --state_id)    body=$(echo "$body" | jq --argjson v "$2" '. + {state_id: $v}'); shift 2 ;;
+        --project_id)  body=$(echo "$body" | jq --argjson v "$2" '. + {project_id: $v}'); shift 2 ;;
+        --agent_id)    body=$(echo "$body" | jq --arg v "$2" '. + {agent_id: $v}'); shift 2 ;;
+        --session_id)  body=$(echo "$body" | jq --arg v "$2" '. + {session_id: $v}'); shift 2 ;;
+        --due_at)      body=$(echo "$body" | jq --arg v "$2" '. + {due_at: $v}'); shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    $CURL -X POST "$BASE_URL/api/v1/tasks" \
+      -H 'Content-Type: application/json' \
+      -d "$body"
+    ;;
+
+  list)
+    params=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --project_id) params="${params}&project_id=$2"; shift 2 ;;
+        --agent_id)   params="${params}&agent_id=$2"; shift 2 ;;
+        --session_id) params="${params}&session_id=$2"; shift 2 ;;
+        --limit)      params="${params}&limit=$2"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    $CURL "$BASE_URL/api/v1/tasks?${params#&}"
+    ;;
+
+  search)
+    q="${1:-}"
+    limit="${2:-50}"
+    q_enc=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$q")
+    $CURL "$BASE_URL/api/v1/tasks?q=$q_enc&limit=$limit"
+    ;;
+
+  show)
+    id="${1:-}"
+    $CURL "$BASE_URL/api/v1/tasks/$id"
+    ;;
+
+  done)
+    id="${1:-}"
+    $CURL -X PATCH "$BASE_URL/api/v1/tasks/$id" \
+      -H 'Content-Type: application/json' \
+      -d '{"state": "done"}'
+    ;;
+
+  start)
+    id="${1:-}"
+    $CURL -X PATCH "$BASE_URL/api/v1/tasks/$id" \
+      -H 'Content-Type: application/json' \
+      -d '{"state": "start"}'
+    ;;
+
+  status)
+    id="${1:-}"
+    shift
+    body="{}"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --state_id) body=$(echo "$body" | jq --argjson v "$2" '. + {state_id: $v}'); shift 2 ;;
+        --priority) body=$(echo "$body" | jq --argjson v "$2" '. + {priority: $v}'); shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    $CURL -X PATCH "$BASE_URL/api/v1/tasks/$id" \
+      -H 'Content-Type: application/json' \
+      -d "$body"
+    ;;
+
+  delete)
+    id="${1:-}"
+    $CURL -X DELETE "$BASE_URL/api/v1/tasks/$id"
+    ;;
+
+  annotate)
+    id="${1:-}"
+    shift
+    body="{}"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --body)  body=$(echo "$body" | jq --arg v "$2" '. + {body: $v}'); shift 2 ;;
+        --title) body=$(echo "$body" | jq --arg v "$2" '. + {title: $v}'); shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    $CURL -X POST "$BASE_URL/api/v1/tasks/$id/annotate" \
+      -H 'Content-Type: application/json' \
+      -d "$body"
+    ;;
+
+  add-session)
+    id="${1:-}"
+    shift
+    session_id=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --session_id) session_id="$2"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    $CURL -X POST "$BASE_URL/api/v1/tasks/$id/sessions" \
+      -H 'Content-Type: application/json' \
+      -d "{\"session_id\": \"$session_id\"}"
+    ;;
+
+  *)
+    echo "Usage: i-todo <create|list|search|show|done|start|status|delete|annotate|add-session> [args...]" >&2
+    exit 1
+    ;;
+esac

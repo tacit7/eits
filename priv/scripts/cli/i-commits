@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# i-commits - Track git commits for a session
+# Usage:
+#   i-commits --agent_id UUID --commit_hashes HASH1,HASH2 [--commit_messages "msg1" "msg2"]
+#   i-commits --agent_id UUID HASH1 HASH2 ...  (positional hashes)
+
+set -euo pipefail
+
+BASE_URL="${EITS_BASE_URL:-http://localhost:5001}"
+CURL="curl -sk"
+
+agent_id="${EITS_SESSION_ID:-}"
+hashes=()
+messages=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --agent_id)        agent_id="$2"; shift 2 ;;
+    --commit_hashes)   IFS=',' read -ra hashes <<< "$2"; shift 2 ;;
+    --commit_messages) shift; while [[ $# -gt 0 && "$1" != --* ]]; do messages+=("$1"); shift; done ;;
+    *) hashes+=("$1"); shift ;;
+  esac
+done
+
+if [[ -z "$agent_id" ]]; then
+  echo "Error: agent_id required (or set EITS_SESSION_ID)" >&2
+  exit 1
+fi
+
+hashes_json=$(printf '%s\n' "${hashes[@]}" | jq -R . | jq -s .)
+messages_json=$(printf '%s\n' "${messages[@]}" | jq -R . | jq -s .)
+
+body=$(jq -n \
+  --arg aid "$agent_id" \
+  --argjson h "$hashes_json" \
+  --argjson m "$messages_json" \
+  '{agent_id: $aid, commit_hashes: $h, commit_messages: $m}')
+
+$CURL -X POST "$BASE_URL/api/v1/commits" \
+  -H 'Content-Type: application/json' \
+  -d "$body"

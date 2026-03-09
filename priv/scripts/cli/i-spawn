@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# i-spawn - Spawn a new Claude Code agent
+# Usage:
+#   i-spawn INSTRUCTIONS [--model haiku|sonnet|opus] [--project_path PATH]
+#            [--parent_agent_id UUID] [--parent_session_id UUID]
+
+set -euo pipefail
+
+BASE=${EITS_API_URL:-http://localhost:5001/api/v1}
+SESSION_ID=${EITS_SESSION_ID:-}
+
+_curl() { curl -sk "$@"; }
+_ok() { local r="$1"; echo "$r" | jq .; if echo "$r" | jq -e '.error' &>/dev/null; then exit 1; fi; }
+
+instructions="${1:?instructions required}"; shift
+
+body=$(jq -n --arg i "$instructions" '{instructions: $i, model: "haiku"}')
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model)             body=$(echo "$body" | jq --arg v "$2" '. + {model: $v}'); shift 2 ;;
+    --project_path)      body=$(echo "$body" | jq --arg v "$2" '. + {project_path: $v}'); shift 2 ;;
+    --parent_agent_id)   body=$(echo "$body" | jq --arg v "$2" '. + {parent_agent_id: $v}'); shift 2 ;;
+    --parent_session_id) body=$(echo "$body" | jq --arg v "$2" '. + {parent_session_id: $v}'); shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+[[ -n "$SESSION_ID" ]] && body=$(echo "$body" | jq --arg v "$SESSION_ID" 'if .parent_session_id then . else . + {parent_session_id: $v} end')
+
+_ok "$(_curl -X POST "$BASE/agents/spawn" -H 'Content-Type: application/json' -d "$body")"

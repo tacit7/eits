@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# i-load-session-context - Load session context by session UUID
+# Usage: i-load-session-context SESSION_UUID
+
+set -euo pipefail
+
+BASE_URL="${EITS_BASE_URL:-http://localhost:5001}"
+CURL="curl -sk"
+
+uuid="${1:-${EITS_SESSION_ID:-}}"
+
+if [[ -z "$uuid" ]]; then
+  echo "Usage: i-load-session-context SESSION_UUID" >&2
+  exit 1
+fi
+
+$CURL "$BASE_URL/api/v1/session-context/$uuid"

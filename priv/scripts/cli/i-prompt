@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# i-prompt - Prompt management
+# Usage:
+#   i-prompt get SLUG_OR_ID [--project_id N] [--no-text]
+#   i-prompt list
+
+set -euo pipefail
+
+BASE=${EITS_API_URL:-http://localhost:5001/api/v1}
+PROJECT_ID=${EITS_PROJECT_ID:-}
+
+_curl() { curl -sk "$@"; }
+_ok() { local r="$1"; echo "$r" | jq .; if echo "$r" | jq -e '.error' &>/dev/null; then exit 1; fi; }
+
+cmd="${1:-get}"
+shift || true
+
+case "$cmd" in
+  get)
+    id="${1:?slug or id required}"; shift
+    project_id="$PROJECT_ID"
+    include_text="true"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --project_id) project_id="$2"; shift 2 ;;
+        --no-text)    include_text="false"; shift ;;
+        *) shift ;;
+      esac
+    done
+    params="include_text=$include_text"
+    [[ -n "$project_id" ]] && params="${params}&project_id=$project_id"
+    id_enc=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$id")
+    _ok "$(_curl "$BASE/prompts/$id_enc?$params")"
+    ;;
+
+  list)
+    sqlite3 "${EITS_DB:-$HOME/.config/eye-in-the-sky/eits.db}" \
+      "SELECT json_object('id',id,'name',name,'slug',slug,'project_id',project_id,'active',active) FROM subagent_prompts WHERE active=1 ORDER BY slug;" \
+      | jq -s '{success:true, prompts:.}'
+    ;;
+
+  *)
+    echo "Usage: i-prompt <get|list> [args...]" >&2
+    exit 1
+    ;;
+esac

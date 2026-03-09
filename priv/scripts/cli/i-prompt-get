@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# i-prompt-get - Retrieve a prompt by ID or slug
+# Usage:
+#   i-prompt-get --id ID_OR_SLUG [--project_id N] [--no-text]
+#   i-prompt-get SLUG
+
+set -euo pipefail
+
+BASE_URL="${EITS_BASE_URL:-http://localhost:5001}"
+CURL="curl -sk"
+
+id=""
+project_id=""
+include_text="true"
+
+# Support positional first arg as slug
+if [[ $# -gt 0 && "$1" != --* ]]; then
+  id="$1"
+  shift
+fi
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --id)         id="$2"; shift 2 ;;
+    --slug)       id="$2"; shift 2 ;;
+    --project_id) project_id="$2"; shift 2 ;;
+    --no-text)    include_text="false"; shift ;;
+    *) shift ;;
+  esac
+done
+
+if [[ -z "$id" ]]; then
+  echo "Usage: i-prompt-get --id ID_OR_SLUG [--project_id N] [--no-text]" >&2
+  exit 1
+fi
+
+params="include_text=$include_text"
+if [[ -n "$project_id" ]]; then
+  params="${params}&project_id=$project_id"
+fi
+
+id_enc=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$id")
+$CURL "$BASE_URL/api/v1/prompts/$id_enc?$params"

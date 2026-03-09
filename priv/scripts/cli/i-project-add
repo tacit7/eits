@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# i-project-add - Create a new project in Eye in the Sky
+# Usage:
+#   i-project-add --name STR [--slug STR] [--path STR] [--remote_url STR] [--branch STR]
+
+set -euo pipefail
+
+BASE_URL="${EITS_BASE_URL:-http://localhost:5001}"
+CURL="curl -sk"
+
+body="{}"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --name)       body=$(echo "$body" | jq --arg v "$2" '. + {name: $v}'); shift 2 ;;
+    --slug)       body=$(echo "$body" | jq --arg v "$2" '. + {slug: $v}'); shift 2 ;;
+    --path)       body=$(echo "$body" | jq --arg v "$2" '. + {path: $v}'); shift 2 ;;
+    --remote_url) body=$(echo "$body" | jq --arg v "$2" '. + {remote_url: $v}'); shift 2 ;;
+    --git_remote) body=$(echo "$body" | jq --arg v "$2" '. + {git_remote: $v}'); shift 2 ;;
+    --repo_url)   body=$(echo "$body" | jq --arg v "$2" '. + {repo_url: $v}'); shift 2 ;;
+    --branch)     body=$(echo "$body" | jq --arg v "$2" '. + {branch: $v}'); shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+$CURL -X POST "$BASE_URL/api/v1/projects" \
+  -H 'Content-Type: application/json' \
+  -d "$body"

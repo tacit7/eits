@@ -13,7 +13,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @sync_interval 3_000
 
   @impl true
-  def mount(%{"session_id" => session_id_param}, _session, socket) do
+  def mount(%{"session_id" => session_id_param} = params, _session, socket) do
+    alias EyeInTheSkyWeb.Projects
+
     # Accept both integer ID and UUID in URL
     session =
       case Integer.parse(session_id_param) do
@@ -22,6 +24,23 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       end
 
     agent = Agents.get_agent!(session.agent_id)
+
+    # Preserve sidebar context when navigating from project sessions page
+    {sidebar_tab, sidebar_project} =
+      case {params["from"], params["project_id"]} do
+        {"project", project_id_str} when is_binary(project_id_str) ->
+          case Integer.parse(project_id_str) do
+            {pid, ""} ->
+              project = Projects.get_project!(pid)
+              {:sessions, project}
+
+            _ ->
+              {:chat, nil}
+          end
+
+        _ ->
+          {:chat, nil}
+      end
 
     if connected?(socket) do
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
@@ -33,8 +52,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     socket =
       socket
       |> assign(:page_title, session.name || "Session")
-      |> assign(:sidebar_tab, :chat)
-      |> assign(:sidebar_project, nil)
+      |> assign(:sidebar_tab, sidebar_tab)
+      |> assign(:sidebar_project, sidebar_project)
       |> assign(:session_id, session.id)
       |> assign(:session_uuid, session.uuid)
       |> assign(:agent_id, session.agent_id)

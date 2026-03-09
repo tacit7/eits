@@ -1,14 +1,15 @@
 defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
-  @moduledoc "Task management. Commands: create, annotate, start, done, status, tag, list, list-agent, list-session, search, delete, add-session, remove-session, add-session-to-tasks, reindex, vacuum, project-sync"
+  @moduledoc "Task management. Commands: create, annotate, start, done, status, tag, list, list-agent, list-session, search, delete, add-session, remove-session, add-session-to-tasks"
 
   use Anubis.Server.Component, type: :tool
 
   alias Anubis.Server.Response
-  alias EyeInTheSkyWeb.Sessions
+  alias EyeInTheSkyWeb.MCP.Tools.Helpers
 
   schema do
     field :command, :string, required: true, description: "Command to execute"
     field :task_id, :string, description: "Task ID"
+    field :task_ids, {:list, :string}, description: "List of task IDs (for add-session-to-tasks)"
     field :title, :string, description: "Task title (for create)"
     field :description, :string, description: "Task description"
     field :priority, :integer, description: "Task priority"
@@ -101,7 +102,12 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
   def execute(%{command: "list-session"} = params, frame) do
     alias EyeInTheSkyWeb.Tasks
 
-    session_int_id = resolve_session_int_id(params[:session_id])
+    session_int_id =
+      case Helpers.resolve_session_int_id(params[:session_id]) do
+        {:ok, id} -> id
+        {:error, _} -> nil
+      end
+
     tasks = if session_int_id, do: Tasks.list_tasks_for_session(session_int_id), else: []
 
     result = %{
@@ -237,10 +243,89 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
     {:reply, response, frame}
   end
 
-  def execute(%{command: cmd}, frame) do
-    response =
-      Response.tool() |> Response.text("Command '#{cmd}' acknowledged (no-op in Phoenix MCP)")
+  def execute(%{command: "remove-session", task_id: task_id} = params, frame) do
+    alias EyeInTheSkyWeb.Tasks
 
+    result =
+      case {task_id, params[:session_id]} do
+        {nil, _} ->
+          %{success: false, message: "task_id required"}
+
+        {_, nil} ->
+          %{success: false, message: "session_id required"}
+
+        {tid, sid} ->
+          task_int_id = parse_int_id(tid)
+          session_int_id =
+            case Helpers.resolve_session_int_id(sid) do
+              {:ok, id} -> id
+              {:error, _} -> nil
+            end
+
+          if task_int_id && session_int_id do
+            count = Tasks.unlink_session_from_task(task_int_id, session_int_id)
+            %{success: true, message: "Unlinked session from task (#{count} row(s) removed)"}
+          else
+            %{success: false, message: "Could not resolve task_id or session_id"}
+          end
+      end
+
+    response = Response.tool() |> Response.json(result)
+    {:reply, response, frame}
+  end
+
+  def execute(%{command: "add-session-to-tasks"} = params, frame) do
+    alias EyeInTheSkyWeb.Tasks
+
+    result =
+      case {params[:session_id], params[:task_ids]} do
+        {nil, _} ->
+          %{success: false, message: "session_id required"}
+
+        {_, nil} ->
+          %{success: false, message: "task_ids required"}
+
+        {_, []} ->
+          %{success: false, message: "task_ids must not be empty"}
+
+        {sid, task_ids} ->
+          case Helpers.resolve_session_int_id(sid) do
+            {:ok, session_int_id} ->
+              linked =
+                Enum.count(task_ids, fn tid ->
+                  case parse_int_id(tid) do
+                    nil -> false
+                    task_int_id ->
+                      Tasks.link_session_to_task(task_int_id, session_int_id)
+                      true
+                  end
+                end)
+
+              %{success: true, message: "Session linked to #{linked}/#{length(task_ids)} task(s)"}
+
+            {:error, reason} ->
+              %{success: false, message: reason}
+          end
+      end
+
+    response = Response.tool() |> Response.json(result)
+    {:reply, response, frame}
+  end
+
+  def execute(%{command: cmd}, frame)
+      when cmd in ["reindex", "vacuum", "project-sync"] do
+    result = %{
+      success: false,
+      message: "Command '#{cmd}' is not supported. These are DB maintenance operations not available at the tool level."
+    }
+
+    response = Response.tool() |> Response.json(result)
+    {:reply, response, frame}
+  end
+
+  def execute(%{command: cmd}, frame) do
+    result = %{success: false, message: "Unknown command: #{cmd}"}
+    response = Response.tool() |> Response.json(result)
     {:reply, response, frame}
   end
 
@@ -273,56 +358,34 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
   defp maybe_link_session(_task_id, nil), do: :ok
 
   defp maybe_link_session(task_id, session_id) when is_binary(session_id) do
-    # Try UUID lookup first; fall back to treating it as an integer PK string
-    int_id =
-      case Sessions.get_session_by_uuid(session_id) do
-        {:ok, s} ->
-          s.id
+    alias EyeInTheSkyWeb.Tasks
 
-        _ ->
-          case Integer.parse(session_id) do
-            {n, ""} -> n
-            _ -> nil
-          end
-      end
+    case Helpers.resolve_session_int_id(session_id) do
+      {:ok, int_id} ->
+        task_int_id = parse_int_id(task_id)
+        if task_int_id, do: Tasks.link_session_to_task(task_int_id, int_id)
 
-    task_int_id =
-      case task_id do
-        id when is_integer(id) -> id
-        id when is_binary(id) -> String.to_integer(id)
-      end
-
-    if int_id do
-      EyeInTheSkyWeb.Repo.insert_all("task_sessions", [%{task_id: task_int_id, session_id: int_id}],
-        on_conflict: :nothing
-      )
+      {:error, _} ->
+        :ok
     end
-
-    :ok
   end
 
-  defp resolve_session_int_id(nil), do: nil
+  defp parse_int_id(id) when is_integer(id), do: id
 
-  defp resolve_session_int_id(session_id) when is_integer(session_id), do: session_id
-
-  defp resolve_session_int_id(session_id) when is_binary(session_id) do
-    case Integer.parse(session_id) do
-      {n, ""} ->
-        n
-
-      _ ->
-        case Sessions.get_session_by_uuid(session_id) do
-          {:ok, s} -> s.id
-          _ -> nil
-        end
+  defp parse_int_id(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {n, ""} -> n
+      _ -> nil
     end
   end
 
   defp resolve_agent_int_id(nil), do: nil
 
   defp resolve_agent_int_id(uuid) do
+    alias EyeInTheSkyWeb.Sessions
+
     case Sessions.get_session_by_uuid(uuid) do
-      {:ok, agent} -> agent.id
+      {:ok, session} -> session.agent_id
       _ -> nil
     end
   end

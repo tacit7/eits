@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
   alias EyeInTheSkyWeb.Sessions
 
   schema do
-    field :agent_id, :string, description: "Agent/session identifier. Defaults to current session."
+    field :agent_id, :string, description: "Agent or session identifier. Accepts an integer agent ID (resolves to most recent session) or a session UUID string. Defaults to current session."
     field :commit_hashes, {:list, :string}, required: true, description: "List of commit hashes"
     field :commit_messages, {:list, :string}, description: "List of commit messages"
   end
@@ -38,6 +38,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
           end
       end
 
+    if is_nil(session_int_id) do
+      result = %{success: false, message: "Could not resolve session for agent_id: #{agent_id}"}
+      response = Response.tool() |> Response.json(result)
+      {:reply, response, frame}
+    else
     results =
       hashes
       |> Enum.with_index()
@@ -63,5 +68,6 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
 
     response = Response.tool() |> Response.json(result)
     {:reply, response, frame}
+    end
   end
 end

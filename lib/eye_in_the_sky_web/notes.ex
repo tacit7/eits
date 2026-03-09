@@ -108,7 +108,14 @@ defmodule EyeInTheSkyWeb.Notes do
   end
 
   @doc """
-  Gets a single note.
+  Gets a single note. Returns nil if not found.
+  """
+  def get_note(id) do
+    Repo.get(Note, id)
+  end
+
+  @doc """
+  Gets a single note. Raises if not found.
   """
   def get_note!(id) do
     Repo.get!(Note, id)
@@ -146,7 +153,7 @@ defmodule EyeInTheSkyWeb.Notes do
   Search notes using FTS5.
   Requires notes_fts FTS5 table in database.
   """
-  def search_notes(query, agent_ids \\ []) when is_binary(query) do
+  def search_notes(query, agent_ids \\ [], opts \\ []) when is_binary(query) do
     pattern = "%#{query}%"
 
     fallback_query =
@@ -175,6 +182,8 @@ defmodule EyeInTheSkyWeb.Notes do
         {"", []}
       end
 
+    limit = Keyword.get(opts, :limit)
+
     FTS5.search(
       table: "notes",
       schema: Note,
@@ -182,7 +191,8 @@ defmodule EyeInTheSkyWeb.Notes do
       search_columns: ["title", "body"],
       sql_filter: sql_filter,
       sql_params: sql_params,
-      fallback_query: fallback_query
+      fallback_query: fallback_query,
+      limit: limit
     )
   end
 end

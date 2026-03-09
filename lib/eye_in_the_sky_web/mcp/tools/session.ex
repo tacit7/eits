@@ -184,9 +184,14 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
   end
 
   defp end_session(params) do
+    opts =
+      %{}
+      |> then(fn m -> if params[:summary], do: Map.put(m, :summary, params[:summary]), else: m end)
+      |> then(fn m -> if params[:final_status], do: Map.put(m, :final_status, params[:final_status]), else: m end)
+
     case Sessions.get_session_by_uuid(params[:agent_id] || params[:session_id]) do
       {:ok, session} ->
-        case Sessions.end_session(session) do
+        case Sessions.end_session(session, opts) do
           {:ok, _} ->
             %{success: true, message: "Session ended"}
 
@@ -259,30 +264,60 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
   defp save_context(params) do
     alias EyeInTheSkyWeb.Contexts
 
-    case Contexts.upsert_session_context(%{
-           session_id: params[:session_id],
-           context: params[:context]
-         }) do
-      {:ok, _} -> %{success: true, message: "Context saved"}
-      {:error, cs} -> %{success: false, message: "Save failed: #{inspect(cs.errors)}"}
+    case Sessions.get_session_by_uuid(params[:session_id]) do
+      {:ok, session} ->
+        case Contexts.upsert_session_context(%{
+               session_id: session.id,
+               agent_id: session.agent_id,
+               context: params[:context]
+             }) do
+          {:ok, _} -> %{success: true, message: "Context saved"}
+          {:error, cs} -> %{success: false, message: "Save failed: #{inspect(cs.errors)}"}
+        end
+
+      {:error, :not_found} ->
+        %{success: false, message: "Session not found: #{params[:session_id]}"}
     end
   end
 
   defp load_context(params) do
     alias EyeInTheSkyWeb.Contexts
 
-    case Contexts.get_session_context(params[:session_id]) do
+    case resolve_session_int_id(params[:session_id]) do
       nil ->
-        %{success: false, message: "No context found"}
+        %{success: false, message: "Session not found: #{params[:session_id]}"}
 
-      ctx ->
-        %{
-          success: true,
-          message: "Context loaded",
-          context: ctx.context,
-          created_at: ctx.inserted_at,
-          updated_at: ctx.updated_at
-        }
+      int_id ->
+        case Contexts.get_session_context(int_id) do
+          nil ->
+            %{success: false, message: "No context found"}
+
+          ctx ->
+            %{
+              success: true,
+              message: "Context loaded",
+              context: ctx.context,
+              created_at: ctx.created_at,
+              updated_at: ctx.updated_at
+            }
+        end
+    end
+  end
+
+  defp resolve_session_int_id(nil), do: nil
+
+  defp resolve_session_int_id(session_id) when is_integer(session_id), do: session_id
+
+  defp resolve_session_int_id(session_id) when is_binary(session_id) do
+    case Integer.parse(session_id) do
+      {n, ""} ->
+        n
+
+      _ ->
+        case Sessions.get_session_by_uuid(session_id) do
+          {:ok, s} -> s.id
+          _ -> nil
+        end
     end
   end
 

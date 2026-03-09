@@ -223,6 +223,32 @@ defmodule EyeInTheSkyWeb.Tasks do
     end
   end
 
+  @doc """
+  Links a session to a task via the task_sessions join table.
+  Uses on_conflict: :nothing to silently skip duplicates.
+  """
+  def link_session_to_task(task_id, session_id)
+      when is_integer(task_id) and is_integer(session_id) do
+    Repo.insert_all("task_sessions", [%{task_id: task_id, session_id: session_id}],
+      on_conflict: :nothing
+    )
+  end
+
+  @doc """
+  Unlinks a session from a task by deleting the task_sessions row.
+  Returns the number of rows deleted.
+  """
+  def unlink_session_from_task(task_id, session_id)
+      when is_integer(task_id) and is_integer(session_id) do
+    {count, _} =
+      from(ts in "task_sessions",
+        where: ts.task_id == ^task_id and ts.session_id == ^session_id
+      )
+      |> Repo.delete_all()
+
+    count
+  end
+
   # PubSub
 
   defp broadcast_change(_) do

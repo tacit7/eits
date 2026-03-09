@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Dm do
   use Anubis.Server.Component, type: :tool
 
   alias Anubis.Server.Response
-  alias EyeInTheSkyWeb.Sessions
+  alias EyeInTheSkyWeb.MCP.Tools.Helpers
 
   schema do
     field :sender_id, :string, description: "Your session ID. Defaults to current session."
@@ -22,13 +22,13 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Dm do
     sender_id = params[:sender_id] || frame.assigns[:eits_session_id]
     target_uuid = params[:target_session_id]
 
-    # Resolve UUID to internal integer session_id
+    # Resolve target UUID/ID to internal integer session_id
     result =
-      case Sessions.get_session_by_uuid(target_uuid) do
-        {:ok, agent} ->
+      case Helpers.resolve_session_int_id(target_uuid) do
+        {:ok, int_id} ->
           attrs = %{
             uuid: Ecto.UUID.generate(),
-            session_id: agent.id,
+            session_id: int_id,
             body: params[:message],
             sender_role: "agent",
             recipient_role: "agent",
@@ -46,18 +46,18 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Dm do
               # Broadcast on the topics DmLive subscribes to
               Phoenix.PubSub.broadcast(
                 EyeInTheSkyWeb.PubSub,
-                "session:#{agent.id}",
+                "session:#{int_id}",
                 {:new_dm, msg}
               )
 
-              %{success: true, message: "DM delivered to session #{agent.id}"}
+              %{success: true, message: "DM delivered to session #{int_id}"}
 
             {:error, cs} ->
               %{success: false, message: "Failed: #{inspect(cs.errors)}"}
           end
 
-        {:error, :not_found} ->
-          %{success: false, message: "Target session not found: #{target_uuid}"}
+        {:error, reason} ->
+          %{success: false, message: reason}
       end
 
     response = Response.tool() |> Response.json(result)

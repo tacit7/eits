@@ -14,21 +14,20 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NoteGet do
     alias EyeInTheSkyWeb.Notes
 
     result =
-      try do
-        note = Notes.get_note!(note_id)
-
-        %{
-          note_id: to_string(note.id),
-          parent_id: note.parent_id,
-          parent_type: note.parent_type,
-          title: note.title,
-          body: note.body,
-          starred: note.starred || 0,
-          created_at: to_string(note.created_at)
-        }
-      rescue
-        Ecto.NoResultsError ->
+      case Notes.get_note(note_id) do
+        nil ->
           %{success: false, message: "Note not found: #{note_id}"}
+
+        note ->
+          %{
+            note_id: to_string(note.id),
+            parent_id: note.parent_id,
+            parent_type: note.parent_type,
+            title: note.title,
+            body: note.body,
+            starred: note.starred || 0,
+            created_at: to_string(note.created_at)
+          }
       end
 
     response = Response.tool() |> Response.json(result)

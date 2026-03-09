@@ -345,7 +345,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       }
 
       opts = [
-        source_uuid: metadata[:uuid],
         metadata: db_metadata
       ]
 

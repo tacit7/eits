@@ -643,25 +643,35 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     {sender_role, recipient_role, direction} = session_message_roles(msg.role)
     inserted_at = parse_session_timestamp(msg.timestamp, now)
 
-    case Messages.create_message(%{
-           uuid: Ecto.UUID.generate(),
-           source_uuid: msg.uuid,
-           session_id: session_id,
-           sender_role: sender_role,
-           recipient_role: recipient_role,
-           direction: direction,
-           body: msg.content,
-           status: "delivered",
-           provider: "claude",
-           inserted_at: inserted_at,
-           updated_at: now
-         }) do
-      {:ok, _message} ->
+    # Check for an existing unlinked message (created before sync) with matching content.
+    # This prevents duplicates when save_result or create_user_message already persisted the
+    # message without a source_uuid, and the session file sync tries to create it again.
+    case Messages.find_unlinked_message(session_id, sender_role, msg.content) do
+      {:ok, existing} ->
+        Messages.update_message(existing, %{source_uuid: msg.uuid, updated_at: now})
         true
 
-      {:error, reason} ->
-        Logger.debug("Skipping imported message source_uuid=#{msg.uuid}: #{inspect(reason)}")
-        false
+      :not_found ->
+        case Messages.create_message(%{
+               uuid: Ecto.UUID.generate(),
+               source_uuid: msg.uuid,
+               session_id: session_id,
+               sender_role: sender_role,
+               recipient_role: recipient_role,
+               direction: direction,
+               body: msg.content,
+               status: "delivered",
+               provider: "claude",
+               inserted_at: inserted_at,
+               updated_at: now
+             }) do
+          {:ok, _message} ->
+            true
+
+          {:error, reason} ->
+            Logger.debug("Skipping imported message source_uuid=#{msg.uuid}: #{inspect(reason)}")
+            false
+        end
     end
   end
 

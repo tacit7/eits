@@ -216,11 +216,29 @@ defmodule EyeInTheSkyWeb.Messages do
     attrs = if channel_id, do: Map.put(attrs, :channel_id, channel_id), else: attrs
 
     result =
-      if source_uuid && message_exists_by_source_uuid?(source_uuid) do
-        # Already recorded, return existing message
-        {:ok, Repo.get_by!(Message, source_uuid: source_uuid)}
-      else
-        create_message(attrs)
+      cond do
+        source_uuid && message_exists_by_source_uuid?(source_uuid) ->
+          # Already recorded by source_uuid, return existing
+          {:ok, Repo.get_by!(Message, source_uuid: source_uuid)}
+
+        is_nil(source_uuid) ->
+          # No source_uuid — check for a recent message with same content to avoid
+          # duplicating a message already imported from the session file via periodic sync.
+          case find_recent_agent_message(session_id, body) do
+            nil ->
+              create_message(attrs)
+
+            existing ->
+              # Enrich existing message with metadata if available
+              if metadata && metadata != %{} do
+                update_message(existing, %{metadata: metadata})
+              else
+                {:ok, existing}
+              end
+          end
+
+        true ->
+          create_message(attrs)
       end
 
     case result do
@@ -386,6 +404,53 @@ defmodule EyeInTheSkyWeb.Messages do
   """
   def count_messages_for_session(session_id) do
     QueryHelpers.count_for_session(Message, session_id)
+  end
+
+  @doc """
+  Finds an existing message with nil source_uuid matching session, role, and body.
+  Used to link messages created before sync (e.g. via send_message or save_result)
+  with their corresponding session file entry, preventing duplicates.
+  Returns {:ok, message} or :not_found.
+  """
+  def find_unlinked_message(session_id, sender_role, body) do
+    one_minute_ago =
+      DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
+
+    Message
+    |> where(
+      [m],
+      m.session_id == ^session_id and
+        m.sender_role == ^sender_role and
+        is_nil(m.source_uuid) and
+        m.body == ^body and
+        m.inserted_at >= ^one_minute_ago
+    )
+    |> order_by([m], desc: m.inserted_at)
+    |> limit(1)
+    |> Repo.one()
+    |> case do
+      nil -> :not_found
+      message -> {:ok, message}
+    end
+  end
+
+  # Finds the most recent agent message in the session matching the given body,
+  # within the last minute. Used to detect duplicates before creating a new record.
+  defp find_recent_agent_message(session_id, body) do
+    one_minute_ago =
+      DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
+
+    Message
+    |> where(
+      [m],
+      m.session_id == ^session_id and
+        m.sender_role == "agent" and
+        m.body == ^body and
+        m.inserted_at >= ^one_minute_ago
+    )
+    |> order_by([m], desc: m.inserted_at)
+    |> limit(1)
+    |> Repo.one()
   end
 
   @doc """

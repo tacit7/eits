@@ -4,41 +4,55 @@
 
 set -uo pipefail
 
-EITS_DB="$HOME/.config/eye-in-the-sky/eits.db"
+EITS_PG_DB="${EITS_PG_DB:-eits_dev}"
+EITS_PG_USER="${EITS_PG_USER:-postgres}"
+EITS_PG_HOST="${EITS_PG_HOST:-localhost}"
+export PGPASSWORD="${EITS_PG_PASSWORD:-postgres}"
+_pgq() { psql -U "$EITS_PG_USER" -h "$EITS_PG_HOST" -d "$EITS_PG_DB" -t -A --no-psqlrc -c "$1" 2>/dev/null | grep -v '^Time:'; }
+
 MAPPING_FILE="$HOME/.claude/hooks/session_agent_map.json"
 EITS_BASE="${EITS_API_URL:-http://localhost:5001/api/v1}"
+LOG_FILE="${HOME}/.claude/hooks/eits.log"
+_log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [resume] $*" >> "$LOG_FILE" 2>/dev/null; }
 
 INPUT=$(cat)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || echo "")
 MODEL=$(echo "$INPUT" | jq -r '.model // empty' 2>/dev/null || echo "")
 
+_log "--- session=$SESSION_ID model=${MODEL:-none}"
 echo "[EITS] resume: session=$SESSION_ID" >&2
 
 [ -z "$SESSION_ID" ] && exit 0
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 PROJECT_NAME=$(basename "$PROJECT_DIR")
+PROJECT_DIR_SQL="${PROJECT_DIR//\'/\'\'}"
+PROJECT_NAME_SQL="${PROJECT_NAME//\'/\'\'}"
 
-# Resolve integer IDs — API first, sqlite3 fallback
+# Resolve integer IDs — API first, psql fallback
 SESSION_INT_ID=""
 AGENT_INT_ID=""
 AGENT_ID=""
 
+_log "resolving IDs via API: $EITS_BASE/sessions/$SESSION_ID"
 SESSION_INFO=$(curl -sf "$EITS_BASE/sessions/$SESSION_ID" 2>/dev/null || true)
 
 if [ -n "$SESSION_INFO" ] && echo "$SESSION_INFO" | jq -e '.initialized == true' >/dev/null 2>&1; then
   SESSION_INT_ID=$(echo "$SESSION_INFO" | jq -r '.id // empty')
   AGENT_INT_ID=$(echo "$SESSION_INFO" | jq -r '.agent_int_id // empty')
   AGENT_ID=$(echo "$SESSION_INFO" | jq -r '.agent_id // empty')
+  _log "resolved via API: session_int=$SESSION_INT_ID agent_int=$AGENT_INT_ID agent_uuid=$AGENT_ID"
   echo "[EITS] resume resolved via API: session=$SESSION_INT_ID agent=$AGENT_INT_ID" >&2
 else
-  SESSION_INT_ID=$(sqlite3 "$EITS_DB" "SELECT id FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1;" 2>/dev/null || true)
-  EXISTING_AGENT=$(sqlite3 "$EITS_DB" "SELECT agent_id FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1;" 2>/dev/null || true)
+  _log "API failed or session not initialized, falling back to psql"
+  SESSION_INT_ID=$(_pgq "SELECT id FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1" || true)
+  EXISTING_AGENT=$(_pgq "SELECT agent_id FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1" || true)
   if [ -n "$EXISTING_AGENT" ]; then
     AGENT_INT_ID="$EXISTING_AGENT"
-    AGENT_ID=$(sqlite3 "$EITS_DB" "SELECT uuid FROM agents WHERE id = $EXISTING_AGENT LIMIT 1;" 2>/dev/null || true)
+    AGENT_ID=$(_pgq "SELECT uuid FROM agents WHERE id = $EXISTING_AGENT LIMIT 1" || true)
   fi
-  echo "[EITS] resume resolved via sqlite: session=$SESSION_INT_ID agent=$AGENT_INT_ID" >&2
+  _log "resolved via psql: session_int=${SESSION_INT_ID:-empty} agent_int=${AGENT_INT_ID:-empty} agent_uuid=${AGENT_ID:-empty}"
+  echo "[EITS] resume resolved via psql: session=$SESSION_INT_ID agent=$AGENT_INT_ID" >&2
 fi
 
 # Update mapping file
@@ -53,25 +67,59 @@ fi
 
 # Overwrite env vars — resume always wins over startup
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
+  _log "env_file=$CLAUDE_ENV_FILE"
   _set() {
     local key="$1" val="$2"
     if grep -q "^${key}=" "$CLAUDE_ENV_FILE" 2>/dev/null; then
       sed -i '' "s|^${key}=.*|${key}=${val}|" "$CLAUDE_ENV_FILE"
+      _log "updated $key=$val"
     else
       echo "${key}=${val}" >> "$CLAUDE_ENV_FILE"
+      _log "wrote $key=$val"
     fi
   }
 
   _set "EITS_SESSION_UUID" "$SESSION_ID"
-  [ -n "${SESSION_INT_ID:-}" ] && _set "EITS_SESSION_ID" "$SESSION_INT_ID"
-  [ -n "${AGENT_INT_ID:-}" ] && _set "EITS_AGENT_ID" "$AGENT_INT_ID"
+  if [ -n "${SESSION_INT_ID:-}" ]; then
+    _set "EITS_SESSION_ID" "$SESSION_INT_ID"
+  else
+    _log "WARN: SESSION_INT_ID empty, skipping EITS_SESSION_ID update"
+  fi
+  if [ -n "${AGENT_INT_ID:-}" ]; then
+    _set "EITS_AGENT_ID" "$AGENT_INT_ID"
+  else
+    _log "WARN: AGENT_INT_ID empty, skipping EITS_AGENT_ID update"
+  fi
 
-  echo "[EITS] env vars updated: SESSION_UUID=$SESSION_ID SESSION_ID=${SESSION_INT_ID:-} AGENT_ID=${AGENT_INT_ID:-}" >&2
+  # Resolve project by path and set EITS_PROJECT_ID
+  PROJECT_ID=$(_pgq "SELECT id FROM projects WHERE path = '$PROJECT_DIR_SQL' LIMIT 1" || true)
+  if [ -z "$PROJECT_ID" ]; then
+    _log "project not found, creating: $PROJECT_NAME"
+    PROJECT_ID=$(_pgq "
+      INSERT INTO projects (name, path, active, inserted_at, updated_at)
+      VALUES ('$PROJECT_NAME_SQL', '$PROJECT_DIR_SQL', true, NOW(), NOW())
+      RETURNING id
+    " || true)
+    _log "project created: id=${PROJECT_ID:-FAILED}"
+  else
+    _log "project found: id=$PROJECT_ID"
+  fi
+  if [ -n "$PROJECT_ID" ]; then
+    _set "EITS_PROJECT_ID" "$PROJECT_ID"
+    _pgq "UPDATE sessions SET project_id = $PROJECT_ID WHERE uuid = '$SESSION_ID' AND project_id IS NULL" >/dev/null || true
+    _log "updated sessions.project_id=$PROJECT_ID for uuid=$SESSION_ID"
+  else
+    _log "WARN: project_id not resolved, skipping"
+  fi
+
+  echo "[EITS] env vars updated: SESSION_UUID=$SESSION_ID SESSION_ID=${SESSION_INT_ID:-} AGENT_ID=${AGENT_INT_ID:-} PROJECT_ID=${PROJECT_ID:-}" >&2
+else
+  _log "WARN: CLAUDE_ENV_FILE not set, skipping env writes"
 fi
 
 # NATS (fire-and-forget)
-DESCRIPTION=$(sqlite3 "$EITS_DB" "SELECT description FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1;" 2>/dev/null || true)
-SESSION_NAME=$(sqlite3 "$EITS_DB" "SELECT name FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1;" 2>/dev/null || true)
+DESCRIPTION=$(_pgq "SELECT description FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1" || true)
+SESSION_NAME=$(_pgq "SELECT name FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1" || true)
 
 nats pub "events.session.start" "$(jq -nc \
   --arg session_id "$SESSION_ID" \

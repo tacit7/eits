@@ -103,13 +103,33 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
 
   defp create_or_find_session(attrs, agent_attrs) do
     alias EyeInTheSkyWeb.Agents
+    alias EyeInTheSkyWeb.Projects
 
     session_uuid = attrs[:uuid]
+
+    project_id =
+      case attrs[:project_name] do
+        nil -> nil
+        name ->
+          case Projects.get_project_by_name(name) do
+            nil -> nil
+            project -> project.id
+          end
+      end
 
     session_result =
       case Sessions.get_session_by_uuid(session_uuid) do
         {:ok, session} ->
-          {:ok, session}
+          update_attrs =
+            %{}
+            |> maybe_put(:name, attrs[:name])
+            |> maybe_put(:description, agent_attrs[:description])
+            |> maybe_put(:project_id, project_id)
+
+          case Sessions.update_session(session, update_attrs) do
+            {:ok, updated} -> {:ok, updated}
+            {:error, _} -> {:ok, session}
+          end
 
         {:error, :not_found} ->
           agent =
@@ -129,10 +149,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
           else
             Sessions.create_session(%{
               uuid: session_uuid,
+              name: attrs[:name],
               description: agent_attrs[:description],
               status: agent_attrs[:status] || "working",
               agent_id: agent.id,
-              project_name: attrs[:project_name],
+              project_id: project_id,
               started_at: DateTime.utc_now() |> DateTime.to_iso8601()
             })
           end

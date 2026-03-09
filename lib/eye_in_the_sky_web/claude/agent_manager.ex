@@ -56,6 +56,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              description: "session-id #{session_uuid} agent-id #{agent_uuid}",
              model: opts[:model],
              provider: provider,
+             project_id: opts[:project_id],
              git_worktree_path: opts[:project_path],
              started_at: DateTime.utc_now() |> DateTime.to_iso8601()
            }) do

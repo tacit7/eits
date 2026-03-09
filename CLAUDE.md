@@ -4,13 +4,13 @@ This file provides guidance to Claude Code when working with the Eye in the Sky 
 
 ## Project Overview
 
-Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky. Reads from a shared SQLite database owned by the Go MCP server. This project should NEVER create Ecto migrations; all schema changes go through the Go core or direct SQL.
+Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky. MCP server is Anubis (HTTP MCP), not Go. This project should NEVER create Ecto migrations; all schema changes go through direct SQL.
 
 ## Build & Run
 
 ```bash
 mix deps.get
-mix phx.server          # Start dev server on https://localhost:4000
+mix phx.server          # Start dev server on http://localhost:5001
 mix compile              # Compile only
 ```
 
@@ -41,9 +41,9 @@ Exit status will be 1 (error) instead of 0 (success).
 
 ## Database
 
-Single SQLite database at `~/.config/eye-in-the-sky/eits.db`. Configured in `config/dev.exs`. The Go MCP server owns the schema; this app is a read-heavy consumer.
+PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. Migrated from SQLite in PR #5.
 
-**No migrations.** The `priv/repo/migrations/` directory should stay empty. Schema changes are applied by the Go core's embedded `schema.sql` or via direct `sqlite3` commands.
+**No migrations.** The `priv/repo/migrations/` directory should stay empty. Schema changes are applied by the Go core or via direct `psql` commands.
 
 ## Architecture
 

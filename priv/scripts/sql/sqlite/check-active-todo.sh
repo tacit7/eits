@@ -7,19 +7,16 @@ set -euo pipefail
 session_id="${1:-}"
 [ -z "$session_id" ] && exit 1
 
-EITS_PG_DB="${EITS_PG_DB:-eits_dev}"
-EITS_PG_USER="${EITS_PG_USER:-postgres}"
-EITS_PG_HOST="${EITS_PG_HOST:-localhost}"
-export PGPASSWORD="${EITS_PG_PASSWORD:-postgres}"
+db_path="${EITS_DB_PATH:-$HOME/.config/eye-in-the-sky/eits.db}"
 
-active_todo_count=$(psql -U "$EITS_PG_USER" -h "$EITS_PG_HOST" -d "$EITS_PG_DB" -t -A -c "
+active_todo_count=$(sqlite3 "$db_path" "
   SELECT COUNT(*)
   FROM tasks t
   JOIN task_sessions ts ON t.id = ts.task_id
   JOIN sessions s ON s.id = ts.session_id
   WHERE s.uuid = '$session_id'
   AND t.state_id = 2
-  AND t.archived = false
+  AND t.archived = 0
 " 2>/dev/null) || active_todo_count=0
 
 [ "$active_todo_count" -gt 0 ]

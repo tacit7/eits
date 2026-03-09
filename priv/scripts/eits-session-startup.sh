@@ -4,13 +4,21 @@
 
 set -uo pipefail
 
-EITS_DB="$HOME/.config/eye-in-the-sky/eits.db"
+EITS_PG_DB="${EITS_PG_DB:-eits_dev}"
+EITS_PG_USER="${EITS_PG_USER:-postgres}"
+EITS_PG_HOST="${EITS_PG_HOST:-localhost}"
+export PGPASSWORD="${EITS_PG_PASSWORD:-postgres}"
+_pgq() { psql -U "$EITS_PG_USER" -h "$EITS_PG_HOST" -d "$EITS_PG_DB" -t -A --no-psqlrc -c "$1" 2>/dev/null | grep -v '^Time:'; }
+
 EITS_BASE="${EITS_API_URL:-http://localhost:5001/api/v1}"
+LOG_FILE="${HOME}/.claude/hooks/eits.log"
+_log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [startup] $*" >> "$LOG_FILE" 2>/dev/null; }
 
 INPUT=$(cat)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || echo "")
 MODEL=$(echo "$INPUT" | jq -r '.model // empty' 2>/dev/null || echo "")
 
+_log "--- session=$SESSION_ID model=${MODEL:-none}"
 echo "[EITS] startup: session=$SESSION_ID" >&2
 
 [ -z "$SESSION_ID" ] && exit 0
@@ -20,20 +28,35 @@ PROJECT_NAME=$(basename "$PROJECT_DIR")
 PROJECT_DIR_SQL="${PROJECT_DIR//\'/\'\'}"
 PROJECT_NAME_SQL="${PROJECT_NAME//\'/\'\'}"
 
+_log "project_dir=$PROJECT_DIR env_file=${CLAUDE_ENV_FILE:-unset}"
+
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   echo "EITS_API_URL=http://localhost:5001/api/v1" >> "$CLAUDE_ENV_FILE"
   echo "EITS_SESSION_UUID=$SESSION_ID" >> "$CLAUDE_ENV_FILE"
+  _log "wrote EITS_SESSION_UUID=$SESSION_ID"
 
   # Resolve or create project
-  PROJECT_ID=$(sqlite3 "$EITS_DB" "SELECT id FROM projects WHERE path = '$PROJECT_DIR_SQL' LIMIT 1;" 2>/dev/null || true)
+  PROJECT_ID=$(_pgq "SELECT id FROM projects WHERE path = '$PROJECT_DIR_SQL' LIMIT 1" || true)
   if [ -z "$PROJECT_ID" ]; then
-    sqlite3 "$EITS_DB" "
+    _log "project not found, creating: $PROJECT_NAME"
+    PROJECT_ID=$(_pgq "
       INSERT INTO projects (name, path, active, inserted_at, updated_at)
-      VALUES ('$PROJECT_NAME_SQL', '$PROJECT_DIR_SQL', 1, datetime('now'), datetime('now'));
-    " 2>/dev/null || true
-    PROJECT_ID=$(sqlite3 "$EITS_DB" "SELECT last_insert_rowid();" 2>/dev/null || true)
+      VALUES ('$PROJECT_NAME_SQL', '$PROJECT_DIR_SQL', true, NOW(), NOW())
+      RETURNING id
+    " || true)
+    _log "project created: id=${PROJECT_ID:-FAILED}"
+  else
+    _log "project found: id=$PROJECT_ID"
   fi
-  [ -n "$PROJECT_ID" ] && echo "EITS_PROJECT_ID=$PROJECT_ID" >> "$CLAUDE_ENV_FILE"
+
+  if [ -n "$PROJECT_ID" ]; then
+    echo "EITS_PROJECT_ID=$PROJECT_ID" >> "$CLAUDE_ENV_FILE"
+    _log "wrote EITS_PROJECT_ID=$PROJECT_ID"
+  else
+    _log "WARN: project_id not resolved, skipping"
+  fi
+else
+  _log "WARN: CLAUDE_ENV_FILE not set, skipping env writes"
 fi
 
 # NATS (fire-and-forget)

@@ -84,7 +84,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskControllerTest do
       task = create_task()
 
       EyeInTheSkyWeb.Repo.query(
-        "INSERT OR IGNORE INTO task_sessions (task_id, session_id) VALUES (?, ?)",
+        "INSERT INTO task_sessions (task_id, session_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
         [task.id, session.id]
       )
 
@@ -276,7 +276,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskControllerTest do
       task = create_task()
 
       EyeInTheSkyWeb.Repo.query(
-        "INSERT OR IGNORE INTO task_sessions (task_id, session_id) VALUES (?, ?)",
+        "INSERT INTO task_sessions (task_id, session_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
         [task.id, session.id]
       )
 

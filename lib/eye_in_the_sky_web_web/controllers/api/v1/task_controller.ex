@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
   use EyeInTheSkyWebWeb, :controller
 
-  alias EyeInTheSkyWeb.{Notes, Projects, Sessions, Tasks}
+  alias EyeInTheSkyWeb.{Agents, Notes, Projects, Sessions, Tasks}
 
   @doc """
   GET /api/v1/tasks - List tasks.
@@ -193,10 +193,12 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
           end
       end
 
+    task_int_id = if is_binary(task_id), do: String.to_integer(task_id), else: task_id
+
     if int_id do
       EyeInTheSkyWeb.Repo.query(
-        "DELETE FROM task_sessions WHERE task_id = ? AND session_id = ?",
-        [task_id, int_id]
+        "DELETE FROM task_sessions WHERE task_id = $1 AND session_id = $2",
+        [task_int_id, int_id]
       )
       json(conn, %{success: true, message: "Session unlinked from task #{task_id}"})
     else
@@ -258,10 +260,12 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
           end
       end
 
+    task_int_id = if is_binary(task_id), do: String.to_integer(task_id), else: task_id
+
     if int_id do
       EyeInTheSkyWeb.Repo.query(
-        "INSERT OR IGNORE INTO task_sessions (task_id, session_id) VALUES (?, ?)",
-        [task_id, int_id]
+        "INSERT INTO task_sessions (task_id, session_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        [task_int_id, int_id]
       )
     end
 
@@ -271,7 +275,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
   defp resolve_agent_int_id(nil), do: nil
 
   defp resolve_agent_int_id(uuid) do
-    case Sessions.get_session_by_uuid(uuid) do
+    case Agents.get_agent_by_uuid(uuid) do
       {:ok, agent} -> agent.id
       _ -> nil
     end

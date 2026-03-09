@@ -83,9 +83,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskControllerTest do
       session = create_session(agent)
       task = create_task()
 
-      EyeInTheSkyWeb.Repo.query(
-        "INSERT INTO task_sessions (task_id, session_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-        [task.id, session.id]
+      EyeInTheSkyWeb.Repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session.id}],
+        on_conflict: :nothing
       )
 
       conn = get(conn, ~p"/api/v1/tasks?session_id=#{session.uuid}")
@@ -275,9 +274,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskControllerTest do
       session = create_session(agent)
       task = create_task()
 
-      EyeInTheSkyWeb.Repo.query(
-        "INSERT INTO task_sessions (task_id, session_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-        [task.id, session.id]
+      EyeInTheSkyWeb.Repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session.id}],
+        on_conflict: :nothing
       )
 
       conn = delete(conn, ~p"/api/v1/tasks/#{task.id}/sessions/#{session.uuid}")

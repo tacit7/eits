@@ -520,11 +520,28 @@ defmodule EyeInTheSkyWeb.Messages do
   Sends a message to a channel (creates an outbound message).
   """
   def send_channel_message(attrs) do
-    attrs
-    |> Map.put(:uuid, Ecto.UUID.generate())
-    |> Map.put(:direction, "outbound")
-    |> Map.put(:status, "pending")
-    |> create_message()
+    result =
+      attrs
+      |> Map.put(:uuid, Ecto.UUID.generate())
+      |> Map.put(:direction, "outbound")
+      |> Map.put(:status, "pending")
+      |> create_message()
+
+    case result do
+      {:ok, message} ->
+        if message.channel_id do
+          Phoenix.PubSub.broadcast(
+            EyeInTheSkyWeb.PubSub,
+            "channel:#{message.channel_id}:messages",
+            {:new_message, message}
+          )
+        end
+
+        {:ok, message}
+
+      error ->
+        error
+    end
   end
 
   # Threading support

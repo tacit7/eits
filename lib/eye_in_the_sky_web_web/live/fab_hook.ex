@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWebWeb.FabHook do
   import Phoenix.LiveView
   import Phoenix.Component, only: [assign: 3]
 
-  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Sessions}
+  alias EyeInTheSkyWeb.{Messages, Sessions}
   alias EyeInTheSkyWeb.Claude.AgentManager
 
   require Logger
@@ -23,7 +23,7 @@ defmodule EyeInTheSkyWebWeb.FabHook do
       socket
       |> assign(:fab_mounted, true)
       |> assign(:fab_timer, nil)
-      |> assign(:fab_subscribed_channels, MapSet.new())
+      |> assign(:fab_subscribed_sessions, MapSet.new())
       |> attach_hook(:fab_events, :handle_event, &handle_fab_event/3)
       |> attach_hook(:fab_info, :handle_info, &handle_fab_info/2)
 
@@ -43,15 +43,18 @@ defmodule EyeInTheSkyWebWeb.FabHook do
 
   defp handle_fab_event("fab_open_chat", %{"session_id" => session_id}, socket) do
     socket =
-      case resolve_and_subscribe(session_id, socket) do
-        {:ok, channel, socket} ->
+      case resolve_session(session_id) do
+        {:ok, session} ->
+          socket = maybe_subscribe_session(socket, session.id)
+
           messages =
-            Messages.list_messages_for_channel(channel.id, limit: 20)
+            Messages.list_recent_messages(session.id, 20)
             |> Enum.map(&%{body: &1.body, sender_role: &1.sender_role})
 
           push_event(socket, "fab_chat_history", %{messages: messages})
 
-        {:error, _reason, socket} ->
+        {:error, reason} ->
+          Logger.error("FAB open_chat error: #{inspect(reason)}")
           socket
       end
 
@@ -59,9 +62,9 @@ defmodule EyeInTheSkyWebWeb.FabHook do
   end
 
   defp handle_fab_event("fab_send_message", %{"session_id" => session_id, "body" => body}, socket) do
-    case send_agent_message(session_id, body) do
-      {:ok, channel_id} ->
-        {:halt, maybe_subscribe_channel(socket, channel_id)}
+    case send_session_message(session_id, body) do
+      {:ok, session_id_int} ->
+        {:halt, maybe_subscribe_session(socket, session_id_int)}
 
       {:error, reason} ->
         {:halt, push_event(socket, "fab_chat_error", %{error: reason})}
@@ -89,7 +92,7 @@ defmodule EyeInTheSkyWebWeb.FabHook do
   end
 
   defp handle_fab_info({event, _}, socket)
-       when event in [:notification_created, :notifications_updated] do
+       when event in [:notification_created, :notifications_updated, :notification_read] do
     send_update(EyeInTheSkyWebWeb.Components.Sidebar, id: "app-sidebar", notification_count: :refresh)
     {:cont, socket}
   end
@@ -98,23 +101,14 @@ defmodule EyeInTheSkyWebWeb.FabHook do
     {:cont, socket}
   end
 
-  defp resolve_and_subscribe(session_id, socket) do
-    with {:ok, session} <- resolve_session(session_id),
-         {:ok, channel} <- find_global_channel(session.project_id) do
-      {:ok, channel, maybe_subscribe_channel(socket, channel.id)}
-    else
-      {:error, reason} -> {:error, reason, socket}
-    end
-  end
+  defp maybe_subscribe_session(socket, session_id) do
+    subscribed = socket.assigns.fab_subscribed_sessions
 
-  defp maybe_subscribe_channel(socket, channel_id) do
-    subscribed = socket.assigns.fab_subscribed_channels
-
-    if MapSet.member?(subscribed, channel_id) do
+    if MapSet.member?(subscribed, session_id) do
       socket
     else
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "channel:#{channel_id}:messages")
-      assign(socket, :fab_subscribed_channels, MapSet.put(subscribed, channel_id))
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session_id}")
+      assign(socket, :fab_subscribed_sessions, MapSet.put(subscribed, session_id))
     end
   end
 
@@ -134,15 +128,20 @@ defmodule EyeInTheSkyWebWeb.FabHook do
     end)
   end
 
-  defp send_agent_message(session_id, body) do
+  defp send_session_message(session_id, body) do
     with {:ok, session} <- resolve_session(session_id),
-         {:ok, channel} <- find_global_channel(session.project_id),
-         {:ok, message} <- create_channel_message(channel, body),
-         :ok <- broadcast_and_continue(session, channel, message, body) do
-      {:ok, channel.id}
+         {:ok, _message} <- Messages.send_message(%{
+           session_id: session.id,
+           sender_role: "user",
+           recipient_role: "agent",
+           provider: "claude",
+           body: body
+         }),
+         :ok <- AgentManager.continue_session(session.id, body, model: "sonnet") do
+      {:ok, session.id}
     else
       {:error, reason} ->
-        Logger.error("FAB chat error: #{inspect(reason)}")
+        Logger.error("FAB send_session_message error: #{inspect(reason)}")
         {:error, to_string(reason)}
     end
   end
@@ -152,59 +151,5 @@ defmodule EyeInTheSkyWebWeb.FabHook do
       {id, ""} -> Sessions.get_session(id)
       _ -> Sessions.get_session_by_uuid(session_id)
     end
-  end
-
-  defp find_global_channel(project_id) do
-    channels =
-      if project_id,
-        do: Channels.list_channels_for_project(project_id),
-        else: Channels.list_channels()
-
-    channel =
-      Enum.find(channels, fn c -> c.name in ["general", "#global"] end) ||
-        List.first(channels)
-
-    case channel do
-      nil -> {:error, "No channel found"}
-      ch -> {:ok, ch}
-    end
-  end
-
-  defp create_channel_message(channel, body) do
-    Messages.send_channel_message(%{
-      channel_id: channel.id,
-      session_id: "web-user",
-      sender_role: "user",
-      recipient_role: "agent",
-      provider: "claude",
-      body: body
-    })
-  end
-
-  defp broadcast_and_continue(session, channel, message, body) do
-    Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
-      "channel:#{channel.id}:messages",
-      {:new_message, message}
-    )
-
-    with {:ok, agent} <- Agents.get_agent(session.agent_id) do
-      project_path = agent.git_worktree_path || File.cwd!()
-
-      prompt = """
-      REMINDER: Use i-chat-send MCP tool to send your response to the channel.
-
-      User message: #{body}
-      """
-
-      AgentManager.continue_session(
-        session.id,
-        prompt,
-        model: "sonnet",
-        project_path: project_path
-      )
-    end
-
-    :ok
   end
 end

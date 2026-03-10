@@ -66,11 +66,17 @@ defmodule EyeInTheSkyWeb.Notifications do
   end
 
   def mark_read(id) do
-    Notification
-    |> Repo.get!(id)
-    |> Ecto.Changeset.change(read: true)
-    |> Repo.update()
-    |> tap(fn {:ok, _} -> broadcast(:notifications_updated) end)
+    result =
+      Notification
+      |> Repo.get!(id)
+      |> Ecto.Changeset.change(read: true)
+      |> Repo.update()
+
+    with {:ok, notification} <- result do
+      broadcast(:notification_read, notification.id)
+    end
+
+    result
   end
 
   def mark_all_read do

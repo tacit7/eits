@@ -175,14 +175,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
              provider: "claude",
              body: body
            }) do
-        {:ok, message} ->
-          # Broadcast to channel
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "channel:#{global_channel.id}:messages",
-            {:new_message, message}
-          )
-
+        {:ok, _message} ->
           # Continue the agent's session
           with {:ok, agent} <- Sessions.get_session(target_session_id),
                {:ok, chat_agent} <- Agents.get_agent(agent.agent_id) do

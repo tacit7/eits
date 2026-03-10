@@ -46,6 +46,19 @@ defmodule EyeInTheSkyWeb.Tasks do
   end
 
   @doc """
+  Returns the current in-progress task for a session (state_id = 2), or nil.
+  """
+  def get_current_task_for_session(session_id) do
+    Task
+    |> join(:inner, [t], ts in "task_sessions", on: ts.task_id == t.id)
+    |> where([t, ts], ts.session_id == ^session_id and t.state_id == 2)
+    |> order_by([t], desc: t.updated_at)
+    |> limit(1)
+    |> preload([:state])
+    |> Repo.one()
+  end
+
+  @doc """
   Counts tasks for a specific session.
   """
   def count_tasks_for_session(session_id) do
@@ -230,6 +243,16 @@ defmodule EyeInTheSkyWeb.Tasks do
   def link_session_to_task(task_id, session_id)
       when is_integer(task_id) and is_integer(session_id) do
     Repo.insert_all("task_sessions", [%{task_id: task_id, session_id: session_id}],
+      on_conflict: :nothing
+    )
+  end
+
+  @doc """
+  Links a tag to a task via the task_tags join table.
+  """
+  def link_tag_to_task(task_id, tag_id)
+      when is_integer(task_id) and is_integer(tag_id) do
+    Repo.insert_all("task_tags", [%{task_id: task_id, tag_id: tag_id}],
       on_conflict: :nothing
     )
   end

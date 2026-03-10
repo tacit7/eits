@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.Workers.DailyDigestWorker do
 
   import Ecto.Query, warn: false
 
-  alias EyeInTheSkyWeb.{Repo, ScheduledJobs, Notes}
+  alias EyeInTheSkyWeb.{Repo, ScheduledJobs, Notes, Notifications}
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"job_id" => job_id}}) do
@@ -21,6 +21,7 @@ defmodule EyeInTheSkyWeb.Workers.DailyDigestWorker do
     case generate_digest() do
       {:ok, note} ->
         ScheduledJobs.record_run_complete(run, "completed", result: "Note #{note.id} created")
+        Notifications.notify("Daily Digest ready", category: :job, body: note.title, resource: {"note", note.id})
         broadcast()
         :ok
 
@@ -146,7 +147,6 @@ defmodule EyeInTheSkyWeb.Workers.DailyDigestWorker do
   end
 
   defp broadcast do
-    Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "daily_digest", :digest_ready)
     Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "scheduled_jobs", :jobs_updated)
   end
 end

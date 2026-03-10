@@ -9,6 +9,10 @@ defmodule EyeInTheSkyWeb.Agents do
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Agents.Agent
 
+  defp broadcast(event, agent) do
+    Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {event, agent})
+  end
+
   @doc """
   Returns the list of agents.
   """
@@ -110,18 +114,18 @@ defmodule EyeInTheSkyWeb.Agents do
   Creates an agent.
   """
   def create_agent(attrs \\ %{}) do
-    %Agent{}
-    |> Agent.changeset(attrs)
-    |> Repo.insert()
+    result = %Agent{} |> Agent.changeset(attrs) |> Repo.insert()
+    with {:ok, agent} <- result, do: broadcast(:agent_created, agent)
+    result
   end
 
   @doc """
   Updates an agent.
   """
   def update_agent(%Agent{} = agent, attrs) do
-    agent
-    |> Agent.changeset(attrs)
-    |> Repo.update()
+    result = agent |> Agent.changeset(attrs) |> Repo.update()
+    with {:ok, updated} <- result, do: broadcast(:agent_updated, updated)
+    result
   end
 
   @doc """
@@ -135,7 +139,9 @@ defmodule EyeInTheSkyWeb.Agents do
   Deletes an agent.
   """
   def delete_agent(%Agent{} = agent) do
-    Repo.delete(agent)
+    result = Repo.delete(agent)
+    with {:ok, deleted} <- result, do: broadcast(:agent_deleted, deleted)
+    result
   end
 
   @doc """

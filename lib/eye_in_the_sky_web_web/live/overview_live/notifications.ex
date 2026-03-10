@@ -26,6 +26,15 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notifications do
   end
 
   @impl true
+  def handle_info({:notification_read, id}, socket) do
+    notifications =
+      Enum.map(socket.assigns.notifications, fn n ->
+        if n.id == id, do: %{n | read: true}, else: n
+      end)
+
+    {:noreply, assign(socket, :notifications, notifications)}
+  end
+
   def handle_info({:notifications_updated, _}, socket) do
     {:noreply, assign(socket, :notifications, load_notifications(socket.assigns.filter))}
   end

@@ -45,6 +45,16 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
     frame_session_id = if is_struct(frame), do: frame.assigns[:eits_session_id], else: nil
     session_id = params[:session_id] || frame_session_id
 
+    # Resolve project_id from session if not explicitly provided
+    resolved_project_id =
+      params[:project_id] ||
+        case frame_session_id && EyeInTheSkyWeb.Sessions.get_session_by_uuid(frame_session_id) do
+          {:ok, session} -> session.project_id
+          _ -> nil
+        end
+
+    attrs = Map.put(attrs, :project_id, resolved_project_id)
+
     result =
       case Tasks.create_task(attrs) do
         {:ok, task} ->
@@ -393,9 +403,14 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
   defp maybe_add_tags(_task, nil), do: :ok
   defp maybe_add_tags(_task, []), do: :ok
 
-  defp maybe_add_tags(_task, tags) do
+  defp maybe_add_tags(task, tags) do
+    alias EyeInTheSkyWeb.Tasks
+
     Enum.each(tags, fn tag_name ->
-      EyeInTheSkyWeb.Tasks.get_or_create_tag(tag_name)
+      case Tasks.get_or_create_tag(tag_name) do
+        {:ok, tag} -> Tasks.link_tag_to_task(task.id, tag.id)
+        _ -> :ok
+      end
     end)
   end
 

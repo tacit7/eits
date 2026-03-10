@@ -32,6 +32,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :slash_items, :list, default: []
   attr :show_new_task_drawer, :boolean, default: false
   attr :workflow_states, :list, default: []
+  attr :current_task, :map, default: nil
 
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
@@ -112,6 +113,26 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             </div>
           </div>
         </div>
+
+        <%!-- Current task strip --%>
+        <%= if @current_task do %>
+          <div class="px-5 py-2 border-t border-base-content/5" id="dm-current-task">
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-semibold uppercase tracking-wider text-base-content/30 flex-shrink-0">
+                Working on
+              </span>
+              <div class="flex items-center gap-1.5 min-w-0">
+                <div class="w-1.5 h-1.5 rounded-full bg-info animate-pulse flex-shrink-0" />
+                <span class="text-[12px] font-medium text-base-content/70 truncate">
+                  {@current_task.title}
+                </span>
+              </div>
+              <span class="flex-shrink-0 text-[10px] text-base-content/25 font-mono">
+                {String.slice(to_string(@current_task.id), 0..7)}
+              </span>
+            </div>
+          </div>
+        <% end %>
 
         <%!-- Pill tabs --%>
         <div class="px-5 pb-3" id="dm-tabs">
@@ -311,7 +332,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             >
               ${:erlang.float_to_binary(message_cost(@message) * 1.0, decimals: 4)}
             </span>
-            <span class="text-[11px] text-base-content/25">{format_time(@message.inserted_at)}</span>
+            <time
+              id={"msg-time-#{@message.id}"}
+              class="text-[11px] text-base-content/25"
+              data-utc={to_utc_string(@message.inserted_at)}
+              phx-hook="LocalTime"
+            ></time>
           </div>
 
           <div
@@ -657,7 +683,13 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                   <div class="flex items-center gap-1.5 mt-0.5 text-[11px] text-base-content/30">
                     <span class="font-mono">{String.slice(hash, 0..7)}</span>
                     <span class="text-base-content/15">/</span>
-                    <span class="tabular-nums">{format_note_timestamp(commit.created_at)}</span>
+                    <time
+                      id={"commit-time-#{commit.id}"}
+                      class="tabular-nums"
+                      data-utc={to_utc_string(commit.created_at)}
+                      data-fmt="short"
+                      phx-hook="LocalTime"
+                    ></time>
                   </div>
                 </div>
               </div>
@@ -715,7 +747,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 <div class="text-sm text-base-content/70 font-mono truncate">{log.message}</div>
                 <%= if Map.has_key?(log, :timestamp) && log.timestamp do %>
                   <div class="text-[11px] text-base-content/30 tabular-nums mt-0.5">
-                    {format_note_timestamp(log.timestamp)}
+                    <time
+                      id={"log-time-#{log.id}"}
+                      data-utc={to_utc_string(log.timestamp)}
+                      data-fmt="short"
+                      phx-hook="LocalTime"
+                    ></time>
                   </div>
                 <% end %>
               </div>
@@ -788,7 +825,13 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                     </button>
 
                     <span class="text-base-content/15">/</span>
-                    <span class="tabular-nums">{format_note_timestamp(note.created_at)}</span>
+                    <time
+                      id={"note-time-#{note.id}"}
+                      class="tabular-nums"
+                      data-utc={to_utc_string(note.created_at)}
+                      data-fmt="short"
+                      phx-hook="LocalTime"
+                    ></time>
                   </div>
                 </div>
               </div>
@@ -861,32 +904,11 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
       not is_nil(message.metadata["total_cost_usd"])
   end
 
-  defp format_time(nil), do: ""
-
-  defp format_time(timestamp) when is_binary(timestamp) do
-    case DateTime.from_iso8601(timestamp) do
-      {:ok, dt, _} -> format_time(dt)
-      _ -> timestamp
-    end
-  end
-
-  defp format_time(%DateTime{} = timestamp) do
-    now = DateTime.utc_now()
-    time = Calendar.strftime(timestamp, "%I:%M %p")
-
-    cond do
-      DateTime.to_date(timestamp) == DateTime.to_date(now) ->
-        "Today at #{time}"
-
-      Date.diff(DateTime.to_date(now), DateTime.to_date(timestamp)) == 1 ->
-        "Yesterday at #{time}"
-
-      true ->
-        Calendar.strftime(timestamp, "%m/%d/%Y %I:%M %p")
-    end
-  end
-
-  defp format_time(_), do: ""
+  defp to_utc_string(nil), do: ""
+  defp to_utc_string(ts) when is_binary(ts), do: ts
+  defp to_utc_string(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
+  defp to_utc_string(%NaiveDateTime{} = dt), do: NaiveDateTime.to_iso8601(dt) <> "Z"
+  defp to_utc_string(_), do: ""
 
   defp model_display_name("opus"), do: "Opus 4.6"
   defp model_display_name("sonnet"), do: "Sonnet 4.5"
@@ -896,12 +918,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   defp format_size(bytes) when bytes < 1024, do: "#{bytes} B"
   defp format_size(bytes) when bytes < 1_048_576, do: "#{Float.round(bytes / 1024, 1)} KB"
   defp format_size(bytes), do: "#{Float.round(bytes / 1_048_576, 1)} MB"
-
-  defp format_note_timestamp(nil), do: ""
-  defp format_note_timestamp(timestamp) when is_binary(timestamp), do: timestamp
-  defp format_note_timestamp(%DateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M")
-  defp format_note_timestamp(%NaiveDateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M")
-  defp format_note_timestamp(_), do: ""
 
   defp extract_title(nil), do: "Untitled"
 

@@ -1,5 +1,18 @@
 # Documentation Update Suggestions
 
+## 2026-03-10
+**Commits reviewed**: a2efe06..86af5ba
+
+- Add notifications system documentation: new Notifications context (notify, mark_read, mark_all_read, purge_old) and `/api/v1/notifications` endpoints in REST_API.md
+- Document i-notify MCP tool (categories: agent/job/system, resource linking, PubSub broadcasting) in MCP_TOOLS.md
+- Update MCP_TOOLS.md to reflect removed tools: i-nats-send, i-nats-listen, i-nats-send-remote, i-nats-listen-remote, i-spawn-claude
+- Document MCP.Tools.Helpers module for shared session ID resolution across MCP tools
+- Add SessionStore 24h TTL cleanup implementation to ARCHITECTURE.md or MCP_TOOLS.md
+- Document i-todo fixes: project_id auto-resolution, tag linking via task_tags join table, remove-session and add-session-to-tasks commands
+- Document Agents context PubSub broadcasting to "agents" topic for real-time updates in agent listings
+- Add JobHelper and WorkableTaskWorker to WORKERS.md (auto-job processing for workable tasks)
+- Update /notifications LiveView features (category filters, mark read inline, resource links, unread count badge)
+
 ## 2026-03-09
 **Commits reviewed**: a2efe06..da77068
 

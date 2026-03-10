@@ -20,7 +20,7 @@ tool_input=$(echo "$input_json" | jq -c '.tool_input // {}' 2>/dev/null) || tool
 "$HOOK_DIR/nats/publish-tool-pre.sh" "$session_id" "$tool_name" "$tool_input"
 
 # Publish EITS domain tools to NATS (input-dependent)
-# Matches both Phoenix (eye-in-the-sky) and Go fallback (eits-go) server prefixes
+# Matches all known server name prefixes for Phoenix HTTP MCP (eits-web, eye-in-the-sky)
 case "$tool_name" in
   Edit|Write)
     file_path=$(echo "$tool_input" | jq -r '.file_path // empty' 2>/dev/null) || file_path=""
@@ -30,23 +30,23 @@ case "$tool_name" in
       "$HOOK_DIR/sql/update-session-intent.sh" "$session_id" "$action $basename"
     fi
     ;;
-  mcp__eye-in-the-sky__i-commits|mcp__eits-go__i-commits)
+  mcp__eits-web__i-commits|mcp__eye-in-the-sky__i-commits)
     payload=$(echo "$tool_input" | jq -c \
       --arg agent_id "$session_id" \
       '{agent_id: $agent_id, commit_hashes: .commit_hashes, commit_messages: .commit_messages}')
     "$HOOK_DIR/nats/publish-domain-event.sh" "commits" "$payload"
     ;;
-  mcp__eye-in-the-sky__i-note-add|mcp__eits-go__i-note-add)
+  mcp__eits-web__i-note-add|mcp__eye-in-the-sky__i-note-add)
     payload=$(echo "$tool_input" | jq -c '{parent_type, parent_id, body, title, starred}')
     "$HOOK_DIR/nats/publish-domain-event.sh" "notes" "$payload"
     ;;
-  mcp__eye-in-the-sky__i-save-session-context|mcp__eits-go__i-save-session-context)
+  mcp__eits-web__i-save-session-context|mcp__eye-in-the-sky__i-save-session-context)
     payload=$(echo "$tool_input" | jq -c \
       --arg agent_id "$session_id" \
       '{agent_id: $agent_id, context: .context}')
     "$HOOK_DIR/nats/publish-domain-event.sh" "session.context" "$payload"
     ;;
-  mcp__eye-in-the-sky__i-todo|mcp__eits-go__i-todo)
+  mcp__eits-web__i-todo|mcp__eye-in-the-sky__i-todo)
     payload=$(printf '%s' "$tool_input" | jq -c '{command, task_id, title, description, priority, tags}' 2>/dev/null) || true
     [ -n "$payload" ] && "$HOOK_DIR/nats/publish-domain-event.sh" "todo" "$payload"
     ;;

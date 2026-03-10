@@ -122,7 +122,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.JobsTest do
     test "closes drawer on cancel", %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
       view |> element("button", "+ New Job") |> render_click()
-      view |> element("button", "Cancel") |> render_click()
+      view |> element("button[phx-click='cancel_form']", "Cancel") |> render_click()
 
       # Backdrop overlay is conditionally rendered — absent means drawer is closed
       refute has_element?(view, "div.fixed.inset-0.z-40")

@@ -23,7 +23,7 @@ defmodule EyeInTheSkyWebWeb.FabHook do
       socket
       |> assign(:fab_mounted, true)
       |> assign(:fab_timer, nil)
-      |> assign(:fab_subscribed_sessions, MapSet.new())
+      |> assign(:fab_active_session_id, nil)
       |> attach_hook(:fab_events, :handle_event, &handle_fab_event/3)
       |> attach_hook(:fab_info, :handle_info, &handle_fab_info/2)
 
@@ -45,7 +45,7 @@ defmodule EyeInTheSkyWebWeb.FabHook do
     socket =
       case resolve_session(session_id) do
         {:ok, session} ->
-          socket = maybe_subscribe_session(socket, session.id)
+          socket = switch_active_session(socket, session.id)
 
           messages =
             Messages.list_recent_messages(session.id, 20)
@@ -61,10 +61,14 @@ defmodule EyeInTheSkyWebWeb.FabHook do
     {:halt, socket}
   end
 
+  defp handle_fab_event("fab_close_chat", _params, socket) do
+    {:halt, unsubscribe_active_session(socket)}
+  end
+
   defp handle_fab_event("fab_send_message", %{"session_id" => session_id, "body" => body}, socket) do
     case send_session_message(session_id, body) do
       {:ok, session_id_int} ->
-        {:halt, maybe_subscribe_session(socket, session_id_int)}
+        {:halt, switch_active_session(socket, session_id_int)}
 
       {:error, reason} ->
         {:halt, push_event(socket, "fab_chat_error", %{error: reason})}
@@ -94,21 +98,29 @@ defmodule EyeInTheSkyWebWeb.FabHook do
   defp handle_fab_info({event, _}, socket)
        when event in [:notification_created, :notifications_updated, :notification_read] do
     send_update(EyeInTheSkyWebWeb.Components.Sidebar, id: "app-sidebar", notification_count: :refresh)
-    {:cont, socket}
+    {:halt, socket}
   end
 
   defp handle_fab_info(_msg, socket) do
     {:cont, socket}
   end
 
-  defp maybe_subscribe_session(socket, session_id) do
-    subscribed = socket.assigns.fab_subscribed_sessions
+  defp switch_active_session(socket, session_id) do
+    socket = unsubscribe_active_session(socket)
 
-    if MapSet.member?(subscribed, session_id) do
-      socket
-    else
+    if socket.assigns.fab_active_session_id != session_id do
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session_id}")
-      assign(socket, :fab_subscribed_sessions, MapSet.put(subscribed, session_id))
+    end
+
+    assign(socket, :fab_active_session_id, session_id)
+  end
+
+  defp unsubscribe_active_session(socket) do
+    case socket.assigns.fab_active_session_id do
+      nil -> socket
+      id ->
+        Phoenix.PubSub.unsubscribe(EyeInTheSkyWeb.PubSub, "session:#{id}")
+        assign(socket, :fab_active_session_id, nil)
     end
   end
 

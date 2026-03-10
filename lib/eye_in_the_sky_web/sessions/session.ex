@@ -27,6 +27,8 @@ defmodule EyeInTheSkyWeb.Sessions.Session do
     field :archived_at, :string
     field :project_id, :integer
     field :git_worktree_path, :string
+    field :parent_agent_id, :integer
+    field :parent_session_id, :integer
 
     belongs_to :agent, EyeInTheSkyWeb.Agents.Agent,
       define_field: false,
@@ -62,7 +64,9 @@ defmodule EyeInTheSkyWeb.Sessions.Session do
       :model_version,
       :archived_at,
       :project_id,
-      :git_worktree_path
+      :git_worktree_path,
+      :parent_agent_id,
+      :parent_session_id
     ])
     |> validate_required([:agent_id, :started_at])
     |> validate_inclusion(:status, [

@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.ScheduledJobs
-  alias EyeInTheSkyWeb.ScheduledJobs.ScheduledJob
+  alias EyeInTheSkyWeb.ScheduledJobs.{ScheduledJob, JobHelper}
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Claude.AgentManager
 
@@ -88,86 +88,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
     end
   end
 
-  defp job_helper_prompt(nil), do: job_helper_prompt("")
-
-  defp job_helper_prompt(description) do
-    user_context =
-      if description != "",
-        do: "\n\nThe user said: \"#{description}\"\nUse this to guide the conversation.\n",
-        else: ""
-
-    """
-    You are Job Helper, a scheduled job creation assistant for Eye in the Sky.#{user_context}
-
-    Your job: help the user create a scheduled job, then create it via the REST API.
-
-    ## Step 0 — Get context first
-
-    Before asking the user anything, fetch available projects so you can offer project scoping:
-
-    ```bash
-    curl -s http://localhost:5001/api/v1/projects | jq '.projects[] | {id, name, path}'
-    ```
-
-    Also fetch existing jobs to avoid duplicates:
-
-    ```bash
-    curl -s http://localhost:5001/api/v1/jobs | jq '.jobs[] | {id, name, job_type, schedule_value}'
-    ```
-
-    ## Job Types
-
-    1. **shell_command** - Run a shell command
-       Config: `{"command": "...", "working_dir": "/path", "timeout_ms": 30000}`
-
-    2. **spawn_agent** - Spawn a Claude Code agent
-       Config: `{"instructions": "...", "model": "sonnet", "project_path": "/path", "description": "..."}`
-
-    3. **mix_task** - Run an Elixir mix task
-       Config: `{"task": "task_name", "args": ["arg1"], "project_path": "/path"}`
-
-    4. **daily_digest** - Generate a daily summary of sessions, tasks, and commits
-       Config: `{}` (no config needed)
-
-    ## Schedule Types
-
-    - **interval** - Run every N seconds. Value is seconds as string (e.g., "300" for 5 min)
-    - **cron** - Standard cron expression. All times are UTC.
-      Examples: "0 5 * * *" = 5 AM UTC daily, "*/5 * * * *" = every 5 min
-      User is in US Central (UTC-6 standard, UTC-5 daylight)
-
-    ## Creating a Job via API
-
-    ```bash
-    curl -s -X POST http://localhost:5001/api/v1/jobs \\
-      -H "Content-Type: application/json" \\
-      -d '{
-        "name": "Job Name",
-        "description": "What it does",
-        "job_type": "shell_command",
-        "schedule_type": "cron",
-        "schedule_value": "0 5 * * *",
-        "config": {"command": "echo hello", "working_dir": "/tmp"},
-        "enabled": 1,
-        "project_id": null
-      }'
-    ```
-
-    Set `project_id` to a project's integer ID to scope it, or `null` for global.
-
-    ## Conversation Flow
-
-    1. Fetch projects and existing jobs (Step 0)
-    2. Ask what the user wants to automate (one clear question)
-    3. Determine job type, schedule, project scope
-    4. Convert schedule to UTC if user gives local time
-    5. Show a concise summary before creating
-    6. POST to the API, confirm the returned job ID
-    7. Tell them to check the Jobs page
-
-    Keep it concise. One question at a time. Don't over-explain.
-    """
-  end
+  defp job_helper_prompt(description), do: JobHelper.prompt(description)
 
   @impl true
   def handle_event("edit_job", %{"id" => id}, socket) do

@@ -46,6 +46,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "dm:#{session.id}:stream")
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "tasks")
       send(self(), :sync_from_session_file)
     end
 
@@ -74,6 +75,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:diff_cache, %{})
       |> assign(:show_new_task_drawer, false)
       |> assign(:workflow_states, Tasks.list_workflow_states())
+      |> assign(:current_task, Tasks.get_current_task_for_session(session.id))
       |> assign(:sync_timer, nil)
       |> allow_upload(:files,
         accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
@@ -302,10 +304,12 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_event("open_iterm", _params, socket) do
+    session_uuid = socket.assigns.session_uuid
+
     dir =
-      case socket.assigns.session.git_worktree_path do
-        path when is_binary(path) and path != "" -> path
-        _ -> "~"
+      case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+        {:ok, path} -> path
+        {:error, _} -> "~"
       end
 
     script = """
@@ -313,7 +317,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       activate
       set newWindow to (create window with default profile)
       tell current session of newWindow
-        write text "cd #{dir}"
+        write text "cd #{dir} && claude --dangerously-skip-permissions -r #{session_uuid}"
       end tell
     end tell
     """
@@ -451,34 +455,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     end
   end
 
-  # NATS handler broadcasts {agent_working, %Agent{}} — match by agent struct
-  @impl true
-  def handle_info({:agent_working, %{id: id}}, socket) do
-    if id == socket.assigns.session_id do
-      {:noreply, socket |> assign(:processing, true) |> start_sync_timer()}
-    else
-      {:noreply, socket}
-    end
-  end
-
   @impl true
   def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
     if session_id == socket.assigns.session_id do
-      {:noreply,
-       socket
-       |> assign(:processing, false)
-       |> stop_sync_timer()
-       |> sync_and_reload()
-       |> push_event("focus-input", %{})}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  # NATS handler broadcasts {agent_stopped, %Agent{}}
-  @impl true
-  def handle_info({:agent_stopped, %{id: id}}, socket) do
-    if id == socket.assigns.session_id do
       {:noreply,
        socket
        |> assign(:processing, false)
@@ -494,6 +473,13 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_info({:new_dm, _msg}, socket) do
     {:noreply, load_tab_data(socket, "messages", socket.assigns.session_id)}
+  end
+
+  # Task state changed — refresh the current task header strip
+  @impl true
+  def handle_info(:tasks_changed, socket) do
+    {:noreply,
+     assign(socket, :current_task, Tasks.get_current_task_for_session(socket.assigns.session_id))}
   end
 
   # NATS handler broadcasts tool events on "session:#{agent.id}"
@@ -569,6 +555,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     socket
     |> assign(:messages, messages)
     |> assign(:has_more_messages, has_more)
+    |> assign(:current_task, Tasks.get_current_task_for_session(session_id))
     |> assign(
       :tasks,
       maybe_load_tab_data(tab, "tasks", socket.assigns[:tasks], fn ->
@@ -805,6 +792,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         slash_items={@slash_items}
         show_new_task_drawer={@show_new_task_drawer}
         workflow_states={@workflow_states}
+        current_task={@current_task}
       />
     </div>
     """

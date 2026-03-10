@@ -86,6 +86,8 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
           "✅ SessionWorker started for #{session_id} (spawn_type=#{spawn_type}, port=#{inspect(port)})"
         )
 
+        broadcast_status(session_id, :working)
+
         if session_int_id do
           Phoenix.PubSub.broadcast(
             EyeInTheSkyWeb.PubSub,
@@ -129,6 +131,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
     if state.processing do
       # Busy: queue or drop
       if length(state.queue) >= @max_queue_size do
+        broadcast_status(state.session_id, :queue_full)
         {:noreply, state}
       else
         {:noreply, %{state | queue: state.queue ++ [{prompt, opts}]}}
@@ -219,6 +222,8 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
     # Process next queued message or go idle
     case state.queue do
       [] ->
+        broadcast_status(state.session_id, :idle)
+
         if state.session_int_id do
           Phoenix.PubSub.broadcast(
             EyeInTheSkyWeb.PubSub,
@@ -261,6 +266,10 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
 
   @impl true
   def terminate(_reason, state) do
+    if state[:session_id] do
+      broadcast_status(state.session_id, :idle)
+    end
+
     if state[:session_id] && state[:session_int_id] do
       Phoenix.PubSub.broadcast(
         EyeInTheSkyWeb.PubSub,
@@ -301,6 +310,8 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
 
     case spawn_cli(spawn_type, state.session_id, prompt, cli_opts) do
       {:ok, port, ^session_ref} ->
+        broadcast_status(state.session_id, :working)
+
         if state.session_int_id do
           Phoenix.PubSub.broadcast(
             EyeInTheSkyWeb.PubSub,
@@ -331,6 +342,13 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
     Utils.cli_module().resume_session(session_id, prompt, opts)
   end
 
+  defp broadcast_status(session_id, status) do
+    Phoenix.PubSub.broadcast(
+      EyeInTheSkyWeb.PubSub,
+      "session:#{session_id}:status",
+      {:session_status, session_id, status}
+    )
+  end
 
   # --- Output handling ---
 

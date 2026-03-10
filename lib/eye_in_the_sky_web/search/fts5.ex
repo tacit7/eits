@@ -50,11 +50,12 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
     sql_params = Keyword.get(opts, :sql_params, [])
     fallback_query = Keyword.fetch!(opts, :fallback_query)
     preloads = Keyword.get(opts, :preload, [])
+    limit = Keyword.get(opts, :limit)
 
-    pg_fts_search(table, schema, query, search_columns, sql_filter, sql_params, fallback_query, preloads)
+    pg_fts_search(table, schema, query, search_columns, sql_filter, sql_params, fallback_query, preloads, limit)
   end
 
-  defp pg_fts_search(table, schema, query, search_columns, sql_filter, sql_params, fallback_query, preloads) do
+  defp pg_fts_search(table, schema, query, search_columns, sql_filter, sql_params, fallback_query, preloads, limit) do
     alias_letter = String.first(table)
 
     # Build tsvector expression from search columns: to_tsvector('english', coalesce(col1,'') || ' ' || coalesce(col2,''))
@@ -63,13 +64,15 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
       |> Enum.map(fn col -> "coalesce(#{alias_letter}.#{col}, '')" end)
       |> Enum.join(" || ' ' || ")
 
+    effective_limit = limit || 50
+
     sql = """
     SELECT #{alias_letter}.*
     FROM #{table} #{alias_letter}
     WHERE to_tsvector('english', #{tsvector_expr}) @@ plainto_tsquery('english', $1)
     #{sql_filter}
     ORDER BY ts_rank(to_tsvector('english', #{tsvector_expr}), plainto_tsquery('english', $1)) DESC
-    LIMIT 50
+    LIMIT #{effective_limit}
     """
 
     params = [query | sql_params]
@@ -92,9 +95,11 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
 
       {:error, _} ->
         # Fallback to ILIKE search
+        fallback_limit = limit || 50
+
         query_result =
           fallback_query
-          |> limit(50)
+          |> limit(^fallback_limit)
 
         query_result =
           if preloads != [] do

@@ -90,6 +90,9 @@ defmodule EyeInTheSkyWebWeb.Router do
     get "/session-context/:uuid", SessionContextController, :show
     post "/session-context", SessionContextController, :create
 
+    # Notifications
+    post "/notifications", NotificationController, :create
+
     # Tasks
     get "/tasks", TaskController, :index
     post "/tasks", TaskController, :create

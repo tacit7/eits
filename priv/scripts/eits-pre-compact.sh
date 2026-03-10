@@ -4,6 +4,7 @@
 set -uo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE_URL="${EITS_API_URL:-http://localhost:5001/api/v1}"
 
 input_json=$(timeout 2 cat 2>/dev/null) || exit 0
 [ -z "$input_json" ] && exit 0
@@ -16,5 +17,11 @@ session_id=$(echo "$input_json" | jq -r '.session_id // empty' 2>/dev/null) || e
 
 # Publish to NATS
 "$HOOK_DIR/nats/publish-session-compact.sh" "$session_id" "compacting"
+
+# Notify user that context is being compacted
+curl -sf -X POST "$BASE_URL/notifications" \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"Context compacting\",\"body\":\"Session $session_id is compacting its context window.\",\"category\":\"agent\",\"resource_type\":\"session\",\"resource_id\":\"$session_id\"}" \
+  > /dev/null 2>&1 || true
 
 exit 0

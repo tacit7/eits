@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with the Eye in the Sky 
 
 ## Project Overview
 
-Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky. MCP server is Anubis (HTTP MCP), not Go. This project should NEVER create Ecto migrations; all schema changes go through direct SQL.
+Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky. MCP server is Anubis (HTTP MCP), not Go.
 
 ## Build & Run
 
@@ -42,8 +42,6 @@ Exit status will be 1 (error) instead of 0 (success).
 ## Database
 
 PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. Migrated from SQLite in PR #5.
-
-**No migrations.** The `priv/repo/migrations/` directory should stay empty. Schema changes are applied by the Go core or via direct `psql` commands.
 
 ## Architecture
 

@@ -2,7 +2,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.{Projects, ScheduledJobs}
-  alias EyeInTheSkyWeb.ScheduledJobs.ScheduledJob
+  alias EyeInTheSkyWeb.ScheduledJobs.{ScheduledJob, JobHelper}
+  alias EyeInTheSkyWeb.Claude.AgentManager
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -37,6 +38,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
         |> assign(:form_config, %{})
         |> assign(:expanded_job_id, nil)
         |> assign(:runs, [])
+        |> assign(:show_claude_drawer, false)
+        |> assign(:claude_model, "sonnet")
       else
         socket
         |> assign(:page_title, "Project Not Found")
@@ -55,6 +58,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
         |> assign(:form_config, %{})
         |> assign(:expanded_job_id, nil)
         |> assign(:runs, [])
+        |> assign(:show_claude_drawer, false)
+        |> assign(:claude_model, "sonnet")
         |> put_flash(:error, "Invalid project ID")
       end
 
@@ -193,6 +198,42 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
     else
       runs = ScheduledJobs.list_runs_for_job(job_id)
       {:noreply, assign(socket, expanded_job_id: job_id, runs: runs)}
+    end
+  end
+
+  @impl true
+  def handle_event("toggle_claude_drawer", _params, socket) do
+    {:noreply, assign(socket, :show_claude_drawer, !socket.assigns.show_claude_drawer)}
+  end
+
+  @impl true
+  def handle_event("claude_model_changed", %{"model" => model}, socket) do
+    {:noreply, assign(socket, :claude_model, model)}
+  end
+
+  @impl true
+  def handle_event("create_with_claude", params, socket) do
+    model = params["model"] || "sonnet"
+    effort_level = params["effort_level"]
+    description = params["description"]
+    project = socket.assigns.project
+
+    case AgentManager.create_agent(
+           model: model,
+           effort_level: effort_level,
+           project_id: project.id,
+           project_path: project.path,
+           description: "Job Helper",
+           instructions: JobHelper.prompt(description, project: project)
+         ) do
+      {:ok, %{session: session}} ->
+        {:noreply,
+         socket
+         |> assign(:show_claude_drawer, false)
+         |> push_navigate(to: ~p"/dm/#{session.id}")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to start session: #{inspect(reason)}")}
     end
   end
 
@@ -436,6 +477,53 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
         <div class="fixed inset-0 z-40 bg-black/30" phx-click="cancel_form"></div>
       <% end %>
 
+      <%!-- Claude Drawer --%>
+      <div class={[
+        "fixed inset-y-0 right-0 z-50 w-full max-w-sm bg-base-100 shadow-xl transform transition-transform duration-200 ease-in-out overflow-y-auto",
+        if(@show_claude_drawer, do: "translate-x-0", else: "translate-x-full")
+      ]}>
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-lg font-semibold">Create Job with Claude</h2>
+            <button class="btn btn-ghost btn-sm btn-square" phx-click="toggle_claude_drawer">
+              <.icon name="hero-x-mark" class="w-4 h-4" />
+            </button>
+          </div>
+          <form phx-submit="create_with_claude" class="flex flex-col gap-4">
+            <div class="form-control">
+              <label class="label"><span class="label-text font-medium">Model</span></label>
+              <select name="model" class="select select-bordered w-full" phx-change="claude_model_changed">
+                <option value="opus" selected={@claude_model == "opus"}>Opus 4.6 · Most capable</option>
+                <option value="sonnet" selected={@claude_model == "sonnet"}>Sonnet 4.5 · Everyday tasks</option>
+                <option value="haiku" selected={@claude_model == "haiku"}>Haiku 4.5 · Fastest</option>
+              </select>
+            </div>
+            <%= if @claude_model == "opus" do %>
+              <div class="form-control">
+                <label class="label"><span class="label-text font-medium">Effort Level</span></label>
+                <select name="effort_level" class="select select-bordered w-full">
+                  <option value="">Default (high)</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+            <% end %>
+            <div class="form-control">
+              <label class="label"><span class="label-text font-medium">Description</span></label>
+              <textarea name="description" class="textarea textarea-bordered w-full" rows="3" placeholder="What kind of job do you want to create?"></textarea>
+            </div>
+            <div class="flex gap-2 mt-4">
+              <button type="submit" class="btn btn-primary flex-1">Start</button>
+              <button type="button" phx-click="toggle_claude_drawer" class="btn btn-ghost">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <%= if @show_claude_drawer do %>
+        <div class="fixed inset-0 z-40 bg-black/30" phx-click="toggle_claude_drawer"></div>
+      <% end %>
+
       <%!-- Project Jobs --%>
       <div class="mb-8">
         <div class="flex items-center justify-between mb-3">
@@ -443,9 +531,14 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
             <h2 class="text-base font-semibold">Scheduled Jobs</h2>
             <p class="text-xs text-base-content/50">Scoped to {@project.name}</p>
           </div>
-          <button class="btn btn-primary btn-sm" phx-click="new_job" phx-value-scope="project">
-            + New Job
-          </button>
+          <div class="flex items-center gap-2">
+            <button class="btn btn-outline btn-sm" phx-click="toggle_claude_drawer">
+              <.icon name="hero-sparkles" class="w-3.5 h-3.5" /> Create with Claude
+            </button>
+            <button class="btn btn-primary btn-sm" phx-click="new_job" phx-value-scope="project">
+              + New Job
+            </button>
+          </div>
         </div>
         <.jobs_table jobs={@project_jobs} expanded_job_id={@expanded_job_id} runs={@runs} />
       </div>

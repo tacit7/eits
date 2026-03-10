@@ -176,6 +176,7 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
         "spawn_agent" -> EyeInTheSkyWeb.Workers.SpawnAgentWorker
         "mix_task" -> EyeInTheSkyWeb.Workers.MixTaskWorker
         "daily_digest" -> EyeInTheSkyWeb.Workers.DailyDigestWorker
+        "workable_task" -> EyeInTheSkyWeb.Workers.WorkableTaskWorker
       end
 
     %{"job_id" => job.id}

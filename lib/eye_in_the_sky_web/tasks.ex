@@ -88,6 +88,26 @@ defmodule EyeInTheSkyWeb.Tasks do
   end
 
   @doc """
+  Gets a task by UUID, falling back to integer ID if UUID lookup misses.
+  Accepts a string that is either a UUID or a stringified integer ID.
+  Raises `Ecto.NoResultsError` if nothing is found.
+  """
+  def get_task_by_uuid_or_id!(id_str) do
+    query = Task |> preload([:state, :tags])
+
+    case Repo.get_by(query, uuid: id_str) do
+      nil ->
+        case Integer.parse(id_str) do
+          {int_id, ""} -> Repo.get!(query, int_id)
+          _ -> raise Ecto.NoResultsError, queryable: Task
+        end
+
+      task ->
+        task
+    end
+  end
+
+  @doc """
   Creates a task.
   """
   def create_task(attrs \\ %{}) do

@@ -90,7 +90,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("open_task_detail", %{"task_id" => task_id}, socket) do
-    task = Tasks.get_task_by_uuid!(task_id)
+    task = Tasks.get_task_by_uuid_or_id!(task_id)
 
     # Load notes for this task (handles both "task" and "tasks" parent_type)
     notes = Notes.list_notes_for_task(task.id)
@@ -168,7 +168,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("delete_task", %{"task_id" => task_id}, socket) do
-    task = Tasks.get_task_by_uuid!(task_id)
+    task = Tasks.get_task_by_uuid_or_id!(task_id)
 
     # Delete related records first to avoid foreign key constraint errors
     Repo.delete_all(from t in "task_tags", where: t.task_id == ^task.id)
@@ -195,7 +195,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   def handle_event("start_agent_for_task", %{"task_id" => task_id}, socket) do
     alias EyeInTheSkyWeb.{Agents, Claude.SessionManager}
 
-    task = Tasks.get_task_by_uuid!(task_id)
+    task = Tasks.get_task_by_uuid_or_id!(task_id)
     project = socket.assigns.project
 
     session_id = Ecto.UUID.generate()

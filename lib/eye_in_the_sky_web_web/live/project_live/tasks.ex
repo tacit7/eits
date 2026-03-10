@@ -37,6 +37,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
         |> assign(:sidebar_project, project)
         |> assign(:project_id, project_id)
         |> assign(:search_query, "")
+        |> assign(:filter_state_id, nil)
+        |> assign(:sort_by, "created_desc")
         |> assign(:workflow_states, workflow_states)
         |> assign(:show_new_task_drawer, false)
         |> assign(:show_task_detail_drawer, false)
@@ -50,6 +52,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
         |> assign(:project, nil)
         |> assign(:project_id, nil)
         |> assign(:search_query, "")
+        |> assign(:filter_state_id, nil)
+        |> assign(:sort_by, "created_desc")
         |> assign(:workflow_states, workflow_states)
         |> assign(:show_new_task_drawer, false)
         |> assign(:show_task_detail_drawer, false)
@@ -75,6 +79,28 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
   end
 
   @impl true
+  def handle_event("filter_status", %{"state_id" => state_id}, socket) do
+    state_id = if state_id == "", do: nil, else: String.to_integer(state_id)
+
+    socket =
+      socket
+      |> assign(:filter_state_id, state_id)
+      |> load_tasks()
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("sort_by", %{"value" => value}, socket) do
+    socket =
+      socket
+      |> assign(:sort_by, value)
+      |> load_tasks()
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("toggle_new_task_drawer", _params, socket) do
     {:noreply, assign(socket, :show_new_task_drawer, !socket.assigns.show_new_task_drawer)}
   end
@@ -93,7 +119,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
 
   @impl true
   def handle_event("open_task_detail", %{"task_id" => task_id}, socket) do
-    task = Tasks.get_task_by_uuid!(task_id)
+    task = Tasks.get_task_by_uuid_or_id!(task_id)
     notes = Notes.list_notes_for_task(task.id)
 
     socket =
@@ -104,6 +130,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
 
     {:noreply, socket}
   end
+
+  def handle_event("open_task_detail", _params, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("update_task", params, socket) do
@@ -163,7 +191,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
 
   @impl true
   def handle_event("delete_task", %{"task_id" => task_id}, socket) do
-    task = Tasks.get_task_by_uuid!(task_id)
+    task = Tasks.get_task_by_uuid_or_id!(task_id)
 
     Repo.delete_all(from t in "task_tags", where: t.task_id == ^task.id)
     Repo.delete_all(from t in "task_sessions", where: t.task_id == ^task.id)
@@ -204,11 +232,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
       |> Enum.map(&String.trim/1)
       |> Enum.reject(&(&1 == ""))
 
-    task_id = String.upcase(Ecto.UUID.generate())
+    task_uuid = String.upcase(Ecto.UUID.generate())
     now = DateTime.utc_now() |> DateTime.to_iso8601()
 
     case Tasks.create_task(%{
-           id: task_id,
+           uuid: task_uuid,
            title: title,
            description: description,
            state_id: state_id,
@@ -254,12 +282,17 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
   defp load_tasks(socket) do
     project_id = socket.assigns.project_id
     query = socket.assigns.search_query
+    filter_state_id = socket.assigns.filter_state_id
+    sort_by = socket.assigns.sort_by
 
     tasks =
       if query != "" and String.trim(query) != "" do
         Tasks.search_tasks(query, project_id)
       else
-        Projects.get_project_tasks(project_id)
+        Projects.get_project_tasks(project_id,
+          state_id: filter_state_id,
+          sort_by: sort_by
+        )
       end
 
     assign(socket, :tasks, tasks)
@@ -271,7 +304,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
     <div class="px-6 lg:px-8 py-6" phx-hook="GlobalKeydown" id="project-tasks-page">
       <div class="max-w-4xl mx-auto">
         <%!-- Search and New Task --%>
-        <div class="mb-5 flex items-center gap-3">
+        <div class="mb-4 flex items-center gap-3">
           <form phx-change="search" class="flex-1 max-w-sm">
             <div class="relative">
               <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -294,6 +327,47 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
           >
             <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Task
           </button>
+        </div>
+
+        <%!-- Filters --%>
+        <div class="mb-4 flex items-center gap-2 flex-wrap">
+          <%!-- Status filter pills --%>
+          <button
+            phx-click="filter_status"
+            phx-value-state_id=""
+            class={[
+              "btn btn-xs gap-1 min-h-0 h-6",
+              if(is_nil(@filter_state_id), do: "btn-neutral", else: "btn-ghost text-base-content/50")
+            ]}
+          >
+            All
+          </button>
+          <%= for state <- @workflow_states do %>
+            <button
+              phx-click="filter_status"
+              phx-value-state_id={state.id}
+              class={[
+                "btn btn-xs gap-1 min-h-0 h-6",
+                if(@filter_state_id == state.id, do: "btn-neutral", else: "btn-ghost text-base-content/50")
+              ]}
+            >
+              {state.name}
+            </button>
+          <% end %>
+
+          <div class="flex-1" />
+
+          <%!-- Sort dropdown --%>
+          <form phx-change="sort_by">
+            <select
+              name="value"
+              class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/60 min-h-0 h-6 text-xs"
+            >
+              <option value="created_desc" selected={@sort_by == "created_desc"}>Newest first</option>
+              <option value="created_asc" selected={@sort_by == "created_asc"}>Oldest first</option>
+              <option value="priority" selected={@sort_by == "priority"}>Priority</option>
+            </select>
+          </form>
         </div>
 
         <%!-- Task count --%>

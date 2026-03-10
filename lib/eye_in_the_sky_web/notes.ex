@@ -94,12 +94,16 @@ defmodule EyeInTheSkyWeb.Notes do
     task = Repo.get(EyeInTheSkyWeb.Tasks.Task, task_id)
 
     if task do
+      uuid_filter =
+        if task.uuid do
+          dynamic([n], n.parent_id == ^to_string(task_id) or n.parent_id == ^task.uuid)
+        else
+          dynamic([n], n.parent_id == ^to_string(task_id))
+        end
+
       Note
-      |> where(
-        [n],
-        n.parent_type in ["task", "tasks"] and
-          (n.parent_id == ^to_string(task_id) or n.parent_id == ^task.uuid)
-      )
+      |> where([n], n.parent_type in ["task", "tasks"])
+      |> where(^uuid_filter)
       |> order_by([n], desc: n.created_at)
       |> Repo.all()
     else
@@ -177,7 +181,7 @@ defmodule EyeInTheSkyWeb.Notes do
           |> Enum.map(fn {_, i} -> "$#{i}" end)
           |> Enum.join(",")
 
-        {"AND n.parent_type = 'agent' AND n.parent_id IN (#{placeholders})", agent_ids}
+        {"AND n.parent_type = 'agent' AND n.parent_id IN (#{placeholders})", Enum.map(agent_ids, &to_string/1)}
       else
         {"", []}
       end

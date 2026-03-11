@@ -178,6 +178,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
         end
       rescue
         Ecto.NoResultsError -> %{success: false, message: "Task not found: #{task_id}"}
+        Ecto.Query.CastError -> %{success: false, message: "Invalid task_id: #{task_id}"}
       end
 
     response = Response.tool() |> Response.json(result)
@@ -197,6 +198,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
         end
       rescue
         Ecto.NoResultsError -> %{success: false, message: "Task not found: #{task_id}"}
+        Ecto.Query.CastError -> %{success: false, message: "Invalid task_id: #{task_id}"}
       end
 
     response = Response.tool() |> Response.json(result)
@@ -232,6 +234,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
         %{success: true, message: "Tags updated for task #{task.id}"}
       rescue
         Ecto.NoResultsError -> %{success: false, message: "Task not found: #{task_id}"}
+        Ecto.Query.CastError -> %{success: false, message: "Invalid task_id: #{task_id}"}
       end
 
     response = Response.tool() |> Response.json(result)
@@ -359,6 +362,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
         end
       rescue
         Ecto.NoResultsError -> %{success: false, message: "Task not found: #{task_id}"}
+        Ecto.Query.CastError -> %{success: false, message: "Invalid task_id: #{task_id}"}
       end
 
     response = Response.tool() |> Response.json(result)

@@ -304,12 +304,15 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         {:error, _} -> "~"
       end
 
+    # Escape double quotes in the path to prevent AppleScript string injection
+    safe_dir = String.replace(dir, "\"", "\\\"")
+
     script = """
     tell application "iTerm"
       activate
       set newWindow to (create window with default profile)
       tell current session of newWindow
-        write text "cd #{dir} && claude --dangerously-skip-permissions -r #{session_uuid}"
+        write text "cd #{safe_dir} && claude --dangerously-skip-permissions -r #{session_uuid}"
       end tell
     end tell
     """

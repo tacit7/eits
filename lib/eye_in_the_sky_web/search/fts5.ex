@@ -41,6 +41,9 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
         preload: [:state, :tags]
       )
   """
+  # Only lowercase letters, digits, and underscores — no injection vectors
+  @safe_identifier ~r/^[a-z][a-z0-9_]*$/
+
   def search(opts) do
     table = Keyword.fetch!(opts, :table)
     schema = Keyword.fetch!(opts, :schema)
@@ -52,7 +55,24 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
     preloads = Keyword.get(opts, :preload, [])
     limit = Keyword.get(opts, :limit)
 
-    pg_fts_search(table, schema, query, search_columns, sql_filter, sql_params, fallback_query, preloads, limit)
+    if safe_identifier?(table) and Enum.all?(search_columns, &safe_identifier?/1) do
+      pg_fts_search(table, schema, query, search_columns, sql_filter, sql_params, fallback_query, preloads, limit)
+    else
+      run_fallback(fallback_query, preloads, limit)
+    end
+  end
+
+  defp safe_identifier?(value), do: Regex.match?(@safe_identifier, value)
+
+  defp run_fallback(fallback_query, preloads, limit) do
+    effective_limit = limit || 50
+
+    query_result = limit(fallback_query, ^effective_limit)
+
+    query_result =
+      if preloads != [], do: preload(query_result, ^preloads), else: query_result
+
+    Repo.all(query_result)
   end
 
   defp pg_fts_search(table, schema, query, search_columns, sql_filter, sql_params, fallback_query, preloads, limit) do
@@ -94,21 +114,7 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
         end
 
       {:error, _} ->
-        # Fallback to ILIKE search
-        fallback_limit = limit || 50
-
-        query_result =
-          fallback_query
-          |> limit(^fallback_limit)
-
-        query_result =
-          if preloads != [] do
-            preload(query_result, ^preloads)
-          else
-            query_result
-          end
-
-        Repo.all(query_result)
+        run_fallback(fallback_query, preloads, limit)
     end
   end
 end

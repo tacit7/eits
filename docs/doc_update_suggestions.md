@@ -1,5 +1,23 @@
 # Documentation Update Suggestions
 
+## 2026-03-11
+**Commits reviewed**: e7f897e..b02aafb
+
+- Document WebAuthn/passkey authentication (new Accounts context: User, Passkey, RegistrationToken schemas; auth controller, auth LiveView, require_auth plug, passkey_auth.js hook)
+- Add passkey setup/registration flow docs and wax_ dependency reference in ARCHITECTURE.md
+- Document port configuration change: HTTPS on 5001, HTTP on 5000
+- Update MCP_TOOLS.md with new agent control tools: i-agent-cancel (terminate), i-agent-send (send messages), i-agent-status (check state)
+- Document enhanced i-spawn-agent tool: new provider, project_id, worktree, effort_level parameters; now returns agent_id + session_id
+- Add parent_agent_id and parent_session_id fields to Agents and Sessions schema docs; explain cascading relationships
+- Document session status broadcasts via PubSub topic `session:<id>:status` (emitted on start/idle/terminate/queue_full events)
+- Document "Create with Claude" feature on project jobs page (model + effort_level selection, spawns agent to DM view)
+- Add git post-commit hook integration docs: eits-post-commit.sh POSTs commit hash+message to `/api/v1/commits`, symlinked to .git/hooks/post-commit
+- Document LocalTime LiveView hook for client-side timezone rendering; remove hardcoded locale from datetime formatters (use system locale)
+- Document task UUID vs integer ID lookup behavior; explain get_task_by_uuid_or_id! fallback in Tasks context
+- Update REST_API.md: document POST `/api/v1/notifications` endpoint (NotificationController)
+- Document total_tokens_for_session field on messages; wire into DM page token count display
+- Document auto-scroll hook and eits.register mix task
+
 ## 2026-03-10
 **Commits reviewed**: a2efe06..86af5ba
 

@@ -71,6 +71,12 @@ config :anubis_mcp, :session_store,
   enabled: true,
   adapter: EyeInTheSkyWeb.MCP.SessionStore
 
+# WebAuthn / Passkey configuration
+config :wax_,
+  origin: "https://unspiriting-catalina-postvocalic.ngrok-free.dev",
+  rp_id: "unspiriting-catalina-postvocalic.ngrok-free.dev",
+  trusted_attestation_types: [:none, :self]
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

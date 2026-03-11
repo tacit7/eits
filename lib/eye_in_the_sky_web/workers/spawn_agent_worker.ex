@@ -28,12 +28,23 @@ defmodule EyeInTheSkyWeb.Workers.SpawnAgentWorker do
 
   defp execute(job) do
     config = ScheduledJobs.decode_config(job)
+    session_uuid = Ecto.UUID.generate()
+    base_url = EyeInTheSkyWebWeb.Endpoint.url()
+    dm_link = "#{base_url}/dm/#{session_uuid}"
+
+    base_instructions = config["instructions"] || "Scheduled agent task"
+
+    instructions =
+      base_instructions <>
+        "\n\nYour DM page link (include this in any notifications): #{dm_link}"
 
     opts = [
-      instructions: config["instructions"] || "Scheduled agent task",
+      instructions: instructions,
       model: config["model"],
       project_path: config["project_path"],
-      description: config["description"] || "Scheduled agent"
+      description: config["description"] || "Scheduled agent",
+      project_id: job.project_id,
+      session_uuid: session_uuid
     ]
 
     case AgentManager.create_agent(opts) do

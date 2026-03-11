@@ -213,7 +213,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
             </div>
           </form>
 
-          <div class="flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
+          <div class="flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5 overflow-x-auto">
             <button
               phx-click="filter_state"
               phx-value-state="all"

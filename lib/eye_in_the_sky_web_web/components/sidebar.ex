@@ -19,6 +19,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
        projects: projects,
        channels: channels,
        collapsed: false,
+       mobile_open: false,
        expanded_chat: false,
        new_channel_name: nil,
        notification_count: Notifications.unread_count()
@@ -43,12 +44,23 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
      |> assign(:sidebar_project, sidebar_project)
      |> assign(:active_channel_id, assigns[:active_channel_id])
      |> assign(:expanded_chat, expanded_chat)
+     |> assign(:mobile_open, false)
      |> assign(:notification_count, Notifications.unread_count())}
   end
 
   @impl true
   def handle_event("toggle_collapsed", _params, socket) do
     {:noreply, assign(socket, :collapsed, !socket.assigns.collapsed)}
+  end
+
+  @impl true
+  def handle_event("toggle_mobile", _params, socket) do
+    {:noreply, assign(socket, :mobile_open, !socket.assigns.mobile_open)}
+  end
+
+  @impl true
+  def handle_event("close_mobile", _params, socket) do
+    {:noreply, assign(socket, :mobile_open, false)}
   end
 
   @impl true
@@ -131,6 +143,15 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   @impl true
   def render(assigns) do
     ~H"""
+    <div>
+    <%!-- Backdrop — mobile only, closes sidebar on tap --%>
+    <div
+      :if={@mobile_open}
+      phx-click="close_mobile"
+      phx-target={@myself}
+      class="md:hidden fixed inset-0 z-40 bg-black/40"
+    />
+
     <aside
       id="app-sidebar"
       phx-hook="SidebarState"
@@ -138,12 +159,14 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
       data-active-project-id={@sidebar_project && @sidebar_project.id}
       class={[
         "flex flex-col h-full border-r border-base-content/8 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)] transition-all duration-200 flex-shrink-0 overflow-hidden",
+        "fixed inset-y-0 left-0 z-50 md:relative md:inset-auto md:z-auto",
+        if(@mobile_open, do: "translate-x-0", else: "-translate-x-full md:translate-x-0"),
         if(@collapsed, do: "w-16", else: "w-60")
       ]}
     >
       <%!-- Branding --%>
       <div class="flex items-center gap-2 px-3 py-3 border-b border-base-content/5">
-        <.link navigate="/" class="flex items-center gap-2 min-w-0">
+        <.link navigate="/" class="flex items-center gap-2 min-w-0 flex-1">
           <img src="/images/logo.svg" class="w-7 h-7 flex-shrink-0" />
           <span class={[
             "text-sm font-semibold text-base-content/80 truncate",
@@ -152,6 +175,14 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
             Eye in the Sky
           </span>
         </.link>
+        <button
+          :if={@mobile_open}
+          phx-click="close_mobile"
+          phx-target={@myself}
+          class="md:hidden btn btn-ghost btn-xs btn-square text-base-content/40"
+        >
+          <.icon name="hero-x-mark" class="w-4 h-4" />
+        </button>
       </div>
 
       <%!-- Scrollable nav --%>
@@ -433,6 +464,14 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
             <.theme_toggle />
           </div>
         <% end %>
+        <.link
+          href="/auth/logout"
+          method="delete"
+          class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-red-500"
+          title="Sign out"
+        >
+          <.icon name="hero-arrow-right-on-rectangle-mini" class="w-4 h-4" />
+        </.link>
         <button
           phx-click="toggle_collapsed"
           phx-target={@myself}
@@ -450,6 +489,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
         </button>
       </div>
     </aside>
+    </div>
     """
   end
 

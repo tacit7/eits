@@ -71,9 +71,9 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="px-6 lg:px-8">
+    <div class="px-4 sm:px-6 lg:px-8">
       <div class="max-w-5xl mx-auto">
-        <div class="flex items-center justify-between py-6">
+        <div class="flex items-center justify-between py-4 sm:py-6">
           <div>
             <h1 class="text-lg font-semibold text-base-content/90">Sessions</h1>
             <p class="text-xs text-base-content/35 mt-0.5">

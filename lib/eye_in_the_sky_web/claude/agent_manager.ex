@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   """
   def create_agent(opts) do
     agent_uuid = Ecto.UUID.generate()
-    session_uuid = Ecto.UUID.generate()
+    session_uuid = opts[:session_uuid] || Ecto.UUID.generate()
 
     description = opts[:description] || "Agent session"
 

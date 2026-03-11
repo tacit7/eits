@@ -77,6 +77,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:workflow_states, Tasks.list_workflow_states())
       |> assign(:current_task, Tasks.get_current_task_for_session(session.id))
       |> assign(:sync_timer, nil)
+      |> assign(:total_tokens, 0)
       |> allow_upload(:files,
         accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
         max_entries: 10,
@@ -551,10 +552,12 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   defp load_tab_data(socket, tab, session_id) do
     Logger.info("Loading DM tab data tab=#{tab} session_id=#{session_id}")
     {messages, has_more} = load_message_data(socket, tab, session_id)
+    total_tokens = Messages.total_tokens_for_session(session_id)
 
     socket
     |> assign(:messages, messages)
     |> assign(:has_more_messages, has_more)
+    |> assign(:total_tokens, total_tokens)
     |> assign(:current_task, Tasks.get_current_task_for_session(session_id))
     |> assign(
       :tasks,
@@ -793,6 +796,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         show_new_task_drawer={@show_new_task_drawer}
         workflow_states={@workflow_states}
         current_task={@current_task}
+        total_tokens={@total_tokens}
       />
     </div>
     """

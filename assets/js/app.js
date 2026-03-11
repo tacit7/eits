@@ -28,9 +28,11 @@ import {CopySessionId} from "./hooks/copy_session_id"
 import {BookmarkAgent} from "./hooks/bookmark_agent"
 import {FavoriteFab} from "./hooks/favorite_fab"
 import {ScrollToBottom} from "./hooks/scroll_to_bottom"
+import {AutoScroll} from "./hooks/auto_scroll"
 import {MarkdownMessage} from "./hooks/markdown_message"
 import {CommandHistory} from "./hooks/command_history"
 import {DiffViewer} from "./hooks/diff_viewer"
+import {PasskeyAuth} from "./hooks/passkey_auth"
 import {getHooks} from "live_svelte"
 import "./theme"
 import hljs from 'highlight.js'
@@ -66,9 +68,11 @@ Hooks.CopySessionId = CopySessionId
 Hooks.BookmarkAgent = BookmarkAgent
 Hooks.FavoriteFab = FavoriteFab
 Hooks.ScrollToBottom = ScrollToBottom
+Hooks.AutoScroll = AutoScroll
 Hooks.CommandHistory = CommandHistory
 Hooks.MarkdownMessage = MarkdownMessage
 Hooks.DiffViewer = DiffViewer
+Hooks.PasskeyAuth = PasskeyAuth
 Hooks.RefreshDot = {
   mounted() { this._flash() },
   updated() { this._flash() },
@@ -250,6 +254,10 @@ Hooks.SidebarState = {
       const id = btn.dataset.projectToggle
       this._toggleProject(id)
     })
+
+    // Listen for mobile open event dispatched from the top bar outside this component
+    this._openHandler = () => this.pushEventTo(this.el, "toggle_mobile", {})
+    this.el.addEventListener("sidebar:open", this._openHandler)
   },
 
   updated() {
@@ -314,6 +322,12 @@ Hooks.SidebarState = {
       chevron.innerHTML = isExpanded
         ? `<svg class="w-3.5 h-3.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>`
         : `<svg class="w-3.5 h-3.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>`
+    }
+  },
+
+  destroyed() {
+    if (this._openHandler) {
+      this.el.removeEventListener("sidebar:open", this._openHandler)
     }
   }
 }

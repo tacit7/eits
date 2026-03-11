@@ -305,6 +305,18 @@ defmodule EyeInTheSkyWeb.Messages do
   end
 
   @doc """
+  Returns the total token count (input + output) for all messages in a session.
+  """
+  def total_tokens_for_session(session_id) do
+    Message
+    |> where([m], m.session_id == ^session_id)
+    |> select([m], fragment(
+      "COALESCE(SUM(CAST(COALESCE(metadata->'usage'->>'input_tokens', '0') AS INTEGER) + CAST(COALESCE(metadata->'usage'->>'output_tokens', '0') AS INTEGER)), 0)"
+    ))
+    |> Repo.one() || 0
+  end
+
+  @doc """
   Returns recent messages for a session (default last 50).
   """
   def list_recent_messages(session_id, limit \\ 50) do

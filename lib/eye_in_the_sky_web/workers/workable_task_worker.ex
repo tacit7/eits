@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
 
   alias EyeInTheSkyWeb.{Projects, Repo, ScheduledJobs}
   alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Workers.SpeakWorker
 
   import Ecto.Query
 
@@ -28,11 +29,13 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
       {:ok, output} ->
         ScheduledJobs.record_run_complete(run, "completed", result: output)
         broadcast()
+        notify(output)
         :ok
 
       {:error, reason} ->
         ScheduledJobs.record_run_complete(run, "failed", result: reason)
         broadcast()
+        notify_error(reason)
         {:error, reason}
     end
   end
@@ -124,5 +127,19 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
 
   defp broadcast do
     Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "scheduled_jobs", :jobs_updated)
+  end
+
+  defp notify(output) do
+    %{"message" => output, "voice" => "Ava"}
+    |> SpeakWorker.new()
+    |> Oban.insert()
+  end
+
+  defp notify_error(reason) do
+    message = "Workable task worker failed: #{reason}"
+
+    %{"message" => message, "voice" => "Ava"}
+    |> SpeakWorker.new()
+    |> Oban.insert()
   end
 end

@@ -33,13 +33,14 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :show_new_task_drawer, :boolean, default: false
   attr :workflow_states, :list, default: []
   attr :current_task, :map, default: nil
+  attr :total_tokens, :integer, default: 0
 
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
 
     ~H"""
     <div
-      class="flex flex-col h-[calc(100vh-2rem)] px-4 sm:px-6 lg:px-8 py-4 relative"
+      class="flex flex-col h-[calc(100vh-5rem)] md:h-[calc(100vh-2rem)] px-2 sm:px-4 lg:px-8 py-2 sm:py-4 relative"
       id="dm-page"
       phx-drop-target={@uploads.files.ref}
       phx-hook="DragUpload"
@@ -61,14 +62,15 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         class="max-w-6xl mx-auto w-full bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0"
         id="dm-header-card"
       >
-        <div class="px-5 py-3" id="dm-header">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
+        <div class="px-4 sm:px-5 py-3" id="dm-header">
+          <div class="flex items-center gap-2 min-w-0">
+            <%!-- Left: status + name + badges --%>
+            <div class="flex items-center gap-2 min-w-0 flex-1">
               <div class={"w-2 h-2 rounded-full flex-shrink-0 " <> if(is_nil(@agent.ended_at) || @agent.ended_at == "", do: "bg-success animate-pulse", else: "bg-base-content/20")} />
-              <h1 class="text-lg font-bold text-base-content">{@agent.name || "Session"}</h1>
+              <h1 class="text-base sm:text-lg font-bold text-base-content truncate min-w-0">{@agent.name || "Session"}</h1>
               <button
                 type="button"
-                class="flex items-center gap-1 text-[11px] font-mono text-base-content/30 bg-base-content/5 px-2 py-0.5 rounded hover:text-base-content/50 hover:bg-base-content/8 transition-colors cursor-pointer"
+                class="hidden sm:flex items-center gap-1 text-[11px] font-mono text-base-content/30 bg-base-content/5 px-2 py-0.5 rounded hover:text-base-content/50 hover:bg-base-content/8 transition-colors cursor-pointer flex-shrink-0"
                 phx-hook="CopyToClipboard"
                 id="copy-session-uuid"
                 data-copy={@session_uuid}
@@ -80,18 +82,19 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 type="button"
                 phx-click="open_iterm"
                 title="Open in iTerm"
-                class="flex items-center gap-1 text-[11px] text-base-content/30 bg-base-content/5 px-2 py-0.5 rounded hover:text-base-content/50 hover:bg-base-content/8 transition-colors cursor-pointer"
+                class="hidden sm:flex items-center gap-1 text-[11px] text-base-content/30 bg-base-content/5 px-2 py-0.5 rounded hover:text-base-content/50 hover:bg-base-content/8 transition-colors cursor-pointer flex-shrink-0"
               >
                 <.icon name="hero-command-line" class="w-3 h-3" />
               </button>
             </div>
-            <div class="flex items-center gap-2">
+            <%!-- Right: controls --%>
+            <div class="flex items-center gap-1 flex-shrink-0">
               <button
                 phx-click="toggle_live_stream"
                 phx-hook="LiveStreamToggle"
                 id="dm-live-stream-toggle"
                 class={[
-                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors",
+                  "flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs transition-colors",
                   @show_live_stream && "text-primary bg-primary/10 hover:bg-primary/15",
                   !@show_live_stream &&
                     "text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5"
@@ -100,12 +103,13 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 <.icon
                   name={if @show_live_stream, do: "hero-signal-solid", else: "hero-signal"}
                   class="w-3.5 h-3.5"
-                /> Live
+                />
+                <span class="hidden sm:inline">Live</span>
               </button>
               <button
                 phx-click="reload_from_session_file"
                 data-confirm="This will delete all messages and re-import from the JSONL file. Continue?"
-                class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+                class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
                 id="dm-reload-button"
               >
                 <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Reload
@@ -135,8 +139,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         <% end %>
 
         <%!-- Pill tabs --%>
-        <div class="px-5 pb-3" id="dm-tabs">
-          <div class="flex items-center gap-1 bg-base-content/[0.03] rounded-lg p-0.5">
+        <div class="px-5 pb-3 overflow-x-auto" id="dm-tabs">
+          <div class="flex items-center gap-1 bg-base-content/[0.03] rounded-lg p-0.5 min-w-max">
             <%= for {tab, icon, label} <- @tabs do %>
               <button
                 class={[
@@ -190,6 +194,16 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         <% end %>
       </div>
 
+      <%!-- Token counter pill (floating, above composer, messages tab only) --%>
+      <%= if @active_tab in ["messages", nil] && @total_tokens > 0 do %>
+        <div class="absolute bottom-[5.5rem] right-8 z-10 pointer-events-none">
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-base-content/[0.06] text-[11px] font-mono tabular-nums text-base-content/40 border border-base-content/[0.06]">
+            <.icon name="hero-hashtag" class="w-3 h-3" />
+            {format_number(@total_tokens)} tokens
+          </span>
+        </div>
+      <% end %>
+
       <%!-- Composer (pinned to bottom) --%>
       <%= if @active_tab in ["messages", nil] do %>
         <div class="flex-shrink-0 max-w-4xl mx-auto w-full pt-2">
@@ -220,7 +234,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         <div
           class="px-4 py-2 overflow-y-auto flex-1 min-h-0"
           id="messages-container"
-          phx-hook="ScrollToBottom"
+          phx-hook="AutoScroll"
           style="scrollbar-width: none; -ms-overflow-style: none;"
         >
           <%= if @messages == [] do %>
@@ -312,7 +326,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         <% end %>
 
         <div class="min-w-0 flex-1">
-          <div class="flex items-baseline gap-2">
+          <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <span class={[
               "text-[13px] font-semibold",
               !@is_user && "text-primary/80",
@@ -340,13 +354,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             ></time>
           </div>
 
-          <div
-            id={"msg-body-#{@message.id}"}
-            class="dm-markdown mt-1 text-sm leading-relaxed text-base-content/85"
-            phx-hook="MarkdownMessage"
-            data-raw-body={@message.body}
-          >
-          </div>
+          <.message_body message={@message} />
 
           <.message_metrics :if={show_message_metrics?(@message)} message={@message} />
           <.message_attachments attachments={@message.attachments || []} />
@@ -426,6 +434,67 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         <% end %>
       </div>
     <% end %>
+    """
+  end
+
+  attr :message, :map, required: true
+
+  defp message_body(assigns) do
+    segments = parse_body_segments(assigns.message.body)
+    assigns = assign(assigns, :segments, segments)
+
+    ~H"""
+    <div class="mt-1 space-y-1.5">
+      <%= for {segment, idx} <- Enum.with_index(@segments) do %>
+        <%= case segment do %>
+          <% {:tool_call, name, rest} -> %>
+            <.tool_widget name={name} rest={rest} />
+          <% {:text, text} when text != "" -> %>
+            <div
+              id={"msg-body-#{@message.id}-#{idx}"}
+              class="dm-markdown text-sm leading-relaxed text-base-content/85"
+              phx-hook="MarkdownMessage"
+              data-raw-body={text}
+            ></div>
+          <% _ -> %>
+        <% end %>
+      <% end %>
+    </div>
+    """
+  end
+
+  attr :name, :string, required: true
+  attr :rest, :string, required: true
+
+  defp tool_widget(assigns) do
+    {icon, label, detail} = tool_widget_meta(assigns.name, assigns.rest)
+    assigns = assigns |> assign(:icon, icon) |> assign(:label, label) |> assign(:detail, detail)
+
+    ~H"""
+    <details class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden">
+      <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
+        <.icon name={@icon} class="w-3.5 h-3.5 flex-shrink-0 text-base-content/35" />
+        <span class="text-[11px] font-mono font-semibold text-base-content/45 uppercase tracking-wide flex-shrink-0">
+          {@label}
+        </span>
+        <span
+          :if={@detail != ""}
+          class="text-[11px] font-mono text-base-content/35 truncate flex-1 min-w-0"
+        >
+          {@detail}
+        </span>
+        <.icon
+          name="hero-chevron-right"
+          class="w-3 h-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
+        />
+      </summary>
+      <div
+        :if={@rest != "" && @rest != @detail}
+        class="px-2.5 pb-2 pt-1 border-t border-base-content/5"
+      >
+        <pre class="font-mono text-[10px] text-base-content/45 whitespace-pre-wrap break-all leading-relaxed">{@rest}</pre>
+      </div>
+    </details>
     """
   end
 
@@ -613,16 +682,21 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           >
             <input type="checkbox" />
             <div class="collapse-title py-3 px-4 min-h-0">
-              <div class="flex items-center gap-3">
+              <div class="flex items-start gap-3">
                 <.icon
                   name="hero-clipboard-document-list"
-                  class="h-4 w-4 flex-shrink-0 text-base-content/30"
+                  class="h-4 w-4 flex-shrink-0 text-base-content/30 mt-0.5"
                 />
                 <div class="flex-1 min-w-0">
-                  <h3 class="text-[13px] font-semibold text-base-content/85 truncate">
+                  <h3 class="text-[13px] font-semibold text-base-content/85">
                     {task.title}
                   </h3>
-                  <div class="flex items-center gap-1.5 mt-0.5 text-[11px] text-base-content/30">
+                  <%= if task.description do %>
+                    <p class="text-[12px] text-base-content/50 mt-0.5 line-clamp-2 leading-snug">
+                      {task.description}
+                    </p>
+                  <% end %>
+                  <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
                     <span class="font-mono">
                       {String.slice(task.uuid || to_string(task.id), 0..7)}
                     </span>
@@ -635,7 +709,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               </div>
             </div>
             <div class="collapse-content px-4 pb-4">
-              <div class="pl-[30px]">
+              <div class="pl-[28px]">
                 <div class="whitespace-pre-wrap text-sm text-base-content/70 leading-relaxed">
                   {task.description || "No description"}
                 </div>
@@ -944,5 +1018,75 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
     |> then(fn text ->
       if String.length(text) >= 60, do: text <> "...", else: text
     end)
+  end
+
+  defp format_number(n) when is_integer(n) do
+    n
+    |> Integer.to_string()
+    |> String.reverse()
+    |> String.graphemes()
+    |> Enum.chunk_every(3)
+    |> Enum.join(",")
+    |> String.reverse()
+  end
+
+  defp format_number(_), do: "0"
+
+  # Tool widget parsing helpers
+
+  defp parse_body_segments(nil), do: [{:text, ""}]
+
+  defp parse_body_segments(body) when is_binary(body) do
+    body
+    |> String.trim()
+    |> String.split(~r/\n\n/, trim: true)
+    |> Enum.map(&parse_body_segment/1)
+  end
+
+  defp parse_body_segment(text) do
+    trimmed = String.trim(text)
+
+    case Regex.run(~r/^> `([^`]+)` ?(.*)/s, trimmed, capture: :all_but_first) do
+      [name, rest] -> {:tool_call, name, String.trim(rest)}
+      _ -> {:text, text}
+    end
+  end
+
+  defp tool_widget_meta("Bash", rest) do
+    command =
+      case Regex.run(~r/^`(.+?)`/s, rest, capture: :all_but_first) do
+        [cmd] -> cmd
+        _ -> rest
+      end
+
+    {"hero-command-line", "Bash", command}
+  end
+
+  defp tool_widget_meta("Read", rest), do: {"hero-document-text", "Read", rest}
+  defp tool_widget_meta("Write", rest), do: {"hero-pencil-square", "Write", rest}
+  defp tool_widget_meta("Edit", rest), do: {"hero-pencil-square", "Edit", rest}
+  defp tool_widget_meta("Glob", rest), do: {"hero-folder-open", "Glob", rest}
+  defp tool_widget_meta("Task", rest), do: {"hero-cpu-chip", "Task", rest}
+
+  defp tool_widget_meta("Grep", rest) do
+    case Regex.run(~r/^`([^`]+)`\s*(.*)/s, rest, capture: :all_but_first) do
+      [pattern, path] ->
+        detail = [pattern, path] |> Enum.reject(&(&1 == "")) |> Enum.join(" ")
+        {"hero-magnifying-glass", "Grep", detail}
+
+      _ ->
+        {"hero-magnifying-glass", "Grep", rest}
+    end
+  end
+
+  defp tool_widget_meta("WebSearch", rest), do: {"hero-globe-alt", "WebSearch", rest}
+
+  defp tool_widget_meta(name, rest) do
+    if String.contains?(name, "__") do
+      short = name |> String.split("__") |> List.last()
+      {"hero-puzzle-piece", short, rest}
+    else
+      {"hero-wrench-screwdriver", name, rest}
+    end
   end
 end

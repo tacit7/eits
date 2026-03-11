@@ -21,12 +21,12 @@ config :eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   https: [
-    port: 5000,
+    port: 5001,
     cipher_suite: :strong,
     certfile: "priv/cert/localhost+2.pem",
     keyfile: "priv/cert/localhost+2-key.pem"
   ],
-  http: [port: 5001],
+  http: [port: 5000],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,

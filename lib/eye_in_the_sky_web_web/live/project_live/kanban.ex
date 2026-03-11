@@ -498,7 +498,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="px-4 sm:px-6 py-6 h-[calc(100vh-4rem)] flex flex-col">
+    <div class="px-4 sm:px-6 py-6 h-[calc(100vh-7rem)] md:h-[calc(100vh-4rem)] flex flex-col">
       <%!-- Search + New Task --%>
       <div class="mb-4 flex items-center gap-3">
         <form phx-change="search" class="flex-1 max-w-sm">

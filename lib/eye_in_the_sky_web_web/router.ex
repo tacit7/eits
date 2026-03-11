@@ -10,14 +10,44 @@ defmodule EyeInTheSkyWebWeb.Router do
     plug :put_secure_browser_headers
   end
 
+  pipeline :require_auth do
+    plug EyeInTheSkyWebWeb.Plugs.RequireAuth
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
   end
 
-  scope "/", EyeInTheSkyWebWeb do
+  # Session-aware JSON pipeline without CSRF — safe for WebAuthn endpoints
+  # (registration is token-gated; login uses WebAuthn challenge binding)
+  pipeline :webauthn do
+    plug :accepts, ["json"]
+    plug :fetch_session
+  end
+
+  # Auth LiveView pages (HTML, with CSRF)
+  scope "/auth", EyeInTheSkyWebWeb do
     pipe_through :browser
 
-    live_session :app, on_mount: [EyeInTheSkyWebWeb.FabHook] do
+    live "/login", AuthLive, :login
+    live "/register", AuthLive, :register
+    delete "/logout", AuthController, :logout
+  end
+
+  # WebAuthn JSON endpoints (no CSRF — protected by token + challenge binding)
+  scope "/auth", EyeInTheSkyWebWeb do
+    pipe_through :webauthn
+
+    post "/register/challenge", AuthController, :register_challenge
+    post "/register/complete", AuthController, :register_complete
+    post "/login/challenge", AuthController, :login_challenge
+    post "/login/complete", AuthController, :login_complete
+  end
+
+  scope "/", EyeInTheSkyWebWeb do
+    pipe_through [:browser, :require_auth]
+
+    live_session :app, on_mount: [EyeInTheSkyWebWeb.AuthHook, EyeInTheSkyWebWeb.FabHook] do
       live "/", AgentLive.Index, :index
       live "/notes", OverviewLive.Notes, :index
       live "/tasks", OverviewLive.Tasks, :index

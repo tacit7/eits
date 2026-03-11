@@ -29,10 +29,8 @@ export const FavoriteFab = {
     this._statuses = {}
     this._chatAgent = null
     this._chatMessages = []
-    this._chatConfirmed = false
     this._unreadCount = 0
-    this._previewTimer = null
-    this._fabLeaveTimer = null
+    this._expanded = false
     this._render()
 
     this._onBookmarksUpdated = () => this._render()
@@ -101,45 +99,25 @@ export const FavoriteFab = {
     this._render()
   },
 
-  // Open chat in preview mode (hover). Confirmed = false until clicked.
   _openChat(agent) {
-    clearTimeout(this._previewTimer)
-    // If switching agents, unsubscribe from old one
     if (this._chatAgent && this._chatAgent.session_id !== agent.session_id) {
       this.pushEvent('fab_close_chat', {})
     }
     this._chatAgent = agent
     this._chatMessages = []
-    this._chatConfirmed = false
     this._unreadCount = 0
     this._updateUnreadBadge()
     this._createChatModal()
     this.pushEvent('fab_open_chat', { session_id: agent.session_id })
-  },
-
-  // Confirm chat (click) — stays open when mouse leaves agent button
-  _confirmChat() {
-    this._chatConfirmed = true
-    clearTimeout(this._previewTimer)
-    // Focus input so user can start typing immediately
     document.getElementById('fab-chat-input')?.focus()
   },
 
   _closeChat(notify = true) {
-    clearTimeout(this._previewTimer)
     this._chatAgent = null
     this._chatMessages = []
-    this._chatConfirmed = false
     const modal = document.getElementById('fab-chat-modal')
     if (modal) modal.remove()
     if (notify) this.pushEvent('fab_close_chat', {})
-  },
-
-  _scheduleClosePreview() {
-    clearTimeout(this._previewTimer)
-    this._previewTimer = setTimeout(() => {
-      if (!this._chatConfirmed) this._closeChat()
-    }, 200)
   },
 
   _sendMessage() {
@@ -221,12 +199,6 @@ export const FavoriteFab = {
 
     document.body.appendChild(modal)
 
-    // Hovering the chat modal cancels the preview close timer
-    modal.addEventListener('mouseenter', () => clearTimeout(this._previewTimer))
-    modal.addEventListener('mouseleave', () => {
-      if (!this._chatConfirmed) this._scheduleClosePreview()
-    })
-
     document.getElementById('fab-chat-close')?.addEventListener('click', () => this._closeChat())
     document.getElementById('fab-chat-send')?.addEventListener('click', () => this._sendMessage())
     const input = document.getElementById('fab-chat-input')
@@ -294,6 +266,21 @@ export const FavoriteFab = {
     return div.innerHTML
   },
 
+  _setExpanded(val) {
+    this._expanded = val
+    this.el.querySelectorAll('.fab-agent-btn').forEach(el => {
+      if (val) {
+        el.style.opacity = '1'
+        el.style.pointerEvents = 'auto'
+        el.style.transform = `translate(${el._tx}px, ${el._ty}px) scale(1)`
+      } else {
+        el.style.opacity = '0'
+        el.style.pointerEvents = 'none'
+        el.style.transform = 'translate(0,0) scale(0.5)'
+      }
+    })
+  },
+
   _render() {
     const bookmarks = this._getBookmarks()
     this._agentMap = bookmarks
@@ -315,7 +302,7 @@ export const FavoriteFab = {
 
     const mainBtn = `
       <div tabindex="0" role="button"
-           style="position:relative;z-index:2"
+           style="position:absolute;bottom:0;right:0;z-index:2;pointer-events:auto"
            class="btn btn-primary btn-circle shadow-lg outline-none">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
           <path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clip-rule="evenodd" />
@@ -336,7 +323,7 @@ export const FavoriteFab = {
       return `
         <button
            class="btn btn-circle bg-base-100 shadow-md hover:bg-base-200 border border-base-content/10 relative group fab-agent-btn"
-           style="position:absolute;top:0;left:0;opacity:0;transform:scale(0.5);transition:opacity 0.18s,transform 0.18s;pointer-events:none"
+           style="position:absolute;bottom:0;right:0;opacity:0;transform:translate(0,0) scale(0.5);transition:opacity 0.18s,transform 0.18s;pointer-events:none"
            title="${(agent.name || 'Agent').replace(/"/g, '&quot;')}"
            data-agent-index="${index}">
           <span class="font-bold text-xs text-base-content/70">${initials}</span>
@@ -355,17 +342,17 @@ export const FavoriteFab = {
 
     this.el.innerHTML = mainBtn + agentBtns
 
-    // Container: fixed bottom-right, sized to main button, overflow visible for radial children
     Object.assign(this.el.style, {
       position: 'fixed',
       bottom: '1rem',
       right: '1rem',
-      width: '56px',
-      height: '56px',
+      width: '200px',
+      height: '200px',
       overflow: 'visible',
+      pointerEvents: 'none',
     })
 
-    // Compute and store radial offsets
+    // Compute and store radial offsets on the elements
     const offsets = radialOffsets(bookmarks.length)
     const agentEls = Array.from(this.el.querySelectorAll('.fab-agent-btn'))
     agentEls.forEach((el, i) => {
@@ -373,36 +360,19 @@ export const FavoriteFab = {
       el._ty = offsets[i].y
     })
 
-    const expand = () => {
-      clearTimeout(this._fabLeaveTimer)
-      this.el.querySelectorAll('.fab-agent-btn').forEach(el => {
-        el.style.opacity = '1'
-        el.style.pointerEvents = ''
-        el.style.transform = `translate(${el._tx}px, ${el._ty}px) scale(1)`
-      })
+    // Restore expanded state after re-render (e.g. from status update)
+    if (this._expanded) this._setExpanded(true)
+
+    // Main button: click toggles agent buttons
+    const mainBtnEl = this.el.querySelector('[role="button"]')
+    if (mainBtnEl) {
+      mainBtnEl.onclick = (e) => {
+        e.stopPropagation()
+        this._setExpanded(!this._expanded)
+      }
     }
 
-    const collapse = () => {
-      this.el.querySelectorAll('.fab-agent-btn').forEach(el => {
-        el.style.opacity = '0'
-        el.style.pointerEvents = 'none'
-        el.style.transform = 'translate(0,0) scale(0.5)'
-      })
-      if (!this._chatConfirmed) this._scheduleClosePreview()
-    }
-
-    // FAB container hover — expand on enter, collapse after 150ms delay on leave
-    // Use onmouseenter/onmouseleave (not addEventListener) so re-renders replace the handler
-    // instead of accumulating stale closures referencing detached DOM elements.
-    this.el.onmouseenter = () => {
-      clearTimeout(this._fabLeaveTimer)
-      expand()
-    }
-    this.el.onmouseleave = () => {
-      this._fabLeaveTimer = setTimeout(collapse, 150)
-    }
-
-    // Wire up remove buttons
+    // Remove buttons
     this.el.querySelectorAll('.fab-remove-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault()
@@ -411,23 +381,13 @@ export const FavoriteFab = {
       })
     })
 
-    // Agent buttons: hover = preview, click = confirm
+    // Agent buttons: click opens chat
     agentEls.forEach(btn => {
-      btn.addEventListener('mouseenter', () => {
-        clearTimeout(this._previewTimer)
-        clearTimeout(this._fabLeaveTimer)
-        const agent = this._agentMap[parseInt(btn.dataset.agentIndex, 10)]
-        if (agent) this._openChat(agent)
-      })
-
-      btn.addEventListener('mouseleave', () => {
-        if (!this._chatConfirmed) this._scheduleClosePreview()
-      })
-
       btn.addEventListener('click', (e) => {
         e.preventDefault()
         e.stopPropagation()
-        this._confirmChat()
+        const agent = this._agentMap[parseInt(btn.dataset.agentIndex, 10)]
+        if (agent) this._openChat(agent)
       })
     })
   }

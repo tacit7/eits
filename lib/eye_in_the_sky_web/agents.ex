@@ -44,7 +44,7 @@ defmodule EyeInTheSkyWeb.Agents do
   end
 
   @doc """
-  Returns counts of agents by project for overview purposes.
+  Returns the total agent count, optionally scoped to a project.
   """
   def get_agent_status_counts(project_id \\ nil) do
     query =
@@ -54,9 +54,7 @@ defmodule EyeInTheSkyWeb.Agents do
         Agent
       end
 
-    query
-    |> select([a], count(a.id))
-    |> Repo.all()
+    Repo.aggregate(query, :count, :id)
   end
 
   @doc """
@@ -129,7 +127,10 @@ defmodule EyeInTheSkyWeb.Agents do
   end
 
   @doc """
-  Updates an agent (status field moved to sessions).
+  No-op. Agent status is tracked on the Session, not the Agent.
+  Use `Sessions.update_session/2` with `%{status: status}` instead.
+
+  @deprecated
   """
   def update_agent_status(%Agent{} = agent, _status) do
     {:ok, agent}

@@ -9,6 +9,17 @@ defmodule EyeInTheSkyWeb.Tasks do
   alias EyeInTheSkyWeb.QueryHelpers
   alias EyeInTheSkyWeb.Search.FTS5
 
+  # Workflow state IDs (matches workflow_states table)
+  @state_todo 1
+  @state_in_progress 2
+  @state_in_review 4
+  @state_done 3
+
+  def state_todo, do: @state_todo
+  def state_in_progress, do: @state_in_progress
+  def state_in_review, do: @state_in_review
+  def state_done, do: @state_done
+
   # Task functions
 
   @doc """
@@ -51,7 +62,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   def get_current_task_for_session(session_id) do
     Task
     |> join(:inner, [t], ts in "task_sessions", on: ts.task_id == t.id)
-    |> where([t, ts], ts.session_id == ^session_id and t.state_id == 2)
+    |> where([t, ts], ts.session_id == ^session_id and t.state_id == @state_in_progress)
     |> order_by([t], desc: t.updated_at)
     |> limit(1)
     |> preload([:state])

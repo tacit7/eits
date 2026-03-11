@@ -144,23 +144,14 @@ defmodule EyeInTheSkyWebWeb.DmLive do
            updated_at: now
          }) do
       {:ok, task} ->
-        Repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_id}],
-          on_conflict: :nothing
-        )
+        Tasks.link_session_to_task(task.id, session_id)
 
-        if length(tag_names) > 0 do
-          Enum.each(tag_names, fn tag_name ->
-            case Tasks.get_or_create_tag(tag_name) do
-              {:ok, tag} ->
-                Repo.insert_all("task_tags", [%{task_id: task.id, tag_id: tag.id}],
-                  on_conflict: :nothing
-                )
-
-              _ ->
-                :ok
-            end
-          end)
-        end
+        Enum.each(tag_names, fn tag_name ->
+          case Tasks.get_or_create_tag(tag_name) do
+            {:ok, tag} -> Tasks.link_tag_to_task(task.id, tag.id)
+            _ -> :ok
+          end
+        end)
 
         socket =
           socket

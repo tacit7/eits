@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.Workers.DailyDigestWorker do
 
   import Ecto.Query, warn: false
 
-  alias EyeInTheSkyWeb.{Repo, ScheduledJobs, Notes, Notifications}
+  alias EyeInTheSkyWeb.{Repo, ScheduledJobs, Notes, Notifications, Tasks}
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"job_id" => job_id}}) do
@@ -74,11 +74,13 @@ defmodule EyeInTheSkyWeb.Workers.DailyDigestWorker do
   end
 
   defp fetch_completed_tasks(since) do
+    state_done = Tasks.state_done()
+
     Repo.all(
       from t in "tasks",
         left_join: p in "projects",
         on: p.id == t.project_id,
-        where: t.state_id == 3 and t.updated_at >= ^since,
+        where: t.state_id == ^state_done and t.updated_at >= ^since,
         select: %{title: t.title, project: p.name},
         order_by: [asc: t.title]
     )

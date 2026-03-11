@@ -206,12 +206,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   @impl true
-  def handle_event("open_chat", %{"session_id" => _session_id}, socket) do
-    # Navigate to agent detail view - currently no dedicated session view
-    {:noreply, socket}
-  end
-
-  @impl true
   def handle_event("search", %{"query" => query}, socket) do
     effective_query = if String.length(String.trim(query)) >= 3, do: query, else: ""
 

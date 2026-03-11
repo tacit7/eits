@@ -14,7 +14,7 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
 
   require Logger
 
-  alias EyeInTheSkyWeb.{Projects, Repo, ScheduledJobs}
+  alias EyeInTheSkyWeb.{Projects, Repo, ScheduledJobs, Tasks}
   alias EyeInTheSkyWeb.Claude.AgentManager
   alias EyeInTheSkyWeb.Workers.SpeakWorker
 
@@ -64,13 +64,15 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
   end
 
   defp fetch_workable_tasks(tag_name) do
+    state_todo = Tasks.state_todo()
+
     Repo.all(
       from t in "tasks",
         join: tt in "task_tags",
         on: tt.task_id == t.id,
         join: tg in "tags",
         on: tg.id == tt.tag_id,
-        where: tg.name == ^tag_name and t.state_id == 1,
+        where: tg.name == ^tag_name and t.state_id == ^state_todo,
         order_by: [desc: t.priority, asc: t.id],
         select: %{
           id: t.id,
@@ -84,7 +86,7 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
   defp mark_in_progress(task_id) do
     Repo.update_all(
       from(t in "tasks", where: t.id == ^task_id),
-      set: [state_id: 2]
+      set: [state_id: Tasks.state_in_progress()]
     )
   end
 

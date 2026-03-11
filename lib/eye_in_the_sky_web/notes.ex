@@ -162,7 +162,7 @@ defmodule EyeInTheSkyWeb.Notes do
 
     fallback_query =
       from n in Note,
-        where: like(n.body, ^pattern)
+        where: ilike(n.body, ^pattern) or ilike(n.title, ^pattern)
 
     fallback_query =
       if length(agent_ids) > 0 do

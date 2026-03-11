@@ -6,6 +6,9 @@ defmodule EyeInTheSkyWeb.Sessions do
   """
 
   import Ecto.Query, warn: false
+
+  require Logger
+
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Sessions.Session
   alias EyeInTheSkyWeb.Scopes.Archivable
@@ -141,7 +144,7 @@ defmodule EyeInTheSkyWeb.Sessions do
   Archives a session (soft delete).
   """
   def archive_session(%Session{} = session) do
-    now = DateTime.utc_now() |> DateTime.to_string()
+    now = DateTime.utc_now() |> DateTime.to_iso8601()
     update_session(session, %{archived_at: now})
   end
 
@@ -149,14 +152,9 @@ defmodule EyeInTheSkyWeb.Sessions do
   Unarchives a session.
   """
   def unarchive_session(%Session{} = session) do
-    require Logger
-
-    Logger.info(
-      "📦 Unarchiving session #{session.id}, current archived_at: #{inspect(session.archived_at)}"
-    )
-
+    Logger.info("unarchive_session id=#{session.id} archived_at=#{inspect(session.archived_at)}")
     result = update_session(session, %{archived_at: nil})
-    Logger.info("📦 Update result: #{inspect(result)}")
+    Logger.info("unarchive_session result=#{inspect(result)}")
     result
   end
 
@@ -349,16 +347,14 @@ defmodule EyeInTheSkyWeb.Sessions do
   Returns tasks, commits, logs, notes, context, and metrics.
   """
   def load_session_data(session_id) do
-    alias EyeInTheSkyWeb.{Tasks, Commits, Logs, Contexts}
+    alias EyeInTheSkyWeb.{Tasks, Commits, Logs, Contexts, Notes}
 
     %{
       tasks: Tasks.list_tasks_for_session(session_id),
       commits: Commits.list_commits_for_session(session_id),
       logs: Logs.list_logs_for_session(session_id),
-      # TODO: Fix parent_id type mismatch (INTEGER vs TEXT)
-      notes: [],
+      notes: Notes.list_notes_for_session(session_id),
       session_context: Contexts.get_session_context(session_id),
-      # TODO: Add metrics when table exists
       metrics: nil
     }
   end

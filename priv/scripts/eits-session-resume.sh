@@ -117,6 +117,13 @@ else
   _log "WARN: CLAUDE_ENV_FILE not set, skipping env writes"
 fi
 
+# Write session UUID to .git/eits-session for post-commit hook
+GIT_DIR=$(git -C "$PROJECT_DIR" rev-parse --git-dir 2>/dev/null || true)
+if [ -n "$GIT_DIR" ]; then
+  echo "$SESSION_ID" > "$GIT_DIR/eits-session" 2>/dev/null || true
+  _log "wrote session UUID to $GIT_DIR/eits-session"
+fi
+
 # NATS (fire-and-forget)
 DESCRIPTION=$(_pgq "SELECT description FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1" || true)
 SESSION_NAME=$(_pgq "SELECT name FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1" || true)

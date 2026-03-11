@@ -94,7 +94,7 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
     project_id = task.project_id || job_project_id
 
     project_path =
-      case project_id && Projects.get_project!(project_id) do
+      case project_id && Repo.get(EyeInTheSkyWeb.Projects.Project, project_id) do
         %{path: path} when is_binary(path) -> path
         _ -> File.cwd!()
       end
@@ -104,8 +104,8 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
 
     #{task.description}
 
-    When done, update the task state to In Review:
-    psql -d eits_dev -c "UPDATE tasks SET state_id=4 WHERE id=#{task.id};"
+    When done, move the task to In Review using the i-todo MCP tool:
+    i-todo command="status" task_id="#{task.id}" state_id=4
     """
 
     opts = [

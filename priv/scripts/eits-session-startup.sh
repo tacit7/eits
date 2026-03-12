@@ -95,10 +95,20 @@ CONTEXT="# Eye in the Sky Integration Active
 
 **IMPORTANT**: Call \`/eits-init\` to name and describe your session.
 
+## Required Workflow (enforced by hooks)
+
+**You MUST have a task in In Progress before editing any files.**
+
 1. **Initialize Session**: \`/eits-init\` - Provide name and description for this work
-2. **Track Tasks**: Use i-todo tools to create and manage tasks
-3. **Log Commits**: Commits are auto-tracked via git hooks
-4. **Save Context**: Use i-save-session-context for important findings
+2. **Create a task**: \`i-todo create --title \"Task name\"\`
+3. **Start the task** (moves to In Progress): \`i-todo start --task_id <id>\`
+4. **Link to session**: \`i-todo add-session --task_id <id> --session_id <session_uuid>\`
+5. **Do the work**
+6. **When done, move task to In Review** (NOT Done): \`i-todo status --task_id <id> --state_id 4\`
+   - State 4 = In Review. Do not mark as Done — leave that for human review.
+
+**Log Commits**: Commits are auto-tracked via git hooks
+**Save Context**: Use i-save-session-context for important findings
 
 **Project**: $PROJECT_NAME ($PROJECT_TYPE)
 **Path**: $PROJECT_DIR"

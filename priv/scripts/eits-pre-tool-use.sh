@@ -9,7 +9,7 @@ EITS_PG_DB="${EITS_PG_DB:-eits_dev}"
 EITS_PG_USER="${EITS_PG_USER:-postgres}"
 EITS_PG_HOST="${EITS_PG_HOST:-localhost}"
 export PGPASSWORD="${EITS_PG_PASSWORD:-postgres}"
-_pgq() { psql -U "$EITS_PG_USER" -h "$EITS_PG_HOST" -d "$EITS_PG_DB" -t -A -c "$1" 2>/dev/null; }
+_pgq() { psql --no-psqlrc -U "$EITS_PG_USER" -h "$EITS_PG_HOST" -d "$EITS_PG_DB" -t -A -c "$1" 2>/dev/null; }
 
 input_json=$(timeout 2 cat 2>/dev/null) || exit 0
 [ -z "$input_json" ] && exit 0
@@ -47,7 +47,7 @@ if [ -z "$is_spawned" ]; then
   # Check for active EITS todo before allowing edits
   if ! "$HOOK_DIR/sql/postgresql/check-active-todo.sh" "$session_id"; then
     jq -n \
-      --arg reason "No active EITS todo for session $session_ref. Create one with: i-todo create --title \"Task name\" then i-todo start --task_id <id>" \
+      --arg reason "No active EITS todo for session $session_ref. Workflow: (1) i-todo create --title \"Task\" (2) i-todo start --task_id <id> (3) i-todo add-session --task_id <id> --session_id $session_id (4) do work (5) i-todo status --task_id <id> --state_id 4 to move to In Review when done" \
       '{
         hookSpecificOutput: {
           hookEventName: "PreToolUse",

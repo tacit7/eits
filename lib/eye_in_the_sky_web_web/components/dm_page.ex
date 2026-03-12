@@ -75,7 +75,9 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             <%!-- Left: status + name + badges --%>
             <div class="flex items-center gap-2 min-w-0 flex-1">
               <div class={"w-2 h-2 rounded-full flex-shrink-0 " <> if(is_nil(@agent.ended_at) || @agent.ended_at == "", do: "bg-success animate-pulse", else: "bg-base-content/20")} />
-              <h1 class="text-base sm:text-lg font-bold text-base-content truncate min-w-0">{@agent.name || "Session"}</h1>
+              <h1 class="text-base sm:text-lg font-bold text-base-content truncate min-w-0">
+                {@agent.name || "Session"}
+              </h1>
               <button
                 type="button"
                 class="hidden sm:flex items-center gap-1 text-[11px] font-mono text-base-content/30 bg-base-content/5 px-2 py-0.5 rounded hover:text-base-content/50 hover:bg-base-content/8 transition-colors cursor-pointer flex-shrink-0"
@@ -134,12 +136,18 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                   class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-44 text-xs"
                 >
                   <li>
-                    <button phx-click="export_jsonl" class="px-3 py-2 hover:bg-base-content/5 rounded text-left w-full">
+                    <button
+                      phx-click="export_jsonl"
+                      class="px-3 py-2 hover:bg-base-content/5 rounded text-left w-full"
+                    >
                       Export as JSONL
                     </button>
                   </li>
                   <li>
-                    <button phx-click="export_markdown" class="px-3 py-2 hover:bg-base-content/5 rounded text-left w-full">
+                    <button
+                      phx-click="export_markdown"
+                      class="px-3 py-2 hover:bg-base-content/5 rounded text-left w-full"
+                    >
                       Export as Markdown
                     </button>
                   </li>
@@ -258,8 +266,18 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         <div
           id="execution-hud"
           class="absolute bottom-[5.5rem] left-1/2 -translate-x-1/2 z-20"
-          phx-mounted={JS.transition({"transition-all duration-200 ease-out", "translate-y-3 opacity-0", "translate-y-0 opacity-100"})}
-          phx-remove={JS.transition({"transition-all duration-150 ease-in", "translate-y-0 opacity-100", "translate-y-3 opacity-0"})}
+          phx-mounted={
+            JS.transition(
+              {"transition-all duration-200 ease-out", "translate-y-3 opacity-0",
+               "translate-y-0 opacity-100"}
+            )
+          }
+          phx-remove={
+            JS.transition(
+              {"transition-all duration-150 ease-in", "translate-y-0 opacity-100",
+               "translate-y-3 opacity-0"}
+            )
+          }
         >
           <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-base-200 border border-base-content/10 shadow-lg text-xs whitespace-nowrap">
             <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse flex-shrink-0" />
@@ -268,21 +286,26 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               phx-hook="ExecutionTimer"
               data-start={@processing_start_at}
               class="font-mono tabular-nums text-base-content/70 min-w-[3ch]"
-            >0:00</span>
+            >
+              0:00
+            </span>
             <%= if @total_tokens > 0 do %>
               <span class="text-base-content/25">·</span>
-              <span class="font-mono tabular-nums text-base-content/40">{format_number(@total_tokens)} tok</span>
+              <span class="font-mono tabular-nums text-base-content/40">
+                {format_number(@total_tokens)} tok
+              </span>
               <%= if @total_cost > 0.0 do %>
                 <span class="text-base-content/25">·</span>
-                <span class="font-mono tabular-nums text-base-content/40">${:erlang.float_to_binary(@total_cost * 1.0, decimals: 4)}</span>
+                <span class="font-mono tabular-nums text-base-content/40">
+                  ${:erlang.float_to_binary(@total_cost * 1.0, decimals: 4)}
+                </span>
               <% end %>
             <% end %>
             <button
               phx-click="kill_session"
               class="ml-0.5 flex items-center gap-1 px-2 py-0.5 rounded-full bg-error/10 text-error/70 hover:bg-error/20 hover:text-error transition-colors font-medium"
             >
-              <.icon name="hero-stop-circle" class="w-3.5 h-3.5" />
-              Stop
+              <.icon name="hero-stop-circle" class="w-3.5 h-3.5" /> Stop
             </button>
           </div>
         </div>
@@ -290,7 +313,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
 
       <%!-- Composer (pinned to bottom) --%>
       <%= if @active_tab in ["messages", nil] do %>
-        <div class="flex-shrink-0 max-w-4xl mx-auto w-full pt-2">
+        <div id="dm-page-composer" class="flex-shrink-0 max-w-4xl mx-auto w-full pt-2 safe-inset-bottom">
           <%!-- Prompt queue panel (shown when queue non-empty) --%>
           <%= if @queued_prompts != [] do %>
             <.prompt_queue prompts={@queued_prompts} />
@@ -346,8 +369,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                         phx-click="select_memory_file"
                         phx-value-path={file.path}
                       >
-                        <p class="text-xs font-medium text-base-content/80 truncate">{file.relative_path}</p>
-                        <p class="text-[10px] text-base-content/40 mt-0.5">{format_mtime(file.mtime)}</p>
+                        <p class="text-xs font-medium text-base-content/80 truncate">
+                          {file.relative_path}
+                        </p>
+                        <p class="text-[10px] text-base-content/40 mt-0.5">
+                          {format_mtime(file.mtime)}
+                        </p>
                       </button>
                     <% end %>
                   <% end %>
@@ -410,11 +437,11 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             <div class="flex flex-col items-center justify-center h-full py-20 text-center select-none">
               <.icon name="hero-chat-bubble-left-right" class="w-16 h-16 text-base-content/10 mb-5" />
               <p class="text-base font-medium text-base-content/40">
-                <%= if @agent, do: @agent.name, else: "No messages yet" %>
+                {if @agent, do: @agent.name, else: "No messages yet"}
               </p>
               <p class="mt-1.5 text-xs text-base-content/25 max-w-xs">
                 <%= if @agent && @agent.git_worktree_path do %>
-                  <span class="font-mono"><%= Path.basename(@agent.git_worktree_path) %></span>
+                  <span class="font-mono">{Path.basename(@agent.git_worktree_path)}</span>
                   &nbsp;&mdash;
                   Send a message to start the conversation
                 <% end %>
@@ -464,6 +491,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 </div>
               </div>
             <% end %>
+            <%!-- Scroll anchor: keeps list pinned to bottom on resize (keyboard open/close) --%>
+            <div id="messages-scroll-anchor" style="overflow-anchor: auto; height: 1px;"></div>
           <% end %>
         </div>
       </div>
@@ -485,7 +514,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         @is_user && "hover:bg-base-content/[0.02]"
       ]}
       id={"dm-message-#{@message.id}"}
-      phx-mounted={JS.transition({"transition-all ease-out duration-200", "opacity-0 translate-y-1", "opacity-100 translate-y-0"})}
+      phx-mounted={
+        JS.transition(
+          {"transition-all ease-out duration-200", "opacity-0 translate-y-1",
+           "opacity-100 translate-y-0"}
+        )
+      }
     >
       <div class="flex items-start gap-2.5">
         <%!-- Sender icon --%>
@@ -527,7 +561,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               class="text-[11px] text-base-content/25"
               data-utc={to_utc_string(@message.inserted_at)}
               phx-hook="LocalTime"
-            ></time>
+            >
+            </time>
           </div>
 
           <.message_body message={@message} />
@@ -650,7 +685,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               class="dm-markdown text-sm leading-relaxed text-base-content/85"
               phx-hook="MarkdownMessage"
               data-raw-body={text}
-            ></div>
+            >
+            </div>
           <% _ -> %>
         <% end %>
       <% end %>
@@ -710,6 +746,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
       class="rounded-2xl border border-base-content/10 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] shadow-sm"
       id="message-form"
       data-slash-items={Jason.encode!(@slash_items)}
+      phx-hook="DmComposer"
     >
       <%!-- Upload previews --%>
       <%= if @uploads.files.entries != [] do %>
@@ -753,7 +790,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           <label
             for={@uploads.files.ref}
             phx-drop-target={@uploads.files.ref}
-            class="flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5 transition-colors"
+            class="flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-lg cursor-pointer text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5 transition-colors"
           >
             <.icon name="hero-plus" class="w-5 h-5" />
           </label>
@@ -804,16 +841,28 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 <%= if @provider == "codex" do %>
                   <li class="menu-title text-[10px] px-3 pt-1 pb-0.5 text-base-content/40">Codex</li>
                   <li>
-                    <a phx-click="select_model" phx-value-model="gpt-5.4" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                    <a
+                      phx-click="select_model"
+                      phx-value-model="gpt-5.4"
+                      phx-value-effort=""
+                      class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
+                    >
                       <.icon name="hero-bolt" class="w-4 h-4 text-warning" />
                       <div>
                         <div class="text-sm font-semibold text-base-content/80">gpt-5.4</div>
-                        <div class="text-[11px] text-base-content/40">Latest frontier agentic coding</div>
+                        <div class="text-[11px] text-base-content/40">
+                          Latest frontier agentic coding
+                        </div>
                       </div>
                     </a>
                   </li>
                   <li>
-                    <a phx-click="select_model" phx-value-model="gpt-5.3-codex" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                    <a
+                      phx-click="select_model"
+                      phx-value-model="gpt-5.3-codex"
+                      phx-value-effort=""
+                      class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
+                    >
                       <.icon name="hero-bolt" class="w-4 h-4 text-warning" />
                       <div>
                         <div class="text-sm font-semibold text-base-content/80">gpt-5.3-codex</div>
@@ -822,7 +871,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                     </a>
                   </li>
                   <li>
-                    <a phx-click="select_model" phx-value-model="gpt-5.2-codex" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                    <a
+                      phx-click="select_model"
+                      phx-value-model="gpt-5.2-codex"
+                      phx-value-effort=""
+                      class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
+                    >
                       <.icon name="hero-bolt" class="w-4 h-4 text-info" />
                       <div>
                         <div class="text-sm font-semibold text-base-content/80">gpt-5.2-codex</div>
@@ -831,7 +885,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                     </a>
                   </li>
                   <li>
-                    <a phx-click="select_model" phx-value-model="gpt-5.2" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                    <a
+                      phx-click="select_model"
+                      phx-value-model="gpt-5.2"
+                      phx-value-effort=""
+                      class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
+                    >
                       <.icon name="hero-bolt" class="w-4 h-4 text-info" />
                       <div>
                         <div class="text-sm font-semibold text-base-content/80">gpt-5.2</div>
@@ -840,19 +899,33 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                     </a>
                   </li>
                   <li>
-                    <a phx-click="select_model" phx-value-model="gpt-5.1-codex-max" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                    <a
+                      phx-click="select_model"
+                      phx-value-model="gpt-5.1-codex-max"
+                      phx-value-effort=""
+                      class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
+                    >
                       <.icon name="hero-bolt" class="w-4 h-4 text-success" />
                       <div>
-                        <div class="text-sm font-semibold text-base-content/80">gpt-5.1-codex-max</div>
+                        <div class="text-sm font-semibold text-base-content/80">
+                          gpt-5.1-codex-max
+                        </div>
                         <div class="text-[11px] text-base-content/40">Deep and fast reasoning</div>
                       </div>
                     </a>
                   </li>
                   <li>
-                    <a phx-click="select_model" phx-value-model="gpt-5.1-codex-mini" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                    <a
+                      phx-click="select_model"
+                      phx-value-model="gpt-5.1-codex-mini"
+                      phx-value-effort=""
+                      class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
+                    >
                       <.icon name="hero-bolt" class="w-4 h-4 text-success" />
                       <div>
-                        <div class="text-sm font-semibold text-base-content/80">gpt-5.1-codex-mini</div>
+                        <div class="text-sm font-semibold text-base-content/80">
+                          gpt-5.1-codex-mini
+                        </div>
                         <div class="text-[11px] text-base-content/40">Cheaper and faster</div>
                       </div>
                     </a>
@@ -860,7 +933,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 <% else %>
                   <li class="menu-title text-[10px] px-3 pt-1 pb-0.5 text-base-content/40">Claude</li>
                   <li>
-                    <a phx-click="select_model" phx-value-model="opus" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                    <a
+                      phx-click="select_model"
+                      phx-value-model="opus"
+                      phx-value-effort=""
+                      class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
+                    >
                       <.icon name="hero-bolt" class="w-4 h-4 text-warning" />
                       <div>
                         <div class="text-sm font-semibold text-base-content/80">Opus 4.6</div>
@@ -869,7 +947,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                     </a>
                   </li>
                   <li>
-                    <a phx-click="select_model" phx-value-model="sonnet" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                    <a
+                      phx-click="select_model"
+                      phx-value-model="sonnet"
+                      phx-value-effort=""
+                      class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
+                    >
                       <.icon name="hero-bolt" class="w-4 h-4 text-info" />
                       <div>
                         <div class="text-sm font-semibold text-base-content/80">Sonnet 4.5</div>
@@ -878,7 +961,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                     </a>
                   </li>
                   <li>
-                    <a phx-click="select_model" phx-value-model="haiku" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                    <a
+                      phx-click="select_model"
+                      phx-value-model="haiku"
+                      phx-value-effort=""
+                      class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
+                    >
                       <.icon name="hero-bolt" class="w-4 h-4 text-success" />
                       <div>
                         <div class="text-sm font-semibold text-base-content/80">Haiku 4.5</div>
@@ -896,7 +984,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             <%= if @processing do %>
               <button
                 type="submit"
-                class="flex items-center justify-center w-8 h-8 rounded-lg bg-base-content/[0.06] text-base-content/40 hover:bg-base-content/10 transition-colors"
+                class="flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-base-content/[0.06] text-base-content/40 hover:bg-base-content/10 transition-colors"
                 id="dm-queue-button"
                 title="Add to queue"
               >
@@ -905,7 +993,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               <button
                 type="button"
                 phx-click="kill_session"
-                class="flex items-center justify-center w-8 h-8 rounded-lg bg-error/80 text-error-content hover:bg-error transition-colors"
+                class="flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-error/80 text-error-content hover:bg-error transition-colors"
                 id="dm-stop-button"
               >
                 <.icon name="hero-stop-solid" class="w-4 h-4" />
@@ -913,7 +1001,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             <% else %>
               <button
                 type="submit"
-                class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/70 text-primary-content hover:bg-primary transition-colors"
+                class="flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-primary/70 text-primary-content hover:bg-primary transition-colors"
                 id="dm-send-button"
               >
                 <.icon name="hero-arrow-up-mini" class="w-5 h-5" />
@@ -945,7 +1033,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               {model_display_name(prompt.context[:model] || "opus")}
             </span>
             <span class="text-xs text-base-content/50 truncate flex-1 min-w-0">
-              {String.slice(prompt.message || "", 0, 80)}{if String.length(prompt.message || "") > 80, do: "…"}
+              {String.slice(prompt.message || "", 0, 80)}{if String.length(prompt.message || "") > 80,
+                do: "…"}
             </span>
             <button
               type="button"
@@ -1067,7 +1156,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                       data-utc={to_utc_string(commit.created_at)}
                       data-fmt="short"
                       phx-hook="LocalTime"
-                    ></time>
+                    >
+                    </time>
                   </div>
                 </div>
               </div>
@@ -1077,7 +1167,9 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 <% is_nil(diff) -> %>
                   <div class="px-4 py-2 text-xs text-base-content/30 italic">Loading diff...</div>
                 <% diff == :error -> %>
-                  <div class="px-4 py-2 text-xs text-error/60">Could not load diff — repo path unavailable</div>
+                  <div class="px-4 py-2 text-xs text-error/60">
+                    Could not load diff — repo path unavailable
+                  </div>
                 <% true -> %>
                   <div
                     id={"diff-#{commit.id}"}
@@ -1130,7 +1222,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                       data-utc={to_utc_string(log.timestamp)}
                       data-fmt="short"
                       phx-hook="LocalTime"
-                    ></time>
+                    >
+                    </time>
                   </div>
                 <% end %>
               </div>
@@ -1209,7 +1302,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                       data-utc={to_utc_string(note.created_at)}
                       data-fmt="short"
                       phx-hook="LocalTime"
-                    ></time>
+                    >
+                    </time>
                   </div>
                 </div>
               </div>

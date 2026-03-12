@@ -1,4 +1,11 @@
-<div class="flex h-full bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)]">
+<div class="flex h-[var(--app-viewport-height)] bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)]">
+  <a
+    href="#main-content"
+    class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] rounded-md bg-base-100 px-3 py-2 text-xs font-medium shadow"
+  >
+    Skip to main content
+  </a>
+
   <.live_component
     module={EyeInTheSkyWebWeb.Components.Sidebar}
     id="app-sidebar"
@@ -9,31 +16,146 @@
 
   <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
     <%!-- Mobile top bar — hidden on md+ since sidebar is always visible --%>
-    <header class="md:hidden flex-shrink-0 flex items-center gap-3 px-4 h-12 border-b border-base-content/8 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)]">
+    <header class="md:hidden flex-shrink-0 flex items-center gap-3 px-4 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)]">
       <button
         phx-click={Phoenix.LiveView.JS.dispatch("sidebar:open", to: "#app-sidebar")}
-        class="btn btn-ghost btn-sm btn-square text-base-content/60"
+        class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
         title="Open menu"
+        aria-label="Open sidebar menu"
       >
         <.icon name="hero-bars-3" class="w-5 h-5" />
       </button>
       <span class="flex-1 text-sm font-semibold text-base-content/80">Eye in the Sky</span>
       <button
+        phx-click={Phoenix.LiveView.JS.dispatch("palette:open", to: "#command-palette")}
+        class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+        title="Open command palette"
+        aria-label="Open command palette"
+      >
+        <.icon name="hero-magnifying-glass" class="w-5 h-5" />
+      </button>
+      <button
         id="push-setup-btn"
         phx-hook="PushSetup"
         phx-update="ignore"
-        class="btn btn-ghost btn-sm btn-square text-base-content/60"
+        class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
         data-push-state="disabled"
         title="Enable push notifications"
+        aria-label="Enable push notifications"
       >
         <.icon name="hero-bell" class="w-5 h-5" />
       </button>
     </header>
 
-    <main class="flex-1 overflow-auto flex flex-col min-w-0">
+    <main
+      id="main-content"
+      class="flex-1 overflow-auto flex flex-col min-w-0 pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0"
+    >
       <.flash_group flash={@flash} />
       {@inner_content}
     </main>
+
+    <% sidebar_project = assigns[:sidebar_project] %>
+    <% mobile_nav_tab = assigns[:mobile_nav_tab] || :sessions %>
+    <% notes_href =
+      if sidebar_project, do: ~p"/projects/#{sidebar_project.id}/notes", else: ~p"/notes" %>
+    <% project_href =
+      if sidebar_project, do: ~p"/projects/#{sidebar_project.id}/sessions", else: ~p"/" %>
+    <nav
+      class="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-base-content/10 bg-base-100/95 backdrop-blur supports-[backdrop-filter]:bg-base-100/80 px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))]"
+      aria-label="Main navigation"
+    >
+      <div class="grid grid-cols-4 gap-1">
+        <.link
+          navigate={~p"/"}
+          aria-label="Sessions"
+          aria-current={if mobile_nav_tab == :sessions, do: "page"}
+          class={[
+            "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
+            if(mobile_nav_tab == :sessions,
+              do: "text-primary bg-primary/10",
+              else: "text-base-content/60"
+            )
+          ]}
+        >
+          <.icon name="hero-cpu-chip" class="w-5 h-5 mb-0.5" /> Sessions
+        </.link>
+        <.link
+          navigate={~p"/tasks"}
+          aria-label="Tasks"
+          aria-current={if mobile_nav_tab == :tasks, do: "page"}
+          class={[
+            "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
+            if(mobile_nav_tab == :tasks,
+              do: "text-primary bg-primary/10",
+              else: "text-base-content/60"
+            )
+          ]}
+        >
+          <.icon name="hero-clipboard-document-list" class="w-5 h-5 mb-0.5" /> Tasks
+        </.link>
+        <.link
+          navigate={notes_href}
+          aria-label="Notes"
+          aria-current={if mobile_nav_tab == :notes, do: "page"}
+          class={[
+            "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
+            if(mobile_nav_tab == :notes,
+              do: "text-primary bg-primary/10",
+              else: "text-base-content/60"
+            )
+          ]}
+        >
+          <.icon name="hero-document-text" class="w-5 h-5 mb-0.5" /> Notes
+        </.link>
+        <.link
+          navigate={project_href}
+          aria-label="Project"
+          aria-current={if mobile_nav_tab == :project, do: "page"}
+          class={[
+            "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
+            if(mobile_nav_tab == :project,
+              do: "text-primary bg-primary/10",
+              else: "text-base-content/60"
+            )
+          ]}
+        >
+          <.icon name="hero-folder" class="w-5 h-5 mb-0.5" /> Project
+        </.link>
+      </div>
+    </nav>
+
+    <dialog
+      id="command-palette"
+      phx-hook="CommandPalette"
+      class="modal modal-bottom sm:modal-middle p-0 bg-transparent"
+    >
+      <div class="modal-box max-w-2xl p-0 overflow-hidden">
+        <div class="border-b border-base-content/10 p-3">
+          <label for="command-palette-input" class="sr-only">Search commands</label>
+          <input
+            id="command-palette-input"
+            type="text"
+            data-palette-input
+            placeholder="Search pages, projects, and commands..."
+            class="w-full h-10 rounded-lg border border-base-content/10 bg-base-100 px-3 text-sm focus:outline-none focus:border-primary/40"
+          />
+        </div>
+        <div
+          data-palette-results
+          role="listbox"
+          aria-label="Command palette results"
+          class="max-h-[55dvh] overflow-y-auto p-2"
+        >
+        </div>
+        <div class="px-3 py-2 text-[11px] text-base-content/55 border-t border-base-content/10">
+          Arrow keys to move • Enter to navigate • Esc to close • Cmd/Ctrl+K to open
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+      </form>
+    </dialog>
   </div>
 
   <div id="favorite-fab" phx-hook="FavoriteFab" phx-update="ignore" class="fab fab-flower"></div>

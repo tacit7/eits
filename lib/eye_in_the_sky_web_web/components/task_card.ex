@@ -43,7 +43,12 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
     <div
       class="group flex items-center gap-2 py-3.5 cursor-pointer"
       phx-click={@on_click}
+      phx-keyup={@on_click}
+      phx-key="Enter"
       phx-value-task_id={@task.uuid || to_string(@task.id)}
+      role="button"
+      tabindex="0"
+      aria-label={"Open task #{@task.title}"}
     >
       <div class="flex flex-col gap-1 flex-1 min-w-0">
         <span class={[
@@ -53,7 +58,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
         ]}>
           {@task.title}
         </span>
-        <div class="flex items-center gap-1.5 text-xs text-base-content/35">
+        <div class="flex items-center gap-1.5 text-xs text-base-content/60">
           <%= if @task.state do %>
             <span class={state_text_color(@task.state_id)}>{@task.state.name}</span>
           <% end %>
@@ -68,8 +73,9 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       <%= if @dm_session do %>
         <.link
           navigate={"/dm/#{@dm_session.uuid}"}
-          class="flex-shrink-0 opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-base-content/25 hover:text-primary hover:bg-primary/10 transition-all"
+          class="flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/40 hover:text-primary hover:bg-primary/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           title="Open agent DM"
+          aria-label="Open agent direct message"
           onclick="event.stopPropagation();"
         >
           <.icon name="hero-chat-bubble-left-ellipsis" class="w-3.5 h-3.5" />
@@ -80,7 +86,8 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
           type="button"
           phx-click={@on_delete}
           phx-value-task_id={@task.uuid || to_string(@task.id)}
-          class="flex-shrink-0 opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-base-content/25 hover:text-error hover:bg-error/10 transition-all"
+          class="flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/40 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
+          aria-label="Delete task"
         >
           <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
         </button>
@@ -93,14 +100,18 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
     ~H"""
     <!-- Task Title with Checkbox -->
     <div class="flex items-start gap-2 mb-2">
-      <button class={
-        "mt-0.5 flex-shrink-0 w-4 h-4 rounded-sm border-2 transition-all " <>
-          if @task.completed_at do
-            "bg-success border-success"
-          else
-            "border-base-content/30 hover:border-base-content/60"
-          end
-      }>
+      <button
+        class={
+          "mt-0.5 flex-shrink-0 w-4 h-4 rounded-sm border-2 transition-all " <>
+            if @task.completed_at do
+              "bg-success border-success"
+            else
+              "border-base-content/30 hover:border-base-content/60"
+            end
+        }
+        aria-label={if @task.completed_at, do: "Mark task incomplete", else: "Mark task complete"}
+        aria-pressed={if @task.completed_at, do: "true", else: "false"}
+      >
         <%= if @task.completed_at do %>
           <svg
             class="w-full h-full text-white p-0.5"
@@ -146,17 +157,18 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
     <% end %>
 
     <!-- Meta Info -->
-    <div class="flex items-center gap-2 text-xs text-base-content/50 flex-wrap">
+    <div class="flex items-center gap-2 text-xs text-base-content/60 flex-wrap">
       <span class="font-mono text-xs">
         {String.slice(@task.uuid || "", 0..7)}
       </span>
       <button
         type="button"
-        class="cursor-pointer hover:text-primary transition-colors z-10"
+        class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] cursor-pointer hover:text-primary transition-colors z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
         phx-hook="CopyToClipboard"
         id={"copy-task-kanban-#{@task.id}"}
         data-copy={@task.uuid}
         onclick="event.stopPropagation(); event.preventDefault();"
+        aria-label="Copy task ID"
       >
         <.icon name="hero-clipboard-document" class="w-3 h-3" />
       </button>
@@ -221,11 +233,12 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       </span>
       <button
         type="button"
-        class="cursor-pointer hover:text-primary transition-colors z-10"
+        class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] cursor-pointer hover:text-primary transition-colors z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
         phx-hook="CopyToClipboard"
         id={"copy-task-grid-#{@task.id}"}
         data-copy={@task.uuid}
         onclick="event.stopPropagation(); event.preventDefault();"
+        aria-label="Copy task ID"
       >
         <.icon name="hero-clipboard-document" class="w-3 h-3" />
       </button>
@@ -287,11 +300,11 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   defp state_badge_class(_), do: "bg-base-content/[0.06] text-base-content/40"
 
   # State ID -> text color for inline list rows
-  defp state_text_color(1), do: "text-base-content/40"
-  defp state_text_color(2), do: "text-info/70"
-  defp state_text_color(4), do: "text-warning/70"
-  defp state_text_color(3), do: "text-success/70"
-  defp state_text_color(_), do: "text-base-content/35"
+  defp state_text_color(1), do: "text-base-content/55"
+  defp state_text_color(2), do: "text-info/80"
+  defp state_text_color(4), do: "text-warning/80"
+  defp state_text_color(3), do: "text-success/80"
+  defp state_text_color(_), do: "text-base-content/55"
 
   defp priority_class(priority) do
     cond do

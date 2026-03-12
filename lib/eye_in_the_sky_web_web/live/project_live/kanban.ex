@@ -423,10 +423,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="px-4 sm:px-6 py-6 h-[calc(100vh-7rem)] md:h-[calc(100vh-4rem)] flex flex-col">
+    <div class="px-4 sm:px-6 py-6 h-[calc(100dvh-7rem)] md:h-[calc(100dvh-4rem)] flex flex-col">
       <%!-- Search + New Task --%>
-      <div class="mb-4 flex items-center gap-3">
-        <form phx-change="search" class="flex-1 max-w-sm">
+      <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+        <form phx-change="search" class="w-full sm:flex-1 sm:max-w-sm">
           <div class="relative">
             <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
               <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
@@ -445,7 +445,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
         <button
           phx-click="toggle_new_task_drawer"
-          class="btn btn-sm btn-primary gap-1.5 min-h-0 h-7 text-xs"
+          class="btn btn-sm btn-primary gap-1.5 h-9 sm:h-7 min-h-0 text-xs w-full sm:w-auto"
         >
           <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Task
         </button>
@@ -453,10 +453,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
       <%!-- Kanban columns --%>
       <div class="flex-1 min-h-0 overflow-x-auto">
-        <div class="inline-flex gap-3 h-full min-w-full pb-2">
+        <div class="inline-flex gap-3 h-full min-w-full pb-2 snap-x snap-mandatory">
           <%= for state <- @workflow_states do %>
             <% column_tasks = Map.get(@tasks_by_state, state.id, []) %>
-            <div class="flex-shrink-0 w-72 flex flex-col h-full">
+            <div class="flex-shrink-0 w-[84vw] max-w-80 md:w-72 flex flex-col h-full snap-start">
               <%!-- Column header with colored accent --%>
               <div class="mb-2">
                 <div
@@ -485,7 +485,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                 data-state-id={state.id}
               >
                 <%= if column_tasks == [] do %>
-                  <div data-empty-placeholder class="flex flex-col items-center justify-center h-24 border border-dashed border-base-content/8 rounded-lg pointer-events-none">
+                  <div
+                    data-empty-placeholder
+                    class="flex flex-col items-center justify-center h-24 border border-dashed border-base-content/8 rounded-lg pointer-events-none"
+                  >
                     <.icon name="hero-inbox" class="w-5 h-5 text-base-content/15 mb-1" />
                     <span class="text-[11px] text-base-content/20">No tasks</span>
                   </div>
@@ -525,7 +528,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                       type="button"
                       phx-click="delete_task"
                       phx-value-task_id={task.uuid}
-                      class="absolute top-1.5 right-1.5 opacity-0 group-hover/card:opacity-100 w-5 h-5 flex items-center justify-center rounded text-base-content/25 hover:text-error hover:bg-error/10 transition-all"
+                      class="absolute top-1.5 right-1.5 opacity-0 group-hover/card:opacity-100 min-w-[44px] min-h-[44px] -mr-1.5 -mt-1.5 flex items-center justify-center rounded text-base-content/25 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
+                      aria-label={"Delete task #{task.title}"}
                     >
                       <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
                     </button>

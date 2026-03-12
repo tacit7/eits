@@ -44,8 +44,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
      |> assign(:sidebar_project, sidebar_project)
      |> assign(:active_channel_id, assigns[:active_channel_id])
      |> assign(:expanded_chat, expanded_chat)
-     |> assign(:mobile_open, false)
-     |> assign(:notification_count, Notifications.unread_count())}
+     |> assign(:mobile_open, false)}
   end
 
   @impl true
@@ -56,6 +55,11 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   @impl true
   def handle_event("toggle_mobile", _params, socket) do
     {:noreply, assign(socket, :mobile_open, !socket.assigns.mobile_open)}
+  end
+
+  @impl true
+  def handle_event("open_mobile", _params, socket) do
+    {:noreply, assign(socket, :mobile_open, true)}
   end
 
   @impl true
@@ -118,7 +122,6 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     end
   end
 
-
   @impl true
   def handle_event("pick_project_folder", _params, socket) do
     case System.cmd("osascript", ["-e", "POSIX path of (choose folder)"]) do
@@ -144,351 +147,388 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   def render(assigns) do
     ~H"""
     <div>
-    <%!-- Backdrop — mobile only, closes sidebar on tap --%>
-    <div
-      :if={@mobile_open}
-      phx-click="close_mobile"
-      phx-target={@myself}
-      class="md:hidden fixed inset-0 z-40 bg-black/40"
-    />
+      <%!-- Backdrop — mobile only, closes sidebar on tap --%>
+      <div
+        :if={@mobile_open}
+        phx-click="close_mobile"
+        phx-target={@myself}
+        class="md:hidden fixed inset-0 z-40 bg-black/40"
+      />
 
-    <aside
-      id="app-sidebar"
-      phx-hook="SidebarState"
-      phx-target={@myself}
-      data-active-project-id={@sidebar_project && @sidebar_project.id}
-      class={[
-        "flex flex-col h-full border-r border-base-content/8 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)] transition-all duration-200 flex-shrink-0 overflow-hidden",
-        "fixed inset-y-0 left-0 z-50 md:relative md:inset-auto md:z-auto",
-        if(@mobile_open, do: "translate-x-0", else: "-translate-x-full md:translate-x-0"),
-        if(@collapsed, do: "w-16", else: "w-60")
-      ]}
-    >
-      <%!-- Branding --%>
-      <div class="flex items-center gap-2 px-3 py-3 border-b border-base-content/5">
-        <.link navigate="/" class="flex items-center gap-2 min-w-0 flex-1">
-          <img src="/images/logo.svg" class="w-7 h-7 flex-shrink-0" />
-          <span class={[
-            "text-sm font-semibold text-base-content/80 truncate",
-            if(@collapsed, do: "hidden")
-          ]}>
-            Eye in the Sky
-          </span>
-        </.link>
-        <button
-          :if={@mobile_open}
-          phx-click="close_mobile"
-          phx-target={@myself}
-          class="md:hidden btn btn-ghost btn-xs btn-square text-base-content/40"
-        >
-          <.icon name="hero-x-mark" class="w-4 h-4" />
-        </button>
-      </div>
-
-      <%!-- Scrollable nav --%>
-      <nav class="flex-1 overflow-y-auto overflow-x-hidden py-2">
-        <.nav_item
-          href="/"
-          icon="hero-cpu-chip"
-          label="Sessions"
-          active={@sidebar_tab == :sessions && is_nil(@sidebar_project)}
-          collapsed={@collapsed}
-        />
-        <.nav_item
-          href="/tasks"
-          icon="hero-clipboard-document-list"
-          label="Tasks"
-          active={@sidebar_tab == :tasks && is_nil(@sidebar_project)}
-          collapsed={@collapsed}
-        />
-        <.nav_item
-          href="/notes"
-          icon="hero-document-text"
-          label="Notes"
-          active={@sidebar_tab == :notes && is_nil(@sidebar_project)}
-          collapsed={@collapsed}
-        />
-        <.nav_item
-          href="/usage"
-          icon="hero-chart-bar"
-          label="Usage"
-          active={@sidebar_tab == :usage}
-          collapsed={@collapsed}
-        />
-        <.nav_item
-          href="/prompts"
-          icon="hero-chat-bubble-left-right"
-          label="Prompts"
-          active={@sidebar_tab == :prompts && is_nil(@sidebar_project)}
-          collapsed={@collapsed}
-        />
-        <.nav_item
-          href="/skills"
-          icon="hero-bolt"
-          label="Skills"
-          active={@sidebar_tab == :skills}
-          collapsed={@collapsed}
-        />
-        <.notification_nav_item
-          href="/notifications"
-          active={@sidebar_tab == :notifications}
-          collapsed={@collapsed}
-          count={@notification_count}
-        />
-
-        <%!-- Chat (expandable with channels) --%>
-        <div>
+      <aside
+        id="app-sidebar"
+        phx-hook="SidebarState"
+        phx-target={@myself}
+        data-active-project-id={@sidebar_project && @sidebar_project.id}
+        class={[
+          "flex flex-col h-full border-r border-base-content/8 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)] transition-all duration-200 flex-shrink-0 overflow-hidden",
+          "fixed inset-y-0 left-0 safe-inset-y z-50 md:relative md:inset-auto md:z-auto",
+          if(@mobile_open, do: "translate-x-0", else: "-translate-x-full md:translate-x-0"),
+          if(@collapsed, do: "w-[85vw] max-w-72 md:w-16", else: "w-[85vw] max-w-72 md:w-60")
+        ]}
+      >
+        <%!-- Branding --%>
+        <div class="flex items-center gap-2 px-3 py-3 border-b border-base-content/5">
+          <.link navigate="/" class="flex items-center gap-2 min-w-0 flex-1">
+            <img src="/images/logo.svg" class="w-7 h-7 flex-shrink-0" />
+            <span class={[
+              "text-sm font-semibold text-base-content/80 truncate",
+              if(@collapsed, do: "hidden")
+            ]}>
+              Eye in the Sky
+            </span>
+          </.link>
           <button
-            phx-click="toggle_chat"
+            :if={@mobile_open}
+            phx-click="close_mobile"
             phx-target={@myself}
-            class={[
-              "flex items-center gap-2.5 w-full text-left text-[13px] transition-colors",
-              if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
-              if(@sidebar_tab == :chat,
-                do: "text-primary bg-primary/10 border-l-2 border-primary font-medium",
-                else: "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5"
-              )
-            ]}
-            title="Chat"
+            class="md:hidden btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            aria-label="Close sidebar"
           >
-            <%= if !@collapsed do %>
-              <.icon
-                name={
-                  if @expanded_chat, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"
-                }
-                class="w-3.5 h-3.5 flex-shrink-0"
-              />
-            <% end %>
-            <.icon name="hero-chat-bubble-left-ellipsis" class="w-4 h-4 flex-shrink-0" />
-            <span class={["truncate", if(@collapsed, do: "hidden")]}>Chat</span>
+            <.icon name="hero-x-mark" class="w-4 h-4" />
           </button>
+        </div>
 
-          <%= if @expanded_chat && !@collapsed do %>
-            <div class="ml-5 border-l border-base-content/8">
-              <%= for channel <- @channels do %>
+        <%!-- Scrollable nav --%>
+        <nav class="flex-1 overflow-y-auto overflow-x-hidden py-2">
+          <.section_label collapsed={@collapsed} label="Workspace" />
+          <.nav_item
+            href="/"
+            icon="hero-cpu-chip"
+            label="Sessions"
+            active={@sidebar_tab == :sessions && is_nil(@sidebar_project)}
+            collapsed={@collapsed}
+          />
+          <.nav_item
+            href="/tasks"
+            icon="hero-clipboard-document-list"
+            label="Tasks"
+            active={@sidebar_tab == :tasks && is_nil(@sidebar_project)}
+            collapsed={@collapsed}
+          />
+          <.nav_item
+            href="/notes"
+            icon="hero-document-text"
+            label="Notes"
+            active={@sidebar_tab == :notes && is_nil(@sidebar_project)}
+            collapsed={@collapsed}
+          />
+
+          <.section_label collapsed={@collapsed} label="Insights" />
+          <.nav_item
+            href="/usage"
+            icon="hero-chart-bar"
+            label="Usage"
+            active={@sidebar_tab == :usage}
+            collapsed={@collapsed}
+          />
+
+          <.section_label collapsed={@collapsed} label="Knowledge" />
+          <.nav_item
+            href="/prompts"
+            icon="hero-chat-bubble-left-right"
+            label="Prompts"
+            active={@sidebar_tab == :prompts && is_nil(@sidebar_project)}
+            collapsed={@collapsed}
+          />
+          <.nav_item
+            href="/skills"
+            icon="hero-bolt"
+            label="Skills"
+            active={@sidebar_tab == :skills}
+            collapsed={@collapsed}
+          />
+          <.notification_nav_item
+            href="/notifications"
+            active={@sidebar_tab == :notifications}
+            collapsed={@collapsed}
+            count={@notification_count}
+          />
+
+          <%!-- Chat (expandable with channels) --%>
+          <div>
+            <button
+              phx-click="toggle_chat"
+              phx-target={@myself}
+              class={[
+                "flex items-center gap-2.5 w-full text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
+                if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
+                if(@sidebar_tab == :chat,
+                  do: "text-primary bg-primary/10 border-l-2 border-primary font-medium",
+                  else: "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5"
+                )
+              ]}
+              title="Chat"
+              aria-label={if @expanded_chat, do: "Collapse chat channels", else: "Expand chat channels"}
+            >
+              <%= if !@collapsed do %>
+                <.icon
+                  name={
+                    if @expanded_chat, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"
+                  }
+                  class="w-3.5 h-3.5 flex-shrink-0"
+                />
+              <% end %>
+              <.icon name="hero-chat-bubble-left-ellipsis" class="w-4 h-4 flex-shrink-0" />
+              <span class={["truncate", if(@collapsed, do: "hidden")]}>Chat</span>
+            </button>
+
+            <%= if @expanded_chat && !@collapsed do %>
+              <div class="ml-5 border-l border-base-content/8">
+                <%= for channel <- @channels do %>
+                  <.link
+                    navigate={~p"/chat?channel_id=#{channel.id}"}
+                    class={[
+                      "block pl-4 pr-3 py-1 text-xs transition-colors",
+                      if(@active_channel_id && to_string(@active_channel_id) == to_string(channel.id),
+                        do: "text-primary font-medium bg-primary/5",
+                        else:
+                          "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/5"
+                      )
+                    ]}
+                  >
+                    <span class="text-base-content/30 mr-0.5">#</span>{channel.name}
+                  </.link>
+                <% end %>
+
+                <%!-- New channel inline form or button --%>
+                <%= if @new_channel_name do %>
+                  <form
+                    phx-submit="create_channel"
+                    phx-target={@myself}
+                    class="flex items-center gap-1 pl-4 pr-2 py-1"
+                  >
+                    <input
+                      type="text"
+                      name="name"
+                      value={@new_channel_name}
+                      phx-keyup="update_channel_name"
+                      phx-target={@myself}
+                      placeholder="channel-name"
+                      class="flex-1 bg-transparent border-b border-base-content/15 text-xs text-base-content/70 placeholder:text-base-content/25 outline-none py-0.5 font-mono"
+                      autofocus
+                    />
+                  </form>
+                <% else %>
+                  <button
+                    phx-click="show_new_channel"
+                    phx-target={@myself}
+                    class="block pl-4 pr-3 py-1 text-xs text-base-content/30 hover:text-base-content/55 transition-colors w-full text-left"
+                  >
+                    + New Channel
+                  </button>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+
+          <%!-- Projects section --%>
+          <%= if !@collapsed do %>
+            <div class="px-3 mb-2">
+              <label for="sidebar-project-filter" class="sr-only">Filter projects</label>
+              <div class="relative">
+                <.icon
+                  name="hero-magnifying-glass-mini"
+                  class="w-3.5 h-3.5 text-base-content/30 absolute left-2.5 top-1/2 -translate-y-1/2"
+                />
+                <input
+                  id="sidebar-project-filter"
+                  type="text"
+                  placeholder="Quick switch project..."
+                  data-project-filter
+                  class="w-full h-8 rounded-md border border-base-content/10 bg-base-100 pl-8 pr-2 text-xs text-base-content/70 placeholder:text-base-content/35 focus:outline-none focus:border-primary/40"
+                />
+              </div>
+            </div>
+          <% end %>
+
+          <div class={[
+            "mt-3 mb-0.5 flex items-center justify-between",
+            if(@collapsed, do: "px-2", else: "px-3")
+          ]}>
+            <span class={[
+              "text-[10px] uppercase tracking-wider font-medium text-base-content/45",
+              if(@collapsed, do: "hidden")
+            ]}>
+              Projects
+            </span>
+            <div class={["border-t border-base-content/8 mt-1 flex-1", if(!@collapsed, do: "hidden")]} />
+            <%= if !@collapsed do %>
+              <button
+                phx-click="pick_project_folder"
+                phx-target={@myself}
+                class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] text-base-content/45 hover:text-base-content/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 rounded"
+                title="New Project"
+                aria-label="Create new project"
+              >
+                <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+              </button>
+            <% end %>
+          </div>
+          <%= for project <- @projects do %>
+            <% is_active_project = @sidebar_project && @sidebar_project.id == project.id %>
+            <div data-project-id={project.id} data-project-name={String.downcase(project.name || "")}>
+              <%!-- Project row --%>
+              <div class={[
+                "flex items-center transition-colors",
+                if(is_active_project,
+                  do: "bg-primary/10 border-l-2 border-primary",
+                  else: "hover:bg-base-content/5"
+                )
+              ]}>
+                <%= if !@collapsed do %>
+                  <button
+                    data-project-toggle={project.id}
+                    class="pl-3 pr-1 py-1 text-base-content/40 hover:text-base-content/70 flex-shrink-0"
+                    title="Expand"
+                    aria-label={"Toggle #{project.name} links"}
+                    aria-expanded="false"
+                    aria-controls={"project-sub-#{project.id}"}
+                  >
+                    <span data-project-chevron={project.id}>
+                      <.icon name="hero-chevron-right-mini" class="w-3.5 h-3.5" />
+                    </span>
+                  </button>
+                <% end %>
                 <.link
-                  navigate={~p"/chat?channel_id=#{channel.id}"}
+                  navigate={~p"/projects/#{project.id}"}
+                  data-project-link
                   class={[
-                    "block pl-4 pr-3 py-1 text-xs transition-colors",
-                    if(@active_channel_id && to_string(@active_channel_id) == to_string(channel.id),
-                      do: "text-primary font-medium bg-primary/5",
-                      else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/5"
+                    "flex items-center gap-2 flex-1 min-w-0 text-sm py-1 transition-colors",
+                    if(@collapsed, do: "px-4 justify-center", else: "pr-3"),
+                    if(is_active_project,
+                      do: "text-primary font-medium",
+                      else: "text-base-content/60 hover:text-base-content/80"
                     )
                   ]}
+                  title={project.name}
                 >
-                  <span class="text-base-content/30 mr-0.5">#</span>{channel.name}
+                  <.icon name="hero-folder" class="w-4 h-4 flex-shrink-0" />
+                  <span class={["truncate", if(@collapsed, do: "hidden")]}>{project.name}</span>
                 </.link>
-              <% end %>
+              </div>
 
-              <%!-- New channel inline form or button --%>
-              <%= if @new_channel_name do %>
-                <form
-                  phx-submit="create_channel"
-                  phx-target={@myself}
-                  class="flex items-center gap-1 pl-4 pr-2 py-1"
-                >
-                  <input
-                    type="text"
-                    name="name"
-                    value={@new_channel_name}
-                    phx-keyup="update_channel_name"
-                    phx-target={@myself}
-                    placeholder="channel-name"
-                    class="flex-1 bg-transparent border-b border-base-content/15 text-xs text-base-content/70 placeholder:text-base-content/25 outline-none py-0.5 font-mono"
-                    autofocus
-                  />
-                </form>
-              <% else %>
-                <button
-                  phx-click="show_new_channel"
-                  phx-target={@myself}
-                  class="block pl-4 pr-3 py-1 text-xs text-base-content/30 hover:text-base-content/55 transition-colors w-full text-left"
-                >
-                  + New Channel
-                </button>
-              <% end %>
-            </div>
-          <% end %>
-        </div>
-
-        <%!-- Projects section --%>
-        <div class={["mt-3 mb-0.5 flex items-center justify-between", if(@collapsed, do: "px-2", else: "px-3")]}>
-          <span class={[
-            "text-[10px] uppercase tracking-wider font-medium text-base-content/30",
-            if(@collapsed, do: "hidden")
-          ]}>
-            Projects
-          </span>
-          <div class={["border-t border-base-content/8 mt-1 flex-1", if(!@collapsed, do: "hidden")]} />
-          <%= if !@collapsed do %>
-            <button
-              phx-click="pick_project_folder"
-              phx-target={@myself}
-              class="text-base-content/30 hover:text-base-content/60 transition-colors"
-              title="New Project"
-            >
-              <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
-            </button>
-          <% end %>
-        </div>
-        <%= for project <- @projects do %>
-          <% is_active_project = @sidebar_project && @sidebar_project.id == project.id %>
-          <div data-project-id={project.id}>
-            <%!-- Project row --%>
-            <div class={[
-              "flex items-center transition-colors",
-              if(is_active_project,
-                do: "bg-primary/10 border-l-2 border-primary",
-                else: "hover:bg-base-content/5"
-              )
-            ]}>
-              <%= if !@collapsed do %>
-                <button
-                  data-project-toggle={project.id}
-                  class="pl-3 pr-1 py-1 text-base-content/40 hover:text-base-content/70 flex-shrink-0"
-                  title="Expand"
-                >
-                  <span data-project-chevron={project.id}>
-                    <.icon name="hero-chevron-right-mini" class="w-3.5 h-3.5" />
-                  </span>
-                </button>
-              <% end %>
-              <.link
-                navigate={~p"/projects/#{project.id}"}
-                class={[
-                  "flex items-center gap-2 flex-1 min-w-0 text-sm py-1 transition-colors",
-                  if(@collapsed, do: "px-4 justify-center", else: "pr-3"),
-                  if(is_active_project,
-                    do: "text-primary font-medium",
-                    else: "text-base-content/60 hover:text-base-content/80"
-                  )
-                ]}
-                title={project.name}
+              <%!-- Sub-items — always rendered, shown/hidden by JS --%>
+              <div
+                id={"project-sub-#{project.id}"}
+                class={["ml-5 border-l border-base-content/8", if(@collapsed, do: "hidden")]}
+                style="display: none;"
               >
-                <.icon name="hero-folder" class="w-4 h-4 flex-shrink-0" />
-                <span class={["truncate", if(@collapsed, do: "hidden")]}>{project.name}</span>
-              </.link>
+                <.project_sub_item
+                  href={~p"/projects/#{project.id}/sessions"}
+                  label="Sessions"
+                  active={is_active_project && @sidebar_tab == :sessions}
+                />
+                <.project_sub_item
+                  href={~p"/projects/#{project.id}/tasks"}
+                  label="Tasks"
+                  active={is_active_project && @sidebar_tab == :tasks}
+                />
+                <.project_sub_item
+                  href={~p"/projects/#{project.id}/kanban"}
+                  label="Kanban"
+                  active={is_active_project && @sidebar_tab == :kanban}
+                />
+                <.project_sub_item
+                  href={~p"/projects/#{project.id}/notes"}
+                  label="Notes"
+                  active={is_active_project && @sidebar_tab == :notes}
+                />
+                <.project_sub_item
+                  href={~p"/projects/#{project.id}/prompts"}
+                  label="Prompts"
+                  active={is_active_project && @sidebar_tab == :prompts}
+                />
+                <.project_sub_item
+                  href={~p"/projects/#{project.id}/files"}
+                  label="Files"
+                  active={is_active_project && @sidebar_tab == :files}
+                />
+                <.project_sub_item
+                  href={~p"/projects/#{project.id}/config"}
+                  label="Config"
+                  active={is_active_project && @sidebar_tab == :config}
+                />
+                <.project_sub_item
+                  href={~p"/projects/#{project.id}/agents"}
+                  label="Agents"
+                  active={is_active_project && @sidebar_tab == :agents}
+                />
+                <.project_sub_item
+                  href={~p"/projects/#{project.id}/jobs"}
+                  label="Jobs"
+                  active={is_active_project && @sidebar_tab == :jobs}
+                />
+              </div>
             </div>
+          <% end %>
 
-            <%!-- Sub-items — always rendered, shown/hidden by JS --%>
-            <div
-              id={"project-sub-#{project.id}"}
-              class={["ml-5 border-l border-base-content/8", if(@collapsed, do: "hidden")]}
-              style="display: none;"
-            >
-              <.project_sub_item
-                href={~p"/projects/#{project.id}/sessions"}
-                label="Sessions"
-                active={is_active_project && @sidebar_tab == :sessions}
-              />
-              <.project_sub_item
-                href={~p"/projects/#{project.id}/tasks"}
-                label="Tasks"
-                active={is_active_project && @sidebar_tab == :tasks}
-              />
-              <.project_sub_item
-                href={~p"/projects/#{project.id}/kanban"}
-                label="Kanban"
-                active={is_active_project && @sidebar_tab == :kanban}
-              />
-              <.project_sub_item
-                href={~p"/projects/#{project.id}/notes"}
-                label="Notes"
-                active={is_active_project && @sidebar_tab == :notes}
-              />
-              <.project_sub_item
-                href={~p"/projects/#{project.id}/prompts"}
-                label="Prompts"
-                active={is_active_project && @sidebar_tab == :prompts}
-              />
-              <.project_sub_item
-                href={~p"/projects/#{project.id}/files"}
-                label="Files"
-                active={is_active_project && @sidebar_tab == :files}
-              />
-              <.project_sub_item
-                href={~p"/projects/#{project.id}/config"}
-                label="Config"
-                active={is_active_project && @sidebar_tab == :config}
-              />
-              <.project_sub_item
-                href={~p"/projects/#{project.id}/agents"}
-                label="Agents"
-                active={is_active_project && @sidebar_tab == :agents}
-              />
-              <.project_sub_item
-                href={~p"/projects/#{project.id}/jobs"}
-                label="Jobs"
-                active={is_active_project && @sidebar_tab == :jobs}
-              />
-            </div>
-          </div>
-        <% end %>
-
-        <%!-- System section --%>
-        <.section_label collapsed={@collapsed} label="System" />
-        <.nav_item
-          href="/config"
-          icon="hero-cog-6-tooth"
-          label="Claude Config"
-          active={@sidebar_tab == :config && is_nil(@sidebar_project)}
-          collapsed={@collapsed}
-        />
-        <.nav_item
-          href="/jobs"
-          icon="hero-calendar-days"
-          label="Jobs"
-          active={@sidebar_tab == :jobs}
-          collapsed={@collapsed}
-        />
-        <.nav_item
-          href="/oban"
-          icon="hero-queue-list"
-          label="Oban"
-          active={false}
-          collapsed={@collapsed}
-        />
-        <.nav_item
-          href="/settings"
-          icon="hero-cog-8-tooth"
-          label="Settings"
-          active={@sidebar_tab == :settings}
-          collapsed={@collapsed}
-        />
-      </nav>
-
-      <%!-- Bottom controls --%>
-      <div class="border-t border-base-content/5 p-2 flex items-center gap-2">
-        <%= if !@collapsed do %>
-          <div class="flex-1">
-            <.theme_toggle />
-          </div>
-        <% end %>
-        <.link
-          href="/auth/logout"
-          method="delete"
-          class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-red-500"
-          title="Sign out"
-        >
-          <.icon name="hero-arrow-right-on-rectangle-mini" class="w-4 h-4" />
-        </.link>
-        <button
-          phx-click="toggle_collapsed"
-          phx-target={@myself}
-          class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-base-content/70"
-          title={if @collapsed, do: "Expand sidebar", else: "Collapse sidebar"}
-        >
-          <.icon
-            name={
-              if @collapsed,
-                do: "hero-chevron-double-right-mini",
-                else: "hero-chevron-double-left-mini"
-            }
-            class="w-4 h-4"
+          <%!-- System section --%>
+          <.section_label collapsed={@collapsed} label="System" />
+          <.nav_item
+            href="/config"
+            icon="hero-cog-6-tooth"
+            label="Claude Config"
+            active={@sidebar_tab == :config && is_nil(@sidebar_project)}
+            collapsed={@collapsed}
           />
-        </button>
-      </div>
-    </aside>
+          <.nav_item
+            href="/jobs"
+            icon="hero-calendar-days"
+            label="Jobs"
+            active={@sidebar_tab == :jobs}
+            collapsed={@collapsed}
+          />
+          <.nav_item
+            href="/oban"
+            icon="hero-queue-list"
+            label="Oban"
+            active={false}
+            collapsed={@collapsed}
+          />
+          <.nav_item
+            href="/settings"
+            icon="hero-cog-8-tooth"
+            label="Settings"
+            active={@sidebar_tab == :settings}
+            collapsed={@collapsed}
+          />
+        </nav>
+
+        <%!-- Bottom controls --%>
+        <div class="border-t border-base-content/5 p-2 flex items-center gap-2">
+          <%= if !@collapsed do %>
+            <div class="flex-1">
+              <.theme_toggle />
+            </div>
+          <% end %>
+          <.link
+            href="/auth/logout"
+            method="delete"
+            class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-red-500 min-h-[44px] min-w-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            title="Sign out"
+            aria-label="Sign out"
+          >
+            <.icon name="hero-arrow-right-on-rectangle-mini" class="w-4 h-4" />
+          </.link>
+          <button
+            phx-click="toggle_collapsed"
+            phx-target={@myself}
+            class="hidden md:inline-flex btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-base-content/70 min-h-[44px] min-w-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            title={if @collapsed, do: "Expand sidebar", else: "Collapse sidebar"}
+            aria-label={if @collapsed, do: "Expand sidebar", else: "Collapse sidebar"}
+          >
+            <.icon
+              name={
+                if @collapsed,
+                  do: "hero-chevron-double-right-mini",
+                  else: "hero-chevron-double-left-mini"
+              }
+              class="w-4 h-4"
+            />
+          </button>
+        </div>
+      </aside>
     </div>
     """
   end
@@ -532,7 +572,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     ~H"""
     <div class={["mt-3 mb-0.5", if(@collapsed, do: "px-2", else: "px-3")]}>
       <span class={[
-        "text-[10px] uppercase tracking-wider font-medium text-base-content/30",
+        "text-[10px] uppercase tracking-wider font-medium text-base-content/45",
         if(@collapsed, do: "hidden")
       ]}>
         {@label}
@@ -553,7 +593,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     <.link
       navigate={@href}
       class={[
-        "flex items-center gap-2.5 text-[13px] transition-colors",
+        "flex items-center gap-2.5 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
         if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
         if(@active,
           do: "text-primary bg-primary/10 border-l-2 border-primary font-medium",
@@ -561,6 +601,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
         )
       ]}
       title={@label}
+      aria-label={@label}
     >
       <.icon name={@icon} class="w-4 h-4 flex-shrink-0" />
       <span class={["truncate", if(@collapsed, do: "hidden")]}>{@label}</span>
@@ -591,30 +632,33 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
 
   defp theme_toggle(assigns) do
     ~H"""
-    <div class="flex items-center gap-0.5 rounded-full bg-base-content/5 p-0.5">
+    <div class="flex items-center gap-0.5 rounded-full bg-base-content/5 p-0.5" role="group" aria-label="Theme selector">
       <button
-        class="p-1 rounded-full hover:bg-base-content/10 transition-colors"
+        class="p-1.5 rounded-full hover:bg-base-content/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         phx-click={Phoenix.LiveView.JS.dispatch("phx:set-theme")}
         data-phx-theme="system"
         title="System theme"
+        aria-label="Use system theme"
       >
-        <.icon name="hero-computer-desktop-micro" class="w-3.5 h-3.5 text-base-content/40" />
+        <.icon name="hero-computer-desktop-micro" class="w-3.5 h-3.5 text-base-content/55" />
       </button>
       <button
-        class="p-1 rounded-full hover:bg-base-content/10 transition-colors"
+        class="p-1.5 rounded-full hover:bg-base-content/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         phx-click={Phoenix.LiveView.JS.dispatch("phx:set-theme")}
         data-phx-theme="light"
         title="Light theme"
+        aria-label="Use light theme"
       >
-        <.icon name="hero-sun-micro" class="w-3.5 h-3.5 text-base-content/40" />
+        <.icon name="hero-sun-micro" class="w-3.5 h-3.5 text-base-content/55" />
       </button>
       <button
-        class="p-1 rounded-full hover:bg-base-content/10 transition-colors"
+        class="p-1.5 rounded-full hover:bg-base-content/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         phx-click={Phoenix.LiveView.JS.dispatch("phx:set-theme")}
         data-phx-theme="dark"
         title="Dark theme"
+        aria-label="Use dark theme"
       >
-        <.icon name="hero-moon-micro" class="w-3.5 h-3.5 text-base-content/40" />
+        <.icon name="hero-moon-micro" class="w-3.5 h-3.5 text-base-content/55" />
       </button>
     </div>
     """

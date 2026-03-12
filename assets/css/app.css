@@ -49,6 +49,55 @@ input.phx-click-loading { opacity: .6 !important; pointer-events: none; }
 
 /* This file is for your main application CSS */
 
+html {
+  font-size: 17px;
+  --app-viewport-height: 100dvh;
+  --keyboard-height: 0px;
+}
+
+@supports not (height: 100dvh) {
+  html {
+    --app-viewport-height: 100vh;
+  }
+}
+
+body {
+  min-height: var(--app-viewport-height);
+}
+
+.safe-inset-y {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-top-sticky {
+  top: env(safe-area-inset-top);
+}
+
+.safe-bottom-sheet {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+*:focus-visible {
+  outline: 2px solid oklch(58% 0.17 55);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ===== Dark theme - Claude palette ===== */
 [data-theme="dark"] {
   /* daisyUI v5 variables — mapped from Claude's bg scale */
@@ -145,9 +194,9 @@ input.phx-click-loading { opacity: .6 !important; pointer-events: none; }
   background: oklch(50% 0 0 / 0.2);
 }
 
-/* ===== Main content scrollbar (always visible) ===== */
+/* ===== Main content scrollbar ===== */
 main {
-  overflow-y: scroll !important;
+  overflow-y: auto !important;
   scrollbar-width: thin;
 }
 [data-theme="dark"] main {
@@ -184,6 +233,15 @@ main::-webkit-scrollbar-track {
 }
 [data-theme="light"] main::-webkit-scrollbar-thumb:hover {
   background: oklch(65% 0.01 80);
+}
+
+@media (hover: none) and (pointer: coarse) {
+  main {
+    scrollbar-width: auto;
+  }
+  main::-webkit-scrollbar {
+    width: 0;
+  }
 }
 
 /* Hide scrollbar for webkit browsers */
@@ -316,6 +374,16 @@ code.hljs { padding: 3px 5px; }
   --d2h-file-header-border-color: oklch(83% 0.012 80);
   --d2h-empty-placeholder-bg-color: oklch(90% 0.006 80);
   --d2h-empty-placeholder-border-color: oklch(83% 0.012 80);
+}
+
+/* ===== DM Composer: keyboard-aware scroll anchoring ===== */
+/* Disable scroll anchoring on all children except the sentinel at the bottom */
+#messages-container > * {
+  overflow-anchor: none;
+}
+/* The sentinel div anchors scroll position when the container resizes (keyboard open/close) */
+#messages-scroll-anchor {
+  overflow-anchor: auto;
 }
 
 /* ===== DM Markdown message styles ===== */

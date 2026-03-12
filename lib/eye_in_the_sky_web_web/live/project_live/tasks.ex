@@ -4,7 +4,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Tasks
   alias EyeInTheSkyWeb.Notes
+  alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWebWeb.Components.TaskCard
+
+  @per_page 50
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -38,10 +41,15 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
         |> assign(:sort_by, "created_desc")
         |> assign(:workflow_states, workflow_states)
         |> assign(:show_new_task_drawer, false)
+        |> assign(:show_filter_sheet, false)
         |> assign(:show_task_detail_drawer, false)
         |> assign(:selected_task, nil)
         |> assign(:task_notes, [])
         |> assign(:tasks, [])
+        |> assign(:page, 1)
+        |> assign(:has_more, false)
+        |> assign(:total_tasks, 0)
+        |> assign(:list_version, 0)
         |> load_tasks()
       else
         socket
@@ -53,10 +61,15 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
         |> assign(:sort_by, "created_desc")
         |> assign(:workflow_states, workflow_states)
         |> assign(:show_new_task_drawer, false)
+        |> assign(:show_filter_sheet, false)
         |> assign(:show_task_detail_drawer, false)
         |> assign(:selected_task, nil)
         |> assign(:task_notes, [])
         |> assign(:tasks, [])
+        |> assign(:page, 1)
+        |> assign(:has_more, false)
+        |> assign(:total_tasks, 0)
+        |> assign(:list_version, 0)
         |> put_flash(:error, "Invalid project ID")
       end
 
@@ -95,6 +108,26 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
       |> load_tasks()
 
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("open_filter_sheet", _params, socket) do
+    {:noreply, assign(socket, :show_filter_sheet, true)}
+  end
+
+  @impl true
+  def handle_event("close_filter_sheet", _params, socket) do
+    {:noreply, assign(socket, :show_filter_sheet, false)}
+  end
+
+  @impl true
+  def handle_event("load_more", _params, socket) do
+    if socket.assigns.has_more do
+      next_page = socket.assigns.page + 1
+      {:noreply, load_tasks_page(socket, next_page)}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true
@@ -253,23 +286,67 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
     end
   end
 
+  # Resets to page 1, replaces the task list
   defp load_tasks(socket) do
     project_id = socket.assigns.project_id
     query = socket.assigns.search_query
     filter_state_id = socket.assigns.filter_state_id
     sort_by = socket.assigns.sort_by
 
-    tasks =
-      if query != "" and String.trim(query) != "" do
-        Tasks.search_tasks(query, project_id)
-      else
+    if query != "" and String.trim(query) != "" do
+      tasks = Tasks.search_tasks(query, project_id)
+
+      tasks =
+        if filter_state_id,
+          do: Enum.filter(tasks, &(&1.state_id == filter_state_id)),
+          else: tasks
+
+      socket
+      |> assign(:tasks, tasks)
+      |> assign(:page, 1)
+      |> assign(:has_more, false)
+      |> assign(:total_tasks, length(tasks))
+      |> update(:list_version, &(&1 + 1))
+    else
+      total = Projects.count_project_tasks(project_id, state_id: filter_state_id)
+
+      tasks =
         Projects.get_project_tasks(project_id,
           state_id: filter_state_id,
-          sort_by: sort_by
+          sort_by: sort_by,
+          limit: @per_page,
+          offset: 0
         )
-      end
 
-    assign(socket, :tasks, tasks)
+      socket
+      |> assign(:tasks, tasks)
+      |> assign(:page, 1)
+      |> assign(:has_more, length(tasks) < total)
+      |> assign(:total_tasks, total)
+      |> update(:list_version, &(&1 + 1))
+    end
+  end
+
+  # Appends the next page to the existing task list
+  defp load_tasks_page(socket, page) do
+    project_id = socket.assigns.project_id
+    filter_state_id = socket.assigns.filter_state_id
+    sort_by = socket.assigns.sort_by
+    offset = (page - 1) * @per_page
+    total = socket.assigns.total_tasks
+
+    new_tasks =
+      Projects.get_project_tasks(project_id,
+        state_id: filter_state_id,
+        sort_by: sort_by,
+        limit: @per_page,
+        offset: offset
+      )
+
+    socket
+    |> assign(:tasks, socket.assigns.tasks ++ new_tasks)
+    |> assign(:page, page)
+    |> assign(:has_more, length(socket.assigns.tasks) + length(new_tasks) < total)
   end
 
   @impl true
@@ -278,15 +355,17 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
     <div class="px-4 sm:px-6 lg:px-8 py-6" phx-hook="GlobalKeydown" id="project-tasks-page">
       <div class="max-w-4xl mx-auto">
         <%!-- Search and New Task --%>
-        <div class="mb-4 flex items-center gap-3">
-          <form phx-change="search" class="flex-1 max-w-sm">
+        <div class="mb-4 flex items-center gap-2 sm:gap-3">
+          <form phx-change="search" class="flex-1 sm:max-w-sm">
             <div class="relative">
               <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                 <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
               </div>
+              <label for="project-tasks-search" class="sr-only">Search tasks</label>
               <input
                 type="text"
                 name="query"
+                id="project-tasks-search"
                 value={@search_query}
                 placeholder="Search tasks..."
                 class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
@@ -295,22 +374,36 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
             </div>
           </form>
 
+          <%!-- Mobile filter button --%>
+          <button
+            phx-click="open_filter_sheet"
+            aria-label="Open filters"
+            aria-haspopup="dialog"
+            class="sm:hidden relative btn btn-ghost btn-sm btn-square"
+          >
+            <.icon name="hero-funnel-mini" class="w-4 h-4" />
+            <%= if !is_nil(@filter_state_id) || @sort_by != "created_desc" do %>
+              <span class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full" aria-hidden="true"></span>
+            <% end %>
+          </button>
+
           <button
             phx-click="toggle_new_task_drawer"
-            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-7 text-xs"
+            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-8 sm:h-7 text-xs"
           >
             <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Task
           </button>
         </div>
 
-        <%!-- Filters --%>
-        <div class="mb-4 flex items-center gap-2 flex-wrap">
+        <%!-- Desktop Filters (hidden on mobile) --%>
+        <div class="mb-4 hidden sm:flex items-center gap-2 flex-wrap">
           <%!-- Status filter pills --%>
           <button
             phx-click="filter_status"
             phx-value-state_id=""
+            aria-pressed={is_nil(@filter_state_id)}
             class={[
-              "btn btn-xs gap-1 min-h-0 h-6",
+              "btn btn-xs gap-1 min-h-0 h-8",
               if(is_nil(@filter_state_id), do: "btn-neutral", else: "btn-ghost text-base-content/50")
             ]}
           >
@@ -320,9 +413,13 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
             <button
               phx-click="filter_status"
               phx-value-state_id={state.id}
+              aria-pressed={@filter_state_id == state.id}
               class={[
-                "btn btn-xs gap-1 min-h-0 h-6",
-                if(@filter_state_id == state.id, do: "btn-neutral", else: "btn-ghost text-base-content/50")
+                "btn btn-xs gap-1 min-h-0 h-8",
+                if(@filter_state_id == state.id,
+                  do: "btn-neutral",
+                  else: "btn-ghost text-base-content/50"
+                )
               ]}
             >
               {state.name}
@@ -333,9 +430,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
 
           <%!-- Sort dropdown --%>
           <form phx-change="sort_by">
+            <label for="project-tasks-sort" class="sr-only">Sort tasks</label>
             <select
               name="value"
-              class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/60 min-h-0 h-6 text-xs"
+              id="project-tasks-sort"
+              class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-0 h-8 text-xs"
             >
               <option value="created_desc" selected={@sort_by == "created_desc"}>Newest first</option>
               <option value="created_asc" selected={@sort_by == "created_asc"}>Oldest first</option>
@@ -344,17 +443,145 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
           </form>
         </div>
 
+        <%!-- Mobile filter bottom sheet --%>
+        <%= if @show_filter_sheet do %>
+          <div
+            class="fixed inset-0 z-40 bg-black/40"
+            phx-click="close_filter_sheet"
+            aria-hidden="true"
+          >
+          </div>
+          <div
+            class="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-base-100 shadow-xl safe-bottom-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Filter tasks"
+            id="tasks-filter-sheet"
+            phx-window-keydown="close_filter_sheet"
+            phx-key="Escape"
+          >
+            <div class="flex justify-center pt-3 pb-1">
+              <div class="w-10 h-1 rounded-full bg-base-content/20"></div>
+            </div>
+            <div class="px-5 pb-6 pt-2">
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="text-sm font-semibold">Filter &amp; Sort</h2>
+                <button
+                  phx-click="close_filter_sheet"
+                  class="btn btn-ghost btn-xs btn-square"
+                  aria-label="Close filter panel"
+                >
+                  <.icon name="hero-x-mark-mini" class="w-4 h-4" />
+                </button>
+              </div>
+
+              <fieldset class="mb-5">
+                <legend class="text-xs font-medium text-base-content/50 uppercase tracking-wider mb-2">Status</legend>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    phx-click="filter_status"
+                    phx-value-state_id=""
+                    aria-pressed={is_nil(@filter_state_id)}
+                    class={"btn btn-sm " <>
+                      if(is_nil(@filter_state_id),
+                        do: "btn-primary",
+                        else: "btn-ghost border border-base-content/15"
+                      )}
+                  >
+                    All
+                  </button>
+                  <%= for state <- @workflow_states do %>
+                    <button
+                      phx-click="filter_status"
+                      phx-value-state_id={state.id}
+                      aria-pressed={@filter_state_id == state.id}
+                      class={"btn btn-sm " <>
+                        if(@filter_state_id == state.id,
+                          do: "btn-primary",
+                          else: "btn-ghost border border-base-content/15"
+                        )}
+                    >
+                      {state.name}
+                    </button>
+                  <% end %>
+                </div>
+              </fieldset>
+
+              <fieldset class="mb-6">
+                <legend class="text-xs font-medium text-base-content/50 uppercase tracking-wider mb-2">Sort by</legend>
+                <div class="flex flex-wrap gap-2">
+                  <%= for {label, val} <- [{"Newest", "created_desc"}, {"Oldest", "created_asc"}, {"Priority", "priority"}] do %>
+                    <button
+                      phx-click="sort_by"
+                      phx-value-value={val}
+                      aria-pressed={@sort_by == val}
+                      class={"btn btn-sm " <>
+                        if(@sort_by == val,
+                          do: "btn-primary",
+                          else: "btn-ghost border border-base-content/15"
+                        )}
+                    >
+                      {label}
+                    </button>
+                  <% end %>
+                </div>
+              </fieldset>
+
+              <div class="flex gap-3">
+                <button phx-click="close_filter_sheet" class="btn btn-primary flex-1">
+                  Apply
+                </button>
+                <button
+                  phx-click="filter_status"
+                  phx-value-state_id=""
+                  class="btn btn-ghost"
+                  aria-label="Reset filters"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
+        <% end %>
+
         <%!-- Task count --%>
         <div class="mb-3">
-          <span class="text-[11px] font-mono tabular-nums text-base-content/30 tracking-wider uppercase">
-            {length(@tasks)} tasks
+          <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
+            <%= if @has_more do %>
+              {length(@tasks)} of {@total_tasks} tasks
+            <% else %>
+              {@total_tasks} tasks
+            <% end %>
           </span>
         </div>
 
         <%= if length(@tasks) > 0 do %>
-          <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-5">
+          <div
+            id={"project-tasks-list-#{@list_version}"}
+            phx-update="append"
+            class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-5"
+          >
             <%= for task <- @tasks do %>
-              <TaskCard.task_card task={task} variant="list" on_click="open_task_detail" on_delete="delete_task" />
+              <div id={"pt-#{task.id}"}>
+                <TaskCard.task_card
+                  task={task}
+                  variant="list"
+                  on_click="open_task_detail"
+                  on_delete="delete_task"
+                />
+              </div>
+            <% end %>
+          </div>
+
+          <div
+            id="project-tasks-sentinel"
+            phx-hook="InfiniteScroll"
+            data-has-more={to_string(@has_more)}
+            data-page={@page}
+            class="py-4 flex justify-center"
+          >
+            <%= if @has_more do %>
+              <span class="loading loading-spinner loading-sm text-base-content/30"></span>
             <% end %>
           </div>
         <% else %>

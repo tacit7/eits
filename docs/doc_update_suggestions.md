@@ -1,5 +1,16 @@
 # Documentation Update Suggestions
 
+## 2026-03-12
+**Commits reviewed**: b02aafb..1b8fce0
+
+- Document Gitea webhook handler for PR review automation: HMAC auth setup (GITEA_WEBHOOK_SECRET env var), webhook event types, PR diff generation flow, and failing closed in production
+- Add PWA and Web Push support documentation: manifest.json, service worker configuration (sw.js), push subscription API endpoints, browser permissions, and client setup in push_notifications.js
+- Update EITS hook scripts documentation: eits-session-end.sh new lifecycle hook, expanded eits-session-startup.sh capabilities, and todo checking logic in check-active-todo.sh
+- Document DM page overhaul features: usage dashboard, agent queue management, new_agent_drawer/new_task_drawer improvements, and agent state lifecycle display
+- Update architecture docs on context safety: atom conversion safeguards in parser.ex, Tasks context refactoring (safe attribute updates), and kanban LiveView state boundary improvements
+- Add REST_API.md sections: push subscription endpoints (POST/GET /api/v1/push/subscriptions), gitea webhook endpoint, and notification trigger payloads
+- Document workable task worker improvements: GenServer crash handling for invalid task_ids, safe project lookup patterns, and worker state management
+
 ## 2026-03-11
 **Commits reviewed**: e7f897e..b02aafb
 

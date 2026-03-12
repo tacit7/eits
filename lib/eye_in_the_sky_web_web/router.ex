@@ -47,7 +47,12 @@ defmodule EyeInTheSkyWebWeb.Router do
   scope "/", EyeInTheSkyWebWeb do
     pipe_through [:browser, :require_auth]
 
-    live_session :app, on_mount: [EyeInTheSkyWebWeb.AuthHook, EyeInTheSkyWebWeb.FabHook] do
+    live_session :app,
+                 on_mount: [
+                   EyeInTheSkyWebWeb.AuthHook,
+                   EyeInTheSkyWebWeb.FabHook,
+                   EyeInTheSkyWebWeb.NavHook
+                 ] do
       live "/", AgentLive.Index, :index
       live "/notes", OverviewLive.Notes, :index
       live "/tasks", OverviewLive.Tasks, :index
@@ -98,6 +103,7 @@ defmodule EyeInTheSkyWebWeb.Router do
     get "/sessions/:uuid", SessionController, :show
     patch "/sessions/:uuid", SessionController, :update
     post "/sessions/:uuid/end", SessionController, :end_session
+    post "/sessions/:uuid/tool-events", SessionController, :tool_event
     get "/sessions/:uuid/context", SessionController, :get_context
     patch "/sessions/:uuid/context", SessionController, :update_context
 

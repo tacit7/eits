@@ -1,0 +1,4 @@
+eits.dev, www.eits.dev {
+	tls internal
+	reverse_proxy localhost:5002
+}

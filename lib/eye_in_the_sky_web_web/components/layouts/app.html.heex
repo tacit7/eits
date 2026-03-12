@@ -17,7 +17,17 @@
       >
         <.icon name="hero-bars-3" class="w-5 h-5" />
       </button>
-      <span class="text-sm font-semibold text-base-content/80">Eye in the Sky</span>
+      <span class="flex-1 text-sm font-semibold text-base-content/80">Eye in the Sky</span>
+      <button
+        id="push-setup-btn"
+        phx-hook="PushSetup"
+        phx-update="ignore"
+        class="btn btn-ghost btn-sm btn-square text-base-content/60"
+        data-push-state="disabled"
+        title="Enable push notifications"
+      >
+        <.icon name="hero-bell" class="w-5 h-5" />
+      </button>
     </header>
 
     <main class="flex-1 overflow-auto flex flex-col min-w-0">

@@ -4,6 +4,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#1e1c1a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="EITS" />
+    <link rel="apple-touch-icon" href="/images/logo.svg" />
     <.live_title default="EyeInTheSkyWeb" suffix=" · Phoenix Framework">
       {assigns[:page_title]}
     </.live_title>

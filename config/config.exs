@@ -71,10 +71,16 @@ config :anubis_mcp, :session_store,
   enabled: true,
   adapter: EyeInTheSkyWeb.MCP.SessionStore
 
+# Web Push / VAPID configuration
+config :web_push_encryption, :vapid_details,
+  subject: "mailto:admin@eits.dev",
+  public_key: "BCeer_3Bsec6cpZU-NAcYLmeF5zqinfsZBYzXoDlA62Gp8nJhtnhKI0OGdPqEJAe5b9lpHuyNZjIDIrOgCjhUIc",
+  private_key: "UjvINIZfpbgbtSEyPrxK41I5Sy-uE6gtxek7Vq9W6ck"
+
 # WebAuthn / Passkey configuration
 config :wax_,
-  origin: "https://unspiriting-catalina-postvocalic.ngrok-free.dev",
-  rp_id: "unspiriting-catalina-postvocalic.ngrok-free.dev",
+  origin: "https://eits.dev",
+  rp_id: "eits.dev",
   trusted_attestation_types: [:none, :self]
 
 # Import environment specific config. This must remain at the bottom

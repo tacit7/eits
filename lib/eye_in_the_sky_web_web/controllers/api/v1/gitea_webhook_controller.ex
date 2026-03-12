@@ -17,79 +17,100 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
   alias EyeInTheSkyWeb.Claude.AgentManager
   alias EyeInTheSkyWeb.{Messages, Sessions}
 
+  @webhook_secret Application.compile_env(:eye_in_the_sky_web, :gitea_webhook_secret, "")
+
+  defp unauthorized(conn),
+    do: conn |> put_status(:unauthorized) |> json(%{error: "Invalid signature"}) |> halt()
+
   # PR opened -> spawn codex reviewer
   def handle(conn, %{"action" => "opened", "pull_request" => pr} = params) do
-    event = get_req_header(conn, "x-gitea-event") |> List.first()
+    with :ok <- verify_signature(conn) do
+      event = get_req_header(conn, "x-gitea-event") |> List.first()
 
-    if event in ["pull_request", "pull_request_sync"] do
-      pr_number = pr["number"]
-      pr_title = pr["title"]
-      pr_body = pr["body"] || ""
-      pr_url = pr["html_url"] || ""
-      head_branch = get_in(pr, ["head", "label"]) || get_in(pr, ["head", "ref"]) || "unknown"
-      repo = get_in(params, ["repository", "full_name"]) || "claude/eits-web"
+      if event in ["pull_request", "pull_request_sync"] do
+        pr_number = pr["number"]
+        pr_title = pr["title"]
+        pr_body = pr["body"] || ""
+        pr_url = pr["html_url"] || ""
+        # head.ref is the plain branch name; head.label is "owner:branch"
+        head_branch = get_in(pr, ["head", "ref"]) || "unknown"
+        repo = get_in(params, ["repository", "full_name"]) || "claude/eits-web"
 
-      Logger.info("Gitea webhook: PR ##{pr_number} opened - spawning codex reviewer")
+        Logger.info("Gitea webhook: PR ##{pr_number} opened - spawning codex reviewer")
 
-      instructions = build_review_instructions(pr_number, pr_title, pr_body, pr_url, head_branch, repo)
+        instructions = build_review_instructions(pr_number, pr_title, pr_body, pr_url, head_branch, repo)
 
-      case AgentManager.create_agent(
-             agent_type: "codex",
-             description: "PR Review: #{pr_title} (##{pr_number})",
-             instructions: instructions,
-             project_path: "/Users/urielmaldonado/projects/eits/web"
-           ) do
-        {:ok, %{session: session}} ->
-          Logger.info("Codex reviewer spawned for PR ##{pr_number}, session=#{session.uuid}")
-          json(conn, %{success: true, message: "Codex reviewer spawned", session_id: session.uuid})
+        case AgentManager.create_agent(
+               agent_type: "codex",
+               description: "PR Review: #{pr_title} (##{pr_number})",
+               instructions: instructions,
+               project_path: "/Users/urielmaldonado/projects/eits/web"
+             ) do
+          {:ok, %{session: session}} ->
+            Logger.info("Codex reviewer spawned for PR ##{pr_number}, session=#{session.uuid}")
+            json(conn, %{success: true, message: "Codex reviewer spawned", session_id: session.uuid})
 
-        {:error, reason} ->
-          Logger.error("Failed to spawn codex for PR ##{pr_number}: #{inspect(reason)}")
+          {:error, reason} ->
+            Logger.error("Failed to spawn codex for PR ##{pr_number}: #{inspect(reason)}")
 
-          conn
-          |> put_status(:internal_server_error)
-          |> json(%{error: "Failed to spawn reviewer: #{inspect(reason)}"})
+            conn
+            |> put_status(:internal_server_error)
+            |> json(%{error: "Failed to spawn reviewer: #{inspect(reason)}"})
+        end
+      else
+        json(conn, %{success: true, message: "Ignored: #{event} #{params["action"]}"})
       end
     else
-      json(conn, %{success: true, message: "Ignored: #{event} #{params["action"]}"})
+      {:error, :unauthorized} -> unauthorized(conn)
     end
   end
 
   # PR comment by codex -> DM the claude session
   def handle(conn, %{"action" => "created", "comment" => comment, "issue" => issue}) do
-    event = get_req_header(conn, "x-gitea-event") |> List.first()
-    commenter = get_in(comment, ["user", "login"]) || ""
-    pr_number = issue["number"]
-    pr_body = get_in(issue, ["body"]) || ""
-    comment_body = comment["body"] || ""
+    with :ok <- verify_signature(conn) do
+      event = get_req_header(conn, "x-gitea-event") |> List.first()
+      commenter = get_in(comment, ["user", "login"]) || ""
+      pr_number = issue["number"]
+      pr_body = get_in(issue, ["body"]) || ""
+      comment_body = comment["body"] || ""
 
-    is_pr = not is_nil(issue["pull_request"])
-    is_codex = commenter == "codex"
+      is_pr = not is_nil(issue["pull_request"])
+      is_codex = commenter == "codex"
 
-    if event in ["issue_comment", "pull_request_comment"] and is_pr and is_codex do
-      Logger.info("Gitea webhook: codex commented on PR ##{pr_number}")
+      if event in ["issue_comment", "pull_request_comment"] and is_pr and is_codex do
+        Logger.info("Gitea webhook: codex commented on PR ##{pr_number}")
 
-      case extract_session_uuid(pr_body) do
-        {:ok, session_uuid} ->
-          dm_session(conn, session_uuid, pr_number, comment_body)
+        case extract_session_uuid(pr_body) do
+          {:ok, session_uuid} ->
+            dm_session(conn, session_uuid, pr_number, comment_body)
 
-        :not_found ->
-          Logger.warning("No Session-ID found in PR ##{pr_number} body; cannot notify session")
-          json(conn, %{success: true, message: "No session to notify"})
+          :not_found ->
+            Logger.warning("No Session-ID found in PR ##{pr_number} body; cannot notify session")
+            json(conn, %{success: true, message: "No session to notify"})
+        end
+      else
+        json(conn, %{success: true, message: "Ignored: #{event} by #{commenter}"})
       end
     else
-      json(conn, %{success: true, message: "Ignored: #{event} by #{commenter}"})
+      {:error, :unauthorized} -> unauthorized(conn)
     end
   end
 
   def handle(conn, params) do
-    event = get_req_header(conn, "x-gitea-event") |> List.first()
-    action = params["action"]
-    Logger.debug("Gitea webhook ignored: event=#{event} action=#{action}")
-    json(conn, %{success: true, message: "Ignored"})
+    with :ok <- verify_signature(conn) do
+      event = get_req_header(conn, "x-gitea-event") |> List.first()
+      action = params["action"]
+      Logger.debug("Gitea webhook ignored: event=#{event} action=#{action}")
+      json(conn, %{success: true, message: "Ignored"})
+    else
+      {:error, :unauthorized} -> unauthorized(conn)
+    end
   end
 
   defp build_review_instructions(pr_number, pr_title, pr_body, pr_url, head_branch, repo) do
+    # repo is "owner/name", e.g. "claude/eits-web" -> tea --repo uses just "name" with --login owner
+    [owner, repo_name] = String.split(repo, "/", parts: 2)
+
     """
     You are a code reviewer. Review PR ##{pr_number} in the #{repo} repo.
 
@@ -101,17 +122,36 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
     #{pr_body}
 
     Steps:
-    1. Run: tea pr view #{pr_number} --login codex --repo claude/eits-web
+    1. Run: tea pr view #{pr_number} --login codex --repo #{owner}/#{repo_name}
     2. Check the diff: git fetch gitea && git diff gitea/main...gitea/#{head_branch}
     3. Review the changes for: correctness, security, code quality, missing tests, breaking changes.
     4. Post a concise review comment:
-       tea comment #{pr_number} --login codex --repo claude/eits-web "your review here"
+       tea comment #{pr_number} --login codex --repo #{owner}/#{repo_name} "your review here"
        - Start with: LGTM / NEEDS CHANGES / BLOCKED
        - List specific issues with file:line references if applicable
        - Keep it actionable and direct
 
     Focus on real issues. Skip praise.
     """
+  end
+
+  defp verify_signature(conn) do
+    secret = @webhook_secret
+
+    if secret == "" do
+      :ok
+    else
+      sig_header = get_req_header(conn, "x-gitea-signature") |> List.first()
+      body = conn.assigns[:raw_body] || ""
+      expected = :crypto.mac(:hmac, :sha256, secret, body) |> Base.encode16(case: :lower)
+
+      if Plug.Crypto.secure_compare("sha256=#{expected}", sig_header || "") do
+        :ok
+      else
+        Logger.warning("Gitea webhook: invalid signature")
+        {:error, :unauthorized}
+      end
+    end
   end
 
   defp extract_session_uuid(pr_body) do

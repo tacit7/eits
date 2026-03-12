@@ -151,10 +151,18 @@ defmodule EyeInTheSkyWebWeb.Router do
     post "/agents", AgentController, :create
     get "/agents/:id", AgentController, :show
 
+    # Push notifications
+    get "/push/vapid-public-key", PushController, :vapid_public_key
+    post "/push/subscribe", PushController, :subscribe
+    delete "/push/subscribe", PushController, :unsubscribe
+
     # Messaging
     post "/dm", MessagingController, :dm
     get "/channels", MessagingController, :list_channels
     post "/channels/:channel_id/messages", MessagingController, :send_channel_message
+
+    # Gitea webhooks
+    post "/webhooks/gitea", GiteaWebhookController, :handle
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

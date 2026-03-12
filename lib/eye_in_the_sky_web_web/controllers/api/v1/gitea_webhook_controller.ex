@@ -17,7 +17,6 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
   alias EyeInTheSkyWeb.Claude.AgentManager
   alias EyeInTheSkyWeb.{Messages, Sessions}
 
-  @webhook_secret Application.compile_env(:eye_in_the_sky_web, :gitea_webhook_secret, "")
 
   defp unauthorized(conn),
     do: conn |> put_status(:unauthorized) |> json(%{error: "Invalid signature"}) |> halt()
@@ -66,13 +65,14 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
   end
 
   # PR comment by codex -> DM the claude session
-  def handle(conn, %{"action" => "created", "comment" => comment, "issue" => issue}) do
+  def handle(conn, %{"action" => "created", "comment" => comment, "issue" => issue} = params) do
     with :ok <- verify_signature(conn) do
       event = get_req_header(conn, "x-gitea-event") |> List.first()
       commenter = get_in(comment, ["user", "login"]) || ""
       pr_number = issue["number"]
       pr_body = get_in(issue, ["body"]) || ""
       comment_body = comment["body"] || ""
+      repo = get_in(params, ["repository", "full_name"]) || "claude/eits-web"
 
       is_pr = not is_nil(issue["pull_request"])
       is_codex = commenter == "codex"
@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
 
         case extract_session_uuid(pr_body) do
           {:ok, session_uuid} ->
-            dm_session(conn, session_uuid, pr_number, comment_body)
+            dm_session(conn, session_uuid, pr_number, comment_body, repo)
 
           :not_found ->
             Logger.warning("No Session-ID found in PR ##{pr_number} body; cannot notify session")
@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
 
   defp build_review_instructions(pr_number, pr_title, pr_body, pr_url, head_branch, repo) do
     # repo is "owner/name", e.g. "claude/eits-web" -> tea --repo uses just "name" with --login owner
-    [owner, repo_name] = String.split(repo, "/", parts: 2)
+    {owner, repo_name} = split_repo(repo)
 
     """
     You are a code reviewer. Review PR ##{pr_number} in the #{repo} repo.
@@ -136,7 +136,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
   end
 
   defp verify_signature(conn) do
-    secret = @webhook_secret
+    secret = Application.get_env(:eye_in_the_sky_web, :gitea_webhook_secret, "")
 
     if secret == "" do
       :ok
@@ -154,6 +154,13 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
     end
   end
 
+  defp split_repo(repo) do
+    case String.split(repo, "/", parts: 2) do
+      [owner, name] -> {owner, name}
+      _ -> {"claude", repo}
+    end
+  end
+
   defp extract_session_uuid(pr_body) do
     case Regex.run(~r/Session-ID:\s*([0-9a-f-]{36})/i, pr_body, capture: :all_but_first) do
       [uuid] -> {:ok, String.trim(uuid)}
@@ -161,7 +168,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
     end
   end
 
-  defp dm_session(conn, session_uuid, pr_number, comment_body) do
+  defp dm_session(conn, session_uuid, pr_number, comment_body, repo) do
+    {owner, repo_name} = split_repo(repo)
+
     case Sessions.get_session_by_uuid(session_uuid) do
       {:ok, session} ->
         notification = """
@@ -169,7 +178,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
 
         #{comment_body}
 
-        Check the PR: tea pr view #{pr_number} --login claude --repo eits-web
+        Check the PR: tea pr view #{pr_number} --login #{owner} --repo #{owner}/#{repo_name}
         """
 
         attrs = %{

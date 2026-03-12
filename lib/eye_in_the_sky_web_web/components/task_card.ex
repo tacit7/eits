@@ -31,6 +31,14 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   end
 
   defp list_row(assigns) do
+    dm_session =
+      case assigns.task do
+        %{agents: [session | _]} -> session
+        _ -> nil
+      end
+
+    assigns = assign(assigns, :dm_session, dm_session)
+
     ~H"""
     <div
       class="group flex items-center gap-2 py-3.5 cursor-pointer"
@@ -57,12 +65,21 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
           <span class="font-mono">{String.slice(@task.uuid || "", 0..7)}</span>
         </div>
       </div>
+      <%= if @dm_session do %>
+        <.link
+          navigate={"/dm/#{@dm_session.uuid}"}
+          class="flex-shrink-0 opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-base-content/25 hover:text-primary hover:bg-primary/10 transition-all"
+          title="Open agent DM"
+          onclick="event.stopPropagation();"
+        >
+          <.icon name="hero-chat-bubble-left-ellipsis" class="w-3.5 h-3.5" />
+        </.link>
+      <% end %>
       <%= if @on_delete do %>
         <button
           type="button"
           phx-click={@on_delete}
           phx-value-task_id={@task.uuid || to_string(@task.id)}
-          data-confirm="Delete this task?"
           class="flex-shrink-0 opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-base-content/25 hover:text-error hover:bg-error/10 transition-all"
         >
           <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />

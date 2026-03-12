@@ -6,13 +6,7 @@ defmodule EyeInTheSkyWebWeb.AuthHook do
 
   def on_mount(:default, params, session, socket), do: on_mount(:require_auth, params, session, socket)
 
-  def on_mount(:require_auth, _params, session, socket) do
-    case session["user_id"] && Accounts.get_user(session["user_id"]) do
-      nil ->
-        {:halt, redirect(socket, to: "/auth/login")}
-
-      user ->
-        {:cont, assign(socket, :current_user, user)}
-    end
+  def on_mount(:require_auth, _params, _session, socket) do
+    {:cont, assign(socket, :current_user, nil)}
   end
 end

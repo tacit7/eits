@@ -121,11 +121,11 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
 
     resume_id = opts[:resume]
 
-    # Resume uses a subcommand: codex exec resume <session_id> [flags] [prompt]
+    # Resume uses a subcommand: codex exec resume <thread_id> [flags] [prompt]
     # New session uses: codex exec [flags] [prompt]
     base_args =
       if resume_id do
-        ["exec", "--resume", to_string(resume_id)]
+        ["exec", "resume", to_string(resume_id)]
       else
         ["exec"]
       end
@@ -144,6 +144,9 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
     # Full auto mode (default true)
     full_auto = Keyword.get(opts, :full_auto, true)
     args = if full_auto, do: args ++ ["--full-auto"], else: args
+
+    # Skip git repo check — allow running outside git repos
+    args = args ++ ["--skip-git-repo-check"]
 
     # Prompt goes last as positional argument
     if prompt = opts[:prompt] do
@@ -249,12 +252,23 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
   # Environment
   # ---------------------------------------------------------------------------
 
-  defp build_env(_opts) do
-    # Pass through system environment (includes OPENAI_API_KEY)
-    for {key, value} <- System.get_env(),
-        value != "" do
-      {String.to_charlist(key), String.to_charlist(value)}
-    end
+  defp build_env(opts) do
+    base_env =
+      for {key, value} <- System.get_env(), value != "" do
+        {String.to_charlist(key), String.to_charlist(value)}
+      end
+
+    base_env
+    |> maybe_add_env("EITS_SESSION_ID", opts[:eits_session_id])
+    |> maybe_add_env("EITS_AGENT_ID", opts[:eits_agent_id])
+    |> maybe_add_env("EITS_MODEL", opts[:eits_model])
+  end
+
+  defp maybe_add_env(env, _key, nil), do: env
+  defp maybe_add_env(env, _key, ""), do: env
+
+  defp maybe_add_env(env, key, value) do
+    env ++ [{String.to_charlist(key), String.to_charlist(to_string(value))}]
   end
 
   # ---------------------------------------------------------------------------

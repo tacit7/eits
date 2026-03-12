@@ -21,6 +21,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :selected_effort, :string, default: ""
   attr :show_model_menu, :boolean, default: false
   attr :processing, :boolean, default: false
+  attr :processing_start_at, :integer, default: nil
   attr :tasks, :list, default: []
   attr :commits, :list, default: []
   attr :diff_cache, :map, default: %{}
@@ -34,13 +35,20 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :workflow_states, :list, default: []
   attr :current_task, :map, default: nil
   attr :total_tokens, :integer, default: 0
+  attr :total_cost, :float, default: 0.0
+  attr :show_memories_panel, :boolean, default: false
+  attr :memory_files, :list, default: []
+  attr :selected_memory_path, :string, default: nil
+  attr :memory_edit_content, :string, default: ""
+  attr :queued_prompts, :list, default: []
+  attr :thinking_enabled, :boolean, default: false
 
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
 
     ~H"""
     <div
-      class="flex flex-col h-[calc(100vh-5rem)] md:h-[calc(100vh-2rem)] px-2 sm:px-4 lg:px-8 py-2 sm:py-4 relative"
+      class="flex flex-col h-[calc(100dvh-3rem)] md:h-[calc(100dvh-2rem)] px-2 sm:px-4 lg:px-8 py-2 sm:py-4 relative"
       id="dm-page"
       phx-drop-target={@uploads.files.ref}
       phx-hook="DragUpload"
@@ -114,6 +122,41 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               >
                 <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Reload
               </button>
+              <div class="hidden sm:block dropdown dropdown-end" id="dm-export-dropdown">
+                <button
+                  tabindex="0"
+                  class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+                >
+                  <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Export
+                </button>
+                <ul
+                  tabindex="0"
+                  class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-44 text-xs"
+                >
+                  <li>
+                    <button phx-click="export_jsonl" class="px-3 py-2 hover:bg-base-content/5 rounded text-left w-full">
+                      Export as JSONL
+                    </button>
+                  </li>
+                  <li>
+                    <button phx-click="export_markdown" class="px-3 py-2 hover:bg-base-content/5 rounded text-left w-full">
+                      Export as Markdown
+                    </button>
+                  </li>
+                </ul>
+              </div>
+              <button
+                phx-click="toggle_memories_panel"
+                class={[
+                  "hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors",
+                  @show_memories_panel && "text-primary bg-primary/10 hover:bg-primary/15",
+                  !@show_memories_panel &&
+                    "text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5"
+                ]}
+                id="dm-memories-button"
+              >
+                <.icon name="hero-cpu-chip" class="w-3.5 h-3.5" /> Memories
+              </button>
             </div>
           </div>
         </div>
@@ -170,6 +213,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               show_live_stream={@show_live_stream}
               stream_content={@stream_content}
               stream_tool={@stream_tool}
+              agent={@agent}
             />
           <% "tasks" -> %>
             <.tasks_tab tasks={@tasks} />
@@ -190,6 +234,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               show_live_stream={@show_live_stream}
               stream_content={@stream_content}
               stream_tool={@stream_tool}
+              agent={@agent}
             />
         <% end %>
       </div>
@@ -199,14 +244,57 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         <div class="absolute bottom-[5.5rem] right-8 z-10 pointer-events-none">
           <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-base-content/[0.06] text-[11px] font-mono tabular-nums text-base-content/40 border border-base-content/[0.06]">
             <.icon name="hero-hashtag" class="w-3 h-3" />
-            {format_number(@total_tokens)} tokens
+            {format_number(@total_tokens)} tok
+            <%= if @total_cost > 0.0 do %>
+              <span class="text-base-content/25">·</span>
+              ${:erlang.float_to_binary(@total_cost * 1.0, decimals: 4)}
+            <% end %>
           </span>
+        </div>
+      <% end %>
+
+      <%!-- Execution HUD pill (bottom-center, visible when processing) --%>
+      <%= if @processing do %>
+        <div
+          id="execution-hud"
+          class="absolute bottom-[5.5rem] left-1/2 -translate-x-1/2 z-20"
+          phx-mounted={JS.transition({"transition-all duration-200 ease-out", "translate-y-3 opacity-0", "translate-y-0 opacity-100"})}
+          phx-remove={JS.transition({"transition-all duration-150 ease-in", "translate-y-0 opacity-100", "translate-y-3 opacity-0"})}
+        >
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-base-200 border border-base-content/10 shadow-lg text-xs whitespace-nowrap">
+            <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse flex-shrink-0" />
+            <span
+              id="execution-timer"
+              phx-hook="ExecutionTimer"
+              data-start={@processing_start_at}
+              class="font-mono tabular-nums text-base-content/70 min-w-[3ch]"
+            >0:00</span>
+            <%= if @total_tokens > 0 do %>
+              <span class="text-base-content/25">·</span>
+              <span class="font-mono tabular-nums text-base-content/40">{format_number(@total_tokens)} tok</span>
+              <%= if @total_cost > 0.0 do %>
+                <span class="text-base-content/25">·</span>
+                <span class="font-mono tabular-nums text-base-content/40">${:erlang.float_to_binary(@total_cost * 1.0, decimals: 4)}</span>
+              <% end %>
+            <% end %>
+            <button
+              phx-click="kill_session"
+              class="ml-0.5 flex items-center gap-1 px-2 py-0.5 rounded-full bg-error/10 text-error/70 hover:bg-error/20 hover:text-error transition-colors font-medium"
+            >
+              <.icon name="hero-stop-circle" class="w-3.5 h-3.5" />
+              Stop
+            </button>
+          </div>
         </div>
       <% end %>
 
       <%!-- Composer (pinned to bottom) --%>
       <%= if @active_tab in ["messages", nil] do %>
         <div class="flex-shrink-0 max-w-4xl mx-auto w-full pt-2">
+          <%!-- Prompt queue panel (shown when queue non-empty) --%>
+          <%= if @queued_prompts != [] do %>
+            <.prompt_queue prompts={@queued_prompts} />
+          <% end %>
           <.message_form
             uploads={@uploads}
             selected_model={@selected_model}
@@ -214,7 +302,87 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             show_model_menu={@show_model_menu}
             processing={@processing}
             slash_items={@slash_items}
+            thinking_enabled={@thinking_enabled}
+            provider={@agent.provider}
           />
+        </div>
+      <% end %>
+
+      <%!-- Memories panel overlay --%>
+      <%= if @show_memories_panel do %>
+        <div class="absolute inset-0 z-50" id="memories-panel">
+          <div class="absolute inset-0 bg-black/60" phx-click="close_memories_panel"></div>
+          <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+            <div
+              class="bg-base-100 rounded-xl shadow-2xl w-full max-w-3xl flex flex-col pointer-events-auto"
+              style="max-height: 80vh;"
+            >
+              <%!-- Panel header --%>
+              <div class="flex items-center justify-between px-5 py-3 border-b border-base-content/10 flex-shrink-0">
+                <div class="flex items-center gap-2">
+                  <.icon name="hero-cpu-chip" class="w-4 h-4 text-base-content/50" />
+                  <span class="font-semibold text-sm text-base-content">CLAUDE.md Files</span>
+                </div>
+                <button
+                  phx-click="close_memories_panel"
+                  class="text-base-content/40 hover:text-base-content transition-colors"
+                >
+                  <.icon name="hero-x-mark" class="w-5 h-5" />
+                </button>
+              </div>
+              <%!-- Panel body: file list + editor --%>
+              <div class="flex flex-1 min-h-0 overflow-hidden" style="min-height: 300px;">
+                <%!-- File list sidebar --%>
+                <div class="w-56 border-r border-base-content/10 overflow-y-auto flex-shrink-0">
+                  <%= if @memory_files == [] do %>
+                    <p class="text-xs text-base-content/40 p-4">No CLAUDE.md files found</p>
+                  <% else %>
+                    <%= for file <- @memory_files do %>
+                      <button
+                        class={[
+                          "w-full text-left px-4 py-2.5 hover:bg-base-content/5 transition-colors border-b border-base-content/5",
+                          @selected_memory_path == file.path && "bg-primary/10"
+                        ]}
+                        phx-click="select_memory_file"
+                        phx-value-path={file.path}
+                      >
+                        <p class="text-xs font-medium text-base-content/80 truncate">{file.relative_path}</p>
+                        <p class="text-[10px] text-base-content/40 mt-0.5">{format_mtime(file.mtime)}</p>
+                      </button>
+                    <% end %>
+                  <% end %>
+                </div>
+                <%!-- Editor pane --%>
+                <div class="flex-1 flex flex-col min-h-0 min-w-0">
+                  <%= if @selected_memory_path do %>
+                    <form phx-submit="save_memory_file" class="flex flex-col flex-1 min-h-0">
+                      <input type="hidden" name="path" value={@selected_memory_path} />
+                      <textarea
+                        id="memory-editor"
+                        name="content"
+                        class="flex-1 p-4 font-mono text-xs bg-transparent resize-none outline-none text-base-content/80"
+                        style="min-height: 250px;"
+                      >{@memory_edit_content}</textarea>
+                      <div class="flex justify-end gap-2 px-4 py-3 border-t border-base-content/10 flex-shrink-0">
+                        <button
+                          type="button"
+                          phx-click="close_memories_panel"
+                          class="btn btn-sm btn-ghost"
+                        >
+                          Cancel
+                        </button>
+                        <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                      </div>
+                    </form>
+                  <% else %>
+                    <div class="flex-1 flex items-center justify-center text-base-content/30 text-sm select-none">
+                      Select a file to edit
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       <% end %>
     </div>
@@ -226,6 +394,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :show_live_stream, :boolean, default: false
   attr :stream_content, :string, default: ""
   attr :stream_tool, :string, default: nil
+  attr :agent, :map, default: nil
 
   defp messages_tab(assigns) do
     ~H"""
@@ -238,11 +407,17 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           style="scrollbar-width: none; -ms-overflow-style: none;"
         >
           <%= if @messages == [] do %>
-            <div class="flex flex-col items-center justify-center py-16 text-center">
-              <.icon name="hero-chat-bubble-left-right" class="w-8 h-8 text-base-content/15 mb-3" />
-              <p class="text-sm text-base-content/40">No messages yet</p>
-              <p class="mt-1 text-xs text-base-content/25">
-                Send a message to start the conversation
+            <div class="flex flex-col items-center justify-center h-full py-20 text-center select-none">
+              <.icon name="hero-chat-bubble-left-right" class="w-16 h-16 text-base-content/10 mb-5" />
+              <p class="text-base font-medium text-base-content/40">
+                <%= if @agent, do: @agent.name, else: "No messages yet" %>
+              </p>
+              <p class="mt-1.5 text-xs text-base-content/25 max-w-xs">
+                <%= if @agent && @agent.git_worktree_path do %>
+                  <span class="font-mono"><%= Path.basename(@agent.git_worktree_path) %></span>
+                  &nbsp;&mdash;
+                  Send a message to start the conversation
+                <% end %>
               </p>
             </div>
           <% else %>
@@ -305,11 +480,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
     ~H"""
     <div
       class={[
-        "py-3 px-2 -mx-2 rounded-lg transition-colors",
+        "py-3 px-2 -mx-2 rounded-lg transition-colors opacity-0",
         !@is_user && "bg-primary/[0.03]",
         @is_user && "hover:bg-base-content/[0.02]"
       ]}
       id={"dm-message-#{@message.id}"}
+      phx-mounted={JS.transition({"transition-all ease-out duration-200", "opacity-0 translate-y-1", "opacity-100 translate-y-0"})}
     >
       <div class="flex items-start gap-2.5">
         <%!-- Sender icon --%>
@@ -441,10 +617,29 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
 
   defp message_body(assigns) do
     segments = parse_body_segments(assigns.message.body)
-    assigns = assign(assigns, :segments, segments)
+    thinking = get_in(assigns.message.metadata || %{}, ["thinking"])
+    assigns = assigns |> assign(:segments, segments) |> assign(:thinking, thinking)
 
     ~H"""
     <div class="mt-1 space-y-1.5">
+      <details
+        :if={@thinking && @thinking != ""}
+        class="group rounded border-l-2 border-purple-500/50 bg-zinc-950/50 overflow-hidden"
+      >
+        <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
+          <.icon name="hero-sparkles" class="w-3.5 h-3.5 flex-shrink-0 text-purple-400/60" />
+          <span class="text-[11px] font-mono font-semibold text-purple-400/60 uppercase tracking-wide">
+            Thinking
+          </span>
+          <.icon
+            name="hero-chevron-right"
+            class="w-3 h-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
+          />
+        </summary>
+        <div class="px-2.5 pb-2 pt-1 border-t border-purple-500/10">
+          <pre class="font-mono text-xs text-base-content/40 whitespace-pre-wrap break-words leading-relaxed">{@thinking}</pre>
+        </div>
+      </details>
       <%= for {segment, idx} <- Enum.with_index(@segments) do %>
         <%= case segment do %>
           <% {:tool_call, name, rest} -> %>
@@ -504,6 +699,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :show_model_menu, :boolean, default: false
   attr :processing, :boolean, default: false
   attr :slash_items, :list, default: []
+  attr :thinking_enabled, :boolean, default: false
+  attr :provider, :string, default: "claude"
 
   defp message_form(assigns) do
     ~H"""
@@ -541,10 +738,9 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         <textarea
           name="body"
           rows="1"
-          placeholder={if @processing, do: "Agent is working...", else: "Reply..."}
+          placeholder={if @processing, do: "Queue a message...", else: "Reply..."}
           class="w-full bg-transparent border-0 outline-none focus:ring-0 text-sm resize-none min-h-[28px] max-h-40 overflow-y-hidden placeholder:text-base-content/30 p-0"
           autocomplete="off"
-          disabled={@processing}
           phx-hook="CommandHistory"
           id="message-input"
         ></textarea>
@@ -566,6 +762,23 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
 
         <%!-- Right: model selector + send/stop --%>
         <div class="flex items-center gap-2">
+          <%!-- Thinking toggle (opus/sonnet only) --%>
+          <%= if @selected_model in ["opus", "sonnet"] do %>
+            <button
+              type="button"
+              phx-click="toggle_thinking"
+              class={[
+                "flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
+                if(@thinking_enabled,
+                  do: "text-purple-400 bg-purple-500/15 hover:bg-purple-500/25",
+                  else: "text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5"
+                )
+              ]}
+              title={if(@thinking_enabled, do: "Extended thinking on", else: "Extended thinking off")}
+            >
+              <.icon name="hero-light-bulb" class="w-4 h-4" />
+            </button>
+          <% end %>
           <%!-- Model selector --%>
           <div
             class="dropdown dropdown-top dropdown-end"
@@ -585,77 +798,168 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             <%= if @show_model_menu do %>
               <ul
                 tabindex="0"
-                class="dropdown-content menu z-[1] w-64 rounded-xl border border-base-content/8 bg-base-100 p-1.5 shadow-lg"
+                class="dropdown-content menu z-[1] w-72 rounded-xl border border-base-content/8 bg-base-100 p-1.5 shadow-lg"
                 id="model-selector-menu"
               >
-                <li>
-                  <a
-                    phx-click="select_model"
-                    phx-value-model="opus"
-                    phx-value-effort=""
-                    class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
-                  >
-                    <.icon name="hero-bolt" class="w-4 h-4 text-warning" />
-                    <div>
-                      <div class="text-sm font-semibold text-base-content/80">Opus 4.6</div>
-                      <div class="text-[11px] text-base-content/40">Most capable</div>
-                    </div>
-                  </a>
-                </li>
-                <li>
-                  <a
-                    phx-click="select_model"
-                    phx-value-model="sonnet"
-                    phx-value-effort=""
-                    class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
-                  >
-                    <.icon name="hero-bolt" class="w-4 h-4 text-info" />
-                    <div>
-                      <div class="text-sm font-semibold text-base-content/80">Sonnet 4.5</div>
-                      <div class="text-[11px] text-base-content/40">Everyday tasks</div>
-                    </div>
-                  </a>
-                </li>
-                <li>
-                  <a
-                    phx-click="select_model"
-                    phx-value-model="haiku"
-                    phx-value-effort=""
-                    class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
-                  >
-                    <.icon name="hero-bolt" class="w-4 h-4 text-success" />
-                    <div>
-                      <div class="text-sm font-semibold text-base-content/80">Haiku 4.5</div>
-                      <div class="text-[11px] text-base-content/40">Fast answers</div>
-                    </div>
-                  </a>
-                </li>
+                <%= if @provider == "codex" do %>
+                  <li class="menu-title text-[10px] px-3 pt-1 pb-0.5 text-base-content/40">Codex</li>
+                  <li>
+                    <a phx-click="select_model" phx-value-model="gpt-5.4" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                      <.icon name="hero-bolt" class="w-4 h-4 text-warning" />
+                      <div>
+                        <div class="text-sm font-semibold text-base-content/80">gpt-5.4</div>
+                        <div class="text-[11px] text-base-content/40">Latest frontier agentic coding</div>
+                      </div>
+                    </a>
+                  </li>
+                  <li>
+                    <a phx-click="select_model" phx-value-model="gpt-5.3-codex" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                      <.icon name="hero-bolt" class="w-4 h-4 text-warning" />
+                      <div>
+                        <div class="text-sm font-semibold text-base-content/80">gpt-5.3-codex</div>
+                        <div class="text-[11px] text-base-content/40">Frontier Codex-optimized</div>
+                      </div>
+                    </a>
+                  </li>
+                  <li>
+                    <a phx-click="select_model" phx-value-model="gpt-5.2-codex" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                      <.icon name="hero-bolt" class="w-4 h-4 text-info" />
+                      <div>
+                        <div class="text-sm font-semibold text-base-content/80">gpt-5.2-codex</div>
+                        <div class="text-[11px] text-base-content/40">Frontier agentic coding</div>
+                      </div>
+                    </a>
+                  </li>
+                  <li>
+                    <a phx-click="select_model" phx-value-model="gpt-5.2" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                      <.icon name="hero-bolt" class="w-4 h-4 text-info" />
+                      <div>
+                        <div class="text-sm font-semibold text-base-content/80">gpt-5.2</div>
+                        <div class="text-[11px] text-base-content/40">Long-running agents</div>
+                      </div>
+                    </a>
+                  </li>
+                  <li>
+                    <a phx-click="select_model" phx-value-model="gpt-5.1-codex-max" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                      <.icon name="hero-bolt" class="w-4 h-4 text-success" />
+                      <div>
+                        <div class="text-sm font-semibold text-base-content/80">gpt-5.1-codex-max</div>
+                        <div class="text-[11px] text-base-content/40">Deep and fast reasoning</div>
+                      </div>
+                    </a>
+                  </li>
+                  <li>
+                    <a phx-click="select_model" phx-value-model="gpt-5.1-codex-mini" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                      <.icon name="hero-bolt" class="w-4 h-4 text-success" />
+                      <div>
+                        <div class="text-sm font-semibold text-base-content/80">gpt-5.1-codex-mini</div>
+                        <div class="text-[11px] text-base-content/40">Cheaper and faster</div>
+                      </div>
+                    </a>
+                  </li>
+                <% else %>
+                  <li class="menu-title text-[10px] px-3 pt-1 pb-0.5 text-base-content/40">Claude</li>
+                  <li>
+                    <a phx-click="select_model" phx-value-model="opus" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                      <.icon name="hero-bolt" class="w-4 h-4 text-warning" />
+                      <div>
+                        <div class="text-sm font-semibold text-base-content/80">Opus 4.6</div>
+                        <div class="text-[11px] text-base-content/40">Most capable</div>
+                      </div>
+                    </a>
+                  </li>
+                  <li>
+                    <a phx-click="select_model" phx-value-model="sonnet" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                      <.icon name="hero-bolt" class="w-4 h-4 text-info" />
+                      <div>
+                        <div class="text-sm font-semibold text-base-content/80">Sonnet 4.5</div>
+                        <div class="text-[11px] text-base-content/40">Everyday tasks</div>
+                      </div>
+                    </a>
+                  </li>
+                  <li>
+                    <a phx-click="select_model" phx-value-model="haiku" phx-value-effort="" class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]">
+                      <.icon name="hero-bolt" class="w-4 h-4 text-success" />
+                      <div>
+                        <div class="text-sm font-semibold text-base-content/80">Haiku 4.5</div>
+                        <div class="text-[11px] text-base-content/40">Fast answers</div>
+                      </div>
+                    </a>
+                  </li>
+                <% end %>
               </ul>
             <% end %>
           </div>
 
           <%!-- Send / Stop button --%>
-          <%= if @processing do %>
-            <button
-              type="button"
-              phx-click="kill_session"
-              class="flex items-center justify-center w-8 h-8 rounded-lg bg-error/80 text-error-content hover:bg-error transition-colors"
-              id="dm-stop-button"
-            >
-              <.icon name="hero-stop-solid" class="w-4 h-4" />
-            </button>
-          <% else %>
-            <button
-              type="submit"
-              class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/70 text-primary-content hover:bg-primary transition-colors"
-              id="dm-send-button"
-            >
-              <.icon name="hero-arrow-up-mini" class="w-5 h-5" />
-            </button>
-          <% end %>
+          <div class="flex items-center gap-1.5">
+            <%= if @processing do %>
+              <button
+                type="submit"
+                class="flex items-center justify-center w-8 h-8 rounded-lg bg-base-content/[0.06] text-base-content/40 hover:bg-base-content/10 transition-colors"
+                id="dm-queue-button"
+                title="Add to queue"
+              >
+                <.icon name="hero-arrow-up-mini" class="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                phx-click="kill_session"
+                class="flex items-center justify-center w-8 h-8 rounded-lg bg-error/80 text-error-content hover:bg-error transition-colors"
+                id="dm-stop-button"
+              >
+                <.icon name="hero-stop-solid" class="w-4 h-4" />
+              </button>
+            <% else %>
+              <button
+                type="submit"
+                class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/70 text-primary-content hover:bg-primary transition-colors"
+                id="dm-send-button"
+              >
+                <.icon name="hero-arrow-up-mini" class="w-5 h-5" />
+              </button>
+            <% end %>
+          </div>
         </div>
       </div>
     </form>
+    """
+  end
+
+  attr :prompts, :list, required: true
+
+  defp prompt_queue(assigns) do
+    ~H"""
+    <details class="group mb-2" open>
+      <summary class="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-base-content/8 bg-base-content/[0.02] cursor-pointer list-none hover:bg-base-content/[0.04] transition-colors select-none">
+        <.icon name="hero-clock" class="w-3.5 h-3.5 text-warning/70" />
+        <span class="text-[11px] font-medium text-base-content/40 flex-1 uppercase tracking-wide">
+          {length(@prompts)} queued
+        </span>
+        <.icon name="hero-chevron-down" class="w-3 h-3 text-base-content/20" />
+      </summary>
+      <div class="mt-1 rounded-xl border border-base-content/8 bg-base-content/[0.02] divide-y divide-base-content/5 overflow-hidden">
+        <%= for prompt <- @prompts do %>
+          <div class="flex items-center gap-2 px-3 py-2">
+            <span class="flex-shrink-0 text-[10px] font-mono font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-base-content/[0.06] text-base-content/40">
+              {model_display_name(prompt.context[:model] || "opus")}
+            </span>
+            <span class="text-xs text-base-content/50 truncate flex-1 min-w-0">
+              {String.slice(prompt.message || "", 0, 80)}{if String.length(prompt.message || "") > 80, do: "…"}
+            </span>
+            <button
+              type="button"
+              phx-click="remove_queued_prompt"
+              phx-value-id={prompt.id}
+              class="flex-shrink-0 text-base-content/20 hover:text-error transition-colors"
+              title="Remove from queue"
+            >
+              <.icon name="hero-x-mark-mini" class="w-4 h-4" />
+            </button>
+          </div>
+        <% end %>
+      </div>
+    </details>
     """
   end
 
@@ -987,6 +1291,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   defp model_display_name("opus"), do: "Opus 4.6"
   defp model_display_name("sonnet"), do: "Sonnet 4.5"
   defp model_display_name("haiku"), do: "Haiku 4.5"
+  defp model_display_name("gpt-5.4"), do: "gpt-5.4"
+  defp model_display_name("gpt-5.3-codex"), do: "gpt-5.3-codex"
+  defp model_display_name("gpt-5.2-codex"), do: "gpt-5.2-codex"
+  defp model_display_name("gpt-5.2"), do: "gpt-5.2"
+  defp model_display_name("gpt-5.1-codex-max"), do: "gpt-5.1-codex-max"
+  defp model_display_name("gpt-5.1-codex-mini"), do: "gpt-5.1-codex-mini"
   defp model_display_name(other), do: other
 
   defp format_size(bytes) when bytes < 1024, do: "#{bytes} B"
@@ -1031,6 +1341,13 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   end
 
   defp format_number(_), do: "0"
+
+  defp format_mtime({{year, month, day}, {hour, min, _sec}}) do
+    :io_lib.format(~c"~4..0B-~2..0B-~2..0B ~2..0B:~2..0B", [year, month, day, hour, min])
+    |> IO.iodata_to_binary()
+  end
+
+  defp format_mtime(_), do: ""
 
   # Tool widget parsing helpers
 

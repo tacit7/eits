@@ -79,7 +79,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="px-6 lg:px-8 py-6">
+    <div class="px-4 sm:px-6 lg:px-8 py-6">
       <div class="max-w-3xl mx-auto">
         <%!-- Search + Filter --%>
         <div class="mb-5 flex items-center gap-3">

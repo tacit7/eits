@@ -477,6 +477,17 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
       content_blocks = Map.get(message, "content") || Map.get(message, :content) || []
       message_uuid = Map.get(parsed, "uuid") || Map.get(parsed, :uuid)
 
+      thinking_text =
+        content_blocks
+        |> Enum.filter(fn block ->
+          (Map.get(block, "type") || Map.get(block, :type)) == "thinking"
+        end)
+        |> Enum.map(fn block ->
+          Map.get(block, "thinking") || Map.get(block, :thinking) || ""
+        end)
+        |> Enum.reject(&(&1 == ""))
+        |> Enum.join("\n\n")
+
       Enum.each(content_blocks, fn block ->
         block_type = Map.get(block, "type") || Map.get(block, :type)
 
@@ -485,13 +496,14 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
             text = Map.get(block, "text") || Map.get(block, :text) || ""
 
             if String.trim(text) != "" do
-              record_stream_message(
-                state,
-                "assistant",
-                text,
-                %{stream_type: "assistant"},
-                message_uuid
-              )
+              metadata =
+                if thinking_text != "" do
+                  %{stream_type: "assistant", thinking: thinking_text}
+                else
+                  %{stream_type: "assistant"}
+                end
+
+              record_stream_message(state, "assistant", text, metadata, message_uuid)
             end
 
           "tool_use" ->

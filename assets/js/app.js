@@ -33,6 +33,7 @@ import {MarkdownMessage} from "./hooks/markdown_message"
 import {CommandHistory} from "./hooks/command_history"
 import {DiffViewer} from "./hooks/diff_viewer"
 import {PasskeyAuth} from "./hooks/passkey_auth"
+import {PushSetup} from "./push_notifications"
 import {getHooks} from "live_svelte"
 import "./theme"
 import hljs from 'highlight.js'
@@ -73,6 +74,7 @@ Hooks.CommandHistory = CommandHistory
 Hooks.MarkdownMessage = MarkdownMessage
 Hooks.DiffViewer = DiffViewer
 Hooks.PasskeyAuth = PasskeyAuth
+Hooks.PushSetup = PushSetup
 Hooks.RefreshDot = {
   mounted() { this._flash() },
   updated() { this._flash() },
@@ -136,7 +138,18 @@ Hooks.LiveStreamToggle = {
   }
 }
 Hooks.ModalDialog = {
-  mounted() { this._sync() },
+  mounted() {
+    this._sync()
+    this._cancelHandler = (e) => {
+      e.preventDefault()
+      const toggleEvent = this.el.dataset.toggleEvent
+      if (toggleEvent) this.pushEvent(toggleEvent, {})
+    }
+    this.el.addEventListener("cancel", this._cancelHandler)
+  },
+  destroyed() {
+    this.el.removeEventListener("cancel", this._cancelHandler)
+  },
   updated() { this._sync() },
   _sync() {
     const open = this.el.dataset.open === "true"
@@ -345,6 +358,34 @@ window.addEventListener("click", (e) => {
   }
 })
 
+Hooks.ExecutionTimer = {
+  mounted() {
+    this._start = parseInt(this.el.dataset.start, 10) || null
+    this._tick()
+    this._interval = setInterval(() => this._tick(), 1000)
+  },
+  updated() {
+    const newStart = parseInt(this.el.dataset.start, 10) || null
+    if (newStart !== this._start) {
+      this._start = newStart
+      this._tick()
+    }
+  },
+  destroyed() {
+    clearInterval(this._interval)
+  },
+  _tick() {
+    if (!this._start) {
+      this.el.textContent = "0:00"
+      return
+    }
+    const elapsed = Math.floor((Date.now() - this._start) / 1000)
+    const m = Math.floor(elapsed / 60)
+    const s = elapsed % 60
+    this.el.textContent = `${m}:${s.toString().padStart(2, "0")}`
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   params: {_csrf_token: csrfToken},
@@ -355,6 +396,22 @@ const liveSocket = new LiveSocket("/live", Socket, {
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
+window.addEventListener("phx:copy_to_clipboard", (e) => {
+  const { text, format } = e.detail
+  if (!text || !navigator.clipboard) return
+
+  navigator.clipboard.writeText(text).then(() => {
+    const toast = document.createElement("div")
+    toast.className = "fixed bottom-4 right-4 z-[9999] bg-base-content text-base-100 text-xs font-medium px-4 py-2 rounded-lg shadow-lg opacity-0 transition-opacity duration-200"
+    toast.textContent = `Copied as ${format}`
+    document.body.appendChild(toast)
+    requestAnimationFrame(() => { toast.style.opacity = "1" })
+    setTimeout(() => {
+      toast.style.opacity = "0"
+      setTimeout(() => toast.remove(), 200)
+    }, 2000)
+  }).catch(err => console.error("Failed to copy:", err))
+})
 
 // connect if there are any LiveViews on the page
 liveSocket.connect()

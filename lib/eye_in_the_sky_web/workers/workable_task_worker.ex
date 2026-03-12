@@ -26,6 +26,11 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
     {:ok, run} = ScheduledJobs.record_run_start(job)
 
     case execute(job) do
+      {:ok, :no_work} ->
+        ScheduledJobs.record_run_complete(run, "completed", result: "No workable tasks")
+        broadcast()
+        :ok
+
       {:ok, output} ->
         ScheduledJobs.record_run_complete(run, "completed", result: output)
         broadcast()
@@ -48,7 +53,7 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
     tasks = fetch_workable_tasks(tag_name)
 
     if tasks == [] do
-      {:ok, "No workable tasks found for tag=#{tag_name}"}
+      {:ok, :no_work}
     else
       results =
         Enum.map(tasks, fn task ->

@@ -18,11 +18,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Dm do
   @impl true
   def execute(params, frame) do
     alias EyeInTheSkyWeb.Messages
+    alias EyeInTheSkyWeb.Claude.AgentManager
 
     sender_id = params[:sender_id] || frame.assigns[:eits_session_id]
     target_uuid = params[:target_session_id]
 
-    # Resolve target UUID/ID to internal integer session_id
     result =
       case Helpers.resolve_session_int_id(target_uuid) do
         {:ok, int_id} ->
@@ -41,19 +41,24 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Dm do
             }
           }
 
-          case Messages.create_message(attrs) do
-            {:ok, msg} ->
-              # Broadcast on the topics DmLive subscribes to
-              Phoenix.PubSub.broadcast(
-                EyeInTheSkyWeb.PubSub,
-                "session:#{int_id}",
-                {:new_dm, msg}
-              )
+          with {:ok, msg} <- Messages.create_message(attrs) do
+            Phoenix.PubSub.broadcast(
+              EyeInTheSkyWeb.PubSub,
+              "session:#{int_id}",
+              {:new_dm, msg}
+            )
 
-              %{success: true, message: "DM delivered to session #{int_id}"}
+            prompt = "[DM from session #{sender_id}]: #{params[:message]}"
 
-            {:error, cs} ->
-              %{success: false, message: "Failed: #{inspect(cs.errors)}"}
+            case AgentManager.send_message(int_id, prompt) do
+              :ok ->
+                %{success: true, message: "DM delivered to session #{int_id}"}
+
+              {:error, reason} ->
+                %{success: true, message: "DM saved but agent delivery failed: #{inspect(reason)}"}
+            end
+          else
+            {:error, cs} -> %{success: false, message: "Failed: #{inspect(cs.errors)}"}
           end
 
         {:error, reason} ->

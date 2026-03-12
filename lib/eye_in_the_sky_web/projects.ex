@@ -84,7 +84,7 @@ defmodule EyeInTheSkyWeb.Projects do
       end
 
     query
-    |> preload([:state, :tags])
+    |> preload([:state, :tags, :agents])
     |> Repo.all()
   end
 end

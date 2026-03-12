@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.Notifications do
   import Ecto.Query
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Notifications.Notification
+  alias EyeInTheSkyWeb.PushSubscriptions
 
   @pubsub EyeInTheSkyWeb.PubSub
   @topic "notifications"
@@ -37,6 +38,7 @@ defmodule EyeInTheSkyWeb.Notifications do
     case create_notification(attrs) do
       {:ok, notification} ->
         broadcast(:notification_created, notification)
+        maybe_push(notification)
         {:ok, notification}
 
       error ->
@@ -107,6 +109,14 @@ defmodule EyeInTheSkyWeb.Notifications do
   defp broadcast(event, payload \\ nil) do
     Phoenix.PubSub.broadcast(@pubsub, @topic, {event, payload})
   end
+
+  defp maybe_push(%{category: "agent"} = notification) do
+    Task.start(fn ->
+      PushSubscriptions.broadcast(notification.title, notification.body)
+    end)
+  end
+
+  defp maybe_push(_notification), do: :ok
 
   defp normalize_category("agent"), do: "agent"
   defp normalize_category("job"), do: "job"

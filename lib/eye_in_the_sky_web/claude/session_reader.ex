@@ -252,7 +252,8 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
         uuid: msg["uuid"],
         role: get_in(msg, ["message", "role"]) || msg["type"],
         content: extract_content(msg),
-        timestamp: timestamp
+        timestamp: timestamp,
+        usage: get_in(msg, ["message", "usage"])
       }
     end)
     |> Enum.reject(fn msg ->

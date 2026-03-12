@@ -328,7 +328,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="bg-base-100 min-h-screen px-6 lg:px-8">
+    <div class="bg-base-100 min-h-screen px-4 sm:px-6 lg:px-8">
       <div class="max-w-3xl mx-auto">
         <%!-- Toolbar --%>
         <div class="flex items-center justify-between py-5">
@@ -344,7 +344,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         </div>
 
         <%!-- Search and Filters --%>
-        <div class="sticky top-16 z-10 bg-base-100/85 backdrop-blur-md -mx-6 lg:-mx-8 px-6 lg:px-8 py-3 border-b border-base-content/5">
+        <div class="sticky top-0 md:top-16 z-10 bg-base-100/85 backdrop-blur-md -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 border-b border-base-content/5">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
             <form phx-submit="search" phx-change="search" class="flex-1 max-w-sm">
               <div class="relative">

@@ -1,12 +1,9 @@
 defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
   use EyeInTheSkyWebWeb, :live_view
 
-  import Ecto.Query, only: [from: 2]
-
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Tasks
   alias EyeInTheSkyWeb.Notes
-  alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWebWeb.Components.TaskCard
 
   @impl true
@@ -138,8 +135,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
     task = socket.assigns.selected_task
     title = params["title"]
     description = params["description"]
-    state_id = String.to_integer(params["state_id"])
-    priority = String.to_integer(params["priority"] || "0")
+    state_id = parse_int(params["state_id"])
+    priority = parse_int(params["priority"], 0)
     due_at = if params["due_at"] != "", do: params["due_at"], else: nil
     tags_string = params["tags"] || ""
 
@@ -158,21 +155,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
            updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
          }) do
       {:ok, updated_task} ->
-        if length(tag_names) > 0 do
-          Repo.delete_all(from t in "task_tags", where: t.task_id == ^task.id)
-
-          Enum.each(tag_names, fn tag_name ->
-            case Tasks.get_or_create_tag(tag_name) do
-              {:ok, tag} ->
-                Repo.insert_all("task_tags", [%{task_id: task.id, tag_id: tag.id}],
-                  on_conflict: :nothing
-                )
-
-              _ ->
-                :ok
-            end
-          end)
-        end
+        Tasks.replace_task_tags(task.id, tag_names)
 
         updated_task = Tasks.get_task!(updated_task.id)
 
@@ -193,11 +176,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
   def handle_event("delete_task", %{"task_id" => task_id}, socket) do
     task = Tasks.get_task_by_uuid_or_id!(task_id)
 
-    Repo.delete_all(from t in "task_tags", where: t.task_id == ^task.id)
-    Repo.delete_all(from t in "task_sessions", where: t.task_id == ^task.id)
-    Repo.delete_all(from t in "commit_tasks", where: t.task_id == ^task.id)
-
-    case Tasks.delete_task(task) do
+    case Tasks.delete_task_with_associations(task) do
       {:ok, _} ->
         socket =
           socket
@@ -222,8 +201,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
   def handle_event("create_new_task", params, socket) do
     title = params["title"]
     description = params["description"]
-    state_id = String.to_integer(params["state_id"])
-    priority = String.to_integer(params["priority"] || "1")
+    state_id = parse_int(params["state_id"])
+    priority = parse_int(params["priority"], 1)
     tags_string = params["tags"] || ""
 
     tag_names =
@@ -241,24 +220,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
            description: description,
            state_id: state_id,
            priority: priority,
-           project_id: Integer.to_string(socket.assigns.project_id),
+           project_id: socket.assigns.project_id,
            created_at: now,
            updated_at: now
          }) do
       {:ok, task} ->
-        if length(tag_names) > 0 do
-          Enum.each(tag_names, fn tag_name ->
-            case Tasks.get_or_create_tag(tag_name) do
-              {:ok, tag} ->
-                Repo.insert_all("task_tags", [%{task_id: task.id, tag_id: tag.id}],
-                  on_conflict: :nothing
-                )
-
-              _ ->
-                :ok
-            end
-          end)
-        end
+        Tasks.replace_task_tags(task.id, tag_names)
 
         socket =
           socket
@@ -277,6 +244,13 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
   @impl true
   def handle_info(:tasks_changed, socket) do
     {:noreply, load_tasks(socket)}
+  end
+
+  defp parse_int(s, default \\ 0) do
+    case Integer.parse(s || "") do
+      {n, ""} -> n
+      _ -> default
+    end
   end
 
   defp load_tasks(socket) do
@@ -301,7 +275,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="px-6 lg:px-8 py-6" phx-hook="GlobalKeydown" id="project-tasks-page">
+    <div class="px-4 sm:px-6 lg:px-8 py-6" phx-hook="GlobalKeydown" id="project-tasks-page">
       <div class="max-w-4xl mx-auto">
         <%!-- Search and New Task --%>
         <div class="mb-4 flex items-center gap-3">

@@ -189,8 +189,15 @@ defmodule EyeInTheSkyWeb.Claude.Parser do
   defp extract_tool_from_content(_), do: nil
 
   # Parse error objects
-  defp parse_error(%{"type" => type, "message" => message}) do
-    {String.to_atom(type), message}
+  @known_error_types ~w(api_error authentication_error permission_error not_found_error
+    rate_limit_error overloaded_error billing_error timeout_error invalid_request_error)
+
+  defp parse_error(%{"type" => type, "message" => message}) when type in @known_error_types do
+    {String.to_existing_atom(type), message}
+  end
+
+  defp parse_error(%{"type" => _type, "message" => message}) do
+    {:unknown_error, message}
   end
 
   defp parse_error(%{"message" => message}) do

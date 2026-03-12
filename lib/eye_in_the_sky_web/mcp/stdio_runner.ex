@@ -192,9 +192,18 @@ defmodule EyeInTheSkyWeb.MCP.StdioRunner do
   end
 
   defp atomize_keys(map) when is_map(map) do
-    Map.new(map, fn {k, v} -> {String.to_existing_atom(k), v} end)
+    Enum.reduce(map, %{}, fn {k, v}, acc ->
+      case string_to_known_atom(k) do
+        {:ok, atom} -> Map.put(acc, atom, v)
+        :error -> acc
+      end
+    end)
+  end
+
+  defp string_to_known_atom(k) when is_binary(k) do
+    {:ok, String.to_existing_atom(k)}
   rescue
-    ArgumentError -> Map.new(map, fn {k, v} -> {String.to_atom(k), v} end)
+    ArgumentError -> :error
   end
 
   defp format_result(result) when is_binary(result), do: result

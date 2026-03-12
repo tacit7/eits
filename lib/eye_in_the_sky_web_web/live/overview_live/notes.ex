@@ -88,9 +88,11 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
               <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                 <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
               </div>
+              <label for="overview-notes-search" class="sr-only">Search notes</label>
               <input
                 type="text"
                 name="query"
+                id="overview-notes-search"
                 value={@search_query}
                 placeholder="Search notes..."
                 class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
@@ -152,7 +154,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
                     type="button"
                     phx-click="toggle_star"
                     phx-value-note_id={note.id}
-                    class="mt-3 flex items-center gap-1.5 text-xs text-base-content/30 hover:text-warning transition-colors"
+                    class="mt-3 flex items-center gap-1.5 text-xs text-base-content/30 hover:text-warning transition-colors min-h-[44px] md:min-h-0 px-1"
+                    aria-label={if note.starred == 1, do: "Unstar note", else: "Star note"}
+                    aria-pressed={note.starred == 1}
                   >
                     <.icon
                       name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}

@@ -2,6 +2,7 @@ import Config
 
 # Gitea webhook HMAC secret — set this in Gitea webhook settings and here
 config :eye_in_the_sky_web, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SECRET", "")
+config :eye_in_the_sky_web, :env, :dev
 
 # Configure your database
 config :eye_in_the_sky_web, EyeInTheSkyWeb.Repo,

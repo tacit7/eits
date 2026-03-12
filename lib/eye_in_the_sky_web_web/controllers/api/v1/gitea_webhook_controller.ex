@@ -138,19 +138,26 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
   defp verify_signature(conn) do
     secret = Application.get_env(:eye_in_the_sky_web, :gitea_webhook_secret, "")
 
-    if secret == "" do
-      :ok
-    else
-      sig_header = get_req_header(conn, "x-gitea-signature") |> List.first()
-      body = conn.assigns[:raw_body] || ""
-      expected = :crypto.mac(:hmac, :sha256, secret, body) |> Base.encode16(case: :lower)
-
-      if Plug.Crypto.secure_compare("sha256=#{expected}", sig_header || "") do
-        :ok
-      else
-        Logger.warning("Gitea webhook: invalid signature")
+    cond do
+      secret == "" and Application.get_env(:eye_in_the_sky_web, :env, :prod) == :prod ->
+        Logger.error("Gitea webhook: GITEA_WEBHOOK_SECRET not set in production — rejecting request")
         {:error, :unauthorized}
-      end
+
+      secret == "" ->
+        Logger.warning("Gitea webhook: no secret configured, skipping signature check")
+        :ok
+
+      true ->
+        sig_header = get_req_header(conn, "x-gitea-signature") |> List.first()
+        body = conn.assigns[:raw_body] || ""
+        expected = :crypto.mac(:hmac, :sha256, secret, body) |> Base.encode16(case: :lower)
+
+        if Plug.Crypto.secure_compare("sha256=#{expected}", sig_header || "") do
+          :ok
+        else
+          Logger.warning("Gitea webhook: invalid signature")
+          {:error, :unauthorized}
+        end
     end
   end
 

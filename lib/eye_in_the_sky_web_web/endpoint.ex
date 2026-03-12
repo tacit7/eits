@@ -41,11 +41,10 @@ defmodule EyeInTheSkyWebWeb.Endpoint do
   plug Plug.RequestId
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
 
-  plug EyeInTheSkyWebWeb.Plugs.CaptureRawBody
-
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
     pass: ["*/*"],
+    body_reader: {EyeInTheSkyWebWeb.Plugs.CaptureRawBody, :read_body, []},
     json_decoder: Phoenix.json_library()
 
   plug Plug.MethodOverride

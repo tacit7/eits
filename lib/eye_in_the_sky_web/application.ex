@@ -43,9 +43,6 @@ defmodule EyeInTheSkyWeb.Application do
       EyeInTheSkyWeb.Tasks.Poller,
       # Poll for external message writes (Go MCP, spawned agents)
       EyeInTheSkyWeb.Messages.Broadcaster,
-      # NATS pub/sub consumer
-      # Connects to localhost:4222, subscribes to events.>, dispatches to Handler
-      EyeInTheSkyWeb.NATS.Consumer,
       # MCP Server (Anubis) — Streamable HTTP at /mcp
       # SessionStore is started by Anubis automatically via :session_store config (enabled: true)
       Anubis.Server.Registry,

@@ -79,6 +79,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:workflow_states, Tasks.list_workflow_states())
       |> assign(:current_task, Tasks.get_current_task_for_session(session.id))
       |> assign(:sync_timer, nil)
+      |> assign(:reload_timer, nil)
       |> assign(:total_tokens, 0)
       |> assign(:total_cost, 0.0)
       |> assign(:context_used, 0)
@@ -546,7 +547,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_info({:new_message, _message}, socket) do
-    {:noreply, maybe_reload_messages(socket)}
+    {:noreply, schedule_message_reload(socket)}
   end
 
   @impl true
@@ -631,7 +632,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   # DM received via MCP i-dm tool
   @impl true
   def handle_info({:new_dm, _msg}, socket) do
-    {:noreply, maybe_reload_messages(socket)}
+    {:noreply, schedule_message_reload(socket)}
   end
 
   # Task state changed — refresh the current task header strip
@@ -649,13 +650,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_info({:tool_result, _tool_name, _is_error}, socket) do
-    # Tool finished — reload messages to show the new tool messages
-    socket =
-      socket
-      |> assign(:stream_tool, nil)
-      |> maybe_reload_messages()
-
-    {:noreply, socket}
+    {:noreply, socket |> assign(:stream_tool, nil) |> schedule_message_reload()}
   end
 
   @impl true
@@ -710,6 +705,11 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_info({:queue_updated, prompts}, socket) do
     {:noreply, assign(socket, :queued_prompts, prompts)}
+  end
+
+  @impl true
+  def handle_info(:do_message_reload, socket) do
+    {:noreply, socket |> assign(:reload_timer, nil) |> maybe_reload_messages()}
   end
 
   @impl true
@@ -1103,6 +1103,20 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     end
 
     assign(socket, :sync_timer, nil)
+  end
+
+  # Debounce rapid bursts of reload triggers (new_message, new_dm, tool_result).
+  # Messages context broadcasts immediately; Broadcaster re-broadcasts 2s later for the same
+  # messages. Without debounce, each message causes at least 2 DB queries.
+  @reload_debounce_ms 300
+
+  defp schedule_message_reload(socket) do
+    if socket.assigns.reload_timer do
+      Process.cancel_timer(socket.assigns.reload_timer)
+    end
+
+    timer = Process.send_after(self(), :do_message_reload, @reload_debounce_ms)
+    assign(socket, :reload_timer, timer)
   end
 
   defp resolve_project_path(session, agent) do

@@ -30,15 +30,17 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   """
   def create_agent(opts) do
     agent_uuid = Ecto.UUID.generate()
-    session_uuid = opts[:session_uuid] || Ecto.UUID.generate()
+    provider = if opts[:agent_type] == "codex", do: "codex", else: "claude"
+
+    # For codex sessions, leave uuid null — Codex sets it via i-session start.
+    # For claude sessions, pre-generate so the worker can reference it immediately.
+    session_uuid = if provider == "codex", do: nil, else: opts[:session_uuid] || Ecto.UUID.generate()
 
     description = opts[:description] || "Agent session"
 
     Logger.info(
-      "📝 create_agent: agent_uuid=#{agent_uuid}, session_uuid=#{session_uuid}, model=#{opts[:model]}, project_id=#{opts[:project_id]}"
+      "📝 create_agent: agent_uuid=#{agent_uuid}, session_uuid=#{inspect(session_uuid)}, model=#{opts[:model]}, project_id=#{opts[:project_id]}"
     )
-
-    provider = if opts[:agent_type] == "codex", do: "codex", else: "claude"
 
     with {:ok, agent} <-
            Agents.create_agent(%{
@@ -55,7 +57,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              uuid: session_uuid,
              agent_id: agent.id,
              name: description,
-             description: "session-id #{session_uuid} agent-id #{agent_uuid}",
+             description: "agent-id #{agent_uuid}",
              model: opts[:model],
              provider: provider,
              project_id: opts[:project_id],
@@ -95,7 +97,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
       case send_message(session.id, instructions,
              model: opts[:model],
              effort_level: opts[:effort_level],
-             worktree: opts[:worktree]
+             worktree: opts[:worktree],
+             agent: opts[:agent]
            ) do
         :ok ->
           Logger.info(
@@ -155,7 +158,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
           effort_level: opts[:effort_level],
           has_messages: has_messages,
           channel_id: opts[:channel_id],
-          thinking_budget: opts[:thinking_budget]
+          thinking_budget: opts[:thinking_budget],
+          agent: opts[:agent]
         }
 
         case AgentWorker.process_message(session_id, message, context) do
@@ -185,7 +189,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
     {:error, :invalid_message}
   end
 
-  defp lookup_or_start(session_id, extra_opts \\ []) do
+  defp lookup_or_start(session_id, extra_opts) do
     case Registry.lookup(@registry, {:agent, session_id}) do
       [{pid, _}] ->
         if Process.alive?(pid) do
@@ -207,7 +211,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
     end
   end
 
-  defp start_agent_worker(session_id, extra_opts \\ []) do
+  defp start_agent_worker(session_id, extra_opts) do
     Logger.info("🚀 start_agent_worker: loading session.id=#{session_id}")
 
     with {:ok, session} <- Sessions.get_session(session_id),

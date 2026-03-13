@@ -111,12 +111,17 @@ defmodule EyeInTheSkyWeb.Notifications do
   end
 
   defp maybe_push(%{category: "agent"} = notification) do
+    url = build_url(notification.resource_type, notification.resource_id)
+
     Task.start(fn ->
-      PushSubscriptions.broadcast(notification.title, notification.body)
+      PushSubscriptions.broadcast(notification.title, notification.body, url)
     end)
   end
 
   defp maybe_push(_notification), do: :ok
+
+  defp build_url("session", id) when is_binary(id), do: "/dm/#{id}"
+  defp build_url(_type, _id), do: nil
 
   defp normalize_category("agent"), do: "agent"
   defp normalize_category("job"), do: "job"

@@ -6,8 +6,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
 
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Sessions
-  import EyeInTheSkyWebWeb.Helpers.ViewHelpers
   import EyeInTheSkyWebWeb.Components.Icons
+  import EyeInTheSkyWebWeb.Components.SessionCard
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -42,7 +42,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         |> assign(:agents, [])
         |> assign(:visible_count, @page_size)
         |> assign(:has_more, false)
-        |> assign(:list_version, 0)
         |> load_agents()
 
       {:ok, socket}
@@ -102,7 +101,15 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
       |> assign(:visible_count, visible_count)
       |> assign(:has_more, length(agents) > visible_count)
 
-    if reset_page, do: update(socket, :list_version, &(&1 + 1)), else: socket
+    visible_agents = Enum.take(agents, visible_count)
+
+    if reset_page do
+      stream(socket, :session_list, visible_agents, reset: true, dom_id: fn a -> "ps-#{a.id}" end)
+    else
+      Enum.reduce(visible_agents, socket, fn agent, acc ->
+        stream_insert(acc, :session_list, agent)
+      end)
+    end
   end
 
   defp filter_agents_by_status(sessions, filter) do
@@ -231,12 +238,20 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   @impl true
   def handle_event("load_more", _params, socket) do
     if socket.assigns.has_more do
-      new_count = socket.assigns.visible_count + @page_size
+      old_count = socket.assigns.visible_count
+      new_count = old_count + @page_size
+      agents = socket.assigns.agents
+
+      new_items = Enum.slice(agents, old_count, @page_size)
 
       socket =
         socket
         |> assign(:visible_count, new_count)
-        |> assign(:has_more, length(socket.assigns.agents) > new_count)
+        |> assign(:has_more, length(agents) > new_count)
+
+      socket = Enum.reduce(new_items, socket, fn agent, acc ->
+        stream_insert(acc, :session_list, agent)
+      end)
 
       {:noreply, socket}
     else
@@ -277,7 +292,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
       project_id: project.id,
       project_path: project.path,
       description: agent_name,
-      instructions: description
+      instructions: description,
+      agent: params["agent"]
     ]
 
     case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
@@ -616,150 +632,77 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
             />
           <% else %>
             <div
-              id={"ps-list-#{@list_version}"}
-              phx-update="append"
+              id="ps-list"
+              phx-update="stream"
               class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl px-4"
             >
-            <%= for agent <- Enum.take(@agents, @visible_count) do %>
-              <div id={"ps-#{agent.id}"}>
-              <% display_status = EyeInTheSkyWebWeb.Helpers.ViewHelpers.derive_display_status(agent) %>
-              <% {status_color, status_bg, status_label, is_active} =
-                case display_status do
-                  "working" -> {"text-success", "bg-success", "Working", true}
-                  "compacting" -> {"text-warning", "bg-warning", "Compacting", true}
-                  "idle" -> {"text-base-content/25", "bg-base-content/20", "Idle", false}
-                  "idle_stale" -> {"text-warning", "bg-warning", "Idle", false}
-                  "idle_dead" -> {"text-error", "bg-error", "Idle", false}
-                  "completed" -> {"text-base-content/25", "bg-base-content/20", "Done", false}
-                  _ -> {"text-base-content/25", "bg-base-content/20", "Idle", false}
-                end %>
-              <div
-                class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer"
-                phx-click="navigate_dm"
-                phx-value-id={agent.id}
-                role="button"
-                tabindex="0"
-                phx-keyup="navigate_dm"
-                phx-key="Enter"
-                aria-label={"Open session: #{agent.name || "Unnamed session"} - #{status_label}"}
-              >
-                <%!-- Status indicator / checkbox --%>
-                <%= if @session_filter == "archived" do %>
-                  <div class="flex-shrink-0 w-6 flex justify-center">
-                    <input
-                      type="checkbox"
-                      checked={MapSet.member?(@selected_ids, to_string(agent.id))}
-                      phx-click="toggle_select"
-                      phx-value-id={agent.id}
-                      class="checkbox checkbox-xs checkbox-primary"
-                      aria-label={"Select session #{agent.name || agent.id}"}
-                    />
-                  </div>
-                <% else %>
-                  <div class="flex-shrink-0 w-6 flex justify-center" title={status_label}>
-                    <%= if is_active do %>
-                      <span class="relative flex h-2 w-2">
-                        <span class={"animate-ping absolute inline-flex h-full w-full rounded-full opacity-50 " <> status_bg}>
-                        </span>
-                        <span class={"relative inline-flex rounded-full h-2 w-2 " <> status_bg}>
-                        </span>
-                      </span>
-                    <% else %>
-                      <span class={"inline-flex rounded-full h-2 w-2 " <> status_bg}></span>
+            <div :for={{dom_id, agent} <- @streams.session_list} id={dom_id}>
+                <.session_row
+                  session={agent}
+                  select_mode={@session_filter == "archived"}
+                  selected={MapSet.member?(@selected_ids, to_string(agent.id))}
+                >
+                  <:actions>
+                    <%= if agent.id do %>
+                      <a
+                        href={~p"/dm/#{agent.id}"}
+                        target="_blank"
+                        class="hidden sm:inline-flex md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-base-content/30 hover:text-primary hover:bg-primary/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        aria-label="Open in new tab"
+                      >
+                        <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
+                      </a>
                     <% end %>
-                  </div>
-                <% end %>
-
-                <%!-- Main content --%>
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-baseline gap-2">
-                    <span class="text-[13px] font-medium text-base-content/85 truncate">
-                      {agent.name || "Unnamed session"}
-                    </span>
-                    <span class={"text-[11px] font-medium uppercase tracking-wider flex-shrink-0 " <> status_color}>
-                      {status_label}
-                    </span>
-                  </div>
-                  <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
-                    <span class="font-mono">{Sessions.format_model_info(agent)}</span>
-                    <span class="text-base-content/15">/</span>
-                    <span class="tabular-nums">{relative_time(agent.started_at)}</span>
-                  </div>
-                  <%= if agent.agent && agent.agent.description do %>
-                    <p class="text-xs text-base-content/35 mt-1 truncate max-w-lg">
-                      {agent.agent.description}
-                    </p>
-                  <% end %>
-                </div>
-
-                <%!-- Actions --%>
-                <div class="flex items-center gap-0 flex-shrink-0" phx-click="noop">
-                  <%= if agent.id do %>
-                    <a
-                      href={~p"/dm/#{agent.id}"}
-                      target="_blank"
-                      class="hidden sm:inline-flex md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-base-content/30 hover:text-primary hover:bg-primary/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                      aria-label="Open in new tab"
-                    >
-                      <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
-                    </a>
-                  <% end %>
-                  <%= if agent.agent && agent.agent.uuid && agent.uuid do %>
-                    <button
-                      id={"bookmark-btn-#{agent.uuid}"}
-                      type="button"
-                      phx-hook="BookmarkAgent"
-                      data-agent-id={agent.agent.uuid}
-                      data-session-id={agent.uuid}
-                      data-agent-name={agent.name || agent.agent.description || "Agent"}
-                      data-agent-status={agent.status}
-                      class="bookmark-button md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
-                      aria-label="Bookmark agent"
-                    >
-                      <.heart class="bookmark-icon w-3.5 h-3.5" />
-                    </button>
-                  <% end %>
-                  <%= if agent.uuid do %>
-                    <%= if agent.archived_at do %>
+                    <%= if agent.agent && agent.agent.uuid && agent.uuid do %>
                       <button
+                        id={"bookmark-btn-#{agent.uuid}"}
                         type="button"
-                        phx-click="unarchive_session"
-                        phx-value-session_id={agent.id}
-                        class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-info hover:bg-info/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
-                        aria-label="Unarchive"
+                        phx-hook="BookmarkAgent"
+                        data-agent-id={agent.agent.uuid}
+                        data-session-id={agent.uuid}
+                        data-agent-name={agent.name || agent.agent.description || "Agent"}
+                        data-agent-status={agent.status}
+                        class="bookmark-button md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
+                        aria-label="Bookmark agent"
                       >
-                        <.icon name="hero-arrow-up-tray-mini" class="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        phx-click="delete_session"
-                        phx-value-session_id={agent.id}
-                        class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
-                        aria-label="Delete"
-                      >
-                        <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
-                      </button>
-                    <% else %>
-                      <button
-                        type="button"
-                        phx-click="archive_session"
-                        phx-value-session_id={agent.id}
-                        class="hidden sm:flex md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-base-content/30 hover:text-warning hover:bg-warning/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
-                        aria-label="Archive"
-                      >
-                        <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
+                        <.heart class="bookmark-icon w-3.5 h-3.5" />
                       </button>
                     <% end %>
-                  <% end %>
-                </div>
-
-                <%!-- Chevron --%>
-                <div class="flex-shrink-0">
-                  <.icon name="hero-chevron-right-mini" class="w-4 h-4 text-base-content/20" />
-                </div>
+                    <%= if agent.uuid do %>
+                      <%= if agent.archived_at do %>
+                        <button
+                          type="button"
+                          phx-click="unarchive_session"
+                          phx-value-session_id={agent.id}
+                          class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-info hover:bg-info/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
+                          aria-label="Unarchive"
+                        >
+                          <.icon name="hero-arrow-up-tray-mini" class="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          phx-click="delete_session"
+                          phx-value-session_id={agent.id}
+                          class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
+                          aria-label="Delete"
+                        >
+                          <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
+                        </button>
+                      <% else %>
+                        <button
+                          type="button"
+                          phx-click="archive_session"
+                          phx-value-session_id={agent.id}
+                          class="hidden sm:flex md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-base-content/30 hover:text-warning hover:bg-warning/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
+                          aria-label="Archive"
+                        >
+                          <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
+                        </button>
+                      <% end %>
+                    <% end %>
+                  </:actions>
+                </.session_row>
               </div>
-              </div>
-            <% end %>
             </div>
           <% end %>
         </div>

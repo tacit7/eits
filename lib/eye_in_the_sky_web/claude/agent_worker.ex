@@ -12,7 +12,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   alias EyeInTheSkyWeb.Claude.{Message, SDK}
   alias EyeInTheSkyWeb.Codex
-  alias EyeInTheSkyWeb.{Agents, Messages, Sessions}
+  alias EyeInTheSkyWeb.{Messages, Sessions}
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
   @retry_start_ms 1_000
@@ -268,10 +268,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   # Other SDK messages (text deltas, tool use, thinking, etc.) - broadcast for live streaming
   @impl true
   def handle_info({:claude_message, ref, %Message{} = msg}, %{sdk_ref: ref} = state) do
-    Logger.info(
-      "[#{state.session_id}] SDK stream message: type=#{msg.type}, delta=#{msg.delta}, content_type=#{msg.content |> inspect() |> String.slice(0..80)}"
-    )
-
     state = update_tool_start(msg, state)
     broadcast_stream_event(msg, state)
     state = update_stream_buffer(msg, state)
@@ -502,7 +498,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       use_script: true,
       eits_session_id: state.session_uuid,
       eits_agent_id: state.agent_id,
-      worktree: state.worktree
+      worktree: state.worktree,
+      agent: context[:agent]
     ]
 
     opts =
@@ -569,24 +566,18 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
        Provider: openai
 
     3. Follow the EITS workflow for all work:
-       a. Create a task via REST API:
-          curl -s -X POST http://localhost:5001/api/v1/tasks \\
-            -H "Content-Type: application/json" \\
-            -d '{"title":"<task title>","description":"<details>"}' | jq '.id'
+       a. Create a task:
+          i-todo create --title "<task title>" --description "<details>"
        b. Start the task (move to In Progress):
-          psql -d eits_dev -c "UPDATE tasks SET workflow_state_id=2 WHERE id=<task_id>;"
+          i-todo start <task_id>
        c. Link task to your session:
-          curl -s -X POST http://localhost:5001/api/v1/tasks/<task_id>/sessions \\
-            -H "Content-Type: application/json" \\
-            -d '{"session_id":"#{session_uuid}"}'
+          i-todo add-session <task_id> --session_id #{session_uuid}
        d. Do the work.
        e. When done, move task to In Review (NOT Done):
-          psql -d eits_dev -c "UPDATE tasks SET workflow_state_id=4 WHERE id=<task_id>;"
+          i-todo status <task_id> --state_id 4
 
     4. When all work is complete, end the session:
-       curl -s -X PATCH http://localhost:5001/api/v1/sessions/#{session_uuid} \\
-         -H "Content-Type: application/json" \\
-         -d '{"status":"completed"}'
+       i-session end #{session_uuid}
 
     Now proceed with the task:
     """
@@ -622,7 +613,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       effort_level: Map.get(context, :effort_level),
       has_messages: Map.get(context, :has_messages, false),
       channel_id: Map.get(context, :channel_id),
-      thinking_budget: Map.get(context, :thinking_budget)
+      thinking_budget: Map.get(context, :thinking_budget),
+      agent: Map.get(context, :agent)
     }
   end
 
@@ -632,7 +624,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       effort_level: context[:effort_level],
       has_messages: context[:has_messages] || false,
       channel_id: context[:channel_id],
-      thinking_budget: context[:thinking_budget]
+      thinking_budget: context[:thinking_budget],
+      agent: context[:agent]
     }
   end
 
@@ -642,7 +635,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       effort_level: nil,
       has_messages: false,
       channel_id: nil,
-      thinking_budget: nil
+      thinking_budget: nil,
+      agent: nil
     }
   end
 

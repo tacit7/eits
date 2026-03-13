@@ -343,7 +343,9 @@ defmodule EyeInTheSkyWeb.Messages do
   @doc """
   Returns recent messages for a session (default last 50).
   """
-  def list_recent_messages(session_id, limit \\ 50) do
+  def list_recent_messages(session_id, limit \\ 50)
+
+  def list_recent_messages(session_id, limit) do
     Message
     |> where([m], m.session_id == ^session_id)
     |> order_by([m], desc: m.inserted_at)
@@ -400,10 +402,6 @@ defmodule EyeInTheSkyWeb.Messages do
     |> Enum.sort_by(fn msg -> msg.inserted_at || DateTime.utc_now() end, {:desc, DateTime})
     |> Enum.take(limit)
     |> Enum.reverse()
-  end
-
-  def list_recent_messages(session_id, limit) do
-    list_recent_messages(session_id, limit, nil)
   end
 
   @doc """

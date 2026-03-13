@@ -556,7 +556,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
 
   defp maybe_record_result(_parsed, _type, _state), do: :ok
 
-  defp record_stream_message(state, sender_role, body, metadata, source_uuid \\ nil) do
+  defp record_stream_message(state, sender_role, body, metadata, source_uuid) do
     attrs = %{
       uuid: Ecto.UUID.generate(),
       session_id: state.session_int_id,

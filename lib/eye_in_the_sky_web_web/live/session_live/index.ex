@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.Sessions
-  import EyeInTheSkyWebWeb.Components.SessionCard
+  import EyeInTheSkyWebWeb.Components.SessionCard, only: [session_row: 1]
 
   @per_page 20
 
@@ -15,15 +15,14 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
     socket =
       socket
       |> assign(:page_title, "Session Overview")
-      |> assign(:agents, agents)
       |> assign(:projects, projects)
       |> assign(:page, 1)
       |> assign(:has_more, length(agents) < total)
       |> assign(:total_sessions, total)
-      |> assign(:list_version, 0)
       |> assign(:show_new_session_modal, false)
       |> assign(:sidebar_tab, :sessions)
       |> assign(:sidebar_project, nil)
+      |> stream(:agents, agents, dom_id: fn a -> "si-#{a.session_uuid}" end)
 
     {:ok, socket}
   end
@@ -39,15 +38,26 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
 
       socket =
         socket
-        |> assign(:agents, socket.assigns.agents ++ new_agents)
         |> assign(:page, next_page)
-        |> assign(:has_more, length(socket.assigns.agents) + length(new_agents) < total)
+        |> assign(:has_more, offset + length(new_agents) < total)
+
+      socket = Enum.reduce(new_agents, socket, fn agent, acc ->
+        stream_insert(acc, :agents, agent)
+      end)
 
       {:noreply, socket}
     else
       {:noreply, socket}
     end
   end
+
+  @impl true
+  def handle_event("navigate_dm", %{"id" => id}, socket) do
+    {:noreply, push_navigate(socket, to: ~p"/dm/#{id}")}
+  end
+
+  @impl true
+  def handle_event("noop", _params, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("start_session", %{"agent_id" => _agent_id}, socket) do
@@ -75,7 +85,8 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
       project_id: project_id,
       project_path: project.path,
       description: agent_name,
-      instructions: description
+      instructions: description,
+      agent: params["agent"]
     ]
 
     case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
@@ -86,11 +97,10 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
         socket =
           socket
           |> assign(:show_new_session_modal, false)
-          |> assign(:agents, agents)
           |> assign(:page, 1)
           |> assign(:has_more, length(agents) < total)
           |> assign(:total_sessions, total)
-          |> update(:list_version, &(&1 + 1))
+          |> stream(:agents, agents, reset: true)
           |> put_flash(:info, "Session launched")
 
         {:noreply, socket}
@@ -103,15 +113,12 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="px-4 sm:px-6 lg:px-8">
-      <div class="max-w-5xl mx-auto">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-4 sm:py-6">
-          <div>
-            <h1 class="text-lg font-semibold text-base-content/90">Sessions</h1>
-            <p class="text-xs text-base-content/50 mt-0.5">
-              Recent sessions across all projects
-            </p>
-          </div>
+    <div class="bg-base-100 min-h-full px-4 sm:px-6 lg:px-8">
+      <div class="max-w-4xl mx-auto">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-5">
+          <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
+            {@total_sessions} sessions
+          </span>
           <div class="flex w-full sm:w-auto items-center gap-2">
             <button
               phx-click="toggle_new_session_modal"
@@ -119,29 +126,33 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
             >
               <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Agent
             </button>
-            <label class="swap swap-rotate btn btn-ghost btn-sm btn-circle min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 sm:btn-xs">
-              <input
-                type="checkbox"
-                class="theme-controller"
-                value="dark"
-                aria-label="Toggle dark theme"
-              />
-              <.icon name="hero-sun" class="swap-on w-4 h-4" />
-              <.icon name="hero-moon" class="swap-off w-4 h-4" />
-            </label>
           </div>
         </div>
 
-        <div
-          id={"sessions-grid-#{@list_version}"}
-          phx-update="append"
-          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"
-        >
-          <%= for agent <- @agents do %>
-            <div id={"si-#{agent.session_uuid}"}>
-              <.session_card session={agent} />
+        <div class="mt-2 rounded-xl shadow-sm">
+          <div
+            id="sessions-list"
+            phx-update="stream"
+            class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl px-4"
+          >
+            <div :for={{dom_id, agent} <- @streams.agents} id={dom_id}>
+              <.session_row
+                session={%{
+                  id: agent.session_id,
+                  uuid: agent.session_uuid,
+                  name: agent.session_name,
+                  status: agent.status,
+                  started_at: agent.started_at,
+                  ended_at: agent.ended_at,
+                  model_name: agent.model_name,
+                  model_provider: agent.model_provider,
+                  model_version: agent.model_version
+                }}
+                project_name={agent.project_name}
+                click_event="navigate_dm"
+              />
             </div>
-          <% end %>
+          </div>
         </div>
 
         <div

@@ -72,8 +72,8 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TeamJoin do
     {session_db_id, agent_db_id} =
       if session_uuid do
         case Sessions.get_session_by_uuid(session_uuid) do
-          nil -> {nil, nil}
-          session -> {session.id, session.agent_id}
+          {:ok, session} -> {session.id, session.agent_id}
+          _ -> {nil, nil}
         end
       else
         {nil, nil}

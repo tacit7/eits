@@ -21,12 +21,12 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
       |> assign(:search_query, "")
       |> assign(:workflow_states, workflow_states)
       |> assign(:state_filter, "all")
-      |> assign(:tasks, [])
+      |> assign(:task_count, 0)
       |> assign(:page, 1)
       |> assign(:has_more, false)
       |> assign(:total_tasks, 0)
-      |> assign(:list_version, 0)
       |> assign(:sidebar_tab, :tasks)
+      |> stream(:tasks, [], dom_id: fn t -> "ot-#{t.id}" end)
       |> assign(:sidebar_project, nil)
       |> assign(:show_filter_sheet, false)
       |> assign(:show_task_detail_drawer, false)
@@ -202,21 +202,21 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
           else: tasks
 
       socket
-      |> assign(:tasks, tasks)
+      |> assign(:task_count, length(tasks))
       |> assign(:page, 1)
       |> assign(:has_more, false)
       |> assign(:total_tasks, length(tasks))
-      |> update(:list_version, &(&1 + 1))
+      |> stream(:tasks, tasks, reset: true)
     else
       total = Tasks.count_tasks(state_id: state_id)
       tasks = Tasks.list_tasks(limit: @per_page, offset: 0, state_id: state_id)
 
       socket
-      |> assign(:tasks, tasks)
+      |> assign(:task_count, length(tasks))
       |> assign(:page, 1)
       |> assign(:has_more, length(tasks) < total)
       |> assign(:total_tasks, total)
-      |> update(:list_version, &(&1 + 1))
+      |> stream(:tasks, tasks, reset: true)
     end
   end
 
@@ -228,10 +228,15 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
 
     new_tasks = Tasks.list_tasks(limit: @per_page, offset: offset, state_id: state_id)
 
-    socket
-    |> assign(:tasks, socket.assigns.tasks ++ new_tasks)
-    |> assign(:page, page)
-    |> assign(:has_more, length(socket.assigns.tasks) + length(new_tasks) < total)
+    socket =
+      socket
+      |> update(:task_count, &(&1 + length(new_tasks)))
+      |> assign(:page, page)
+      |> assign(:has_more, offset + length(new_tasks) < total)
+
+    Enum.reduce(new_tasks, socket, fn task, acc ->
+      stream_insert(acc, :tasks, task)
+    end)
   end
 
   @impl true
@@ -388,29 +393,27 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
         <div class="mb-3">
           <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
             <%= if @has_more do %>
-              {length(@tasks)} of {@total_tasks} tasks
+              {@task_count} of {@total_tasks} tasks
             <% else %>
               {@total_tasks} tasks
             <% end %>
           </span>
         </div>
 
-        <%= if length(@tasks) > 0 do %>
+        <%= if @task_count > 0 do %>
           <div
-            id={"overview-tasks-list-#{@list_version}"}
-            phx-update="append"
+            id="overview-tasks-list"
+            phx-update="stream"
             class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-5"
           >
-            <%= for task <- @tasks do %>
-              <div id={"ot-#{task.id}"}>
-                <TaskCard.task_card
-                  task={task}
-                  variant="list"
-                  on_click="open_task_detail"
-                  on_delete="delete_task"
-                />
-              </div>
-            <% end %>
+            <div :for={{dom_id, task} <- @streams.tasks} id={dom_id}>
+              <TaskCard.task_card
+                task={task}
+                variant="list"
+                on_click="open_task_detail"
+                on_delete="delete_task"
+              />
+            </div>
           </div>
 
           <div

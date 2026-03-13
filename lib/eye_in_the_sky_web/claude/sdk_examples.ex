@@ -104,12 +104,12 @@ defmodule EyeInTheSkyWeb.Claude.SDKExamples do
     end
   end
 
-  @doc """
-  GenServer example that wraps SDK for stateful sessions.
-
-  Shows how to build session management on top of the SDK.
-  """
   defmodule SessionServer do
+    @moduledoc """
+    GenServer example that wraps SDK for stateful sessions.
+
+    Shows how to build session management on top of the SDK.
+    """
     use GenServer
 
     def start_link(opts) do

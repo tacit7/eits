@@ -1,4 +1,8 @@
 import Config
+import Dotenvy
+
+# Load .env file if present (dev/local overrides)
+source!([".env", System.get_env()])
 
 # config/runtime.exs is executed for all environments, including
 # during releases. It is executed after compilation and before the

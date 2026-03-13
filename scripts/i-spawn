@@ -27,4 +27,4 @@ done
 
 [[ -n "$SESSION_ID" ]] && body=$(echo "$body" | jq --arg v "$SESSION_ID" 'if .parent_session_id then . else . + {parent_session_id: $v} end')
 
-_ok "$(_curl -X POST "$BASE/agents/spawn" -H 'Content-Type: application/json' -d "$body")"
+_ok "$(_curl -X POST "$BASE/agents" -H 'Content-Type: application/json' -d "$body")"

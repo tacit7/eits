@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TeamStatus do
   use Anubis.Server.Component, type: :tool
 
   alias Anubis.Server.Response
-  alias EyeInTheSkyWeb.{Repo, Tasks, Teams}
+  alias EyeInTheSkyWeb.{Repo, Teams}
   import Ecto.Query
 
   schema do

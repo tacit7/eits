@@ -11,7 +11,7 @@ export PGPASSWORD="${EITS_PG_PASSWORD:-postgres}"
 _pgq() { psql -U "$EITS_PG_USER" -h "$EITS_PG_HOST" -d "$EITS_PG_DB" -t -A --no-psqlrc -c "$1" 2>/dev/null | grep -v '^Time:'; }
 
 MAPPING_FILE="$HOME/.claude/hooks/session_agent_map.json"
-EITS_BASE="${EITS_API_URL:-https://localhost:5001/api/v1}"
+EITS_BASE="${EITS_API_URL:-http://localhost:5000/api/v1}"
 _curl() { curl ${EITS_API_KEY:+-H "Authorization: Bearer ${EITS_API_KEY}"} "$@"; }
 LOG_FILE="${HOME}/.claude/hooks/eits.log"
 _log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [resume] $*" >> "$LOG_FILE" 2>/dev/null; }
@@ -91,6 +91,12 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   else
     _log "WARN: AGENT_INT_ID empty, skipping EITS_AGENT_ID update"
   fi
+  if [ -n "${AGENT_ID:-}" ]; then
+    _set "EITS_AGENT_UUID" "$AGENT_ID"
+    _log "wrote EITS_AGENT_UUID=$AGENT_ID"
+  else
+    _log "WARN: AGENT_ID (UUID) empty, skipping EITS_AGENT_UUID update"
+  fi
 
   # Resolve project by path and set EITS_PROJECT_ID
   PROJECT_ID=$(_pgq "SELECT id FROM projects WHERE path = '$PROJECT_DIR_SQL' LIMIT 1" || true)
@@ -148,11 +154,30 @@ nats pub "events.session.update" "$(jq -nc \
 # Inject context with session info
 CONTEXT="# Eye in the Sky — Session Resumed
 
-**Session**: ${SESSION_NAME:-unnamed} (ID: ${SESSION_INT_ID:-$SESSION_ID})
-**Agent ID**: ${AGENT_INT_ID:-$AGENT_ID}
-**Project**: $PROJECT_NAME
+## Session Context
 
-Call \`/eits-init\` if this session needs a name, otherwise continue your work."
+- **EITS_SESSION_UUID**: $SESSION_ID
+- **EITS_AGENT_UUID**: ${AGENT_ID:-unresolved}
+- **EITS_PROJECT_ID**: ${PROJECT_ID:-unresolved}
+- **Session**: ${SESSION_NAME:-unnamed} (ID: ${SESSION_INT_ID:-$SESSION_ID})
+- **Project**: $PROJECT_NAME
+
+Call \`/eits-init\` if this session needs a name, otherwise continue your work.
+
+## Workflow
+
+\`\`\`bash
+# Create + start (session linked automatically via EITS_SESSION_UUID)
+eits tasks create --title \"Task name\" --description \"Details\"
+eits tasks start <task_id>
+
+# Finish
+eits tasks annotate <task_id> --body \"What happened\"
+eits tasks update <task_id> --state 4
+
+# Log commits
+eits commits create --hash <hash>
+\`\`\`"
 
 cat <<EOF
 {

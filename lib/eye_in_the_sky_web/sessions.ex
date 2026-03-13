@@ -315,12 +315,15 @@ defmodule EyeInTheSkyWeb.Sessions do
           session_name: s.name,
           agent_id: a.id,
           agent_uuid: a.uuid,
-          agent_description: a.description,
+          session_description: s.description,
           project_name: p.name,
           started_at: s.started_at,
           ended_at: s.ended_at,
           status: s.status,
           intent: s.intent,
+          model_provider: s.model_provider,
+          model_name: s.model_name,
+          model_version: s.model_version,
           active_task:
             fragment(
               "(SELECT t.title FROM tasks t JOIN task_sessions ts ON t.id = ts.task_id WHERE ts.session_id = ? AND t.state_id = ? AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)",
@@ -520,6 +523,19 @@ defmodule EyeInTheSkyWeb.Sessions do
 
   Returns "provider/name (version)" or "provider/name" if version not set.
   """
+  def format_model_info(%{model_name: name} = session) when is_binary(name) and name != "" do
+    version = Map.get(session, :model_version)
+
+    raw =
+      if is_binary(version) and version != "",
+        do: "#{name} (#{version})",
+        else: name
+
+    raw
+    |> String.replace(~r/^claude-/, "")
+    |> String.replace(~r/^claude\//, "")
+  end
+
   def format_model_info(%Session{} = session) do
     raw =
       case {session.model_provider, session.model_name, session.model_version} do

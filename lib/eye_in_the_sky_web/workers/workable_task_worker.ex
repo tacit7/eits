@@ -14,7 +14,7 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
 
   require Logger
 
-  alias EyeInTheSkyWeb.{Projects, Repo, ScheduledJobs, Tasks}
+  alias EyeInTheSkyWeb.{Repo, ScheduledJobs, Tasks}
   alias EyeInTheSkyWeb.Claude.AgentManager
   alias EyeInTheSkyWeb.Notifications
   alias EyeInTheSkyWeb.Workers.SpeakWorker
@@ -67,6 +67,8 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
 
       {:ok, "Spawned #{spawned} agents for tag=#{tag_name} (#{failed} failed)"}
     end
+  rescue
+    e -> {:error, Exception.message(e)}
   end
 
   defp fetch_workable_tasks(tag_name) do

@@ -71,7 +71,8 @@ defmodule EyeInTheSkyWeb.MixProject do
       {:crontab, "~> 1.1"},
 {:anubis_mcp, "~> 0.17"},
       {:wax_, "~> 0.7.0"},
-      {:web_push_encryption, "~> 0.3"}
+      {:web_push_encryption, "~> 0.3"},
+      {:dotenvy, "~> 0.8.0"}
     ]
   end
 

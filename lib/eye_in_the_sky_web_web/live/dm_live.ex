@@ -67,7 +67,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:message_limit, @default_message_limit)
       |> assign(:has_more_messages, false)
       |> assign(:selected_model, session.model || "opus")
-      |> assign(:selected_effort, "")
+      |> assign(:selected_effort, "medium")
+      |> assign(:show_effort_menu, false)
       |> assign(:show_model_menu, false)
       |> assign(:show_live_stream, false)
       |> assign(:stream_content, AgentWorker.get_stream_state(session.id))
@@ -78,14 +79,19 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:workflow_states, Tasks.list_workflow_states())
       |> assign(:current_task, Tasks.get_current_task_for_session(session.id))
       |> assign(:sync_timer, nil)
+      |> assign(:reload_timer, nil)
       |> assign(:total_tokens, 0)
       |> assign(:total_cost, 0.0)
+      |> assign(:context_used, 0)
+      |> assign(:context_window, 0)
       |> assign(:show_memories_panel, false)
       |> assign(:memory_files, [])
       |> assign(:selected_memory_path, nil)
       |> assign(:memory_edit_content, "")
       |> assign(:queued_prompts, AgentWorker.get_queue(session.id))
       |> assign(:thinking_enabled, false)
+      |> assign(:max_budget_usd, nil)
+      |> assign(:compacting, session.status == "compacting")
       |> allow_upload(:files,
         accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
         max_entries: 10,
@@ -233,6 +239,27 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_event("set_max_budget", %{"value" => value}, socket) do
+    budget =
+      case Float.parse(value) do
+        {f, _} when f > 0 -> f
+        _ -> nil
+      end
+
+    {:noreply, assign(socket, :max_budget_usd, budget)}
+  end
+
+  @impl true
+  def handle_event("toggle_effort_menu", _params, socket) do
+    {:noreply, assign(socket, :show_effort_menu, !socket.assigns.show_effort_menu)}
+  end
+
+  @impl true
+  def handle_event("select_effort", %{"effort" => effort}, socket) do
+    {:noreply, socket |> assign(:selected_effort, effort) |> assign(:show_effort_menu, false)}
+  end
+
+  @impl true
   def handle_event("toggle_thinking", _params, socket) do
     {:noreply, assign(socket, :thinking_enabled, !socket.assigns.thinking_enabled)}
   end
@@ -262,64 +289,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     end
 
     {:noreply, socket}
-  end
-
-  defp parse_int(s, default \\ 0) do
-    case Integer.parse(s || "") do
-      {n, ""} -> n
-      _ -> default
-    end
-  end
-
-  defp handle_send_message(body, socket) do
-    model = socket.assigns.selected_model
-    effort_level = socket.assigns.selected_effort
-    thinking_enabled = socket.assigns.thinking_enabled
-
-    Logger.info(
-      "DM send_message received for session=#{socket.assigns.session_id} model=#{model} effort=#{effort_level} body_length=#{String.length(body)}"
-    )
-
-    uploaded_files = consume_uploaded_files(socket)
-    full_body = build_message_body(body, uploaded_files)
-    session_id = socket.assigns.session_id
-
-    case create_user_message(session_id, full_body) do
-      {:ok, message} ->
-        Logger.info("Message created in DB with id=#{message.id}")
-        persist_upload_attachments(uploaded_files, message.id)
-
-        socket = load_tab_data(socket, "messages", session_id)
-
-        case AgentManager.continue_session(
-               session_id,
-               full_body,
-               continue_session_opts(model, effort_level, thinking_enabled)
-             ) do
-          :ok ->
-            Logger.info("Message forwarded to AgentManager for session=#{session_id}")
-
-            {:noreply,
-             socket
-             |> assign(:processing, true)
-             |> start_sync_timer()
-             |> push_event("clear-input", %{})}
-
-          {:error, reason} ->
-            Logger.error("Failed to send message via AgentManager: #{inspect(reason)}")
-
-            socket =
-              socket
-              |> assign(:processing, false)
-              |> put_flash(:error, "Failed to send message: #{inspect(reason)}")
-
-            {:noreply, socket}
-        end
-
-      {:error, reason} ->
-        Logger.error("Failed to create message: #{inspect(reason)}")
-        {:noreply, put_flash(socket, :error, "Failed to create message: #{inspect(reason)}")}
-    end
   end
 
   @impl true
@@ -478,6 +447,65 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     end
   end
 
+  defp parse_int(s, default \\ 0) do
+    case Integer.parse(s || "") do
+      {n, ""} -> n
+      _ -> default
+    end
+  end
+
+  defp handle_send_message(body, socket) do
+    model = socket.assigns.selected_model
+    effort_level = socket.assigns.selected_effort
+    thinking_enabled = socket.assigns.thinking_enabled
+    max_budget_usd = socket.assigns.max_budget_usd
+
+    Logger.info(
+      "DM send_message received for session=#{socket.assigns.session_id} model=#{model} effort=#{effort_level} body_length=#{String.length(body)}"
+    )
+
+    uploaded_files = consume_uploaded_files(socket)
+    full_body = build_message_body(body, uploaded_files)
+    session_id = socket.assigns.session_id
+
+    case create_user_message(session_id, full_body) do
+      {:ok, message} ->
+        Logger.info("Message created in DB with id=#{message.id}")
+        persist_upload_attachments(uploaded_files, message.id)
+
+        socket = load_tab_data(socket, "messages", session_id)
+
+        case AgentManager.continue_session(
+               session_id,
+               full_body,
+               continue_session_opts(model, effort_level, thinking_enabled, max_budget_usd)
+             ) do
+          :ok ->
+            Logger.info("Message forwarded to AgentManager for session=#{session_id}")
+
+            {:noreply,
+             socket
+             |> assign(:processing, true)
+             |> start_sync_timer()
+             |> push_event("clear-input", %{})}
+
+          {:error, reason} ->
+            Logger.error("Failed to send message via AgentManager: #{inspect(reason)}")
+
+            socket =
+              socket
+              |> assign(:processing, false)
+              |> put_flash(:error, "Failed to send message: #{inspect(reason)}")
+
+            {:noreply, socket}
+        end
+
+      {:error, reason} ->
+        Logger.error("Failed to create message: #{inspect(reason)}")
+        {:noreply, put_flash(socket, :error, "Failed to create message: #{inspect(reason)}")}
+    end
+  end
+
   @impl true
   def handle_info(:sync_from_session_file, socket) do
     case sync_messages_from_session_file(socket) do
@@ -519,7 +547,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_info({:new_message, _message}, socket) do
-    {:noreply, maybe_reload_messages(socket)}
+    {:noreply, schedule_message_reload(socket)}
   end
 
   @impl true
@@ -538,6 +566,28 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_info({:agent_working, %{id: session_id, status: "compacting"}}, socket) do
+    if session_id == socket.assigns.session_id do
+      {:noreply, assign(socket, :compacting, true)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info({:agent_working, %{id: session_id}}, socket) do
+    if session_id == socket.assigns.session_id do
+      {:noreply,
+       socket
+       |> assign(:compacting, false)
+       |> assign(:processing, true)
+       |> start_sync_timer()}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_info({:agent_working, _session_uuid, session_id}, socket) do
     if session_id == socket.assigns.session_id do
       {:noreply,
@@ -550,10 +600,26 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_info({:agent_stopped, %{id: session_id}}, socket) do
+    if session_id == socket.assigns.session_id do
+      {:noreply,
+       socket
+       |> assign(:compacting, false)
+       |> assign(:processing, false)
+       |> stop_sync_timer()
+       |> sync_and_reload()
+       |> push_event("focus-input", %{})}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
     if session_id == socket.assigns.session_id do
       {:noreply,
        socket
+       |> assign(:compacting, false)
        |> assign(:processing, false)
        |> stop_sync_timer()
        |> sync_and_reload()
@@ -566,7 +632,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   # DM received via MCP i-dm tool
   @impl true
   def handle_info({:new_dm, _msg}, socket) do
-    {:noreply, maybe_reload_messages(socket)}
+    {:noreply, schedule_message_reload(socket)}
   end
 
   # Task state changed — refresh the current task header strip
@@ -584,13 +650,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_info({:tool_result, _tool_name, _is_error}, socket) do
-    # Tool finished — reload messages to show the new tool messages
-    socket =
-      socket
-      |> assign(:stream_tool, nil)
-      |> maybe_reload_messages()
-
-    {:noreply, socket}
+    {:noreply, socket |> assign(:stream_tool, nil) |> schedule_message_reload()}
   end
 
   @impl true
@@ -648,23 +708,70 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_info(:do_message_reload, socket) do
+    {:noreply, socket |> assign(:reload_timer, nil) |> maybe_reload_messages()}
+  end
+
+  @impl true
   def handle_info(msg, socket) do
     Logger.debug("Unhandled message in DM LiveView: #{inspect(msg)}")
     {:noreply, socket}
+  end
+
+  defp extract_context_window(messages) do
+    messages
+    |> Enum.reverse()
+    |> Enum.find_value(fn msg ->
+      case msg.metadata do
+        # Claude CLI result messages: model_usage map with camelCase keys
+        %{"model_usage" => model_usage} when is_map(model_usage) and map_size(model_usage) > 0 ->
+          model_usage
+          |> Map.values()
+          |> Enum.find_value(fn entry when is_map(entry) ->
+            input = entry["inputTokens"] || 0
+            cache_read = entry["cacheReadInputTokens"] || 0
+            cache_creation = entry["cacheCreationInputTokens"] || 0
+            ctx_window = entry["contextWindow"] || 200_000
+            used = input + cache_read + cache_creation
+
+            if used > 0, do: {used, ctx_window}
+          end)
+
+        # Anubis/streaming messages: usage map with snake_case keys
+        %{"usage" => %{"input_tokens" => _} = usage} ->
+          input = usage["input_tokens"] || 0
+          cache_read = usage["cache_read_input_tokens"] || 0
+          cache_creation = usage["cache_creation_input_tokens"] || 0
+          used = input + cache_read + cache_creation
+
+          if used > 0, do: {used, 200_000}
+
+        _ ->
+          nil
+      end
+    end) || {0, 0}
+  end
+
+  defp read_session_usage_stats(socket, session_id) do
+    case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+      {:ok, project_path} ->
+        case SessionReader.read_usage(socket.assigns.session_uuid, project_path) do
+          {:ok, tokens, cost} -> {tokens, cost}
+          _ -> {Messages.total_tokens_for_session(session_id), Messages.total_cost_for_session(session_id)}
+        end
+
+      _ ->
+        {Messages.total_tokens_for_session(session_id), Messages.total_cost_for_session(session_id)}
+    end
   end
 
   defp load_tab_data(socket, tab, session_id) do
     Logger.info("Loading DM tab data tab=#{tab} session_id=#{session_id}")
     {messages, has_more} = load_message_data(socket, tab, session_id)
 
-    total_tokens =
-      maybe_load_value(tab, "messages", socket.assigns[:total_tokens], fn ->
-        Messages.total_tokens_for_session(session_id)
-      end)
-
-    total_cost =
-      maybe_load_value(tab, "messages", socket.assigns[:total_cost], fn ->
-        Messages.total_cost_for_session(session_id)
+    {total_tokens, total_cost} =
+      maybe_load_value(tab, "messages", {socket.assigns[:total_tokens], socket.assigns[:total_cost]}, fn ->
+        read_session_usage_stats(socket, session_id)
       end)
 
     current_task =
@@ -672,11 +779,18 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         Tasks.get_current_task_for_session(session_id)
       end)
 
+    {context_used, context_window} =
+      maybe_load_value(tab, "messages", {socket.assigns[:context_used], socket.assigns[:context_window]}, fn ->
+        extract_context_window(messages)
+      end)
+
     socket
     |> assign(:messages, messages)
     |> assign(:has_more_messages, has_more)
     |> assign(:total_tokens, total_tokens)
     |> assign(:total_cost, total_cost)
+    |> assign(:context_used, context_used || 0)
+    |> assign(:context_window, context_window || 0)
     |> assign(:current_task, current_task)
     |> assign(
       :tasks,
@@ -881,7 +995,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     end)
   end
 
-  defp continue_session_opts(model, effort_level, thinking_enabled \\ false) do
+  defp continue_session_opts(model, effort_level, thinking_enabled, max_budget_usd) do
     opts = [model: model]
 
     opts =
@@ -891,14 +1005,21 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         opts
       end
 
-    if thinking_enabled do
-      budget =
-        case model do
-          "opus" -> 16000
-          _ -> 10000
-        end
+    opts =
+      if thinking_enabled do
+        budget =
+          case model do
+            "opus" -> 16000
+            _ -> 10000
+          end
 
-      opts ++ [thinking_budget: budget]
+        opts ++ [thinking_budget: budget]
+      else
+        opts
+      end
+
+    if max_budget_usd do
+      opts ++ [max_budget_usd: max_budget_usd]
     else
       opts
     end
@@ -917,6 +1038,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         uploads={@uploads}
         selected_model={@selected_model}
         selected_effort={@selected_effort}
+        show_effort_menu={@show_effort_menu}
         show_model_menu={@show_model_menu}
         processing={@processing}
         show_live_stream={@show_live_stream}
@@ -938,6 +1060,10 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         selected_memory_path={@selected_memory_path}
         memory_edit_content={@memory_edit_content}
         thinking_enabled={@thinking_enabled}
+        max_budget_usd={@max_budget_usd}
+        compacting={@compacting}
+        context_used={@context_used}
+        context_window={@context_window}
       />
     </div>
     """
@@ -948,13 +1074,10 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   defp sync_and_reload(socket) do
-    socket =
-      case sync_messages_from_session_file(socket) do
-        {:ok, socket, _imported} -> socket
-        {:error, _reason} -> socket
-      end
-
-    maybe_reload_messages(socket)
+    case sync_messages_from_session_file(socket) do
+      {:ok, socket, _imported} -> socket
+      {:error, _reason} -> maybe_reload_messages(socket)
+    end
   end
 
   defp maybe_reload_messages(socket) do
@@ -966,6 +1089,10 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   defp start_sync_timer(socket) do
+    if socket.assigns.sync_timer do
+      Process.cancel_timer(socket.assigns.sync_timer)
+    end
+
     timer = Process.send_after(self(), :periodic_sync, @sync_interval)
     assign(socket, :sync_timer, timer)
   end
@@ -976,6 +1103,20 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     end
 
     assign(socket, :sync_timer, nil)
+  end
+
+  # Debounce rapid bursts of reload triggers (new_message, new_dm, tool_result).
+  # Messages context broadcasts immediately; Broadcaster re-broadcasts 2s later for the same
+  # messages. Without debounce, each message causes at least 2 DB queries.
+  @reload_debounce_ms 300
+
+  defp schedule_message_reload(socket) do
+    if socket.assigns.reload_timer do
+      Process.cancel_timer(socket.assigns.reload_timer)
+    end
+
+    timer = Process.send_after(self(), :do_message_reload, @reload_debounce_ms)
+    assign(socket, :reload_timer, timer)
   end
 
   defp resolve_project_path(session, agent) do

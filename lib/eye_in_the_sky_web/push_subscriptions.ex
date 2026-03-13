@@ -35,15 +35,13 @@ defmodule EyeInTheSkyWeb.PushSubscriptions do
   @doc """
   Send a push notification to all subscribed devices.
   """
-  def broadcast(title, body \\ nil) do
+  def broadcast(title, body \\ nil, url \\ nil) do
     subs = list_all()
 
     payload =
-      Jason.encode!(%{
-        title: title,
-        body: body || title,
-        icon: "/images/logo.svg"
-      })
+      %{title: title, body: body || title, icon: "/images/logo.svg"}
+      |> then(fn p -> if url, do: Map.put(p, :url, url), else: p end)
+      |> Jason.encode!()
 
     for sub <- subs do
       subscription = %{

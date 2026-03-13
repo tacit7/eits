@@ -47,7 +47,7 @@ if [ -z "$is_spawned" ]; then
   # Check for active EITS todo before allowing edits
   if ! "$HOOK_DIR/sql/postgresql/check-active-todo.sh" "$session_id"; then
     jq -n \
-      --arg reason "No active EITS todo for session $session_ref. Workflow: (1) i-todo create --title \"Task\" (2) i-todo start --task_id <id> (3) i-todo add-session --task_id <id> --session_id $session_id (4) do work (5) i-todo status --task_id <id> --state_id 4 to move to In Review when done" \
+      --arg reason "No active EITS todo for session $session_ref. Workflow: (1) eits tasks create --title \"Task\" (2) eits tasks start <id> (3) eits tasks update <id> --state 4 when done" \
       '{
         hookSpecificOutput: {
           hookEventName: "PreToolUse",

@@ -281,6 +281,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     args = maybe_flag(args, "--mcp-config", opts[:mcp_config])
     args = maybe_flag(args, "--worktree", opts[:worktree])
     args = maybe_flag(args, "--thinking-budget-tokens", opts[:thinking_budget])
+    args = maybe_flag(args, "--agent", opts[:agent])
 
     # Boolean flags
     # stream-json requires --verbose for proper output parsing

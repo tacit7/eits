@@ -45,11 +45,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
         |> assign(:show_task_detail_drawer, false)
         |> assign(:selected_task, nil)
         |> assign(:task_notes, [])
-        |> assign(:tasks, [])
+        |> assign(:task_count, 0)
         |> assign(:page, 1)
         |> assign(:has_more, false)
         |> assign(:total_tasks, 0)
-        |> assign(:list_version, 0)
+        |> stream(:tasks, [], dom_id: fn t -> "pt-#{t.id}" end)
         |> load_tasks()
       else
         socket
@@ -65,11 +65,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
         |> assign(:show_task_detail_drawer, false)
         |> assign(:selected_task, nil)
         |> assign(:task_notes, [])
-        |> assign(:tasks, [])
+        |> assign(:task_count, 0)
         |> assign(:page, 1)
         |> assign(:has_more, false)
         |> assign(:total_tasks, 0)
-        |> assign(:list_version, 0)
+        |> stream(:tasks, [], dom_id: fn t -> "pt-#{t.id}" end)
         |> put_flash(:error, "Invalid project ID")
       end
 
@@ -302,11 +302,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
           else: tasks
 
       socket
-      |> assign(:tasks, tasks)
+      |> assign(:task_count, length(tasks))
       |> assign(:page, 1)
       |> assign(:has_more, false)
       |> assign(:total_tasks, length(tasks))
-      |> update(:list_version, &(&1 + 1))
+      |> stream(:tasks, tasks, reset: true)
     else
       total = Projects.count_project_tasks(project_id, state_id: filter_state_id)
 
@@ -319,11 +319,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
         )
 
       socket
-      |> assign(:tasks, tasks)
+      |> assign(:task_count, length(tasks))
       |> assign(:page, 1)
       |> assign(:has_more, length(tasks) < total)
       |> assign(:total_tasks, total)
-      |> update(:list_version, &(&1 + 1))
+      |> stream(:tasks, tasks, reset: true)
     end
   end
 
@@ -343,10 +343,15 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
         offset: offset
       )
 
-    socket
-    |> assign(:tasks, socket.assigns.tasks ++ new_tasks)
-    |> assign(:page, page)
-    |> assign(:has_more, length(socket.assigns.tasks) + length(new_tasks) < total)
+    socket =
+      socket
+      |> update(:task_count, &(&1 + length(new_tasks)))
+      |> assign(:page, page)
+      |> assign(:has_more, offset + length(new_tasks) < total)
+
+    Enum.reduce(new_tasks, socket, fn task, acc ->
+      stream_insert(acc, :tasks, task)
+    end)
   end
 
   @impl true
@@ -548,29 +553,27 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
         <div class="mb-3">
           <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
             <%= if @has_more do %>
-              {length(@tasks)} of {@total_tasks} tasks
+              {@task_count} of {@total_tasks} tasks
             <% else %>
               {@total_tasks} tasks
             <% end %>
           </span>
         </div>
 
-        <%= if length(@tasks) > 0 do %>
+        <%= if @task_count > 0 do %>
           <div
-            id={"project-tasks-list-#{@list_version}"}
-            phx-update="append"
+            id="project-tasks-list"
+            phx-update="stream"
             class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-5"
           >
-            <%= for task <- @tasks do %>
-              <div id={"pt-#{task.id}"}>
-                <TaskCard.task_card
-                  task={task}
-                  variant="list"
-                  on_click="open_task_detail"
-                  on_delete="delete_task"
-                />
-              </div>
-            <% end %>
+            <div :for={{dom_id, task} <- @streams.tasks} id={dom_id}>
+              <TaskCard.task_card
+                task={task}
+                variant="list"
+                on_click="open_task_detail"
+                on_delete="delete_task"
+              />
+            </div>
           </div>
 
           <div

@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionManager do
   use GenServer
   require Logger
 
-  alias EyeInTheSkyWeb.Claude.{SessionWorker, CLI}
+  alias EyeInTheSkyWeb.Claude.SessionWorker
   alias EyeInTheSkyWeb.{Agents, Sessions}
 
   @supervisor EyeInTheSkyWeb.Claude.SessionSupervisor

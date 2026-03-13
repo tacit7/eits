@@ -280,25 +280,6 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   defp card_body_class("grid"), do: "card-body p-5"
   defp card_body_class(_), do: ""
 
-  defp priority_dot_color(priority) when is_integer(priority) do
-    cond do
-      priority >= 70 -> "bg-error"
-      priority >= 40 -> "bg-warning"
-      priority >= 20 -> "bg-info"
-      priority > 0 -> "bg-base-content/20"
-      true -> "bg-base-content/10"
-    end
-  end
-
-  defp priority_dot_color(_), do: "bg-base-content/10"
-
-  # State ID -> badge class mapping (matches workflow_states table)
-  defp state_badge_class(1), do: "bg-base-content/[0.06] text-base-content/50"
-  defp state_badge_class(2), do: "bg-info/10 text-info"
-  defp state_badge_class(4), do: "bg-warning/10 text-warning"
-  defp state_badge_class(3), do: "bg-success/10 text-success"
-  defp state_badge_class(_), do: "bg-base-content/[0.06] text-base-content/40"
-
   # State ID -> text color for inline list rows
   defp state_text_color(1), do: "text-base-content/55"
   defp state_text_color(2), do: "text-info/80"

@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # eits - CLI for the Eye in the Sky REST API
-# Base URL defaults to https://localhost:5001/api/v1
+# Base URL defaults to http://localhost:5000/api/v1
 # Override with EITS_URL env var
+#
+# Session env vars (injected by EITS hooks):
+#   EITS_SESSION_UUID  - current session UUID
+#   EITS_AGENT_UUID    - current agent UUID (default for --agent)
+#   EITS_PROJECT_ID    - current project ID  (default for --project)
 
 set -euo pipefail
 
-BASE_URL="${EITS_URL:-https://localhost:5001/api/v1}"
+BASE_URL="${EITS_URL:-http://localhost:5000/api/v1}"
 AUTH_HEADER="${EITS_API_KEY:+Authorization: Bearer ${EITS_API_KEY}}"
 
 # Check deps
@@ -120,8 +125,9 @@ cmd_tasks() {
       _get "/tasks/$id"
       ;;
     create)
-      # eits tasks create --title <t> [--description <d>] [--project <id>] [--priority <p>] [--session <uuid>]
-      local title="" description="" project_id="" priority="" session_id=""
+      # eits tasks create --title <t> [--description <d>] [--project <id>] [--priority <p>] [--session <uuid>] [--agent <uuid>]
+      # Defaults: --agent from $EITS_AGENT_UUID, --project from $EITS_PROJECT_ID, --session from $EITS_SESSION_UUID
+      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" session_id="${EITS_SESSION_UUID:-}" agent_id="${EITS_AGENT_UUID:-}"
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --title)       title="$2";       shift 2 ;;
@@ -129,11 +135,12 @@ cmd_tasks() {
           --project)     project_id="$2";  shift 2 ;;
           --priority)    priority="$2";    shift 2 ;;
           --session)     session_id="$2";  shift 2 ;;
+          --agent)       agent_id="$2";    shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
       need title
-      _post "/tasks" "$(json title "$title" description "$description" project_id "$project_id" priority "$priority" session_id "$session_id")"
+      _post "/tasks" "$(json title "$title" description "$description" project_id "$project_id" priority "$priority" session_id "$session_id" agent_id "$agent_id")"
       ;;
     update)
       # eits tasks update <id> [--state <id>] [--state-name <done|start>] [--priority <p>] [--description <d>]
@@ -177,9 +184,11 @@ cmd_tasks() {
       _post "/tasks/$id/annotations" "$(json body "$body" title "$title")"
       ;;
     link-session)
-      # eits tasks link-session <task_id> <session_uuid>
+      # eits tasks link-session <task_id> [<session_uuid>]
+      # session_uuid defaults to $EITS_SESSION_UUID if not provided
       local id="${1:-}"; need id; shift
-      local session_id="${1:-}"; need session_id
+      local session_id="${1:-${EITS_SESSION_UUID:-}}"
+      [[ -n "$session_id" ]] || die "session_uuid is required (or set EITS_SESSION_UUID)"
       _post "/tasks/$id/sessions" "$(json session_id "$session_id")"
       ;;
     unlink-session)
@@ -308,8 +317,9 @@ cmd_commits() {
       _get "/commits"
       ;;
     create)
-      # eits commits create --agent <uuid> --hash <h1> [--hash <h2>] [--message <m>] ...
-      local agent_id="" hashes=() messages=()
+      # eits commits create [--agent <uuid>] --hash <h1> [--hash <h2>] [--message <m>] ...
+      # --agent defaults to $EITS_AGENT_UUID
+      local agent_id="${EITS_AGENT_UUID:-}" hashes=() messages=()
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --agent)   agent_id="$2";        shift 2 ;;
@@ -318,7 +328,7 @@ cmd_commits() {
           *) die "unknown flag: $1" ;;
         esac
       done
-      need agent_id
+      [[ -n "$agent_id" ]] || die "agent_id is required (or set EITS_AGENT_UUID)"
       [[ ${#hashes[@]} -gt 0 ]] || die "at least one --hash is required"
       local hashes_json; hashes_json=$(printf '%s\n' "${hashes[@]}" | jq -R . | jq -s .)
       local payload

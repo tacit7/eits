@@ -26,6 +26,11 @@ defmodule EyeInTheSkyWeb.Projects do
   end
 
   @doc """
+  Gets a single project by id. Returns nil if not found.
+  """
+  def get_project(id), do: Repo.get(Project, id)
+
+  @doc """
   Gets a single project by name.
   """
   def get_project_by_name(name) do

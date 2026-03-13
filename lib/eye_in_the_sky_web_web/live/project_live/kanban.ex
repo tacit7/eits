@@ -379,12 +379,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   defp state_dot_color(color) when is_binary(color), do: color
   defp state_dot_color(_), do: "#6B7280"
 
-  defp priority_border_class(nil), do: "border-l-transparent"
-  defp priority_border_class(0), do: "border-l-transparent"
-  defp priority_border_class(priority) when priority >= 3, do: "border-l-error"
-  defp priority_border_class(2), do: "border-l-warning"
-  defp priority_border_class(1), do: "border-l-info"
-  defp priority_border_class(_), do: "border-l-transparent"
 
   defp due_date_class(nil), do: "text-base-content/30"
 
@@ -406,19 +400,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   defp due_date_class(_), do: "text-base-content/30"
 
-  defp first_line(nil), do: nil
-  defp first_line(""), do: nil
-
-  defp first_line(text) do
-    text
-    |> String.split(~r/[\r\n]/, parts: 2)
-    |> List.first()
-    |> String.trim()
-    |> case do
-      "" -> nil
-      line -> line
-    end
-  end
 
   @impl true
   def render(assigns) do

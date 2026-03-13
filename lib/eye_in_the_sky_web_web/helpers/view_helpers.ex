@@ -68,7 +68,34 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
     end
   end
 
+  def relative_time(%NaiveDateTime{} = naive) do
+    case DateTime.from_naive(naive, "Etc/UTC") do
+      {:ok, dt} -> relative_time(dt)
+      :error -> "—"
+    end
+  end
+
   def relative_time(_), do: "—"
+
+  @doc """
+  Open a file with the system's default application (cross-platform).
+  """
+  def open_in_system(path) when is_binary(path) do
+    cmd =
+      case :os.type() do
+        {:unix, :darwin} -> "open"
+        {:unix, _} -> "xdg-open"
+        {:win32, _} -> "cmd"
+      end
+
+    args =
+      case :os.type() do
+        {:win32, _} -> ["/c", "start", "", path]
+        _ -> [path]
+      end
+
+    System.cmd(cmd, args, stderr_to_stdout: true)
+  end
 
   @doc """
   Format full datetime for tooltips.
@@ -130,7 +157,9 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
     display_status = derive_display_status(agent)
     badge_variant = status_to_badge(display_status)
     label = status_label(display_status)
-    assigns = Map.merge(assigns, %{status: display_status, badge_variant: badge_variant, label: label})
+
+    assigns =
+      Map.merge(assigns, %{status: display_status, badge_variant: badge_variant, label: label})
 
     ~H"""
     <span class={"badge #{@badge_variant}"}>
@@ -171,7 +200,9 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
         str when is_binary(str) ->
           dt =
             case DateTime.from_iso8601(str) do
-              {:ok, dt, _} -> dt
+              {:ok, dt, _} ->
+                dt
+
               _ ->
                 case parse_datetime(str) do
                   {:ok, dt} -> dt

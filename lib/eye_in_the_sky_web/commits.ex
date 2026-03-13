@@ -54,6 +54,19 @@ defmodule EyeInTheSkyWeb.Commits do
   end
 
   @doc """
+  Returns recent commits for multiple sessions in a single query.
+  """
+  def list_commits_for_sessions(session_ids, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 10)
+
+    Commit
+    |> where([c], c.session_id in ^session_ids)
+    |> order_by([c], desc: c.created_at)
+    |> limit(^limit)
+    |> Repo.all()
+  end
+
+  @doc """
   Gets a single commit.
 
   Raises `Ecto.NoResultsError` if the Commit does not exist.

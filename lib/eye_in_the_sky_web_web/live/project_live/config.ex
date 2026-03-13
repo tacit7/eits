@@ -18,7 +18,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
           Projects.get_project!(project_id)
           |> Repo.preload([:agents])
 
-        tasks = Projects.get_project_tasks(project_id)
         claude_dir = if project.path, do: Path.join(project.path, ".claude"), else: nil
 
         socket
@@ -26,7 +25,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
         |> assign(:project, project)
         |> assign(:sidebar_tab, :config)
         |> assign(:sidebar_project, project)
-        |> assign(:tasks, tasks)
         |> assign(:claude_dir, claude_dir)
         |> assign(:selected_file, nil)
         |> assign(:selected_file_path, nil)
@@ -38,7 +36,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
         socket
         |> assign(:page_title, "Project Not Found")
         |> assign(:project, nil)
-        |> assign(:tasks, [])
         |> assign(:claude_dir, nil)
         |> assign(:selected_file, nil)
         |> assign(:selected_file_path, nil)
@@ -92,7 +89,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
     claude_dir = socket.assigns.claude_dir
 
     if path && claude_dir && String.starts_with?(path, claude_dir) && File.exists?(path) do
-      System.cmd("open", [path])
+      EyeInTheSkyWebWeb.Helpers.ViewHelpers.open_in_system(path)
     end
 
     {:noreply, socket}

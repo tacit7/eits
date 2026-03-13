@@ -20,8 +20,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Agents do
           Projects.get_project!(project_id)
           |> Repo.preload([:agents])
 
-        tasks = Projects.get_project_tasks(project_id)
-
         project_agents_dir =
           if project.path, do: Path.join([project.path, ".claude", "agents"]), else: nil
 
@@ -30,7 +28,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Agents do
         |> assign(:project, project)
         |> assign(:sidebar_tab, :agents)
         |> assign(:sidebar_project, project)
-        |> assign(:tasks, tasks)
         |> assign(:project_agents_dir, project_agents_dir)
         |> assign(:user_agents_dir, @user_agents_dir)
         |> assign(:selected_file, nil)
@@ -44,7 +41,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Agents do
         socket
         |> assign(:page_title, "Project Not Found")
         |> assign(:project, nil)
-        |> assign(:tasks, [])
         |> assign(:project_agents_dir, nil)
         |> assign(:user_agents_dir, @user_agents_dir)
         |> assign(:selected_file, nil)
@@ -113,7 +109,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Agents do
            String.starts_with?(path, user_dir)) &&
         File.exists?(path)
 
-    if allowed, do: System.cmd("open", [path])
+    if allowed, do: EyeInTheSkyWebWeb.Helpers.ViewHelpers.open_in_system(path)
 
     {:noreply, socket}
   end
@@ -233,8 +229,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Agents do
                   scope={:project}
                 />
               </div>
-
-              <!-- User-level agents -->
+              
+    <!-- User-level agents -->
               <div class="flex items-center gap-2 mb-3">
                 <.icon name="hero-user" class="w-4 h-4 text-base-content/40" />
                 <span class="text-sm font-semibold text-base-content/60 uppercase tracking-wider">
@@ -251,8 +247,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Agents do
                 />
               </div>
             </div>
-
-            <!-- Right: file viewer -->
+            
+    <!-- Right: file viewer -->
             <%= if @selected_file do %>
               <div class="sticky top-20">
                 <div class="card bg-base-100 border border-base-300 shadow-sm">

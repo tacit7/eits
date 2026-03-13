@@ -45,4 +45,11 @@ defmodule EyeInTheSkyWeb.MCP.Server do
   component(EyeInTheSkyWeb.MCP.Tools.AgentSend, name: "i-agent-send")
   component(EyeInTheSkyWeb.MCP.Tools.AgentCancel, name: "i-agent-cancel")
   component(EyeInTheSkyWeb.MCP.Tools.AgentStatus, name: "i-agent-status")
+
+  # Phase 6 — Teams
+  component(EyeInTheSkyWeb.MCP.Tools.TeamCreate, name: "i-team-create")
+  component(EyeInTheSkyWeb.MCP.Tools.TeamDelete, name: "i-team-delete")
+  component(EyeInTheSkyWeb.MCP.Tools.TeamJoin, name: "i-team-join")
+  component(EyeInTheSkyWeb.MCP.Tools.TeamMembers, name: "i-team-members")
+  component(EyeInTheSkyWeb.MCP.Tools.TeamStatus, name: "i-team-status")
 end

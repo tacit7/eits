@@ -57,6 +57,17 @@ defmodule EyeInTheSkyWeb.Tasks do
   end
 
   @doc """
+  Returns the list of tasks for a specific team.
+  """
+  def list_tasks_for_team(team_id) do
+    Task
+    |> where([t], t.team_id == ^team_id)
+    |> preload([:state, :tags])
+    |> order_by([t], asc: t.id)
+    |> Repo.all()
+  end
+
+  @doc """
   Returns the current in-progress task for a session (state_id = 2), or nil.
   """
   def get_current_task_for_session(session_id) do

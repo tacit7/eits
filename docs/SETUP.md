@@ -58,7 +58,7 @@ caddy trust
 caddy run --config Caddyfile
 ```
 
-Caddy listens on port 443 and proxies to Phoenix on port 5000. Phoenix itself does not need to serve HTTPS directly for local dev.
+Caddy listens on port 443 and proxies to Phoenix on port 5001 (HTTPS). Phoenix also has a direct HTTPS listener on port 5001 (`priv/cert/localhost+2.pem`) for API and MCP access without going through Caddy — that cert is for `localhost`, not `eits.dev`, so WebAuthn still requires Caddy on 443.
 
 ## 4. Start Phoenix
 
@@ -107,14 +107,82 @@ Hooks registered:
 
 ## 7. MCP Server
 
-The EITS MCP server runs at `http://localhost:5000/mcp`. Add to `~/.claude.json` under `mcpServers`:
+The EITS MCP server runs at `https://localhost:5001/mcp`. Add to `~/.claude/settings.json` under `mcpServers`:
 
 ```json
 "eits-web": {
   "type": "http",
-  "url": "http://localhost:5000/mcp"
+  "url": "https://localhost:5001/mcp"
 }
 ```
+
+## 8. API Key
+
+The REST API requires a bearer token. Generate one with:
+
+```bash
+mix eits.gen.api_key
+```
+
+Add the output to `~/.zshrc`:
+
+```bash
+export EITS_API_KEY="<generated-key>"
+```
+
+Start the server with the key set:
+
+```bash
+EITS_API_KEY="<generated-key>" mix phx.server
+```
+
+## 9. PWA & Web Push (Optional)
+
+The app includes Web Push and PWA install capability.
+
+**Browser setup:**
+1. Visit `https://eits.dev` (requires HTTPS via Caddy)
+2. Browser may prompt to "Install app" or show in app menu
+3. Click install to add to home screen / app drawer
+
+**Push notifications:**
+1. Browser requests permission when registering service worker
+2. Grant "Allow notifications" when prompted
+3. Subscriptions are stored in `/push_subscriptions` table via REST API
+
+**Service worker:**
+- Registered from `assets/js/push_notifications.js`
+- Runs at `priv/static/sw.js`
+- Handles incoming push events and displays notifications
+
+**Configuration (production):**
+Set `WEB_PUSH_ENCRYPTION_KEY` env var (base64-encoded 16-byte key) for push encryption. Missing key disables push (app still works).
+
+---
+
+## 10. CLI Tools
+
+The `scripts/eits` script provides shell access to the REST API.
+
+**Add to PATH** (add to `~/.zshrc` or `~/.bashrc`):
+
+```bash
+export PATH="$HOME/projects/eits/web/scripts:$PATH"
+export EITS_API_KEY="<generated-key>"   # from mix eits.gen.api_key
+```
+
+**Usage:**
+
+```bash
+eits projects list
+eits tasks list --project 1 --state 2
+eits tasks create --title "fix auth bug" --project 1
+eits tasks done 42
+eits notes create --parent-type session --parent-id <uuid> --body "finding"
+eits dm --from agent-1 --to <session_uuid> --message "hello"
+```
+
+The script defaults to `https://localhost:5001/api/v1`. Override per-call with `EITS_URL=<url> eits ...`. Reads `EITS_API_KEY` for auth. Uses `-k` to accept the self-signed dev cert. Requires `curl` and `jq`.
 
 ---
 
@@ -176,7 +244,7 @@ pg_dump eits_dev --no-owner --no-acl --data-only | \
 
 - Migrations auto-run on startup via `Ecto.Migrator` — no manual step needed beyond `ecto.setup`
 - Caddy `tls internal` auto-generates and manages the local cert; no manual cert generation needed
-- Phoenix also has an HTTPS listener on port 5001 (`priv/cert/localhost+2.pem`) but that cert is for `localhost`, not `eits.dev` — use Caddy on 443 for WebAuthn
+- Phoenix HTTPS listener is on port 5001 (`priv/cert/localhost+2.pem`); that cert is for `localhost`, not `eits.dev` — use Caddy on 443 for WebAuthn. Use `https://localhost:5001` for direct API/MCP access
 - No `.tool-versions` or `.nvmrc` — use Node 22 LTS
 - No `.env.example` — dev uses hardcoded values in `config/dev.exs`; prod vars are documented in `config/runtime.exs`
 - Oban background jobs require the DB to be up before server starts

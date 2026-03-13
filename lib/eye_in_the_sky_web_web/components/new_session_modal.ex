@@ -142,6 +142,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
                 placeholder="What should this agent work on?"
                 required
                 autofocus
+                phx-update="ignore"
                 phx-mounted={Phoenix.LiveView.JS.dispatch("focus")}
               >{@prefill_text}</textarea>
             </div>

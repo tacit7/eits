@@ -526,7 +526,8 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       project_id: selected_project_id,
       project_path: project_path,
       description: agent_description,
-      instructions: instructions
+      instructions: instructions,
+      agent: params["agent"]
     ]
 
     case AgentManager.create_agent(opts) do

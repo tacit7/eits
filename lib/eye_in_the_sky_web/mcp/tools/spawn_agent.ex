@@ -35,6 +35,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
 
     field :member_name, :string,
       description: "Member alias within the team (e.g. 'researcher'). Required with team_name."
+
+    field :agent, :string,
+      description:
+        "Agent name to use (e.g. 'test-runner'). Resolved from project/.claude/agents or ~/.claude/agents."
   end
 
   @impl true
@@ -61,11 +65,12 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
       agent_type: params[:provider] || "claude",
       project_id: params[:project_id],
       project_path: params[:project_path],
-      description: params[:instructions],
+      description: String.slice(params[:instructions] || "Agent session", 0, 250),
       worktree: params[:worktree],
       effort_level: params[:effort_level],
       parent_agent_id: params[:parent_agent_id],
-      parent_session_id: params[:parent_session_id]
+      parent_session_id: params[:parent_session_id],
+      agent: params[:agent]
     ]
 
     result =

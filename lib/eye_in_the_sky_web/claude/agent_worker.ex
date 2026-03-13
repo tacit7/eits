@@ -566,24 +566,18 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
        Provider: openai
 
     3. Follow the EITS workflow for all work:
-       a. Create a task via REST API:
-          curl -s -X POST http://localhost:5001/api/v1/tasks \\
-            -H "Content-Type: application/json" \\
-            -d '{"title":"<task title>","description":"<details>"}' | jq '.id'
+       a. Create a task:
+          i-todo create --title "<task title>" --description "<details>"
        b. Start the task (move to In Progress):
-          psql -d eits_dev -c "UPDATE tasks SET workflow_state_id=2 WHERE id=<task_id>;"
+          i-todo start <task_id>
        c. Link task to your session:
-          curl -s -X POST http://localhost:5001/api/v1/tasks/<task_id>/sessions \\
-            -H "Content-Type: application/json" \\
-            -d '{"session_id":"#{session_uuid}"}'
+          i-todo add-session <task_id> --session_id #{session_uuid}
        d. Do the work.
        e. When done, move task to In Review (NOT Done):
-          psql -d eits_dev -c "UPDATE tasks SET workflow_state_id=4 WHERE id=<task_id>;"
+          i-todo status <task_id> --state_id 4
 
     4. When all work is complete, end the session:
-       curl -s -X PATCH http://localhost:5001/api/v1/sessions/#{session_uuid} \\
-         -H "Content-Type: application/json" \\
-         -d '{"status":"completed"}'
+       i-session end #{session_uuid}
 
     Now proceed with the task:
     """

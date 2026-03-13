@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
   use Phoenix.LiveComponent
   import EyeInTheSkyWebWeb.CoreComponents, only: [icon: 1]
 
-  alias EyeInTheSkyWeb.Agents
+  @global_agents_dir Path.expand("~/.claude/agents")
 
   @claude_models [
     {"sonnet", "Sonnet 4.5"},
@@ -26,21 +26,21 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
 
   @impl true
   def mount(socket) do
-    agent_templates =
-      Agents.list_active_agents()
-      |> Enum.filter(fn a -> a.description && a.description != "" end)
-      |> Enum.take(50)
-      |> Enum.map(fn a -> %{id: a.id, description: a.description} end)
-
     {:ok,
      assign(socket,
        selected_model: "sonnet",
        selected_provider: "claude",
        selected_prompt_id: nil,
-       selected_agent_id: nil,
        prefill_text: "",
-       agent_templates: agent_templates
+       available_agents: []
      )}
+  end
+
+  @impl true
+  def update(assigns, socket) do
+    project_path = assigns[:current_project] && assigns[:current_project].path
+    available_agents = list_agents(project_path)
+    {:ok, assign(socket, Map.put(assigns, :available_agents, available_agents))}
   end
 
   @impl true
@@ -63,22 +63,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
 
     prefill = if prompt, do: prompt.prompt_text || "", else: ""
 
-    {:noreply,
-     assign(socket, selected_prompt_id: prompt_id, selected_agent_id: nil, prefill_text: prefill)}
-  end
-
-  def handle_event("agent_template_selected", %{"agent_id" => ""}, socket) do
-    {:noreply, assign(socket, selected_agent_id: nil, prefill_text: "")}
-  end
-
-  def handle_event("agent_template_selected", %{"agent_id" => agent_id}, socket) do
-    agents = socket.assigns[:agent_templates] || []
-    agent = Enum.find(agents, fn a -> to_string(a.id) == agent_id end)
-
-    prefill = if agent, do: agent.description || "", else: ""
-
-    {:noreply,
-     assign(socket, selected_agent_id: agent_id, selected_prompt_id: nil, prefill_text: prefill)}
+    {:noreply, assign(socket, selected_prompt_id: prompt_id, prefill_text: prefill)}
   end
 
   @impl true
@@ -109,26 +94,14 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
               </select>
             </div>
 
-            <%!-- Copy from Agent --%>
-            <%= if length(assigns[:agent_templates] || []) > 0 do %>
+            <%!-- Agent --%>
+            <%= if length(@available_agents) > 0 do %>
               <div>
-                <label class="text-sm font-medium text-base-content/70 mb-1.5 block">
-                  Copy from Agent
-                </label>
-                <select
-                  name="agent_id"
-                  class="select select-bordered w-full"
-                  phx-change="agent_template_selected"
-                  phx-target={@myself}
-                >
+                <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Agent</label>
+                <select name="agent" class="select select-bordered w-full">
                   <option value="">-- None --</option>
-                  <%= for agent <- @agent_templates do %>
-                    <option
-                      value={agent.id}
-                      selected={to_string(@selected_agent_id) == to_string(agent.id)}
-                    >
-                      {agent.description}
-                    </option>
+                  <%= for {name, scope} <- @available_agents do %>
+                    <option value={name}>{name}<%= if scope == :project, do: " (project)" %></option>
                   <% end %>
                 </select>
               </div>
@@ -163,7 +136,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
             <div>
               <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Description</label>
               <textarea
-                id={"desc-#{@selected_agent_id || @selected_prompt_id || "none"}"}
+                id={"desc-#{@selected_prompt_id || "none"}"}
                 name="description"
                 class="textarea textarea-bordered w-full h-20 text-sm"
                 placeholder="What should this agent work on?"
@@ -255,4 +228,41 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
 
   defp models_for_provider("codex"), do: @codex_models
   defp models_for_provider(_), do: @claude_models
+
+  # Returns [{name, scope}] where scope is :project or :global.
+  # Project agents take priority and are listed first; duplicates deduped by name.
+  defp list_agents(project_path) do
+    project_agents =
+      if project_path do
+        dir = Path.join([project_path, ".claude", "agents"])
+        scan_agent_dir(dir, :project)
+      else
+        []
+      end
+
+    global_agents = scan_agent_dir(@global_agents_dir, :global)
+
+    project_names = MapSet.new(project_agents, fn {name, _} -> name end)
+
+    deduped_global =
+      Enum.reject(global_agents, fn {name, _} -> MapSet.member?(project_names, name) end)
+
+    project_agents ++ deduped_global
+  end
+
+  defp scan_agent_dir(dir, scope) do
+    if File.dir?(dir) do
+      dir
+      |> File.ls!()
+      |> Enum.filter(&String.ends_with?(&1, ".md"))
+      |> Enum.reject(&(&1 == "README.md"))
+      |> Enum.map(fn filename ->
+        name = Path.rootname(filename)
+        {name, scope}
+      end)
+      |> Enum.sort_by(fn {name, _} -> name end)
+    else
+      []
+    end
+  end
 end

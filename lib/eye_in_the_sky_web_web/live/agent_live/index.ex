@@ -358,27 +358,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   def handle_event("noop", _params, socket), do: {:noreply, socket}
 
   @impl true
-  def handle_info(:refresh_agents, socket) do
-    socket = socket |> load_agents() |> schedule_refresh()
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:agent_created, _agent}, socket) do
-    {:noreply, load_agents(socket)}
-  end
-
-  @impl true
-  def handle_info({:agent_updated, _agent}, socket) do
-    {:noreply, load_agents(socket)}
-  end
-
-  @impl true
-  def handle_info({:agent_deleted, _agent}, socket) do
-    {:noreply, load_agents(socket)}
-  end
-
-  @impl true
   def handle_event("toggle_new_session_drawer", _params, socket) do
     {:noreply, assign(socket, :show_new_session_drawer, !socket.assigns.show_new_session_drawer)}
   end
@@ -443,38 +422,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     end
   end
 
-  @impl true
-  def handle_info({:agent_working, %{id: session_id}}, socket) do
-    {:noreply, update_agent_status_in_list(socket, session_id, "working")}
-  end
-
-  @impl true
-  def handle_info({:agent_working, _session_uuid, session_id}, socket) do
-    {:noreply, update_agent_status_in_list(socket, session_id, "working")}
-  end
-
-  @impl true
-  def handle_info({:agent_stopped, %{id: session_id, status: status}}, socket) do
-    {:noreply, update_agent_status_in_list(socket, session_id, status || "completed")}
-  end
-
-  @impl true
-  def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
-    {:noreply, update_agent_status_in_list(socket, session_id, "idle")}
-  end
-
-  @impl true
-  def handle_info({:claude_output, _ref, _line}, socket) do
-    # Ignore Claude output - SessionWorker handles these
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:claude_exit, _ref, _status}, socket) do
-    # Ignore Claude exit - SessionWorker handles these
-    {:noreply, socket}
-  end
-
   # SDK Demo event handlers
   @impl true
   def handle_event("toggle_sdk_demo", _params, socket) do
@@ -505,6 +452,59 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
      |> assign(:sdk_messages, [])
      |> assign(:sdk_ref, nil)
      |> assign(:sdk_session_id, nil)}
+  end
+
+  @impl true
+  def handle_info(:refresh_agents, socket) do
+    socket = socket |> load_agents() |> schedule_refresh()
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:agent_created, _agent}, socket) do
+    {:noreply, load_agents(socket)}
+  end
+
+  @impl true
+  def handle_info({:agent_updated, _agent}, socket) do
+    {:noreply, load_agents(socket)}
+  end
+
+  @impl true
+  def handle_info({:agent_deleted, _agent}, socket) do
+    {:noreply, load_agents(socket)}
+  end
+
+  @impl true
+  def handle_info({:agent_working, %{id: session_id}}, socket) do
+    {:noreply, update_agent_status_in_list(socket, session_id, "working")}
+  end
+
+  @impl true
+  def handle_info({:agent_working, _session_uuid, session_id}, socket) do
+    {:noreply, update_agent_status_in_list(socket, session_id, "working")}
+  end
+
+  @impl true
+  def handle_info({:agent_stopped, %{id: session_id, status: status}}, socket) do
+    {:noreply, update_agent_status_in_list(socket, session_id, status || "completed")}
+  end
+
+  @impl true
+  def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
+    {:noreply, update_agent_status_in_list(socket, session_id, "idle")}
+  end
+
+  @impl true
+  def handle_info({:claude_output, _ref, _line}, socket) do
+    # Ignore Claude output - SessionWorker handles these
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:claude_exit, _ref, _status}, socket) do
+    # Ignore Claude exit - SessionWorker handles these
+    {:noreply, socket}
   end
 
   # SDK message handlers - only show :result, skip streaming text deltas to avoid duplicates

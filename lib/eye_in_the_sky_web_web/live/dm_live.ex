@@ -270,64 +270,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     {:noreply, socket}
   end
 
-  defp handle_send_message(body, socket) do
-    model = socket.assigns.selected_model
-    effort_level = socket.assigns.selected_effort
-    thinking_enabled = socket.assigns.thinking_enabled
-
-    Logger.info(
-      "DM send_message received for session=#{socket.assigns.session_id} model=#{model} effort=#{effort_level} body_length=#{String.length(body)}"
-    )
-
-    uploaded_files = consume_uploaded_files(socket)
-    full_body = build_message_body(body, uploaded_files)
-    session_id = socket.assigns.session_id
-
-    case create_user_message(session_id, full_body) do
-      {:ok, message} ->
-        Logger.info("Message created in DB with id=#{message.id}")
-        persist_upload_attachments(uploaded_files, message.id)
-
-        socket = load_tab_data(socket, "messages", session_id)
-
-        case AgentManager.continue_session(
-               session_id,
-               full_body,
-               continue_session_opts(model, effort_level, thinking_enabled)
-             ) do
-          :ok ->
-            Logger.info("Message forwarded to AgentManager for session=#{session_id}")
-
-            {:noreply,
-             socket
-             |> assign(:processing, true)
-             |> start_sync_timer()
-             |> push_event("clear-input", %{})}
-
-          {:error, reason} ->
-            Logger.error("Failed to send message via AgentManager: #{inspect(reason)}")
-
-            socket =
-              socket
-              |> assign(:processing, false)
-              |> put_flash(:error, "Failed to send message: #{inspect(reason)}")
-
-            {:noreply, socket}
-        end
-
-      {:error, reason} ->
-        Logger.error("Failed to create message: #{inspect(reason)}")
-        {:noreply, put_flash(socket, :error, "Failed to create message: #{inspect(reason)}")}
-    end
-  end
-
-  defp parse_int(s, default \\ 0) do
-    case Integer.parse(s || "") do
-      {n, ""} -> n
-      _ -> default
-    end
-  end
-
   @impl true
   def handle_event("load_diff", %{"hash" => hash}, socket) do
     # Skip if already cached
@@ -476,6 +418,64 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Failed to toggle star")}
+    end
+  end
+
+  defp parse_int(s, default \\ 0) do
+    case Integer.parse(s || "") do
+      {n, ""} -> n
+      _ -> default
+    end
+  end
+
+  defp handle_send_message(body, socket) do
+    model = socket.assigns.selected_model
+    effort_level = socket.assigns.selected_effort
+    thinking_enabled = socket.assigns.thinking_enabled
+
+    Logger.info(
+      "DM send_message received for session=#{socket.assigns.session_id} model=#{model} effort=#{effort_level} body_length=#{String.length(body)}"
+    )
+
+    uploaded_files = consume_uploaded_files(socket)
+    full_body = build_message_body(body, uploaded_files)
+    session_id = socket.assigns.session_id
+
+    case create_user_message(session_id, full_body) do
+      {:ok, message} ->
+        Logger.info("Message created in DB with id=#{message.id}")
+        persist_upload_attachments(uploaded_files, message.id)
+
+        socket = load_tab_data(socket, "messages", session_id)
+
+        case AgentManager.continue_session(
+               session_id,
+               full_body,
+               continue_session_opts(model, effort_level, thinking_enabled)
+             ) do
+          :ok ->
+            Logger.info("Message forwarded to AgentManager for session=#{session_id}")
+
+            {:noreply,
+             socket
+             |> assign(:processing, true)
+             |> start_sync_timer()
+             |> push_event("clear-input", %{})}
+
+          {:error, reason} ->
+            Logger.error("Failed to send message via AgentManager: #{inspect(reason)}")
+
+            socket =
+              socket
+              |> assign(:processing, false)
+              |> put_flash(:error, "Failed to send message: #{inspect(reason)}")
+
+            {:noreply, socket}
+        end
+
+      {:error, reason} ->
+        Logger.error("Failed to create message: #{inspect(reason)}")
+        {:noreply, put_flash(socket, :error, "Failed to create message: #{inspect(reason)}")}
     end
   end
 
@@ -692,18 +692,26 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     {:noreply, socket}
   end
 
+  defp read_session_usage_stats(socket, session_id) do
+    case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+      {:ok, project_path} ->
+        case SessionReader.read_usage(socket.assigns.session_uuid, project_path) do
+          {:ok, tokens, cost} -> {tokens, cost}
+          _ -> {Messages.total_tokens_for_session(session_id), Messages.total_cost_for_session(session_id)}
+        end
+
+      _ ->
+        {Messages.total_tokens_for_session(session_id), Messages.total_cost_for_session(session_id)}
+    end
+  end
+
   defp load_tab_data(socket, tab, session_id) do
     Logger.info("Loading DM tab data tab=#{tab} session_id=#{session_id}")
     {messages, has_more} = load_message_data(socket, tab, session_id)
 
-    total_tokens =
-      maybe_load_value(tab, "messages", socket.assigns[:total_tokens], fn ->
-        Messages.total_tokens_for_session(session_id)
-      end)
-
-    total_cost =
-      maybe_load_value(tab, "messages", socket.assigns[:total_cost], fn ->
-        Messages.total_cost_for_session(session_id)
+    {total_tokens, total_cost} =
+      maybe_load_value(tab, "messages", {socket.assigns[:total_tokens], socket.assigns[:total_cost]}, fn ->
+        read_session_usage_stats(socket, session_id)
       end)
 
     current_task =

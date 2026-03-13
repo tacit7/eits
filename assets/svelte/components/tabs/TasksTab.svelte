@@ -10,7 +10,7 @@
   import ClipboardSvg from 'heroicons/24/outline/clipboard-document.svg'
 
   export let tasks = []
-  export let live
+  export const live = undefined
 
   let selectedTask = null
   let hoveredTask = null
@@ -53,7 +53,10 @@
 
       <div
         class="group relative border-b border-base-200 hover:bg-base-200/50 transition-colors cursor-pointer"
+        role="button"
+        tabindex="0"
         on:click={() => handleTaskClick(task)}
+        on:keydown={(e) => e.key === 'Enter' && handleTaskClick(task)}
         on:mouseenter={() => hoveredTask = task.id}
         on:mouseleave={() => hoveredTask = null}
       >

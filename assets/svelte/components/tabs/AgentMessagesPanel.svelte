@@ -517,6 +517,7 @@
           type="submit"
           class="btn btn-sm btn-primary min-h-0 h-10 px-5"
           disabled={!inputValue || inputValue.trim() === ''}
+          aria-label="Send message"
         >
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="22" y1="2" x2="11" y2="13"/>

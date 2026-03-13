@@ -4,7 +4,7 @@
   export let tasks = []
   export let commits = []
   export let logs = []
-  export let live
+  export const live = undefined
 </script>
 
 <div class="p-4 space-y-6 h-full overflow-y-auto">

@@ -1,6 +1,6 @@
 <script>
   export let commits = []
-  export let live
+  export const live = undefined
 
   let selectedCommit = commits[0] || null
 

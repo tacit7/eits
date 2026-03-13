@@ -1,6 +1,6 @@
 <script>
   export let logs = []
-  export let live
+  export const live = undefined
 
   let filterLevel = 'all'
 

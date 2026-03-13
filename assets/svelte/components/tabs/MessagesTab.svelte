@@ -109,11 +109,11 @@
     <form on:submit|preventDefault={handleSubmit} class="flex items-center gap-2">
       <!-- Provider selector dropdown -->
       <div class="dropdown dropdown-top">
-        <label tabindex="0" class="btn btn-ghost btn-sm gap-2" title="Select AI Provider">
+        <button type="button" tabindex="0" class="btn btn-ghost btn-sm gap-2" title="Select AI Provider">
           <span class="w-4 h-4">{@html ComputerDesktopSvg}</span>
           <span class="badge badge-sm badge-primary">{selectedProvider}</span>
-        </label>
-        <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-40 mb-2">
+        </button>
+        <ul class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-40 mb-2">
           <li>
             <button type="button" on:click={() => selectProvider('claude')}
               class="flex items-center justify-between">

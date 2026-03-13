@@ -1,6 +1,9 @@
 defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   use EyeInTheSkyWebWeb, :live_view
 
+  @telemetry_prefix [:eye_in_the_sky_web, :project_sessions]
+  @page_size 25
+
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Sessions
   import EyeInTheSkyWebWeb.Helpers.ViewHelpers
@@ -33,8 +36,13 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         |> assign(:sort_by, "recent")
         |> assign(:session_filter, "all")
         |> assign(:show_new_session_drawer, false)
+        |> assign(:show_filter_sheet, false)
         |> assign(:selected_ids, MapSet.new())
+        |> assign(:all_agents, [])
         |> assign(:agents, [])
+        |> assign(:visible_count, @page_size)
+        |> assign(:has_more, false)
+        |> assign(:list_version, 0)
         |> load_agents()
 
       {:ok, socket}
@@ -50,14 +58,51 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
     project_id = socket.assigns.project_id
     include_archived = socket.assigns.session_filter == "archived"
 
-    agents =
-      Sessions.list_sessions_with_agent(include_archived: include_archived)
-      |> Enum.filter(&(&1.project_id == project_id))
-      |> filter_agents_by_status(socket.assigns.session_filter)
-      |> filter_agents_by_search(socket.assigns.search_query)
-      |> sort_agents(socket.assigns.sort_by)
+    {duration_us, all_agents} =
+      :timer.tc(fn ->
+        Sessions.list_project_sessions_with_agent(project_id, include_archived: include_archived)
+      end)
 
-    assign(socket, :agents, agents)
+    :telemetry.execute(
+      @telemetry_prefix ++ [:load_agents],
+      %{duration_us: duration_us, count: length(all_agents)},
+      %{project_id: project_id, include_archived: include_archived}
+    )
+
+    socket
+    |> assign(:all_agents, all_agents)
+    |> apply_agent_view(true)
+  end
+
+  defp apply_agent_view(socket, reset_page \\ false) do
+    visible_count = if reset_page, do: @page_size, else: socket.assigns.visible_count
+
+    {duration_us, agents} =
+      :timer.tc(fn ->
+        socket.assigns.all_agents
+        |> filter_agents_by_status(socket.assigns.session_filter)
+        |> filter_agents_by_search(socket.assigns.search_query)
+        |> sort_agents(socket.assigns.sort_by)
+      end)
+
+    :telemetry.execute(
+      @telemetry_prefix ++ [:apply_view],
+      %{duration_us: duration_us, count: length(agents)},
+      %{
+        project_id: socket.assigns.project_id,
+        filter: socket.assigns.session_filter,
+        sort_by: socket.assigns.sort_by,
+        search_query_length: String.length(socket.assigns.search_query || "")
+      }
+    )
+
+    socket =
+      socket
+      |> assign(:agents, agents)
+      |> assign(:visible_count, visible_count)
+      |> assign(:has_more, length(agents) > visible_count)
+
+    if reset_page, do: update(socket, :list_version, &(&1 + 1)), else: socket
   end
 
   defp filter_agents_by_status(sessions, filter) do
@@ -133,8 +178,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   defp update_agent_status_in_list(socket, session_id, new_status) do
     now = DateTime.utc_now() |> DateTime.to_iso8601()
 
-    updated_agents =
-      socket.assigns.agents
+    update_status = fn agents ->
+      agents
       |> Enum.map(fn agent ->
         if agent.id == session_id do
           agent = %{agent | status: new_status}
@@ -143,9 +188,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
           agent
         end
       end)
-      |> sort_agents(socket.assigns.sort_by)
+    end
 
-    assign(socket, :agents, updated_agents)
+    socket
+    |> assign(:all_agents, update_status.(socket.assigns.all_agents))
+    |> apply_agent_view()
   end
 
   @impl true
@@ -155,7 +202,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
     socket =
       socket
       |> assign(:search_query, effective_query)
-      |> load_agents()
+      |> apply_agent_view(true)
 
     {:noreply, socket}
   end
@@ -176,9 +223,35 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
     socket =
       socket
       |> assign(:sort_by, sort_by)
-      |> load_agents()
+      |> apply_agent_view(true)
 
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("load_more", _params, socket) do
+    if socket.assigns.has_more do
+      new_count = socket.assigns.visible_count + @page_size
+
+      socket =
+        socket
+        |> assign(:visible_count, new_count)
+        |> assign(:has_more, length(socket.assigns.agents) > new_count)
+
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("open_filter_sheet", _params, socket) do
+    {:noreply, assign(socket, :show_filter_sheet, true)}
+  end
+
+  @impl true
+  def handle_event("close_filter_sheet", _params, socket) do
+    {:noreply, assign(socket, :show_filter_sheet, false)}
   end
 
   @impl true
@@ -328,33 +401,38 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="bg-base-100 min-h-screen px-6 lg:px-8">
-      <div class="max-w-3xl mx-auto">
+    <div class="bg-base-100 min-h-full px-4 sm:px-6 lg:px-8">
+      <div class="max-w-4xl mx-auto">
         <%!-- Toolbar --%>
-        <div class="flex items-center justify-between py-5">
-          <span class="text-[11px] font-mono tabular-nums text-base-content/30 tracking-wider uppercase">
-            {length(@agents)} sessions
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-5">
+          <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
+            <%= if @has_more do %>
+              {min(@visible_count, length(@agents))} of {length(@agents)} sessions
+            <% else %>
+              {length(@agents)} sessions
+            <% end %>
           </span>
           <button
             phx-click="toggle_new_session_drawer"
-            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-7 text-xs"
+            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-8 sm:h-7 text-xs w-full sm:w-auto"
           >
             <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Agent
           </button>
         </div>
 
         <%!-- Search and Filters --%>
-        <div class="sticky top-16 z-10 bg-base-100/85 backdrop-blur-md -mx-6 lg:-mx-8 px-6 lg:px-8 py-3 border-b border-base-content/5">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
-            <form phx-submit="search" phx-change="search" class="flex-1 max-w-sm">
+        <div class="sticky safe-top-sticky md:top-16 z-10 bg-base-100/85 backdrop-blur-md -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 border-b border-base-content/5">
+          <div class="flex items-center gap-3">
+            <form phx-submit="search" phx-change="search" class="flex-1 sm:max-w-sm">
               <div class="relative">
                 <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                   <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
                 </div>
+                <label for="project-sessions-search" class="sr-only">Search sessions</label>
                 <input
                   type="text"
                   name="query"
-                  id="search"
+                  id="project-sessions-search"
                   value={@search_query}
                   phx-debounce="300"
                   class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
@@ -363,7 +441,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
               </div>
             </form>
 
-            <div class="flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
+            <%!-- Desktop filter pills (hidden on mobile) --%>
+            <div class="hidden sm:flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
               <%= for {label, filter, active_class} <- [
                 {"All", "all", "bg-base-100 text-base-content shadow-sm"},
                 {"Active", "active", "bg-base-100 text-success shadow-sm"},
@@ -373,18 +452,129 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                 <button
                   phx-click="filter_session"
                   phx-value-filter={filter}
+                  aria-pressed={@session_filter == filter}
                   class={"px-3 py-1 rounded-md text-xs font-medium transition-all duration-150 " <>
                     if(@session_filter == filter,
                       do: active_class,
-                      else: "text-base-content/40 hover:text-base-content/60"
+                      else: "text-base-content/60 hover:text-base-content/85"
                     )}
                 >
                   {label}
                 </button>
               <% end %>
             </div>
+
+            <%!-- Mobile filter button (hidden on sm+) --%>
+            <button
+              phx-click="open_filter_sheet"
+              aria-label="Open filters"
+              aria-haspopup="dialog"
+              class="sm:hidden relative btn btn-ghost btn-sm btn-square"
+            >
+              <.icon name="hero-funnel-mini" class="w-4 h-4" />
+              <%= if @session_filter != "all" || @sort_by != "recent" do %>
+                <span class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full" aria-hidden="true"></span>
+              <% end %>
+            </button>
           </div>
         </div>
+
+        <%!-- Mobile filter bottom sheet --%>
+        <%= if @show_filter_sheet do %>
+          <div
+            class="fixed inset-0 z-40 bg-black/40"
+            phx-click="close_filter_sheet"
+            aria-hidden="true"
+          >
+          </div>
+          <div
+            class="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-base-100 shadow-xl safe-bottom-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Filter sessions"
+            id="session-filter-sheet"
+            phx-window-keydown="close_filter_sheet"
+            phx-key="Escape"
+          >
+            <div class="flex justify-center pt-3 pb-1">
+              <div class="w-10 h-1 rounded-full bg-base-content/20"></div>
+            </div>
+            <div class="px-5 pb-6 pt-2">
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="text-sm font-semibold">Filter &amp; Sort</h2>
+                <button
+                  phx-click="close_filter_sheet"
+                  class="btn btn-ghost btn-xs btn-square"
+                  aria-label="Close filter panel"
+                >
+                  <.icon name="hero-x-mark-mini" class="w-4 h-4" />
+                </button>
+              </div>
+
+              <fieldset class="mb-5">
+                <legend class="text-xs font-medium text-base-content/50 uppercase tracking-wider mb-2">Status</legend>
+                <div class="flex flex-wrap gap-2">
+                  <%= for {label, filter} <- [
+                    {"All", "all"},
+                    {"Active", "active"},
+                    {"Completed", "completed"},
+                    {"Archived", "archived"}
+                  ] do %>
+                    <button
+                      phx-click="filter_session"
+                      phx-value-filter={filter}
+                      aria-pressed={@session_filter == filter}
+                      class={"btn btn-sm " <>
+                        if(@session_filter == filter,
+                          do: "btn-primary",
+                          else: "btn-ghost border border-base-content/15"
+                        )}
+                    >
+                      {label}
+                    </button>
+                  <% end %>
+                </div>
+              </fieldset>
+
+              <fieldset class="mb-6">
+                <legend class="text-xs font-medium text-base-content/50 uppercase tracking-wider mb-2">Sort by</legend>
+                <div class="flex flex-wrap gap-2">
+                  <%= for {label, sort} <- [{"Recent", "recent"}, {"Name", "name"}, {"Status", "status"}] do %>
+                    <button
+                      phx-click="sort"
+                      phx-value-by={sort}
+                      aria-pressed={@sort_by == sort}
+                      class={"btn btn-sm " <>
+                        if(@sort_by == sort,
+                          do: "btn-primary",
+                          else: "btn-ghost border border-base-content/15"
+                        )}
+                    >
+                      {label}
+                    </button>
+                  <% end %>
+                </div>
+              </fieldset>
+
+              <div class="flex gap-3">
+                <button
+                  phx-click="close_filter_sheet"
+                  class="btn btn-primary flex-1"
+                >
+                  Apply
+                </button>
+                <button
+                  phx-click="filter_session"
+                  phx-value-filter="all"
+                  class="btn btn-ghost"
+                  aria-label="Reset filters"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
+        <% end %>
 
         <%!-- Selection toolbar (archived view) --%>
         <%= if @session_filter == "archived" && @agents != [] do %>
@@ -394,6 +584,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
               checked={MapSet.size(@selected_ids) == length(@agents) && @agents != []}
               phx-click="toggle_select_all"
               class="checkbox checkbox-xs checkbox-primary"
+              aria-label="Select all archived sessions"
             />
             <%= if MapSet.size(@selected_ids) > 0 do %>
               <span class="text-[11px] text-base-content/50 font-medium">
@@ -412,7 +603,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         <% end %>
 
         <%!-- Session list --%>
-        <div class="mt-2 divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-4">
+        <div class="mt-2 rounded-xl shadow-sm">
           <%= if @agents == [] do %>
             <.empty_state
               id="project-sessions-empty"
@@ -424,7 +615,13 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
               }
             />
           <% else %>
-            <%= for agent <- @agents do %>
+            <div
+              id={"ps-list-#{@list_version}"}
+              phx-update="append"
+              class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl px-4"
+            >
+            <%= for agent <- Enum.take(@agents, @visible_count) do %>
+              <div id={"ps-#{agent.id}"}>
               <% display_status = EyeInTheSkyWebWeb.Helpers.ViewHelpers.derive_display_status(agent) %>
               <% {status_color, status_bg, status_label, is_active} =
                 case display_status do
@@ -440,6 +637,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                 class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer"
                 phx-click="navigate_dm"
                 phx-value-id={agent.id}
+                role="button"
+                tabindex="0"
+                phx-keyup="navigate_dm"
+                phx-key="Enter"
+                aria-label={"Open session: #{agent.name || "Unnamed session"} - #{status_label}"}
               >
                 <%!-- Status indicator / checkbox --%>
                 <%= if @session_filter == "archived" do %>
@@ -450,6 +652,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                       phx-click="toggle_select"
                       phx-value-id={agent.id}
                       class="checkbox checkbox-xs checkbox-primary"
+                      aria-label={"Select session #{agent.name || agent.id}"}
                     />
                   </div>
                 <% else %>
@@ -473,7 +676,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                     <span class="text-[13px] font-medium text-base-content/85 truncate">
                       {agent.name || "Unnamed session"}
                     </span>
-                    <span class={"text-[10px] font-medium uppercase tracking-wider " <> status_color}>
+                    <span class={"text-[11px] font-medium uppercase tracking-wider flex-shrink-0 " <> status_color}>
                       {status_label}
                     </span>
                   </div>
@@ -490,12 +693,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                 </div>
 
                 <%!-- Actions --%>
-                <div class="flex items-center gap-0.5 flex-shrink-0" phx-click="noop">
+                <div class="flex items-center gap-0 flex-shrink-0" phx-click="noop">
                   <%= if agent.id do %>
                     <a
                       href={~p"/dm/#{agent.id}"}
                       target="_blank"
-                      class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-primary"
+                      class="hidden sm:inline-flex md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-base-content/30 hover:text-primary hover:bg-primary/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       aria-label="Open in new tab"
                     >
                       <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
@@ -510,7 +713,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                       data-session-id={agent.uuid}
                       data-agent-name={agent.name || agent.agent.description || "Agent"}
                       data-agent-status={agent.status}
-                      class="bookmark-button btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-error"
+                      class="bookmark-button md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
                       aria-label="Bookmark agent"
                     >
                       <.heart class="bookmark-icon w-3.5 h-3.5" />
@@ -522,7 +725,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                         type="button"
                         phx-click="unarchive_session"
                         phx-value-session_id={agent.id}
-                        class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-info"
+                        class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-info hover:bg-info/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
                         aria-label="Unarchive"
                       >
                         <.icon name="hero-arrow-up-tray-mini" class="w-3.5 h-3.5" />
@@ -531,7 +734,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                         type="button"
                         phx-click="delete_session"
                         phx-value-session_id={agent.id}
-                        class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-error"
+                        class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
                         aria-label="Delete"
                       >
                         <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
@@ -541,7 +744,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                         type="button"
                         phx-click="archive_session"
                         phx-value-session_id={agent.id}
-                        class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-warning"
+                        class="hidden sm:flex md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-base-content/30 hover:text-warning hover:bg-warning/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
                         aria-label="Archive"
                       >
                         <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
@@ -555,7 +758,21 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                   <.icon name="hero-chevron-right-mini" class="w-4 h-4 text-base-content/20" />
                 </div>
               </div>
+              </div>
             <% end %>
+            </div>
+          <% end %>
+        </div>
+
+        <div
+          id="project-sessions-sentinel"
+          phx-hook="InfiniteScroll"
+          data-has-more={to_string(@has_more)}
+          data-page={@visible_count}
+          class="py-4 flex justify-center"
+        >
+          <%= if @has_more do %>
+            <span class="loading loading-spinner loading-sm text-base-content/30"></span>
           <% end %>
         </div>
       </div>

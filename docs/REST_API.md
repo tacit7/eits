@@ -220,6 +220,89 @@ These endpoints broadcast events for real-time LiveView updates:
 | `"agent:working"` | `{:agent_working, agent}` | PATCH with non-terminal status |
 | `"agent:working"` | `{:agent_stopped, agent}` | PATCH with completed/failed |
 
+### POST /webhooks/gitea
+
+Receive Gitea webhook events for PR review automation.
+
+**Webhook events supported:**
+- `pull_request` (opened) — spawns a Codex review agent
+- `issue_comment` (created on PR) — routes DM to the Claude session embedded in PR body
+
+**Request body:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `action` | string | `opened` or `created` (issue_comment) |
+| `pull_request` | object | PR details (title, body, head.sha, base.ref, diff_url) |
+| `issue` | object | Issue/PR metadata (number, title) |
+| `comment` | object | Comment object (body, created_at) |
+| `repository` | object | Repository details (full_name, clone_url) |
+
+**HMAC authentication:**
+
+Gitea webhook must be signed with `GITEA_WEBHOOK_SECRET` env var. Plug validates `X-Gitea-Signature` header against raw body:
+
+```
+sha256_hmac(raw_body, GITEA_WEBHOOK_SECRET)
+```
+
+Requests without valid signature return `401 Unauthorized`. In production, unsigned requests fail closed (return 403) when `GITEA_WEBHOOK_SECRET` is missing.
+
+**Response:** `202 Accepted` (async processing)
+
+---
+
+### POST /api/v1/push/subscriptions
+
+Register a browser for web push notifications.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `subscription` | object | yes | Web Push subscription object from service worker |
+| `subscription.endpoint` | string | yes | Push service endpoint URL |
+| `subscription.keys` | object | yes | Encryption keys (p256dh, auth) |
+
+**Response:** `201 Created`
+
+```json
+{
+  "id": 1,
+  "endpoint": "https://fcm.googleapis.com/...",
+  "inserted_at": "2026-03-12T10:30:00Z"
+}
+```
+
+**Example:**
+
+```bash
+# After service worker registers
+curl -X POST localhost:5001/api/v1/push/subscriptions \
+  -H 'Content-Type: application/json' \
+  -d @subscription.json  # from navigator.serviceWorker.ready.then(reg => reg.pushManager.getSubscription())
+```
+
+---
+
+### GET /api/v1/push/subscriptions
+
+List all registered push subscriptions for the current user.
+
+**Response:** `200 OK`
+
+```json
+[
+  {
+    "id": 1,
+    "endpoint": "https://fcm.googleapis.com/...",
+    "inserted_at": "2026-03-12T10:30:00Z"
+  }
+]
+```
+
+---
+
 ## Hook Integration
 
 These endpoints map to Claude Code hooks:

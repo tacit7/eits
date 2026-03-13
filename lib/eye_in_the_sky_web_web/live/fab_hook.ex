@@ -90,14 +90,21 @@ defmodule EyeInTheSkyWebWeb.FabHook do
     {:halt, socket}
   end
 
-  defp handle_fab_info({:new_message, %EyeInTheSkyWeb.Messages.Message{sender_role: role, body: body}}, socket)
+  defp handle_fab_info(
+         {:new_message, %EyeInTheSkyWeb.Messages.Message{sender_role: role, body: body}},
+         socket
+       )
        when role != "user" do
     {:halt, push_event(socket, "fab_chat_message", %{body: body, sender_role: role})}
   end
 
   defp handle_fab_info({event, _}, socket)
        when event in [:notification_created, :notifications_updated, :notification_read] do
-    send_update(EyeInTheSkyWebWeb.Components.Sidebar, id: "app-sidebar", notification_count: :refresh)
+    send_update(EyeInTheSkyWebWeb.Components.Sidebar,
+      id: "app-sidebar",
+      notification_count: :refresh
+    )
+
     {:halt, socket}
   end
 
@@ -117,7 +124,9 @@ defmodule EyeInTheSkyWebWeb.FabHook do
 
   defp unsubscribe_active_session(socket) do
     case socket.assigns.fab_active_session_id do
-      nil -> socket
+      nil ->
+        socket
+
       id ->
         Phoenix.PubSub.unsubscribe(EyeInTheSkyWeb.PubSub, "session:#{id}")
         assign(socket, :fab_active_session_id, nil)
@@ -134,6 +143,7 @@ defmodule EyeInTheSkyWebWeb.FabHook do
     Sessions.list_sessions_with_agent(include_archived: false)
     |> Enum.reduce(%{}, fn s, acc ->
       status = s.status || "idle"
+
       acc
       |> Map.put(to_string(s.id), status)
       |> then(fn a -> if s.uuid, do: Map.put(a, s.uuid, status), else: a end)
@@ -142,13 +152,14 @@ defmodule EyeInTheSkyWebWeb.FabHook do
 
   defp send_session_message(session_id, body) do
     with {:ok, session} <- resolve_session(session_id),
-         {:ok, _message} <- Messages.send_message(%{
-           session_id: session.id,
-           sender_role: "user",
-           recipient_role: "agent",
-           provider: "claude",
-           body: body
-         }),
+         {:ok, _message} <-
+           Messages.send_message(%{
+             session_id: session.id,
+             sender_role: "user",
+             recipient_role: "agent",
+             provider: "claude",
+             body: body
+           }),
          :ok <- AgentManager.continue_session(session.id, body, model: "sonnet") do
       {:ok, session.id}
     else

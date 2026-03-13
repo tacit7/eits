@@ -59,7 +59,9 @@ defmodule EyeInTheSkyWeb.Accounts do
 
   def peek_registration_token(token) do
     case Repo.get_by(RegistrationToken, token: token) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       rt ->
         if NaiveDateTime.compare(rt.expires_at, NaiveDateTime.utc_now()) == :gt,
           do: {:ok, rt.username},

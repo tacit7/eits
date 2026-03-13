@@ -379,6 +379,9 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   @impl true
+  def handle_info(_msg, socket), do: {:noreply, socket}
+
+  @impl true
   def handle_event("toggle_new_session_drawer", _params, socket) do
     {:noreply, assign(socket, :show_new_session_drawer, !socket.assigns.show_new_session_drawer)}
   end
@@ -396,11 +399,12 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
     project = EyeInTheSkyWeb.Projects.get_project!(project_id)
 
-    worktree = case params["worktree"] do
-      nil -> nil
-      "" -> nil
-      v -> String.trim(v)
-    end
+    worktree =
+      case params["worktree"] do
+        nil -> nil
+        "" -> nil
+        v -> String.trim(v)
+      end
 
     opts = [
       agent_type: agent_type,
@@ -637,7 +641,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
         </div>
 
         <%!-- Search and Filters --%>
-        <div class="sticky top-0 md:top-16 z-10 bg-base-100/85 backdrop-blur-md -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 border-b border-base-content/5">
+        <div class="sticky safe-top-sticky md:top-16 z-10 bg-base-100/85 backdrop-blur-md -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 border-b border-base-content/5">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
             <form phx-submit="search" phx-change="search" class="flex-1 max-w-sm">
               <label for="search" class="sr-only">Search agents</label>

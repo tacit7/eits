@@ -230,11 +230,120 @@ Rules of thumb:
 
 ---
 
+## Context Safety Patterns
+
+**Problem:** User input flowing through contexts can crash the server if not validated.
+
+**Safe patterns:**
+
+### 1. Atom Conversion (Parser Context)
+
+**❌ Unsafe:**
+```elixir
+# Parser gets raw JSON from external source
+def parse_message(raw_json) do
+  map = Jason.decode!(raw_json)
+  atom_map = for {k, v} <- map, into: %{}, do: {String.to_atom(k), v}
+  # CRASH: User can pass any string as key, creating unbounded atoms
+end
+```
+
+**✅ Safe:**
+```elixir
+def parse_message(raw_json) do
+  map = Jason.decode!(raw_json)
+  # Option 1: Use whitelist
+  allowed_keys = [“type”, “content”, “timestamp”]
+  filtered = Map.take(map, allowed_keys)
+
+  # Option 2: Keep as strings, not atoms
+  filtered
+end
+```
+
+**Guideline:** Never convert untrusted strings to atoms. The atom table has no max size and can’t be garbage collected.
+
+---
+
+### 2. Task Context Boundary (Safe Attribute Updates)
+
+**Problem:** Task attributes (`title`, `description`, `state_id`) come from LiveViews and may contain invalid values.
+
+**Safe pattern:**
+```elixir
+# Tasks context enforces validation at the boundary
+def update_task(task, attrs) do
+  task
+  |> Task.changeset(attrs)  # Changeset validates
+  |> Repo.update()
+end
+
+# LiveView can’t bypass validation (no raw DB updates)
+def handle_event(“update_title”, %{“title” => new_title}, socket) do
+  Tasks.update_task(socket.assigns.task, %{title: new_title})
+  # Changeset rejects invalid state_id, unknown keys, etc.
+end
+```
+
+**Guideline:** All DB changes go through contexts with `changeset/2` for validation. Never bypass with raw SQL or direct struct updates.
+
+---
+
+### 3. Kanban LiveView State Boundary
+
+**Problem:** User can send arbitrary `state_id` values from LiveView, potentially setting invalid states.
+
+**Safe pattern:**
+```elixir
+# Validate state_id in the context, not the LiveView
+def move_task(task_id, new_state_id) do
+  # Check state_id is valid (1-4, not arbitrary)
+  valid_states = [1, 2, 3, 4]
+
+  case new_state_id in valid_states do
+    true -> Tasks.update_task(task_id, %{state_id: new_state_id})
+    false -> {:error, “invalid state”}
+  end
+end
+```
+
+**Guideline:** Context validates state transitions, not LiveView. LiveView is UI; context is business logic.
+
+---
+
+### 4. Parser Safety (Codex/Claude Output)
+
+**Problem:** Claude output may include malformed JSON or unexpected data types.
+
+**Safe pattern:**
+```elixir
+def parse_agent_response(raw_response) do
+  case Jason.decode(raw_response) do
+    {:ok, %{“messages” => msgs} = data} when is_list(msgs) ->
+      # Only accept expected structure
+      {:ok, data}
+
+    {:ok, _unexpected} ->
+      {:error, “unexpected response format”}
+
+    {:error, reason} ->
+      {:error, “invalid json: #{reason}”}
+  end
+end
+```
+
+**Guideline:** Always validate structure and types from external sources. Don’t assume JSON keys/types are correct.
+
+---
+
 ## “Gotchas” Checklist
 
 - If you see missing `current_scope`: fix routing/live_session + pass it to `<Layouts.app>`.
 - Don’t call `<.flash_group>` outside `Layouts`.
 - Don’t use `@apply` in CSS.
 - Don’t add inline scripts or inline `onclick`.
+- **Never convert untrusted strings to atoms** (unbounded atom table).
+- **Validate state transitions in contexts, not LiveViews** (not in UI layer).
+- **All DB writes through contexts with changesets** (not raw SQL from LiveView).
 - Run `mix precommit` before pushing.
 

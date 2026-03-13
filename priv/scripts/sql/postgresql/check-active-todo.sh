@@ -12,7 +12,7 @@ EITS_PG_USER="${EITS_PG_USER:-postgres}"
 EITS_PG_HOST="${EITS_PG_HOST:-localhost}"
 export PGPASSWORD="${EITS_PG_PASSWORD:-postgres}"
 
-active_todo_count=$(psql -U "$EITS_PG_USER" -h "$EITS_PG_HOST" -d "$EITS_PG_DB" -t -A -c "
+active_todo_count=$(psql --no-psqlrc -U "$EITS_PG_USER" -h "$EITS_PG_HOST" -d "$EITS_PG_DB" -t -A -c "
   SELECT COUNT(*)
   FROM tasks t
   JOIN task_sessions ts ON t.id = ts.task_id

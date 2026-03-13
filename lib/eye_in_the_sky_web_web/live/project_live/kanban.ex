@@ -1,20 +1,16 @@
 defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   use EyeInTheSkyWebWeb, :live_view
 
-  import Ecto.Query, only: [from: 2]
-
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Tasks
   alias EyeInTheSkyWeb.Notes
-  alias EyeInTheSkyWeb.Agents
-  alias EyeInTheSkyWeb.Sessions
   alias EyeInTheSkyWeb.Repo
-  alias EyeInTheSkyWebWeb.Components.TaskCard
+  alias EyeInTheSkyWeb.Claude.AgentManager
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "tasks")
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "tasks:#{id}")
     end
 
     # Parse project ID safely
@@ -60,6 +56,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
         |> assign(:workflow_states, workflow_states)
         |> assign(:tasks, [])
         |> assign(:tasks_by_state, %{})
+        |> assign(:show_new_task_drawer, false)
+        |> assign(:show_task_detail_drawer, false)
+        |> assign(:selected_task, nil)
+        |> assign(:task_notes, [])
+        |> assign(:quick_add_column, nil)
         |> put_flash(:error, "Invalid project ID")
       end
 
@@ -109,8 +110,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     task = socket.assigns.selected_task
     title = params["title"]
     description = params["description"]
-    state_id = String.to_integer(params["state_id"])
-    priority = String.to_integer(params["priority"] || "0")
+    state_id = parse_int(params["state_id"])
+    priority = parse_int(params["priority"], 0)
     due_at = if params["due_at"] != "", do: params["due_at"], else: nil
     tags_string = params["tags"] || ""
 
@@ -131,24 +132,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
            updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
          }) do
       {:ok, updated_task} ->
-        # Handle tags
-        if length(tag_names) > 0 do
-          # Delete existing tags
-          Repo.delete_all(from t in "task_tags", where: t.task_id == ^task.id)
-
-          # Add new tags
-          Enum.each(tag_names, fn tag_name ->
-            case Tasks.get_or_create_tag(tag_name) do
-              {:ok, tag} ->
-                Repo.insert_all("task_tags", [%{task_id: task.id, tag_id: tag.id}],
-                  on_conflict: :nothing
-                )
-
-              _ ->
-                :ok
-            end
-          end)
-        end
+        Tasks.replace_task_tags(task.id, tag_names)
 
         # Reload task with associations
         updated_task = Tasks.get_task!(updated_task.id)
@@ -170,12 +154,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   def handle_event("delete_task", %{"task_id" => task_id}, socket) do
     task = Tasks.get_task_by_uuid_or_id!(task_id)
 
-    # Delete related records first to avoid foreign key constraint errors
-    Repo.delete_all(from t in "task_tags", where: t.task_id == ^task.id)
-    Repo.delete_all(from t in "task_sessions", where: t.task_id == ^task.id)
-    Repo.delete_all(from t in "commit_tasks", where: t.task_id == ^task.id)
-
-    case Tasks.delete_task(task) do
+    case Tasks.delete_task_with_associations(task) do
       {:ok, _} ->
         socket =
           socket
@@ -193,90 +172,32 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("start_agent_for_task", %{"task_id" => task_id}, socket) do
-    alias EyeInTheSkyWeb.{Agents, Claude.SessionManager}
-
     task = Tasks.get_task_by_uuid_or_id!(task_id)
     project = socket.assigns.project
 
-    session_id = Ecto.UUID.generate()
-    agent_id = Ecto.UUID.generate()
-    now = DateTime.utc_now() |> DateTime.to_iso8601()
-
     task_prompt = "#{task.title}\n\n#{task.description || ""}" |> String.trim()
 
-    case Agents.create_agent(%{
-           uuid: agent_id,
-           description: task_prompt,
-           project_id: project.id,
-           git_worktree_path: project.path
-         }) do
-      {:ok, agent} ->
-        case Sessions.create_session_with_model(%{
-               uuid: session_id,
-               agent_id: agent.id,
-               name: task.title,
-               description: task_prompt,
-               started_at: now,
-               model_provider: "claude",
-               model_name: "sonnet"
-             }) do
-          {:ok, session} ->
-            # Link task to session
-            Repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session.id}],
-              on_conflict: :nothing
-            )
+    opts = [
+      description: task.title,
+      instructions: task_prompt,
+      project_id: project.id,
+      project_path: project.path,
+      model: "sonnet"
+    ]
 
-            init_prompt = """
-            INITIALIZATION - Eye in the Sky Session:
+    case AgentManager.create_agent(opts) do
+      {:ok, %{session: session}} ->
+        Tasks.link_session_to_task(task.id, session.id)
 
-            Session ID: #{session_id}
-            Agent ID: #{agent_id}
-            Project: #{project.name}
-            Task ID: #{task_id}
+        socket =
+          socket
+          |> assign(:show_task_detail_drawer, false)
+          |> put_flash(:info, "Agent spawned for task: #{String.slice(task.title, 0..40)}")
 
-            CRITICAL FIRST STEP: Call i-start-session MCP tool to register with Eye in the Sky:
+        {:noreply, socket}
 
-            mcp__eye-in-the-sky__i-start-session({
-              "session_id": "#{session_id}",
-              "description": "#{task_prompt}",
-              "agent_description": "Agent for task #{String.slice(task_id, 0..7)}",
-              "project_name": "#{project.name}",
-              "worktree_path": "#{project.path}"
-            })
-
-            WORKFLOW:
-            1. Use i-start-session to register (done above)
-            2. Log significant actions with i-note-add
-            3. Track tasks with i-todo-create and i-todo-list
-            4. Use i-end-session when done
-
-            YOUR TASK: #{task_prompt}
-
-            Ready to start working.
-            """
-
-            Task.Supervisor.start_child(EyeInTheSkyWeb.TaskSupervisor, fn ->
-              SessionManager.start_session(session_id, init_prompt,
-                model: "sonnet",
-                project_path: project.path
-              )
-            end)
-
-            socket =
-              socket
-              |> assign(:show_task_detail_drawer, false)
-              |> put_flash(:info, "Agent spawned for task: #{String.slice(task.title, 0..40)}")
-
-            {:noreply, socket}
-
-          {:error, changeset} ->
-            {:noreply,
-             put_flash(socket, :error, "Failed to create session: #{inspect(changeset.errors)}")}
-        end
-
-      {:error, changeset} ->
-        {:noreply,
-         put_flash(socket, :error, "Failed to create agent: #{inspect(changeset.errors)}")}
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to spawn agent: #{inspect(reason)}")}
     end
   end
 
@@ -285,8 +206,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     # Extract form data
     title = params["title"]
     description = params["description"]
-    state_id = String.to_integer(params["state_id"])
-    priority = String.to_integer(params["priority"] || "1")
+    state_id = parse_int(params["state_id"])
+    priority = parse_int(params["priority"], 1)
     tags_string = params["tags"] || ""
 
     # Parse tags
@@ -312,20 +233,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
            updated_at: now
          }) do
       {:ok, task} ->
-        # Add tags if provided
-        if length(tag_names) > 0 do
-          Enum.each(tag_names, fn tag_name ->
-            case Tasks.get_or_create_tag(tag_name) do
-              {:ok, tag} ->
-                Repo.insert_all("task_tags", [%{task_id: task.id, tag_id: tag.id}],
-                  on_conflict: :nothing
-                )
-
-              _ ->
-                :ok
-            end
-          end)
-        end
+        Tasks.replace_task_tags(task.id, tag_names)
 
         socket =
           socket
@@ -343,12 +251,23 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_info(:tasks_changed, socket) do
-    {:noreply, load_tasks(socket)}
+    socket = load_tasks(socket)
+
+    socket =
+      if socket.assigns.selected_task && socket.assigns.show_task_detail_drawer do
+        task = Tasks.get_task!(socket.assigns.selected_task.id)
+        notes = Notes.list_notes_for_task(task.id)
+        socket |> assign(:selected_task, task) |> assign(:task_notes, notes)
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   @impl true
   def handle_event("move_task", %{"task_id" => task_uuid, "state_id" => state_id_str}, socket) do
-    state_id = String.to_integer(state_id_str)
+    state_id = parse_int(state_id_str)
     task = Tasks.get_task_by_uuid!(task_uuid)
 
     case Tasks.update_task(task, %{
@@ -356,7 +275,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
            updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
          }) do
       {:ok, _} ->
-        Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "tasks", :tasks_changed)
         {:noreply, load_tasks(socket)}
 
       {:error, _} ->
@@ -366,7 +284,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("show_quick_add", %{"state_id" => state_id}, socket) do
-    {:noreply, assign(socket, :quick_add_column, String.to_integer(state_id))}
+    {:noreply, assign(socket, :quick_add_column, parse_int(state_id))}
   end
 
   @impl true
@@ -381,7 +299,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     if title == "" do
       {:noreply, assign(socket, :quick_add_column, nil)}
     else
-      state_id = String.to_integer(state_id_str)
+      state_id = parse_int(state_id_str)
       task_uuid = Ecto.UUID.generate()
       now = DateTime.utc_now() |> DateTime.to_iso8601()
 
@@ -405,6 +323,13 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
         {:error, _} ->
           {:noreply, put_flash(socket, :error, "Failed to create task")}
       end
+    end
+  end
+
+  defp parse_int(s, default \\ 0) do
+    case Integer.parse(s || "") do
+      {n, ""} -> n
+      _ -> default
     end
   end
 
@@ -454,12 +379,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   defp state_dot_color(color) when is_binary(color), do: color
   defp state_dot_color(_), do: "#6B7280"
 
-  defp priority_border_class(nil), do: "border-l-transparent"
-  defp priority_border_class(0), do: "border-l-transparent"
-  defp priority_border_class(priority) when priority >= 3, do: "border-l-error"
-  defp priority_border_class(2), do: "border-l-warning"
-  defp priority_border_class(1), do: "border-l-info"
-  defp priority_border_class(_), do: "border-l-transparent"
 
   defp due_date_class(nil), do: "text-base-content/30"
 
@@ -481,27 +400,14 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   defp due_date_class(_), do: "text-base-content/30"
 
-  defp first_line(nil), do: nil
-  defp first_line(""), do: nil
-
-  defp first_line(text) do
-    text
-    |> String.split(~r/[\r\n]/, parts: 2)
-    |> List.first()
-    |> String.trim()
-    |> case do
-      "" -> nil
-      line -> line
-    end
-  end
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="px-4 sm:px-6 py-6 h-[calc(100vh-7rem)] md:h-[calc(100vh-4rem)] flex flex-col">
+    <div class="px-4 sm:px-6 py-6 h-[calc(100dvh-7rem)] md:h-[calc(100dvh-4rem)] flex flex-col">
       <%!-- Search + New Task --%>
-      <div class="mb-4 flex items-center gap-3">
-        <form phx-change="search" class="flex-1 max-w-sm">
+      <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+        <form phx-change="search" class="w-full sm:flex-1 sm:max-w-sm">
           <div class="relative">
             <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
               <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
@@ -520,7 +426,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
         <button
           phx-click="toggle_new_task_drawer"
-          class="btn btn-sm btn-primary gap-1.5 min-h-0 h-7 text-xs"
+          class="btn btn-sm btn-primary gap-1.5 h-9 sm:h-7 min-h-0 text-xs w-full sm:w-auto"
         >
           <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Task
         </button>
@@ -528,10 +434,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
       <%!-- Kanban columns --%>
       <div class="flex-1 min-h-0 overflow-x-auto">
-        <div class="inline-flex gap-3 h-full min-w-full pb-2">
+        <div class="inline-flex gap-3 h-full min-w-full pb-2 snap-x snap-mandatory">
           <%= for state <- @workflow_states do %>
             <% column_tasks = Map.get(@tasks_by_state, state.id, []) %>
-            <div class="flex-shrink-0 w-72 flex flex-col h-full">
+            <div class="flex-shrink-0 w-[84vw] max-w-80 md:w-72 flex flex-col h-full snap-start">
               <%!-- Column header with colored accent --%>
               <div class="mb-2">
                 <div
@@ -560,7 +466,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                 data-state-id={state.id}
               >
                 <%= if column_tasks == [] do %>
-                  <div data-empty-placeholder class="flex flex-col items-center justify-center h-24 border border-dashed border-base-content/8 rounded-lg pointer-events-none">
+                  <div
+                    data-empty-placeholder
+                    class="flex flex-col items-center justify-center h-24 border border-dashed border-base-content/8 rounded-lg pointer-events-none"
+                  >
                     <.icon name="hero-inbox" class="w-5 h-5 text-base-content/15 mb-1" />
                     <span class="text-[11px] text-base-content/20">No tasks</span>
                   </div>
@@ -600,8 +509,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                       type="button"
                       phx-click="delete_task"
                       phx-value-task_id={task.uuid}
-                      data-confirm="Delete this task?"
-                      class="absolute top-1.5 right-1.5 opacity-0 group-hover/card:opacity-100 w-5 h-5 flex items-center justify-center rounded text-base-content/25 hover:text-error hover:bg-error/10 transition-all"
+                      class="absolute top-1.5 right-1.5 opacity-0 group-hover/card:opacity-100 min-w-[44px] min-h-[44px] -mr-1.5 -mt-1.5 flex items-center justify-center rounded text-base-content/25 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
+                      aria-label={"Delete task #{task.title}"}
                     >
                       <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
                     </button>

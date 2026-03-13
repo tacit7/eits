@@ -10,7 +10,7 @@ EITS_PG_HOST="${EITS_PG_HOST:-localhost}"
 export PGPASSWORD="${EITS_PG_PASSWORD:-postgres}"
 _pgq() { psql -U "$EITS_PG_USER" -h "$EITS_PG_HOST" -d "$EITS_PG_DB" -t -A --no-psqlrc -c "$1" 2>/dev/null | grep -v '^Time:'; }
 
-EITS_BASE="${EITS_API_URL:-http://localhost:5001/api/v1}"
+EITS_BASE="${EITS_API_URL:-https://localhost:5001/api/v1}"
 LOG_FILE="${HOME}/.claude/hooks/eits.log"
 _log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [startup] $*" >> "$LOG_FILE" 2>/dev/null; }
 
@@ -31,7 +31,8 @@ PROJECT_NAME_SQL="${PROJECT_NAME//\'/\'\'}"
 _log "project_dir=$PROJECT_DIR env_file=${CLAUDE_ENV_FILE:-unset}"
 
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
-  echo "EITS_API_URL=http://localhost:5001/api/v1" >> "$CLAUDE_ENV_FILE"
+  echo "EITS_API_URL=https://localhost:5001/api/v1" >> "$CLAUDE_ENV_FILE"
+  [ -n "${EITS_API_KEY:-}" ] && echo "EITS_API_KEY=${EITS_API_KEY}" >> "$CLAUDE_ENV_FILE"
   echo "EITS_SESSION_UUID=$SESSION_ID" >> "$CLAUDE_ENV_FILE"
   _log "wrote EITS_SESSION_UUID=$SESSION_ID"
 
@@ -95,10 +96,20 @@ CONTEXT="# Eye in the Sky Integration Active
 
 **IMPORTANT**: Call \`/eits-init\` to name and describe your session.
 
+## Required Workflow (enforced by hooks)
+
+**You MUST have a task in In Progress before editing any files.**
+
 1. **Initialize Session**: \`/eits-init\` - Provide name and description for this work
-2. **Track Tasks**: Use i-todo tools to create and manage tasks
-3. **Log Commits**: Commits are auto-tracked via git hooks
-4. **Save Context**: Use i-save-session-context for important findings
+2. **Create a task**: \`i-todo create --title \"Task name\"\`
+3. **Start the task** (moves to In Progress): \`i-todo start --task_id <id>\`
+4. **Link to session**: \`i-todo add-session --task_id <id> --session_id <session_uuid>\`
+5. **Do the work**
+6. **When done, move task to In Review** (NOT Done): \`i-todo status --task_id <id> --state_id 4\`
+   - State 4 = In Review. Do not mark as Done — leave that for human review.
+
+**Log Commits**: Commits are auto-tracked via git hooks
+**Save Context**: Use i-save-session-context for important findings
 
 **Project**: $PROJECT_NAME ($PROJECT_TYPE)
 **Path**: $PROJECT_DIR"

@@ -62,8 +62,7 @@ defmodule EyeInTheSkyWebWeb.PromptLive.New do
     <div class="px-4 sm:px-6 lg:px-8">
       <div class="mb-6">
         <.link navigate={~p"/prompts"} class="btn btn-ghost btn-sm gap-2">
-          <.icon name="hero-arrow-left" class="h-4 w-4" />
-          Back to Prompts
+          <.icon name="hero-arrow-left" class="h-4 w-4" /> Back to Prompts
         </.link>
       </div>
 
@@ -120,7 +119,9 @@ defmodule EyeInTheSkyWebWeb.PromptLive.New do
 
           <div class="form-control">
             <label class="label">
-              <span class="label-text font-semibold">Prompt Text <span class="text-error">*</span></span>
+              <span class="label-text font-semibold">
+                Prompt Text <span class="text-error">*</span>
+              </span>
             </label>
             <.input
               field={@form[:prompt_text]}
@@ -137,8 +138,7 @@ defmodule EyeInTheSkyWebWeb.PromptLive.New do
               Cancel
             </.link>
             <button type="submit" class="btn btn-primary">
-              <.icon name="hero-check" class="h-4 w-4" />
-              Create Prompt
+              <.icon name="hero-check" class="h-4 w-4" /> Create Prompt
             </button>
           </div>
         </div>

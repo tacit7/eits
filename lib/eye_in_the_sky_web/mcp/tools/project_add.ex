@@ -11,7 +11,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.ProjectAdd do
     field :path, :string, description: "Local filesystem path"
     field :remote_url, :string, description: "Git remote URL (e.g., git@github.com:org/repo.git)"
     field :git_remote, :string, description: "Git remote name (e.g., origin, upstream)"
-    field :repo_url, :string, description: "Web URL for browsing the repository (e.g., https://github.com/org/repo)"
+
+    field :repo_url, :string,
+      description: "Web URL for browsing the repository (e.g., https://github.com/org/repo)"
+
     field :branch, :string, description: "Git branch name"
     field :active, :boolean, description: "Active status (default: true)"
   end

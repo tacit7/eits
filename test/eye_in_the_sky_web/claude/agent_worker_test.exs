@@ -123,7 +123,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
         session_uuid: original_uuid
       })
 
-
     prompt = "Say hello"
     assert :ok == EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, prompt)
 
@@ -158,7 +157,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
         session_name: "Outbound-only"
       })
 
-
     {:ok, _user_message} =
       Messages.send_message(%{
         session_id: session.id,
@@ -192,7 +190,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
         provider: "codex"
       })
 
-
     {:ok, _reply} =
       Messages.record_incoming_reply(session.id, "codex", "prior codex reply")
 
@@ -208,7 +205,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
         description: "No Path Session",
         session_name: "No Path Session"
       })
-
 
     assert :ok == EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, "hello")
 
@@ -230,16 +226,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
         session_name: "PubSub Working"
       })
 
-
     # Subscribe to the agent:working topic
     Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
 
     session_id = session.id
 
     assert :ok ==
-             EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, "hello",
-               model: "haiku"
-             )
+             EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, "hello", model: "haiku")
 
     # Should receive :agent_working broadcast when SDK starts
     assert_receive {:agent_working, session_uuid, ^session_id},
@@ -256,14 +249,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
         session_name: "PubSub Stopped"
       })
 
-
     # Subscribe to the agent:working topic
     Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
 
     assert :ok ==
-             EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, "hello",
-               model: "haiku"
-             )
+             EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, "hello", model: "haiku")
 
     mock_port = wait_for_mock_port(session.id)
     assert mock_port != nil
@@ -303,14 +293,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
         session_name: "PubSub New Message"
       })
 
-
     # Subscribe to session-specific messages topic
     Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
 
     assert :ok ==
-             EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, "hello",
-               model: "haiku"
-             )
+             EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, "hello", model: "haiku")
 
     mock_port = wait_for_mock_port(session.id)
     assert mock_port != nil
@@ -343,13 +330,10 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
         session_name: "PubSub Error Stop"
       })
 
-
     Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
 
     assert :ok ==
-             EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, "hello",
-               model: "haiku"
-             )
+             EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, "hello", model: "haiku")
 
     mock_port = wait_for_mock_port(session.id)
     assert mock_port != nil

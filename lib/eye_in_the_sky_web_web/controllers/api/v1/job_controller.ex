@@ -66,8 +66,11 @@ defmodule EyeInTheSkyWebWeb.Api.V1.JobController do
           |> maybe_encode_config()
 
         case ScheduledJobs.update_job(job, attrs) do
-          {:ok, updated} -> json(conn, serialize(updated))
-          {:error, cs} -> conn |> put_status(:unprocessable_entity) |> json(%{error: translate_errors(cs)})
+          {:ok, updated} ->
+            json(conn, serialize(updated))
+
+          {:error, cs} ->
+            conn |> put_status(:unprocessable_entity) |> json(%{error: translate_errors(cs)})
         end
 
       {:error, :not_found} ->
@@ -80,8 +83,11 @@ defmodule EyeInTheSkyWebWeb.Api.V1.JobController do
     case ScheduledJobs.get_job(parse_int(id)) do
       {:ok, job} ->
         case ScheduledJobs.delete_job(job) do
-          {:ok, _} -> json(conn, %{success: true})
-          {:error, :system_job} -> conn |> put_status(:forbidden) |> json(%{error: "Cannot delete system jobs"})
+          {:ok, _} ->
+            json(conn, %{success: true})
+
+          {:error, :system_job} ->
+            conn |> put_status(:forbidden) |> json(%{error: "Cannot delete system jobs"})
         end
 
       {:error, :not_found} ->
@@ -92,9 +98,14 @@ defmodule EyeInTheSkyWebWeb.Api.V1.JobController do
   @doc "POST /api/v1/jobs/:id/run - Trigger a job immediately."
   def run(conn, %{"id" => id}) do
     case ScheduledJobs.run_now(parse_int(id)) do
-      {:ok, _} -> json(conn, %{success: true, message: "Job enqueued"})
-      {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "Job not found"})
-      {:error, reason} -> conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+      {:ok, _} ->
+        json(conn, %{success: true, message: "Job enqueued"})
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "Job not found"})
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
     end
   end
 
@@ -129,6 +140,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.JobController do
 
   defp parse_int(nil), do: nil
   defp parse_int(v) when is_integer(v), do: v
+
   defp parse_int(v) when is_binary(v) do
     case Integer.parse(v) do
       {n, _} -> n

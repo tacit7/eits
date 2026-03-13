@@ -32,14 +32,15 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
       |> Enum.take(50)
       |> Enum.map(fn a -> %{id: a.id, description: a.description} end)
 
-    {:ok, assign(socket,
-      selected_model: "sonnet",
-      selected_provider: "claude",
-      selected_prompt_id: nil,
-      selected_agent_id: nil,
-      prefill_text: "",
-      agent_templates: agent_templates
-    )}
+    {:ok,
+     assign(socket,
+       selected_model: "sonnet",
+       selected_provider: "claude",
+       selected_prompt_id: nil,
+       selected_agent_id: nil,
+       prefill_text: "",
+       agent_templates: agent_templates
+     )}
   end
 
   @impl true
@@ -61,7 +62,9 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
     prompt = Enum.find(prompts, fn p -> to_string(p.id) == prompt_id end)
 
     prefill = if prompt, do: prompt.prompt_text || "", else: ""
-    {:noreply, assign(socket, selected_prompt_id: prompt_id, selected_agent_id: nil, prefill_text: prefill)}
+
+    {:noreply,
+     assign(socket, selected_prompt_id: prompt_id, selected_agent_id: nil, prefill_text: prefill)}
   end
 
   def handle_event("agent_template_selected", %{"agent_id" => ""}, socket) do
@@ -73,7 +76,9 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
     agent = Enum.find(agents, fn a -> to_string(a.id) == agent_id end)
 
     prefill = if agent, do: agent.description || "", else: ""
-    {:noreply, assign(socket, selected_agent_id: agent_id, selected_prompt_id: nil, prefill_text: prefill)}
+
+    {:noreply,
+     assign(socket, selected_agent_id: agent_id, selected_prompt_id: nil, prefill_text: prefill)}
   end
 
   @impl true
@@ -107,7 +112,9 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
             <%!-- Copy from Agent --%>
             <%= if length(assigns[:agent_templates] || []) > 0 do %>
               <div>
-                <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Copy from Agent</label>
+                <label class="text-sm font-medium text-base-content/70 mb-1.5 block">
+                  Copy from Agent
+                </label>
                 <select
                   name="agent_id"
                   class="select select-bordered w-full"
@@ -116,7 +123,10 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
                 >
                   <option value="">-- None --</option>
                   <%= for agent <- @agent_templates do %>
-                    <option value={agent.id} selected={to_string(@selected_agent_id) == to_string(agent.id)}>
+                    <option
+                      value={agent.id}
+                      selected={to_string(@selected_agent_id) == to_string(agent.id)}
+                    >
                       {agent.description}
                     </option>
                   <% end %>
@@ -127,7 +137,9 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
             <%!-- Agent Prompt (when prompts exist) --%>
             <%= if length(assigns[:prompts] || []) > 0 do %>
               <div>
-                <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Agent Prompt</label>
+                <label class="text-sm font-medium text-base-content/70 mb-1.5 block">
+                  Agent Prompt
+                </label>
                 <select
                   name="prompt_id"
                   class="select select-bordered w-full"
@@ -136,7 +148,10 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
                 >
                   <option value="">-- None --</option>
                   <%= for prompt <- @prompts do %>
-                    <option value={prompt.id} selected={to_string(@selected_prompt_id) == to_string(prompt.id)}>
+                    <option
+                      value={prompt.id}
+                      selected={to_string(@selected_prompt_id) == to_string(prompt.id)}
+                    >
                       {prompt.name}
                     </option>
                   <% end %>

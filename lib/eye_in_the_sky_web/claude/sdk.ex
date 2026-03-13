@@ -338,6 +338,10 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
             stop_and_unregister(sdk_ref)
             :ok
 
+          :tool_block_stop ->
+            send(caller_pid, {:tool_block_stop, sdk_ref})
+            handle_messages(sdk_ref, caller_pid, session_id)
+
           :skip ->
             handle_messages(sdk_ref, caller_pid, session_id)
         end

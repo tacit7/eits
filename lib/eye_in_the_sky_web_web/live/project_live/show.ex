@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Sessions
   alias EyeInTheSkyWeb.Commits
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1]
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -30,9 +31,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
 
         # Load active sessions for this project (max 5)
         active_sessions =
-          Sessions.list_sessions_with_agent()
-          |> Enum.filter(&(is_nil(&1.ended_at) and &1.project_id == project_id))
-          |> Enum.sort_by(& &1.started_at, :desc)
+          Sessions.list_project_sessions_with_agent(project_id)
+          |> Enum.filter(&is_nil(&1.ended_at))
           |> Enum.take(5)
 
         # Load recent notes for this project (max 5)
@@ -45,21 +45,19 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
         # Load agents for this project
         project_agents = Agents.list_agents_by_project(project_id)
 
-        # Load all sessions for count
+        # Load all sessions for count (include archived for accurate total)
         all_sessions =
-          Sessions.list_sessions_with_agent(project_id: project_id)
+          Sessions.list_project_sessions_with_agent(project_id, include_archived: true)
 
-        # Load recent commits via project sessions
-        recent_commits =
-          all_sessions
-          |> Enum.flat_map(&Commits.list_commits_for_session(&1.id, limit: 5))
-          |> Enum.sort_by(& &1.created_at, :desc)
-          |> Enum.uniq_by(& &1.commit_hash)
-          |> Enum.take(10)
+        # Load recent commits via single batch query
+        session_ids = Enum.map(all_sessions, & &1.id)
+        recent_commits = Commits.list_commits_for_sessions(session_ids, limit: 10)
 
         # Task stats
         open_tasks = Enum.count(tasks, &is_nil(&1.completed_at))
         done_tasks = Enum.count(tasks, & &1.completed_at)
+
+        claude_files = scan_claude_files(project.path)
 
         socket
         |> assign(:page_title, "Project: #{project.name}")
@@ -74,6 +72,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
         |> assign(:recent_commits, recent_commits)
         |> assign(:open_tasks, open_tasks)
         |> assign(:done_tasks, done_tasks)
+        |> assign(:claude_files, claude_files)
       else
         # Invalid project ID - show error
         socket
@@ -124,53 +123,42 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
             </div>
           </div>
         </div>
-
-        <!-- Responsive Grid Layout -->
+        
+    <!-- Responsive Grid Layout -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <!-- Quick Access -->
+          <!-- Claude Files -->
           <div class="card bg-base-100 shadow-sm">
             <div class="card-body p-4">
-              <h2 class="card-title text-base mb-2">Quick Access</h2>
+              <h2 class="card-title text-base mb-2">Claude Files</h2>
               <%= if @project.path do %>
                 <div class="mb-2 pb-2 border-b border-base-300">
                   <p class="text-xs text-base-content/60 mb-1">Project Path</p>
                   <p class="text-xs font-mono text-base-content/90 break-all">{@project.path}</p>
                 </div>
               <% end %>
-              <div class="space-y-1">
-                <a
-                  href={~p"/projects/#{@project.id}/files?path=CLAUDE.md"}
-                  class="flex items-center gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors"
-                >
-                  <svg
-                    class="w-4 h-4 text-primary flex-shrink-0"
-                    fill="currentColor"
-                    viewBox="0 0 16 16"
-                  >
-                    <path d="M4 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H4zm0 1h8a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z" />
-                  </svg>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-base-content">CLAUDE.md</p>
-                    <p class="text-xs text-base-content/60">Project instructions</p>
-                  </div>
-                </a>
-                <a
-                  href={~p"/projects/#{@project.id}/files?path=.claude/hooks"}
-                  class="flex items-center gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors"
-                >
-                  <svg
-                    class="w-4 h-4 text-secondary flex-shrink-0"
-                    fill="currentColor"
-                    viewBox="0 0 16 16"
-                  >
-                    <path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z" />
-                  </svg>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-base-content">.claude/hooks/</p>
-                    <p class="text-xs text-base-content/60">Hooks configuration</p>
-                  </div>
-                </a>
-              </div>
+              <%= if length(@claude_files) > 0 do %>
+                <div class="space-y-1">
+                  <%= for entry <- @claude_files do %>
+                    <a
+                      href={~p"/projects/#{@project.id}/files?path=#{entry.rel_path}"}
+                      class="flex items-center gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors"
+                    >
+                      <.icon
+                        name={if entry.type == :dir, do: "hero-folder", else: "hero-document-text"}
+                        class={"w-4 h-4 flex-shrink-0 #{if entry.type == :dir, do: "text-secondary", else: "text-primary"}"}
+                      />
+                      <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-base-content">
+                          {entry.rel_path}{if entry.type == :dir, do: "/"}
+                        </p>
+                        <p class="text-xs text-base-content/60">{entry.detail}</p>
+                      </div>
+                    </a>
+                  <% end %>
+                </div>
+              <% else %>
+                <p class="text-sm text-base-content/50">No Claude files found</p>
+              <% end %>
             </div>
           </div>
           
@@ -220,13 +208,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
                     <div class="flex items-center gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors">
                       <div class="flex-shrink-0">
                         <%= if task.completed_at do %>
-                          <svg class="w-4 h-4 text-success" fill="currentColor" viewBox="0 0 20 20">
-                            <path
-                              fill-rule="evenodd"
-                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                              clip-rule="evenodd"
-                            />
-                          </svg>
+                          <.icon name="hero-check-circle-solid" class="w-4 h-4 text-success" />
                         <% else %>
                           <div class="w-4 h-4 rounded-full border-2 border-base-content/30"></div>
                         <% end %>
@@ -257,7 +239,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
                     <div class="p-2 rounded-lg bg-base-200/30 border border-base-300">
                       <p class="text-xs text-base-content/60 mb-1">
                         <%= if note.inserted_at do %>
-                          {format_relative_time(note.inserted_at)}
+                          {relative_time(note.inserted_at)}
                         <% end %>
                       </p>
                       <p class="text-sm text-base-content line-clamp-3">{note.body}</p>
@@ -275,7 +257,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
                 <div class="space-y-1">
                   <%= for commit <- @recent_commits do %>
                     <div class="flex items-start gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors">
-                      <.icon name="hero-code-bracket" class="w-3.5 h-3.5 text-base-content/30 flex-shrink-0 mt-0.5" />
+                      <.icon
+                        name="hero-code-bracket"
+                        class="w-3.5 h-3.5 text-base-content/30 flex-shrink-0 mt-0.5"
+                      />
                       <div class="flex-1 min-w-0">
                         <p class="text-xs font-mono text-base-content/40 mb-0.5">
                           {String.slice(commit.commit_hash || "", 0, 7)}
@@ -296,28 +281,78 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
     """
   end
 
-  defp format_relative_time(datetime) when is_nil(datetime), do: "—"
+  defp scan_claude_files(nil), do: []
 
-  defp format_relative_time(%DateTime{} = datetime) do
-    now = DateTime.utc_now()
-    seconds = DateTime.diff(now, datetime)
+  defp scan_claude_files(project_path) do
+    entries = []
 
-    cond do
-      seconds < 60 -> "just now"
-      seconds < 3600 -> "#{div(seconds, 60)}m ago"
-      seconds < 86400 -> "#{div(seconds, 3600)}h ago"
-      seconds < 604_800 -> "#{div(seconds, 86400)}d ago"
-      true -> "#{div(seconds, 604_800)}w ago"
+    # CLAUDE.md at project root
+    claude_md = Path.join(project_path, "CLAUDE.md")
+
+    entries =
+      if File.exists?(claude_md) do
+        size = file_size_label(claude_md)
+        entries ++ [%{rel_path: "CLAUDE.md", type: :file, detail: "Project instructions · #{size}"}]
+      else
+        entries
+      end
+
+    # .claude/ directory contents
+    claude_dir = Path.join(project_path, ".claude")
+
+    entries =
+      if File.dir?(claude_dir) do
+        children =
+          claude_dir
+          |> File.ls!()
+          |> Enum.reject(&String.starts_with?(&1, "."))
+          |> Enum.sort()
+          |> Enum.map(fn name ->
+            full = Path.join(claude_dir, name)
+            rel = ".claude/#{name}"
+
+            if File.dir?(full) do
+              count = count_files_recursive(full)
+              %{rel_path: rel, type: :dir, detail: "#{count} #{if count == 1, do: "item", else: "items"}"}
+            else
+              size = file_size_label(full)
+              %{rel_path: rel, type: :file, detail: size}
+            end
+          end)
+
+        entries ++ children
+      else
+        entries
+      end
+
+    entries
+  end
+
+  defp file_size_label(path) do
+    case File.stat(path) do
+      {:ok, %{size: s}} when s >= 1024 -> "#{Float.round(s / 1024, 1)} KB"
+      {:ok, %{size: s}} -> "#{s} B"
+      _ -> ""
     end
   end
 
-  defp format_relative_time(%NaiveDateTime{} = naive_datetime) do
-    # Convert NaiveDateTime to DateTime assuming UTC
-    case DateTime.from_naive(naive_datetime, "Etc/UTC") do
-      {:ok, datetime} -> format_relative_time(datetime)
-      :error -> "—"
+  defp count_files_recursive(dir) do
+    case File.ls(dir) do
+      {:ok, entries} ->
+        entries
+        |> Enum.reject(&String.starts_with?(&1, "."))
+        |> Enum.reduce(0, fn name, acc ->
+          full = Path.join(dir, name)
+
+          if File.dir?(full) do
+            acc + count_files_recursive(full)
+          else
+            acc + 1
+          end
+        end)
+
+      _ ->
+        0
     end
   end
-
-  defp format_relative_time(_), do: "—"
 end

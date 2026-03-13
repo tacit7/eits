@@ -70,7 +70,10 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
     channels =
       if params["project_id"] do
         project_id = parse_int(params["project_id"])
-        if project_id, do: Channels.list_channels_for_project(project_id), else: Channels.list_channels()
+
+        if project_id,
+          do: Channels.list_channels_for_project(project_id),
+          else: Channels.list_channels()
       else
         Channels.list_channels()
       end

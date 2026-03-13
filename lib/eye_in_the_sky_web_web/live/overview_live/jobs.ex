@@ -412,22 +412,24 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
   def render(assigns) do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-6">
-      <div class="flex items-center justify-between mb-4">
+      <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 class="text-xl font-semibold">Scheduled Jobs</h1>
-        <div class="flex items-center gap-2">
-          <button class="btn btn-outline btn-sm" phx-click="toggle_claude_drawer">
+        <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <button class="btn btn-outline btn-sm w-full sm:w-auto" phx-click="toggle_claude_drawer">
             <svg class="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-7v4h4l-5 7z" />
             </svg>
             Create with Claude
           </button>
-          <button class="btn btn-primary btn-sm" phx-click="new_job">+ New Job</button>
+          <button class="btn btn-primary btn-sm w-full sm:w-auto" phx-click="new_job">
+            + New Job
+          </button>
         </div>
       </div>
 
       <%!-- Job Form Drawer --%>
       <div class={[
-        "fixed inset-y-0 right-0 z-50 w-full max-w-md bg-base-100 shadow-xl transform transition-transform duration-200 ease-in-out overflow-y-auto",
+        "fixed inset-y-0 right-0 safe-inset-y z-50 w-full max-w-md bg-base-100 shadow-xl transform transition-transform duration-200 ease-in-out overflow-y-auto",
         if(@show_form, do: "translate-x-0", else: "translate-x-full")
       ]}>
         <div class="p-6">
@@ -436,6 +438,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
               {if @editing_job, do: "Edit Job", else: "New Job"}
             </h2>
             <button class="btn btn-ghost btn-sm btn-square" phx-click="cancel_form">
+              <span class="sr-only">Close job form</span>
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   stroke-linecap="round"
@@ -468,7 +471,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
               />
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div class="form-control">
                 <label class="label"><span class="label-text">Job Type</span></label>
                 <select name="job[job_type]" class="select select-bordered w-full">
@@ -547,7 +550,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
                   rows="3"
                 ><%= cfg(@form_config, "instructions") %></textarea>
               </div>
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="form-control">
                   <label class="label"><span class="label-text">Model</span></label>
                   <select name="job[config_model]" class="select select-bordered w-full">
@@ -616,7 +619,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
               </div>
             <% end %>
 
-            <div class="flex justify-end gap-2 pt-4">
+            <div class="sticky bottom-0 bg-base-100 pt-4 pb-1 flex justify-end gap-2">
               <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_form">
                 Cancel
               </button>
@@ -631,13 +634,14 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
 
       <%!-- Claude Create Drawer --%>
       <div class={[
-        "fixed inset-y-0 right-0 z-50 w-full max-w-sm bg-base-100 shadow-xl transform transition-transform duration-200 ease-in-out overflow-y-auto",
+        "fixed inset-y-0 right-0 safe-inset-y z-50 w-full max-w-sm bg-base-100 shadow-xl transform transition-transform duration-200 ease-in-out overflow-y-auto",
         if(@show_claude_drawer, do: "translate-x-0", else: "translate-x-full")
       ]}>
         <div class="p-6">
           <div class="flex items-center justify-between mb-6">
             <h2 class="text-lg font-semibold">Create Job with Claude</h2>
             <button class="btn btn-ghost btn-sm btn-square" phx-click="toggle_claude_drawer">
+              <span class="sr-only">Close Claude drawer</span>
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   stroke-linecap="round"
@@ -708,7 +712,75 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
 
       <%!-- Jobs Table --%>
       <%= if length(@jobs) > 0 do %>
-        <div class="overflow-x-auto">
+        <div class="md:hidden space-y-3">
+          <%= for job <- @jobs do %>
+            <article class="rounded-xl border border-base-content/10 bg-base-100 p-3 shadow-sm">
+              <button
+                class="w-full text-left"
+                phx-click="expand_job"
+                phx-value-id={job.id}
+              >
+                <div class="flex items-start justify-between gap-2">
+                  <div class="min-w-0">
+                    <h3 class="font-medium text-sm truncate">{job.name}</h3>
+                    <p class="text-[11px] font-mono text-base-content/50 mt-1 truncate">
+                      {format_schedule(job)}
+                    </p>
+                  </div>
+                  <span class={"badge badge-sm #{type_badge_class(job.job_type)}"}>
+                    {type_label(job.job_type)}
+                  </span>
+                </div>
+              </button>
+
+              <div class="mt-3 flex items-center justify-between">
+                <span class="text-xs text-base-content/60">Enabled</span>
+                <span class={[
+                  "badge badge-xs",
+                  if(job.enabled == 1, do: "badge-success", else: "badge-ghost")
+                ]}>
+                  {if job.enabled == 1, do: "Yes", else: "No"}
+                </span>
+              </div>
+
+              <div class="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
+                <span class="text-base-content/50">Last Run</span>
+                <span class="text-right">{format_time(job.last_run_at)}</span>
+                <span class="text-base-content/50">Next Run</span>
+                <span class="text-right">{format_time(job.next_run_at)}</span>
+                <span class="text-base-content/50">Runs</span>
+                <span class="text-right">{job.run_count || 0}</span>
+              </div>
+
+              <%= if @expanded_job_id == job.id do %>
+                <div class="mt-3 rounded-lg bg-base-200/50 p-2">
+                  <p class="text-xs font-medium mb-2">Recent Runs</p>
+                  <%= if length(@runs) > 0 do %>
+                    <div class="space-y-1.5">
+                      <%= for run <- @runs do %>
+                        <div class="rounded-md bg-base-100/70 p-2 text-xs">
+                          <div class="flex items-center justify-between gap-2">
+                            <span class={"badge badge-xs #{status_badge_class(run.status)}"}>
+                              {run.status}
+                            </span>
+                            <span class="text-base-content/60 truncate">
+                              {format_time(run.started_at)}
+                            </span>
+                          </div>
+                          <p class="mt-1 text-base-content/60 truncate">{run.result || "-"}</p>
+                        </div>
+                      <% end %>
+                    </div>
+                  <% else %>
+                    <p class="text-xs text-base-content/50">No runs yet</p>
+                  <% end %>
+                </div>
+              <% end %>
+            </article>
+          <% end %>
+        </div>
+
+        <div class="hidden md:block -mx-4 sm:mx-0 overflow-x-auto px-4 sm:px-0">
           <table class="table table-sm">
             <thead>
               <tr>
@@ -765,6 +837,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
                         phx-click="run_now"
                         phx-value-id={job.id}
                         title="Run Now"
+                        aria-label="Run job now"
                       >
                         <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
@@ -775,6 +848,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
                         phx-click="edit_job"
                         phx-value-id={job.id}
                         title="Edit"
+                        aria-label="Edit job"
                       >
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path
@@ -792,6 +866,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
                           phx-value-id={job.id}
                           data-confirm="Delete this job?"
                           title="Delete"
+                          aria-label="Delete job"
                         >
                           <svg
                             class="w-3.5 h-3.5"

@@ -28,59 +28,84 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
         source: "hook"
       }
 
-      case Agents.create_agent(agent_attrs) do
-        {:ok, agent} ->
-          # Parse model info
-          {model_provider, model_name} = parse_model(params["model"])
+      # Check if session already exists (resumed session)
+      case Sessions.get_session_by_uuid(session_uuid) do
+        {:ok, existing} ->
+          case Sessions.update_session(existing, %{
+                 status: "working",
+                 last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()
+               }) do
+            {:ok, updated} ->
+              Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, updated})
 
-          # Build Session (sessions table) attrs
-          session_attrs = %{
-            uuid: session_uuid,
-            agent_id: agent.id,
-            name: params["name"] || params["description"],
-            status: "working",
-            started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-            provider: params["provider"] || "claude",
-            model: params["model"],
-            model_provider: model_provider,
-            model_name: model_name,
-            project_id: project_id,
-            git_worktree_path: params["worktree_path"]
-          }
-
-          create_fn =
-            if model_name,
-              do: &Sessions.create_session_with_model/1,
-              else: &Sessions.create_session/1
-
-          case create_fn.(session_attrs) do
-            {:ok, session} ->
-              Phoenix.PubSub.broadcast(
-                EyeInTheSkyWeb.PubSub,
-                "agents",
-                {:agent_updated, session}
-              )
-
-              conn
-              |> put_status(:created)
-              |> json(%{
-                id: session.id,
-                uuid: session.uuid,
-                agent_id: agent.id,
-                agent_uuid: agent.uuid,
-                status: session.status
+              json(conn, %{
+                id: updated.id,
+                uuid: updated.uuid,
+                agent_id: nil,
+                agent_uuid: nil,
+                status: updated.status
               })
 
             {:error, changeset} ->
               conn
               |> put_status(:unprocessable_entity)
-              |> json(%{error: "Failed to create session", details: translate_errors(changeset)})
+              |> json(%{error: "Failed to update session", details: translate_errors(changeset)})
           end
 
-        {:error, changeset} ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> json(%{error: "Failed to create agent", details: translate_errors(changeset)})
+        {:error, :not_found} ->
+          with {:ok, agent} <- find_or_create_agent(agent_attrs) do
+            # Parse model info
+            {model_provider, model_name} = parse_model(params["model"])
+
+            # Build Session (sessions table) attrs
+            session_attrs = %{
+              uuid: session_uuid,
+              agent_id: agent.id,
+              name: params["name"] || params["description"],
+              status: "working",
+              started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+              provider: params["provider"] || "claude",
+              model: params["model"],
+              model_provider: model_provider,
+              model_name: model_name,
+              project_id: project_id,
+              git_worktree_path: params["worktree_path"]
+            }
+
+            create_fn =
+              if model_name,
+                do: &Sessions.create_session_with_model/1,
+                else: &Sessions.create_session/1
+
+            case create_fn.(session_attrs) do
+              {:ok, session} ->
+                Phoenix.PubSub.broadcast(
+                  EyeInTheSkyWeb.PubSub,
+                  "agents",
+                  {:agent_updated, session}
+                )
+
+                conn
+                |> put_status(:created)
+                |> json(%{
+                  id: session.id,
+                  uuid: session.uuid,
+                  agent_id: agent.id,
+                  agent_uuid: agent.uuid,
+                  status: session.status
+                })
+
+              {:error, changeset} ->
+                conn
+                |> put_status(:unprocessable_entity)
+                |> json(%{error: "Failed to create session", details: translate_errors(changeset)})
+            end
+          else
+            {:error, changeset} ->
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{error: "Failed to create agent", details: translate_errors(changeset)})
+          end
       end
     end
   end
@@ -143,6 +168,77 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
   end
 
   @doc """
+  POST /api/v1/sessions/:uuid/tool-events - Record a tool pre/post event.
+
+  Body: type ("pre" | "post"), tool_name, tool_input (optional)
+  Writes a Message record and broadcasts PubSub events for DmLive real-time UI.
+  """
+  def tool_event(conn, %{"uuid" => uuid} = params) do
+    type = params["type"]
+    tool_name = params["tool_name"]
+
+    if is_nil(tool_name) or tool_name == "" do
+      conn |> put_status(:bad_request) |> json(%{error: "tool_name is required"})
+    else
+      case Sessions.get_session_by_uuid(uuid) do
+        {:ok, session} ->
+          Sessions.update_session(session, %{
+            last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()
+          })
+
+          tool_input = params["tool_input"] || %{}
+
+          case type do
+            "pre" ->
+              input_json = Jason.encode!(tool_input)
+              body = "Tool: #{tool_name}\n#{input_json}" |> String.slice(0..3999)
+
+              EyeInTheSkyWeb.Messages.create_message(%{
+                uuid: Ecto.UUID.generate(),
+                session_id: session.id,
+                sender_role: "tool",
+                recipient_role: "user",
+                direction: "inbound",
+                body: body,
+                status: "delivered",
+                provider: "claude",
+                metadata: %{"stream_type" => "tool_use", "tool_name" => tool_name, "input" => tool_input}
+              })
+
+              Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agent:working", {:agent_working, session})
+              Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "session:#{session.id}", {:tool_use, tool_name, tool_input})
+
+            "post" ->
+              input_json = Jason.encode!(tool_input)
+              body = "Tool: #{tool_name} (completed)\n#{input_json}" |> String.slice(0..3999)
+
+              EyeInTheSkyWeb.Messages.create_message(%{
+                uuid: Ecto.UUID.generate(),
+                session_id: session.id,
+                sender_role: "tool",
+                recipient_role: "user",
+                direction: "inbound",
+                body: body,
+                status: "delivered",
+                provider: "claude",
+                metadata: %{"stream_type" => "tool_result", "tool_name" => tool_name}
+              })
+
+              Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "session:#{session.id}", {:tool_result, tool_name, false})
+
+            _ ->
+              nil
+          end
+
+          json(conn, %{success: true})
+
+        {:error, :not_found} ->
+          conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+      end
+    end
+  end
+
+  @doc """
   GET /api/v1/sessions - Search sessions.
   Query params: q, limit (default 20)
   """
@@ -151,7 +247,12 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
     limit = parse_int(params["limit"], 20)
 
     opts = [search_query: query]
-    opts = if params["project_id"], do: Keyword.put(opts, :project_id, parse_int(params["project_id"], nil)), else: opts
+
+    opts =
+      if params["project_id"],
+        do: Keyword.put(opts, :project_id, parse_int(params["project_id"], nil)),
+        else: opts
+
     opts = if params["status"], do: Keyword.put(opts, :status, params["status"]), else: opts
 
     results = Sessions.list_sessions_filtered(opts) |> Enum.take(limit)
@@ -204,12 +305,19 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
 
         case Sessions.update_session(session, attrs) do
           {:ok, updated} ->
-            Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agent:working", {:agent_stopped, updated})
+            Phoenix.PubSub.broadcast(
+              EyeInTheSkyWeb.PubSub,
+              "agent:working",
+              {:agent_stopped, updated}
+            )
+
             Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, updated})
             json(conn, %{success: true, message: "Session ended", status: updated.status})
 
           {:error, cs} ->
-            conn |> put_status(:unprocessable_entity) |> json(%{error: "Failed", details: translate_errors(cs)})
+            conn
+            |> put_status(:unprocessable_entity)
+            |> json(%{error: "Failed", details: translate_errors(cs)})
         end
 
       {:error, :not_found} ->
@@ -258,13 +366,43 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
               json(conn, %{success: true, context: sc.context})
 
             {:error, cs} ->
-              conn |> put_status(:unprocessable_entity) |> json(%{error: "Failed", details: translate_errors(cs)})
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{error: "Failed", details: translate_errors(cs)})
           end
 
         {:error, :not_found} ->
           conn |> put_status(:not_found) |> json(%{error: "Session not found"})
       end
     end
+  end
+
+  defp find_or_create_agent(%{uuid: uuid} = attrs) do
+    case Agents.get_agent_by_uuid(uuid) do
+      {:ok, existing} ->
+        {:ok, existing}
+
+      {:error, :not_found} ->
+        case Agents.create_agent(attrs) do
+          {:ok, agent} ->
+            {:ok, agent}
+
+          {:error, %Ecto.Changeset{}} = err ->
+            err
+
+          _ ->
+            case Agents.get_agent_by_uuid(uuid) do
+              {:ok, existing} -> {:ok, existing}
+              err -> err
+            end
+        end
+    end
+  rescue
+    Ecto.ConstraintError ->
+      case Agents.get_agent_by_uuid(uuid) do
+        {:ok, existing} -> {:ok, existing}
+        _ -> {:error, :constraint_race}
+      end
   end
 
   # Resolve project_id from project_name or direct project_id param

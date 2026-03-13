@@ -45,7 +45,11 @@ defmodule EyeInTheSkyWeb.ScheduledJobsTest do
     test "returns all jobs regardless of project" do
       project = create_project()
       {:ok, _} = ScheduledJobs.create_job(job_attrs(%{"name" => "Global Job"}))
-      {:ok, _} = ScheduledJobs.create_job(job_attrs(%{"name" => "Project Job", "project_id" => project.id}))
+
+      {:ok, _} =
+        ScheduledJobs.create_job(
+          job_attrs(%{"name" => "Project Job", "project_id" => project.id})
+        )
 
       jobs = ScheduledJobs.list_jobs()
       assert length(jobs) == 2
@@ -53,7 +57,9 @@ defmodule EyeInTheSkyWeb.ScheduledJobsTest do
 
     test "orders system jobs before user jobs" do
       {:ok, user_job} = ScheduledJobs.create_job(job_attrs(%{"name" => "User Job"}))
-      {:ok, system_job} = ScheduledJobs.create_job(job_attrs(%{"name" => "System Job", "origin" => "system"}))
+
+      {:ok, system_job} =
+        ScheduledJobs.create_job(job_attrs(%{"name" => "System Job", "origin" => "system"}))
 
       jobs = ScheduledJobs.list_jobs()
       assert hd(jobs).id == system_job.id
@@ -70,8 +76,12 @@ defmodule EyeInTheSkyWeb.ScheduledJobsTest do
       project_a = create_project("project-a")
       project_b = create_project("project-b")
 
-      {:ok, job_a} = ScheduledJobs.create_job(job_attrs(%{"name" => "Job A", "project_id" => project_a.id}))
-      {:ok, _job_b} = ScheduledJobs.create_job(job_attrs(%{"name" => "Job B", "project_id" => project_b.id}))
+      {:ok, job_a} =
+        ScheduledJobs.create_job(job_attrs(%{"name" => "Job A", "project_id" => project_a.id}))
+
+      {:ok, _job_b} =
+        ScheduledJobs.create_job(job_attrs(%{"name" => "Job B", "project_id" => project_b.id}))
+
       {:ok, _global} = ScheduledJobs.create_job(job_attrs(%{"name" => "Global"}))
 
       jobs = ScheduledJobs.list_jobs_for_project(project_a.id)
@@ -136,7 +146,9 @@ defmodule EyeInTheSkyWeb.ScheduledJobsTest do
     end
 
     test "rejects invalid job_type" do
-      assert {:error, changeset} = ScheduledJobs.create_job(job_attrs(%{"job_type" => "bad_type"}))
+      assert {:error, changeset} =
+               ScheduledJobs.create_job(job_attrs(%{"job_type" => "bad_type"}))
+
       assert changeset.errors[:job_type] != nil
     end
   end

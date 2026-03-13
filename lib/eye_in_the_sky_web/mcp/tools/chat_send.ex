@@ -57,5 +57,4 @@ defmodule EyeInTheSkyWeb.MCP.Tools.ChatSend do
     response = Response.tool() |> Response.json(result)
     {:reply, response, frame}
   end
-
 end

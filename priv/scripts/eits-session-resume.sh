@@ -11,7 +11,8 @@ export PGPASSWORD="${EITS_PG_PASSWORD:-postgres}"
 _pgq() { psql -U "$EITS_PG_USER" -h "$EITS_PG_HOST" -d "$EITS_PG_DB" -t -A --no-psqlrc -c "$1" 2>/dev/null | grep -v '^Time:'; }
 
 MAPPING_FILE="$HOME/.claude/hooks/session_agent_map.json"
-EITS_BASE="${EITS_API_URL:-http://localhost:5001/api/v1}"
+EITS_BASE="${EITS_API_URL:-https://localhost:5001/api/v1}"
+_curl() { curl ${EITS_API_KEY:+-H "Authorization: Bearer ${EITS_API_KEY}"} "$@"; }
 LOG_FILE="${HOME}/.claude/hooks/eits.log"
 _log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [resume] $*" >> "$LOG_FILE" 2>/dev/null; }
 
@@ -35,7 +36,7 @@ AGENT_INT_ID=""
 AGENT_ID=""
 
 _log "resolving IDs via API: $EITS_BASE/sessions/$SESSION_ID"
-SESSION_INFO=$(curl -sf "$EITS_BASE/sessions/$SESSION_ID" 2>/dev/null || true)
+SESSION_INFO=$(_curl -sf "$EITS_BASE/sessions/$SESSION_ID" 2>/dev/null || true)
 
 if [ -n "$SESSION_INFO" ] && echo "$SESSION_INFO" | jq -e '.initialized == true' >/dev/null 2>&1; then
   SESSION_INT_ID=$(echo "$SESSION_INFO" | jq -r '.id // empty')

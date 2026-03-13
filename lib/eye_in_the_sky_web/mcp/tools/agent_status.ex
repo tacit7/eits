@@ -24,9 +24,14 @@ defmodule EyeInTheSkyWeb.MCP.Tools.AgentStatus do
           alive = worker_alive?(int_id)
 
           cond do
-            not alive -> %{success: true, session_id: int_id, status: "no_worker", processing: false}
-            processing -> %{success: true, session_id: int_id, status: "processing", processing: true}
-            true -> %{success: true, session_id: int_id, status: "idle", processing: false}
+            not alive ->
+              %{success: true, session_id: int_id, status: "no_worker", processing: false}
+
+            processing ->
+              %{success: true, session_id: int_id, status: "processing", processing: true}
+
+            true ->
+              %{success: true, session_id: int_id, status: "idle", processing: false}
           end
 
         {:error, reason} ->

@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWebWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
+    plug EyeInTheSkyWebWeb.Plugs.RequireAuth
   end
 
   # Session-aware JSON pipeline without CSRF — safe for WebAuthn endpoints
@@ -47,7 +48,12 @@ defmodule EyeInTheSkyWebWeb.Router do
   scope "/", EyeInTheSkyWebWeb do
     pipe_through [:browser, :require_auth]
 
-    live_session :app, on_mount: [EyeInTheSkyWebWeb.AuthHook, EyeInTheSkyWebWeb.FabHook] do
+    live_session :app,
+                 on_mount: [
+                   EyeInTheSkyWebWeb.AuthHook,
+                   EyeInTheSkyWebWeb.FabHook,
+                   EyeInTheSkyWebWeb.NavHook
+                 ] do
       live "/", AgentLive.Index, :index
       live "/notes", OverviewLive.Notes, :index
       live "/tasks", OverviewLive.Tasks, :index
@@ -99,6 +105,7 @@ defmodule EyeInTheSkyWebWeb.Router do
     get "/sessions/:uuid", SessionController, :show
     patch "/sessions/:uuid", SessionController, :update
     post "/sessions/:uuid/end", SessionController, :end_session
+    post "/sessions/:uuid/tool-events", SessionController, :tool_event
     get "/sessions/:uuid/context", SessionController, :get_context
     patch "/sessions/:uuid/context", SessionController, :update_context
 
@@ -152,10 +159,18 @@ defmodule EyeInTheSkyWebWeb.Router do
     post "/agents", AgentController, :create
     get "/agents/:id", AgentController, :show
 
+    # Push notifications
+    get "/push/vapid-public-key", PushController, :vapid_public_key
+    post "/push/subscribe", PushController, :subscribe
+    delete "/push/subscribe", PushController, :unsubscribe
+
     # Messaging
     post "/dm", MessagingController, :dm
     get "/channels", MessagingController, :list_channels
     post "/channels/:channel_id/messages", MessagingController, :send_channel_message
+
+    # Gitea webhooks
+    post "/webhooks/gitea", GiteaWebhookController, :handle
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

@@ -86,4 +86,99 @@ defmodule EyeInTheSkyWebWeb.Components.DmPageTest do
     # Verify module has the function with arity 1
     assert {:dm_page, 1} in DmPage.__info__(:functions)
   end
+
+  # ===== Mobile keyboard-aware composer layout tests =====
+  #
+  # These tests verify the structural requirements for the mobile keyboard
+  # layout to work correctly. They check that:
+  #   1. The message form has the DmComposer phx-hook for visualViewport events
+  #   2. The composer wrapper has safe-area bottom padding
+  #   3. The messages scroll anchor sentinel is present
+  #   4. Action buttons have appropriate mobile touch target sizes
+  #
+  # Interaction behavior (keyboard open/close scrolling) is tested by the
+  # DmComposer JS hook which reacts to window.visualViewport resize events.
+
+  describe "mobile keyboard layout" do
+    @project_root Path.expand("../../..", __DIR__)
+    @dm_page_source Path.join([@project_root, "lib/eye_in_the_sky_web_web/components/dm_page.ex"])
+    @dm_composer_js Path.join([@project_root, "assets/js/hooks/dm_composer.js"])
+    @app_js Path.join([@project_root, "assets/js/app.js"])
+
+    test "message form source declares DmComposer hook" do
+      # Prevents regressions where the hook gets removed from the form.
+      source = File.read!(@dm_page_source)
+
+      assert source =~ ~s(phx-hook="DmComposer"),
+             "message-form must declare phx-hook=\"DmComposer\" for keyboard-aware scroll"
+    end
+
+    test "composer wrapper has safe-inset-bottom class" do
+      source = File.read!(@dm_page_source)
+
+      assert source =~ ~s(id="dm-page-composer"),
+             "composer wrapper must have id=\"dm-page-composer\""
+
+      assert source =~ ~s(safe-inset-bottom),
+             "composer wrapper must include safe-inset-bottom for notch/home-indicator devices"
+    end
+
+    test "scroll anchor sentinel is present in messages list" do
+      source = File.read!(@dm_page_source)
+
+      assert source =~ ~s(id="messages-scroll-anchor"),
+             "messages list must include the scroll anchor sentinel div"
+
+      assert source =~ ~s(overflow-anchor: auto),
+             "scroll anchor sentinel must set overflow-anchor: auto"
+    end
+
+    test "send button has mobile-adequate touch target" do
+      source = File.read!(@dm_page_source)
+
+      # Send button should be at least w-10 h-10 on mobile (40x40px meets WCAG 2.5.5)
+      assert source =~ ~r/id="dm-send-button"[^>]*w-10 h-10|w-10 h-10[^>]*id="dm-send-button"/s,
+             "send button must have w-10 h-10 touch target on mobile"
+    end
+
+    test "stop button has mobile-adequate touch target" do
+      source = File.read!(@dm_page_source)
+
+      assert source =~ ~r/id="dm-stop-button"[^>]*w-10 h-10|w-10 h-10[^>]*id="dm-stop-button"/s,
+             "stop button must have w-10 h-10 touch target on mobile"
+    end
+
+    test "attach label has mobile-adequate touch target" do
+      source = File.read!(@dm_page_source)
+
+      # Attach button (label wrapping file input) should be w-10 h-10 on mobile
+      assert source =~ "w-10 h-10 sm:w-8 sm:h-8",
+             "attach label must have w-10 h-10 touch target on mobile, sm:w-8 sm:h-8 on desktop"
+    end
+
+    test "dm_composer js hook file exists" do
+      assert File.exists?(@dm_composer_js),
+             "dm_composer.js hook must exist at assets/js/hooks/dm_composer.js"
+
+      content = File.read!(@dm_composer_js)
+      assert content =~ "visualViewport",
+             "DmComposer hook must subscribe to visualViewport events"
+
+      assert content =~ "messages-container",
+             "DmComposer hook must scroll the messages-container on keyboard change"
+
+      assert content =~ "--keyboard-height",
+             "DmComposer hook must set --keyboard-height CSS variable"
+    end
+
+    test "dm_composer hook is registered in app.js" do
+      app_js = File.read!(@app_js)
+
+      assert app_js =~ ~s(import {DmComposer}),
+             "DmComposer must be imported in app.js"
+
+      assert app_js =~ "Hooks.DmComposer = DmComposer",
+             "DmComposer must be registered on Hooks in app.js"
+    end
+  end
 end

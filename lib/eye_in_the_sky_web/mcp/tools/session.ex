@@ -118,7 +118,9 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
 
     project_id =
       case attrs[:project_name] do
-        nil -> nil
+        nil ->
+          nil
+
         name ->
           case Projects.get_project_by_name(name) do
             nil -> nil
@@ -186,8 +188,12 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
   defp end_session(params) do
     opts =
       %{}
-      |> then(fn m -> if params[:summary], do: Map.put(m, :summary, params[:summary]), else: m end)
-      |> then(fn m -> if params[:final_status], do: Map.put(m, :final_status, params[:final_status]), else: m end)
+      |> then(fn m ->
+        if params[:summary], do: Map.put(m, :summary, params[:summary]), else: m
+      end)
+      |> then(fn m ->
+        if params[:final_status], do: Map.put(m, :final_status, params[:final_status]), else: m
+      end)
 
     case Sessions.get_session_by_uuid(params[:agent_id] || params[:session_id]) do
       {:ok, session} ->

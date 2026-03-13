@@ -280,6 +280,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     args = maybe_flag(args, "--permission-mode", opts[:permission_mode])
     args = maybe_flag(args, "--mcp-config", opts[:mcp_config])
     args = maybe_flag(args, "--worktree", opts[:worktree])
+    args = maybe_flag(args, "--thinking-budget-tokens", opts[:thinking_budget])
 
     # Boolean flags
     # stream-json requires --verbose for proper output parsing
@@ -369,7 +370,11 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     session_ref = Keyword.get(opts, :session_ref, make_ref())
 
     raw_timeout = EyeInTheSkyWeb.Settings.get_integer("cli_idle_timeout_ms")
-    default_timeout = if is_integer(raw_timeout) and raw_timeout > 0, do: raw_timeout, else: @fallback_idle_timeout_ms
+
+    default_timeout =
+      if is_integer(raw_timeout) and raw_timeout > 0,
+        do: raw_timeout,
+        else: @fallback_idle_timeout_ms
 
     idle_timeout_ms =
       case Keyword.get(opts, :idle_timeout_ms, default_timeout) do
@@ -479,10 +484,21 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   # Port output handler
   # ---------------------------------------------------------------------------
 
+  @max_buffer_bytes 4 * 1024 * 1024
+
   defp handle_port_output(port, session_ref, caller, buffer, idle_timeout_ms) do
     receive do
       {^port, {:data, data}} ->
         new_buffer = buffer <> data
+
+        new_buffer =
+          if byte_size(new_buffer) > @max_buffer_bytes do
+            Logger.warning("[CLI] port buffer exceeded #{@max_buffer_bytes} bytes, flushing")
+            ""
+          else
+            new_buffer
+          end
+
         lines = String.split(new_buffer, "\n")
 
         {complete_lines, remaining} =

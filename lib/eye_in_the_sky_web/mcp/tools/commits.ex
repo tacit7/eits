@@ -7,7 +7,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
   alias EyeInTheSkyWeb.Sessions
 
   schema do
-    field :agent_id, :string, description: "Agent or session identifier. Accepts an integer agent ID (resolves to most recent session) or a session UUID string. Defaults to current session."
+    field :agent_id, :string,
+      description:
+        "Agent or session identifier. Accepts an integer agent ID (resolves to most recent session) or a session UUID string. Defaults to current session."
+
     field :commit_hashes, {:list, :string}, required: true, description: "List of commit hashes"
     field :commit_messages, {:list, :string}, description: "List of commit messages"
   end
@@ -43,31 +46,31 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
       response = Response.tool() |> Response.json(result)
       {:reply, response, frame}
     else
-    results =
-      hashes
-      |> Enum.with_index()
-      |> Enum.map(fn {hash, idx} ->
-        message = Enum.at(messages, idx, "")
+      results =
+        hashes
+        |> Enum.with_index()
+        |> Enum.map(fn {hash, idx} ->
+          message = Enum.at(messages, idx, "")
 
-        case Commits.create_commit(%{
-               commit_hash: hash,
-               commit_message: message,
-               session_id: session_int_id
-             }) do
-          {:ok, _} -> :ok
-          {:error, _} -> :error
-        end
-      end)
+          case Commits.create_commit(%{
+                 commit_hash: hash,
+                 commit_message: message,
+                 session_id: session_int_id
+               }) do
+            {:ok, _} -> :ok
+            {:error, _} -> :error
+          end
+        end)
 
-    ok_count = Enum.count(results, &(&1 == :ok))
+      ok_count = Enum.count(results, &(&1 == :ok))
 
-    result = %{
-      success: true,
-      message: "Logged #{ok_count}/#{length(hashes)} commits"
-    }
+      result = %{
+        success: true,
+        message: "Logged #{ok_count}/#{length(hashes)} commits"
+      }
 
-    response = Response.tool() |> Response.json(result)
-    {:reply, response, frame}
+      response = Response.tool() |> Response.json(result)
+      {:reply, response, frame}
     end
   end
 end

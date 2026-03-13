@@ -85,7 +85,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Config do
     path = socket.assigns.selected_file_path
 
     if path && String.starts_with?(path, @claude_dir) && File.exists?(path) do
-      System.cmd("open", [path])
+      EyeInTheSkyWebWeb.Helpers.ViewHelpers.open_in_system(path)
     end
 
     {:noreply, socket}

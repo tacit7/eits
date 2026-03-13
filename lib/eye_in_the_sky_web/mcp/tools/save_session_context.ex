@@ -7,8 +7,12 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SaveSessionContext do
   alias EyeInTheSkyWeb.{Contexts, Sessions}
 
   schema do
-    field :agent_id, :string, description: "Session UUID (Claude Code session ID). Defaults to current session."
-    field :session_id, :string, description: "Session UUID — alias for agent_id, takes precedence if provided"
+    field :agent_id, :string,
+      description: "Session UUID (Claude Code session ID). Defaults to current session."
+
+    field :session_id, :string,
+      description: "Session UUID — alias for agent_id, takes precedence if provided"
+
     field :context, :string, required: true, description: "Markdown formatted context"
   end
 

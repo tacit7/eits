@@ -58,20 +58,21 @@ defmodule EyeInTheSkyWebWeb.AuthController do
          {:ok, attestation_object} <- decode_b64url(params["attestationObject"]),
          {:ok, client_data_json} <- decode_b64url(params["clientDataJSON"]),
          credential_id_raw <- decode_b64url!(params["id"]),
-         {:ok, {auth_data, _attestation}} <- Wax.register(attestation_object, client_data_json, challenge) do
-
+         {:ok, {auth_data, _attestation}} <-
+           Wax.register(attestation_object, client_data_json, challenge) do
       cred_id = auth_data.attested_credential_data.credential_id
       cose_key = auth_data.attested_credential_data.credential_public_key
       cose_key_bin = :erlang.term_to_binary(cose_key)
       sign_count = auth_data.sign_count || 0
 
       with {:ok, user} <- Accounts.get_or_create_user(username),
-           {:ok, _passkey} <- Accounts.create_passkey(%{
-             user_id: user.id,
-             credential_id: cred_id || credential_id_raw,
-             cose_key: cose_key_bin,
-             sign_count: sign_count
-           }) do
+           {:ok, _passkey} <-
+             Accounts.create_passkey(%{
+               user_id: user.id,
+               credential_id: cred_id || credential_id_raw,
+               cose_key: cose_key_bin,
+               sign_count: sign_count
+             }) do
         conn
         |> delete_session(:webauthn_challenge)
         |> delete_session(:webauthn_username)
@@ -97,7 +98,8 @@ defmodule EyeInTheSkyWebWeb.AuthController do
   # --- Authentication ---
 
   @doc "POST /auth/login/challenge — generate a WebAuthn authentication challenge"
-  def login_challenge(conn, %{"username" => username}) when is_binary(username) and username != "" do
+  def login_challenge(conn, %{"username" => username})
+      when is_binary(username) and username != "" do
     case Accounts.get_user_by_username(username) do
       nil ->
         conn |> put_status(:not_found) |> json(%{error: "user not found"})
@@ -106,7 +108,9 @@ defmodule EyeInTheSkyWebWeb.AuthController do
         allow_credentials = Accounts.build_allowed_credentials(user.id)
 
         if allow_credentials == [] do
-          conn |> put_status(:bad_request) |> json(%{error: "no passkeys registered for this user"})
+          conn
+          |> put_status(:bad_request)
+          |> json(%{error: "no passkeys registered for this user"})
         else
           challenge = Wax.new_authentication_challenge(allow_credentials: allow_credentials)
 
@@ -144,8 +148,8 @@ defmodule EyeInTheSkyWebWeb.AuthController do
          {:ok, auth_data_bin} <- decode_b64url(params["authenticatorData"]),
          {:ok, sig} <- decode_b64url(params["signature"]),
          {:ok, client_data_json} <- decode_b64url(params["clientDataJSON"]),
-         {:ok, auth_data} <- Wax.authenticate(credential_id, auth_data_bin, sig, client_data_json, challenge) do
-
+         {:ok, auth_data} <-
+           Wax.authenticate(credential_id, auth_data_bin, sig, client_data_json, challenge) do
       passkey = Accounts.get_passkey_by_credential_id(credential_id)
       if passkey, do: Accounts.update_sign_count(passkey, auth_data.sign_count)
 

@@ -14,9 +14,10 @@ SESSION_ID=$(cat "$SESSION_FILE" 2>/dev/null | tr -d '[:space:]')
 HASH=$(git rev-parse HEAD 2>/dev/null) || exit 0
 MSG=$(git log -1 --pretty=%s HEAD 2>/dev/null) || MSG=""
 
-BASE="${EITS_API_URL:-http://localhost:5001/api/v1}"
+BASE="${EITS_API_URL:-https://localhost:5001/api/v1}"
+_curl() { curl ${EITS_API_KEY:+-H "Authorization: Bearer ${EITS_API_KEY}"} "$@"; }
 
-curl -sf -X POST "$BASE/commits" \
+_curl -sf -X POST "$BASE/commits" \
   -H "Content-Type: application/json" \
   -d "$(jq -nc \
     --arg agent_id "$SESSION_ID" \

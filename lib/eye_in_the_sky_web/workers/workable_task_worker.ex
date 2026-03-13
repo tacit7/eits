@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
 
   alias EyeInTheSkyWeb.{Projects, Repo, ScheduledJobs, Tasks}
   alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Notifications
   alias EyeInTheSkyWeb.Workers.SpeakWorker
 
   import Ecto.Query
@@ -26,6 +27,11 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
     {:ok, run} = ScheduledJobs.record_run_start(job)
 
     case execute(job) do
+      {:ok, :no_work} ->
+        ScheduledJobs.record_run_complete(run, "completed", result: "No workable tasks")
+        broadcast()
+        :ok
+
       {:ok, output} ->
         ScheduledJobs.record_run_complete(run, "completed", result: output)
         broadcast()
@@ -48,7 +54,7 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
     tasks = fetch_workable_tasks(tag_name)
 
     if tasks == [] do
-      {:ok, "No workable tasks found for tag=#{tag_name}"}
+      {:ok, :no_work}
     else
       results =
         Enum.map(tasks, fn task ->
@@ -122,7 +128,10 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
         {:ok, task.id}
 
       {:error, reason} ->
-        Logger.error("WorkableTaskWorker: failed to spawn agent for task ##{task.id} - #{inspect(reason)}")
+        Logger.error(
+          "WorkableTaskWorker: failed to spawn agent for task ##{task.id} - #{inspect(reason)}"
+        )
+
         {:error, reason}
     end
   end
@@ -132,6 +141,8 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
   end
 
   defp notify(output) do
+    Notifications.notify(output, category: :agent)
+
     %{"message" => output, "voice" => "Ava"}
     |> SpeakWorker.new()
     |> Oban.insert()

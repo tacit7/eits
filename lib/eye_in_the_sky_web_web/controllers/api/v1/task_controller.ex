@@ -17,11 +17,17 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
 
         params["session_id"] ->
           session_int_id = resolve_session_int_id(params["session_id"])
-          if session_int_id, do: Tasks.list_tasks_for_session(session_int_id) |> Enum.take(limit), else: []
+
+          if session_int_id,
+            do: Tasks.list_tasks_for_session(session_int_id) |> Enum.take(limit),
+            else: []
 
         params["agent_id"] ->
           agent_int_id = resolve_agent_int_id(params["agent_id"])
-          if agent_int_id, do: Tasks.list_tasks_for_agent(agent_int_id) |> Enum.take(limit), else: []
+
+          if agent_int_id,
+            do: Tasks.list_tasks_for_agent(agent_int_id) |> Enum.take(limit),
+            else: []
 
         params["project_id"] ->
           Projects.get_project_tasks(parse_int(params["project_id"], nil)) |> Enum.take(limit)
@@ -83,7 +89,12 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
     try do
       task = Tasks.get_task!(id)
       annotations = Notes.list_notes_for_task(id)
-      json(conn, %{success: true, task: format_task(task), annotations: Enum.map(annotations, &format_note/1)})
+
+      json(conn, %{
+        success: true,
+        task: format_task(task),
+        annotations: Enum.map(annotations, &format_note/1)
+      })
     rescue
       Ecto.NoResultsError ->
         conn |> put_status(:not_found) |> json(%{error: "Task not found"})
@@ -185,7 +196,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
   def unlink_session(conn, %{"id" => task_id, "uuid" => session_uuid}) do
     int_id =
       case Integer.parse(session_uuid) do
-        {n, ""} -> n
+        {n, ""} ->
+          n
+
         _ ->
           case Sessions.get_session_by_uuid(session_uuid) do
             {:ok, s} -> s.id
@@ -197,9 +210,13 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
 
     if int_id do
       import Ecto.Query, only: [from: 2]
+
       EyeInTheSkyWeb.Repo.delete_all(
-        from(ts in "task_sessions", where: ts.task_id == ^task_int_id and ts.session_id == ^int_id)
+        from(ts in "task_sessions",
+          where: ts.task_id == ^task_int_id and ts.session_id == ^int_id
+        )
       )
+
       json(conn, %{success: true, message: "Session unlinked from task #{task_id}"})
     else
       conn |> put_status(:not_found) |> json(%{error: "Session not found"})
@@ -263,9 +280,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
     task_int_id = if is_binary(task_id), do: String.to_integer(task_id), else: task_id
 
     if int_id do
-      EyeInTheSkyWeb.Repo.insert_all("task_sessions", [%{task_id: task_int_id, session_id: int_id}],
-        on_conflict: :nothing
-      )
+      EyeInTheSkyWeb.Repo.insert_all(
+        "task_sessions",
+        [%{task_id: task_int_id, session_id: int_id}], on_conflict: :nothing)
     end
 
     :ok
@@ -284,7 +301,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
 
   defp resolve_session_int_id(val) do
     case Integer.parse(val) do
-      {n, ""} -> n
+      {n, ""} ->
+        n
+
       _ ->
         case Sessions.get_session_by_uuid(val) do
           {:ok, s} -> s.id

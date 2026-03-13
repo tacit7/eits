@@ -17,7 +17,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :has_more_messages, :boolean, default: false
   attr :uploads, :map, required: true
   attr :selected_model, :string, default: "opus"
-  attr :selected_effort, :string, default: ""
+  attr :selected_effort, :string, default: "medium"
+  attr :show_effort_menu, :boolean, default: false
   attr :show_model_menu, :boolean, default: false
   attr :processing, :boolean, default: false
   attr :tasks, :list, default: []
@@ -39,7 +40,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :memory_edit_content, :string, default: ""
   attr :queued_prompts, :list, default: []
   attr :thinking_enabled, :boolean, default: false
+  attr :max_budget_usd, :any, default: nil
   attr :compacting, :boolean, default: false
+  attr :context_used, :integer, default: 0
+  attr :context_window, :integer, default: 0
 
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
@@ -174,6 +178,84 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 <.icon name="hero-bell" class="w-3.5 h-3.5" />
                 <span>Notify</span>
               </button>
+              <%!-- Mobile overflow menu --%>
+              <div class="sm:hidden dropdown dropdown-end" id="dm-mobile-menu">
+                <button
+                  tabindex="0"
+                  class="flex items-center justify-center w-7 h-7 rounded-lg text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+                  title="More options"
+                >
+                  <.icon name="hero-ellipsis-vertical" class="w-4 h-4" />
+                </button>
+                <ul
+                  tabindex="0"
+                  class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-52 text-xs"
+                >
+                  <li>
+                    <button
+                      phx-hook="CopyToClipboard"
+                      id="copy-session-uuid-mobile"
+                      data-copy={@session_uuid}
+                      class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+                    >
+                      <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" />
+                      Copy session ID
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      phx-click="open_iterm"
+                      class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+                    >
+                      <.icon name="hero-command-line" class="w-3.5 h-3.5" />
+                      Open in iTerm
+                    </button>
+                  </li>
+                  <li><hr class="border-base-content/10 my-1" /></li>
+                  <li>
+                    <button
+                      phx-click="reload_from_session_file"
+                      data-confirm="This will delete all messages and re-import from the JSONL file. Continue?"
+                      class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+                    >
+                      <.icon name="hero-arrow-path" class="w-3.5 h-3.5" />
+                      Reload from file
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      phx-click="export_jsonl"
+                      class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+                    >
+                      <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" />
+                      Export as JSONL
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      phx-click="export_markdown"
+                      class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+                    >
+                      <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" />
+                      Export as Markdown
+                    </button>
+                  </li>
+                  <li><hr class="border-base-content/10 my-1" /></li>
+                  <li>
+                    <button
+                      phx-click="toggle_memories_panel"
+                      class={[
+                        "flex items-center gap-2 px-3 py-2 w-full text-left rounded",
+                        @show_memories_panel && "text-primary bg-primary/10",
+                        !@show_memories_panel && "hover:bg-base-content/5"
+                      ]}
+                    >
+                      <.icon name="hero-cpu-chip" class="w-3.5 h-3.5" />
+                      Memories
+                    </button>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -264,20 +346,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         <% end %>
       </div>
 
-      <%!-- Token counter pill (floating, above composer, messages tab only) --%>
-      <%= if @active_tab in ["messages", nil] && @total_tokens > 0 do %>
-        <div class="absolute bottom-[5.5rem] right-8 z-10 pointer-events-none">
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-base-content/[0.06] text-[11px] font-mono tabular-nums text-base-content/40 border border-base-content/[0.06]">
-            <.icon name="hero-hashtag" class="w-3 h-3" />
-            {format_number(@total_tokens)} tok
-            <%= if @total_cost > 0.0 do %>
-              <span class="text-base-content/25">·</span>
-              ${:erlang.float_to_binary(@total_cost * 1.0, decimals: 4)}
-            <% end %>
-          </span>
-        </div>
-      <% end %>
-
       <%!-- Composer (pinned to bottom) --%>
       <%= if @active_tab in ["messages", nil] do %>
         <div id="dm-page-composer" class="flex-shrink-0 max-w-4xl mx-auto w-full pt-2 safe-inset-bottom">
@@ -289,11 +357,17 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             uploads={@uploads}
             selected_model={@selected_model}
             selected_effort={@selected_effort}
+            show_effort_menu={@show_effort_menu}
             show_model_menu={@show_model_menu}
             processing={@processing}
             slash_items={@slash_items}
             thinking_enabled={@thinking_enabled}
+            max_budget_usd={@max_budget_usd}
             provider={@agent.provider}
+            total_tokens={@total_tokens}
+            total_cost={@total_cost}
+            context_used={@context_used}
+            context_window={@context_window}
           />
         </div>
       <% end %>
@@ -694,12 +768,18 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
 
   attr :uploads, :map, required: true
   attr :selected_model, :string, default: "opus"
-  attr :selected_effort, :string, default: ""
+  attr :selected_effort, :string, default: "medium"
+  attr :show_effort_menu, :boolean, default: false
   attr :show_model_menu, :boolean, default: false
   attr :processing, :boolean, default: false
   attr :slash_items, :list, default: []
   attr :thinking_enabled, :boolean, default: false
+  attr :max_budget_usd, :any, default: nil
   attr :provider, :string, default: "claude"
+  attr :total_tokens, :integer, default: 0
+  attr :total_cost, :float, default: 0.0
+  attr :context_used, :integer, default: 0
+  attr :context_window, :integer, default: 0
 
   defp message_form(assigns) do
     ~H"""
@@ -748,8 +828,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
 
       <%!-- Bottom toolbar --%>
       <div class="flex items-center justify-between px-3 pb-3 pt-1" id="dm-composer-toolbar">
-        <%!-- Left: upload button --%>
-        <div class="flex items-center">
+        <%!-- Left: upload button + effort pills (opus only) --%>
+        <div class="flex items-center gap-2">
           <label
             for={@uploads.files.ref}
             phx-drop-target={@uploads.files.ref}
@@ -758,6 +838,100 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             <.icon name="hero-plus" class="w-5 h-5" />
           </label>
           <.live_file_input upload={@uploads.files} class="hidden" />
+          <%!-- Budget cap input --%>
+          <div class="flex items-center gap-0.5 text-xs text-base-content/40">
+            <span class="font-mono">$</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="unlimited"
+              value={@max_budget_usd}
+              phx-blur="set_max_budget"
+              class="w-16 bg-transparent border-0 outline-none focus:ring-0 text-xs placeholder:text-base-content/20 font-mono p-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
+          </div>
+          <%= if @selected_model == "opus" do %>
+            <div
+              class="dropdown dropdown-top"
+              phx-click="toggle_effort_menu"
+              id="effort-selector-dropdown"
+            >
+              <button
+                type="button"
+                tabindex="0"
+                class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-base-content/50 hover:text-base-content/70 transition-colors"
+                id="effort-selector-button"
+              >
+                <.icon name="hero-adjustments-horizontal" class="w-3.5 h-3.5" />
+                <span class="font-medium">{effort_display_name(@selected_effort)}</span>
+                <.icon name="hero-chevron-down-mini" class="w-3.5 h-3.5" />
+              </button>
+              <%= if @show_effort_menu do %>
+                <ul
+                  tabindex="0"
+                  class="dropdown-content menu z-[1] w-52 rounded-xl border border-base-content/8 bg-base-100 p-1.5 shadow-lg"
+                  id="effort-selector-menu"
+                >
+                  <li class="menu-title text-[10px] px-3 pt-1 pb-0.5 text-base-content/40">Effort Level</li>
+                  <%= for {label, value, desc, icon_color} <- [
+                    {"Low", "low", "Quick, minimal reasoning", "text-success"},
+                    {"Medium", "medium", "Balanced (default)", "text-info"},
+                    {"High", "high", "Thorough analysis", "text-warning"},
+                    {"Max", "max", "Maximum reasoning depth", "text-error"}
+                  ] do %>
+                    <li>
+                      <a
+                        phx-click="select_effort"
+                        phx-value-effort={value}
+                        class={[
+                          "flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]",
+                          @selected_effort == value && "bg-base-content/[0.06]"
+                        ]}
+                      >
+                        <.icon name="hero-adjustments-horizontal" class={"w-4 h-4 #{icon_color}"} />
+                        <div>
+                          <div class="text-sm font-semibold text-base-content/80">{label}</div>
+                          <div class="text-[11px] text-base-content/40">{desc}</div>
+                        </div>
+                        <%= if @selected_effort == value do %>
+                          <.icon name="hero-check-mini" class="w-4 h-4 text-primary ml-auto" />
+                        <% end %>
+                      </a>
+                    </li>
+                  <% end %>
+                </ul>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+
+        <%!-- Center: token counter + context remaining --%>
+        <div class="inline-flex items-center gap-2">
+          <%= if @total_tokens > 0 do %>
+            <span class="inline-flex items-center gap-1.5 text-[11px] font-mono tabular-nums text-base-content/30">
+              {format_number(@total_tokens)} tok
+              <%= if @total_cost > 0.0 do %>
+                <span class="text-base-content/20">·</span>
+                ${:erlang.float_to_binary(@total_cost * 1.0, decimals: 4)}
+              <% end %>
+            </span>
+          <% end %>
+          <%= if @context_window > 0 do %>
+            <% remaining = @context_window - @context_used %>
+            <% pct = Float.round(remaining / @context_window * 100, 1) %>
+            <% color_class = cond do
+              pct > 40 -> "text-base-content/30"
+              pct > 20 -> "text-warning/70"
+              true -> "text-error/70"
+            end %>
+            <span
+              class={"inline-flex items-center gap-1 text-[11px] font-mono tabular-nums " <> color_class}
+              title={"#{format_number(remaining)} / #{format_number(@context_window)} tokens remaining"}
+            >
+              {pct}% ctx
+            </span>
+          <% end %>
         </div>
 
         <%!-- Right: model selector + send/stop --%>
@@ -1328,6 +1502,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   defp model_display_name("gpt-5.1-codex-max"), do: "gpt-5.1-codex-max"
   defp model_display_name("gpt-5.1-codex-mini"), do: "gpt-5.1-codex-mini"
   defp model_display_name(other), do: other
+
+  defp effort_display_name("low"), do: "Low"
+  defp effort_display_name("medium"), do: "Medium"
+  defp effort_display_name("high"), do: "High"
+  defp effort_display_name("max"), do: "Max"
+  defp effort_display_name(_), do: "Medium"
 
   defp format_size(bytes) when bytes < 1024, do: "#{bytes} B"
   defp format_size(bytes) when bytes < 1_048_576, do: "#{Float.round(bytes / 1024, 1)} KB"

@@ -86,6 +86,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:memory_edit_content, "")
       |> assign(:queued_prompts, AgentWorker.get_queue(session.id))
       |> assign(:thinking_enabled, false)
+      |> assign(:compacting, session.status == "compacting")
       |> allow_upload(:files,
         accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
         max_entries: 10,
@@ -264,11 +265,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     {:noreply, socket}
   end
 
-  defp parse_int(s, default \\ 0) do
-    case Integer.parse(s || "") do
-      {n, ""} -> n
-      _ -> default
-    end
+  @impl true
+  def handle_event("send_message", _params, socket) do
+    {:noreply, socket}
   end
 
   defp handle_send_message(body, socket) do
@@ -322,9 +321,11 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     end
   end
 
-  @impl true
-  def handle_event("send_message", _params, socket) do
-    {:noreply, socket}
+  defp parse_int(s, default \\ 0) do
+    case Integer.parse(s || "") do
+      {n, ""} -> n
+      _ -> default
+    end
   end
 
   @impl true
@@ -538,6 +539,28 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_info({:agent_working, %{id: session_id, status: "compacting"}}, socket) do
+    if session_id == socket.assigns.session_id do
+      {:noreply, assign(socket, :compacting, true)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info({:agent_working, %{id: session_id}}, socket) do
+    if session_id == socket.assigns.session_id do
+      {:noreply,
+       socket
+       |> assign(:compacting, false)
+       |> assign(:processing, true)
+       |> start_sync_timer()}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_info({:agent_working, _session_uuid, session_id}, socket) do
     if session_id == socket.assigns.session_id do
       {:noreply,
@@ -550,10 +573,26 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_info({:agent_stopped, %{id: session_id}}, socket) do
+    if session_id == socket.assigns.session_id do
+      {:noreply,
+       socket
+       |> assign(:compacting, false)
+       |> assign(:processing, false)
+       |> stop_sync_timer()
+       |> sync_and_reload()
+       |> push_event("focus-input", %{})}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
     if session_id == socket.assigns.session_id do
       {:noreply,
        socket
+       |> assign(:compacting, false)
        |> assign(:processing, false)
        |> stop_sync_timer()
        |> sync_and_reload()
@@ -881,7 +920,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     end)
   end
 
-  defp continue_session_opts(model, effort_level, thinking_enabled \\ false) do
+  defp continue_session_opts(model, effort_level, thinking_enabled) do
     opts = [model: model]
 
     opts =
@@ -938,6 +977,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         selected_memory_path={@selected_memory_path}
         memory_edit_content={@memory_edit_content}
         thinking_enabled={@thinking_enabled}
+        compacting={@compacting}
       />
     </div>
     """

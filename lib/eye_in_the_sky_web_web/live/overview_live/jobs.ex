@@ -88,8 +88,6 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
     end
   end
 
-  defp job_helper_prompt(description), do: JobHelper.prompt(description)
-
   @impl true
   def handle_event("edit_job", %{"id" => id}, socket) do
     job = ScheduledJobs.get_job!(String.to_integer(id))
@@ -189,6 +187,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
       {:noreply, assign(socket, expanded_job_id: job_id, runs: runs)}
     end
   end
+
+  defp job_helper_prompt(description), do: JobHelper.prompt(description)
 
   defp build_config(params) do
     case params["job_type"] do

@@ -72,7 +72,7 @@ defmodule EyeInTheSkyWeb.Messages.JsonlStorage do
         convert_to_message(data)
 
       {:error, reason} ->
-        Logger.warn("Failed to parse JSONL line: #{inspect(reason)}")
+        Logger.warning("Failed to parse JSONL line: #{inspect(reason)}")
         nil
     end
   end

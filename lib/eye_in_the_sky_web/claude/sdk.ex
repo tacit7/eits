@@ -311,18 +311,6 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
             finalize_after_terminal_event(sdk_ref, final_session_id)
             :ok
 
-          {:complete, sid} ->
-            final_session_id = sid || session_id
-            send(caller_pid, {:claude_complete, sdk_ref, final_session_id})
-
-            :telemetry.execute([:eits, :sdk, :complete], %{system_time: System.system_time()}, %{
-              session_id: final_session_id
-            })
-
-            Logger.info("[telemetry] sdk.complete session_id=#{final_session_id}")
-            finalize_after_terminal_event(sdk_ref, final_session_id)
-            :ok
-
           {:error, reason} ->
             send(caller_pid, {:claude_error, sdk_ref, reason})
 

@@ -103,11 +103,11 @@ defmodule EyeInTheSkyWeb.MCP.StdioRunner do
   end
 
   defp handle_message(message) do
-    Logger.warn("Invalid message format: #{inspect(message)}")
+    Logger.warning("Invalid message format: #{inspect(message)}")
     :ok
   end
 
-  defp route_message(%{"method" => "initialize", "params" => params, "id" => id}) do
+  defp route_message(%{"method" => "initialize", "params" => _params, "id" => _id}) do
     # MCP initialize handshake
     response = %{
       protocolVersion: "2024-11-05",
@@ -162,7 +162,7 @@ defmodule EyeInTheSkyWeb.MCP.StdioRunner do
   end
 
   defp route_message(%{"method" => method}) do
-    Logger.warn("Unknown method: #{method}")
+    Logger.warning("Unknown method: #{method}")
     {:error, %{"code" => -32601, "message" => "Method not found"}}
   end
 

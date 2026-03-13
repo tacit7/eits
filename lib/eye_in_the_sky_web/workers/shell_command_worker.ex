@@ -37,12 +37,12 @@ defmodule EyeInTheSkyWeb.Workers.ShellCommandWorker do
         {output, 0} -> {:ok, String.trim(output)}
         {output, exit_code} -> {:error, "Exit code #{exit_code}: #{String.trim(output)}"}
       end
+    rescue
+      e -> {:error, "Command failed: #{inspect(e)}"}
     catch
       :exit, {:timeout, _} ->
         Task.shutdown(task, :brutal_kill)
         {:error, "Command timed out after #{timeout}ms"}
-    rescue
-      e -> {:error, "Command failed: #{inspect(e)}"}
     end
   end
 

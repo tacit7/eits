@@ -12,7 +12,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   alias EyeInTheSkyWeb.Claude.{Message, SDK}
   alias EyeInTheSkyWeb.Codex
-  alias EyeInTheSkyWeb.{Agents, Messages, Sessions}
+  alias EyeInTheSkyWeb.{Messages, Sessions}
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
   @retry_start_ms 1_000
@@ -502,7 +502,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       use_script: true,
       eits_session_id: state.session_uuid,
       eits_agent_id: state.agent_id,
-      worktree: state.worktree
+      worktree: state.worktree,
+      agent: context[:agent]
     ]
 
     opts =
@@ -622,7 +623,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       effort_level: Map.get(context, :effort_level),
       has_messages: Map.get(context, :has_messages, false),
       channel_id: Map.get(context, :channel_id),
-      thinking_budget: Map.get(context, :thinking_budget)
+      thinking_budget: Map.get(context, :thinking_budget),
+      agent: Map.get(context, :agent)
     }
   end
 
@@ -632,7 +634,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       effort_level: context[:effort_level],
       has_messages: context[:has_messages] || false,
       channel_id: context[:channel_id],
-      thinking_budget: context[:thinking_budget]
+      thinking_budget: context[:thinking_budget],
+      agent: context[:agent]
     }
   end
 
@@ -642,7 +645,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       effort_level: nil,
       has_messages: false,
       channel_id: nil,
-      thinking_budget: nil
+      thinking_budget: nil,
+      agent: nil
     }
   end
 

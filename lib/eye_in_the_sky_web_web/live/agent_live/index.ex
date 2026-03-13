@@ -379,9 +379,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   @impl true
-  def handle_info(_msg, socket), do: {:noreply, socket}
-
-  @impl true
   def handle_event("toggle_new_session_drawer", _params, socket) do
     {:noreply, assign(socket, :show_new_session_drawer, !socket.assigns.show_new_session_drawer)}
   end
@@ -414,7 +411,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       project_path: project.path,
       description: agent_name,
       instructions: description,
-      worktree: worktree
+      worktree: worktree,
+      agent: params["agent"]
     ]
 
     Logger.info(
@@ -443,11 +441,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
         Logger.error("❌ create_new_session: failed - #{inspect(reason)}")
         {:noreply, put_flash(socket, :error, "Failed to create session: #{inspect(reason)}")}
     end
-  end
-
-  @impl true
-  def handle_info({:agent_updated, _agent}, socket) do
-    {:noreply, load_agents(socket)}
   end
 
   @impl true
@@ -565,6 +558,9 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       {:noreply, socket}
     end
   end
+
+  @impl true
+  def handle_info(_msg, socket), do: {:noreply, socket}
 
   defp apply_action(socket, :index, _params) do
     assign(socket, :page_title, "Agents")

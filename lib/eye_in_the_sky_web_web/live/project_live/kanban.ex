@@ -250,22 +250,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   end
 
   @impl true
-  def handle_info(:tasks_changed, socket) do
-    socket = load_tasks(socket)
-
-    socket =
-      if socket.assigns.selected_task && socket.assigns.show_task_detail_drawer do
-        task = Tasks.get_task!(socket.assigns.selected_task.id)
-        notes = Notes.list_notes_for_task(task.id)
-        socket |> assign(:selected_task, task) |> assign(:task_notes, notes)
-      else
-        socket
-      end
-
-    {:noreply, socket}
-  end
-
-  @impl true
   def handle_event("move_task", %{"task_id" => task_uuid, "state_id" => state_id_str}, socket) do
     state_id = parse_int(state_id_str)
     task = Tasks.get_task_by_uuid!(task_uuid)
@@ -324,6 +308,22 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
           {:noreply, put_flash(socket, :error, "Failed to create task")}
       end
     end
+  end
+
+  @impl true
+  def handle_info(:tasks_changed, socket) do
+    socket = load_tasks(socket)
+
+    socket =
+      if socket.assigns.selected_task && socket.assigns.show_task_detail_drawer do
+        task = Tasks.get_task!(socket.assigns.selected_task.id)
+        notes = Notes.list_notes_for_task(task.id)
+        socket |> assign(:selected_task, task) |> assign(:task_notes, notes)
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   defp parse_int(s, default \\ 0) do

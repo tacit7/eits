@@ -182,7 +182,7 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
          caller_pid,
          session_id,
          accumulated_text,
-         fallback_session_id \\ nil
+         fallback_session_id
        ) do
     receive do
       {:claude_output, _cli_ref, line} ->

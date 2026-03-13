@@ -58,7 +58,7 @@ caddy trust
 caddy run --config Caddyfile
 ```
 
-Caddy listens on port 443 and proxies to Phoenix on port 5001 (HTTPS). Phoenix also has a direct HTTPS listener on port 5001 (`priv/cert/localhost+2.pem`) for API and MCP access without going through Caddy — that cert is for `localhost`, not `eits.dev`, so WebAuthn still requires Caddy on 443.
+Caddy listens on 443, terminates TLS with `tls internal`, and proxies to Phoenix on port 5000 (plain HTTP). Both `https://eits.dev` and `https://localhost` are served. Phoenix does not handle TLS directly.
 
 ## 4. Start Phoenix
 
@@ -70,18 +70,13 @@ App is available at `https://eits.dev`.
 
 ## 5. Register the first user
 
-WebAuthn registration requires a one-time token. Generate one in iex:
+WebAuthn registration requires a one-time token. Generate one with:
 
 ```bash
-iex -S mix
+mix eits.register
 ```
 
-```elixir
-{:ok, token} = EyeInTheSkyWeb.Accounts.create_registration_token("your_username")
-IO.puts("https://eits.dev/auth/register?token=#{token.token}")
-```
-
-Open that URL in the browser. It will prompt you to register a passkey (Touch ID, Face ID, or hardware key). Token expires in 15 minutes.
+Open the printed URL in the browser. It will prompt you to register a passkey (Touch ID, Face ID, or hardware key). Token expires in 15 minutes.
 
 After registering, log in at `https://eits.dev/auth/login`.
 
@@ -107,16 +102,16 @@ Hooks registered:
 
 ## 7. MCP Server
 
-The EITS MCP server runs at `https://localhost:5001/mcp`. Add to `~/.claude/settings.json` under `mcpServers`:
+The EITS MCP server runs at `https://eits.dev/mcp`. Add to `~/.claude/settings.json` under `mcpServers`:
 
 ```json
 "eits-web": {
   "type": "http",
-  "url": "https://localhost:5001/mcp"
+  "url": "https://eits.dev/mcp"
 }
 ```
 
-## 8. API Key
+## 8. API Key & Environment
 
 The REST API requires a bearer token. Generate one with:
 
@@ -124,17 +119,23 @@ The REST API requires a bearer token. Generate one with:
 mix eits.gen.api_key
 ```
 
-Add the output to `~/.zshrc`:
+Copy `.env.example` to `.env` and fill in the generated key:
+
+```bash
+cp .env.example .env
+# edit .env and set EITS_API_KEY
+```
+
+Phoenix loads `.env` automatically at startup via `dotenvy`.
+
+Also export the key in your shell so CLI scripts pick it up:
 
 ```bash
 export EITS_API_KEY="<generated-key>"
+export EITS_API_URL="https://eits.dev/api/v1"
 ```
 
-Start the server with the key set:
-
-```bash
-EITS_API_KEY="<generated-key>" mix phx.server
-```
+Add both to `~/.zshrc` for persistence.
 
 ## 9. PWA & Web Push (Optional)
 
@@ -164,11 +165,12 @@ Set `WEB_PUSH_ENCRYPTION_KEY` env var (base64-encoded 16-byte key) for push encr
 
 The `scripts/eits` script provides shell access to the REST API.
 
-**Add to PATH** (add to `~/.zshrc` or `~/.bashrc`):
+**Add to PATH** (add to `~/.zshrc`):
 
 ```bash
 export PATH="$HOME/projects/eits/web/scripts:$PATH"
-export EITS_API_KEY="<generated-key>"   # from mix eits.gen.api_key
+export EITS_API_KEY="<generated-key>"
+export EITS_API_URL="https://eits.dev/api/v1"
 ```
 
 **Usage:**
@@ -182,7 +184,7 @@ eits notes create --parent-type session --parent-id <uuid> --body "finding"
 eits dm --from agent-1 --to <session_uuid> --message "hello"
 ```
 
-The script defaults to `https://localhost:5001/api/v1`. Override per-call with `EITS_URL=<url> eits ...`. Reads `EITS_API_KEY` for auth. Uses `-k` to accept the self-signed dev cert. Requires `curl` and `jq`.
+Requires `curl` and `jq`.
 
 ---
 
@@ -212,8 +214,8 @@ To switch back to local DB, update `Caddyfile` to proxy to `localhost:5000` and 
 | | Local | Supabase worktree |
 |--|--|--|
 | DB | `eits_dev` on localhost | Supabase PostgreSQL (IPv6) |
-| Port | 5000 | 5002 |
-| HTTPS listener | Port 5001 (self-signed) | Disabled (Caddy handles TLS) |
+| Port | 5000 (HTTP) | 5002 |
+| TLS | Caddy handles (port 443) | Caddy handles (port 443) |
 | Oban notifier | `Oban.Notifiers.PG` | `Oban.Notifiers.Postgres` (poll-based; Supabase `postgres` user can't use `LISTEN/NOTIFY`) |
 | `socket_options` | default | `[:inet6]` (Supabase direct connection is IPv6-only) |
 
@@ -243,8 +245,8 @@ pg_dump eits_dev --no-owner --no-acl --data-only | \
 ## Key Notes
 
 - Migrations auto-run on startup via `Ecto.Migrator` — no manual step needed beyond `ecto.setup`
-- Caddy `tls internal` auto-generates and manages the local cert; no manual cert generation needed
-- Phoenix HTTPS listener is on port 5001 (`priv/cert/localhost+2.pem`); that cert is for `localhost`, not `eits.dev` — use Caddy on 443 for WebAuthn. Use `https://localhost:5001` for direct API/MCP access
+- Caddy `tls internal` auto-generates and manages the local cert; run `caddy trust` once to install the CA
+- Phoenix serves plain HTTP on port 5000; Caddy handles all TLS on port 443
+- `.env` is loaded automatically at startup via `dotenvy`; copy `.env.example` to get started
 - No `.tool-versions` or `.nvmrc` — use Node 22 LTS
-- No `.env.example` — dev uses hardcoded values in `config/dev.exs`; prod vars are documented in `config/runtime.exs`
 - Oban background jobs require the DB to be up before server starts

@@ -29,7 +29,11 @@ done
 [[ ${#hashes[@]} -eq 0 ]] && { echo "Error: at least one commit hash required" >&2; exit 1; }
 
 hashes_json=$(printf '%s\n' "${hashes[@]}" | jq -R . | jq -s .)
-messages_json=$(printf '%s\n' "${messages[@]}" | jq -R . | jq -s .)
+if [[ ${#messages[@]} -gt 0 ]]; then
+  messages_json=$(printf '%s\n' "${messages[@]}" | jq -R . | jq -s .)
+else
+  messages_json='[]'
+fi
 
 body=$(jq -n \
   --arg aid "$agent_id" \

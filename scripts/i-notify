@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# i-notify - Send a notification
+# Usage:
+#   i-notify --title STR [--body STR] [--category agent|job|system]
+#             [--resource_type STR] [--resource_id STR]
+
+set -euo pipefail
+
+BASE=${EITS_API_URL:-https://localhost:5001/api/v1}
+
+_curl() { curl -sk ${EITS_API_KEY:+-H "Authorization: Bearer ${EITS_API_KEY}"} "$@"; }
+_ok() { local r="$1"; echo "$r" | jq .; if echo "$r" | jq -e '.error' &>/dev/null; then exit 1; fi; }
+
+body="{}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --title)         body=$(echo "$body" | jq --arg v "$2" '. + {title: $v}'); shift 2 ;;
+    --body)          body=$(echo "$body" | jq --arg v "$2" '. + {body: $v}'); shift 2 ;;
+    --category)      body=$(echo "$body" | jq --arg v "$2" '. + {category: $v}'); shift 2 ;;
+    --resource_type) body=$(echo "$body" | jq --arg v "$2" '. + {resource_type: $v}'); shift 2 ;;
+    --resource_id)   body=$(echo "$body" | jq --arg v "$2" '. + {resource_id: $v}'); shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+title=$(echo "$body" | jq -r '.title // empty')
+[[ -z "$title" ]] && { echo "Error: --title required" >&2; exit 1; }
+
+_ok "$(_curl -X POST "$BASE/notifications" -H 'Content-Type: application/json' -d "$body")"

@@ -97,7 +97,7 @@ case "$cmd" in
         *) shift ;;
       esac
     done
-    _ok "$(_curl -X POST "$BASE/tasks/$id/annotate" -H 'Content-Type: application/json' -d "$body")"
+    _ok "$(_curl -X POST "$BASE/tasks/$id/annotations" -H 'Content-Type: application/json' -d "$body")"
     ;;
 
   delete)
@@ -124,8 +124,18 @@ case "$cmd" in
     _ok "$(_curl -X POST "$BASE/tasks/$id/sessions" -H 'Content-Type: application/json' -d "{\"session_id\":\"$sid\"}")"
     ;;
 
+  remove-session)
+    id="${1:?task id required}"; shift
+    sid="$SESSION_ID"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in --session_id) sid="$2"; shift 2 ;; *) shift ;; esac
+    done
+    [[ -z "$sid" ]] && { echo "Error: session_id required" >&2; exit 1; }
+    _ok "$(_curl -X DELETE "$BASE/tasks/$id/sessions/$sid")"
+    ;;
+
   *)
-    echo "Usage: i-todo <list|get|create|start|done|status|annotate|delete|search|add-session> [args...]" >&2
+    echo "Usage: i-todo <list|get|create|start|done|status|annotate|delete|search|add-session|remove-session> [args...]" >&2
     exit 1
     ;;
 esac

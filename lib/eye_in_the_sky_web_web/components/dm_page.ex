@@ -472,6 +472,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           class="px-4 py-2 overflow-y-auto flex-1 min-h-0"
           id="messages-container"
           phx-hook="AutoScroll"
+          data-has-more={if @has_more_messages, do: "true", else: "false"}
           style="scrollbar-width: none; -ms-overflow-style: none;"
         >
           <%= if @messages == [] do %>
@@ -875,10 +876,9 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 >
                   <li class="menu-title text-[10px] px-3 pt-1 pb-0.5 text-base-content/40">Effort Level</li>
                   <%= for {label, value, desc, icon_color} <- [
-                    {"Low", "low", "Quick, minimal reasoning", "text-success"},
+                    {"Low", "low", "Faster and cheaper", "text-success"},
                     {"Medium", "medium", "Balanced (default)", "text-info"},
-                    {"High", "high", "Thorough analysis", "text-warning"},
-                    {"Max", "max", "Maximum reasoning depth", "text-error"}
+                    {"High", "high", "Deeper reasoning", "text-warning"}
                   ] do %>
                     <li>
                       <a
@@ -1233,7 +1233,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                   task.completed_at && "text-base-content/40 line-through",
                   !task.completed_at && "text-base-content/85"
                 ]}>
-                  {task.title}
+                  {String.trim(task.title || "")}
                 </span>
                 <div class="flex items-center gap-1.5 mt-0.5 text-[11px]">
                   <%= if task.state do %>
@@ -1263,7 +1263,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             <%= if task.description do %>
               <div class="collapse-content px-0 pb-4">
                 <div class="pl-8 text-sm text-base-content/65 leading-relaxed whitespace-pre-wrap">
-                  {task.description}
+                  {String.trim(task.description || "")}
                 </div>
               </div>
             <% end %>
@@ -1506,7 +1506,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   defp effort_display_name("low"), do: "Low"
   defp effort_display_name("medium"), do: "Medium"
   defp effort_display_name("high"), do: "High"
-  defp effort_display_name("max"), do: "Max"
   defp effort_display_name(_), do: "Medium"
 
   defp format_size(bytes) when bytes < 1024, do: "#{bytes} B"

@@ -59,6 +59,11 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   end
 
   @impl true
+  def handle_event("open_mobile", _params, socket) do
+    {:noreply, assign(socket, :mobile_open, true)}
+  end
+
+  @impl true
   def handle_event("close_mobile", _params, socket) do
     {:noreply, assign(socket, :mobile_open, false)}
   end

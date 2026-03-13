@@ -242,6 +242,53 @@ pg_dump eits_dev --no-owner --no-acl --data-only | \
 
 ---
 
+## ngrok (External Access / Tunneling)
+
+ngrok creates a public HTTPS tunnel to your local dev server, useful for testing webhooks, mobile access, or sharing your dev instance.
+
+**Install:**
+
+```bash
+brew install ngrok
+```
+
+**Authenticate (one-time):**
+
+Sign up at [ngrok.com](https://ngrok.com), then:
+
+```bash
+ngrok config add-authtoken <your-token>
+```
+
+Get your token from the ngrok dashboard under "Your Authtoken". Without this step you'll get `err_ngrok_3004`.
+
+**Start tunnel:**
+
+```bash
+# Tunnel to Phoenix — must specify http:// explicitly
+ngrok http http://localhost:5000
+```
+
+ngrok will display a public URL like `https://abc123.ngrok-free.app`. Use that to access your local app externally.
+
+**Important:** Always use `http://localhost:5000`, not just `5000`. Without the scheme, ngrok may try HTTPS to your upstream and fail with `err_ngrok_3004` ("invalid or incomplete HTTP response").
+
+**Common errors:**
+
+| Error | Fix |
+|-------|-----|
+| `err_ngrok_3004` (auth) | Run `ngrok config add-authtoken <token>` |
+| `err_ngrok_3004` (gateway) | Use `ngrok http http://localhost:5000` — ngrok is sending HTTPS to a plain HTTP server |
+| `err_ngrok_108` | ngrok agent already running; kill it with `pkill ngrok` |
+| `err_ngrok_334` | Endpoint already online; kill existing ngrok first |
+
+**Notes:**
+- Free tier gives one tunnel at a time with random subdomain
+- The public URL changes each restart unless you have a paid plan with reserved domains
+- LiveView WebSocket connections work through ngrok out of the box
+
+---
+
 ## Key Notes
 
 - Migrations auto-run on startup via `Ecto.Migrator` — no manual step needed beyond `ecto.setup`

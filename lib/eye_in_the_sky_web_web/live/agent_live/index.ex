@@ -32,6 +32,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       |> assign(:sidebar_tab, :sessions)
       |> assign(:sidebar_project, nil)
       |> assign(:selected_ids, MapSet.new())
+      |> assign(:show_delete_confirm, false)
       |> load_agents()
       |> schedule_refresh()
 
@@ -166,24 +167,29 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                body: body
              }) do
           {:ok, _message} ->
-            with {:ok, chat_agent} <- Agents.get_agent(session.agent_id) do
-              project_path = chat_agent.git_worktree_path || File.cwd!()
+            case Agents.get_agent(session.agent_id) do
+              {:ok, chat_agent} ->
+                project_path = chat_agent.git_worktree_path || File.cwd!()
 
-              prompt_with_reminder = """
-              REMINDER: Use i-chat-send MCP tool to send your response to the channel.
+                prompt_with_reminder = """
+                REMINDER: Use i-chat-send MCP tool to send your response to the channel.
 
-              User message: #{body}
-              """
+                User message: #{body}
+                """
 
-              EyeInTheSkyWeb.Claude.AgentManager.continue_session(
-                session.id,
-                prompt_with_reminder,
-                model: "sonnet",
-                project_path: project_path
-              )
+                EyeInTheSkyWeb.Claude.AgentManager.continue_session(
+                  session.id,
+                  prompt_with_reminder,
+                  model: "sonnet",
+                  project_path: project_path
+                )
+
+                {:noreply, socket}
+
+              _ ->
+                Logger.warning("send_direct_message: agent #{session.agent_id} not found, message sent but session not continued")
+                {:noreply, socket}
             end
-
-            {:noreply, socket}
 
           {:error, _} ->
             {:noreply, put_flash(socket, :error, "Failed to send message")}
@@ -265,6 +271,16 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   @impl true
+  def handle_event("confirm_delete_selected", _params, socket) do
+    {:noreply, assign(socket, :show_delete_confirm, true)}
+  end
+
+  @impl true
+  def handle_event("cancel_delete_selected", _params, socket) do
+    {:noreply, assign(socket, :show_delete_confirm, false)}
+  end
+
+  @impl true
   def handle_event("delete_selected", _params, socket) do
     ids = socket.assigns.selected_ids
 
@@ -283,6 +299,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     socket =
       socket
       |> assign(:selected_ids, MapSet.new())
+      |> assign(:show_delete_confirm, false)
       |> load_agents()
       |> put_flash(:info, "Deleted #{deleted} session#{if deleted != 1, do: "s"}")
 
@@ -315,13 +332,21 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   defp create_new_session_with_project(params, project_id, socket) do
+    case EyeInTheSkyWeb.Projects.get_project(project_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Project not found")}
+
+      project ->
+        do_create_session(params, project, socket)
+    end
+  end
+
+  defp do_create_session(params, project, socket) do
     agent_type = params["agent_type"] || "claude"
     model = params["model"]
     effort_level = params["effort_level"]
     description = params["description"]
     agent_name = params["agent_name"] || String.slice(description || "", 0, 60)
-
-    project = EyeInTheSkyWeb.Projects.get_project!(project_id)
 
     worktree =
       case params["worktree"] do
@@ -334,7 +359,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       agent_type: agent_type,
       model: model,
       effort_level: effort_level,
-      project_id: project_id,
+      project_id: project.id,
       project_path: project.path,
       description: agent_name,
       instructions: description,
@@ -343,7 +368,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     ]
 
     Logger.info(
-      "create_new_session: model=#{model}, effort=#{inspect(effort_level)}, project_id=#{project_id}, project_path=#{project.path}"
+      "create_new_session: model=#{model}, effort=#{inspect(effort_level)}, project_id=#{project.id}, project_path=#{project.path}"
     )
 
     case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
@@ -549,7 +574,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       </div>
 
       <div class="flex items-center gap-0.5 flex-shrink-0" phx-click={%JS{}}>
-        <%= if @agent.id do %>
           <a
             href={~p"/dm/#{@agent.id}"}
             target="_blank"
@@ -558,7 +582,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
           >
             <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
           </a>
-        <% end %>
         <%= if @agent.agent && @agent.agent.uuid && @agent.uuid do %>
           <button
             id={"bookmark-btn-#{@agent.uuid}"}
@@ -622,7 +645,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
         <div class="sticky safe-top-sticky md:top-16 z-10 bg-base-100/85 backdrop-blur-md -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 border-b border-base-content/5">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
-            <form phx-submit="search" phx-change="search" class="flex-1 max-w-sm">
+            <form phx-change="search" class="flex-1 max-w-sm">
               <label for="search" class="sr-only">Search agents</label>
               <div class="relative">
                 <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -653,7 +676,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
             />
             <%= if MapSet.size(@selected_ids) > 0 do %>
               <span class="text-[11px] text-base-content/50 font-medium">{MapSet.size(@selected_ids)} selected</span>
-              <button phx-click="delete_selected" class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1">
+              <button phx-click="confirm_delete_selected" class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1">
                 <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
               </button>
             <% else %>
@@ -676,6 +699,22 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
         </div>
       </div>
     </div>
+
+    <dialog id="delete-confirm-modal" class={"modal " <> if(@show_delete_confirm, do: "modal-open", else: "")}>
+      <div class="modal-box max-w-sm">
+        <h3 class="text-lg font-bold">Delete sessions</h3>
+        <p class="py-4 text-sm text-base-content/70">
+          Permanently delete {MapSet.size(@selected_ids)} selected session{if MapSet.size(@selected_ids) != 1, do: "s"}? This cannot be undone.
+        </p>
+        <div class="modal-action">
+          <button phx-click="cancel_delete_selected" class="btn btn-sm btn-ghost">Cancel</button>
+          <button phx-click="delete_selected" class="btn btn-sm btn-error">Delete</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button phx-click="cancel_delete_selected">close</button>
+      </form>
+    </dialog>
 
     <.live_component
       module={EyeInTheSkyWebWeb.Components.NewSessionModal}

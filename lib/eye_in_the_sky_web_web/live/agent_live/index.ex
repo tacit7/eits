@@ -93,8 +93,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
           [
             s.uuid,
             s.name,
-            s.agent.description,
-            s.agent.project_name
+            s.agent && s.agent.description,
+            s.agent && s.agent.project_name
           ]
           |> Enum.map(&to_string_or_empty/1)
           |> Enum.join(" ")
@@ -153,57 +153,52 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
         %{"session_id" => target_session_id, "body" => body},
         socket
       ) do
-    # Get the global channel — try agent's project first, fall back to all channels
-    project_id =
-      case Sessions.get_session(target_session_id) do
-        {:ok, agent} -> agent.project_id
-        _ -> nil
-      end
+    # Fetch session once, reuse below
+    with {:ok, session} <- Sessions.get_session(target_session_id) do
+      channels =
+        if session.project_id,
+          do: EyeInTheSkyWeb.Channels.list_channels_for_project(session.project_id),
+          else: EyeInTheSkyWeb.Channels.list_channels()
 
-    channels =
-      if project_id,
-        do: EyeInTheSkyWeb.Channels.list_channels_for_project(project_id),
-        else: EyeInTheSkyWeb.Channels.list_channels()
+      global_channel = Enum.find(channels, fn c -> c.name == "#global" end)
 
-    global_channel = Enum.find(channels, fn c -> c.name == "#global" end)
+      if global_channel do
+        case EyeInTheSkyWeb.Messages.send_channel_message(%{
+               channel_id: global_channel.id,
+               session_id: "web-user",
+               sender_role: "user",
+               recipient_role: "agent",
+               provider: "claude",
+               body: body
+             }) do
+          {:ok, _message} ->
+            with {:ok, chat_agent} <- Agents.get_agent(session.agent_id) do
+              project_path = chat_agent.git_worktree_path || File.cwd!()
 
-    if global_channel do
-      # Send message via the chat system
-      case EyeInTheSkyWeb.Messages.send_channel_message(%{
-             channel_id: global_channel.id,
-             session_id: "web-user",
-             sender_role: "user",
-             recipient_role: "agent",
-             provider: "claude",
-             body: body
-           }) do
-        {:ok, _message} ->
-          # Continue the agent's session
-          with {:ok, agent} <- Sessions.get_session(target_session_id),
-               {:ok, chat_agent} <- Agents.get_agent(agent.agent_id) do
-            project_path = chat_agent.git_worktree_path || File.cwd!()
+              prompt_with_reminder = """
+              REMINDER: Use i-chat-send MCP tool to send your response to the channel.
 
-            prompt_with_reminder = """
-            REMINDER: Use i-chat-send MCP tool to send your response to the channel.
+              User message: #{body}
+              """
 
-            User message: #{body}
-            """
+              EyeInTheSkyWeb.Claude.AgentManager.continue_session(
+                session.id,
+                prompt_with_reminder,
+                model: "sonnet",
+                project_path: project_path
+              )
+            end
 
-            EyeInTheSkyWeb.Claude.AgentManager.continue_session(
-              agent.id,
-              prompt_with_reminder,
-              model: "sonnet",
-              project_path: project_path
-            )
-          end
+            {:noreply, socket}
 
-          {:noreply, socket}
-
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to send message")}
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Failed to send message")}
+        end
+      else
+        {:noreply, put_flash(socket, :error, "Global channel not found")}
       end
     else
-      {:noreply, put_flash(socket, :error, "Global channel not found")}
+      _ -> {:noreply, put_flash(socket, :error, "Session not found")}
     end
   end
 
@@ -364,10 +359,55 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_event("create_new_session", params, socket) do
+    project_id =
+      case Integer.parse(params["project_id"] || "") do
+        {id, ""} -> id
+        _ -> nil
+      end
+
+    if is_nil(project_id) do
+      {:noreply, put_flash(socket, :error, "Invalid project")}
+    else
+      create_new_session_with_project(params, project_id, socket)
+    end
+  end
+
+  # SDK Demo event handlers
+  @impl true
+  def handle_event("toggle_sdk_demo", _params, socket) do
+    {:noreply, assign(socket, :show_sdk_demo, !socket.assigns.show_sdk_demo)}
+  end
+
+  @impl true
+  def handle_event("sdk_send_message", %{"prompt" => prompt}, socket) do
+    case SDK.start(prompt, to: self(), model: "haiku", max_turns: 1) do
+      {:ok, ref} ->
+        socket =
+          socket
+          |> assign(:sdk_ref, ref)
+          |> assign(:sdk_prompt, "")
+          |> assign(:sdk_messages, [%{type: :user, content: prompt}])
+
+        {:noreply, socket}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "SDK error: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("sdk_clear", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:sdk_messages, [])
+     |> assign(:sdk_ref, nil)
+     |> assign(:sdk_session_id, nil)}
+  end
+
+  defp create_new_session_with_project(params, project_id, socket) do
     agent_type = params["agent_type"] || "claude"
     model = params["model"]
     effort_level = params["effort_level"]
-    project_id = String.to_integer(params["project_id"])
     description = params["description"]
     agent_name = params["agent_name"] || String.slice(description || "", 0, 60)
 
@@ -414,38 +454,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
         Logger.error("create_new_session: failed - #{inspect(reason)}")
         {:noreply, put_flash(socket, :error, "Failed to create session: #{inspect(reason)}")}
     end
-  end
-
-  # SDK Demo event handlers
-  @impl true
-  def handle_event("toggle_sdk_demo", _params, socket) do
-    {:noreply, assign(socket, :show_sdk_demo, !socket.assigns.show_sdk_demo)}
-  end
-
-  @impl true
-  def handle_event("sdk_send_message", %{"prompt" => prompt}, socket) do
-    case SDK.start(prompt, to: self(), model: "haiku", max_turns: 1) do
-      {:ok, ref} ->
-        socket =
-          socket
-          |> assign(:sdk_ref, ref)
-          |> assign(:sdk_prompt, "")
-          |> assign(:sdk_messages, [%{type: :user, content: prompt}])
-
-        {:noreply, socket}
-
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "SDK error: #{inspect(reason)}")}
-    end
-  end
-
-  @impl true
-  def handle_event("sdk_clear", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:sdk_messages, [])
-     |> assign(:sdk_ref, nil)
-     |> assign(:sdk_session_id, nil)}
   end
 
   @impl true

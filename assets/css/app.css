@@ -351,13 +351,13 @@ code.hljs { padding: 3px 5px; }
   --d2h-empty-placeholder-bg-color: hsla(215, 8%, 47%, 0.1);
   --d2h-empty-placeholder-border-color: hsl(60, 2%, 23%);
   --d2h-selected-color: rgba(56, 139, 253, 0.1);
-  --d2h-ins-bg-color: rgba(46, 160, 67, 0.15);
-  --d2h-ins-border-color: rgba(46, 160, 67, 0.4);
-  --d2h-ins-highlight-bg-color: rgba(46, 160, 67, 0.4);
+  --d2h-ins-bg-color: rgba(46, 160, 67, 0.25);
+  --d2h-ins-border-color: rgba(46, 160, 67, 0.5);
+  --d2h-ins-highlight-bg-color: rgba(46, 160, 67, 0.55);
   --d2h-ins-label-color: #3fb950;
-  --d2h-del-bg-color: rgba(248, 81, 73, 0.1);
-  --d2h-del-border-color: rgba(248, 81, 73, 0.4);
-  --d2h-del-highlight-bg-color: rgba(248, 81, 73, 0.4);
+  --d2h-del-bg-color: rgba(248, 81, 73, 0.22);
+  --d2h-del-border-color: rgba(248, 81, 73, 0.5);
+  --d2h-del-highlight-bg-color: rgba(248, 81, 73, 0.55);
   --d2h-del-label-color: #f85149;
   --d2h-change-del-color: rgba(210, 153, 34, 0.2);
   --d2h-change-ins-color: rgba(46, 160, 67, 0.25);
@@ -374,6 +374,20 @@ code.hljs { padding: 3px 5px; }
   --d2h-file-header-border-color: oklch(83% 0.012 80);
   --d2h-empty-placeholder-bg-color: oklch(90% 0.006 80);
   --d2h-empty-placeholder-border-color: oklch(83% 0.012 80);
+  /* ins/del colors: clearly visible but not neon */
+  --d2h-ins-bg-color: #e6f4ea;
+  --d2h-ins-border-color: #a8d5b0;
+  --d2h-ins-highlight-bg-color: #b8e0be;
+  --d2h-ins-label-color: #276b30;
+  --d2h-del-bg-color: #fce8e6;
+  --d2h-del-border-color: #f0b8b4;
+  --d2h-del-highlight-bg-color: #f5c4c0;
+  --d2h-del-label-color: #a83232;
+  --d2h-change-del-color: #fef3d0;
+  --d2h-change-ins-color: #e8f5e9;
+  --d2h-info-bg-color: oklch(94% 0.008 250);
+  --d2h-info-border-color: oklch(84% 0.015 250);
+  --d2h-dim-color: rgba(0, 0, 0, 0.35);
 }
 
 /* ===== DM Composer: keyboard-aware scroll anchoring ===== */

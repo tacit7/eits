@@ -7,6 +7,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   import EyeInTheSkyWebWeb.Helpers.ViewHelpers
   import EyeInTheSkyWebWeb.Components.Icons
 
+  require Logger
+
   @default_refresh_ms 300_000
 
   @impl true
@@ -240,13 +242,12 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_event("archive_session", %{"session_id" => session_id}, socket) do
-    require Logger
-    Logger.info("🗄️  Archive button clicked for session: #{session_id}")
+    Logger.info("Archive button clicked for session: #{session_id}")
 
     with {:ok, agent} <- Sessions.get_session(session_id),
          {:ok, updated} <- Sessions.archive_session(agent) do
       Logger.info(
-        "✅ Session archived successfully: #{session_id}, archived_at now: #{inspect(updated.archived_at)}"
+        "Session archived successfully: #{session_id}, archived_at: #{inspect(updated.archived_at)}"
       )
 
       socket =
@@ -257,20 +258,19 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       {:noreply, socket}
     else
       {:error, reason} ->
-        Logger.error("❌ Failed to archive session #{session_id}: #{inspect(reason)}")
+        Logger.error("Failed to archive session #{session_id}: #{inspect(reason)}")
         {:noreply, put_flash(socket, :error, "Failed to archive session")}
     end
   end
 
   @impl true
   def handle_event("unarchive_session", %{"session_id" => session_id}, socket) do
-    require Logger
-    Logger.info("🔄 Unarchive button clicked for session: #{session_id}")
+    Logger.info("Unarchive button clicked for session: #{session_id}")
 
     with {:ok, agent} <- Sessions.get_session(session_id),
          {:ok, updated} <- Sessions.unarchive_session(agent) do
       Logger.info(
-        "✅ Session unarchived successfully: #{session_id}, archived_at now: #{inspect(updated.archived_at)}"
+        "Session unarchived successfully: #{session_id}, archived_at: #{inspect(updated.archived_at)}"
       )
 
       socket =
@@ -281,7 +281,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       {:noreply, socket}
     else
       {:error, reason} ->
-        Logger.error("❌ Failed to unarchive session #{session_id}: #{inspect(reason)}")
+        Logger.error("Failed to unarchive session #{session_id}: #{inspect(reason)}")
         {:noreply, put_flash(socket, :error, "Failed to unarchive session")}
     end
   end
@@ -364,8 +364,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_event("create_new_session", params, socket) do
-    require Logger
-
     agent_type = params["agent_type"] || "claude"
     model = params["model"]
     effort_level = params["effort_level"]
@@ -395,13 +393,13 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     ]
 
     Logger.info(
-      "🚀 create_new_session: model=#{model}, effort=#{inspect(effort_level)}, project_id=#{project_id}, project_path=#{project.path}"
+      "create_new_session: model=#{model}, effort=#{inspect(effort_level)}, project_id=#{project_id}, project_path=#{project.path}"
     )
 
     case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
       {:ok, result} ->
         Logger.info(
-          "✅ create_new_session: agent created - agent_id=#{result.agent.id}, session_id=#{result.agent.id}, session_uuid=#{result.agent.uuid}"
+          "create_new_session: agent created - agent_id=#{result.agent.id}, session_id=#{result.agent.id}, session_uuid=#{result.agent.uuid}"
         )
 
         socket =
@@ -410,14 +408,10 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
           |> load_agents()
           |> put_flash(:info, "Session launched")
 
-        Logger.info(
-          "📤 create_new_session: returning success response to client, closing drawer, reloading sessions"
-        )
-
         {:noreply, socket}
 
       {:error, reason} ->
-        Logger.error("❌ create_new_session: failed - #{inspect(reason)}")
+        Logger.error("create_new_session: failed - #{inspect(reason)}")
         {:noreply, put_flash(socket, :error, "Failed to create session: #{inspect(reason)}")}
     end
   end
@@ -519,12 +513,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   @impl true
-  def handle_info({:claude_message, ref, %Message{}}, socket) do
-    if socket.assigns.sdk_ref == ref do
-      {:noreply, socket}
-    else
-      {:noreply, socket}
-    end
+  def handle_info({:claude_message, _ref, %Message{}}, socket) do
+    {:noreply, socket}
   end
 
   @impl true
@@ -580,7 +570,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   defp cancel_timer(socket), do: socket
 
   defp update_agent_status_in_list(socket, session_id, new_status) do
-    now = DateTime.utc_now() |> DateTime.to_iso8601()
+    now = NaiveDateTime.utc_now()
 
     updated_agents =
       socket.assigns.agents

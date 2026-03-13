@@ -8,7 +8,11 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
-    agents = Sessions.list_session_overview_rows(limit: @per_page, offset: 0)
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agents")
+    end
+
+    sessions = Sessions.list_session_overview_rows(limit: @per_page, offset: 0)
     total = Sessions.count_session_overview_rows()
     projects = EyeInTheSkyWeb.Projects.list_projects()
 
@@ -17,12 +21,10 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
       |> assign(:page_title, "Session Overview")
       |> assign(:projects, projects)
       |> assign(:page, 1)
-      |> assign(:has_more, length(agents) < total)
+      |> assign(:has_more, length(sessions) < total)
       |> assign(:total_sessions, total)
       |> assign(:show_new_session_modal, false)
-      |> assign(:sidebar_tab, :sessions)
-      |> assign(:sidebar_project, nil)
-      |> stream(:agents, agents, dom_id: fn a -> "si-#{a.session_uuid}" end)
+      |> stream(:sessions, sessions, dom_id: fn s -> "si-#{s.session_uuid}" end)
 
     {:ok, socket}
   end
@@ -34,16 +36,17 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
       offset = (next_page - 1) * @per_page
       total = socket.assigns.total_sessions
 
-      new_agents = Sessions.list_session_overview_rows(limit: @per_page, offset: offset)
+      new_sessions = Sessions.list_session_overview_rows(limit: @per_page, offset: offset)
 
       socket =
         socket
         |> assign(:page, next_page)
-        |> assign(:has_more, offset + length(new_agents) < total)
+        |> assign(:has_more, offset + length(new_sessions) < total)
 
-      socket = Enum.reduce(new_agents, socket, fn agent, acc ->
-        stream_insert(acc, :agents, agent)
-      end)
+      socket =
+        Enum.reduce(new_sessions, socket, fn session, acc ->
+          stream_insert(acc, :sessions, session)
+        end)
 
       {:noreply, socket}
     else
@@ -58,11 +61,6 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
 
   @impl true
   def handle_event("noop", _params, socket), do: {:noreply, socket}
-
-  @impl true
-  def handle_event("start_session", %{"agent_id" => _agent_id}, socket) do
-    {:noreply, socket}
-  end
 
   @impl true
   def handle_event("toggle_new_session_modal", _params, socket) do
@@ -91,16 +89,16 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
 
     case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
       {:ok, _result} ->
-        agents = Sessions.list_session_overview_rows(limit: @per_page, offset: 0)
+        sessions = Sessions.list_session_overview_rows(limit: @per_page, offset: 0)
         total = Sessions.count_session_overview_rows()
 
         socket =
           socket
           |> assign(:show_new_session_modal, false)
           |> assign(:page, 1)
-          |> assign(:has_more, length(agents) < total)
+          |> assign(:has_more, length(sessions) < total)
           |> assign(:total_sessions, total)
-          |> stream(:agents, agents, reset: true)
+          |> stream(:sessions, sessions, reset: true)
           |> put_flash(:info, "Session launched")
 
         {:noreply, socket}
@@ -108,6 +106,22 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Failed to create session: #{inspect(reason)}")}
     end
+  end
+
+  # Real-time: reload sessions list when agents change
+  @impl true
+  def handle_info({_event, _agent}, socket) do
+    sessions = Sessions.list_session_overview_rows(limit: socket.assigns.page * @per_page, offset: 0)
+    total = Sessions.count_session_overview_rows()
+
+    socket =
+      socket
+      |> assign(:page, 1)
+      |> assign(:has_more, length(sessions) < total)
+      |> assign(:total_sessions, total)
+      |> stream(:sessions, sessions, reset: true, dom_id: fn s -> "si-#{s.session_uuid}" end)
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -135,20 +149,20 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
             phx-update="stream"
             class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl px-4"
           >
-            <div :for={{dom_id, agent} <- @streams.agents} id={dom_id}>
+            <div :for={{dom_id, session} <- @streams.sessions} id={dom_id}>
               <.session_row
                 session={%{
-                  id: agent.session_id,
-                  uuid: agent.session_uuid,
-                  name: agent.session_name,
-                  status: agent.status,
-                  started_at: agent.started_at,
-                  ended_at: agent.ended_at,
-                  model_name: agent.model_name,
-                  model_provider: agent.model_provider,
-                  model_version: agent.model_version
+                  id: session.session_id,
+                  uuid: session.session_uuid,
+                  name: session.session_name,
+                  status: session.status,
+                  started_at: session.started_at,
+                  ended_at: session.ended_at,
+                  model_name: session.model_name,
+                  model_provider: session.model_provider,
+                  model_version: session.model_version
                 }}
-                project_name={agent.project_name}
+                project_name={session.project_name}
                 click_event="navigate_dm"
               />
             </div>

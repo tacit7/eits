@@ -300,7 +300,6 @@ defmodule EyeInTheSkyWeb.Sessions do
     include_archived = Keyword.get(opts, :include_archived, false)
     project_id = Keyword.get(opts, :project_id, nil)
     search_query = Keyword.get(opts, :search_query, "")
-    state_in_progress = EyeInTheSkyWeb.Tasks.state_in_progress()
 
     query =
       from(s in Session,
@@ -323,13 +322,7 @@ defmodule EyeInTheSkyWeb.Sessions do
           intent: s.intent,
           model_provider: s.model_provider,
           model_name: s.model_name,
-          model_version: s.model_version,
-          active_task:
-            fragment(
-              "(SELECT t.title FROM tasks t JOIN task_sessions ts ON t.id = ts.task_id WHERE ts.session_id = ? AND t.state_id = ? AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)",
-              s.id,
-              ^state_in_progress
-            )
+          model_version: s.model_version
         }
       )
 

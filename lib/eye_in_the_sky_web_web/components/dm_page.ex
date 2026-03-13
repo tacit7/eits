@@ -7,7 +7,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
     {"messages", "hero-chat-bubble-left-right", "Messages"},
     {"tasks", "hero-clipboard-document-list", "Tasks"},
     {"commits", "hero-code-bracket", "Commits"},
-    {"logs", "hero-command-line", "Logs"},
     {"notes", "hero-document-text", "Notes"}
   ]
 
@@ -24,7 +23,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :tasks, :list, default: []
   attr :commits, :list, default: []
   attr :diff_cache, :map, default: %{}
-  attr :logs, :list, default: []
   attr :notes, :list, default: []
   attr :show_live_stream, :boolean, default: false
   attr :stream_content, :string, default: ""
@@ -170,10 +168,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 phx-update="ignore"
                 data-push-state="disabled"
                 title="Enable push notifications"
-                class="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+                class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors"
               >
                 <.icon name="hero-bell" class="w-3.5 h-3.5" />
-                <span class="hidden sm:inline">Notify</span>
+                <span>Notify</span>
               </button>
             </div>
           </div>
@@ -237,8 +235,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             <.tasks_tab tasks={@tasks} />
           <% "commits" -> %>
             <.commits_tab commits={@commits} diff_cache={@diff_cache} />
-          <% "logs" -> %>
-            <.logs_tab logs={@logs} />
           <% "notes" -> %>
             <.notes_tab
               notes={@notes}
@@ -268,48 +264,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               ${:erlang.float_to_binary(@total_cost * 1.0, decimals: 4)}
             <% end %>
           </span>
-        </div>
-      <% end %>
-
-      <%!-- Execution HUD pill (bottom-center, visible when processing) --%>
-      <%= if @processing do %>
-        <div
-          id="execution-hud"
-          class="absolute bottom-[5.5rem] left-1/2 -translate-x-1/2 z-20"
-          phx-mounted={
-            JS.transition(
-              {"transition-all duration-200 ease-out", "translate-y-3 opacity-0",
-               "translate-y-0 opacity-100"}
-            )
-          }
-          phx-remove={
-            JS.transition(
-              {"transition-all duration-150 ease-in", "translate-y-0 opacity-100",
-               "translate-y-3 opacity-0"}
-            )
-          }
-        >
-          <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-base-200 border border-base-content/10 shadow-lg text-xs whitespace-nowrap">
-            <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse flex-shrink-0" />
-            <%= if @total_tokens > 0 do %>
-              <span class="text-base-content/25">·</span>
-              <span class="font-mono tabular-nums text-base-content/40">
-                {format_number(@total_tokens)} tok
-              </span>
-              <%= if @total_cost > 0.0 do %>
-                <span class="text-base-content/25">·</span>
-                <span class="font-mono tabular-nums text-base-content/40">
-                  ${:erlang.float_to_binary(@total_cost * 1.0, decimals: 4)}
-                </span>
-              <% end %>
-            <% end %>
-            <button
-              phx-click="kill_session"
-              class="ml-0.5 flex items-center gap-1 px-2 py-0.5 rounded-full bg-error/10 text-error/70 hover:bg-error/20 hover:text-error transition-colors font-medium"
-            >
-              <.icon name="hero-stop-circle" class="w-3.5 h-3.5" /> Stop
-            </button>
-          </div>
         </div>
       <% end %>
 
@@ -1071,62 +1025,67 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         id="dm-task-list"
       >
         <%= for task <- @tasks do %>
-          <div class="flex items-center gap-3 py-3.5" id={"dm-task-#{task.id}"}>
-            <%!-- Status dot --%>
-            <div class="flex-shrink-0 w-5 flex justify-center">
-              <%= if task.state_id == 2 do %>
-                <span class="relative flex h-2 w-2">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-info opacity-50"></span>
-                  <span class="relative inline-flex rounded-full h-2 w-2 bg-info"></span>
-                </span>
-              <% else %>
-                <span class={[
-                  "inline-flex rounded-full h-2 w-2",
-                  task.state_id == 3 && "bg-success",
-                  task.state_id == 4 && "bg-warning",
-                  task.state_id not in [2, 3, 4] && "bg-base-content/20"
-                ]}></span>
-              <% end %>
-            </div>
-
-            <%!-- Content --%>
-            <div class="flex-1 min-w-0">
-              <span class={[
-                "text-[13px] font-medium truncate block",
-                task.completed_at && "text-base-content/40 line-through",
-                !task.completed_at && "text-base-content/85"
-              ]}>
-                {task.title}
-              </span>
-              <div class="flex items-center gap-1.5 mt-0.5 text-[11px]">
-                <%= if task.state do %>
+          <div class={["collapse", task.description && "collapse-arrow"]} id={"dm-task-#{task.id}"}>
+            <input type="checkbox" class="min-h-0 p-0" disabled={is_nil(task.description)} />
+            <div class="collapse-title py-3.5 px-0 min-h-0 flex items-center gap-3">
+              <%!-- Status dot --%>
+              <div class="flex-shrink-0 w-5 flex justify-center">
+                <%= if task.state_id == 2 do %>
+                  <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-info opacity-50"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-info"></span>
+                  </span>
+                <% else %>
                   <span class={[
-                    "font-medium",
-                    task.state_id == 2 && "text-info/80",
-                    task.state_id == 3 && "text-success/80",
-                    task.state_id == 4 && "text-warning/80",
-                    task.state_id not in [2, 3, 4] && "text-base-content/45"
-                  ]}>
-                    {task.state.name}
-                  </span>
+                    "inline-flex rounded-full h-2 w-2",
+                    task.state_id == 3 && "bg-success",
+                    task.state_id == 4 && "bg-warning",
+                    task.state_id not in [2, 3, 4] && "bg-base-content/20"
+                  ]}></span>
                 <% end %>
-                <%= if task.tags && length(task.tags) > 0 do %>
-                  <span class="text-base-content/15">&middot;</span>
-                  <span class="text-base-content/35">
-                    {Enum.map_join(Enum.take(task.tags, 2), ", ", & &1.name)}
-                  </span>
-                <% end %>
-                <span class="text-base-content/15">&middot;</span>
-                <span class="font-mono text-base-content/30">
-                  {String.slice(task.uuid || to_string(task.id), 0..7)}
-                </span>
               </div>
-              <%= if task.description do %>
-                <p class="text-[12px] text-base-content/40 mt-0.5 truncate leading-snug">
-                  {task.description}
-                </p>
-              <% end %>
+
+              <%!-- Content --%>
+              <div class="flex-1 min-w-0">
+                <span class={[
+                  "text-[13px] font-medium truncate block",
+                  task.completed_at && "text-base-content/40 line-through",
+                  !task.completed_at && "text-base-content/85"
+                ]}>
+                  {task.title}
+                </span>
+                <div class="flex items-center gap-1.5 mt-0.5 text-[11px]">
+                  <%= if task.state do %>
+                    <span class={[
+                      "font-medium",
+                      task.state_id == 2 && "text-info/80",
+                      task.state_id == 3 && "text-success/80",
+                      task.state_id == 4 && "text-warning/80",
+                      task.state_id not in [2, 3, 4] && "text-base-content/45"
+                    ]}>
+                      {task.state.name}
+                    </span>
+                  <% end %>
+                  <%= if task.tags && length(task.tags) > 0 do %>
+                    <span class="text-base-content/15">&middot;</span>
+                    <span class="text-base-content/35">
+                      {Enum.map_join(Enum.take(task.tags, 2), ", ", & &1.name)}
+                    </span>
+                  <% end %>
+                  <span class="text-base-content/15">&middot;</span>
+                  <span class="font-mono text-base-content/30">
+                    {String.slice(task.uuid || to_string(task.id), 0..7)}
+                  </span>
+                </div>
+              </div>
             </div>
+            <%= if task.description do %>
+              <div class="collapse-content px-0 pb-4">
+                <div class="pl-8 text-sm text-base-content/65 leading-relaxed whitespace-pre-wrap">
+                  {task.description}
+                </div>
+              </div>
+            <% end %>
           </div>
         <% end %>
       </div>
@@ -1197,55 +1156,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                     class="diff2html-wrap text-xs"
                   />
               <% end %>
-            </div>
-          </div>
-        <% end %>
-      </div>
-    <% end %>
-    """
-  end
-
-  attr :logs, :list, default: []
-
-  defp logs_tab(assigns) do
-    ~H"""
-    <%= if @logs == [] do %>
-      <.empty_state
-        id="dm-logs-empty"
-        icon="hero-command-line"
-        title="No logs"
-        subtitle="Logs from this session will appear here"
-      />
-    <% else %>
-      <div
-        class="space-y-1 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4"
-        id="dm-log-list"
-      >
-        <%= for log <- @logs do %>
-          <div
-            class="rounded-lg border border-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] px-4 py-3"
-            id={"dm-log-#{log.id}"}
-          >
-            <div class="flex items-start gap-2">
-              <%= if Map.has_key?(log, :type) && log.type do %>
-                <span class="flex-shrink-0 mt-0.5 text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-base-content/8 text-base-content/50 uppercase tracking-wide">
-                  {log.type}
-                </span>
-              <% end %>
-              <div class="flex-1 min-w-0">
-                <div class="text-sm text-base-content/70 font-mono truncate">{log.message}</div>
-                <%= if Map.has_key?(log, :timestamp) && log.timestamp do %>
-                  <div class="text-[11px] text-base-content/30 tabular-nums mt-0.5">
-                    <time
-                      id={"log-time-#{log.id}"}
-                      data-utc={to_utc_string(log.timestamp)}
-                      data-fmt="short"
-                      phx-hook="LocalTime"
-                    >
-                    </time>
-                  </div>
-                <% end %>
-              </div>
             </div>
           </div>
         <% end %>

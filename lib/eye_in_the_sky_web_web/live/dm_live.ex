@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.DmLive do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.{Sessions, Agents, Commits, Logs, Messages, Notes, Repo, Tasks}
+  alias EyeInTheSkyWeb.{Sessions, Agents, Commits, Messages, Notes, Repo, Tasks}
   alias EyeInTheSkyWeb.Claude.{AgentManager, AgentWorker, SessionReader}
   alias EyeInTheSkyWeb.FileAttachments
   alias EyeInTheSkyWebWeb.Components.DmPage
@@ -691,21 +691,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       end)
     )
     |> assign(
-      :logs,
-      maybe_load_tab_data(tab, "logs", socket.assigns[:logs], fn ->
-        case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
-          {:ok, project_path} ->
-            case SessionReader.read_tool_events(socket.assigns.session_uuid, project_path) do
-              {:ok, events} -> events
-              _ -> Logs.list_logs_for_session(session_id)
-            end
-
-          _ ->
-            Logs.list_logs_for_session(session_id)
-        end
-      end)
-    )
-    |> assign(
       :notes,
       maybe_load_tab_data(tab, "notes", socket.assigns[:notes], fn ->
         Notes.list_notes_for_session(session_id)
@@ -940,7 +925,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         tasks={@tasks}
         commits={@commits}
         diff_cache={@diff_cache}
-        logs={@logs}
         notes={@notes}
         slash_items={@slash_items}
         show_new_task_drawer={@show_new_task_drawer}

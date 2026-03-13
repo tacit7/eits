@@ -65,8 +65,7 @@ export const BookmarkAgent = {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       return stored ? JSON.parse(stored) : [];
-    } catch (e) {
-      console.error('Failed to load bookmarks:', e);
+    } catch (_e) {
       return [];
     }
   },
@@ -74,8 +73,7 @@ export const BookmarkAgent = {
   saveBookmarks(bookmarks) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
-    } catch (e) {
-      console.error('Failed to save bookmarks:', e);
+    } catch (_e) {
     }
   },
 

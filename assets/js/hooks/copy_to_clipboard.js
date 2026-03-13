@@ -7,7 +7,7 @@ export const CopyToClipboard = {
       if (navigator.clipboard?.writeText) {
         navigator.clipboard
           .writeText(id)
-          .catch((err) => console.error("Failed to copy session id", err))
+          .catch(() => {})
       }
     }
 

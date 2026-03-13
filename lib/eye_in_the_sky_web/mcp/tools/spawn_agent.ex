@@ -31,7 +31,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
       description: "Parent session ID for tracking spawn hierarchy"
 
     field :team_name, :string,
-      description: "Team name to auto-join after spawn. Agent will call i-team-join on startup."
+      description: "Team name to join. Agent is registered as a member server-side immediately on spawn."
 
     field :member_name, :string,
       description: "Member alias within the team (e.g. 'researcher'). Required with team_name."
@@ -40,14 +40,19 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
   @impl true
   def execute(params, frame) do
     alias EyeInTheSkyWeb.Claude.AgentManager
+    alias EyeInTheSkyWeb.Teams
 
-    team_instructions = build_team_instructions(params)
+    # Resolve team before spawning so we can inject team_id into instructions
+    team =
+      case params[:team_name] do
+        nil -> nil
+        name -> Teams.get_team_by_name(name)
+      end
 
     instructions =
-      if team_instructions do
-        params[:instructions] <> "\n\n" <> team_instructions
-      else
-        params[:instructions]
+      case team do
+        nil -> params[:instructions]
+        t -> params[:instructions] <> "\n\n" <> build_team_context(t, params[:member_name])
       end
 
     opts = [
@@ -66,6 +71,8 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
     result =
       case AgentManager.create_agent(opts) do
         {:ok, %{agent: agent, session: session}} ->
+          maybe_join_team(team, agent, session, params[:member_name])
+
           base = %{
             success: true,
             message: "Agent spawned",
@@ -74,8 +81,8 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
             session_uuid: session.uuid
           }
 
-          if params[:team_name] do
-            Map.merge(base, %{team_name: params[:team_name], member_name: params[:member_name]})
+          if team do
+            Map.merge(base, %{team_id: team.id, team_name: team.name, member_name: params[:member_name]})
           else
             base
           end
@@ -88,17 +95,29 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
     {:reply, response, frame}
   end
 
-  defp build_team_instructions(%{team_name: team_name, member_name: name})
-       when is_binary(team_name) and is_binary(name) do
-    """
-    ## Team Context
-    You are part of team "#{team_name}" with the role/name "#{name}".
-    On startup, call i-team-join with team_name: "#{team_name}", name: "#{name}".
-    Use i-team-members to discover your teammates.
-    Use i-todo with team_id to list shared team tasks and claim work.
-    When you complete work, update your status with i-team-join (status: "done").
-    """
+  defp maybe_join_team(nil, _agent, _session, _name), do: :ok
+
+  defp maybe_join_team(team, agent, session, member_name) do
+    alias EyeInTheSkyWeb.Teams
+
+    Teams.join_team(%{
+      team_id: team.id,
+      agent_id: agent.id,
+      session_id: session.id,
+      name: member_name || agent.uuid,
+      role: member_name || "agent",
+      status: "active"
+    })
   end
 
-  defp build_team_instructions(_), do: nil
+  defp build_team_context(team, member_name) do
+    """
+    ## Team Context
+    You are member "#{member_name || "agent"}" of team "#{team.name}" (team_id: #{team.id}).
+    You have been registered as a team member automatically.
+    Use i-team-members with team_id: #{team.id} to discover your teammates.
+    Use i-todo list with team_id: #{team.id} to see shared tasks and claim work.
+    Use i-team-join with command: "status" to update your status (active/idle/done).
+    """
+  end
 end

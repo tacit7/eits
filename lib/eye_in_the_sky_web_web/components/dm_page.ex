@@ -21,7 +21,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :selected_effort, :string, default: ""
   attr :show_model_menu, :boolean, default: false
   attr :processing, :boolean, default: false
-  attr :processing_start_at, :integer, default: nil
   attr :tasks, :list, default: []
   attr :commits, :list, default: []
   attr :diff_cache, :map, default: %{}
@@ -165,6 +164,17 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               >
                 <.icon name="hero-cpu-chip" class="w-3.5 h-3.5" /> Memories
               </button>
+              <button
+                id="dm-push-setup-btn"
+                phx-hook="PushSetup"
+                phx-update="ignore"
+                data-push-state="disabled"
+                title="Enable push notifications"
+                class="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+              >
+                <.icon name="hero-bell" class="w-3.5 h-3.5" />
+                <span class="hidden sm:inline">Notify</span>
+              </button>
             </div>
           </div>
         </div>
@@ -281,14 +291,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         >
           <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-base-200 border border-base-content/10 shadow-lg text-xs whitespace-nowrap">
             <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse flex-shrink-0" />
-            <span
-              id="execution-timer"
-              phx-hook="ExecutionTimer"
-              data-start={@processing_start_at}
-              class="font-mono tabular-nums text-base-content/70 min-w-[3ch]"
-            >
-              0:00
-            </span>
             <%= if @total_tokens > 0 do %>
               <span class="text-base-content/25">·</span>
               <span class="font-mono tabular-nums text-base-content/40">
@@ -1065,48 +1067,65 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
       />
     <% else %>
       <div
-        class="space-y-1 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4"
+        class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-4"
         id="dm-task-list"
       >
         <%= for task <- @tasks do %>
-          <div
-            class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] hover:border-base-content/10 transition-colors"
-            id={"dm-task-#{task.id}"}
-          >
-            <input type="checkbox" />
-            <div class="collapse-title py-3 px-4 min-h-0">
-              <div class="flex items-start gap-3">
-                <.icon
-                  name="hero-clipboard-document-list"
-                  class="h-4 w-4 flex-shrink-0 text-base-content/30 mt-0.5"
-                />
-                <div class="flex-1 min-w-0">
-                  <h3 class="text-[13px] font-semibold text-base-content/85">
-                    {task.title}
-                  </h3>
-                  <%= if task.description do %>
-                    <p class="text-[12px] text-base-content/50 mt-0.5 line-clamp-2 leading-snug">
-                      {task.description}
-                    </p>
-                  <% end %>
-                  <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
-                    <span class="font-mono">
-                      {String.slice(task.uuid || to_string(task.id), 0..7)}
-                    </span>
-                    <%= if task.state do %>
-                      <span class="text-base-content/15">/</span>
-                      <span class="font-medium">{task.state.name}</span>
-                    <% end %>
-                  </div>
-                </div>
-              </div>
+          <div class="flex items-center gap-3 py-3.5" id={"dm-task-#{task.id}"}>
+            <%!-- Status dot --%>
+            <div class="flex-shrink-0 w-5 flex justify-center">
+              <%= if task.state_id == 2 do %>
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-info opacity-50"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-info"></span>
+                </span>
+              <% else %>
+                <span class={[
+                  "inline-flex rounded-full h-2 w-2",
+                  task.state_id == 3 && "bg-success",
+                  task.state_id == 4 && "bg-warning",
+                  task.state_id not in [2, 3, 4] && "bg-base-content/20"
+                ]}></span>
+              <% end %>
             </div>
-            <div class="collapse-content px-4 pb-4">
-              <div class="pl-[28px]">
-                <div class="whitespace-pre-wrap text-sm text-base-content/70 leading-relaxed">
-                  {task.description || "No description"}
-                </div>
+
+            <%!-- Content --%>
+            <div class="flex-1 min-w-0">
+              <span class={[
+                "text-[13px] font-medium truncate block",
+                task.completed_at && "text-base-content/40 line-through",
+                !task.completed_at && "text-base-content/85"
+              ]}>
+                {task.title}
+              </span>
+              <div class="flex items-center gap-1.5 mt-0.5 text-[11px]">
+                <%= if task.state do %>
+                  <span class={[
+                    "font-medium",
+                    task.state_id == 2 && "text-info/80",
+                    task.state_id == 3 && "text-success/80",
+                    task.state_id == 4 && "text-warning/80",
+                    task.state_id not in [2, 3, 4] && "text-base-content/45"
+                  ]}>
+                    {task.state.name}
+                  </span>
+                <% end %>
+                <%= if task.tags && length(task.tags) > 0 do %>
+                  <span class="text-base-content/15">&middot;</span>
+                  <span class="text-base-content/35">
+                    {Enum.map_join(Enum.take(task.tags, 2), ", ", & &1.name)}
+                  </span>
+                <% end %>
+                <span class="text-base-content/15">&middot;</span>
+                <span class="font-mono text-base-content/30">
+                  {String.slice(task.uuid || to_string(task.id), 0..7)}
+                </span>
               </div>
+              <%= if task.description do %>
+                <p class="text-[12px] text-base-content/40 mt-0.5 truncate leading-snug">
+                  {task.description}
+                </p>
+              <% end %>
             </div>
           </div>
         <% end %>

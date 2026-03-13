@@ -87,6 +87,12 @@ body {
   outline-offset: 2px;
 }
 
+textarea:focus-visible,
+input:focus-visible,
+form:focus-visible {
+  outline: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

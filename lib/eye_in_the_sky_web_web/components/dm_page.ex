@@ -39,6 +39,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :memory_edit_content, :string, default: ""
   attr :queued_prompts, :list, default: []
   attr :thinking_enabled, :boolean, default: false
+  attr :compacting, :boolean, default: false
 
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
@@ -193,6 +194,16 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               <span class="flex-shrink-0 text-[10px] text-base-content/25 font-mono">
                 {String.slice(to_string(@current_task.id), 0..7)}
               </span>
+            </div>
+          </div>
+        <% end %>
+
+        <%!-- Compacting indicator --%>
+        <%= if @compacting do %>
+          <div class="px-5 py-2 border-t border-warning/20 bg-warning/5" id="dm-compacting-strip">
+            <div class="flex items-center gap-2">
+              <div class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse flex-shrink-0" />
+              <span class="text-[11px] font-medium text-warning/80">Compacting context...</span>
             </div>
           </div>
         <% end %>
@@ -464,11 +475,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
 
     ~H"""
     <div
-      class={[
-        "py-3 px-2 -mx-2 rounded-lg transition-colors opacity-0",
-        !@is_user && "bg-primary/[0.03]",
-        @is_user && "hover:bg-base-content/[0.02]"
-      ]}
+      class="py-3 px-2 -mx-2 rounded-lg opacity-0"
       id={"dm-message-#{@message.id}"}
       phx-mounted={
         JS.transition(
@@ -699,7 +706,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
     <form
       phx-submit="send_message"
       phx-change="validate_upload"
-      class="rounded-2xl border border-base-content/10 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] shadow-sm"
+      class="rounded-2xl border border-base-content/10 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] shadow-sm outline-none"
       id="message-form"
       data-slash-items={Jason.encode!(@slash_items)}
       phx-hook="DmComposer"

@@ -268,10 +268,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   # Other SDK messages (text deltas, tool use, thinking, etc.) - broadcast for live streaming
   @impl true
   def handle_info({:claude_message, ref, %Message{} = msg}, %{sdk_ref: ref} = state) do
-    Logger.info(
-      "[#{state.session_id}] SDK stream message: type=#{msg.type}, delta=#{msg.delta}, content_type=#{msg.content |> inspect() |> String.slice(0..80)}"
-    )
-
     state = update_tool_start(msg, state)
     broadcast_stream_event(msg, state)
     state = update_stream_buffer(msg, state)

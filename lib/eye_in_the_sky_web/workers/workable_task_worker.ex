@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
 
   alias EyeInTheSkyWeb.{Projects, Repo, ScheduledJobs, Tasks}
   alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Notifications
   alias EyeInTheSkyWeb.Workers.SpeakWorker
 
   import Ecto.Query
@@ -127,7 +128,10 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
         {:ok, task.id}
 
       {:error, reason} ->
-        Logger.error("WorkableTaskWorker: failed to spawn agent for task ##{task.id} - #{inspect(reason)}")
+        Logger.error(
+          "WorkableTaskWorker: failed to spawn agent for task ##{task.id} - #{inspect(reason)}"
+        )
+
         {:error, reason}
     end
   end
@@ -137,6 +141,8 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
   end
 
   defp notify(output) do
+    Notifications.notify(output, category: :agent)
+
     %{"message" => output, "voice" => "Ava"}
     |> SpeakWorker.new()
     |> Oban.insert()

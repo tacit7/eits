@@ -181,7 +181,8 @@ defmodule EyeInTheSkyWeb.Notes do
           |> Enum.map(fn {_, i} -> "$#{i}" end)
           |> Enum.join(",")
 
-        {"AND n.parent_type = 'agent' AND n.parent_id IN (#{placeholders})", Enum.map(agent_ids, &to_string/1)}
+        {"AND n.parent_type = 'agent' AND n.parent_id IN (#{placeholders})",
+         Enum.map(agent_ids, &to_string/1)}
       else
         {"", []}
       end

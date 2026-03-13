@@ -128,7 +128,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.NoteController do
               })
 
             {:error, cs} ->
-              conn |> put_status(:unprocessable_entity) |> json(%{error: "Failed", details: translate_errors(cs)})
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{error: "Failed", details: translate_errors(cs)})
           end
       end
     rescue

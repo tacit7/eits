@@ -23,7 +23,15 @@ defmodule EyeInTheSkyWebWeb.Api.V1.PromptController do
       success: true,
       prompts:
         Enum.map(prompts, fn p ->
-          %{id: p.id, uuid: p.uuid, name: p.name, slug: p.slug, description: p.description, project_id: p.project_id, active: p.active}
+          %{
+            id: p.id,
+            uuid: p.uuid,
+            name: p.name,
+            slug: p.slug,
+            description: p.description,
+            project_id: p.project_id,
+            active: p.active
+          }
         end)
     })
   end

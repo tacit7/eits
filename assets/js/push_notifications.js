@@ -98,18 +98,31 @@ export const PushSetup = {
     }
   },
   _updateEl(permission, subscribed) {
+    const on = ["text-primary", "bg-primary/10", "hover:bg-primary/15"]
+    const off = ["text-base-content/40", "hover:text-base-content/70", "hover:bg-base-content/5"]
+    const warn = ["text-warning/70", "hover:bg-warning/10"]
+
+    const apply = (classes) => {
+      this.el.classList.remove(...on, ...off, ...warn)
+      this.el.classList.add(...classes)
+    }
+
     if (permission === "unsupported") {
       this.el.title = "Push notifications not supported"
       this.el.dataset.pushState = "unsupported"
+      apply(off)
     } else if (permission === "denied") {
       this.el.title = "Notifications blocked — enable in browser settings"
       this.el.dataset.pushState = "denied"
+      apply(warn)
     } else if (subscribed) {
-      this.el.title = "Notifications enabled — click to disable"
+      this.el.title = "Notifications enabled — tap to disable"
       this.el.dataset.pushState = "enabled"
+      apply(on)
     } else {
       this.el.title = "Enable push notifications"
       this.el.dataset.pushState = "disabled"
+      apply(off)
     }
   },
 }

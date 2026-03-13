@@ -269,6 +269,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
 
         {tid, sid} ->
           task_int_id = parse_int_id(tid)
+
           session_int_id =
             case Helpers.resolve_session_int_id(sid) do
               {:ok, id} -> id
@@ -307,7 +308,9 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
               linked =
                 Enum.count(task_ids, fn tid ->
                   case parse_int_id(tid) do
-                    nil -> false
+                    nil ->
+                      false
+
                     task_int_id ->
                       Tasks.link_session_to_task(task_int_id, session_int_id)
                       true
@@ -329,7 +332,8 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
       when cmd in ["reindex", "vacuum", "project-sync"] do
     result = %{
       success: false,
-      message: "Command '#{cmd}' is not supported. These are DB maintenance operations not available at the tool level."
+      message:
+        "Command '#{cmd}' is not supported. These are DB maintenance operations not available at the tool level."
     }
 
     response = Response.tool() |> Response.json(result)

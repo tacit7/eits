@@ -162,7 +162,13 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
           )
 
           # accumulated_text collects agent_message content during a turn
-          handle_messages(sdk_ref, caller_pid, _session_id = nil, _accumulated_text = "", fallback_session_id)
+          handle_messages(
+            sdk_ref,
+            caller_pid,
+            _session_id = nil,
+            _accumulated_text = "",
+            fallback_session_id
+          )
       after
         5_000 ->
           send(caller_pid, {:claude_error, sdk_ref, :handler_timeout})
@@ -171,7 +177,13 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
   end
 
   # Message handler loop - receives {:claude_output, ref, line} from CLI
-  defp handle_messages(sdk_ref, caller_pid, session_id, accumulated_text, fallback_session_id \\ nil) do
+  defp handle_messages(
+         sdk_ref,
+         caller_pid,
+         session_id,
+         accumulated_text,
+         fallback_session_id \\ nil
+       ) do
     receive do
       {:claude_output, _cli_ref, line} ->
         maybe_log_raw_line(session_id, line)
@@ -189,7 +201,14 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
 
           {:ok, message} ->
             send(caller_pid, {:claude_message, sdk_ref, message})
-            handle_messages(sdk_ref, caller_pid, session_id, accumulated_text, fallback_session_id)
+
+            handle_messages(
+              sdk_ref,
+              caller_pid,
+              session_id,
+              accumulated_text,
+              fallback_session_id
+            )
 
           {:session_id, sid} ->
             handle_messages(sdk_ref, caller_pid, sid, accumulated_text, fallback_session_id)
@@ -256,7 +275,13 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
             :ok
 
           :skip ->
-            handle_messages(sdk_ref, caller_pid, session_id, accumulated_text, fallback_session_id)
+            handle_messages(
+              sdk_ref,
+              caller_pid,
+              session_id,
+              accumulated_text,
+              fallback_session_id
+            )
         end
 
       {:claude_exit, _cli_ref, 0} ->

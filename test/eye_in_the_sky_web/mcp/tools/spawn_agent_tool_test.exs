@@ -22,7 +22,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgentToolTest do
 
   test "associates agent with project when project_id given" do
     {:ok, project} = Projects.create_project(%{name: "proj-#{uniq()}"})
-    r = SpawnAgent.execute(%{instructions: "task", project_id: project.id}, @frame) |> json_result()
+
+    r =
+      SpawnAgent.execute(%{instructions: "task", project_id: project.id}, @frame) |> json_result()
+
     assert r.success == true
 
     {:ok, session} = Sessions.get_session(r.session_id)
@@ -46,7 +49,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgentToolTest do
   end
 
   test "stores project_path as git_worktree_path on session" do
-    r = SpawnAgent.execute(%{instructions: "task", project_path: "/tmp/myproject"}, @frame) |> json_result()
+    r =
+      SpawnAgent.execute(%{instructions: "task", project_path: "/tmp/myproject"}, @frame)
+      |> json_result()
+
     assert r.success == true
 
     {:ok, session} = Sessions.get_session(r.session_id)
@@ -55,18 +61,25 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgentToolTest do
 
   test "stores parent_agent_id and parent_session_id on agent and session" do
     {:ok, parent_agent} = Agents.create_agent(%{name: "parent-#{uniq()}", status: "active"})
-    {:ok, parent_session} = Sessions.create_session(%{
-      uuid: Ecto.UUID.generate(),
-      agent_id: parent_agent.id,
-      started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-      status: "idle"
-    })
 
-    r = SpawnAgent.execute(%{
-      instructions: "child task",
-      parent_agent_id: parent_agent.id,
-      parent_session_id: parent_session.id
-    }, @frame) |> json_result()
+    {:ok, parent_session} =
+      Sessions.create_session(%{
+        uuid: Ecto.UUID.generate(),
+        agent_id: parent_agent.id,
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+        status: "idle"
+      })
+
+    r =
+      SpawnAgent.execute(
+        %{
+          instructions: "child task",
+          parent_agent_id: parent_agent.id,
+          parent_session_id: parent_session.id
+        },
+        @frame
+      )
+      |> json_result()
 
     assert r.success == true
 

@@ -18,7 +18,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.PushController do
   """
   def subscribe(conn, %{"endpoint" => endpoint, "keys" => %{"auth" => auth, "p256dh" => p256dh}}) do
     case PushSubscriptions.upsert(endpoint, auth, p256dh) do
-      {:ok, _} -> json(conn, %{success: true})
+      {:ok, _} ->
+        json(conn, %{success: true})
+
       {:error, cs} ->
         conn
         |> put_status(:unprocessable_entity)

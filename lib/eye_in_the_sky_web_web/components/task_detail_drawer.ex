@@ -18,7 +18,12 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
         />
 
         <%!-- Panel --%>
-        <div class="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-base-100 shadow-xl overflow-y-auto">
+        <div
+          id="task-detail-panel"
+          phx-hook="DrawerSwipeClose"
+          data-close-event={@toggle_event}
+          class="fixed inset-y-0 right-0 safe-inset-y z-50 w-full max-w-lg bg-base-100 shadow-xl overflow-y-auto"
+        >
           <%= if @task do %>
             <form phx-submit={@update_event} class="flex flex-col h-full">
               <%!-- Header --%>
@@ -195,7 +200,9 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                     <span class="text-base-content/10">&middot;</span>
                   <% end %>
                   <%= if @task.agent_id do %>
-                    <span class="font-mono">Agent {String.slice(to_string(@task.agent_id), 0..7)}</span>
+                    <span class="font-mono">
+                      Agent {String.slice(to_string(@task.agent_id), 0..7)}
+                    </span>
                   <% end %>
                 </div>
               </div>

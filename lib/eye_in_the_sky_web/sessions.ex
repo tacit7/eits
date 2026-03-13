@@ -134,8 +134,14 @@ defmodule EyeInTheSkyWeb.Sessions do
   def end_session(%Session{} = session, opts \\ %{}) do
     attrs =
       %{ended_at: DateTime.utc_now() |> DateTime.to_iso8601()}
-      |> then(fn m -> if opts[:summary], do: Map.put(m, :description, opts[:summary]), else: m end)
-      |> then(fn m -> if opts[:final_status], do: Map.put(m, :status, opts[:final_status]), else: Map.put(m, :status, "completed") end)
+      |> then(fn m ->
+        if opts[:summary], do: Map.put(m, :description, opts[:summary]), else: m
+      end)
+      |> then(fn m ->
+        if opts[:final_status],
+          do: Map.put(m, :status, opts[:final_status]),
+          else: Map.put(m, :status, "completed")
+      end)
 
     update_session(session, attrs)
   end
@@ -191,6 +197,20 @@ defmodule EyeInTheSkyWeb.Sessions do
   """
   def list_sessions_with_agent(opts \\ []) do
     Session
+    |> preload(:agent)
+    |> order_by([s], desc: s.started_at)
+    |> Archivable.include_archived(opts)
+    |> Repo.all()
+  end
+
+  @doc """
+  Lists sessions for a single project with agents preloaded.
+  Returns sessions ordered by most recent first, excluding archived by default.
+  Pass `include_archived: true` to include archived sessions.
+  """
+  def list_project_sessions_with_agent(project_id, opts \\ []) do
+    Session
+    |> where([s], s.project_id == ^project_id)
     |> preload(:agent)
     |> order_by([s], desc: s.started_at)
     |> Archivable.include_archived(opts)
@@ -264,7 +284,6 @@ defmodule EyeInTheSkyWeb.Sessions do
     Repo.all(base_query)
   end
 
-
   @doc """
   Returns session overview rows for the sessions table.
   Joins sessions with agents and projects to get complete information.
@@ -302,11 +321,12 @@ defmodule EyeInTheSkyWeb.Sessions do
           ended_at: s.ended_at,
           status: s.status,
           intent: s.intent,
-          active_task: fragment(
-            "(SELECT t.title FROM tasks t JOIN task_sessions ts ON t.id = ts.task_id WHERE ts.session_id = ? AND t.state_id = ? AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)",
-            s.id,
-            ^state_in_progress
-          )
+          active_task:
+            fragment(
+              "(SELECT t.title FROM tasks t JOIN task_sessions ts ON t.id = ts.task_id WHERE ts.session_id = ? AND t.state_id = ? AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)",
+              s.id,
+              ^state_in_progress
+            )
         }
       )
 
@@ -341,7 +361,45 @@ defmodule EyeInTheSkyWeb.Sessions do
         query
       end
 
+    offset = Keyword.get(opts, :offset, 0)
+    query = if offset > 0, do: offset(query, ^offset), else: query
+
     Repo.all(query)
+  end
+
+  @doc """
+  Counts sessions for overview (same filters as list_session_overview_rows, without limit/offset).
+  """
+  def count_session_overview_rows(opts \\ []) do
+    include_archived = Keyword.get(opts, :include_archived, false)
+    project_id = Keyword.get(opts, :project_id, nil)
+    search_query = Keyword.get(opts, :search_query, "")
+
+    query =
+      from(s in Session,
+        join: a in assoc(s, :agent)
+      )
+
+    query = if include_archived, do: query, else: where(query, [s], is_nil(s.archived_at))
+    query = if project_id, do: where(query, [s, a], a.project_id == ^project_id), else: query
+
+    query =
+      if search_query != "" do
+        where(
+          query,
+          [s],
+          fragment(
+            "to_tsvector('english', coalesce(?.name, '') || ' ' || coalesce(?.description, '')) @@ plainto_tsquery('english', ?)",
+            s,
+            s,
+            ^search_query
+          )
+        )
+      else
+        query
+      end
+
+    Repo.aggregate(query, :count, :id)
   end
 
   @doc """

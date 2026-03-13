@@ -1,7 +1,14 @@
 defmodule EyeInTheSkyWeb.MCP.Tools.DataToolsTest do
   use EyeInTheSkyWeb.DataCase, async: false
 
-  alias EyeInTheSkyWeb.MCP.Tools.{ProjectAdd, Commits, PromptGet, SaveSessionContext, LoadSessionContext}
+  alias EyeInTheSkyWeb.MCP.Tools.{
+    ProjectAdd,
+    Commits,
+    PromptGet,
+    SaveSessionContext,
+    LoadSessionContext
+  }
+
   alias EyeInTheSkyWeb.{Agents, Sessions, Prompts}
 
   @frame :test_frame
@@ -14,23 +21,28 @@ defmodule EyeInTheSkyWeb.MCP.Tools.DataToolsTest do
 
   defp new_session do
     {:ok, agent} = Agents.create_agent(%{name: "dt-agent-#{uniq()}", status: "active"})
-    {:ok, session} = Sessions.create_session(%{
-      uuid: "dt-#{uniq()}",
-      agent_id: agent.id,
-      started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-      status: "idle"
-    })
+
+    {:ok, session} =
+      Sessions.create_session(%{
+        uuid: "dt-#{uniq()}",
+        agent_id: agent.id,
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+        status: "idle"
+      })
+
     session
   end
 
   defp new_prompt do
-    {:ok, p} = Prompts.create_prompt(%{
-      uuid: Ecto.UUID.generate(),
-      name: "prompt #{uniq()}",
-      slug: "slug#{uniq()}",
-      prompt_text: "do the thing",
-      active: true
-    })
+    {:ok, p} =
+      Prompts.create_prompt(%{
+        uuid: Ecto.UUID.generate(),
+        name: "prompt #{uniq()}",
+        slug: "slug#{uniq()}",
+        prompt_text: "do the thing",
+        active: true
+      })
+
     p
   end
 
@@ -52,21 +64,34 @@ defmodule EyeInTheSkyWeb.MCP.Tools.DataToolsTest do
 
   test "Commits: logs commits for a known session" do
     s = new_session()
-    r = Commits.execute(%{
-      agent_id: s.uuid,
-      commit_hashes: ["abc123", "def456"],
-      commit_messages: ["msg1", "msg2"]
-    }, @frame) |> json_result()
+
+    r =
+      Commits.execute(
+        %{
+          agent_id: s.uuid,
+          commit_hashes: ["abc123", "def456"],
+          commit_messages: ["msg1", "msg2"]
+        },
+        @frame
+      )
+      |> json_result()
+
     assert r.success == true
     assert r.message == "Logged 2/2 commits"
   end
 
   test "Commits: returns error when session cannot be resolved" do
-    r = Commits.execute(%{
-      agent_id: "unknown-uuid",
-      commit_hashes: ["aaa111"],
-      commit_messages: ["orphan"]
-    }, @frame) |> json_result()
+    r =
+      Commits.execute(
+        %{
+          agent_id: "unknown-uuid",
+          commit_hashes: ["aaa111"],
+          commit_messages: ["orphan"]
+        },
+        @frame
+      )
+      |> json_result()
+
     # nil guard: unknown UUID returns error instead of silently inserting with nil session_id
     assert r.success == false
     assert String.contains?(r.message, "Could not resolve session")
@@ -123,13 +148,20 @@ defmodule EyeInTheSkyWeb.MCP.Tools.DataToolsTest do
 
   test "SaveSessionContext: saves context for a known session" do
     s = new_session()
-    r = SaveSessionContext.execute(%{agent_id: s.uuid, context: "# Context\nsome work"}, @frame) |> json_result()
+
+    r =
+      SaveSessionContext.execute(%{agent_id: s.uuid, context: "# Context\nsome work"}, @frame)
+      |> json_result()
+
     assert r.success == true
     assert r.message == "Session context saved"
   end
 
   test "SaveSessionContext: error for unknown session UUID" do
-    r = SaveSessionContext.execute(%{agent_id: "ghost-uuid", context: "data"}, @frame) |> json_result()
+    r =
+      SaveSessionContext.execute(%{agent_id: "ghost-uuid", context: "data"}, @frame)
+      |> json_result()
+
     assert r.success == false
   end
 
@@ -151,7 +183,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.DataToolsTest do
   test "LoadSessionContext: session_id takes priority over agent_id" do
     s = new_session()
     SaveSessionContext.execute(%{agent_id: s.uuid, context: "right context"}, @frame)
-    r = LoadSessionContext.execute(%{session_id: s.uuid, agent_id: "other"}, @frame) |> json_result()
+
+    r =
+      LoadSessionContext.execute(%{session_id: s.uuid, agent_id: "other"}, @frame)
+      |> json_result()
+
     assert r.success == true
     assert r.context == "right context"
   end

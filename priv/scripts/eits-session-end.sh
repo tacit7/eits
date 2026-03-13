@@ -4,7 +4,8 @@
 set -uo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE=${EITS_API_URL:-http://localhost:5001/api/v1}
+BASE=${EITS_API_URL:-https://localhost:5001/api/v1}
+_curl() { curl ${EITS_API_KEY:+-H "Authorization: Bearer ${EITS_API_KEY}"} "$@"; }
 
 EITS_PG_DB="${EITS_PG_DB:-eits_dev}"
 EITS_PG_USER="${EITS_PG_USER:-postgres}"
@@ -34,7 +35,7 @@ _pgq "
 " || true
 
 # Update session status to completed via REST
-curl -sk -X PATCH "$BASE/sessions/$session_id" \
+_curl -sk -X PATCH "$BASE/sessions/$session_id" \
   -H 'Content-Type: application/json' \
   -d '{"status":"completed"}' >/dev/null 2>&1
 

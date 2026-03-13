@@ -201,7 +201,10 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
 
         # Log flags only (omit prompt to avoid logging secrets/huge text)
         prompt = opts[:prompt] || ""
-        prompt_summary = if prompt != "", do: " <prompt: #{String.length(prompt)} chars>", else: ""
+
+        prompt_summary =
+          if prompt != "", do: " <prompt: #{String.length(prompt)} chars>", else: ""
+
         flags = Enum.slice(args, 0..(length(args) - 2)//1)
         cmd_string = "codex " <> Enum.join(flags, " ") <> prompt_summary
         Logger.info("[Codex.CLI] Spawning in #{project_path}: #{cmd_string}")

@@ -10,7 +10,7 @@ EITS_PG_HOST="${EITS_PG_HOST:-localhost}"
 export PGPASSWORD="${EITS_PG_PASSWORD:-postgres}"
 _pgq() { psql -U "$EITS_PG_USER" -h "$EITS_PG_HOST" -d "$EITS_PG_DB" -t -A --no-psqlrc -c "$1" 2>/dev/null | grep -v '^Time:'; }
 
-EITS_BASE="${EITS_API_URL:-http://localhost:5001/api/v1}"
+EITS_BASE="${EITS_API_URL:-https://localhost:5001/api/v1}"
 LOG_FILE="${HOME}/.claude/hooks/eits.log"
 _log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [startup] $*" >> "$LOG_FILE" 2>/dev/null; }
 
@@ -31,7 +31,8 @@ PROJECT_NAME_SQL="${PROJECT_NAME//\'/\'\'}"
 _log "project_dir=$PROJECT_DIR env_file=${CLAUDE_ENV_FILE:-unset}"
 
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
-  echo "EITS_API_URL=http://localhost:5001/api/v1" >> "$CLAUDE_ENV_FILE"
+  echo "EITS_API_URL=https://localhost:5001/api/v1" >> "$CLAUDE_ENV_FILE"
+  [ -n "${EITS_API_KEY:-}" ] && echo "EITS_API_KEY=${EITS_API_KEY}" >> "$CLAUDE_ENV_FILE"
   echo "EITS_SESSION_UUID=$SESSION_ID" >> "$CLAUDE_ENV_FILE"
   _log "wrote EITS_SESSION_UUID=$SESSION_ID"
 

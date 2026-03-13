@@ -53,7 +53,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.JobsTest do
       refute html =~ "Other Job"
     end
 
-    test "shows global (null project_id) jobs in a separate section", %{conn: conn, project: project} do
+    test "shows global (null project_id) jobs in a separate section", %{
+      conn: conn,
+      project: project
+    } do
       {:ok, _} =
         ScheduledJobs.create_job(%{
           "name" => "Global Job",

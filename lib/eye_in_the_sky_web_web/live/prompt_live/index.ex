@@ -94,8 +94,7 @@ defmodule EyeInTheSkyWebWeb.PromptLive.Index do
         </div>
         <div class="mt-4 sm:mt-0 flex items-center gap-2">
           <.link navigate={~p"/prompts/new"} class="btn btn-primary btn-sm gap-2">
-            <.icon name="hero-plus" class="h-4 w-4" />
-            New Prompt
+            <.icon name="hero-plus" class="h-4 w-4" /> New Prompt
           </.link>
           <label class="swap swap-rotate btn btn-ghost btn-sm btn-circle">
             <input type="checkbox" class="theme-controller" value="dark" />

@@ -63,6 +63,8 @@ defmodule EyeInTheSkyWeb.Projects do
   def get_project_tasks(project_id, opts \\ []) when is_integer(project_id) do
     state_id = Keyword.get(opts, :state_id)
     sort_by = Keyword.get(opts, :sort_by, "created_desc")
+    limit = Keyword.get(opts, :limit)
+    offset = Keyword.get(opts, :offset, 0)
 
     query =
       from(t in EyeInTheSkyWeb.Tasks.Task,
@@ -83,8 +85,20 @@ defmodule EyeInTheSkyWeb.Projects do
         _ -> order_by(query, [t], desc: t.created_at)
       end
 
+    query = if limit, do: limit(query, ^limit), else: query
+    query = if offset > 0, do: offset(query, ^offset), else: query
+
     query
     |> preload([:state, :tags, :agents])
     |> Repo.all()
+  end
+
+  def count_project_tasks(project_id, opts \\ []) when is_integer(project_id) do
+    state_id = Keyword.get(opts, :state_id)
+
+    query = from(t in EyeInTheSkyWeb.Tasks.Task, where: t.project_id == ^project_id)
+    query = if state_id, do: where(query, [t], t.state_id == ^state_id), else: query
+
+    EyeInTheSkyWeb.Repo.aggregate(query, :count, :id)
   end
 end

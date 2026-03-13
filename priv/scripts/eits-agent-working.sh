@@ -3,7 +3,8 @@
 set -uo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE=${EITS_API_URL:-http://localhost:5001/api/v1}
+BASE=${EITS_API_URL:-https://localhost:5001/api/v1}
+_curl() { curl ${EITS_API_KEY:+-H "Authorization: Bearer ${EITS_API_KEY}"} "$@"; }
 
 # Parse stdin JSON for session info
 input_json=$(timeout 2 cat 2>/dev/null) || exit 0
@@ -14,7 +15,7 @@ session_id=$(echo "$input_json" | jq -r '.session_id // empty' 2>/dev/null) || e
 [ -z "$session_id" ] && exit 0
 
 # Update session to working via REST
-curl -sk -X PATCH "$BASE/sessions/$session_id" \
+_curl -sk -X PATCH "$BASE/sessions/$session_id" \
   -H 'Content-Type: application/json' \
   -d '{"status":"working"}' >/dev/null 2>&1 &
 

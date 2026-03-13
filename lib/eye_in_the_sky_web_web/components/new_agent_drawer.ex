@@ -18,7 +18,12 @@ defmodule EyeInTheSkyWebWeb.Components.NewAgentDrawer do
       />
       <div class="drawer-side z-50">
         <label for="new-agent-drawer" class="drawer-overlay"></label>
-        <div class="menu p-6 w-96 min-h-full bg-base-100 text-base-content">
+        <div
+          id="new-agent-panel"
+          phx-hook="DrawerSwipeClose"
+          data-close-event={@toggle_event}
+          class="menu p-6 w-96 min-h-full bg-base-100 text-base-content"
+        >
           <div class="flex items-center justify-between mb-6">
             <h2 class="text-xl font-semibold">New Agent</h2>
             <button phx-click={@toggle_event} class="btn btn-ghost btn-sm btn-circle">✕</button>
@@ -53,7 +58,9 @@ defmodule EyeInTheSkyWebWeb.Components.NewAgentDrawer do
                   <option value="gpt-5.3-codex">gpt-5.3-codex • Frontier Codex-optimized</option>
                   <option value="gpt-5.2-codex">gpt-5.2-codex • Frontier agentic coding</option>
                   <option value="gpt-5.2">gpt-5.2 • Optimized for long-running agents</option>
-                  <option value="gpt-5.1-codex-max">gpt-5.1-codex-max • Deep and fast reasoning</option>
+                  <option value="gpt-5.1-codex-max">
+                    gpt-5.1-codex-max • Deep and fast reasoning
+                  </option>
                   <option value="gpt-5.1-codex-mini">gpt-5.1-codex-mini • Cheaper and faster</option>
                 </optgroup>
               </select>
@@ -129,8 +136,8 @@ defmodule EyeInTheSkyWebWeb.Components.NewAgentDrawer do
                 <span class="label-text-alt text-base-content/40">Branch: worktree-&lt;name&gt;</span>
               </label>
             </div>
-
-            <!-- Actions -->
+            
+    <!-- Actions -->
             <div class="flex gap-2 mt-4">
               <button type="submit" class="btn btn-primary flex-1">Create Agent</button>
               <button type="button" phx-click={@toggle_event} class="btn btn-ghost flex-shrink-0">

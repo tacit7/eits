@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWebWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
+    plug EyeInTheSkyWebWeb.Plugs.RequireAuth
   end
 
   # Session-aware JSON pipeline without CSRF — safe for WebAuthn endpoints

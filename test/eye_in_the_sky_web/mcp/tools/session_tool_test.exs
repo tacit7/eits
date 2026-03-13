@@ -15,12 +15,15 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionToolTest do
 
   defp new_session do
     {:ok, agent} = Agents.create_agent(%{name: "test-agent-#{uniq()}", status: "working"})
-    {:ok, session} = Sessions.create_session(%{
-      uuid: "sess-#{uniq()}",
-      agent_id: agent.id,
-      started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-      status: "working"
-    })
+
+    {:ok, session} =
+      Sessions.create_session(%{
+        uuid: "sess-#{uniq()}",
+        agent_id: agent.id,
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+        status: "working"
+      })
+
     session
   end
 
@@ -68,7 +71,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionToolTest do
 
   test "update: updates session status" do
     s = new_session()
-    r = SessionTool.execute(%{command: "update", session_id: s.uuid, status: "idle"}, @frame) |> json_result()
+
+    r =
+      SessionTool.execute(%{command: "update", session_id: s.uuid, status: "idle"}, @frame)
+      |> json_result()
+
     assert r.success == true
   end
 
@@ -164,6 +171,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionToolTest do
 
   test "SessionSearch: respects limit" do
     {:ok, agent} = Agents.create_agent(%{name: "limit-agent-#{uniq()}", status: "active"})
+
     for _ <- 1..5 do
       Sessions.create_session(%{
         uuid: "lim-#{uniq()}",
@@ -172,6 +180,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionToolTest do
         status: "idle"
       })
     end
+
     r = SessionSearch.execute(%{query: "", limit: 2}, @frame) |> json_result()
     assert length(r.results) <= 2
   end
@@ -180,34 +189,60 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionToolTest do
 
   test "save-context: saves context for a known session UUID" do
     s = new_session()
-    r = SessionTool.execute(%{command: "save-context", session_id: s.uuid, context: "# Work\ndone stuff"}, @frame) |> json_result()
+
+    r =
+      SessionTool.execute(
+        %{command: "save-context", session_id: s.uuid, context: "# Work\ndone stuff"},
+        @frame
+      )
+      |> json_result()
+
     assert r.success == true
     assert r.message == "Context saved"
   end
 
   test "save-context: error for unknown session UUID" do
-    r = SessionTool.execute(%{command: "save-context", session_id: "ghost-uuid", context: "data"}, @frame) |> json_result()
+    r =
+      SessionTool.execute(
+        %{command: "save-context", session_id: "ghost-uuid", context: "data"},
+        @frame
+      )
+      |> json_result()
+
     assert r.success == false
     assert String.contains?(r.message, "Session not found")
   end
 
   test "load-context: error when no context saved" do
     s = new_session()
-    r = SessionTool.execute(%{command: "load-context", session_id: s.uuid}, @frame) |> json_result()
+
+    r =
+      SessionTool.execute(%{command: "load-context", session_id: s.uuid}, @frame) |> json_result()
+
     assert r.success == false
     assert String.contains?(r.message, "No context found")
   end
 
   test "load-context: returns previously saved context" do
     s = new_session()
-    SessionTool.execute(%{command: "save-context", session_id: s.uuid, context: "# My Context"}, @frame)
-    r = SessionTool.execute(%{command: "load-context", session_id: s.uuid}, @frame) |> json_result()
+
+    SessionTool.execute(
+      %{command: "save-context", session_id: s.uuid, context: "# My Context"},
+      @frame
+    )
+
+    r =
+      SessionTool.execute(%{command: "load-context", session_id: s.uuid}, @frame) |> json_result()
+
     assert r.success == true
     assert r.context == "# My Context"
   end
 
   test "load-context: error for unknown session UUID" do
-    r = SessionTool.execute(%{command: "load-context", session_id: "ghost-uuid"}, @frame) |> json_result()
+    r =
+      SessionTool.execute(%{command: "load-context", session_id: "ghost-uuid"}, @frame)
+      |> json_result()
+
     assert r.success == false
   end
 end

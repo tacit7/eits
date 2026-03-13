@@ -12,8 +12,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
 
     field :model, :string, description: "Model to use (haiku, sonnet, opus). Default: haiku"
 
-    field :provider, :string,
-      description: "AI provider (claude, codex). Default: claude"
+    field :provider, :string, description: "AI provider (claude, codex). Default: claude"
 
     field :project_id, :integer,
       description: "Project ID to associate with the spawned agent and session"
@@ -26,8 +25,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
 
     field :effort_level, :string, description: "Effort level override"
 
-    field :parent_agent_id, :integer,
-      description: "Parent agent ID for tracking spawn hierarchy"
+    field :parent_agent_id, :integer, description: "Parent agent ID for tracking spawn hierarchy"
 
     field :parent_session_id, :integer,
       description: "Parent session ID for tracking spawn hierarchy"

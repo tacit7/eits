@@ -745,34 +745,6 @@ Hooks.FlashTimeout = {
   }
 }
 
-Hooks.ExecutionTimer = {
-  mounted() {
-    this._start = parseInt(this.el.dataset.start, 10) || null
-    this._tick()
-    this._interval = setInterval(() => this._tick(), 1000)
-  },
-  updated() {
-    const newStart = parseInt(this.el.dataset.start, 10) || null
-    if (newStart !== this._start) {
-      this._start = newStart
-      this._tick()
-    }
-  },
-  destroyed() {
-    clearInterval(this._interval)
-  },
-  _tick() {
-    if (!this._start) {
-      this.el.textContent = "0:00"
-      return
-    }
-    const elapsed = Math.floor((Date.now() - this._start) / 1000)
-    const m = Math.floor(elapsed / 60)
-    const s = elapsed % 60
-    this.el.textContent = `${m}:${s.toString().padStart(2, "0")}`
-  }
-}
-
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   params: {_csrf_token: csrfToken},

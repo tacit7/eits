@@ -55,7 +55,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Dm do
                 %{success: true, message: "DM delivered to session #{int_id}"}
 
               {:error, reason} ->
-                %{success: true, message: "DM saved but agent delivery failed: #{inspect(reason)}"}
+                %{
+                  success: true,
+                  message: "DM saved but agent delivery failed: #{inspect(reason)}"
+                }
             end
           else
             {:error, cs} -> %{success: false, message: "Failed: #{inspect(cs.errors)}"}

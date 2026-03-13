@@ -17,7 +17,6 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
   alias EyeInTheSkyWeb.Claude.AgentManager
   alias EyeInTheSkyWeb.{Messages, Sessions}
 
-
   defp unauthorized(conn),
     do: conn |> put_status(:unauthorized) |> json(%{error: "Invalid signature"}) |> halt()
 
@@ -37,7 +36,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
 
         Logger.info("Gitea webhook: PR ##{pr_number} opened - spawning codex reviewer")
 
-        instructions = build_review_instructions(pr_number, pr_title, pr_body, pr_url, head_branch, repo)
+        instructions =
+          build_review_instructions(pr_number, pr_title, pr_body, pr_url, head_branch, repo)
 
         case AgentManager.create_agent(
                agent_type: "codex",
@@ -47,7 +47,12 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
              ) do
           {:ok, %{session: session}} ->
             Logger.info("Codex reviewer spawned for PR ##{pr_number}, session=#{session.uuid}")
-            json(conn, %{success: true, message: "Codex reviewer spawned", session_id: session.uuid})
+
+            json(conn, %{
+              success: true,
+              message: "Codex reviewer spawned",
+              session_id: session.uuid
+            })
 
           {:error, reason} ->
             Logger.error("Failed to spawn codex for PR ##{pr_number}: #{inspect(reason)}")
@@ -140,7 +145,10 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
 
     cond do
       secret == "" and Application.get_env(:eye_in_the_sky_web, :env, :prod) == :prod ->
-        Logger.error("Gitea webhook: GITEA_WEBHOOK_SECRET not set in production — rejecting request")
+        Logger.error(
+          "Gitea webhook: GITEA_WEBHOOK_SECRET not set in production — rejecting request"
+        )
+
         {:error, :unauthorized}
 
       secret == "" ->

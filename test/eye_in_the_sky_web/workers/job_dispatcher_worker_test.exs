@@ -29,7 +29,10 @@ defmodule EyeInTheSkyWeb.Workers.JobDispatcherWorkerTest do
 
       assert :ok = perform_job(JobDispatcherWorker, %{})
 
-      assert_enqueued(worker: EyeInTheSkyWeb.Workers.ShellCommandWorker, args: %{"job_id" => job.id})
+      assert_enqueued(
+        worker: EyeInTheSkyWeb.Workers.ShellCommandWorker,
+        args: %{"job_id" => job.id}
+      )
     end
 
     test "advances next_run_at after dispatching" do
@@ -50,7 +53,10 @@ defmodule EyeInTheSkyWeb.Workers.JobDispatcherWorkerTest do
 
       :ok = perform_job(JobDispatcherWorker, %{})
 
-      refute_enqueued(worker: EyeInTheSkyWeb.Workers.ShellCommandWorker, args: %{"job_id" => job.id})
+      refute_enqueued(
+        worker: EyeInTheSkyWeb.Workers.ShellCommandWorker,
+        args: %{"job_id" => job.id}
+      )
     end
 
     test "does not enqueue jobs with future next_run_at" do
@@ -58,7 +64,10 @@ defmodule EyeInTheSkyWeb.Workers.JobDispatcherWorkerTest do
 
       :ok = perform_job(JobDispatcherWorker, %{})
 
-      refute_enqueued(worker: EyeInTheSkyWeb.Workers.ShellCommandWorker, args: %{"job_id" => job.id})
+      refute_enqueued(
+        worker: EyeInTheSkyWeb.Workers.ShellCommandWorker,
+        args: %{"job_id" => job.id}
+      )
     end
 
     test "enqueues correct worker for spawn_agent job type" do
@@ -80,7 +89,10 @@ defmodule EyeInTheSkyWeb.Workers.JobDispatcherWorkerTest do
 
       :ok = perform_job(JobDispatcherWorker, %{})
 
-      assert_enqueued(worker: EyeInTheSkyWeb.Workers.SpawnAgentWorker, args: %{"job_id" => job.id})
+      assert_enqueued(
+        worker: EyeInTheSkyWeb.Workers.SpawnAgentWorker,
+        args: %{"job_id" => job.id}
+      )
     end
 
     test "enqueues correct worker for mix_task job type" do
@@ -112,8 +124,15 @@ defmodule EyeInTheSkyWeb.Workers.JobDispatcherWorkerTest do
 
       :ok = perform_job(JobDispatcherWorker, %{})
 
-      assert_enqueued(worker: EyeInTheSkyWeb.Workers.ShellCommandWorker, args: %{"job_id" => job1.id})
-      assert_enqueued(worker: EyeInTheSkyWeb.Workers.ShellCommandWorker, args: %{"job_id" => job2.id})
+      assert_enqueued(
+        worker: EyeInTheSkyWeb.Workers.ShellCommandWorker,
+        args: %{"job_id" => job1.id}
+      )
+
+      assert_enqueued(
+        worker: EyeInTheSkyWeb.Workers.ShellCommandWorker,
+        args: %{"job_id" => job2.id}
+      )
     end
 
     test "returns :ok even when no due jobs exist" do

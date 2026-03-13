@@ -74,7 +74,8 @@ config :anubis_mcp, :session_store,
 # Web Push / VAPID configuration
 config :web_push_encryption, :vapid_details,
   subject: "mailto:admin@eits.dev",
-  public_key: "BCeer_3Bsec6cpZU-NAcYLmeF5zqinfsZBYzXoDlA62Gp8nJhtnhKI0OGdPqEJAe5b9lpHuyNZjIDIrOgCjhUIc",
+  public_key:
+    "BCeer_3Bsec6cpZU-NAcYLmeF5zqinfsZBYzXoDlA62Gp8nJhtnhKI0OGdPqEJAe5b9lpHuyNZjIDIrOgCjhUIc",
   private_key: "UjvINIZfpbgbtSEyPrxK41I5Sy-uE6gtxek7Vq9W6ck"
 
 # WebAuthn / Passkey configuration

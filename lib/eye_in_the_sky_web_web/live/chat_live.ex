@@ -242,9 +242,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
               body: body
             })
 
-            Logger.info(
-              "Routing to session=#{member.session_id} mode=#{mode}"
-            )
+            Logger.info("Routing to session=#{member.session_id} mode=#{mode}")
 
             AgentManager.send_message(member.session_id, prompt,
               model: "sonnet",
@@ -271,6 +269,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     require Logger
     session_id = get_session_id(socket)
     channel_id = params["channel_id"] || socket.assigns.active_channel_id
+
     target_session_id =
       case Integer.parse(to_string(target_session_id_str)) do
         {n, ""} -> n
@@ -639,7 +638,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     assigns = assign(assigns, :active_channel, active_channel)
 
     ~H"""
-    <div class="flex flex-col h-[calc(100vh-3rem)] md:h-[calc(100vh-2rem)] px-4 sm:px-6 lg:px-8 py-4">
+    <div class="flex flex-col h-[calc(100dvh-3rem)] md:h-[calc(100dvh-2rem)] px-4 sm:px-6 lg:px-8 py-4">
       <%!-- Header card --%>
       <div
         class="max-w-6xl mx-auto w-full bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0"

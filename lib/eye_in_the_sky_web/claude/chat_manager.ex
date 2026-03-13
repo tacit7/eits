@@ -53,7 +53,10 @@ defmodule EyeInTheSkyWeb.Claude.ChatManager do
 
     case DynamicSupervisor.start_child(@supervisor, {ChatWorker, opts}) do
       {:ok, pid} = result ->
-        Logger.info("ChatManager: started ChatWorker for channel=#{channel_id} pid=#{inspect(pid)}")
+        Logger.info(
+          "ChatManager: started ChatWorker for channel=#{channel_id} pid=#{inspect(pid)}"
+        )
+
         result
 
       {:error, {:already_started, pid}} ->

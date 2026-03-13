@@ -18,6 +18,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TodoToolTest do
       title: "task #{uniq()}",
       created_at: DateTime.utc_now() |> DateTime.to_iso8601()
     }
+
     {:ok, task} = Tasks.create_task(Map.merge(defaults, attrs))
     task
   end
@@ -35,7 +36,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TodoToolTest do
   end
 
   test "create: includes description" do
-    r = Todo.execute(%{command: "create", title: "T", description: "details"}, @frame) |> json_result()
+    r =
+      Todo.execute(%{command: "create", title: "T", description: "details"}, @frame)
+      |> json_result()
+
     assert r.success == true
   end
 
@@ -61,7 +65,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TodoToolTest do
   end
 
   test "status: error for unknown task" do
-    r = Todo.execute(%{command: "status", task_id: "999999999", state_id: 1}, @frame) |> json_result()
+    r =
+      Todo.execute(%{command: "status", task_id: "999999999", state_id: 1}, @frame)
+      |> json_result()
+
     assert r.success == false
   end
 
@@ -76,10 +83,12 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TodoToolTest do
   end
 
   test "list: filters by project_id without crashing" do
-    {:ok, project} = EyeInTheSkyWeb.Projects.create_project(%{
-      name: "proj-#{uniq()}",
-      path: "/tmp/proj-#{uniq()}"
-    })
+    {:ok, project} =
+      EyeInTheSkyWeb.Projects.create_project(%{
+        name: "proj-#{uniq()}",
+        path: "/tmp/proj-#{uniq()}"
+      })
+
     make_task(%{project_id: to_string(project.id)})
     r = Todo.execute(%{command: "list", project_id: project.id}, @frame) |> json_result()
     assert r.success == true
@@ -99,13 +108,18 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TodoToolTest do
 
   test "list-session: returns tasks list for session UUID" do
     {:ok, agent} = Agents.create_agent(%{name: "s#{uniq()}", status: "active"})
-    {:ok, session} = Sessions.create_session(%{
-      uuid: "ss-#{uniq()}",
-      agent_id: agent.id,
-      started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-      status: "working"
-    })
-    r = Todo.execute(%{command: "list-session", session_id: session.uuid}, @frame) |> json_result()
+
+    {:ok, session} =
+      Sessions.create_session(%{
+        uuid: "ss-#{uniq()}",
+        agent_id: agent.id,
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+        status: "working"
+      })
+
+    r =
+      Todo.execute(%{command: "list-session", session_id: session.uuid}, @frame) |> json_result()
+
     assert r.success == true
     assert is_list(r.tasks)
   end
@@ -142,7 +156,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TodoToolTest do
 
   test "annotate: adds note to a task" do
     t = make_task()
-    r = Todo.execute(%{command: "annotate", task_id: tid(t), body: "some note"}, @frame) |> json_result()
+
+    r =
+      Todo.execute(%{command: "annotate", task_id: tid(t), body: "some note"}, @frame)
+      |> json_result()
+
     assert r.success == true
   end
 

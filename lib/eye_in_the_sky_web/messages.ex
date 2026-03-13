@@ -318,9 +318,10 @@ defmodule EyeInTheSkyWeb.Messages do
   def total_cost_for_session(session_id) do
     Message
     |> where([m], m.session_id == ^session_id)
-    |> select([m], fragment(
-      "COALESCE(SUM(CAST(COALESCE(metadata->>'total_cost_usd', '0') AS FLOAT)), 0.0)"
-    ))
+    |> select(
+      [m],
+      fragment("COALESCE(SUM(CAST(COALESCE(metadata->>'total_cost_usd', '0') AS FLOAT)), 0.0)")
+    )
     |> Repo.one() || 0.0
   end
 
@@ -330,9 +331,12 @@ defmodule EyeInTheSkyWeb.Messages do
   def total_tokens_for_session(session_id) do
     Message
     |> where([m], m.session_id == ^session_id)
-    |> select([m], fragment(
-      "COALESCE(SUM(CAST(COALESCE(metadata->'usage'->>'input_tokens', '0') AS INTEGER) + CAST(COALESCE(metadata->'usage'->>'output_tokens', '0') AS INTEGER)), 0)"
-    ))
+    |> select(
+      [m],
+      fragment(
+        "COALESCE(SUM(CAST(COALESCE(metadata->'usage'->>'input_tokens', '0') AS INTEGER) + CAST(COALESCE(metadata->'usage'->>'output_tokens', '0') AS INTEGER)), 0)"
+      )
+    )
     |> Repo.one() || 0
   end
 
@@ -532,7 +536,7 @@ defmodule EyeInTheSkyWeb.Messages do
     # Get the last N messages by ordering DESC, then reverse for chronological display
     Message
     |> where([m], m.channel_id == ^channel_id and is_nil(m.parent_message_id))
-    |> order_by([m], [desc: m.inserted_at, desc: m.id])
+    |> order_by([m], desc: m.inserted_at, desc: m.id)
     |> limit(^limit)
     |> preload([:reactions, :attachments, :session])
     |> Repo.all()

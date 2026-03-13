@@ -24,15 +24,18 @@ defmodule EyeInTheSkyWebWeb.MCPPlug do
     :exit, reason ->
       conn
       |> Plug.Conn.put_resp_content_type("application/json")
-      |> Plug.Conn.send_resp(503, Jason.encode!(%{
-        jsonrpc: "2.0",
-        error: %{
-          code: -32_603,
-          message: "MCP server unavailable",
-          data: %{reason: inspect(reason), retry: true}
-        },
-        id: nil
-      }))
+      |> Plug.Conn.send_resp(
+        503,
+        Jason.encode!(%{
+          jsonrpc: "2.0",
+          error: %{
+            code: -32_603,
+            message: "MCP server unavailable",
+            data: %{reason: inspect(reason), retry: true}
+          },
+          id: nil
+        })
+      )
   end
 
   # Anubis requires Accept to include application/json. Claude Code sends only

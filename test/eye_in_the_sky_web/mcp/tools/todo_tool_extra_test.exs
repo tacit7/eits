@@ -62,7 +62,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TodoToolExtraTest do
 
   test "tag: adds tags to a task" do
     t = make_task()
-    r = Todo.execute(%{command: "tag", task_id: tid(t), tags: ["bug", "urgent"]}, @frame) |> json_result()
+
+    r =
+      Todo.execute(%{command: "tag", task_id: tid(t), tags: ["bug", "urgent"]}, @frame)
+      |> json_result()
+
     assert r.success == true
     assert String.contains?(r.message, "Tags updated")
   end
@@ -74,7 +78,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TodoToolExtraTest do
   end
 
   test "tag: error for unknown task" do
-    r = Todo.execute(%{command: "tag", task_id: "999999999", tags: ["test"]}, @frame) |> json_result()
+    r =
+      Todo.execute(%{command: "tag", task_id: "999999999", tags: ["test"]}, @frame)
+      |> json_result()
+
     assert r.success == false
     assert String.contains?(r.message, "not found")
   end
@@ -84,7 +91,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TodoToolExtraTest do
   test "add-session: links session to task" do
     t = make_task()
     s = new_session()
-    r = Todo.execute(%{command: "add-session", task_id: tid(t), session_id: s.uuid}, @frame) |> json_result()
+
+    r =
+      Todo.execute(%{command: "add-session", task_id: tid(t), session_id: s.uuid}, @frame)
+      |> json_result()
+
     assert r.success == true
     assert String.contains?(r.message, "Session linked")
   end

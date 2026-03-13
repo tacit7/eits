@@ -402,7 +402,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   def render(assigns) do
     ~H"""
     <div class="bg-base-100 min-h-full px-4 sm:px-6 lg:px-8">
-      <div class="max-w-3xl mx-auto">
+      <div class="max-w-4xl mx-auto">
         <%!-- Toolbar --%>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-5">
           <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
@@ -676,7 +676,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                     <span class="text-[13px] font-medium text-base-content/85 truncate">
                       {agent.name || "Unnamed session"}
                     </span>
-                    <span class={"text-[10px] font-medium uppercase tracking-wider " <> status_color}>
+                    <span class={"text-[11px] font-medium uppercase tracking-wider flex-shrink-0 " <> status_color}>
                       {status_label}
                     </span>
                   </div>
@@ -693,12 +693,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                 </div>
 
                 <%!-- Actions --%>
-                <div class="flex items-center gap-0.5 flex-shrink-0" phx-click="noop">
+                <div class="flex items-center gap-0 flex-shrink-0" phx-click="noop">
                   <%= if agent.id do %>
                     <a
                       href={~p"/dm/#{agent.id}"}
                       target="_blank"
-                      class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-primary"
+                      class="hidden sm:inline-flex md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-base-content/30 hover:text-primary hover:bg-primary/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       aria-label="Open in new tab"
                     >
                       <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
@@ -713,7 +713,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                       data-session-id={agent.uuid}
                       data-agent-name={agent.name || agent.agent.description || "Agent"}
                       data-agent-status={agent.status}
-                      class="bookmark-button btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-error"
+                      class="bookmark-button md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
                       aria-label="Bookmark agent"
                     >
                       <.heart class="bookmark-icon w-3.5 h-3.5" />
@@ -725,7 +725,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                         type="button"
                         phx-click="unarchive_session"
                         phx-value-session_id={agent.id}
-                        class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-info"
+                        class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-info hover:bg-info/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
                         aria-label="Unarchive"
                       >
                         <.icon name="hero-arrow-up-tray-mini" class="w-3.5 h-3.5" />
@@ -734,7 +734,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                         type="button"
                         phx-click="delete_session"
                         phx-value-session_id={agent.id}
-                        class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-error"
+                        class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
                         aria-label="Delete"
                       >
                         <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
@@ -744,7 +744,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                         type="button"
                         phx-click="archive_session"
                         phx-value-session_id={agent.id}
-                        class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-warning"
+                        class="hidden sm:flex md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-base-content/30 hover:text-warning hover:bg-warning/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
                         aria-label="Archive"
                       >
                         <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />

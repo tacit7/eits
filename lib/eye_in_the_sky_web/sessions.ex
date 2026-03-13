@@ -315,7 +315,7 @@ defmodule EyeInTheSkyWeb.Sessions do
           session_name: s.name,
           agent_id: a.id,
           agent_uuid: a.uuid,
-          agent_description: a.description,
+          session_description: s.description,
           project_name: p.name,
           started_at: s.started_at,
           ended_at: s.ended_at,

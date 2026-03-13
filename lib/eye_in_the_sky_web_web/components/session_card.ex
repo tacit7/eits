@@ -1,13 +1,15 @@
 defmodule EyeInTheSkyWebWeb.Components.SessionCard do
   use Phoenix.Component
   import EyeInTheSkyWebWeb.CoreComponents, only: [icon: 1]
-  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1]
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1, derive_display_status: 1]
+
+  alias EyeInTheSkyWeb.Sessions
 
   @doc """
-  Renders a session card with status pulse, name, description, and metadata.
+  Renders a session card (grid layout) with status pulse, name, and timestamp.
 
   ## Attrs
-    * `:session` - Map with session_id, session_name, agent_id, project_name, started_at, ended_at
+    * `:session` - Map from list_session_overview_rows with session_id, session_name, started_at, etc.
     * `:show_project` - Whether to show project name (default: true)
   """
   attr :session, :map, required: true
@@ -15,15 +17,7 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
 
   def session_card(assigns) do
     status = session_status(assigns.session)
-    active_task = Map.get(assigns.session, :active_task)
-    intent = Map.get(assigns.session, :intent)
-    subtitle = pick_subtitle(active_task, intent, Map.get(assigns.session, :agent_description))
-
-    assigns =
-      assigns
-      |> assign(:status, status)
-      |> assign(:active_task, if(is_binary(active_task) && active_task != "", do: active_task))
-      |> assign(:subtitle, subtitle)
+    assigns = assign(assigns, :status, status)
 
     ~H"""
     <.link
@@ -40,9 +34,6 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
 
           :compacting ->
             "bg-gradient-to-r from-warning/60 via-warning to-warning/60"
-
-          :idle ->
-            "bg-gradient-to-r from-transparent via-base-content/6 to-transparent group-hover:via-primary/20"
 
           _ ->
             "bg-gradient-to-r from-transparent via-base-content/6 to-transparent group-hover:via-primary/20"
@@ -85,53 +76,118 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
           </span>
         </div>
 
-        <%!-- Session name + active task / subtitle --%>
-        <div class="min-h-[2.5rem]">
-          <p class="text-[13px] font-semibold text-base-content/90 line-clamp-1 group-hover:text-primary transition-colors duration-200">
-            {@session.session_name || "Unnamed session"}
-          </p>
-          <%= if @active_task do %>
-            <p class="text-xs text-base-content/50 mt-1 line-clamp-1 leading-relaxed flex items-center gap-1">
-              <.icon name="hero-check-circle-mini" class="w-3 h-3 text-success/60 shrink-0" />
-              <span class="truncate">{@active_task}</span>
-            </p>
-          <% else %>
-            <%= if @subtitle do %>
-              <p class="text-xs text-base-content/55 mt-1 line-clamp-2 leading-relaxed">
-                {@subtitle}
-              </p>
-            <% end %>
-          <% end %>
-        </div>
-
-        <%!-- Footer: project + ID --%>
-        <div class="flex items-center justify-between pt-2.5 border-t border-base-content/5">
-          <%= if @show_project && @session.project_name do %>
-            <span class="inline-flex items-center gap-1.5 text-[11px] text-base-content/50">
-              <.icon name="hero-folder-mini" class="w-3 h-3 text-base-content/40" />
-              <span class="truncate max-w-[120px]">{@session.project_name}</span>
-            </span>
-          <% else %>
-            <span></span>
-          <% end %>
-          <div class="flex items-center gap-1">
-            <code class="text-[10px] font-mono text-base-content/40 tracking-wider">
-              {String.slice(@session.session_uuid || "", 0..7)}
-            </code>
-            <button
-              phx-hook="CopyToClipboard"
-              id={"copy-#{@session.session_uuid}"}
-              data-session-id={@session.session_uuid}
-              class="opacity-0 group-hover:opacity-100 transition-opacity duration-200 btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
-              onclick="event.preventDefault(); event.stopPropagation();"
-              aria-label="Copy session ID"
-            >
-              <.icon name="hero-clipboard-document-mini" class="w-3 h-3 text-base-content/55" />
-            </button>
-          </div>
-        </div>
+        <%!-- Session name --%>
+        <p class="text-[13px] font-semibold text-base-content/90 line-clamp-1 group-hover:text-primary transition-colors duration-200">
+          {@session.session_name || "Unnamed session"}
+        </p>
       </div>
     </.link>
+    """
+  end
+
+  @doc """
+  Renders a session list row (used in project sessions view).
+
+  ## Attrs
+    * `:session` - Session struct with :agent preloaded
+    * `:select_mode` - Show checkbox instead of status dot (archive mode)
+    * `:selected` - Whether this row is checked
+  ## Slots
+    * `:actions` - Action buttons rendered on the right side
+  """
+  attr :session, :map, required: true
+  attr :select_mode, :boolean, default: false
+  attr :selected, :boolean, default: false
+  attr :click_event, :string, default: "navigate_dm"
+  slot :actions
+
+  def session_row(assigns) do
+    display_status = derive_display_status(assigns.session)
+
+    {status_color, status_bg, status_label, is_active} =
+      case display_status do
+        "working" -> {"text-success", "bg-success", "Working", true}
+        "compacting" -> {"text-warning", "bg-warning", "Compacting", true}
+        "idle" -> {"text-base-content/25", "bg-base-content/20", "Idle", false}
+        "idle_stale" -> {"text-warning", "bg-warning", "Idle", false}
+        "idle_dead" -> {"text-error", "bg-error", "Idle", false}
+        "completed" -> {"text-base-content/25", "bg-base-content/20", "Done", false}
+        _ -> {"text-base-content/25", "bg-base-content/20", "Idle", false}
+      end
+
+    assigns =
+      assigns
+      |> assign(:status_color, status_color)
+      |> assign(:status_bg, status_bg)
+      |> assign(:status_label, status_label)
+      |> assign(:is_active, is_active)
+
+    ~H"""
+    <div
+      class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer"
+      phx-click={@click_event}
+      phx-value-id={@session.id}
+      role="button"
+      tabindex="0"
+      phx-keyup={@click_event}
+      phx-key="Enter"
+      aria-label={"Open session: #{@session.name || "Unnamed session"} - #{@status_label}"}
+    >
+      <%!-- Status indicator or checkbox --%>
+      <%= if @select_mode do %>
+        <div class="flex-shrink-0 w-6 flex justify-center">
+          <input
+            type="checkbox"
+            checked={@selected}
+            phx-click="toggle_select"
+            phx-value-id={@session.id}
+            class="checkbox checkbox-xs checkbox-primary"
+            aria-label={"Select session #{@session.name || @session.id}"}
+          />
+        </div>
+      <% else %>
+        <div class="flex-shrink-0 w-6 flex justify-center" title={@status_label}>
+          <%= if @is_active do %>
+            <span class="relative flex h-2 w-2">
+              <span class={"animate-ping absolute inline-flex h-full w-full rounded-full opacity-50 " <> @status_bg}>
+              </span>
+              <span class={"relative inline-flex rounded-full h-2 w-2 " <> @status_bg}></span>
+            </span>
+          <% else %>
+            <span class={"inline-flex rounded-full h-2 w-2 " <> @status_bg}></span>
+          <% end %>
+        </div>
+      <% end %>
+
+      <%!-- Main content --%>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-baseline gap-2">
+          <span class="text-[13px] font-medium text-base-content/85 truncate">
+            {@session.name || "Unnamed session"}
+          </span>
+          <span class={"text-[11px] font-medium uppercase tracking-wider flex-shrink-0 " <> @status_color}>
+            {@status_label}
+          </span>
+        </div>
+        <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
+          <span class="font-mono">{Sessions.format_model_info(@session)}</span>
+          <span class="text-base-content/15">/</span>
+          <span class="tabular-nums">{relative_time(@session.started_at)}</span>
+        </div>
+      </div>
+
+      <%!-- Actions slot --%>
+      <%= if @actions != [] do %>
+        <div class="flex items-center gap-0 flex-shrink-0" phx-click="noop">
+          {render_slot(@actions)}
+        </div>
+      <% end %>
+
+      <%!-- Chevron --%>
+      <div class="flex-shrink-0">
+        <.icon name="hero-chevron-right-mini" class="w-4 h-4 text-base-content/20" />
+      </div>
+    </div>
     """
   end
 
@@ -142,13 +198,4 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
   defp session_status(%{status: "compacting"}), do: :compacting
   defp session_status(%{status: "idle"}), do: :idle
   defp session_status(_), do: :ended
-
-  defp pick_subtitle(active_task, _intent, _desc)
-       when is_binary(active_task) and active_task != "", do: nil
-
-  defp pick_subtitle(_active_task, intent, _desc) when is_binary(intent) and intent != "",
-    do: intent
-
-  defp pick_subtitle(_active_task, _intent, desc) when is_binary(desc) and desc != "", do: desc
-  defp pick_subtitle(_, _, _), do: nil
 end

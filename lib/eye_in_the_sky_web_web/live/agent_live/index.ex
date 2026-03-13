@@ -2,7 +2,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.Agents
-  alias EyeInTheSkyWeb.Claude.{SDK, Message}
   alias EyeInTheSkyWeb.Sessions
   import EyeInTheSkyWebWeb.Helpers.ViewHelpers
   import EyeInTheSkyWebWeb.Components.Icons
@@ -30,11 +29,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       |> assign(:show_new_session_drawer, false)
       |> assign(:projects, projects)
       |> assign(:timer_ref, nil)
-      |> assign(:show_sdk_demo, false)
-      |> assign(:sdk_ref, nil)
-      |> assign(:sdk_messages, [])
-      |> assign(:sdk_session_id, nil)
-      |> assign(:sdk_prompt, "")
       |> assign(:sidebar_tab, :sessions)
       |> assign(:sidebar_project, nil)
       |> assign(:selected_ids, MapSet.new())
@@ -372,38 +366,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     end
   end
 
-  # SDK Demo event handlers
-  @impl true
-  def handle_event("toggle_sdk_demo", _params, socket) do
-    {:noreply, assign(socket, :show_sdk_demo, !socket.assigns.show_sdk_demo)}
-  end
-
-  @impl true
-  def handle_event("sdk_send_message", %{"prompt" => prompt}, socket) do
-    case SDK.start(prompt, to: self(), model: "haiku", max_turns: 1) do
-      {:ok, ref} ->
-        socket =
-          socket
-          |> assign(:sdk_ref, ref)
-          |> assign(:sdk_prompt, "")
-          |> assign(:sdk_messages, [%{type: :user, content: prompt}])
-
-        {:noreply, socket}
-
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "SDK error: #{inspect(reason)}")}
-    end
-  end
-
-  @impl true
-  def handle_event("sdk_clear", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:sdk_messages, [])
-     |> assign(:sdk_ref, nil)
-     |> assign(:sdk_session_id, nil)}
-  end
-
   defp create_new_session_with_project(params, project_id, socket) do
     agent_type = params["agent_type"] || "claude"
     model = params["model"]
@@ -498,66 +460,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   @impl true
-  def handle_info({:claude_output, _ref, _line}, socket) do
-    # Ignore Claude output - SessionWorker handles these
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:claude_exit, _ref, _status}, socket) do
-    # Ignore Claude exit - SessionWorker handles these
-    {:noreply, socket}
-  end
-
-  # SDK message handlers - only show :result, skip streaming text deltas to avoid duplicates
-  @impl true
-  def handle_info({:claude_message, ref, %Message{type: :result} = message}, socket) do
-    if socket.assigns.sdk_ref == ref do
-      messages = socket.assigns.sdk_messages ++ [%{type: :assistant, message: message}]
-      {:noreply, assign(socket, :sdk_messages, messages)}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_info({:claude_message, _ref, %Message{}}, socket) do
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:claude_complete, ref, session_id}, socket) do
-    if socket.assigns.sdk_ref == ref do
-      socket =
-        socket
-        |> assign(:sdk_ref, nil)
-        |> assign(:sdk_session_id, session_id)
-
-      {:noreply, socket}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_info({:claude_error, ref, reason}, socket) do
-    if socket.assigns.sdk_ref == ref do
-      messages =
-        socket.assigns.sdk_messages ++
-          [%{type: :error, content: "Error: #{inspect(reason)}"}]
-
-      socket =
-        socket
-        |> assign(:sdk_ref, nil)
-        |> assign(:sdk_messages, messages)
-
-      {:noreply, socket}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
   def handle_info(_msg, socket), do: {:noreply, socket}
 
   defp apply_action(socket, :index, _params) do
@@ -595,11 +497,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     assign(socket, :agents, updated_agents)
   end
 
-  defp format_sdk_message(%Message{type: :result, content: text}), do: text
-  defp format_sdk_message(%Message{type: :text, content: text}), do: text
-  defp format_sdk_message(%Message{content: text}) when is_binary(text), do: text
-  defp format_sdk_message(%Message{type: type}), do: "[#{type}]"
-
   @impl true
   def render(assigns) do
     ~H"""
@@ -619,12 +516,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
               class="btn btn-sm btn-primary gap-1.5 min-h-0 h-7 text-xs"
             >
               <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Agent
-            </button>
-            <button
-              phx-click="toggle_sdk_demo"
-              class="btn btn-sm btn-ghost gap-1.5 min-h-0 h-7 text-xs text-base-content/50 hover:text-base-content"
-            >
-              <.icon name="hero-command-line-mini" class="w-3.5 h-3.5" /> SDK
             </button>
             <label class="swap swap-rotate btn btn-ghost btn-xs btn-circle">
               <input type="checkbox" class="theme-controller" value="dark" />
@@ -800,11 +691,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                     <span class="text-base-content/15">/</span>
                     <span class="tabular-nums">{relative_time(agent.started_at)}</span>
                   </div>
-                  <%= if agent.agent && agent.agent.description do %>
-                    <p class="text-xs text-base-content/35 mt-1 truncate max-w-lg">
-                      {agent.agent.description}
-                    </p>
-                  <% end %>
                 </div>
 
                 <%!-- Actions (visible on hover) --%>
@@ -893,100 +779,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       submit_event="create_new_session"
     />
 
-    <%!-- SDK Demo Chat --%>
-    <%= if @show_sdk_demo do %>
-      <div class="fixed bottom-4 right-4 w-96 z-50 flex flex-col bg-base-100 border border-base-content/10 rounded-xl shadow-2xl max-h-[500px] overflow-hidden">
-        <div class="flex items-center justify-between px-4 py-2.5 border-b border-base-content/5 bg-base-200/30">
-          <div class="flex items-center gap-2">
-            <.icon name="hero-command-line-mini" class="w-3.5 h-3.5 text-primary/60" />
-            <span class="text-xs font-semibold text-base-content/70">SDK Chat</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <%= if @sdk_session_id do %>
-              <span class="text-[10px] font-mono text-base-content/25 truncate max-w-[120px]">
-                {@sdk_session_id}
-              </span>
-            <% end %>
-            <button
-              phx-click="sdk_clear"
-              class="btn btn-ghost btn-xs btn-square text-base-content/30"
-              title="Clear"
-            >
-              <.icon name="hero-trash-mini" class="w-3 h-3" />
-            </button>
-            <button
-              phx-click="toggle_sdk_demo"
-              class="btn btn-ghost btn-xs btn-square text-base-content/30"
-              title="Close"
-            >
-              <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
-        <div
-          id="sdk-messages"
-          phx-hook="ScrollToBottom"
-          class="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-[200px] max-h-[360px]"
-        >
-          <%= if @sdk_messages == [] do %>
-            <div class="text-center text-base-content/25 text-xs py-10">
-              Send a message to test the SDK pipeline
-            </div>
-          <% else %>
-            <%= for msg <- @sdk_messages do %>
-              <%= case msg.type do %>
-                <% :user -> %>
-                  <div class="flex justify-end">
-                    <div class="bg-primary/90 text-primary-content rounded-xl rounded-br-sm px-3 py-2 text-sm max-w-[80%]">
-                      {msg.content}
-                    </div>
-                  </div>
-                <% :assistant -> %>
-                  <div class="flex justify-start">
-                    <div class="bg-base-200/60 rounded-xl rounded-bl-sm px-3 py-2 text-sm max-w-[80%] whitespace-pre-wrap">
-                      {format_sdk_message(msg.message)}
-                    </div>
-                  </div>
-                <% :error -> %>
-                  <div class="flex justify-start">
-                    <div class="bg-error/10 text-error rounded-xl px-3 py-2 text-sm max-w-[80%]">
-                      {msg.content}
-                    </div>
-                  </div>
-                <% _ -> %>
-              <% end %>
-            <% end %>
-          <% end %>
-          <%= if @sdk_ref do %>
-            <div class="flex justify-start">
-              <span class="loading loading-dots loading-xs text-base-content/30"></span>
-            </div>
-          <% end %>
-        </div>
-
-        <form phx-submit="sdk_send_message" class="px-3 py-2.5 border-t border-base-content/5">
-          <div class="flex gap-2">
-            <input
-              type="text"
-              name="prompt"
-              value={@sdk_prompt}
-              placeholder="Type a message..."
-              class="input input-sm flex-1 bg-base-200/50 border-base-content/8 text-sm placeholder:text-base-content/25"
-              autocomplete="off"
-              disabled={@sdk_ref != nil}
-            />
-            <button
-              type="submit"
-              class="btn btn-primary btn-sm btn-square"
-              disabled={@sdk_ref != nil}
-            >
-              <.icon name="hero-paper-airplane-mini" class="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </form>
-      </div>
-    <% end %>
     """
   end
 end

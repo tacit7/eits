@@ -99,6 +99,7 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
   attr :select_mode, :boolean, default: false
   attr :selected, :boolean, default: false
   attr :click_event, :string, default: "navigate_dm"
+  attr :project_name, :string, default: nil
   slot :actions
 
   def session_row(assigns) do
@@ -173,6 +174,10 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
           <span class="font-mono">{Sessions.format_model_info(@session)}</span>
           <span class="text-base-content/15">/</span>
           <span class="tabular-nums">{relative_time(@session.started_at)}</span>
+          <%= if @project_name do %>
+            <span class="text-base-content/15">/</span>
+            <span class="truncate text-base-content/45">{@project_name}</span>
+          <% end %>
         </div>
       </div>
 

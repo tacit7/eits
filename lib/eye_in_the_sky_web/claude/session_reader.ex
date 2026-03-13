@@ -177,6 +177,48 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
   defp is_conversation_message?(_), do: false
 
   @doc """
+  Reads total token usage and cost from a Claude session JSONL file.
+  Sums input_tokens and output_tokens from all assistant entries' message.usage,
+  and total_cost_usd from result entries.
+  Returns {:ok, total_tokens, total_cost_usd} or {:error, reason}.
+  """
+  def read_usage(session_id, project_path) do
+    case find_session_file(session_id, project_path) do
+      {:ok, file_path} ->
+        case File.read(file_path) do
+          {:ok, content} ->
+            {tokens, cost} =
+              content
+              |> String.split("\n", trim: true)
+              |> Enum.reduce({0, 0.0}, fn line, {tok_acc, cost_acc} ->
+                case Jason.decode(line) do
+                  {:ok, %{"type" => "assistant", "message" => %{"usage" => usage}}}
+                  when is_map(usage) ->
+                    input = Map.get(usage, "input_tokens") || 0
+                    output = Map.get(usage, "output_tokens") || 0
+                    {tok_acc + input + output, cost_acc}
+
+                  {:ok, %{"type" => "result", "total_cost_usd" => cost}}
+                  when is_number(cost) ->
+                    {tok_acc, cost_acc + cost}
+
+                  _ ->
+                    {tok_acc, cost_acc}
+                end
+              end)
+
+            {:ok, tokens, cost}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  @doc """
   Reads tool_use events from a Claude session JSONL file.
   Returns {:ok, list} where each entry is:
     %{id: String.t(), type: String.t(), message: String.t(), timestamp: String.t() | nil}

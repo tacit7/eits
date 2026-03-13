@@ -344,9 +344,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   @impl true
-  def handle_event("noop", _params, socket), do: {:noreply, socket}
-
-  @impl true
   def handle_event("toggle_new_session_drawer", _params, socket) do
     {:noreply, assign(socket, :show_new_session_drawer, !socket.assigns.show_new_session_drawer)}
   end
@@ -696,7 +693,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                 <%!-- Actions (visible on hover) --%>
                 <div
                   class="flex items-center gap-0.5 flex-shrink-0"
-                  phx-click="noop"
+                  phx-click={%JS{}}
                 >
                   <%= if agent.id do %>
                     <a

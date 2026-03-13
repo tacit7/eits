@@ -1,0 +1,38 @@
+defmodule EyeInTheSkyWeb.MCP.Tools.TeamDelete do
+  @moduledoc "Archive/delete a team when work is complete"
+
+  use Anubis.Server.Component, type: :tool
+
+  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.Teams
+
+  schema do
+    field :team_id, :integer, description: "Team ID to delete"
+    field :team_name, :string, description: "Team name to delete (alternative to team_id)"
+  end
+
+  @impl true
+  def execute(params, frame) do
+    team =
+      cond do
+        params[:team_id] -> Teams.get_team(params[:team_id])
+        params[:team_name] -> Teams.get_team_by_name(params[:team_name])
+        true -> nil
+      end
+
+    result =
+      case team do
+        nil ->
+          %{success: false, message: "Team not found"}
+
+        team ->
+          case Teams.delete_team(team) do
+            {:ok, _} -> %{success: true, message: "Team archived", team_id: team.id}
+            {:error, cs} -> %{success: false, message: "Failed: #{inspect(cs.errors)}"}
+          end
+      end
+
+    response = Response.tool() |> Response.json(result)
+    {:reply, response, frame}
+  end
+end

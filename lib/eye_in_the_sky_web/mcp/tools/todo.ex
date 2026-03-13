@@ -1,5 +1,5 @@
 defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
-  @moduledoc "Task management. Commands: create, annotate, start, done, status, tag, list, list-agent, list-session, search, delete, add-session, remove-session, add-session-to-tasks"
+  @moduledoc "Task management. Commands: create, annotate, start, done, status, tag, list, list-agent, list-session, list-team, search, delete, add-session, remove-session, add-session-to-tasks"
 
   use Anubis.Server.Component, type: :tool
 
@@ -15,6 +15,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
     field :priority, :integer, description: "Task priority"
     field :state_id, :integer, description: "Workflow state ID"
     field :project_id, :integer, description: "Project ID"
+    field :team_id, :integer, description: "Team ID (for list-team or scoping tasks to a team)"
     field :agent_id, :string, description: "Agent ID"
     field :session_id, :string, description: "Session ID"
     field :query, :string, description: "Search query"
@@ -35,17 +36,15 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
       priority: params[:priority],
       state_id: params[:state_id] || 1,
       project_id: params[:project_id],
+      team_id: params[:team_id],
       agent_id: resolve_agent_int_id(params[:agent_id]),
       due_at: params[:due_at],
       created_at: DateTime.utc_now() |> DateTime.to_iso8601()
     }
 
-    # Explicit session_id param takes precedence; fall back to the EITS session
-    # UUID stored in frame assigns by i-session start.
     frame_session_id = if is_struct(frame), do: frame.assigns[:eits_session_id], else: nil
     session_id = params[:session_id] || frame_session_id
 
-    # Resolve project_id from session if not explicitly provided
     resolved_project_id =
       params[:project_id] ||
         case frame_session_id && EyeInTheSkyWeb.Sessions.get_session_by_uuid(frame_session_id) do
@@ -74,10 +73,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
     alias EyeInTheSkyWeb.Tasks
 
     tasks =
-      if params[:project_id] do
-        EyeInTheSkyWeb.Projects.get_project_tasks(params[:project_id])
-      else
-        Tasks.list_tasks()
+      cond do
+        params[:team_id] -> Tasks.list_tasks_for_team(params[:team_id])
+        params[:project_id] -> EyeInTheSkyWeb.Projects.get_project_tasks(params[:project_id])
+        true -> Tasks.list_tasks()
       end
 
     limit = params[:limit] || 50
@@ -88,6 +87,31 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
       message: "#{length(tasks)} task(s)",
       tasks: Enum.map(tasks, &format_task/1)
     }
+
+    response = Response.tool() |> Response.json(result)
+    {:reply, response, frame}
+  end
+
+  def execute(%{command: "list-team"} = params, frame) do
+    alias EyeInTheSkyWeb.{Tasks, Teams}
+
+    team =
+      cond do
+        params[:team_id] -> Teams.get_team(params[:team_id])
+        true -> nil
+      end
+
+    result =
+      case team do
+        nil ->
+          %{success: false, message: "team_id required"}
+
+        team ->
+          tasks = Tasks.list_tasks_for_team(team.id)
+          limit = params[:limit] || 100
+          tasks = Enum.take(tasks, limit)
+          %{success: true, team_id: team.id, team_name: team.name, tasks: Enum.map(tasks, &format_task/1)}
+      end
 
     response = Response.tool() |> Response.json(result)
     {:reply, response, frame}
@@ -269,6 +293,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
 
         {tid, sid} ->
           task_int_id = parse_int_id(tid)
+
           session_int_id =
             case Helpers.resolve_session_int_id(sid) do
               {:ok, id} -> id
@@ -307,7 +332,9 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
               linked =
                 Enum.count(task_ids, fn tid ->
                   case parse_int_id(tid) do
-                    nil -> false
+                    nil ->
+                      false
+
                     task_int_id ->
                       Tasks.link_session_to_task(task_int_id, session_int_id)
                       true
@@ -329,7 +356,8 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
       when cmd in ["reindex", "vacuum", "project-sync"] do
     result = %{
       success: false,
-      message: "Command '#{cmd}' is not supported. These are DB maintenance operations not available at the tool level."
+      message:
+        "Command '#{cmd}' is not supported. These are DB maintenance operations not available at the tool level."
     }
 
     response = Response.tool() |> Response.json(result)
@@ -425,7 +453,8 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
       description: task.description,
       priority: task.priority,
       state: if(Ecto.assoc_loaded?(task.state) && task.state, do: task.state.name),
-      state_id: task.state_id
+      state_id: task.state_id,
+      team_id: Map.get(task, :team_id)
     }
   end
 end

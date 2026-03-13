@@ -22,7 +22,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
   end
 
   @impl true
-  def handle_event("set_range", %{"range" => range}, socket) when is_map_key(@date_ranges, range) do
+  def handle_event("set_range", %{"range" => range}, socket)
+      when is_map_key(@date_ranges, range) do
     {:noreply, socket |> assign(:date_range, range) |> load_all(range)}
   end
 
@@ -62,8 +63,13 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
 
   defp cutoff_timestamp(range) do
     case Map.get(@date_ranges, range) do
-      nil -> nil
-      days -> NaiveDateTime.utc_now() |> NaiveDateTime.add(-days * 86400, :second) |> NaiveDateTime.to_string()
+      nil ->
+        nil
+
+      days ->
+        NaiveDateTime.utc_now()
+        |> NaiveDateTime.add(-days * 86400, :second)
+        |> NaiveDateTime.to_string()
     end
   end
 
@@ -73,8 +79,11 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
   defp load_totals(cutoff) do
     {join, params} =
       case cutoff do
-        nil -> {"", []}
-        ts -> {"JOIN sessions s ON s.id = session_metrics.session_id AND s.started_at >= $1", [ts]}
+        nil ->
+          {"", []}
+
+        ts ->
+          {"JOIN sessions s ON s.id = session_metrics.session_id AND s.started_at >= $1", [ts]}
       end
 
     {:ok, %{rows: [[cost, tokens, requests, sessions, subagents]]}} =
@@ -212,7 +221,20 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
         params
       )
 
-    Enum.map(rows, fn [name, uuid, project, model, input, output, cache_read, cache_create, requests, subagents, cost, started_at] ->
+    Enum.map(rows, fn [
+                        name,
+                        uuid,
+                        project,
+                        model,
+                        input,
+                        output,
+                        cache_read,
+                        cache_create,
+                        requests,
+                        subagents,
+                        cost,
+                        started_at
+                      ] ->
       %{
         name: name || "Unnamed session",
         uuid: uuid,
@@ -248,7 +270,15 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
       """)
 
     Enum.map(rows, fn [month, sessions, input, output, requests, cost] ->
-      %{period: month, sessions: sessions, input_tokens: input, output_tokens: output, total_tokens: input + output, requests: requests, cost: cost}
+      %{
+        period: month,
+        sessions: sessions,
+        input_tokens: input,
+        output_tokens: output,
+        total_tokens: input + output,
+        requests: requests,
+        cost: cost
+      }
     end)
   end
 
@@ -271,7 +301,15 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
       """)
 
     Enum.map(rows, fn [week, sessions, input, output, requests, cost] ->
-      %{period: week, sessions: sessions, input_tokens: input, output_tokens: output, total_tokens: input + output, requests: requests, cost: cost}
+      %{
+        period: week,
+        sessions: sessions,
+        input_tokens: input,
+        output_tokens: output,
+        total_tokens: input + output,
+        requests: requests,
+        cost: cost
+      }
     end)
   end
 
@@ -328,27 +366,39 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
             <button
               phx-click="set_range"
               phx-value-range="7d"
-              class={["join-item btn btn-sm", if(@date_range == "7d", do: "btn-primary", else: "btn-outline")]}
+              class={[
+                "join-item btn btn-sm",
+                if(@date_range == "7d", do: "btn-primary", else: "btn-outline")
+              ]}
             >
               7d
             </button>
             <button
               phx-click="set_range"
               phx-value-range="30d"
-              class={["join-item btn btn-sm", if(@date_range == "30d", do: "btn-primary", else: "btn-outline")]}
+              class={[
+                "join-item btn btn-sm",
+                if(@date_range == "30d", do: "btn-primary", else: "btn-outline")
+              ]}
             >
               30d
             </button>
             <button
               phx-click="set_range"
               phx-value-range="all"
-              class={["join-item btn btn-sm", if(@date_range == "all", do: "btn-primary", else: "btn-outline")]}
+              class={[
+                "join-item btn btn-sm",
+                if(@date_range == "all", do: "btn-primary", else: "btn-outline")
+              ]}
             >
               All time
             </button>
           </div>
           <button phx-click="recalculate" disabled={@recalculating} class="btn btn-sm btn-outline">
-            <.icon name="hero-arrow-path" class={if @recalculating, do: "size-4 animate-spin", else: "size-4"} />
+            <.icon
+              name="hero-arrow-path"
+              class={if @recalculating, do: "size-4 animate-spin", else: "size-4"}
+            />
             {if @recalculating, do: "Recalculating...", else: "Recalculate"}
           </button>
         </div>
@@ -383,7 +433,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
             </div>
             <div class="card bg-base-100 border border-base-300 shadow-sm">
               <div class="card-body p-4 text-center">
-                <p class="text-xs text-base-content/60 uppercase tracking-wider">Sessions w/ Metrics</p>
+                <p class="text-xs text-base-content/60 uppercase tracking-wider">
+                  Sessions w/ Metrics
+                </p>
                 <p class="text-3xl font-bold text-info">{format_number(@totals.sessions)}</p>
               </div>
             </div>
@@ -415,11 +467,15 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
                 </thead>
                 <tbody>
                   <tr :if={@by_project == [] && !@recalculating} class="hover">
-                    <td colspan="7" class="text-center text-base-content/40 py-6">No data for this period</td>
+                    <td colspan="7" class="text-center text-base-content/40 py-6">
+                      No data for this period
+                    </td>
                   </tr>
                   <%= if @recalculating do %>
                     <tr :for={_ <- 1..5} class="hover">
-                      <td :for={_ <- 1..7}><div class="skeleton h-4 w-full"></div></td>
+                      <td :for={_ <- 1..7}>
+                        <div class="skeleton h-4 w-full"></div>
+                      </td>
                     </tr>
                   <% else %>
                     <tr :for={row <- @by_project} class="hover">
@@ -477,7 +533,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
         <%!-- Week by Week --%>
         <div class="card bg-base-100 border border-base-300 shadow-sm">
           <div class="card-body p-4">
-            <h2 class="text-lg font-semibold mb-3">By Week <span class="text-sm font-normal text-base-content/40">(last 26 weeks)</span></h2>
+            <h2 class="text-lg font-semibold mb-3">
+              By Week <span class="text-sm font-normal text-base-content/40">(last 26 weeks)</span>
+            </h2>
             <div class="overflow-x-auto">
               <table class="table table-sm">
                 <thead>
@@ -532,7 +590,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
                 <tbody>
                   <%= if @recalculating do %>
                     <tr :for={_ <- 1..5} class="hover">
-                      <td :for={_ <- 1..9}><div class="skeleton h-4 w-full"></div></td>
+                      <td :for={_ <- 1..9}>
+                        <div class="skeleton h-4 w-full"></div>
+                      </td>
                     </tr>
                   <% else %>
                     <tr :for={row <- @model_breakdown} class="hover">
@@ -577,7 +637,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
                 <tbody>
                   <%= if @recalculating do %>
                     <tr :for={_ <- 1..10} class="hover">
-                      <td :for={_ <- 1..11}><div class="skeleton h-4 w-full"></div></td>
+                      <td :for={_ <- 1..11}>
+                        <div class="skeleton h-4 w-full"></div>
+                      </td>
                     </tr>
                   <% else %>
                     <tr :for={row <- @top_sessions} class="hover">
@@ -588,7 +650,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
                       </td>
                       <td class="text-base-content/60 whitespace-nowrap">{row.project}</td>
                       <td class="whitespace-nowrap">{short_model(row.model)}</td>
-                      <td class="text-base-content/60 whitespace-nowrap">{format_date(row.started_at)}</td>
+                      <td class="text-base-content/60 whitespace-nowrap">
+                        {format_date(row.started_at)}
+                      </td>
                       <td class="text-right">{format_number(row.input_tokens)}</td>
                       <td class="text-right">{format_number(row.output_tokens)}</td>
                       <td class="text-right">{format_number(row.cache_read)}</td>

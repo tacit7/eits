@@ -213,7 +213,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.KanbanTest do
 
       # Use the drawer's delete button (has data-confirm attribute, distinct from card inline button)
       view
-      |> element("button[data-confirm][phx-click='delete_task'][phx-value-task_id='#{task.uuid}']")
+      |> element(
+        "button[data-confirm][phx-click='delete_task'][phx-value-task_id='#{task.uuid}']"
+      )
       |> render_click()
 
       refute render(view) =~ "Task To Delete"

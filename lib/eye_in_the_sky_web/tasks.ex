@@ -24,11 +24,43 @@ defmodule EyeInTheSkyWeb.Tasks do
 
   @doc """
   Returns the list of tasks.
+
+  Options:
+  - `:limit` - maximum number of tasks to return (default: nil = all)
+  - `:offset` - number of tasks to skip (default: 0)
+  - `:state_id` - filter by workflow state ID (default: nil = all)
   """
-  def list_tasks do
-    Task
-    |> preload([:state, :tags, :agents])
-    |> Repo.all()
+  def list_tasks(opts \\ []) do
+    limit = Keyword.get(opts, :limit)
+    offset = Keyword.get(opts, :offset, 0)
+    state_id = Keyword.get(opts, :state_id)
+
+    query =
+      Task
+      |> preload([:state, :tags, :agents])
+      |> order_by([t], desc: t.created_at)
+
+    query = if state_id, do: where(query, [t], t.state_id == ^state_id), else: query
+    query = if limit, do: limit(query, ^limit), else: query
+    query = if offset > 0, do: offset(query, ^offset), else: query
+
+    Repo.all(query)
+  end
+
+  @doc """
+  Returns the count of tasks matching the given filters.
+
+  Options:
+  - `:state_id` - filter by workflow state ID (default: nil = all)
+  """
+  def count_tasks(opts \\ []) do
+    state_id = Keyword.get(opts, :state_id)
+
+    query = Task
+
+    query = if state_id, do: where(query, [t], t.state_id == ^state_id), else: query
+
+    Repo.aggregate(query, :count, :id)
   end
 
   @doc """
@@ -317,9 +349,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   """
   def link_tag_to_task(task_id, tag_id)
       when is_integer(task_id) and is_integer(tag_id) do
-    Repo.insert_all("task_tags", [%{task_id: task_id, tag_id: tag_id}],
-      on_conflict: :nothing
-    )
+    Repo.insert_all("task_tags", [%{task_id: task_id, tag_id: tag_id}], on_conflict: :nothing)
   end
 
   @doc """

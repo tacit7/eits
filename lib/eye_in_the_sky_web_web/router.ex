@@ -10,14 +10,44 @@ defmodule EyeInTheSkyWebWeb.Router do
     plug :put_secure_browser_headers
   end
 
+  pipeline :require_auth do
+    plug EyeInTheSkyWebWeb.Plugs.RequireAuth
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
   end
 
-  scope "/", EyeInTheSkyWebWeb do
+  # Session-aware JSON pipeline without CSRF — safe for WebAuthn endpoints
+  # (registration is token-gated; login uses WebAuthn challenge binding)
+  pipeline :webauthn do
+    plug :accepts, ["json"]
+    plug :fetch_session
+  end
+
+  # Auth LiveView pages (HTML, with CSRF)
+  scope "/auth", EyeInTheSkyWebWeb do
     pipe_through :browser
 
-    live_session :app, on_mount: [EyeInTheSkyWebWeb.FabHook] do
+    live "/login", AuthLive, :login
+    live "/register", AuthLive, :register
+    delete "/logout", AuthController, :logout
+  end
+
+  # WebAuthn JSON endpoints (no CSRF — protected by token + challenge binding)
+  scope "/auth", EyeInTheSkyWebWeb do
+    pipe_through :webauthn
+
+    post "/register/challenge", AuthController, :register_challenge
+    post "/register/complete", AuthController, :register_complete
+    post "/login/challenge", AuthController, :login_challenge
+    post "/login/complete", AuthController, :login_complete
+  end
+
+  scope "/", EyeInTheSkyWebWeb do
+    pipe_through [:browser, :require_auth]
+
+    live_session :app, on_mount: [EyeInTheSkyWebWeb.AuthHook, EyeInTheSkyWebWeb.FabHook] do
       live "/", AgentLive.Index, :index
       live "/notes", OverviewLive.Notes, :index
       live "/tasks", OverviewLive.Tasks, :index
@@ -25,6 +55,7 @@ defmodule EyeInTheSkyWebWeb.Router do
       live "/skills", OverviewLive.Skills, :index
       live "/config", OverviewLive.Config, :index
       live "/jobs", OverviewLive.Jobs, :index
+      live "/notifications", OverviewLive.Notifications, :index
       live "/settings", OverviewLive.Settings, :index
       live "/sessions", SessionLive.Index, :index
       live "/prompts", PromptLive.Index, :index
@@ -39,9 +70,17 @@ defmodule EyeInTheSkyWebWeb.Router do
       live "/projects/:id/files", ProjectLive.Files, :show
       live "/projects/:id/config", ProjectLive.Config, :show
       live "/projects/:id/agents", ProjectLive.Agents, :show
+      live "/projects/:id/jobs", ProjectLive.Jobs, :show
       live "/chat", ChatLive, :index
       live "/dm/:session_id", DmLive, :show
     end
+  end
+
+  import Oban.Web.Router
+
+  scope "/oban" do
+    pipe_through :browser
+    oban_dashboard("/")
   end
 
   # MCP Server — Streamable HTTP
@@ -81,6 +120,9 @@ defmodule EyeInTheSkyWebWeb.Router do
     get "/session-context/:uuid", SessionContextController, :show
     post "/session-context", SessionContextController, :create
 
+    # Notifications
+    post "/notifications", NotificationController, :create
+
     # Tasks
     get "/tasks", TaskController, :index
     post "/tasks", TaskController, :create
@@ -90,6 +132,14 @@ defmodule EyeInTheSkyWebWeb.Router do
     post "/tasks/:id/annotations", TaskController, :annotate
     post "/tasks/:id/sessions", TaskController, :link_session
     delete "/tasks/:id/sessions/:uuid", TaskController, :unlink_session
+
+    # Scheduled Jobs
+    get "/jobs", JobController, :index
+    post "/jobs", JobController, :create
+    get "/jobs/:id", JobController, :show
+    patch "/jobs/:id", JobController, :update
+    delete "/jobs/:id", JobController, :delete
+    post "/jobs/:id/run", JobController, :run
 
     # Projects
     get "/projects", ProjectController, :index
@@ -101,10 +151,18 @@ defmodule EyeInTheSkyWebWeb.Router do
     post "/agents", AgentController, :create
     get "/agents/:id", AgentController, :show
 
+    # Push notifications
+    get "/push/vapid-public-key", PushController, :vapid_public_key
+    post "/push/subscribe", PushController, :subscribe
+    delete "/push/subscribe", PushController, :unsubscribe
+
     # Messaging
     post "/dm", MessagingController, :dm
     get "/channels", MessagingController, :list_channels
     post "/channels/:channel_id/messages", MessagingController, :send_channel_message
+
+    # Gitea webhooks
+    post "/webhooks/gitea", GiteaWebhookController, :handle
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
     <div
       class="group flex items-center gap-2 py-3.5 cursor-pointer"
       phx-click={@on_click}
-      phx-value-task_id={@task.uuid}
+      phx-value-task_id={@task.uuid || to_string(@task.id)}
     >
       <div class="flex flex-col gap-1 flex-1 min-w-0">
         <span class={[
@@ -54,14 +54,14 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
             <span>{Enum.map_join(Enum.take(@task.tags, 2), ", ", & &1.name)}</span>
           <% end %>
           <span class="text-base-content/15">&middot;</span>
-          <span class="font-mono">{String.slice(@task.uuid, 0..7)}</span>
+          <span class="font-mono">{String.slice(@task.uuid || "", 0..7)}</span>
         </div>
       </div>
       <%= if @on_delete do %>
         <button
           type="button"
           phx-click={@on_delete}
-          phx-value-task_id={@task.uuid}
+          phx-value-task_id={@task.uuid || to_string(@task.id)}
           data-confirm="Delete this task?"
           class="flex-shrink-0 opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-base-content/25 hover:text-error hover:bg-error/10 transition-all"
         >
@@ -131,7 +131,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
     <!-- Meta Info -->
     <div class="flex items-center gap-2 text-xs text-base-content/50 flex-wrap">
       <span class="font-mono text-xs">
-        {String.slice(@task.uuid, 0..7)}
+        {String.slice(@task.uuid || "", 0..7)}
       </span>
       <button
         type="button"
@@ -200,7 +200,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
     <!-- Task Metadata -->
     <div class="flex flex-wrap items-center gap-2 mt-auto pt-3 border-t border-base-300">
       <span class="badge badge-ghost badge-sm font-mono text-xs">
-        {String.slice(@task.uuid, 0..7)}
+        {String.slice(@task.uuid || "", 0..7)}
       </span>
       <button
         type="button"

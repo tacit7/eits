@@ -16,8 +16,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionSearch do
 
     query = params[:query] || ""
     limit = params[:limit] || 20
-    results = Sessions.list_sessions_filtered(search_query: query)
-    results = Enum.take(results, limit)
+    results = Sessions.list_sessions_filtered(search_query: query, limit: limit)
 
     result = %{
       success: true,

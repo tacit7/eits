@@ -6,23 +6,22 @@ defmodule EyeInTheSkyWeb.Claude.SessionManagerTest do
   alias EyeInTheSkyWeb.Claude.SessionWorker
 
   setup do
-    # Kill all processes from previous tests to ensure clean state
-    # Using :kill ensures immediate termination without normal shutdown
-    for name <- [SessionManager, @supervisor, @registry, EyeInTheSkyWeb.PubSub] do
-      case Process.whereis(name) do
-        nil -> :ok
-        pid -> Process.exit(pid, :kill)
-      end
-    end
+    # SessionManager holds no per-session state (it's stateless, using Registry).
+    # All session state lives in workers. Terminating workers cleans up Registry
+    # entries automatically. No need to restart PubSub/Registry/SessionSupervisor,
+    # which avoids hitting the app supervisor's max_restarts limit.
+    @supervisor
+    |> DynamicSupervisor.which_children()
+    |> Enum.each(fn
+      {_, pid, :worker, _} when is_pid(pid) ->
+        DynamicSupervisor.terminate_child(@supervisor, pid)
 
-    # Brief delay to ensure processes are fully stopped
+      _ ->
+        :ok
+    end)
+
+    # Brief wait for Registry to clean up terminated worker entries.
     Process.sleep(20)
-
-    # Each test needs its own isolated supervision tree
-    start_supervised!({Phoenix.PubSub, name: EyeInTheSkyWeb.PubSub})
-    start_supervised!({Registry, keys: :duplicate, name: @registry})
-    start_supervised!({DynamicSupervisor, name: @supervisor, strategy: :one_for_one})
-    start_supervised!(SessionManager)
 
     :ok
   end

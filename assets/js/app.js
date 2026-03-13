@@ -28,9 +28,11 @@ import {CopySessionId} from "./hooks/copy_session_id"
 import {BookmarkAgent} from "./hooks/bookmark_agent"
 import {FavoriteFab} from "./hooks/favorite_fab"
 import {ScrollToBottom} from "./hooks/scroll_to_bottom"
+import {AutoScroll} from "./hooks/auto_scroll"
 import {MarkdownMessage} from "./hooks/markdown_message"
 import {CommandHistory} from "./hooks/command_history"
 import {DiffViewer} from "./hooks/diff_viewer"
+import {PasskeyAuth} from "./hooks/passkey_auth"
 import {getHooks} from "live_svelte"
 import "./theme"
 import hljs from 'highlight.js'
@@ -66,9 +68,11 @@ Hooks.CopySessionId = CopySessionId
 Hooks.BookmarkAgent = BookmarkAgent
 Hooks.FavoriteFab = FavoriteFab
 Hooks.ScrollToBottom = ScrollToBottom
+Hooks.AutoScroll = AutoScroll
 Hooks.CommandHistory = CommandHistory
 Hooks.MarkdownMessage = MarkdownMessage
 Hooks.DiffViewer = DiffViewer
+Hooks.PasskeyAuth = PasskeyAuth
 Hooks.RefreshDot = {
   mounted() { this._flash() },
   updated() { this._flash() },
@@ -161,43 +165,75 @@ Hooks.GlobalKeydown = {
     window.removeEventListener("keydown", this._handler)
   }
 }
+Hooks.LocalTime = {
+  mounted() { this._format() },
+  updated() { this._format() },
+  _format() {
+    const utc = this.el.dataset.utc
+    if (!utc) return
+    const d = new Date(utc)
+    if (isNaN(d)) return
+    if (this.el.dataset.fmt === 'short') {
+      this.el.textContent = d.toLocaleString(undefined, {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+      })
+      return
+    }
+    const now = new Date()
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const timeStr = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+    if (d.toDateString() === now.toDateString()) {
+      this.el.textContent = `Today at ${timeStr}`
+    } else if (d.toDateString() === yesterday.toDateString()) {
+      this.el.textContent = `Yesterday at ${timeStr}`
+    } else {
+      this.el.textContent = d.toLocaleString(undefined, {
+        month: '2-digit', day: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      })
+    }
+  }
+}
 Hooks.DragUpload = {
   mounted() {
-    this._count = 0
     this._overlay = this.el.querySelector('#drag-overlay')
+    this._active = false
 
+    // Window-level listeners: more reliable for detecting when drag
+    // enters/leaves the browser window vs element-boundary noise.
     this._onDragEnter = (e) => {
-      if (!e.dataTransfer?.types?.includes('Files')) return
-      this._count++
-      if (this._count === 1) this._overlay?.classList.remove('hidden')
+      const types = e.dataTransfer?.types
+      if (!types) return
+      if (!Array.from(types).includes('Files')) return
+      if (!this._active) {
+        this._active = true
+        this._overlay?.classList.remove('hidden')
+      }
     }
 
     this._onDragLeave = (e) => {
-      if (!e.dataTransfer?.types?.includes('Files')) return
-      this._count--
-      if (this._count <= 0) {
-        this._count = 0
+      // relatedTarget is null only when the cursor leaves the browser window
+      if (e.relatedTarget === null) {
+        this._active = false
         this._overlay?.classList.add('hidden')
       }
     }
 
     this._onDrop = () => {
-      this._count = 0
+      this._active = false
       this._overlay?.classList.add('hidden')
     }
 
-    this._onDragOver = (e) => e.preventDefault()
-
-    this.el.addEventListener('dragenter', this._onDragEnter)
-    this.el.addEventListener('dragleave', this._onDragLeave)
-    this.el.addEventListener('drop', this._onDrop)
-    this.el.addEventListener('dragover', this._onDragOver)
+    window.addEventListener('dragenter', this._onDragEnter)
+    window.addEventListener('dragleave', this._onDragLeave)
+    window.addEventListener('drop', this._onDrop)
   },
   destroyed() {
-    this.el.removeEventListener('dragenter', this._onDragEnter)
-    this.el.removeEventListener('dragleave', this._onDragLeave)
-    this.el.removeEventListener('drop', this._onDrop)
-    this.el.removeEventListener('dragover', this._onDragOver)
+    window.removeEventListener('dragenter', this._onDragEnter)
+    window.removeEventListener('dragleave', this._onDragLeave)
+    window.removeEventListener('drop', this._onDrop)
   }
 }
 Hooks.SidebarState = {
@@ -218,6 +254,10 @@ Hooks.SidebarState = {
       const id = btn.dataset.projectToggle
       this._toggleProject(id)
     })
+
+    // Listen for mobile open event dispatched from the top bar outside this component
+    this._openHandler = () => this.pushEventTo(this.el, "toggle_mobile", {})
+    this.el.addEventListener("sidebar:open", this._openHandler)
   },
 
   updated() {
@@ -282,6 +322,12 @@ Hooks.SidebarState = {
       chevron.innerHTML = isExpanded
         ? `<svg class="w-3.5 h-3.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>`
         : `<svg class="w-3.5 h-3.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>`
+    }
+  },
+
+  destroyed() {
+    if (this._openHandler) {
+      this.el.removeEventListener("sidebar:open", this._openHandler)
     }
   }
 }

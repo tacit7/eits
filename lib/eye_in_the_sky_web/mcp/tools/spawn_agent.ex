@@ -8,14 +8,29 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
   schema do
     field :instructions, :string,
       required: true,
-      description: "Task instructions for the agent (required)"
+      description: "Task instructions for the agent"
 
     field :model, :string, description: "Model to use (haiku, sonnet, opus). Default: haiku"
-    field :project_path, :string, description: "Working directory. Default: current directory"
-    field :skip_permissions, :boolean, description: "Skip permission prompts (default: true)"
-    field :background, :boolean, description: "Run agent in background (default: false)"
-    field :parent_agent_id, :string, description: "Parent agent ID for tracking hierarchy"
-    field :parent_session_id, :string, description: "Parent session ID for tracking hierarchy"
+
+    field :provider, :string,
+      description: "AI provider (claude, codex). Default: claude"
+
+    field :project_id, :integer,
+      description: "Project ID to associate with the spawned agent and session"
+
+    field :project_path, :string,
+      description: "Working directory for the agent. Default: current directory"
+
+    field :worktree, :string,
+      description: "Git worktree name. Appends git push + PR instructions automatically."
+
+    field :effort_level, :string, description: "Effort level override"
+
+    field :parent_agent_id, :integer,
+      description: "Parent agent ID for tracking spawn hierarchy"
+
+    field :parent_session_id, :integer,
+      description: "Parent session ID for tracking spawn hierarchy"
   end
 
   @impl true
@@ -25,19 +40,25 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
     opts = [
       instructions: params[:instructions],
       model: params[:model] || "haiku",
+      agent_type: params[:provider] || "claude",
+      project_id: params[:project_id],
       project_path: params[:project_path],
       description: params[:instructions],
+      worktree: params[:worktree],
+      effort_level: params[:effort_level],
       parent_agent_id: params[:parent_agent_id],
       parent_session_id: params[:parent_session_id]
     ]
 
     result =
       case AgentManager.create_agent(opts) do
-        {:ok, %{agent: _agent, session: session}} ->
+        {:ok, %{agent: agent, session: session}} ->
           %{
             success: true,
             message: "Agent spawned",
-            session_id: session.uuid
+            agent_id: agent.uuid,
+            session_id: session.id,
+            session_uuid: session.uuid
           }
 
         {:error, reason} ->

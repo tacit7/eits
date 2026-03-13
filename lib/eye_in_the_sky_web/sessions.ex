@@ -6,6 +6,9 @@ defmodule EyeInTheSkyWeb.Sessions do
   """
 
   import Ecto.Query, warn: false
+
+  require Logger
+
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Sessions.Session
   alias EyeInTheSkyWeb.Scopes.Archivable
@@ -128,15 +131,20 @@ defmodule EyeInTheSkyWeb.Sessions do
   @doc """
   Ends a session by setting ended_at timestamp.
   """
-  def end_session(%Session{} = session) do
-    update_session(session, %{ended_at: DateTime.utc_now() |> DateTime.to_iso8601()})
+  def end_session(%Session{} = session, opts \\ %{}) do
+    attrs =
+      %{ended_at: DateTime.utc_now() |> DateTime.to_iso8601()}
+      |> then(fn m -> if opts[:summary], do: Map.put(m, :description, opts[:summary]), else: m end)
+      |> then(fn m -> if opts[:final_status], do: Map.put(m, :status, opts[:final_status]), else: Map.put(m, :status, "completed") end)
+
+    update_session(session, attrs)
   end
 
   @doc """
   Archives a session (soft delete).
   """
   def archive_session(%Session{} = session) do
-    now = DateTime.utc_now() |> DateTime.to_string()
+    now = DateTime.utc_now() |> DateTime.to_iso8601()
     update_session(session, %{archived_at: now})
   end
 
@@ -144,14 +152,9 @@ defmodule EyeInTheSkyWeb.Sessions do
   Unarchives a session.
   """
   def unarchive_session(%Session{} = session) do
-    require Logger
-
-    Logger.info(
-      "📦 Unarchiving session #{session.id}, current archived_at: #{inspect(session.archived_at)}"
-    )
-
+    Logger.info("unarchive_session id=#{session.id} archived_at=#{inspect(session.archived_at)}")
     result = update_session(session, %{archived_at: nil})
-    Logger.info("📦 Update result: #{inspect(result)}")
+    Logger.info("unarchive_session result=#{inspect(result)}")
     result
   end
 
@@ -278,6 +281,7 @@ defmodule EyeInTheSkyWeb.Sessions do
     include_archived = Keyword.get(opts, :include_archived, false)
     project_id = Keyword.get(opts, :project_id, nil)
     search_query = Keyword.get(opts, :search_query, "")
+    state_in_progress = EyeInTheSkyWeb.Tasks.state_in_progress()
 
     query =
       from(s in Session,
@@ -299,8 +303,9 @@ defmodule EyeInTheSkyWeb.Sessions do
           status: s.status,
           intent: s.intent,
           active_task: fragment(
-            "(SELECT t.title FROM tasks t JOIN task_sessions ts ON t.id = ts.task_id WHERE ts.session_id = ? AND t.state_id = 2 AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)",
-            s.id
+            "(SELECT t.title FROM tasks t JOIN task_sessions ts ON t.id = ts.task_id WHERE ts.session_id = ? AND t.state_id = ? AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)",
+            s.id,
+            ^state_in_progress
           )
         }
       )
@@ -344,16 +349,14 @@ defmodule EyeInTheSkyWeb.Sessions do
   Returns tasks, commits, logs, notes, context, and metrics.
   """
   def load_session_data(session_id) do
-    alias EyeInTheSkyWeb.{Tasks, Commits, Logs, Contexts}
+    alias EyeInTheSkyWeb.{Tasks, Commits, Logs, Contexts, Notes}
 
     %{
       tasks: Tasks.list_tasks_for_session(session_id),
       commits: Commits.list_commits_for_session(session_id),
       logs: Logs.list_logs_for_session(session_id),
-      # TODO: Fix parent_id type mismatch (INTEGER vs TEXT)
-      notes: [],
+      notes: Notes.list_notes_for_session(session_id),
       session_context: Contexts.get_session_context(session_id),
-      # TODO: Add metrics when table exists
       metrics: nil
     }
   end

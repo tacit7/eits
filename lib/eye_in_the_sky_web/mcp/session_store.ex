@@ -12,6 +12,10 @@ defmodule EyeInTheSkyWeb.MCP.SessionStore do
   use GenServer
 
   @table :mcp_sessions
+  # 30 minutes in milliseconds
+  @cleanup_interval :timer.minutes(30)
+  # 24 hours in milliseconds
+  @max_age_ms :timer.hours(24)
 
   # ── Anubis.Server.Session.Store callbacks ──────────────────────────────────
 
@@ -71,6 +75,18 @@ defmodule EyeInTheSkyWeb.MCP.SessionStore do
   @impl GenServer
   def init(_opts) do
     :ets.new(@table, [:named_table, :public, read_concurrency: true])
+    :timer.send_interval(@cleanup_interval, :cleanup_expired)
     {:ok, %{}}
+  end
+
+  @impl GenServer
+  def handle_info(:cleanup_expired, state) do
+    cutoff = System.system_time(:millisecond) - @max_age_ms
+
+    :ets.select_delete(@table, [
+      {{:_, :_, :"$1"}, [{:<, :"$1", cutoff}], [true]}
+    ])
+
+    {:noreply, state}
   end
 end

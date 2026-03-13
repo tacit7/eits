@@ -41,6 +41,9 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
         preload: [:state, :tags]
       )
   """
+  # Only lowercase letters, digits, and underscores — no injection vectors
+  @safe_identifier ~r/^[a-z][a-z0-9_]*$/
+
   def search(opts) do
     table = Keyword.fetch!(opts, :table)
     schema = Keyword.fetch!(opts, :schema)
@@ -50,11 +53,29 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
     sql_params = Keyword.get(opts, :sql_params, [])
     fallback_query = Keyword.fetch!(opts, :fallback_query)
     preloads = Keyword.get(opts, :preload, [])
+    limit = Keyword.get(opts, :limit)
 
-    pg_fts_search(table, schema, query, search_columns, sql_filter, sql_params, fallback_query, preloads)
+    if safe_identifier?(table) and Enum.all?(search_columns, &safe_identifier?/1) do
+      pg_fts_search(table, schema, query, search_columns, sql_filter, sql_params, fallback_query, preloads, limit)
+    else
+      run_fallback(fallback_query, preloads, limit)
+    end
   end
 
-  defp pg_fts_search(table, schema, query, search_columns, sql_filter, sql_params, fallback_query, preloads) do
+  defp safe_identifier?(value), do: Regex.match?(@safe_identifier, value)
+
+  defp run_fallback(fallback_query, preloads, limit) do
+    effective_limit = limit || 50
+
+    query_result = limit(fallback_query, ^effective_limit)
+
+    query_result =
+      if preloads != [], do: preload(query_result, ^preloads), else: query_result
+
+    Repo.all(query_result)
+  end
+
+  defp pg_fts_search(table, schema, query, search_columns, sql_filter, sql_params, fallback_query, preloads, limit) do
     alias_letter = String.first(table)
 
     # Build tsvector expression from search columns: to_tsvector('english', coalesce(col1,'') || ' ' || coalesce(col2,''))
@@ -63,13 +84,15 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
       |> Enum.map(fn col -> "coalesce(#{alias_letter}.#{col}, '')" end)
       |> Enum.join(" || ' ' || ")
 
+    effective_limit = limit || 50
+
     sql = """
     SELECT #{alias_letter}.*
     FROM #{table} #{alias_letter}
     WHERE to_tsvector('english', #{tsvector_expr}) @@ plainto_tsquery('english', $1)
     #{sql_filter}
     ORDER BY ts_rank(to_tsvector('english', #{tsvector_expr}), plainto_tsquery('english', $1)) DESC
-    LIMIT 50
+    LIMIT #{effective_limit}
     """
 
     params = [query | sql_params]
@@ -91,19 +114,7 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
         end
 
       {:error, _} ->
-        # Fallback to ILIKE search
-        query_result =
-          fallback_query
-          |> limit(50)
-
-        query_result =
-          if preloads != [] do
-            preload(query_result, ^preloads)
-          else
-            query_result
-          end
-
-        Repo.all(query_result)
+        run_fallback(fallback_query, preloads, limit)
     end
   end
 end

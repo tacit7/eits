@@ -56,13 +56,26 @@ config :phoenix, :json_library, Jason
 # Oban job processing
 config :eye_in_the_sky_web, Oban,
   engine: Oban.Engines.Basic,
-  queues: [jobs: 5],
-  repo: EyeInTheSkyWeb.Repo
+  notifier: Oban.Notifiers.PG,
+  queues: [jobs: 5, default: 5],
+  repo: EyeInTheSkyWeb.Repo,
+  plugins: [
+    {Oban.Plugins.Cron,
+     crontab: [
+       {"* * * * *", EyeInTheSkyWeb.Workers.JobDispatcherWorker}
+     ]}
+  ]
 
 # Anubis MCP session store — ETS-backed, survives session agent crashes
 config :anubis_mcp, :session_store,
   enabled: true,
   adapter: EyeInTheSkyWeb.MCP.SessionStore
+
+# WebAuthn / Passkey configuration
+config :wax_,
+  origin: "https://unspiriting-catalina-postvocalic.ngrok-free.dev",
+  rp_id: "unspiriting-catalina-postvocalic.ngrok-free.dev",
+  trusted_attestation_types: [:none, :self]
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

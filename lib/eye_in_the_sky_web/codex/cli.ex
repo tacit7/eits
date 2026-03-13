@@ -125,7 +125,7 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
     # New session uses: codex exec [flags] [prompt]
     base_args =
       if resume_id do
-        ["exec", "resume", to_string(resume_id)]
+        ["exec", "--resume", to_string(resume_id)]
       else
         ["exec"]
       end

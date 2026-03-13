@@ -67,9 +67,11 @@ defmodule EyeInTheSkyWeb.MixProject do
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
       {:oban, "~> 2.19"},
+      {:oban_web, "~> 2.11"},
       {:crontab, "~> 1.1"},
       {:gnat, "~> 1.8"},
-      {:anubis_mcp, "~> 0.17"}
+      {:anubis_mcp, "~> 0.17"},
+      {:wax_, "~> 0.7.0"}
     ]
   end
 

@@ -60,10 +60,30 @@ defmodule EyeInTheSkyWeb.Projects do
   @doc """
   Gets tasks for a project.
   """
-  def get_project_tasks(project_id) when is_integer(project_id) do
-    from(t in EyeInTheSkyWeb.Tasks.Task,
-      where: t.project_id == ^project_id
-    )
+  def get_project_tasks(project_id, opts \\ []) when is_integer(project_id) do
+    state_id = Keyword.get(opts, :state_id)
+    sort_by = Keyword.get(opts, :sort_by, "created_desc")
+
+    query =
+      from(t in EyeInTheSkyWeb.Tasks.Task,
+        where: t.project_id == ^project_id
+      )
+
+    query =
+      if state_id do
+        where(query, [t], t.state_id == ^state_id)
+      else
+        query
+      end
+
+    query =
+      case sort_by do
+        "created_asc" -> order_by(query, [t], asc: t.created_at)
+        "priority" -> order_by(query, [t], desc: t.priority, desc: t.created_at)
+        _ -> order_by(query, [t], desc: t.created_at)
+      end
+
+    query
     |> preload([:state, :tags])
     |> Repo.all()
   end

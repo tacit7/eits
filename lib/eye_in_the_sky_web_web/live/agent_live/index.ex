@@ -175,14 +175,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
              provider: "claude",
              body: body
            }) do
-        {:ok, message} ->
-          # Broadcast to channel
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "channel:#{global_channel.id}:messages",
-            {:new_message, message}
-          )
-
+        {:ok, _message} ->
           # Continue the agent's session
           with {:ok, agent} <- Sessions.get_session(target_session_id),
                {:ok, chat_agent} <- Agents.get_agent(agent.agent_id) do
@@ -210,12 +203,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     else
       {:noreply, put_flash(socket, :error, "Global channel not found")}
     end
-  end
-
-  @impl true
-  def handle_event("open_chat", %{"session_id" => _session_id}, socket) do
-    # Navigate to agent detail view - currently no dedicated session view
-    {:noreply, socket}
   end
 
   @impl true
@@ -374,6 +361,21 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   def handle_info(:refresh_agents, socket) do
     socket = socket |> load_agents() |> schedule_refresh()
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:agent_created, _agent}, socket) do
+    {:noreply, load_agents(socket)}
+  end
+
+  @impl true
+  def handle_info({:agent_updated, _agent}, socket) do
+    {:noreply, load_agents(socket)}
+  end
+
+  @impl true
+  def handle_info({:agent_deleted, _agent}, socket) do
+    {:noreply, load_agents(socket)}
   end
 
   @impl true
@@ -603,7 +605,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="bg-base-100 px-6 lg:px-8">
+    <div class="bg-base-100 px-4 sm:px-6 lg:px-8">
       <div class="max-w-3xl mx-auto">
         <%!-- Toolbar: refresh + actions --%>
         <div class="flex items-center justify-between py-5">
@@ -635,7 +637,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
         </div>
 
         <%!-- Search and Filters --%>
-        <div class="sticky top-16 z-10 bg-base-100/85 backdrop-blur-md -mx-6 lg:-mx-8 px-6 lg:px-8 py-3 border-b border-base-content/5">
+        <div class="sticky top-0 md:top-16 z-10 bg-base-100/85 backdrop-blur-md -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 border-b border-base-content/5">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
             <form phx-submit="search" phx-change="search" class="flex-1 max-w-sm">
               <label for="search" class="sr-only">Search agents</label>

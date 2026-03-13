@@ -9,6 +9,12 @@ set -euo pipefail
 
 BASE=${EITS_API_URL:-http://localhost:5001/api/v1}
 
+EITS_PG_DB="${EITS_PG_DB:-eits_dev}"
+EITS_PG_USER="${EITS_PG_USER:-postgres}"
+EITS_PG_HOST="${EITS_PG_HOST:-localhost}"
+export PGPASSWORD="${EITS_PG_PASSWORD:-postgres}"
+_pgq() { psql -U "$EITS_PG_USER" -h "$EITS_PG_HOST" -d "$EITS_PG_DB" -t -A -c "$1" 2>/dev/null; }
+
 _curl() { curl -sk "$@"; }
 _ok() { local r="$1"; echo "$r" | jq .; if echo "$r" | jq -e '.error' &>/dev/null; then exit 1; fi; }
 
@@ -34,16 +40,13 @@ case "$cmd" in
     ;;
 
   list)
-    # Projects list not yet in REST API — query DB directly as fallback
-    sqlite3 "${EITS_DB:-$HOME/.config/eye-in-the-sky/eits.db}" \
-      "SELECT json_object('id',id,'name',name,'path',path,'active',active) FROM projects ORDER BY id;" \
+    _pgq "SELECT row_to_json(r) FROM (SELECT id, name, path, active FROM projects ORDER BY id) r" \
       | jq -s '{success:true, projects:.}'
     ;;
 
   get)
     id="${1:?project id required}"
-    sqlite3 "${EITS_DB:-$HOME/.config/eye-in-the-sky/eits.db}" \
-      "SELECT json_object('id',id,'name',name,'path',path,'slug',slug,'active',active) FROM projects WHERE id=$id LIMIT 1;" \
+    _pgq "SELECT row_to_json(r) FROM (SELECT id, name, path, slug, active FROM projects WHERE id = $id LIMIT 1) r" \
       | jq '{success:true, project:.}'
     ;;
 

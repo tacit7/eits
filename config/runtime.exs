@@ -20,6 +20,10 @@ if System.get_env("PHX_SERVER") do
   config :eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint, server: true
 end
 
+# Gitea webhook HMAC secret — required for signature verification in all envs
+config :eye_in_the_sky_web, :gitea_webhook_secret,
+  System.get_env("GITEA_WEBHOOK_SECRET", "")
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

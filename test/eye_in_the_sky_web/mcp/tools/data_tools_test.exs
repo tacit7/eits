@@ -18,7 +18,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.DataToolsTest do
       uuid: "dt-#{uniq()}",
       agent_id: agent.id,
       started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-      status: "active"
+      status: "idle"
     })
     session
   end
@@ -61,19 +61,20 @@ defmodule EyeInTheSkyWeb.MCP.Tools.DataToolsTest do
     assert r.message == "Logged 2/2 commits"
   end
 
-  test "Commits: returns success even for unknown session (0 logged)" do
+  test "Commits: returns error when session cannot be resolved" do
     r = Commits.execute(%{
       agent_id: "unknown-uuid",
       commit_hashes: ["aaa111"],
       commit_messages: ["orphan"]
     }, @frame) |> json_result()
-    # session_id is required on commits; unknown UUID resolves to nil so inserts fail
-    assert r.success == true
-    assert String.contains?(r.message, "/1 commits")
+    # nil guard: unknown UUID returns error instead of silently inserting with nil session_id
+    assert r.success == false
+    assert String.contains?(r.message, "Could not resolve session")
   end
 
   test "Commits: handles empty list" do
-    r = Commits.execute(%{agent_id: "x", commit_hashes: []}, @frame) |> json_result()
+    s = new_session()
+    r = Commits.execute(%{agent_id: s.uuid, commit_hashes: []}, @frame) |> json_result()
     assert r.success == true
     assert r.message == "Logged 0/0 commits"
   end

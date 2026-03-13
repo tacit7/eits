@@ -9,6 +9,10 @@ defmodule EyeInTheSkyWeb.Agents do
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Agents.Agent
 
+  defp broadcast(event, agent) do
+    Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {event, agent})
+  end
+
   @doc """
   Returns the list of agents.
   """
@@ -40,7 +44,7 @@ defmodule EyeInTheSkyWeb.Agents do
   end
 
   @doc """
-  Returns counts of agents by project for overview purposes.
+  Returns the total agent count, optionally scoped to a project.
   """
   def get_agent_status_counts(project_id \\ nil) do
     query =
@@ -50,9 +54,7 @@ defmodule EyeInTheSkyWeb.Agents do
         Agent
       end
 
-    query
-    |> select([a], count(a.id))
-    |> Repo.all()
+    Repo.aggregate(query, :count, :id)
   end
 
   @doc """
@@ -110,22 +112,25 @@ defmodule EyeInTheSkyWeb.Agents do
   Creates an agent.
   """
   def create_agent(attrs \\ %{}) do
-    %Agent{}
-    |> Agent.changeset(attrs)
-    |> Repo.insert()
+    result = %Agent{} |> Agent.changeset(attrs) |> Repo.insert()
+    with {:ok, agent} <- result, do: broadcast(:agent_created, agent)
+    result
   end
 
   @doc """
   Updates an agent.
   """
   def update_agent(%Agent{} = agent, attrs) do
-    agent
-    |> Agent.changeset(attrs)
-    |> Repo.update()
+    result = agent |> Agent.changeset(attrs) |> Repo.update()
+    with {:ok, updated} <- result, do: broadcast(:agent_updated, updated)
+    result
   end
 
   @doc """
-  Updates an agent (status field moved to sessions).
+  No-op. Agent status is tracked on the Session, not the Agent.
+  Use `Sessions.update_session/2` with `%{status: status}` instead.
+
+  @deprecated
   """
   def update_agent_status(%Agent{} = agent, _status) do
     {:ok, agent}
@@ -135,7 +140,9 @@ defmodule EyeInTheSkyWeb.Agents do
   Deletes an agent.
   """
   def delete_agent(%Agent{} = agent) do
-    Repo.delete(agent)
+    result = Repo.delete(agent)
+    with {:ok, deleted} <- result, do: broadcast(:agent_deleted, deleted)
+    result
   end
 
   @doc """

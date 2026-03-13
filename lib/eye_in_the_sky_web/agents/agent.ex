@@ -26,6 +26,8 @@ defmodule EyeInTheSkyWeb.Agents.Agent do
 
     has_many :tasks, EyeInTheSkyWeb.Tasks.Task, foreign_key: :agent_id
 
+    field :parent_agent_id, :integer
+    field :parent_session_id, :integer
     field :created_at, :string
     field :archived_at, :string
     field :project_name, :string
@@ -42,7 +44,9 @@ defmodule EyeInTheSkyWeb.Agents.Agent do
       :source,
       :description,
       :bookmarked,
-      :git_worktree_path
+      :git_worktree_path,
+      :parent_agent_id,
+      :parent_session_id
     ])
     |> maybe_generate_uuid()
     |> validate_required([])

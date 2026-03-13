@@ -7,12 +7,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NoteAdd do
 
   schema do
     field :parent_id, :string,
-      required: true,
-      description: "Parent entity identifier (session, agent, context, etc)"
+      description: "Parent entity identifier. Defaults to current session UUID."
 
     field :parent_type, :string,
-      required: true,
-      description: "Parent entity type (sessions, agents, contexts, etc)"
+      description: "Parent entity type (sessions, agents, contexts, etc). Defaults to 'sessions'."
 
     field :body, :string, required: true, description: "Note content"
     field :title, :string, description: "Note title (optional)"
@@ -23,9 +21,12 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NoteAdd do
   def execute(params, frame) do
     alias EyeInTheSkyWeb.Notes
 
+    parent_id = params[:parent_id] || frame.assigns[:eits_session_id]
+    parent_type = params[:parent_type] || "sessions"
+
     attrs = %{
-      parent_id: params[:parent_id],
-      parent_type: params[:parent_type],
+      parent_id: parent_id,
+      parent_type: parent_type,
       body: params[:body],
       title: params[:title],
       starred: params[:starred] || 0

@@ -9,6 +9,17 @@ defmodule EyeInTheSkyWeb.Tasks do
   alias EyeInTheSkyWeb.QueryHelpers
   alias EyeInTheSkyWeb.Search.FTS5
 
+  # Workflow state IDs (matches workflow_states table)
+  @state_todo 1
+  @state_in_progress 2
+  @state_in_review 4
+  @state_done 3
+
+  def state_todo, do: @state_todo
+  def state_in_progress, do: @state_in_progress
+  def state_in_review, do: @state_in_review
+  def state_done, do: @state_done
+
   # Task functions
 
   @doc """
@@ -46,6 +57,19 @@ defmodule EyeInTheSkyWeb.Tasks do
   end
 
   @doc """
+  Returns the current in-progress task for a session (state_id = 2), or nil.
+  """
+  def get_current_task_for_session(session_id) do
+    Task
+    |> join(:inner, [t], ts in "task_sessions", on: ts.task_id == t.id)
+    |> where([t, ts], ts.session_id == ^session_id and t.state_id == @state_in_progress)
+    |> order_by([t], desc: t.updated_at)
+    |> limit(1)
+    |> preload([:state])
+    |> Repo.one()
+  end
+
+  @doc """
   Counts tasks for a specific session.
   """
   def count_tasks_for_session(session_id) do
@@ -72,6 +96,26 @@ defmodule EyeInTheSkyWeb.Tasks do
     Task
     |> preload([:state, :tags])
     |> Repo.get_by!(uuid: uuid)
+  end
+
+  @doc """
+  Gets a task by UUID, falling back to integer ID if UUID lookup misses.
+  Accepts a string that is either a UUID or a stringified integer ID.
+  Raises `Ecto.NoResultsError` if nothing is found.
+  """
+  def get_task_by_uuid_or_id!(id_str) do
+    query = Task |> preload([:state, :tags])
+
+    case Repo.get_by(query, uuid: id_str) do
+      nil ->
+        case Integer.parse(id_str) do
+          {int_id, ""} -> Repo.get!(query, int_id)
+          _ -> raise Ecto.NoResultsError, queryable: Task
+        end
+
+      task ->
+        task
+    end
   end
 
   @doc """
@@ -221,6 +265,42 @@ defmodule EyeInTheSkyWeb.Tasks do
       tag ->
         {:ok, tag}
     end
+  end
+
+  @doc """
+  Links a session to a task via the task_sessions join table.
+  Uses on_conflict: :nothing to silently skip duplicates.
+  """
+  def link_session_to_task(task_id, session_id)
+      when is_integer(task_id) and is_integer(session_id) do
+    Repo.insert_all("task_sessions", [%{task_id: task_id, session_id: session_id}],
+      on_conflict: :nothing
+    )
+  end
+
+  @doc """
+  Links a tag to a task via the task_tags join table.
+  """
+  def link_tag_to_task(task_id, tag_id)
+      when is_integer(task_id) and is_integer(tag_id) do
+    Repo.insert_all("task_tags", [%{task_id: task_id, tag_id: tag_id}],
+      on_conflict: :nothing
+    )
+  end
+
+  @doc """
+  Unlinks a session from a task by deleting the task_sessions row.
+  Returns the number of rows deleted.
+  """
+  def unlink_session_from_task(task_id, session_id)
+      when is_integer(task_id) and is_integer(session_id) do
+    {count, _} =
+      from(ts in "task_sessions",
+        where: ts.task_id == ^task_id and ts.session_id == ^session_id
+      )
+      |> Repo.delete_all()
+
+    count
   end
 
   # PubSub

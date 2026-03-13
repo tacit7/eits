@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.DME2ETest do
   use EyeInTheSkyWebWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSkyWeb.{Agents, ChatAgents, Channels, Messages, Projects}
+  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Projects, Sessions}
   alias EyeInTheSkyWeb.Claude.SessionManager
 
   @moduletag :integration
@@ -24,7 +24,23 @@ defmodule EyeInTheSkyWeb.DME2ETest do
 
     on_exit(fn ->
       Application.put_env(:eye_in_the_sky_web, :cli_module, EyeInTheSkyWeb.Claude.MockCLI)
+
+      supervisor = EyeInTheSkyWeb.Claude.AgentSupervisor
+
+      supervisor
+      |> DynamicSupervisor.which_children()
+      |> Enum.each(fn
+        {_, pid, :worker, _} when is_pid(pid) ->
+          DynamicSupervisor.terminate_child(supervisor, pid)
+
+        _ ->
+          :ok
+      end)
+
+      Process.sleep(200)
     end)
+
+    File.mkdir_p!("/tmp/dm-e2e-test")
 
     # Create test project
     {:ok, project} =
@@ -37,7 +53,7 @@ defmodule EyeInTheSkyWeb.DME2ETest do
 
     # Create sender (web UI user)
     {:ok, sender_agent} =
-      ChatAgents.create_chat_agent(%{
+      Agents.create_agent(%{
         uuid: "dm-sender-#{System.system_time(:second)}",
         description: "DM Test Sender",
         source: "web",
@@ -45,7 +61,7 @@ defmodule EyeInTheSkyWeb.DME2ETest do
       })
 
     {:ok, sender_session} =
-      Agents.create_execution_agent(%{
+      Sessions.create_session(%{
         uuid: "dm-sender-session-#{System.system_time(:second)}",
         agent_id: sender_agent.id,
         name: "Sender Session",
@@ -54,7 +70,7 @@ defmodule EyeInTheSkyWeb.DME2ETest do
 
     # Create recipient agent
     {:ok, recipient_agent} =
-      ChatAgents.create_chat_agent(%{
+      Agents.create_agent(%{
         uuid: "dm-recipient-#{System.system_time(:second)}",
         description: "DM Test Recipient",
         source: "claude",
@@ -62,7 +78,7 @@ defmodule EyeInTheSkyWeb.DME2ETest do
       })
 
     {:ok, recipient_session} =
-      Agents.create_execution_agent(%{
+      Sessions.create_session(%{
         uuid: "dm-recipient-session-#{System.system_time(:second)}",
         agent_id: recipient_agent.id,
         name: "Recipient Session",
@@ -306,19 +322,14 @@ defmodule EyeInTheSkyWeb.DME2ETest do
 
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "channel:#{channel.id}:messages")
 
-      # Send 5 DMs concurrently
-      tasks =
-        for i <- 1..5 do
-          Task.async(fn ->
-            render_hook(view, "send_direct_message", %{
-              "session_id" => to_string(recipient.id),
-              "channel_id" => to_string(channel.id),
-              "body" => "Concurrent message #{i}"
-            })
-          end)
-        end
-
-      Task.await_many(tasks, 5000)
+      # Send 5 DMs sequentially (render_hook must be called from the test process)
+      for i <- 1..5 do
+        render_hook(view, "send_direct_message", %{
+          "session_id" => to_string(recipient.id),
+          "channel_id" => to_string(channel.id),
+          "body" => "Concurrent message #{i}"
+        })
+      end
 
       # Wait for all to be processed
       Process.sleep(500)

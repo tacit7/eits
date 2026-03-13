@@ -19,34 +19,66 @@ tool_input=$(echo "$input_json" | jq -c '.tool_input // {}' 2>/dev/null) || tool
 # Publish all tool calls to NATS
 "$HOOK_DIR/nats/publish-tool-pre.sh" "$session_id" "$tool_name" "$tool_input"
 
+# Update session intent (what Claude is currently doing)
+_set_intent() {
+  "$HOOK_DIR/sql/postgresql/update-session-intent.sh" "$session_id" "$1" 2>/dev/null || true
+}
+
 # Publish EITS domain tools to NATS (input-dependent)
-# Matches both Phoenix (eye-in-the-sky) and Go fallback (eits-go) server prefixes
+# Matches all known server name prefixes for Phoenix HTTP MCP (eits-web, eye-in-the-sky)
 case "$tool_name" in
   Edit|Write)
     file_path=$(echo "$tool_input" | jq -r '.file_path // empty' 2>/dev/null) || file_path=""
     if [ -n "$file_path" ]; then
       action=$([ "$tool_name" = "Write" ] && echo "Writing" || echo "Editing")
-      basename=$(basename "$file_path")
-      "$HOOK_DIR/sql/update-session-intent.sh" "$session_id" "$action $basename"
+      _set_intent "$action $(basename "$file_path")"
     fi
     ;;
-  mcp__eye-in-the-sky__i-commits|mcp__eits-go__i-commits)
+  Read)
+    file_path=$(echo "$tool_input" | jq -r '.file_path // empty' 2>/dev/null) || file_path=""
+    [ -n "$file_path" ] && _set_intent "Reading $(basename "$file_path")"
+    ;;
+  Bash)
+    cmd=$(echo "$tool_input" | jq -r '.command // empty' 2>/dev/null | cut -c1-60) || cmd=""
+    [ -n "$cmd" ] && _set_intent "bash: $cmd"
+    ;;
+  Grep)
+    pattern=$(echo "$tool_input" | jq -r '.pattern // empty' 2>/dev/null | cut -c1-40) || pattern=""
+    [ -n "$pattern" ] && _set_intent "Grep: $pattern"
+    ;;
+  Glob)
+    pattern=$(echo "$tool_input" | jq -r '.pattern // empty' 2>/dev/null) || pattern=""
+    [ -n "$pattern" ] && _set_intent "Glob: $pattern"
+    ;;
+  Agent)
+    desc=$(echo "$tool_input" | jq -r '.description // empty' 2>/dev/null | cut -c1-50) || desc=""
+    _set_intent "Spawning agent${desc:+: $desc}"
+    ;;
+  WebFetch)
+    url=$(echo "$tool_input" | jq -r '.url // empty' 2>/dev/null | cut -c1-60) || url=""
+    [ -n "$url" ] && _set_intent "Fetching: $url"
+    ;;
+  WebSearch)
+    query=$(echo "$tool_input" | jq -r '.query // empty' 2>/dev/null | cut -c1-50) || query=""
+    [ -n "$query" ] && _set_intent "Web search: $query"
+    ;;
+  mcp__eits-web__i-commits|mcp__eye-in-the-sky__i-commits)
     payload=$(echo "$tool_input" | jq -c \
       --arg agent_id "$session_id" \
       '{agent_id: $agent_id, commit_hashes: .commit_hashes, commit_messages: .commit_messages}')
     "$HOOK_DIR/nats/publish-domain-event.sh" "commits" "$payload"
     ;;
-  mcp__eye-in-the-sky__i-note-add|mcp__eits-go__i-note-add)
+  mcp__eits-web__i-note-add|mcp__eye-in-the-sky__i-note-add)
     payload=$(echo "$tool_input" | jq -c '{parent_type, parent_id, body, title, starred}')
     "$HOOK_DIR/nats/publish-domain-event.sh" "notes" "$payload"
     ;;
-  mcp__eye-in-the-sky__i-save-session-context|mcp__eits-go__i-save-session-context)
+  mcp__eits-web__i-save-session-context|mcp__eye-in-the-sky__i-save-session-context)
     payload=$(echo "$tool_input" | jq -c \
       --arg agent_id "$session_id" \
       '{agent_id: $agent_id, context: .context}')
     "$HOOK_DIR/nats/publish-domain-event.sh" "session.context" "$payload"
     ;;
-  mcp__eye-in-the-sky__i-todo|mcp__eits-go__i-todo)
+  mcp__eits-web__i-todo|mcp__eye-in-the-sky__i-todo)
     payload=$(printf '%s' "$tool_input" | jq -c '{command, task_id, title, description, priority, tags}' 2>/dev/null) || true
     [ -n "$payload" ] && "$HOOK_DIR/nats/publish-domain-event.sh" "todo" "$payload"
     ;;

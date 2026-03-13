@@ -55,7 +55,16 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
 
     result = create_or_find_session(attrs, agent_attrs)
     response = Response.tool() |> Response.json(result)
-    {:reply, response, frame}
+    # Store EITS session UUID in frame assigns so other tools (e.g. i-todo) can
+    # auto-link to this session without requiring an explicit session_id param.
+    updated_frame =
+      if params[:session_id] && is_struct(frame) do
+        Anubis.Server.Frame.assign(frame, :eits_session_id, params[:session_id])
+      else
+        frame
+      end
+
+    {:reply, response, updated_frame}
   end
 
   def execute(%{command: "end"} = params, frame) do
@@ -103,13 +112,33 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
 
   defp create_or_find_session(attrs, agent_attrs) do
     alias EyeInTheSkyWeb.Agents
+    alias EyeInTheSkyWeb.Projects
 
     session_uuid = attrs[:uuid]
+
+    project_id =
+      case attrs[:project_name] do
+        nil -> nil
+        name ->
+          case Projects.get_project_by_name(name) do
+            nil -> nil
+            project -> project.id
+          end
+      end
 
     session_result =
       case Sessions.get_session_by_uuid(session_uuid) do
         {:ok, session} ->
-          {:ok, session}
+          update_attrs =
+            %{}
+            |> maybe_put(:name, attrs[:name])
+            |> maybe_put(:description, agent_attrs[:description])
+            |> maybe_put(:project_id, project_id)
+
+          case Sessions.update_session(session, update_attrs) do
+            {:ok, updated} -> {:ok, updated}
+            {:error, _} -> {:ok, session}
+          end
 
         {:error, :not_found} ->
           agent =
@@ -129,10 +158,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
           else
             Sessions.create_session(%{
               uuid: session_uuid,
+              name: attrs[:name],
               description: agent_attrs[:description],
               status: agent_attrs[:status] || "working",
               agent_id: agent.id,
-              project_name: attrs[:project_name],
+              project_id: project_id,
               started_at: DateTime.utc_now() |> DateTime.to_iso8601()
             })
           end
@@ -154,9 +184,14 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
   end
 
   defp end_session(params) do
+    opts =
+      %{}
+      |> then(fn m -> if params[:summary], do: Map.put(m, :summary, params[:summary]), else: m end)
+      |> then(fn m -> if params[:final_status], do: Map.put(m, :final_status, params[:final_status]), else: m end)
+
     case Sessions.get_session_by_uuid(params[:agent_id] || params[:session_id]) do
       {:ok, session} ->
-        case Sessions.end_session(session) do
+        case Sessions.end_session(session, opts) do
           {:ok, _} ->
             %{success: true, message: "Session ended"}
 
@@ -229,30 +264,60 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
   defp save_context(params) do
     alias EyeInTheSkyWeb.Contexts
 
-    case Contexts.upsert_session_context(%{
-           session_id: params[:session_id],
-           context: params[:context]
-         }) do
-      {:ok, _} -> %{success: true, message: "Context saved"}
-      {:error, cs} -> %{success: false, message: "Save failed: #{inspect(cs.errors)}"}
+    case Sessions.get_session_by_uuid(params[:session_id]) do
+      {:ok, session} ->
+        case Contexts.upsert_session_context(%{
+               session_id: session.id,
+               agent_id: session.agent_id,
+               context: params[:context]
+             }) do
+          {:ok, _} -> %{success: true, message: "Context saved"}
+          {:error, cs} -> %{success: false, message: "Save failed: #{inspect(cs.errors)}"}
+        end
+
+      {:error, :not_found} ->
+        %{success: false, message: "Session not found: #{params[:session_id]}"}
     end
   end
 
   defp load_context(params) do
     alias EyeInTheSkyWeb.Contexts
 
-    case Contexts.get_session_context(params[:session_id]) do
+    case resolve_session_int_id(params[:session_id]) do
       nil ->
-        %{success: false, message: "No context found"}
+        %{success: false, message: "Session not found: #{params[:session_id]}"}
 
-      ctx ->
-        %{
-          success: true,
-          message: "Context loaded",
-          context: ctx.context,
-          created_at: ctx.inserted_at,
-          updated_at: ctx.updated_at
-        }
+      int_id ->
+        case Contexts.get_session_context(int_id) do
+          nil ->
+            %{success: false, message: "No context found"}
+
+          ctx ->
+            %{
+              success: true,
+              message: "Context loaded",
+              context: ctx.context,
+              created_at: ctx.created_at,
+              updated_at: ctx.updated_at
+            }
+        end
+    end
+  end
+
+  defp resolve_session_int_id(nil), do: nil
+
+  defp resolve_session_int_id(session_id) when is_integer(session_id), do: session_id
+
+  defp resolve_session_int_id(session_id) when is_binary(session_id) do
+    case Integer.parse(session_id) do
+      {n, ""} ->
+        n
+
+      _ ->
+        case Sessions.get_session_by_uuid(session_id) do
+          {:ok, s} -> s.id
+          _ -> nil
+        end
     end
   end
 

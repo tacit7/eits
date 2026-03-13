@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.DMNatsE2ETest do
   use EyeInTheSkyWebWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSkyWeb.{Agents, ChatAgents, Channels, Messages, Projects}
+  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Projects, Sessions}
   alias EyeInTheSkyWeb.Claude.SessionManager
 
   @moduletag :integration
@@ -46,7 +46,24 @@ defmodule EyeInTheSkyWeb.DMNatsE2ETest do
 
     on_exit(fn ->
       Application.put_env(:eye_in_the_sky_web, :cli_module, EyeInTheSkyWeb.Claude.MockCLI)
+
+      supervisor = EyeInTheSkyWeb.Claude.AgentSupervisor
+
+      supervisor
+      |> DynamicSupervisor.which_children()
+      |> Enum.each(fn
+        {_, pid, :worker, _} when is_pid(pid) ->
+          DynamicSupervisor.terminate_child(supervisor, pid)
+
+        _ ->
+          :ok
+      end)
+
+      # Allow Postgrex pool to recover after worker shutdown
+      Process.sleep(200)
     end)
+
+    File.mkdir_p!("/tmp/nats-e2e-test")
 
     # Create test entities
     {:ok, project} =
@@ -58,7 +75,7 @@ defmodule EyeInTheSkyWeb.DMNatsE2ETest do
       })
 
     {:ok, sender_agent} =
-      ChatAgents.create_chat_agent(%{
+      Agents.create_agent(%{
         uuid: "nats-sender-#{System.system_time(:second)}",
         description: "NATS Test Sender",
         source: "web",
@@ -66,7 +83,7 @@ defmodule EyeInTheSkyWeb.DMNatsE2ETest do
       })
 
     {:ok, sender_session} =
-      Agents.create_execution_agent(%{
+      Sessions.create_session(%{
         uuid: "nats-sender-session-#{System.system_time(:second)}",
         agent_id: sender_agent.id,
         name: "Sender",
@@ -74,7 +91,7 @@ defmodule EyeInTheSkyWeb.DMNatsE2ETest do
       })
 
     {:ok, recipient_agent} =
-      ChatAgents.create_chat_agent(%{
+      Agents.create_agent(%{
         uuid: "nats-recipient-#{System.system_time(:second)}",
         description: "NATS Test Recipient",
         source: "claude",
@@ -82,7 +99,7 @@ defmodule EyeInTheSkyWeb.DMNatsE2ETest do
       })
 
     {:ok, recipient_session} =
-      Agents.create_execution_agent(%{
+      Sessions.create_session(%{
         uuid: "nats-recipient-session-#{System.system_time(:second)}",
         agent_id: recipient_agent.id,
         name: "Recipient",

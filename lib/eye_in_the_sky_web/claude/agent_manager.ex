@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   """
   def create_agent(opts) do
     agent_uuid = Ecto.UUID.generate()
-    session_uuid = Ecto.UUID.generate()
+    session_uuid = opts[:session_uuid] || Ecto.UUID.generate()
 
     description = opts[:description] || "Agent session"
 
@@ -46,7 +46,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              agent_type: opts[:agent_type] || "claude",
              project_id: opts[:project_id],
              status: "working",
-             description: description
+             description: description,
+             parent_agent_id: opts[:parent_agent_id],
+             parent_session_id: opts[:parent_session_id]
            }),
          {:ok, session} <-
            Sessions.create_session(%{
@@ -56,8 +58,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              description: "session-id #{session_uuid} agent-id #{agent_uuid}",
              model: opts[:model],
              provider: provider,
+             project_id: opts[:project_id],
              git_worktree_path: opts[:project_path],
-             started_at: DateTime.utc_now() |> DateTime.to_iso8601()
+             started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+             parent_agent_id: opts[:parent_agent_id],
+             parent_session_id: opts[:parent_session_id]
            }) do
       Logger.info(
         "✅ create_agent: DB records created - agent.id=#{agent.id}, session.id=#{session.id}, session_uuid=#{session.uuid}"

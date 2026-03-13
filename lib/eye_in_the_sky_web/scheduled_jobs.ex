@@ -6,7 +6,23 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
 
   def list_jobs do
     from(j in ScheduledJob,
-      order_by: [desc: j.origin, asc: j.name]
+      order_by: [asc: j.origin, asc: j.name]
+    )
+    |> Repo.all()
+  end
+
+  def list_jobs_for_project(project_id) do
+    from(j in ScheduledJob,
+      where: j.project_id == ^project_id,
+      order_by: [asc: j.origin, asc: j.name]
+    )
+    |> Repo.all()
+  end
+
+  def list_global_jobs do
+    from(j in ScheduledJob,
+      where: is_nil(j.project_id),
+      order_by: [asc: j.origin, asc: j.name]
     )
     |> Repo.all()
   end
@@ -56,12 +72,33 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
 
     case job |> ScheduledJob.changeset(attrs) |> Repo.update() do
       {:ok, updated} ->
-        next = compute_next_run_at(updated.schedule_type, updated.schedule_value)
-        update_job_fields(updated, %{next_run_at: next})
-        {:ok, Repo.get!(ScheduledJob, updated.id)}
+        if Map.has_key?(attrs, "next_run_at") do
+          {:ok, Repo.get!(ScheduledJob, updated.id)}
+        else
+          next = compute_next_run_at(updated.schedule_type, updated.schedule_value)
+          update_job_fields(updated, %{next_run_at: next})
+          {:ok, Repo.get!(ScheduledJob, updated.id)}
+        end
 
       error ->
         error
+    end
+  end
+
+  def run_now(job_id) do
+    case get_job(job_id) do
+      {:ok, job} ->
+        case enqueue_job(job) do
+          {:ok, _} = result ->
+            mark_job_executed(job)
+            result
+
+          error ->
+            error
+        end
+
+      {:error, _} = err ->
+        err
     end
   end
 
@@ -138,6 +175,8 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
         "shell_command" -> EyeInTheSkyWeb.Workers.ShellCommandWorker
         "spawn_agent" -> EyeInTheSkyWeb.Workers.SpawnAgentWorker
         "mix_task" -> EyeInTheSkyWeb.Workers.MixTaskWorker
+        "daily_digest" -> EyeInTheSkyWeb.Workers.DailyDigestWorker
+        "workable_task" -> EyeInTheSkyWeb.Workers.WorkableTaskWorker
       end
 
     %{"job_id" => job.id}

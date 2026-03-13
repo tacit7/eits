@@ -22,11 +22,17 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Window do
   end tell
   """
 
+  @timeout_ms 3_000
+
   @impl true
   def execute(_params, frame) do
+    task = Task.async(fn ->
+      System.cmd("osascript", ["-e", @applescript], stderr_to_stdout: true)
+    end)
+
     result =
-      case System.cmd("osascript", ["-e", @applescript], stderr_to_stdout: true) do
-        {output, 0} ->
+      case Task.yield(task, @timeout_ms) || Task.shutdown(task, :brutal_kill) do
+        {:ok, {output, 0}} ->
           [app | rest] = String.split(String.trim(output), "|", parts: 2)
           window_title = List.first(rest, "")
 
@@ -37,8 +43,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Window do
             window_title: window_title
           }
 
-        {err, _} ->
+        {:ok, {err, _}} ->
           %{success: false, message: "Failed to get window info: #{String.trim(err)}"}
+
+        nil ->
+          %{success: false, message: "osascript timed out after #{@timeout_ms}ms"}
       end
 
     response = Response.tool() |> Response.json(result)

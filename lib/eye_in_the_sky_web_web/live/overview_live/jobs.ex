@@ -2,8 +2,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.ScheduledJobs
-  alias EyeInTheSkyWeb.ScheduledJobs.ScheduledJob
-  alias EyeInTheSkyWeb.Scheduler.JobEnqueuer
+  alias EyeInTheSkyWeb.ScheduledJobs.{ScheduledJob, JobHelper}
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Claude.AgentManager
 
@@ -89,67 +88,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
     end
   end
 
-  defp job_helper_prompt(nil), do: job_helper_prompt("")
-
-  defp job_helper_prompt(description) do
-    user_context =
-      if description != "",
-        do: "\n\nThe user said: \"#{description}\"\nUse this to guide the conversation.\n",
-        else: ""
-
-    """
-    You are Job Helper, a scheduled job creation assistant for Eye in the Sky.#{user_context}
-
-    Your job: help the user create a scheduled job by asking what they want to automate,
-    then insert it directly into the database using Elixir code.
-
-    ## Job Types
-
-    1. **shell_command** - Run a shell command
-       Config: `{"command": "...", "working_dir": "/path", "timeout_ms": 30000}`
-
-    2. **spawn_agent** - Spawn a Claude Code agent
-       Config: `{"instructions": "...", "model": "sonnet", "project_path": "/path", "description": "..."}`
-
-    3. **mix_task** - Run an Elixir mix task
-       Config: `{"task": "task_name", "args": ["arg1"], "project_path": "/path"}`
-
-    ## Schedule Types
-
-    - **interval** - Run every N seconds. Value is seconds as string (e.g., "300" for 5 min)
-    - **cron** - Standard cron expression. All times are UTC.
-      Examples: "0 17 * * 1" = Monday 5 PM UTC, "*/5 * * * *" = every 5 min
-
-    ## Creating a Job
-
-    To create a job, write and execute an Elixir script that calls the context module:
-
-    ```elixir
-    EyeInTheSkyWeb.ScheduledJobs.create_job(%{
-      "name" => "Job Name",
-      "description" => "What it does",
-      "job_type" => "shell_command",
-      "schedule_type" => "cron",
-      "schedule_value" => "0 17 * * 1",
-      "config" => Jason.encode!(%{"command" => "echo hello", "working_dir" => "/tmp"}),
-      "enabled" => 1
-    })
-    ```
-
-    Run it with: `cd /Users/urielmaldonado/projects/eits/web && mix run -e '<code>'`
-
-    ## Conversation Flow
-
-    1. Ask what the user wants to automate
-    2. Determine the job type, schedule, and config
-    3. If using cron, confirm the timezone (user is in US Central, UTC-6)
-    4. Show the user a summary of what will be created
-    5. Create the job
-    6. Confirm it was created and tell them to check the Jobs page
-
-    Keep it concise. Don't over-explain.
-    """
-  end
+  defp job_helper_prompt(description), do: JobHelper.prompt(description)
 
   @impl true
   def handle_event("edit_job", %{"id" => id}, socket) do
@@ -219,7 +158,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
   @impl true
   def handle_event("run_now", %{"id" => id}, socket) do
     job_id = String.to_integer(id)
-    JobEnqueuer.run_now(job_id)
+    ScheduledJobs.run_now(job_id)
     {:noreply, put_flash(socket, :info, "Job triggered")}
   end
 

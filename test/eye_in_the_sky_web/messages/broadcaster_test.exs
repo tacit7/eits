@@ -69,7 +69,9 @@ defmodule EyeInTheSkyWeb.Messages.BroadcasterTest do
 
   test "poll broadcasts new session messages" do
     session = create_session()
-    last_id = current_max_id()
+    # Seed a message so last_id is non-zero, simulating an already-running broadcaster
+    seed = insert_message(session.id, "seed")
+    last_id = seed.id
 
     Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
 
@@ -79,7 +81,7 @@ defmodule EyeInTheSkyWeb.Messages.BroadcasterTest do
     {:noreply, new_state} = Broadcaster.handle_info(:poll, state)
 
     assert_receive {:new_message, %{body: "hello from external"}}, 1_000
-    assert new_state.last_id > (last_id || 0)
+    assert new_state.last_id > last_id
   end
 
   test "poll is a no-op when no new messages" do
@@ -98,7 +100,8 @@ defmodule EyeInTheSkyWeb.Messages.BroadcasterTest do
 
   test "poll advances last_id" do
     session = create_session()
-    last_id = current_max_id()
+    seed = insert_message(session.id, "seed")
+    last_id = seed.id
 
     msg = insert_message(session.id, "new one")
 
@@ -111,7 +114,8 @@ defmodule EyeInTheSkyWeb.Messages.BroadcasterTest do
   test "poll broadcasts to multiple sessions" do
     s1 = create_session()
     s2 = create_session()
-    last_id = current_max_id()
+    seed = insert_message(s1.id, "seed")
+    last_id = seed.id
 
     Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{s1.id}")
     Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{s2.id}")

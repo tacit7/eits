@@ -94,12 +94,16 @@ defmodule EyeInTheSkyWeb.Notes do
     task = Repo.get(EyeInTheSkyWeb.Tasks.Task, task_id)
 
     if task do
+      uuid_filter =
+        if task.uuid do
+          dynamic([n], n.parent_id == ^to_string(task_id) or n.parent_id == ^task.uuid)
+        else
+          dynamic([n], n.parent_id == ^to_string(task_id))
+        end
+
       Note
-      |> where(
-        [n],
-        n.parent_type in ["task", "tasks"] and
-          (n.parent_id == ^to_string(task_id) or n.parent_id == ^task.uuid)
-      )
+      |> where([n], n.parent_type in ["task", "tasks"])
+      |> where(^uuid_filter)
       |> order_by([n], desc: n.created_at)
       |> Repo.all()
     else
@@ -108,7 +112,14 @@ defmodule EyeInTheSkyWeb.Notes do
   end
 
   @doc """
-  Gets a single note.
+  Gets a single note. Returns nil if not found.
+  """
+  def get_note(id) do
+    Repo.get(Note, id)
+  end
+
+  @doc """
+  Gets a single note. Raises if not found.
   """
   def get_note!(id) do
     Repo.get!(Note, id)
@@ -146,12 +157,12 @@ defmodule EyeInTheSkyWeb.Notes do
   Search notes using FTS5.
   Requires notes_fts FTS5 table in database.
   """
-  def search_notes(query, agent_ids \\ []) when is_binary(query) do
+  def search_notes(query, agent_ids \\ [], opts \\ []) when is_binary(query) do
     pattern = "%#{query}%"
 
     fallback_query =
       from n in Note,
-        where: like(n.body, ^pattern)
+        where: ilike(n.body, ^pattern) or ilike(n.title, ^pattern)
 
     fallback_query =
       if length(agent_ids) > 0 do
@@ -170,10 +181,12 @@ defmodule EyeInTheSkyWeb.Notes do
           |> Enum.map(fn {_, i} -> "$#{i}" end)
           |> Enum.join(",")
 
-        {"AND n.parent_type = 'agent' AND n.parent_id IN (#{placeholders})", agent_ids}
+        {"AND n.parent_type = 'agent' AND n.parent_id IN (#{placeholders})", Enum.map(agent_ids, &to_string/1)}
       else
         {"", []}
       end
+
+    limit = Keyword.get(opts, :limit)
 
     FTS5.search(
       table: "notes",
@@ -182,7 +195,8 @@ defmodule EyeInTheSkyWeb.Notes do
       search_columns: ["title", "body"],
       sql_filter: sql_filter,
       sql_params: sql_params,
-      fallback_query: fallback_query
+      fallback_query: fallback_query,
+      limit: limit
     )
   end
 end

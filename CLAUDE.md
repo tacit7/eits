@@ -4,13 +4,13 @@ This file provides guidance to Claude Code when working with the Eye in the Sky 
 
 ## Project Overview
 
-Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky. Reads from a shared SQLite database owned by the Go MCP server. This project should NEVER create Ecto migrations; all schema changes go through the Go core or direct SQL.
+Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky. MCP server is Anubis (HTTP MCP), not Go.
 
 ## Build & Run
 
 ```bash
 mix deps.get
-mix phx.server          # Start dev server on https://localhost:4000
+mix phx.server          # Start dev server on http://localhost:5001
 mix compile              # Compile only
 ```
 
@@ -41,15 +41,13 @@ Exit status will be 1 (error) instead of 0 (success).
 
 ## Database
 
-Single SQLite database at `~/.config/eye-in-the-sky/eits.db`. Configured in `config/dev.exs`. The Go MCP server owns the schema; this app is a read-heavy consumer.
-
-**No migrations.** The `priv/repo/migrations/` directory should stay empty. Schema changes are applied by the Go core's embedded `schema.sql` or via direct `sqlite3` commands.
+PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. Migrated from SQLite in PR #5.
 
 ## Architecture
 
 - `lib/eye_in_the_sky_web/` - Contexts (Sessions, Tasks, Agents, Projects, Notes, Prompts, Commits)
 - `lib/eye_in_the_sky_web_web/` - Web layer (LiveViews, components, router)
-- `lib/eye_in_the_sky_web/search/fts5.ex` - Reusable FTS5 search module with LIKE fallback
+- `lib/eye_in_the_sky_web/search/fts5.ex` - Full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback (module name is legacy from SQLite era)
 
 ## UI Standards
 
@@ -86,6 +84,8 @@ NATS message processing is **currently disabled** to prevent duplicate messages.
 Original code is kept as comments for future re-enablement when proper deduplication is implemented.
 
 ### FTS5 Full-Text Search
+
+> **Note:** The FTS5 section below documents the old SQLite implementation. We currently use PostgreSQL with `tsvector/tsquery` via `lib/eye_in_the_sky_web/search/fts5.ex` (despite the filename, it now wraps PG full-text search with an ILIKE fallback). The virtual tables and triggers below no longer apply.
 
 Three FTS5 virtual tables in eits.db provide full-text search using **external content tables** (stores only the index, not duplicate data). Triggers keep them in sync.
 

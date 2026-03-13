@@ -120,7 +120,7 @@ export function formatTime(timestamp) {
   const parsed = parseDateLike(timestamp)
   if (!parsed) return '—'
 
-  return parsed.toLocaleTimeString('en-US', {
+  return parsed.toLocaleTimeString(undefined, {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false
@@ -148,7 +148,7 @@ export function formatDateRelative(dateStr) {
   if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
   if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
 
-  return date.toLocaleDateString('en-US', {
+  return date.toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
     year: 'numeric'
@@ -167,7 +167,7 @@ export function formatDateTime(dateStr) {
   if (!date) return ''
 
   try {
-    return date.toLocaleString('en-US', {
+    return date.toLocaleString(undefined, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',

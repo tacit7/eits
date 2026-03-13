@@ -37,10 +37,8 @@ defmodule EyeInTheSkyWeb.Application do
       {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.ChatSupervisor, strategy: :one_for_one},
       # Claude CLI session coordinator
       EyeInTheSkyWeb.Claude.SessionManager,
-      # Oban job processing
+      # Oban job processing (includes Cron plugin for JobDispatcherWorker)
       {Oban, Application.fetch_env!(:eye_in_the_sky_web, Oban)},
-      # Scheduled jobs enqueuer (polls due jobs, enqueues Oban workers)
-      EyeInTheSkyWeb.Scheduler.JobEnqueuer,
       # Poll for external task changes (Go MCP i-todo writes)
       EyeInTheSkyWeb.Tasks.Poller,
       # Poll for external message writes (Go MCP, spawned agents)

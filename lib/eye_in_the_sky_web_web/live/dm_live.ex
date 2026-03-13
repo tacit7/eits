@@ -13,7 +13,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @sync_interval 3_000
 
   @impl true
-  def mount(%{"session_id" => session_id_param}, _session, socket) do
+  def mount(%{"session_id" => session_id_param} = params, _session, socket) do
+    alias EyeInTheSkyWeb.Projects
+
     # Accept both integer ID and UUID in URL
     session =
       case Integer.parse(session_id_param) do
@@ -23,18 +25,36 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
     agent = Agents.get_agent!(session.agent_id)
 
+    # Preserve sidebar context when navigating from project sessions page
+    {sidebar_tab, sidebar_project} =
+      case {params["from"], params["project_id"]} do
+        {"project", project_id_str} when is_binary(project_id_str) ->
+          case Integer.parse(project_id_str) do
+            {pid, ""} ->
+              project = Projects.get_project!(pid)
+              {:sessions, project}
+
+            _ ->
+              {:chat, nil}
+          end
+
+        _ ->
+          {:chat, nil}
+      end
+
     if connected?(socket) do
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "dm:#{session.id}:stream")
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "tasks")
       send(self(), :sync_from_session_file)
     end
 
     socket =
       socket
       |> assign(:page_title, session.name || "Session")
-      |> assign(:sidebar_tab, :chat)
-      |> assign(:sidebar_project, nil)
+      |> assign(:sidebar_tab, sidebar_tab)
+      |> assign(:sidebar_project, sidebar_project)
       |> assign(:session_id, session.id)
       |> assign(:session_uuid, session.uuid)
       |> assign(:agent_id, session.agent_id)
@@ -55,7 +75,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:diff_cache, %{})
       |> assign(:show_new_task_drawer, false)
       |> assign(:workflow_states, Tasks.list_workflow_states())
+      |> assign(:current_task, Tasks.get_current_task_for_session(session.id))
       |> assign(:sync_timer, nil)
+      |> assign(:total_tokens, 0)
       |> allow_upload(:files,
         accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
         max_entries: 10,
@@ -122,23 +144,14 @@ defmodule EyeInTheSkyWebWeb.DmLive do
            updated_at: now
          }) do
       {:ok, task} ->
-        Repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_id}],
-          on_conflict: :nothing
-        )
+        Tasks.link_session_to_task(task.id, session_id)
 
-        if length(tag_names) > 0 do
-          Enum.each(tag_names, fn tag_name ->
-            case Tasks.get_or_create_tag(tag_name) do
-              {:ok, tag} ->
-                Repo.insert_all("task_tags", [%{task_id: task.id, tag_id: tag.id}],
-                  on_conflict: :nothing
-                )
-
-              _ ->
-                :ok
-            end
-          end)
-        end
+        Enum.each(tag_names, fn tag_name ->
+          case Tasks.get_or_create_tag(tag_name) do
+            {:ok, tag} -> Tasks.link_tag_to_task(task.id, tag.id)
+            _ -> :ok
+          end
+        end)
 
         socket =
           socket
@@ -282,6 +295,33 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_event("open_iterm", _params, socket) do
+    session_uuid = socket.assigns.session_uuid
+
+    dir =
+      case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+        {:ok, path} -> path
+        {:error, _} -> "~"
+      end
+
+    # Escape double quotes in the path to prevent AppleScript string injection
+    safe_dir = String.replace(dir, "\"", "\\\"")
+
+    script = """
+    tell application "iTerm"
+      activate
+      set newWindow to (create window with default profile)
+      tell current session of newWindow
+        write text "cd #{safe_dir} && claude --dangerously-skip-permissions -r #{session_uuid}"
+      end tell
+    end tell
+    """
+
+    System.cmd("osascript", ["-e", script], stderr_to_stdout: true)
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("reload_from_session_file", _params, socket) do
     session_id = socket.assigns.session_id
     session_uuid = socket.assigns.session_uuid
@@ -410,34 +450,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     end
   end
 
-  # NATS handler broadcasts {agent_working, %Agent{}} — match by agent struct
-  @impl true
-  def handle_info({:agent_working, %{id: id}}, socket) do
-    if id == socket.assigns.session_id do
-      {:noreply, socket |> assign(:processing, true) |> start_sync_timer()}
-    else
-      {:noreply, socket}
-    end
-  end
-
   @impl true
   def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
     if session_id == socket.assigns.session_id do
-      {:noreply,
-       socket
-       |> assign(:processing, false)
-       |> stop_sync_timer()
-       |> sync_and_reload()
-       |> push_event("focus-input", %{})}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  # NATS handler broadcasts {agent_stopped, %Agent{}}
-  @impl true
-  def handle_info({:agent_stopped, %{id: id}}, socket) do
-    if id == socket.assigns.session_id do
       {:noreply,
        socket
        |> assign(:processing, false)
@@ -453,6 +468,13 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_info({:new_dm, _msg}, socket) do
     {:noreply, load_tab_data(socket, "messages", socket.assigns.session_id)}
+  end
+
+  # Task state changed — refresh the current task header strip
+  @impl true
+  def handle_info(:tasks_changed, socket) do
+    {:noreply,
+     assign(socket, :current_task, Tasks.get_current_task_for_session(socket.assigns.session_id))}
   end
 
   # NATS handler broadcasts tool events on "session:#{agent.id}"
@@ -524,10 +546,13 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   defp load_tab_data(socket, tab, session_id) do
     Logger.info("Loading DM tab data tab=#{tab} session_id=#{session_id}")
     {messages, has_more} = load_message_data(socket, tab, session_id)
+    total_tokens = Messages.total_tokens_for_session(session_id)
 
     socket
     |> assign(:messages, messages)
     |> assign(:has_more_messages, has_more)
+    |> assign(:total_tokens, total_tokens)
+    |> assign(:current_task, Tasks.get_current_task_for_session(session_id))
     |> assign(
       :tasks,
       maybe_load_tab_data(tab, "tasks", socket.assigns[:tasks], fn ->
@@ -621,25 +646,35 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     {sender_role, recipient_role, direction} = session_message_roles(msg.role)
     inserted_at = parse_session_timestamp(msg.timestamp, now)
 
-    case Messages.create_message(%{
-           uuid: Ecto.UUID.generate(),
-           source_uuid: msg.uuid,
-           session_id: session_id,
-           sender_role: sender_role,
-           recipient_role: recipient_role,
-           direction: direction,
-           body: msg.content,
-           status: "delivered",
-           provider: "claude",
-           inserted_at: inserted_at,
-           updated_at: now
-         }) do
-      {:ok, _message} ->
+    # Check for an existing unlinked message (created before sync) with matching content.
+    # This prevents duplicates when save_result or create_user_message already persisted the
+    # message without a source_uuid, and the session file sync tries to create it again.
+    case Messages.find_unlinked_message(session_id, sender_role, msg.content) do
+      {:ok, existing} ->
+        Messages.update_message(existing, %{source_uuid: msg.uuid, updated_at: now})
         true
 
-      {:error, reason} ->
-        Logger.debug("Skipping imported message source_uuid=#{msg.uuid}: #{inspect(reason)}")
-        false
+      :not_found ->
+        case Messages.create_message(%{
+               uuid: Ecto.UUID.generate(),
+               source_uuid: msg.uuid,
+               session_id: session_id,
+               sender_role: sender_role,
+               recipient_role: recipient_role,
+               direction: direction,
+               body: msg.content,
+               status: "delivered",
+               provider: "claude",
+               inserted_at: inserted_at,
+               updated_at: now
+             }) do
+          {:ok, _message} ->
+            true
+
+          {:error, reason} ->
+            Logger.debug("Skipping imported message source_uuid=#{msg.uuid}: #{inspect(reason)}")
+            false
+        end
     end
   end
 
@@ -754,6 +789,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         slash_items={@slash_items}
         show_new_task_drawer={@show_new_task_drawer}
         workflow_states={@workflow_states}
+        current_task={@current_task}
+        total_tokens={@total_tokens}
       />
     </div>
     """

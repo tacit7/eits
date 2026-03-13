@@ -300,7 +300,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
 
   @impl true
   def handle_event("navigate_dm", %{"id" => id}, socket) do
-    {:noreply, push_navigate(socket, to: ~p"/dm/#{id}")}
+    project_id = socket.assigns.project_id
+    {:noreply, push_navigate(socket, to: ~p"/dm/#{id}?from=project&project_id=#{project_id}")}
   end
 
   @impl true

@@ -110,7 +110,6 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
   @impl true
   def handle_call(:cancel, _from, state) do
     Utils.close_port_safely(state.port)
-    broadcast_status(state.session_id, :idle)
     {:stop, :normal, :ok, state}
   end
 
@@ -242,7 +241,6 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
 
           {:error, reason} ->
             Logger.error("[#{state.session_id}] Failed to spawn next CLI: #{inspect(reason)}")
-            broadcast_status(state.session_id, :idle)
             {:noreply, %{state | port: nil, processing: false, queue: rest, session_ref: nil}}
         end
     end
@@ -268,6 +266,10 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
 
   @impl true
   def terminate(_reason, state) do
+    if state[:session_id] do
+      broadcast_status(state.session_id, :idle)
+    end
+
     if state[:session_id] && state[:session_int_id] do
       Phoenix.PubSub.broadcast(
         EyeInTheSkyWeb.PubSub,

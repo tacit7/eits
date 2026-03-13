@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWebWeb.FabHook do
   import Phoenix.LiveView
   import Phoenix.Component, only: [assign: 3]
 
-  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Sessions}
+  alias EyeInTheSkyWeb.{Messages, Sessions}
   alias EyeInTheSkyWeb.Claude.AgentManager
 
   require Logger
@@ -15,10 +15,15 @@ defmodule EyeInTheSkyWebWeb.FabHook do
   @refresh_interval_ms 30_000
 
   def on_mount(:default, _params, _session, socket) do
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "notifications")
+    end
+
     socket =
       socket
       |> assign(:fab_mounted, true)
       |> assign(:fab_timer, nil)
+      |> assign(:fab_active_session_id, nil)
       |> attach_hook(:fab_events, :handle_event, &handle_fab_event/3)
       |> attach_hook(:fab_info, :handle_info, &handle_fab_info/2)
 
@@ -36,10 +41,34 @@ defmodule EyeInTheSkyWebWeb.FabHook do
     {:halt, socket}
   end
 
+  defp handle_fab_event("fab_open_chat", %{"session_id" => session_id}, socket) do
+    socket =
+      case resolve_session(session_id) do
+        {:ok, session} ->
+          socket = switch_active_session(socket, session.id)
+
+          messages =
+            Messages.list_recent_messages(session.id, 20)
+            |> Enum.map(&%{body: &1.body, sender_role: &1.sender_role})
+
+          push_event(socket, "fab_chat_history", %{messages: messages})
+
+        {:error, reason} ->
+          Logger.error("FAB open_chat error: #{inspect(reason)}")
+          socket
+      end
+
+    {:halt, socket}
+  end
+
+  defp handle_fab_event("fab_close_chat", _params, socket) do
+    {:halt, unsubscribe_active_session(socket)}
+  end
+
   defp handle_fab_event("fab_send_message", %{"session_id" => session_id, "body" => body}, socket) do
-    case send_agent_message(session_id, body) do
-      :ok ->
-        {:halt, socket}
+    case send_session_message(session_id, body) do
+      {:ok, session_id_int} ->
+        {:halt, switch_active_session(socket, session_id_int)}
 
       {:error, reason} ->
         {:halt, push_event(socket, "fab_chat_error", %{error: reason})}
@@ -61,8 +90,38 @@ defmodule EyeInTheSkyWebWeb.FabHook do
     {:halt, socket}
   end
 
+  defp handle_fab_info({:new_message, %EyeInTheSkyWeb.Messages.Message{sender_role: role, body: body}}, socket)
+       when role != "user" do
+    {:halt, push_event(socket, "fab_chat_message", %{body: body, sender_role: role})}
+  end
+
+  defp handle_fab_info({event, _}, socket)
+       when event in [:notification_created, :notifications_updated, :notification_read] do
+    send_update(EyeInTheSkyWebWeb.Components.Sidebar, id: "app-sidebar", notification_count: :refresh)
+    {:halt, socket}
+  end
+
   defp handle_fab_info(_msg, socket) do
     {:cont, socket}
+  end
+
+  defp switch_active_session(socket, session_id) do
+    socket = unsubscribe_active_session(socket)
+
+    if socket.assigns.fab_active_session_id != session_id do
+      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session_id}")
+    end
+
+    assign(socket, :fab_active_session_id, session_id)
+  end
+
+  defp unsubscribe_active_session(socket) do
+    case socket.assigns.fab_active_session_id do
+      nil -> socket
+      id ->
+        Phoenix.PubSub.unsubscribe(EyeInTheSkyWeb.PubSub, "session:#{id}")
+        assign(socket, :fab_active_session_id, nil)
+    end
   end
 
   defp schedule_fab_refresh(socket) do
@@ -81,15 +140,20 @@ defmodule EyeInTheSkyWebWeb.FabHook do
     end)
   end
 
-  defp send_agent_message(session_id, body) do
+  defp send_session_message(session_id, body) do
     with {:ok, session} <- resolve_session(session_id),
-         {:ok, channel} <- find_global_channel(session.project_id),
-         {:ok, message} <- create_channel_message(channel, body),
-         :ok <- broadcast_and_continue(session, channel, message, body) do
-      :ok
+         {:ok, _message} <- Messages.send_message(%{
+           session_id: session.id,
+           sender_role: "user",
+           recipient_role: "agent",
+           provider: "claude",
+           body: body
+         }),
+         :ok <- AgentManager.continue_session(session.id, body, model: "sonnet") do
+      {:ok, session.id}
     else
       {:error, reason} ->
-        Logger.error("FAB chat error: #{inspect(reason)}")
+        Logger.error("FAB send_session_message error: #{inspect(reason)}")
         {:error, to_string(reason)}
     end
   end
@@ -97,57 +161,7 @@ defmodule EyeInTheSkyWebWeb.FabHook do
   defp resolve_session(session_id) do
     case Integer.parse(session_id) do
       {id, ""} -> Sessions.get_session(id)
-      _ -> Sessions.get_session(session_id)
+      _ -> Sessions.get_session_by_uuid(session_id)
     end
-  end
-
-  defp find_global_channel(project_id) do
-    channels =
-      if project_id,
-        do: Channels.list_channels_for_project(project_id),
-        else: Channels.list_channels()
-
-    case Enum.find(channels, fn c -> c.name == "#global" end) do
-      nil -> {:error, "Global channel not found"}
-      channel -> {:ok, channel}
-    end
-  end
-
-  defp create_channel_message(channel, body) do
-    Messages.send_channel_message(%{
-      channel_id: channel.id,
-      session_id: "web-user",
-      sender_role: "user",
-      recipient_role: "agent",
-      provider: "claude",
-      body: body
-    })
-  end
-
-  defp broadcast_and_continue(session, channel, message, body) do
-    Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
-      "channel:#{channel.id}:messages",
-      {:new_message, message}
-    )
-
-    with {:ok, agent} <- Agents.get_agent(session.agent_id) do
-      project_path = agent.git_worktree_path || File.cwd!()
-
-      prompt = """
-      REMINDER: Use i-chat-send MCP tool to send your response to the channel.
-
-      User message: #{body}
-      """
-
-      AgentManager.continue_session(
-        session.id,
-        prompt,
-        model: "sonnet",
-        project_path: project_path
-      )
-    end
-
-    :ok
   end
 end

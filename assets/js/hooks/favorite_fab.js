@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'eye-in-the-sky-bookmarks'
+const FAB_RADIUS = 90  // px — radial distance from main button to agent buttons
 
 const STATUS_STYLES = {
   working:   { dot: 'bg-success',          ping: true  },
@@ -8,11 +9,28 @@ const STATUS_STYLES = {
   default:   { dot: 'bg-base-content/20',  ping: false },
 }
 
+// Compute radial offsets for N buttons, arc from 90° (up) to 180° (left)
+function radialOffsets(n) {
+  if (n === 0) return []
+  const angles = n === 1
+    ? [135]
+    : Array.from({ length: n }, (_, i) => 90 + i * 90 / (n - 1))
+  return angles.map(deg => {
+    const rad = deg * Math.PI / 180
+    return {
+      x: Math.round(FAB_RADIUS * Math.cos(rad)),
+      y: Math.round(-FAB_RADIUS * Math.sin(rad)),
+    }
+  })
+}
+
 export const FavoriteFab = {
   mounted() {
     this._statuses = {}
     this._chatAgent = null
     this._chatMessages = []
+    this._unreadCount = 0
+    this._expanded = false
     this._render()
 
     this._onBookmarksUpdated = () => this._render()
@@ -23,14 +41,25 @@ export const FavoriteFab = {
       this._render()
     })
 
+    this.handleEvent('fab_chat_history', ({ messages }) => {
+      this._chatMessages = messages || []
+      this._refreshMessages()
+    })
+
     this.handleEvent('fab_chat_message', ({ body, sender_role }) => {
-      this._chatMessages.push({ body, sender_role, ts: new Date().toISOString() })
-      this._renderChat()
+      const msg = { body, sender_role, ts: new Date().toISOString() }
+      this._chatMessages.push(msg)
+      this._appendMessage(msg)
+      if (!this._chatAgent) {
+        this._unreadCount++
+        this._updateUnreadBadge()
+      }
     })
 
     this.handleEvent('fab_chat_error', ({ error }) => {
-      this._chatMessages.push({ body: error, sender_role: 'error', ts: new Date().toISOString() })
-      this._renderChat()
+      const msg = { body: error, sender_role: 'error', ts: new Date().toISOString() }
+      this._chatMessages.push(msg)
+      this._appendMessage(msg)
     })
 
     this.pushEvent('fab_request_statuses', {})
@@ -66,23 +95,29 @@ export const FavoriteFab = {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks))
     } catch (e) { /* ignore */ }
-    window.dispatchEvent(new CustomEvent('bookmarks-updated', {
-      detail: { bookmarks }
-    }))
+    window.dispatchEvent(new CustomEvent('bookmarks-updated', { detail: { bookmarks } }))
     this._render()
   },
 
   _openChat(agent) {
+    if (this._chatAgent && this._chatAgent.session_id !== agent.session_id) {
+      this.pushEvent('fab_close_chat', {})
+    }
     this._chatAgent = agent
     this._chatMessages = []
-    this._renderChat()
+    this._unreadCount = 0
+    this._updateUnreadBadge()
+    this._createChatModal()
+    this.pushEvent('fab_open_chat', { session_id: agent.session_id })
+    document.getElementById('fab-chat-input')?.focus()
   },
 
-  _closeChat() {
+  _closeChat(notify = true) {
     this._chatAgent = null
     this._chatMessages = []
     const modal = document.getElementById('fab-chat-modal')
     if (modal) modal.remove()
+    if (notify) this.pushEvent('fab_close_chat', {})
   },
 
   _sendMessage() {
@@ -90,53 +125,37 @@ export const FavoriteFab = {
     if (!input || !input.value.trim() || !this._chatAgent) return
 
     const body = input.value.trim()
-    this._chatMessages.push({ body, sender_role: 'user', ts: new Date().toISOString() })
-    this._renderChat()
+    const msg = { body, sender_role: 'user', ts: new Date().toISOString() }
+    this._chatMessages.push(msg)
+    this._appendMessage(msg)
 
     this.pushEvent('fab_send_message', {
       session_id: this._chatAgent.session_id,
-      body: body
+      body
     })
 
     input.value = ''
     input.focus()
   },
 
-  _renderChat() {
-    let modal = document.getElementById('fab-chat-modal')
-    if (!this._chatAgent) {
-      if (modal) modal.remove()
-      return
-    }
+  _createChatModal() {
+    const existing = document.getElementById('fab-chat-modal')
+    if (existing) existing.remove()
 
     const agent = this._chatAgent
     const style = this._getStatusStyle(agent.session_id, agent.status)
     const statusLabel = this._statuses[agent.session_id] || agent.status || 'idle'
 
-    const messagesHtml = this._chatMessages.length === 0
-      ? `<div class="text-center text-base-content/25 text-xs py-10">
-           Send a message to ${(agent.name || 'Agent').replace(/</g, '&lt;')}
-         </div>`
-      : this._chatMessages.map(m => {
-          if (m.sender_role === 'error') {
-            return `<div class="flex justify-start">
-              <div class="bg-error/10 text-error rounded-xl px-3 py-2 text-sm max-w-[80%]">${this._escapeHtml(m.body)}</div>
-            </div>`
-          }
-          const isUser = m.sender_role === 'user'
-          return `<div class="flex ${isUser ? 'justify-end' : 'justify-start'}">
-            <div class="${isUser ? 'bg-primary/90 text-primary-content rounded-xl rounded-br-sm' : 'bg-base-200/60 rounded-xl rounded-bl-sm'} px-3 py-2 text-sm max-w-[80%] whitespace-pre-wrap">${this._escapeHtml(m.body)}</div>
-          </div>`
-        }).join('')
-
-    const html = `
-      <div class="fixed bottom-4 right-4 w-96 z-[1000] flex flex-col bg-base-100 border border-base-content/10 rounded-xl shadow-2xl max-h-[500px] overflow-hidden">
+    const modal = document.createElement('div')
+    modal.id = 'fab-chat-modal'
+    modal.innerHTML = `
+      <div class="fixed bottom-24 right-4 w-[520px] z-[1000] flex flex-col bg-base-100 border border-base-content/10 rounded-xl shadow-2xl max-h-[850px] overflow-hidden">
         <div class="flex items-center justify-between px-4 py-2.5 border-b border-base-content/5 bg-base-200/30">
           <div class="flex items-center gap-2">
             <span class="font-bold text-xs bg-primary/10 text-primary rounded-full w-7 h-7 flex items-center justify-center">${this._getInitials(agent.name)}</span>
             <div>
               <span class="text-xs font-semibold text-base-content/70">${this._escapeHtml(agent.name || 'Agent')}</span>
-              <span class="text-[10px] font-medium uppercase tracking-wider ml-1.5 ${style.ping ? 'text-success' : 'text-base-content/30'}">${statusLabel}</span>
+              <span id="fab-chat-status" class="text-[10px] font-medium uppercase tracking-wider ml-1.5 ${style.ping ? 'text-success' : 'text-base-content/30'}">${statusLabel}</span>
             </div>
           </div>
           <div class="flex items-center gap-1">
@@ -154,8 +173,10 @@ export const FavoriteFab = {
           </div>
         </div>
 
-        <div id="fab-chat-messages" class="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-[200px] max-h-[360px]">
-          ${messagesHtml}
+        <div id="fab-chat-messages" class="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-[400px] max-h-[720px]">
+          <div id="fab-chat-empty" class="text-center text-base-content/25 text-xs py-10">
+            Loading messages...
+          </div>
         </div>
 
         <div class="px-3 py-2.5 border-t border-base-content/5">
@@ -176,18 +197,8 @@ export const FavoriteFab = {
         </div>
       </div>`
 
-    if (!modal) {
-      modal = document.createElement('div')
-      modal.id = 'fab-chat-modal'
-      document.body.appendChild(modal)
-    }
-    modal.innerHTML = html
+    document.body.appendChild(modal)
 
-    // Scroll messages to bottom
-    const msgContainer = document.getElementById('fab-chat-messages')
-    if (msgContainer) msgContainer.scrollTop = msgContainer.scrollHeight
-
-    // Wire up events
     document.getElementById('fab-chat-close')?.addEventListener('click', () => this._closeChat())
     document.getElementById('fab-chat-send')?.addEventListener('click', () => this._sendMessage())
     const input = document.getElementById('fab-chat-input')
@@ -198,7 +209,54 @@ export const FavoriteFab = {
           this._sendMessage()
         }
       })
-      input.focus()
+    }
+  },
+
+  _refreshMessages() {
+    const container = document.getElementById('fab-chat-messages')
+    if (!container) return
+    if (this._chatMessages.length === 0) {
+      container.innerHTML = `<div id="fab-chat-empty" class="text-center text-base-content/25 text-xs py-10">No messages yet</div>`
+    } else {
+      container.innerHTML = this._chatMessages.map(m => this._messageHtml(m)).join('')
+    }
+    container.scrollTop = container.scrollHeight
+  },
+
+  _appendMessage(msg) {
+    const container = document.getElementById('fab-chat-messages')
+    if (!container) return
+    const empty = document.getElementById('fab-chat-empty')
+    if (empty) empty.remove()
+    const div = document.createElement('div')
+    div.innerHTML = this._messageHtml(msg)
+    container.appendChild(div.firstChild)
+    container.scrollTop = container.scrollHeight
+  },
+
+  _messageHtml(m) {
+    if (m.sender_role === 'error') {
+      return `<div class="flex justify-start">
+        <div class="bg-error/10 text-error rounded-xl px-3 py-2 text-sm max-w-[80%]">${this._escapeHtml(m.body)}</div>
+      </div>`
+    }
+    const isUser = m.sender_role === 'user'
+    return `<div class="flex ${isUser ? 'justify-end' : 'justify-start'}">
+      <div class="${isUser ? 'bg-primary/90 text-primary-content rounded-xl rounded-br-sm' : 'bg-base-200/60 rounded-xl rounded-bl-sm'} px-3 py-2 text-sm max-w-[80%] whitespace-pre-wrap">${this._escapeHtml(m.body)}</div>
+    </div>`
+  },
+
+  _updateUnreadBadge() {
+    const mainBtn = this.el.querySelector('[role="button"]')
+    if (!mainBtn) return
+    const existing = mainBtn.querySelector('span.absolute')
+    if (existing) existing.remove()
+    if (this._unreadCount > 0) {
+      mainBtn.insertAdjacentHTML('beforeend',
+        `<span class="absolute -top-1 -right-1 flex h-3 w-3">
+           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
+           <span class="relative inline-flex rounded-full h-3 w-3 bg-error ring-2 ring-base-100"></span>
+         </span>`)
     }
   },
 
@@ -206,6 +264,21 @@ export const FavoriteFab = {
     const div = document.createElement('div')
     div.textContent = str
     return div.innerHTML
+  },
+
+  _setExpanded(val) {
+    this._expanded = val
+    this.el.querySelectorAll('.fab-agent-btn').forEach(el => {
+      if (val) {
+        el.style.opacity = '1'
+        el.style.pointerEvents = 'auto'
+        el.style.transform = `translate(${el._tx}px, ${el._ty}px) scale(1)`
+      } else {
+        el.style.opacity = '0'
+        el.style.pointerEvents = 'none'
+        el.style.transform = 'translate(0,0) scale(0.5)'
+      }
+    })
   },
 
   _render() {
@@ -220,21 +293,22 @@ export const FavoriteFab = {
 
     this.el.classList.remove('hidden')
 
+    const unreadDot = this._unreadCount > 0
+      ? `<span class="absolute -top-1 -right-1 flex h-3 w-3">
+           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
+           <span class="relative inline-flex rounded-full h-3 w-3 bg-error ring-2 ring-base-100"></span>
+         </span>`
+      : ''
+
     const mainBtn = `
       <div tabindex="0" role="button"
+           style="position:absolute;bottom:0;right:0;z-index:2;pointer-events:auto"
            class="btn btn-primary btn-circle shadow-lg outline-none">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
           <path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clip-rule="evenodd" />
         </svg>
-        <span class="badge badge-sm badge-warning absolute -top-1 -right-1">${bookmarks.length}</span>
+        ${unreadDot}
       </div>`
-
-    const closeBtn = `
-      <button class="btn btn-circle btn-ghost fab-close" tabindex="0">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
-          <path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-        </svg>
-      </button>`
 
     const agentBtns = bookmarks.map((agent, index) => {
       const style = this._getStatusStyle(agent.session_id, agent.status)
@@ -249,6 +323,7 @@ export const FavoriteFab = {
       return `
         <button
            class="btn btn-circle bg-base-100 shadow-md hover:bg-base-200 border border-base-content/10 relative group fab-agent-btn"
+           style="position:absolute;bottom:0;right:0;opacity:0;transform:translate(0,0) scale(0.5);transition:opacity 0.18s,transform 0.18s;pointer-events:none"
            title="${(agent.name || 'Agent').replace(/"/g, '&quot;')}"
            data-agent-index="${index}">
           <span class="font-bold text-xs text-base-content/70">${initials}</span>
@@ -265,25 +340,53 @@ export const FavoriteFab = {
         </button>`
     }).join('')
 
-    this.el.innerHTML = mainBtn + closeBtn + agentBtns
+    this.el.innerHTML = mainBtn + agentBtns
 
-    // Wire up remove buttons (stop propagation so chat doesn't open)
+    Object.assign(this.el.style, {
+      position: 'fixed',
+      bottom: '1rem',
+      right: '1rem',
+      width: '200px',
+      height: '200px',
+      overflow: 'visible',
+      pointerEvents: 'none',
+    })
+
+    // Compute and store radial offsets on the elements
+    const offsets = radialOffsets(bookmarks.length)
+    const agentEls = Array.from(this.el.querySelectorAll('.fab-agent-btn'))
+    agentEls.forEach((el, i) => {
+      el._tx = offsets[i].x
+      el._ty = offsets[i].y
+    })
+
+    // Restore expanded state after re-render (e.g. from status update)
+    if (this._expanded) this._setExpanded(true)
+
+    // Main button: click toggles agent buttons
+    const mainBtnEl = this.el.querySelector('[role="button"]')
+    if (mainBtnEl) {
+      mainBtnEl.onclick = (e) => {
+        e.stopPropagation()
+        this._setExpanded(!this._expanded)
+      }
+    }
+
+    // Remove buttons
     this.el.querySelectorAll('.fab-remove-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault()
         e.stopPropagation()
-        const idx = parseInt(btn.dataset.removeIndex, 10)
-        this._removeBookmark(idx)
+        this._removeBookmark(parseInt(btn.dataset.removeIndex, 10))
       })
     })
 
-    // Wire up agent button clicks to open chat
-    this.el.querySelectorAll('.fab-agent-btn').forEach(btn => {
+    // Agent buttons: click opens chat
+    agentEls.forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault()
         e.stopPropagation()
-        const idx = parseInt(btn.dataset.agentIndex, 10)
-        const agent = this._agentMap[idx]
+        const agent = this._agentMap[parseInt(btn.dataset.agentIndex, 10)]
         if (agent) this._openChat(agent)
       })
     })

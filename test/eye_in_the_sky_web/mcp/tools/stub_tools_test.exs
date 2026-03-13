@@ -1,10 +1,8 @@
 defmodule EyeInTheSkyWeb.MCP.Tools.StubToolsTest do
-  # These tools are either stubs, system calls, or external service calls.
+  # These tools are system calls or external service calls.
   # Tests verify they return properly structured responses without crashing.
-  use ExUnit.Case, async: true
+  use EyeInTheSkyWeb.DataCase, async: true
 
-  alias EyeInTheSkyWeb.MCP.Tools.NatsListen
-  alias EyeInTheSkyWeb.MCP.Tools.NatsListenRemote
   alias EyeInTheSkyWeb.MCP.Tools.Window
   alias EyeInTheSkyWeb.MCP.Tools.Speak
 
@@ -14,54 +12,8 @@ defmodule EyeInTheSkyWeb.MCP.Tools.StubToolsTest do
     Jason.decode!(json, keys: :atoms)
   end
 
-  describe "NatsListen tool (stub)" do
-    test "returns empty messages list" do
-      result = NatsListen.execute(%{session_id: "test-session"}, @frame) |> decode()
-
-      assert result.success == true
-      assert result.messages == []
-      assert result.count == 0
-    end
-
-    test "echoes last_sequence" do
-      result = NatsListen.execute(%{session_id: "test-session", last_sequence: 42}, @frame) |> decode()
-
-      assert result.last_sequence == 42
-    end
-
-    test "defaults last_sequence to 0 when not provided" do
-      result = NatsListen.execute(%{session_id: "test-session"}, @frame) |> decode()
-
-      assert result.last_sequence == 0
-    end
-  end
-
-  describe "NatsListenRemote tool (stub)" do
-    test "returns empty messages list" do
-      result = NatsListenRemote.execute(%{
-        session_id: "test-session",
-        server_url: "nats://localhost:4222"
-      }, @frame) |> decode()
-
-      assert result.success == true
-      assert result.messages == []
-      assert result.count == 0
-    end
-
-    test "echoes last_sequence" do
-      result = NatsListenRemote.execute(%{
-        session_id: "test-session",
-        server_url: "nats://localhost:4222",
-        last_sequence: 99
-      }, @frame) |> decode()
-
-      assert result.last_sequence == 99
-    end
-  end
-
   describe "Window tool" do
     test "returns a response without crashing" do
-      # On macOS CI or dev it may succeed or fail - just verify no crash
       {:reply, response, @frame} = Window.execute(%{}, @frame)
 
       assert %Anubis.Server.Response{type: :tool} = response
@@ -72,6 +24,20 @@ defmodule EyeInTheSkyWeb.MCP.Tools.StubToolsTest do
       result = Window.execute(%{}, @frame) |> decode()
 
       assert Map.has_key?(result, :success)
+    end
+
+    test "completes within timeout" do
+      # Should return (success or timed-out error) within 5s
+      {elapsed, _} = :timer.tc(fn -> Window.execute(%{}, @frame) end)
+      assert elapsed < 5_000_000
+    end
+
+    test "timeout returns structured error" do
+      # Verify the timeout path returns a proper error struct (not a crash)
+      # We can't force a timeout easily, but we verify the response is always well-formed
+      result = Window.execute(%{}, @frame) |> decode()
+      assert is_boolean(result.success)
+      assert is_binary(result.message)
     end
   end
 

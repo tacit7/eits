@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   use EyeInTheSkyWebWeb, :live_component
 
-  alias EyeInTheSkyWeb.{Projects, Channels}
+  alias EyeInTheSkyWeb.{Projects, Channels, Notifications}
   alias EyeInTheSkyWeb.Channels.Channel
 
   @impl true
@@ -19,12 +19,18 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
        projects: projects,
        channels: channels,
        collapsed: false,
+       mobile_open: false,
        expanded_chat: false,
-       new_channel_name: nil
+       new_channel_name: nil,
+       notification_count: Notifications.unread_count()
      )}
   end
 
   @impl true
+  def update(%{notification_count: :refresh}, socket) do
+    {:ok, assign(socket, :notification_count, Notifications.unread_count())}
+  end
+
   def update(assigns, socket) do
     sidebar_project = assigns[:sidebar_project]
 
@@ -37,12 +43,24 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
      |> assign(:sidebar_tab, sidebar_tab)
      |> assign(:sidebar_project, sidebar_project)
      |> assign(:active_channel_id, assigns[:active_channel_id])
-     |> assign(:expanded_chat, expanded_chat)}
+     |> assign(:expanded_chat, expanded_chat)
+     |> assign(:mobile_open, false)
+     |> assign(:notification_count, Notifications.unread_count())}
   end
 
   @impl true
   def handle_event("toggle_collapsed", _params, socket) do
     {:noreply, assign(socket, :collapsed, !socket.assigns.collapsed)}
+  end
+
+  @impl true
+  def handle_event("toggle_mobile", _params, socket) do
+    {:noreply, assign(socket, :mobile_open, !socket.assigns.mobile_open)}
+  end
+
+  @impl true
+  def handle_event("close_mobile", _params, socket) do
+    {:noreply, assign(socket, :mobile_open, false)}
   end
 
   @impl true
@@ -125,6 +143,15 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   @impl true
   def render(assigns) do
     ~H"""
+    <div>
+    <%!-- Backdrop — mobile only, closes sidebar on tap --%>
+    <div
+      :if={@mobile_open}
+      phx-click="close_mobile"
+      phx-target={@myself}
+      class="md:hidden fixed inset-0 z-40 bg-black/40"
+    />
+
     <aside
       id="app-sidebar"
       phx-hook="SidebarState"
@@ -132,12 +159,14 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
       data-active-project-id={@sidebar_project && @sidebar_project.id}
       class={[
         "flex flex-col h-full border-r border-base-content/8 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)] transition-all duration-200 flex-shrink-0 overflow-hidden",
+        "fixed inset-y-0 left-0 z-50 md:relative md:inset-auto md:z-auto",
+        if(@mobile_open, do: "translate-x-0", else: "-translate-x-full md:translate-x-0"),
         if(@collapsed, do: "w-16", else: "w-60")
       ]}
     >
       <%!-- Branding --%>
       <div class="flex items-center gap-2 px-3 py-3 border-b border-base-content/5">
-        <.link navigate="/" class="flex items-center gap-2 min-w-0">
+        <.link navigate="/" class="flex items-center gap-2 min-w-0 flex-1">
           <img src="/images/logo.svg" class="w-7 h-7 flex-shrink-0" />
           <span class={[
             "text-sm font-semibold text-base-content/80 truncate",
@@ -146,6 +175,14 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
             Eye in the Sky
           </span>
         </.link>
+        <button
+          :if={@mobile_open}
+          phx-click="close_mobile"
+          phx-target={@myself}
+          class="md:hidden btn btn-ghost btn-xs btn-square text-base-content/40"
+        >
+          <.icon name="hero-x-mark" class="w-4 h-4" />
+        </button>
       </div>
 
       <%!-- Scrollable nav --%>
@@ -192,6 +229,13 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           active={@sidebar_tab == :skills}
           collapsed={@collapsed}
         />
+        <.notification_nav_item
+          href="/notifications"
+          active={@sidebar_tab == :notifications}
+          collapsed={@collapsed}
+          count={@notification_count}
+        />
+
         <%!-- Chat (expandable with channels) --%>
         <div>
           <button
@@ -372,6 +416,11 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
                 label="Agents"
                 active={is_active_project && @sidebar_tab == :agents}
               />
+              <.project_sub_item
+                href={~p"/projects/#{project.id}/jobs"}
+                label="Jobs"
+                active={is_active_project && @sidebar_tab == :jobs}
+              />
             </div>
           </div>
         <% end %>
@@ -393,6 +442,13 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           collapsed={@collapsed}
         />
         <.nav_item
+          href="/oban"
+          icon="hero-queue-list"
+          label="Oban"
+          active={false}
+          collapsed={@collapsed}
+        />
+        <.nav_item
           href="/settings"
           icon="hero-cog-8-tooth"
           label="Settings"
@@ -408,6 +464,14 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
             <.theme_toggle />
           </div>
         <% end %>
+        <.link
+          href="/auth/logout"
+          method="delete"
+          class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-red-500"
+          title="Sign out"
+        >
+          <.icon name="hero-arrow-right-on-rectangle-mini" class="w-4 h-4" />
+        </.link>
         <button
           phx-click="toggle_collapsed"
           phx-target={@myself}
@@ -425,6 +489,39 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
         </button>
       </div>
     </aside>
+    </div>
+    """
+  end
+
+  attr :href, :string, required: true
+  attr :active, :boolean, default: false
+  attr :collapsed, :boolean, default: false
+  attr :count, :integer, default: 0
+
+  defp notification_nav_item(assigns) do
+    ~H"""
+    <.link
+      navigate={@href}
+      class={[
+        "flex items-center gap-2.5 text-[13px] transition-colors",
+        if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
+        if(@active,
+          do: "text-primary bg-primary/10 border-l-2 border-primary font-medium",
+          else: "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5"
+        )
+      ]}
+      title="Notifications"
+    >
+      <div class="relative">
+        <.icon name="hero-bell" class="w-4 h-4 flex-shrink-0" />
+        <%= if @count > 0 do %>
+          <span class="absolute -top-1.5 -right-1.5 badge badge-xs badge-primary text-[9px] min-w-[14px] h-[14px] p-0">
+            {if @count > 99, do: "99+", else: @count}
+          </span>
+        <% end %>
+      </div>
+      <span class={["truncate", if(@collapsed, do: "hidden")]}>Notifications</span>
+    </.link>
     """
   end
 

@@ -66,9 +66,9 @@ defmodule EyeInTheSkyWeb.MCP.Tools.CommitsToolTest do
       )
       |> json_result()
 
-    # session_id will be nil, so insert fails — but the tool still returns success
-    assert r.success == true
-    assert String.contains?(r.message, "/1 commits")
+    # nil guard: agent with no sessions cannot be resolved, returns error
+    assert r.success == false
+    assert String.contains?(r.message, "Could not resolve session")
   end
 
   test "integer agent_id picks the most recent session" do

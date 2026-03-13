@@ -33,15 +33,16 @@ defmodule EyeInTheSkyWeb.MCP.Server do
   component(EyeInTheSkyWeb.MCP.Tools.Window, name: "i-window")
 
   # Phase 3 — Messaging tools
-  component(EyeInTheSkyWeb.MCP.Tools.NatsSend, name: "i-nats-send")
-  component(EyeInTheSkyWeb.MCP.Tools.NatsListen, name: "i-nats-listen")
-  component(EyeInTheSkyWeb.MCP.Tools.NatsSendRemote, name: "i-nats-send-remote")
-  component(EyeInTheSkyWeb.MCP.Tools.NatsListenRemote, name: "i-nats-listen-remote")
   component(EyeInTheSkyWeb.MCP.Tools.ChatSend, name: "i-chat-send")
   component(EyeInTheSkyWeb.MCP.Tools.Dm, name: "i-dm")
   component(EyeInTheSkyWeb.MCP.Tools.ChatChannelList, name: "i-chat-channel-list")
 
+  # Phase 5 — Notifications
+  component(EyeInTheSkyWeb.MCP.Tools.Notify, name: "i-notify")
+
   # Phase 4 — Agent spawning
   component(EyeInTheSkyWeb.MCP.Tools.SpawnAgent, name: "i-spawn-agent")
-  component(EyeInTheSkyWeb.MCP.Tools.SpawnClaude, name: "i-spawn-claude")
+  component(EyeInTheSkyWeb.MCP.Tools.AgentSend, name: "i-agent-send")
+  component(EyeInTheSkyWeb.MCP.Tools.AgentCancel, name: "i-agent-cancel")
+  component(EyeInTheSkyWeb.MCP.Tools.AgentStatus, name: "i-agent-status")
 end

@@ -76,6 +76,7 @@ defmodule EyeInTheSkyWebWeb.Router do
       live "/projects/:id/config", ProjectLive.Config, :show
       live "/projects/:id/agents", ProjectLive.Agents, :show
       live "/projects/:id/jobs", ProjectLive.Jobs, :show
+      live "/teams", TeamLive.Index, :index
       live "/chat", ChatLive, :index
       live "/dm/:session_id", DmLive, :show
     end

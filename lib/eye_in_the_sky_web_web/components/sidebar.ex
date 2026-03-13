@@ -473,6 +473,13 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
             collapsed={@collapsed}
           />
           <.nav_item
+            href="/teams"
+            icon="hero-users"
+            label="Teams"
+            active={@sidebar_tab == :teams}
+            collapsed={@collapsed}
+          />
+          <.nav_item
             href="/jobs"
             icon="hero-calendar-days"
             label="Jobs"

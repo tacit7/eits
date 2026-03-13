@@ -309,6 +309,78 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
               <% end %>
             </div>
           <% end %>
+
+          <%!-- System section --%>
+          <.section_label collapsed={@collapsed} label="System" />
+          <.nav_item
+            href="/config"
+            icon="hero-cog-6-tooth"
+            label="Claude Config"
+            active={@sidebar_tab == :config && is_nil(@sidebar_project)}
+            collapsed={@collapsed}
+          />
+          <.nav_item
+            href="/teams"
+            icon="hero-users"
+            label="Teams"
+            active={@sidebar_tab == :teams}
+            collapsed={@collapsed}
+          />
+          <.nav_item
+            href="/jobs"
+            icon="hero-calendar-days"
+            label="Jobs"
+            active={@sidebar_tab == :jobs}
+            collapsed={@collapsed}
+          />
+          <.nav_item
+            href="/oban"
+            icon="hero-queue-list"
+            label="Oban"
+            active={false}
+            collapsed={@collapsed}
+          />
+          <.nav_item
+            href="/settings"
+            icon="hero-cog-8-tooth"
+            label="Settings"
+            active={@sidebar_tab == :settings}
+            collapsed={@collapsed}
+          />
+        </nav>
+
+        <%!-- Bottom controls --%>
+        <div class="border-t border-base-content/5 p-2 flex items-center gap-2">
+          <%= if !@collapsed do %>
+            <div class="flex-1">
+              <.theme_toggle />
+            </div>
+          <% end %>
+          <.link
+            href="/auth/logout"
+            method="delete"
+            class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-red-500 min-h-[44px] min-w-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            title="Sign out"
+            aria-label="Sign out"
+          >
+            <.icon name="hero-arrow-right-on-rectangle-mini" class="w-4 h-4" />
+          </.link>
+          <button
+            phx-click="toggle_collapsed"
+            phx-target={@myself}
+            class="hidden md:inline-flex btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-base-content/70 min-h-[44px] min-w-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+            title={if @collapsed, do: "Expand sidebar", else: "Collapse sidebar"}
+            aria-label={if @collapsed, do: "Expand sidebar", else: "Collapse sidebar"}
+          >
+            <.icon
+              name={
+                if @collapsed,
+                  do: "hero-chevron-double-right-mini",
+                  else: "hero-chevron-double-left-mini"
+              }
+              class="w-4 h-4"
+            />
+          </button>
         </div>
 
         <%!-- Projects section --%>

@@ -15,15 +15,14 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
     socket =
       socket
       |> assign(:page_title, "Session Overview")
-      |> assign(:agents, agents)
       |> assign(:projects, projects)
       |> assign(:page, 1)
       |> assign(:has_more, length(agents) < total)
       |> assign(:total_sessions, total)
-      |> assign(:list_version, 0)
       |> assign(:show_new_session_modal, false)
       |> assign(:sidebar_tab, :sessions)
       |> assign(:sidebar_project, nil)
+      |> stream(:agents, agents, dom_id: fn a -> "si-#{a.session_uuid}" end)
 
     {:ok, socket}
   end
@@ -39,9 +38,12 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
 
       socket =
         socket
-        |> assign(:agents, socket.assigns.agents ++ new_agents)
         |> assign(:page, next_page)
-        |> assign(:has_more, length(socket.assigns.agents) + length(new_agents) < total)
+        |> assign(:has_more, offset + length(new_agents) < total)
+
+      socket = Enum.reduce(new_agents, socket, fn agent, acc ->
+        stream_insert(acc, :agents, agent)
+      end)
 
       {:noreply, socket}
     else
@@ -75,7 +77,8 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
       project_id: project_id,
       project_path: project.path,
       description: agent_name,
-      instructions: description
+      instructions: description,
+      agent: params["agent"]
     ]
 
     case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
@@ -86,11 +89,10 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
         socket =
           socket
           |> assign(:show_new_session_modal, false)
-          |> assign(:agents, agents)
           |> assign(:page, 1)
           |> assign(:has_more, length(agents) < total)
           |> assign(:total_sessions, total)
-          |> update(:list_version, &(&1 + 1))
+          |> stream(:agents, agents, reset: true)
           |> put_flash(:info, "Session launched")
 
         {:noreply, socket}
@@ -133,15 +135,13 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
         </div>
 
         <div
-          id={"sessions-grid-#{@list_version}"}
-          phx-update="append"
+          id="sessions-grid"
+          phx-update="stream"
           class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"
         >
-          <%= for agent <- @agents do %>
-            <div id={"si-#{agent.session_uuid}"}>
-              <.session_card session={agent} />
-            </div>
-          <% end %>
+          <div :for={{dom_id, agent} <- @streams.agents} id={dom_id}>
+            <.session_card session={agent} />
+          </div>
         </div>
 
         <div

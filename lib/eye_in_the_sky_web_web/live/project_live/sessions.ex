@@ -6,7 +6,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
 
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Sessions
-  import EyeInTheSkyWebWeb.Helpers.ViewHelpers
   import EyeInTheSkyWebWeb.Components.Icons
   import EyeInTheSkyWebWeb.Components.SessionCard
 
@@ -43,7 +42,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         |> assign(:agents, [])
         |> assign(:visible_count, @page_size)
         |> assign(:has_more, false)
-        |> assign(:list_version, 0)
         |> load_agents()
 
       {:ok, socket}
@@ -103,7 +101,15 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
       |> assign(:visible_count, visible_count)
       |> assign(:has_more, length(agents) > visible_count)
 
-    if reset_page, do: update(socket, :list_version, &(&1 + 1)), else: socket
+    visible_agents = Enum.take(agents, visible_count)
+
+    if reset_page do
+      stream(socket, :session_list, visible_agents, reset: true, dom_id: fn a -> "ps-#{a.id}" end)
+    else
+      Enum.reduce(visible_agents, socket, fn agent, acc ->
+        stream_insert(acc, :session_list, agent)
+      end)
+    end
   end
 
   defp filter_agents_by_status(sessions, filter) do
@@ -232,12 +238,20 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   @impl true
   def handle_event("load_more", _params, socket) do
     if socket.assigns.has_more do
-      new_count = socket.assigns.visible_count + @page_size
+      old_count = socket.assigns.visible_count
+      new_count = old_count + @page_size
+      agents = socket.assigns.agents
+
+      new_items = Enum.slice(agents, old_count, @page_size)
 
       socket =
         socket
         |> assign(:visible_count, new_count)
-        |> assign(:has_more, length(socket.assigns.agents) > new_count)
+        |> assign(:has_more, length(agents) > new_count)
+
+      socket = Enum.reduce(new_items, socket, fn agent, acc ->
+        stream_insert(acc, :session_list, agent)
+      end)
 
       {:noreply, socket}
     else
@@ -618,12 +632,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
             />
           <% else %>
             <div
-              id={"ps-list-#{@list_version}"}
-              phx-update="append"
+              id="ps-list"
+              phx-update="stream"
               class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl px-4"
             >
-            <%= for agent <- Enum.take(@agents, @visible_count) do %>
-              <div id={"ps-#{agent.id}"}>
+            <div :for={{dom_id, agent} <- @streams.session_list} id={dom_id}>
                 <.session_row
                   session={agent}
                   select_mode={@session_filter == "archived"}
@@ -690,7 +703,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                   </:actions>
                 </.session_row>
               </div>
-            <% end %>
             </div>
           <% end %>
         </div>

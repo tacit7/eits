@@ -230,64 +230,15 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   @impl true
-  def handle_event("archive_session", %{"session_id" => session_id}, socket) do
-    Logger.info("Archive button clicked for session: #{session_id}")
-
-    with {:ok, agent} <- Sessions.get_session(session_id),
-         {:ok, updated} <- Sessions.archive_session(agent) do
-      Logger.info(
-        "Session archived successfully: #{session_id}, archived_at: #{inspect(updated.archived_at)}"
-      )
-
-      socket =
-        socket
-        |> load_agents()
-        |> put_flash(:info, "Session archived successfully")
-
-      {:noreply, socket}
+  def handle_event(action, %{"session_id" => session_id}, socket)
+      when action in ["archive_session", "unarchive_session", "delete_session"] do
+    with {:ok, session} <- Sessions.get_session(session_id),
+         {:ok, _} <- apply_session_action(action, session) do
+      {:noreply, socket |> load_agents() |> put_flash(:info, "Session #{action_label(action)}")}
     else
       {:error, reason} ->
-        Logger.error("Failed to archive session #{session_id}: #{inspect(reason)}")
-        {:noreply, put_flash(socket, :error, "Failed to archive session")}
-    end
-  end
-
-  @impl true
-  def handle_event("unarchive_session", %{"session_id" => session_id}, socket) do
-    Logger.info("Unarchive button clicked for session: #{session_id}")
-
-    with {:ok, agent} <- Sessions.get_session(session_id),
-         {:ok, updated} <- Sessions.unarchive_session(agent) do
-      Logger.info(
-        "Session unarchived successfully: #{session_id}, archived_at: #{inspect(updated.archived_at)}"
-      )
-
-      socket =
-        socket
-        |> load_agents()
-        |> put_flash(:info, "Session unarchived successfully")
-
-      {:noreply, socket}
-    else
-      {:error, reason} ->
-        Logger.error("Failed to unarchive session #{session_id}: #{inspect(reason)}")
-        {:noreply, put_flash(socket, :error, "Failed to unarchive session")}
-    end
-  end
-
-  @impl true
-  def handle_event("delete_session", %{"session_id" => session_id}, socket) do
-    with {:ok, agent} <- Sessions.get_session(session_id),
-         {:ok, _} <- Sessions.delete_session(agent) do
-      socket =
-        socket
-        |> load_agents()
-        |> put_flash(:info, "Session deleted successfully")
-
-      {:noreply, socket}
-    else
-      {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to delete session")}
+        Logger.error("#{action} failed for #{session_id}: #{inspect(reason)}")
+        {:noreply, put_flash(socket, :error, "Failed to #{action_label(action)}")}
     end
   end
 
@@ -422,17 +373,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   @impl true
-  def handle_info({:agent_created, _agent}, socket) do
-    {:noreply, load_agents(socket)}
-  end
-
-  @impl true
-  def handle_info({:agent_updated, _agent}, socket) do
-    {:noreply, load_agents(socket)}
-  end
-
-  @impl true
-  def handle_info({:agent_deleted, _agent}, socket) do
+  def handle_info({event, _agent}, socket)
+      when event in [:agent_created, :agent_updated, :agent_deleted] do
     {:noreply, load_agents(socket)}
   end
 
@@ -494,24 +436,180 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     assign(socket, :agents, updated_agents)
   end
 
+  defp apply_session_action("archive_session", session), do: Sessions.archive_session(session)
+  defp apply_session_action("unarchive_session", session), do: Sessions.unarchive_session(session)
+  defp apply_session_action("delete_session", session), do: Sessions.delete_session(session)
+
+  defp action_label("archive_session"), do: "archived"
+  defp action_label("unarchive_session"), do: "unarchived"
+  defp action_label("delete_session"), do: "deleted"
+
+  # -- Function Components --------------------------------------------------
+
+  @filter_tabs [
+    {"all", "All", "text-base-content"},
+    {"active", "Active", "text-success"},
+    {"completed", "Completed", "text-base-content"},
+    {"archived", "Archived", "text-warning"}
+  ]
+
+  defp filter_tabs(assigns) do
+    assigns = assign(assigns, :tabs, @filter_tabs)
+
+    ~H"""
+    <div class="flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
+      <button
+        :for={{value, label, active_color} <- @tabs}
+        phx-click="filter_session"
+        phx-value-filter={value}
+        class={"px-3 py-1 rounded-md text-xs font-medium transition-all duration-150 " <>
+          if(@current == value,
+            do: "bg-base-100 #{active_color} shadow-sm",
+            else: "text-base-content/40 hover:text-base-content/60"
+          )}
+      >
+        {label}
+      </button>
+    </div>
+    """
+  end
+
+  @status_styles %{
+    "working" => {"text-success", "bg-success", "Working", true},
+    "compacting" => {"text-warning", "bg-warning", "Compacting", true},
+    "idle" => {"text-base-content/25", "bg-base-content/20", "Idle", false},
+    "idle_stale" => {"text-warning", "bg-warning", "Idle", false},
+    "idle_dead" => {"text-error", "bg-error", "Idle", false},
+    "completed" => {"text-base-content/25", "bg-base-content/20", "Done", false}
+  }
+  @default_status {"text-base-content/25", "bg-base-content/20", "Idle", false}
+
+  defp status_style(agent) do
+    display = EyeInTheSkyWebWeb.Helpers.ViewHelpers.derive_display_status(agent)
+    Map.get(@status_styles, display, @default_status)
+  end
+
+  defp status_indicator(assigns) do
+    ~H"""
+    <div class="flex-shrink-0 w-6 flex justify-center" title={@label}>
+      <%= if @active do %>
+        <span class="relative flex h-2 w-2">
+          <span class={"animate-ping absolute inline-flex h-full w-full rounded-full opacity-50 " <> @bg} />
+          <span class={"relative inline-flex rounded-full h-2 w-2 " <> @bg} />
+        </span>
+      <% else %>
+        <span class={"inline-flex rounded-full h-2 w-2 " <> @bg} />
+      <% end %>
+    </div>
+    """
+  end
+
+  defp agent_row(assigns) do
+    {color, bg, label, active} = status_style(assigns.agent)
+    assigns = assign(assigns, status_color: color, status_bg: bg, status_label: label, is_active: active)
+
+    ~H"""
+    <div
+      class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer"
+      phx-click="navigate_dm"
+      phx-value-id={@agent.id}
+    >
+      <%= if @archived do %>
+        <div class="flex-shrink-0 w-6 flex justify-center">
+          <input
+            type="checkbox"
+            checked={MapSet.member?(@selected_ids, to_string(@agent.id))}
+            phx-click="toggle_select"
+            phx-value-id={@agent.id}
+            class="checkbox checkbox-xs checkbox-primary"
+          />
+        </div>
+      <% else %>
+        <.status_indicator bg={@status_bg} label={@status_label} active={@is_active} />
+      <% end %>
+
+      <div class="flex-1 min-w-0">
+        <div class="flex items-baseline gap-2">
+          <span class="text-[13px] font-medium text-base-content/85 truncate">
+            {@agent.name || "Unnamed session"}
+          </span>
+          <span class={"text-[10px] font-medium uppercase tracking-wider " <> @status_color}>
+            {@status_label}
+          </span>
+        </div>
+        <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
+          <span class="font-mono">{Sessions.format_model_info(@agent)}</span>
+          <%= if @agent.project_name do %>
+            <span class="text-base-content/15">/</span>
+            <span>{@agent.project_name}</span>
+          <% end %>
+          <span class="text-base-content/15">/</span>
+          <span class="tabular-nums">{relative_time(@agent.started_at)}</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-0.5 flex-shrink-0" phx-click={%JS{}}>
+        <%= if @agent.id do %>
+          <a
+            href={~p"/dm/#{@agent.id}"}
+            target="_blank"
+            class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-primary"
+            aria-label="Open in new tab"
+          >
+            <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
+          </a>
+        <% end %>
+        <%= if @agent.agent && @agent.agent.uuid && @agent.uuid do %>
+          <button
+            id={"bookmark-btn-#{@agent.uuid}"}
+            type="button"
+            phx-hook="BookmarkAgent"
+            data-agent-id={@agent.agent.uuid}
+            data-session-id={@agent.uuid}
+            data-agent-name={@agent.name || @agent.agent.description || "Agent"}
+            data-agent-status={@agent.status}
+            class="bookmark-button btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-error"
+            aria-label="Bookmark agent"
+          >
+            <.heart class="bookmark-icon w-3.5 h-3.5" />
+          </button>
+        <% end %>
+        <%= if @agent.uuid do %>
+          <%= if @agent.archived_at do %>
+            <button type="button" phx-click="unarchive_session" phx-value-session_id={@agent.id} class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-info" aria-label="Unarchive">
+              <.icon name="hero-arrow-up-tray-mini" class="w-3.5 h-3.5" />
+            </button>
+            <button type="button" phx-click="delete_session" phx-value-session_id={@agent.id} class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-error" aria-label="Delete">
+              <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
+            </button>
+          <% else %>
+            <button type="button" phx-click="archive_session" phx-value-session_id={@agent.id} class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-warning" aria-label="Archive">
+              <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
+            </button>
+          <% end %>
+        <% end %>
+      </div>
+
+      <div class="flex-shrink-0">
+        <.icon name="hero-chevron-right-mini" class="w-4 h-4 text-base-content/20" />
+      </div>
+    </div>
+    """
+  end
+
+  # -- Render ---------------------------------------------------------------
+
   @impl true
   def render(assigns) do
     ~H"""
     <div class="bg-base-100 px-4 sm:px-6 lg:px-8">
       <div class="max-w-3xl mx-auto">
-        <%!-- Toolbar: refresh + actions --%>
         <div class="flex items-center justify-between py-5">
-          <div class="flex items-center gap-3">
-            <%!-- Agent count --%>
-            <span class="text-[11px] font-mono tabular-nums text-base-content/30 tracking-wider uppercase">
-              {length(@agents)} agents
-            </span>
-          </div>
+          <span class="text-[11px] font-mono tabular-nums text-base-content/30 tracking-wider uppercase">
+            {length(@agents)} agents
+          </span>
           <div class="flex items-center gap-2">
-            <button
-              phx-click="toggle_new_session_drawer"
-              class="btn btn-sm btn-primary gap-1.5 min-h-0 h-7 text-xs"
-            >
+            <button phx-click="toggle_new_session_drawer" class="btn btn-sm btn-primary gap-1.5 min-h-0 h-7 text-xs">
               <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Agent
             </button>
             <label class="swap swap-rotate btn btn-ghost btn-xs btn-circle">
@@ -522,7 +620,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
           </div>
         </div>
 
-        <%!-- Search and Filters --%>
         <div class="sticky safe-top-sticky md:top-16 z-10 bg-base-100/85 backdrop-blur-md -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 border-b border-base-content/5">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
             <form phx-submit="search" phx-change="search" class="flex-1 max-w-sm">
@@ -542,73 +639,21 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                 />
               </div>
             </form>
-
-            <div class="flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
-              <button
-                phx-click="filter_session"
-                phx-value-filter="all"
-                class={"px-3 py-1 rounded-md text-xs font-medium transition-all duration-150 " <>
-                  if(@session_filter == "all",
-                    do: "bg-base-100 text-base-content shadow-sm",
-                    else: "text-base-content/40 hover:text-base-content/60"
-                  )}
-              >
-                All
-              </button>
-              <button
-                phx-click="filter_session"
-                phx-value-filter="active"
-                class={"px-3 py-1 rounded-md text-xs font-medium transition-all duration-150 " <>
-                  if(@session_filter == "active",
-                    do: "bg-base-100 text-success shadow-sm",
-                    else: "text-base-content/40 hover:text-base-content/60"
-                  )}
-              >
-                Active
-              </button>
-              <button
-                phx-click="filter_session"
-                phx-value-filter="completed"
-                class={"px-3 py-1 rounded-md text-xs font-medium transition-all duration-150 " <>
-                  if(@session_filter == "completed",
-                    do: "bg-base-100 text-base-content shadow-sm",
-                    else: "text-base-content/40 hover:text-base-content/60"
-                  )}
-              >
-                Completed
-              </button>
-              <button
-                phx-click="filter_session"
-                phx-value-filter="archived"
-                class={"px-3 py-1 rounded-md text-xs font-medium transition-all duration-150 " <>
-                  if(@session_filter == "archived",
-                    do: "bg-base-100 text-warning shadow-sm",
-                    else: "text-base-content/40 hover:text-base-content/60"
-                  )}
-              >
-                Archived
-              </button>
-            </div>
+            <.filter_tabs current={@session_filter} />
           </div>
         </div>
 
-        <%!-- Selection toolbar (archived view) --%>
         <%= if @session_filter == "archived" && @agents != [] do %>
           <div class="mt-2 flex items-center gap-3 px-2 py-1.5">
             <input
               type="checkbox"
-              checked={MapSet.size(@selected_ids) == length(@agents) && @agents != []}
+              checked={MapSet.size(@selected_ids) == length(@agents)}
               phx-click="toggle_select_all"
               class="checkbox checkbox-xs checkbox-primary"
             />
             <%= if MapSet.size(@selected_ids) > 0 do %>
-              <span class="text-[11px] text-base-content/50 font-medium">
-                {MapSet.size(@selected_ids)} selected
-              </span>
-              <button
-                phx-click="delete_selected"
-                class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1"
-              >
+              <span class="text-[11px] text-base-content/50 font-medium">{MapSet.size(@selected_ids)} selected</span>
+              <button phx-click="delete_selected" class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1">
                 <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
               </button>
             <% else %>
@@ -617,155 +662,21 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
           </div>
         <% end %>
 
-        <%!-- Agent list --%>
         <div class="mt-2 divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-4">
           <%= if @agents == [] do %>
-            <.empty_state
-              id="agents-empty"
-              title="No agents found"
-              subtitle="Try adjusting your search or filters"
-            />
+            <.empty_state id="agents-empty" title="No agents found" subtitle="Try adjusting your search or filters" />
           <% else %>
-            <%= for agent <- @agents do %>
-              <% display_status = EyeInTheSkyWebWeb.Helpers.ViewHelpers.derive_display_status(agent) %>
-              <% {status_color, status_bg, status_label, is_active} =
-                case display_status do
-                  "working" -> {"text-success", "bg-success", "Working", true}
-                  "compacting" -> {"text-warning", "bg-warning", "Compacting", true}
-                  "idle" -> {"text-base-content/25", "bg-base-content/20", "Idle", false}
-                  "idle_stale" -> {"text-warning", "bg-warning", "Idle", false}
-                  "idle_dead" -> {"text-error", "bg-error", "Idle", false}
-                  "completed" -> {"text-base-content/25", "bg-base-content/20", "Done", false}
-                  _ -> {"text-base-content/25", "bg-base-content/20", "Idle", false}
-                end %>
-              <div
-                class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer"
-                phx-click="navigate_dm"
-                phx-value-id={agent.id}
-              >
-                <%!-- Status indicator / checkbox --%>
-                <%= if @session_filter == "archived" do %>
-                  <div class="flex-shrink-0 w-6 flex justify-center">
-                    <input
-                      type="checkbox"
-                      checked={MapSet.member?(@selected_ids, to_string(agent.id))}
-                      phx-click="toggle_select"
-                      phx-value-id={agent.id}
-                      class="checkbox checkbox-xs checkbox-primary"
-                    />
-                  </div>
-                <% else %>
-                  <div class="flex-shrink-0 w-6 flex justify-center" title={status_label}>
-                    <%= if is_active do %>
-                      <span class="relative flex h-2 w-2">
-                        <span class={"animate-ping absolute inline-flex h-full w-full rounded-full opacity-50 " <> status_bg}>
-                        </span>
-                        <span class={"relative inline-flex rounded-full h-2 w-2 " <> status_bg}>
-                        </span>
-                      </span>
-                    <% else %>
-                      <span class={"inline-flex rounded-full h-2 w-2 " <> status_bg}></span>
-                    <% end %>
-                  </div>
-                <% end %>
-
-                <%!-- Main content --%>
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-baseline gap-2">
-                    <span class="text-[13px] font-medium text-base-content/85 truncate">
-                      {agent.name || "Unnamed session"}
-                    </span>
-                    <span class={"text-[10px] font-medium uppercase tracking-wider " <> status_color}>
-                      {status_label}
-                    </span>
-                  </div>
-                  <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
-                    <span class="font-mono">{Sessions.format_model_info(agent)}</span>
-                    <%= if agent.project_name do %>
-                      <span class="text-base-content/15">/</span>
-                      <span>{agent.project_name}</span>
-                    <% end %>
-                    <span class="text-base-content/15">/</span>
-                    <span class="tabular-nums">{relative_time(agent.started_at)}</span>
-                  </div>
-                </div>
-
-                <%!-- Actions (visible on hover) --%>
-                <div
-                  class="flex items-center gap-0.5 flex-shrink-0"
-                  phx-click={%JS{}}
-                >
-                  <%= if agent.id do %>
-                    <a
-                      href={~p"/dm/#{agent.id}"}
-                      target="_blank"
-                      class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-primary"
-                      aria-label="Open in new tab"
-                    >
-                      <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
-                    </a>
-                  <% end %>
-                  <%= if agent.agent && agent.agent.uuid && agent.uuid do %>
-                    <button
-                      id={"bookmark-btn-#{agent.uuid}"}
-                      type="button"
-                      phx-hook="BookmarkAgent"
-                      data-agent-id={agent.agent.uuid}
-                      data-session-id={agent.uuid}
-                      data-agent-name={agent.name || agent.agent.description || "Agent"}
-                      data-agent-status={agent.status}
-                      class="bookmark-button btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-error"
-                      aria-label="Bookmark agent"
-                    >
-                      <.heart class="bookmark-icon w-3.5 h-3.5" />
-                    </button>
-                  <% end %>
-                  <%= if agent.uuid do %>
-                    <%= if agent.archived_at do %>
-                      <button
-                        type="button"
-                        phx-click="unarchive_session"
-                        phx-value-session_id={agent.id}
-                        class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-info"
-                        aria-label="Unarchive"
-                      >
-                        <.icon name="hero-arrow-up-tray-mini" class="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        phx-click="delete_session"
-                        phx-value-session_id={agent.id}
-                        class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-error"
-                        aria-label="Delete"
-                      >
-                        <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
-                      </button>
-                    <% else %>
-                      <button
-                        type="button"
-                        phx-click="archive_session"
-                        phx-value-session_id={agent.id}
-                        class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-warning"
-                        aria-label="Archive"
-                      >
-                        <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
-                      </button>
-                    <% end %>
-                  <% end %>
-                </div>
-
-                <%!-- Chevron --%>
-                <div class="flex-shrink-0">
-                  <.icon name="hero-chevron-right-mini" class="w-4 h-4 text-base-content/20" />
-                </div>
-              </div>
-            <% end %>
+            <.agent_row
+              :for={agent <- @agents}
+              agent={agent}
+              archived={@session_filter == "archived"}
+              selected_ids={@selected_ids}
+            />
           <% end %>
         </div>
       </div>
     </div>
 
-    <%!-- New Session Modal --%>
     <.live_component
       module={EyeInTheSkyWebWeb.Components.NewSessionModal}
       id="new-session-modal"
@@ -775,7 +686,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       toggle_event="toggle_new_session_drawer"
       submit_event="create_new_session"
     />
-
     """
   end
 end

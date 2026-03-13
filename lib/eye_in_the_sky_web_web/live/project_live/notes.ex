@@ -21,15 +21,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
           Projects.get_project!(project_id)
           |> Repo.preload([:agents])
 
-        # Load tasks manually due to type mismatch
-        tasks = Projects.get_project_tasks(project_id)
-
         socket
         |> assign(:page_title, "Notes - #{project.name}")
         |> assign(:project, project)
         |> assign(:sidebar_tab, :notes)
         |> assign(:sidebar_project, project)
-        |> assign(:tasks, tasks)
         |> assign(:search_query, "")
         |> assign(:starred_filter, false)
         |> assign(:notes, [])
@@ -38,7 +34,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
         socket
         |> assign(:page_title, "Project Not Found")
         |> assign(:project, nil)
-        |> assign(:tasks, [])
         |> assign(:search_query, "")
         |> assign(:notes, [])
         |> put_flash(:error, "Invalid project ID")
@@ -69,8 +64,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
 
   @impl true
   def handle_event("toggle_star", params, socket) do
-    IO.inspect(params, label: "TOGGLE_STAR_PARAMS")
-
     note_id = params["note_id"] || params["note-id"] || params["value"]
 
     case Notes.toggle_starred(note_id) do
@@ -127,18 +120,30 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="px-6 lg:px-8 py-6">
-      <div class="max-w-3xl mx-auto">
+    <div class="px-4 sm:px-6 lg:px-8 py-6">
+      <div class="max-w-4xl mx-auto">
+        <%!-- Page header --%>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+          <div>
+            <h1 class="text-lg font-semibold text-base-content/90">Notes</h1>
+            <p class="text-xs text-base-content/50 mt-0.5">
+              Notes captured by agents in this project
+            </p>
+          </div>
+        </div>
+
         <%!-- Search + Filter --%>
         <div class="mb-5 flex items-center gap-3">
-          <form phx-change="search" class="flex-1 max-w-sm">
+          <form phx-change="search" class="flex-1 sm:max-w-sm">
             <div class="relative">
               <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                 <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
               </div>
+              <label for="project-notes-search" class="sr-only">Search notes</label>
               <input
                 type="text"
                 name="query"
+                id="project-notes-search"
                 value={@search_query}
                 placeholder="Search notes..."
                 class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
@@ -149,7 +154,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
           <button
             type="button"
             phx-click="toggle_starred_filter"
-            class={"flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all duration-150 " <>
+            class={"flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 " <>
               if(@starred_filter,
                 do: "bg-warning/10 text-warning",
                 else: "text-base-content/35 hover:text-base-content/50 hover:bg-base-200/40"
@@ -164,7 +169,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
 
         <%!-- Notes count --%>
         <div class="mb-3">
-          <span class="text-[11px] font-mono tabular-nums text-base-content/30 tracking-wider uppercase">
+          <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
             {length(@notes)} notes
           </span>
         </div>
@@ -175,17 +180,24 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
               <div class="collapse collapse-arrow">
                 <input type="checkbox" class="min-h-0 p-0" />
                 <div class="collapse-title py-3.5 px-0 min-h-0 flex flex-col gap-1">
-                  <span class="text-sm font-medium text-base-content/85 truncate pr-6">
-                    {note.title || extract_title(note.body)}
-                  </span>
-                  <div class="flex items-center gap-1.5 text-xs text-base-content/35">
-                    <span>{note.parent_type}</span>
-                    <span class="text-base-content/15">&middot;</span>
-                    <span class="font-mono tabular-nums">{format_date(note.created_at)}</span>
+                  <div class="flex items-center gap-2 pr-6">
                     <%= if note.starred == 1 do %>
-                      <span class="text-base-content/15">&middot;</span>
-                      <.icon name="hero-star-solid" class="w-3 h-3 text-warning" />
+                      <.icon name="hero-star-solid" class="w-3.5 h-3.5 text-warning flex-shrink-0" />
                     <% end %>
+                    <span class="text-sm font-medium text-base-content/85 truncate">
+                      {note.title || extract_title(note.body)}
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-1.5 text-xs text-base-content/40">
+                    <span class={[
+                      "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium",
+                      parent_type_class(note.parent_type)
+                    ]}>
+                      <.icon name={parent_type_icon(note.parent_type)} class="w-2.5 h-2.5" />
+                      {parent_type_label(note.parent_type)}
+                    </span>
+                    <span class="text-base-content/20">&middot;</span>
+                    <span class="font-mono tabular-nums">{format_date(note.created_at)}</span>
                   </div>
                 </div>
                 <div class="collapse-content px-0 pb-4">
@@ -200,7 +212,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
                     type="button"
                     phx-click="toggle_star"
                     phx-value-note_id={note.id}
-                    class="mt-3 flex items-center gap-1.5 text-xs text-base-content/30 hover:text-warning transition-colors"
+                    class="mt-3 flex items-center gap-1.5 text-xs text-base-content/30 hover:text-warning transition-colors min-h-[44px] md:min-h-0 px-1"
+                    aria-label={if note.starred == 1, do: "Unstar note", else: "Star note"}
+                    aria-pressed={note.starred == 1}
                   >
                     <.icon
                       name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}
@@ -225,12 +239,56 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
     """
   end
 
+  defp parent_type_label(type) when type in ["session", "sessions"], do: "Session"
+  defp parent_type_label(type) when type in ["agent", "agents"], do: "Agent"
+  defp parent_type_label(type) when type in ["project", "projects"], do: "Project"
+  defp parent_type_label(type) when type in ["task", "tasks"], do: "Task"
+  defp parent_type_label(type) when is_binary(type), do: String.capitalize(type)
+  defp parent_type_label(_), do: "Note"
+
+  defp parent_type_icon(type) when type in ["session", "sessions"], do: "hero-clock-mini"
+  defp parent_type_icon(type) when type in ["agent", "agents"], do: "hero-cpu-chip-mini"
+  defp parent_type_icon(type) when type in ["project", "projects"], do: "hero-folder-mini"
+  defp parent_type_icon(type) when type in ["task", "tasks"], do: "hero-clipboard-document-list-mini"
+  defp parent_type_icon(_), do: "hero-document-text-mini"
+
+  defp parent_type_class(type) when type in ["session", "sessions"],
+    do: "bg-info/10 text-info/70"
+
+  defp parent_type_class(type) when type in ["agent", "agents"],
+    do: "bg-primary/10 text-primary/70"
+
+  defp parent_type_class(type) when type in ["project", "projects"],
+    do: "bg-success/10 text-success/70"
+
+  defp parent_type_class(_), do: "bg-base-content/[0.06] text-base-content/50"
+
   defp format_date(nil), do: ""
 
   defp format_date(timestamp) when is_binary(timestamp) do
-    case String.split(timestamp, [" ", "T"], parts: 2) do
-      [date | _] -> date
-      _ -> timestamp
+    case NaiveDateTime.from_iso8601(timestamp) do
+      {:ok, ndt} -> format_naive_date(ndt)
+      _ ->
+        case String.split(timestamp, [" ", "T"], parts: 2) do
+          [date | _] -> date
+          _ -> timestamp
+        end
+    end
+  end
+
+  defp format_naive_date(ndt) do
+    today = Date.utc_today()
+    date = NaiveDateTime.to_date(ndt)
+
+    cond do
+      Date.compare(date, today) == :eq ->
+        Calendar.strftime(ndt, "Today at %H:%M")
+      Date.compare(date, Date.add(today, -1)) == :eq ->
+        "Yesterday"
+      Date.diff(today, date) < 7 ->
+        Calendar.strftime(ndt, "%a %b %d")
+      true ->
+        Calendar.strftime(ndt, "%b %d, %Y")
     end
   end
 

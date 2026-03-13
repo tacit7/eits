@@ -111,6 +111,5 @@ defmodule EyeInTheSkyWebWeb.Api.V1.ProjectControllerTest do
 
       assert resp["error"] == "Failed to create project"
     end
-
   end
 end

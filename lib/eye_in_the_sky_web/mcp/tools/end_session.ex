@@ -7,7 +7,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.EndSession do
   alias EyeInTheSkyWeb.Sessions
 
   schema do
-    field :session_id, :string, required: true, description: "Session UUID (Claude Code session ID)"
+    field :session_id, :string,
+      required: true,
+      description: "Session UUID (Claude Code session ID)"
+
     field :summary, :string, description: "Summary of work completed"
 
     field :final_status, :string,
@@ -20,8 +23,12 @@ defmodule EyeInTheSkyWeb.MCP.Tools.EndSession do
 
     opts =
       %{}
-      |> then(fn m -> if params[:summary], do: Map.put(m, :summary, params[:summary]), else: m end)
-      |> then(fn m -> if params[:final_status], do: Map.put(m, :final_status, params[:final_status]), else: m end)
+      |> then(fn m ->
+        if params[:summary], do: Map.put(m, :summary, params[:summary]), else: m
+      end)
+      |> then(fn m ->
+        if params[:final_status], do: Map.put(m, :final_status, params[:final_status]), else: m
+      end)
 
     result =
       case Sessions.get_session_by_uuid(session_uuid) do

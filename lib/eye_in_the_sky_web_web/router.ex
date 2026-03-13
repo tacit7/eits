@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWebWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
+    plug EyeInTheSkyWebWeb.Plugs.RequireAuth
   end
 
   # Session-aware JSON pipeline without CSRF — safe for WebAuthn endpoints
@@ -47,7 +48,12 @@ defmodule EyeInTheSkyWebWeb.Router do
   scope "/", EyeInTheSkyWebWeb do
     pipe_through [:browser, :require_auth]
 
-    live_session :app, on_mount: [EyeInTheSkyWebWeb.AuthHook, EyeInTheSkyWebWeb.FabHook] do
+    live_session :app,
+                 on_mount: [
+                   EyeInTheSkyWebWeb.AuthHook,
+                   EyeInTheSkyWebWeb.FabHook,
+                   EyeInTheSkyWebWeb.NavHook
+                 ] do
       live "/", AgentLive.Index, :index
       live "/notes", OverviewLive.Notes, :index
       live "/tasks", OverviewLive.Tasks, :index
@@ -71,6 +77,7 @@ defmodule EyeInTheSkyWebWeb.Router do
       live "/projects/:id/config", ProjectLive.Config, :show
       live "/projects/:id/agents", ProjectLive.Agents, :show
       live "/projects/:id/jobs", ProjectLive.Jobs, :show
+      live "/teams", TeamLive.Index, :index
       live "/chat", ChatLive, :index
       live "/dm/:session_id", DmLive, :show
     end
@@ -98,6 +105,7 @@ defmodule EyeInTheSkyWebWeb.Router do
     get "/sessions/:uuid", SessionController, :show
     patch "/sessions/:uuid", SessionController, :update
     post "/sessions/:uuid/end", SessionController, :end_session
+    post "/sessions/:uuid/tool-events", SessionController, :tool_event
     get "/sessions/:uuid/context", SessionController, :get_context
     patch "/sessions/:uuid/context", SessionController, :update_context
 

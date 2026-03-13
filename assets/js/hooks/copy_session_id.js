@@ -13,13 +13,11 @@ export const CopySessionId = {
           .then(() => {
             this.showTooltip("Copied!");
           })
-          .catch((err) => {
-            console.error("Failed to copy session ID:", err);
+          .catch((_err) => {
             this.showTooltip("Copy failed");
           });
       } else {
         // Fallback for browsers without clipboard API
-        console.warn("Clipboard API not available");
         this.showTooltip("Copy not supported");
       }
     };

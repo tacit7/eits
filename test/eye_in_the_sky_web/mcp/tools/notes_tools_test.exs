@@ -44,22 +44,37 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NotesToolsTest do
   # ---- NoteAdd ----
 
   test "NoteAdd: creates note with required fields" do
-    r = NoteAdd.execute(%{parent_id: "a1", parent_type: "agent", body: "note body"}, @frame) |> json_result()
+    r =
+      NoteAdd.execute(%{parent_id: "a1", parent_type: "agent", body: "note body"}, @frame)
+      |> json_result()
+
     assert r.success == true
     assert r.message == "Note created"
     assert is_integer(r.id)
   end
 
   test "NoteAdd: accepts optional title and starred" do
-    r = NoteAdd.execute(%{
-      parent_id: "s1", parent_type: "session", body: "body",
-      title: "My Title", starred: 1
-    }, @frame) |> json_result()
+    r =
+      NoteAdd.execute(
+        %{
+          parent_id: "s1",
+          parent_type: "session",
+          body: "body",
+          title: "My Title",
+          starred: 1
+        },
+        @frame
+      )
+      |> json_result()
+
     assert r.success == true
   end
 
   test "NoteAdd: defaults starred to 0" do
-    r = NoteAdd.execute(%{parent_id: "s1", parent_type: "session", body: "body"}, @frame) |> json_result()
+    r =
+      NoteAdd.execute(%{parent_id: "s1", parent_type: "session", body: "body"}, @frame)
+      |> json_result()
+
     assert r.success == true
     note = Notes.get_note!(r.id)
     assert note.starred == 0
@@ -88,7 +103,13 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NotesToolsTest do
   end
 
   test "NoteSearch: result items have expected fields" do
-    make_note(%{title: "fieldchk", body: "fieldchk body", parent_id: "s1", parent_type: "session"})
+    make_note(%{
+      title: "fieldchk",
+      body: "fieldchk body",
+      parent_id: "s1",
+      parent_type: "session"
+    })
+
     r = NoteSearch.execute(%{query: "fieldchk"}, @frame) |> json_result()
     assert length(r.results) >= 1
     item = hd(r.results)

@@ -10,14 +10,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Notify do
     field :title, :string, required: true, description: "Notification title"
     field :body, :string, description: "Optional notification body/details"
 
-    field :category, :string,
-      description: "Category: agent, job, or system (default: system)"
+    field :category, :string, description: "Category: agent, job, or system (default: system)"
 
-    field :resource_type, :string,
-      description: "Type of linked resource (e.g., session, job_run)"
+    field :resource_type, :string, description: "Type of linked resource (e.g., session, job_run)"
 
-    field :resource_id, :string,
-      description: "ID of linked resource"
+    field :resource_id, :string, description: "ID of linked resource"
   end
 
   @impl true

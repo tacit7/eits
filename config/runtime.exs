@@ -21,8 +21,21 @@ if System.get_env("PHX_SERVER") do
 end
 
 # Gitea webhook HMAC secret — required for signature verification in all envs
-config :eye_in_the_sky_web, :gitea_webhook_secret,
-  System.get_env("GITEA_WEBHOOK_SECRET", "")
+config :eye_in_the_sky_web, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SECRET", "")
+
+# REST API key — set EITS_API_KEY to require bearer auth on /api/v1.
+# Leave unset to disable auth (dev default).
+# Generate with: mix eits.gen.api_key
+config :eye_in_the_sky_web, :api_key, System.get_env("EITS_API_KEY")
+
+# WebAuthn — override origin/rp_id via env vars (useful for ngrok tunnels)
+if webauthn_origin = System.get_env("WEBAUTHN_ORIGIN") do
+  rp_id = System.get_env("WEBAUTHN_RP_ID", URI.parse(webauthn_origin).host)
+
+  config :wax_,
+    origin: webauthn_origin,
+    rp_id: rp_id
+end
 
 if config_env() == :prod do
   database_url =

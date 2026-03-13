@@ -56,7 +56,17 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
     limit = Keyword.get(opts, :limit)
 
     if safe_identifier?(table) and Enum.all?(search_columns, &safe_identifier?/1) do
-      pg_fts_search(table, schema, query, search_columns, sql_filter, sql_params, fallback_query, preloads, limit)
+      pg_fts_search(
+        table,
+        schema,
+        query,
+        search_columns,
+        sql_filter,
+        sql_params,
+        fallback_query,
+        preloads,
+        limit
+      )
     else
       run_fallback(fallback_query, preloads, limit)
     end
@@ -75,7 +85,17 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
     Repo.all(query_result)
   end
 
-  defp pg_fts_search(table, schema, query, search_columns, sql_filter, sql_params, fallback_query, preloads, limit) do
+  defp pg_fts_search(
+         table,
+         schema,
+         query,
+         search_columns,
+         sql_filter,
+         sql_params,
+         fallback_query,
+         preloads,
+         limit
+       ) do
     alias_letter = String.first(table)
 
     # Build tsvector expression from search columns: to_tsvector('english', coalesce(col1,'') || ' ' || coalesce(col2,''))

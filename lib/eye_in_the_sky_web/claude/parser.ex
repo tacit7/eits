@@ -27,6 +27,7 @@ defmodule EyeInTheSkyWeb.Claude.Parser do
           | {:result, map()}
           | {:complete, String.t() | nil}
           | {:error, term()}
+          | :tool_block_stop
           | :skip
   def parse_stream_line(line) when is_binary(line) do
     line = String.trim(line)
@@ -41,7 +42,9 @@ defmodule EyeInTheSkyWeb.Claude.Parser do
       true ->
         case Jason.decode(line) do
           {:ok, json} -> parse_event(json)
-          {:error, _reason} -> :skip
+          {:error, _reason} ->
+            Logger.debug("[Parser] skipping non-JSON line: #{inspect(line)}")
+            :skip
         end
     end
   end
@@ -147,7 +150,7 @@ defmodule EyeInTheSkyWeb.Claude.Parser do
   end
 
   defp parse_stream_event(%{"type" => "content_block_stop"}) do
-    :skip
+    :tool_block_stop
   end
 
   defp parse_stream_event(%{"type" => "message_start"}) do
@@ -189,8 +192,15 @@ defmodule EyeInTheSkyWeb.Claude.Parser do
   defp extract_tool_from_content(_), do: nil
 
   # Parse error objects
-  defp parse_error(%{"type" => type, "message" => message}) do
-    {String.to_atom(type), message}
+  @known_error_types ~w(api_error authentication_error permission_error not_found_error
+    rate_limit_error overloaded_error billing_error timeout_error invalid_request_error)
+
+  defp parse_error(%{"type" => type, "message" => message}) when type in @known_error_types do
+    {String.to_existing_atom(type), message}
+  end
+
+  defp parse_error(%{"type" => _type, "message" => message}) do
+    {:unknown_error, message}
   end
 
   defp parse_error(%{"message" => message}) do

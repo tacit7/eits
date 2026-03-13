@@ -38,6 +38,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.AgentControlToolsTest do
 
   test "AgentStatus: idle after worker started but not processing" do
     session = new_session()
+
     # send a message to start the worker, then check immediately — cast is async so worker will be idle
     EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, "test", [])
     r = AgentStatus.execute(%{session_id: session.uuid}, @frame) |> json_result()

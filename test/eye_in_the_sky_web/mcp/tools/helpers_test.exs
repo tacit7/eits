@@ -8,12 +8,15 @@ defmodule EyeInTheSkyWeb.MCP.Tools.HelpersTest do
 
   defp new_session do
     {:ok, agent} = Agents.create_agent(%{name: "helpers-agent-#{uniq()}", status: "idle"})
-    {:ok, session} = Sessions.create_session(%{
-      uuid: "helpers-#{uniq()}",
-      agent_id: agent.id,
-      started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-      status: "working"
-    })
+
+    {:ok, session} =
+      Sessions.create_session(%{
+        uuid: "helpers-#{uniq()}",
+        agent_id: agent.id,
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+        status: "working"
+      })
+
     session
   end
 
@@ -36,7 +39,9 @@ defmodule EyeInTheSkyWeb.MCP.Tools.HelpersTest do
     end
 
     test "returns error for unknown UUID" do
-      assert {:error, msg} = Helpers.resolve_session_int_id("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+      assert {:error, msg} =
+               Helpers.resolve_session_int_id("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+
       assert String.contains?(msg, "Session not found")
     end
 

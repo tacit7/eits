@@ -117,7 +117,12 @@ defmodule EyeInTheSkyWeb.Claude.SessionReaderTest do
           "message" => %{
             "role" => "assistant",
             "content" => [
-              %{"type" => "tool_use", "id" => "t1", "name" => "Read", "input" => %{"file_path" => "/tmp/test.txt"}}
+              %{
+                "type" => "tool_use",
+                "id" => "t1",
+                "name" => "Read",
+                "input" => %{"file_path" => "/tmp/test.txt"}
+              }
             ]
           },
           "timestamp" => "2026-03-01T10:00:00Z"
@@ -184,7 +189,12 @@ defmodule EyeInTheSkyWeb.Claude.SessionReaderTest do
             "role" => "assistant",
             "content" => [
               %{"type" => "text", "text" => "Let me read that file."},
-              %{"type" => "tool_use", "id" => "t1", "name" => "Read", "input" => %{"file_path" => "/tmp/f.txt"}}
+              %{
+                "type" => "tool_use",
+                "id" => "t1",
+                "name" => "Read",
+                "input" => %{"file_path" => "/tmp/f.txt"}
+              }
             ]
           },
           "timestamp" => "2026-03-01T10:00:00Z"
@@ -211,39 +221,58 @@ defmodule EyeInTheSkyWeb.Claude.SessionReaderTest do
 
       File.mkdir_p!(dir)
 
-      content = Enum.join([
-        Jason.encode!(%{
-          "type" => "assistant",
-          "message" => %{
-            "content" => [
-              %{"type" => "tool_use", "id" => "t1", "name" => "Read", "input" => %{"file_path" => "/tmp/a.txt"}},
-              %{"type" => "tool_use", "id" => "t2", "name" => "Bash", "input" => %{"command" => "ls -la"}}
-            ]
-          },
-          "timestamp" => "2026-03-01T10:00:00Z"
-        }),
-        Jason.encode!(%{
-          "type" => "user",
-          "message" => %{"content" => "next step"}
-        }),
-        Jason.encode!(%{
-          "type" => "assistant",
-          "message" => %{
-            "content" => [
-              %{"type" => "text", "text" => "Done."}
-            ]
-          }
-        }),
-        Jason.encode!(%{
-          "type" => "assistant",
-          "message" => %{
-            "content" => [
-              %{"type" => "tool_use", "id" => "t3", "name" => "Write", "input" => %{"file_path" => "/tmp/b.txt"}}
-            ]
-          },
-          "timestamp" => "2026-03-01T10:00:05Z"
-        })
-      ], "\n")
+      content =
+        Enum.join(
+          [
+            Jason.encode!(%{
+              "type" => "assistant",
+              "message" => %{
+                "content" => [
+                  %{
+                    "type" => "tool_use",
+                    "id" => "t1",
+                    "name" => "Read",
+                    "input" => %{"file_path" => "/tmp/a.txt"}
+                  },
+                  %{
+                    "type" => "tool_use",
+                    "id" => "t2",
+                    "name" => "Bash",
+                    "input" => %{"command" => "ls -la"}
+                  }
+                ]
+              },
+              "timestamp" => "2026-03-01T10:00:00Z"
+            }),
+            Jason.encode!(%{
+              "type" => "user",
+              "message" => %{"content" => "next step"}
+            }),
+            Jason.encode!(%{
+              "type" => "assistant",
+              "message" => %{
+                "content" => [
+                  %{"type" => "text", "text" => "Done."}
+                ]
+              }
+            }),
+            Jason.encode!(%{
+              "type" => "assistant",
+              "message" => %{
+                "content" => [
+                  %{
+                    "type" => "tool_use",
+                    "id" => "t3",
+                    "name" => "Write",
+                    "input" => %{"file_path" => "/tmp/b.txt"}
+                  }
+                ]
+              },
+              "timestamp" => "2026-03-01T10:00:05Z"
+            })
+          ],
+          "\n"
+        )
 
       File.write!(file_path, content)
 
@@ -308,8 +337,12 @@ defmodule EyeInTheSkyWeb.Claude.SessionReaderTest do
           "message" => %{
             "role" => "assistant",
             "content" => [
-              %{"type" => "tool_use", "id" => "t1", "name" => "Grep",
-                "input" => %{"pattern" => "defmodule", "path" => "/tmp/lib"}}
+              %{
+                "type" => "tool_use",
+                "id" => "t1",
+                "name" => "Grep",
+                "input" => %{"pattern" => "defmodule", "path" => "/tmp/lib"}
+              }
             ]
           },
           "timestamp" => "2026-03-01T10:00:00Z"
@@ -331,8 +364,12 @@ defmodule EyeInTheSkyWeb.Claude.SessionReaderTest do
           "message" => %{
             "role" => "assistant",
             "content" => [
-              %{"type" => "tool_use", "id" => "t1", "name" => "Glob",
-                "input" => %{"pattern" => "**/*.ex"}}
+              %{
+                "type" => "tool_use",
+                "id" => "t1",
+                "name" => "Glob",
+                "input" => %{"pattern" => "**/*.ex"}
+              }
             ]
           },
           "timestamp" => "2026-03-01T10:00:00Z"
@@ -355,8 +392,12 @@ defmodule EyeInTheSkyWeb.Claude.SessionReaderTest do
           "message" => %{
             "role" => "assistant",
             "content" => [
-              %{"type" => "tool_use", "id" => "t1", "name" => "Bash",
-                "input" => %{"command" => long_cmd}}
+              %{
+                "type" => "tool_use",
+                "id" => "t1",
+                "name" => "Bash",
+                "input" => %{"command" => long_cmd}
+              }
             ]
           },
           "timestamp" => "2026-03-01T10:00:00Z"
@@ -381,8 +422,12 @@ defmodule EyeInTheSkyWeb.Claude.SessionReaderTest do
           "message" => %{
             "role" => "assistant",
             "content" => [
-              %{"type" => "tool_use", "id" => "t1", "name" => "Task",
-                "input" => %{"prompt" => long_prompt}}
+              %{
+                "type" => "tool_use",
+                "id" => "t1",
+                "name" => "Task",
+                "input" => %{"prompt" => long_prompt}
+              }
             ]
           },
           "timestamp" => "2026-03-01T10:00:00Z"
@@ -403,8 +448,12 @@ defmodule EyeInTheSkyWeb.Claude.SessionReaderTest do
           "message" => %{
             "role" => "assistant",
             "content" => [
-              %{"type" => "tool_use", "id" => "t1", "name" => "CustomTool",
-                "input" => %{"key1" => "value1", "key2" => "value2"}}
+              %{
+                "type" => "tool_use",
+                "id" => "t1",
+                "name" => "CustomTool",
+                "input" => %{"key1" => "value1", "key2" => "value2"}
+              }
             ]
           },
           "timestamp" => "2026-03-01T10:00:00Z"
@@ -424,8 +473,12 @@ defmodule EyeInTheSkyWeb.Claude.SessionReaderTest do
           "message" => %{
             "role" => "assistant",
             "content" => [
-              %{"type" => "tool_use", "id" => "t1", "name" => "Edit",
-                "input" => %{"file_path" => "/tmp/edited.ex"}}
+              %{
+                "type" => "tool_use",
+                "id" => "t1",
+                "name" => "Edit",
+                "input" => %{"file_path" => "/tmp/edited.ex"}
+              }
             ]
           },
           "timestamp" => "2026-03-01T10:00:00Z"
@@ -446,8 +499,12 @@ defmodule EyeInTheSkyWeb.Claude.SessionReaderTest do
           "message" => %{
             "role" => "assistant",
             "content" => [
-              %{"type" => "tool_use", "id" => "t1", "name" => "Write",
-                "input" => %{"file_path" => "/tmp/new_file.ex"}}
+              %{
+                "type" => "tool_use",
+                "id" => "t1",
+                "name" => "Write",
+                "input" => %{"file_path" => "/tmp/new_file.ex"}
+              }
             ]
           },
           "timestamp" => "2026-03-01T10:00:00Z"

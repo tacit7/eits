@@ -14,24 +14,30 @@ defmodule EyeInTheSkyWeb.MCP.Tools.MessagingToolsTest do
 
   defp new_session do
     {:ok, agent} = Agents.create_agent(%{name: "msg-agent-#{uniq()}", status: "active"})
-    {:ok, session} = Sessions.create_session(%{
-      uuid: "msg-#{uniq()}",
-      agent_id: agent.id,
-      started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-      status: "idle"
-    })
+
+    {:ok, session} =
+      Sessions.create_session(%{
+        uuid: "msg-#{uniq()}",
+        agent_id: agent.id,
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+        status: "idle"
+      })
+
     session
   end
 
   defp new_channel(session) do
     {:ok, project} = Projects.create_project(%{name: "proj #{uniq()}"})
-    {:ok, channel} = Channels.create_channel(%{
-      uuid: Ecto.UUID.generate(),
-      name: "ch#{uniq()}",
-      channel_type: "public",
-      project_id: project.id,
-      session_id: session.id
-    })
+
+    {:ok, channel} =
+      Channels.create_channel(%{
+        uuid: Ecto.UUID.generate(),
+        name: "ch#{uniq()}",
+        channel_type: "public",
+        project_id: project.id,
+        session_id: session.id
+      })
+
     {project, channel}
   end
 
@@ -40,13 +46,23 @@ defmodule EyeInTheSkyWeb.MCP.Tools.MessagingToolsTest do
   test "Dm: delivers message to existing session" do
     sender = new_session()
     target = new_session()
-    r = Dm.execute(%{sender_id: sender.uuid, target_session_id: target.uuid, message: "hey"}, @frame) |> json_result()
+
+    r =
+      Dm.execute(
+        %{sender_id: sender.uuid, target_session_id: target.uuid, message: "hey"},
+        @frame
+      )
+      |> json_result()
+
     assert r.success == true
     assert String.contains?(r.message, "delivered")
   end
 
   test "Dm: error for nonexistent target" do
-    r = Dm.execute(%{sender_id: "s1", target_session_id: "ghost", message: "hey"}, @frame) |> json_result()
+    r =
+      Dm.execute(%{sender_id: "s1", target_session_id: "ghost", message: "hey"}, @frame)
+      |> json_result()
+
     assert r.success == false
     assert String.contains?(r.message, "not found")
   end
@@ -54,7 +70,19 @@ defmodule EyeInTheSkyWeb.MCP.Tools.MessagingToolsTest do
   test "Dm: response_required flag accepted" do
     sender = new_session()
     target = new_session()
-    r = Dm.execute(%{sender_id: sender.uuid, target_session_id: target.uuid, message: "reply pls", response_required: true}, @frame) |> json_result()
+
+    r =
+      Dm.execute(
+        %{
+          sender_id: sender.uuid,
+          target_session_id: target.uuid,
+          message: "reply pls",
+          response_required: true
+        },
+        @frame
+      )
+      |> json_result()
+
     assert r.success == true
   end
 
@@ -96,7 +124,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.MessagingToolsTest do
   # ---- ChatSend ----
 
   test "ChatSend: error when session not found" do
-    r = ChatSend.execute(%{channel_id: "1", session_id: "ghost-uuid", body: "hello"}, @frame) |> json_result()
+    r =
+      ChatSend.execute(%{channel_id: "1", session_id: "ghost-uuid", body: "hello"}, @frame)
+      |> json_result()
+
     assert r.success == false
     assert String.contains?(r.message, "not found")
   end
@@ -104,7 +135,14 @@ defmodule EyeInTheSkyWeb.MCP.Tools.MessagingToolsTest do
   test "ChatSend: sends message to channel" do
     s = new_session()
     {_project, channel} = new_channel(s)
-    r = ChatSend.execute(%{channel_id: to_string(channel.id), session_id: s.uuid, body: "hello"}, @frame) |> json_result()
+
+    r =
+      ChatSend.execute(
+        %{channel_id: to_string(channel.id), session_id: s.uuid, body: "hello"},
+        @frame
+      )
+      |> json_result()
+
     assert r.success == true
     assert Map.has_key?(r, :message_id)
   end

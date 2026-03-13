@@ -29,15 +29,23 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
     <.link
       navigate={"/dm/#{@session.session_id}"}
       class="group relative block rounded-xl bg-base-100 border border-base-content/6 hover:border-primary/30 transition-all duration-300 overflow-hidden"
+      aria-label={"#{@session.session_name || "Unnamed session"} - #{to_string(@status)}"}
     >
       <%!-- Subtle top accent line --%>
       <div class={[
         "absolute top-0 left-0 right-0 h-[2px] transition-all duration-300",
         case @status do
-          :working -> "bg-gradient-to-r from-success/60 via-success to-success/60"
-          :compacting -> "bg-gradient-to-r from-warning/60 via-warning to-warning/60"
-          :idle -> "bg-gradient-to-r from-transparent via-base-content/6 to-transparent group-hover:via-primary/20"
-          _ -> "bg-gradient-to-r from-transparent via-base-content/6 to-transparent group-hover:via-primary/20"
+          :working ->
+            "bg-gradient-to-r from-success/60 via-success to-success/60"
+
+          :compacting ->
+            "bg-gradient-to-r from-warning/60 via-warning to-warning/60"
+
+          :idle ->
+            "bg-gradient-to-r from-transparent via-base-content/6 to-transparent group-hover:via-primary/20"
+
+          _ ->
+            "bg-gradient-to-r from-transparent via-base-content/6 to-transparent group-hover:via-primary/20"
         end
       ]} />
 
@@ -48,25 +56,31 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
             <%= case @status do %>
               <% :working -> %>
                 <span class="relative flex h-2 w-2">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-60"></span>
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-60">
+                  </span>
                   <span class="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
                 </span>
-                <span class="text-[11px] font-semibold tracking-wide uppercase text-success/80">Working</span>
+                <span class="text-[11px] font-semibold tracking-wide uppercase text-success/80">
+                  Working
+                </span>
               <% :compacting -> %>
                 <span class="relative flex h-2 w-2">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-warning opacity-60"></span>
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-warning opacity-60">
+                  </span>
                   <span class="relative inline-flex rounded-full h-2 w-2 bg-warning"></span>
                 </span>
-                <span class="text-[11px] font-semibold tracking-wide uppercase text-warning/80">Compacting</span>
+                <span class="text-[11px] font-semibold tracking-wide uppercase text-warning/80">
+                  Compacting
+                </span>
               <% :idle -> %>
                 <span class="inline-flex rounded-full h-2 w-2 bg-base-content/25"></span>
-                <span class="text-[11px] tracking-wide uppercase text-base-content/40">Idle</span>
+                <span class="text-[11px] tracking-wide uppercase text-base-content/55">Idle</span>
               <% _ -> %>
-                <span class="inline-flex rounded-full h-2 w-2 bg-base-content/15"></span>
-                <span class="text-[11px] tracking-wide uppercase text-base-content/30">Ended</span>
+                <span class="inline-flex rounded-full h-2 w-2 bg-base-content/20"></span>
+                <span class="text-[11px] tracking-wide uppercase text-base-content/50">Ended</span>
             <% end %>
           </div>
-          <span class="text-[11px] tabular-nums text-base-content/35">
+          <span class="text-[11px] tabular-nums text-base-content/50">
             {relative_time(@session.started_at)}
           </span>
         </div>
@@ -83,7 +97,7 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
             </p>
           <% else %>
             <%= if @subtitle do %>
-              <p class="text-xs text-base-content/40 mt-1 line-clamp-2 leading-relaxed">
+              <p class="text-xs text-base-content/55 mt-1 line-clamp-2 leading-relaxed">
                 {@subtitle}
               </p>
             <% end %>
@@ -93,26 +107,26 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
         <%!-- Footer: project + ID --%>
         <div class="flex items-center justify-between pt-2.5 border-t border-base-content/5">
           <%= if @show_project && @session.project_name do %>
-            <span class="inline-flex items-center gap-1.5 text-[11px] text-base-content/35">
-              <.icon name="hero-folder-mini" class="w-3 h-3 text-base-content/25" />
+            <span class="inline-flex items-center gap-1.5 text-[11px] text-base-content/50">
+              <.icon name="hero-folder-mini" class="w-3 h-3 text-base-content/40" />
               <span class="truncate max-w-[120px]">{@session.project_name}</span>
             </span>
           <% else %>
             <span></span>
           <% end %>
           <div class="flex items-center gap-1">
-            <code class="text-[10px] font-mono text-base-content/25 tracking-wider">
+            <code class="text-[10px] font-mono text-base-content/40 tracking-wider">
               {String.slice(@session.session_uuid || "", 0..7)}
             </code>
             <button
               phx-hook="CopyToClipboard"
               id={"copy-#{@session.session_uuid}"}
               data-session-id={@session.session_uuid}
-              class="opacity-0 group-hover:opacity-100 transition-opacity duration-200 btn btn-ghost btn-xs btn-square"
+              class="opacity-0 group-hover:opacity-100 transition-opacity duration-200 btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
               onclick="event.preventDefault(); event.stopPropagation();"
               aria-label="Copy session ID"
             >
-              <.icon name="hero-clipboard-document-mini" class="w-3 h-3 text-base-content/40" />
+              <.icon name="hero-clipboard-document-mini" class="w-3 h-3 text-base-content/55" />
             </button>
           </div>
         </div>
@@ -121,15 +135,20 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
     """
   end
 
-  defp session_status(%{ended_at: ended_at}) when is_binary(ended_at) and ended_at != "", do: :ended
+  defp session_status(%{ended_at: ended_at}) when is_binary(ended_at) and ended_at != "",
+    do: :ended
 
   defp session_status(%{status: "working"}), do: :working
   defp session_status(%{status: "compacting"}), do: :compacting
   defp session_status(%{status: "idle"}), do: :idle
   defp session_status(_), do: :ended
 
-  defp pick_subtitle(active_task, _intent, _desc) when is_binary(active_task) and active_task != "", do: nil
-  defp pick_subtitle(_active_task, intent, _desc) when is_binary(intent) and intent != "", do: intent
+  defp pick_subtitle(active_task, _intent, _desc)
+       when is_binary(active_task) and active_task != "", do: nil
+
+  defp pick_subtitle(_active_task, intent, _desc) when is_binary(intent) and intent != "",
+    do: intent
+
   defp pick_subtitle(_active_task, _intent, desc) when is_binary(desc) and desc != "", do: desc
   defp pick_subtitle(_, _, _), do: nil
 end

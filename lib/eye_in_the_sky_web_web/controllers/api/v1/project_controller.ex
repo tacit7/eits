@@ -24,9 +24,16 @@ defmodule EyeInTheSkyWebWeb.Api.V1.ProjectController do
   def show(conn, %{"id" => id}) do
     try do
       project = Projects.get_project!(id)
+
       json(conn, %{
         success: true,
-        project: %{id: project.id, name: project.name, path: project.path, slug: project.slug, active: project.active}
+        project: %{
+          id: project.id,
+          name: project.name,
+          path: project.path,
+          slug: project.slug,
+          active: project.active
+        }
       })
     rescue
       Ecto.NoResultsError ->

@@ -14,6 +14,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewTaskDrawer do
       class="modal"
       phx-hook="ModalDialog"
       data-open={to_string(@show)}
+      data-toggle-event={@toggle_event}
     >
       <div class="modal-box w-96 max-w-lg">
         <div class="flex items-center justify-between mb-6">
@@ -23,7 +24,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewTaskDrawer do
           </button>
         </div>
 
-        <form phx-submit={@submit_event} class="flex flex-col gap-4">
+        <form id={"#{@id}-form"} phx-submit={@submit_event} class="flex flex-col gap-4">
           <div class="form-control">
             <label class="label">
               <span class="label-text font-medium">Title</span>

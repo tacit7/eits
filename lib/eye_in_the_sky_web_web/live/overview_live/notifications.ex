@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notifications do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.Notifications
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -85,17 +86,6 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notifications do
   defp category_badge_class("job"), do: "badge-warning"
   defp category_badge_class(_), do: "badge-info"
 
-  defp time_ago(datetime) do
-    diff = NaiveDateTime.diff(NaiveDateTime.utc_now(), datetime, :second)
-
-    cond do
-      diff < 60 -> "just now"
-      diff < 3600 -> "#{div(diff, 60)}m ago"
-      diff < 86400 -> "#{div(diff, 3600)}h ago"
-      true -> "#{div(diff, 86400)}d ago"
-    end
-  end
-
   @impl true
   def render(assigns) do
     ~H"""
@@ -174,7 +164,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notifications do
                   <p class="text-xs text-base-content/50 mt-0.5 line-clamp-2">{n.body}</p>
                 <% end %>
                 <div class="flex items-center gap-3 mt-1">
-                  <span class="text-xs text-base-content/35">{time_ago(n.inserted_at)}</span>
+                  <span class="text-xs text-base-content/35">{relative_time(n.inserted_at)}</span>
                   <%= if link do %>
                     <.link navigate={link} class="text-xs text-primary hover:underline">
                       View

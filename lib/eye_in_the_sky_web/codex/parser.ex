@@ -206,7 +206,10 @@ defmodule EyeInTheSkyWeb.Codex.Parser do
 
   # Item completed - other types
   defp parse_event(%{"type" => "item.completed"} = event) do
-    Logger.debug("[Codex.Parser] Unhandled item.completed type: #{inspect(event["item"]["type"])}")
+    Logger.debug(
+      "[Codex.Parser] Unhandled item.completed type: #{inspect(event["item"]["type"])}"
+    )
+
     :skip
   end
 

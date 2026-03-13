@@ -154,7 +154,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
           model: opts[:model],
           effort_level: opts[:effort_level],
           has_messages: has_messages,
-          channel_id: opts[:channel_id]
+          channel_id: opts[:channel_id],
+          thinking_budget: opts[:thinking_budget]
         }
 
         case AgentWorker.process_message(session_id, message, context) do

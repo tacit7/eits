@@ -86,7 +86,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Settings do
     |> Enum.each(fn {k, _} -> Settings.reset(k) end)
 
     settings = Settings.all()
-    {:noreply, socket |> assign(:settings, settings) |> put_flash(:info, "Pricing reset to defaults")}
+
+    {:noreply,
+     socket |> assign(:settings, settings) |> put_flash(:info, "Pricing reset to defaults")}
   end
 
   @impl true
@@ -108,19 +110,19 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Settings do
   end
 
   defp load_db_info do
-    db_path = Application.get_env(:eye_in_the_sky_web, EyeInTheSkyWeb.Repo)[:database]
-    db_path = db_path || "unknown"
+    db_config = Application.get_env(:eye_in_the_sky_web, EyeInTheSkyWeb.Repo)
+    db_name = db_config[:database] || "unknown"
 
     size =
-      case File.stat(db_path) do
-        {:ok, %{size: s}} -> s
+      case Repo.query("SELECT pg_database_size(current_database())") do
+        {:ok, %{rows: [[s]]}} -> s
         _ -> 0
       end
 
     table_counts = load_table_counts()
 
     %{
-      path: db_path,
+      path: db_name,
       size: size,
       table_counts: table_counts
     }
@@ -217,7 +219,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Settings do
                     <input
                       type="number"
                       name="value"
-                      value={div(String.to_integer(@settings["cli_idle_timeout_ms"] || "300000"), 1000)}
+                      value={
+                        div(String.to_integer(@settings["cli_idle_timeout_ms"] || "300000"), 1000)
+                      }
                       min="30"
                       max="3600"
                       step="30"
@@ -338,7 +342,10 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Settings do
                     <tbody>
                       <tr :for={model <- ["opus", "sonnet", "haiku"]} class="hover">
                         <td class="font-medium capitalize">{model}</td>
-                        <td :for={type <- ["input", "output", "cache_read", "cache_creation"]} class="text-right">
+                        <td
+                          :for={type <- ["input", "output", "cache_read", "cache_creation"]}
+                          class="text-right"
+                        >
                           <input
                             type="number"
                             name={"pricing_#{model}_#{type}"}

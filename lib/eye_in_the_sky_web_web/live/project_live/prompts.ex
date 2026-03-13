@@ -20,15 +20,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Prompts do
           Projects.get_project!(project_id)
           |> Repo.preload([:agents])
 
-        # Load tasks manually due to type mismatch
-        tasks = Projects.get_project_tasks(project_id)
-
         socket
         |> assign(:page_title, "Prompts - #{project.name}")
         |> assign(:project, project)
         |> assign(:sidebar_tab, :prompts)
         |> assign(:sidebar_project, project)
-        |> assign(:tasks, tasks)
         |> assign(:project_id, project_id)
         |> assign(:search_query, "")
         |> assign(:prompts, [])
@@ -37,7 +33,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Prompts do
         socket
         |> assign(:page_title, "Project Not Found")
         |> assign(:project, nil)
-        |> assign(:tasks, [])
         |> assign(:project_id, nil)
         |> assign(:search_query, "")
         |> assign(:prompts, [])
@@ -124,9 +119,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Prompts do
     <!-- Meta Information -->
                         <div class="flex items-center gap-4 text-xs text-base-content/60">
                           <span class="flex items-center gap-1">
-                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
-                              <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm7-3.25v2.992l2.028.812a.75.75 0 0 1-.557 1.392l-2.5-1A.751.751 0 0 1 7 8.25v-3.5a.75.75 0 0 1 1.5 0Z" />
-                            </svg>
+                            <.icon name="hero-clock" class="w-3 h-3" />
                             v{prompt.version}
                           </span>
                           <%= if prompt.tags do %>
@@ -143,17 +136,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Prompts do
                       </div>
                       
     <!-- Chevron -->
-                      <svg
-                        class="w-5 h-5 text-base-content/40 flex-shrink-0 mt-1"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fill-rule="evenodd"
-                          d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                          clip-rule="evenodd"
-                        />
-                      </svg>
+                      <.icon name="hero-chevron-right" class="w-5 h-5 text-base-content/40 flex-shrink-0 mt-1" />
                     </div>
                   </div>
                 </div>

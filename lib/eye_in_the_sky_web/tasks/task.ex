@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.Tasks.Task do
 
     belongs_to :state, EyeInTheSkyWeb.Tasks.WorkflowState, foreign_key: :state_id, type: :integer
     belongs_to :project, EyeInTheSkyWeb.Projects.Project, foreign_key: :project_id, type: :integer
+    belongs_to :team, EyeInTheSkyWeb.Teams.Team, foreign_key: :team_id, type: :integer
 
     belongs_to :agent, EyeInTheSkyWeb.Sessions.Session,
       define_field: false,
@@ -50,6 +51,7 @@ defmodule EyeInTheSkyWeb.Tasks.Task do
       :description,
       :state_id,
       :project_id,
+      :team_id,
       :agent_id,
       :priority,
       :due_at,

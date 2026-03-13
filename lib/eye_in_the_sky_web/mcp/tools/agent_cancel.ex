@@ -20,8 +20,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.AgentCancel do
       case Helpers.resolve_session_int_id(params[:session_id]) do
         {:ok, int_id} ->
           case AgentManager.cancel_session(int_id) do
-            :ok -> %{success: true, message: "Cancelled session #{int_id}"}
-            {:error, :not_found} -> %{success: false, message: "No active worker for session #{int_id}"}
+            :ok ->
+              %{success: true, message: "Cancelled session #{int_id}"}
+
+            {:error, :not_found} ->
+              %{success: false, message: "No active worker for session #{int_id}"}
           end
 
         {:error, reason} ->

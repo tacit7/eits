@@ -21,7 +21,13 @@ defmodule EyeInTheSkyWeb.Workers.DailyDigestWorker do
     case generate_digest() do
       {:ok, note} ->
         ScheduledJobs.record_run_complete(run, "completed", result: "Note #{note.id} created")
-        Notifications.notify("Daily Digest ready", category: :job, body: note.title, resource: {"note", note.id})
+
+        Notifications.notify("Daily Digest ready",
+          category: :job,
+          body: note.title,
+          resource: {"note", note.id}
+        )
+
         broadcast()
         :ok
 
@@ -44,8 +50,11 @@ defmodule EyeInTheSkyWeb.Workers.DailyDigestWorker do
     desktop_path = Path.expand("~/Desktop/daily-digest-#{date_label}.md")
 
     case File.write(desktop_path, body) do
-      :ok -> Logger.info("DailyDigestWorker: wrote #{desktop_path}")
-      {:error, reason} -> Logger.error("DailyDigestWorker: failed to write to Desktop: #{inspect(reason)}")
+      :ok ->
+        Logger.info("DailyDigestWorker: wrote #{desktop_path}")
+
+      {:error, reason} ->
+        Logger.error("DailyDigestWorker: failed to write to Desktop: #{inspect(reason)}")
     end
 
     Notes.create_note(%{

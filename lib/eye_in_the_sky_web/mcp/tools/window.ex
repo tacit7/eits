@@ -26,9 +26,10 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Window do
 
   @impl true
   def execute(_params, frame) do
-    task = Task.async(fn ->
-      System.cmd("osascript", ["-e", @applescript], stderr_to_stdout: true)
-    end)
+    task =
+      Task.async(fn ->
+        System.cmd("osascript", ["-e", @applescript], stderr_to_stdout: true)
+      end)
 
     result =
       case Task.yield(task, @timeout_ms) || Task.shutdown(task, :brutal_kill) do

@@ -27,6 +27,7 @@ defmodule EyeInTheSkyWeb.Claude.Parser do
           | {:result, map()}
           | {:complete, String.t() | nil}
           | {:error, term()}
+          | :tool_block_stop
           | :skip
   def parse_stream_line(line) when is_binary(line) do
     line = String.trim(line)
@@ -41,7 +42,9 @@ defmodule EyeInTheSkyWeb.Claude.Parser do
       true ->
         case Jason.decode(line) do
           {:ok, json} -> parse_event(json)
-          {:error, _reason} -> :skip
+          {:error, _reason} ->
+            Logger.debug("[Parser] skipping non-JSON line: #{inspect(line)}")
+            :skip
         end
     end
   end
@@ -147,7 +150,7 @@ defmodule EyeInTheSkyWeb.Claude.Parser do
   end
 
   defp parse_stream_event(%{"type" => "content_block_stop"}) do
-    :skip
+    :tool_block_stop
   end
 
   defp parse_stream_event(%{"type" => "message_start"}) do

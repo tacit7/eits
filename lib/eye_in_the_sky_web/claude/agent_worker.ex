@@ -53,6 +53,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     end
   end
 
+  def get_stream_state(session_id) do
+    case Registry.lookup(@registry, {:agent, session_id}) do
+      [{pid, _}] -> GenServer.call(pid, :get_stream_state)
+      [] -> ""
+    end
+  end
+
   def remove_queued_prompt(session_id, prompt_id) do
     case Registry.lookup(@registry, {:agent, session_id}) do
       [{pid, _}] -> GenServer.cast(pid, {:remove_queued_prompt, prompt_id})
@@ -81,7 +88,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       project_path: project_path,
       provider: provider,
       worktree: worktree,
-      retry_timer_ref: nil
+      retry_timer_ref: nil,
+      stream_buffer: "",
+      current_tool_id: nil,
+      current_tool_name: nil,
+      current_tool_input: ""
     }
 
     Logger.info(
@@ -99,6 +110,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   @impl true
   def handle_call(:get_queue, _from, state) do
     {:reply, state.queue, state}
+  end
+
+  @impl true
+  def handle_call(:get_stream_state, _from, state) do
+    {:reply, state.stream_buffer, state}
   end
 
   @impl true
@@ -238,6 +254,17 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     {:noreply, state}
   end
 
+  # Tool input delta - accumulate, don't broadcast raw JSON chunk as a tool name
+  @impl true
+  def handle_info(
+        {:claude_message, ref, %Message{type: :tool_use, delta: true, content: json}},
+        %{sdk_ref: ref} = state
+      )
+      when is_binary(json) do
+    state = %{state | current_tool_input: state.current_tool_input <> json}
+    {:noreply, state}
+  end
+
   # Other SDK messages (text deltas, tool use, thinking, etc.) - broadcast for live streaming
   @impl true
   def handle_info({:claude_message, ref, %Message{} = msg}, %{sdk_ref: ref} = state) do
@@ -245,15 +272,47 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       "[#{state.session_id}] SDK stream message: type=#{msg.type}, delta=#{msg.delta}, content_type=#{msg.content |> inspect() |> String.slice(0..80)}"
     )
 
+    state = update_tool_start(msg, state)
     broadcast_stream_event(msg, state)
+    state = update_stream_buffer(msg, state)
     {:noreply, state}
   end
+
+  # Tool block complete - decode accumulated input and broadcast
+  @impl true
+  def handle_info({:tool_block_stop, ref}, %{sdk_ref: ref} = state) do
+    state =
+      if state.current_tool_id do
+        input =
+          case Jason.decode(state.current_tool_input) do
+            {:ok, decoded} -> decoded
+            {:error, _} -> %{raw: state.current_tool_input}
+          end
+
+        Phoenix.PubSub.broadcast(
+          EyeInTheSkyWeb.PubSub,
+          "dm:#{state.session_id}:stream",
+          {:stream_tool_input, state.current_tool_name, input}
+        )
+
+        %{state | current_tool_id: nil, current_tool_name: nil, current_tool_input: ""}
+      else
+        state
+      end
+
+    {:noreply, state}
+  end
+
+  # Stale tool_block_stop from old sdk ref - ignore
+  @impl true
+  def handle_info({:tool_block_stop, _ref}, state), do: {:noreply, state}
 
   # SDK completion - process next queued job
   @impl true
   def handle_info({:claude_complete, ref, session_id}, %{sdk_ref: ref} = state) do
     state = maybe_sync_session_uuid(state, session_id)
     broadcast_stream_clear(state)
+    state = %{state | stream_buffer: "", current_tool_id: nil, current_tool_name: nil, current_tool_input: ""}
 
     Logger.info("[#{state.session_id}] SDK complete")
 
@@ -271,6 +330,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       {:agent_stopped, state.session_uuid, state.session_id}
     )
 
+    notify_agent_complete(state)
+
     process_next_job(%{state | sdk_ref: nil, current_job: nil})
   end
 
@@ -282,6 +343,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       )
       when is_list(errors) do
     broadcast_stream_clear(state)
+    state = %{state | stream_buffer: "", current_tool_id: nil, current_tool_name: nil, current_tool_input: ""}
 
     if Enum.any?(errors, &String.contains?(&1, "No conversation found")) && not is_nil(job) do
       Logger.warning(
@@ -318,7 +380,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   @impl true
   def handle_info({:claude_error, ref, reason}, %{sdk_ref: ref} = state) do
     broadcast_stream_clear(state)
-    do_handle_sdk_error(reason, state)
+    do_handle_sdk_error(reason, %{state | stream_buffer: "", current_tool_id: nil, current_tool_name: nil, current_tool_input: ""})
   end
 
   # Stale messages from previous SDK refs - ignore
@@ -406,7 +468,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
           {:agent_working, state.session_uuid, state.session_id}
         )
 
-        new_state = clear_retry_timer(%{state | sdk_ref: sdk_ref, current_job: next_job, queue: rest})
+        new_state =
+          clear_retry_timer(%{state | sdk_ref: sdk_ref, current_job: next_job, queue: rest})
+
         broadcast_queue_update(new_state)
         {:noreply, new_state}
 
@@ -485,7 +549,10 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       Codex.SDK.resume(state.session_uuid, prompt, opts)
     else
       Logger.info("Starting new Codex session #{state.session_uuid}")
-      full_prompt = codex_eits_init(state.session_uuid, context[:model]) <> "\n\n---\n\n" <> prompt
+
+      full_prompt =
+        codex_eits_init(state.session_uuid, context[:model]) <> "\n\n---\n\n" <> prompt
+
       Codex.SDK.start(full_prompt, opts)
     end
   end
@@ -682,6 +749,28 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     )
   end
 
+  defp update_stream_buffer(%Message{type: :text, content: text, delta: true}, state)
+       when is_binary(text) do
+    %{state | stream_buffer: state.stream_buffer <> text}
+  end
+
+  defp update_stream_buffer(%Message{type: :text, content: text, delta: false}, state)
+       when is_binary(text) do
+    %{state | stream_buffer: text}
+  end
+
+  defp update_stream_buffer(_msg, state), do: state
+
+  # Track the start of a tool block so we can accumulate its input
+  defp update_tool_start(
+         %Message{type: :tool_use, delta: false, content: %{name: name}, metadata: %{id: id}},
+         state
+       ) do
+    %{state | current_tool_id: id, current_tool_name: name, current_tool_input: ""}
+  end
+
+  defp update_tool_start(_msg, state), do: state
+
   defp do_handle_sdk_error(reason, state) do
     Logger.error("[#{state.session_id}] SDK error: #{inspect(reason)}")
 
@@ -734,5 +823,21 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     e ->
       Logger.warning("[#{session_id}] update_agent_status raised: #{inspect(e)}")
       :ok
+  end
+
+  defp notify_agent_complete(state) do
+    title =
+      case Sessions.get_session(state.session_id) do
+        {:ok, session} when is_binary(session.name) and session.name != "" ->
+          "Agent finished: #{session.name}"
+
+        _ ->
+          "Agent finished"
+      end
+
+    EyeInTheSkyWeb.Notifications.notify(title,
+      category: :agent,
+      resource: {"session", state.session_uuid}
+    )
   end
 end

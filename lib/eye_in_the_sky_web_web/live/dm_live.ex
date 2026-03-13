@@ -64,17 +64,13 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:active_tab, "messages")
       |> assign(:session_ref, nil)
       |> assign(:processing, AgentWorker.is_processing?(session.id))
-      |> assign(
-        :processing_start_at,
-        if(AgentWorker.is_processing?(session.id), do: System.system_time(:millisecond), else: nil)
-      )
       |> assign(:message_limit, @default_message_limit)
       |> assign(:has_more_messages, false)
       |> assign(:selected_model, session.model || "opus")
       |> assign(:selected_effort, "")
       |> assign(:show_model_menu, false)
       |> assign(:show_live_stream, false)
-      |> assign(:stream_content, "")
+      |> assign(:stream_content, AgentWorker.get_stream_state(session.id))
       |> assign(:stream_tool, nil)
       |> assign(:slash_items, build_slash_items())
       |> assign(:diff_cache, %{})
@@ -306,7 +302,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
             {:noreply,
              socket
              |> assign(:processing, true)
-             |> assign(:processing_start_at, System.system_time(:millisecond))
              |> start_sync_timer()
              |> push_event("clear-input", %{})}
 
@@ -467,7 +462,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_event("kill_session", _params, socket) do
     AgentManager.cancel_session(socket.assigns.session_id)
-    {:noreply, socket |> assign(:processing, false) |> assign(:processing_start_at, nil)}
+    {:noreply, socket |> assign(:processing, false)}
   end
 
   @impl true
@@ -515,7 +510,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     socket =
       socket
       |> assign(:processing, false)
-      |> assign(:processing_start_at, nil)
       |> stop_sync_timer()
       |> sync_and_reload()
       |> push_event("focus-input", %{})
@@ -525,12 +519,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_info({:new_message, _message}, socket) do
-    # New message received - reload messages
-    socket =
-      socket
-      |> load_tab_data("messages", socket.assigns.session_id)
-
-    {:noreply, socket}
+    {:noreply, maybe_reload_messages(socket)}
   end
 
   @impl true
@@ -540,7 +529,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     socket =
       socket
       |> assign(:processing, false)
-      |> assign(:processing_start_at, nil)
       |> assign(:session_ref, nil)
       |> stop_sync_timer()
       |> sync_and_reload()
@@ -555,7 +543,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       {:noreply,
        socket
        |> assign(:processing, true)
-       |> assign(:processing_start_at, System.system_time(:millisecond))
        |> start_sync_timer()}
     else
       {:noreply, socket}
@@ -568,7 +555,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       {:noreply,
        socket
        |> assign(:processing, false)
-       |> assign(:processing_start_at, nil)
        |> stop_sync_timer()
        |> sync_and_reload()
        |> push_event("focus-input", %{})}
@@ -580,7 +566,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   # DM received via MCP i-dm tool
   @impl true
   def handle_info({:new_dm, _msg}, socket) do
-    {:noreply, load_tab_data(socket, "messages", socket.assigns.session_id)}
+    {:noreply, maybe_reload_messages(socket)}
   end
 
   # Task state changed — refresh the current task header strip
@@ -602,7 +588,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     socket =
       socket
       |> assign(:stream_tool, nil)
-      |> load_tab_data("messages", socket.assigns.session_id)
+      |> maybe_reload_messages()
 
     {:noreply, socket}
   end
@@ -651,6 +637,12 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_info({:stream_tool_input, name, _input}, socket) do
+    Logger.info("[DmLive] stream_tool_input tool=#{name}")
+    {:noreply, assign(socket, :stream_tool, name)}
+  end
+
+  @impl true
   def handle_info({:queue_updated, prompts}, socket) do
     {:noreply, assign(socket, :queued_prompts, prompts)}
   end
@@ -664,15 +656,28 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   defp load_tab_data(socket, tab, session_id) do
     Logger.info("Loading DM tab data tab=#{tab} session_id=#{session_id}")
     {messages, has_more} = load_message_data(socket, tab, session_id)
-    total_tokens = Messages.total_tokens_for_session(session_id)
-    total_cost = Messages.total_cost_for_session(session_id)
+
+    total_tokens =
+      maybe_load_value(tab, "messages", socket.assigns[:total_tokens], fn ->
+        Messages.total_tokens_for_session(session_id)
+      end)
+
+    total_cost =
+      maybe_load_value(tab, "messages", socket.assigns[:total_cost], fn ->
+        Messages.total_cost_for_session(session_id)
+      end)
+
+    current_task =
+      maybe_load_value(tab, ["messages", "tasks"], socket.assigns[:current_task], fn ->
+        Tasks.get_current_task_for_session(session_id)
+      end)
 
     socket
     |> assign(:messages, messages)
     |> assign(:has_more_messages, has_more)
     |> assign(:total_tokens, total_tokens)
     |> assign(:total_cost, total_cost)
-    |> assign(:current_task, Tasks.get_current_task_for_session(session_id))
+    |> assign(:current_task, current_task)
     |> assign(
       :tasks,
       maybe_load_tab_data(tab, "tasks", socket.assigns[:tasks], fn ->
@@ -736,6 +741,16 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     end
   end
 
+  defp maybe_load_value(active_tab, target_tabs, existing_value, loader) do
+    targets = List.wrap(target_tabs)
+
+    if active_tab in targets do
+      loader.()
+    else
+      existing_value
+    end
+  end
+
   defp sync_messages_from_session_file(socket) do
     session_id = socket.assigns.session_id
     session_uuid = socket.assigns.session_uuid
@@ -774,7 +789,10 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     case Messages.find_unlinked_message(session_id, sender_role, msg.content) do
       {:ok, existing} ->
         update_attrs = %{source_uuid: msg.uuid, updated_at: now}
-        update_attrs = if metadata, do: Map.put(update_attrs, :metadata, metadata), else: update_attrs
+
+        update_attrs =
+          if metadata, do: Map.put(update_attrs, :metadata, metadata), else: update_attrs
+
         Messages.update_message(existing, update_attrs)
         true
 
@@ -916,7 +934,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         selected_effort={@selected_effort}
         show_model_menu={@show_model_menu}
         processing={@processing}
-        processing_start_at={@processing_start_at}
         show_live_stream={@show_live_stream}
         stream_content={@stream_content}
         stream_tool={@stream_tool}
@@ -953,7 +970,15 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         {:error, _reason} -> socket
       end
 
-    load_tab_data(socket, "messages", socket.assigns.session_id)
+    maybe_reload_messages(socket)
+  end
+
+  defp maybe_reload_messages(socket) do
+    if socket.assigns.active_tab == "messages" do
+      load_tab_data(socket, "messages", socket.assigns.session_id)
+    else
+      socket
+    end
   end
 
   defp start_sync_timer(socket) do
@@ -991,6 +1016,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         Path.wildcard(Path.join(worktree_path, "**/CLAUDE.md"))
         |> Enum.map(fn path ->
           stat = File.stat!(path)
+
           %{
             path: path,
             relative_path: Path.relative_to(path, worktree_path),

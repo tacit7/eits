@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.TeamController do
   use EyeInTheSkyWebWeb, :controller
 
+  import EyeInTheSkyWebWeb.ControllerHelpers
+
   alias EyeInTheSkyWeb.{Repo, Teams}
   alias EyeInTheSkyWeb.Teams.TeamMember
 
@@ -243,11 +245,4 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TeamController do
   defp maybe_opt(opts, _key, nil), do: opts
   defp maybe_opt(opts, key, val), do: Keyword.put(opts, key, val)
 
-  defp translate_errors(%Ecto.Changeset{} = changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-      Enum.reduce(opts, msg, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", to_string(value))
-      end)
-    end)
-  end
 end

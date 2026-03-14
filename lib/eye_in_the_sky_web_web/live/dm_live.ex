@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   alias EyeInTheSkyWeb.Claude.{AgentManager, AgentWorker, SessionReader}
   alias EyeInTheSkyWeb.FileAttachments
   alias EyeInTheSkyWebWeb.Components.DmPage
+  import EyeInTheSkyWebWeb.ControllerHelpers
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
 
   require Logger
@@ -176,7 +177,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   def handle_event("create_new_task", params, socket) do
     title = params["title"]
     description = params["description"]
-    state_id = parse_int(params["state_id"])
+    state_id = parse_int(params["state_id"], 0)
     priority = parse_int(params["priority"], 1)
     tags_string = params["tags"] || ""
     session_id = socket.assigns.session_id
@@ -448,13 +449,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Failed to toggle star")}
-    end
-  end
-
-  defp parse_int(s, default \\ 0) do
-    case Integer.parse(s || "") do
-      {n, ""} -> n
-      _ -> default
     end
   end
 

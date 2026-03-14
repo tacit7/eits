@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.PromptController do
   use EyeInTheSkyWebWeb, :controller
 
+  import EyeInTheSkyWebWeb.ControllerHelpers
+
   alias EyeInTheSkyWeb.Prompts
 
   @doc """
@@ -139,11 +141,4 @@ defmodule EyeInTheSkyWebWeb.Api.V1.PromptController do
     end
   end
 
-  defp translate_errors(%Ecto.Changeset{} = changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-      Enum.reduce(opts, msg, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", to_string(value))
-      end)
-    end)
-  end
 end

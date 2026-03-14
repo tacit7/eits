@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.BookmarkController do
   use EyeInTheSkyWebWeb, :controller
 
+  import EyeInTheSkyWebWeb.ControllerHelpers
+
   alias EyeInTheSkyWeb.Bookmarks
   alias EyeInTheSkyWeb.Bookmarks.Bookmark
 
@@ -109,16 +111,6 @@ defmodule EyeInTheSkyWebWeb.BookmarkController do
   defp add_opt(opts, _key, nil), do: opts
   defp add_opt(opts, key, value), do: Keyword.put(opts, key, value)
 
-  defp parse_int(nil), do: nil
-  defp parse_int(value) when is_integer(value), do: value
-
-  defp parse_int(value) when is_binary(value) do
-    case Integer.parse(value) do
-      {int, _} -> int
-      :error -> nil
-    end
-  end
-
   defp render_bookmarks(bookmarks) do
     Enum.map(bookmarks, &render_bookmark/1)
   end
@@ -144,11 +136,4 @@ defmodule EyeInTheSkyWebWeb.BookmarkController do
     }
   end
 
-  defp translate_errors(changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-      Enum.reduce(opts, msg, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", to_string(value))
-      end)
-    end)
-  end
 end

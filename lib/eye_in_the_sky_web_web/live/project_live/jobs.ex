@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
   alias EyeInTheSkyWeb.{Projects, ScheduledJobs}
   alias EyeInTheSkyWeb.ScheduledJobs.{ScheduledJob, JobHelper}
   alias EyeInTheSkyWeb.Claude.AgentManager
+  import EyeInTheSkyWebWeb.ControllerHelpers
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -274,16 +275,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
 
       _ ->
         %{}
-    end
-  end
-
-  defp parse_int(nil, default), do: default
-  defp parse_int("", default), do: default
-
-  defp parse_int(str, default) do
-    case Integer.parse(str) do
-      {n, _} -> n
-      :error -> default
     end
   end
 

@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
   use EyeInTheSkyWebWeb, :controller
 
+  import EyeInTheSkyWebWeb.ControllerHelpers
+
   alias EyeInTheSkyWeb.{Agents, Contexts, Sessions, Projects}
 
   @doc """
@@ -460,26 +462,6 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
     end
   end
 
-  defp parse_int(nil, default), do: default
-  defp parse_int(val, _default) when is_integer(val), do: val
-
-  defp parse_int(val, default) when is_binary(val) do
-    case Integer.parse(val) do
-      {n, ""} -> n
-      _ -> default
-    end
-  end
-
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
-
-  defp translate_errors(%Ecto.Changeset{} = changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-      Enum.reduce(opts, msg, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", to_string(value))
-      end)
-    end)
-  end
-
-  defp translate_errors(_), do: %{}
 end

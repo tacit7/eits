@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
   use EyeInTheSkyWebWeb, :controller
 
+  import EyeInTheSkyWebWeb.ControllerHelpers
+
   alias EyeInTheSkyWeb.{Channels, Messages, Sessions}
 
   @doc """
@@ -157,24 +159,4 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
     end
   end
 
-  defp parse_int(nil), do: nil
-
-  defp parse_int(val) when is_binary(val) do
-    case Integer.parse(val) do
-      {n, ""} -> n
-      _ -> nil
-    end
-  end
-
-  defp parse_int(val) when is_integer(val), do: val
-
-  defp translate_errors(%Ecto.Changeset{} = changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-      Enum.reduce(opts, msg, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", to_string(value))
-      end)
-    end)
-  end
-
-  defp translate_errors(_), do: %{}
 end

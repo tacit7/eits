@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   alias EyeInTheSkyWeb.Notes
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Claude.AgentManager
+  import EyeInTheSkyWebWeb.ControllerHelpers
   import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [format_due_date: 1, due_date_class: 1, parse_id: 1]
 
   @impl true
@@ -106,7 +107,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     task = socket.assigns.selected_task
     title = params["title"]
     description = params["description"]
-    state_id = parse_int(params["state_id"])
+    state_id = parse_int(params["state_id"], 0)
     priority = parse_int(params["priority"], 0)
     due_at = if params["due_at"] != "", do: params["due_at"], else: nil
     tags_string = params["tags"] || ""
@@ -202,7 +203,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     # Extract form data
     title = params["title"]
     description = params["description"]
-    state_id = parse_int(params["state_id"])
+    state_id = parse_int(params["state_id"], 0)
     priority = parse_int(params["priority"], 1)
     tags_string = params["tags"] || ""
 
@@ -247,7 +248,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("move_task", %{"task_id" => task_uuid, "state_id" => state_id_str}, socket) do
-    state_id = parse_int(state_id_str)
+    state_id = parse_int(state_id_str, 0)
     task = Tasks.get_task_by_uuid!(task_uuid)
 
     case Tasks.update_task(task, %{
@@ -264,7 +265,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("show_quick_add", %{"state_id" => state_id}, socket) do
-    {:noreply, assign(socket, :quick_add_column, parse_int(state_id))}
+    {:noreply, assign(socket, :quick_add_column, parse_int(state_id, 0))}
   end
 
   @impl true
@@ -279,7 +280,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     if title == "" do
       {:noreply, assign(socket, :quick_add_column, nil)}
     else
-      state_id = parse_int(state_id_str)
+      state_id = parse_int(state_id_str, 0)
       task_uuid = Ecto.UUID.generate()
       now = DateTime.utc_now() |> DateTime.to_iso8601()
 
@@ -321,14 +322,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
     {:noreply, socket}
   end
-
-  defp parse_int(s, default \\ 0) do
-    case Integer.parse(s || "") do
-      {n, ""} -> n
-      _ -> default
-    end
-  end
-
 
   defp load_tasks(socket) do
     project_id = socket.assigns.project_id

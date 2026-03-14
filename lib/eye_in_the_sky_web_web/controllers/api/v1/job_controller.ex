@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.JobController do
   use EyeInTheSkyWebWeb, :controller
 
+  import EyeInTheSkyWebWeb.ControllerHelpers
+
   alias EyeInTheSkyWeb.ScheduledJobs
 
   @doc "GET /api/v1/jobs - List all scheduled jobs."
@@ -138,19 +140,4 @@ defmodule EyeInTheSkyWebWeb.Api.V1.JobController do
     end
   end
 
-  defp parse_int(nil), do: nil
-  defp parse_int(v) when is_integer(v), do: v
-
-  defp parse_int(v) when is_binary(v) do
-    case Integer.parse(v) do
-      {n, _} -> n
-      :error -> nil
-    end
-  end
-
-  defp translate_errors(%Ecto.Changeset{} = cs) do
-    Ecto.Changeset.traverse_errors(cs, fn {msg, opts} ->
-      Enum.reduce(opts, msg, fn {k, v}, acc -> String.replace(acc, "%{#{k}}", to_string(v)) end)
-    end)
-  end
 end

@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.ProjectController do
   use EyeInTheSkyWebWeb, :controller
 
+  import EyeInTheSkyWebWeb.ControllerHelpers
+
   alias EyeInTheSkyWeb.Projects
 
   @doc """
@@ -69,11 +71,4 @@ defmodule EyeInTheSkyWebWeb.Api.V1.ProjectController do
     end
   end
 
-  defp translate_errors(%Ecto.Changeset{} = changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-      Enum.reduce(opts, msg, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", to_string(value))
-      end)
-    end)
-  end
 end

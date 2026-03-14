@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
   alias EyeInTheSkyWeb.Tasks
   alias EyeInTheSkyWeb.Notes
   alias EyeInTheSkyWebWeb.Components.TaskCard
+  import EyeInTheSkyWebWeb.ControllerHelpers
 
   @per_page 50
 
@@ -103,7 +104,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
     task = socket.assigns.selected_task
     title = params["title"]
     description = params["description"]
-    state_id = parse_int(params["state_id"])
+    state_id = parse_int(params["state_id"], 0)
     priority = parse_int(params["priority"], 0)
     due_at = if params["due_at"] != "", do: params["due_at"], else: nil
     tags_string = params["tags"] || ""
@@ -170,12 +171,6 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
     {:noreply, load_tasks(socket)}
   end
 
-  defp parse_int(s, default \\ 0) do
-    case Integer.parse(s || "") do
-      {n, ""} -> n
-      _ -> default
-    end
-  end
 
   defp state_id_from_filter("all"), do: nil
 

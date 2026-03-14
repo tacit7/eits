@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.CommitController do
   use EyeInTheSkyWebWeb, :controller
 
+  import EyeInTheSkyWebWeb.ControllerHelpers
+
   alias EyeInTheSkyWeb.{Agents, Commits, Sessions}
 
   @doc """
@@ -100,21 +102,4 @@ defmodule EyeInTheSkyWebWeb.Api.V1.CommitController do
     end
   end
 
-  defp parse_int(nil, default), do: default
-  defp parse_int(val, _default) when is_integer(val), do: val
-
-  defp parse_int(val, default) when is_binary(val) do
-    case Integer.parse(val) do
-      {n, ""} -> n
-      _ -> default
-    end
-  end
-
-  defp translate_errors(%Ecto.Changeset{} = changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-      Enum.reduce(opts, msg, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", to_string(value))
-      end)
-    end)
-  end
 end

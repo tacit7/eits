@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
   use EyeInTheSkyWebWeb, :controller
 
+  import EyeInTheSkyWebWeb.ControllerHelpers
+
   alias EyeInTheSkyWeb.{Agents, Claude.AgentManager}
 
   @doc """
@@ -88,13 +90,4 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
     }
   end
 
-  defp parse_int(nil, default), do: default
-  defp parse_int(val, _default) when is_integer(val), do: val
-
-  defp parse_int(val, default) when is_binary(val) do
-    case Integer.parse(val) do
-      {n, ""} -> n
-      _ -> default
-    end
-  end
 end

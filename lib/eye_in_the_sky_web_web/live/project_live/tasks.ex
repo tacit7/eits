@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
   alias EyeInTheSkyWeb.Notes
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWebWeb.Components.TaskCard
+  import EyeInTheSkyWebWeb.ControllerHelpers
   import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [parse_id: 1]
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
 
@@ -165,7 +166,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
     task = socket.assigns.selected_task
     title = params["title"]
     description = params["description"]
-    state_id = parse_int(params["state_id"])
+    state_id = parse_int(params["state_id"], 0)
     priority = parse_int(params["priority"], 0)
     due_at = if params["due_at"] != "", do: params["due_at"], else: nil
     tags_string = params["tags"] || ""
@@ -231,7 +232,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
   def handle_event("create_new_task", params, socket) do
     title = params["title"]
     description = params["description"]
-    state_id = parse_int(params["state_id"])
+    state_id = parse_int(params["state_id"], 0)
     priority = parse_int(params["priority"], 1)
     tags_string = params["tags"] || ""
 
@@ -274,13 +275,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
   @impl true
   def handle_info(:tasks_changed, socket) do
     {:noreply, load_tasks(socket)}
-  end
-
-  defp parse_int(s, default \\ 0) do
-    case Integer.parse(s || "") do
-      {n, ""} -> n
-      _ -> default
-    end
   end
 
   # Resets to page 1, replaces the task list

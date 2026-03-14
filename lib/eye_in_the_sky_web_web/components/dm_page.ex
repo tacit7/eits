@@ -90,7 +90,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 id="copy-session-uuid"
                 data-copy={@session_uuid}
               >
-                {String.slice(@session_uuid, 0..7)}
+                {if @session_uuid, do: String.slice(@session_uuid, 0..7), else: "—"}
                 <.icon name="hero-clipboard-document" class="w-3 h-3" />
               </button>
               <button

@@ -458,10 +458,14 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   # ---------------------------------------------------------------------------
 
   defp build_env(opts) do
+    # Strip vars that prevent nested Claude sessions from starting
+    blocked_vars = ~w[CLAUDECODE CLAUDE_CODE_ENTRYPOINT]
+
     # Pass through system environment
     base_env =
       for {key, value} <- System.get_env(),
-          value != "" do
+          value != "",
+          key not in blocked_vars do
         {String.to_charlist(key), String.to_charlist(value)}
       end
 

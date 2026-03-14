@@ -134,9 +134,6 @@ defmodule EyeInTheSkyWebWeb.Api.V1.NoteController do
     end
   end
 
-  defp maybe_put(map, _key, nil), do: map
-  defp maybe_put(map, key, value), do: Map.put(map, key, value)
-
   defp parse_starred(nil), do: nil
   defp parse_starred(val) when is_integer(val), do: val
   defp parse_starred(true), do: 1
@@ -147,12 +144,5 @@ defmodule EyeInTheSkyWebWeb.Api.V1.NoteController do
       _ -> nil
     end
   end
-
-  # Normalize plural parent_type to singular for schema validation
-  defp normalize_parent_type("sessions"), do: "session"
-  defp normalize_parent_type("agents"), do: "agent"
-  defp normalize_parent_type("tasks"), do: "task"
-  defp normalize_parent_type("projects"), do: "project"
-  defp normalize_parent_type(type), do: type
 
 end

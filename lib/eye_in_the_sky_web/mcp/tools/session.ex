@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
 
   use Anubis.Server.Component, type: :tool
 
-  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
+  alias EyeInTheSkyWeb.MCP.Tools.{Helpers, ResponseHelper}
   alias EyeInTheSkyWeb.Sessions
 
   schema do
@@ -133,9 +133,9 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
         {:ok, session} ->
           update_attrs =
             %{}
-            |> maybe_put(:name, attrs[:name])
-            |> maybe_put(:description, agent_attrs[:description])
-            |> maybe_put(:project_id, project_id)
+            |> Helpers.maybe_put(:name, attrs[:name])
+            |> Helpers.maybe_put(:description, agent_attrs[:description])
+            |> Helpers.maybe_put(:project_id, project_id)
 
           case Sessions.update_session(session, update_attrs) do
             {:ok, updated} -> {:ok, updated}
@@ -217,9 +217,9 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
       {:ok, session} ->
         update_attrs =
           %{}
-          |> maybe_put(:name, params[:name])
-          |> maybe_put(:status, params[:status])
-          |> maybe_put(:description, params[:description])
+          |> Helpers.maybe_put(:name, params[:name])
+          |> Helpers.maybe_put(:status, params[:status])
+          |> Helpers.maybe_put(:description, params[:description])
 
         case Sessions.update_session(session, update_attrs) do
           {:ok, _} -> %{success: true, message: "Session updated"}
@@ -289,11 +289,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
   defp load_context(params) do
     alias EyeInTheSkyWeb.Contexts
 
-    case resolve_session_int_id(params[:session_id]) do
-      nil ->
+    case Helpers.resolve_session_int_id(params[:session_id]) do
+      {:error, _} ->
         %{success: false, message: "Session not found: #{params[:session_id]}"}
 
-      int_id ->
+      {:ok, int_id} ->
         case Contexts.get_session_context(int_id) do
           nil ->
             %{success: false, message: "No context found"}
@@ -310,23 +310,4 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
     end
   end
 
-  defp resolve_session_int_id(nil), do: nil
-
-  defp resolve_session_int_id(session_id) when is_integer(session_id), do: session_id
-
-  defp resolve_session_int_id(session_id) when is_binary(session_id) do
-    case Integer.parse(session_id) do
-      {n, ""} ->
-        n
-
-      _ ->
-        case Sessions.get_session_by_uuid(session_id) do
-          {:ok, s} -> s.id
-          _ -> nil
-        end
-    end
-  end
-
-  defp maybe_put(map, _key, nil), do: map
-  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 end

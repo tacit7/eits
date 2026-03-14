@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
   import EyeInTheSkyWebWeb.ControllerHelpers
 
   alias EyeInTheSkyWeb.{Agents, Notes, Projects, Sessions, Tasks}
+  alias EyeInTheSkyWeb.MCP.Tools.Helpers
 
   @doc """
   GET /api/v1/tasks - List tasks.
@@ -18,7 +19,11 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
           Tasks.search_tasks(params["q"]) |> Enum.take(limit)
 
         params["session_id"] ->
-          session_int_id = resolve_session_int_id(params["session_id"])
+          session_int_id =
+            case Helpers.resolve_session_int_id(params["session_id"]) do
+              {:ok, id} -> id
+              _ -> nil
+            end
 
           if session_int_id,
             do: Tasks.list_tasks_for_session(session_int_id) |> Enum.take(limit),
@@ -299,21 +304,6 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
     end
   end
 
-  defp resolve_session_int_id(nil), do: nil
-
-  defp resolve_session_int_id(val) do
-    case Integer.parse(val) do
-      {n, ""} ->
-        n
-
-      _ ->
-        case Sessions.get_session_by_uuid(val) do
-          {:ok, s} -> s.id
-          _ -> nil
-        end
-    end
-  end
-
   defp maybe_add_tags(_task, nil), do: :ok
   defp maybe_add_tags(_task, []), do: :ok
 
@@ -321,6 +311,4 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
     Enum.each(tags, fn tag_name -> Tasks.get_or_create_tag(tag_name) end)
   end
 
-  defp maybe_put(map, _key, nil), do: map
-  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 end

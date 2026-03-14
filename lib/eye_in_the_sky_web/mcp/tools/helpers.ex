@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.MCP.Tools.Helpers do
   @moduledoc "Shared utilities for MCP tools"
 
-  alias EyeInTheSkyWeb.Sessions
+  alias EyeInTheSkyWeb.{Agents, Sessions, Teams}
 
   @doc """
   Resolves a session identifier (integer, integer string, or UUID string) to an internal integer ID.
@@ -24,6 +24,32 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Helpers do
           {:ok, session} -> {:ok, session.id}
           {:error, :not_found} -> {:error, "Session not found: #{raw}"}
         end
+    end
+  end
+
+  def maybe_put(map, _key, nil), do: map
+  def maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  def resolve_agent_uuid(nil), do: nil
+
+  def resolve_agent_uuid(agent_int_id) do
+    case Agents.get_agent(agent_int_id) do
+      {:ok, agent} -> agent.uuid
+      _ -> nil
+    end
+  end
+
+  def normalize_parent_type("sessions"), do: "session"
+  def normalize_parent_type("agents"), do: "agent"
+  def normalize_parent_type("tasks"), do: "task"
+  def normalize_parent_type("projects"), do: "project"
+  def normalize_parent_type(type), do: type
+
+  def resolve_team(params) do
+    cond do
+      params[:team_id] -> Teams.get_team(params[:team_id])
+      params[:team_name] -> Teams.get_team_by_name(params[:team_name])
+      true -> nil
     end
   end
 end

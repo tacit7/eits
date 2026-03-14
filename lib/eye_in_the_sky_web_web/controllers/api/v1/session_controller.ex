@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
   import EyeInTheSkyWebWeb.ControllerHelpers
 
   alias EyeInTheSkyWeb.{Agents, Contexts, Sessions, Projects}
+  alias EyeInTheSkyWeb.MCP.Tools.Helpers
 
   @doc """
   POST /api/v1/sessions - Register a new session (SessionStart hook).
@@ -281,7 +282,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
   def show(conn, %{"uuid" => uuid}) do
     case Sessions.get_session_by_uuid(uuid) do
       {:ok, session} ->
-        agent_uuid = resolve_agent_uuid(session.agent_id)
+        agent_uuid = Helpers.resolve_agent_uuid(session.agent_id)
 
         json(conn, %{
           id: session.id,
@@ -453,15 +454,4 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
     end
   end
 
-  defp resolve_agent_uuid(nil), do: nil
-
-  defp resolve_agent_uuid(agent_int_id) do
-    case EyeInTheSkyWeb.Agents.get_agent(agent_int_id) do
-      {:ok, agent} -> agent.uuid
-      _ -> nil
-    end
-  end
-
-  defp maybe_put(map, _key, nil), do: map
-  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 end

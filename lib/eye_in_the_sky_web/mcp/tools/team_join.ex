@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TeamJoin do
 
   use Anubis.Server.Component, type: :tool
 
-  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
+  alias EyeInTheSkyWeb.MCP.Tools.{Helpers, ResponseHelper}
   alias EyeInTheSkyWeb.{Sessions, Teams}
 
   schema do
@@ -21,12 +21,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TeamJoin do
 
   @impl true
   def execute(params, frame) do
-    team =
-      cond do
-        params[:team_id] -> Teams.get_team(params[:team_id])
-        params[:team_name] -> Teams.get_team_by_name(params[:team_name])
-        true -> nil
-      end
+    team = Helpers.resolve_team(params)
 
     with {:ok, team} <- resolve_team(team),
          {:ok, session_db_id, agent_db_id} <- resolve_ids(params, frame) do

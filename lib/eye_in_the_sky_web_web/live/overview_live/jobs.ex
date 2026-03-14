@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
   alias EyeInTheSkyWeb.ScheduledJobs.{ScheduledJob, JobHelper}
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Claude.AgentManager
-  import EyeInTheSkyWebWeb.ControllerHelpers
+  import EyeInTheSkyWebWeb.Live.Shared.JobsHelpers
 
   @impl true
   def mount(_params, _session, socket) do
@@ -52,14 +52,12 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
   end
 
   @impl true
-  def handle_event("toggle_claude_drawer", _params, socket) do
-    {:noreply, assign(socket, :show_claude_drawer, !socket.assigns.show_claude_drawer)}
-  end
+  def handle_event("toggle_claude_drawer", params, socket),
+    do: handle_toggle_claude_drawer(params, socket)
 
   @impl true
-  def handle_event("claude_model_changed", %{"model" => model}, socket) do
-    {:noreply, assign(socket, :claude_model, model)}
-  end
+  def handle_event("claude_model_changed", params, socket),
+    do: handle_claude_model_changed(params, socket)
 
   @impl true
   def handle_event("create_with_claude", params, socket) do
@@ -68,15 +66,13 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
     description = params["description"]
     project = socket.assigns.web_project
 
-    instructions = job_helper_prompt(description)
-
     case AgentManager.create_agent(
            model: model,
            effort_level: effort_level,
            project_id: project.id,
            project_path: project.path,
            description: "Job Helper",
-           instructions: instructions
+           instructions: JobHelper.prompt(description)
          ) do
       {:ok, %{session: session}} ->
         {:noreply,
@@ -105,19 +101,14 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
   end
 
   @impl true
-  def handle_event("cancel_form", _params, socket) do
-    {:noreply, assign(socket, :show_form, false)}
-  end
+  def handle_event("cancel_form", params, socket), do: handle_cancel_form(params, socket)
 
   @impl true
-  def handle_event("change_job_type", %{"job" => %{"job_type" => jt}}, socket) do
-    {:noreply, assign(socket, :form_job_type, jt)}
-  end
+  def handle_event("change_job_type", params, socket), do: handle_change_job_type(params, socket)
 
   @impl true
-  def handle_event("change_schedule_type", %{"job" => %{"schedule_type" => st}}, socket) do
-    {:noreply, assign(socket, :form_schedule_type, st)}
-  end
+  def handle_event("change_schedule_type", params, socket),
+    do: handle_change_schedule_type(params, socket)
 
   @impl true
   def handle_event("save_job", %{"job" => params}, socket) do
@@ -155,11 +146,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
   end
 
   @impl true
-  def handle_event("run_now", %{"id" => id}, socket) do
-    job_id = String.to_integer(id)
-    ScheduledJobs.run_now(job_id)
-    {:noreply, put_flash(socket, :info, "Job triggered")}
-  end
+  def handle_event("run_now", params, socket), do: handle_run_now(params, socket)
 
   @impl true
   def handle_event("delete_job", %{"id" => id}, socket) do
@@ -178,52 +165,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
   end
 
   @impl true
-  def handle_event("expand_job", %{"id" => id}, socket) do
-    job_id = String.to_integer(id)
-
-    if socket.assigns.expanded_job_id == job_id do
-      {:noreply, assign(socket, expanded_job_id: nil, runs: [])}
-    else
-      runs = ScheduledJobs.list_runs_for_job(job_id)
-      {:noreply, assign(socket, expanded_job_id: job_id, runs: runs)}
-    end
-  end
-
-  defp job_helper_prompt(description), do: JobHelper.prompt(description)
-
-  defp build_config(params) do
-    case params["job_type"] do
-      "spawn_agent" ->
-        %{
-          "instructions" => params["config_instructions"] || "",
-          "model" => params["config_model"] || "sonnet",
-          "project_path" => params["config_project_path"] || "",
-          "description" => params["config_description"] || ""
-        }
-
-      "shell_command" ->
-        %{
-          "command" => params["config_command"] || "",
-          "working_dir" => params["config_working_dir"] || "",
-          "timeout_ms" => parse_int(params["config_timeout_ms"], 30_000)
-        }
-
-      "mix_task" ->
-        args =
-          (params["config_args"] || "")
-          |> String.split(",", trim: true)
-          |> Enum.map(&String.trim/1)
-
-        %{
-          "task" => params["config_task"] || "",
-          "args" => args,
-          "project_path" => params["config_project_path"] || ""
-        }
-
-      _ ->
-        %{}
-    end
-  end
+  def handle_event("expand_job", params, socket), do: handle_expand_job(params, socket)
 
   defp format_schedule(%{schedule_type: "interval", schedule_value: val}) do
     case Integer.parse(val) do
@@ -360,42 +302,6 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
     case Integer.parse(s) do
       {n, ""} -> {:ok, n}
       _ -> :error
-    end
-  end
-
-  defp format_time(nil), do: "-"
-
-  defp format_time(iso) when is_binary(iso) do
-    case NaiveDateTime.from_iso8601(String.replace(iso, "Z", "")) do
-      {:ok, dt} ->
-        Calendar.strftime(dt, "%m/%d %H:%M")
-
-      _ ->
-        iso
-    end
-  end
-
-  defp type_badge_class("spawn_agent"), do: "badge-primary"
-  defp type_badge_class("shell_command"), do: "badge-warning"
-  defp type_badge_class("mix_task"), do: "badge-accent"
-  defp type_badge_class(_), do: "badge-ghost"
-
-  defp type_label("spawn_agent"), do: "Agent"
-  defp type_label("shell_command"), do: "Shell"
-  defp type_label("mix_task"), do: "Mix"
-  defp type_label(t), do: t
-
-  defp status_badge_class("running"), do: "badge-info"
-  defp status_badge_class("completed"), do: "badge-success"
-  defp status_badge_class("failed"), do: "badge-error"
-  defp status_badge_class(_), do: "badge-ghost"
-
-  defp cfg(config, key) do
-    case config do
-      %{^key => val} when is_binary(val) -> val
-      %{^key => val} when is_list(val) -> Enum.join(val, ", ")
-      %{^key => val} -> to_string(val)
-      _ -> ""
     end
   end
 

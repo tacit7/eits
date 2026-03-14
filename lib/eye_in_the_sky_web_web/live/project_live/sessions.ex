@@ -39,6 +39,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         |> assign(:selected_ids, MapSet.new())
         |> assign(:all_agents, [])
         |> assign(:agents, [])
+        |> assign(:depths, %{})
         |> assign(:visible_count, @page_size)
         |> assign(:has_more, false)
         |> load_agents()
@@ -75,17 +76,18 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   defp apply_agent_view(socket, reset_page \\ false) do
     visible_count = if reset_page, do: @page_size, else: socket.assigns.visible_count
 
-    {duration_us, agents} =
+    {duration_us, {ordered_agents, depths}} =
       :timer.tc(fn ->
         socket.assigns.all_agents
         |> filter_agents_by_status(socket.assigns.session_filter)
         |> filter_agents_by_search(socket.assigns.search_query)
         |> sort_agents(socket.assigns.sort_by)
+        |> build_tree_order()
       end)
 
     :telemetry.execute(
       @telemetry_prefix ++ [:apply_view],
-      %{duration_us: duration_us, count: length(agents)},
+      %{duration_us: duration_us, count: length(ordered_agents)},
       %{
         project_id: socket.assigns.project_id,
         filter: socket.assigns.session_filter,
@@ -96,11 +98,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
 
     socket =
       socket
-      |> assign(:agents, agents)
+      |> assign(:agents, ordered_agents)
+      |> assign(:depths, depths)
       |> assign(:visible_count, visible_count)
-      |> assign(:has_more, length(agents) > visible_count)
+      |> assign(:has_more, length(ordered_agents) > visible_count)
 
-    visible_agents = Enum.take(agents, visible_count)
+    visible_agents = Enum.take(ordered_agents, visible_count)
 
     if reset_page do
       stream(socket, :session_list, visible_agents, reset: true, dom_id: fn a -> "ps-#{a.id}" end)
@@ -109,6 +112,29 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         stream_insert(acc, :session_list, agent)
       end)
     end
+  end
+
+  defp build_tree_order(sessions) do
+    session_ids = MapSet.new(sessions, & &1.id)
+
+    {children, top_level} =
+      Enum.split_with(sessions, fn s ->
+        s.parent_session_id && MapSet.member?(session_ids, s.parent_session_id)
+      end)
+
+    children_by_parent = Enum.group_by(children, & &1.parent_session_id)
+
+    ordered =
+      Enum.flat_map(top_level, fn parent ->
+        kids = Map.get(children_by_parent, parent.id, [])
+        [parent | kids]
+      end)
+
+    depths =
+      Map.new(top_level, &{&1.id, 0})
+      |> Map.merge(Map.new(children, &{&1.id, 1}))
+
+    {ordered, depths}
   end
 
   defp update_agent_status_in_list(socket, session_id, new_status) do
@@ -565,7 +591,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
               phx-update="stream"
               class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl px-4"
             >
-            <div :for={{dom_id, agent} <- @streams.session_list} id={dom_id}>
+            <div
+              :for={{dom_id, agent} <- @streams.session_list}
+              id={dom_id}
+              class={if Map.get(@depths, agent.id, 0) > 0, do: "ml-5 border-l-2 border-primary/20 pl-3", else: ""}
+            >
                 <.session_row
                   session={agent}
                   select_mode={@session_filter == "archived"}

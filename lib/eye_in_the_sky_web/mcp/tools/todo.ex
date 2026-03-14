@@ -117,6 +117,31 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
     {:reply, response, frame}
   end
 
+  def execute(%{command: "list-team"} = params, frame) do
+    alias EyeInTheSkyWeb.{Tasks, Teams}
+
+    team =
+      cond do
+        params[:team_id] -> Teams.get_team(params[:team_id])
+        true -> nil
+      end
+
+    result =
+      case team do
+        nil ->
+          %{success: false, message: "team_id required"}
+
+        team ->
+          tasks = Tasks.list_tasks_for_team(team.id)
+          limit = params[:limit] || 100
+          tasks = Enum.take(tasks, limit)
+          %{success: true, team_id: team.id, team_name: team.name, tasks: Enum.map(tasks, &format_task/1)}
+      end
+
+    response = Response.tool() |> Response.json(result)
+    {:reply, response, frame}
+  end
+
   def execute(%{command: "list-agent"} = params, frame) do
     alias EyeInTheSkyWeb.Tasks
 

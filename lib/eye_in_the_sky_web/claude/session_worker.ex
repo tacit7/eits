@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
   require Logger
 
   alias EyeInTheSkyWeb.Claude.Utils
+  alias EyeInTheSkyWeb.MCP.Tools.Helpers
   alias EyeInTheSkyWeb.Messages
   alias EyeInTheSkyWeb.Sessions
 
@@ -63,7 +64,11 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
 
     # Resolve integer PK from sessions table for FK references (messages, etc.)
     # Wrapped in rescue for test environments without Repo
-    session_int_id = resolve_session_int_id(session_id)
+    session_int_id =
+      case Helpers.resolve_session_int_id(session_id) do
+        {:ok, id} -> id
+        _ -> nil
+      end
 
     Logger.debug(
       "SessionWorker.init: resolved session_int_id=#{inspect(session_int_id)} for session_id=#{session_id}"
@@ -283,15 +288,6 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
   end
 
   # --- Private ---
-
-  defp resolve_session_int_id(session_id) do
-    case Sessions.get_session_by_uuid(session_id) do
-      {:ok, session} -> session.id
-      {:error, _} -> nil
-    end
-  rescue
-    _ -> nil
-  end
 
   defp spawn_next_cli(state, prompt, opts) do
     session_ref = make_ref()

@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NoteAdd do
 
   use Anubis.Server.Component, type: :tool
 
-  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
+  alias EyeInTheSkyWeb.MCP.Tools.{Helpers, ResponseHelper}
 
   schema do
     field :parent_id, :string,
@@ -22,7 +22,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NoteAdd do
     alias EyeInTheSkyWeb.Notes
 
     parent_id = params[:parent_id] || frame.assigns[:eits_session_id]
-    parent_type = normalize_parent_type(params[:parent_type] || "session")
+    parent_type = Helpers.normalize_parent_type(params[:parent_type] || "session")
 
     attrs = %{
       parent_id: parent_id,
@@ -45,9 +45,4 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NoteAdd do
     {:reply, response, frame}
   end
 
-  defp normalize_parent_type("sessions"), do: "session"
-  defp normalize_parent_type("agents"), do: "agent"
-  defp normalize_parent_type("tasks"), do: "task"
-  defp normalize_parent_type("projects"), do: "project"
-  defp normalize_parent_type(type), do: type
 end

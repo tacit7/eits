@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TeamStatus do
 
   use Anubis.Server.Component, type: :tool
 
-  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
+  alias EyeInTheSkyWeb.MCP.Tools.{Helpers, ResponseHelper}
   alias EyeInTheSkyWeb.{Repo, Teams}
   import Ecto.Query
 
@@ -14,12 +14,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TeamStatus do
 
   @impl true
   def execute(params, frame) do
-    team =
-      cond do
-        params[:team_id] -> Teams.get_team(params[:team_id])
-        params[:team_name] -> Teams.get_team_by_name(params[:team_name])
-        true -> nil
-      end
+    team = Helpers.resolve_team(params)
 
     result =
       case team do

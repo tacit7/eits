@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionInfo do
 
   use Anubis.Server.Component, type: :tool
 
-  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
+  alias EyeInTheSkyWeb.MCP.Tools.{Helpers, ResponseHelper}
   alias EyeInTheSkyWeb.Sessions
 
   schema do
@@ -18,7 +18,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionInfo do
       if uuid do
         case Sessions.get_session_by_uuid(uuid) do
           {:ok, session} ->
-            agent_uuid = resolve_agent_uuid(session.agent_id)
+            agent_uuid = Helpers.resolve_agent_uuid(session.agent_id)
 
             %{
               agent_id: agent_uuid,
@@ -39,14 +39,4 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionInfo do
     {:reply, response, frame}
   end
 
-  defp resolve_agent_uuid(nil), do: nil
-
-  defp resolve_agent_uuid(agent_int_id) do
-    alias EyeInTheSkyWeb.Agents
-
-    case Agents.get_agent(agent_int_id) do
-      {:ok, agent} -> agent.uuid
-      _ -> nil
-    end
-  end
 end

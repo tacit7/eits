@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.TeamController do
   use EyeInTheSkyWebWeb, :controller
 
+  action_fallback EyeInTheSkyWebWeb.Api.V1.FallbackController
+
   import EyeInTheSkyWebWeb.ControllerHelpers
 
   alias EyeInTheSkyWeb.{Repo, Teams}

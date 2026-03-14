@@ -281,6 +281,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     args = maybe_flag(args, "--mcp-config", opts[:mcp_config])
     args = maybe_flag(args, "--worktree", opts[:worktree])
     args = maybe_flag(args, "--thinking-budget-tokens", opts[:thinking_budget])
+    args = maybe_flag(args, "--max-budget-usd", opts[:max_budget_usd])
     args = maybe_flag(args, "--agent", opts[:agent])
 
     # Boolean flags
@@ -389,6 +390,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
 
         cmd_string = "claude " <> Enum.join(safe_log_args(args), " ")
         Logger.info("Spawning Claude in #{project_path}: #{cmd_string}")
+        Logger.info("CLI env: CLAUDE_CODE_EFFORT_LEVEL=#{inspect(opts[:effort_level])} max_budget_usd=#{inspect(opts[:max_budget_usd])}")
 
         handler_pid =
           spawn_link(fn ->

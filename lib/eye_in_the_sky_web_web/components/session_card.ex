@@ -29,11 +29,11 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
       case display_status do
         "working" -> {"text-success", "bg-success", "Working", true}
         "compacting" -> {"text-warning", "bg-warning", "Compacting", true}
-        "idle" -> {"text-base-content/25", "bg-base-content/20", "Idle", false}
+        "idle" -> {"text-base-content/55", "bg-base-content/20", "Idle", false}
         "idle_stale" -> {"text-warning", "bg-warning", "Idle", false}
         "idle_dead" -> {"text-error", "bg-error", "Idle", false}
-        "completed" -> {"text-base-content/25", "bg-base-content/20", "Done", false}
-        _ -> {"text-base-content/25", "bg-base-content/20", "Idle", false}
+        "completed" -> {"text-base-content/50", "bg-base-content/20", "Done", false}
+        _ -> {"text-base-content/55", "bg-base-content/20", "Idle", false}
       end
 
     assigns =
@@ -96,7 +96,7 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
           <span class="tabular-nums">{relative_time(@session.started_at)}</span>
           <%= if @project_name do %>
             <span class="text-base-content/15">/</span>
-            <span class="truncate text-base-content/45">{@project_name}</span>
+            <span class="truncate text-base-content/50">{@project_name}</span>
           <% end %>
         </div>
       </div>

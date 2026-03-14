@@ -233,10 +233,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     session = socket.assigns.session
     Sessions.update_session(session, %{model: model})
 
-    socket =
-      # Default effort to "medium" for opus when not explicitly set
-      effort = if effort == "" and model == "opus", do: "medium", else: effort
+    effort = if effort == "" and model == "opus", do: "medium", else: effort
 
+    socket =
       socket
       |> assign(:selected_model, model)
       |> assign(:selected_effort, effort)

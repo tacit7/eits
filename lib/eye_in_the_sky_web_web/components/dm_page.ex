@@ -1381,7 +1381,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               </div>
             </div>
             <%= if task.description do %>
-              <div class="collapse-content px-0 pb-4">
+              <div class="collapse-content px-0 pt-0 pb-4">
                 <div class="pl-8 text-sm text-base-content/65 leading-relaxed whitespace-pre-wrap">
                   {String.trim(task.description || "")}
                 </div>

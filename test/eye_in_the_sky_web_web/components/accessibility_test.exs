@@ -34,17 +34,17 @@ defmodule EyeInTheSkyWebWeb.Components.AccessibilityTest do
   defp sample_session(overrides \\ %{}) do
     Map.merge(
       %{
-        session_id: "sess-001",
-        session_uuid: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-        session_name: "Test Session",
+        id: 1,
+        uuid: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        name: "Test Session",
         agent_id: nil,
         project_name: "web",
         started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
         ended_at: nil,
+        last_activity_at: nil,
         status: "idle",
         active_task: nil,
-        intent: nil,
-        agent_description: nil
+        intent: nil
       },
       overrides
     )
@@ -169,68 +169,64 @@ defmodule EyeInTheSkyWebWeb.Components.AccessibilityTest do
     end
   end
 
-  describe "SessionCard - aria-labels and contrast" do
-    test "copy session ID button has aria-label" do
+  describe "SessionRow - aria-labels and contrast" do
+    test "row has aria-label with session name and status" do
       session = sample_session()
 
       html =
-        render_component(&SessionCard.session_card/1,
-          session: session,
-          show_project: true
+        render_component(&SessionCard.session_row/1,
+          session: session
         )
 
-      assert html =~ ~s(aria-label="Copy session ID")
+      assert html =~ ~s(aria-label="Open session: Test Session - Idle")
     end
 
-    test "copy button has min 44px touch target classes" do
+    test "row is keyboard accessible with role=button and tabindex" do
       session = sample_session()
 
       html =
-        render_component(&SessionCard.session_card/1,
-          session: session,
-          show_project: true
+        render_component(&SessionCard.session_row/1,
+          session: session
         )
 
-      assert html =~ "min-h-[44px]"
-      assert html =~ "min-w-[44px]"
+      assert html =~ ~s(role="button")
+      assert html =~ ~s(tabindex="0")
     end
 
     test "idle status text uses readable contrast class" do
       session = sample_session(%{status: "idle"})
 
       html =
-        render_component(&SessionCard.session_card/1,
-          session: session,
-          show_project: true
+        render_component(&SessionCard.session_row/1,
+          session: session
         )
 
-      # /55 for "Idle" text (up from /40)
+      # /55 for "Idle" text
       assert html =~ "text-base-content/55"
     end
 
-    test "ended status text uses readable contrast class" do
-      session = sample_session(%{ended_at: "2026-03-01T00:00:00Z"})
+    test "completed status text uses readable contrast class" do
+      session = sample_session(%{status: "completed"})
 
       html =
-        render_component(&SessionCard.session_card/1,
-          session: session,
-          show_project: true
+        render_component(&SessionCard.session_row/1,
+          session: session
         )
 
-      # /50 for "Ended" text (up from /30)
+      # /50 for "Done" text
       assert html =~ "text-base-content/50"
     end
 
     test "project name text uses readable contrast class" do
-      session = sample_session(%{project_name: "web"})
+      session = sample_session()
 
       html =
-        render_component(&SessionCard.session_card/1,
+        render_component(&SessionCard.session_row/1,
           session: session,
-          show_project: true
+          project_name: "web"
         )
 
-      # /50 for project name (up from /35)
+      # /50 for project name
       assert html =~ "text-base-content/50"
     end
   end

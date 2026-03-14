@@ -39,7 +39,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
         recent_notes =
           Notes.list_notes()
           |> Enum.filter(&(&1.parent_type == "project" and &1.parent_id == to_string(project_id)))
-          |> Enum.sort_by(& &1.inserted_at, :desc)
+          |> Enum.sort_by(& &1.created_at, :desc)
           |> Enum.take(5)
 
         # Load agents for this project
@@ -238,8 +238,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
                   <%= for note <- @recent_notes do %>
                     <div class="p-2 rounded-lg bg-base-200/30 border border-base-300">
                       <p class="text-xs text-base-content/60 mb-1">
-                        <%= if note.inserted_at do %>
-                          {relative_time(note.inserted_at)}
+                        <%= if note.created_at do %>
+                          {relative_time(note.created_at)}
                         <% end %>
                       </p>
                       <p class="text-sm text-base-content line-clamp-3">{note.body}</p>

@@ -109,7 +109,12 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
 
   # Fall back to caller's project context when not explicitly provided
   defp resolve_project_context(params, caller_project_id, caller_session_uuid, sessions_mod) do
-    project_id = params[:project_id] || caller_project_id
+    project_id =
+      params[:project_id] || caller_project_id ||
+        case caller_session_uuid && sessions_mod.get_session_by_uuid(caller_session_uuid) do
+          {:ok, session} -> session.project_id
+          _ -> nil
+        end
 
     project_path =
       case params[:project_path] do

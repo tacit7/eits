@@ -59,7 +59,16 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
     # auto-link to this session without requiring an explicit session_id param.
     updated_frame =
       if params[:session_id] && is_struct(frame) do
-        Anubis.Server.Frame.assign(frame, :eits_session_id, params[:session_id])
+        f = Anubis.Server.Frame.assign(frame, :eits_session_id, params[:session_id])
+
+        # Also store project_id so spawn_agent and team_create can inherit it
+        case result do
+          %{success: true, project_id: pid} when not is_nil(pid) ->
+            Anubis.Server.Frame.assign(f, :eits_project_id, pid)
+
+          _ ->
+            f
+        end
       else
         frame
       end
@@ -177,7 +186,8 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
           message: "Session #{attrs[:uuid]} ready",
           session_id: attrs[:uuid],
           agent_id: session.agent_id,
-          session_int_id: session.id
+          session_int_id: session.id,
+          project_id: session.project_id
         }
 
       {:error, changeset} ->

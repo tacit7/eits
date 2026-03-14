@@ -11,6 +11,7 @@ export const CommandHistory = {
     this.slashIndex = 0
     this.slashOpen = false
     this.slashTriggerPos = -1
+    this.slashTriggerChar = '/'  // '/' or '@'
 
     this.loadSlashItems()
     this.buildPopup()
@@ -160,7 +161,28 @@ export const CommandHistory = {
     const val = this.el.value
     const cursor = this.el.selectionStart
 
-    // Find the last '/' before cursor that's at start or after a space/newline
+    // Check for @ trigger (agents only)
+    let atTriggerPos = -1
+    for (let i = cursor - 1; i >= 0; i--) {
+      if (val[i] === '@') {
+        const before = i === 0 ? '' : val[i - 1]
+        if (i === 0 || before === ' ' || before === '\n') {
+          atTriggerPos = i
+        }
+        break
+      }
+      if (val[i] === ' ' || val[i] === '\n') break
+    }
+
+    if (atTriggerPos !== -1) {
+      const query = val.slice(atTriggerPos + 1, cursor)
+      this.slashTriggerPos = atTriggerPos
+      this.slashTriggerChar = '@'
+      this.slashFilter(query, 'agent')
+      return
+    }
+
+    // Check for / trigger (skills, commands, prompts)
     let triggerPos = -1
     for (let i = cursor - 1; i >= 0; i--) {
       if (val[i] === '/') {
@@ -170,7 +192,6 @@ export const CommandHistory = {
         }
         break
       }
-      // If we hit a space/newline before finding '/', stop
       if (val[i] === ' ' || val[i] === '\n') break
     }
 
@@ -181,16 +202,46 @@ export const CommandHistory = {
 
     const query = val.slice(triggerPos + 1, cursor)
     this.slashTriggerPos = triggerPos
-    this.slashFilter(query)
+    this.slashTriggerChar = '/'
+    this.slashFilter(query, null)
   },
 
-  slashFilter(query) {
+  // Score an item against a query. Higher = better match.
+  // 3: exact match on slug
+  // 2: slug starts with query
+  // 1: slug contains query
+  // 0: description/type contains query
+  scoreItem(item, q) {
+    if (!q) return 1
+    const slug = item.slug.toLowerCase()
+    const desc = (item.description || '').toLowerCase()
+    const type = (item.type || '').toLowerCase()
+    if (slug === q) return 3
+    if (slug.startsWith(q)) return 2
+    if (slug.includes(q)) return 1
+    if (desc.includes(q) || type.includes(q)) return 0
+    return -1
+  },
+
+  slashFilter(query, typeFilter) {
     const q = query.toLowerCase()
-    this.slashFiltered = this.slashItems.filter(item => {
-      return item.slug.toLowerCase().includes(q) ||
-        (item.description || '').toLowerCase().includes(q) ||
-        (item.type || '').toLowerCase().includes(q)
+    const MAX_RESULTS = 8
+
+    let pool = typeFilter
+      ? this.slashItems.filter(item => item.type === typeFilter)
+      : this.slashItems.filter(item => item.type !== 'agent')
+
+    let scored = pool
+      .map(item => ({ item, score: this.scoreItem(item, q) }))
+      .filter(({ score }) => score >= 0)
+
+    // Sort by score desc, then slug asc for ties
+    scored.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score
+      return a.item.slug.localeCompare(b.item.slug)
     })
+
+    this.slashFiltered = scored.slice(0, MAX_RESULTS).map(({ item }) => item)
 
     if (this.slashFiltered.length === 0) {
       this.slashClose()
@@ -244,7 +295,7 @@ export const CommandHistory = {
         row.type = 'button'
         row.dataset.slashIdx = idx
         row.className = this.rowClass(idx)
-        row.innerHTML = this.rowHTML(item)
+        row.innerHTML = this.rowHTML(item, query)
         row.addEventListener('mouseenter', () => {
           this.slashIndex = idx
           this.highlightRow()
@@ -258,15 +309,42 @@ export const CommandHistory = {
       }
     }
 
+    // Keyboard hint footer
+    const hint = document.createElement('div')
+    hint.className = 'px-3 py-1.5 text-[10px] text-base-content/30 border-t border-base-content/5 flex items-center gap-3 sticky bottom-0 bg-base-100'
+    hint.innerHTML = '<kbd class="font-mono">↑↓</kbd> navigate &nbsp;<kbd class="font-mono">↵</kbd> or <kbd class="font-mono">Tab</kbd> select &nbsp;<kbd class="font-mono">Esc</kbd> dismiss'
+    this.popup.appendChild(hint)
+
     this.popup.classList.remove('hidden')
     this.highlightRow()
+  },
+
+  // Highlight query match in text — wraps matching part in <mark>
+  highlightMatch(text, query) {
+    if (!query) return this.escapeHtml(text)
+    const q = query.toLowerCase()
+    const idx = text.toLowerCase().indexOf(q)
+    if (idx === -1) return this.escapeHtml(text)
+    return (
+      this.escapeHtml(text.slice(0, idx)) +
+      `<mark class="bg-primary/20 text-primary rounded px-0.5">${this.escapeHtml(text.slice(idx, idx + q.length))}</mark>` +
+      this.escapeHtml(text.slice(idx + q.length))
+    )
+  },
+
+  escapeHtml(str) {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
   },
 
   rowClass(idx) {
     return 'w-full flex items-start gap-3 px-3 py-2 text-left transition-colors text-sm'
   },
 
-  rowHTML(item) {
+  rowHTML(item, query) {
     const badge = {
       skill: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary">skill</span>',
       command: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary/10 text-secondary">cmd</span>',
@@ -274,12 +352,12 @@ export const CommandHistory = {
       prompt: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-warning/10 text-warning">prompt</span>',
     }[item.type] || ''
 
-    const name = item.type === 'agent'
-      ? `<span class="font-medium text-base-content">@${item.slug}</span>`
-      : `<span class="font-medium text-base-content">/${item.slug}</span>`
+    const prefix = item.type === 'agent' ? '@' : '/'
+    const nameHtml = this.highlightMatch(item.slug, query)
+    const name = `<span class="font-medium text-base-content">${prefix}${nameHtml}</span>`
 
     const desc = item.description
-      ? `<span class="text-xs text-base-content/50 truncate">${item.description}</span>`
+      ? `<span class="text-xs text-base-content/50 truncate">${this.escapeHtml(item.description)}</span>`
       : ''
 
     return `
@@ -337,6 +415,7 @@ export const CommandHistory = {
   slashClose() {
     this.slashOpen = false
     this.slashTriggerPos = -1
+    this.slashTriggerChar = '/'
     this.slashOrdered = []
     this.popup.classList.add('hidden')
     this.popup.innerHTML = ''

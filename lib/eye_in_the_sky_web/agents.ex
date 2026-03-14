@@ -5,6 +5,8 @@ defmodule EyeInTheSkyWeb.Agents do
   An Agent represents a participant/identity in the chat/DM system.
   """
 
+  use EyeInTheSkyWeb.CrudHelpers, schema: EyeInTheSkyWeb.Agents.Agent
+
   import Ecto.Query, warn: false
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Agents.Agent

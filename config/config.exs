@@ -33,6 +33,7 @@ config :eye_in_the_sky_web, EyeInTheSkyWeb.Mailer, adapter: Swoosh.Adapters.Loca
 
 # esbuild is handled by custom build.js script (for Svelte support)
 # See assets/build.js and the node watcher in config/dev.exs
+config :esbuild, :version, "0.25.4"
 
 # Configure tailwind (the version is required)
 config :tailwind,

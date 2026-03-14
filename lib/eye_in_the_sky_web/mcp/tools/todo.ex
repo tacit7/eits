@@ -138,7 +138,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
           %{success: true, team_id: team.id, team_name: team.name, tasks: Enum.map(tasks, &format_task/1)}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 

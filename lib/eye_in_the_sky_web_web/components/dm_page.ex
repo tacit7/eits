@@ -1037,8 +1037,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               <% end %>
             </span>
           <% end %>
-          <%= if @context_window > 0 do %>
-            <% remaining = max(0, @context_window - @context_used) %>
+          <% remaining = max(0, @context_window - @context_used) %>
+          <%= if @context_window > 0 and remaining > 0 do %>
             <% pct = Float.round(remaining / @context_window * 100, 1) %>
             <% color_class = cond do
               pct > 40 -> "text-base-content/30"
@@ -1326,8 +1326,9 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         id="dm-task-list"
       >
         <%= for task <- @tasks do %>
-          <div class={["collapse", task.description && "collapse-arrow"]} id={"dm-task-#{task.id}"}>
-            <input type="checkbox" class="min-h-0 p-0" disabled={is_nil(task.description)} />
+          <% has_expandable = task.description || Map.get(task, :notes, []) != [] %>
+          <div class={["collapse", has_expandable && "collapse-arrow"]} id={"dm-task-#{task.id}"}>
+            <input type="checkbox" class="min-h-0 p-0" disabled={!has_expandable} />
             <div class="collapse-title py-3.5 px-0 min-h-0 flex items-center gap-3">
               <%!-- Status dot --%>
               <div class="flex-shrink-0 w-5 flex justify-center">
@@ -1377,12 +1378,29 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                   <span class="font-mono text-base-content/30">
                     {String.slice(task.uuid || to_string(task.id), 0..7)}
                   </span>
+                  <%= if Map.get(task, :notes_count, 0) > 0 do %>
+                    <span class="text-base-content/15">&middot;</span>
+                    <span class="flex items-center gap-0.5 text-base-content/35">
+                      <.icon name="hero-chat-bubble-bottom-center-text" class="w-3 h-3" />
+                      {Map.get(task, :notes_count)}
+                    </span>
+                  <% end %>
                 </div>
               </div>
             </div>
-            <%= if task.description do %>
-              <div class="collapse-content px-0 pt-0 pb-4">
-                <div class="pl-8 text-sm text-base-content/65 leading-relaxed whitespace-pre-wrap">{String.trim(task.description || "")}</div>
+            <%= if has_expandable do %>
+              <div class="collapse-content px-0 pt-0 pb-4 pl-8">
+                <%= if task.description do %>
+                  <div class="text-sm text-base-content/65 leading-relaxed whitespace-pre-wrap mb-2">{String.trim(task.description)}</div>
+                <% end %>
+                <%= for note <- Map.get(task, :notes, []) do %>
+                  <div class="mt-1.5 rounded-lg bg-base-200/60 px-3 py-2">
+                    <%= if note.title do %>
+                      <div class="text-[11px] font-semibold text-base-content/60 mb-0.5">{note.title}</div>
+                    <% end %>
+                    <pre class="whitespace-pre-wrap text-xs text-base-content/55 font-mono leading-relaxed">{note.body}</pre>
+                  </div>
+                <% end %>
               </div>
             <% end %>
           </div>

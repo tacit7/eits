@@ -618,34 +618,31 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                     <% end %>
                     <%= if agent.uuid do %>
                       <%= if agent.archived_at do %>
-                        <button
-                          type="button"
-                          phx-click="unarchive_session"
-                          phx-value-session_id={agent.id}
-                          class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-info hover:bg-info/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info"
-                          aria-label="Unarchive"
-                        >
-                          <.icon name="hero-arrow-up-tray-mini" class="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          phx-click="delete_session"
-                          phx-value-session_id={agent.id}
-                          class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
-                          aria-label="Delete"
-                        >
-                          <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
-                        </button>
+                        <.icon_button
+                          icon="hero-arrow-up-tray-mini"
+                          on_click="unarchive_session"
+                          aria_label="Unarchive"
+                          color="info"
+                          show_on_hover={false}
+                          values={%{"session_id" => agent.id}}
+                        />
+                        <.icon_button
+                          icon="hero-trash-mini"
+                          on_click="delete_session"
+                          aria_label="Delete"
+                          color="error"
+                          show_on_hover={false}
+                          values={%{"session_id" => agent.id}}
+                        />
                       <% else %>
-                        <button
-                          type="button"
-                          phx-click="archive_session"
-                          phx-value-session_id={agent.id}
-                          class="hidden sm:flex md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-base-content/30 hover:text-warning hover:bg-warning/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
-                          aria-label="Archive"
-                        >
-                          <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
-                        </button>
+                        <.icon_button
+                          icon="hero-archive-box-mini"
+                          on_click="archive_session"
+                          aria_label="Archive"
+                          color="warning"
+                          class="hidden sm:flex"
+                          values={%{"session_id" => agent.id}}
+                        />
                       <% end %>
                     <% end %>
                   </:actions>

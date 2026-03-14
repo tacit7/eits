@@ -49,6 +49,11 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   end
 
   @impl true
+  def handle_event("new_chat", _params, socket) do
+    {:noreply, push_navigate(socket, to: "/?new=1")}
+  end
+
+  @impl true
   def handle_event("toggle_collapsed", _params, socket) do
     {:noreply, assign(socket, :collapsed, !socket.assigns.collapsed)}
   end
@@ -180,6 +185,17 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
             Eye in the Sky
           </span>
         </.link>
+        <button
+          phx-click="new_chat"
+          phx-target={@myself}
+          class={[
+            "btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-primary hover:bg-primary/10 transition-colors",
+            if(@mobile_open, do: "hidden")
+          ]}
+          title="New Chat"
+        >
+          <.icon name="hero-pencil-square" class="w-4 h-4" />
+        </button>
         <button
           :if={@mobile_open}
           phx-click="close_mobile"

@@ -302,13 +302,10 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
           "create_new_session: agent created - agent_id=#{result.agent.id}, session_id=#{result.agent.id}, session_uuid=#{result.agent.uuid}"
         )
 
-        socket =
-          socket
-          |> assign(:show_new_session_drawer, false)
-          |> load_agents()
-          |> put_flash(:info, "Session launched")
-
-        {:noreply, socket}
+        {:noreply,
+         socket
+         |> assign(:show_new_session_drawer, false)
+         |> push_navigate(to: ~p"/dm/#{result.session.id}")}
 
       {:error, reason} ->
         Logger.error("create_new_session: failed - #{inspect(reason)}")
@@ -350,6 +347,12 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   @impl true
   def handle_info(_msg, socket), do: {:noreply, socket}
+
+  defp apply_action(socket, :index, %{"new" => "1"}) do
+    socket
+    |> assign(:page_title, "Agents")
+    |> assign(:show_new_session_drawer, true)
+  end
 
   defp apply_action(socket, :index, _params) do
     assign(socket, :page_title, "Agents")

@@ -309,12 +309,12 @@ defmodule EyeInTheSkyWeb.Sessions do
         order_by: [desc: s.started_at],
         limit: ^limit,
         select: %{
-          session_id: s.id,
-          session_uuid: s.uuid,
-          session_name: s.name,
+          id: s.id,
+          uuid: s.uuid,
+          name: s.name,
           agent_id: a.id,
           agent_uuid: a.uuid,
-          session_description: s.description,
+          description: s.description,
           project_name: p.name,
           started_at: s.started_at,
           ended_at: s.ended_at,
@@ -322,7 +322,8 @@ defmodule EyeInTheSkyWeb.Sessions do
           intent: s.intent,
           model_provider: s.model_provider,
           model_name: s.model_name,
-          model_version: s.model_version
+          model_version: s.model_version,
+          last_activity_at: a.last_activity_at
         }
       )
 

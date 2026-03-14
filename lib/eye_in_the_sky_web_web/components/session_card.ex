@@ -6,86 +6,6 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
   alias EyeInTheSkyWeb.Sessions
 
   @doc """
-  Renders a session card (grid layout) with status pulse, name, and timestamp.
-
-  ## Attrs
-    * `:session` - Map from list_session_overview_rows with session_id, session_name, started_at, etc.
-    * `:show_project` - Whether to show project name (default: true)
-  """
-  attr :session, :map, required: true
-  attr :show_project, :boolean, default: true
-
-  def session_card(assigns) do
-    status = session_status(assigns.session)
-    assigns = assign(assigns, :status, status)
-
-    ~H"""
-    <.link
-      navigate={"/dm/#{@session.session_id}"}
-      class="group relative block rounded-xl bg-base-100 border border-base-content/6 hover:border-primary/30 transition-all duration-300 overflow-hidden"
-      aria-label={"#{@session.session_name || "Unnamed session"} - #{to_string(@status)}"}
-    >
-      <%!-- Subtle top accent line --%>
-      <div class={[
-        "absolute top-0 left-0 right-0 h-[2px] transition-all duration-300",
-        case @status do
-          :working ->
-            "bg-gradient-to-r from-success/60 via-success to-success/60"
-
-          :compacting ->
-            "bg-gradient-to-r from-warning/60 via-warning to-warning/60"
-
-          _ ->
-            "bg-gradient-to-r from-transparent via-base-content/6 to-transparent group-hover:via-primary/20"
-        end
-      ]} />
-
-      <div class="p-4 pt-5 space-y-3">
-        <%!-- Top row: status badge + time --%>
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <%= case @status do %>
-              <% :working -> %>
-                <span class="relative flex h-2 w-2">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-60">
-                  </span>
-                  <span class="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
-                </span>
-                <span class="text-[11px] font-semibold tracking-wide uppercase text-success/80">
-                  Working
-                </span>
-              <% :compacting -> %>
-                <span class="relative flex h-2 w-2">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-warning opacity-60">
-                  </span>
-                  <span class="relative inline-flex rounded-full h-2 w-2 bg-warning"></span>
-                </span>
-                <span class="text-[11px] font-semibold tracking-wide uppercase text-warning/80">
-                  Compacting
-                </span>
-              <% :idle -> %>
-                <span class="inline-flex rounded-full h-2 w-2 bg-base-content/25"></span>
-                <span class="text-[11px] tracking-wide uppercase text-base-content/55">Idle</span>
-              <% _ -> %>
-                <span class="inline-flex rounded-full h-2 w-2 bg-base-content/20"></span>
-                <span class="text-[11px] tracking-wide uppercase text-base-content/50">Ended</span>
-            <% end %>
-          </div>
-          <span class="text-[11px] tabular-nums text-base-content/50">
-            {relative_time(@session.started_at)}
-          </span>
-        </div>
-
-        <%!-- Session name --%>
-        <p class="text-[13px] font-semibold text-base-content/90 line-clamp-1 group-hover:text-primary transition-colors duration-200">
-          {@session.session_name || "Unnamed session"}
-        </p>
-      </div>
-    </.link>
-    """
-  end
-
-  @doc """
   Renders a session list row (used in project sessions view).
 
   ## Attrs
@@ -195,12 +115,4 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
     </div>
     """
   end
-
-  defp session_status(%{ended_at: ended_at}) when is_binary(ended_at) and ended_at != "",
-    do: :ended
-
-  defp session_status(%{status: "working"}), do: :working
-  defp session_status(%{status: "compacting"}), do: :compacting
-  defp session_status(%{status: "idle"}), do: :idle
-  defp session_status(_), do: :ended
 end

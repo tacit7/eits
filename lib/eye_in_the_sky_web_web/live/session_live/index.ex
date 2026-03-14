@@ -24,7 +24,7 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
       |> assign(:has_more, length(sessions) < total)
       |> assign(:total_sessions, total)
       |> assign(:show_new_session_modal, false)
-      |> stream(:sessions, sessions, dom_id: fn s -> "si-#{s.session_uuid}" end)
+      |> stream(:sessions, sessions, dom_id: fn s -> "si-#{s.uuid}" end)
 
     {:ok, socket}
   end
@@ -77,6 +77,12 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
 
     project = EyeInTheSkyWeb.Projects.get_project!(project_id)
 
+    worktree = case params["worktree"] do
+      nil -> nil
+      "" -> nil
+      w -> w
+    end
+
     opts = [
       model: model,
       effort_level: effort_level,
@@ -84,7 +90,8 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
       project_path: project.path,
       description: agent_name,
       instructions: description,
-      agent: params["agent"]
+      agent: params["agent"],
+      worktree: worktree
     ]
 
     case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
@@ -110,16 +117,17 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
 
   # Real-time: reload sessions list when agents change
   @impl true
-  def handle_info({_event, _agent}, socket) do
-    sessions = Sessions.list_session_overview_rows(limit: socket.assigns.page * @per_page, offset: 0)
+  def handle_info({event, _agent}, socket)
+      when event in [:agent_created, :agent_updated, :agent_deleted] do
+    current_page = socket.assigns.page
+    sessions = Sessions.list_session_overview_rows(limit: current_page * @per_page, offset: 0)
     total = Sessions.count_session_overview_rows()
 
     socket =
       socket
-      |> assign(:page, 1)
       |> assign(:has_more, length(sessions) < total)
       |> assign(:total_sessions, total)
-      |> stream(:sessions, sessions, reset: true, dom_id: fn s -> "si-#{s.session_uuid}" end)
+      |> stream(:sessions, sessions, reset: true)
 
     {:noreply, socket}
   end
@@ -151,17 +159,7 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
           >
             <div :for={{dom_id, session} <- @streams.sessions} id={dom_id}>
               <.session_row
-                session={%{
-                  id: session.session_id,
-                  uuid: session.session_uuid,
-                  name: session.session_name,
-                  status: session.status,
-                  started_at: session.started_at,
-                  ended_at: session.ended_at,
-                  model_name: session.model_name,
-                  model_provider: session.model_provider,
-                  model_version: session.model_version
-                }}
+                session={session}
                 project_name={session.project_name}
                 click_event="navigate_dm"
               />

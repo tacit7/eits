@@ -287,6 +287,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   end
 
   @impl true
+  def handle_event("reorder_tasks", %{"task_ids" => task_ids}, socket) when is_list(task_ids) do
+    Tasks.reorder_tasks(task_ids)
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("move_task", %{"task_id" => task_uuid, "state_id" => state_id_str}, socket) do
     state_id = parse_int(state_id_str, 0)
     task = Tasks.get_task_by_uuid!(task_uuid)

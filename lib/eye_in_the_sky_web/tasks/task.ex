@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.Tasks.Task do
     field :title, :string
     field :description, :string
     field :priority, :integer, default: 0
+    field :position, :integer, default: 0
     field :due_at, :string
     field :completed_at, :string
     field :archived, :boolean, default: false
@@ -57,6 +58,7 @@ defmodule EyeInTheSkyWeb.Tasks.Task do
       :team_id,
       :agent_id,
       :priority,
+      :position,
       :due_at,
       :completed_at,
       :archived,

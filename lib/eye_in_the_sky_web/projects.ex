@@ -62,8 +62,8 @@ defmodule EyeInTheSkyWeb.Projects do
     order =
       case sort_by do
         "created_asc" -> [asc: :created_at]
-        "priority" -> [desc: :priority, desc: :created_at]
-        _ -> [desc: :created_at]
+        "priority" -> [desc: :priority, asc: :position]
+        _ -> [asc: :position, desc: :created_at]
       end
 
     base_project_tasks_query(project_id, opts)

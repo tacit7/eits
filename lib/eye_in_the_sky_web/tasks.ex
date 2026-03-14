@@ -241,6 +241,25 @@ defmodule EyeInTheSkyWeb.Tasks do
     update_task(task, %{archived: false, updated_at: DateTime.utc_now() |> DateTime.to_iso8601()})
   end
 
+  @doc """
+  Bulk-updates position for a list of tasks within a column.
+  `ordered_uuids` is a list of task UUIDs in the desired order (index = position).
+  """
+  def reorder_tasks(ordered_uuids) when is_list(ordered_uuids) do
+    now = DateTime.utc_now() |> DateTime.to_iso8601()
+
+    ordered_uuids
+    |> Enum.with_index(1)
+    |> Enum.each(fn {uuid, position} ->
+      Repo.update_all(
+        from(t in Task, where: t.uuid == ^uuid),
+        set: [position: position, updated_at: now]
+      )
+    end)
+
+    :ok
+  end
+
   @doc "Deletes a task."
   def delete_task(%Task{} = task) do
     result = Repo.delete(task)

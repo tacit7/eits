@@ -41,7 +41,7 @@ Exit status will be 1 (error) instead of 0 (success).
 
 ## Database
 
-PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. **This app owns the schema** — Go is no longer involved. Schema changes are made via direct psql (no Ecto migrations).
+PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. **This app owns the schema** — Go is no longer involved. Schema changes are made via Ecto migrations (`mix ecto.gen.migration` / `mix ecto.migrate`).
 
 ## Architecture
 

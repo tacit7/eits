@@ -29,6 +29,7 @@ defmodule EyeInTheSkyWeb.Sessions.Session do
     field :git_worktree_path, :string
     field :parent_agent_id, :integer
     field :parent_session_id, :integer
+    field :current_task_title, :string, virtual: true
 
     belongs_to :agent, EyeInTheSkyWeb.Agents.Agent,
       define_field: false,

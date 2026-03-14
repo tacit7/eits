@@ -125,13 +125,16 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
     ]
 
     case AgentManager.create_agent(opts) do
-      {:ok, _result} ->
-        Logger.info("WorkableTaskWorker: spawned agent for task ##{task.id}")
+      {:ok, %{session: session}} ->
+        Logger.info(
+          "WorkableTaskWorker: spawned agent for task ##{task.id} session=#{session.uuid} project_path=#{project_path}"
+        )
+
         {:ok, task.id}
 
       {:error, reason} ->
         Logger.error(
-          "WorkableTaskWorker: failed to spawn agent for task ##{task.id} - #{inspect(reason)}"
+          "WorkableTaskWorker: failed to spawn agent for task ##{task.id} project_path=#{project_path} - #{inspect(reason)}"
         )
 
         {:error, reason}

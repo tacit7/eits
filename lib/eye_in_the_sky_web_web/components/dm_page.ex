@@ -1329,7 +1329,11 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           <% has_expandable = task.description || Map.get(task, :notes, []) != [] %>
           <div class={["collapse", has_expandable && "collapse-arrow"]} id={"dm-task-#{task.id}"}>
             <input type="checkbox" class="min-h-0 p-0" disabled={!has_expandable} />
-            <div class="collapse-title py-3.5 px-0 min-h-0 flex items-center gap-3">
+            <div
+              class="collapse-title py-3.5 px-0 min-h-0 flex items-center gap-3 cursor-pointer"
+              phx-click="open_task_detail"
+              phx-value-task_id={task.uuid || to_string(task.id)}
+            >
               <%!-- Status dot --%>
               <div class="flex-shrink-0 w-5 flex justify-center">
                 <%= if task.state_id == 2 do %>

@@ -175,8 +175,16 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
           {:noreply, clear_retry_timer(%{state | sdk_ref: sdk_ref, current_job: job})}
 
         {:error, reason} ->
+          reason_str = inspect(reason)
+
           Logger.error(
-            "AgentWorker: failed to start SDK for session_id=#{state.session_id} - #{inspect(reason)}"
+            "AgentWorker: failed to start SDK for session_id=#{state.session_id} - #{reason_str}"
+          )
+
+          EyeInTheSkyWeb.Messages.record_incoming_reply(
+            state.session_id,
+            "system",
+            "[spawn error] Failed to start Claude: #{reason_str}"
           )
 
           {:noreply, state |> enqueue_job(job) |> schedule_retry_start()}

@@ -98,6 +98,10 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
             <span class="text-base-content/15">/</span>
             <span class="truncate text-base-content/50">{@project_name}</span>
           <% end %>
+          <%= if task_title = Map.get(@session, :current_task_title) do %>
+            <span class="text-base-content/15">/</span>
+            <span class="truncate text-primary/60 font-medium">{task_title}</span>
+          <% end %>
         </div>
       </div>
 

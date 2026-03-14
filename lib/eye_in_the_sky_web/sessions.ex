@@ -188,12 +188,35 @@ defmodule EyeInTheSkyWeb.Sessions do
   Pass `include_archived: true` to include archived sessions.
   """
   def list_project_sessions_with_agent(project_id, opts \\ []) do
-    Session
-    |> where([s], s.project_id == ^project_id)
-    |> preload(:agent)
-    |> order_by([s], desc: s.started_at)
-    |> Archivable.include_archived(opts)
-    |> Repo.all()
+    sessions =
+      Session
+      |> where([s], s.project_id == ^project_id)
+      |> preload(:agent)
+      |> order_by([s], desc: s.started_at)
+      |> Archivable.include_archived(opts)
+      |> Repo.all()
+
+    attach_current_task_titles(sessions)
+  end
+
+  defp attach_current_task_titles([]), do: []
+
+  defp attach_current_task_titles(sessions) do
+    session_ids = Enum.map(sessions, & &1.id)
+
+    tasks_by_session =
+      from(t in EyeInTheSkyWeb.Tasks.Task,
+        join: ts in "task_sessions",
+        on: ts.task_id == t.id,
+        where: ts.session_id in ^session_ids and t.state_id == 2 and t.archived == false,
+        select: {ts.session_id, t.title}
+      )
+      |> Repo.all()
+      |> Map.new()
+
+    Enum.map(sessions, fn s ->
+      %{s | current_task_title: Map.get(tasks_by_session, s.id)}
+    end)
   end
 
   @doc """
@@ -297,7 +320,12 @@ defmodule EyeInTheSkyWeb.Sessions do
       model_provider: s.model_provider,
       model_name: s.model_name,
       model_version: s.model_version,
-      last_activity_at: a.last_activity_at
+      last_activity_at: a.last_activity_at,
+      current_task_title:
+        fragment(
+          "(SELECT t.title FROM tasks t JOIN task_sessions ts ON ts.task_id = t.id WHERE ts.session_id = ? AND t.state_id = 2 AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)",
+          s.id
+        )
     })
     |> Repo.all()
   end

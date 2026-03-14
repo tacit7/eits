@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   alias EyeInTheSkyWebWeb.Components.DmPage
   import EyeInTheSkyWebWeb.ControllerHelpers
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
+  import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
 
   require Logger
 
@@ -78,6 +79,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:slash_items, build_slash_items())
       |> assign(:diff_cache, %{})
       |> assign(:show_new_task_drawer, false)
+      |> assign(:show_task_detail_drawer, false)
+      |> assign(:selected_task, nil)
+      |> assign(:task_notes, [])
       |> assign(:workflow_states, Tasks.list_workflow_states())
       |> assign(:current_task, Tasks.get_current_task_for_session(session.id))
       |> assign(:sync_timer, nil)
@@ -126,6 +130,22 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   def handle_event("toggle_new_task_drawer", _params, socket) do
     {:noreply, assign(socket, :show_new_task_drawer, !socket.assigns.show_new_task_drawer)}
   end
+
+  @impl true
+  def handle_event("open_task_detail", params, socket),
+    do: handle_open_task_detail(params, socket)
+
+  @impl true
+  def handle_event("toggle_task_detail_drawer", params, socket),
+    do: handle_toggle_task_detail_drawer(params, socket)
+
+  @impl true
+  def handle_event("update_task", params, socket),
+    do: handle_update_task(params, socket, &reload_tasks/1)
+
+  @impl true
+  def handle_event("delete_task", params, socket),
+    do: handle_delete_task(params, socket, &reload_tasks/1)
 
   @impl true
   def handle_event("toggle_memories_panel", _params, socket) do
@@ -914,6 +934,10 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     )
   end
 
+  defp reload_tasks(socket) do
+    assign(socket, :tasks, Tasks.list_tasks_for_session(socket.assigns.session_id))
+  end
+
   defp load_message_data(socket, "messages", session_id) do
     limit = socket.assigns[:message_limit] || @default_message_limit
 
@@ -1169,6 +1193,18 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         checkpoints={@checkpoints}
         show_create_checkpoint={@show_create_checkpoint}
       />
+
+    <.live_component
+      module={EyeInTheSkyWebWeb.Components.TaskDetailDrawer}
+      id="dm-task-detail-drawer"
+      show={@show_task_detail_drawer}
+      task={@selected_task}
+      notes={@task_notes}
+      workflow_states={@workflow_states}
+      toggle_event="toggle_task_detail_drawer"
+      update_event="update_task"
+      delete_event="delete_task"
+    />
     </div>
     """
   end

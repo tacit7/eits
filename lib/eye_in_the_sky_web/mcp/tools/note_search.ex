@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NoteSearch do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
 
   schema do
     field :query, :string, required: true, description: "Search query for FTS5 search"
@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NoteSearch do
         end)
     }
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 end

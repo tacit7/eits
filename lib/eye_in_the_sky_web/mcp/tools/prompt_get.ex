@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.PromptGet do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
 
   schema do
     field :id, :string, description: "Prompt ID"
@@ -52,7 +52,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.PromptGet do
           %{success: false, message: "Either id or slug is required"}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 

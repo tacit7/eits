@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
 
   schema do
     field :instructions, :string,
@@ -103,7 +103,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
           %{success: false, message: "Spawn failed: #{inspect(reason)}"}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 

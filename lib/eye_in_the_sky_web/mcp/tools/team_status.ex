@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TeamStatus do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
   alias EyeInTheSkyWeb.{Repo, Teams}
   import Ecto.Query
 
@@ -58,7 +58,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TeamStatus do
           }
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 

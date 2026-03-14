@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.ProjectAdd do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
 
   schema do
     field :name, :string, required: true, description: "Project name (required)"
@@ -43,7 +43,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.ProjectAdd do
           %{success: false, message: "Failed: #{inspect(cs.errors)}"}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 end

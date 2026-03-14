@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
   alias EyeInTheSkyWeb.Sessions
 
   schema do
@@ -54,7 +54,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
     }
 
     result = create_or_find_session(attrs, agent_attrs)
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     # Store EITS session UUID in frame assigns so other tools (e.g. i-todo) can
     # auto-link to this session without requiring an explicit session_id param.
     updated_frame =
@@ -69,42 +69,42 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Session do
 
   def execute(%{command: "end"} = params, frame) do
     result = end_session(params)
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
   def execute(%{command: "update"} = params, frame) do
     result = update_session(params)
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
   def execute(%{command: "info"} = params, frame) do
     result = get_session_info(params)
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
   def execute(%{command: "search"} = params, frame) do
     result = search_sessions(params)
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
   def execute(%{command: "save-context"} = params, frame) do
     result = save_context(params)
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
   def execute(%{command: "load-context"} = params, frame) do
     result = load_context(params)
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
   def execute(%{command: cmd}, frame) do
-    response = Response.tool() |> Response.error("Unknown command: #{cmd}")
+    response = ResponseHelper.error_response("Unknown command: #{cmd}")
     {:reply, response, frame}
   end
 

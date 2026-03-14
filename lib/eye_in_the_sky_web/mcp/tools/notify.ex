@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Notify do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
   alias EyeInTheSkyWeb.Notifications
 
   schema do
@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Notify do
           %{success: false, message: "Failed: #{inspect(cs.errors)}"}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 

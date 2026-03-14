@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TeamJoin do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
   alias EyeInTheSkyWeb.{Sessions, Teams}
 
   schema do
@@ -54,11 +54,11 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TeamJoin do
             %{success: false, message: "Failed to join team", errors: errors}
         end
 
-      response = Response.tool() |> Response.json(result)
+      response = ResponseHelper.json_response(result)
       {:reply, response, frame}
     else
       {:error, msg} ->
-        response = Response.tool() |> Response.json(%{success: false, message: msg})
+        response = ResponseHelper.json_response(%{success: false, message: msg})
         {:reply, response, frame}
     end
   end

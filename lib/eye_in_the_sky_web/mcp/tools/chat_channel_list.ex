@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.ChatChannelList do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
 
   schema do
     field :project_id, :integer, description: "Filter by project ID (optional)"
@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.ChatChannelList do
         end)
     }
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 end

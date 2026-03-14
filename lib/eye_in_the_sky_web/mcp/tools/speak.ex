@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Speak do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
 
   @valid_voices ~w(Ava Isha Lee Jamie Serena)
 
@@ -32,7 +32,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Speak do
         {:error, reason} -> %{success: false, message: "Failed to queue TTS: #{inspect(reason)}"}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 

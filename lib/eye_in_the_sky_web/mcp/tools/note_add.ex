@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NoteAdd do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
 
   schema do
     field :parent_id, :string,
@@ -41,7 +41,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NoteAdd do
           %{success: false, message: "Failed: #{inspect(cs.errors)}"}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 

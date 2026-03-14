@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
   alias EyeInTheSkyWeb.Sessions
 
   schema do
@@ -43,7 +43,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
 
     if is_nil(session_int_id) do
       result = %{success: false, message: "Could not resolve session for agent_id: #{agent_id}"}
-      response = Response.tool() |> Response.json(result)
+      response = ResponseHelper.json_response(result)
       {:reply, response, frame}
     else
       results =
@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Commits do
         message: "Logged #{ok_count}/#{length(hashes)} commits"
       }
 
-      response = Response.tool() |> Response.json(result)
+      response = ResponseHelper.json_response(result)
       {:reply, response, frame}
     end
   end

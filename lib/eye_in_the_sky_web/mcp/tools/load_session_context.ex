@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.LoadSessionContext do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
   alias EyeInTheSkyWeb.{Contexts, Sessions}
 
   schema do
@@ -38,7 +38,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.LoadSessionContext do
           %{success: false, message: "No context found for session #{session_uuid}"}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 end

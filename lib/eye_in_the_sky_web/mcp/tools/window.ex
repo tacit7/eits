@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Window do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
 
   schema do
     field :_placeholder, :string, description: "No parameters needed"
@@ -51,7 +51,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Window do
           %{success: false, message: "osascript timed out after #{@timeout_ms}ms"}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 end

@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TeamMembers do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
   alias EyeInTheSkyWeb.Teams
 
   schema do
@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TeamMembers do
           }
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 end

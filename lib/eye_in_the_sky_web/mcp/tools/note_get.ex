@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NoteGet do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
 
   schema do
     field :note_id, :string, required: true, description: "Note ID to retrieve"
@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NoteGet do
           }
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 end

@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionInfo do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
   alias EyeInTheSkyWeb.Sessions
 
   schema do
@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionInfo do
         %{agent_id: nil, session_id: nil, initialized: false}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 

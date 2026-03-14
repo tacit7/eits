@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
 
   use Anubis.Server.Component, type: :tool
 
-  alias Anubis.Server.Response
+  alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
   alias EyeInTheSkyWeb.MCP.Tools.Helpers
 
   schema do
@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
           %{success: false, message: "Failed: #{inspect(cs.errors)}"}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
@@ -88,7 +88,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
       tasks: Enum.map(tasks, &format_task/1)
     }
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
@@ -113,7 +113,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
           %{success: true, team_id: team.id, team_name: team.name, tasks: Enum.map(tasks, &format_task/1)}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
@@ -129,7 +129,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
       tasks: Enum.map(tasks, &format_task/1)
     }
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
@@ -150,7 +150,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
       tasks: Enum.map(tasks, &format_task/1)
     }
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
@@ -168,7 +168,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
       tasks: Enum.map(tasks, &format_task/1)
     }
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
@@ -205,7 +205,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
         Ecto.Query.CastError -> %{success: false, message: "Invalid task_id: #{task_id}"}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
@@ -225,7 +225,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
         Ecto.Query.CastError -> %{success: false, message: "Invalid task_id: #{task_id}"}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
@@ -243,7 +243,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
         {:error, cs} -> %{success: false, message: "Failed: #{inspect(cs.errors)}"}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
@@ -261,7 +261,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
         Ecto.Query.CastError -> %{success: false, message: "Invalid task_id: #{task_id}"}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
@@ -276,7 +276,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
           %{success: true, message: "Session linked to task #{task_id}"}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
@@ -308,7 +308,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
           end
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
@@ -348,7 +348,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
           end
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
@@ -360,13 +360,13 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
         "Command '#{cmd}' is not supported. These are DB maintenance operations not available at the tool level."
     }
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
   def execute(%{command: cmd}, frame) do
     result = %{success: false, message: "Unknown command: #{cmd}"}
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 
@@ -393,7 +393,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
         Ecto.Query.CastError -> %{success: false, message: "Invalid task_id: #{task_id}"}
       end
 
-    response = Response.tool() |> Response.json(result)
+    response = ResponseHelper.json_response(result)
     {:reply, response, frame}
   end
 

@@ -3,23 +3,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentControllerTest do
 
   alias EyeInTheSkyWeb.Agents
 
-  defp uniq, do: System.unique_integer([:positive])
-
-  defp create_agent(overrides \\ %{}) do
-    {:ok, agent} =
-      Agents.create_agent(
-        Map.merge(
-          %{
-            uuid: Ecto.UUID.generate(),
-            description: "Test agent #{uniq()}",
-            source: "test"
-          },
-          overrides
-        )
-      )
-
-    agent
-  end
+  import EyeInTheSkyWeb.Factory
 
   # ---- GET /api/v1/agents ----
 

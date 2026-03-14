@@ -3,36 +3,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionControllerTest do
 
   alias EyeInTheSkyWeb.{Agents, Contexts, Sessions}
 
-  defp uniq, do: System.unique_integer([:positive])
-
-  defp create_agent do
-    {:ok, agent} =
-      Agents.create_agent(%{
-        uuid: Ecto.UUID.generate(),
-        description: "Test agent #{uniq()}",
-        source: "test"
-      })
-
-    agent
-  end
-
-  defp create_session(agent, overrides \\ %{}) do
-    {:ok, session} =
-      Sessions.create_session(
-        Map.merge(
-          %{
-            uuid: Ecto.UUID.generate(),
-            agent_id: agent.id,
-            name: "Test session #{uniq()}",
-            status: "working",
-            started_at: DateTime.utc_now() |> DateTime.to_iso8601()
-          },
-          overrides
-        )
-      )
-
-    session
-  end
+  import EyeInTheSkyWeb.Factory
 
   # ---- GET /api/v1/sessions ----
 

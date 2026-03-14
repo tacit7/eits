@@ -6,11 +6,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TodoToolTest do
 
   @frame :test_frame
 
-  defp json_result({:reply, %Anubis.Server.Response{content: [%{"text" => json} | _]}, @frame}) do
-    Jason.decode!(json, keys: :atoms)
-  end
-
-  defp uniq, do: System.unique_integer([:positive])
+  import EyeInTheSkyWeb.Factory
 
   defp make_task(attrs \\ %{}) do
     defaults = %{

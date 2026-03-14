@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.PromptControllerTest do
 
   alias EyeInTheSkyWeb.Prompts
 
-  defp uniq, do: System.unique_integer([:positive])
+  import EyeInTheSkyWeb.Factory
 
   defp valid_prompt_params(overrides \\ %{}) do
     n = uniq()

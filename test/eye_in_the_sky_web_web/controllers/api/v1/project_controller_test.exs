@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.ProjectControllerTest do
 
   alias EyeInTheSkyWeb.Projects
 
-  defp uniq, do: System.unique_integer([:positive])
+  import EyeInTheSkyWeb.Factory
 
   defp create_project(overrides \\ %{}) do
     n = uniq()

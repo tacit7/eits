@@ -3,31 +3,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.CommitControllerTest do
 
   alias EyeInTheSkyWeb.{Agents, Commits, Sessions}
 
-  defp uniq, do: System.unique_integer([:positive])
-
-  defp create_agent do
-    {:ok, agent} =
-      Agents.create_agent(%{
-        uuid: Ecto.UUID.generate(),
-        description: "Test agent #{uniq()}",
-        source: "test"
-      })
-
-    agent
-  end
-
-  defp create_session(agent) do
-    {:ok, session} =
-      Sessions.create_session(%{
-        uuid: Ecto.UUID.generate(),
-        agent_id: agent.id,
-        name: "Test session #{uniq()}",
-        status: "working",
-        started_at: DateTime.utc_now() |> DateTime.to_iso8601()
-      })
-
-    session
-  end
+  import EyeInTheSkyWeb.Factory
 
   defp create_commit(session, overrides \\ %{}) do
     {:ok, commit} =

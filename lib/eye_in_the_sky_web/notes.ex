@@ -16,6 +16,35 @@ defmodule EyeInTheSkyWeb.Notes do
   end
 
   @doc """
+  Batch-loads annotations for a list of tasks and sets :notes and :notes_count on each.
+  Notes are stored with parent_type "task"/"tasks" and parent_id as integer string or UUID.
+  """
+  def with_notes_count(tasks) when is_list(tasks) do
+    task_int_ids = Enum.map(tasks, &to_string(&1.id))
+    task_uuids = tasks |> Enum.map(& &1.uuid) |> Enum.reject(&is_nil/1)
+    all_ids = task_int_ids ++ task_uuids
+
+    notes_by_parent =
+      Note
+      |> where([n], n.parent_type in ["task", "tasks"])
+      |> where([n], n.parent_id in ^all_ids)
+      |> order_by([n], asc: n.created_at)
+      |> Repo.all()
+      |> Enum.group_by(& &1.parent_id)
+
+    Enum.map(tasks, fn task ->
+      notes =
+        (Map.get(notes_by_parent, to_string(task.id), []) ++
+           if task.uuid, do: Map.get(notes_by_parent, task.uuid, []), else: [])
+        |> Enum.uniq_by(& &1.id)
+
+      task
+      |> Map.put(:notes, notes)
+      |> Map.put(:notes_count, length(notes))
+    end)
+  end
+
+  @doc """
   Returns notes for a specific session.
   Handles both "session" and "sessions" parent_type for backwards compatibility.
   Matches on both integer ID (as string) and UUID for migration compatibility.
@@ -158,46 +187,36 @@ defmodule EyeInTheSkyWeb.Notes do
   Requires notes_fts FTS5 table in database.
   """
   def search_notes(query, agent_ids \\ [], opts \\ []) when is_binary(query) do
-    pattern = "%#{query}%"
+    agent_ids_str = Enum.map(agent_ids, &to_string/1)
 
-    fallback_query =
-      from n in Note,
-        where: ilike(n.body, ^pattern) or ilike(n.title, ^pattern)
-
-    fallback_query =
-      if length(agent_ids) > 0 do
-        where(fallback_query, [n], n.parent_type == "agent" and n.parent_id in ^agent_ids)
-      else
-        fallback_query
+    extra_where =
+      if agent_ids_str != [] do
+        dynamic([n], n.parent_type == "agent" and n.parent_id in ^agent_ids_str)
       end
-      |> order_by([n], desc: n.created_at)
 
     # Build SQL filter for agent_ids (params start at $2 since $1 is the search query)
     {sql_filter, sql_params} =
-      if length(agent_ids) > 0 do
+      if agent_ids_str != [] do
         placeholders =
-          agent_ids
+          agent_ids_str
           |> Enum.with_index(2)
           |> Enum.map(fn {_, i} -> "$#{i}" end)
           |> Enum.join(",")
 
-        {"AND n.parent_type = 'agent' AND n.parent_id IN (#{placeholders})",
-         Enum.map(agent_ids, &to_string/1)}
+        {"AND n.parent_type = 'agent' AND n.parent_id IN (#{placeholders})", agent_ids_str}
       else
         {"", []}
       end
 
-    limit = Keyword.get(opts, :limit)
-
-    FTS5.search(
+    FTS5.search_for(query,
       table: "notes",
       schema: Note,
-      query: query,
       search_columns: ["title", "body"],
       sql_filter: sql_filter,
       sql_params: sql_params,
-      fallback_query: fallback_query,
-      limit: limit
+      extra_where: extra_where,
+      order_by: [desc: :created_at],
+      limit: Keyword.get(opts, :limit)
     )
   end
 end

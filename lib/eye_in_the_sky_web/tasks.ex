@@ -11,6 +11,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   alias EyeInTheSkyWeb.QueryHelpers
   alias EyeInTheSkyWeb.QueryBuilder
   alias EyeInTheSkyWeb.Search.FTS5
+  alias EyeInTheSkyWeb.Notes
 
   # Workflow state IDs (matches workflow_states table)
   @state_todo 1
@@ -81,6 +82,7 @@ defmodule EyeInTheSkyWeb.Tasks do
       preload: [:state, :tags],
       order_by: [desc: :priority, asc: :created_at]
     )
+    |> Notes.with_notes_count()
   end
 
   @doc """
@@ -257,28 +259,17 @@ defmodule EyeInTheSkyWeb.Tasks do
   Requires task_search FTS5 table in database.
   """
   def search_tasks(query, project_id \\ nil) when is_binary(query) do
-    pattern = "%#{query}%"
+    extra_where =
+      if project_id, do: dynamic([t], t.project_id == ^project_id)
 
-    fallback_query =
-      from t in Task,
-        where: ilike(t.title, ^pattern) or ilike(t.description, ^pattern)
-
-    fallback_query =
-      if project_id do
-        where(fallback_query, [t], t.project_id == ^project_id)
-      else
-        fallback_query
-      end
-      |> order_by([t], desc: t.priority, desc: t.created_at)
-
-    FTS5.search(
+    FTS5.search_for(query,
       table: "tasks",
       schema: Task,
-      query: query,
       search_columns: ["title", "description"],
       sql_filter: if(project_id, do: "AND t.project_id = $2", else: ""),
       sql_params: if(project_id, do: [project_id], else: []),
-      fallback_query: fallback_query,
+      extra_where: extra_where,
+      order_by: [desc: :priority, desc: :created_at],
       preload: [:state, :tags, :agents]
     )
   end

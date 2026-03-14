@@ -9,6 +9,51 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
   import Ecto.Query, warn: false
   alias EyeInTheSkyWeb.Repo
 
+  # Only lowercase letters, digits, and underscores — no injection vectors
+  @safe_identifier ~r/^[a-z][a-z0-9_]*$/
+
+  @doc """
+  Convenience wrapper around `search/1` that builds the ILIKE fallback query automatically.
+
+  Accepts the same options as `search/1`, plus:
+
+  - `:extra_where` - An `Ecto.Query.dynamic/2` expression ANDed onto the ILIKE fallback
+  - `:order_by` - Ecto order_by keyword list for the fallback query (e.g. `[desc: :created_at]`)
+
+  The fallback is built as:
+      WHERE col1 ILIKE pattern OR col2 ILIKE pattern [AND extra_where] ORDER BY order_by
+  """
+  def search_for(query, opts) when is_binary(query) do
+    schema = Keyword.fetch!(opts, :schema)
+    search_columns = Keyword.fetch!(opts, :search_columns)
+    order_by = Keyword.get(opts, :order_by, [])
+    extra_where = Keyword.get(opts, :extra_where)
+
+    pattern = "%#{query}%"
+    column_atoms = Enum.map(search_columns, &String.to_existing_atom/1)
+
+    fallback_query =
+      Enum.reduce(column_atoms, from(s in schema), fn col, acc ->
+        or_where(acc, [s], ilike(field(s, ^col), ^pattern))
+      end)
+
+    fallback_query =
+      if extra_where do
+        where(fallback_query, ^extra_where)
+      else
+        fallback_query
+      end
+
+    fallback_query =
+      if order_by != [] do
+        order_by(fallback_query, ^order_by)
+      else
+        fallback_query
+      end
+
+    search(opts ++ [fallback_query: fallback_query])
+  end
+
   @doc """
   Performs PostgreSQL full-text search with fallback to ILIKE queries.
 
@@ -27,23 +72,7 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
 
   - `:fts_table` - No longer used (PostgreSQL doesn't need separate FTS tables)
   - `:join_key` - No longer used
-
-  ## Examples
-
-      FTS5.search(
-        table: "tasks",
-        schema: Task,
-        query: "bug fix",
-        search_columns: ["title", "description"],
-        sql_filter: "AND t.project_id = $2",
-        sql_params: [project_id],
-        fallback_query: from(t in Task, where: ilike(t.title, ^pattern)),
-        preload: [:state, :tags]
-      )
   """
-  # Only lowercase letters, digits, and underscores — no injection vectors
-  @safe_identifier ~r/^[a-z][a-z0-9_]*$/
-
   def search(opts) do
     table = Keyword.fetch!(opts, :table)
     schema = Keyword.fetch!(opts, :schema)

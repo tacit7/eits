@@ -144,33 +144,24 @@ defmodule EyeInTheSkyWeb.Prompts do
   Requires prompt_search FTS5 table in database.
   """
   def search_prompts(query, project_id \\ nil) when is_binary(query) do
-    pattern = "%#{query}%"
-
-    fallback_query =
-      from p in Prompt,
-        where:
-          (ilike(p.name, ^pattern) or ilike(p.description, ^pattern) or
-             ilike(p.prompt_text, ^pattern)) and p.active == true
-
-    fallback_query =
+    extra_where =
       if project_id do
-        where(fallback_query, [p], p.project_id == ^project_id or is_nil(p.project_id))
+        dynamic([p], (p.project_id == ^project_id or is_nil(p.project_id)) and p.active == true)
       else
-        fallback_query
+        dynamic([p], p.active == true)
       end
-      |> order_by([p], desc: p.updated_at)
 
-    FTS5.search(
+    FTS5.search_for(query,
       table: "subagent_prompts",
       schema: Prompt,
-      query: query,
       search_columns: ["name", "description", "prompt_text"],
       sql_filter: """
       #{if project_id, do: "AND (s.project_id = $2 OR s.project_id IS NULL)", else: ""}
       AND s.active = true
       """,
       sql_params: if(project_id, do: [project_id], else: []),
-      fallback_query: fallback_query
+      extra_where: extra_where,
+      order_by: [desc: :updated_at]
     )
   end
 end

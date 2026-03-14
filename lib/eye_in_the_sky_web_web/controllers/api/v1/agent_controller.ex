@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
   use EyeInTheSkyWebWeb, :controller
 
+  action_fallback EyeInTheSkyWebWeb.Api.V1.FallbackController
+
   import EyeInTheSkyWebWeb.ControllerHelpers
 
   alias EyeInTheSkyWeb.{Agents, Claude.AgentManager, Teams}
@@ -42,9 +44,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
         _ -> Agents.get_agent_by_uuid(id)
       end
 
-    case result do
-      {:ok, agent} -> json(conn, %{success: true, agent: format_agent(agent)})
-      _ -> conn |> put_status(:not_found) |> json(%{error: "Agent not found"})
+    with {:ok, agent} <- result do
+      json(conn, %{success: true, agent: format_agent(agent)})
     end
   end
 

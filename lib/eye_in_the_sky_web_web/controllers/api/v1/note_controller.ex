@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.NoteController do
   use EyeInTheSkyWebWeb, :controller
 
+  action_fallback EyeInTheSkyWebWeb.Api.V1.FallbackController
+
   import EyeInTheSkyWebWeb.ControllerHelpers
 
   alias EyeInTheSkyWeb.Notes
@@ -56,8 +58,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.NoteController do
         created_at: to_string(note.created_at)
       })
     rescue
-      Ecto.NoResultsError ->
-        conn |> put_status(:not_found) |> json(%{error: "Note not found"})
+      Ecto.NoResultsError -> {:error, :not_found}
     end
   end
 
@@ -123,14 +124,11 @@ defmodule EyeInTheSkyWebWeb.Api.V1.NoteController do
             starred: updated.starred || 0
           })
 
-        {:error, cs} ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> json(%{error: "Failed", details: translate_errors(cs)})
+        {:error, _} = err ->
+          err
       end
     rescue
-      Ecto.NoResultsError ->
-        conn |> put_status(:not_found) |> json(%{error: "Note not found"})
+      Ecto.NoResultsError -> {:error, :not_found}
     end
   end
 

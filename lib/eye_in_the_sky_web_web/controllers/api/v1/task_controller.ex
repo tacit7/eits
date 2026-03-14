@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
   use EyeInTheSkyWebWeb, :controller
 
+  action_fallback EyeInTheSkyWebWeb.Api.V1.FallbackController
+
   import EyeInTheSkyWebWeb.ControllerHelpers
 
   alias EyeInTheSkyWeb.{Agents, Notes, Projects, Sessions, Tasks}
@@ -103,8 +105,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
         annotations: Enum.map(annotations, &format_note/1)
       })
     rescue
-      Ecto.NoResultsError ->
-        conn |> put_status(:not_found) |> json(%{error: "Task not found"})
+      Ecto.NoResultsError -> {:error, :not_found}
     end
   end
 
@@ -127,14 +128,11 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
         {:ok, updated} ->
           json(conn, %{success: true, message: "Task updated", task: format_task(updated)})
 
-        {:error, cs} ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> json(%{error: "Failed", details: translate_errors(cs)})
+        {:error, _} = err ->
+          err
       end
     rescue
-      Ecto.NoResultsError ->
-        conn |> put_status(:not_found) |> json(%{error: "Task not found"})
+      Ecto.NoResultsError -> {:error, :not_found}
     end
   end
 
@@ -149,14 +147,11 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
         {:ok, _} ->
           json(conn, %{success: true, message: "Task deleted"})
 
-        {:error, cs} ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> json(%{error: "Failed", details: translate_errors(cs)})
+        {:error, _} = err ->
+          err
       end
     rescue
-      Ecto.NoResultsError ->
-        conn |> put_status(:not_found) |> json(%{error: "Task not found"})
+      Ecto.NoResultsError -> {:error, :not_found}
     end
   end
 
@@ -201,18 +196,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
   DELETE /api/v1/tasks/:id/sessions/:uuid - Unlink a session from a task.
   """
   def unlink_session(conn, %{"id" => task_id, "uuid" => session_uuid}) do
-    int_id =
-      case Integer.parse(session_uuid) do
-        {n, ""} ->
-          n
-
-        _ ->
-          case Sessions.get_session_by_uuid(session_uuid) do
-            {:ok, s} -> s.id
-            _ -> nil
-          end
-      end
-
+    int_id = resolve_session_int_id(session_uuid)
     task_int_id = if is_binary(task_id), do: String.to_integer(task_id), else: task_id
 
     if int_id do
@@ -272,18 +256,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
   defp maybe_link_session(_task_id, nil), do: :ok
 
   defp maybe_link_session(task_id, session_id) when is_binary(session_id) do
-    int_id =
-      case Integer.parse(session_id) do
-        {n, ""} ->
-          n
-
-        _ ->
-          case Sessions.get_session_by_uuid(session_id) do
-            {:ok, s} -> s.id
-            _ -> nil
-          end
-      end
-
+    int_id = resolve_session_int_id(session_id)
     task_int_id = if is_binary(task_id), do: String.to_integer(task_id), else: task_id
 
     if int_id do
@@ -309,6 +282,10 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
 
   defp maybe_add_tags(_task, tags) do
     Enum.each(tags, fn tag_name -> Tasks.get_or_create_tag(tag_name) end)
+  end
+
+  defp resolve_session_int_id(raw) do
+    resolve_id(raw, &Sessions.get_session_by_uuid/1)
   end
 
 end

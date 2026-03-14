@@ -31,4 +31,29 @@ defmodule EyeInTheSkyWebWeb.ControllerHelpers do
   def normalize_parent_type("tasks"), do: "task"
   def normalize_parent_type("projects"), do: "project"
   def normalize_parent_type(type), do: type
+
+  @doc """
+  Resolves a raw string to an integer ID.
+
+  Tries Integer.parse first; on failure calls lookup_fn.(raw), which should
+  return {:ok, struct_with_id} or {:ok, integer} on success, or any error
+  tuple on failure.
+
+  Returns the integer ID or nil.
+  """
+  def resolve_id(nil, _lookup_fn), do: nil
+
+  def resolve_id(raw, lookup_fn) when is_binary(raw) do
+    case Integer.parse(raw) do
+      {n, ""} ->
+        n
+
+      _ ->
+        case lookup_fn.(raw) do
+          {:ok, %{id: id}} -> id
+          {:ok, id} when is_integer(id) -> id
+          _ -> nil
+        end
+    end
+  end
 end

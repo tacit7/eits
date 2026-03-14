@@ -44,7 +44,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
   @impl true
   def execute(params, frame) do
     alias EyeInTheSkyWeb.Claude.AgentManager
-    alias EyeInTheSkyWeb.Teams
+    alias EyeInTheSkyWeb.{Sessions, Teams}
 
     # Resolve team before spawning so we can inject team_id into instructions
     team =
@@ -59,12 +59,19 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
         t -> params[:instructions] <> "\n\n" <> build_team_context(t, params[:member_name])
       end
 
+    # Inherit project context from caller when not explicitly provided
+    caller_session_uuid = frame.assigns[:eits_session_id]
+    caller_project_id = frame.assigns[:eits_project_id]
+
+    {resolved_project_id, resolved_project_path} =
+      resolve_project_context(params, caller_project_id, caller_session_uuid, Sessions)
+
     opts = [
       instructions: instructions,
       model: params[:model] || "haiku",
       agent_type: params[:provider] || "claude",
-      project_id: params[:project_id],
-      project_path: params[:project_path],
+      project_id: resolved_project_id,
+      project_path: resolved_project_path,
       description: String.slice(params[:instructions] || "Agent session", 0, 250),
       worktree: params[:worktree],
       effort_level: params[:effort_level],
@@ -100,6 +107,28 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
     {:reply, response, frame}
   end
 
+  # Fall back to caller's project context when not explicitly provided
+  defp resolve_project_context(params, caller_project_id, caller_session_uuid, sessions_mod) do
+    project_id = params[:project_id] || caller_project_id
+
+    project_path =
+      case params[:project_path] do
+        path when is_binary(path) and path != "" ->
+          path
+
+        _ ->
+          case caller_session_uuid && sessions_mod.get_session_by_uuid(caller_session_uuid) do
+            {:ok, caller_session} when is_binary(caller_session.git_worktree_path) ->
+              caller_session.git_worktree_path
+
+            _ ->
+              nil
+          end
+      end
+
+    {project_id, project_path}
+  end
+
   defp maybe_join_team(nil, _agent, _session, _name), do: :ok
 
   defp maybe_join_team(team, agent, session, member_name) do
@@ -123,6 +152,14 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgent do
     Use i-team-members with team_id: #{team.id} to discover your teammates.
     Use i-todo list with team_id: #{team.id} to see shared tasks and claim work.
     Use i-team-join with command: "status" to update your status (active/idle/done).
+
+    ## Task Completion
+    When you finish a task or move it to in-review (state 4), follow this sequence exactly:
+    1. Call `i-todo` with command: "annotate", task_id: "<task_id>", body: "Summary of what was done, decisions made, and any issues encountered"
+    2. Call `i-todo` with command: "done", task_id: "<task_id>" (or command: "status", task_id: "<task_id>", state_id: 4 for in-review)
+    3. Call `i-team-join` with command: "status", status: "done"
+    4. Run the `/i-update-status` slash command to commit your work and update session tracking
+    Do NOT skip any steps. The orchestrator needs to see what you did.
     """
   end
 end

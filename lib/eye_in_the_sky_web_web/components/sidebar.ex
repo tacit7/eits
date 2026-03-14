@@ -280,7 +280,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
             phx-click="toggle_chat"
             phx-target={@myself}
             class={[
-              "flex items-center gap-2.5 w-full text-left text-[13px] transition-colors",
+              "flex items-center gap-2.5 w-full text-left text-sm transition-colors",
               if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
               if(@sidebar_tab == :chat,
                 do: "text-primary bg-primary/10 border-l-2 border-primary font-medium",
@@ -307,7 +307,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
                 <.link
                   navigate={~p"/chat?channel_id=#{channel.id}"}
                   class={[
-                    "block pl-4 pr-3 py-1 text-xs transition-colors",
+                    "block pl-4 pr-3 py-1 text-sm transition-colors",
                     if(@active_channel_id && to_string(@active_channel_id) == to_string(channel.id),
                       do: "text-primary font-medium bg-primary/5",
                       else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/5"
@@ -340,7 +340,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
                 <button
                   phx-click="show_new_channel"
                   phx-target={@myself}
-                  class="block pl-4 pr-3 py-1 text-xs text-base-content/30 hover:text-base-content/55 transition-colors w-full text-left"
+                  class="block pl-4 pr-3 py-1 text-sm text-base-content/30 hover:text-base-content/55 transition-colors w-full text-left"
                 >
                   + New Channel
                 </button>
@@ -559,7 +559,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     <.link
       navigate={@href}
       class={[
-        "flex items-center gap-2.5 text-[13px] transition-colors",
+        "flex items-center gap-2.5 text-base transition-colors",
         if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
         if(@active,
           do: "text-primary bg-primary/10 border-l-2 border-primary font-medium",
@@ -609,7 +609,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     <.link
       navigate={@href}
       class={[
-        "flex items-center gap-2.5 text-[13px] transition-colors",
+        "flex items-center gap-2.5 text-base transition-colors",
         if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
         if(@active,
           do: "text-primary bg-primary/10 border-l-2 border-primary font-medium",
@@ -633,7 +633,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     <.link
       navigate={@href}
       class={[
-        "block pl-4 pr-3 py-0.5 text-xs transition-colors",
+        "block pl-4 pr-3 py-0.5 text-sm transition-colors",
         if(@active,
           do: "text-primary font-medium bg-primary/5",
           else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/5"

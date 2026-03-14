@@ -699,7 +699,13 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   defp message_body(assigns) do
     segments = parse_body_segments(assigns.message.body)
     thinking = get_in(assigns.message.metadata || %{}, ["thinking"])
-    assigns = assigns |> assign(:segments, segments) |> assign(:thinking, thinking)
+    stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
+
+    assigns =
+      assigns
+      |> assign(:segments, segments)
+      |> assign(:thinking, thinking)
+      |> assign(:stream_type, stream_type)
 
     ~H"""
     <div class="mt-1 space-y-1.5">
@@ -721,22 +727,58 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           <pre class="font-mono text-xs text-base-content/40 whitespace-pre-wrap break-words leading-relaxed">{@thinking}</pre>
         </div>
       </details>
-      <%= for {segment, idx} <- Enum.with_index(@segments) do %>
-        <%= case segment do %>
-          <% {:tool_call, name, rest} -> %>
-            <.tool_widget name={name} rest={rest} />
-          <% {:text, text} when text != "" -> %>
-            <div
-              id={"msg-body-#{@message.id}-#{idx}"}
-              class="dm-markdown text-sm leading-relaxed text-base-content/85"
-              phx-hook="MarkdownMessage"
-              data-raw-body={text}
-            >
-            </div>
-          <% _ -> %>
+      <%= if @stream_type == "tool_result" do %>
+        <.tool_result_body body={@message.body} />
+      <% else %>
+        <%= for {segment, idx} <- Enum.with_index(@segments) do %>
+          <%= case segment do %>
+            <% {:tool_call, name, rest} -> %>
+              <.tool_widget name={name} rest={rest} />
+            <% {:text, text} when text != "" -> %>
+              <div
+                id={"msg-body-#{@message.id}-#{idx}"}
+                class="dm-markdown text-sm leading-relaxed text-base-content/85"
+                phx-hook="MarkdownMessage"
+                data-raw-body={text}
+              >
+              </div>
+            <% _ -> %>
+          <% end %>
         <% end %>
       <% end %>
     </div>
+    """
+  end
+
+  attr :body, :string, default: ""
+
+  defp tool_result_body(assigns) do
+    body = assigns.body || ""
+    preview = body |> String.slice(0..100) |> then(&if String.length(body) > 100, do: &1 <> "…", else: &1)
+    assigns = assign(assigns, :preview, preview)
+
+    ~H"""
+    <details class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden">
+      <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
+        <.icon name="hero-code-bracket" class="w-3.5 h-3.5 flex-shrink-0 text-base-content/30" />
+        <span class="text-[11px] font-mono font-semibold text-base-content/40 uppercase tracking-wide flex-shrink-0">
+          Output
+        </span>
+        <span
+          :if={@preview != ""}
+          class="text-[11px] font-mono text-base-content/25 truncate flex-1 min-w-0"
+        >
+          {@preview}
+        </span>
+        <.icon
+          name="hero-chevron-right"
+          class="w-3 h-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
+        />
+      </summary>
+      <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
+        <pre class="font-mono text-[10px] text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto">{@body}</pre>
+      </div>
+    </details>
     """
   end
 
@@ -745,7 +787,19 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
 
   defp tool_widget(assigns) do
     {icon, label, detail} = tool_widget_meta(assigns.name, assigns.rest)
-    assigns = assigns |> assign(:icon, icon) |> assign(:label, label) |> assign(:detail, detail)
+
+    input =
+      case Jason.decode(assigns.rest) do
+        {:ok, map} when is_map(map) -> map
+        _ -> nil
+      end
+
+    assigns =
+      assigns
+      |> assign(:icon, icon)
+      |> assign(:label, label)
+      |> assign(:detail, detail)
+      |> assign(:input, input)
 
     ~H"""
     <details class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden">
@@ -765,13 +819,71 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           class="w-3 h-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
         />
       </summary>
-      <div
-        :if={@rest != "" && @rest != @detail}
-        class="px-2.5 pb-2 pt-1 border-t border-base-content/5"
-      >
-        <pre class="font-mono text-[10px] text-base-content/45 whitespace-pre-wrap break-all leading-relaxed">{@rest}</pre>
-      </div>
+      <.tool_widget_body name={@name} rest={@rest} detail={@detail} input={@input} />
     </details>
+    """
+  end
+
+  attr :name, :string, required: true
+  attr :rest, :string, required: true
+  attr :detail, :string, required: true
+  attr :input, :any, default: nil
+
+  defp tool_widget_body(assigns) do
+    body_type =
+      cond do
+        assigns.name == "Bash" and is_map(assigns.input) and
+            Map.has_key?(assigns.input, "command") ->
+          :bash
+
+        assigns.name == "Edit" and is_map(assigns.input) and
+            Map.has_key?(assigns.input, "old_string") ->
+          :edit
+
+        assigns.name == "Write" and is_map(assigns.input) and
+            Map.has_key?(assigns.input, "content") ->
+          :write
+
+        is_map(assigns.input) and map_size(assigns.input) > 0 and
+            assigns.name not in ["Read", "Glob", "Grep", "WebSearch", "Task"] ->
+          :json
+
+        assigns.rest != "" and assigns.rest != assigns.detail ->
+          :text
+
+        true ->
+          :none
+      end
+
+    assigns = assign(assigns, :body_type, body_type)
+
+    ~H"""
+    <%= case @body_type do %>
+      <% :bash -> %>
+        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
+          <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-[10px] text-base-content/70 whitespace-pre-wrap break-all leading-relaxed">{@input["command"]}</pre>
+        </div>
+      <% :edit -> %>
+        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5 space-y-1.5">
+          <div class="font-mono text-[10px] text-base-content/40 pb-0.5">{@input["file_path"]}</div>
+          <pre class="bg-red-950/30 text-red-400/70 rounded px-2 py-1 font-mono text-[10px] whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{String.slice(@input["old_string"] || "", 0..500)}</pre>
+          <pre class="bg-green-950/30 text-green-400/70 rounded px-2 py-1 font-mono text-[10px] whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{String.slice(@input["new_string"] || "", 0..500)}</pre>
+        </div>
+      <% :write -> %>
+        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5 space-y-1">
+          <div class="font-mono text-[10px] text-base-content/40 pb-0.5">{@input["file_path"]}</div>
+          <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-[10px] text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-48 overflow-y-auto">{String.slice(@input["content"] || "", 0..500)}{if String.length(@input["content"] || "") > 500, do: "\n…", else: ""}</pre>
+        </div>
+      <% :json -> %>
+        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
+          <pre class="font-mono text-[10px] text-base-content/40 whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto">{Jason.encode!(@input, pretty: true)}</pre>
+        </div>
+      <% :text -> %>
+        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
+          <pre class="font-mono text-[10px] text-base-content/45 whitespace-pre-wrap break-all leading-relaxed">{@rest}</pre>
+        </div>
+      <% :none -> %>
+    <% end %>
     """
   end
 
@@ -926,7 +1038,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             </span>
           <% end %>
           <%= if @context_window > 0 do %>
-            <% remaining = @context_window - @context_used %>
+            <% remaining = max(0, @context_window - @context_used) %>
             <% pct = Float.round(remaining / @context_window * 100, 1) %>
             <% color_class = cond do
               pct > 40 -> "text-base-content/30"
@@ -1580,45 +1692,114 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   defp parse_body_segment(text) do
     trimmed = String.trim(text)
 
-    case Regex.run(~r/^> `([^`]+)` ?(.*)/s, trimmed, capture: :all_but_first) do
-      [name, rest] -> {:tool_call, name, String.trim(rest)}
-      _ -> {:text, text}
+    cond do
+      # session_reader format: > `ToolName` args...
+      match = Regex.run(~r/^> `([^`]+)` ?(.*)/s, trimmed, capture: :all_but_first) ->
+        [name, rest] = match
+        {:tool_call, name, String.trim(rest)}
+
+      # session_worker format: Tool: ToolName\n{json}
+      match = Regex.run(~r/^Tool: ([^\n]+)\n(.*)/s, trimmed, capture: :all_but_first) ->
+        [name, json_rest] = match
+        {:tool_call, String.trim(name), String.trim(json_rest)}
+
+      true ->
+        {:text, text}
     end
   end
 
   defp tool_widget_meta("Bash", rest) do
     command =
-      case Regex.run(~r/^`(.+?)`/s, rest, capture: :all_but_first) do
-        [cmd] -> cmd
-        _ -> rest
+      with {:ok, %{"command" => cmd}} <- Jason.decode(rest) do
+        String.slice(cmd, 0..120) <> if(String.length(cmd) > 121, do: "…", else: "")
+      else
+        _ ->
+          case Regex.run(~r/^`(.+?)`/s, rest, capture: :all_but_first) do
+            [cmd] -> cmd
+            _ -> rest
+          end
       end
 
     {"hero-command-line", "Bash", command}
   end
 
-  defp tool_widget_meta("Read", rest), do: {"hero-document-text", "Read", rest}
-  defp tool_widget_meta("Write", rest), do: {"hero-pencil-square", "Write", rest}
-  defp tool_widget_meta("Edit", rest), do: {"hero-pencil-square", "Edit", rest}
-  defp tool_widget_meta("Glob", rest), do: {"hero-folder-open", "Glob", rest}
-  defp tool_widget_meta("Task", rest), do: {"hero-cpu-chip", "Task", rest}
+  defp tool_widget_meta("Read", rest) do
+    path = with {:ok, %{"file_path" => p}} <- Jason.decode(rest), do: p, else: (_ -> rest)
+    {"hero-document-text", "Read", path}
+  end
+
+  defp tool_widget_meta("Write", rest) do
+    path = with {:ok, %{"file_path" => p}} <- Jason.decode(rest), do: p, else: (_ -> rest)
+    {"hero-pencil-square", "Write", path}
+  end
+
+  defp tool_widget_meta("Edit", rest) do
+    path = with {:ok, %{"file_path" => p}} <- Jason.decode(rest), do: p, else: (_ -> rest)
+    {"hero-pencil-square", "Edit", path}
+  end
+
+  defp tool_widget_meta("Glob", rest) do
+    pat = with {:ok, %{"pattern" => p}} <- Jason.decode(rest), do: p, else: (_ -> rest)
+    {"hero-folder-open", "Glob", pat}
+  end
+
+  defp tool_widget_meta("Task", rest) do
+    prompt =
+      with {:ok, %{"prompt" => p}} <- Jason.decode(rest) do
+        String.slice(p, 0..80) <> if(String.length(p) > 81, do: "…", else: "")
+      else
+        _ -> rest
+      end
+
+    {"hero-cpu-chip", "Task", prompt}
+  end
 
   defp tool_widget_meta("Grep", rest) do
-    case Regex.run(~r/^`([^`]+)`\s*(.*)/s, rest, capture: :all_but_first) do
-      [pattern, path] ->
-        detail = [pattern, path] |> Enum.reject(&(&1 == "")) |> Enum.join(" ")
+    case Jason.decode(rest) do
+      {:ok, %{"pattern" => pat} = input} ->
+        path = input["path"] || ""
+        detail = [pat, path] |> Enum.reject(&(&1 == "")) |> Enum.join(" ")
         {"hero-magnifying-glass", "Grep", detail}
 
       _ ->
-        {"hero-magnifying-glass", "Grep", rest}
+        case Regex.run(~r/^`([^`]+)`\s*(.*)/s, rest, capture: :all_but_first) do
+          [pattern, path] ->
+            detail = [pattern, path] |> Enum.reject(&(&1 == "")) |> Enum.join(" ")
+            {"hero-magnifying-glass", "Grep", detail}
+
+          _ ->
+            {"hero-magnifying-glass", "Grep", rest}
+        end
     end
   end
 
-  defp tool_widget_meta("WebSearch", rest), do: {"hero-globe-alt", "WebSearch", rest}
+  defp tool_widget_meta("WebSearch", rest) do
+    query = with {:ok, %{"query" => q}} <- Jason.decode(rest), do: q, else: (_ -> rest)
+    {"hero-globe-alt", "WebSearch", query}
+  end
 
   defp tool_widget_meta(name, rest) do
     if String.contains?(name, "__") do
       short = name |> String.split("__") |> List.last()
-      {"hero-puzzle-piece", short, rest}
+
+      detail =
+        case Jason.decode(rest) do
+          {:ok, input} when is_map(input) ->
+            summary =
+              input
+              |> Map.to_list()
+              |> Enum.take(2)
+              |> Enum.filter(fn {_k, v} -> is_binary(v) or is_number(v) or is_atom(v) end)
+              |> Enum.map(fn {k, v} -> "#{k}: #{String.slice(to_string(v), 0..40)}" end)
+              |> Enum.join(", ")
+
+            if summary == "", do: rest, else: summary
+
+          _ ->
+            rest
+        end
+
+      {"hero-puzzle-piece", short, detail}
     else
       {"hero-wrench-screwdriver", name, rest}
     end

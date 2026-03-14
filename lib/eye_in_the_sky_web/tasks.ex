@@ -223,8 +223,25 @@ defmodule EyeInTheSkyWeb.Tasks do
   end
 
   @doc """
-  Deletes a task.
+  Archives a task (sets archived = true). Non-destructive.
   """
+  def archive_task(%Task{} = task) do
+    result = update_task(task, %{archived: true, updated_at: DateTime.utc_now() |> DateTime.to_iso8601()})
+    case result do
+      {:ok, updated} -> broadcast_change({:updated, updated})
+      _ -> :ok
+    end
+    result
+  end
+
+  @doc """
+  Unarchives a task (sets archived = false).
+  """
+  def unarchive_task(%Task{} = task) do
+    update_task(task, %{archived: false, updated_at: DateTime.utc_now() |> DateTime.to_iso8601()})
+  end
+
+  @doc "Deletes a task."
   def delete_task(%Task{} = task) do
     result = Repo.delete(task)
 

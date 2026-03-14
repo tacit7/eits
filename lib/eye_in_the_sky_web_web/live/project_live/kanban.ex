@@ -26,9 +26,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
         preload: [:agents]
       )
       |> assign(:search_query, "")
+      |> assign(:filter_priority, nil)
+      |> assign(:filter_tag, nil)
       |> assign(:workflow_states, Tasks.list_workflow_states())
       |> assign(:tasks, [])
       |> assign(:tasks_by_state, %{})
+      |> assign(:available_tags, [])
       |> assign(:show_new_task_drawer, false)
       |> assign(:show_task_detail_drawer, false)
       |> assign(:selected_task, nil)
@@ -223,6 +226,26 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   end
 
   @impl true
+  def handle_event("archive_task", %{"task_id" => task_id}, socket) do
+    task = Tasks.get_task_by_uuid_or_id!(task_id)
+
+    case Tasks.archive_task(task) do
+      {:ok, _} ->
+        socket =
+          socket
+          |> assign(:show_task_detail_drawer, false)
+          |> assign(:selected_task, nil)
+          |> load_tasks()
+          |> put_flash(:info, "Task archived")
+
+        {:noreply, socket}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to archive task")}
+    end
+  end
+
+  @impl true
   def handle_event("add_task_annotation", %{"task_id" => task_id, "body" => body}, socket) do
     task = Tasks.get_task_by_uuid_or_id!(task_id)
     body = String.trim(body)
@@ -239,6 +262,28 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     else
       {:noreply, socket}
     end
+  end
+
+  @impl true
+  def handle_event("clear_filters", _params, socket) do
+    {:noreply, socket |> assign(:filter_priority, nil) |> assign(:filter_tag, nil) |> apply_filters()}
+  end
+
+  @impl true
+  def handle_event("set_priority_filter", %{"priority" => priority}, socket) do
+    new_priority = if priority == "", do: nil, else: String.to_integer(priority)
+    current = socket.assigns.filter_priority
+    priority_filter = if current == new_priority, do: nil, else: new_priority
+
+    {:noreply, socket |> assign(:filter_priority, priority_filter) |> apply_filters()}
+  end
+
+  @impl true
+  def handle_event("set_tag_filter", %{"tag" => tag}, socket) do
+    current = socket.assigns.filter_tag
+    tag_filter = if current == tag, do: nil, else: tag
+
+    {:noreply, socket |> assign(:filter_tag, tag_filter) |> apply_filters()}
   end
 
   @impl true
@@ -322,7 +367,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     project_id = socket.assigns.project_id
     query = socket.assigns.search_query
 
-    tasks =
+    all_tasks =
       if query != "" and String.trim(query) != "" do
         Tasks.search_tasks(query, project_id)
       else
@@ -330,15 +375,44 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       end
       |> Notes.with_notes_count()
 
-    # Group tasks by state for kanban view
+    available_tags =
+      all_tasks
+      |> Enum.flat_map(fn t -> t.tags || [] end)
+      |> Enum.uniq_by(& &1.name)
+      |> Enum.sort_by(& &1.name)
+
+    socket
+    |> assign(:tasks, all_tasks)
+    |> assign(:available_tags, available_tags)
+    |> apply_filters()
+  end
+
+  defp apply_filters(socket) do
+    tasks = socket.assigns.tasks
+    priority_filter = socket.assigns.filter_priority
+    tag_filter = socket.assigns.filter_tag
+
+    filtered =
+      tasks
+      |> filter_by_priority(priority_filter)
+      |> filter_by_tag(tag_filter)
+
     tasks_by_state =
-      Enum.group_by(tasks, fn task ->
+      Enum.group_by(filtered, fn task ->
         if task.state, do: task.state.id, else: nil
       end)
 
-    socket
-    |> assign(:tasks, tasks)
-    |> assign(:tasks_by_state, tasks_by_state)
+    assign(socket, :tasks_by_state, tasks_by_state)
+  end
+
+  defp filter_by_priority(tasks, nil), do: tasks
+  defp filter_by_priority(tasks, priority), do: Enum.filter(tasks, &(&1.priority == priority))
+
+  defp filter_by_tag(tasks, nil), do: tasks
+  defp filter_by_tag(tasks, tag_name) do
+    Enum.filter(tasks, fn t ->
+      Enum.any?(t.tags || [], &(&1.name == tag_name))
+    end)
   end
 
   defp state_dot_color(color) when is_binary(color), do: color
@@ -376,6 +450,42 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
           <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Task
         </button>
       </div>
+
+      <%!-- Filter chips --%>
+      <%= if @available_tags != [] || @filter_priority do %>
+        <div class="mb-3 flex flex-wrap items-center gap-1.5">
+          <%!-- Priority filters --%>
+          <%= for {label, value, color} <- [{"High", 3, "text-error"}, {"Med", 2, "text-warning"}, {"Low", 1, "text-info"}] do %>
+            <button
+              phx-click="set_priority_filter"
+              phx-value-priority={value}
+              class={"btn btn-xs gap-1 " <> if(@filter_priority == value, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
+            >
+              <span class={color}>●</span> {label}
+            </button>
+          <% end %>
+          <%= if @available_tags != [] do %>
+            <span class="text-base-content/15 text-xs">|</span>
+            <%= for tag <- @available_tags do %>
+              <button
+                phx-click="set_tag_filter"
+                phx-value-tag={tag.name}
+                class={"btn btn-xs " <> if(@filter_tag == tag.name, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
+              >
+                {tag.name}
+              </button>
+            <% end %>
+          <% end %>
+          <%= if @filter_priority || @filter_tag do %>
+            <button
+              phx-click="clear_filters"
+              class="btn btn-xs btn-ghost text-base-content/30 hover:text-base-content/60"
+            >
+              Clear
+            </button>
+          <% end %>
+        </div>
+      <% end %>
 
       <%!-- Kanban columns --%>
       <div class="flex-1 min-h-0 overflow-x-auto">

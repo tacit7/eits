@@ -80,7 +80,10 @@ defmodule EyeInTheSkyWeb.Projects do
   end
 
   defp base_project_tasks_query(project_id, opts) do
-    from(t in EyeInTheSkyWeb.Tasks.Task, where: t.project_id == ^project_id)
-    |> QueryBuilder.maybe_where(opts, :state_id)
+    include_archived = Keyword.get(opts, :include_archived, false)
+
+    query = from(t in EyeInTheSkyWeb.Tasks.Task, where: t.project_id == ^project_id)
+    query = if include_archived, do: query, else: where(query, [t], t.archived == false)
+    QueryBuilder.maybe_where(query, opts, :state_id)
   end
 end

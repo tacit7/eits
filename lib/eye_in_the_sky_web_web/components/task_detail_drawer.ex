@@ -224,7 +224,16 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                 >
                   <.icon name="hero-play" class="w-3.5 h-3.5" /> Start Agent
                 </button>
-                <div class="ml-auto">
+                <div class="ml-auto flex items-center gap-1">
+                  <button
+                    type="button"
+                    phx-click="archive_task"
+                    phx-value-task_id={@task.uuid || to_string(@task.id)}
+                    class="btn btn-sm btn-ghost text-xs text-base-content/40 hover:text-warning hover:bg-warning/10"
+                    title="Archive task"
+                  >
+                    <.icon name="hero-archive-box" class="w-3.5 h-3.5" />
+                  </button>
                   <button
                     type="button"
                     phx-click={@delete_event}

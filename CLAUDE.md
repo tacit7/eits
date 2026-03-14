@@ -41,7 +41,7 @@ Exit status will be 1 (error) instead of 0 (success).
 
 ## Database
 
-PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. Migrated from SQLite in PR #5.
+PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. **This app owns the schema** — Go is no longer involved. Schema changes are made via direct psql (no Ecto migrations).
 
 ## Architecture
 
@@ -83,65 +83,9 @@ NATS message processing is **currently disabled** to prevent duplicate messages.
 
 Original code is kept as comments for future re-enablement when proper deduplication is implemented.
 
-### FTS5 Full-Text Search
+### Full-Text Search
 
-> **Note:** The FTS5 section below documents the old SQLite implementation. We currently use PostgreSQL with `tsvector/tsquery` via `lib/eye_in_the_sky_web/search/fts5.ex` (despite the filename, it now wraps PG full-text search with an ILIKE fallback). The virtual tables and triggers below no longer apply.
-
-Three FTS5 virtual tables in eits.db provide full-text search using **external content tables** (stores only the index, not duplicate data). Triggers keep them in sync.
-
-**`sessions_fts`** - Indexes session name and description from sessions table.
-
-```sql
-CREATE VIRTUAL TABLE sessions_fts USING fts5(
-  name, description,
-  content=sessions,
-  content_rowid=id
-);
-```
-
-Triggers: `sessions_fts_insert`, `sessions_fts_update`, `sessions_fts_delete`
-- Keeps FTS index in sync with sessions table changes
-- Uses external content: FTS5 stores only the index, data lives in sessions table
-- Join key: `rowid` (FTS5 rowid matches sessions.id via content_rowid)
-
-**`task_search`** - Indexes task title and description from tasks table.
-
-```sql
-CREATE VIRTUAL TABLE task_search USING fts5(
-  title, description,
-  content=tasks,
-  content_rowid=id,
-  tokenize='porter'
-);
-```
-
-Triggers: `task_search_insert`, `task_search_update`, `task_search_delete`
-- Keeps FTS index in sync with tasks table changes
-- Uses external content: FTS5 stores only the index, data lives in tasks table
-- Join key: `rowid` (FTS5 rowid matches tasks.id via content_rowid)
-
-**`notes_fts`** - Indexes note title and body from notes table.
-
-```sql
-CREATE VIRTUAL TABLE notes_fts USING fts5(
-  title, body,
-  content=notes,
-  content_rowid=id
-);
-```
-
-Triggers: `notes_fts_insert`, `notes_fts_update`, `notes_fts_delete`
-- Keeps FTS index in sync with notes table changes
-- Uses external content: FTS5 stores only the index, data lives in notes table
-- Join key: `rowid` (FTS5 rowid matches notes.id via content_rowid)
-
-### FTS5.search Module
-
-`lib/eye_in_the_sky_web/search/fts5.ex` provides a reusable search function. Key option: `join_key` specifies which FTS column to join on the main table's `id`. Defaults to `"rowid"`.
-
-With external content tables, use `join_key: "rowid"` for all FTS5 searches.
-
-If the FTS5 query fails (e.g., table doesn't exist), it falls back to ILIKE.
+`lib/eye_in_the_sky_web/search/fts5.ex` wraps PostgreSQL `tsvector/tsquery` full-text search with an ILIKE fallback. The module name is a legacy artifact from the SQLite era — it is not FTS5. Use `FTS5.search_for/2` for all full-text queries across sessions, tasks, and notes.
 
 ### Workflow States
 
@@ -156,8 +100,8 @@ The `workflow_states` table defines kanban columns. Current states:
 
 ### Type Quirks
 
-- Project PK is integer (`@primary_key {:id, :id, autogenerate: false}`) but Go MCP writes some foreign keys as text. Task `project_id` uses `type: :string` in the Ecto association to handle this.
-- Agent `project_name` is a real DB column (not virtual), populated by Go.
+- Project PK is integer (`@primary_key {:id, :id, autogenerate: false}`). Task `project_id` uses `type: :string` in the Ecto association for legacy compatibility.
+- Agent `project_name` is a real DB column (not virtual).
 
 ### Schema Naming
 

@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
   alias EyeInTheSkyWeb.Repo
   import Ecto.Query
   import EyeInTheSkyWebWeb.Components.NotesList
+  import EyeInTheSkyWebWeb.Live.Shared.NotesHelpers
 
   @impl true
   def mount(_params, _session, socket) do
@@ -23,37 +24,16 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
   end
 
   @impl true
-  def handle_event("search", %{"query" => query}, socket) do
-    effective_query = if String.length(String.trim(query)) >= 4, do: query, else: ""
-
-    socket =
-      socket
-      |> assign(:search_query, effective_query)
-      |> load_notes()
-
-    {:noreply, socket}
-  end
+  def handle_event("search", params, socket),
+    do: handle_search(params, socket, &load_notes/1)
 
   @impl true
-  def handle_event("toggle_starred_filter", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:starred_filter, !socket.assigns.starred_filter)
-     |> load_notes()}
-  end
+  def handle_event("toggle_starred_filter", params, socket),
+    do: handle_toggle_starred_filter(params, socket, &load_notes/1)
 
   @impl true
-  def handle_event("toggle_star", params, socket) do
-    note_id = params["note_id"] || params["note-id"] || params["value"]
-
-    case Notes.toggle_starred(note_id) do
-      {:ok, _note} ->
-        {:noreply, load_notes(socket)}
-
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to toggle star")}
-    end
-  end
+  def handle_event("toggle_star", params, socket),
+    do: handle_toggle_star(params, socket, &load_notes/1)
 
   defp load_notes(socket) do
     query = socket.assigns.search_query

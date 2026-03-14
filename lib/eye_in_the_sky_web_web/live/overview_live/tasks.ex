@@ -2,9 +2,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.Tasks
-  alias EyeInTheSkyWeb.Notes
   alias EyeInTheSkyWebWeb.Components.TaskCard
-  import EyeInTheSkyWebWeb.ControllerHelpers
+  import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
 
   @per_page 50
 
@@ -39,127 +38,44 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
   end
 
   @impl true
-  def handle_event("search", %{"query" => query}, socket) do
-    effective_query = if String.length(String.trim(query)) >= 4, do: query, else: ""
-
-    socket =
-      socket
-      |> assign(:search_query, effective_query)
-      |> load_tasks()
-
-    {:noreply, socket}
-  end
+  def handle_event("search", params, socket),
+    do: handle_search(params, socket, &load_tasks/1)
 
   @impl true
   def handle_event("filter_state", %{"state" => state}, socket) do
-    socket =
-      socket
-      |> assign(:state_filter, state)
-      |> load_tasks()
-
-    {:noreply, socket}
+    {:noreply,
+     socket
+     |> assign(:state_filter, state)
+     |> load_tasks()}
   end
 
   @impl true
-  def handle_event("open_filter_sheet", _params, socket) do
-    {:noreply, assign(socket, :show_filter_sheet, true)}
-  end
+  def handle_event("open_filter_sheet", params, socket),
+    do: handle_open_filter_sheet(params, socket)
 
   @impl true
-  def handle_event("close_filter_sheet", _params, socket) do
-    {:noreply, assign(socket, :show_filter_sheet, false)}
-  end
+  def handle_event("close_filter_sheet", params, socket),
+    do: handle_close_filter_sheet(params, socket)
 
   @impl true
-  def handle_event("load_more", _params, socket) do
-    if socket.assigns.has_more do
-      next_page = socket.assigns.page + 1
-      {:noreply, load_tasks_page(socket, next_page)}
-    else
-      {:noreply, socket}
-    end
-  end
+  def handle_event("load_more", params, socket),
+    do: handle_load_more(params, socket, &load_tasks_page/2)
 
   @impl true
-  def handle_event("open_task_detail", %{"task_id" => task_id}, socket) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-    notes = Notes.list_notes_for_task(task.id)
-
-    socket =
-      socket
-      |> assign(:selected_task, task)
-      |> assign(:task_notes, notes)
-      |> assign(:show_task_detail_drawer, true)
-
-    {:noreply, socket}
-  end
+  def handle_event("open_task_detail", params, socket),
+    do: handle_open_task_detail(params, socket)
 
   @impl true
-  def handle_event("toggle_task_detail_drawer", _params, socket) do
-    {:noreply, assign(socket, :show_task_detail_drawer, !socket.assigns.show_task_detail_drawer)}
-  end
+  def handle_event("toggle_task_detail_drawer", params, socket),
+    do: handle_toggle_task_detail_drawer(params, socket)
 
   @impl true
-  def handle_event("update_task", params, socket) do
-    task = socket.assigns.selected_task
-    title = params["title"]
-    description = params["description"]
-    state_id = parse_int(params["state_id"], 0)
-    priority = parse_int(params["priority"], 0)
-    due_at = if params["due_at"] != "", do: params["due_at"], else: nil
-    tags_string = params["tags"] || ""
-
-    tag_names =
-      tags_string
-      |> String.split(",")
-      |> Enum.map(&String.trim/1)
-      |> Enum.reject(&(&1 == ""))
-
-    case Tasks.update_task(task, %{
-           title: title,
-           description: description,
-           state_id: state_id,
-           priority: priority,
-           due_at: due_at,
-           updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
-         }) do
-      {:ok, updated_task} ->
-        Tasks.replace_task_tags(task.id, tag_names)
-
-        updated_task = Tasks.get_task!(updated_task.id)
-
-        socket =
-          socket
-          |> assign(:selected_task, updated_task)
-          |> load_tasks()
-          |> put_flash(:info, "Task updated")
-
-        {:noreply, socket}
-
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to update task")}
-    end
-  end
+  def handle_event("update_task", params, socket),
+    do: handle_update_task(params, socket, &load_tasks/1)
 
   @impl true
-  def handle_event("delete_task", %{"task_id" => task_id}, socket) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-
-    case Tasks.delete_task_with_associations(task) do
-      {:ok, _} ->
-        socket =
-          socket
-          |> assign(:show_task_detail_drawer, false)
-          |> assign(:selected_task, nil)
-          |> load_tasks()
-          |> put_flash(:info, "Task deleted")
-
-        {:noreply, socket}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to delete task")}
-    end
-  end
+  def handle_event("delete_task", params, socket),
+    do: handle_delete_task(params, socket, &load_tasks/1)
 
   @impl true
   def handle_event("start_agent_for_task", _params, socket) do
@@ -167,10 +83,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
   end
 
   @impl true
-  def handle_info(:tasks_changed, socket) do
-    {:noreply, load_tasks(socket)}
-  end
-
+  def handle_info(:tasks_changed, socket),
+    do: handle_tasks_changed(socket, &load_tasks/1)
 
   defp state_id_from_filter("all"), do: nil
 
@@ -188,7 +102,6 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
     state_id = state_id_from_filter(state_filter)
 
     if query != "" and String.trim(query) != "" do
-      # Search: return all results (no pagination), filter by state in memory
       tasks = Tasks.search_tasks(query)
 
       tasks =

@@ -1,55 +1,39 @@
 defmodule EyeInTheSkyWebWeb.ProjectLive.Agents do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.Projects
-  alias EyeInTheSkyWeb.Repo
+  import EyeInTheSkyWebWeb.Helpers.ProjectLiveHelpers
 
   @user_agents_dir Path.expand("~/.claude/agents")
 
   @impl true
-  def mount(%{"id" => id}, _session, socket) do
-    project_id =
-      case Integer.parse(id) do
-        {int, ""} -> int
-        _ -> nil
-      end
+  def mount(%{"id" => _} = params, _session, socket) do
+    socket =
+      socket
+      |> mount_project(params,
+        sidebar_tab: :agents,
+        page_title_prefix: "Agents",
+        preload: [:agents]
+      )
+      |> assign(:user_agents_dir, @user_agents_dir)
+      |> assign(:selected_file, nil)
+      |> assign(:selected_file_path, nil)
+      |> assign(:file_content, nil)
+      |> assign(:selected_scope, nil)
+      |> assign(:project_agents, [])
+      |> assign(:user_agents, [])
 
     socket =
-      if project_id do
-        project =
-          Projects.get_project!(project_id)
-          |> Repo.preload([:agents])
+      if socket.assigns.project do
+        project = socket.assigns.project
 
         project_agents_dir =
           if project.path, do: Path.join([project.path, ".claude", "agents"]), else: nil
 
         socket
-        |> assign(:page_title, "Agents - #{project.name}")
-        |> assign(:project, project)
-        |> assign(:sidebar_tab, :agents)
-        |> assign(:sidebar_project, project)
         |> assign(:project_agents_dir, project_agents_dir)
-        |> assign(:user_agents_dir, @user_agents_dir)
-        |> assign(:selected_file, nil)
-        |> assign(:selected_file_path, nil)
-        |> assign(:file_content, nil)
-        |> assign(:selected_scope, nil)
-        |> assign(:project_agents, [])
-        |> assign(:user_agents, [])
         |> load_all_agents()
       else
-        socket
-        |> assign(:page_title, "Project Not Found")
-        |> assign(:project, nil)
-        |> assign(:project_agents_dir, nil)
-        |> assign(:user_agents_dir, @user_agents_dir)
-        |> assign(:selected_file, nil)
-        |> assign(:selected_file_path, nil)
-        |> assign(:file_content, nil)
-        |> assign(:selected_scope, nil)
-        |> assign(:project_agents, [])
-        |> assign(:user_agents, [])
-        |> put_flash(:error, "Invalid project ID")
+        assign(socket, :project_agents_dir, nil)
       end
 
     {:ok, socket}

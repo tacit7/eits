@@ -4,62 +4,37 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Tasks
   alias EyeInTheSkyWeb.Notes
-  alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Claude.AgentManager
   import EyeInTheSkyWebWeb.ControllerHelpers
-  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [format_due_date: 1, due_date_class: 1, parse_id: 1]
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [format_due_date: 1, due_date_class: 1]
+  import EyeInTheSkyWebWeb.Helpers.ProjectLiveHelpers
 
   @impl true
-  def mount(%{"id" => id}, _session, socket) do
+  def mount(%{"id" => _} = params, _session, socket) do
+    id = params["id"]
+
     if connected?(socket) do
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "tasks:#{id}")
     end
 
-    project_id = parse_id(id)
-
     socket =
-      if project_id do
-        project =
-          Projects.get_project!(project_id)
-          |> Repo.preload([:agents])
+      socket
+      |> mount_project(params,
+        sidebar_tab: :kanban,
+        page_title_prefix: "Kanban",
+        preload: [:agents]
+      )
+      |> assign(:search_query, "")
+      |> assign(:workflow_states, Tasks.list_workflow_states())
+      |> assign(:tasks, [])
+      |> assign(:tasks_by_state, %{})
+      |> assign(:show_new_task_drawer, false)
+      |> assign(:show_task_detail_drawer, false)
+      |> assign(:selected_task, nil)
+      |> assign(:task_notes, [])
+      |> assign(:quick_add_column, nil)
 
-        # Load workflow states
-        workflow_states = Tasks.list_workflow_states()
-
-        socket
-        |> assign(:page_title, "Kanban - #{project.name}")
-        |> assign(:project, project)
-        |> assign(:sidebar_tab, :kanban)
-        |> assign(:sidebar_project, project)
-        |> assign(:project_id, project_id)
-        |> assign(:search_query, "")
-        |> assign(:workflow_states, workflow_states)
-        |> assign(:tasks, [])
-        |> assign(:tasks_by_state, %{})
-        |> assign(:show_new_task_drawer, false)
-        |> assign(:show_task_detail_drawer, false)
-        |> assign(:selected_task, nil)
-        |> assign(:task_notes, [])
-        |> assign(:quick_add_column, nil)
-        |> load_tasks()
-      else
-        workflow_states = Tasks.list_workflow_states()
-
-        socket
-        |> assign(:page_title, "Project Not Found")
-        |> assign(:project, nil)
-        |> assign(:project_id, nil)
-        |> assign(:search_query, "")
-        |> assign(:workflow_states, workflow_states)
-        |> assign(:tasks, [])
-        |> assign(:tasks_by_state, %{})
-        |> assign(:show_new_task_drawer, false)
-        |> assign(:show_task_detail_drawer, false)
-        |> assign(:selected_task, nil)
-        |> assign(:task_notes, [])
-        |> assign(:quick_add_column, nil)
-        |> put_flash(:error, "Invalid project ID")
-      end
+    socket = if socket.assigns.project, do: load_tasks(socket), else: socket
 
     {:ok, socket}
   end

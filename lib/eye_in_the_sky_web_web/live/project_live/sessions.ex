@@ -4,33 +4,25 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   @telemetry_prefix [:eye_in_the_sky_web, :project_sessions]
   @page_size 25
 
-  alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Sessions
   import EyeInTheSkyWebWeb.Components.Icons
   import EyeInTheSkyWebWeb.Components.SessionCard
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
-  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [parse_id: 1]
+  import EyeInTheSkyWebWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWebWeb.Helpers.SessionFilters
 
   @impl true
-  def mount(%{"id" => id}, _session, socket) do
-    project_id = parse_id(id)
+  def mount(%{"id" => _} = params, _session, socket) do
+    socket = mount_project(socket, params, sidebar_tab: :sessions, page_title_prefix: "Sessions")
 
-    if project_id do
+    if socket.assigns.project do
       if connected?(socket) do
         subscribe_agents()
         subscribe_agent_working()
       end
 
-      project = Projects.get_project!(project_id)
-
       socket =
         socket
-        |> assign(:page_title, "Sessions - #{project.name}")
-        |> assign(:project, project)
-        |> assign(:sidebar_tab, :sessions)
-        |> assign(:sidebar_project, project)
-        |> assign(:project_id, project_id)
         |> assign(:search_query, "")
         |> assign(:sort_by, "recent")
         |> assign(:session_filter, "all")
@@ -46,10 +38,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
 
       {:ok, socket}
     else
-      {:ok,
-       socket
-       |> assign(:page_title, "Project Not Found")
-       |> put_flash(:error, "Invalid project ID")}
+      {:ok, socket}
     end
   end
 

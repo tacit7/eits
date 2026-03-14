@@ -582,6 +582,29 @@ defmodule EyeInTheSkyWebWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Renders a modal/drawer header with a title and close button.
+
+  ## Examples
+
+      <.modal_header title="New Task" toggle_event="toggle_new_task" />
+      <.modal_header title="Edit" toggle_event="close" class="mb-5" />
+  """
+  attr :title, :string, required: true
+  attr :toggle_event, :string, required: true
+  attr :class, :string, default: nil
+
+  def modal_header(assigns) do
+    ~H"""
+    <div class={["flex items-center justify-between mb-6", @class]}>
+      <h2 class="text-xl font-semibold">{@title}</h2>
+      <button phx-click={@toggle_event} class="btn btn-ghost btn-sm btn-circle">
+        <.icon name="hero-x-mark" class="w-4 h-4" />
+      </button>
+    </div>
+    """
+  end
+
   ## JS Commands
 
   def show(js \\ %JS{}, selector) do

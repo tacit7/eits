@@ -17,18 +17,10 @@ defmodule EyeInTheSkyWebWeb.Components.NewTaskDrawer do
       data-toggle-event={@toggle_event}
     >
       <div class="modal-box w-96 max-w-lg">
-        <div class="flex items-center justify-between mb-6">
-          <h2 class="text-xl font-semibold">New Task</h2>
-          <button phx-click={@toggle_event} class="btn btn-ghost btn-sm btn-circle">
-            <.icon name="hero-x-mark" class="w-4 h-4" />
-          </button>
-        </div>
+        <.modal_header title="New Task" toggle_event={@toggle_event} />
 
         <form id={"#{@id}-form"} phx-submit={@submit_event} class="flex flex-col gap-4">
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text font-medium">Title</span>
-            </label>
+          <.form_field label="Title">
             <input
               type="text"
               name="title"
@@ -37,23 +29,17 @@ defmodule EyeInTheSkyWebWeb.Components.NewTaskDrawer do
               required
               autofocus={@show}
             />
-          </div>
+          </.form_field>
 
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text font-medium">Description</span>
-            </label>
+          <.form_field label="Description">
             <textarea
               name="description"
               class="textarea textarea-bordered h-24"
               placeholder="Task description (optional)"
             ></textarea>
-          </div>
+          </.form_field>
 
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text font-medium">Status</span>
-            </label>
+          <.form_field label="Status">
             <select name="state_id" class="select select-bordered" required>
               <%= for state <- @workflow_states do %>
                 <option value={state.id} selected={state.name == "todo"}>
@@ -61,24 +47,18 @@ defmodule EyeInTheSkyWebWeb.Components.NewTaskDrawer do
                 </option>
               <% end %>
             </select>
-          </div>
+          </.form_field>
 
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text font-medium">Priority</span>
-            </label>
+          <.form_field label="Priority">
             <select name="priority" class="select select-bordered">
               <option value="0">None</option>
               <option value="1" selected>Low</option>
               <option value="2">Medium</option>
               <option value="3">High</option>
             </select>
-          </div>
+          </.form_field>
 
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text font-medium">Tags</span>
-            </label>
+          <.form_field label="Tags">
             <input
               type="text"
               name="tags"
@@ -88,12 +68,9 @@ defmodule EyeInTheSkyWebWeb.Components.NewTaskDrawer do
             <label class="label">
               <span class="label-text-alt">Comma-separated</span>
             </label>
-          </div>
+          </.form_field>
 
-          <div class="flex gap-2 mt-2">
-            <button type="submit" class="btn btn-primary flex-1">Create Task</button>
-            <button type="button" phx-click={@toggle_event} class="btn btn-ghost">Cancel</button>
-          </div>
+          <.form_actions submit_text="Create Task" cancel_event={@toggle_event} class="mt-2" />
         </form>
       </div>
       <form method="dialog" class="modal-backdrop">

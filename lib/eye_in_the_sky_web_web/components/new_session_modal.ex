@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
   """
 
   use Phoenix.LiveComponent
-  import EyeInTheSkyWebWeb.CoreComponents, only: [icon: 1]
+  import EyeInTheSkyWebWeb.CoreComponents, only: [icon: 1, modal_header: 1]
   import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [claude_models: 0, codex_models: 0]
 
   @global_agents_dir Path.expand("~/.claude/agents")
@@ -58,12 +58,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
     <div>
       <div :if={@show} class="modal modal-open" phx-window-keydown={@toggle_event} phx-key="Escape">
         <div class="modal-box max-w-md">
-          <div class="flex items-center justify-between mb-5">
-            <h3 class="text-base font-semibold">{assigns[:title] || "New Agent"}</h3>
-            <button phx-click={@toggle_event} class="btn btn-ghost btn-sm btn-circle">
-              <.icon name="hero-x-mark-mini" class="w-4 h-4" />
-            </button>
-          </div>
+          <.modal_header title={assigns[:title] || "New Agent"} toggle_event={@toggle_event} />
 
           <form phx-submit={@submit_event} class="flex flex-col gap-4">
             <%!-- Agent Type --%>

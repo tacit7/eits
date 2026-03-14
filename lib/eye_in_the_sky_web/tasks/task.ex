@@ -40,6 +40,9 @@ defmodule EyeInTheSkyWeb.Tasks.Task do
 
     field :created_at, :string
     field :updated_at, :string
+
+    field :notes_count, :integer, virtual: true, default: 0
+    field :notes, :any, virtual: true, default: []
   end
 
   @doc false

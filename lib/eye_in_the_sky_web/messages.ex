@@ -441,6 +441,33 @@ defmodule EyeInTheSkyWeb.Messages do
   end
 
   @doc """
+  Deletes messages for a session beyond the given index (keeps the N oldest).
+  Returns the number of deleted rows.
+  """
+  def truncate_messages_after_index(session_id, keep_count) when is_integer(keep_count) and keep_count >= 0 do
+    # Find the ID of the Nth oldest message to use as a cutoff
+    cutoff_id =
+      Message
+      |> where([m], m.session_id == ^session_id)
+      |> order_by([m], asc: m.id)
+      |> offset(^keep_count)
+      |> limit(1)
+      |> select([m], m.id)
+      |> Repo.one()
+
+    if cutoff_id do
+      {deleted, _} =
+        Message
+        |> where([m], m.session_id == ^session_id and m.id >= ^cutoff_id)
+        |> Repo.delete_all()
+
+      deleted
+    else
+      0
+    end
+  end
+
+  @doc """
   Finds an existing message with nil source_uuid matching session, role, and body.
   Used to link messages created before sync (e.g. via send_message or save_result)
   with their corresponding session file entry, preventing duplicates.

@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.DmLive do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.{Sessions, Agents, Commits, Messages, Notes, Repo, Tasks}
+  alias EyeInTheSkyWeb.{Sessions, Agents, Checkpoints, Commits, Messages, Notes, Repo, Tasks}
   alias EyeInTheSkyWeb.Claude.{AgentManager, AgentWorker, SessionReader}
   alias EyeInTheSkyWeb.FileAttachments
   alias EyeInTheSkyWebWeb.Components.DmPage
@@ -94,6 +94,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:thinking_enabled, false)
       |> assign(:max_budget_usd, nil)
       |> assign(:compacting, session.status == "compacting")
+      |> assign(:checkpoints, [])
+      |> assign(:show_create_checkpoint, false)
       |> allow_upload(:files,
         accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
         max_entries: 10,
@@ -449,6 +451,103 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Failed to toggle star")}
+    end
+  end
+
+  @impl true
+  def handle_event("toggle_create_checkpoint", _params, socket) do
+    {:noreply, assign(socket, :show_create_checkpoint, !socket.assigns.show_create_checkpoint)}
+  end
+
+  @impl true
+  def handle_event("create_checkpoint", params, socket) do
+    session_id = socket.assigns.session_id
+    name = String.trim(params["name"] || "")
+    description = String.trim(params["description"] || "")
+
+    project_path =
+      case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+        {:ok, path} -> path
+        _ -> nil
+      end
+
+    attrs = %{
+      name: if(name == "", do: nil, else: name),
+      description: if(description == "", do: nil, else: description),
+      project_path: project_path
+    }
+
+    case Checkpoints.create_checkpoint(session_id, attrs) do
+      {:ok, _checkpoint} ->
+        socket =
+          socket
+          |> assign(:show_create_checkpoint, false)
+          |> assign(:checkpoints, Checkpoints.list_checkpoints_for_session(session_id))
+
+        {:noreply, put_flash(socket, :info, "Checkpoint saved")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to create checkpoint: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("restore_checkpoint", %{"id" => id_str}, socket) do
+    with {id, ""} <- Integer.parse(id_str),
+         {:ok, checkpoint} <- Checkpoints.get_checkpoint(id),
+         true <- checkpoint.session_id == socket.assigns.session_id,
+         {:ok, _deleted} <- Checkpoints.restore_checkpoint(checkpoint) do
+      socket =
+        socket
+        |> load_tab_data("messages", socket.assigns.session_id)
+        |> assign(:checkpoints, Checkpoints.list_checkpoints_for_session(socket.assigns.session_id))
+
+      {:noreply, put_flash(socket, :info, "Restored to checkpoint")}
+    else
+      false ->
+        {:noreply, put_flash(socket, :error, "Checkpoint does not belong to this session")}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Checkpoint not found")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Failed to restore checkpoint")}
+    end
+  end
+
+  @impl true
+  def handle_event("fork_checkpoint", %{"id" => id_str}, socket) do
+    with {id, ""} <- Integer.parse(id_str),
+         {:ok, checkpoint} <- Checkpoints.get_checkpoint(id),
+         true <- checkpoint.session_id == socket.assigns.session_id,
+         {:ok, new_session} <- Checkpoints.fork_checkpoint(checkpoint) do
+      {:noreply,
+       socket
+       |> put_flash(:info, "Forked to new session ##{new_session.id}")
+       |> push_navigate(to: ~p"/dm/#{new_session.id}")}
+    else
+      false ->
+        {:noreply, put_flash(socket, :error, "Checkpoint does not belong to this session")}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Checkpoint not found")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Failed to fork checkpoint")}
+    end
+  end
+
+  @impl true
+  def handle_event("delete_checkpoint", %{"id" => id_str}, socket) do
+    with {id, ""} <- Integer.parse(id_str),
+         {:ok, checkpoint} <- Checkpoints.get_checkpoint(id),
+         true <- checkpoint.session_id == socket.assigns.session_id,
+         {:ok, _} <- Checkpoints.delete_checkpoint(checkpoint) do
+      {:noreply,
+       assign(socket, :checkpoints, Checkpoints.list_checkpoints_for_session(socket.assigns.session_id))}
+    else
+      _ ->
+        {:noreply, put_flash(socket, :error, "Failed to delete checkpoint")}
     end
   end
 
@@ -808,6 +907,12 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         Notes.list_notes_for_session(session_id)
       end)
     )
+    |> assign(
+      :checkpoints,
+      maybe_load_tab_data(tab, "timeline", socket.assigns[:checkpoints], fn ->
+        Checkpoints.list_checkpoints_for_session(session_id)
+      end)
+    )
   end
 
   defp load_message_data(socket, "messages", session_id) do
@@ -1062,6 +1167,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         compacting={@compacting}
         context_used={@context_used}
         context_window={@context_window}
+        checkpoints={@checkpoints}
+        show_create_checkpoint={@show_create_checkpoint}
       />
     </div>
     """

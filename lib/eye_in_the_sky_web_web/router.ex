@@ -19,6 +19,11 @@ defmodule EyeInTheSkyWebWeb.Router do
     plug EyeInTheSkyWebWeb.Plugs.RequireAuth
   end
 
+  # Unauthenticated JSON pipeline for inbound webhooks (auth handled per-controller)
+  pipeline :accepts_json do
+    plug :accepts, ["json"]
+  end
+
   # Session-aware JSON pipeline without CSRF — safe for WebAuthn endpoints
   # (registration is token-gated; login uses WebAuthn challenge binding)
   pipeline :webauthn do
@@ -169,7 +174,21 @@ defmodule EyeInTheSkyWebWeb.Router do
     get "/channels", MessagingController, :list_channels
     post "/channels/:channel_id/messages", MessagingController, :send_channel_message
 
-    # Gitea webhooks
+    # Teams
+    get "/teams", TeamController, :index
+    post "/teams", TeamController, :create
+    get "/teams/:id", TeamController, :show
+    delete "/teams/:id", TeamController, :delete
+    get "/teams/:team_id/members", TeamController, :list_members
+    post "/teams/:team_id/members", TeamController, :join
+    patch "/teams/:team_id/members/:member_id", TeamController, :update_member
+    delete "/teams/:team_id/members/:member_id", TeamController, :leave
+  end
+
+  # Gitea webhooks — no Bearer auth; controller validates HMAC signature from Gitea
+  scope "/api/v1", EyeInTheSkyWebWeb.Api.V1 do
+    pipe_through [:accepts_json]
+
     post "/webhooks/gitea", GiteaWebhookController, :handle
   end
 

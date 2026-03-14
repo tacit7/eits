@@ -448,6 +448,95 @@ cmd_prompts() {
   esac
 }
 
+# ── teams ─────────────────────────────────────────────────────────────────────
+
+cmd_teams() {
+  local sub="${1:-}"; shift || true
+  case "$sub" in
+    list)
+      local project_id="" status=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --project) project_id="$2"; shift 2 ;;
+          --status)  status="$2";     shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      local qs=""
+      [[ -n "$project_id" ]] && qs="${qs}&project_id=${project_id}"
+      [[ -n "$status"     ]] && qs="${qs}&status=${status}"
+      _get "/teams${qs:+?${qs:1}}"
+      ;;
+    get)
+      local id="${1:-}"; need id
+      _get "/teams/$id"
+      ;;
+    create)
+      local name="" description="" project_id=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --name)        name="$2";        shift 2 ;;
+          --description) description="$2"; shift 2 ;;
+          --project)     project_id="$2";  shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need name
+      _post "/teams" "$(json name "$name" description "$description" project_id "$project_id")"
+      ;;
+    delete)
+      local id="${1:-}"; need id
+      _delete "/teams/$id"
+      ;;
+    members)
+      local id="${1:-}"; need id
+      _get "/teams/$id/members"
+      ;;
+    join)
+      local team_id="${1:-}"; need team_id; shift
+      local name="" role="" session_id="" agent_id=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --name)    name="$2";       shift 2 ;;
+          --role)    role="$2";       shift 2 ;;
+          --session) session_id="$2"; shift 2 ;;
+          --agent)   agent_id="$2";   shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need name
+      session_id="${session_id:-${EITS_SESSION_UUID:-}}"
+      _post "/teams/$team_id/members" "$(json name "$name" role "$role" session_id "$session_id" agent_id "$agent_id")"
+      ;;
+    status)
+      # alias for get (includes members inline)
+      local id="${1:-}"; need id
+      _get "/teams/$id"
+      ;;
+    update-member)
+      local team_id="${1:-}"; need team_id; shift
+      local member_id="${1:-}"; need member_id; shift
+      local status=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --status) status="$2"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need status
+      _patch "/teams/$team_id/members/$member_id" "$(json status "$status")"
+      ;;
+    leave)
+      local team_id="${1:-}"; need team_id; shift
+      local member_id="${1:-}"; need member_id
+      _delete "/teams/$team_id/members/$member_id"
+      ;;
+    *)
+      echo "usage: eits teams <list|get|create|delete|members|join|status|update-member|leave>"
+      ;;
+  esac
+}
+
 # ── help ──────────────────────────────────────────────────────────────────────
 
 usage() {
@@ -466,6 +555,7 @@ Commands:
   dm        --from <id> --to <session_uuid> --message <text> [--response-required]
   channels  list [--project <id>] | send <channel_id> --session <uuid> --body <text>
   prompts   list|get
+  teams     list|get|create|delete|members|join|status|update-member|leave
 
 Requires: curl, jq
 EOF
@@ -485,6 +575,7 @@ case "$cmd" in
   dm)        cmd_dm        "$@" ;;
   channels)  cmd_channels  "$@" ;;
   prompts)   cmd_prompts   "$@" ;;
+  teams)     cmd_teams     "$@" ;;
   help|--help|-h) usage ;;
   "") usage; exit 0 ;;
   *) die "unknown command: $cmd" ;;

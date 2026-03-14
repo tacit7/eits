@@ -193,6 +193,153 @@ _agent_uuid() { cat "$BATS_FILE_TMPDIR/agent_uuid"; }
   [[ ! "$output" =~ "agent_id is required" ]]
 }
 
+# ── teams ─────────────────────────────────────────────────────────────────────
+
+setup_team() {
+  local name="bats-team-$(date +%s)-$RANDOM"
+  local id
+  id=$("$EITS" teams create --name "$name" --description "bats test team" | jq -r '.id')
+  echo "$id" >> "$BATS_FILE_TMPDIR/teams_to_cleanup"
+  echo "$id"
+}
+
+teardown_teams() {
+  local f="$BATS_FILE_TMPDIR/teams_to_cleanup"
+  [ -f "$f" ] || return 0
+  local ids
+  ids=$(grep -E '^[0-9]+$' "$f" | tr '\n' ',' | sed 's/,$//')
+  if [ -n "$ids" ]; then
+    PGPASSWORD="${EITS_PG_PASSWORD:-postgres}" psql \
+      --no-psqlrc -U "${EITS_PG_USER:-postgres}" -h "${EITS_PG_HOST:-localhost}" -d "${EITS_PG_DB:-eits_dev}" \
+      -c "DELETE FROM team_members WHERE team_id IN ($ids); DELETE FROM teams WHERE id IN ($ids);" \
+      >/dev/null 2>&1 || true
+  fi
+  rm -f "$f"
+}
+
+@test "teams list: returns success and teams array" {
+  run "$EITS" teams list
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  echo "$output" | jq -e '.teams | type == "array"' >/dev/null
+}
+
+@test "teams list --status archived: returns archived teams only" {
+  team_id=$(setup_team)
+  "$EITS" teams delete "$team_id" >/dev/null
+  run "$EITS" teams list --status archived
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e ".teams[] | select(.id == $team_id)" >/dev/null
+  teardown_teams
+}
+
+@test "teams create: returns id, uuid, name" {
+  name="bats-create-$(date +%s)-$RANDOM"
+  run "$EITS" teams create --name "$name" --description "test"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  echo "$output" | jq -e '.id | type == "number"' >/dev/null
+  echo "$output" | jq -e '.uuid | type == "string"' >/dev/null
+  echo "$output" | jq -e ".name == \"$name\"" >/dev/null
+  echo "$output" | jq -r '.id' >> "$BATS_FILE_TMPDIR/teams_to_cleanup"
+  teardown_teams
+}
+
+@test "teams create: fails without --name" {
+  run "$EITS" teams create --description "no name" 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "name" ]]
+}
+
+@test "teams get: returns team by id" {
+  team_id=$(setup_team)
+  run "$EITS" teams get "$team_id"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e ".id == $team_id" >/dev/null
+  echo "$output" | jq -e '.members | type == "array"' >/dev/null
+  teardown_teams
+}
+
+@test "teams get: resolves team by name" {
+  name="bats-byname-$(date +%s)-$RANDOM"
+  team_id=$("$EITS" teams create --name "$name" | jq -r '.id')
+  echo "$team_id" >> "$BATS_FILE_TMPDIR/teams_to_cleanup"
+  run "$EITS" teams get "$name"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e ".id == $team_id" >/dev/null
+  teardown_teams
+}
+
+@test "teams status: alias for get, includes members" {
+  team_id=$(setup_team)
+  run "$EITS" teams status "$team_id"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e ".id == $team_id" >/dev/null
+  echo "$output" | jq -e '.members | type == "array"' >/dev/null
+  teardown_teams
+}
+
+@test "teams delete: archives team" {
+  team_id=$(setup_team)
+  run "$EITS" teams delete "$team_id"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  archived=$("$EITS" teams list --status archived | jq -e ".teams[] | select(.id == $team_id)")
+  [ -n "$archived" ]
+  teardown_teams
+}
+
+@test "teams members: returns members array" {
+  team_id=$(setup_team)
+  run "$EITS" teams members "$team_id"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  echo "$output" | jq -e '.members | type == "array"' >/dev/null
+  teardown_teams
+}
+
+@test "teams join: adds member to team" {
+  team_id=$(setup_team)
+  run "$EITS" teams join "$team_id" --name "bats-member" --role "member"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  echo "$output" | jq -e '.member_id | type == "number"' >/dev/null
+  members=$("$EITS" teams members "$team_id")
+  echo "$members" | jq -e '.members[] | select(.name == "bats-member")' >/dev/null
+  teardown_teams
+}
+
+@test "teams join: auto-picks EITS_SESSION_UUID when --session omitted" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  team_id=$(setup_team)
+  run "$EITS" teams join "$team_id" --name "bats-auto-session"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  teardown_teams
+}
+
+@test "teams update-member: changes member status" {
+  team_id=$(setup_team)
+  member_id=$("$EITS" teams join "$team_id" --name "bats-status-member" | jq -r '.member_id')
+  run "$EITS" teams update-member "$team_id" "$member_id" --status "done"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  echo "$output" | jq -e '.status == "done"' >/dev/null
+  teardown_teams
+}
+
+@test "teams leave: removes member" {
+  team_id=$(setup_team)
+  member_id=$("$EITS" teams join "$team_id" --name "bats-leave-member" | jq -r '.member_id')
+  run "$EITS" teams leave "$team_id" "$member_id"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  members=$("$EITS" teams members "$team_id" | jq '.members')
+  count=$(echo "$members" | jq "[.[] | select(.id == $member_id)] | length")
+  [ "$count" -eq 0 ]
+  teardown_teams
+}
+
 # ── default URL ───────────────────────────────────────────────────────────────
 
 @test "BASE_URL: defaults to http://localhost:5000/api/v1 when EITS_URL unset" {

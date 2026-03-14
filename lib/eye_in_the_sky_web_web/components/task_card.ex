@@ -83,15 +83,13 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
         </.link>
       <% end %>
       <%= if @on_delete do %>
-        <button
-          type="button"
-          phx-click={@on_delete}
-          phx-value-task_id={@task.uuid || to_string(@task.id)}
-          class="flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/40 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
-          aria-label="Delete task"
-        >
-          <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
-        </button>
+        <.icon_button
+          icon="hero-trash-mini"
+          on_click={@on_delete}
+          aria_label="Delete task"
+          color="error"
+          values={%{"task_id" => @task.uuid || to_string(@task.id)}}
+        />
       <% end %>
     </div>
     """
@@ -208,16 +206,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
           {@task.title}
         </h3>
       </div>
-      <%= cond do %>
-        <% @task.priority >= 3 -> %>
-          <span class="badge badge-error badge-sm flex-shrink-0">High</span>
-        <% @task.priority == 2 -> %>
-          <span class="badge badge-warning badge-sm flex-shrink-0">Med</span>
-        <% @task.priority == 1 -> %>
-          <span class="badge badge-info badge-sm flex-shrink-0">Low</span>
-        <% true -> %>
-          <span></span>
-      <% end %>
+      <.priority_badge priority={@task.priority} />
     </div>
 
     <!-- Description -->
@@ -244,9 +233,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
         <.icon name="hero-clipboard-document" class="w-3 h-3" />
       </button>
       <%= if @task.state do %>
-        <span class="badge badge-ghost badge-sm">
-          {@task.state.name}
-        </span>
+        <.state_badge state_id={@task.state_id} state_name={@task.state.name} />
       <% end %>
 
       <%= if @task.due_at do %>

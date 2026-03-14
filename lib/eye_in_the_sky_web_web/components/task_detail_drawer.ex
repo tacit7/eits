@@ -33,16 +33,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                   <span class="font-mono">
                     {String.slice(@task.uuid || to_string(@task.id), 0..7)}
                   </span>
-                  <%= if @task.priority && @task.priority > 0 do %>
-                    <span class={[
-                      "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium",
-                      @task.priority >= 3 && "bg-error/10 text-error",
-                      @task.priority == 2 && "bg-warning/10 text-warning",
-                      @task.priority == 1 && "bg-info/10 text-info"
-                    ]}>
-                      {priority_label(@task.priority)}
-                    </span>
-                  <% end %>
+                  <.priority_badge priority={@task.priority} />
                   <button
                     type="button"
                     phx-hook="CopyToClipboard"
@@ -254,8 +245,4 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
     |> Enum.join(", ")
   end
 
-  defp priority_label(p) when p >= 3, do: "High"
-  defp priority_label(2), do: "Medium"
-  defp priority_label(1), do: "Low"
-  defp priority_label(_), do: ""
 end

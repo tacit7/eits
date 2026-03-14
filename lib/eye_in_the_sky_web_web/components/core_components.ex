@@ -456,6 +456,132 @@ defmodule EyeInTheSkyWebWeb.CoreComponents do
     """
   end
 
+  attr :submit_text, :string, required: true
+  attr :cancel_event, :any, required: true
+  attr :submit_disabled, :boolean, default: false
+  attr :class, :string, default: nil
+
+  def form_actions(assigns) do
+    ~H"""
+    <div class={["flex gap-2", @class]}>
+      <button type="submit" class="btn btn-primary flex-1" disabled={@submit_disabled}>
+        {@submit_text}
+      </button>
+      <button type="button" phx-click={@cancel_event} class="btn btn-ghost">
+        Cancel
+      </button>
+    </div>
+    """
+  end
+
+  @doc """
+  Icon action button with optional hover-reveal behavior.
+
+  Used for delete, star, archive, and other icon-only actions
+  that appear on hover in list/table rows.
+
+  ## Examples
+
+      <.icon_button icon="hero-trash-mini" on_click="delete" aria_label="Delete" color="error"
+        values={%{"id" => @item.id}} />
+      <.icon_button icon="hero-star-mini" on_click="star" aria_label="Star" show_on_hover={false} />
+  """
+  attr :icon, :string, required: true
+  attr :on_click, :string, required: true
+  attr :aria_label, :string, required: true
+  attr :values, :map, default: %{}
+  attr :color, :string, default: "primary"
+  attr :show_on_hover, :boolean, default: true
+  attr :class, :string, default: nil
+
+  def icon_button(assigns) do
+    ~H"""
+    <button
+      type="button"
+      phx-click={@on_click}
+      aria-label={@aria_label}
+      class={[
+        "flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md transition-all focus-visible:outline-none focus-visible:ring-2",
+        @show_on_hover && "md:opacity-0 md:group-hover:opacity-100",
+        color_classes(@color),
+        @class
+      ]}
+      {phx_values(@values)}
+    >
+      <.icon name={@icon} class="w-3.5 h-3.5" />
+    </button>
+    """
+  end
+
+  defp color_classes("primary"),
+    do: "text-base-content/40 hover:text-primary hover:bg-primary/10 focus-visible:ring-primary"
+
+  defp color_classes("error"),
+    do: "text-base-content/40 hover:text-error hover:bg-error/10 focus-visible:ring-error"
+
+  defp color_classes("warning"),
+    do: "text-base-content/40 hover:text-warning hover:bg-warning/10 focus-visible:ring-warning"
+
+  defp color_classes("success"),
+    do: "text-base-content/40 hover:text-success hover:bg-success/10 focus-visible:ring-success"
+
+  defp color_classes(_),
+    do: "text-base-content/40 hover:text-primary hover:bg-primary/10 focus-visible:ring-primary"
+
+  defp phx_values(values) when map_size(values) == 0, do: []
+
+  defp phx_values(values) do
+    Enum.map(values, fn {k, v} -> {:"phx-value-#{k}", v} end)
+  end
+
+  @doc """
+  Renders a form field container with a label above the inner input/select/textarea.
+
+  ## Examples
+
+      <.form_field label="Title">
+        <input type="text" name="title" class="input input-bordered" />
+      </.form_field>
+
+      <.form_field label="Budget" hint="Optional">
+        <input type="number" name="budget" class="input input-bordered" />
+      </.form_field>
+  """
+  attr :label, :string, required: true
+  attr :hint, :string, default: nil
+  attr :class, :string, default: nil
+
+  slot :inner_block, required: true
+
+  def form_field(assigns) do
+    ~H"""
+    <div class={["form-control", @class]}>
+      <label class="label">
+        <span class="label-text font-medium">{@label}</span>
+        <span :if={@hint} class="label-text-alt">{@hint}</span>
+      </label>
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  @doc """
+  Renders the compact 11px uppercase label used in detail drawer field groups.
+
+  ## Examples
+
+      <.detail_label text="Status" />
+  """
+  attr :text, :string, required: true
+
+  def detail_label(assigns) do
+    ~H"""
+    <label class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-1.5 block">
+      {@text}
+    </label>
+    """
+  end
+
   ## JS Commands
 
   def show(js \\ %JS{}, selector) do
@@ -506,4 +632,44 @@ defmodule EyeInTheSkyWebWeb.CoreComponents do
   def translate_errors(errors, field) when is_list(errors) do
     for {^field, {msg, opts}} <- errors, do: translate_error({msg, opts})
   end
+
+  @doc """
+  Renders a priority badge for a task.
+  """
+  attr :priority, :integer, default: nil
+
+  def priority_badge(assigns) do
+    ~H"""
+    <%= cond do %>
+      <% is_integer(@priority) && @priority >= 3 -> %>
+        <span class="badge badge-error badge-sm flex-shrink-0">High</span>
+      <% @priority == 2 -> %>
+        <span class="badge badge-warning badge-sm flex-shrink-0">Med</span>
+      <% @priority == 1 -> %>
+        <span class="badge badge-info badge-sm flex-shrink-0">Low</span>
+      <% true -> %>
+        <span></span>
+    <% end %>
+    """
+  end
+
+  @doc """
+  Renders a state badge for a task, colored by workflow state.
+  """
+  attr :state_id, :integer, required: true
+  attr :state_name, :string, required: true
+
+  def state_badge(assigns) do
+    ~H"""
+    <span class={["badge badge-sm flex-shrink-0", state_badge_class(@state_id)]}>
+      {@state_name}
+    </span>
+    """
+  end
+
+  defp state_badge_class(1), do: "badge-ghost"
+  defp state_badge_class(2), do: "badge-info"
+  defp state_badge_class(4), do: "badge-warning"
+  defp state_badge_class(3), do: "badge-success"
+  defp state_badge_class(_), do: "badge-ghost"
 end

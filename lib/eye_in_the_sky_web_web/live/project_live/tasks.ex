@@ -3,73 +3,43 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
 
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Tasks
-  alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWebWeb.Components.TaskCard
   import EyeInTheSkyWebWeb.ControllerHelpers
-  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [parse_id: 1]
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
+  import EyeInTheSkyWebWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
 
   @per_page 50
 
   @impl true
-  def mount(%{"id" => id}, _session, socket) do
-    if connected?(socket) do
-      subscribe_tasks()
-    end
-
-    project_id = parse_id(id)
+  def mount(%{"id" => _} = params, _session, socket) do
+    if connected?(socket), do: subscribe_tasks()
 
     workflow_states = Tasks.list_workflow_states()
 
     socket =
-      if project_id do
-        project =
-          Projects.get_project!(project_id)
-          |> Repo.preload([:agents])
+      socket
+      |> mount_project(params,
+        sidebar_tab: :tasks,
+        page_title_prefix: "Tasks",
+        preload: [:agents]
+      )
+      |> assign(:search_query, "")
+      |> assign(:filter_state_id, nil)
+      |> assign(:sort_by, "created_desc")
+      |> assign(:workflow_states, workflow_states)
+      |> assign(:show_new_task_drawer, false)
+      |> assign(:show_filter_sheet, false)
+      |> assign(:show_task_detail_drawer, false)
+      |> assign(:selected_task, nil)
+      |> assign(:task_notes, [])
+      |> assign(:task_count, 0)
+      |> assign(:page, 1)
+      |> assign(:has_more, false)
+      |> assign(:total_tasks, 0)
+      |> stream(:tasks, [], dom_id: fn t -> "pt-#{t.id}" end)
 
-        socket
-        |> assign(:page_title, "Tasks - #{project.name}")
-        |> assign(:project, project)
-        |> assign(:sidebar_tab, :tasks)
-        |> assign(:sidebar_project, project)
-        |> assign(:project_id, project_id)
-        |> assign(:search_query, "")
-        |> assign(:filter_state_id, nil)
-        |> assign(:sort_by, "created_desc")
-        |> assign(:workflow_states, workflow_states)
-        |> assign(:show_new_task_drawer, false)
-        |> assign(:show_filter_sheet, false)
-        |> assign(:show_task_detail_drawer, false)
-        |> assign(:selected_task, nil)
-        |> assign(:task_notes, [])
-        |> assign(:task_count, 0)
-        |> assign(:page, 1)
-        |> assign(:has_more, false)
-        |> assign(:total_tasks, 0)
-        |> stream(:tasks, [], dom_id: fn t -> "pt-#{t.id}" end)
-        |> load_tasks()
-      else
-        socket
-        |> assign(:page_title, "Project Not Found")
-        |> assign(:project, nil)
-        |> assign(:project_id, nil)
-        |> assign(:search_query, "")
-        |> assign(:filter_state_id, nil)
-        |> assign(:sort_by, "created_desc")
-        |> assign(:workflow_states, workflow_states)
-        |> assign(:show_new_task_drawer, false)
-        |> assign(:show_filter_sheet, false)
-        |> assign(:show_task_detail_drawer, false)
-        |> assign(:selected_task, nil)
-        |> assign(:task_notes, [])
-        |> assign(:task_count, 0)
-        |> assign(:page, 1)
-        |> assign(:has_more, false)
-        |> assign(:total_tasks, 0)
-        |> stream(:tasks, [], dom_id: fn t -> "pt-#{t.id}" end)
-        |> put_flash(:error, "Invalid project ID")
-      end
+    socket = if socket.assigns.project, do: load_tasks(socket), else: socket
 
     {:ok, socket}
   end

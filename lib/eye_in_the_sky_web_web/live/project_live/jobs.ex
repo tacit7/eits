@@ -1,67 +1,44 @@
 defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.{Projects, ScheduledJobs}
+  alias EyeInTheSkyWeb.ScheduledJobs
   alias EyeInTheSkyWeb.ScheduledJobs.{ScheduledJob, JobHelper}
   alias EyeInTheSkyWeb.Claude.AgentManager
+  import EyeInTheSkyWebWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWebWeb.Live.Shared.JobsHelpers
 
   @impl true
-  def mount(%{"id" => id}, _session, socket) do
+  def mount(%{"id" => _} = params, _session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "scheduled_jobs")
     end
 
-    project_id =
-      case Integer.parse(id) do
-        {int, ""} -> int
-        _ -> nil
-      end
+    socket =
+      socket
+      |> mount_project(params, sidebar_tab: :jobs, page_title_prefix: "Jobs")
+      |> assign(:form_scope, "project")
+      |> assign(:show_form, false)
+      |> assign(:editing_job, nil)
+      |> assign(:changeset, ScheduledJobs.change_job(%ScheduledJob{}))
+      |> assign(:form_job_type, "shell_command")
+      |> assign(:form_schedule_type, "interval")
+      |> assign(:form_config, %{})
+      |> assign(:expanded_job_id, nil)
+      |> assign(:runs, [])
+      |> assign(:show_claude_drawer, false)
+      |> assign(:claude_model, "sonnet")
 
     socket =
-      if project_id do
-        project = Projects.get_project!(project_id)
+      if socket.assigns.project do
+        project_id = socket.assigns.project_id
 
         socket
-        |> assign(:page_title, "Jobs - #{project.name}")
-        |> assign(:project, project)
-        |> assign(:project_id, project_id)
-        |> assign(:sidebar_tab, :jobs)
-        |> assign(:sidebar_project, project)
         |> assign(:project_jobs, ScheduledJobs.list_jobs_for_project(project_id))
         |> assign(:global_jobs, ScheduledJobs.list_global_jobs())
-        |> assign(:form_scope, "project")
-        |> assign(:show_form, false)
-        |> assign(:editing_job, nil)
-        |> assign(:changeset, ScheduledJobs.change_job(%ScheduledJob{}))
-        |> assign(:form_job_type, "shell_command")
-        |> assign(:form_schedule_type, "interval")
-        |> assign(:form_config, %{})
-        |> assign(:expanded_job_id, nil)
-        |> assign(:runs, [])
-        |> assign(:show_claude_drawer, false)
-        |> assign(:claude_model, "sonnet")
       else
         socket
-        |> assign(:page_title, "Project Not Found")
-        |> assign(:project, nil)
-        |> assign(:project_id, nil)
-        |> assign(:sidebar_tab, :jobs)
-        |> assign(:sidebar_project, nil)
         |> assign(:project_jobs, [])
         |> assign(:global_jobs, [])
-        |> assign(:form_scope, "project")
-        |> assign(:show_form, false)
-        |> assign(:editing_job, nil)
-        |> assign(:changeset, ScheduledJobs.change_job(%ScheduledJob{}))
-        |> assign(:form_job_type, "shell_command")
-        |> assign(:form_schedule_type, "interval")
-        |> assign(:form_config, %{})
-        |> assign(:expanded_job_id, nil)
-        |> assign(:runs, [])
-        |> assign(:show_claude_drawer, false)
-        |> assign(:claude_model, "sonnet")
-        |> put_flash(:error, "Invalid project ID")
       end
 
     {:ok, socket}

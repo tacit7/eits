@@ -85,20 +85,32 @@ defmodule EyeInTheSkyWebWeb.Components.NotesList do
                 data-raw-body={note.body}
               >
               </div>
-              <button
-                type="button"
-                phx-click="toggle_star"
-                phx-value-note_id={note.id}
-                class="mt-3 flex items-center gap-1.5 text-xs text-base-content/30 hover:text-warning transition-colors min-h-[44px] md:min-h-0 px-1"
-                aria-label={if note.starred == 1, do: "Unstar note", else: "Star note"}
-                aria-pressed={note.starred == 1}
-              >
-                <.icon
-                  name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}
-                  class={"w-3.5 h-3.5 #{if note.starred == 1, do: "text-warning", else: ""}"}
-                />
-                {if note.starred == 1, do: "Starred", else: "Star"}
-              </button>
+              <div class="mt-3 flex items-center gap-3">
+                <button
+                  type="button"
+                  phx-click="toggle_star"
+                  phx-value-note_id={note.id}
+                  class="flex items-center gap-1.5 text-xs text-base-content/30 hover:text-warning transition-colors min-h-[44px] md:min-h-0 px-1"
+                  aria-label={if note.starred == 1, do: "Unstar note", else: "Star note"}
+                  aria-pressed={note.starred == 1}
+                >
+                  <.icon
+                    name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}
+                    class={"w-3.5 h-3.5 #{if note.starred == 1, do: "text-warning", else: ""}"}
+                  />
+                  {if note.starred == 1, do: "Starred", else: "Star"}
+                </button>
+                <button
+                  type="button"
+                  phx-click="delete_note"
+                  phx-value-note_id={note.id}
+                  data-confirm="Delete this note?"
+                  class="flex items-center gap-1.5 text-xs text-base-content/30 hover:text-error transition-colors min-h-[44px] md:min-h-0 px-1"
+                  aria-label="Delete note"
+                >
+                  <.icon name="hero-trash" class="w-3.5 h-3.5" /> Delete
+                </button>
+              </div>
             </div>
           </div>
         <% end %>

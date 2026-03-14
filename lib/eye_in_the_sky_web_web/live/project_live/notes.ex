@@ -52,6 +52,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
   def handle_event("toggle_star", params, socket),
     do: handle_toggle_star(params, socket, &load_notes/1)
 
+  @impl true
+  def handle_event("delete_note", params, socket),
+    do: handle_delete_note(params, socket, &load_notes/1)
+
   defp load_notes(socket) do
     project = socket.assigns.project
     agent_ids = Enum.map(project.agents, & &1.id)

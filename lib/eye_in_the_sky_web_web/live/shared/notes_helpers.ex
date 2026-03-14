@@ -36,4 +36,22 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.NotesHelpers do
         {:noreply, put_flash(socket, :error, "Failed to toggle star")}
     end
   end
+
+  def handle_delete_note(params, socket, reload_fn) do
+    note_id = params["note_id"] || params["note-id"] || params["value"]
+
+    case Notes.get_note(note_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Note not found")}
+
+      note ->
+        case Notes.delete_note(note) do
+          {:ok, _} ->
+            {:noreply, reload_fn.(socket)}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Failed to delete note")}
+        end
+    end
+  end
 end

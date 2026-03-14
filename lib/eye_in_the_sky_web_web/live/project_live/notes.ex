@@ -6,14 +6,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
   alias EyeInTheSkyWeb.Repo
   import Ecto.Query
   import EyeInTheSkyWebWeb.Components.NotesList
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [parse_id: 1]
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    project_id =
-      case Integer.parse(id) do
-        {int, ""} -> int
-        _ -> nil
-      end
+    project_id = parse_id(id)
 
     socket =
       if project_id do

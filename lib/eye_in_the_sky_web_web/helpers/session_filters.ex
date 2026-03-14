@@ -58,15 +58,102 @@ defmodule EyeInTheSkyWebWeb.Helpers.SessionFilters do
     Enum.sort_by(sessions, &parse_started_at/1, {:desc, DateTime})
   end
 
-  defp parse_started_at(%{started_at: nil}), do: ~U[1970-01-01 00:00:00Z]
-  defp parse_started_at(%{started_at: %DateTime{} = dt}), do: dt
+  defp parse_started_at(%{started_at: value}), do: VH.coerce_datetime(value)
 
-  defp parse_started_at(%{started_at: str}) when is_binary(str) do
-    case VH.parse_datetime(str) do
-      {:ok, dt} -> dt
-      :error -> ~U[1970-01-01 00:00:00Z]
+  @doc """
+  Filters sessions by status/archive state.
+
+  Filters: "active", "completed", "archived", or any other value passes all through.
+  """
+  def filter_agents_by_status(sessions, filter) do
+    case filter do
+      "active" ->
+        Enum.filter(sessions, &(&1.status in ["working", "idle", nil] and is_nil(&1.archived_at)))
+
+      "completed" ->
+        Enum.filter(sessions, &(&1.status == "completed" and is_nil(&1.archived_at)))
+
+      "archived" ->
+        Enum.filter(sessions, &(!is_nil(&1.archived_at)))
+
+      _ ->
+        sessions
     end
   end
+
+  @doc """
+  Filters sessions by a free-text search query against uuid, name, agent description, and project name.
+  """
+  def filter_agents_by_search(sessions, query) do
+    q = (query || "") |> String.trim() |> String.downcase()
+
+    if q == "" do
+      sessions
+    else
+      Enum.filter(sessions, fn s ->
+        haystack =
+          [
+            s.uuid,
+            s.name,
+            s.agent && s.agent.description,
+            s.agent && s.agent.project_name
+          ]
+          |> Enum.map(&to_string_or_empty/1)
+          |> Enum.join(" ")
+          |> String.downcase()
+
+        String.contains?(haystack, q)
+      end)
+    end
+  end
+
+  @doc """
+  Sorts sessions by "name", "status", or "recent" (default).
+  """
+  def sort_agents(sessions, sort_by) do
+    case sort_by do
+      "name" ->
+        Enum.sort_by(sessions, fn s -> (s.name || "") |> String.downcase() end)
+
+      "status" ->
+        Enum.sort_by(sessions, &session_status_rank/1)
+
+      _ ->
+        Enum.sort_by(
+          sessions,
+          fn s -> sort_datetime(s.last_activity_at || s.started_at) end,
+          {:desc, NaiveDateTime}
+        )
+    end
+  end
+
+  @doc """
+  Returns a numeric rank for a session's status (lower = more prominent).
+  """
+  def session_status_rank(agent) do
+    case agent.status do
+      "discovered" -> 0
+      "working" -> 1
+      "idle" -> 1
+      "completed" -> 2
+      nil -> 1
+      _ -> 2
+    end
+  end
+
+  @doc """
+  Converts a value to a string, returning empty string for nil.
+  """
+  def to_string_or_empty(nil), do: ""
+  def to_string_or_empty(v) when is_binary(v), do: v
+  def to_string_or_empty(v), do: to_string(v)
+
+  @doc """
+  Normalizes a datetime value to NaiveDateTime for sorting, returning epoch for nil/unknown.
+  """
+  def sort_datetime(%NaiveDateTime{} = ndt), do: ndt
+  def sort_datetime(%DateTime{} = dt), do: DateTime.to_naive(dt)
+  def sort_datetime(_), do: ~N[0000-01-01 00:00:00]
 
   @doc """
   Returns true if the session is stale given a threshold in hours.

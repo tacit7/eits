@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewAgentDrawer do
   """
 
   use Phoenix.LiveComponent
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [claude_models: 0, codex_models: 0]
 
   @impl true
   def render(assigns) do
@@ -48,20 +49,14 @@ defmodule EyeInTheSkyWebWeb.Components.NewAgentDrawer do
               </label>
               <select name="model" class="select select-bordered" required>
                 <optgroup label="Claude">
-                  <option value="opus">Opus 4.6 • Most capable for complex work</option>
-                  <option value="sonnet">Sonnet 4.5 • Best for everyday tasks</option>
-                  <option value="sonnet[1m]">Sonnet 4.5 (1M) • 1M context window</option>
-                  <option value="haiku">Haiku 4.5 • Fastest for quick answers</option>
+                  <%= for {value, label} <- claude_models() do %>
+                    <option value={value}>{label}</option>
+                  <% end %>
                 </optgroup>
                 <optgroup label="Codex">
-                  <option value="gpt-5.4">gpt-5.4 • Latest frontier agentic coding model</option>
-                  <option value="gpt-5.3-codex">gpt-5.3-codex • Frontier Codex-optimized</option>
-                  <option value="gpt-5.2-codex">gpt-5.2-codex • Frontier agentic coding</option>
-                  <option value="gpt-5.2">gpt-5.2 • Optimized for long-running agents</option>
-                  <option value="gpt-5.1-codex-max">
-                    gpt-5.1-codex-max • Deep and fast reasoning
-                  </option>
-                  <option value="gpt-5.1-codex-mini">gpt-5.1-codex-mini • Cheaper and faster</option>
+                  <%= for {value, label} <- codex_models() do %>
+                    <option value={value}>{label}</option>
+                  <% end %>
                 </optgroup>
               </select>
             </div>
@@ -80,6 +75,25 @@ defmodule EyeInTheSkyWebWeb.Components.NewAgentDrawer do
               </select>
             </div>
             
+    <!-- Max Budget -->
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text font-medium">Max Budget (USD)</span>
+                <span class="label-text-alt text-xs">Optional — blank = unlimited</span>
+              </label>
+              <label class="input input-bordered flex items-center gap-1">
+                <span class="text-base-content/50 font-mono">$</span>
+                <input
+                  type="number"
+                  name="max_budget_usd"
+                  min="0"
+                  step="0.01"
+                  placeholder="unlimited"
+                  class="grow bg-transparent border-0 outline-none focus:ring-0"
+                />
+              </label>
+            </div>
+
     <!-- Prompt Template -->
             <div class="form-control">
               <label class="label">

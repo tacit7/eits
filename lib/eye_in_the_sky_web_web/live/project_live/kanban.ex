@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   alias EyeInTheSkyWeb.Notes
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Claude.AgentManager
-  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [format_due_date: 1, due_date_class: 1]
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [format_due_date: 1, due_date_class: 1, parse_id: 1]
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -14,12 +14,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "tasks:#{id}")
     end
 
-    # Parse project ID safely
-    project_id =
-      case Integer.parse(id) do
-        {int, ""} -> int
-        _ -> nil
-      end
+    project_id = parse_id(id)
 
     socket =
       if project_id do

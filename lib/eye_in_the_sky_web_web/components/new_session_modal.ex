@@ -6,23 +6,9 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
 
   use Phoenix.LiveComponent
   import EyeInTheSkyWebWeb.CoreComponents, only: [icon: 1]
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [claude_models: 0, codex_models: 0]
 
   @global_agents_dir Path.expand("~/.claude/agents")
-
-  @claude_models [
-    {"sonnet", "Sonnet 4.5"},
-    {"opus", "Opus 4.6"},
-    {"sonnet[1m]", "Sonnet 4.5 (1M)"},
-    {"haiku", "Haiku 4.5"}
-  ]
-
-  @codex_models [
-    {"gpt-5.3-codex", "GPT-5.3 Codex"},
-    {"gpt-5.2-codex", "GPT-5.2 Codex"},
-    {"gpt-5.2", "GPT-5.2"},
-    {"gpt-5.1", "GPT-5.1"},
-    {"gpt-5-codex-mini", "GPT-5 Codex Mini"}
-  ]
 
   @impl true
   def mount(socket) do
@@ -145,6 +131,18 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
                 phx-update="ignore"
                 phx-mounted={Phoenix.LiveView.JS.dispatch("focus")}
               >{@prefill_text}</textarea>
+              <label class="flex items-center gap-1.5 mt-2 cursor-pointer w-fit">
+                <.icon name="hero-paper-clip-mini" class="w-3.5 h-3.5 text-base-content/40" />
+                <span class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">Attach file</span>
+                <input
+                  type="file"
+                  class="hidden"
+                  accept=".txt,.md,.json,.yaml,.yml,.ex,.exs,.js,.ts,.py,.sh,.csv,.xml,.toml"
+                  phx-hook="FileAttach"
+                  id={"file-attach-#{@selected_prompt_id || "none"}"}
+                  data-target={"desc-#{@selected_prompt_id || "none"}"}
+                />
+              </label>
             </div>
 
             <%!-- Project --%>
@@ -221,14 +219,14 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
             </button>
           </form>
         </div>
-        <div class="modal-backdrop" phx-click={@toggle_event}></div>
+        <div class="modal-backdrop bg-black/50 cursor-pointer" phx-click={@toggle_event}></div>
       </div>
     </div>
     """
   end
 
-  defp models_for_provider("codex"), do: @codex_models
-  defp models_for_provider(_), do: @claude_models
+  defp models_for_provider("codex"), do: codex_models()
+  defp models_for_provider(_), do: claude_models()
 
   # Returns [{name, scope}] where scope is :project or :global.
   # Project agents take priority and are listed first; duplicates deduped by name.

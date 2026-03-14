@@ -6,6 +6,59 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
   use Phoenix.Component
 
   @doc """
+  Returns the list of Claude model {value, label} tuples for select inputs.
+  """
+  def claude_models do
+    [
+      {"sonnet", "Sonnet 4.5"},
+      {"opus", "Opus 4.6"},
+      {"sonnet[1m]", "Sonnet 4.5 (1M)"},
+      {"haiku", "Haiku 4.5"}
+    ]
+  end
+
+  @doc """
+  Returns the list of Codex model {value, label} tuples for select inputs.
+  """
+  def codex_models do
+    [
+      {"gpt-5.3-codex", "GPT-5.3 Codex"},
+      {"gpt-5.2-codex", "GPT-5.2 Codex"},
+      {"gpt-5.2", "GPT-5.2"},
+      {"gpt-5.1", "GPT-5.1"},
+      {"gpt-5-codex-mini", "GPT-5 Codex Mini"}
+    ]
+  end
+
+  @doc """
+  Parse an integer ID from a string route param. Returns nil for invalid input.
+  """
+  def parse_id(str) when is_binary(str) do
+    case Integer.parse(str) do
+      {int, ""} -> int
+      _ -> nil
+    end
+  end
+
+  def parse_id(_), do: nil
+
+  @doc """
+  Coerce a raw datetime value (nil | DateTime | binary string) to a DateTime.
+  Returns a fallback epoch datetime when the value is nil or unparseable.
+  """
+  def coerce_datetime(nil), do: ~U[1970-01-01 00:00:00Z]
+  def coerce_datetime(%DateTime{} = dt), do: dt
+
+  def coerce_datetime(str) when is_binary(str) do
+    case parse_datetime(str) do
+      {:ok, dt} -> dt
+      :error -> ~U[1970-01-01 00:00:00Z]
+    end
+  end
+
+  def coerce_datetime(_), do: ~U[1970-01-01 00:00:00Z]
+
+  @doc """
   Parse datetime from various formats (DateTime struct, binary string, nil).
   Returns a DateTime struct or a fallback epoch datetime.
   """

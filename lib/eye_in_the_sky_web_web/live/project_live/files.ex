@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
         |> assign(:sidebar_project, project)
         |> assign(:file_path, nil)
         |> assign(:file_content, nil)
-                |> assign(:file_type, nil)
+        |> assign(:file_type, nil)
         |> assign(:file_tree, file_tree)
         |> assign(:files, [])
         |> assign(:view_mode, :list)
@@ -45,7 +45,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
         |> assign(:project, nil)
         |> assign(:file_path, nil)
         |> assign(:file_content, nil)
-                |> assign(:file_type, nil)
+        |> assign(:file_type, nil)
         |> assign(:file_tree, [])
         |> assign(:files, [])
         |> assign(:view_mode, :list)
@@ -63,70 +63,99 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
     if project.path do
       full_path = Path.join(project.path, path)
 
-      cond do
-        File.dir?(full_path) ->
-          # List directory contents (for list view)
-          case File.ls(full_path) do
-            {:ok, files} ->
-              file_list =
-                files
-                |> Enum.filter(fn file ->
-                  file_path = Path.join(full_path, file)
-                  File.dir?(file_path) or !is_binary_file?(file_path)
-                end)
-                |> Enum.map(fn file ->
-                  file_path = Path.join(full_path, file)
+      expanded_project_path = Path.expand(project.path)
+      expanded_full_path = Path.expand(full_path)
 
-                  %{
-                    name: file,
-                    path: Path.join(path, file),
-                    is_dir: File.dir?(file_path),
-                    size: get_file_size(file_path)
-                  }
-                end)
-                |> Enum.sort_by(&{!&1.is_dir, &1.name})
+      if not String.starts_with?(expanded_full_path, expanded_project_path) do
+        {:noreply,
+         socket
+         |> assign(:error, "Access denied: path outside project directory")
+         |> assign(:file_content, nil)
+         |> assign(:files, [])}
+      else
+        cond do
+          File.dir?(full_path) ->
+            # List directory contents (for list view)
+            case File.ls(full_path) do
+              {:ok, files} ->
+                file_list =
+                  files
+                  |> Enum.filter(fn file ->
+                    file_path = Path.join(full_path, file)
+                    File.dir?(file_path) or !is_binary_file?(file_path)
+                  end)
+                  |> Enum.map(fn file ->
+                    file_path = Path.join(full_path, file)
 
-              {:noreply,
-               socket
-               |> assign(:file_path, path)
-               |> assign(:file_content, nil)
-               |> assign(:files, file_list)
-               |> assign(:error, nil)}
+                    %{
+                      name: file,
+                      path: Path.join(path, file),
+                      is_dir: File.dir?(file_path),
+                      size: get_file_size(file_path)
+                    }
+                  end)
+                  |> Enum.sort_by(&{!&1.is_dir, &1.name})
 
-            {:error, reason} ->
-              {:noreply,
-               socket
-               |> assign(:error, "Failed to read directory: #{reason}")
-               |> assign(:files, [])}
-          end
+                {:noreply,
+                 socket
+                 |> assign(:file_path, path)
+                 |> assign(:file_content, nil)
+                 |> assign(:files, file_list)
+                 |> assign(:error, nil)}
 
-        File.regular?(full_path) ->
-          # Read file contents
-          case File.read(full_path) do
-            {:ok, content} ->
-              file_type = detect_file_type(path)
+              {:error, reason} ->
+                {:noreply,
+                 socket
+                 |> assign(:error, "Failed to read directory: #{reason}")
+                 |> assign(:files, [])}
+            end
 
-              {:noreply,
-               socket
-               |> assign(:file_path, path)
-               |> assign(:file_content, content)
-               |> assign(:file_type, file_type)
-               |> assign(:files, [])
-               |> assign(:error, nil)}
+          File.regular?(full_path) ->
+            # Check file size before reading
+            case File.stat(full_path) do
+              {:ok, %{size: size}} when size > 1_048_576 ->
+                {:noreply,
+                 socket
+                 |> assign(:file_path, path)
+                 |> assign(:file_content, nil)
+                 |> assign(:file_type, nil)
+                 |> assign(:files, [])
+                 |> assign(:error, "File too large to display (over 1 MB)")}
 
-            {:error, reason} ->
-              {:noreply,
-               socket
-               |> assign(:error, "Failed to read file: #{reason}")
-               |> assign(:file_content, nil)}
-          end
+              {:ok, _stat} ->
+                case File.read(full_path) do
+                  {:ok, content} ->
+                    file_type = detect_file_type(path)
 
-        true ->
-          {:noreply,
-           socket
-           |> assign(:error, "File not found: #{path}")
-           |> assign(:file_content, nil)
-           |> assign(:files, [])}
+                    {:noreply,
+                     socket
+                     |> assign(:file_path, path)
+                     |> assign(:file_content, content)
+                     |> assign(:file_type, file_type)
+                     |> assign(:files, [])
+                     |> assign(:error, nil)}
+
+                  {:error, reason} ->
+                    {:noreply,
+                     socket
+                     |> assign(:error, "Failed to read file: #{reason}")
+                     |> assign(:file_content, nil)}
+                end
+
+              {:error, reason} ->
+                {:noreply,
+                 socket
+                 |> assign(:error, "Failed to stat file: #{reason}")
+                 |> assign(:file_content, nil)}
+            end
+
+          true ->
+            {:noreply,
+             socket
+             |> assign(:error, "File not found: #{path}")
+             |> assign(:file_content, nil)
+             |> assign(:files, [])}
+        end
       end
     else
       {:noreply,
@@ -174,8 +203,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
 
   @impl true
   def handle_event("toggle_view_mode", %{"mode" => mode}, socket) do
-    view_mode = String.to_existing_atom(mode)
-    {:noreply, assign(socket, :view_mode, view_mode)}
+    case mode do
+      "list" -> {:noreply, assign(socket, :view_mode, :list)}
+      "tree" -> {:noreply, assign(socket, :view_mode, :tree)}
+      _ -> {:noreply, socket}
+    end
   end
 
   defp build_file_tree(base_path, current_path, max_depth \\ 5, current_depth \\ 0) do
@@ -188,7 +220,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
           |> Enum.filter(fn file ->
             full_path = Path.join(current_path, file)
             # Filter out common ignored directories/files and binary files
+            ignored_dirs = ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
             (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
+              file not in ignored_dirs and
               (File.dir?(full_path) or !is_binary_file?(full_path))
           end)
           |> Enum.map(fn file ->

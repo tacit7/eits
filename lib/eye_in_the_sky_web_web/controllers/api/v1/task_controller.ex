@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
 
   alias EyeInTheSkyWeb.{Agents, Notes, Projects, Sessions, Tasks}
   alias EyeInTheSkyWeb.MCP.Tools.Helpers
+  alias EyeInTheSkyWebWeb.Presenters.ApiPresenter
 
   @doc """
   GET /api/v1/tasks - List tasks.
@@ -55,7 +56,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
     json(conn, %{
       success: true,
       message: "#{length(tasks)} task(s)",
-      tasks: Enum.map(tasks, &format_task/1)
+      tasks: Enum.map(tasks, &ApiPresenter.present_task/1)
     })
   end
 
@@ -101,8 +102,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
 
       json(conn, %{
         success: true,
-        task: format_task(task),
-        annotations: Enum.map(annotations, &format_note/1)
+        task: ApiPresenter.present_task(task),
+        annotations: Enum.map(annotations, &ApiPresenter.present_note/1)
       })
     rescue
       Ecto.NoResultsError -> {:error, :not_found}
@@ -126,7 +127,11 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
 
       case result do
         {:ok, updated} ->
-          json(conn, %{success: true, message: "Task updated", task: format_task(updated)})
+          json(conn, %{
+            success: true,
+            message: "Task updated",
+            task: ApiPresenter.present_task(updated)
+          })
 
         {:error, _} = err ->
           err
@@ -216,22 +221,6 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
 
   # Helpers
 
-  defp format_task(task) do
-    %{
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      priority: task.priority,
-      state: if(Ecto.assoc_loaded?(task.state) && task.state, do: task.state.name),
-      state_id: task.state_id,
-      due_at: task.due_at
-    }
-  end
-
-  defp format_note(note) do
-    %{id: note.id, title: note.title, body: note.body, starred: note.starred || 0}
-  end
-
   defp move_to_state(task, state_name) do
     state = Tasks.get_workflow_state_by_name(state_name)
 
@@ -262,7 +251,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
     if int_id do
       EyeInTheSkyWeb.Repo.insert_all(
         "task_sessions",
-        [%{task_id: task_int_id, session_id: int_id}], on_conflict: :nothing)
+        [%{task_id: task_int_id, session_id: int_id}],
+        on_conflict: :nothing
+      )
     end
 
     :ok
@@ -287,5 +278,4 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
   defp resolve_session_int_id(raw) do
     resolve_id(raw, &Sessions.get_session_by_uuid/1)
   end
-
 end

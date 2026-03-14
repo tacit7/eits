@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TeamController do
 
   alias EyeInTheSkyWeb.{Repo, Teams}
   alias EyeInTheSkyWeb.Teams.TeamMember
+  alias EyeInTheSkyWebWeb.Presenters.ApiPresenter
 
   # GET /api/v1/teams
   def index(conn, params) do
@@ -19,19 +20,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TeamController do
 
     json(conn, %{
       success: true,
-      teams:
-        Enum.map(teams, fn t ->
-          %{
-            id: t.id,
-            uuid: t.uuid,
-            name: t.name,
-            description: t.description,
-            status: t.status,
-            project_id: t.project_id,
-            member_count: length(t.members),
-            created_at: to_string(t.created_at)
-          }
-        end)
+      teams: Enum.map(teams, &ApiPresenter.present_team/1)
     })
   end
 
@@ -246,5 +235,4 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TeamController do
 
   defp maybe_opt(opts, _key, nil), do: opts
   defp maybe_opt(opts, key, val), do: Keyword.put(opts, key, val)
-
 end

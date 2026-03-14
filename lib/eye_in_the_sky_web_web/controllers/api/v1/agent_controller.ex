@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
   import EyeInTheSkyWebWeb.ControllerHelpers
 
   alias EyeInTheSkyWeb.{Agents, Claude.AgentManager, Teams}
+  alias EyeInTheSkyWebWeb.Presenters.ApiPresenter
 
   @doc """
   GET /api/v1/agents - List agents.
@@ -30,7 +31,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
 
     json(conn, %{
       success: true,
-      agents: Enum.map(agents, &format_agent/1)
+      agents: Enum.map(agents, &ApiPresenter.present_agent/1)
     })
   end
 
@@ -45,7 +46,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
       end
 
     with {:ok, agent} <- result do
-      json(conn, %{success: true, agent: format_agent(agent)})
+      json(conn, %{success: true, agent: ApiPresenter.present_agent(agent)})
     end
   end
 
@@ -148,16 +149,4 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
     Do NOT skip any steps. The orchestrator needs to see what you did.
     """
   end
-
-  defp format_agent(agent) do
-    %{
-      id: agent.id,
-      uuid: agent.uuid,
-      description: agent.description,
-      status: agent.status,
-      project_id: agent.project_id,
-      project_name: agent.project_name
-    }
-  end
-
 end

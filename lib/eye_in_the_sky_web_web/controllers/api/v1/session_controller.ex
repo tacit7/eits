@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
 
   alias EyeInTheSkyWeb.{Agents, Contexts, Sessions, Projects}
   alias EyeInTheSkyWeb.MCP.Tools.Helpers
+  alias EyeInTheSkyWebWeb.Presenters.ApiPresenter
 
   @doc """
   POST /api/v1/sessions - Register a new session (SessionStart hook).
@@ -213,11 +214,24 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
                 body: body,
                 status: "delivered",
                 provider: "claude",
-                metadata: %{"stream_type" => "tool_use", "tool_name" => tool_name, "input" => tool_input}
+                metadata: %{
+                  "stream_type" => "tool_use",
+                  "tool_name" => tool_name,
+                  "input" => tool_input
+                }
               })
 
-              Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agent:working", {:agent_working, session})
-              Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "session:#{session.id}", {:tool_use, tool_name, tool_input})
+              Phoenix.PubSub.broadcast(
+                EyeInTheSkyWeb.PubSub,
+                "agent:working",
+                {:agent_working, session}
+              )
+
+              Phoenix.PubSub.broadcast(
+                EyeInTheSkyWeb.PubSub,
+                "session:#{session.id}",
+                {:tool_use, tool_name, tool_input}
+              )
 
             "post" ->
               input_json = Jason.encode!(tool_input)
@@ -235,7 +249,11 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
                 metadata: %{"stream_type" => "tool_result", "tool_name" => tool_name}
               })
 
-              Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "session:#{session.id}", {:tool_result, tool_name, false})
+              Phoenix.PubSub.broadcast(
+                EyeInTheSkyWeb.PubSub,
+                "session:#{session.id}",
+                {:tool_result, tool_name, false}
+              )
 
             _ ->
               nil
@@ -271,10 +289,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
     json(conn, %{
       success: true,
       message: "Found #{length(results)} session(s)",
-      results:
-        Enum.map(results, fn s ->
-          %{id: s.id, uuid: s.uuid, description: s.description, status: s.status}
-        end)
+      results: Enum.map(results, &ApiPresenter.present_session/1)
     })
   end
 
@@ -455,5 +470,4 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
         {"anthropic", model}
     end
   end
-
 end

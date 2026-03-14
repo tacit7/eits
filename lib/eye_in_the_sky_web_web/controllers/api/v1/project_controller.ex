@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.ProjectController do
   import EyeInTheSkyWebWeb.ControllerHelpers
 
   alias EyeInTheSkyWeb.Projects
+  alias EyeInTheSkyWebWeb.Presenters.ApiPresenter
 
   @doc """
   GET /api/v1/projects - List all projects.
@@ -13,10 +14,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.ProjectController do
 
     json(conn, %{
       success: true,
-      projects:
-        Enum.map(projects, fn p ->
-          %{id: p.id, name: p.name, path: p.path, slug: p.slug, active: p.active}
-        end)
+      projects: Enum.map(projects, &ApiPresenter.present_project/1)
     })
   end
 
@@ -29,13 +27,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.ProjectController do
 
       json(conn, %{
         success: true,
-        project: %{
-          id: project.id,
-          name: project.name,
-          path: project.path,
-          slug: project.slug,
-          active: project.active
-        }
+        project: ApiPresenter.present_project(project)
       })
     rescue
       Ecto.NoResultsError ->
@@ -70,5 +62,4 @@ defmodule EyeInTheSkyWebWeb.Api.V1.ProjectController do
         |> json(%{error: "Failed to create project", details: translate_errors(changeset)})
     end
   end
-
 end

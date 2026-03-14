@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.PromptController do
   import EyeInTheSkyWebWeb.ControllerHelpers
 
   alias EyeInTheSkyWeb.Prompts
+  alias EyeInTheSkyWebWeb.Presenters.ApiPresenter
 
   @doc """
   GET /api/v1/prompts - List prompts. Supports ?query= for search, ?project_id= for scoping.
@@ -23,18 +24,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.PromptController do
 
     json(conn, %{
       success: true,
-      prompts:
-        Enum.map(prompts, fn p ->
-          %{
-            id: p.id,
-            uuid: p.uuid,
-            name: p.name,
-            slug: p.slug,
-            description: p.description,
-            project_id: p.project_id,
-            active: p.active
-          }
-        end)
+      prompts: Enum.map(prompts, &ApiPresenter.present_prompt/1)
     })
   end
 
@@ -79,15 +69,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.PromptController do
       {:ok, prompt} ->
         base = %{
           success: true,
-          prompt: %{
-            id: prompt.id,
-            uuid: prompt.uuid,
-            name: prompt.name,
-            slug: prompt.slug,
-            description: prompt.description,
-            project_id: prompt.project_id,
-            active: prompt.active
-          }
+          prompt: ApiPresenter.present_prompt(prompt)
         }
 
         response =
@@ -140,5 +122,4 @@ defmodule EyeInTheSkyWebWeb.Api.V1.PromptController do
         |> json(%{error: "Failed to create prompt", details: translate_errors(changeset)})
     end
   end
-
 end

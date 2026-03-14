@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   alias EyeInTheSkyWeb.Claude.{AgentManager, AgentWorker, SessionReader}
   alias EyeInTheSkyWeb.FileAttachments
   alias EyeInTheSkyWebWeb.Components.DmPage
+  import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
 
   require Logger
 
@@ -43,11 +44,11 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       end
 
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "dm:#{session.id}:stream")
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "dm:#{session.id}:queue")
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "tasks")
+      subscribe_session(session.id)
+      subscribe_agent_working()
+      subscribe_dm_stream(session.id)
+      subscribe_dm_queue(session.id)
+      subscribe_tasks()
       send(self(), :sync_from_session_file)
     end
 
@@ -230,6 +231,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     Sessions.update_session(session, %{model: model})
 
     socket =
+      # Default effort to "medium" for opus when not explicitly set
+      effort = if effort == "" and model == "opus", do: "medium", else: effort
+
       socket
       |> assign(:selected_model, model)
       |> assign(:selected_effort, effort)

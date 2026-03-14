@@ -8,19 +8,18 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   alias EyeInTheSkyWeb.Sessions
   import EyeInTheSkyWebWeb.Components.Icons
   import EyeInTheSkyWebWeb.Components.SessionCard
+  import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [parse_id: 1]
+  import EyeInTheSkyWebWeb.Helpers.SessionFilters
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    project_id =
-      case Integer.parse(id) do
-        {int, ""} -> int
-        _ -> nil
-      end
+    project_id = parse_id(id)
 
     if project_id do
       if connected?(socket) do
-        Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agents")
-        Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
+        subscribe_agents()
+        subscribe_agent_working()
       end
 
       project = Projects.get_project!(project_id)
@@ -111,76 +110,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
       end)
     end
   end
-
-  defp filter_agents_by_status(sessions, filter) do
-    case filter do
-      "active" ->
-        Enum.filter(sessions, &(&1.status in ["working", "idle", nil] and is_nil(&1.archived_at)))
-
-      "completed" ->
-        Enum.filter(sessions, &(&1.status == "completed" and is_nil(&1.archived_at)))
-
-      "archived" ->
-        Enum.filter(sessions, &(!is_nil(&1.archived_at)))
-
-      _ ->
-        sessions
-    end
-  end
-
-  defp filter_agents_by_search(sessions, query) do
-    q = (query || "") |> String.trim() |> String.downcase()
-
-    if q == "" do
-      sessions
-    else
-      Enum.filter(sessions, fn s ->
-        haystack =
-          [s.uuid, s.name, s.agent && s.agent.description]
-          |> Enum.map(&to_string_or_empty/1)
-          |> Enum.join(" ")
-          |> String.downcase()
-
-        String.contains?(haystack, q)
-      end)
-    end
-  end
-
-  defp sort_agents(sessions, sort_by) do
-    case sort_by do
-      "name" ->
-        Enum.sort_by(sessions, fn s -> (s.name || "") |> String.downcase() end)
-
-      "status" ->
-        Enum.sort_by(sessions, &status_rank/1)
-
-      _ ->
-        Enum.sort_by(
-          sessions,
-          fn s -> sort_datetime(s.last_activity_at || s.started_at) end,
-          {:desc, NaiveDateTime}
-        )
-    end
-  end
-
-  defp status_rank(agent) do
-    case agent.status do
-      "discovered" -> 0
-      "working" -> 1
-      "idle" -> 1
-      "completed" -> 2
-      nil -> 1
-      _ -> 2
-    end
-  end
-
-  defp to_string_or_empty(nil), do: ""
-  defp to_string_or_empty(v) when is_binary(v), do: v
-  defp to_string_or_empty(v), do: to_string(v)
-
-  defp sort_datetime(%NaiveDateTime{} = ndt), do: ndt
-  defp sort_datetime(%DateTime{} = dt), do: DateTime.to_naive(dt)
-  defp sort_datetime(_), do: ~N[0000-01-01 00:00:00]
 
   defp update_agent_status_in_list(socket, session_id, new_status) do
     now = DateTime.utc_now() |> DateTime.to_iso8601()

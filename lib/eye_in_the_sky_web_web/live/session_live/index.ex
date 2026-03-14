@@ -3,13 +3,14 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
 
   alias EyeInTheSkyWeb.Sessions
   import EyeInTheSkyWebWeb.Components.SessionCard, only: [session_row: 1]
+  import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
 
   @per_page 20
 
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agents")
+      subscribe_agents()
     end
 
     sessions = Sessions.list_session_overview_rows(limit: @per_page, offset: 0)

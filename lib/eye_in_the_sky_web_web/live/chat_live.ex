@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
   alias EyeInTheSkyWeb.{Agents, Channels, Messages, Projects, Prompts, Sessions}
   alias EyeInTheSkyWeb.Claude.{AgentManager, ChannelProtocol}
+  import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
 
   # Deterministic UUIDs for the web UI user
   @web_agent_uuid "00000000-0000-0000-0000-000000000001"
@@ -14,7 +15,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
     # Subscribe to agent working events once on mount
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
+      subscribe_agent_working()
     end
 
     socket =
@@ -84,7 +85,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
     # Subscribe to channel messages if connected
     if connected?(socket) && channel_id do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "channel:#{channel_id}:messages")
+      subscribe_channel_messages(channel_id)
     end
 
     # Load messages for active channel (with JSONL support)
@@ -481,6 +482,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   def handle_event("create_agent", params, socket) do
     model = params["model"] || "sonnet"
     effort_level = params["effort_level"]
+    max_budget_usd = parse_budget(params["max_budget_usd"])
     agent_name = params["agent_name"] || ""
     description = params["description"] || ""
     selected_project_id = params["project_id"]
@@ -523,6 +525,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       agent_type: agent_type,
       model: model,
       effort_level: effort_level,
+      max_budget_usd: max_budget_usd,
       project_id: selected_project_id,
       project_path: project_path,
       description: agent_description,
@@ -958,5 +961,15 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         prompt_text: prompt.prompt_text
       }
     end)
+  end
+
+  defp parse_budget(nil), do: nil
+  defp parse_budget(""), do: nil
+
+  defp parse_budget(v) when is_binary(v) do
+    case Float.parse(v) do
+      {f, _} when f > 0 -> f
+      _ -> nil
+    end
   end
 end

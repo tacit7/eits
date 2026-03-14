@@ -4,7 +4,9 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   alias EyeInTheSkyWeb.Agents
   alias EyeInTheSkyWeb.Sessions
   import EyeInTheSkyWebWeb.Helpers.ViewHelpers
+  import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWebWeb.Components.Icons
+  import EyeInTheSkyWebWeb.Helpers.SessionFilters
 
   require Logger
 
@@ -13,8 +15,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agents")
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
+      subscribe_agents()
+      subscribe_agent_working()
     end
 
     projects = EyeInTheSkyWeb.Projects.list_projects()
@@ -57,85 +59,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
     assign(socket, :agents, agents)
   end
-
-  defp filter_agents_by_status(sessions, filter) do
-    case filter do
-      "active" ->
-        Enum.filter(
-          sessions,
-          &(&1.status in ["working", "idle", nil] and is_nil(&1.archived_at))
-        )
-
-      "completed" ->
-        Enum.filter(sessions, &(&1.status == "completed" and is_nil(&1.archived_at)))
-
-      "archived" ->
-        Enum.filter(sessions, &(!is_nil(&1.archived_at)))
-
-      _ ->
-        sessions
-    end
-  end
-
-  defp filter_agents_by_search(sessions, query) do
-    q = (query || "") |> String.trim() |> String.downcase()
-
-    if q == "" do
-      sessions
-    else
-      Enum.filter(sessions, fn s ->
-        haystack =
-          [
-            s.uuid,
-            s.name,
-            s.agent && s.agent.description,
-            s.agent && s.agent.project_name
-          ]
-          |> Enum.map(&to_string_or_empty/1)
-          |> Enum.join(" ")
-          |> String.downcase()
-
-        String.contains?(haystack, q)
-      end)
-    end
-  end
-
-  defp sort_agents(sessions, sort_by) do
-    case sort_by do
-      "name" ->
-        Enum.sort_by(sessions, fn s -> (s.name || "") |> String.downcase() end)
-
-      "status" ->
-        Enum.sort_by(sessions, fn s -> session_status_rank(s) end)
-
-      _ ->
-        # "recent" (default) - sort by last_activity_at, fall back to started_at
-        Enum.sort_by(
-          sessions,
-          fn s -> sort_datetime(s.last_activity_at || s.started_at) end,
-          {:desc, NaiveDateTime}
-        )
-    end
-  end
-
-  defp session_status_rank(agent) do
-    case agent.status do
-      "discovered" -> 0
-      "working" -> 1
-      "idle" -> 1
-      "completed" -> 2
-      nil -> 1
-      _ -> 2
-    end
-  end
-
-  defp to_string_or_empty(nil), do: ""
-  defp to_string_or_empty(v) when is_binary(v), do: v
-  defp to_string_or_empty(v), do: to_string(v)
-
-  defp sort_datetime(%NaiveDateTime{} = ndt), do: ndt
-  defp sort_datetime(%DateTime{} = dt), do: DateTime.to_naive(dt)
-  defp sort_datetime(_), do: ~N[0000-01-01 00:00:00]
 
   @impl true
   def handle_params(params, _url, socket) do
@@ -345,6 +268,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     agent_type = params["agent_type"] || "claude"
     model = params["model"]
     effort_level = params["effort_level"]
+    max_budget_usd = parse_budget(params["max_budget_usd"])
     description = params["description"]
     agent_name = params["agent_name"] || String.slice(description || "", 0, 60)
 
@@ -359,6 +283,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       agent_type: agent_type,
       model: model,
       effort_level: effort_level,
+      max_budget_usd: max_budget_usd,
       project_id: project.id,
       project_path: project.path,
       description: agent_name,
@@ -625,7 +550,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="bg-base-100 px-4 sm:px-6 lg:px-8">
+    <div class="bg-base-100 min-h-full px-4 sm:px-6 lg:px-8">
       <div class="max-w-3xl mx-auto">
         <div class="flex items-center justify-between py-5">
           <span class="text-[11px] font-mono tabular-nums text-base-content/30 tracking-wider uppercase">
@@ -726,5 +651,15 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       submit_event="create_new_session"
     />
     """
+  end
+
+  defp parse_budget(nil), do: nil
+  defp parse_budget(""), do: nil
+
+  defp parse_budget(v) when is_binary(v) do
+    case Float.parse(v) do
+      {f, _} when f > 0 -> f
+      _ -> nil
+    end
   end
 end

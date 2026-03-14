@@ -6,21 +6,18 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
   alias EyeInTheSkyWeb.Notes
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWebWeb.Components.TaskCard
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [parse_id: 1]
+  import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
 
   @per_page 50
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "tasks")
+      subscribe_tasks()
     end
 
-    # Parse project ID safely
-    project_id =
-      case Integer.parse(id) do
-        {int, ""} -> int
-        _ -> nil
-      end
+    project_id = parse_id(id)
 
     workflow_states = Tasks.list_workflow_states()
 

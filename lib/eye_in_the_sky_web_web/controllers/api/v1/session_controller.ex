@@ -149,6 +149,12 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
             Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agent:working", topic)
             Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, updated})
 
+            # Sync team member status when session completes/fails
+            if status in ["completed", "failed"] do
+              member_status = if status == "failed", do: "failed", else: "done"
+              EyeInTheSkyWeb.Teams.mark_member_done_by_session(updated.id, member_status)
+            end
+
             json(conn, %{
               id: updated.id,
               uuid: updated.uuid,
@@ -312,6 +318,11 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
             )
 
             Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, updated})
+
+            # Sync team member status on session end
+            member_status = if status == "failed", do: "failed", else: "done"
+            EyeInTheSkyWeb.Teams.mark_member_done_by_session(updated.id, member_status)
+
             json(conn, %{success: true, message: "Session ended", status: updated.status})
 
           {:error, cs} ->

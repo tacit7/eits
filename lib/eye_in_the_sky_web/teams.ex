@@ -85,6 +85,17 @@ defmodule EyeInTheSkyWeb.Teams do
     |> tap_broadcast(:member_updated)
   end
 
+  @doc """
+  Marks any team member linked to the given session_id as done/failed.
+  Called when a session ends to keep member status in sync.
+  """
+  def mark_member_done_by_session(session_id, status \\ "done") when status in ["done", "failed", "idle"] do
+    case Repo.get_by(TeamMember, session_id: session_id) do
+      nil -> :ok
+      member -> update_member_status(member, status)
+    end
+  end
+
   def leave_team(%TeamMember{} = member) do
     Repo.delete(member)
     |> tap_broadcast(:member_left)

@@ -516,6 +516,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         opts
       end
 
+    opts =
+      if context[:max_budget_usd] do
+        opts ++ [max_budget_usd: context[:max_budget_usd]]
+      else
+        opts
+      end
+
     if has_messages do
       Logger.info("Resuming Claude session #{state.session_uuid}")
       SDK.resume(state.session_uuid, prompt, opts)
@@ -614,6 +621,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       has_messages: Map.get(context, :has_messages, false),
       channel_id: Map.get(context, :channel_id),
       thinking_budget: Map.get(context, :thinking_budget),
+      max_budget_usd: Map.get(context, :max_budget_usd),
       agent: Map.get(context, :agent)
     }
   end
@@ -625,6 +633,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       has_messages: context[:has_messages] || false,
       channel_id: context[:channel_id],
       thinking_budget: context[:thinking_budget],
+      max_budget_usd: context[:max_budget_usd],
       agent: context[:agent]
     }
   end
@@ -636,6 +645,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       has_messages: false,
       channel_id: nil,
       thinking_budget: nil,
+      max_budget_usd: nil,
       agent: nil
     }
   end
@@ -810,6 +820,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
         Sessions.update_session(agent, attrs)
 
+        # Sync team member status when session goes idle (work finished)
+        if status == "idle" do
+          EyeInTheSkyWeb.Teams.mark_member_done_by_session(session_id, "done")
+        end
+
       {:error, _} ->
         :ok
     end
@@ -823,7 +838,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     title =
       case Sessions.get_session(state.session_id) do
         {:ok, session} when is_binary(session.name) and session.name != "" ->
-          "Agent finished: #{session.name}"
+          String.slice("Agent finished: #{session.name}", 0, 255)
 
         _ ->
           "Agent finished"

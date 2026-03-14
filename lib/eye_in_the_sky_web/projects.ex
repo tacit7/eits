@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.Projects do
   import Ecto.Query, warn: false
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Projects.Project
+  alias EyeInTheSkyWeb.QueryBuilder
 
   @doc """
   Returns the list of projects.
@@ -56,44 +57,30 @@ defmodule EyeInTheSkyWeb.Projects do
   Gets tasks for a project.
   """
   def get_project_tasks(project_id, opts \\ []) when is_integer(project_id) do
-    state_id = Keyword.get(opts, :state_id)
     sort_by = Keyword.get(opts, :sort_by, "created_desc")
-    limit = Keyword.get(opts, :limit)
-    offset = Keyword.get(opts, :offset, 0)
 
-    query =
-      from(t in EyeInTheSkyWeb.Tasks.Task,
-        where: t.project_id == ^project_id
-      )
-
-    query =
-      if state_id do
-        where(query, [t], t.state_id == ^state_id)
-      else
-        query
-      end
-
-    query =
+    order =
       case sort_by do
-        "created_asc" -> order_by(query, [t], asc: t.created_at)
-        "priority" -> order_by(query, [t], desc: t.priority, desc: t.created_at)
-        _ -> order_by(query, [t], desc: t.created_at)
+        "created_asc" -> [asc: :created_at]
+        "priority" -> [desc: :priority, desc: :created_at]
+        _ -> [desc: :created_at]
       end
 
-    query = if limit, do: limit(query, ^limit), else: query
-    query = if offset > 0, do: offset(query, ^offset), else: query
-
-    query
+    base_project_tasks_query(project_id, opts)
+    |> order_by(^order)
+    |> QueryBuilder.maybe_limit(opts)
+    |> QueryBuilder.maybe_offset(opts)
     |> preload([:state, :tags, :agents])
     |> Repo.all()
   end
 
   def count_project_tasks(project_id, opts \\ []) when is_integer(project_id) do
-    state_id = Keyword.get(opts, :state_id)
+    base_project_tasks_query(project_id, opts)
+    |> EyeInTheSkyWeb.Repo.aggregate(:count, :id)
+  end
 
-    query = from(t in EyeInTheSkyWeb.Tasks.Task, where: t.project_id == ^project_id)
-    query = if state_id, do: where(query, [t], t.state_id == ^state_id), else: query
-
-    EyeInTheSkyWeb.Repo.aggregate(query, :count, :id)
+  defp base_project_tasks_query(project_id, opts) do
+    from(t in EyeInTheSkyWeb.Tasks.Task, where: t.project_id == ^project_id)
+    |> QueryBuilder.maybe_where(opts, :state_id)
   end
 end

@@ -77,6 +77,7 @@ defmodule EyeInTheSkyWebWeb.Components.JobFormDrawer do
                 name="job[description]"
                 value={(@editing_job && @editing_job.description) || ""}
                 class="input input-bordered w-full"
+                required
               />
             </div>
 

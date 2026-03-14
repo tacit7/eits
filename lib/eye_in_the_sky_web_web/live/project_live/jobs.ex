@@ -352,6 +352,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
               <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0">
                   <h3 class="font-medium text-sm truncate">{job.name}</h3>
+                  <%= if job.description do %>
+                    <p class="text-[11px] text-base-content/60 mt-0.5 truncate">{job.description}</p>
+                  <% end %>
                   <p class="text-[11px] font-mono text-base-content/50 mt-1 truncate">
                     {format_schedule(job)}
                   </p>
@@ -428,6 +431,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
               <tr class={"hover #{if @expanded_job_id == job.id, do: "bg-base-200"}"}>
                 <td class="cursor-pointer" phx-click="expand_job" phx-value-id={job.id}>
                   <div class="font-medium">{job.name}</div>
+                  <%= if job.description do %>
+                    <p class="text-xs text-base-content/50 mt-0.5">{job.description}</p>
+                  <% end %>
                   <%= if job.origin == "system" do %>
                     <span class="badge badge-xs badge-ghost">system</span>
                   <% end %>

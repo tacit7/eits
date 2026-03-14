@@ -160,6 +160,23 @@ Hooks.SortableKanban = {
     if (this.sortable) this.sortable.destroy()
   }
 }
+Hooks.SortableColumns = {
+  mounted() {
+    this.sortable = Sortable.create(this.el, {
+      animation: 150,
+      ghostClass: "opacity-30",
+      handle: "[data-column-handle]",
+      draggable: "[data-column-id]",
+      onEnd: () => {
+        const order = [...this.el.querySelectorAll("[data-column-id]")].map(el => el.dataset.columnId)
+        this.pushEvent("reorder_columns", { column_ids: order })
+      }
+    })
+  },
+  destroyed() {
+    if (this.sortable) this.sortable.destroy()
+  }
+}
 Hooks.LiveStreamToggle = {
   mounted() {
     const saved = localStorage.getItem("show_live_stream")

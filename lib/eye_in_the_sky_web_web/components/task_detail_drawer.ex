@@ -225,6 +225,36 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                   <.icon name="hero-play" class="w-3.5 h-3.5" /> Start Agent
                 </button>
                 <div class="ml-auto flex items-center gap-1">
+                  <%= if assigns[:copy_event] && assigns[:projects] do %>
+                    <% other_projects = Enum.reject(@projects, & &1.id == @current_project_id) %>
+                    <%= if other_projects != [] do %>
+                      <div class="dropdown dropdown-top dropdown-end">
+                        <button
+                          type="button"
+                          tabindex="0"
+                          class="btn btn-sm btn-ghost text-xs text-base-content/40 hover:text-primary hover:bg-primary/10"
+                          title="Copy to project"
+                        >
+                          <.icon name="hero-document-duplicate" class="w-3.5 h-3.5" />
+                        </button>
+                        <ul tabindex="0" class="dropdown-content menu p-1 shadow-lg bg-base-200 rounded-lg w-48 z-50">
+                          <%= for project <- other_projects do %>
+                            <li>
+                              <button
+                                type="button"
+                                phx-click={@copy_event}
+                                phx-value-project_id={project.id}
+                                class="text-xs"
+                              >
+                                <.icon name="hero-folder" class="w-3.5 h-3.5" />
+                                {project.name}
+                              </button>
+                            </li>
+                          <% end %>
+                        </ul>
+                      </div>
+                    <% end %>
+                  <% end %>
                   <button
                     type="button"
                     phx-click="archive_task"

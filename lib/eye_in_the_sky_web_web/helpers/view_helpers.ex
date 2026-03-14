@@ -405,6 +405,42 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
   def format_date_input(datetime) when is_binary(datetime), do: String.slice(datetime, 0..9)
   def format_date_input(_), do: ""
 
+  @doc """
+  Return the number of days since a task was last updated.
+  Accepts ISO8601 string or DateTime. Returns nil if unparseable.
+  """
+  def days_since_update(nil), do: nil
+
+  def days_since_update(%DateTime{} = dt) do
+    DateTime.diff(DateTime.utc_now(), dt, :second) |> div(86400)
+  end
+
+  def days_since_update(str) when is_binary(str) do
+    case DateTime.from_iso8601(str) do
+      {:ok, dt, _} -> days_since_update(dt)
+      _ ->
+        case parse_datetime(str) do
+          {:ok, dt} -> days_since_update(dt)
+          :error -> nil
+        end
+    end
+  end
+
+  def days_since_update(_), do: nil
+
+  @doc """
+  CSS classes for card aging indicator.
+  Returns {border_class, label} or nil if card is fresh.
+  """
+  def card_aging_indicator(updated_at) do
+    case days_since_update(updated_at) do
+      nil -> nil
+      days when days >= 14 -> {"border-l-2 border-l-error/60", "#{days}d stale"}
+      days when days >= 7 -> {"border-l-2 border-l-warning/60", "#{days}d idle"}
+      _days -> nil
+    end
+  end
+
   defp render_no_project do
     assigns = %{}
 

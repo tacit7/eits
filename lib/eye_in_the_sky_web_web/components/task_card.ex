@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
 
   use Phoenix.Component
   import EyeInTheSkyWebWeb.CoreComponents
-  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [format_due_date: 1]
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [format_due_date: 1, card_aging_indicator: 1]
 
   attr :task, :map, required: true
   attr :variant, :string, default: "kanban", values: ["kanban", "grid", "list"]
@@ -14,15 +14,18 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   attr :rest, :global
 
   def task_card(assigns) do
+    aging = if assigns.variant == "kanban", do: card_aging_indicator(assigns.task.updated_at), else: nil
+    assigns = assign(assigns, :aging, aging)
+
     ~H"""
     <%= case @variant do %>
       <% "list" -> %>
         <.list_row task={@task} on_click={@on_click} on_delete={@on_delete} />
       <% _ -> %>
-        <div class={card_class(@variant)} {@rest}>
+        <div class={[card_class(@variant), @aging && elem(@aging, 0)]} {@rest}>
           <div class={card_body_class(@variant)}>
             <%= if @variant == "kanban" do %>
-              <.kanban_card_content task={@task} on_click={@on_click} on_delete={@on_delete} />
+              <.kanban_card_content task={@task} on_click={@on_click} on_delete={@on_delete} aging={@aging} />
             <% else %>
               <.grid_card_content task={@task} on_click={@on_click} />
             <% end %>
@@ -157,6 +160,12 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
 
     <!-- Meta Info -->
     <div class="flex items-center gap-2 text-xs text-base-content/60 flex-wrap">
+      <%= if @aging do %>
+        <span class={"flex items-center gap-0.5 " <> if(String.contains?(elem(@aging, 1), "stale"), do: "text-error/70", else: "text-warning/70")}>
+          <.icon name="hero-clock" class="w-3 h-3" />
+          {elem(@aging, 1)}
+        </span>
+      <% end %>
       <span class="font-mono text-xs">
         {String.slice(@task.uuid || "", 0..7)}
       </span>
@@ -184,7 +193,8 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       <% end %>
       <%= if @task.tags && length(@task.tags) > 0 do %>
         <%= for tag <- Enum.take(@task.tags, 2) do %>
-          <span class="badge badge-xs badge-ghost">
+          <span class="badge badge-xs badge-ghost gap-1">
+            <span class="w-1.5 h-1.5 rounded-full inline-block" style={"background-color: #{tag.color || "#6B7280"}"}></span>
             {tag.name}
           </span>
         <% end %>

@@ -322,6 +322,30 @@ defmodule EyeInTheSkyWeb.Tasks do
   end
 
   @doc """
+  Reorder workflow states by a list of IDs in desired order.
+  Uses negative temp positions to avoid unique constraint violations.
+  """
+  def reorder_workflow_states(ordered_ids) when is_list(ordered_ids) do
+    Repo.transaction(fn ->
+      # First pass: negative temp positions to avoid unique constraint
+      ordered_ids
+      |> Enum.with_index(1)
+      |> Enum.each(fn {id, idx} ->
+        from(ws in WorkflowState, where: ws.id == ^id)
+        |> Repo.update_all(set: [position: -idx])
+      end)
+
+      # Second pass: final positive positions
+      ordered_ids
+      |> Enum.with_index(1)
+      |> Enum.each(fn {id, idx} ->
+        from(ws in WorkflowState, where: ws.id == ^id)
+        |> Repo.update_all(set: [position: idx])
+      end)
+    end)
+  end
+
+  @doc """
   Gets a single workflow state.
   """
   def get_workflow_state!(id) do
@@ -349,6 +373,15 @@ defmodule EyeInTheSkyWeb.Tasks do
   """
   def get_tag!(id) do
     Repo.get!(Tag, id)
+  end
+
+  @doc """
+  Updates a tag's attributes (e.g., color).
+  """
+  def update_tag(%Tag{} = tag, attrs) do
+    tag
+    |> Tag.changeset(attrs)
+    |> Repo.update()
   end
 
   @doc """

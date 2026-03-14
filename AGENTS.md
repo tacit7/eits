@@ -1,5 +1,6 @@
 This is a web application written using the Phoenix web framework.
 
+When starting a session always say "hello"
 ## Project guidelines
 
 - Use `mix precommit` alias when you are done with all changes and fix any pending issues

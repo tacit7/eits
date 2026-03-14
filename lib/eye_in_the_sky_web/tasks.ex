@@ -100,6 +100,29 @@ defmodule EyeInTheSkyWeb.Tasks do
   end
 
   @doc """
+  Returns team tasks with their linked session IDs from task_sessions.
+  Each task has a :session_ids key with a list of session integer IDs.
+  """
+  def list_tasks_for_team_with_sessions(team_id) do
+    tasks = list_tasks_for_team(team_id)
+    task_ids = Enum.map(tasks, & &1.id)
+
+    session_rows =
+      from(ts in "task_sessions",
+        where: ts.task_id in ^task_ids,
+        select: {ts.task_id, ts.session_id}
+      )
+      |> Repo.all()
+
+    sessions_by_task =
+      Enum.group_by(session_rows, fn {task_id, _} -> task_id end, fn {_, sid} -> sid end)
+
+    Enum.map(tasks, fn t ->
+      Map.put(t, :session_ids, Map.get(sessions_by_task, t.id, []))
+    end)
+  end
+
+  @doc """
   Returns the current in-progress task for a session (state_id = 2), or nil.
   """
   def get_current_task_for_session(session_id) do

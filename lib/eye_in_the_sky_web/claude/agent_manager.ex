@@ -38,15 +38,34 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
 
     description = opts[:description] || "Agent session"
 
+    # Inherit project_id from parent session if not explicitly provided
+    project_id =
+      case opts[:project_id] do
+        nil ->
+          case opts[:parent_session_id] do
+            nil ->
+              nil
+
+            parent_id ->
+              case Sessions.get_session(parent_id) do
+                {:ok, parent} -> parent.project_id
+                _ -> nil
+              end
+          end
+
+        id ->
+          id
+      end
+
     Logger.info(
-      "📝 create_agent: agent_uuid=#{agent_uuid}, session_uuid=#{inspect(session_uuid)}, model=#{opts[:model]}, project_id=#{opts[:project_id]}"
+      "📝 create_agent: agent_uuid=#{agent_uuid}, session_uuid=#{inspect(session_uuid)}, model=#{opts[:model]}, project_id=#{project_id}"
     )
 
     with {:ok, agent} <-
            Agents.create_agent(%{
              uuid: agent_uuid,
              agent_type: opts[:agent_type] || "claude",
-             project_id: opts[:project_id],
+             project_id: project_id,
              status: "working",
              description: description,
              parent_agent_id: opts[:parent_agent_id],
@@ -60,7 +79,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              description: "agent-id #{agent_uuid}",
              model: opts[:model],
              provider: provider,
-             project_id: opts[:project_id],
+             project_id: project_id,
              git_worktree_path: opts[:project_path],
              started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
              parent_agent_id: opts[:parent_agent_id],
@@ -97,6 +116,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
       case send_message(session.id, instructions,
              model: opts[:model],
              effort_level: opts[:effort_level],
+             max_budget_usd: opts[:max_budget_usd],
              worktree: opts[:worktree],
              agent: opts[:agent]
            ) do
@@ -159,6 +179,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
           has_messages: has_messages,
           channel_id: opts[:channel_id],
           thinking_budget: opts[:thinking_budget],
+          max_budget_usd: opts[:max_budget_usd],
           agent: opts[:agent]
         }
 

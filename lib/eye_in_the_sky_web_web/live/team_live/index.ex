@@ -41,6 +41,16 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   end
 
   @impl true
+  def handle_event("assign_task", %{"task-id" => task_id, "session-id" => session_id}, socket) do
+    task_id = String.to_integer(task_id)
+    session_id = String.to_integer(session_id)
+    Tasks.link_session_to_task(task_id, session_id)
+
+    team = Teams.get_team!(socket.assigns.selected_team_id) |> load_team_detail()
+    {:noreply, assign(socket, :selected_team, team)}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <div class="flex h-full gap-0">
@@ -139,7 +149,8 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   defp team_detail(assigns) do
     active_members = Enum.count(assigns.team.members, &(&1.status == "active"))
     done_tasks = Enum.count(assigns.team.tasks, &(&1.state_id == 3))
-    assigns = assign(assigns, active_members: active_members, done_tasks: done_tasks)
+    total_tasks = length(assigns.team.tasks)
+    assigns = assign(assigns, active_members: active_members, done_tasks: done_tasks, total_tasks: total_tasks)
 
     ~H"""
     <div class="p-6 max-w-4xl space-y-6">
@@ -169,7 +180,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
           <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Active</div>
         </div>
         <div class="bg-base-200 rounded-lg px-4 py-3">
-          <div class="text-2xl font-bold font-mono text-base-content"><%= length(@team.tasks) %></div>
+          <div class="text-2xl font-bold font-mono text-base-content"><%= @total_tasks %></div>
           <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Tasks</div>
         </div>
         <div class="bg-base-200 rounded-lg px-4 py-3">
@@ -186,62 +197,80 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
           <span class="font-mono text-[11px] text-base-content/30"><%= length(@team.members) %></span>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div class="space-y-2">
           <%= for member <- @team.members do %>
-            <div class="flex items-center gap-3 p-3 rounded-lg bg-base-200 hover:bg-base-300/60 transition-colors group">
-              <%!-- Avatar initials --%>
-              <div class={[
-                "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
-                member_avatar_class(member.status)
-              ]}>
-                <%= member_initials(member.name) %>
+            <div class="rounded-lg bg-base-200 overflow-hidden">
+              <div class="flex items-center gap-3 p-3 hover:bg-base-300/60 transition-colors group">
+                <%!-- Avatar initials --%>
+                <div class={[
+                  "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
+                  member_avatar_class(member.status)
+                ]}>
+                  <%= member_initials(member.name) %>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="font-medium text-sm text-base-content truncate"><%= member.name %></span>
+                    <%= if member.role && member.role != "" do %>
+                      <span class="text-[10px] text-base-content/40 font-mono shrink-0"><%= member.role %></span>
+                    <% end %>
+                  </div>
+                  <div class="flex items-center gap-2 mt-0.5">
+                    <span class={["w-1.5 h-1.5 rounded-full shrink-0", member_status_dot(member.status)]}></span>
+                    <span class={["text-[11px] font-medium", member_status_text(member.status)]}>
+                      <%= member.status %>
+                    </span>
+                  </div>
+                </div>
+                <%= if member.session do %>
+                  <.link
+                    navigate={~p"/dm/#{member.session_id}"}
+                    class="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[10px] font-mono text-base-content/40 bg-base-content/5 px-2 py-1 rounded hover:text-base-content/60 transition-all shrink-0"
+                  >
+                    <%= String.slice(member.session.uuid || to_string(member.session_id), 0..7) %>
+                    <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
+                  </.link>
+                <% end %>
               </div>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="font-medium text-sm text-base-content truncate"><%= member.name %></span>
-                  <%= if member.role && member.role != "" do %>
-                    <span class="text-[10px] text-base-content/40 font-mono shrink-0"><%= member.role %></span>
+              <%!-- Per-member tasks --%>
+              <%= if Map.get(member, :tasks, []) != [] do %>
+                <div class="border-t border-base-300/50 px-3 py-2 space-y-1">
+                  <%= for task <- member.tasks do %>
+                    <div class="flex items-center gap-2">
+                      <div class={["w-1.5 h-1.5 rounded-full shrink-0", task_state_dot(task.state_id)]}></div>
+                      <span class="flex-1 text-xs text-base-content/70 truncate"><%= task.title %></span>
+                      <%= if task.state do %>
+                        <span class={["text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0", task_state_chip(task.state_id)]}>
+                          <%= task.state.name %>
+                        </span>
+                      <% end %>
+                    </div>
                   <% end %>
                 </div>
-                <div class="flex items-center gap-2 mt-0.5">
-                  <span class={["w-1.5 h-1.5 rounded-full shrink-0", member_status_dot(member.status)]}></span>
-                  <span class={["text-[11px] font-medium", member_status_text(member.status)]}>
-                    <%= member.status %>
-                  </span>
-                </div>
-              </div>
-              <%= if member.session do %>
-                <.link
-                  navigate={~p"/dm/#{member.session_id}"}
-                  class="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[10px] font-mono text-base-content/40 bg-base-content/5 px-2 py-1 rounded hover:text-base-content/60 transition-all shrink-0"
-                >
-                  <%= String.slice(member.session.uuid || to_string(member.session_id), 0..7) %>
-                  <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
-                </.link>
               <% end %>
             </div>
           <% end %>
         </div>
       </section>
 
-      <%!-- Tasks --%>
+      <%!-- Unowned Tasks --%>
       <section>
         <div class="flex items-center gap-2 mb-3">
-          <h2 class="text-[11px] font-semibold text-base-content/50 uppercase tracking-widest">Tasks</h2>
+          <h2 class="text-[11px] font-semibold text-base-content/50 uppercase tracking-widest">Unassigned Tasks</h2>
           <div class="h-px flex-1 bg-base-300"></div>
-          <span class="font-mono text-[11px] text-base-content/30"><%= length(@team.tasks) %></span>
+          <span class="font-mono text-[11px] text-base-content/30"><%= length(Map.get(@team, :unowned_tasks, [])) %></span>
         </div>
 
-        <%= if @team.tasks == [] do %>
+        <%= if Map.get(@team, :unowned_tasks, []) == [] do %>
           <div class="flex items-center gap-3 p-4 rounded-lg border border-dashed border-base-300 text-base-content/30">
             <.icon name="hero-clipboard-document-list" class="w-4 h-4" />
-            <p class="text-sm">No tasks assigned to this team</p>
+            <p class="text-sm">No unassigned tasks</p>
           </div>
         <% else %>
           <div class="space-y-1.5">
-            <%= for task <- @team.tasks do %>
+            <%= for task <- @team.unowned_tasks do %>
               <div class="rounded-lg bg-base-200 overflow-hidden">
-                <div class="flex items-center gap-3 px-3 py-2.5">
+                <div class="flex items-center gap-3 px-3 py-2.5 group">
                   <div class={["w-1.5 h-1.5 rounded-full shrink-0", task_state_dot(task.state_id)]}></div>
                   <span class="flex-1 text-sm text-base-content min-w-0 truncate"><%= task.title %></span>
                   <div class="flex items-center gap-1.5 shrink-0">
@@ -256,6 +285,18 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
                         <%= task.state.name %>
                       </span>
                     <% end %>
+                    <%!-- Assign to member picker --%>
+                    <select
+                      class="opacity-0 group-hover:opacity-100 text-[10px] bg-base-300 border-0 rounded px-1.5 py-0.5 text-base-content/60 cursor-pointer focus:outline-none transition-opacity"
+                      phx-change="assign_task"
+                      phx-value-task-id={task.id}
+                      name="session-id"
+                    >
+                      <option value="">Assign to...</option>
+                      <%= for member <- Enum.filter(@team.members, & &1.session_id) do %>
+                        <option value={member.session_id}><%= member.name %></option>
+                      <% end %>
+                    </select>
                   </div>
                 </div>
                 <%= if Map.get(task, :annotations, []) != [] do %>
@@ -287,13 +328,38 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
     team = EyeInTheSkyWeb.Repo.preload(team, members: [:session])
 
     tasks =
-      Tasks.list_tasks_for_team(team.id)
+      Tasks.list_tasks_for_team_with_sessions(team.id)
       |> Enum.map(fn task ->
         annotations = Notes.list_notes_for_task(task.id)
         Map.put(task, :annotations, annotations)
       end)
 
-    Map.put(team, :tasks, tasks)
+    # Group tasks by which member session owns them
+    member_session_ids = Enum.map(team.members, & &1.session_id) |> MapSet.new()
+
+    tasks_by_session =
+      Enum.reduce(tasks, %{}, fn task, acc ->
+        matched_sessions = Enum.filter(task.session_ids, &MapSet.member?(member_session_ids, &1))
+
+        case matched_sessions do
+          [] -> acc
+          sids -> Enum.reduce(sids, acc, fn sid, a -> Map.update(a, sid, [task], &(&1 ++ [task])) end)
+        end
+      end)
+
+    unowned_tasks = Enum.filter(tasks, fn t ->
+      Enum.empty?(Enum.filter(t.session_ids, &MapSet.member?(member_session_ids, &1)))
+    end)
+
+    members_with_tasks =
+      Enum.map(team.members, fn m ->
+        Map.put(m, :tasks, Map.get(tasks_by_session, m.session_id, []))
+      end)
+
+    team
+    |> Map.put(:tasks, tasks)
+    |> Map.put(:members, members_with_tasks)
+    |> Map.put(:unowned_tasks, unowned_tasks)
   end
 
   defp maybe_refresh_selected_team(%{assigns: %{selected_team_id: nil}} = socket), do: socket

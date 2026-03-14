@@ -164,6 +164,10 @@ cmd_tasks() {
     start)
       local id="${1:-}"; need id
       _patch "/tasks/$id" '{"state":"start"}'
+      # Auto-link current session to task
+      if [[ -n "${EITS_SESSION_UUID:-}" ]]; then
+        _post "/tasks/$id/sessions" "$(json session_id "$EITS_SESSION_UUID")" > /dev/null
+      fi
       ;;
     delete)
       local id="${1:-}"; need id

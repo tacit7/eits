@@ -10,11 +10,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TodoToolExtraTest do
 
   @frame :test_frame
 
-  defp json_result({:reply, %Anubis.Server.Response{content: [%{"text" => json} | _]}, @frame}) do
-    Jason.decode!(json, keys: :atoms)
-  end
-
-  defp uniq, do: System.unique_integer([:positive])
+  import EyeInTheSkyWeb.Factory
 
   defp make_task(attrs \\ %{}) do
     defaults = %{
@@ -28,20 +24,6 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TodoToolExtraTest do
   end
 
   defp tid(task), do: to_string(task.id)
-
-  defp new_session do
-    {:ok, agent} = Agents.create_agent(%{name: "todo-agent-#{uniq()}", status: "idle"})
-
-    {:ok, session} =
-      Sessions.create_session(%{
-        uuid: "todo-sess-#{uniq()}",
-        agent_id: agent.id,
-        started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-        status: "working"
-      })
-
-    session
-  end
 
   # ---- start ----
 

@@ -5,9 +5,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NotifyToolTest do
 
   @frame :test_frame
 
-  defp json_result({:reply, %Anubis.Server.Response{content: [%{"text" => json} | _]}, @frame}) do
-    Jason.decode!(json, keys: :atoms)
-  end
+  import EyeInTheSkyWeb.Factory
 
   test "creates a notification with title only" do
     r = Notify.execute(%{title: "Hello"}, @frame) |> json_result()

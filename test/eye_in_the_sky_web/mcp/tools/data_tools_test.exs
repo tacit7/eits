@@ -13,25 +13,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.DataToolsTest do
 
   @frame :test_frame
 
-  defp json_result({:reply, %Anubis.Server.Response{content: [%{"text" => json} | _]}, @frame}) do
-    Jason.decode!(json, keys: :atoms)
-  end
-
-  defp uniq, do: System.unique_integer([:positive])
-
-  defp new_session do
-    {:ok, agent} = Agents.create_agent(%{name: "dt-agent-#{uniq()}", status: "active"})
-
-    {:ok, session} =
-      Sessions.create_session(%{
-        uuid: "dt-#{uniq()}",
-        agent_id: agent.id,
-        started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-        status: "idle"
-      })
-
-    session
-  end
+  import EyeInTheSkyWeb.Factory
 
   defp new_prompt do
     {:ok, p} =

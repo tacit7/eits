@@ -4,21 +4,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.HelpersTest do
   alias EyeInTheSkyWeb.MCP.Tools.Helpers
   alias EyeInTheSkyWeb.{Agents, Sessions}
 
-  defp uniq, do: System.unique_integer([:positive])
-
-  defp new_session do
-    {:ok, agent} = Agents.create_agent(%{name: "helpers-agent-#{uniq()}", status: "idle"})
-
-    {:ok, session} =
-      Sessions.create_session(%{
-        uuid: "helpers-#{uniq()}",
-        agent_id: agent.id,
-        started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-        status: "working"
-      })
-
-    session
-  end
+  import EyeInTheSkyWeb.Factory
 
   describe "resolve_session_int_id/1" do
     test "returns error for nil" do

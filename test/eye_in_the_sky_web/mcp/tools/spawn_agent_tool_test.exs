@@ -6,11 +6,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SpawnAgentToolTest do
 
   @frame :test_frame
 
-  defp json_result({:reply, %Anubis.Server.Response{content: [%{"text" => json} | _]}, @frame}) do
-    Jason.decode!(json, keys: :atoms)
-  end
-
-  defp uniq, do: System.unique_integer([:positive])
+  import EyeInTheSkyWeb.Factory
 
   test "spawns agent and returns session_id, session_uuid, agent_id" do
     r = SpawnAgent.execute(%{instructions: "say hello"}, @frame) |> json_result()

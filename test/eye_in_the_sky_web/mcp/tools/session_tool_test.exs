@@ -9,25 +9,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionToolTest do
 
   @frame :test_frame
 
-  defp json_result({:reply, %Anubis.Server.Response{content: [%{"text" => json} | _]}, @frame}) do
-    Jason.decode!(json, keys: :atoms)
-  end
-
-  defp new_session do
-    {:ok, agent} = Agents.create_agent(%{name: "test-agent-#{uniq()}", status: "working"})
-
-    {:ok, session} =
-      Sessions.create_session(%{
-        uuid: "sess-#{uniq()}",
-        agent_id: agent.id,
-        started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-        status: "working"
-      })
-
-    session
-  end
-
-  defp uniq, do: System.unique_integer([:positive])
+  import EyeInTheSkyWeb.Factory
 
   # ---- Session tool ----
 

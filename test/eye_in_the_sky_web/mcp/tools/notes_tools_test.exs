@@ -6,17 +6,13 @@ defmodule EyeInTheSkyWeb.MCP.Tools.NotesToolsTest do
 
   @frame :test_frame
 
-  defp json_result({:reply, %Anubis.Server.Response{content: [%{"text" => json} | _]}, @frame}) do
-    Jason.decode!(json, keys: :atoms)
-  end
+  import EyeInTheSkyWeb.Factory
 
   defp make_note(attrs \\ %{}) do
     defaults = %{parent_id: "s1", parent_type: "session", body: "body #{uniq()}"}
     {:ok, note} = Notes.create_note(Map.merge(defaults, attrs))
     note
   end
-
-  defp uniq, do: System.unique_integer([:positive])
 
   # ---- NoteGet ----
 

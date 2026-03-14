@@ -129,10 +129,6 @@ defmodule EyeInTheSkyWebWeb.Router do
     post "/prompts", PromptController, :create
     get "/prompts/:id", PromptController, :show
 
-    # Session context (legacy routes kept for hook compat)
-    get "/session-context/:uuid", SessionContextController, :show
-    post "/session-context", SessionContextController, :create
-
     # Notifications
     post "/notifications", NotificationController, :create
 

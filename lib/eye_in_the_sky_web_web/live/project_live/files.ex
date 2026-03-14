@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
   use EyeInTheSkyWebWeb, :live_view
 
+  import EyeInTheSkyWebWeb.Helpers.FileHelpers
+
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Repo
 
@@ -57,8 +59,16 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
   end
 
   @impl true
-  def handle_params(%{"path" => path}, _uri, socket) do
+  def handle_params(%{"path" => path} = params, _uri, socket) do
     project = socket.assigns.project
+
+    mode =
+      case Map.get(params, "mode") do
+        "tree" -> :tree
+        _ -> :list
+      end
+
+    socket = assign(socket, :view_mode, mode)
 
     if project.path do
       full_path = Path.join(project.path, path)
@@ -165,19 +175,31 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
     end
   end
 
-  def handle_params(_params, _uri, socket) do
+  def handle_params(params, _uri, socket) do
     # Load root directory for list view
     project = socket.assigns.project
 
-    if project.path && socket.assigns.view_mode == :list do
+    mode =
+      case Map.get(params, "mode") do
+        "tree" -> :tree
+        _ -> :list
+      end
+
+    socket = assign(socket, :view_mode, mode)
+
+    if project.path && mode == :list do
       case File.ls(project.path) do
         {:ok, files} ->
+          ignored_dirs = ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
+
           file_list =
             files
             |> Enum.filter(fn file ->
               file_path = Path.join(project.path, file)
-              # Filter out binary files, but keep directories
-              File.dir?(file_path) or !is_binary_file?(file_path)
+
+              (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
+                file not in ignored_dirs and
+                (File.dir?(file_path) or !is_binary_file?(file_path))
             end)
             |> Enum.map(fn file ->
               file_path = Path.join(project.path, file)
@@ -203,186 +225,22 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
 
   @impl true
   def handle_event("toggle_view_mode", %{"mode" => mode}, socket) do
+    project = socket.assigns.project
+
     case mode do
-      "list" -> {:noreply, assign(socket, :view_mode, :list)}
-      "tree" -> {:noreply, assign(socket, :view_mode, :tree)}
-      _ -> {:noreply, socket}
+      "list" ->
+        {:noreply, push_patch(socket, to: ~p"/projects/#{project.id}/files?mode=list")}
+
+      "tree" ->
+        {:noreply, push_patch(socket, to: ~p"/projects/#{project.id}/files?mode=tree")}
+
+      _ ->
+        {:noreply, socket}
     end
   end
 
-  defp build_file_tree(base_path, current_path, max_depth \\ 5, current_depth \\ 0) do
-    if current_depth >= max_depth do
-      []
-    else
-      case File.ls(current_path) do
-        {:ok, files} ->
-          files
-          |> Enum.filter(fn file ->
-            full_path = Path.join(current_path, file)
-            # Filter out common ignored directories/files and binary files
-            ignored_dirs = ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
-            (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
-              file not in ignored_dirs and
-              (File.dir?(full_path) or !is_binary_file?(full_path))
-          end)
-          |> Enum.map(fn file ->
-            full_path = Path.join(current_path, file)
-            relative_path = Path.relative_to(full_path, base_path)
-
-            if File.dir?(full_path) do
-              children = build_file_tree(base_path, full_path, max_depth, current_depth + 1)
-
-              %{
-                name: file,
-                path: relative_path,
-                type: :directory,
-                children: Enum.sort_by(children, &{&1.type != :directory, &1.name})
-              }
-            else
-              %{
-                name: file,
-                path: relative_path,
-                type: :file,
-                size: get_file_size(full_path)
-              }
-            end
-          end)
-          |> Enum.sort_by(&{&1.type != :directory, &1.name})
-
-        {:error, _reason} ->
-          []
-      end
-    end
-  end
-
-  defp get_file_size(path) do
-    case File.stat(path) do
-      {:ok, %{size: size}} -> format_size(size)
-      _ -> ""
-    end
-  end
-
-  defp is_binary_file?(path) do
-    # Common binary file extensions
-    binary_extensions = [
-      # Executables and libraries
-      ".so",
-      ".dll",
-      ".dylib",
-      ".exe",
-      ".bin",
-      ".o",
-      ".a",
-      ".lib",
-      # Archives
-      ".zip",
-      ".tar",
-      ".gz",
-      ".bz2",
-      ".xz",
-      ".7z",
-      ".rar",
-      # Images
-      ".jpg",
-      ".jpeg",
-      ".png",
-      ".gif",
-      ".bmp",
-      ".ico",
-      ".svg",
-      ".webp",
-      # Media
-      ".mp3",
-      ".mp4",
-      ".avi",
-      ".mov",
-      ".mkv",
-      ".wav",
-      ".flac",
-      # Documents
-      ".pdf",
-      ".doc",
-      ".docx",
-      ".xls",
-      ".xlsx",
-      ".ppt",
-      ".pptx",
-      # Databases
-      ".db",
-      ".sqlite",
-      ".sqlite3",
-      ".db-shm",
-      ".db-wal",
-      # Others
-      ".wasm",
-      ".beam",
-      ".class",
-      ".jar",
-      ".war"
-    ]
-
-    extension = path |> Path.extname() |> String.downcase()
-    Enum.member?(binary_extensions, extension)
-  end
-
-  defp format_size(size) when size < 1024, do: "#{size} B"
-  defp format_size(size) when size < 1024 * 1024, do: "#{Float.round(size / 1024, 1)} KB"
-  defp format_size(size), do: "#{Float.round(size / (1024 * 1024), 1)} MB"
-
-  defp detect_file_type(path) do
-    extension = path |> Path.extname() |> String.downcase()
-
-    case extension do
-      ".md" -> :markdown
-      ".markdown" -> :markdown
-      ".ex" -> :elixir
-      ".exs" -> :elixir
-      ".js" -> :javascript
-      ".ts" -> :typescript
-      ".jsx" -> :javascript
-      ".tsx" -> :typescript
-      ".json" -> :json
-      ".yml" -> :yaml
-      ".yaml" -> :yaml
-      ".html" -> :html
-      ".css" -> :css
-      ".py" -> :python
-      ".rb" -> :ruby
-      ".go" -> :go
-      ".rs" -> :rust
-      ".java" -> :java
-      ".c" -> :c
-      ".cpp" -> :cpp
-      ".sh" -> :bash
-      ".sql" -> :sql
-      ".xml" -> :xml
-      _ -> :text
-    end
-  end
-
-  defp language_class(file_type) do
-    case file_type do
-      :markdown -> "markdown"
-      :elixir -> "elixir"
-      :javascript -> "javascript"
-      :typescript -> "typescript"
-      :json -> "json"
-      :yaml -> "yaml"
-      :html -> "html"
-      :css -> "css"
-      :python -> "python"
-      :ruby -> "ruby"
-      :go -> "go"
-      :rust -> "rust"
-      :java -> "java"
-      :c -> "c"
-      :cpp -> "cpp"
-      :bash -> "bash"
-      :sql -> "sql"
-      :xml -> "xml"
-      _ -> "plaintext"
-    end
-  end
+  @impl true
+  def handle_info(_msg, socket), do: {:noreply, socket}
 
   attr :item, :map, required: true
   attr :project_id, :integer, required: true

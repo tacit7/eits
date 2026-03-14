@@ -80,9 +80,12 @@ defmodule EyeInTheSkyWebWeb.Helpers.FileHelpers do
   @doc """
   Recursively builds a file tree up to `max_depth`.
   Returns a list of %{name, path, type, children?/size} maps.
+  Filters out hidden files (except .claude/.git), common ignored dirs, and binary files.
   """
   @spec build_file_tree(String.t(), String.t(), non_neg_integer, non_neg_integer) :: list(map())
   def build_file_tree(base_path, current_path, max_depth \\ 5, current_depth \\ 0) do
+    ignored_dirs = ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
+
     if current_depth >= max_depth do
       []
     else
@@ -90,7 +93,11 @@ defmodule EyeInTheSkyWebWeb.Helpers.FileHelpers do
         {:ok, files} ->
           files
           |> Enum.filter(fn file ->
-            not String.starts_with?(file, ".") or file in [".claude", ".git"]
+            full_path = Path.join(current_path, file)
+
+            (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
+              file not in ignored_dirs and
+              (File.dir?(full_path) or !is_binary_file?(full_path))
           end)
           |> Enum.map(fn file ->
             full_path = Path.join(current_path, file)
@@ -120,5 +127,31 @@ defmodule EyeInTheSkyWebWeb.Helpers.FileHelpers do
           []
       end
     end
+  end
+
+  @doc """
+  Returns true if the file at `path` is a known binary format based on extension.
+  """
+  @spec is_binary_file?(String.t()) :: boolean
+  def is_binary_file?(path) do
+    binary_extensions = [
+      # Executables and libraries
+      ".so", ".dll", ".dylib", ".exe", ".bin", ".o", ".a", ".lib",
+      # Archives
+      ".zip", ".tar", ".gz", ".bz2", ".xz", ".7z", ".rar",
+      # Images
+      ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".ico", ".svg", ".webp",
+      # Media
+      ".mp3", ".mp4", ".avi", ".mov", ".mkv", ".wav", ".flac",
+      # Documents
+      ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+      # Databases
+      ".db", ".sqlite", ".sqlite3", ".db-shm", ".db-wal",
+      # Others
+      ".wasm", ".beam", ".class", ".jar", ".war"
+    ]
+
+    extension = path |> Path.extname() |> String.downcase()
+    Enum.member?(binary_extensions, extension)
   end
 end

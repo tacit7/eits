@@ -148,6 +148,78 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     do: handle_delete_task(params, socket, &reload_tasks/1)
 
   @impl true
+  def handle_event("archive_task", %{"task_id" => task_id}, socket) do
+    task = Tasks.get_task_by_uuid_or_id!(task_id)
+
+    case Tasks.archive_task(task) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:show_task_detail_drawer, false)
+         |> assign(:selected_task, nil)
+         |> reload_tasks()
+         |> put_flash(:info, "Task archived")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to archive task")}
+    end
+  end
+
+  @impl true
+  def handle_event("add_task_annotation", %{"task_id" => task_id, "body" => body}, socket) do
+    task = Tasks.get_task_by_uuid_or_id!(task_id)
+    body = String.trim(body)
+
+    if body != "" do
+      Notes.create_note(%{
+        parent_type: "task",
+        parent_id: task.uuid || to_string(task.id),
+        body: body
+      })
+
+      notes = Notes.list_notes_for_task(task.id)
+      {:noreply, assign(socket, :task_notes, notes)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("start_agent_for_task", %{"task_id" => task_id}, socket) do
+    task = Tasks.get_task_by_uuid_or_id!(task_id)
+    session = socket.assigns.session
+    agent = socket.assigns.agent
+
+    project_id = agent.project_id
+
+    project_path =
+      case resolve_project_path(session, agent) do
+        {:ok, path} -> path
+        _ -> nil
+      end
+
+    task_prompt = "#{task.title}\n\n#{task.description || ""}" |> String.trim()
+
+    opts =
+      [description: task.title, instructions: task_prompt, model: "sonnet"]
+      |> then(fn o -> if project_id, do: o ++ [project_id: project_id], else: o end)
+      |> then(fn o -> if project_path, do: o ++ [project_path: project_path], else: o end)
+
+    case AgentManager.create_agent(opts) do
+      {:ok, %{session: new_session}} ->
+        Tasks.link_session_to_task(task.id, new_session.id)
+
+        {:noreply,
+         socket
+         |> assign(:show_task_detail_drawer, false)
+         |> put_flash(:info, "Agent spawned for: #{String.slice(task.title, 0..40)}")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to spawn agent: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
   def handle_event("toggle_memories_panel", _params, socket) do
     if socket.assigns.show_memories_panel do
       {:noreply,
@@ -632,7 +704,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_info(:periodic_sync, socket) do
-    if socket.assigns.processing do
+    actually_processing = AgentWorker.is_processing?(socket.assigns.session_id)
+
+    if socket.assigns.processing && actually_processing do
       case sync_messages_from_session_file(socket) do
         {:ok, socket, _imported} ->
           {:noreply, start_sync_timer(socket)}
@@ -641,7 +715,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
           {:noreply, start_sync_timer(socket)}
       end
     else
-      {:noreply, assign(socket, :sync_timer, nil)}
+      {:noreply, socket |> assign(:processing, false) |> assign(:sync_timer, nil)}
     end
   end
 

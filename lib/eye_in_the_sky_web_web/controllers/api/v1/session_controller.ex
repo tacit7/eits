@@ -144,15 +144,17 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
 
         case Sessions.update_session(session, attrs) do
           {:ok, updated} ->
-            # Broadcast status change
-            topic =
-              if status in ["completed", "failed"] do
-                {:agent_stopped, updated}
-              else
-                {:agent_working, updated}
-              end
+            # Only broadcast a status-change event when status is explicitly provided
+            if status do
+              topic =
+                if status in ["completed", "failed"] do
+                  {:agent_stopped, updated}
+                else
+                  {:agent_working, updated}
+                end
 
-            Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agent:working", topic)
+              Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agent:working", topic)
+            end
             Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, updated})
 
             # Sync team member status when session completes/fails

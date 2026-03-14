@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.Tasks
+  alias EyeInTheSkyWebWeb.Components.FilterSheet
   alias EyeInTheSkyWebWeb.Components.TaskCard
   import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
 
@@ -20,7 +21,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
       |> assign(:page_title, "All Tasks")
       |> assign(:search_query, "")
       |> assign(:workflow_states, workflow_states)
-      |> assign(:state_filter, "all")
+      |> assign(:filter_state_id, nil)
       |> assign(:task_count, 0)
       |> assign(:page, 1)
       |> assign(:has_more, false)
@@ -42,10 +43,12 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
     do: handle_search(params, socket, &load_tasks/1)
 
   @impl true
-  def handle_event("filter_state", %{"state" => state}, socket) do
+  def handle_event("filter_status", %{"state_id" => state_id}, socket) do
+    state_id = if state_id == "", do: nil, else: String.to_integer(state_id)
+
     {:noreply,
      socket
-     |> assign(:state_filter, state)
+     |> assign(:filter_state_id, state_id)
      |> load_tasks()}
   end
 
@@ -86,20 +89,10 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
   def handle_info(:tasks_changed, socket),
     do: handle_tasks_changed(socket, &load_tasks/1)
 
-  defp state_id_from_filter("all"), do: nil
-
-  defp state_id_from_filter(state_id_str) do
-    case Integer.parse(state_id_str) do
-      {id, ""} -> id
-      _ -> nil
-    end
-  end
-
   # Resets to page 1, replaces the task list
   defp load_tasks(socket) do
     query = socket.assigns.search_query
-    state_filter = socket.assigns.state_filter
-    state_id = state_id_from_filter(state_filter)
+    state_id = socket.assigns.filter_state_id
 
     if query != "" and String.trim(query) != "" do
       tasks = Tasks.search_tasks(query)
@@ -130,7 +123,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
 
   # Appends the next page to the existing task list
   defp load_tasks_page(socket, page) do
-    state_id = state_id_from_filter(socket.assigns.state_filter)
+    state_id = socket.assigns.filter_state_id
     offset = (page - 1) * @per_page
     total = socket.assigns.total_tasks
 
@@ -180,7 +173,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
             class="sm:hidden relative btn btn-ghost btn-sm btn-square"
           >
             <.icon name="hero-funnel-mini" class="w-4 h-4" />
-            <%= if @state_filter != "all" do %>
+            <%= if !is_nil(@filter_state_id) do %>
               <span class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full" aria-hidden="true"></span>
             <% end %>
           </button>
@@ -188,114 +181,41 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
           <%!-- Desktop filter pills --%>
           <div class="hidden sm:flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
             <button
-              phx-click="filter_state"
-              phx-value-state="all"
-              aria-pressed={@state_filter == "all"}
+              phx-click="filter_status"
+              phx-value-state_id=""
+              aria-pressed={is_nil(@filter_state_id)}
               class={"px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 " <>
-                if(@state_filter == "all",
+                if(is_nil(@filter_state_id),
                   do: "bg-base-100 text-base-content shadow-sm",
                   else: "text-base-content/60 hover:text-base-content/85"
                 )}
             >
               All
             </button>
-            <%= for state <- @workflow_states do %>
-              <button
-                phx-click="filter_state"
-                phx-value-state={to_string(state.id)}
-                aria-pressed={@state_filter == to_string(state.id)}
-                class={"px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 " <>
-                  if(@state_filter == to_string(state.id),
-                    do: "bg-base-100 text-base-content shadow-sm",
-                    else: "text-base-content/60 hover:text-base-content/85"
-                  )}
-              >
-                {state.name}
-              </button>
-            <% end %>
+            <button
+              :for={state <- @workflow_states}
+              phx-click="filter_status"
+              phx-value-state_id={state.id}
+              aria-pressed={@filter_state_id == state.id}
+              class={"px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 " <>
+                if(@filter_state_id == state.id,
+                  do: "bg-base-100 text-base-content shadow-sm",
+                  else: "text-base-content/60 hover:text-base-content/85"
+                )}
+            >
+              {state.name}
+            </button>
           </div>
         </div>
 
         <%!-- Mobile filter bottom sheet --%>
-        <%= if @show_filter_sheet do %>
-          <div
-            class="fixed inset-0 z-40 bg-black/40"
-            phx-click="close_filter_sheet"
-            aria-hidden="true"
-          >
-          </div>
-          <div
-            class="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-base-100 shadow-xl safe-bottom-sheet"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Filter tasks"
-            id="overview-tasks-filter-sheet"
-            phx-window-keydown="close_filter_sheet"
-            phx-key="Escape"
-          >
-            <div class="flex justify-center pt-3 pb-1">
-              <div class="w-10 h-1 rounded-full bg-base-content/20"></div>
-            </div>
-            <div class="px-5 pb-6 pt-2">
-              <div class="flex items-center justify-between mb-4">
-                <h2 class="text-sm font-semibold">Filter by Status</h2>
-                <button
-                  phx-click="close_filter_sheet"
-                  class="btn btn-ghost btn-xs btn-square"
-                  aria-label="Close filter panel"
-                >
-                  <.icon name="hero-x-mark-mini" class="w-4 h-4" />
-                </button>
-              </div>
-
-              <fieldset class="mb-6">
-                <legend class="sr-only">Status filter</legend>
-                <div class="flex flex-wrap gap-2">
-                  <button
-                    phx-click="filter_state"
-                    phx-value-state="all"
-                    aria-pressed={@state_filter == "all"}
-                    class={"btn btn-sm " <>
-                      if(@state_filter == "all",
-                        do: "btn-primary",
-                        else: "btn-ghost border border-base-content/15"
-                      )}
-                  >
-                    All
-                  </button>
-                  <%= for state <- @workflow_states do %>
-                    <button
-                      phx-click="filter_state"
-                      phx-value-state={to_string(state.id)}
-                      aria-pressed={@state_filter == to_string(state.id)}
-                      class={"btn btn-sm " <>
-                        if(@state_filter == to_string(state.id),
-                          do: "btn-primary",
-                          else: "btn-ghost border border-base-content/15"
-                        )}
-                    >
-                      {state.name}
-                    </button>
-                  <% end %>
-                </div>
-              </fieldset>
-
-              <div class="flex gap-3">
-                <button phx-click="close_filter_sheet" class="btn btn-primary flex-1">
-                  Apply
-                </button>
-                <button
-                  phx-click="filter_state"
-                  phx-value-state="all"
-                  class="btn btn-ghost"
-                  aria-label="Reset filters"
-                >
-                  Reset
-                </button>
-              </div>
-            </div>
-          </div>
-        <% end %>
+        <FilterSheet.filter_sheet
+          id="overview-tasks-filter-sheet"
+          show={@show_filter_sheet}
+          title="Filter by Status"
+          workflow_states={@workflow_states}
+          filter_state_id={@filter_state_id}
+        />
 
         <%!-- Task count --%>
         <div class="mb-3">
@@ -340,12 +260,12 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
             id="overview-tasks-empty"
             icon="hero-clipboard-document-list"
             title={
-              if @search_query != "" || @state_filter != "all",
+              if @search_query != "" || !is_nil(@filter_state_id),
                 do: "No tasks found",
                 else: "No tasks yet"
             }
             subtitle={
-              if @search_query != "" || @state_filter != "all",
+              if @search_query != "" || !is_nil(@filter_state_id),
                 do: "Try adjusting your search or filters",
                 else: "Tasks created by agents will appear here"
             }

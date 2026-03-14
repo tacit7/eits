@@ -167,7 +167,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   Raises `Ecto.NoResultsError` if nothing is found.
   """
   def get_task_by_uuid_or_id!(id_str) do
-    query = Task |> preload([:state, :tags, :agents])
+    query = Task |> preload([:state, :tags, :agents, :checklist_items])
 
     case Repo.get_by(query, uuid: id_str) do
       nil ->

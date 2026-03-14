@@ -83,7 +83,7 @@ body {
 }
 
 *:focus-visible {
-  outline: 2px solid oklch(58% 0.17 55);
+  outline: 2px solid oklch(61% 0.15 42);
   outline-offset: 2px;
 }
 
@@ -104,60 +104,72 @@ form:focus-visible {
   }
 }
 
-/* ===== Dark theme - Claude palette ===== */
+/* ===== Dark theme - Claude.ai actual CSS vars ===== */
+/* --bg-100: hsl(60 2.7% 14.5%) page bg                */
+/* --bg-000: hsl(60 2.1% 18.4%) surfaces               */
+/* --bg-200: hsl(30 3.3% 11.8%) deep bg                */
+/* --text-000: hsl(48 33.3% 97.1%) primary text        */
+/* --text-200: hsl(50 9% 73.7%) secondary text         */
+/* --brand-100: hsl(15 63.1% 59.6%) orange             */
 [data-theme="dark"] {
-  /* daisyUI v5 variables — mapped from Claude's bg scale */
-  --color-base-100: hsl(60, 2.7%, 14.5%);  /* page bg (Claude bg-100) */
-  --color-base-200: hsl(60, 2.1%, 18.4%);  /* elevated surface (Claude bg-000) */
-  --color-base-300: hsl(60, 2%, 23%);       /* highest surface / borders */
-  --color-base-content: oklch(93% 0 0);     /* high contrast text */
-  --color-primary: oklch(70% 0.17 55);      /* Claude orange */
-  --color-primary-content: oklch(98% 0 0);
+  /* daisyUI v5 variables */
+  --color-base-100: hsl(60 2.7% 14.5%);      /* --bg-100 page bg */
+  --color-base-200: hsl(60 2.1% 18.4%);      /* --bg-000 surfaces */
+  --color-base-300: hsl(30 3.3% 11.8%);      /* --bg-200 deep bg */
+  --color-base-content: hsl(48 33.3% 97.1%); /* --text-000 primary */
+  --color-primary: hsl(15 63.1% 59.6%);      /* --brand-100 orange */
+  --color-primary-content: hsl(0 0% 100%);   /* --oncolor-100 */
+  --color-neutral: hsl(50 9% 73.7%);         /* --text-200 secondary */
   /* daisyUI v4 fallbacks */
-  --b1: hsl(60, 2.7%, 14.5%);
-  --b2: hsl(60, 2.1%, 18.4%);
-  --b3: hsl(60, 2%, 23%);
-  --bc: oklch(93% 0 0);
-  --p: oklch(70% 0.17 55);       /* primary - Claude orange */
-  --pc: oklch(98% 0 0);          /* primary content */
-  --s: oklch(65% 0.15 300);      /* secondary */
-  --sc: oklch(98% 0 0);
-  --su: oklch(72% 0.19 155);     /* success - vivid green */
-  --wa: oklch(78% 0.15 75);      /* warning - warm amber */
-  --er: oklch(65% 0.2 25);       /* error - clear red */
+  --b1: hsl(60 2.7% 14.5%);
+  --b2: hsl(60 2.1% 18.4%);
+  --b3: hsl(30 3.3% 11.8%);
+  --bc: hsl(48 33.3% 97.1%);
+  --p: hsl(15 63.1% 59.6%);
+  --pc: hsl(0 0% 100%);
+  --s: oklch(65% 0.15 300);
+  --sc: hsl(0 0% 100%);
+  --su: hsl(97 59.1% 46.1%);    /* --success-000 */
+  --wa: hsl(40 71% 50%);         /* --warning-000 */
+  --er: hsl(0 67% 59.6%);        /* --danger-100 */
+  --in: hsl(210 65.5% 67.1%);    /* --accent-000 blue */
 }
 
 [data-theme="dark"] .card,
 [data-theme="dark"] .modal-box,
 [data-theme="dark"] .tab-content,
 [data-theme="dark"] [role="tabpanel"] {
-  background-color: hsl(60, 2.1%, 18.4%) !important;
+  background-color: hsl(60 2.1% 18.4%) !important; /* --bg-000 surfaces */
 }
 
 [data-theme="dark"] .navbar {
-  background-color: hsl(60, 2.7%, 14.5%) !important;
-  border-bottom: 1px solid hsl(60, 2%, 23%);
+  background-color: hsl(60 2.7% 14.5%) !important; /* --bg-100 page bg */
+  border-bottom: 1px solid hsl(30 3.3% 11.8%);     /* --bg-200 deep */
 }
 
 [data-theme="dark"] .table {
   background-color: transparent !important;
 }
 
-/* ===== Light theme - warm stone surfaces ===== */
+/* ===== Light theme - Claude.ai Pampas palette ===== */
+/* Reference: #FAF9F6 page, #F4F3EE pampas, #F0EFEA panels, #E8E6DC borders */
+/* Text: #1D1D19 primary, #66655D secondary, #B1ADA1 muted */
+/* Accent: #D97757 primary orange, #C15F3C brand rust */
 [data-theme="light"] {
   /* daisyUI v5 variables (--color-*) */
-  --color-base-100: oklch(92% 0.005 80);    /* page bg - light warm gray */
-  --color-base-200: oklch(83% 0.012 80);   /* borders/dividers */
-  --color-base-300: oklch(78% 0.014 80);   /* stronger borders */
-  --color-base-content: oklch(18% 0.015 260); /* rich dark text */
-  --color-primary: oklch(58% 0.17 55);    /* primary - Claude orange */
+  --color-base-100: oklch(97.5% 0.004 85);  /* page bg — #FAF9F6 */
+  --color-base-200: oklch(94.5% 0.006 85);  /* sidebar/panels — #F0EFEA */
+  --color-base-300: oklch(91% 0.012 90);    /* borders/dividers — #E8E6DC */
+  --color-base-content: oklch(12% 0.008 100); /* primary text — #1D1D19 */
+  --color-primary: oklch(61% 0.15 42);      /* D97757 accent orange */
   --color-primary-content: oklch(98% 0 0);
+  --color-neutral: oklch(42% 0.01 90);      /* secondary text — #66655D */
   /* daisyUI v4 fallbacks */
-  --b1: oklch(92% 0.005 80);
-  --b2: oklch(97% 0.005 80);     /* surfaces - off-white, not pure white */
-  --b3: oklch(83% 0.012 80);
-  --bc: oklch(18% 0.015 260);
-  --p: oklch(58% 0.17 55);       /* primary - Claude orange */
+  --b1: oklch(97.5% 0.004 85);
+  --b2: oklch(94.5% 0.006 85);
+  --b3: oklch(91% 0.012 90);
+  --bc: oklch(12% 0.008 100);
+  --p: oklch(61% 0.15 42);       /* primary - #D97757 */
   --pc: oklch(98% 0 0);
   --su: oklch(50% 0.2 155);      /* success - deeper green */
   --wa: oklch(58% 0.18 75);      /* warning - richer amber */
@@ -168,13 +180,13 @@ form:focus-visible {
 [data-theme="light"] .modal-box,
 [data-theme="light"] .tab-content,
 [data-theme="light"] [role="tabpanel"] {
-  background-color: oklch(97% 0.005 80) !important;
-  box-shadow: 0 1px 3px oklch(0% 0 0 / 0.10);
+  background-color: oklch(96% 0.006 85) !important; /* Pampas — #F4F3EE */
+  box-shadow: 0 1px 3px oklch(0% 0 0 / 0.08);
 }
 
 [data-theme="light"] .navbar {
-  background-color: oklch(93% 0.008 80) !important;
-  border-bottom: 1px solid oklch(83% 0.012 80);
+  background-color: oklch(94.5% 0.006 85) !important; /* panels — #F0EFEA */
+  border-bottom: 1px solid oklch(91% 0.012 90);
 }
 
 [data-theme="light"] .table {
@@ -206,10 +218,10 @@ main {
   scrollbar-width: thin;
 }
 [data-theme="dark"] main {
-  scrollbar-color: oklch(45% 0 0) hsl(60, 2.7%, 16%);
+  scrollbar-color: hsl(60 2.1% 18.4%) hsl(60 2.7% 14.5%);
 }
 [data-theme="light"] main {
-  scrollbar-color: oklch(70% 0.01 80) oklch(90% 0.005 80);
+  scrollbar-color: oklch(71% 0.01 85) oklch(94.5% 0.006 85);
 }
 main::-webkit-scrollbar {
   width: 8px;
@@ -219,10 +231,10 @@ main::-webkit-scrollbar-track {
   background: transparent;
 }
 [data-theme="dark"] main::-webkit-scrollbar-track {
-  background: hsl(60, 2.7%, 16%);
+  background: hsl(60 2.7% 14.5%);
 }
 [data-theme="light"] main::-webkit-scrollbar-track {
-  background: oklch(90% 0.005 80);
+  background: oklch(94.5% 0.006 85);
 }
 [data-theme="dark"] main::-webkit-scrollbar-thumb {
   background: oklch(35% 0 0);
@@ -233,12 +245,12 @@ main::-webkit-scrollbar-track {
   background: oklch(45% 0 0);
 }
 [data-theme="light"] main::-webkit-scrollbar-thumb {
-  background: oklch(75% 0.01 80);
+  background: oklch(71% 0.01 85);
   border-radius: 4px;
   min-height: 40px;
 }
 [data-theme="light"] main::-webkit-scrollbar-thumb:hover {
-  background: oklch(65% 0.01 80);
+  background: oklch(61% 0.01 85);
 }
 
 @media (hover: none) and (pointer: coarse) {
@@ -348,14 +360,14 @@ code.hljs { padding: 3px 5px; }
 /* ===== diff2html theme overrides ===== */
 /* diff2html defaults to light vars on :root; remap them per theme */
 [data-theme="dark"] {
-  --d2h-bg-color: hsl(60, 2.7%, 14.5%);
-  --d2h-border-color: hsl(60, 2%, 23%);
-  --d2h-dim-color: #6e7681;
-  --d2h-line-border-color: hsl(60, 2%, 20%);
-  --d2h-file-header-bg-color: hsl(60, 2.1%, 18.4%);
-  --d2h-file-header-border-color: hsl(60, 2%, 23%);
-  --d2h-empty-placeholder-bg-color: hsla(215, 8%, 47%, 0.1);
-  --d2h-empty-placeholder-border-color: hsl(60, 2%, 23%);
+  --d2h-bg-color: hsl(60 2.7% 14.5%);        /* --bg-100 */
+  --d2h-border-color: hsl(30 3.3% 11.8%);    /* --bg-200 */
+  --d2h-dim-color: hsl(50 9% 73.7%);         /* --text-200 */
+  --d2h-line-border-color: hsl(60 2.1% 18.4%);
+  --d2h-file-header-bg-color: hsl(60 2.1% 18.4%); /* --bg-000 */
+  --d2h-file-header-border-color: hsl(30 3.3% 11.8%);
+  --d2h-empty-placeholder-bg-color: hsl(60 2.1% 18.4% / 0.5);
+  --d2h-empty-placeholder-border-color: hsl(30 3.3% 11.8%);
   --d2h-selected-color: rgba(56, 139, 253, 0.1);
   --d2h-ins-bg-color: rgba(46, 160, 67, 0.25);
   --d2h-ins-border-color: rgba(46, 160, 67, 0.5);
@@ -373,13 +385,13 @@ code.hljs { padding: 3px 5px; }
 }
 
 [data-theme="light"] {
-  --d2h-bg-color: oklch(97% 0.005 80);
-  --d2h-border-color: oklch(83% 0.012 80);
-  --d2h-line-border-color: oklch(87% 0.008 80);
-  --d2h-file-header-bg-color: oklch(93% 0.008 80);
-  --d2h-file-header-border-color: oklch(83% 0.012 80);
-  --d2h-empty-placeholder-bg-color: oklch(90% 0.006 80);
-  --d2h-empty-placeholder-border-color: oklch(83% 0.012 80);
+  --d2h-bg-color: oklch(96% 0.006 85);
+  --d2h-border-color: oklch(91% 0.012 90);
+  --d2h-line-border-color: oklch(93% 0.008 85);
+  --d2h-file-header-bg-color: oklch(94.5% 0.006 85);
+  --d2h-file-header-border-color: oklch(91% 0.012 90);
+  --d2h-empty-placeholder-bg-color: oklch(93% 0.008 85);
+  --d2h-empty-placeholder-border-color: oklch(91% 0.012 90);
   /* ins/del colors: clearly visible but not neon */
   --d2h-ins-bg-color: #e6f4ea;
   --d2h-ins-border-color: #a8d5b0;

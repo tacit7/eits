@@ -185,7 +185,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
       phx-target={@myself}
       data-active-project-id={@sidebar_project && @sidebar_project.id}
       class={[
-        "flex flex-col h-full border-r border-base-content/8 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)] transition-all duration-200 flex-shrink-0 overflow-hidden",
+        "flex flex-col h-full border-r border-base-content/10 bg-base-100 lg:bg-gradient-to-t lg:from-base-300/5 lg:to-base-300/30 shadow-lg lg:shadow-none transition-[background-color,border-color,box-shadow] duration-[35ms] flex-shrink-0 overflow-hidden",
         "fixed inset-y-0 left-0 z-50 md:relative md:inset-auto md:z-auto",
         if(@mobile_open, do: "translate-x-0", else: "-translate-x-full md:translate-x-0"),
         if(@collapsed, do: "w-16", else: "w-60")
@@ -534,14 +534,9 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-base-content/70"
           title={if @collapsed, do: "Expand sidebar", else: "Collapse sidebar"}
         >
-          <.icon
-            name={
-              if @collapsed,
-                do: "hero-chevron-double-right-mini",
-                else: "hero-chevron-double-left-mini"
-            }
-            class="w-4 h-4"
-          />
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+            <path d="M16.5 4C17.3284 4 18 4.67157 18 5.5V14.5C18 15.3284 17.3284 16 16.5 16H3.5C2.67157 16 2 15.3284 2 14.5V5.5C2 4.67157 2.67157 4 3.5 4H16.5ZM7 15H16.5C16.7761 15 17 14.7761 17 14.5V5.5C17 5.22386 16.7761 5 16.5 5H7V15ZM3.5 5C3.22386 5 3 5.22386 3 5.5V14.5C3 14.7761 3.22386 15 3.5 15H6V5H3.5Z" />
+          </svg>
         </button>
       </div>
     </aside>

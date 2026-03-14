@@ -72,7 +72,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
       </div>
       <%!-- Header card --%>
       <div
-        class="max-w-6xl mx-auto w-full bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0"
+        class="max-w-6xl mx-auto w-full bg-base-200 rounded-2xl border border-base-content/10 shadow-sm mb-3 flex-shrink-0"
         id="dm-header-card"
       >
         <div class="px-4 sm:px-5 py-3" id="dm-header">
@@ -794,12 +794,15 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         _ -> nil
       end
 
+    wrap_detail = label == "i-speak"
+
     assigns =
       assigns
       |> assign(:icon, icon)
       |> assign(:label, label)
       |> assign(:detail, detail)
       |> assign(:input, input)
+      |> assign(:wrap_detail, wrap_detail)
 
     ~H"""
     <details class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden">
@@ -809,7 +812,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           {@label}
         </span>
         <span
-          :if={@detail != ""}
+          :if={@detail != "" && !@wrap_detail}
           class="text-[11px] font-mono text-base-content/35 truncate flex-1 min-w-0"
         >
           {@detail}
@@ -844,6 +847,9 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             Map.has_key?(assigns.input, "content") ->
           :write
 
+        String.ends_with?(assigns.name, "i-speak") and assigns.detail != "" ->
+          :speak
+
         is_map(assigns.input) and map_size(assigns.input) > 0 and
             assigns.name not in ["Read", "Glob", "Grep", "WebSearch", "Task"] ->
           :json
@@ -873,6 +879,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5 space-y-1">
           <div class="font-mono text-[10px] text-base-content/40 pb-0.5">{@input["file_path"]}</div>
           <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-[10px] text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-48 overflow-y-auto">{String.slice(@input["content"] || "", 0..500)}{if String.length(@input["content"] || "") > 500, do: "\n…", else: ""}</pre>
+        </div>
+      <% :speak -> %>
+        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5 overflow-hidden">
+          <p class="text-[12px] text-base-content/70 leading-relaxed whitespace-pre-wrap break-words">{@detail}</p>
         </div>
       <% :json -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
@@ -907,7 +917,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
     <form
       phx-submit="send_message"
       phx-change="validate_upload"
-      class="rounded-2xl border border-base-content/10 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] shadow-sm outline-none"
+      class="rounded-2xl border border-base-content/10 bg-base-200 shadow-sm outline-none"
       id="message-form"
       data-slash-items={Jason.encode!(@slash_items)}
       phx-hook="DmComposer"
@@ -1322,91 +1332,101 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
       />
     <% else %>
       <div
-        class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-4"
+        class="divide-y divide-base-content/5 bg-base-200 rounded-xl shadow-sm px-4"
         id="dm-task-list"
       >
         <%= for task <- @tasks do %>
           <% has_expandable = task.description || Map.get(task, :notes, []) != [] %>
-          <div class={["collapse", has_expandable && "collapse-arrow"]} id={"dm-task-#{task.id}"}>
-            <input type="checkbox" class="min-h-0 p-0" disabled={!has_expandable} />
-            <div
-              class="collapse-title py-3.5 px-0 min-h-0 flex items-center gap-3 cursor-pointer"
+          <div class="flex items-start" id={"dm-task-#{task.id}"}>
+            <%!-- Edit button — outside collapse so checkbox overlay can't intercept --%>
+            <button
+              type="button"
               phx-click="open_task_detail"
               phx-value-task_id={task.uuid || to_string(task.id)}
+              class="flex-shrink-0 mt-3 p-1.5 rounded-md text-base-content/25 hover:text-base-content/70 hover:bg-base-content/8 transition-all z-10"
+              title="Edit task"
             >
-              <%!-- Status dot --%>
-              <div class="flex-shrink-0 w-5 flex justify-center">
-                <%= if task.state_id == 2 do %>
-                  <span class="relative flex h-2 w-2">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-info opacity-50"></span>
-                    <span class="relative inline-flex rounded-full h-2 w-2 bg-info"></span>
-                  </span>
-                <% else %>
-                  <span class={[
-                    "inline-flex rounded-full h-2 w-2",
-                    task.state_id == 3 && "bg-success",
-                    task.state_id == 4 && "bg-warning",
-                    task.state_id not in [2, 3, 4] && "bg-base-content/20"
-                  ]}></span>
-                <% end %>
-              </div>
+              <.icon name="hero-pencil-square" class="w-3.5 h-3.5" />
+            </button>
 
-              <%!-- Content --%>
-              <div class="flex-1 min-w-0">
-                <span class={[
-                  "text-[13px] font-medium truncate block",
-                  task.completed_at && "text-base-content/40 line-through",
-                  !task.completed_at && "text-base-content/85"
-                ]}>
-                  {String.trim(task.title || "")}
-                </span>
-                <div class="flex items-center gap-1.5 mt-0.5 text-[11px]">
-                  <%= if task.state do %>
+            <%!-- Collapse (status dot + title + expandable content) --%>
+            <div class={["collapse flex-1", has_expandable && "collapse-arrow"]}>
+              <input type="checkbox" class="min-h-0 p-0" disabled={!has_expandable} />
+              <div class="collapse-title py-3.5 px-0 min-h-0 flex items-center gap-3">
+                <%!-- Status dot --%>
+                <div class="flex-shrink-0 w-5 flex justify-center">
+                  <%= if task.state_id == 2 do %>
+                    <span class="relative flex h-2 w-2">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-info opacity-50"></span>
+                      <span class="relative inline-flex rounded-full h-2 w-2 bg-info"></span>
+                    </span>
+                  <% else %>
                     <span class={[
-                      "font-medium",
-                      task.state_id == 2 && "text-info/80",
-                      task.state_id == 3 && "text-success/80",
-                      task.state_id == 4 && "text-warning/80",
-                      task.state_id not in [2, 3, 4] && "text-base-content/45"
-                    ]}>
-                      {task.state.name}
-                    </span>
-                  <% end %>
-                  <%= if task.tags && length(task.tags) > 0 do %>
-                    <span class="text-base-content/15">&middot;</span>
-                    <span class="text-base-content/35">
-                      {Enum.map_join(Enum.take(task.tags, 2), ", ", & &1.name)}
-                    </span>
-                  <% end %>
-                  <span class="text-base-content/15">&middot;</span>
-                  <span class="font-mono text-base-content/30">
-                    {String.slice(task.uuid || to_string(task.id), 0..7)}
-                  </span>
-                  <%= if Map.get(task, :notes_count, 0) > 0 do %>
-                    <span class="text-base-content/15">&middot;</span>
-                    <span class="flex items-center gap-0.5 text-base-content/35">
-                      <.icon name="hero-chat-bubble-bottom-center-text" class="w-3 h-3" />
-                      {Map.get(task, :notes_count)}
-                    </span>
+                      "inline-flex rounded-full h-2 w-2",
+                      task.state_id == 3 && "bg-success",
+                      task.state_id == 4 && "bg-warning",
+                      task.state_id not in [2, 3, 4] && "bg-base-content/20"
+                    ]}></span>
                   <% end %>
                 </div>
-              </div>
-            </div>
-            <%= if has_expandable do %>
-              <div class="collapse-content px-0 pt-0 pb-4 pl-8">
-                <%= if task.description do %>
-                  <div class="text-sm text-base-content/65 leading-relaxed whitespace-pre-wrap mb-2">{String.trim(task.description)}</div>
-                <% end %>
-                <%= for note <- Map.get(task, :notes, []) do %>
-                  <div class="mt-1.5 rounded-lg bg-base-200/60 px-3 py-2">
-                    <%= if note.title do %>
-                      <div class="text-[11px] font-semibold text-base-content/60 mb-0.5">{note.title}</div>
+
+                <%!-- Content --%>
+                <div class="flex-1 min-w-0">
+                  <span class={[
+                    "text-[13px] font-medium truncate block",
+                    task.completed_at && "text-base-content/40 line-through",
+                    !task.completed_at && "text-base-content/85"
+                  ]}>
+                    {String.trim(task.title || "")}
+                  </span>
+                  <div class="flex items-center gap-1.5 mt-0.5 text-[11px]">
+                    <%= if task.state do %>
+                      <span class={[
+                        "font-medium",
+                        task.state_id == 2 && "text-info/80",
+                        task.state_id == 3 && "text-success/80",
+                        task.state_id == 4 && "text-warning/80",
+                        task.state_id not in [2, 3, 4] && "text-base-content/45"
+                      ]}>
+                        {task.state.name}
+                      </span>
                     <% end %>
-                    <pre class="whitespace-pre-wrap text-xs text-base-content/55 font-mono leading-relaxed">{note.body}</pre>
+                    <%= if task.tags && length(task.tags) > 0 do %>
+                      <span class="text-base-content/15">&middot;</span>
+                      <span class="text-base-content/35">
+                        {Enum.map_join(Enum.take(task.tags, 2), ", ", & &1.name)}
+                      </span>
+                    <% end %>
+                    <span class="text-base-content/15">&middot;</span>
+                    <span class="font-mono text-base-content/30">
+                      {String.slice(task.uuid || to_string(task.id), 0..7)}
+                    </span>
+                    <%= if Map.get(task, :notes_count, 0) > 0 do %>
+                      <span class="text-base-content/15">&middot;</span>
+                      <span class="flex items-center gap-0.5 text-base-content/35">
+                        <.icon name="hero-chat-bubble-bottom-center-text" class="w-3 h-3" />
+                        {Map.get(task, :notes_count)}
+                      </span>
+                    <% end %>
                   </div>
-                <% end %>
+                </div>
               </div>
-            <% end %>
+              <%= if has_expandable do %>
+                <div class="collapse-content px-0 pt-0 pb-4 pl-8">
+                  <%= if task.description do %>
+                    <div class="text-sm text-base-content/65 leading-relaxed whitespace-pre-wrap mb-2">{String.trim(task.description)}</div>
+                  <% end %>
+                  <%= for note <- Map.get(task, :notes, []) do %>
+                    <div class="mt-1.5 rounded-lg bg-base-200/60 px-3 py-2">
+                      <%= if note.title do %>
+                        <div class="text-[11px] font-semibold text-base-content/60 mb-0.5">{note.title}</div>
+                      <% end %>
+                      <pre class="whitespace-pre-wrap text-xs text-base-content/55 font-mono leading-relaxed">{note.body}</pre>
+                    </div>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
           </div>
         <% end %>
       </div>
@@ -1428,14 +1448,14 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
       />
     <% else %>
       <div
-        class="space-y-1 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4"
+        class="space-y-1 bg-base-200 rounded-xl shadow-sm p-4"
         id="dm-commit-list"
       >
         <%= for commit <- @commits do %>
           <% hash = commit.commit_hash || "" %>
           <% diff = Map.get(@diff_cache, hash) %>
           <div
-            class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] hover:border-base-content/10 transition-colors"
+            class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
             id={"dm-commit-#{commit.id}"}
           >
             <input type="checkbox" phx-click="load_diff" phx-value-hash={hash} />
@@ -1500,12 +1520,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
       />
     <% else %>
       <div
-        class="space-y-1 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm p-4"
+        class="space-y-1 bg-base-200 rounded-xl shadow-sm p-4"
         id="dm-note-list"
       >
         <%= for note <- @notes do %>
           <div
-            class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] hover:border-base-content/10 transition-colors"
+            class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
             id={"dm-note-#{note.id}"}
           >
             <input type="checkbox" />
@@ -1798,31 +1818,44 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
     {"hero-globe-alt", "WebSearch", query}
   end
 
-  defp tool_widget_meta(name, rest) do
-    if String.contains?(name, "__") do
-      short = name |> String.split("__") |> List.last()
+  defp tool_widget_meta(name, rest) when is_binary(name) and binary_part(name, 0, 4) == "mcp_" do
+    short = name |> String.split("__") |> List.last()
 
-      detail =
-        case Jason.decode(rest) do
-          {:ok, input} when is_map(input) ->
-            summary =
-              input
-              |> Map.to_list()
-              |> Enum.take(2)
-              |> Enum.filter(fn {_k, v} -> is_binary(v) or is_number(v) or is_atom(v) end)
-              |> Enum.map(fn {k, v} -> "#{k}: #{String.slice(to_string(v), 0..40)}" end)
-              |> Enum.join(", ")
+    {icon, detail} =
+      case {short, Jason.decode(rest)} do
+        {"i-speak", {:ok, %{"message" => msg}}} ->
+          {"hero-speaker-wave", msg}
 
-            if summary == "", do: rest, else: summary
-
-          _ ->
+        {"i-speak", _} ->
+          msg =
             rest
-        end
+            |> String.replace_prefix("message: ", "")
+            |> String.split(~r/,\s*(?:voice|rate):\s*/)
+            |> List.first()
+            |> String.trim()
 
-      {"hero-puzzle-piece", short, detail}
-    else
-      {"hero-wrench-screwdriver", name, rest}
-    end
+          {"hero-speaker-wave", msg}
+
+        {_, {:ok, input}} when is_map(input) ->
+          summary =
+            input
+            |> Map.to_list()
+            |> Enum.take(2)
+            |> Enum.filter(fn {_k, v} -> is_binary(v) or is_number(v) or is_atom(v) end)
+            |> Enum.map(fn {k, v} -> "#{k}: #{String.slice(to_string(v), 0..40)}" end)
+            |> Enum.join(", ")
+
+          {"hero-puzzle-piece", if(summary == "", do: rest, else: summary)}
+
+        _ ->
+          {"hero-puzzle-piece", rest}
+      end
+
+    {icon, short, detail}
+  end
+
+  defp tool_widget_meta(name, rest) do
+    {"hero-wrench-screwdriver", name, rest}
   end
 
   # ─── Timeline Tab ────────────────────────────────────────────────────────────

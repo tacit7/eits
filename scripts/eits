@@ -126,8 +126,8 @@ cmd_tasks() {
       ;;
     create)
       # eits tasks create --title <t> [--description <d>] [--project <id>] [--priority <p>] [--session <uuid>] [--agent <uuid>]
-      # Defaults: --agent from $EITS_AGENT_UUID, --project from $EITS_PROJECT_ID, --session from $EITS_SESSION_UUID
-      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" session_id="${EITS_SESSION_UUID:-}" agent_id="${EITS_AGENT_UUID:-}"
+      # Defaults: --agent from $EITS_AGENT_UUID, --project from $EITS_PROJECT_ID, --session from $EITS_SESSION_UUID (falls back to $EITS_SESSION_ID)
+      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" agent_id="${EITS_AGENT_UUID:-}"
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --title)       title="$2";       shift 2 ;;
@@ -164,9 +164,10 @@ cmd_tasks() {
     start)
       local id="${1:-}"; need id
       _patch "/tasks/$id" '{"state":"start"}'
-      # Auto-link current session to task
-      if [[ -n "${EITS_SESSION_UUID:-}" ]]; then
-        _post "/tasks/$id/sessions" "$(json session_id "$EITS_SESSION_UUID")" > /dev/null
+      # Auto-link current session to task ($EITS_SESSION_UUID preferred; falls back to $EITS_SESSION_ID)
+      local _sess="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+      if [[ -n "$_sess" ]]; then
+        _post "/tasks/$id/sessions" "$(json session_id "$_sess")" > /dev/null
       fi
       ;;
     delete)
@@ -189,10 +190,10 @@ cmd_tasks() {
       ;;
     link-session)
       # eits tasks link-session <task_id> [<session_uuid>]
-      # session_uuid defaults to $EITS_SESSION_UUID if not provided
+      # session_uuid defaults to $EITS_SESSION_UUID (falls back to $EITS_SESSION_ID) if not provided
       local id="${1:-}"; need id; shift
-      local session_id="${1:-${EITS_SESSION_UUID:-}}"
-      [[ -n "$session_id" ]] || die "session_uuid is required (or set EITS_SESSION_UUID)"
+      local session_id="${1:-${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}}"
+      [[ -n "$session_id" ]] || die "session_uuid is required (or set EITS_SESSION_UUID / EITS_SESSION_ID)"
       _post "/tasks/$id/sessions" "$(json session_id "$session_id")"
       ;;
     unlink-session)
@@ -306,8 +307,62 @@ cmd_agents() {
       local id="${1:-}"; need id
       _get "/agents/$id"
       ;;
+    spawn)
+      # eits agents spawn --instructions <text> [--model <m>] [--provider <p>]
+      #   [--project-id <n>] [--project-path <path>] [--worktree <branch>]
+      #   [--effort-level <level>] [--parent-session-id <n>] [--parent-agent-id <n>]
+      #   [--team-name <name>] [--member-name <alias>] [--agent <name>]
+      local instructions="" model="" provider="" project_id="" project_path=""
+      local worktree="" effort_level="" parent_session_id="" parent_agent_id=""
+      local team_name="" member_name="" agent_name=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --instructions)      instructions="$2";      shift 2 ;;
+          --model)             model="$2";             shift 2 ;;
+          --provider)          provider="$2";          shift 2 ;;
+          --project-id)        project_id="$2";        shift 2 ;;
+          --project-path)      project_path="$2";      shift 2 ;;
+          --worktree)          worktree="$2";          shift 2 ;;
+          --effort-level)      effort_level="$2";      shift 2 ;;
+          --parent-session-id) parent_session_id="$2"; shift 2 ;;
+          --parent-agent-id)   parent_agent_id="$2";   shift 2 ;;
+          --team-name)         team_name="$2";         shift 2 ;;
+          --member-name)       member_name="$2";       shift 2 ;;
+          --agent)             agent_name="$2";        shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need instructions
+      local payload
+      payload=$(jq -n \
+        --arg     instructions      "$instructions" \
+        --arg     model             "$model" \
+        --arg     provider          "$provider" \
+        --arg     project_path      "$project_path" \
+        --arg     worktree          "$worktree" \
+        --arg     effort_level      "$effort_level" \
+        --arg     team_name         "$team_name" \
+        --arg     member_name       "$member_name" \
+        --arg     agent             "$agent_name" \
+        --argjson project_id        "${project_id:-null}" \
+        --argjson parent_session_id "${parent_session_id:-null}" \
+        --argjson parent_agent_id   "${parent_agent_id:-null}" \
+        '{instructions: $instructions}
+         + (if $model             != "" then {model: $model}                           else {} end)
+         + (if $provider          != "" then {provider: $provider}                     else {} end)
+         + (if $project_path      != "" then {project_path: $project_path}             else {} end)
+         + (if $worktree          != "" then {worktree: $worktree}                     else {} end)
+         + (if $effort_level      != "" then {effort_level: $effort_level}             else {} end)
+         + (if $team_name         != "" then {team_name: $team_name}                   else {} end)
+         + (if $member_name       != "" then {member_name: $member_name}               else {} end)
+         + (if $agent             != "" then {agent: $agent}                           else {} end)
+         + (if $project_id        != null then {project_id: $project_id}               else {} end)
+         + (if $parent_session_id != null then {parent_session_id: $parent_session_id} else {} end)
+         + (if $parent_agent_id   != null then {parent_agent_id: $parent_agent_id}     else {} end)')
+      _post "/agents" "$payload"
+      ;;
     *)
-      echo "usage: eits agents <list|get>"
+      echo "usage: eits agents <list|get|spawn>"
       ;;
   esac
 }

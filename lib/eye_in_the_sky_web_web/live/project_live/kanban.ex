@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   alias EyeInTheSkyWeb.Notes
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Claude.AgentManager
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [format_due_date: 1, due_date_class: 1]
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -333,26 +334,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     end
   end
 
-  defp format_due(nil), do: ""
-
-  defp format_due(datetime) when is_binary(datetime) do
-    case Date.from_iso8601(String.slice(datetime, 0..9)) do
-      {:ok, date} ->
-        today = Date.utc_today()
-
-        cond do
-          Date.compare(date, today) == :eq -> "Today"
-          Date.compare(date, Date.add(today, 1)) == :eq -> "Tomorrow"
-          Date.compare(date, today) == :lt -> "Overdue"
-          true -> Calendar.strftime(date, "%b %d")
-        end
-
-      _ ->
-        datetime
-    end
-  end
-
-  defp format_due(_), do: ""
 
   defp load_tasks(socket) do
     project_id = socket.assigns.project_id
@@ -379,26 +360,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   defp state_dot_color(color) when is_binary(color), do: color
   defp state_dot_color(_), do: "#6B7280"
 
-
-  defp due_date_class(nil), do: "text-base-content/30"
-
-  defp due_date_class(datetime) when is_binary(datetime) do
-    case Date.from_iso8601(String.slice(datetime, 0..9)) do
-      {:ok, date} ->
-        today = Date.utc_today()
-
-        cond do
-          Date.compare(date, today) == :lt -> "text-error font-medium"
-          Date.compare(date, today) == :eq -> "text-warning font-medium"
-          true -> "text-base-content/30"
-        end
-
-      _ ->
-        "text-base-content/30"
-    end
-  end
-
-  defp due_date_class(_), do: "text-base-content/30"
 
 
   @impl true
@@ -497,7 +458,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                             due_date_class(task.due_at)
                           ]}>
                             <.icon name="hero-clock-mini" class="w-3.5 h-3.5" />
-                            {format_due(task.due_at)}
+                            {format_due_date(task.due_at)}
                           </span>
                         <% end %>
                         <%= if task.description && task.description != "" do %>
@@ -509,6 +470,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                       type="button"
                       phx-click="delete_task"
                       phx-value-task_id={task.uuid}
+                      data-confirm="Delete this task?"
                       class="absolute top-1.5 right-1.5 opacity-0 group-hover/card:opacity-100 min-w-[44px] min-h-[44px] -mr-1.5 -mt-1.5 flex items-center justify-center rounded text-base-content/25 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
                       aria-label={"Delete task #{task.title}"}
                     >

@@ -35,6 +35,7 @@ import {DiffViewer} from "./hooks/diff_viewer"
 import {PasskeyAuth} from "./hooks/passkey_auth"
 import {InfiniteScroll} from "./hooks/infinite_scroll"
 import {DmComposer} from "./hooks/dm_composer"
+import {FileAttach} from "./hooks/file_attach"
 import {PushSetup} from "./push_notifications"
 import {TOUCH_DEVICE, createSwipeDetector} from "./hooks/touch_gesture"
 import {getHooks} from "live_svelte"
@@ -90,6 +91,7 @@ Hooks.PasskeyAuth = PasskeyAuth
 Hooks.PushSetup = PushSetup
 Hooks.InfiniteScroll = InfiniteScroll
 Hooks.DmComposer = DmComposer
+Hooks.FileAttach = FileAttach
 Hooks.RefreshDot = {
   mounted() { this._flash() },
   updated() { this._flash() },
@@ -110,9 +112,7 @@ Hooks.Highlight = {
 Hooks.SortableKanban = {
   mounted() { this._init() },
   updated() {
-    // Reinitialize after LiveView patches the DOM
-    if (this.sortable) this.sortable.destroy()
-    this._init()
+    // Sortable handles DOM mutations internally; no need to destroy/recreate
   },
   _init() {
     this.sortable = Sortable.create(this.el, {

@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
 
   use Phoenix.LiveComponent
   import EyeInTheSkyWebWeb.CoreComponents
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1, is_overdue?: 1, is_due_today?: 1, format_date_input: 1]
 
   @impl true
   def render(assigns) do
@@ -53,7 +54,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                     <.icon name="hero-clipboard-document" class="w-3 h-3" />
                   </button>
                   <span class="text-base-content/15">&middot;</span>
-                  <span>{format_relative_time(@task.created_at)}</span>
+                  <span>{relative_time(@task.created_at)}</span>
                 </div>
                 <button
                   type="button"
@@ -185,7 +186,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                           <% end %>
                           <pre class="whitespace-pre-wrap text-xs text-base-content/60 font-mono leading-relaxed">{note.body}</pre>
                           <div class="mt-1.5 text-[11px] text-base-content/25">
-                            {format_relative_time(note.created_at)}
+                            {relative_time(note.created_at)}
                           </div>
                         </div>
                       <% end %>
@@ -196,7 +197,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                 <%!-- Metadata --%>
                 <div class="flex items-center gap-3 text-[11px] text-base-content/25 pt-2">
                   <%= if @task.updated_at && @task.updated_at != @task.created_at do %>
-                    <span>Updated {format_relative_time(@task.updated_at)}</span>
+                    <span>Updated {relative_time(@task.updated_at)}</span>
                     <span class="text-base-content/10">&middot;</span>
                   <% end %>
                   <%= if @task.agent_id do %>
@@ -244,14 +245,6 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
     """
   end
 
-  defp format_date_input(nil), do: ""
-
-  defp format_date_input(datetime) when is_binary(datetime) do
-    String.slice(datetime, 0..9)
-  end
-
-  defp format_date_input(_), do: ""
-
   defp format_tags(nil), do: ""
   defp format_tags([]), do: ""
 
@@ -260,51 +253,6 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
     |> Enum.map(& &1.name)
     |> Enum.join(", ")
   end
-
-  defp format_relative_time(nil), do: ""
-
-  defp format_relative_time(timestamp) when is_binary(timestamp) do
-    case NaiveDateTime.from_iso8601(timestamp) do
-      {:ok, dt} ->
-        now = NaiveDateTime.utc_now()
-        diff_seconds = NaiveDateTime.diff(now, dt)
-
-        cond do
-          diff_seconds < 60 -> "just now"
-          diff_seconds < 3600 -> "#{div(diff_seconds, 60)}m ago"
-          diff_seconds < 86400 -> "#{div(diff_seconds, 3600)}h ago"
-          diff_seconds < 604_800 -> "#{div(diff_seconds, 86400)}d ago"
-          true -> Calendar.strftime(dt, "%b %d, %Y")
-        end
-
-      _ ->
-        timestamp
-    end
-  end
-
-  defp format_relative_time(_), do: ""
-
-  defp is_overdue?(nil), do: false
-
-  defp is_overdue?(datetime) when is_binary(datetime) do
-    case Date.from_iso8601(String.slice(datetime, 0..9)) do
-      {:ok, date} -> Date.compare(date, Date.utc_today()) == :lt
-      _ -> false
-    end
-  end
-
-  defp is_overdue?(_), do: false
-
-  defp is_due_today?(nil), do: false
-
-  defp is_due_today?(datetime) when is_binary(datetime) do
-    case Date.from_iso8601(String.slice(datetime, 0..9)) do
-      {:ok, date} -> Date.compare(date, Date.utc_today()) == :eq
-      _ -> false
-    end
-  end
-
-  defp is_due_today?(_), do: false
 
   defp priority_label(p) when p >= 3, do: "High"
   defp priority_label(2), do: "Medium"

@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
 
   use Phoenix.Component
   import EyeInTheSkyWebWeb.CoreComponents
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [format_due_date: 1]
 
   attr :task, :map, required: true
   attr :variant, :string, default: "kanban", values: ["kanban", "grid", "list"]
@@ -175,7 +176,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       <%= if @task.due_at do %>
         <span class="flex items-center gap-1">
           <.icon name="hero-calendar" class="w-3 h-3" />
-          {format_date(@task.due_at)}
+          {format_due_date(@task.due_at)}
         </span>
       <% end %>
       <%= if @task.agent_id do %>
@@ -208,11 +209,11 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
         </h3>
       </div>
       <%= cond do %>
-        <% @task.priority >= 70 -> %>
+        <% @task.priority >= 3 -> %>
           <span class="badge badge-error badge-sm flex-shrink-0">High</span>
-        <% @task.priority >= 40 -> %>
+        <% @task.priority == 2 -> %>
           <span class="badge badge-warning badge-sm flex-shrink-0">Med</span>
-        <% @task.priority >= 20 -> %>
+        <% @task.priority == 1 -> %>
           <span class="badge badge-info badge-sm flex-shrink-0">Low</span>
         <% true -> %>
           <span></span>
@@ -251,7 +252,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       <%= if @task.due_at do %>
         <span class="badge badge-ghost badge-sm">
           <.icon name="hero-calendar" class="w-3 h-3 mr-1" />
-          {format_date(@task.due_at)}
+          {format_due_date(@task.due_at)}
         </span>
       <% end %>
 
@@ -289,39 +290,20 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
 
   defp priority_class(priority) do
     cond do
-      priority >= 4 -> "text-xs text-error"
-      priority >= 3 -> "text-xs text-warning"
-      priority >= 2 -> "text-xs text-info"
+      priority >= 3 -> "text-xs text-error"
+      priority == 2 -> "text-xs text-warning"
+      priority == 1 -> "text-xs text-info"
       true -> "text-xs text-base-content/40"
     end
   end
 
   defp priority_label(priority) do
     cond do
-      priority >= 4 -> "P1"
-      priority >= 3 -> "P2"
-      priority >= 2 -> "P3"
-      true -> "P#{priority}"
+      priority >= 3 -> "High"
+      priority == 2 -> "Med"
+      priority == 1 -> "Low"
+      true -> ""
     end
   end
 
-  defp format_date(nil), do: ""
-
-  defp format_date(datetime) when is_binary(datetime) do
-    case NaiveDateTime.from_iso8601(datetime) do
-      {:ok, naive_dt} -> format_date(naive_dt)
-      _ -> datetime
-    end
-  end
-
-  defp format_date(datetime) do
-    today = Date.utc_today()
-    date = NaiveDateTime.to_date(datetime)
-
-    cond do
-      Date.compare(date, today) == :eq -> "Today"
-      Date.compare(date, Date.add(today, 1)) == :eq -> "Tomorrow"
-      true -> Calendar.strftime(datetime, "%b %d")
-    end
-  end
 end

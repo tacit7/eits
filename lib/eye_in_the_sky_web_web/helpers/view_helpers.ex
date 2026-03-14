@@ -268,6 +268,90 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
     """
   end
 
+  # ── Task date helpers ──────────────────────────────────────────────
+
+  @doc """
+  Format a due date for display: "Today", "Tomorrow", "Overdue", or "Jan 15".
+  """
+  def format_due_date(nil), do: ""
+
+  def format_due_date(datetime) when is_binary(datetime) do
+    case Date.from_iso8601(String.slice(datetime, 0..9)) do
+      {:ok, date} ->
+        today = Date.utc_today()
+
+        cond do
+          Date.compare(date, today) == :eq -> "Today"
+          Date.compare(date, Date.add(today, 1)) == :eq -> "Tomorrow"
+          Date.compare(date, today) == :lt -> "Overdue"
+          true -> Calendar.strftime(date, "%b %d")
+        end
+
+      _ ->
+        datetime
+    end
+  end
+
+  def format_due_date(_), do: ""
+
+  @doc """
+  CSS class for due date based on urgency.
+  """
+  def due_date_class(nil), do: "text-base-content/30"
+
+  def due_date_class(datetime) when is_binary(datetime) do
+    case Date.from_iso8601(String.slice(datetime, 0..9)) do
+      {:ok, date} ->
+        today = Date.utc_today()
+
+        cond do
+          Date.compare(date, today) == :lt -> "text-error font-medium"
+          Date.compare(date, today) == :eq -> "text-warning font-medium"
+          true -> "text-base-content/30"
+        end
+
+      _ ->
+        "text-base-content/30"
+    end
+  end
+
+  def due_date_class(_), do: "text-base-content/30"
+
+  @doc """
+  Check if a due date is overdue.
+  """
+  def is_overdue?(nil), do: false
+
+  def is_overdue?(datetime) when is_binary(datetime) do
+    case Date.from_iso8601(String.slice(datetime, 0..9)) do
+      {:ok, date} -> Date.compare(date, Date.utc_today()) == :lt
+      _ -> false
+    end
+  end
+
+  def is_overdue?(_), do: false
+
+  @doc """
+  Check if a due date is today.
+  """
+  def is_due_today?(nil), do: false
+
+  def is_due_today?(datetime) when is_binary(datetime) do
+    case Date.from_iso8601(String.slice(datetime, 0..9)) do
+      {:ok, date} -> Date.compare(date, Date.utc_today()) == :eq
+      _ -> false
+    end
+  end
+
+  def is_due_today?(_), do: false
+
+  @doc """
+  Format a date for HTML date input (YYYY-MM-DD).
+  """
+  def format_date_input(nil), do: ""
+  def format_date_input(datetime) when is_binary(datetime), do: String.slice(datetime, 0..9)
+  def format_date_input(_), do: ""
+
   defp render_no_project do
     assigns = %{}
 

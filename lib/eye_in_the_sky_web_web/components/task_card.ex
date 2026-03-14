@@ -11,6 +11,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   attr :variant, :string, default: "kanban", values: ["kanban", "grid", "list"]
   attr :on_click, :string, default: nil
   attr :on_delete, :string, default: nil
+  attr :rest, :global
 
   def task_card(assigns) do
     ~H"""
@@ -18,10 +19,10 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       <% "list" -> %>
         <.list_row task={@task} on_click={@on_click} on_delete={@on_delete} />
       <% _ -> %>
-        <div class={card_class(@variant)}>
+        <div class={card_class(@variant)} {@rest}>
           <div class={card_body_class(@variant)}>
             <%= if @variant == "kanban" do %>
-              <.kanban_card_content task={@task} on_click={@on_click} />
+              <.kanban_card_content task={@task} on_click={@on_click} on_delete={@on_delete} />
             <% else %>
               <.grid_card_content task={@task} on_click={@on_click} />
             <% end %>
@@ -97,36 +98,8 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
 
   defp kanban_card_content(assigns) do
     ~H"""
-    <!-- Task Title with Checkbox -->
+    <!-- Task Title + Priority -->
     <div class="flex items-start gap-2 mb-2">
-      <button
-        class={
-          "mt-0.5 flex-shrink-0 w-4 h-4 rounded-sm border-2 transition-all " <>
-            if @task.completed_at do
-              "bg-success border-success"
-            else
-              "border-base-content/30 hover:border-base-content/60"
-            end
-        }
-        aria-label={if @task.completed_at, do: "Mark task incomplete", else: "Mark task complete"}
-        aria-pressed={if @task.completed_at, do: "true", else: "false"}
-      >
-        <%= if @task.completed_at do %>
-          <svg
-            class="w-full h-full text-white p-0.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="3"
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
-        <% end %>
-      </button>
       <h4
         class={
           "text-sm font-medium flex-1 hover:text-primary transition-colors cursor-pointer " <>
@@ -146,6 +119,19 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
           {priority_label(@task.priority)}
         </span>
       <% end %>
+      <%= if @on_delete do %>
+        <button
+          type="button"
+          phx-click={@on_delete}
+          phx-value-task_id={@task.uuid || to_string(@task.id)}
+          data-confirm="Delete this task?"
+          class="flex-shrink-0 opacity-0 group-hover/card:opacity-100 flex items-center justify-center w-5 h-5 rounded text-base-content/25 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-error"
+          aria-label={"Delete task #{@task.title}"}
+          onclick="event.stopPropagation();"
+        >
+          <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
+        </button>
+      <% end %>
     </div>
 
     <!-- Description -->
@@ -153,6 +139,20 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       <p class="text-xs text-base-content/60 line-clamp-2 mb-2">
         {@task.description}
       </p>
+    <% end %>
+
+    <!-- Annotations -->
+    <%= if Map.get(@task, :notes, []) != [] do %>
+      <div class="mb-2 space-y-1">
+        <%= for note <- Map.get(@task, :notes, []) do %>
+          <div class="text-[11px] text-base-content/50 bg-base-200 rounded px-2 py-1 line-clamp-2">
+            <%= if note.title do %>
+              <span class="font-semibold text-base-content/60">{note.title}: </span>
+            <% end %>
+            {note.body}
+          </div>
+        <% end %>
+      </div>
     <% end %>
 
     <!-- Meta Info -->
@@ -188,6 +188,12 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
             {tag.name}
           </span>
         <% end %>
+      <% end %>
+      <%= if Map.get(@task, :notes_count, 0) > 0 do %>
+        <span class="flex items-center gap-0.5 text-base-content/40">
+          <.icon name="hero-chat-bubble-bottom-center-text" class="w-3 h-3" />
+          {Map.get(@task, :notes_count)}
+        </span>
       <% end %>
     </div>
     """
@@ -255,7 +261,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   end
 
   defp card_class("kanban") do
-    "card bg-base-100 border border-base-300 hover:shadow-md transition-all"
+    "group/card card bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] border border-base-content/8 hover:shadow-md transition-all cursor-pointer"
   end
 
   defp card_class("grid") do

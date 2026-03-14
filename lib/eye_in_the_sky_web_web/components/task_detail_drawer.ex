@@ -72,9 +72,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                 <div class="grid grid-cols-2 gap-3">
                   <%!-- Status --%>
                   <div>
-                    <label class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-1.5 block">
-                      Status
-                    </label>
+                    <.detail_label text="Status" />
                     <select
                       name="state_id"
                       class="select select-sm w-full bg-base-200 border-base-300 text-sm focus:border-primary/30"
@@ -89,9 +87,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
 
                   <%!-- Priority --%>
                   <div>
-                    <label class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-1.5 block">
-                      Priority
-                    </label>
+                    <.detail_label text="Priority" />
                     <select
                       name="priority"
                       class="select select-sm w-full bg-base-200 border-base-300 text-sm focus:border-primary/30"
@@ -131,9 +127,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
 
                   <%!-- Tags --%>
                   <div>
-                    <label class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-1.5 block">
-                      Tags
-                    </label>
+                    <.detail_label text="Tags" />
                     <input
                       type="text"
                       name="tags"
@@ -146,9 +140,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
 
                 <%!-- Description --%>
                 <div>
-                  <label class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-1.5 block">
-                    Description
-                  </label>
+                  <.detail_label text="Description" />
                   <textarea
                     name="description"
                     class="w-full min-h-[100px] bg-base-200 border border-base-300 rounded-lg px-3 py-2 text-sm focus:border-primary/30 focus:outline-none resize-y"
@@ -196,6 +188,26 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                       Agent {String.slice(to_string(@task.agent_id), 0..7)}
                     </span>
                   <% end %>
+                </div>
+
+                <%!-- Add annotation --%>
+                <div class="border-t border-base-content/5 pt-4">
+                  <span class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider block mb-2">
+                    Add Annotation
+                  </span>
+                  <form phx-submit="add_task_annotation" class="flex flex-col gap-2">
+                    <input type="hidden" name="task_id" value={@task.uuid || to_string(@task.id)} />
+                    <textarea
+                      name="body"
+                      rows="3"
+                      placeholder="Add a note..."
+                      class="w-full bg-base-200 border border-base-300 rounded-lg px-3 py-2 text-sm focus:border-primary/30 focus:outline-none resize-none"
+                      required
+                    ></textarea>
+                    <button type="submit" class="btn btn-sm btn-ghost text-xs self-end gap-1.5 text-base-content/50 hover:text-base-content/80">
+                      <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> Add
+                    </button>
+                  </form>
                 </div>
               </div>
 

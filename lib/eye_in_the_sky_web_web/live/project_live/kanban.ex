@@ -6,8 +6,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   alias EyeInTheSkyWeb.Notes
   alias EyeInTheSkyWeb.Claude.AgentManager
   import EyeInTheSkyWebWeb.ControllerHelpers
-  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [format_due_date: 1, due_date_class: 1]
+
   import EyeInTheSkyWebWeb.Helpers.ProjectLiveHelpers
+  import EyeInTheSkyWebWeb.Components.TaskCard, only: [task_card: 1]
 
   @impl true
   def mount(%{"id" => _} = params, _session, socket) do
@@ -222,6 +223,25 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   end
 
   @impl true
+  def handle_event("add_task_annotation", %{"task_id" => task_id, "body" => body}, socket) do
+    task = Tasks.get_task_by_uuid_or_id!(task_id)
+    body = String.trim(body)
+
+    if body != "" do
+      Notes.create_note(%{
+        parent_type: "task",
+        parent_id: task.uuid || to_string(task.id),
+        body: body
+      })
+
+      notes = Notes.list_notes_for_task(task.id)
+      {:noreply, assign(socket, :task_notes, notes)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_event("move_task", %{"task_id" => task_uuid, "state_id" => state_id_str}, socket) do
     state_id = parse_int(state_id_str, 0)
     task = Tasks.get_task_by_uuid!(task_uuid)
@@ -308,6 +328,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       else
         Projects.get_project_tasks(project_id)
       end
+      |> Notes.with_notes_count()
 
     # Group tasks by state for kanban view
     tasks_by_state =
@@ -399,47 +420,16 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                   </div>
                 <% end %>
                 <%= for task <- column_tasks do %>
-                  <div
-                    class="group/card relative rounded-lg bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] px-3 py-2 cursor-pointer hover:bg-base-200/80 dark:hover:bg-[hsl(60,2%,21%)] transition-colors"
+                  <.task_card
+                    variant="kanban"
+                    task={task}
+                    on_click="open_task_detail"
+                    on_delete="delete_task"
+                    id={"kanban-task-#{task.id}"}
+                    data-task-id={task.uuid}
                     phx-click="open_task_detail"
                     phx-value-task_id={task.uuid}
-                    data-task-id={task.uuid}
-                    id={"kanban-task-#{task.id}"}
-                  >
-                    <span class={[
-                      "text-sm font-medium leading-snug pr-5",
-                      task.completed_at && "text-base-content/40 line-through",
-                      !task.completed_at && "text-base-content/85"
-                    ]}>
-                      {task.title}
-                    </span>
-                    <%= if task.due_at || (task.description && task.description != "") do %>
-                      <div class="flex items-center gap-2 mt-1.5 text-base-content/30">
-                        <%= if task.due_at do %>
-                          <span class={[
-                            "flex items-center gap-1 text-[11px]",
-                            due_date_class(task.due_at)
-                          ]}>
-                            <.icon name="hero-clock-mini" class="w-3.5 h-3.5" />
-                            {format_due_date(task.due_at)}
-                          </span>
-                        <% end %>
-                        <%= if task.description && task.description != "" do %>
-                          <.icon name="hero-bars-3-bottom-left-mini" class="w-3.5 h-3.5" />
-                        <% end %>
-                      </div>
-                    <% end %>
-                    <button
-                      type="button"
-                      phx-click="delete_task"
-                      phx-value-task_id={task.uuid}
-                      data-confirm="Delete this task?"
-                      class="absolute top-1.5 right-1.5 opacity-0 group-hover/card:opacity-100 min-w-[44px] min-h-[44px] -mr-1.5 -mt-1.5 flex items-center justify-center rounded text-base-content/25 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
-                      aria-label={"Delete task #{task.title}"}
-                    >
-                      <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  />
                 <% end %>
 
                 <%!-- Quick-add --%>

@@ -5,6 +5,8 @@ defmodule EyeInTheSkyWeb.Sessions do
   A Session represents an autonomous Claude process doing work (execution context).
   """
 
+  use EyeInTheSkyWeb.CrudHelpers, schema: EyeInTheSkyWeb.Sessions.Session
+
   import Ecto.Query, warn: false
 
   require Logger
@@ -40,42 +42,24 @@ defmodule EyeInTheSkyWeb.Sessions do
 
   Raises `Ecto.NoResultsError` if the Session does not exist.
   """
-  def get_session!(id) do
-    Repo.get!(Session, id)
-  end
+  def get_session!(id), do: get!(id)
 
   @doc """
   Gets a single session by UUID.
 
   Raises `Ecto.NoResultsError` if the Session does not exist.
   """
-  def get_session_by_uuid!(uuid) do
-    Repo.get_by!(Session, uuid: uuid)
-  end
+  def get_session_by_uuid!(uuid), do: get_by_uuid!(uuid)
 
   @doc """
   Gets a single session by UUID, returning {:ok, session} or {:error, :not_found}.
-
-  This is the safe version that doesn't raise exceptions.
   """
-  def get_session_by_uuid(uuid) do
-    case Repo.get_by(Session, uuid: uuid) do
-      nil -> {:error, :not_found}
-      session -> {:ok, session}
-    end
-  end
+  def get_session_by_uuid(uuid), do: get_by_uuid(uuid)
 
   @doc """
   Gets a single session, returning {:ok, session} or {:error, :not_found}.
-
-  This is the safe version that doesn't raise exceptions.
   """
-  def get_session(id) do
-    case Repo.get(Session, id) do
-      nil -> {:error, :not_found}
-      session -> {:ok, session}
-    end
-  end
+  def get_session(id), do: get(id)
 
   @doc """
   Gets a single session with logs preloaded.
@@ -89,11 +73,7 @@ defmodule EyeInTheSkyWeb.Sessions do
   @doc """
   Creates a session.
   """
-  def create_session(attrs \\ %{}) do
-    %Session{}
-    |> Session.changeset(attrs)
-    |> Repo.insert()
-  end
+  def create_session(attrs \\ %{}), do: create(attrs)
 
   @doc """
   Creates a session with model tracking information.
@@ -167,9 +147,7 @@ defmodule EyeInTheSkyWeb.Sessions do
   @doc """
   Deletes a session (hard delete).
   """
-  def delete_session(%Session{} = session) do
-    Repo.delete(session)
-  end
+  def delete_session(%Session{} = session), do: delete(session)
 
   @doc """
   Returns an `%Ecto.Changeset{}` for tracking session changes.

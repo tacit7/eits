@@ -3,6 +3,8 @@ defmodule EyeInTheSkyWeb.Tasks do
   The Tasks context for managing tasks and workflow states.
   """
 
+  use EyeInTheSkyWeb.CrudHelpers, schema: EyeInTheSkyWeb.Tasks.Task
+
   import Ecto.Query, warn: false
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Tasks.{Task, WorkflowState, Tag}

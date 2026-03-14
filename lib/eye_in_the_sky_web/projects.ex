@@ -3,6 +3,8 @@ defmodule EyeInTheSkyWeb.Projects do
   The Projects context for managing projects.
   """
 
+  use EyeInTheSkyWeb.CrudHelpers, schema: EyeInTheSkyWeb.Projects.Project
+
   import Ecto.Query, warn: false
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Projects.Project
@@ -21,9 +23,7 @@ defmodule EyeInTheSkyWeb.Projects do
 
   Raises `Ecto.NoResultsError` if the Project does not exist.
   """
-  def get_project!(id) do
-    Repo.get!(Project, id)
-  end
+  def get_project!(id), do: get!(id)
 
   @doc """
   Gets a single project by id. Returns nil if not found.
@@ -40,27 +40,17 @@ defmodule EyeInTheSkyWeb.Projects do
   @doc """
   Creates a project.
   """
-  def create_project(attrs \\ %{}) do
-    %Project{}
-    |> Project.changeset(attrs)
-    |> Repo.insert()
-  end
+  def create_project(attrs \\ %{}), do: create(attrs)
 
   @doc """
   Updates a project.
   """
-  def update_project(%Project{} = project, attrs) do
-    project
-    |> Project.changeset(attrs)
-    |> Repo.update()
-  end
+  def update_project(%Project{} = project, attrs), do: __MODULE__.update(project, attrs)
 
   @doc """
   Deletes a project.
   """
-  def delete_project(%Project{} = project) do
-    Repo.delete(project)
-  end
+  def delete_project(%Project{} = project), do: delete(project)
 
   @doc """
   Gets tasks for a project.

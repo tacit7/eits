@@ -144,6 +144,22 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       </p>
     <% end %>
 
+    <!-- Checklist progress -->
+    <% checklist = Map.get(@task, :checklist_items, []) %>
+    <%= if checklist != [] do %>
+      <% cl_total = length(checklist) %>
+      <% cl_done = Enum.count(checklist, & &1.completed) %>
+      <div class="mb-2 flex items-center gap-2">
+        <div class="flex-1 bg-base-300 rounded-full h-1">
+          <div
+            class={"h-1 rounded-full " <> if(cl_done == cl_total, do: "bg-success", else: "bg-primary")}
+            style={"width: #{round(cl_done / cl_total * 100)}%"}
+          />
+        </div>
+        <span class="text-[10px] text-base-content/40 tabular-nums">{cl_done}/{cl_total}</span>
+      </div>
+    <% end %>
+
     <!-- Annotations -->
     <%= if Map.get(@task, :notes, []) != [] do %>
       <div class="mb-2 space-y-1">

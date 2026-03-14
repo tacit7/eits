@@ -39,6 +39,9 @@ defmodule EyeInTheSkyWeb.Tasks.Task do
       join_keys: [task_id: :id, tag_id: :id],
       on_replace: :delete
 
+    has_many :checklist_items, EyeInTheSkyWeb.Tasks.ChecklistItem,
+      preload_order: [asc: :position, asc: :id]
+
     field :created_at, :string
     field :updated_at, :string
 

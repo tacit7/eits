@@ -70,7 +70,7 @@ defmodule EyeInTheSkyWeb.Projects do
     |> order_by(^order)
     |> QueryBuilder.maybe_limit(opts)
     |> QueryBuilder.maybe_offset(opts)
-    |> preload([:state, :tags, :agents])
+    |> preload([:state, :tags, :agents, :checklist_items])
     |> Repo.all()
   end
 

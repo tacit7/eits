@@ -379,6 +379,56 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   end
 
   @impl true
+  def handle_event("add_checklist_item", %{"task_id" => task_id, "title" => title}, socket) do
+    title = String.trim(title)
+
+    if title != "" do
+      task = Tasks.get_task_by_uuid_or_id!(task_id)
+      items = Tasks.list_checklist_items(task.id)
+      next_position = if items == [], do: 0, else: length(items)
+
+      case Tasks.create_checklist_item(%{task_id: task.id, title: title, position: next_position}) do
+        {:ok, _} ->
+          updated_task = Tasks.get_task!(task.id)
+          {:noreply, socket |> assign(:selected_task, updated_task) |> load_tasks()}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Failed to add checklist item")}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("toggle_checklist_item", %{"item-id" => item_id_str}, socket) do
+    item_id = parse_int(item_id_str, 0)
+
+    case Tasks.toggle_checklist_item(item_id) do
+      {:ok, item} ->
+        updated_task = Tasks.get_task!(item.task_id)
+        {:noreply, socket |> assign(:selected_task, updated_task) |> load_tasks()}
+
+      {:error, _} ->
+        {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("delete_checklist_item", %{"item-id" => item_id_str}, socket) do
+    item_id = parse_int(item_id_str, 0)
+
+    case Tasks.delete_checklist_item(item_id) do
+      {:ok, item} ->
+        updated_task = Tasks.get_task!(item.task_id)
+        {:noreply, socket |> assign(:selected_task, updated_task) |> load_tasks()}
+
+      {:error, _} ->
+        {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_event("clear_filters", _params, socket) do
     {:noreply, socket |> assign(:filter_priority, nil) |> assign(:filter_tags, MapSet.new()) |> assign(:filter_tag_mode, :and) |> apply_filters()}
   end

@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.Tasks do
 
   import Ecto.Query, warn: false
   alias EyeInTheSkyWeb.Repo
-  alias EyeInTheSkyWeb.Tasks.{Task, WorkflowState, Tag}
+  alias EyeInTheSkyWeb.Tasks.{Task, WorkflowState, Tag, ChecklistItem}
   alias EyeInTheSkyWeb.QueryHelpers
   alias EyeInTheSkyWeb.QueryBuilder
   alias EyeInTheSkyWeb.Search.FTS5
@@ -36,7 +36,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   """
   def list_tasks(opts \\ []) do
     base_tasks_query(opts)
-    |> preload([:state, :tags, :agents])
+    |> preload([:state, :tags, :agents, :checklist_items])
     |> order_by([t], desc: t.created_at)
     |> QueryBuilder.maybe_limit(opts)
     |> QueryBuilder.maybe_offset(opts)
@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   def list_tasks_for_agent(agent_id) do
     Task
     |> where([t], t.agent_id == ^agent_id)
-    |> preload([:state, :tags, :agents])
+    |> preload([:state, :tags, :agents, :checklist_items])
     |> order_by([t],
       desc: fragment("CASE WHEN ? IS NULL THEN 0 ELSE 1 END", t.archived),
       desc: t.priority,
@@ -146,7 +146,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   """
   def get_task!(id) do
     Task
-    |> preload([:state, :tags, :agents])
+    |> preload([:state, :tags, :agents, :checklist_items])
     |> Repo.get!(id)
   end
 
@@ -157,7 +157,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   """
   def get_task_by_uuid!(uuid) do
     Task
-    |> preload([:state, :tags, :agents])
+    |> preload([:state, :tags, :agents, :checklist_items])
     |> Repo.get_by!(uuid: uuid)
   end
 
@@ -306,7 +306,7 @@ defmodule EyeInTheSkyWeb.Tasks do
       sql_params: if(project_id, do: [project_id], else: []),
       extra_where: extra_where,
       order_by: [desc: :priority, desc: :created_at],
-      preload: [:state, :tags, :agents]
+      preload: [:state, :tags, :agents, :checklist_items]
     )
   end
 
@@ -476,5 +476,45 @@ defmodule EyeInTheSkyWeb.Tasks do
         :tasks_changed
       )
     end
+  end
+
+  # Checklist Items
+
+  @doc """
+  Lists checklist items for a task, ordered by position.
+  """
+  def list_checklist_items(task_id) do
+    ChecklistItem
+    |> where([c], c.task_id == ^task_id)
+    |> order_by([c], asc: c.position, asc: c.id)
+    |> Repo.all()
+  end
+
+  @doc """
+  Creates a checklist item for a task.
+  """
+  def create_checklist_item(attrs) do
+    %ChecklistItem{}
+    |> ChecklistItem.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Toggles a checklist item's completed state.
+  """
+  def toggle_checklist_item(id) do
+    item = Repo.get!(ChecklistItem, id)
+
+    item
+    |> ChecklistItem.changeset(%{completed: !item.completed})
+    |> Repo.update()
+  end
+
+  @doc """
+  Deletes a checklist item.
+  """
+  def delete_checklist_item(id) do
+    Repo.get!(ChecklistItem, id)
+    |> Repo.delete()
   end
 end

@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
   alias EyeInTheSkyWeb.Claude.AgentManager
   import EyeInTheSkyWebWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWebWeb.Live.Shared.JobsHelpers
+  import EyeInTheSkyWebWeb.Components.JobFormDrawer
 
   @impl true
   def mount(%{"id" => _} = params, _session, socket) do
@@ -219,213 +220,18 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-6">
       <%!-- Job Form Drawer --%>
-      <%= if @show_form do %>
-        <div class="fixed inset-y-0 right-0 safe-inset-y z-50 w-full max-w-md bg-base-100 shadow-xl overflow-y-auto">
-          <div class="p-6">
-            <div class="flex items-center justify-between mb-4">
-              <div>
-                <h2 class="text-lg font-semibold">
-                  {if @editing_job, do: "Edit Job", else: "New Job"}
-                </h2>
-                <p class="text-xs text-base-content/50 mt-0.5">
-                  {if @form_scope == "global",
-                    do: "Global — runs across all projects",
-                    else: "Project — scoped to #{@project && @project.name}"}
-                </p>
-              </div>
-              <button class="btn btn-ghost btn-sm btn-square" phx-click="cancel_form">
-                <span class="sr-only">Close job form</span>
-                <.icon name="hero-x-mark" class="w-4 h-4" />
-              </button>
-            </div>
-
-            <.form
-              for={@changeset}
-              phx-submit="save_job"
-              phx-change="change_job_type"
-              class="space-y-4"
-            >
-              <input type="hidden" name="job[project_id]" value={@project_id} />
-              <div class="form-control">
-                <label class="label"><span class="label-text">Name</span></label>
-                <input
-                  type="text"
-                  name="job[name]"
-                  value={(@editing_job && @editing_job.name) || ""}
-                  class="input input-bordered w-full"
-                  required
-                />
-              </div>
-
-              <div class="form-control">
-                <label class="label"><span class="label-text">Description</span></label>
-                <input
-                  type="text"
-                  name="job[description]"
-                  value={(@editing_job && @editing_job.description) || ""}
-                  class="input input-bordered w-full"
-                />
-              </div>
-
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="form-control">
-                  <label class="label"><span class="label-text">Job Type</span></label>
-                  <select name="job[job_type]" class="select select-bordered w-full">
-                    <option value="shell_command" selected={@form_job_type == "shell_command"}>
-                      Shell Command
-                    </option>
-                    <option value="spawn_agent" selected={@form_job_type == "spawn_agent"}>
-                      Spawn Agent
-                    </option>
-                    <option value="mix_task" selected={@form_job_type == "mix_task"}>Mix Task</option>
-                    <option value="daily_digest" selected={@form_job_type == "daily_digest"}>
-                      Daily Digest
-                    </option>
-                  </select>
-                </div>
-
-                <div class="form-control">
-                  <label class="label"><span class="label-text">Schedule Type</span></label>
-                  <select
-                    name="job[schedule_type]"
-                    class="select select-bordered w-full"
-                    phx-change="change_schedule_type"
-                  >
-                    <option value="interval" selected={@form_schedule_type == "interval"}>
-                      Interval
-                    </option>
-                    <option value="cron" selected={@form_schedule_type == "cron"}>Cron</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="form-control">
-                <label class="label">
-                  <span class="label-text">
-                    {if @form_schedule_type == "interval",
-                      do: "Interval (seconds)",
-                      else: "Cron Expression"}
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  name="job[schedule_value]"
-                  value={(@editing_job && @editing_job.schedule_value) || ""}
-                  placeholder={if @form_schedule_type == "interval", do: "60", else: "*/5 * * * *"}
-                  class="input input-bordered w-full font-mono"
-                  required
-                />
-              </div>
-
-              <%= if @form_job_type == "shell_command" do %>
-                <div class="form-control">
-                  <label class="label"><span class="label-text">Command</span></label>
-                  <input
-                    type="text"
-                    name="job[config_command]"
-                    value={cfg(@form_config, "command")}
-                    class="input input-bordered w-full font-mono"
-                  />
-                </div>
-                <div class="form-control">
-                  <label class="label"><span class="label-text">Working Directory</span></label>
-                  <input
-                    type="text"
-                    name="job[config_working_dir]"
-                    value={cfg(@form_config, "working_dir")}
-                    class="input input-bordered w-full"
-                  />
-                </div>
-              <% end %>
-
-              <%= if @form_job_type == "spawn_agent" do %>
-                <div class="form-control">
-                  <label class="label"><span class="label-text">Instructions</span></label>
-                  <textarea
-                    name="job[config_instructions]"
-                    class="textarea textarea-bordered w-full"
-                    rows="3"
-                  ><%= cfg(@form_config, "instructions") %></textarea>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div class="form-control">
-                    <label class="label"><span class="label-text">Model</span></label>
-                    <select name="job[config_model]" class="select select-bordered w-full">
-                      <option value="haiku" selected={cfg(@form_config, "model") == "haiku"}>
-                        Haiku
-                      </option>
-                      <option value="sonnet" selected={cfg(@form_config, "model") in ["sonnet", ""]}>
-                        Sonnet
-                      </option>
-                      <option value="opus" selected={cfg(@form_config, "model") == "opus"}>
-                        Opus
-                      </option>
-                    </select>
-                  </div>
-                  <div class="form-control">
-                    <label class="label"><span class="label-text">Project Path</span></label>
-                    <input
-                      type="text"
-                      name="job[config_project_path]"
-                      value={cfg(@form_config, "project_path")}
-                      class="input input-bordered w-full"
-                    />
-                  </div>
-                </div>
-                <div class="form-control">
-                  <label class="label"><span class="label-text">Agent Description</span></label>
-                  <input
-                    type="text"
-                    name="job[config_description]"
-                    value={cfg(@form_config, "description")}
-                    class="input input-bordered w-full"
-                  />
-                </div>
-              <% end %>
-
-              <%= if @form_job_type == "mix_task" do %>
-                <div class="form-control">
-                  <label class="label"><span class="label-text">Task Name</span></label>
-                  <input
-                    type="text"
-                    name="job[config_task]"
-                    value={cfg(@form_config, "task")}
-                    class="input input-bordered w-full font-mono"
-                  />
-                </div>
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text">Arguments (comma-separated)</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="job[config_args]"
-                    value={cfg(@form_config, "args")}
-                    class="input input-bordered w-full"
-                  />
-                </div>
-                <div class="form-control">
-                  <label class="label"><span class="label-text">Project Path</span></label>
-                  <input
-                    type="text"
-                    name="job[config_project_path]"
-                    value={cfg(@form_config, "project_path")}
-                    class="input input-bordered w-full"
-                  />
-                </div>
-              <% end %>
-
-              <div class="sticky bottom-0 bg-base-100 pt-4 pb-1 flex justify-end gap-2">
-                <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_form">
-                  Cancel
-                </button>
-                <button type="submit" class="btn btn-primary btn-sm">Save</button>
-              </div>
-            </.form>
-          </div>
-        </div>
-        <div class="fixed inset-0 z-40 bg-black/30" phx-click="cancel_form"></div>
-      <% end %>
+      <.job_form_drawer
+        show={@show_form}
+        editing_job={@editing_job}
+        changeset={@changeset}
+        form_job_type={@form_job_type}
+        form_schedule_type={@form_schedule_type}
+        form_config={@form_config}
+        project_id={@project_id}
+        project={@project}
+        form_scope={@form_scope}
+        show_daily_digest={true}
+      />
 
       <%!-- Claude Drawer --%>
       <div class={[

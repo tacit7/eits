@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
 
   alias EyeInTheSkyWeb.{Projects, Channels, Notifications}
   alias EyeInTheSkyWeb.Channels.Channel
+  alias EyeInTheSkyWeb.Claude.AgentManager
 
   @impl true
   def mount(socket) do
@@ -128,6 +129,22 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     end
   end
 
+
+  @impl true
+  def handle_event("new_session", %{"project_id" => project_id_str}, socket) do
+    with {project_id, ""} <- Integer.parse(project_id_str),
+         project <- Projects.get_project!(project_id),
+         {:ok, %{session: session}} <-
+           AgentManager.create_agent(
+             project_id: project.id,
+             project_path: project.path,
+             model: "sonnet"
+           ) do
+      {:noreply, push_navigate(socket, to: "/dm/#{session.id}")}
+    else
+      _ -> {:noreply, socket}
+    end
+  end
 
   @impl true
   def handle_event("pick_project_folder", _params, socket) do
@@ -357,7 +374,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           <div data-project-id={project.id}>
             <%!-- Project row --%>
             <div class={[
-              "flex items-center transition-colors",
+              "group flex items-center transition-colors",
               if(is_active_project,
                 do: "bg-primary/10 border-l-2 border-primary",
                 else: "hover:bg-base-content/5"
@@ -378,7 +395,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
                 navigate={~p"/projects/#{project.id}"}
                 class={[
                   "flex items-center gap-2 flex-1 min-w-0 text-sm py-1 transition-colors",
-                  if(@collapsed, do: "px-4 justify-center", else: "pr-3"),
+                  if(@collapsed, do: "px-4 justify-center", else: ""),
                   if(is_active_project,
                     do: "text-primary font-medium",
                     else: "text-base-content/60 hover:text-base-content/80"
@@ -389,6 +406,17 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
                 <.icon name="hero-folder" class="w-4 h-4 flex-shrink-0" />
                 <span class={["truncate", if(@collapsed, do: "hidden")]}>{project.name}</span>
               </.link>
+              <%= if !@collapsed do %>
+                <button
+                  phx-click="new_session"
+                  phx-value-project_id={project.id}
+                  phx-target={@myself}
+                  class="opacity-0 group-hover:opacity-100 flex-shrink-0 px-1.5 py-1 text-base-content/35 hover:text-primary transition-all"
+                  title="New session"
+                >
+                  <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+                </button>
+              <% end %>
             </div>
 
             <%!-- Sub-items — always rendered, shown/hidden by JS --%>

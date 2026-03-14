@@ -16,10 +16,11 @@ defmodule EyeInTheSkyWeb.Notes.Note do
   @doc false
   def changeset(note, attrs) do
     note
-    |> cast(attrs, [:uuid, :parent_type, :parent_id, :title, :body, :starred])
+    |> cast(attrs, [:uuid, :parent_type, :parent_id, :title, :body, :starred, :created_at])
     |> maybe_generate_uuid()
+    |> maybe_set_created_at()
     |> validate_required([:parent_type, :parent_id, :body])
-    |> validate_inclusion(:parent_type, ["session", "task", "agent", "system"])
+    |> validate_inclusion(:parent_type, ["session", "task", "agent", "project", "system"])
   end
 
   defp maybe_generate_uuid(changeset) do
@@ -27,6 +28,14 @@ defmodule EyeInTheSkyWeb.Notes.Note do
       changeset
     else
       put_change(changeset, :uuid, Ecto.UUID.generate())
+    end
+  end
+
+  defp maybe_set_created_at(changeset) do
+    if get_field(changeset, :created_at) do
+      changeset
+    else
+      put_change(changeset, :created_at, DateTime.utc_now() |> DateTime.to_iso8601())
     end
   end
 end

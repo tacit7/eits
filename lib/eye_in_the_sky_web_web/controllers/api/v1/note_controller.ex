@@ -105,33 +105,26 @@ defmodule EyeInTheSkyWebWeb.Api.V1.NoteController do
     try do
       note = Notes.get_note!(note_id)
 
-      cond do
-        params["starred"] != nil ->
-          Notes.toggle_starred(note_id)
-          json(conn, %{success: true, message: "Note updated"})
+      attrs =
+        %{}
+        |> maybe_put(:body, params["body"])
+        |> maybe_put(:title, params["title"])
+        |> maybe_put(:starred, parse_starred(params["starred"]))
 
-        true ->
-          # Direct update via Repo for body/title
-          attrs =
-            %{}
-            |> maybe_put(:body, params["body"])
-            |> maybe_put(:title, params["title"])
+      case EyeInTheSkyWeb.Repo.update(Ecto.Changeset.change(note, attrs)) do
+        {:ok, updated} ->
+          json(conn, %{
+            success: true,
+            id: updated.id,
+            body: updated.body,
+            title: updated.title,
+            starred: updated.starred || 0
+          })
 
-          case EyeInTheSkyWeb.Repo.update(Ecto.Changeset.change(note, attrs)) do
-            {:ok, updated} ->
-              json(conn, %{
-                success: true,
-                id: updated.id,
-                body: updated.body,
-                title: updated.title,
-                starred: updated.starred || 0
-              })
-
-            {:error, cs} ->
-              conn
-              |> put_status(:unprocessable_entity)
-              |> json(%{error: "Failed", details: translate_errors(cs)})
-          end
+        {:error, cs} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: "Failed", details: translate_errors(cs)})
       end
     rescue
       Ecto.NoResultsError ->
@@ -142,10 +135,22 @@ defmodule EyeInTheSkyWebWeb.Api.V1.NoteController do
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
+  defp parse_starred(nil), do: nil
+  defp parse_starred(val) when is_integer(val), do: val
+  defp parse_starred(true), do: 1
+  defp parse_starred(false), do: 0
+  defp parse_starred(val) when is_binary(val) do
+    case Integer.parse(val) do
+      {n, ""} -> n
+      _ -> nil
+    end
+  end
+
   # Normalize plural parent_type to singular for schema validation
   defp normalize_parent_type("sessions"), do: "session"
   defp normalize_parent_type("agents"), do: "agent"
   defp normalize_parent_type("tasks"), do: "task"
+  defp normalize_parent_type("projects"), do: "project"
   defp normalize_parent_type(type), do: type
 
   defp parse_int(nil, default), do: default

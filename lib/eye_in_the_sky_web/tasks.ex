@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Tasks.{Task, WorkflowState, Tag}
   alias EyeInTheSkyWeb.QueryHelpers
+  alias EyeInTheSkyWeb.QueryBuilder
   alias EyeInTheSkyWeb.Search.FTS5
 
   # Workflow state IDs (matches workflow_states table)
@@ -31,20 +32,12 @@ defmodule EyeInTheSkyWeb.Tasks do
   - `:state_id` - filter by workflow state ID (default: nil = all)
   """
   def list_tasks(opts \\ []) do
-    limit = Keyword.get(opts, :limit)
-    offset = Keyword.get(opts, :offset, 0)
-    state_id = Keyword.get(opts, :state_id)
-
-    query =
-      Task
-      |> preload([:state, :tags, :agents])
-      |> order_by([t], desc: t.created_at)
-
-    query = if state_id, do: where(query, [t], t.state_id == ^state_id), else: query
-    query = if limit, do: limit(query, ^limit), else: query
-    query = if offset > 0, do: offset(query, ^offset), else: query
-
-    Repo.all(query)
+    base_tasks_query(opts)
+    |> preload([:state, :tags, :agents])
+    |> order_by([t], desc: t.created_at)
+    |> QueryBuilder.maybe_limit(opts)
+    |> QueryBuilder.maybe_offset(opts)
+    |> Repo.all()
   end
 
   @doc """
@@ -54,13 +47,13 @@ defmodule EyeInTheSkyWeb.Tasks do
   - `:state_id` - filter by workflow state ID (default: nil = all)
   """
   def count_tasks(opts \\ []) do
-    state_id = Keyword.get(opts, :state_id)
+    base_tasks_query(opts)
+    |> Repo.aggregate(:count, :id)
+  end
 
-    query = Task
-
-    query = if state_id, do: where(query, [t], t.state_id == ^state_id), else: query
-
-    Repo.aggregate(query, :count, :id)
+  defp base_tasks_query(opts) do
+    Task
+    |> QueryBuilder.maybe_where(opts, :state_id)
   end
 
   @doc """

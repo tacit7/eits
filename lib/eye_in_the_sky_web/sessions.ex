@@ -12,6 +12,7 @@ defmodule EyeInTheSkyWeb.Sessions do
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Sessions.Session
   alias EyeInTheSkyWeb.Scopes.Archivable
+  alias EyeInTheSkyWeb.QueryBuilder
 
   @doc """
   Returns the list of sessions, excluding archived by default.
@@ -242,6 +243,7 @@ defmodule EyeInTheSkyWeb.Sessions do
         limit: ^limit,
         offset: ^offset
 
+
     # Apply full-text search filter
     base_query =
       if search_query != "" do
@@ -297,6 +299,40 @@ defmodule EyeInTheSkyWeb.Sessions do
   """
   def list_session_overview_rows(opts \\ []) do
     limit = Keyword.get(opts, :limit, 20)
+
+    base_session_overview_query(opts)
+    |> order_by([s], desc: s.started_at)
+    |> limit(^limit)
+    |> QueryBuilder.maybe_offset(opts)
+    |> select([s, a, p], %{
+      id: s.id,
+      uuid: s.uuid,
+      name: s.name,
+      agent_id: a.id,
+      agent_uuid: a.uuid,
+      description: s.description,
+      project_name: p.name,
+      started_at: s.started_at,
+      ended_at: s.ended_at,
+      status: s.status,
+      intent: s.intent,
+      model_provider: s.model_provider,
+      model_name: s.model_name,
+      model_version: s.model_version,
+      last_activity_at: a.last_activity_at
+    })
+    |> Repo.all()
+  end
+
+  @doc """
+  Counts sessions for overview (same filters as list_session_overview_rows, without limit/offset).
+  """
+  def count_session_overview_rows(opts \\ []) do
+    base_session_overview_query(opts)
+    |> Repo.aggregate(:count, :id)
+  end
+
+  defp base_session_overview_query(opts) do
     include_archived = Keyword.get(opts, :include_archived, false)
     project_id = Keyword.get(opts, :project_id, nil)
     search_query = Keyword.get(opts, :search_query, "")
@@ -305,98 +341,26 @@ defmodule EyeInTheSkyWeb.Sessions do
       from(s in Session,
         join: a in assoc(s, :agent),
         left_join: p in EyeInTheSkyWeb.Projects.Project,
-        on: p.id == a.project_id,
-        order_by: [desc: s.started_at],
-        limit: ^limit,
-        select: %{
-          id: s.id,
-          uuid: s.uuid,
-          name: s.name,
-          agent_id: a.id,
-          agent_uuid: a.uuid,
-          description: s.description,
-          project_name: p.name,
-          started_at: s.started_at,
-          ended_at: s.ended_at,
-          status: s.status,
-          intent: s.intent,
-          model_provider: s.model_provider,
-          model_name: s.model_name,
-          model_version: s.model_version,
-          last_activity_at: a.last_activity_at
-        }
-      )
-
-    query =
-      if include_archived do
-        query
-      else
-        where(query, [s], is_nil(s.archived_at))
-      end
-
-    query =
-      if project_id do
-        where(query, [s, a], a.project_id == ^project_id)
-      else
-        query
-      end
-
-    # Apply full-text search if query provided
-    query =
-      if search_query != "" do
-        where(
-          query,
-          [s],
-          fragment(
-            "to_tsvector('english', coalesce(?.name, '') || ' ' || coalesce(?.description, '')) @@ plainto_tsquery('english', ?)",
-            s,
-            s,
-            ^search_query
-          )
-        )
-      else
-        query
-      end
-
-    offset = Keyword.get(opts, :offset, 0)
-    query = if offset > 0, do: offset(query, ^offset), else: query
-
-    Repo.all(query)
-  end
-
-  @doc """
-  Counts sessions for overview (same filters as list_session_overview_rows, without limit/offset).
-  """
-  def count_session_overview_rows(opts \\ []) do
-    include_archived = Keyword.get(opts, :include_archived, false)
-    project_id = Keyword.get(opts, :project_id, nil)
-    search_query = Keyword.get(opts, :search_query, "")
-
-    query =
-      from(s in Session,
-        join: a in assoc(s, :agent)
+        on: p.id == a.project_id
       )
 
     query = if include_archived, do: query, else: where(query, [s], is_nil(s.archived_at))
     query = if project_id, do: where(query, [s, a], a.project_id == ^project_id), else: query
 
-    query =
-      if search_query != "" do
-        where(
-          query,
-          [s],
-          fragment(
-            "to_tsvector('english', coalesce(?.name, '') || ' ' || coalesce(?.description, '')) @@ plainto_tsquery('english', ?)",
-            s,
-            s,
-            ^search_query
-          )
+    if search_query != "" do
+      where(
+        query,
+        [s],
+        fragment(
+          "to_tsvector('english', coalesce(?.name, '') || ' ' || coalesce(?.description, '')) @@ plainto_tsquery('english', ?)",
+          s,
+          s,
+          ^search_query
         )
-      else
-        query
-      end
-
-    Repo.aggregate(query, :count, :id)
+      )
+    else
+      query
+    end
   end
 
   @doc """

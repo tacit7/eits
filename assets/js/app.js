@@ -115,11 +115,16 @@ Hooks.SortableKanban = {
     // Sortable handles DOM mutations internally; no need to destroy/recreate
   },
   _init() {
+    const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0
     this.sortable = Sortable.create(this.el, {
       group: "kanban",
       animation: 150,
       ghostClass: "opacity-30",
       draggable: "[data-task-id]",
+      handle: isTouchDevice ? "[data-drag-handle]" : null,
+      delay: isTouchDevice ? 150 : 0,
+      delayOnTouchOnly: true,
+      touchStartThreshold: 5,
       onEnd: (evt) => {
         const taskId = evt.item.dataset.taskId
         const targetCol = evt.to.closest("[data-state-id]")
@@ -175,6 +180,69 @@ Hooks.SortableColumns = {
   },
   destroyed() {
     if (this.sortable) this.sortable.destroy()
+  }
+}
+Hooks.KanbanKeyboard = {
+  mounted() {
+    this._handler = (e) => {
+      // Skip if user is typing in an input/textarea/select
+      const tag = e.target.tagName
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || e.target.isContentEditable) return
+
+      if (e.key === "n" && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault()
+        this.pushEvent("toggle_new_task_drawer", {})
+      } else if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault()
+        const searchInput = this.el.querySelector("input[name='query']")
+        if (searchInput) searchInput.focus()
+      } else if (e.key === "Escape") {
+        // Close drawers/quick-add if open
+        const detailDrawer = document.getElementById("task-detail-panel")
+        const newTaskDrawer = document.getElementById("new-task-drawer")
+        if (detailDrawer) {
+          this.pushEvent("toggle_task_detail_drawer", {})
+        } else if (newTaskDrawer && newTaskDrawer.querySelector("[data-show='true']")) {
+          this.pushEvent("toggle_new_task_drawer", {})
+        } else {
+          this.pushEvent("hide_quick_add", {})
+        }
+      }
+    }
+    document.addEventListener("keydown", this._handler)
+  },
+  destroyed() {
+    if (this._handler) document.removeEventListener("keydown", this._handler)
+  }
+}
+Hooks.KanbanScrollDots = {
+  mounted() {
+    const dots = this.el.querySelector("#kanban-dots")
+    if (!dots) return
+    const allDots = dots.querySelectorAll("[data-dot-index]")
+    const count = parseInt(this.el.dataset.columnCount) || 0
+    if (count === 0) return
+
+    const update = () => {
+      const scrollLeft = this.el.scrollLeft
+      const scrollWidth = this.el.scrollWidth - this.el.clientWidth
+      const ratio = scrollWidth > 0 ? scrollLeft / scrollWidth : 0
+      const activeIdx = Math.round(ratio * (count - 1))
+      allDots.forEach(dot => {
+        const idx = parseInt(dot.dataset.dotIndex)
+        dot.style.opacity = idx === activeIdx ? "1" : "0.3"
+        dot.style.transform = idx === activeIdx ? "scale(1.3)" : "scale(1)"
+      })
+    }
+
+    update()
+    this.el.addEventListener("scroll", update, { passive: true })
+    this._scrollHandler = update
+  },
+  destroyed() {
+    if (this._scrollHandler) {
+      this.el.removeEventListener("scroll", this._scrollHandler)
+    }
   }
 }
 Hooks.LiveStreamToggle = {
@@ -528,7 +596,7 @@ Hooks.CommandPalette = {
     this.el.addEventListener("palette:open", this._openHandler)
 
     this._globalKeyHandler = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      if (e.metaKey && e.key.toLowerCase() === "k") {
         e.preventDefault()
         this.open()
       }
@@ -792,21 +860,34 @@ const liveSocket = new LiveSocket("/live", Socket, {
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
+function showToast(message) {
+  const toast = document.createElement("div")
+  toast.className = "fixed bottom-4 right-4 z-[9999] bg-base-content text-base-100 text-xs font-medium px-4 py-2 rounded-lg shadow-lg opacity-0 transition-opacity duration-200"
+  toast.textContent = message
+  document.body.appendChild(toast)
+  requestAnimationFrame(() => { toast.style.opacity = "1" })
+  setTimeout(() => {
+    toast.style.opacity = "0"
+    setTimeout(() => toast.remove(), 200)
+  }, 2000)
+}
+
 window.addEventListener("phx:copy_to_clipboard", (e) => {
-  const { text, format } = e.detail
+  const { text, format, error } = e.detail
+
+  if (error) {
+    showToast("Failed to copy")
+    return
+  }
+
   if (!text || !navigator.clipboard) return
 
   navigator.clipboard.writeText(text).then(() => {
-    const toast = document.createElement("div")
-    toast.className = "fixed bottom-4 right-4 z-[9999] bg-base-content text-base-100 text-xs font-medium px-4 py-2 rounded-lg shadow-lg opacity-0 transition-opacity duration-200"
-    toast.textContent = `Copied as ${format}`
-    document.body.appendChild(toast)
-    requestAnimationFrame(() => { toast.style.opacity = "1" })
-    setTimeout(() => {
-      toast.style.opacity = "0"
-      setTimeout(() => toast.remove(), 200)
-    }, 2000)
-  }).catch(err => console.error("Failed to copy:", err))
+    showToast(`Copied as ${format}`)
+  }).catch(err => {
+    console.error("Failed to copy:", err)
+    showToast("Failed to copy")
+  })
 })
 
 // connect if there are any LiveViews on the page

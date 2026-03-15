@@ -38,6 +38,7 @@ import {DmComposer} from "./hooks/dm_composer"
 import {FileAttach} from "./hooks/file_attach"
 import {PushSetup} from "./push_notifications"
 import {TOUCH_DEVICE, createSwipeDetector} from "./hooks/touch_gesture"
+import {SwipeRow} from "./hooks/swipe_row"
 import {getHooks} from "live_svelte"
 import "./theme"
 import hljs from 'highlight.js'
@@ -92,6 +93,7 @@ Hooks.PushSetup = PushSetup
 Hooks.InfiniteScroll = InfiniteScroll
 Hooks.DmComposer = DmComposer
 Hooks.FileAttach = FileAttach
+Hooks.SwipeRow = SwipeRow
 Hooks.RefreshDot = {
   mounted() { this._flash() },
   updated() { this._flash() },

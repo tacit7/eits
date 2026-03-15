@@ -25,15 +25,15 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
   def session_row(assigns) do
     display_status = derive_display_status(assigns.session)
 
-    {status_color, status_bg, status_label, is_active} =
+    {status_color, status_bg, status_label, is_active, status_border} =
       case display_status do
-        "working" -> {"text-success", "bg-success", "Working", true}
-        "compacting" -> {"text-warning", "bg-warning", "Compacting", true}
-        "idle" -> {"text-base-content/55", "bg-base-content/20", "Idle", false}
-        "idle_stale" -> {"text-warning", "bg-warning", "Idle", false}
-        "idle_dead" -> {"text-error", "bg-error", "Idle", false}
-        "completed" -> {"text-base-content/50", "bg-base-content/20", "Done", false}
-        _ -> {"text-base-content/55", "bg-base-content/20", "Idle", false}
+        "working" -> {"text-success", "bg-success", "Working", true, "border-success"}
+        "compacting" -> {"text-warning", "bg-warning", "Compacting", true, "border-warning"}
+        "idle" -> {"text-base-content/55", "bg-base-content/20", "Idle", false, "border-transparent"}
+        "idle_stale" -> {"text-warning", "bg-warning", "Idle", false, "border-transparent"}
+        "idle_dead" -> {"text-error", "bg-error", "Idle", false, "border-transparent"}
+        "completed" -> {"text-base-content/50", "bg-base-content/20", "Done", false, "border-transparent"}
+        _ -> {"text-base-content/55", "bg-base-content/20", "Idle", false, "border-transparent"}
       end
 
     assigns =
@@ -42,10 +42,11 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
       |> assign(:status_bg, status_bg)
       |> assign(:status_label, status_label)
       |> assign(:is_active, is_active)
+      |> assign(:status_border, status_border)
 
     ~H"""
     <div
-      class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer"
+      class={"group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer border-l-2 " <> @status_border}
       phx-click={@click_event}
       phx-value-id={@session.id}
       role="button"

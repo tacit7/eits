@@ -958,7 +958,7 @@ function getCommands() {
           const data = await res.json()
           return (data.results || []).map(s => ({
             id: "session-" + s.uuid,
-            label: s.description || s.uuid.slice(0, 8),
+            label: s.name || s.description || s.uuid.slice(0, 8),
             icon: "hero-chat-bubble-left-right",
             group: projectId ? "Project Sessions" : "Recent",
             hint: s.status,

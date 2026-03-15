@@ -67,6 +67,6 @@ defmodule EyeInTheSkyWebWeb.Presenters.ApiPresenter do
   end
 
   def present_session(session) do
-    %{id: session.id, uuid: session.uuid, description: session.description, status: session.status}
+    %{id: session.id, uuid: session.uuid, name: session.name, description: session.description, status: session.status}
   end
 end

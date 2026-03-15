@@ -25,23 +25,20 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
   def session_row(assigns) do
     display_status = derive_display_status(assigns.session)
 
-    {status_color, status_bg, status_label, is_active, status_border} =
+    {status_label, status_border} =
       case display_status do
-        "working" -> {"text-success", "bg-success", "Working", true, "border-success"}
-        "compacting" -> {"text-warning", "bg-warning", "Compacting", true, "border-warning"}
-        "idle" -> {"text-base-content/55", "bg-base-content/20", "Idle", false, "border-transparent"}
-        "idle_stale" -> {"text-warning", "bg-warning", "Idle", false, "border-transparent"}
-        "idle_dead" -> {"text-error", "bg-error", "Idle", false, "border-transparent"}
-        "completed" -> {"text-base-content/50", "bg-base-content/20", "Done", false, "border-transparent"}
-        _ -> {"text-base-content/55", "bg-base-content/20", "Idle", false, "border-transparent"}
+        "working" -> {"Working", "border-success"}
+        "compacting" -> {"Compacting", "border-warning"}
+        "idle" -> {"Idle", "border-transparent"}
+        "idle_stale" -> {"Idle", "border-transparent"}
+        "idle_dead" -> {"Idle", "border-transparent"}
+        "completed" -> {"Done", "border-transparent"}
+        _ -> {"Idle", "border-transparent"}
       end
 
     assigns =
       assigns
-      |> assign(:status_color, status_color)
-      |> assign(:status_bg, status_bg)
       |> assign(:status_label, status_label)
-      |> assign(:is_active, is_active)
       |> assign(:status_border, status_border)
 
     ~H"""
@@ -55,7 +52,7 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
       phx-key="Enter"
       aria-label={"Open session: #{@session.name || "Unnamed session"} - #{@status_label}"}
     >
-      <%!-- Status indicator or checkbox --%>
+      <%!-- Select checkbox (archive mode only) --%>
       <%= if @select_mode do %>
         <div class="flex-shrink-0 w-6 flex justify-center">
           <input
@@ -67,8 +64,6 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
             aria-label={"Select session #{@session.name || @session.id}"}
           />
         </div>
-      <% else %>
-        <span class={"hidden sm:inline flex-shrink-0 text-xs leading-none " <> @status_color} title={@status_label}>●</span>
       <% end %>
 
       <%!-- Main content --%>

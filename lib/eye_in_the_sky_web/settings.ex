@@ -30,7 +30,9 @@ defmodule EyeInTheSkyWeb.Settings do
     "pricing_haiku_input" => "0.80",
     "pricing_haiku_output" => "4.0",
     "pricing_haiku_cache_read" => "0.08",
-    "pricing_haiku_cache_creation" => "1.00"
+    "pricing_haiku_cache_creation" => "1.00",
+    "preferred_editor" => "code",
+    "eits_workflow_enabled" => "true"
   }
 
   @doc "Get a single setting value, falling back to default."

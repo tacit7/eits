@@ -160,4 +160,18 @@ defmodule EyeInTheSkyWeb.SettingsTest do
     assert defaults["default_model"] == "sonnet"
     assert defaults["tts_voice"] == "Ava"
   end
+
+  # ---- new defaults ----
+
+  describe "defaults" do
+    test "preferred_editor defaults to code" do
+      Settings.reset("preferred_editor")
+      assert Settings.get("preferred_editor") == "code"
+    end
+
+    test "eits_workflow_enabled defaults to true" do
+      Settings.reset("eits_workflow_enabled")
+      assert Settings.get_boolean("eits_workflow_enabled") == true
+    end
+  end
 end

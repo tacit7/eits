@@ -112,8 +112,6 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
               "text-base-content"
             end
         }
-        phx-click={@on_click}
-        phx-value-task_id={@task.uuid}
       >
         {@task.title}
       </h4>

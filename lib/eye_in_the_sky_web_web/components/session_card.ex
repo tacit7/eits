@@ -45,7 +45,7 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
     ~H"""
     <div
       id={"swipe-row-#{@session.id}"}
-      class={"relative overflow-hidden bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] border-l-2 " <> @status_border}
+      class={"relative overflow-hidden bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] border-l-2 pl-2 " <> @status_border}
       phx-hook="SwipeRow"
     >
       <%!-- Action panel (mobile only, sits behind the row, revealed by swipe) --%>

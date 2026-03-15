@@ -167,6 +167,14 @@ defmodule EyeInTheSkyWebWeb.Helpers.SessionFilters do
   """
   def sort_datetime(%NaiveDateTime{} = ndt), do: ndt
   def sort_datetime(%DateTime{} = dt), do: DateTime.to_naive(dt)
+
+  def sort_datetime(str) when is_binary(str) do
+    case DateTime.from_iso8601(str) do
+      {:ok, dt, _} -> DateTime.to_naive(dt)
+      _ -> ~N[0000-01-01 00:00:00]
+    end
+  end
+
   def sort_datetime(_), do: ~N[0000-01-01 00:00:00]
 
   @doc """

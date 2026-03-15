@@ -70,9 +70,12 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="flex h-full gap-0">
+    <div class="flex h-full gap-0 flex-col sm:flex-row">
       <%!-- Team list sidebar --%>
-      <div class="w-72 border-r border-base-300 flex flex-col shrink-0">
+      <div class={[
+        "border-r border-base-300 flex flex-col flex-1 sm:flex-none w-full sm:w-72 sm:shrink-0",
+        @mobile_view == :detail && "hidden sm:flex"
+      ]}>
         <div class="px-4 py-3 border-b border-base-300 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <.icon name="hero-user-group" class="w-4 h-4 text-base-content/50" />
@@ -153,7 +156,19 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
       </div>
 
       <%!-- Team detail panel --%>
-      <div class="flex-1 overflow-y-auto min-w-0">
+      <div class={[
+        "flex-1 overflow-y-auto min-w-0 w-full",
+        @mobile_view == :list && "hidden sm:block"
+      ]}>
+        <%= if @mobile_view == :detail do %>
+          <button
+            class="sm:hidden flex items-center gap-2 px-4 py-3 text-sm text-base-content/60 border-b border-base-300 w-full hover:bg-base-200"
+            phx-click="close_team"
+          >
+            <.icon name="hero-arrow-left" class="w-4 h-4" />
+            Teams
+          </button>
+        <% end %>
         <%= if @selected_team do %>
           <.team_detail team={@selected_team} />
         <% else %>
@@ -181,11 +196,11 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
     assigns = assign(assigns, active_members: active_members, done_tasks: done_tasks, total_tasks: total_tasks)
 
     ~H"""
-    <div class="p-6 max-w-4xl space-y-6">
+    <div class="p-4 sm:p-6 max-w-4xl space-y-6">
       <%!-- Header --%>
       <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
-          <div class="flex items-center gap-3 mb-1">
+          <div class="flex items-center flex-wrap gap-3 mb-1">
             <h1 class="text-2xl font-bold text-base-content tracking-tight"><%= @team.name %></h1>
             <span class={["badge badge-sm font-medium", status_badge_class(@team.status)]}>
               <%= @team.status %>
@@ -198,7 +213,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
       </div>
 
       <%!-- Stats row --%>
-      <div class="grid grid-cols-4 gap-3">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div class="bg-base-200 rounded-lg px-4 py-3">
           <div class="text-2xl font-bold font-mono text-base-content"><%= length(@team.members) %></div>
           <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Members</div>
@@ -269,7 +284,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
                 <%= if member.session do %>
                   <.link
                     navigate={~p"/dm/#{member.session_id}"}
-                    class="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[10px] font-mono text-base-content/40 bg-base-content/5 px-2 py-1 rounded hover:text-base-content/60 transition-all shrink-0"
+                    class="sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-1 text-[10px] font-mono text-base-content/40 bg-base-content/5 px-2 py-1 rounded hover:text-base-content/60 transition-all shrink-0"
                   >
                     <%= String.slice(member.session.uuid || to_string(member.session_id), 0..7) %>
                     <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
@@ -343,7 +358,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
                     <% end %>
                     <%!-- Assign to member picker --%>
                     <select
-                      class="opacity-0 group-hover:opacity-100 text-[10px] bg-base-300 border-0 rounded px-1.5 py-0.5 text-base-content/60 cursor-pointer focus:outline-none transition-opacity"
+                      class="sm:opacity-0 sm:group-hover:opacity-100 text-[10px] bg-base-300 border-0 rounded px-1.5 py-0.5 text-base-content/60 cursor-pointer focus:outline-none transition-opacity"
                       phx-change="assign_task"
                       phx-value-task-id={task.id}
                       name="session-id"

@@ -1073,7 +1073,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               type="number"
               min="0"
               step="0.01"
-              placeholder="unlimited"
+              placeholder=""
               value={@max_budget_usd}
               phx-blur="set_max_budget"
               class="w-16 bg-transparent border-0 outline-none focus:ring-0 text-xs placeholder:text-base-content/20 font-mono p-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -1133,17 +1133,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           <% end %>
         </div>
 
-        <%!-- Center: token counter + context remaining --%>
+        <%!-- Center: context remaining --%>
         <div class="inline-flex items-center gap-2">
-          <%= if @total_tokens > 0 do %>
-            <span class="inline-flex items-center gap-1.5 text-[11px] font-mono tabular-nums text-base-content/30">
-              {format_number(@total_tokens)} tok
-              <%= if @total_cost > 0.0 do %>
-                <span class="text-base-content/20">·</span>
-                ${:erlang.float_to_binary(@total_cost * 1.0, decimals: 4)}
-              <% end %>
-            </span>
-          <% end %>
           <% remaining = max(0, @context_window - @context_used) %>
           <%= if @context_window > 0 and remaining > 0 do %>
             <% pct = Float.round(remaining / @context_window * 100, 1) %>
@@ -1163,23 +1154,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
 
         <%!-- Right: model selector + send/stop --%>
         <div class="flex items-center gap-2">
-          <%!-- Thinking toggle (opus/sonnet only) --%>
-          <%= if @selected_model in ["opus", "sonnet"] do %>
-            <button
-              type="button"
-              phx-click="toggle_thinking"
-              class={[
-                "flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
-                if(@thinking_enabled,
-                  do: "text-purple-400 bg-purple-500/15 hover:bg-purple-500/25",
-                  else: "text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5"
-                )
-              ]}
-              title={if(@thinking_enabled, do: "Extended thinking on", else: "Extended thinking off")}
-            >
-              <.icon name="hero-light-bulb" class="w-4 h-4" />
-            </button>
-          <% end %>
           <%!-- Model selector --%>
           <div
             class="dropdown dropdown-top dropdown-end"

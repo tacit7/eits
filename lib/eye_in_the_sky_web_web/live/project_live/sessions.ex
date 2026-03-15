@@ -34,6 +34,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         |> assign(:depths, %{})
         |> assign(:visible_count, @page_size)
         |> assign(:has_more, false)
+        |> assign(:editing_session_id, nil)
         |> load_agents()
 
       {:ok, socket}
@@ -341,6 +342,36 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   def handle_event("noop", _params, socket), do: {:noreply, socket}
 
   @impl true
+  def handle_event("rename_session", %{"session_id" => session_id}, socket) do
+    {:noreply, assign(socket, :editing_session_id, String.to_integer(session_id))}
+  end
+
+  @impl true
+  def handle_event("save_session_name", %{"session_id" => session_id, "name" => name}, socket) do
+    name = String.trim(name)
+
+    socket =
+      if name != "" do
+        case Sessions.get_session(session_id) do
+          {:ok, session} ->
+            Sessions.update_session(session, %{name: name})
+            socket
+          _ ->
+            socket
+        end
+      else
+        socket
+      end
+
+    {:noreply, assign(socket, :editing_session_id, nil)}
+  end
+
+  @impl true
+  def handle_event("cancel_rename", _params, socket) do
+    {:noreply, assign(socket, :editing_session_id, nil)}
+  end
+
+  @impl true
   def handle_info({:agent_updated, _agent}, socket) do
     {:noreply, load_agents(socket)}
   end
@@ -611,6 +642,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
                   session={agent}
                   select_mode={@session_filter == "archived"}
                   selected={MapSet.member?(@selected_ids, to_string(agent.id))}
+                  editing_session_id={@editing_session_id}
                 >
                   <:actions>
                     <%= if agent.id do %>

@@ -25,6 +25,7 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
       |> assign(:has_more, length(sessions) < total)
       |> assign(:total_sessions, total)
       |> assign(:show_new_session_modal, false)
+      |> assign(:editing_session_id, nil)
       |> stream(:sessions, sessions, dom_id: fn s -> "si-#{s.uuid}" end)
 
     {:ok, socket}
@@ -62,6 +63,56 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
 
   @impl true
   def handle_event("noop", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_event("rename_session", %{"session_id" => session_id}, socket) do
+    {:noreply, assign(socket, :editing_session_id, String.to_integer(session_id))}
+  end
+
+  @impl true
+  def handle_event("save_session_name", %{"session_id" => session_id, "name" => name}, socket) do
+    name = String.trim(name)
+
+    socket =
+      if name != "" do
+        case Sessions.get_session(session_id) do
+          {:ok, session} ->
+            Sessions.update_session(session, %{name: name})
+            socket
+          _ ->
+            socket
+        end
+      else
+        socket
+      end
+
+    {:noreply, assign(socket, :editing_session_id, nil)}
+  end
+
+  @impl true
+  def handle_event("cancel_rename", _params, socket) do
+    {:noreply, assign(socket, :editing_session_id, nil)}
+  end
+
+  @impl true
+  def handle_event("archive_session", %{"session_id" => session_id}, socket) do
+    with {:ok, session} <- Sessions.get_session(session_id),
+         {:ok, _} <- Sessions.archive_session(session) do
+      sessions = Sessions.list_session_overview_rows(limit: socket.assigns.page * @per_page, offset: 0)
+      total = Sessions.count_session_overview_rows()
+
+      socket =
+        socket
+        |> assign(:has_more, length(sessions) < total)
+        |> assign(:total_sessions, total)
+        |> stream(:sessions, sessions, reset: true)
+        |> put_flash(:info, "Session archived")
+
+      {:noreply, socket}
+    else
+      {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to archive session")}
+    end
+  end
 
   @impl true
   def handle_event("toggle_new_session_modal", _params, socket) do
@@ -163,6 +214,7 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
                 session={session}
                 project_name={session.project_name}
                 click_event="navigate_dm"
+                editing_session_id={@editing_session_id}
               />
             </div>
           </div>

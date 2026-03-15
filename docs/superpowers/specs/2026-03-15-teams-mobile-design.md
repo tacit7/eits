@@ -24,35 +24,53 @@ Add one new assign to `mount/3`:
 
 Type: `:list | :detail`
 
+## State Transition Helpers
+
+To prevent `mobile_view` drifting out of sync with `selected_team`, centralize all
+selection state changes into two private helpers. All event handlers and PubSub callbacks
+must use these instead of assigning directly.
+
+```elixir
+defp show_team_detail(socket, team_id, team) do
+  socket
+  |> assign(:selected_team_id, team_id)
+  |> assign(:selected_team, team)
+  |> assign(:mobile_view, :detail)
+end
+
+defp show_team_list(socket) do
+  socket
+  |> assign(:selected_team_id, nil)
+  |> assign(:selected_team, nil)
+  |> assign(:mobile_view, :list)
+end
+```
+
 ## Event Handler Changes
 
-**`select_team`** — only new line is `|> assign(:mobile_view, :detail)`. All other logic is unchanged:
+All handlers must use the helpers above — never assign `selected_team`, `selected_team_id`, or `mobile_view` directly in handler bodies.
+
+**`select_team`** — replace direct assigns with `show_team_detail/3`:
 
 ```elixir
 @impl true
 def handle_event("select_team", %{"id" => id}, socket) do
   team_id = String.to_integer(id)
   team = Teams.get_team!(team_id) |> load_team_detail()
-  {:noreply, socket
-   |> assign(:selected_team_id, team_id)
-   |> assign(:selected_team, team)
-   |> assign(:mobile_view, :detail)}
+  {:noreply, show_team_detail(socket, team_id, team)}
 end
 ```
 
-**`close_team`** — only new line is `|> assign(:mobile_view, :list)`. All other logic is unchanged:
+**`close_team`** — replace direct assigns with `show_team_list/1`:
 
 ```elixir
 @impl true
 def handle_event("close_team", _params, socket) do
-  {:noreply, socket
-   |> assign(:selected_team_id, nil)
-   |> assign(:selected_team, nil)
-   |> assign(:mobile_view, :list)}
+  {:noreply, show_team_list(socket)}
 end
 ```
 
-**`maybe_refresh_selected_team/1`** — replace the entire non-nil function clause (the second clause). The nil function clause is left as-is. Only the `nil ->` arm of the `case` inside the non-nil clause changes — add `|> assign(:mobile_view, :list)`:
+**`maybe_refresh_selected_team/1`** — replace the entire non-nil function clause (second clause). Nil clause is unchanged:
 
 ```elixir
 # Leave this clause unchanged:
@@ -61,13 +79,8 @@ defp maybe_refresh_selected_team(%{assigns: %{selected_team_id: nil}} = socket),
 # Replace this entire clause with:
 defp maybe_refresh_selected_team(%{assigns: %{selected_team_id: id}} = socket) do
   case Teams.get_team(id) do
-    nil ->
-      socket
-      |> assign(:selected_team_id, nil)
-      |> assign(:selected_team, nil)
-      |> assign(:mobile_view, :list)
-    team ->
-      assign(socket, :selected_team, load_team_detail(team))
+    nil -> show_team_list(socket)
+    team -> assign(socket, :selected_team, load_team_detail(team))
   end
 end
 ```

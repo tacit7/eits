@@ -23,7 +23,8 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
      |> assign(:show_archived, false)
      |> assign(:teams, load_teams(false))
      |> assign(:selected_team_id, nil)
-     |> assign(:selected_team, nil)}
+     |> assign(:selected_team, nil)
+     |> assign(:mobile_view, :list)}
   end
 
   @impl true
@@ -39,12 +40,12 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   def handle_event("select_team", %{"id" => id}, socket) do
     team_id = String.to_integer(id)
     team = Teams.get_team!(team_id) |> load_team_detail()
-    {:noreply, socket |> assign(:selected_team_id, team_id) |> assign(:selected_team, team)}
+    {:noreply, show_team_detail(socket, team_id, team)}
   end
 
   @impl true
   def handle_event("close_team", _params, socket) do
-    {:noreply, socket |> assign(:selected_team_id, nil) |> assign(:selected_team, nil)}
+    {:noreply, show_team_list(socket)}
   end
 
   @impl true
@@ -422,9 +423,23 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
 
   defp maybe_refresh_selected_team(%{assigns: %{selected_team_id: id}} = socket) do
     case Teams.get_team(id) do
-      nil -> socket |> assign(:selected_team_id, nil) |> assign(:selected_team, nil)
+      nil -> show_team_list(socket)
       team -> assign(socket, :selected_team, load_team_detail(team))
     end
+  end
+
+  defp show_team_detail(socket, team_id, team) do
+    socket
+    |> assign(:selected_team_id, team_id)
+    |> assign(:selected_team, team)
+    |> assign(:mobile_view, :detail)
+  end
+
+  defp show_team_list(socket) do
+    socket
+    |> assign(:selected_team_id, nil)
+    |> assign(:selected_team, nil)
+    |> assign(:mobile_view, :list)
   end
 
   defp active_member_count(members), do: Enum.count(members, &(&1.status == "active"))

@@ -169,6 +169,17 @@
               class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm resize-none"
             ></textarea>
           </div>
+          <div>
+            <label class="sr-only" for="qct-tags">Tags</label>
+            <input
+              id="qct-tags"
+              type="text"
+              data-qct-tags
+              placeholder="tag1, tag2, tag3"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm"
+              autocomplete="off"
+            />
+          </div>
           <div class="flex justify-end gap-2 pt-1">
             <button data-qct-cancel type="button" class="btn btn-ghost btn-sm">Cancel</button>
             <button type="submit" class="btn btn-primary btn-sm">Create Task</button>

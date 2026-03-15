@@ -615,12 +615,14 @@ Hooks.QuickCreateTask = {
     if (!title) return
 
     const description = (this.el.querySelector("[data-qct-description]")?.value || "").trim()
+    const tagsRaw = (this.el.querySelector("[data-qct-tags]")?.value || "").trim()
+    const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : []
 
     try {
       const res = await fetch("/api/v1/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description, state_id: 1 })
+        body: JSON.stringify({ title, description, tags, state_id: 1 })
       })
       if (res.ok) {
         this.el.close()
@@ -637,8 +639,10 @@ Hooks.QuickCreateTask = {
   _reset() {
     const t = this.el.querySelector("[data-qct-title]")
     const d = this.el.querySelector("[data-qct-description]")
+    const g = this.el.querySelector("[data-qct-tags]")
     if (t) t.value = ""
     if (d) d.value = ""
+    if (g) g.value = ""
   }
 }
 

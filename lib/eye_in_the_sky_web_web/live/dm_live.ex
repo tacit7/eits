@@ -304,6 +304,22 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_event("update_session_name", %{"value" => value}, socket) do
+    session = socket.assigns.session
+    value = String.trim(value)
+    Sessions.update_session(session, %{name: if(value == "", do: nil, else: value)})
+    {:noreply, assign(socket, :session, %{session | name: value})}
+  end
+
+  @impl true
+  def handle_event("update_session_description", %{"value" => value}, socket) do
+    session = socket.assigns.session
+    value = String.trim(value)
+    Sessions.update_session(session, %{description: if(value == "", do: nil, else: value)})
+    {:noreply, assign(socket, :session, %{session | description: value})}
+  end
+
+  @impl true
   def handle_event("toggle_effort_menu", _params, socket) do
     {:noreply, assign(socket, :show_effort_menu, !socket.assigns.show_effort_menu)}
   end
@@ -1107,7 +1123,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   defp upload_destination(client_name) do
-    base_upload_dir = Path.join([System.user_home!(), ".config", "eye-in-the-sky", "uploads"])
+    base_upload_dir = Path.join([:code.priv_dir(:eye_in_the_sky_web), "static", "uploads", "dm"])
     date_dir = Date.utc_today() |> Date.to_string()
     filename = "#{Ecto.UUID.generate()}#{Path.extname(client_name)}"
 
@@ -1220,8 +1236,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         show_create_checkpoint={@show_create_checkpoint}
       />
 
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.NewTaskDrawer}
+    <EyeInTheSkyWebWeb.Components.NewTaskDrawer.new_task_drawer
       id="dm-new-task-drawer"
       show={@show_new_task_drawer}
       workflow_states={@workflow_states}
@@ -1229,8 +1244,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       submit_event="create_new_task"
     />
 
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.TaskDetailDrawer}
+    <EyeInTheSkyWebWeb.Components.TaskDetailDrawer.task_detail_drawer
       id="dm-task-detail-drawer"
       show={@show_task_detail_drawer}
       task={@selected_task}

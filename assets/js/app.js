@@ -696,105 +696,130 @@ Hooks.CommandPalette = {
   mounted() {
     this.input = this.el.querySelector("[data-palette-input]")
     this.results = this.el.querySelector("[data-palette-results]")
-    this.items = []
-    this.visibleItems = []
+    this.breadcrumb = this.el.querySelector("[data-palette-breadcrumb]")
+    this.stack = []
     this.activeIndex = 0
+    this.visibleItems = []
 
-    this._openHandler = () => this.open()
-    this.el.addEventListener("palette:open", this._openHandler)
+    this._isMac = navigator.userAgentData
+      ? navigator.userAgentData.platform === "macOS"
+      : navigator.platform.toUpperCase().includes("MAC")
 
     this._globalKeyHandler = (e) => {
-      if (e.metaKey && e.key.toLowerCase() === "k") {
+      if ((this._isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "k") {
+        const inEditor = document.activeElement?.closest(".cm-editor, .monaco-editor, [data-palette-no-intercept]")
+        if (inEditor) return
         e.preventDefault()
         this.open()
       }
     }
     window.addEventListener("keydown", this._globalKeyHandler)
 
-    this._debouncedRender = debounce(() => this.render(), 90)
-    this.input?.addEventListener("input", this._debouncedRender)
+    this._openHandler = () => this.open()
+    this.el.addEventListener("palette:open", this._openHandler)
+
+    this.input?.addEventListener("input", () => {
+      this.activeIndex = 0
+      this.render()
+    })
     this.input?.addEventListener("keydown", (e) => this.onInputKeydown(e))
 
     this._resultsClickHandler = (e) => {
       const btn = e.target.closest("button[data-index]")
       if (!btn) return
       const idx = Number(btn.dataset.index)
-      this.navigate(this.visibleItems[idx])
+      const cmd = this.visibleItems[idx]
+      if (cmd) this.activate(cmd)
     }
     this.results?.addEventListener("click", this._resultsClickHandler)
   },
 
   destroyed() {
-    if (this._debouncedRender?.cancel) {
-      this._debouncedRender.cancel()
-    }
-    this.input?.removeEventListener("input", this._debouncedRender)
     window.removeEventListener("keydown", this._globalKeyHandler)
     this.el.removeEventListener("palette:open", this._openHandler)
     this.results?.removeEventListener("click", this._resultsClickHandler)
   },
 
   open() {
-    this.collectItems()
+    this.stack = []
     this.activeIndex = 0
     this.el.showModal()
     if (this.input) {
       this.input.value = ""
       this.input.focus()
     }
+    this.updateBreadcrumb()
     this.render()
   },
 
-  collectItems() {
-    const staticItems = [
-      { label: "Sessions", href: "/", group: "Workspace" },
-      { label: "Tasks", href: "/tasks", group: "Workspace" },
-      { label: "Notes", href: "/notes", group: "Workspace" },
-      { label: "Usage", href: "/usage", group: "Insights" },
-      { label: "Prompts", href: "/prompts", group: "Knowledge" },
-      { label: "Skills", href: "/skills", group: "Knowledge" },
-      { label: "Notifications", href: "/notifications", group: "Knowledge" },
-      { label: "Jobs", href: "/jobs", group: "System" },
-      { label: "Settings", href: "/settings", group: "System" }
-    ]
-
-    const sidebarLinks = [...document.querySelectorAll("#app-sidebar a[href]")]
-      .map((a) => ({
-        label: (a.textContent || "").trim().replace(/\s+/g, " "),
-        href: a.getAttribute("href")
-      }))
-      .filter((item) => item.label && item.href && item.href !== "#")
-      .map((item) => ({
-        ...item,
-        group: this.groupForHref(item.href)
-      }))
-
-    const deduped = new Map()
-    for (const item of [...staticItems, ...sidebarLinks]) {
-      const key = `${item.label}|${item.href}`
-      deduped.set(key, item)
-    }
-    this.items = [...deduped.values()]
+  activeCommands() {
+    if (this.stack.length === 0) return getCommands()
+    return this.stack[this.stack.length - 1].commands
   },
 
   filteredItems() {
     const q = (this.input?.value || "").trim().toLowerCase()
+    const cmds = this.activeCommands().filter(cmd => !cmd.when || cmd.when())
+
     if (!q) {
-      const recent = this.loadRecent()
-      const byHref = new Map(this.items.map((item) => [item.href, item]))
-      const recentItems = recent
-        .map((r) => byHref.get(r.href))
-        .filter(Boolean)
-      const seen = new Set(recentItems.map((item) => `${item.label}|${item.href}`))
-      const rest = this.items.filter((item) => !seen.has(`${item.label}|${item.href}`))
-      return [...recentItems, ...rest].slice(0, 40)
+      if (this.stack.length === 0) {
+        const recent = this.loadRecent()
+        const byHref = new Map(cmds.filter(c => c.type === "navigate").map(c => [c.href, c]))
+        const recentItems = recent
+          .map(r => byHref.get(r.href))
+          .filter(Boolean)
+          .filter(cmd => !cmd.when || cmd.when())
+        const recentHrefs = new Set(recentItems.map(c => c.href))
+        const rest = cmds.filter(c => !recentHrefs.has(c.href))
+        return [...recentItems, ...rest].slice(0, 40)
+      }
+      return cmds.slice(0, 40)
     }
 
-    return this.items
-      .map((item) => ({...item, _score: this.scoreItem(item, q)}))
-      .filter((item) => item._score > 0)
-      .sort((a, b) => b._score - a._score || a.label.localeCompare(b.label))
+    return cmds
+      .map(cmd => {
+        const positions = this.fuzzyPositions(cmd.label, q)
+        return { cmd, score: this.scoreCmd(cmd, q, positions), positions }
+      })
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score || a.cmd.label.localeCompare(b.cmd.label))
       .slice(0, 40)
+      .map(({ cmd, positions }) => ({ ...cmd, _matchPositions: positions }))
+  },
+
+  scoreCmd(cmd, q, positions) {
+    const label = cmd.label.toLowerCase()
+    let score = 0
+
+    if (label === q) score += 200
+    if (label.startsWith(q)) score += 100
+    if (label.includes(q)) score += 50
+
+    if (positions !== null) {
+      score += 60
+      let consecutive = 0
+      for (let i = 1; i < positions.length; i++) {
+        if (positions[i] === positions[i - 1] + 1) consecutive++
+      }
+      score += consecutive * 2
+    }
+
+    const kws = (cmd.keywords || []).join(" ").toLowerCase()
+    if (kws && kws.includes(q)) score += 30
+    if (cmd.hint && cmd.hint.toLowerCase().includes(q)) score += 15
+    if (cmd.group && cmd.group.toLowerCase().includes(q)) score += 10
+
+    return score
+  },
+
+  fuzzyPositions(label, q) {
+    const lc = label.toLowerCase()
+    const positions = []
+    let qi = 0
+    for (let i = 0; i < lc.length && qi < q.length; i++) {
+      if (lc[i] === q[qi]) { positions.push(i); qi++ }
+    }
+    return qi === q.length ? positions : null
   },
 
   render() {
@@ -808,119 +833,152 @@ Hooks.CommandPalette = {
       return
     }
 
-    let idx = 0
-    const grouped = this.groupItems(items)
-    this.results.innerHTML = grouped.map((section) => {
-      const buttons = section.items.map((item) => {
-        const buttonIndex = idx
-        idx += 1
-        return `
-          <button
-            type="button"
-            data-index="${buttonIndex}"
-            role="option"
-            aria-selected="${buttonIndex === this.activeIndex}"
-            class="w-full text-left rounded-lg px-3 py-2.5 text-sm transition-colors ${buttonIndex === this.activeIndex ? "bg-base-200 text-base-content" : "hover:bg-base-200/70 text-base-content/80"}"
-          >
-            <div class="font-medium truncate">${this.escapeHtml(item.label)}</div>
-            <div class="text-[11px] text-base-content/45 truncate">${this.escapeHtml(item.href)}</div>
-          </button>
-        `
-      }).join("")
+    const q = (this.input?.value || "").trim()
+    const grouped = !q && this.stack.length === 0
 
-      return `
-        <section class="px-1 py-1">
-          <h3 class="px-2 py-1 text-[10px] uppercase tracking-wider text-base-content/40">${this.escapeHtml(section.group)}</h3>
-          <div class="space-y-1">${buttons}</div>
-        </section>
-      `
-    }).join("")
+    this.results.innerHTML = grouped ? this.renderGrouped(items) : this.renderFlat(items)
 
     const active = this.results.querySelector(`button[data-index="${this.activeIndex}"]`)
-    if (active) active.scrollIntoView({block: "nearest"})
+    if (active) active.scrollIntoView({ block: "nearest" })
+  },
+
+  renderGrouped(items) {
+    const groupOrder = ["Workspace", "Projects", "Tasks", "Insights", "Knowledge", "Communication", "System"]
+    const groups = new Map()
+    for (const item of items) {
+      const g = item.group || "Other"
+      if (!groups.has(g)) groups.set(g, [])
+      groups.get(g).push(item)
+    }
+
+    let idx = 0
+    return [...groups.entries()]
+      .sort((a, b) => {
+        const ai = groupOrder.indexOf(a[0])
+        const bi = groupOrder.indexOf(b[0])
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi) || a[0].localeCompare(b[0])
+      })
+      .map(([group, groupItems]) => {
+        const buttons = groupItems.map(item => this.renderRow(item, idx++, null)).join("")
+        return `<section class="px-1 py-1"><h3 class="px-2 py-1 text-[10px] uppercase tracking-wider text-base-content/40">${this.escapeHtml(group)}</h3><div>${buttons}</div></section>`
+      }).join("")
+  },
+
+  renderFlat(items) {
+    return `<div class="px-1 py-1">${items.map((item, i) => this.renderRow(item, i, item._matchPositions || null)).join("")}</div>`
+  },
+
+  renderRow(item, idx, matchPositions) {
+    const isActive = idx === this.activeIndex
+    const labelHtml = matchPositions
+      ? this.highlightLabel(item.label, new Set(matchPositions))
+      : this.escapeHtml(item.label)
+
+    const hintHtml = item.hint
+      ? `<div class="text-xs text-base-content/45 truncate">${this.escapeHtml(item.hint)}</div>`
+      : ""
+
+    const shortcutHtml = item.shortcut
+      ? item.shortcut.split(" ").map(k => `<kbd class="text-[10px] px-1 py-0.5 rounded border border-base-content/20 text-base-content/50">${this.escapeHtml(k)}</kbd>`).join(" ")
+      : ""
+
+    const chevronHtml = item.type === "submenu"
+      ? `<span class="hero-chevron-right w-3 h-3 text-base-content/40 shrink-0"></span>`
+      : ""
+
+    const rightHtml = (shortcutHtml || chevronHtml)
+      ? `<div class="flex items-center gap-1 ml-2 shrink-0">${shortcutHtml}${chevronHtml}</div>`
+      : ""
+
+    return `<button type="button" data-index="${idx}" role="option" aria-selected="${isActive}" class="w-full text-left rounded-lg px-3 py-2 text-sm flex items-center gap-2 transition-colors ${isActive ? "bg-base-200 text-base-content" : "hover:bg-base-200/70 text-base-content/80"}"><span class="${this.escapeHtml(item.icon)} w-4 h-4 shrink-0 text-base-content/50"></span><div class="flex-1 min-w-0"><div class="font-medium truncate">${labelHtml}</div>${hintHtml}</div>${rightHtml}</button>`
+  },
+
+  highlightLabel(label, matchedPositions) {
+    return [...label].map((char, i) =>
+      matchedPositions.has(i)
+        ? `<mark class="bg-transparent text-primary font-semibold">${this.escapeHtml(char)}</mark>`
+        : this.escapeHtml(char)
+    ).join("")
+  },
+
+  updateBreadcrumb() {
+    if (!this.breadcrumb) return
+    if (this.stack.length === 0) {
+      this.breadcrumb.classList.add("hidden")
+      this.breadcrumb.textContent = ""
+    } else {
+      this.breadcrumb.classList.remove("hidden")
+      this.breadcrumb.textContent = ["Commands", ...this.stack.map(s => s.label)].join(" › ")
+    }
   },
 
   onInputKeydown(e) {
-    const items = this.visibleItems
+    const items = this.visibleItems || []
+    const len = Math.max(items.length, 1)
+
     if (e.key === "ArrowDown") {
       e.preventDefault()
-      this.activeIndex = Math.min(this.activeIndex + 1, Math.max(items.length - 1, 0))
+      this.activeIndex = (this.activeIndex + 1) % len
       this.render()
     } else if (e.key === "ArrowUp") {
       e.preventDefault()
-      this.activeIndex = Math.max(this.activeIndex - 1, 0)
+      this.activeIndex = (this.activeIndex - 1 + len) % len
       this.render()
     } else if (e.key === "Enter") {
       e.preventDefault()
-      if (items[this.activeIndex]) this.navigate(items[this.activeIndex])
+      const cmd = items[this.activeIndex]
+      if (cmd) this.activate(cmd)
     } else if (e.key === "Escape") {
+      e.preventDefault()
+      if (this.stack.length > 0) {
+        this.stack.pop()
+        this.activeIndex = 0
+        if (this.input) this.input.value = ""
+        this.updateBreadcrumb()
+        this.render()
+      } else {
+        this.el.close()
+      }
+    } else if (e.key === "Backspace" && !e.isComposing) {
+      if ((this.input?.value || "") === "" && this.stack.length > 0) {
+        e.preventDefault()
+        this.stack.pop()
+        this.activeIndex = 0
+        this.updateBreadcrumb()
+        this.render()
+      }
+    }
+  },
+
+  activate(cmd) {
+    if (cmd.type === "navigate") {
+      this.saveRecent(cmd)
       this.el.close()
+      window.location.assign(cmd.href)
+    } else if (cmd.type === "callback") {
+      this.el.close()
+      cmd.fn()
+    } else if (cmd.type === "submenu") {
+      const resolved = typeof cmd.commands === "function" ? cmd.commands() : cmd.commands
+      this.stack.push({ id: cmd.id, label: cmd.label, commands: resolved })
+      this.activeIndex = 0
+      if (this.input) this.input.value = ""
+      this.updateBreadcrumb()
+      this.render()
     }
-  },
-
-  navigate(item) {
-    if (!item?.href) return
-    this.saveRecent(item)
-    window.location.assign(item.href)
-  },
-
-  groupForHref(href) {
-    if (href.startsWith("/projects/")) return "Projects"
-    if (href.startsWith("/chat")) return "Communication"
-    if (href.startsWith("/settings") || href.startsWith("/jobs") || href.startsWith("/config")) return "System"
-    if (href.startsWith("/usage")) return "Insights"
-    if (href.startsWith("/prompts") || href.startsWith("/skills") || href.startsWith("/notes") || href.startsWith("/notifications")) return "Knowledge"
-    return "Workspace"
-  },
-
-  groupItems(items) {
-    const groupOrder = ["Workspace", "Projects", "Insights", "Knowledge", "Communication", "System"]
-    const groups = new Map()
-    for (const item of items) {
-      const group = item.group || this.groupForHref(item.href)
-      if (!groups.has(group)) groups.set(group, [])
-      groups.get(group).push(item)
-    }
-
-    return [...groups.entries()]
-      .sort((a, b) => {
-        const aIndex = groupOrder.indexOf(a[0])
-        const bIndex = groupOrder.indexOf(b[0])
-        const left = aIndex === -1 ? 999 : aIndex
-        const right = bIndex === -1 ? 999 : bIndex
-        return left - right || a[0].localeCompare(b[0])
-      })
-      .map(([group, groupedItems]) => ({group, items: groupedItems}))
-  },
-
-  scoreItem(item, q) {
-    const label = item.label.toLowerCase()
-    const href = item.href.toLowerCase()
-    let score = 0
-
-    if (label === q) score += 120
-    if (label.startsWith(q)) score += 90
-    if (label.includes(q)) score += 50
-    if (href.startsWith(q)) score += 35
-    if (href.includes(q)) score += 20
-    if (item.group && item.group.toLowerCase().includes(q)) score += 10
-
-    return score
   },
 
   loadRecent() {
     try {
       const parsed = JSON.parse(localStorage.getItem("command_palette_recent") || "[]")
       return Array.isArray(parsed) ? parsed : []
-    } catch (_) {
-      return []
-    }
+    } catch (_) { return [] }
   },
 
-  saveRecent(item) {
-    const now = Date.now()
-    const existing = this.loadRecent().filter((entry) => entry.href !== item.href)
-    const next = [{label: item.label, href: item.href, at: now}, ...existing].slice(0, 8)
+  saveRecent(cmd) {
+    if (cmd.type !== "navigate") return
+    const existing = this.loadRecent().filter(e => e.href !== cmd.href)
+    const next = [{ id: cmd.id, label: cmd.label, href: cmd.href, at: Date.now() }, ...existing].slice(0, 8)
     localStorage.setItem("command_palette_recent", JSON.stringify(next))
   },
 

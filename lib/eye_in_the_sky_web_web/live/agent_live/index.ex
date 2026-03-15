@@ -541,9 +541,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
         <% end %>
       </div>
 
-      <div class="flex-shrink-0">
-        <.icon name="hero-chevron-right-mini" class="w-4 h-4 text-base-content/20" />
-      </div>
     </div>
     """
   end

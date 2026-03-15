@@ -585,6 +585,64 @@ Hooks.DrawerSwipeClose = {
 }
 
 // ---------------------------------------------------------------------------
+// QuickCreateTask — global task creation dialog, triggered by palette:create-task
+// ---------------------------------------------------------------------------
+
+Hooks.QuickCreateTask = {
+  mounted() {
+    this._openHandler = () => {
+      this.el.showModal()
+      this.el.querySelector("[data-qct-title]")?.focus()
+    }
+    window.addEventListener("palette:create-task", this._openHandler)
+
+    this.el.querySelector("[data-qct-form]")?.addEventListener("submit", (e) => {
+      e.preventDefault()
+      this._submit()
+    })
+
+    this.el.querySelectorAll("[data-qct-cancel]").forEach(btn =>
+      btn.addEventListener("click", () => this.el.close())
+    )
+  },
+
+  destroyed() {
+    window.removeEventListener("palette:create-task", this._openHandler)
+  },
+
+  async _submit() {
+    const title = (this.el.querySelector("[data-qct-title]")?.value || "").trim()
+    if (!title) return
+
+    const description = (this.el.querySelector("[data-qct-description]")?.value || "").trim()
+
+    try {
+      const res = await fetch("/api/v1/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, description, state_id: 1 })
+      })
+      if (res.ok) {
+        this.el.close()
+        this._reset()
+        showToast("Task created")
+      } else {
+        showToast("Failed to create task")
+      }
+    } catch (_) {
+      showToast("Failed to create task")
+    }
+  },
+
+  _reset() {
+    const t = this.el.querySelector("[data-qct-title]")
+    const d = this.el.querySelector("[data-qct-description]")
+    if (t) t.value = ""
+    if (d) d.value = ""
+  }
+}
+
+// ---------------------------------------------------------------------------
 // CommandRegistry — flat discriminated union of all palette commands
 // ---------------------------------------------------------------------------
 
@@ -611,7 +669,7 @@ function getCommands() {
       keywords: ["new", "add", "todo"],
       shortcut: null,
       type: "callback",
-      fn: () => { window.location.assign("/tasks?intent=create") },
+      fn: () => { window.dispatchEvent(new CustomEvent("palette:create-task")) },
       when: null
     },
     {

@@ -116,10 +116,12 @@ Change the outer `<div>` of the team list sidebar:
 
 <%!-- After --%>
 <div class={[
-  "border-r border-base-300 flex flex-col w-full sm:w-72 sm:shrink-0",
+  "border-r border-base-300 flex flex-col flex-1 sm:flex-none w-full sm:w-72 sm:shrink-0",
   @mobile_view == :detail && "hidden sm:flex"
 ]}>
 ```
+
+Note: `flex-1 sm:flex-none` is required so the list panel fills the `flex-col` outer container's height on mobile. Without it, the panel collapses to content height and the inner `overflow-y-auto` scroll never activates.
 
 ### Detail panel + back button
 

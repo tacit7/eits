@@ -51,7 +51,7 @@ defmodule EyeInTheSkyWebWeb.Router do
   end
 
   scope "/", EyeInTheSkyWebWeb do
-    pipe_through [:browser, :require_auth]
+    pipe_through [:browser]
 
     live_session :app,
                  on_mount: [

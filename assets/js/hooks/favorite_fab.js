@@ -381,13 +381,18 @@ export const FavoriteFab = {
       })
     })
 
-    // Agent buttons: click opens chat
+    // Agent buttons: navigate to DM on mobile, open chat on desktop
     agentEls.forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault()
         e.stopPropagation()
         const agent = this._agentMap[parseInt(btn.dataset.agentIndex, 10)]
-        if (agent) this._openChat(agent)
+        if (!agent) return
+        if (window.innerWidth < 640) {
+          window.location.href = `/dm/${agent.session_id}`
+        } else {
+          this._openChat(agent)
+        }
       })
     })
   }

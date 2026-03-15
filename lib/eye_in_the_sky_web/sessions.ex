@@ -240,7 +240,7 @@ defmodule EyeInTheSkyWeb.Sessions do
         join: a in assoc(s, :agent),
         where: is_nil(s.archived_at),
         preload: [agent: a],
-        order_by: [desc: s.started_at],
+        order_by: [desc_nulls_last: s.last_activity_at, desc: s.started_at],
         limit: ^limit,
         offset: ^offset
 

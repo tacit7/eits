@@ -284,7 +284,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
         do: Keyword.put(opts, :project_id, parse_int(params["project_id"], nil)),
         else: opts
 
-    opts = if params["status"], do: Keyword.put(opts, :status, params["status"]), else: opts
+    opts = if params["status"], do: Keyword.put(opts, :status_filter, params["status"]), else: opts
 
     results = Sessions.list_sessions_filtered(opts) |> Enum.take(limit)
 

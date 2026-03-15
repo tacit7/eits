@@ -118,7 +118,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              effort_level: opts[:effort_level],
              max_budget_usd: opts[:max_budget_usd],
              worktree: opts[:worktree],
-             agent: opts[:agent]
+             agent: opts[:agent],
+             eits_workflow: opts[:eits_workflow]
            ) do
         :ok ->
           Logger.info(

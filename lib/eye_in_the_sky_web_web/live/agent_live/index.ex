@@ -310,6 +310,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
         v -> String.trim(v)
       end
 
+    eits_workflow = params["eits_workflow"] || "1"
+
     opts = [
       agent_type: agent_type,
       model: model,
@@ -320,7 +322,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       description: agent_name,
       instructions: description,
       worktree: worktree,
-      agent: params["agent"]
+      agent: params["agent"],
+      eits_workflow: eits_workflow
     ]
 
     Logger.info(

@@ -208,6 +208,13 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
               </p>
             </div>
 
+            <%!-- EITS Workflow --%>
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+              <input type="hidden" name="eits_workflow" value="0" />
+              <input type="checkbox" name="eits_workflow" value="1" class="checkbox checkbox-sm" checked />
+              <span class="text-sm text-base-content/70">EITS Workflow</span>
+            </label>
+
             <%!-- Submit --%>
             <button type="submit" class="btn btn-primary w-full mt-2">
               {assigns[:button_text] || "Create Agent"}

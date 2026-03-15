@@ -506,6 +506,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       use_script: true,
       eits_session_id: state.session_uuid,
       eits_agent_id: state.agent_id,
+      eits_workflow: context[:eits_workflow] || "1",
       worktree: state.worktree,
       agent: context[:agent]
     ]
@@ -630,7 +631,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       channel_id: Map.get(context, :channel_id),
       thinking_budget: Map.get(context, :thinking_budget),
       max_budget_usd: Map.get(context, :max_budget_usd),
-      agent: Map.get(context, :agent)
+      agent: Map.get(context, :agent),
+      eits_workflow: Map.get(context, :eits_workflow, "1")
     }
   end
 
@@ -642,7 +644,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       channel_id: context[:channel_id],
       thinking_budget: context[:thinking_budget],
       max_budget_usd: context[:max_budget_usd],
-      agent: context[:agent]
+      agent: context[:agent],
+      eits_workflow: context[:eits_workflow] || "1"
     }
   end
 
@@ -654,7 +657,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       channel_id: nil,
       thinking_budget: nil,
       max_budget_usd: nil,
-      agent: nil
+      agent: nil,
+      eits_workflow: "1"
     }
   end
 

@@ -3,6 +3,8 @@
 # Fires before Claude processes the prompt — marks the process as active.
 set -uo pipefail
 
+[ "${EITS_WORKFLOW:-1}" = "0" ] && exit 0
+
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 input_json=$(timeout 2 cat 2>/dev/null) || exit 0

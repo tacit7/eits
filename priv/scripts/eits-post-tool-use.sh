@@ -3,6 +3,8 @@
 # Publishes tool results to NATS for real-time Phoenix sync
 set -uo pipefail
 
+[ "${EITS_WORKFLOW:-1}" = "0" ] && exit 0
+
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Parse stdin JSON for tool info

@@ -4,6 +4,8 @@
 
 set -uo pipefail
 
+[ "${EITS_WORKFLOW:-1}" = "0" ] && exit 0
+
 EITS_PG_DB="${EITS_PG_DB:-eits_dev}"
 EITS_PG_USER="${EITS_PG_USER:-postgres}"
 EITS_PG_HOST="${EITS_PG_HOST:-localhost}"
@@ -69,11 +71,15 @@ else
   _log "WARN: CLAUDE_ENV_FILE not set, skipping env writes"
 fi
 
-# Write session UUID to .git/eits-session for post-commit hook
+# Write session/agent UUIDs to .git/ for post-commit hook
 GIT_DIR=$(git -C "$PROJECT_DIR" rev-parse --git-dir 2>/dev/null || true)
 if [ -n "$GIT_DIR" ]; then
   echo "$SESSION_ID" > "$GIT_DIR/eits-session" 2>/dev/null || true
   _log "wrote session UUID to $GIT_DIR/eits-session"
+  if [ -n "${EXISTING_AGENT_UUID:-}" ]; then
+    echo "$EXISTING_AGENT_UUID" > "$GIT_DIR/eits-agent" 2>/dev/null || true
+    _log "wrote agent UUID to $GIT_DIR/eits-agent"
+  fi
 fi
 
 # NATS (fire-and-forget)
@@ -126,9 +132,10 @@ $INIT_NOTE
 \`\`\`bash
 # After /eits-init — env vars EITS_AGENT_UUID, EITS_PROJECT_ID, EITS_SESSION_UUID are set
 
-# Create + start (session linked automatically)
+# Create + start (start also calls link-session as a follow-up)
 eits tasks create --title \"Task name\" --description \"Details\"
 eits tasks start <task_id>
+# Or atomically: eits tasks quick --title \"Task name\" --description \"Details\"
 
 # Finish
 eits tasks annotate <task_id> --body \"What happened\"

@@ -20,7 +20,8 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
      |> assign(:page_title, "Teams")
      |> assign(:sidebar_tab, :teams)
      |> assign(:sidebar_project, nil)
-     |> assign(:teams, load_teams())
+     |> assign(:show_archived, false)
+     |> assign(:teams, load_teams(false))
      |> assign(:selected_team_id, nil)
      |> assign(:selected_team, nil)}
   end
@@ -30,7 +31,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
       when event in [:team_created, :team_deleted, :member_joined, :member_updated, :member_left] do
     {:noreply,
      socket
-     |> assign(:teams, load_teams())
+     |> assign(:teams, load_teams(socket.assigns.show_archived))
      |> maybe_refresh_selected_team()}
   end
 
@@ -44,6 +45,15 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   @impl true
   def handle_event("close_team", _params, socket) do
     {:noreply, socket |> assign(:selected_team_id, nil) |> assign(:selected_team, nil)}
+  end
+
+  @impl true
+  def handle_event("toggle_archived", _params, socket) do
+    show_archived = !socket.assigns.show_archived
+    {:noreply,
+     socket
+     |> assign(:show_archived, show_archived)
+     |> assign(:teams, load_teams(show_archived))}
   end
 
   @impl true
@@ -67,7 +77,18 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
             <.icon name="hero-user-group" class="w-4 h-4 text-base-content/50" />
             <span class="text-xs font-semibold uppercase tracking-widest text-base-content/60">Teams</span>
           </div>
-          <span class="font-mono text-xs text-base-content/40"><%= length(@teams) %></span>
+          <div class="flex items-center gap-2">
+            <button
+              phx-click="toggle_archived"
+              class={["text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors",
+                if(@show_archived, do: "bg-base-content/10 text-base-content/60", else: "text-base-content/30 hover:text-base-content/50")
+              ]}
+              title={if @show_archived, do: "Showing archived", else: "Show archived"}
+            >
+              <%= if @show_archived, do: "archived", else: "archived" %>
+            </button>
+            <span class="font-mono text-xs text-base-content/40"><%= length(@teams) %></span>
+          </div>
         </div>
 
         <div class="flex-1 overflow-y-auto">
@@ -85,7 +106,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
                   class={[
                     "w-full text-left px-3 py-2.5 group transition-colors relative",
                     if(@selected_team_id == team.id,
-                      do: "bg-primary/8 border-l-2 border-l-primary",
+                      do: "bg-primary/10 border-l-2 border-l-primary",
                       else: "hover:bg-base-200 border-l-2 border-l-transparent"
                     )
                   ]}
@@ -190,10 +211,26 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
           <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Tasks</div>
         </div>
         <div class="bg-base-200 rounded-lg px-4 py-3">
-          <div class="text-2xl font-bold font-mono text-info"><%= @done_tasks %></div>
+          <div class="text-2xl font-bold font-mono text-success"><%= @done_tasks %></div>
           <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Completed</div>
         </div>
       </div>
+
+      <%!-- Task progress bar --%>
+      <%= if @total_tasks > 0 do %>
+        <div class="space-y-1">
+          <div class="flex items-center justify-between text-[11px] text-base-content/40">
+            <span>Progress</span>
+            <span class="font-mono"><%= @done_tasks %>/<%= @total_tasks %></span>
+          </div>
+          <div class="h-1.5 bg-base-300 rounded-full overflow-hidden">
+            <div
+              class="h-full bg-success rounded-full transition-all"
+              style={"width: #{Float.round(@done_tasks / @total_tasks * 100, 1)}%"}
+            ></div>
+          </div>
+        </div>
+      <% end %>
 
       <%!-- Members --%>
       <section>
@@ -244,7 +281,13 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
                   <%= for task <- member.tasks do %>
                     <div class="flex items-center gap-2">
                       <div class={["w-1.5 h-1.5 rounded-full shrink-0", task_state_dot(task.state_id)]}></div>
-                      <span class="flex-1 text-xs text-base-content/70 truncate"><%= task.title %></span>
+                      <%= if task.project_id do %>
+                        <.link navigate={~p"/projects/#{task.project_id}/tasks"} class="flex-1 text-xs text-base-content/70 truncate hover:text-base-content/90 hover:underline">
+                          <%= task.title %>
+                        </.link>
+                      <% else %>
+                        <span class="flex-1 text-xs text-base-content/70 truncate"><%= task.title %></span>
+                      <% end %>
                       <%= if task.state do %>
                         <span class={["text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0", task_state_chip(task.state_id)]}>
                           <%= task.state.name %>
@@ -278,12 +321,18 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
               <div class="rounded-lg bg-base-200 overflow-hidden">
                 <div class="flex items-center gap-3 px-3 py-2.5 group">
                   <div class={["w-1.5 h-1.5 rounded-full shrink-0", task_state_dot(task.state_id)]}></div>
-                  <span class="flex-1 text-sm text-base-content min-w-0 truncate"><%= task.title %></span>
+                  <%= if task.project_id do %>
+                    <.link navigate={~p"/projects/#{task.project_id}/tasks"} class="flex-1 text-sm text-base-content min-w-0 truncate hover:underline">
+                      <%= task.title %>
+                    </.link>
+                  <% else %>
+                    <span class="flex-1 text-sm text-base-content min-w-0 truncate"><%= task.title %></span>
+                  <% end %>
                   <div class="flex items-center gap-1.5 shrink-0">
-                    <%= if Map.get(task, :annotations, []) != [] do %>
+                    <%= if Map.get(task, :notes, []) != [] do %>
                       <span class="flex items-center gap-1 text-[10px] text-base-content/40 font-mono">
                         <.icon name="hero-chat-bubble-left-ellipsis" class="w-3 h-3" />
-                        <%= length(task.annotations) %>
+                        <%= length(task.notes) %>
                       </span>
                     <% end %>
                     <%= if task.state do %>
@@ -305,9 +354,9 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
                     </select>
                   </div>
                 </div>
-                <%= if Map.get(task, :annotations, []) != [] do %>
+                <%= if Map.get(task, :notes, []) != [] do %>
                   <div class="border-t border-base-300/50 px-3 pb-2.5 pt-2 space-y-2">
-                    <%= for note <- task.annotations do %>
+                    <%= for note <- task.notes do %>
                       <div class="text-xs text-base-content/50 pl-3 border-l-2 border-base-content/10">
                         <p class="whitespace-pre-wrap leading-relaxed"><%= note.body %></p>
                         <span class="text-[10px] text-base-content/25 mt-1 block font-mono">
@@ -326,8 +375,12 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
     """
   end
 
-  defp load_teams do
-    Teams.list_teams()
+  defp load_teams(show_archived) do
+    if show_archived do
+      Teams.list_teams(status: "archived")
+    else
+      Teams.list_teams()
+    end
   end
 
   defp load_team_detail(team) do
@@ -335,10 +388,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
 
     tasks =
       Tasks.list_tasks_for_team_with_sessions(team.id)
-      |> Enum.map(fn task ->
-        annotations = Notes.list_notes_for_task(task.id)
-        Map.put(task, :annotations, annotations)
-      end)
+      |> Notes.with_notes_count()
 
     # Group tasks by which member session owns them
     member_session_ids = Enum.map(team.members, & &1.session_id) |> MapSet.new()

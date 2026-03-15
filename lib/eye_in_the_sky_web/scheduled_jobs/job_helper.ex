@@ -30,9 +30,9 @@ defmodule EyeInTheSkyWeb.ScheduledJobs.JobHelper do
 
     ```bash
     which curl jq psql mix 2>/dev/null
-    curl -sk https://localhost:5001/api/v1/projects 2>/dev/null | jq '.projects[] | {id, name, path}' 2>/dev/null \
+    curl -s http://localhost:5000/api/v1/projects 2>/dev/null | jq '.projects[] | {id, name, path}' 2>/dev/null \
       || psql -d eits_dev -tAq -c "SELECT id, name FROM projects ORDER BY name;" 2>/dev/null
-    curl -sk https://localhost:5001/api/v1/jobs 2>/dev/null | jq '.jobs[] | {id, name, job_type, schedule_value}' 2>/dev/null \
+    curl -s http://localhost:5000/api/v1/jobs 2>/dev/null | jq '.jobs[] | {id, name, job_type, schedule_value}' 2>/dev/null \
       || psql -d eits_dev -tAq -c "SELECT id, name, job_type, schedule_value FROM scheduled_jobs ORDER BY name;" 2>/dev/null
     ```
 
@@ -68,7 +68,7 @@ defmodule EyeInTheSkyWeb.ScheduledJobs.JobHelper do
     ## Creating a Job via API
 
     ```bash
-    curl -sk -X POST https://localhost:5001/api/v1/jobs \\
+    curl -s -X POST http://localhost:5000/api/v1/jobs \\
       -H "Content-Type: application/json" \\
       -d '{
         "name": "Job Name",

@@ -1221,6 +1221,15 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       />
 
     <.live_component
+      module={EyeInTheSkyWebWeb.Components.NewTaskDrawer}
+      id="dm-new-task-drawer"
+      show={@show_new_task_drawer}
+      workflow_states={@workflow_states}
+      toggle_event="toggle_new_task_drawer"
+      submit_event="create_new_task"
+    />
+
+    <.live_component
       module={EyeInTheSkyWebWeb.Components.TaskDetailDrawer}
       id="dm-task-detail-drawer"
       show={@show_task_detail_drawer}

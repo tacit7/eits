@@ -349,11 +349,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           <% "commits" -> %>
             <.commits_tab commits={@commits} diff_cache={@diff_cache} />
           <% "notes" -> %>
-            <.notes_tab
-              notes={@notes}
-              show_new_task_drawer={@show_new_task_drawer}
-              workflow_states={@workflow_states}
-            />
+            <.notes_tab notes={@notes} />
           <% "timeline" -> %>
             <.timeline_tab
               checkpoints={@checkpoints}
@@ -1424,8 +1420,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   end
 
   attr :notes, :list, default: []
-  attr :show_new_task_drawer, :boolean, default: false
-  attr :workflow_states, :list, default: []
 
   defp notes_tab(assigns) do
     ~H"""
@@ -1513,15 +1507,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
       </div>
     <% end %>
 
-    <!-- New Task Drawer -->
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.NewTaskDrawer}
-      id="dm-new-task-drawer"
-      show={@show_new_task_drawer}
-      workflow_states={@workflow_states}
-      toggle_event="toggle_new_task_drawer"
-      submit_event="create_new_task"
-    />
     """
   end
 

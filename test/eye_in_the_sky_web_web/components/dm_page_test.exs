@@ -181,4 +181,32 @@ defmodule EyeInTheSkyWebWeb.Components.DmPageTest do
              "DmComposer must be registered on Hooks in app.js"
     end
   end
+
+  # ===== NewTaskDrawer placement regression =====
+  #
+  # The NewTaskDrawer must be mounted at the LiveView level (dm_live.ex),
+  # not inside notes_tab. When it lives inside notes_tab, clicking "Add task"
+  # on the tasks tab does nothing — the drawer is not in the DOM.
+  #
+  # Ref: task #1152
+
+  describe "NewTaskDrawer placement" do
+    @project_root Path.expand("../../..", __DIR__)
+    @dm_page_source Path.join([@project_root, "lib/eye_in_the_sky_web_web/components/dm_page.ex"])
+    @dm_live_source Path.join([@project_root, "lib/eye_in_the_sky_web_web/live/dm_live.ex"])
+
+    test "NewTaskDrawer is NOT rendered inside dm_page.ex (notes_tab)" do
+      source = File.read!(@dm_page_source)
+
+      refute source =~ "dm-new-task-drawer",
+             "NewTaskDrawer must not live in dm_page.ex/notes_tab — it must be in dm_live.ex so it is always in the DOM regardless of active tab"
+    end
+
+    test "NewTaskDrawer IS rendered in dm_live.ex at the LiveView level" do
+      source = File.read!(@dm_live_source)
+
+      assert source =~ "dm-new-task-drawer",
+             "NewTaskDrawer must be mounted in dm_live.ex so it is accessible from any tab"
+    end
+  end
 end

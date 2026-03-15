@@ -15,6 +15,6 @@ export PGPASSWORD="${EITS_PG_PASSWORD:-postgres}"
 psql -U "$EITS_PG_USER" -h "$EITS_PG_HOST" -d "$EITS_PG_DB" -c "
   UPDATE agents
   SET status = '$status',
-      last_activity_at = NOW()
+      last_activity_at = to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
   WHERE uuid = '$agent_id'
 " 2>/dev/null || exit 0

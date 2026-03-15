@@ -41,6 +41,15 @@ defmodule EyeInTheSkyWeb.Scheduler.AgentStatus do
     {:noreply, state}
   end
 
+  defp parse_iso8601(str) when is_binary(str) do
+    case DateTime.from_iso8601(str) do
+      {:ok, dt, _} -> DateTime.to_naive(dt)
+      _ -> nil
+    end
+  end
+
+  defp parse_iso8601(_), do: nil
+
   defp mark_stale_agents do
     try do
       now = NaiveDateTime.utc_now()
@@ -81,22 +90,18 @@ defmodule EyeInTheSkyWeb.Scheduler.AgentStatus do
     end
   end
 
-  defp is_too_old(last_activity_at, _now) when is_nil(last_activity_at) do
-    false
-  end
-
   defp is_too_old(last_activity_at, now) do
-    seconds_since = NaiveDateTime.diff(now, last_activity_at)
-    seconds_since > @one_day_ago
-  end
-
-  defp is_stale(last_activity_at, _now) when is_nil(last_activity_at) do
-    false
+    case parse_iso8601(last_activity_at) do
+      nil -> false
+      dt -> NaiveDateTime.diff(now, dt) > @one_day_ago
+    end
   end
 
   defp is_stale(last_activity_at, now) do
-    seconds_since = NaiveDateTime.diff(now, last_activity_at)
-    seconds_since > @one_hour_ago
+    case parse_iso8601(last_activity_at) do
+      nil -> false
+      dt -> NaiveDateTime.diff(now, dt) > @one_hour_ago
+    end
   end
 
   defp is_waiting(created_at, _now) when is_nil(created_at) do

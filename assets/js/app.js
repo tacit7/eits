@@ -949,14 +949,18 @@ function getCommands() {
       type: "submenu",
       commands: async () => {
         try {
-          const res = await fetch("/api/v1/sessions?limit=30")
+          const projectId = document.getElementById("quick-create-task")?.dataset?.projectId
+          const url = projectId
+            ? `/api/v1/sessions?limit=30&project_id=${projectId}`
+            : "/api/v1/sessions?limit=30"
+          const res = await fetch(url)
           if (!res.ok) return []
           const data = await res.json()
           return (data.results || []).map(s => ({
             id: "session-" + s.uuid,
             label: s.description || s.uuid.slice(0, 8),
             icon: "hero-chat-bubble-left-right",
-            group: "Recent",
+            group: projectId ? "Project Sessions" : "Recent",
             hint: s.status,
             keywords: [],
             shortcut: null,

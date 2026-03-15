@@ -795,7 +795,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
           </button>
           <button
             phx-click="bulk_delete"
-            data-confirm={"Delete #{MapSet.size(@selected_tasks)} tasks?"}
+            phx-confirm={"Delete #{MapSet.size(@selected_tasks)} tasks?"}
             class="btn btn-xs btn-ghost text-error gap-1"
           >
             <.icon name="hero-trash-mini" class="w-3 h-3" /> Delete

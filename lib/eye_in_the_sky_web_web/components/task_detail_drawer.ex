@@ -249,7 +249,11 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                   <% end %>
                   <%= if @task.agent_id do %>
                     <span class="font-mono">
-                      Agent {String.slice(to_string(@task.agent_id), 0..7)}
+                      <%= if is_list(@task.agents) && @task.agents != [] do %>
+                        <%= (List.first(@task.agents).description || "Agent") |> String.slice(0..30) %>
+                      <% else %>
+                        Agent #{@task.agent_id}
+                      <% end %>
                     </span>
                   <% end %>
                 </div>
@@ -332,7 +336,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                     type="button"
                     phx-click={@delete_event}
                     phx-value-task_id={@task.uuid || to_string(@task.id)}
-                    data-confirm="Delete this task?"
+                    phx-confirm="Delete this task?"
                     class="btn btn-sm btn-ghost text-xs text-error/50 hover:text-error hover:bg-error/10"
                   >
                     <.icon name="hero-trash" class="w-3.5 h-3.5" />

@@ -113,6 +113,48 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionControllerTest do
       {:ok, updated} = Sessions.get_session_by_uuid(session.uuid)
       assert updated.name == "original name"
     end
+
+    test "persists description on fresh session create", %{conn: conn} do
+      uuid = Ecto.UUID.generate()
+
+      post(conn, ~p"/api/v1/sessions", %{
+        "session_id" => uuid,
+        "name" => "test session",
+        "description" => "doing important work"
+      })
+
+      {:ok, session} = Sessions.get_session_by_uuid(uuid)
+      assert session.description == "doing important work"
+    end
+
+    test "sets description when session already exists", %{conn: _conn} do
+      agent = create_agent()
+      pre_registered = create_session(agent, %{description: nil})
+
+      post(build_conn(), ~p"/api/v1/sessions", %{
+        "session_id" => pre_registered.uuid,
+        "name" => "named",
+        "description" => "added after pre-register"
+      })
+
+      {:ok, updated} = Sessions.get_session_by_uuid(pre_registered.uuid)
+      assert updated.description == "added after pre-register"
+    end
+
+    test "name and description are independent fields", %{conn: conn} do
+      uuid = Ecto.UUID.generate()
+
+      post(conn, ~p"/api/v1/sessions", %{
+        "session_id" => uuid,
+        "name" => "the name",
+        "description" => "the description"
+      })
+
+      {:ok, session} = Sessions.get_session_by_uuid(uuid)
+      assert session.name == "the name"
+      assert session.description == "the description"
+      assert session.name != session.description
+    end
   end
 
   # ---- GET /api/v1/sessions/:uuid ----

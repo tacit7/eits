@@ -46,3 +46,6 @@ config :eye_in_the_sky_web, Oban, testing: :manual
 
 # Disable message broadcaster polling in test (tested manually via handle_info)
 config :eye_in_the_sky_web, EyeInTheSkyWeb.Messages.Broadcaster, enabled: false
+
+# Disable API key auth in test (RequireAuth plug passes through when nil)
+config :eye_in_the_sky_web, :api_key, nil

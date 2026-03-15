@@ -39,7 +39,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
         {:ok, existing} ->
           update_attrs =
             %{status: "working", last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()}
-            |> maybe_put(:name, params["name"] || params["description"])
+            |> maybe_put(:name, params["name"])
+            |> maybe_put(:description, params["description"])
 
           case Sessions.update_session(existing, update_attrs) do
             {:ok, updated} ->
@@ -68,7 +69,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
             session_attrs = %{
               uuid: session_uuid,
               agent_id: agent.id,
-              name: params["name"] || params["description"],
+              name: params["name"],
+              description: params["description"],
               status: "working",
               started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
               provider: params["provider"] || "claude",

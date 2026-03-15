@@ -13,7 +13,8 @@ config :eye_in_the_sky_web, EyeInTheSkyWeb.Repo,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10,
-  log: false
+  log: false,
+  prepare: :unnamed
 
 # For development, we disable any cache and enable
 # debugging and code reloading.

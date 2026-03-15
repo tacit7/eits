@@ -137,6 +137,7 @@
     <dialog
       id="quick-create-task"
       phx-hook="QuickCreateTask"
+      data-project-id={assigns[:sidebar_project] && assigns[:sidebar_project].id}
       class="modal modal-bottom sm:modal-middle p-0 bg-transparent"
     >
       <div class="modal-box max-w-lg p-0 overflow-hidden">

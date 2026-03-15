@@ -617,12 +617,16 @@ Hooks.QuickCreateTask = {
     const description = (this.el.querySelector("[data-qct-description]")?.value || "").trim()
     const tagsRaw = (this.el.querySelector("[data-qct-tags]")?.value || "").trim()
     const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : []
+    const projectId = this.el.dataset.projectId ? Number(this.el.dataset.projectId) : null
+
+    const body = { title, description, tags, state_id: 1 }
+    if (projectId) body.project_id = projectId
 
     try {
       const res = await fetch("/api/v1/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description, tags, state_id: 1 })
+        body: JSON.stringify(body)
       })
       if (res.ok) {
         this.el.close()

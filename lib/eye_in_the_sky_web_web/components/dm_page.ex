@@ -97,6 +97,23 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             tabindex="0"
             class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-52 text-xs"
           >
+            <%!-- Tab navigation --%>
+            <%= for {tab, icon, label} <- @tabs do %>
+              <li>
+                <button
+                  phx-click="change_tab"
+                  phx-value-tab={tab}
+                  class={[
+                    "flex items-center gap-2 px-3 py-2 w-full text-left rounded",
+                    @active_tab == tab && "text-primary bg-primary/10",
+                    @active_tab != tab && "hover:bg-base-content/5"
+                  ]}
+                >
+                  <.icon name={icon} class="w-3.5 h-3.5" /> {label}
+                </button>
+              </li>
+            <% end %>
+            <li><hr class="border-base-content/10 my-1" /></li>
             <li>
               <button
                 phx-hook="CopyToClipboard"

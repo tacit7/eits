@@ -23,7 +23,7 @@ defmodule EyeInTheSkyWeb.QueryHelpers do
   """
   def for_session_direct(queryable, session_id, opts \\ []) do
     limit_val = Keyword.get(opts, :limit)
-    order = Keyword.get(opts, :order_by, desc: :inserted_at)
+    order = Keyword.get(opts, :order_by, asc: :inserted_at)
     preloads = Keyword.get(opts, :preload, [])
 
     query =
@@ -42,20 +42,34 @@ defmodule EyeInTheSkyWeb.QueryHelpers do
 
   Used for many-to-many relationships like tasks <-> sessions.
 
+  ## Options
+
+    - `:entity_key` - join table column referencing the primary schema (default: `:task_id`)
+    - `:session_key` - join table column referencing the session (default: `:session_id`)
+    - `:limit` - max number of records to return
+    - `:order_by` - ordering clause (default: `[asc: :inserted_at]`)
+    - `:preload` - associations to preload
+
   ## Examples
 
       iex> for_session_join(Task, "session-123", "task_sessions", preload: [:state, :tags])
       [%Task{}, ...]
+
+      iex> for_session_join(Note, "session-123", "note_sessions",
+      ...>   entity_key: :note_id, session_key: :session_id)
+      [%Note{}, ...]
   """
   def for_session_join(queryable, session_id, join_table, opts \\ []) do
     limit_val = Keyword.get(opts, :limit)
-    order = Keyword.get(opts, :order_by, desc: :inserted_at)
+    order = Keyword.get(opts, :order_by, asc: :inserted_at)
     preloads = Keyword.get(opts, :preload, [])
+    entity_key = Keyword.get(opts, :entity_key, :task_id)
+    session_key = Keyword.get(opts, :session_key, :session_id)
 
     query =
       queryable
-      |> join(:inner, [x], j in ^join_table, on: j.task_id == x.id)
-      |> where([x, j], j.session_id == ^session_id)
+      |> join(:inner, [x], j in ^join_table, on: field(j, ^entity_key) == x.id)
+      |> where([x, j], field(j, ^session_key) == ^session_id)
       |> order_by([x], ^order)
 
     query = if limit_val, do: limit(query, ^limit_val), else: query
@@ -82,15 +96,27 @@ defmodule EyeInTheSkyWeb.QueryHelpers do
   @doc """
   Counts records for a session using join table pattern.
 
+  ## Options
+
+    - `:entity_key` - join table column referencing the primary schema (default: `:task_id`)
+    - `:session_key` - join table column referencing the session (default: `:session_id`)
+
   ## Examples
 
       iex> count_for_session_join(Task, "session-123", "task_sessions")
       15
+
+      iex> count_for_session_join(Note, "session-123", "note_sessions",
+      ...>   entity_key: :note_id, session_key: :session_id)
+      3
   """
-  def count_for_session_join(queryable, session_id, join_table) do
+  def count_for_session_join(queryable, session_id, join_table, opts \\ []) do
+    entity_key = Keyword.get(opts, :entity_key, :task_id)
+    session_key = Keyword.get(opts, :session_key, :session_id)
+
     queryable
-    |> join(:inner, [x], j in ^join_table, on: j.task_id == x.id)
-    |> where([x, j], j.session_id == ^session_id)
+    |> join(:inner, [x], j in ^join_table, on: field(j, ^entity_key) == x.id)
+    |> where([x, j], field(j, ^session_key) == ^session_id)
     |> select([x], count(x.id))
     |> Repo.one() || 0
   end

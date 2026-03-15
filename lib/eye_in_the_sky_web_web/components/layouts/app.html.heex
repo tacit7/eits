@@ -141,12 +141,16 @@
     >
       <div class="modal-box max-w-2xl p-0 overflow-hidden">
         <div class="border-b border-base-content/10 p-3">
+          <div
+            data-palette-breadcrumb
+            class="hidden text-[11px] text-base-content/50 mb-2 select-none"
+          ></div>
           <label for="command-palette-input" class="sr-only">Search commands</label>
           <input
             id="command-palette-input"
             type="text"
             data-palette-input
-            placeholder="Search pages, projects, and commands..."
+            placeholder="Search commands..."
             class="w-full h-10 rounded-lg border border-base-content/10 bg-base-100 px-3 text-sm focus:outline-none focus:border-primary/40"
           />
         </div>
@@ -158,7 +162,7 @@
         >
         </div>
         <div class="px-3 py-2 text-[11px] text-base-content/55 border-t border-base-content/10">
-          Arrow keys to move • Enter to navigate • Esc to close • Cmd/Ctrl+K to open
+          ↑↓ to move · Enter to select · Esc to close/back · Backspace to go back
         </div>
       </div>
       <form method="dialog" class="modal-backdrop">

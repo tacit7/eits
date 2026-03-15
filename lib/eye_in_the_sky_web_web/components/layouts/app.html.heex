@@ -25,7 +25,7 @@
 
   <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
     <%!-- Mobile top bar — hidden on md+ since sidebar is always visible --%>
-    <header class="md:hidden flex-shrink-0 flex items-center gap-3 px-4 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)]">
+    <header class={["md:hidden flex-shrink-0 flex items-center gap-3 px-4 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)]", assigns[:hide_mobile_header] && "hidden"]}>
       <button
         phx-click={Phoenix.LiveView.JS.dispatch("sidebar:open", to: "#app-sidebar")}
         class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"

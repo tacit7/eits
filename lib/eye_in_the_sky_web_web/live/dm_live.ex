@@ -57,6 +57,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     socket =
       socket
       |> assign(:page_title, session.name || "Session")
+      |> assign(:hide_mobile_header, true)
       |> assign(:sidebar_tab, sidebar_tab)
       |> assign(:sidebar_project, sidebar_project)
       |> assign(:session_id, session.id)

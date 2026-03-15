@@ -53,7 +53,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
 
     ~H"""
     <div
-      class="flex flex-col h-[calc(100dvh-3rem)] md:h-[calc(100dvh-2rem)] px-2 sm:px-4 lg:px-8 py-2 sm:py-4 relative"
+      class="flex flex-col h-[100dvh] md:h-[calc(100dvh-2rem)] px-0 sm:px-4 lg:px-8 py-0 sm:py-4 relative"
       id="dm-page"
       phx-drop-target={@uploads.files.ref}
       phx-hook="DragUpload"
@@ -70,9 +70,89 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           </div>
         </div>
       </div>
-      <%!-- Header card --%>
+      <%!-- Mobile slim top bar (replaces global app header on DM page) --%>
+      <div class="md:hidden flex-shrink-0 flex items-center gap-1 px-2 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-base-100">
+        <button
+          phx-click={Phoenix.LiveView.JS.dispatch("sidebar:open", to: "#app-sidebar")}
+          class="btn btn-ghost btn-square w-10 h-10 text-base-content/60"
+          aria-label="Open menu"
+        >
+          <.icon name="hero-bars-3" class="w-5 h-5" />
+        </button>
+        <div class="flex-1 flex items-center justify-center gap-1.5 min-w-0 px-1">
+          <div class={"w-1.5 h-1.5 rounded-full flex-shrink-0 " <> if(is_nil(@agent.ended_at) || @agent.ended_at == "", do: "bg-success animate-pulse", else: "bg-base-content/20")} />
+          <span class="text-sm font-semibold text-base-content/85 truncate">
+            {@agent.name || "Session"}
+          </span>
+        </div>
+        <div class="dropdown dropdown-end">
+          <button
+            tabindex="0"
+            class="btn btn-ghost btn-square w-10 h-10 text-base-content/60"
+            aria-label="More options"
+          >
+            <.icon name="hero-ellipsis-horizontal" class="w-5 h-5" />
+          </button>
+          <ul
+            tabindex="0"
+            class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-52 text-xs"
+          >
+            <li>
+              <button
+                phx-hook="CopyToClipboard"
+                id="copy-session-uuid-slim"
+                data-copy={@session_uuid}
+                class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+              >
+                <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Copy session ID
+              </button>
+            </li>
+            <li>
+              <button
+                phx-click="open_iterm"
+                class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+              >
+                <.icon name="hero-command-line" class="w-3.5 h-3.5" /> Open in iTerm
+              </button>
+            </li>
+            <li><hr class="border-base-content/10 my-1" /></li>
+            <li>
+              <button
+                phx-click="reload_from_session_file"
+                data-confirm="This will delete all messages and re-import from the JSONL file. Continue?"
+                class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+              >
+                <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Reload from file
+              </button>
+            </li>
+            <li>
+              <button
+                phx-click="export_markdown"
+                class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+              >
+                <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Export as Markdown
+              </button>
+            </li>
+            <li><hr class="border-base-content/10 my-1" /></li>
+            <li>
+              <button
+                phx-click="toggle_memories_panel"
+                class={[
+                  "flex items-center gap-2 px-3 py-2 w-full text-left rounded",
+                  @show_memories_panel && "text-primary bg-primary/10",
+                  !@show_memories_panel && "hover:bg-base-content/5"
+                ]}
+              >
+                <.icon name="hero-cpu-chip" class="w-3.5 h-3.5" /> Memories
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <%!-- Header card (desktop only) --%>
       <div
-        class="max-w-6xl mx-auto w-full bg-base-200 rounded-2xl border border-base-content/10 shadow-sm mb-3 flex-shrink-0"
+        class="hidden md:block max-w-6xl mx-auto w-full bg-base-200 rounded-2xl border border-base-content/10 shadow-sm mb-3 flex-shrink-0"
         id="dm-header-card"
       >
         <div class="px-4 sm:px-5 py-3" id="dm-header">
@@ -881,8 +961,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-[10px] text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-48 overflow-y-auto">{String.slice(@input["content"] || "", 0..500)}{if String.length(@input["content"] || "") > 500, do: "\n…", else: ""}</pre>
         </div>
       <% :speak -> %>
-        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5 overflow-hidden">
-          <p class="text-[12px] text-base-content/70 leading-relaxed whitespace-pre-wrap break-words">{@detail}</p>
+        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
+          <pre class="bg-base-200 rounded px-2 py-1.5 text-[11px] text-base-content/70 whitespace-pre-wrap break-all leading-relaxed">{@detail}</pre>
         </div>
       <% :json -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">

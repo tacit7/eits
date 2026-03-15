@@ -60,10 +60,11 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
           data-session-id={@session.uuid}
           data-agent-name={@session.name || (@session.agent && @session.agent.description) || "Agent"}
           data-agent-status={@session.status}
+          data-swipe-fav="true"
           class="bookmark-button w-[53px] flex flex-col items-center justify-center gap-1 bg-[#f43f5e] text-white text-[9px] font-bold uppercase tracking-wide border-none"
           aria-label="Bookmark session"
         >
-          <.icon name="hero-heart" class="w-5 h-5" />
+          <.icon name="hero-heart" class="bookmark-icon w-5 h-5" />
           Fav
         </button>
         <%!-- Rename --%>

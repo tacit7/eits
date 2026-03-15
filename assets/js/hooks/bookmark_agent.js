@@ -80,25 +80,37 @@ export const BookmarkAgent = {
   updateBookmarkUI() {
     const bookmarks = this.getBookmarks();
     const isBookmarked = bookmarks.some(b => b.session_id === this.sessionId);
+    const icon = this.el.querySelector('.bookmark-icon');
 
-    // Update icon and color
+    // Swipe panel fav button: hide heart when not bookmarked, filled red when bookmarked
+    if (this.el.dataset.swipeFav) {
+      if (isBookmarked) {
+        if (icon) {
+          icon.style.opacity = '1';
+          icon.style.fill = 'currentColor';
+          icon.style.stroke = 'none';
+          icon.innerHTML = '<path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" />';
+        }
+      } else {
+        if (icon) icon.style.opacity = '0';
+      }
+      return;
+    }
+
+    // Standard bookmark button (sidebar / actions slot)
     if (isBookmarked) {
       this.el.classList.remove('text-base-content/40');
       this.el.classList.add('text-warning');
-      // Use filled heart icon
-      const icon = this.el.querySelector('.bookmark-icon');
       if (icon) {
         icon.innerHTML = '<path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" />';
       }
     } else {
       this.el.classList.remove('text-warning');
       this.el.classList.add('text-base-content/40');
-      // Use outline heart icon
-      const icon = this.el.querySelector('.bookmark-icon');
       if (icon) {
         icon.innerHTML = '<path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd" />';
-        icon.style.fill = isBookmarked ? 'currentColor' : 'none';
-        icon.style.stroke = isBookmarked ? 'none' : 'currentColor';
+        icon.style.fill = 'none';
+        icon.style.stroke = 'currentColor';
       }
     }
   },

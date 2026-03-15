@@ -30,7 +30,9 @@ config :eye_in_the_sky_web, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK
 # REST API key — set EITS_API_KEY to require bearer auth on /api/v1.
 # Leave unset to disable auth (dev default).
 # Generate with: mix eits.gen.api_key
-config :eye_in_the_sky_web, :api_key, System.get_env("EITS_API_KEY")
+if config_env() != :test do
+  config :eye_in_the_sky_web, :api_key, System.get_env("EITS_API_KEY")
+end
 
 # WebAuthn — override origin/rp_id via env vars (useful for ngrok tunnels)
 if webauthn_origin = System.get_env("WEBAUTHN_ORIGIN") do

@@ -1,6 +1,5 @@
 defmodule EyeInTheSkyWebWeb.Components.SessionCard do
   use Phoenix.Component
-  import EyeInTheSkyWebWeb.CoreComponents, only: [icon: 1]
   import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1, derive_display_status: 1]
 
   alias EyeInTheSkyWeb.Sessions

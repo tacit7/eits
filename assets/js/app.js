@@ -1251,6 +1251,11 @@ Hooks.CommandPalette = {
       } else {
         this.el.close()
       }
+    } else if (e.key === "Tab") {
+      if (items.length === 1) {
+        e.preventDefault()
+        this.activate(items[0])
+      }
     } else if (e.key === "Backspace" && !e.isComposing) {
       if ((this.input?.value || "") === "" && this.stack.length > 0) {
         e.preventDefault()

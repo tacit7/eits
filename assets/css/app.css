@@ -433,12 +433,17 @@ code.hljs { padding: 3px 5px; }
 }
 
 .dm-markdown pre code {
+  display: block;
   background: none;
   padding: 1.25rem;
   border-radius: 0;
   font-size: inherit;
   color: inherit;
 }
+
+/* Prevent theme-level code background from bleeding into pre code blocks */
+[data-theme="dark"] .dm-markdown pre code { background: none; }
+[data-theme="light"] .dm-markdown pre code { background: none; }
 
 .dm-markdown code {
   padding: 0.125rem 0.375rem;

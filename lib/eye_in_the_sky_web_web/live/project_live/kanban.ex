@@ -39,7 +39,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       |> assign(:selected_task, nil)
       |> assign(:task_notes, [])
       |> assign(:quick_add_column, nil)
-      |> assign(:wip_limit, 8)
+
       |> assign(:show_completed, false)
       |> assign(:show_archived, false)
       |> assign(:selected_tasks, MapSet.new())
@@ -53,11 +53,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
-    effective_query = if String.length(String.trim(query)) >= 4, do: query, else: ""
-
     socket =
       socket
-      |> assign(:search_query, effective_query)
+      |> assign(:search_query, query)
       |> load_tasks()
 
     {:noreply, socket}
@@ -583,7 +581,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     show_completed = socket.assigns.show_completed
 
     all_tasks =
-      if query != "" and String.trim(query) != "" do
+      if String.length(String.trim(query)) >= 2 do
         Tasks.search_tasks(query, project_id)
       else
         Projects.get_project_tasks(project_id, include_archived: show_archived)
@@ -675,6 +673,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
               autocomplete="off"
             />
           </div>
+          <%= if String.length(String.trim(@search_query)) == 1 do %>
+            <p class="text-xs text-base-content/30 mt-1 pl-9">Type at least 2 characters to search</p>
+          <% end %>
         </form>
 
         <div class="flex items-center gap-1.5">
@@ -809,8 +810,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
           <%= for state <- @workflow_states do %>
             <% column_tasks = Map.get(@tasks_by_state, state.id, []) %>
             <% task_count = length(column_tasks) %>
-            <% wip_limit = @wip_limit %>
-            <% over_wip = wip_limit > 0 and task_count > wip_limit %>
             <div class="flex-shrink-0 w-[84vw] max-w-80 md:w-72 flex flex-col h-full snap-start" data-column-id={state.id}>
               <%!-- Column header with colored accent --%>
               <div class="mb-2">
@@ -838,11 +837,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                   <span class="text-xs font-semibold text-base-content/70 uppercase tracking-wider">
                     {state.name}
                   </span>
-                  <span class={[
-                    "ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-medium tabular-nums",
-                    if(over_wip, do: "bg-warning/20 text-warning", else: "bg-base-content/[0.06] text-base-content/40")
-                  ]}>
-                    {task_count}<%= if wip_limit > 0 do %>/{wip_limit}<% end %>
+                  <span class="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-medium tabular-nums bg-base-content/[0.06] text-base-content/40">
+                    {task_count}
                   </span>
                 </div>
               </div>

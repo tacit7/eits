@@ -1,15 +1,10 @@
 #!/usr/bin/env bash
 # Hook: Enforce EITS session and todo requirements before file edits (PreToolUse)
 # Matcher: Edit|Write — only runs on file modification tools
-# Returns hookSpecificOutput JSON for structured denial; exit 2 for hard errors
+# Returns hookSpecificOutput JSON for structured denial; exit 0 to allow
 set -uo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-EITS_PG_DB="${EITS_PG_DB:-eits_dev}"
-EITS_PG_USER="${EITS_PG_USER:-postgres}"
-EITS_PG_HOST="${EITS_PG_HOST:-localhost}"
-export PGPASSWORD="${EITS_PG_PASSWORD:-postgres}"
-_pgq() { psql --no-psqlrc -U "$EITS_PG_USER" -h "$EITS_PG_HOST" -d "$EITS_PG_DB" -t -A -c "$1" 2>/dev/null; }
 
 input_json=$(timeout 2 cat 2>/dev/null) || exit 0
 [ -z "$input_json" ] && exit 0
@@ -20,16 +15,21 @@ session_id=$(echo "$input_json" | jq -r '.session_id // empty' 2>/dev/null) || e
 tool_name=$(echo "$input_json" | jq -r '.tool_name // empty' 2>/dev/null) || exit 0
 [ -z "$tool_name" ] && exit 0
 
-# Resolve integer session ID for error messages
-session_int_id=$(_pgq "SELECT id FROM sessions WHERE uuid = '$session_id' LIMIT 1" || true)
-session_ref="${session_int_id:-$session_id}"
+# Fetch session info via eits CLI (single call: id, name, is_spawned)
+session_info=$(eits sessions get "$session_id" 2>/dev/null) || session_info=""
 
-# Skip spawned agents — they don't need /eits-init
-is_spawned=$(_pgq "SELECT 1 FROM sessions s JOIN agents a ON a.id = s.agent_id WHERE s.uuid = '$session_id' AND a.parent_agent_id IS NOT NULL LIMIT 1" || true)
+if [ -z "$session_info" ]; then
+  # API unreachable — fail open so work isn't blocked
+  exit 0
+fi
 
-if [ -z "$is_spawned" ]; then
+is_spawned=$(echo "$session_info" | jq -r '.is_spawned // false')
+session_ref=$(echo "$session_info" | jq -r '.id // empty')
+session_ref="${session_ref:-$session_id}"
+
+if [ "$is_spawned" != "true" ]; then
   # Check session has been named via /eits-init
-  session_name=$(_pgq "SELECT name FROM sessions WHERE uuid = '$session_id' AND name IS NOT NULL AND name != '' LIMIT 1" || true)
+  session_name=$(echo "$session_info" | jq -r '.name // empty')
 
   if [ -z "$session_name" ]; then
     jq -n \

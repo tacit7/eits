@@ -49,7 +49,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
 
     tasks =
       if state_id = parse_int(params["state_id"], nil) do
-        Enum.filter(tasks, &(&1.state_id == state_id))
+        tasks |> Enum.filter(&(&1.state_id == state_id)) |> Enum.take(limit)
       else
         tasks
       end
@@ -129,6 +129,10 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
 
       case result do
         {:ok, updated} ->
+          if params["state"] == "start" do
+            maybe_link_session(updated.id, params["session_id"])
+          end
+
           json(conn, %{
             success: true,
             message: "Task updated",

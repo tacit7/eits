@@ -74,17 +74,17 @@ cmd_sessions() {
       _post "/sessions" "$(json session_id "$session_id" name "$name" description "$description" project_name "$project_name" model "$model")"
       ;;
     update)
-      # eits sessions update <uuid> --status <status>
+      # eits sessions update <uuid> [--status <status>] [--intent <text>]
       local uuid="${1:-}"; need uuid; shift
-      local status=""
+      local status="" intent=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --status) status="$2"; shift 2 ;;
+          --intent) intent="$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      need status
-      _patch "/sessions/$uuid" "$(json status "$status")"
+      _patch "/sessions/$uuid" "$(json status "$status" intent "$intent")"
       ;;
     end)
       local uuid="${1:-}"; need uuid
@@ -171,12 +171,9 @@ cmd_tasks() {
       ;;
     start)
       local id="${1:-}"; need id
-      _patch "/tasks/$id" '{"state":"start"}'
-      # Auto-link current session to task ($EITS_SESSION_UUID preferred; falls back to $EITS_SESSION_ID)
+      # Auto-link current session atomically with the state transition
       local _sess="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
-      if [[ -n "$_sess" ]]; then
-        _post "/tasks/$id/sessions" "$(json session_id "$_sess")" > /dev/null
-      fi
+      _patch "/tasks/$id" "$(json state "start" session_id "$_sess")"
       ;;
     delete)
       local id="${1:-}"; need id
@@ -209,6 +206,30 @@ cmd_tasks() {
       local session_id="${1:-}"; need session_id
       _delete "/tasks/$id/sessions/$session_id"
       ;;
+    quick)
+      # eits tasks quick --title <t> [--description <d>] [--project <id>] [--priority <p>]
+      # Creates a task, links the current session, and starts it — all in one command.
+      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --title)       title="$2";       shift 2 ;;
+          --description) description="$2"; shift 2 ;;
+          --project)     project_id="$2";  shift 2 ;;
+          --priority)    priority="$2";    shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need title
+      local _sess="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+      local body
+      body="$(json title "$title" description "$description" project_id "$project_id" priority "$priority" session_id "$_sess")"
+      local create_resp task_id
+      create_resp=$(_post "/tasks" "$body")
+      echo "$create_resp"
+      task_id=$(echo "$create_resp" | jq -r '.task_id // empty')
+      [[ -n "$task_id" ]] || die "task creation failed"
+      _patch "/tasks/$task_id" "$(json state "start" session_id "$_sess")" > /dev/null
+      ;;
     tag)
       # eits tasks tag <task_id> <tag_id>
       local task_id="${1:-}"; need task_id; shift
@@ -217,7 +238,7 @@ cmd_tasks() {
       echo "{\"success\":true,\"task_id\":\"$task_id\",\"tag_id\":\"$tag_id\"}"
       ;;
     *)
-      echo "usage: eits tasks <list|get|create|update|done|start|delete|annotate|link-session|unlink-session|tag>"
+      echo "usage: eits tasks <list|get|create|update|done|quick|start|delete|annotate|link-session|unlink-session|tag>"
       ;;
   esac
 }

@@ -4,7 +4,7 @@
 set -uo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE_URL="${EITS_API_URL:-https://localhost:5001/api/v1}"
+BASE_URL="${EITS_URL:-http://localhost:5000/api/v1}"
 _curl() { curl ${EITS_API_KEY:+-H "Authorization: Bearer ${EITS_API_KEY}"} "$@"; }
 
 input_json=$(timeout 2 cat 2>/dev/null) || exit 0
@@ -14,7 +14,7 @@ session_id=$(echo "$input_json" | jq -r '.session_id // empty' 2>/dev/null) || e
 [ -z "$session_id" ] && exit 0
 
 # Set status to compacting so UI shows the reason for slow response
-"$HOOK_DIR/sql/update-session-status.sh" "$session_id" "compacting"
+"$HOOK_DIR/sql/postgresql/update-session-status.sh" "$session_id" "compacting"
 
 # Publish to NATS
 "$HOOK_DIR/nats/publish-session-compact.sh" "$session_id" "compacting"

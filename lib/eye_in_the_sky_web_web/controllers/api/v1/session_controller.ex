@@ -37,10 +37,11 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
       # Check if session already exists (resumed session)
       case Sessions.get_session_by_uuid(session_uuid) do
         {:ok, existing} ->
-          case Sessions.update_session(existing, %{
-                 status: "working",
-                 last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()
-               }) do
+          update_attrs =
+            %{status: "working", last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()}
+            |> maybe_put(:name, params["name"] || params["description"])
+
+          case Sessions.update_session(existing, update_attrs) do
             {:ok, updated} ->
               Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, updated})
 
@@ -303,6 +304,12 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
       {:ok, session} ->
         agent_uuid = Helpers.resolve_agent_uuid(session.agent_id)
 
+        is_spawned =
+          case Agents.get_agent(session.agent_id) do
+            {:ok, agent} -> not is_nil(agent.parent_agent_id)
+            _ -> false
+          end
+
         json(conn, %{
           id: session.id,
           agent_id: agent_uuid,
@@ -310,6 +317,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
           session_id: uuid,
           project_id: session.project_id,
           status: session.status,
+          name: session.name,
+          is_spawned: is_spawned,
           initialized: true
         })
 

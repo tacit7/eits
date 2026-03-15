@@ -67,14 +67,13 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
             aria-label={"Select session #{@session.name || @session.id}"}
           />
         </div>
+      <% else %>
+        <span class={"flex-shrink-0 text-xs leading-none " <> @status_color} title={@status_label}>●</span>
       <% end %>
 
       <%!-- Main content --%>
       <div class="flex-1 min-w-0">
-        <div class="flex items-baseline gap-1.5">
-          <%= if not @select_mode do %>
-            <span class={"flex-shrink-0 " <> @status_color} title={@status_label}>●</span>
-          <% end %>
+        <div class="flex items-baseline gap-2">
           <span class="text-[13px] font-medium text-base-content/85 truncate">
             {@session.name || "Unnamed session"}
           </span>

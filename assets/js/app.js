@@ -40,6 +40,7 @@ import {PushSetup} from "./push_notifications"
 import {TOUCH_DEVICE, createSwipeDetector} from "./hooks/touch_gesture"
 import {SwipeRow} from "./hooks/swipe_row"
 import {ConfigChatGuide} from "./hooks/config_chat_guide"
+import {CodeMirrorHook} from "./hooks/codemirror"
 import {getHooks} from "live_svelte"
 import "./theme"
 import hljs from 'highlight.js'
@@ -96,6 +97,7 @@ Hooks.DmComposer = DmComposer
 Hooks.FileAttach = FileAttach
 Hooks.SwipeRow = SwipeRow
 Hooks.ConfigChatGuide = ConfigChatGuide
+Hooks.CodeMirror = CodeMirrorHook
 Hooks.RefreshDot = {
   mounted() { this._flash() },
   updated() { this._flash() },

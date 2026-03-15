@@ -194,6 +194,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPageTest do
     @project_root Path.expand("../../..", __DIR__)
     @dm_page_source Path.join([@project_root, "lib/eye_in_the_sky_web_web/components/dm_page.ex"])
     @dm_live_source Path.join([@project_root, "lib/eye_in_the_sky_web_web/live/dm_live.ex"])
+    @new_task_drawer_source Path.join([@project_root, "lib/eye_in_the_sky_web_web/components/new_task_drawer.ex"])
 
     test "NewTaskDrawer is NOT rendered inside dm_page.ex (notes_tab)" do
       source = File.read!(@dm_page_source)
@@ -207,6 +208,23 @@ defmodule EyeInTheSkyWebWeb.Components.DmPageTest do
 
       assert source =~ "dm-new-task-drawer",
              "NewTaskDrawer must be mounted in dm_live.ex so it is accessible from any tab"
+    end
+
+    test "NewTaskDrawer does NOT use native <dialog> element with ModalDialog hook" do
+      # DaisyUI 5 keeps <dialog showModal()> in the browser top layer for 0.3s
+      # during its CSS exit transition (visibility: allow-discrete). During that window,
+      # the native ::backdrop blocks all pointer events — making the page unclickable.
+      # Fix: render conditionally with <%= if @show do %> like TaskDetailDrawer,
+      # which removes the element from the DOM entirely when closed.
+      #
+      # Ref: task #1157
+      source = File.read!(@new_task_drawer_source)
+
+      refute source =~ ~s(phx-hook="ModalDialog"),
+             "NewTaskDrawer must not use ModalDialog hook (native dialog top-layer bug blocks clicks after close)"
+
+      refute source =~ ~r/<dialog[\s>]/,
+             "NewTaskDrawer must not use native <dialog> element — use conditional div rendering like TaskDetailDrawer"
     end
   end
 end

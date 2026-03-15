@@ -158,7 +158,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
       <%!-- Team detail panel --%>
       <div class={[
         "flex-1 overflow-y-auto min-w-0 w-full",
-        @mobile_view == :list && "hidden sm:flex"
+        @mobile_view == :list && "hidden sm:block"
       ]}>
         <%= if @mobile_view == :detail do %>
           <button

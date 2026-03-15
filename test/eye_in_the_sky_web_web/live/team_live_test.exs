@@ -13,11 +13,11 @@ defmodule EyeInTheSkyWebWeb.TeamLive.IndexTest do
       assert render(lv) =~ "Teams"
     end
 
-    test "detail panel has hidden sm:flex on initial load", %{conn: conn} do
-      # On load, mobile_view is :list so the detail panel gets hidden sm:flex.
-      # The sidebar does NOT have hidden sm:flex (it hides only when mobile_view == :detail).
+    test "detail panel has hidden sm:block on initial load", %{conn: conn} do
+      # On load, mobile_view is :list so the detail panel gets hidden sm:block.
+      # The sidebar does NOT have hidden sm:block (it hides only when mobile_view == :detail).
       {:ok, _lv, html} = live(conn, ~p"/teams")
-      assert html =~ ~s(hidden sm:flex)
+      assert html =~ ~s(hidden sm:block)
     end
   end
 
@@ -29,8 +29,8 @@ defmodule EyeInTheSkyWebWeb.TeamLive.IndexTest do
 
       html = lv |> element("[phx-click='select_team'][phx-value-id='#{team.id}']") |> render_click()
 
-      # After selection, detail panel is visible; sidebar now has hidden sm:flex.
-      # The sidebar hidden class should now appear and team name should be present.
+      # Back button present — mobile_view is now :detail
+      assert html =~ ~s(phx-click="close_team")
       assert html =~ "Test Team Select"
     end
 
@@ -45,8 +45,8 @@ defmodule EyeInTheSkyWebWeb.TeamLive.IndexTest do
       # Close team via the back button
       html = lv |> element("[phx-click='close_team']") |> render_click()
 
-      # Back to list state — "Teams" heading should still be present
-      assert html =~ "Teams"
+      # Back button gone — mobile_view is back to :list
+      refute html =~ ~s(phx-click="close_team")
     end
   end
 end

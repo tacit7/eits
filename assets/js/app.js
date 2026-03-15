@@ -939,6 +939,36 @@ function getCommands() {
 
     // --- Submenus ---
     {
+      id: "list-sessions",
+      label: "Go to Session...",
+      icon: "hero-chat-bubble-left-right",
+      group: "Workspace",
+      hint: null,
+      keywords: ["dm", "chat", "open", "history", "recent"],
+      shortcut: null,
+      type: "submenu",
+      commands: async () => {
+        try {
+          const res = await fetch("/api/v1/sessions?limit=30")
+          if (!res.ok) return []
+          const data = await res.json()
+          return (data.results || []).map(s => ({
+            id: "session-" + s.uuid,
+            label: s.description || s.uuid.slice(0, 8),
+            icon: "hero-chat-bubble-left-right",
+            group: "Recent",
+            hint: s.status,
+            keywords: [],
+            shortcut: null,
+            type: "navigate",
+            href: "/dm/" + s.uuid,
+            when: null
+          }))
+        } catch (_) { return [] }
+      },
+      when: null
+    },
+    {
       id: "go-project",
       label: "Go to Project...",
       icon: "hero-folder",
@@ -1228,7 +1258,7 @@ Hooks.CommandPalette = {
     }
   },
 
-  activate(cmd) {
+  async activate(cmd) {
     if (cmd.type === "navigate") {
       this.saveRecent(cmd)
       this.el.close()
@@ -1237,11 +1267,19 @@ Hooks.CommandPalette = {
       this.el.close()
       cmd.fn()
     } else if (cmd.type === "submenu") {
-      const resolved = typeof cmd.commands === "function" ? cmd.commands() : cmd.commands
-      this.stack.push({ id: cmd.id, label: cmd.label, commands: resolved })
+      let commands = typeof cmd.commands === "function" ? cmd.commands() : cmd.commands
       this.activeIndex = 0
       if (this.input) this.input.value = ""
-      this.updateBreadcrumb()
+      if (commands instanceof Promise) {
+        this.stack.push({ id: cmd.id, label: cmd.label, commands: [] })
+        this.updateBreadcrumb()
+        if (this.results) this.results.innerHTML = `<div class="px-3 py-4 text-sm text-base-content/50">Loading...</div>`
+        commands = await commands
+        this.stack[this.stack.length - 1].commands = commands
+      } else {
+        this.stack.push({ id: cmd.id, label: cmd.label, commands })
+        this.updateBreadcrumb()
+      }
       this.render()
     }
   },

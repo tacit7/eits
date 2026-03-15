@@ -32,6 +32,8 @@ defmodule EyeInTheSkyWeb.QueryHelpers do
       |> order_by(^order)
 
     query = if limit_val, do: limit(query, ^limit_val), else: query
+    offset_val = Keyword.get(opts, :offset)
+    query = if offset_val, do: offset(query, ^offset_val), else: query
     query = if preloads != [], do: preload(query, ^preloads), else: query
 
     Repo.all(query)
@@ -73,6 +75,8 @@ defmodule EyeInTheSkyWeb.QueryHelpers do
       |> order_by([x], ^order)
 
     query = if limit_val, do: limit(query, ^limit_val), else: query
+    offset_val = Keyword.get(opts, :offset)
+    query = if offset_val, do: offset(query, ^offset_val), else: query
     query = if preloads != [], do: preload(query, ^preloads), else: query
 
     Repo.all(query)

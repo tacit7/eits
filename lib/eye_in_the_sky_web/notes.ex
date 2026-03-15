@@ -49,7 +49,7 @@ defmodule EyeInTheSkyWeb.Notes do
   Handles both "session" and "sessions" parent_type for backwards compatibility.
   Matches on both integer ID (as string) and UUID for migration compatibility.
   """
-  def list_notes_for_session(session_id) do
+  def list_notes_for_session(session_id, opts \\ []) do
     # session_id can be a UUID string or an integer string
     session =
       case Integer.parse(to_string(session_id)) do
@@ -59,15 +59,22 @@ defmodule EyeInTheSkyWeb.Notes do
 
     if session do
       session_int_str = to_string(session.id)
+      limit_val = Keyword.get(opts, :limit)
+      offset_val = Keyword.get(opts, :offset)
 
-      Note
-      |> where(
-        [n],
-        n.parent_type in ["session", "sessions"] and
-          (n.parent_id == ^session_int_str or n.parent_id == ^session.uuid)
-      )
-      |> order_by([n], desc: n.created_at)
-      |> Repo.all()
+      query =
+        Note
+        |> where(
+          [n],
+          n.parent_type in ["session", "sessions"] and
+            (n.parent_id == ^session_int_str or n.parent_id == ^session.uuid)
+        )
+        |> order_by([n], desc: n.created_at)
+
+      query = if limit_val, do: limit(query, ^limit_val), else: query
+      query = if offset_val, do: offset(query, ^offset_val), else: query
+
+      Repo.all(query)
     else
       []
     end

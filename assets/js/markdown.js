@@ -23,6 +23,13 @@ marked.setOptions({
   gfm: true
 });
 
+function stripFrontmatter(markdown) {
+  if (!markdown.startsWith('---')) return markdown;
+  const end = markdown.indexOf('\n---', 3);
+  if (end === -1) return markdown;
+  return markdown.slice(end + 4).replace(/^\n/, '');
+}
+
 /**
  * Render markdown with syntax highlighting
  * @param {string} markdown - The markdown text to render
@@ -30,7 +37,7 @@ marked.setOptions({
  */
 export function renderMarkdown(markdown) {
   if (!markdown) return '';
-  return marked.parse(markdown);
+  return marked.parse(stripFrontmatter(markdown));
 }
 
 export default renderMarkdown;

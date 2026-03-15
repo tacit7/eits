@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.Tasks
+  alias EyeInTheSkyWeb.Tasks.WorkflowState
   alias EyeInTheSkyWebWeb.Components.FilterSheet
   alias EyeInTheSkyWebWeb.Components.TaskCard
   import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
@@ -110,7 +111,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
     case Tasks.create_task(%{
       title: title,
       description: description,
-      state_id: if(state_id > 0, do: state_id, else: 1),
+      state_id: if(state_id > 0, do: state_id, else: WorkflowState.todo_id()),
       created_at: DateTime.utc_now() |> DateTime.to_iso8601(),
       updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
     }) do

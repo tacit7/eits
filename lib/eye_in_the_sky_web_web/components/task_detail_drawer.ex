@@ -249,8 +249,8 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                   <% end %>
                   <%= if @task.agent_id do %>
                     <span class="font-mono">
-                      <%= if is_list(@task.agents) && @task.agents != [] do %>
-                        <%= (List.first(@task.agents).description || "Agent") |> String.slice(0..30) %>
+                      <%= if is_list(@task.sessions) && @task.sessions != [] do %>
+                        <%= (List.first(@task.sessions).description || "Agent") |> String.slice(0..30) %>
                       <% else %>
                         Agent #{@task.agent_id}
                       <% end %>

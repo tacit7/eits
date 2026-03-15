@@ -91,10 +91,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:total_cost, 0.0)
       |> assign(:context_used, 0)
       |> assign(:context_window, 0)
-      |> assign(:show_memories_panel, false)
-      |> assign(:memory_files, [])
-      |> assign(:selected_memory_path, nil)
-      |> assign(:memory_edit_content, "")
       |> assign(:queued_prompts, AgentWorker.get_queue(session.id))
       |> assign(:thinking_enabled, false)
       |> assign(:max_budget_usd, nil)
@@ -218,47 +214,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Failed to spawn agent: #{inspect(reason)}")}
     end
-  end
-
-  @impl true
-  def handle_event("toggle_memories_panel", _params, socket) do
-    if socket.assigns.show_memories_panel do
-      {:noreply,
-       assign(socket,
-         show_memories_panel: false,
-         selected_memory_path: nil,
-         memory_edit_content: ""
-       )}
-    else
-      files = scan_claude_md_files(socket)
-      {:noreply, assign(socket, show_memories_panel: true, memory_files: files)}
-    end
-  end
-
-  @impl true
-  def handle_event("close_memories_panel", _params, socket) do
-    {:noreply,
-     assign(socket,
-       show_memories_panel: false,
-       selected_memory_path: nil,
-       memory_edit_content: ""
-     )}
-  end
-
-  @impl true
-  def handle_event("select_memory_file", %{"path" => path}, socket) do
-    content = File.read!(path)
-    {:noreply, assign(socket, selected_memory_path: path, memory_edit_content: content)}
-  end
-
-  @impl true
-  def handle_event("save_memory_file", %{"path" => path, "content" => content}, socket) do
-    File.write!(path, content)
-
-    {:noreply,
-     socket
-     |> assign(show_memories_panel: false, selected_memory_path: nil, memory_edit_content: "")
-     |> put_flash(:info, "Saved #{Path.basename(path)}")}
   end
 
   @impl true
@@ -1256,10 +1211,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         total_tokens={@total_tokens}
         total_cost={@total_cost}
         queued_prompts={@queued_prompts}
-        show_memories_panel={@show_memories_panel}
-        memory_files={@memory_files}
-        selected_memory_path={@selected_memory_path}
-        memory_edit_content={@memory_edit_content}
         thinking_enabled={@thinking_enabled}
         max_budget_usd={@max_budget_usd}
         compacting={@compacting}
@@ -1350,23 +1301,4 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     end
   end
 
-  defp scan_claude_md_files(socket) do
-    case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
-      {:ok, worktree_path} ->
-        Path.wildcard(Path.join(worktree_path, "**/CLAUDE.md"))
-        |> Enum.map(fn path ->
-          stat = File.stat!(path)
-
-          %{
-            path: path,
-            relative_path: Path.relative_to(path, worktree_path),
-            mtime: stat.mtime
-          }
-        end)
-        |> Enum.sort_by(& &1.relative_path)
-
-      _ ->
-        []
-    end
-  end
 end

@@ -235,6 +235,15 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
             "agent:working",
             {:agent_stopped, state.session_id, state.session_int_id}
           )
+
+          case Sessions.get_session(state.session_int_id) do
+            {:ok, session} ->
+              final_status = if exit_code == 0, do: "completed", else: "failed"
+              Sessions.end_session(session, %{final_status: final_status})
+
+            _ ->
+              :ok
+          end
         end
 
         {:noreply, %{state | port: nil, processing: false, session_ref: nil}}

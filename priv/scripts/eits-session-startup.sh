@@ -37,6 +37,14 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   echo "EITS_SESSION_UUID=$SESSION_ID" >> "$CLAUDE_ENV_FILE"
   _log "wrote EITS_SESSION_UUID=$SESSION_ID"
 
+  # Check if this session was pre-registered (e.g. by workable task worker)
+  # If so, inject EITS_AGENT_UUID so eits-init skips interactive prompting
+  EXISTING_AGENT_UUID=$(_pgq "SELECT a.uuid FROM agents a JOIN sessions s ON s.agent_id = a.id WHERE s.uuid = '$SESSION_ID' LIMIT 1" || true)
+  if [ -n "$EXISTING_AGENT_UUID" ]; then
+    echo "EITS_AGENT_UUID=$EXISTING_AGENT_UUID" >> "$CLAUDE_ENV_FILE"
+    _log "pre-registered session: wrote EITS_AGENT_UUID=$EXISTING_AGENT_UUID"
+  fi
+
   # Resolve or create project
   PROJECT_ID=$(_pgq "SELECT id FROM projects WHERE path = '$PROJECT_DIR_SQL' LIMIT 1" || true)
   if [ -z "$PROJECT_ID" ]; then
@@ -93,15 +101,23 @@ else
   PROJECT_TYPE="Git Repository"
 fi
 
+if [ -n "${EXISTING_AGENT_UUID:-}" ]; then
+  INIT_NOTE="Session pre-registered (spawned agent). EITS_AGENT_UUID is already set — skip /eits-init."
+  AGENT_UUID_LINE="**EITS_AGENT_UUID**: $EXISTING_AGENT_UUID (pre-registered)"
+else
+  INIT_NOTE="**IMPORTANT**: Call \`/eits-init\` to name and describe your session."
+  AGENT_UUID_LINE="**EITS_AGENT_UUID**: not yet set — available after /eits-init"
+fi
+
 CONTEXT="# Eye in the Sky Integration Active
 
-**IMPORTANT**: Call \`/eits-init\` to name and describe your session.
+$INIT_NOTE
 
 ## Session Context
 
 - **EITS_SESSION_UUID**: $SESSION_ID
 - **EITS_PROJECT_ID**: ${PROJECT_ID:-unresolved}
-- **EITS_AGENT_UUID**: not yet set — available after /eits-init via \`eits sessions get \$EITS_SESSION_UUID\`
+- $AGENT_UUID_LINE
 
 ## Required Workflow (enforced by hooks)
 

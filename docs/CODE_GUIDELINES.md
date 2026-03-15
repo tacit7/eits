@@ -336,6 +336,73 @@ end
 
 ---
 
+### 5. QueryBuilder Field Name Validation
+
+**Problem:** Dynamic SQL field names (from user input or configuration) can be exploited via SQL injection if not validated.
+
+**Safe pattern:**
+```elixir
+# QueryBuilder.maybe_where/3 validates field names before building queries
+def maybe_where(query, field_name, value) do
+  # Whitelist allowed field names
+  allowed_fields = ~w[title description state_id created_at last_activity_at]
+
+  if field_name in allowed_fields do
+    where(query, [{^field_name, value}])
+  else
+    # Reject invalid field names
+    {:error, “invalid field: #{field_name}”}
+  end
+end
+
+# Usage: Only pass trusted field names to dynamic queries
+query = Task |> maybe_where(“title”, “bug fix”) |> Repo.all()
+```
+
+**Guideline:** Validate field names against an explicit whitelist before interpolating into SQL. Never trust user input for column names.
+
+---
+
+---
+
+## Component Patterns
+
+### Session Card Component
+
+**Purpose:** Reusable card component for displaying session summary across multiple pages (agent_live/index, project sessions, overview).
+
+**Location:** `lib/eye_in_the_sky_web_web/components/session_card.ex`
+
+**Features:**
+- **Title/Name:** Session name (falls back to description if name unavailable)
+- **Status indicator:** Colored left border accent matching agent status (working=blue, idle=gray, waiting=yellow)
+- **Agent name:** Shows active agent assigned to session
+- **Last activity:** Displays last_activity_at timestamp (ISO8601 format, client-side timezone rendering)
+- **Model:** Shows Claude model version used in session
+- **Mobile responsive:** Hides status indicator on mobile to prevent layout clipping
+
+**Props:**
+```elixir
+<.session_card
+  session={@session}
+  on_click={JS.navigate(...)}
+  class=”optional-tailwind-classes”
+/>
+```
+
+**Mobile considerations:**
+- Status bullet hidden on mobile (status conveyed via border only)
+- No chevron icon (mobile layout doesn't need collapse indicators)
+- Full-width card for touch-friendly interaction
+
+**Reusability patterns:**
+- Used in agent_live/index (global sessions list)
+- Used in project_live/sessions (project-scoped sessions)
+- Used in overview (session summary cards)
+- Consistent styling across all contexts
+
+---
+
 ## “Gotchas” Checklist
 
 - If you see missing `current_scope`: fix routing/live_session + pass it to `<Layouts.app>`.

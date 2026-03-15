@@ -358,15 +358,27 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
   end
 
   defp format_tool_call("Bash", %{"command" => cmd}) do
-    truncated = String.slice(cmd, 0..120)
-    suffix = if String.length(cmd) > 121, do: "...", else: ""
-    "> `Bash` `#{truncated}#{suffix}`"
+    "> `Bash` #{cmd}"
   end
 
   defp format_tool_call("Task", %{"prompt" => prompt}) do
     truncated = String.slice(prompt, 0..80)
     suffix = if String.length(prompt) > 81, do: "...", else: ""
     "> `Task` #{truncated}#{suffix}"
+  end
+
+  defp format_tool_call(name, %{"message" => msg} = input)
+       when is_binary(name) and is_binary(msg) do
+    voice = Map.get(input, "voice", "")
+    rate = Map.get(input, "rate")
+
+    parts =
+      ["message: #{msg}", if(voice != "", do: "voice: #{voice}", else: nil),
+       if(rate, do: "rate: #{rate}", else: nil)]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.join(", ")
+
+    "> `#{name}` #{parts}"
   end
 
   defp format_tool_call(name, input) when is_map(input) do
@@ -376,7 +388,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
       |> Enum.take(2)
       |> Enum.filter(fn {_k, v} -> is_binary(v) or is_number(v) or is_atom(v) end)
       |> Enum.map(fn {k, v} ->
-        val = v |> to_string() |> String.slice(0..60)
+        val = v |> to_string() |> String.slice(0..500)
         "#{k}: #{val}"
       end)
       |> Enum.join(", ")

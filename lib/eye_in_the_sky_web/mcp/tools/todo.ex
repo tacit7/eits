@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
 
   alias EyeInTheSkyWeb.MCP.Tools.ResponseHelper
   alias EyeInTheSkyWeb.MCP.Tools.Helpers
+  alias EyeInTheSkyWeb.Tasks.WorkflowState
 
   schema do
     field :command, :string, required: true, description: "Command to execute"
@@ -34,7 +35,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
       title: params[:title],
       description: params[:description],
       priority: params[:priority],
-      state_id: params[:state_id] || 1,
+      state_id: params[:state_id] || WorkflowState.todo_id(),
       project_id: params[:project_id],
       team_id: params[:team_id],
       agent_id: resolve_agent_int_id(params[:agent_id]),
@@ -326,7 +327,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.Todo do
             end
 
           if task_int_id && session_int_id do
-            count = Tasks.unlink_session_from_task(task_int_id, session_int_id)
+            {:ok, count} = Tasks.unlink_session_from_task(task_int_id, session_int_id)
             %{success: true, message: "Unlinked session from task (#{count} row(s) removed)"}
           else
             %{success: false, message: "Could not resolve task_id or session_id"}

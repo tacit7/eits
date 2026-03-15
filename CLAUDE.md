@@ -87,6 +87,15 @@ Original code is kept as comments for future re-enablement when proper deduplica
 
 `lib/eye_in_the_sky_web/search/fts5.ex` wraps PostgreSQL `tsvector/tsquery` full-text search with an ILIKE fallback. The module name is a legacy artifact from the SQLite era — it is not FTS5. Use `FTS5.search_for/2` for all full-text queries across sessions, tasks, and notes.
 
+**Helper Function: `FTS5.fts_name_description_match/1`**
+
+Extracts reusable tsvector query fragments for common search patterns across sessions, tasks, and notes. This helper:
+- Builds PostgreSQL `@@` operator queries on indexed columns
+- Returns parameterized tsvector expressions for use in composed queries
+- Falls back to ILIKE for partial matching when tsquery doesn't match
+- Used in Sessions, Tasks, and Notes contexts for consistent search behavior
+- Performance: tsvector queries are O(log N) on indexed columns vs O(N) for ILIKE
+
 ### Workflow States
 
 The `workflow_states` table defines kanban columns. Current states:
@@ -116,3 +125,21 @@ In LiveViews and components:
 - `@session` typically refers to a `Session` struct (from sessions table)
 - Sessions have an `agent_id` foreign key pointing to the agents table
 - The `Agents` context handles agent CRUD; the `Sessions` context handles session-specific logic like `format_model_info/1`
+
+### Agent `last_activity_at` Schema
+
+**Migration History:**
+- Previous: DateTime field (Elixir datetime)
+- Current: ISO8601 text field (standardized string format)
+- Migration: `20260309000001_change_agent_last_activity_at_to_text.exs`
+
+**Impact:**
+- Agent status scheduling in `lib/eye_in_the_sky_web/scheduler/agent_status.ex` now uses ISO8601 strings
+- Queries comparing timestamps must use string comparison or convert to datetime
+- Use `DateTime.from_iso8601/1` when comparing with Elixir datetime values
+- Always pass ISO8601 strings when updating `last_activity_at` on agents
+
+**Sessions `last_activity_at` Ordering:**
+- Sessions can be sorted by `last_activity_at`, `created_at`, or `last_message_at`
+- Use `Sessions.list_sessions/2` with `:last_activity_at`, `:created_at`, or `:last_message_at` sort options
+- Filtering works with ISO8601 string values; comparisons use standard string ordering

@@ -125,9 +125,9 @@ cmd_tasks() {
       _get "/tasks/$id"
       ;;
     create)
-      # eits tasks create --title <t> [--description <d>] [--project <id>] [--priority <p>] [--session <uuid>] [--agent <uuid>]
+      # eits tasks create --title <t> [--description <d>] [--project <id>] [--priority <p>] [--session <uuid>] [--agent <uuid>] [--tags <id1,id2,...>]
       # Defaults: --agent from $EITS_AGENT_UUID, --project from $EITS_PROJECT_ID, --session from $EITS_SESSION_UUID (falls back to $EITS_SESSION_ID)
-      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" agent_id="${EITS_AGENT_UUID:-}"
+      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" agent_id="${EITS_AGENT_UUID:-}" tags=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --title)       title="$2";       shift 2 ;;
@@ -136,11 +136,19 @@ cmd_tasks() {
           --priority)    priority="$2";    shift 2 ;;
           --session)     session_id="$2";  shift 2 ;;
           --agent)       agent_id="$2";    shift 2 ;;
+          --tags)        tags="$2";        shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
       need title
-      _post "/tasks" "$(json title "$title" description "$description" project_id "$project_id" priority "$priority" session_id "$session_id" agent_id "$agent_id")"
+      local body
+      body="$(json title "$title" description "$description" project_id "$project_id" priority "$priority" session_id "$session_id" agent_id "$agent_id")"
+      if [[ -n "$tags" ]]; then
+        local tag_array
+        tag_array=$(echo "$tags" | jq -R 'split(",") | map(tonumber)')
+        body=$(echo "$body" | jq --argjson ids "$tag_array" '. + {tag_ids: $ids}')
+      fi
+      _post "/tasks" "$body"
       ;;
     update)
       # eits tasks update <id> [--state <id>] [--state-name <done|start>] [--priority <p>] [--description <d>]
@@ -201,8 +209,15 @@ cmd_tasks() {
       local session_id="${1:-}"; need session_id
       _delete "/tasks/$id/sessions/$session_id"
       ;;
+    tag)
+      # eits tasks tag <task_id> <tag_id>
+      local task_id="${1:-}"; need task_id; shift
+      local tag_id="${1:-}"; need tag_id
+      psql -d eits_dev -tAq -c "INSERT INTO task_tags (task_id, tag_id) VALUES ($task_id, $tag_id) ON CONFLICT DO NOTHING;"
+      echo "{\"success\":true,\"task_id\":\"$task_id\",\"tag_id\":\"$tag_id\"}"
+      ;;
     *)
-      echo "usage: eits tasks <list|get|create|update|done|start|delete|annotate|link-session|unlink-session>"
+      echo "usage: eits tasks <list|get|create|update|done|start|delete|annotate|link-session|unlink-session|tag>"
       ;;
   esac
 }

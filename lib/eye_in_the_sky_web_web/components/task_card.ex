@@ -7,6 +7,13 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   import EyeInTheSkyWebWeb.CoreComponents
   import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [format_due_date: 1, card_aging_indicator: 1]
 
+  alias EyeInTheSkyWeb.Tasks.WorkflowState
+
+  @state_todo WorkflowState.todo_id()
+  @state_in_progress WorkflowState.in_progress_id()
+  @state_in_review WorkflowState.in_review_id()
+  @state_done WorkflowState.done_id()
+
   attr :task, :map, required: true
   attr :variant, :string, default: "kanban", values: ["kanban", "grid", "list"]
   attr :on_click, :string, default: nil
@@ -38,7 +45,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   defp list_row(assigns) do
     dm_session =
       case assigns.task do
-        %{agents: [session | _]} -> session
+        %{sessions: [session | _]} -> session
         _ -> nil
       end
 
@@ -103,6 +110,13 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
     ~H"""
     <!-- Task Title + Priority -->
     <div class="flex items-start gap-2 mb-2">
+      <div
+        data-drag-handle
+        class="flex-shrink-0 mt-1 touch-none cursor-grab active:cursor-grabbing flex md:hidden items-center justify-center w-5 h-5 rounded text-base-content/20 hover:text-base-content/40"
+        aria-label="Drag to reorder"
+      >
+        <.icon name="hero-bars-2" class="w-3.5 h-3.5" />
+      </div>
       <h4
         class={
           "text-sm font-medium flex-1 hover:text-primary transition-colors cursor-pointer " <>
@@ -126,7 +140,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
           phx-click={@on_delete}
           phx-value-task_id={@task.uuid || to_string(@task.id)}
           phx-confirm="Delete this task?"
-          class="flex-shrink-0 opacity-0 group-hover/card:opacity-100 flex items-center justify-center w-5 h-5 rounded text-base-content/25 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-error"
+          class="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover/card:opacity-100 flex items-center justify-center w-7 h-7 sm:w-5 sm:h-5 rounded text-base-content/25 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-error"
           aria-label={"Delete task #{@task.title}"}
           onclick="event.stopPropagation();"
         >
@@ -173,19 +187,19 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
     <% end %>
 
     <!-- Meta Info -->
-    <div class="flex items-center gap-2 text-xs text-base-content/60 flex-wrap">
+    <div class="flex items-center gap-1.5 sm:gap-2 text-xs text-base-content/60 flex-wrap">
       <%= if @aging do %>
         <span class={"flex items-center gap-0.5 " <> if(String.contains?(elem(@aging, 1), "stale"), do: "text-error/70", else: "text-warning/70")}>
           <.icon name="hero-clock" class="w-3 h-3" />
           {elem(@aging, 1)}
         </span>
       <% end %>
-      <span class="font-mono text-xs">
+      <span class="font-mono text-xs hidden sm:inline">
         {String.slice(@task.uuid || "", 0..7)}
       </span>
       <button
         type="button"
-        class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] cursor-pointer hover:text-primary transition-colors z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+        class="inline-flex items-center justify-center p-1.5 -m-1 cursor-pointer hover:text-primary transition-colors z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
         phx-hook="CopyToClipboard"
         id={"copy-task-kanban-#{@task.id}"}
         data-copy={@task.uuid}
@@ -294,15 +308,15 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
 
   defp card_class(_), do: ""
 
-  defp card_body_class("kanban"), do: "card-body p-3"
+  defp card_body_class("kanban"), do: "card-body p-3.5 sm:p-3"
   defp card_body_class("grid"), do: "card-body p-5"
   defp card_body_class(_), do: ""
 
   # State ID -> text color for inline list rows
-  defp state_text_color(1), do: "text-base-content/55"
-  defp state_text_color(2), do: "text-info/80"
-  defp state_text_color(4), do: "text-warning/80"
-  defp state_text_color(3), do: "text-success/80"
+  defp state_text_color(@state_todo), do: "text-base-content/55"
+  defp state_text_color(@state_in_progress), do: "text-info/80"
+  defp state_text_color(@state_in_review), do: "text-warning/80"
+  defp state_text_color(@state_done), do: "text-success/80"
   defp state_text_color(_), do: "text-base-content/55"
 
   defp priority_class(priority) do

@@ -3,6 +3,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
 
   use EyeInTheSkyWebWeb, :html
 
+  alias EyeInTheSkyWeb.Tasks.WorkflowState
+
   @tabs [
     {"messages", "hero-chat-bubble-left-right", "Messages"},
     {"tasks", "hero-clipboard-document-list", "Tasks"},
@@ -35,10 +37,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :current_task, :map, default: nil
   attr :total_tokens, :integer, default: 0
   attr :total_cost, :float, default: 0.0
-  attr :show_memories_panel, :boolean, default: false
-  attr :memory_files, :list, default: []
-  attr :selected_memory_path, :string, default: nil
-  attr :memory_edit_content, :string, default: ""
   attr :queued_prompts, :list, default: []
   attr :thinking_enabled, :boolean, default: false
   attr :max_budget_usd, :any, default: nil
@@ -116,25 +114,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             <li><hr class="border-base-content/10 my-1" /></li>
             <li>
               <button
-                phx-hook="CopyToClipboard"
-                id="copy-session-uuid-slim"
-                data-copy={@session_uuid}
-                class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
-              >
-                <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Copy session ID
-              </button>
-            </li>
-            <li>
-              <button
-                phx-click="open_iterm"
-                class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
-              >
-                <.icon name="hero-command-line" class="w-3.5 h-3.5" /> Open in iTerm
-              </button>
-            </li>
-            <li><hr class="border-base-content/10 my-1" /></li>
-            <li>
-              <button
                 phx-click="reload_from_session_file"
                 data-confirm="This will delete all messages and re-import from the JSONL file. Continue?"
                 class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
@@ -148,19 +127,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
               >
                 <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Export as Markdown
-              </button>
-            </li>
-            <li><hr class="border-base-content/10 my-1" /></li>
-            <li>
-              <button
-                phx-click="toggle_memories_panel"
-                class={[
-                  "flex items-center gap-2 px-3 py-2 w-full text-left rounded",
-                  @show_memories_panel && "text-primary bg-primary/10",
-                  !@show_memories_panel && "hover:bg-base-content/5"
-                ]}
-              >
-                <.icon name="hero-cpu-chip" class="w-3.5 h-3.5" /> Memories
               </button>
             </li>
           </ul>
@@ -256,18 +222,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 </ul>
               </div>
               <button
-                phx-click="toggle_memories_panel"
-                class={[
-                  "hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors",
-                  @show_memories_panel && "text-primary bg-primary/10 hover:bg-primary/15",
-                  !@show_memories_panel &&
-                    "text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5"
-                ]}
-                id="dm-memories-button"
-              >
-                <.icon name="hero-cpu-chip" class="w-3.5 h-3.5" /> Memories
-              </button>
-              <button
                 id="dm-push-setup-btn"
                 phx-hook="PushSetup"
                 phx-update="ignore"
@@ -291,27 +245,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                   tabindex="0"
                   class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-52 text-xs"
                 >
-                  <li>
-                    <button
-                      phx-hook="CopyToClipboard"
-                      id="copy-session-uuid-mobile"
-                      data-copy={@session_uuid}
-                      class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
-                    >
-                      <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" />
-                      Copy session ID
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      phx-click="open_iterm"
-                      class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
-                    >
-                      <.icon name="hero-command-line" class="w-3.5 h-3.5" />
-                      Open in iTerm
-                    </button>
-                  </li>
-                  <li><hr class="border-base-content/10 my-1" /></li>
                   <li>
                     <button
                       phx-click="reload_from_session_file"
@@ -341,19 +274,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                     </button>
                   </li>
                   <li><hr class="border-base-content/10 my-1" /></li>
-                  <li>
-                    <button
-                      phx-click="toggle_memories_panel"
-                      class={[
-                        "flex items-center gap-2 px-3 py-2 w-full text-left rounded",
-                        @show_memories_panel && "text-primary bg-primary/10",
-                        !@show_memories_panel && "hover:bg-base-content/5"
-                      ]}
-                    >
-                      <.icon name="hero-cpu-chip" class="w-3.5 h-3.5" />
-                      Memories
-                    </button>
-                  </li>
                 </ul>
               </div>
             </div>
@@ -477,87 +397,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         </div>
       <% end %>
 
-      <%!-- Memories panel overlay --%>
-      <%= if @show_memories_panel do %>
-        <div class="absolute inset-0 z-50" id="memories-panel">
-          <div class="absolute inset-0 bg-black/60" phx-click="close_memories_panel"></div>
-          <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
-            <div
-              class="bg-base-100 rounded-xl shadow-2xl w-full max-w-3xl flex flex-col pointer-events-auto"
-              style="max-height: 80vh;"
-            >
-              <%!-- Panel header --%>
-              <div class="flex items-center justify-between px-5 py-3 border-b border-base-content/10 flex-shrink-0">
-                <div class="flex items-center gap-2">
-                  <.icon name="hero-cpu-chip" class="w-4 h-4 text-base-content/50" />
-                  <span class="font-semibold text-sm text-base-content">CLAUDE.md Files</span>
-                </div>
-                <button
-                  phx-click="close_memories_panel"
-                  class="text-base-content/40 hover:text-base-content transition-colors"
-                >
-                  <.icon name="hero-x-mark" class="w-5 h-5" />
-                </button>
-              </div>
-              <%!-- Panel body: file list + editor --%>
-              <div class="flex flex-1 min-h-0 overflow-hidden" style="min-height: 300px;">
-                <%!-- File list sidebar --%>
-                <div class="w-56 border-r border-base-content/10 overflow-y-auto flex-shrink-0">
-                  <%= if @memory_files == [] do %>
-                    <p class="text-xs text-base-content/40 p-4">No CLAUDE.md files found</p>
-                  <% else %>
-                    <%= for file <- @memory_files do %>
-                      <button
-                        class={[
-                          "w-full text-left px-4 py-2.5 hover:bg-base-content/5 transition-colors border-b border-base-content/5",
-                          @selected_memory_path == file.path && "bg-primary/10"
-                        ]}
-                        phx-click="select_memory_file"
-                        phx-value-path={file.path}
-                      >
-                        <p class="text-xs font-medium text-base-content/80 truncate">
-                          {file.relative_path}
-                        </p>
-                        <p class="text-[10px] text-base-content/40 mt-0.5">
-                          {format_mtime(file.mtime)}
-                        </p>
-                      </button>
-                    <% end %>
-                  <% end %>
-                </div>
-                <%!-- Editor pane --%>
-                <div class="flex-1 flex flex-col min-h-0 min-w-0">
-                  <%= if @selected_memory_path do %>
-                    <form phx-submit="save_memory_file" class="flex flex-col flex-1 min-h-0">
-                      <input type="hidden" name="path" value={@selected_memory_path} />
-                      <textarea
-                        id="memory-editor"
-                        name="content"
-                        class="flex-1 p-4 font-mono text-xs bg-transparent resize-none outline-none text-base-content/80"
-                        style="min-height: 250px;"
-                      >{@memory_edit_content}</textarea>
-                      <div class="flex justify-end gap-2 px-4 py-3 border-t border-base-content/10 flex-shrink-0">
-                        <button
-                          type="button"
-                          phx-click="close_memories_panel"
-                          class="btn btn-sm btn-ghost"
-                        >
-                          Cancel
-                        </button>
-                        <button type="submit" class="btn btn-sm btn-primary">Save</button>
-                      </div>
-                    </form>
-                  <% else %>
-                    <div class="flex-1 flex items-center justify-center text-base-content/30 text-sm select-none">
-                      Select a file to edit
-                    </div>
-                  <% end %>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      <% end %>
     </div>
     """
   end
@@ -932,8 +771,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   defp tool_widget_body(assigns) do
     body_type =
       cond do
-        assigns.name == "Bash" and is_map(assigns.input) and
-            Map.has_key?(assigns.input, "command") ->
+        assigns.name == "Bash" and assigns.rest != "" ->
           :bash
 
         assigns.name == "Edit" and is_map(assigns.input) and
@@ -964,7 +802,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
     <%= case @body_type do %>
       <% :bash -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-          <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-[10px] text-base-content/70 whitespace-pre-wrap break-all leading-relaxed">{@input["command"]}</pre>
+          <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-[10px] text-base-content/70 whitespace-pre-wrap break-all leading-relaxed">{(@input && @input["command"]) || @detail}</pre>
         </div>
       <% :edit -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5 space-y-1.5">
@@ -1394,31 +1232,32 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
 
   defp tasks_tab(assigns) do
     ~H"""
-    <%= if @tasks == [] do %>
-      <.empty_state
-        id="dm-tasks-empty"
-        icon="hero-clipboard-document-list"
-        title="No tasks yet"
-        subtitle="Tasks from this session will appear here"
-      />
-    <% else %>
-      <div
-        class="divide-y divide-base-content/5 bg-base-200 rounded-xl shadow-sm px-4"
-        id="dm-task-list"
-      >
-        <%= for task <- @tasks do %>
-          <% has_expandable = task.description || Map.get(task, :notes, []) != [] %>
-          <div class="flex items-start" id={"dm-task-#{task.id}"}>
-            <%!-- Edit button — outside collapse so checkbox overlay can't intercept --%>
-            <button
-              type="button"
-              phx-click="open_task_detail"
-              phx-value-task_id={task.uuid || to_string(task.id)}
-              class="flex-shrink-0 mt-3 p-1.5 rounded-md text-base-content/25 hover:text-base-content/70 hover:bg-base-content/8 transition-all z-10"
-              title="Edit task"
-            >
-              <.icon name="hero-pencil-square" class="w-3.5 h-3.5" />
-            </button>
+    <div class="flex flex-col gap-2">
+      <%= if @tasks == [] do %>
+        <.empty_state
+          id="dm-tasks-empty"
+          icon="hero-clipboard-document-list"
+          title="No tasks yet"
+          subtitle="Tasks from this session will appear here"
+        />
+      <% else %>
+        <div
+          class="divide-y divide-base-content/5 bg-base-200 rounded-xl shadow-sm px-4"
+          id="dm-task-list"
+        >
+          <%= for task <- @tasks do %>
+            <% has_expandable = task.description || Map.get(task, :notes, []) != [] %>
+            <div class="flex items-start" id={"dm-task-#{task.id}"}>
+              <%!-- Edit button — outside collapse so checkbox overlay can't intercept --%>
+              <button
+                type="button"
+                phx-click="open_task_detail"
+                phx-value-task_id={task.uuid || to_string(task.id)}
+                class="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-base-content/25 hover:text-base-content/70 active:text-primary transition-all z-10 md:min-w-0 md:min-h-0 md:mt-3 md:p-1.5"
+                title="Edit task"
+              >
+                <.icon name="hero-pencil-square" class="w-4 h-4 md:w-3.5 md:h-3.5" />
+              </button>
 
             <%!-- Collapse (status dot + title + expandable content) --%>
             <div class={["collapse flex-1", has_expandable && "collapse-arrow"]}>
@@ -1426,7 +1265,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               <div class="collapse-title py-3.5 px-0 min-h-0 flex items-center gap-3">
                 <%!-- Status dot --%>
                 <div class="flex-shrink-0 w-5 flex justify-center">
-                  <%= if task.state_id == 2 do %>
+                  <%= if task.state_id == WorkflowState.in_progress_id() do %>
                     <span class="relative flex h-2 w-2">
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-info opacity-50"></span>
                       <span class="relative inline-flex rounded-full h-2 w-2 bg-info"></span>
@@ -1434,9 +1273,9 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                   <% else %>
                     <span class={[
                       "inline-flex rounded-full h-2 w-2",
-                      task.state_id == 3 && "bg-success",
-                      task.state_id == 4 && "bg-warning",
-                      task.state_id not in [2, 3, 4] && "bg-base-content/20"
+                      task.state_id == WorkflowState.done_id() && "bg-success",
+                      task.state_id == WorkflowState.in_review_id() && "bg-warning",
+                      task.state_id not in [WorkflowState.in_progress_id(), WorkflowState.done_id(), WorkflowState.in_review_id()] && "bg-base-content/20"
                     ]}></span>
                   <% end %>
                 </div>
@@ -1454,10 +1293,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                     <%= if task.state do %>
                       <span class={[
                         "font-medium",
-                        task.state_id == 2 && "text-info/80",
-                        task.state_id == 3 && "text-success/80",
-                        task.state_id == 4 && "text-warning/80",
-                        task.state_id not in [2, 3, 4] && "text-base-content/45"
+                        task.state_id == WorkflowState.in_progress_id() && "text-info/80",
+                        task.state_id == WorkflowState.done_id() && "text-success/80",
+                        task.state_id == WorkflowState.in_review_id() && "text-warning/80",
+                        task.state_id not in [WorkflowState.in_progress_id(), WorkflowState.done_id(), WorkflowState.in_review_id()] && "text-base-content/45"
                       ]}>
                         {task.state.name}
                       </span>
@@ -1499,9 +1338,17 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               <% end %>
             </div>
           </div>
-        <% end %>
-      </div>
-    <% end %>
+          <% end %>
+        </div>
+      <% end %>
+      <button
+        phx-click="toggle_new_task_drawer"
+        class="flex items-center gap-2 w-full px-3 py-3 rounded-xl text-sm text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 active:bg-base-content/10 transition-colors border border-dashed border-base-content/15 hover:border-base-content/25"
+      >
+        <.icon name="hero-plus" class="w-4 h-4" />
+        Add task
+      </button>
+    </div>
     """
   end
 
@@ -1782,13 +1629,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
 
   defp format_number(_), do: "0"
 
-  defp format_mtime({{year, month, day}, {hour, min, _sec}}) do
-    :io_lib.format(~c"~4..0B-~2..0B-~2..0B ~2..0B:~2..0B", [year, month, day, hour, min])
-    |> IO.iodata_to_binary()
-  end
-
-  defp format_mtime(_), do: ""
-
   # Tool widget parsing helpers
 
   defp parse_body_segments(nil), do: [{:text, ""}]
@@ -1822,7 +1662,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   defp tool_widget_meta("Bash", rest) do
     command =
       with {:ok, %{"command" => cmd}} <- Jason.decode(rest) do
-        String.slice(cmd, 0..120) <> if(String.length(cmd) > 121, do: "…", else: "")
+        cmd
       else
         _ ->
           case Regex.run(~r/^`(.+?)`/s, rest, capture: :all_but_first) do

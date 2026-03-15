@@ -2,6 +2,12 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.{Teams, Tasks, Notes}
+  alias EyeInTheSkyWeb.Tasks.WorkflowState
+
+  @state_todo WorkflowState.todo_id()
+  @state_in_progress WorkflowState.in_progress_id()
+  @state_in_review WorkflowState.in_review_id()
+  @state_done WorkflowState.done_id()
 
   @impl true
   def mount(_params, _session, socket) do
@@ -148,7 +154,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
 
   defp team_detail(assigns) do
     active_members = Enum.count(assigns.team.members, &(&1.status == "active"))
-    done_tasks = Enum.count(assigns.team.tasks, &(&1.state_id == 3))
+    done_tasks = Enum.count(assigns.team.tasks, &(&1.state_id == @state_done))
     total_tasks = length(assigns.team.tasks)
     assigns = assign(assigns, active_members: active_members, done_tasks: done_tasks, total_tasks: total_tasks)
 
@@ -421,15 +427,15 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   defp member_avatar_class("done"), do: "bg-base-300 text-base-content/40"
   defp member_avatar_class(_), do: "bg-base-300 text-base-content/30"
 
-  defp task_state_dot(1), do: "bg-base-content/30"
-  defp task_state_dot(2), do: "bg-info"
-  defp task_state_dot(3), do: "bg-success"
-  defp task_state_dot(4), do: "bg-warning"
+  defp task_state_dot(@state_todo), do: "bg-base-content/30"
+  defp task_state_dot(@state_in_progress), do: "bg-info"
+  defp task_state_dot(@state_done), do: "bg-success"
+  defp task_state_dot(@state_in_review), do: "bg-warning"
   defp task_state_dot(_), do: "bg-base-content/20"
 
-  defp task_state_chip(1), do: "bg-base-300 text-base-content/40"
-  defp task_state_chip(2), do: "bg-info/15 text-info"
-  defp task_state_chip(3), do: "bg-success/15 text-success"
-  defp task_state_chip(4), do: "bg-warning/15 text-warning"
+  defp task_state_chip(@state_todo), do: "bg-base-300 text-base-content/40"
+  defp task_state_chip(@state_in_progress), do: "bg-info/15 text-info"
+  defp task_state_chip(@state_done), do: "bg-success/15 text-success"
+  defp task_state_chip(@state_in_review), do: "bg-warning/15 text-warning"
   defp task_state_chip(_), do: "bg-base-300 text-base-content/30"
 end

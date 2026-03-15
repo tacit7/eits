@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TeamStatus do
 
   alias EyeInTheSkyWeb.MCP.Tools.{Helpers, ResponseHelper}
   alias EyeInTheSkyWeb.{Repo, Teams}
+  alias EyeInTheSkyWeb.Tasks.WorkflowState
   import Ecto.Query
 
   schema do
@@ -48,7 +49,7 @@ defmodule EyeInTheSkyWeb.MCP.Tools.TeamStatus do
               idle: Enum.count(members, &(&1.status == "idle")),
               done: Enum.count(members, &(&1.status == "done")),
               total_tasks: length(tasks),
-              completed_tasks: Enum.count(tasks, &(&1.state_id == 3))
+              completed_tasks: Enum.count(tasks, &(&1.state_id == WorkflowState.done_id()))
             }
           }
       end

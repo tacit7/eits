@@ -150,7 +150,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
 
                 <%!-- Checklist --%>
                 <div>
-                  <% items = @task.checklist_items || [] %>
+                  <% items = if is_list(@task.checklist_items), do: @task.checklist_items, else: [] %>
                   <% total = length(items) %>
                   <% done = Enum.count(items, & &1.completed) %>
                   <div class="flex items-center gap-2 mb-2">

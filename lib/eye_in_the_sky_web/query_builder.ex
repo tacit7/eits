@@ -30,6 +30,10 @@ defmodule EyeInTheSkyWeb.QueryBuilder do
 
   import Ecto.Query, warn: false
 
+  # Fields that maybe_where/3 is permitted to filter on via dynamic field(x, ^field) access.
+  # Extend this list when adding new filter fields; passing an unlisted atom raises at runtime.
+  @allowed_where_fields [:project_id, :status, :state_id, :agent_id, :session_id]
+
   @doc """
   Applies common filters from opts: project_id, status, state_id, limit, offset.
   Does not apply order_by since defaults are schema-specific — call maybe_order/3 separately.
@@ -48,12 +52,21 @@ defmodule EyeInTheSkyWeb.QueryBuilder do
 
       maybe_where(query, opts, :state_id)
       # => WHERE state_id = ^value (only if opts[:state_id] is set)
+
+  `field` must be one of `@allowed_where_fields`. Passing an unlisted atom raises
+  `ArgumentError` to prevent accidental dynamic field access on arbitrary columns.
   """
-  def maybe_where(query, opts, field) do
+  def maybe_where(query, opts, field) when field in @allowed_where_fields do
     case Keyword.get(opts, field) do
       nil -> query
       value -> where(query, [x], field(x, ^field) == ^value)
     end
+  end
+
+  def maybe_where(_query, _opts, field) do
+    raise ArgumentError,
+      "maybe_where/3 does not allow filtering on :#{field}. " <>
+        "Add it to @allowed_where_fields in QueryBuilder if it is intentional."
   end
 
   @doc """

@@ -6,6 +6,14 @@ This file provides guidance to Claude Code when working with the Eye in the Sky 
 
 Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky. MCP server is Anubis (HTTP MCP), not Go.
 
+This project uses Phoenix LiveView with Elixir. Primary languages: TypeScript, JavaScript, Elixir/HEEx, Go, Rust. Use Tailwind CSS for styling.
+
+## Git Worktrees
+
+When working in git worktrees, always compile from the main project directory or symlink deps/build directories first. Never attempt to compile directly in a worktree without verifying deps are available.
+
+When using git worktrees, always verify you are editing files in the worktree directory, NOT the main project directory. Check `pwd` before making edits.
+
 ## Build & Run
 
 ```bash
@@ -19,6 +27,12 @@ Assets: `cd assets && npm install` for JS dependencies. Esbuild and Tailwind run
 ## Development Workflow
 
 **Before committing:** Always run `mix compile` to ensure the project compiles without errors. Only warnings are acceptable.
+
+After completing code changes, always run `mix compile --warnings-as-errors` to verify clean compilation before committing.
+
+## Bug Fixes
+
+When fixing bugs, search the entire file for ALL occurrences of the problematic pattern before committing. Don't fix just the first occurrence.
 
 ## REST API
 

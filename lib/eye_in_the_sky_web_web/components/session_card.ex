@@ -68,7 +68,7 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
           />
         </div>
       <% else %>
-        <span class={"flex-shrink-0 text-xs leading-none " <> @status_color} title={@status_label}>●</span>
+        <span class={"hidden sm:inline flex-shrink-0 text-xs leading-none " <> @status_color} title={@status_label}>●</span>
       <% end %>
 
       <%!-- Main content --%>
@@ -100,10 +100,6 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
         </div>
       <% end %>
 
-      <%!-- Chevron --%>
-      <div class="flex-shrink-0">
-        <.icon name="hero-chevron-right-mini" class="w-4 h-4 text-base-content/20" />
-      </div>
     </div>
     """
   end

@@ -158,7 +158,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
       <%!-- Team detail panel --%>
       <div class={[
         "flex-1 overflow-y-auto min-w-0 w-full",
-        @mobile_view == :list && "hidden sm:block"
+        @mobile_view == :list && "hidden sm:flex"
       ]}>
         <%= if @mobile_view == :detail do %>
           <button
@@ -439,7 +439,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   defp maybe_refresh_selected_team(%{assigns: %{selected_team_id: id}} = socket) do
     case Teams.get_team(id) do
       nil -> show_team_list(socket)
-      team -> show_team_detail(socket, id, load_team_detail(team))
+      team -> assign(socket, :selected_team, load_team_detail(team))
     end
   end
 

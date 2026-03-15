@@ -127,7 +127,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
           type="button"
           phx-click={@on_delete}
           phx-value-task_id={@task.uuid || to_string(@task.id)}
-          data-confirm="Delete this task?"
+          phx-confirm="Delete this task?"
           class="flex-shrink-0 opacity-0 group-hover/card:opacity-100 flex items-center justify-center w-5 h-5 rounded text-base-content/25 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-error"
           aria-label={"Delete task #{@task.title}"}
           onclick="event.stopPropagation();"

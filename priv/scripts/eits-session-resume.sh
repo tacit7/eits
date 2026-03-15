@@ -19,9 +19,10 @@ _log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [resume] $*" >> "$LOG_FILE" 2>/dev
 INPUT=$(cat)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || echo "")
 MODEL=$(echo "$INPUT" | jq -r '.model // empty' 2>/dev/null || echo "")
+ENTRYPOINT="${CLAUDE_CODE_ENTRYPOINT:-}"
 
-_log "--- session=$SESSION_ID model=${MODEL:-none}"
-echo "[EITS] resume: session=$SESSION_ID" >&2
+_log "--- session=$SESSION_ID model=${MODEL:-none} entrypoint=${ENTRYPOINT:-none}"
+echo "[EITS] resume: session=$SESSION_ID entrypoint=${ENTRYPOINT:-none}" >&2
 
 [ -z "$SESSION_ID" ] && exit 0
 
@@ -80,6 +81,7 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
     fi
   }
 
+  [ -n "$ENTRYPOINT" ] && _set "EITS_ENTRYPOINT" "$ENTRYPOINT"
   _set "EITS_SESSION_UUID" "$SESSION_ID"
   if [ -n "${SESSION_INT_ID:-}" ]; then
     _set "EITS_SESSION_ID" "$SESSION_INT_ID"
@@ -119,16 +121,28 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
     _log "WARN: project_id not resolved, skipping"
   fi
 
+  # Patch entrypoint on resumed session
+  if [ -n "$ENTRYPOINT" ]; then
+    curl -sf -X PATCH -H "Content-Type: application/json" \
+      -d "{\"entrypoint\":\"$ENTRYPOINT\"}" \
+      "${EITS_BASE}/sessions/${SESSION_ID}" >/dev/null 2>&1 || true
+    _log "patched entrypoint=$ENTRYPOINT"
+  fi
+
   echo "[EITS] env vars updated: SESSION_UUID=$SESSION_ID SESSION_ID=${SESSION_INT_ID:-} AGENT_ID=${AGENT_INT_ID:-} PROJECT_ID=${PROJECT_ID:-}" >&2
 else
   _log "WARN: CLAUDE_ENV_FILE not set, skipping env writes"
 fi
 
-# Write session UUID to .git/eits-session for post-commit hook
+# Write session/agent UUIDs to .git/ for post-commit hook
 GIT_DIR=$(git -C "$PROJECT_DIR" rev-parse --git-dir 2>/dev/null || true)
 if [ -n "$GIT_DIR" ]; then
   echo "$SESSION_ID" > "$GIT_DIR/eits-session" 2>/dev/null || true
   _log "wrote session UUID to $GIT_DIR/eits-session"
+  if [ -n "${AGENT_ID:-}" ]; then
+    echo "$AGENT_ID" > "$GIT_DIR/eits-agent" 2>/dev/null || true
+    _log "wrote agent UUID to $GIT_DIR/eits-agent"
+  fi
 fi
 
 # NATS (fire-and-forget)

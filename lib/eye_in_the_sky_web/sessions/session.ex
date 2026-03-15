@@ -52,6 +52,7 @@ defmodule EyeInTheSkyWeb.Sessions.Session do
     field :git_worktree_path, :string
     field :parent_agent_id, :integer
     field :parent_session_id, :integer
+    field :entrypoint, :string
     # Virtual field populated by context functions — never set by changesets.
     # Two callers:
     #   1. `Sessions.list_project_sessions_with_agent/2` — populated via
@@ -102,7 +103,8 @@ defmodule EyeInTheSkyWeb.Sessions.Session do
       :project_id,
       :git_worktree_path,
       :parent_agent_id,
-      :parent_session_id
+      :parent_session_id,
+      :entrypoint
     ])
     |> validate_required([:agent_id, :started_at])
     |> validate_inclusion(:status, [

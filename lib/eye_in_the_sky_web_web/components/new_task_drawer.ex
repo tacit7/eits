@@ -9,11 +9,15 @@ defmodule EyeInTheSkyWebWeb.Components.NewTaskDrawer do
   from the DOM entirely when closed.
   """
 
-  use Phoenix.LiveComponent
-  import EyeInTheSkyWebWeb.CoreComponents
+  use EyeInTheSkyWebWeb, :html
 
-  @impl true
-  def render(assigns) do
+  attr :id, :string, required: true
+  attr :show, :boolean, required: true
+  attr :workflow_states, :list, required: true
+  attr :toggle_event, :string, required: true
+  attr :submit_event, :string, required: true
+
+  def new_task_drawer(assigns) do
     ~H"""
     <div id={@id}>
       <%= if @show do %>

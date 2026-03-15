@@ -317,8 +317,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
     </div>
 
     <!-- New Task Drawer -->
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.NewTaskDrawer}
+    <EyeInTheSkyWebWeb.Components.NewTaskDrawer.new_task_drawer
       id="tasks-new-task-drawer"
       show={@show_create_task_drawer}
       workflow_states={@workflow_states}
@@ -327,8 +326,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
     />
 
     <!-- Task Detail Drawer -->
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.TaskDetailDrawer}
+    <EyeInTheSkyWebWeb.Components.TaskDetailDrawer.task_detail_drawer
       id="task-detail-drawer"
       show={@show_task_detail_drawer}
       task={@selected_task}

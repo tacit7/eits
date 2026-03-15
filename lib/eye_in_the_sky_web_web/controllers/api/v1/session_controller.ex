@@ -78,7 +78,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
               model_provider: model_provider,
               model_name: model_name,
               project_id: project_id,
-              git_worktree_path: params["worktree_path"]
+              git_worktree_path: params["worktree_path"],
+              entrypoint: params["entrypoint"]
             }
 
             create_fn =
@@ -131,6 +132,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
           %{}
           |> maybe_put(:status, status)
           |> maybe_put(:intent, params["intent"])
+          |> maybe_put(:entrypoint, params["entrypoint"])
           |> maybe_put(:last_activity_at, DateTime.utc_now() |> DateTime.to_iso8601())
 
         # For terminal states, set ended_at

@@ -276,6 +276,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   end
 
   @impl true
+  def handle_event("toggle_select_task", _params, socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("select_all_column", %{"state-id" => state_id_str}, socket) do
     state_id = parse_int(state_id_str, 0)
     column_uuids = Map.get(socket.assigns.tasks_by_state, state_id, []) |> Enum.map(& &1.uuid) |> Enum.reject(&is_nil/1)
@@ -979,8 +984,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       </div>
     </div>
 
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.NewTaskDrawer}
+    <EyeInTheSkyWebWeb.Components.NewTaskDrawer.new_task_drawer
       id="new-task-drawer"
       show={@show_new_task_drawer}
       workflow_states={@workflow_states}
@@ -988,8 +992,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       submit_event="create_new_task"
     />
 
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.TaskDetailDrawer}
+    <EyeInTheSkyWebWeb.Components.TaskDetailDrawer.task_detail_drawer
       id="task-detail-drawer"
       show={@show_task_detail_drawer}
       task={@selected_task}

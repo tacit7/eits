@@ -4,8 +4,6 @@
 set -uo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE=${EITS_API_URL:-https://localhost:5001/api/v1}
-_curl() { curl ${EITS_API_KEY:+-H "Authorization: Bearer ${EITS_API_KEY}"} "$@"; }
 
 EITS_PG_DB="${EITS_PG_DB:-eits_dev}"
 EITS_PG_USER="${EITS_PG_USER:-postgres}"
@@ -34,10 +32,8 @@ _pgq "
     AND t.archived = false
 " || true
 
-# Update session status to completed via REST
-_curl -sk -X PATCH "$BASE/sessions/$session_id" \
-  -H 'Content-Type: application/json' \
-  -d '{"status":"completed"}' >/dev/null 2>&1
+# Update session status to completed via eits CLI
+EITS_URL="${EITS_API_URL:-http://localhost:5000/api/v1}" eits sessions update "$session_id" --status completed >/dev/null 2>&1 || true
 
 # Publish to NATS
 "$HOOK_DIR/nats/publish-session-end.sh" "$session_id" "completed"

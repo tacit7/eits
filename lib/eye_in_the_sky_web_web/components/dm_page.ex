@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         </div>
       </div>
       <%!-- Mobile slim top bar (replaces global app header on DM page) --%>
-      <div class="md:hidden flex-shrink-0 flex items-center gap-1 px-2 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-base-100">
+      <div class="md:hidden sticky top-0 z-30 flex-shrink-0 flex items-center gap-1 px-2 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-base-100">
         <button
           phx-click={Phoenix.LiveView.JS.dispatch("sidebar:open", to: "#app-sidebar")}
           class="btn btn-ghost btn-square w-10 h-10 text-base-content/60"
@@ -79,9 +79,15 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         </button>
         <div class="flex-1 flex items-center justify-center gap-1.5 min-w-0 px-1">
           <div class={"w-1.5 h-1.5 rounded-full flex-shrink-0 " <> if(is_nil(@agent.ended_at) || @agent.ended_at == "", do: "bg-success animate-pulse", else: "bg-base-content/20")} />
-          <span class="text-sm font-semibold text-base-content/85 truncate">
-            {@agent.name || "Session"}
-          </span>
+          <input
+            type="text"
+            value={@agent.name || ""}
+            placeholder="Session name"
+            phx-blur="update_session_name"
+            phx-keydown="update_session_name"
+            phx-key="Enter"
+            class="text-sm font-semibold text-base-content/85 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 flex-1 text-center placeholder:text-base-content/20 transition-colors"
+          />
         </div>
         <div class="dropdown dropdown-end">
           <button
@@ -141,29 +147,48 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         <div class="px-4 sm:px-5 py-3" id="dm-header">
           <div class="flex items-center gap-2 min-w-0">
             <%!-- Left: status + name + badges --%>
-            <div class="flex items-center gap-2 min-w-0 flex-1">
-              <div class={"w-2 h-2 rounded-full flex-shrink-0 " <> if(is_nil(@agent.ended_at) || @agent.ended_at == "", do: "bg-success animate-pulse", else: "bg-base-content/20")} />
-              <h1 class="text-base sm:text-lg font-bold text-base-content truncate min-w-0">
-                {@agent.name || "Session"}
-              </h1>
-              <button
-                type="button"
-                class="hidden sm:flex items-center gap-1 text-[11px] font-mono text-base-content/30 bg-base-content/5 px-2 py-0.5 rounded hover:text-base-content/50 hover:bg-base-content/8 transition-colors cursor-pointer flex-shrink-0"
-                phx-hook="CopyToClipboard"
-                id="copy-session-uuid"
-                data-copy={@session_uuid}
-              >
-                {if @session_uuid, do: String.slice(@session_uuid, 0..7), else: "—"}
-                <.icon name="hero-clipboard-document" class="w-3 h-3" />
-              </button>
-              <button
-                type="button"
-                phx-click="open_iterm"
-                title="Open in iTerm"
-                class="hidden sm:flex items-center gap-1 text-[11px] text-base-content/30 bg-base-content/5 px-2 py-0.5 rounded hover:text-base-content/50 hover:bg-base-content/8 transition-colors cursor-pointer flex-shrink-0"
-              >
-                <.icon name="hero-command-line" class="w-3 h-3" />
-              </button>
+            <div class="flex items-start gap-2 min-w-0 flex-1">
+              <div class={"w-2 h-2 rounded-full flex-shrink-0 mt-[5px] " <> if(is_nil(@agent.ended_at) || @agent.ended_at == "", do: "bg-success animate-pulse", else: "bg-base-content/20")} />
+              <div class="flex flex-col min-w-0 flex-1">
+                <div class="flex items-center gap-2 min-w-0">
+                  <input
+                    type="text"
+                    value={@agent.name || ""}
+                    placeholder="Session name"
+                    phx-blur="update_session_name"
+                    phx-keydown="update_session_name"
+                    phx-key="Enter"
+                    class="text-base sm:text-lg font-bold text-base-content bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 flex-1 placeholder:text-base-content/20 transition-colors"
+                  />
+                  <button
+                    type="button"
+                    class="hidden sm:flex items-center gap-1 text-[11px] font-mono text-base-content/30 bg-base-content/5 px-2 py-0.5 rounded hover:text-base-content/50 hover:bg-base-content/8 transition-colors cursor-pointer flex-shrink-0"
+                    phx-hook="CopyToClipboard"
+                    id="copy-session-uuid"
+                    data-copy={@session_uuid}
+                  >
+                    {if @session_uuid, do: String.slice(@session_uuid, 0..7), else: "—"}
+                    <.icon name="hero-clipboard-document" class="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    phx-click="open_iterm"
+                    title="Open in iTerm"
+                    class="hidden sm:flex items-center gap-1 text-[11px] text-base-content/30 bg-base-content/5 px-2 py-0.5 rounded hover:text-base-content/50 hover:bg-base-content/8 transition-colors cursor-pointer flex-shrink-0"
+                  >
+                    <.icon name="hero-command-line" class="w-3 h-3" />
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={@agent.description || ""}
+                  placeholder="Add a description..."
+                  phx-blur="update_session_description"
+                  phx-keydown="update_session_description"
+                  phx-key="Enter"
+                  class="text-xs text-base-content/40 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 placeholder:text-base-content/20 transition-colors w-full"
+                />
+              </div>
             </div>
             <%!-- Right: controls --%>
             <div class="flex items-center gap-1 flex-shrink-0">

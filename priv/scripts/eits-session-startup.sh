@@ -19,9 +19,10 @@ _log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [startup] $*" >> "$LOG_FILE" 2>/de
 INPUT=$(cat)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || echo "")
 MODEL=$(echo "$INPUT" | jq -r '.model // empty' 2>/dev/null || echo "")
+ENTRYPOINT="${CLAUDE_CODE_ENTRYPOINT:-}"
 
-_log "--- session=$SESSION_ID model=${MODEL:-none}"
-echo "[EITS] startup: session=$SESSION_ID" >&2
+_log "--- session=$SESSION_ID model=${MODEL:-none} entrypoint=${ENTRYPOINT:-none}"
+echo "[EITS] startup: session=$SESSION_ID entrypoint=${ENTRYPOINT:-none}" >&2
 
 [ -z "$SESSION_ID" ] && exit 0
 
@@ -38,6 +39,7 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   [ -n "${EITS_API_KEY:-}" ] && echo "EITS_API_KEY=${EITS_API_KEY}" >> "$CLAUDE_ENV_FILE"
   echo "EITS_SESSION_UUID=$SESSION_ID" >> "$CLAUDE_ENV_FILE"
   _log "wrote EITS_SESSION_UUID=$SESSION_ID"
+  [ -n "$ENTRYPOINT" ] && echo "EITS_ENTRYPOINT=$ENTRYPOINT" >> "$CLAUDE_ENV_FILE" && _log "wrote EITS_ENTRYPOINT=$ENTRYPOINT"
 
   # Check if this session was pre-registered (e.g. by workable task worker)
   # If so, inject EITS_AGENT_UUID so eits-init skips interactive prompting
@@ -45,6 +47,13 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   if [ -n "$EXISTING_AGENT_UUID" ]; then
     echo "EITS_AGENT_UUID=$EXISTING_AGENT_UUID" >> "$CLAUDE_ENV_FILE"
     _log "pre-registered session: wrote EITS_AGENT_UUID=$EXISTING_AGENT_UUID"
+    # Patch entrypoint on pre-registered sessions
+    if [ -n "$ENTRYPOINT" ]; then
+      curl -sf -X PATCH -H "Content-Type: application/json" \
+        -d "{\"entrypoint\":\"$ENTRYPOINT\"}" \
+        "${EITS_BASE}/sessions/${SESSION_ID}" >/dev/null 2>&1 || true
+      _log "patched entrypoint=$ENTRYPOINT on pre-registered session"
+    fi
   fi
 
   # Resolve or create project

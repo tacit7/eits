@@ -220,7 +220,10 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Settings do
                       type="number"
                       name="value"
                       value={
-                        div(String.to_integer(@settings["cli_idle_timeout_ms"] || "300000"), 1000)
+                        div(String.to_integer(case @settings["cli_idle_timeout_ms"] do
+                          v when v in [nil, ""] -> "300000"
+                          v -> v
+                        end), 1000)
                       }
                       min="30"
                       max="3600"

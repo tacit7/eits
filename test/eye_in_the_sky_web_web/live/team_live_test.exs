@@ -29,9 +29,10 @@ defmodule EyeInTheSkyWebWeb.TeamLive.IndexTest do
 
       html = lv |> element("[phx-click='select_team'][phx-value-id='#{team.id}']") |> render_click()
 
-      # Back button present — mobile_view is now :detail
-      assert html =~ ~s(phx-click="close_team")
+      # Team name visible in detail view
       assert html =~ "Test Team Select"
+      # Back button visible on mobile (proves mobile_view: :detail state)
+      assert html =~ ~s(phx-click="close_team")
     end
 
     test "close_team resets mobile_view to :list", %{conn: conn} do
@@ -45,7 +46,9 @@ defmodule EyeInTheSkyWebWeb.TeamLive.IndexTest do
       # Close team via the back button
       html = lv |> element("[phx-click='close_team']") |> render_click()
 
-      # Back button gone — mobile_view is back to :list
+      # Back to list state — detail panel should be hidden again (mobile_view: :list)
+      assert html =~ ~s(hidden sm:block)
+      # Back button gone (mobile_view: :list means no back button)
       refute html =~ ~s(phx-click="close_team")
     end
   end

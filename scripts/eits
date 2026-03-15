@@ -58,8 +58,8 @@ cmd_sessions() {
       _get "/sessions/$uuid"
       ;;
     create)
-      # eits sessions create --session-id <uuid> [--name <n>] [--description <d>] [--project <p>] [--model <m>]
-      local session_id="" name="" description="" project_name="" model=""
+      # eits sessions create --session-id <uuid> [--name <n>] [--description <d>] [--project <p>] [--model <m>] [--entrypoint <e>]
+      local session_id="" name="" description="" project_name="" model="" entrypoint=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --session-id)  session_id="$2";   shift 2 ;;
@@ -67,24 +67,26 @@ cmd_sessions() {
           --description) description="$2";  shift 2 ;;
           --project)     project_name="$2"; shift 2 ;;
           --model)       model="$2";        shift 2 ;;
+          --entrypoint)  entrypoint="$2";   shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
       need session_id
-      _post "/sessions" "$(json session_id "$session_id" name "$name" description "$description" project_name "$project_name" model "$model")"
+      _post "/sessions" "$(json session_id "$session_id" name "$name" description "$description" project_name "$project_name" model "$model" entrypoint "$entrypoint")"
       ;;
     update)
-      # eits sessions update <uuid> [--status <status>] [--intent <text>]
+      # eits sessions update <uuid> [--status <status>] [--intent <text>] [--entrypoint <e>]
       local uuid="${1:-}"; need uuid; shift
-      local status="" intent=""
+      local status="" intent="" entrypoint=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --status) status="$2"; shift 2 ;;
-          --intent) intent="$2"; shift 2 ;;
+          --status)     status="$2";     shift 2 ;;
+          --intent)     intent="$2";     shift 2 ;;
+          --entrypoint) entrypoint="$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      _patch "/sessions/$uuid" "$(json status "$status" intent "$intent")"
+      _patch "/sessions/$uuid" "$(json status "$status" intent "$intent" entrypoint "$entrypoint")"
       ;;
     end)
       local uuid="${1:-}"; need uuid
@@ -174,6 +176,13 @@ cmd_tasks() {
       # Auto-link current session atomically with the state transition
       local _sess="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
       _patch "/tasks/$id" "$(json state "start" session_id "$_sess")"
+      # Belt-and-suspenders: explicit follow-up link in case the session wasn't
+      # in the DB yet when the PATCH was processed (silent no-op if already linked)
+      if [[ -n "$_sess" ]]; then
+        _curl -sf -X POST -H "Content-Type: application/json" \
+          -d "$(json session_id "$_sess")" \
+          "$BASE_URL/tasks/$id/sessions" >/dev/null 2>&1 || true
+      fi
       ;;
     delete)
       local id="${1:-}"; need id
@@ -229,6 +238,11 @@ cmd_tasks() {
       task_id=$(echo "$create_resp" | jq -r '.task_id // empty')
       [[ -n "$task_id" ]] || die "task creation failed"
       _patch "/tasks/$task_id" "$(json state "start" session_id "$_sess")" > /dev/null
+      if [[ -n "$_sess" ]]; then
+        _curl -sf -X POST -H "Content-Type: application/json" \
+          -d "$(json session_id "$_sess")" \
+          "$BASE_URL/tasks/$task_id/sessions" >/dev/null 2>&1 || true
+      fi
       ;;
     tag)
       # eits tasks tag <task_id> <tag_id>

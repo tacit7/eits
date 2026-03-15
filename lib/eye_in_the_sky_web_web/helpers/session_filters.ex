@@ -108,7 +108,7 @@ defmodule EyeInTheSkyWebWeb.Helpers.SessionFilters do
   end
 
   @doc """
-  Sorts sessions by "name", "status", or "recent" (default).
+  Sorts sessions by "name", "status", "created", "last_message", or "recent" (default).
   """
   def sort_agents(sessions, sort_by) do
     case sort_by do
@@ -117,6 +117,20 @@ defmodule EyeInTheSkyWebWeb.Helpers.SessionFilters do
 
       "status" ->
         Enum.sort_by(sessions, &session_status_rank/1)
+
+      "created" ->
+        Enum.sort_by(
+          sessions,
+          fn s -> sort_datetime(s.started_at) end,
+          {:desc, NaiveDateTime}
+        )
+
+      "last_message" ->
+        Enum.sort_by(
+          sessions,
+          fn s -> sort_datetime(s.last_activity_at || s.started_at) end,
+          {:desc, NaiveDateTime}
+        )
 
       _ ->
         Enum.sort_by(

@@ -24,7 +24,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
       socket =
         socket
         |> assign(:search_query, "")
-        |> assign(:sort_by, "recent")
+        |> assign(:sort_by, "last_message")
         |> assign(:session_filter, "all")
         |> assign(:show_new_session_drawer, false)
         |> assign(:show_filter_sheet, false)
@@ -424,6 +424,28 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
               <% end %>
             </div>
 
+            <%!-- Desktop sort pills (hidden on mobile) --%>
+            <div class="hidden sm:flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
+              <%= for {label, sort} <- [
+                {"Last msg", "last_message"},
+                {"Created", "created"},
+                {"Name", "name"}
+              ] do %>
+                <button
+                  phx-click="sort"
+                  phx-value-by={sort}
+                  aria-pressed={@sort_by == sort}
+                  class={"px-3 py-1 rounded-md text-xs font-medium transition-all duration-150 " <>
+                    if(@sort_by == sort,
+                      do: "bg-base-100 text-base-content shadow-sm",
+                      else: "text-base-content/60 hover:text-base-content/85"
+                    )}
+                >
+                  {label}
+                </button>
+              <% end %>
+            </div>
+
             <%!-- Mobile filter button (hidden on sm+) --%>
             <button
               phx-click="open_filter_sheet"
@@ -432,7 +454,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
               class="sm:hidden relative btn btn-ghost btn-sm btn-square"
             >
               <.icon name="hero-funnel-mini" class="w-4 h-4" />
-              <%= if @session_filter != "all" || @sort_by != "recent" do %>
+              <%= if @session_filter != "all" || @sort_by != "last_message" do %>
                 <span class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full" aria-hidden="true"></span>
               <% end %>
             </button>
@@ -499,7 +521,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
               <fieldset class="mb-6">
                 <legend class="text-xs font-medium text-base-content/50 uppercase tracking-wider mb-2">Sort by</legend>
                 <div class="flex flex-wrap gap-2">
-                  <%= for {label, sort} <- [{"Recent", "recent"}, {"Name", "name"}, {"Status", "status"}] do %>
+                  <%= for {label, sort} <- [{"Last Message", "last_message"}, {"Created", "created"}, {"Name", "name"}, {"Status", "status"}] do %>
                     <button
                       phx-click="sort"
                       phx-value-by={sort}
@@ -578,7 +600,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
             <div
               id="ps-list"
               phx-update="stream"
-              class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl px-4"
+              class="divide-y divide-base-content/5 bg-base-200 rounded-xl px-4"
             >
             <div
               :for={{dom_id, agent} <- @streams.session_list}

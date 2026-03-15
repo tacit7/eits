@@ -5,6 +5,17 @@
 
 set -uo pipefail
 
+# --- EITS Workflow Guard ---
+EITS_WORKFLOW="${EITS_WORKFLOW:-}"
+if [ -z "$EITS_WORKFLOW" ]; then
+  EITS_URL="${EITS_API_URL:-http://localhost:5000/api/v1}"
+  ENABLED=$(curl -sf "${EITS_URL}/settings/eits_workflow_enabled" 2>/dev/null | jq -r '.enabled' 2>/dev/null || echo "true")
+  [ "$ENABLED" = "false" ] && exit 0
+elif [ "$EITS_WORKFLOW" = "0" ]; then
+  exit 0
+fi
+# --- End Workflow Guard ---
+
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MAPPING_FILE="$HOME/.claude/hooks/session_agent_map.json"
 LOG_FILE="$HOME/.config/eye-in-the-sky/compact-hook.log"

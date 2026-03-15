@@ -3,7 +3,16 @@
 # Fires before Claude processes the prompt — marks the process as active.
 set -uo pipefail
 
-[ "${EITS_WORKFLOW:-1}" = "0" ] && exit 0
+# --- EITS Workflow Guard ---
+EITS_WORKFLOW="${EITS_WORKFLOW:-}"
+if [ -z "$EITS_WORKFLOW" ]; then
+  EITS_URL="${EITS_API_URL:-http://localhost:5000/api/v1}"
+  ENABLED=$(curl -sf "${EITS_URL}/settings/eits_workflow_enabled" 2>/dev/null | jq -r '.enabled' 2>/dev/null || echo "true")
+  [ "$ENABLED" = "false" ] && exit 0
+elif [ "$EITS_WORKFLOW" = "0" ]; then
+  exit 0
+fi
+# --- End Workflow Guard ---
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

@@ -4,6 +4,17 @@
 
 set -uo pipefail
 
+# --- EITS Workflow Guard ---
+EITS_WORKFLOW="${EITS_WORKFLOW:-}"
+if [ -z "$EITS_WORKFLOW" ]; then
+  EITS_URL="${EITS_API_URL:-http://localhost:5000/api/v1}"
+  ENABLED=$(curl -sf "${EITS_URL}/settings/eits_workflow_enabled" 2>/dev/null | jq -r '.enabled' 2>/dev/null || echo "true")
+  [ "$ENABLED" = "false" ] && exit 0
+elif [ "$EITS_WORKFLOW" = "0" ]; then
+  exit 0
+fi
+# --- End Workflow Guard ---
+
 EITS_PG_DB="${EITS_PG_DB:-eits_dev}"
 EITS_PG_USER="${EITS_PG_USER:-postgres}"
 EITS_PG_HOST="${EITS_PG_HOST:-localhost}"

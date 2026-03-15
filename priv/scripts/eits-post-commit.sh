@@ -3,6 +3,17 @@
 # Reads session UUID from .git/eits-session written by startup/resume hooks.
 set -uo pipefail
 
+# --- EITS Workflow Guard ---
+EITS_WORKFLOW="${EITS_WORKFLOW:-}"
+if [ -z "$EITS_WORKFLOW" ]; then
+  EITS_URL="${EITS_API_URL:-http://localhost:5000/api/v1}"
+  ENABLED=$(curl -sf "${EITS_URL}/settings/eits_workflow_enabled" 2>/dev/null | jq -r '.enabled' 2>/dev/null || echo "true")
+  [ "$ENABLED" = "false" ] && exit 0
+elif [ "$EITS_WORKFLOW" = "0" ]; then
+  exit 0
+fi
+# --- End Workflow Guard ---
+
 GIT_DIR="$(git rev-parse --git-dir 2>/dev/null)" || exit 0
 SESSION_FILE="$GIT_DIR/eits-session"
 AGENT_FILE="$GIT_DIR/eits-agent"

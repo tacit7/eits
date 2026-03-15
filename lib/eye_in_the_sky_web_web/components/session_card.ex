@@ -45,7 +45,7 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
     ~H"""
     <div
       id={"swipe-row-#{@session.id}"}
-      class="relative overflow-hidden bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)]"
+      class={"relative overflow-hidden bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] border-l-2 " <> @status_border}
       phx-hook="SwipeRow"
     >
       <%!-- Action panel (mobile only, sits behind the row, revealed by swipe) --%>
@@ -94,7 +94,7 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
       <%!-- Row content (slides left on swipe) --%>
       <div
         data-swipe-row
-        class={"group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer border-l-2 bg-inherit relative z-[1] will-change-transform " <> @status_border}
+        class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer bg-inherit relative z-[1] will-change-transform"
         phx-click={if !@select_mode, do: @click_event}
         phx-value-id={@session.id}
         role="button"

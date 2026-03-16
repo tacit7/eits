@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
 
   import EyeInTheSkyWebWeb.ControllerHelpers
 
-  alias EyeInTheSkyWeb.{Agents, Claude.AgentManager, Teams}
+  alias EyeInTheSkyWeb.{Agents, Claude.AgentManager, Sessions, Teams}
   alias EyeInTheSkyWebWeb.Presenters.ApiPresenter
 
   @doc """
@@ -175,5 +175,137 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
     4. Run the `/i-update-status` slash command to commit your work and update session tracking
     Do NOT skip any steps. The orchestrator needs to see what you did.
     """
+  end
+
+  defp coerce_parent_id(nil, _field), do: {:ok, nil}
+  defp coerce_parent_id("", _field), do: {:ok, nil}
+  defp coerce_parent_id(val, _field) when is_integer(val), do: {:ok, val}
+
+  defp coerce_parent_id(val, field) when is_binary(val) do
+    case Integer.parse(val) do
+      {int, ""} -> {:ok, int}
+      _         -> {:error, "invalid_parameter", "#{field} must be an integer"}
+    end
+  end
+
+  defp coerce_parent_id(_val, field),
+    do: {:error, "invalid_parameter", "#{field} must be an integer"}
+
+  defp validate_instructions(nil),
+    do: {:error, "missing_required", "instructions is required"}
+
+  defp validate_instructions(val) when is_binary(val) do
+    trimmed = String.trim(val)
+
+    cond do
+      trimmed == "" ->
+        {:error, "missing_required", "instructions is required"}
+
+      String.length(trimmed) > 32_000 ->
+        {:error, "instructions_too_long", "instructions exceeds 32000 character limit"}
+
+      true ->
+        {:ok, trimmed}
+    end
+  end
+
+  defp validate_model(model) when model in @valid_models, do: {:ok, model}
+
+  defp validate_model(_model),
+    do: {:error, "invalid_model", "invalid model; must be one of: #{Enum.join(@valid_models, ", ")}"}
+
+  defp validate_parent_agent(nil), do: {:ok, nil}
+
+  defp validate_parent_agent(id) do
+    case Agents.get_agent(id) do
+      {:ok, _}             -> {:ok, id}
+      {:error, :not_found} -> {:error, "parent_not_found", "parent_agent_id #{id} does not exist"}
+    end
+  end
+
+  defp validate_parent_session(nil), do: {:ok, nil}
+
+  defp validate_parent_session(id) do
+    case Sessions.get_session(id) do
+      {:ok, _}             -> {:ok, id}
+      {:error, :not_found} -> {:error, "parent_not_found", "parent_session_id #{id} does not exist"}
+    end
+  end
+
+  defp validate_params(params) do
+    model = params["model"] || "haiku"
+
+    with {:ok, instructions}      <- validate_instructions(params["instructions"]),
+         {:ok, _}                 <- validate_model(model),
+         {:ok, parent_agent_id}   <- coerce_parent_id(params["parent_agent_id"], "parent_agent_id"),
+         {:ok, parent_session_id} <- coerce_parent_id(params["parent_session_id"], "parent_session_id"),
+         {:ok, _}                 <- validate_parent_agent(parent_agent_id),
+         {:ok, _}                 <- validate_parent_session(parent_session_id) do
+      {:ok,
+       Map.merge(params, %{
+         "instructions"      => instructions,
+         "model"             => model,
+         "parent_agent_id"   => parent_agent_id,
+         "parent_session_id" => parent_session_id
+       })}
+    end
+  end
+
+  defp resolve_team(params) do
+    case params["team_name"] do
+      name when name in [nil, ""] ->
+        {:ok, nil}
+
+      name ->
+        case Teams.get_team_by_name(name) do
+          nil  -> {:error, "team_not_found", "team not found: #{name}"}
+          team -> {:ok, team}
+        end
+    end
+  end
+
+  defp apply_team_context(instructions, nil, _member_name), do: instructions
+
+  defp apply_team_context(instructions, team, member_name) do
+    instructions <> "\n\n" <> build_team_context(team, member_name)
+  end
+
+  defp build_spawn_opts(params, _team) do
+    [
+      instructions:      params["instructions"],
+      model:             params["model"],
+      agent_type:        params["provider"] || "claude",
+      project_id:        parse_int(params["project_id"], nil),
+      project_path:      params["project_path"],
+      description:       String.slice(params["instructions"] || "Agent session", 0, 250),
+      worktree:          params["worktree"],
+      effort_level:      params["effort_level"],
+      parent_agent_id:   params["parent_agent_id"],
+      parent_session_id: params["parent_session_id"],
+      agent:             params["agent"]
+    ]
+  end
+
+  defp build_response(agent, session, nil, _member_name) do
+    %{
+      success:      true,
+      message:      "Agent spawned",
+      agent_id:     agent.uuid,
+      session_id:   session.id,
+      session_uuid: session.uuid
+    }
+  end
+
+  defp build_response(agent, session, team, member_name) do
+    %{
+      success:      true,
+      message:      "Agent spawned",
+      agent_id:     agent.uuid,
+      session_id:   session.id,
+      session_uuid: session.uuid,
+      team_id:      team.id,
+      team_name:    team.name,
+      member_name:  member_name
+    }
   end
 end

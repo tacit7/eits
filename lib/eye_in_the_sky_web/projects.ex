@@ -39,6 +39,13 @@ defmodule EyeInTheSkyWeb.Projects do
   end
 
   @doc """
+  Gets a single project by path.
+  """
+  def get_project_by_path(path) do
+    Repo.get_by(Project, path: path)
+  end
+
+  @doc """
   Creates a project.
   """
   def create_project(attrs \\ %{}), do: create(attrs)

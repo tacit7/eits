@@ -1,8 +1,6 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.AgentControllerTest do
   use EyeInTheSkyWebWeb.ConnCase, async: false
 
-  alias EyeInTheSkyWeb.Agents
-
   import EyeInTheSkyWeb.Factory
 
   # ---- GET /api/v1/agents ----
@@ -73,17 +71,115 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentControllerTest do
 
   # ---- POST /api/v1/agents ----
 
-  describe "POST /api/v1/agents" do
-    test "returns 400 when instructions are missing", %{conn: conn} do
-      conn = post(conn, ~p"/api/v1/agents", %{"model" => "haiku"})
-      assert json_response(conn, 400)["error"] == "instructions is required"
+  @valid_params %{
+    "instructions" => "Do the thing",
+    "model"        => "haiku",
+    "project_path" => "/tmp"
+  }
+
+  defp post_spawn(conn, params) do
+    post(conn, ~p"/api/v1/agents", params)
+  end
+
+  describe "POST /api/v1/agents validation" do
+    test "returns missing_required when instructions absent", %{conn: conn} do
+      conn = post_spawn(conn, Map.delete(@valid_params, "instructions"))
+      resp = json_response(conn, 400)
+      assert resp["error_code"] == "missing_required"
+      assert resp["message"] =~ "instructions"
     end
 
-    test "returns 400 when instructions are empty", %{conn: conn} do
-      conn = post(conn, ~p"/api/v1/agents", %{"instructions" => ""})
-      assert json_response(conn, 400)["error"] == "instructions is required"
+    test "returns missing_required when instructions is empty string", %{conn: conn} do
+      conn = post_spawn(conn, Map.put(@valid_params, "instructions", ""))
+      resp = json_response(conn, 400)
+      assert resp["error_code"] == "missing_required"
     end
 
-    # Skipping actual spawn test — requires AgentManager to start a Claude process
+    test "returns missing_required when instructions is whitespace-only", %{conn: conn} do
+      conn = post_spawn(conn, Map.put(@valid_params, "instructions", "   "))
+      resp = json_response(conn, 400)
+      assert resp["error_code"] == "missing_required"
+    end
+
+    test "returns instructions_too_long when over 32000 chars", %{conn: conn} do
+      conn = post_spawn(conn, Map.put(@valid_params, "instructions", String.duplicate("a", 32_001)))
+      resp = json_response(conn, 400)
+      assert resp["error_code"] == "instructions_too_long"
+    end
+
+    test "returns invalid_model for unknown model", %{conn: conn} do
+      conn = post_spawn(conn, Map.put(@valid_params, "model", "gpt-4"))
+      resp = json_response(conn, 400)
+      assert resp["error_code"] == "invalid_model"
+    end
+
+    test "returns invalid_parameter when parent_agent_id is non-integer string", %{conn: conn} do
+      conn = post_spawn(conn, Map.put(@valid_params, "parent_agent_id", "abc"))
+      resp = json_response(conn, 400)
+      assert resp["error_code"] == "invalid_parameter"
+      assert resp["message"] =~ "parent_agent_id"
+    end
+
+    test "returns invalid_parameter when parent_session_id is a float string", %{conn: conn} do
+      conn = post_spawn(conn, Map.put(@valid_params, "parent_session_id", "1.5"))
+      resp = json_response(conn, 400)
+      assert resp["error_code"] == "invalid_parameter"
+      assert resp["message"] =~ "parent_session_id"
+    end
+
+    test "succeeds when parent_agent_id is absent", %{conn: conn} do
+      conn = post_spawn(conn, @valid_params)
+      assert json_response(conn, 201)["success"] == true
+    end
+
+    test "succeeds when parent_session_id is absent", %{conn: conn} do
+      conn = post_spawn(conn, @valid_params)
+      assert json_response(conn, 201)["success"] == true
+    end
+
+    test "returns parent_not_found when parent_agent_id does not exist", %{conn: conn} do
+      conn = post_spawn(conn, Map.put(@valid_params, "parent_agent_id", "999999"))
+      resp = json_response(conn, 400)
+      assert resp["error_code"] == "parent_not_found"
+      assert resp["message"] =~ "parent_agent_id"
+    end
+
+    test "returns parent_not_found when parent_session_id does not exist", %{conn: conn} do
+      conn = post_spawn(conn, Map.put(@valid_params, "parent_session_id", "999999"))
+      resp = json_response(conn, 400)
+      assert resp["error_code"] == "parent_not_found"
+      assert resp["message"] =~ "parent_session_id"
+    end
+
+    test "accepts valid parent_agent_id that exists in DB", %{conn: conn} do
+      agent = create_agent()
+      conn = post_spawn(conn, Map.put(@valid_params, "parent_agent_id", to_string(agent.id)))
+      assert json_response(conn, 201)["success"] == true
+    end
+
+    test "returns team_not_found when team_name does not exist", %{conn: conn} do
+      conn = post_spawn(conn, Map.put(@valid_params, "team_name", "nonexistent-team"))
+      resp = json_response(conn, 400)
+      assert resp["error_code"] == "team_not_found"
+      assert resp["message"] =~ "nonexistent-team"
+    end
+  end
+
+  describe "POST /api/v1/agents success" do
+    test "returns 201 with agent_id, session_id, session_uuid", %{conn: conn} do
+      conn = post_spawn(conn, @valid_params)
+      resp = json_response(conn, 201)
+
+      assert resp["success"] == true
+      assert resp["message"] == "Agent spawned"
+      assert is_binary(resp["agent_id"])
+      assert is_integer(resp["session_id"])
+      assert is_binary(resp["session_uuid"])
+    end
+
+    test "defaults model to haiku when absent", %{conn: conn} do
+      conn = post_spawn(conn, Map.delete(@valid_params, "model"))
+      assert json_response(conn, 201)["success"] == true
+    end
   end
 end

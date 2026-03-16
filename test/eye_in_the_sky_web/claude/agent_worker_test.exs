@@ -608,11 +608,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     # Then cast a process_message. Since SDK starts succeed with MockCLI,
     # the retry resets. Instead, we call schedule_retry_start indirectly by
     # setting the state and letting the GenServer handle it.
-    fake_job = %{
-      message: "will-be-drained",
-      context: %{has_messages: false},
-      queued_at: DateTime.utc_now()
-    }
+    fake_job = EyeInTheSkyWeb.Claude.Job.new("will-be-drained", %{has_messages: false})
 
     :sys.replace_state(worker_pid, fn state ->
       %{state | queue: [fake_job], retry_attempt: 5, retry_timer_ref: nil, sdk_ref: nil, current_job: nil}

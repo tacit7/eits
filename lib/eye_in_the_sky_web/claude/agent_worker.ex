@@ -10,7 +10,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   use GenServer
   require Logger
 
-  alias EyeInTheSkyWeb.Claude.{Message, SDK}
+  alias EyeInTheSkyWeb.Claude.{Job, Message, SDK}
   alias EyeInTheSkyWeb.Codex
   alias EyeInTheSkyWeb.{Messages, Sessions}
 
@@ -159,11 +159,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       has_messages: context.has_messages
     })
 
-    job = %{
-      message: message,
-      context: context,
-      queued_at: DateTime.utc_now()
-    }
+    job = Job.new(message, context)
 
     if state.sdk_ref == nil do
       Logger.info("AgentWorker: starting SDK for session_id=#{state.session_id}")
@@ -243,7 +239,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   end
 
   def handle_cast({:remove_queued_prompt, prompt_id}, state) do
-    new_queue = Enum.reject(state.queue, fn job -> job[:id] == prompt_id end)
+    new_queue = Enum.reject(state.queue, fn %Job{id: id} -> id == prompt_id end)
     new_state = %{state | queue: new_queue}
     broadcast_queue_update(new_state)
     {:noreply, new_state}
@@ -361,7 +357,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         "[#{state.session_id}] Stale Claude session UUID=#{state.session_uuid}, retrying as new session"
       )
 
-      fresh_job = put_in(job, [:context, :has_messages], false)
+      fresh_job = Job.as_fresh_session(job)
 
       case start_sdk(state, fresh_job) do
         {:ok, sdk_ref} ->
@@ -604,8 +600,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   defp cancel_sdk("codex", ref), do: Codex.SDK.cancel(ref)
   defp cancel_sdk(_provider, ref), do: SDK.cancel(ref)
 
-  defp enqueue_job(state, job) do
-    job = Map.put(job, :id, System.unique_integer([:positive, :monotonic]))
+  defp enqueue_job(state, %Job{} = job) do
+    job = Job.assign_id(job)
     new_state = %{state | queue: state.queue ++ [job]}
     broadcast_queue_update(new_state)
     new_state

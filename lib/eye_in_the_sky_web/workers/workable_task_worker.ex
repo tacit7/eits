@@ -72,7 +72,17 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
         results =
           Enum.map(tasks, fn task ->
             mark_in_progress(task.id)
-            spawn_agent(task, model, job.project_id)
+            result = spawn_agent(task, model, job.project_id)
+
+            if match?({:error, _}, result) do
+              Logger.warning(
+                "WorkableTaskWorker: spawn failed for task ##{task.id}, rolling back to To Do"
+              )
+
+              reset_to_todo(task.id)
+            end
+
+            result
           end)
 
         spawned = Enum.count(results, &match?({:ok, _}, &1))
@@ -120,6 +130,13 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
     Repo.update_all(
       from(t in "tasks", where: t.id == ^task_id),
       set: [state_id: Tasks.state_in_progress()]
+    )
+  end
+
+  defp reset_to_todo(task_id) do
+    Repo.update_all(
+      from(t in "tasks", where: t.id == ^task_id),
+      set: [state_id: Tasks.state_todo()]
     )
   end
 

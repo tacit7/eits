@@ -16,6 +16,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
   @retry_start_ms 1_000
+  @retry_max_ms 30_000
+  @max_queue_depth 5
 
   # --- Client API ---
 
@@ -89,6 +91,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       provider: provider,
       worktree: worktree,
       retry_timer_ref: nil,
+      retry_attempt: 0,
       stream_buffer: "",
       current_tool_id: nil,
       current_tool_name: nil,
@@ -190,23 +193,31 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
           {:noreply, state |> enqueue_job(job) |> schedule_retry_start()}
       end
     else
-      # Busy, queue the job
-      new_queue_length = length(state.queue) + 1
+      # Busy — check queue depth before accepting
+      if length(state.queue) >= @max_queue_depth do
+        Logger.warning(
+          "AgentWorker: queue full (#{@max_queue_depth}) for session_id=#{state.session_id}, dropping message"
+        )
 
-      Logger.info(
-        "AgentWorker: busy, queueing message for session_id=#{state.session_id}, " <>
-          "queue_length=#{new_queue_length}"
-      )
+        {:noreply, state}
+      else
+        new_queue_length = length(state.queue) + 1
 
-      :telemetry.execute([:eits, :agent, :job, :queued], %{queue_length: new_queue_length}, %{
-        session_id: state.session_id
-      })
+        Logger.info(
+          "AgentWorker: busy, queueing message for session_id=#{state.session_id}, " <>
+            "queue_length=#{new_queue_length}"
+        )
 
-      Logger.info(
-        "[telemetry] agent.job.queued session_id=#{state.session_id} queue_length=#{new_queue_length}"
-      )
+        :telemetry.execute([:eits, :agent, :job, :queued], %{queue_length: new_queue_length}, %{
+          session_id: state.session_id
+        })
 
-      {:noreply, enqueue_job(state, job)}
+        Logger.info(
+          "[telemetry] agent.job.queued session_id=#{state.session_id} queue_length=#{new_queue_length}"
+        )
+
+        {:noreply, enqueue_job(state, job)}
+      end
     end
   end
 
@@ -242,7 +253,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         {:claude_message, ref, %Message{type: :result, content: text, metadata: metadata}},
         %{sdk_ref: ref} = state
       ) do
-    state = maybe_sync_session_uuid(state, metadata[:session_id])
     save_result(text, metadata, state)
 
     result_len = if(is_binary(text), do: String.length(text), else: 0)
@@ -610,17 +620,23 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   end
 
   defp schedule_retry_start(%{retry_timer_ref: nil} = state) do
-    timer_ref = Process.send_after(self(), :retry_start, @retry_start_ms)
-    %{state | retry_timer_ref: timer_ref}
+    delay = min(round(@retry_start_ms * :math.pow(2, state.retry_attempt)), @retry_max_ms)
+
+    Logger.info(
+      "[#{state.session_id}] Scheduling retry in #{delay}ms (attempt=#{state.retry_attempt})"
+    )
+
+    timer_ref = Process.send_after(self(), :retry_start, delay)
+    %{state | retry_timer_ref: timer_ref, retry_attempt: state.retry_attempt + 1}
   end
 
   defp schedule_retry_start(state), do: state
 
-  defp clear_retry_timer(%{retry_timer_ref: nil} = state), do: state
+  defp clear_retry_timer(%{retry_timer_ref: nil} = state), do: %{state | retry_attempt: 0}
 
   defp clear_retry_timer(state) do
     Process.cancel_timer(state.retry_timer_ref)
-    %{state | retry_timer_ref: nil}
+    %{state | retry_timer_ref: nil, retry_attempt: 0}
   end
 
   defp normalize_context(context) when is_map(context) do

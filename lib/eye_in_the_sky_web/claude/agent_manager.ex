@@ -181,7 +181,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
           channel_id: opts[:channel_id],
           thinking_budget: opts[:thinking_budget],
           max_budget_usd: opts[:max_budget_usd],
-          agent: opts[:agent]
+          agent: opts[:agent],
+          eits_workflow: opts[:eits_workflow]
         }
 
         GenServer.cast(pid, {:process_message, message, context})
@@ -231,18 +232,26 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
          {:ok, agent} <- Agents.get_agent(session.agent_id) do
       project_path_from_project = if agent.project, do: agent.project.path, else: nil
 
-      project_path =
+      resolved_path =
         session.git_worktree_path ||
           agent.git_worktree_path ||
-          project_path_from_project ||
-          File.cwd!()
+          project_path_from_project
 
-      if is_nil(session.git_worktree_path) && is_nil(agent.git_worktree_path) &&
-           is_nil(project_path_from_project) do
-        Logger.warning(
-          "start_agent_worker: no explicit project_path for session.id=#{session_id}; defaulting to cwd=#{project_path}"
-        )
-      end
+      project_path =
+        if is_nil(resolved_path) do
+          fallback = File.cwd!()
+
+          Logger.error(
+            "start_agent_worker: no project_path for session.id=#{session_id}; " <>
+              "session.git_worktree_path=#{inspect(session.git_worktree_path)}, " <>
+              "agent.git_worktree_path=#{inspect(agent.git_worktree_path)}, " <>
+              "project.path=#{inspect(project_path_from_project)} — falling back to cwd=#{fallback}"
+          )
+
+          fallback
+        else
+          resolved_path
+        end
 
       Logger.info(
         "✅ start_agent_worker: loaded session.uuid=#{session.uuid}, agent.id=#{agent.id}, project_path=#{project_path}"

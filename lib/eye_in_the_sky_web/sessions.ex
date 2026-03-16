@@ -13,8 +13,10 @@ defmodule EyeInTheSkyWeb.Sessions do
 
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Sessions.Session
+  alias EyeInTheSkyWeb.Tasks.WorkflowState
   alias EyeInTheSkyWeb.Scopes.Archivable
   alias EyeInTheSkyWeb.QueryBuilder
+  alias EyeInTheSkyWeb.Search.FTS5
 
   @doc """
   Returns the list of sessions, excluding archived by default.
@@ -208,7 +210,7 @@ defmodule EyeInTheSkyWeb.Sessions do
       from(t in EyeInTheSkyWeb.Tasks.Task,
         join: ts in "task_sessions",
         on: ts.task_id == t.id,
-        where: ts.session_id in ^session_ids and t.state_id == 2 and t.archived == false,
+        where: ts.session_id in ^session_ids and t.state_id == ^WorkflowState.in_progress_id() and t.archived == false,
         select: {ts.session_id, t.title}
       )
       |> Repo.all()
@@ -221,13 +223,14 @@ defmodule EyeInTheSkyWeb.Sessions do
 
   @doc """
   Lists sessions filtered by search query and status filter using FTS5 full-text search.
-  Only returns active (non-archived) sessions.
+  Excludes archived sessions by default. Pass `include_archived: true` to include archived sessions.
 
   Options:
   - `:search_query` - String to search across session name, description, project name, agent ID, agent description
   - `:status_filter` - One of: "all", "active", "completed", "stale", "discovered"
   - `:limit` - Maximum number of results (default: 100)
   - `:offset` - Number of results to skip (default: 0)
+  - `:include_archived` - Include archived sessions (default: false)
   """
   def list_sessions_filtered(opts \\ []) do
     search_query = Keyword.get(opts, :search_query, "")
@@ -238,26 +241,17 @@ defmodule EyeInTheSkyWeb.Sessions do
     base_query =
       from s in Session,
         join: a in assoc(s, :agent),
-        where: is_nil(s.archived_at),
         preload: [agent: a],
-        order_by: [desc: s.started_at],
+        order_by: [desc_nulls_last: s.last_activity_at, desc: s.started_at],
         limit: ^limit,
         offset: ^offset
 
+    base_query = Archivable.include_archived(base_query, opts)
 
     # Apply full-text search filter
     base_query =
       if search_query != "" do
-        where(
-          base_query,
-          [s, a],
-          fragment(
-            "to_tsvector('english', coalesce(?.name, '') || ' ' || coalesce(?.description, '')) @@ plainto_tsquery('english', ?)",
-            s,
-            s,
-            ^search_query
-          )
-        )
+        where(base_query, [s, a], ^FTS5.fts_name_description_match(search_query))
       else
         base_query
       end
@@ -323,7 +317,7 @@ defmodule EyeInTheSkyWeb.Sessions do
       last_activity_at: a.last_activity_at,
       current_task_title:
         fragment(
-          "(SELECT t.title FROM tasks t JOIN task_sessions ts ON ts.task_id = t.id WHERE ts.session_id = ? AND t.state_id = 2 AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)",
+          "(SELECT t.title FROM tasks t JOIN task_sessions ts ON ts.task_id = t.id WHERE ts.session_id = ? AND t.state_id = 2 AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)", # 2 = WorkflowState.in_progress_id()
           s.id
         )
     })
@@ -339,7 +333,6 @@ defmodule EyeInTheSkyWeb.Sessions do
   end
 
   defp base_session_overview_query(opts) do
-    include_archived = Keyword.get(opts, :include_archived, false)
     project_id = Keyword.get(opts, :project_id, nil)
     search_query = Keyword.get(opts, :search_query, "")
 
@@ -350,37 +343,63 @@ defmodule EyeInTheSkyWeb.Sessions do
         on: p.id == a.project_id
       )
 
-    query = if include_archived, do: query, else: where(query, [s], is_nil(s.archived_at))
+    query = Archivable.include_archived(query, opts)
     query = if project_id, do: where(query, [s, a], a.project_id == ^project_id), else: query
 
     if search_query != "" do
-      where(
-        query,
-        [s],
-        fragment(
-          "to_tsvector('english', coalesce(?.name, '') || ' ' || coalesce(?.description, '')) @@ plainto_tsquery('english', ?)",
-          s,
-          s,
-          ^search_query
-        )
-      )
+      where(query, [s], ^FTS5.fts_name_description_match(search_query))
     else
       query
     end
   end
 
   @doc """
-  Loads all data for a specific session.
-  Returns tasks, commits, logs, notes, context, and metrics.
+  Loads associated data for a specific session detail view.
+
+  Intended for single-session detail pages only. Do NOT use for list views
+  or anywhere multiple sessions are rendered — it issues one query per
+  association.
+
+  ## Options
+
+    - `:tasks_limit` / `:tasks_offset` — paginate tasks
+    - `:commits_limit` / `:commits_offset` — paginate commits
+    - `:logs_limit` / `:logs_offset` — paginate logs
+    - `:notes_limit` / `:notes_offset` — paginate notes
+
+  ## Examples
+
+      iex> load_session_data("abc-123")
+      %{tasks: [...], commits: [...], ...}
+
+      iex> load_session_data("abc-123", tasks_limit: 20, logs_limit: 50, logs_offset: 50)
+      %{tasks: [...], ...}
+
   """
-  def load_session_data(session_id) do
+  def load_session_data(session_id, opts \\ []) do
     alias EyeInTheSkyWeb.{Tasks, Commits, Logs, Contexts, Notes}
 
     %{
-      tasks: Tasks.list_tasks_for_session(session_id),
-      commits: Commits.list_commits_for_session(session_id),
-      logs: Logs.list_logs_for_session(session_id),
-      notes: Notes.list_notes_for_session(session_id),
+      tasks:
+        Tasks.list_tasks_for_session(session_id,
+          limit: Keyword.get(opts, :tasks_limit),
+          offset: Keyword.get(opts, :tasks_offset)
+        ),
+      commits:
+        Commits.list_commits_for_session(session_id,
+          limit: Keyword.get(opts, :commits_limit),
+          offset: Keyword.get(opts, :commits_offset)
+        ),
+      logs:
+        Logs.list_logs_for_session(session_id,
+          limit: Keyword.get(opts, :logs_limit),
+          offset: Keyword.get(opts, :logs_offset)
+        ),
+      notes:
+        Notes.list_notes_for_session(session_id,
+          limit: Keyword.get(opts, :notes_limit),
+          offset: Keyword.get(opts, :notes_offset)
+        ),
       session_context: Contexts.get_session_context(session_id),
       metrics: nil
     }
@@ -490,40 +509,45 @@ defmodule EyeInTheSkyWeb.Sessions do
   def format_model_info(%{model_name: name} = session) when is_binary(name) and name != "" do
     version = Map.get(session, :model_version)
 
-    raw =
-      if is_binary(version) and version != "",
-        do: "#{name} (#{version})",
-        else: name
-
-    raw
-    |> String.replace(~r/^claude-/, "")
-    |> String.replace(~r/^claude\//, "")
+    name
+    |> with_version(version)
+    |> strip_claude_prefix()
   end
 
   def format_model_info(%Session{} = session) do
-    raw =
-      case {session.model_provider, session.model_name, session.model_version} do
-        {_provider, name, version}
-        when is_binary(name) and is_binary(version) and name != "" and version != "" ->
-          "#{name} (#{version})"
-
-        {_provider, name, _} when is_binary(name) and name != "" ->
-          name
-
-        _ ->
-          # Fall back to provider/model fields
-          case {session.provider, session.model} do
-            {_, m} when is_binary(m) and m != "" -> m
-            {p, _} when is_binary(p) and p != "" -> p
-            _ -> "unknown"
-          end
-      end
-
-    # Strip "claude-" prefix for cleaner display (e.g. "claude-opus-4-6" -> "opus-4-6")
-    raw
-    |> String.replace(~r/^claude-/, "")
-    |> String.replace(~r/^claude\//, "")
+    session
+    |> resolve_model_string()
+    |> strip_claude_prefix()
   end
 
   def format_model_info(_), do: "unknown"
+
+  defp with_version(name, version) when is_binary(version) and version != "",
+    do: "#{name} (#{version})"
+
+  defp with_version(name, _), do: name
+
+  defp resolve_model_string(%Session{model_name: name, model_version: version})
+       when is_binary(name) and name != "" and is_binary(version) and version != "",
+       do: "#{name} (#{version})"
+
+  defp resolve_model_string(%Session{model_name: name})
+       when is_binary(name) and name != "",
+       do: name
+
+  defp resolve_model_string(%Session{model: m})
+       when is_binary(m) and m != "",
+       do: m
+
+  defp resolve_model_string(%Session{provider: p})
+       when is_binary(p) and p != "",
+       do: p
+
+  defp resolve_model_string(_), do: "unknown"
+
+  defp strip_claude_prefix(str) do
+    str
+    |> String.replace(~r/^claude-/, "")
+    |> String.replace(~r/^claude\//, "")
+  end
 end

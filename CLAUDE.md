@@ -6,6 +6,14 @@ This file provides guidance to Claude Code when working with the Eye in the Sky 
 
 Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky. MCP server is Anubis (HTTP MCP), not Go.
 
+This project uses Phoenix LiveView with Elixir. Primary languages: TypeScript, JavaScript, Elixir/HEEx, Go, Rust. Use Tailwind CSS for styling.
+
+## Git Worktrees
+
+When working in git worktrees, always compile from the main project directory or symlink deps/build directories first. Never attempt to compile directly in a worktree without verifying deps are available.
+
+When using git worktrees, always verify you are editing files in the worktree directory, NOT the main project directory. Check `pwd` before making edits.
+
 ## Build & Run
 
 ```bash
@@ -19,6 +27,12 @@ Assets: `cd assets && npm install` for JS dependencies. Esbuild and Tailwind run
 ## Development Workflow
 
 **Before committing:** Always run `mix compile` to ensure the project compiles without errors. Only warnings are acceptable.
+
+After completing code changes, always run `mix compile --warnings-as-errors` to verify clean compilation before committing.
+
+## Bug Fixes
+
+When fixing bugs, search the entire file for ALL occurrences of the problematic pattern before committing. Don't fix just the first occurrence.
 
 ## REST API
 
@@ -87,6 +101,15 @@ Original code is kept as comments for future re-enablement when proper deduplica
 
 `lib/eye_in_the_sky_web/search/fts5.ex` wraps PostgreSQL `tsvector/tsquery` full-text search with an ILIKE fallback. The module name is a legacy artifact from the SQLite era — it is not FTS5. Use `FTS5.search_for/2` for all full-text queries across sessions, tasks, and notes.
 
+**Helper Function: `FTS5.fts_name_description_match/1`**
+
+Extracts reusable tsvector query fragments for common search patterns across sessions, tasks, and notes. This helper:
+- Builds PostgreSQL `@@` operator queries on indexed columns
+- Returns parameterized tsvector expressions for use in composed queries
+- Falls back to ILIKE for partial matching when tsquery doesn't match
+- Used in Sessions, Tasks, and Notes contexts for consistent search behavior
+- Performance: tsvector queries are O(log N) on indexed columns vs O(N) for ILIKE
+
 ### Workflow States
 
 The `workflow_states` table defines kanban columns. Current states:
@@ -116,3 +139,21 @@ In LiveViews and components:
 - `@session` typically refers to a `Session` struct (from sessions table)
 - Sessions have an `agent_id` foreign key pointing to the agents table
 - The `Agents` context handles agent CRUD; the `Sessions` context handles session-specific logic like `format_model_info/1`
+
+### Agent `last_activity_at` Schema
+
+**Migration History:**
+- Previous: DateTime field (Elixir datetime)
+- Current: ISO8601 text field (standardized string format)
+- Migration: `20260309000001_change_agent_last_activity_at_to_text.exs`
+
+**Impact:**
+- Agent status scheduling in `lib/eye_in_the_sky_web/scheduler/agent_status.ex` now uses ISO8601 strings
+- Queries comparing timestamps must use string comparison or convert to datetime
+- Use `DateTime.from_iso8601/1` when comparing with Elixir datetime values
+- Always pass ISO8601 strings when updating `last_activity_at` on agents
+
+**Sessions `last_activity_at` Ordering:**
+- Sessions can be sorted by `last_activity_at`, `created_at`, or `last_message_at`
+- Use `Sessions.list_sessions/2` with `:last_activity_at`, `:created_at`, or `:last_message_at` sort options
+- Filtering works with ISO8601 string values; comparisons use standard string ordering

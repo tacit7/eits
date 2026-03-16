@@ -20,13 +20,41 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     alias EyeInTheSkyWeb.Projects
 
     # Accept both integer ID and UUID in URL
-    session =
+    session_result =
       case Integer.parse(session_id_param) do
-        {id, ""} -> Sessions.get_session!(id)
-        _ -> Sessions.get_session_by_uuid!(session_id_param)
+        {id, ""} -> Sessions.get_session(id)
+        _ -> Sessions.get_session_by_uuid(session_id_param)
       end
 
-    agent = Agents.get_agent!(session.agent_id)
+    case session_result do
+      {:error, :not_found} ->
+        {:ok,
+         socket
+         |> put_flash(:error, "Session not found")
+         |> redirect(to: "/")}
+
+      {:ok, session} ->
+        mount_session(session, params, socket)
+    end
+  end
+
+  defp mount_session(session, params, socket) do
+    alias EyeInTheSkyWeb.Projects
+
+    case Agents.get_agent(session.agent_id) do
+      {:error, :not_found} ->
+        {:ok,
+         socket
+         |> put_flash(:error, "Agent not found for this session")
+         |> redirect(to: "/")}
+
+      {:ok, agent} ->
+        mount_session_with_agent(session, agent, params, socket)
+    end
+  end
+
+  defp mount_session_with_agent(session, agent, params, socket) do
+    alias EyeInTheSkyWeb.Projects
 
     # Preserve sidebar context when navigating from project sessions page
     {sidebar_tab, sidebar_project} =
@@ -57,6 +85,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     socket =
       socket
       |> assign(:page_title, session.name || "Session")
+      |> assign(:hide_mobile_header, true)
       |> assign(:sidebar_tab, sidebar_tab)
       |> assign(:sidebar_project, sidebar_project)
       |> assign(:session_id, session.id)
@@ -90,10 +119,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       |> assign(:total_cost, 0.0)
       |> assign(:context_used, 0)
       |> assign(:context_window, 0)
-      |> assign(:show_memories_panel, false)
-      |> assign(:memory_files, [])
-      |> assign(:selected_memory_path, nil)
-      |> assign(:memory_edit_content, "")
       |> assign(:queued_prompts, AgentWorker.get_queue(session.id))
       |> assign(:thinking_enabled, false)
       |> assign(:max_budget_usd, nil)
@@ -220,47 +245,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
-  def handle_event("toggle_memories_panel", _params, socket) do
-    if socket.assigns.show_memories_panel do
-      {:noreply,
-       assign(socket,
-         show_memories_panel: false,
-         selected_memory_path: nil,
-         memory_edit_content: ""
-       )}
-    else
-      files = scan_claude_md_files(socket)
-      {:noreply, assign(socket, show_memories_panel: true, memory_files: files)}
-    end
-  end
-
-  @impl true
-  def handle_event("close_memories_panel", _params, socket) do
-    {:noreply,
-     assign(socket,
-       show_memories_panel: false,
-       selected_memory_path: nil,
-       memory_edit_content: ""
-     )}
-  end
-
-  @impl true
-  def handle_event("select_memory_file", %{"path" => path}, socket) do
-    content = File.read!(path)
-    {:noreply, assign(socket, selected_memory_path: path, memory_edit_content: content)}
-  end
-
-  @impl true
-  def handle_event("save_memory_file", %{"path" => path, "content" => content}, socket) do
-    File.write!(path, content)
-
-    {:noreply,
-     socket
-     |> assign(show_memories_panel: false, selected_memory_path: nil, memory_edit_content: "")
-     |> put_flash(:info, "Saved #{Path.basename(path)}")}
-  end
-
-  @impl true
   def handle_event("keydown", %{"key" => "k", "ctrlKey" => true}, socket) do
     {:noreply, assign(socket, :show_new_task_drawer, !socket.assigns.show_new_task_drawer)}
   end
@@ -345,6 +329,22 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       end
 
     {:noreply, assign(socket, :max_budget_usd, budget)}
+  end
+
+  @impl true
+  def handle_event("update_session_name", %{"value" => value}, socket) do
+    session = socket.assigns.session
+    value = String.trim(value)
+    Sessions.update_session(session, %{name: if(value == "", do: nil, else: value)})
+    {:noreply, assign(socket, :session, %{session | name: value})}
+  end
+
+  @impl true
+  def handle_event("update_session_description", %{"value" => value}, socket) do
+    session = socket.assigns.session
+    value = String.trim(value)
+    Sessions.update_session(session, %{description: if(value == "", do: nil, else: value)})
+    {:noreply, assign(socket, :session, %{session | description: value})}
   end
 
   @impl true
@@ -433,27 +433,32 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   def handle_event("open_iterm", _params, socket) do
     session_uuid = socket.assigns.session_uuid
 
-    dir =
-      case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
-        {:ok, path} -> path
-        {:error, _} -> "~"
-      end
+    # Reject anything that isn't a canonical UUID to prevent AppleScript injection
+    unless Regex.match?(~r/\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/, session_uuid) do
+      {:noreply, put_flash(socket, :error, "Invalid session UUID")}
+    else
+      dir =
+        case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+          {:ok, path} -> path
+          {:error, _} -> "~"
+        end
 
-    # Escape double quotes in the path to prevent AppleScript string injection
-    safe_dir = String.replace(dir, "\"", "\\\"")
+      # Escape double quotes in the path to prevent AppleScript string injection
+      safe_dir = String.replace(dir, "\"", "\\\"")
 
-    script = """
-    tell application "iTerm"
-      activate
-      set newWindow to (create window with default profile)
-      tell current session of newWindow
-        write text "cd #{safe_dir} && claude --dangerously-skip-permissions -r #{session_uuid}"
+      script = """
+      tell application "iTerm"
+        activate
+        set newWindow to (create window with default profile)
+        tell current session of newWindow
+          write text "cd #{safe_dir} && claude --dangerously-skip-permissions -r #{session_uuid}"
+        end tell
       end tell
-    end tell
-    """
+      """
 
-    System.cmd("osascript", ["-e", script], stderr_to_stdout: true)
-    {:noreply, socket}
+      System.cmd("osascript", ["-e", script], stderr_to_stdout: true)
+      {:noreply, socket}
+    end
   end
 
   @impl true
@@ -1151,7 +1156,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   defp upload_destination(client_name) do
-    base_upload_dir = Path.join([System.user_home!(), ".config", "eye-in-the-sky", "uploads"])
+    base_upload_dir = Path.join([:code.priv_dir(:eye_in_the_sky_web), "static", "uploads", "dm"])
     date_dir = Date.utc_today() |> Date.to_string()
     filename = "#{Ecto.UUID.generate()}#{Path.extname(client_name)}"
 
@@ -1255,10 +1260,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         total_tokens={@total_tokens}
         total_cost={@total_cost}
         queued_prompts={@queued_prompts}
-        show_memories_panel={@show_memories_panel}
-        memory_files={@memory_files}
-        selected_memory_path={@selected_memory_path}
-        memory_edit_content={@memory_edit_content}
         thinking_enabled={@thinking_enabled}
         max_budget_usd={@max_budget_usd}
         compacting={@compacting}
@@ -1268,8 +1269,15 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         show_create_checkpoint={@show_create_checkpoint}
       />
 
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.TaskDetailDrawer}
+    <EyeInTheSkyWebWeb.Components.NewTaskDrawer.new_task_drawer
+      id="dm-new-task-drawer"
+      show={@show_new_task_drawer}
+      workflow_states={@workflow_states}
+      toggle_event="toggle_new_task_drawer"
+      submit_event="create_new_task"
+    />
+
+    <EyeInTheSkyWebWeb.Components.TaskDetailDrawer.task_detail_drawer
       id="dm-task-detail-drawer"
       show={@show_task_detail_drawer}
       task={@selected_task}
@@ -1349,23 +1357,4 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     end
   end
 
-  defp scan_claude_md_files(socket) do
-    case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
-      {:ok, worktree_path} ->
-        Path.wildcard(Path.join(worktree_path, "**/CLAUDE.md"))
-        |> Enum.map(fn path ->
-          stat = File.stat!(path)
-
-          %{
-            path: path,
-            relative_path: Path.relative_to(path, worktree_path),
-            mtime: stat.mtime
-          }
-        end)
-        |> Enum.sort_by(& &1.relative_path)
-
-      _ ->
-        []
-    end
-  end
 end

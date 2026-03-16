@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
   import EyeInTheSkyWebWeb.ControllerHelpers
 
   alias EyeInTheSkyWeb.{Agents, Contexts, Sessions, Projects}
-  alias EyeInTheSkyWeb.MCP.Tools.Helpers
+  alias EyeInTheSkyWeb.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWebWeb.Presenters.ApiPresenter
 
   @doc """
@@ -37,10 +37,12 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
       # Check if session already exists (resumed session)
       case Sessions.get_session_by_uuid(session_uuid) do
         {:ok, existing} ->
-          case Sessions.update_session(existing, %{
-                 status: "working",
-                 last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()
-               }) do
+          update_attrs =
+            %{status: "working", last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()}
+            |> maybe_put(:name, params["name"])
+            |> maybe_put(:description, params["description"])
+
+          case Sessions.update_session(existing, update_attrs) do
             {:ok, updated} ->
               Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, updated})
 
@@ -67,7 +69,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
             session_attrs = %{
               uuid: session_uuid,
               agent_id: agent.id,
-              name: params["name"] || params["description"],
+              name: params["name"],
+              description: params["description"],
               status: "working",
               started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
               provider: params["provider"] || "claude",
@@ -75,7 +78,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
               model_provider: model_provider,
               model_name: model_name,
               project_id: project_id,
-              git_worktree_path: params["worktree_path"]
+              git_worktree_path: params["worktree_path"],
+              entrypoint: params["entrypoint"]
             }
 
             create_fn =
@@ -128,6 +132,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
           %{}
           |> maybe_put(:status, status)
           |> maybe_put(:intent, params["intent"])
+          |> maybe_put(:entrypoint, params["entrypoint"])
           |> maybe_put(:last_activity_at, DateTime.utc_now() |> DateTime.to_iso8601())
 
         # For terminal states, set ended_at
@@ -284,7 +289,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
         do: Keyword.put(opts, :project_id, parse_int(params["project_id"], nil)),
         else: opts
 
-    opts = if params["status"], do: Keyword.put(opts, :status, params["status"]), else: opts
+    opts = if params["status"], do: Keyword.put(opts, :status_filter, params["status"]), else: opts
 
     results = Sessions.list_sessions_filtered(opts) |> Enum.take(limit)
 
@@ -303,6 +308,12 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
       {:ok, session} ->
         agent_uuid = Helpers.resolve_agent_uuid(session.agent_id)
 
+        is_spawned =
+          case Agents.get_agent(session.agent_id) do
+            {:ok, agent} -> not is_nil(agent.parent_agent_id)
+            _ -> false
+          end
+
         json(conn, %{
           id: session.id,
           agent_id: agent_uuid,
@@ -310,6 +321,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
           session_id: uuid,
           project_id: session.project_id,
           status: session.status,
+          name: session.name,
+          is_spawned: is_spawned,
           initialized: true
         })
 

@@ -6,7 +6,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
   import EyeInTheSkyWebWeb.ControllerHelpers
 
   alias EyeInTheSkyWeb.{Agents, Notes, Projects, Sessions, Tasks}
-  alias EyeInTheSkyWeb.MCP.Tools.Helpers
+  alias EyeInTheSkyWeb.Tasks.WorkflowState
+  alias EyeInTheSkyWeb.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWebWeb.Presenters.ApiPresenter
 
   @doc """
@@ -48,7 +49,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
 
     tasks =
       if state_id = parse_int(params["state_id"], nil) do
-        Enum.filter(tasks, &(&1.state_id == state_id))
+        tasks |> Enum.filter(&(&1.state_id == state_id)) |> Enum.take(limit)
       else
         tasks
       end
@@ -69,8 +70,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
       title: params["title"],
       description: params["description"],
       priority: params["priority"],
-      state_id: params["state_id"] || 1,
+      state_id: params["state_id"] || WorkflowState.todo_id(),
       project_id: params["project_id"],
+      team_id: parse_int(params["team_id"], nil),
       agent_id: resolve_agent_int_id(params["agent_id"]),
       due_at: params["due_at"],
       created_at: DateTime.utc_now() |> DateTime.to_iso8601()
@@ -79,6 +81,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
     case Tasks.create_task(attrs) do
       {:ok, task} ->
         maybe_add_tags(task, params["tags"])
+        maybe_add_tag_ids(task, params["tag_ids"])
         maybe_link_session(task.id, params["session_id"])
 
         conn
@@ -127,6 +130,10 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
 
       case result do
         {:ok, updated} ->
+          if params["state"] == "start" do
+            maybe_link_session(updated.id, params["session_id"])
+          end
+
           json(conn, %{
             success: true,
             message: "Task updated",
@@ -271,8 +278,21 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
   defp maybe_add_tags(_task, nil), do: :ok
   defp maybe_add_tags(_task, []), do: :ok
 
-  defp maybe_add_tags(_task, tags) do
-    Enum.each(tags, fn tag_name -> Tasks.get_or_create_tag(tag_name) end)
+  defp maybe_add_tags(task, tags) when is_list(tags) do
+    Tasks.replace_task_tags(task.id, tags)
+  end
+
+  defp maybe_add_tag_ids(_task, nil), do: :ok
+  defp maybe_add_tag_ids(_task, []), do: :ok
+
+  defp maybe_add_tag_ids(task, tag_ids) when is_list(tag_ids) do
+    Enum.each(tag_ids, fn tag_id ->
+      case tag_id do
+        id when is_integer(id) -> Tasks.link_tag_to_task(task.id, id)
+        id when is_binary(id) -> Tasks.link_tag_to_task(task.id, String.to_integer(id))
+        _ -> :ok
+      end
+    end)
   end
 
   defp resolve_session_int_id(raw) do

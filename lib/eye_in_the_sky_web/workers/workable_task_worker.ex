@@ -21,6 +21,11 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
 
   import Ecto.Query
 
+  # Max tasks to spawn per run (prevents API concurrency overload)
+  @batch_limit 3
+  # Skip spawning if this many agents are already active
+  @max_active_agents 8
+
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"job_id" => job_id}}) do
     job = ScheduledJobs.get_job!(job_id)
@@ -51,27 +56,56 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
     tag_name = config["tag"] || "workable"
     model = config["model"] || "haiku"
 
-    tasks = fetch_workable_tasks(tag_name)
+    active_count = count_active_agents()
 
-    if tasks == [] do
+    if active_count >= @max_active_agents do
       {:ok, :no_work}
     else
-      results =
-        Enum.map(tasks, fn task ->
-          mark_in_progress(task.id)
-          spawn_agent(task, model, job.project_id)
-        end)
+      available_slots = @max_active_agents - active_count
+      limit = min(@batch_limit, available_slots)
 
-      spawned = Enum.count(results, &match?({:ok, _}, &1))
-      failed = Enum.count(results, &match?({:error, _}, &1))
+      tasks = fetch_workable_tasks(tag_name, limit)
 
-      {:ok, "Spawned #{spawned} agents for tag=#{tag_name} (#{failed} failed)"}
+      if tasks == [] do
+        {:ok, :no_work}
+      else
+        results =
+          Enum.map(tasks, fn task ->
+            mark_in_progress(task.id)
+            result = spawn_agent(task, model, job.project_id)
+
+            if match?({:error, _}, result) do
+              Logger.warning(
+                "WorkableTaskWorker: spawn failed for task ##{task.id}, rolling back to To Do"
+              )
+
+              reset_to_todo(task.id)
+            end
+
+            result
+          end)
+
+        spawned = Enum.count(results, &match?({:ok, _}, &1))
+        failed = Enum.count(results, &match?({:error, _}, &1))
+
+        {:ok, "Spawned #{spawned} agents for tag=#{tag_name} (#{failed} failed)"}
+      end
     end
   rescue
     e -> {:error, Exception.message(e)}
   end
 
-  defp fetch_workable_tasks(tag_name) do
+  defp count_active_agents do
+    Repo.one(
+      from s in "sessions",
+        join: a in "agents",
+        on: a.id == s.agent_id,
+        where: a.status == "working",
+        select: count(s.id)
+    ) || 0
+  end
+
+  defp fetch_workable_tasks(tag_name, limit) do
     state_todo = Tasks.state_todo()
 
     Repo.all(
@@ -82,6 +116,7 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
         on: tg.id == tt.tag_id,
         where: tg.name == ^tag_name and t.state_id == ^state_todo,
         order_by: [desc: t.priority, asc: t.id],
+        limit: ^limit,
         select: %{
           id: t.id,
           title: t.title,
@@ -95,6 +130,13 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
     Repo.update_all(
       from(t in "tasks", where: t.id == ^task_id),
       set: [state_id: Tasks.state_in_progress()]
+    )
+  end
+
+  defp reset_to_todo(task_id) do
+    Repo.update_all(
+      from(t in "tasks", where: t.id == ^task_id),
+      set: [state_id: Tasks.state_todo()]
     )
   end
 
@@ -129,6 +171,8 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
         Logger.info(
           "WorkableTaskWorker: spawned agent for task ##{task.id} session=#{session.uuid} project_path=#{project_path}"
         )
+
+        Tasks.link_session_to_task(task.id, session.id)
 
         {:ok, task.id}
 

@@ -42,24 +42,37 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
   @type opts :: keyword()
   @terminal_exit_wait_ms 2_000
 
-  # Agent to track running sessions for cancellation
+  # ETS-based registry for tracking running sessions (lock-free concurrent reads)
   defmodule Registry do
-    use Agent
+    use GenServer
+
+    @table __MODULE__
 
     def start_link(_) do
-      Agent.start_link(fn -> %{} end, name: __MODULE__)
+      GenServer.start_link(__MODULE__, [], name: __MODULE__)
+    end
+
+    @impl true
+    def init(_) do
+      :ets.new(@table, [:named_table, :public, :set])
+      {:ok, nil}
     end
 
     def register(ref, port) do
-      Agent.update(__MODULE__, &Map.put(&1, ref, port))
+      :ets.insert(@table, {ref, port})
+      :ok
     end
 
     def lookup(ref) do
-      Agent.get(__MODULE__, &Map.get(&1, ref))
+      case :ets.lookup(@table, ref) do
+        [{^ref, port}] -> port
+        [] -> nil
+      end
     end
 
     def unregister(ref) do
-      Agent.update(__MODULE__, &Map.delete(&1, ref))
+      :ets.delete(@table, ref)
+      :ok
     end
   end
 
@@ -87,47 +100,7 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
   """
   @spec start(String.t(), opts()) :: {:ok, ref()} | {:error, term()}
   def start(prompt, opts \\ []) do
-    to = Keyword.fetch!(opts, :to)
-    sdk_ref = make_ref()
-    meta = %{session_id: opts[:session_id], model: opts[:model]}
-
-    :telemetry.execute([:eits, :sdk, :start], %{system_time: System.system_time()}, meta)
-    Logger.info("[telemetry] sdk.start session_id=#{meta.session_id} model=#{meta.model}")
-
-    # Spawn handler first so we can pass its PID to CLI
-    handler_pid = spawn_handler_process(sdk_ref, to)
-
-    cli = Keyword.get(opts, :cli_module) || Utils.cli_module()
-
-    cli_opts =
-      opts
-      |> Keyword.put(:output_format, "stream-json")
-      |> Keyword.put(:verbose, true)
-      |> Keyword.put(:include_partial_messages, true)
-      |> Keyword.put(:caller, handler_pid)
-      |> Keyword.delete(:to)
-      |> Keyword.delete(:cli_module)
-
-    case cli.spawn_new_session(prompt, cli_opts) do
-      {:ok, port, _cli_ref} ->
-        Registry.register(sdk_ref, port)
-        send(handler_pid, {:start_handling, sdk_ref})
-        {:ok, sdk_ref}
-
-      {:error, reason} ->
-        :telemetry.execute(
-          [:eits, :sdk, :error],
-          %{system_time: System.system_time()},
-          Map.put(meta, :reason, reason)
-        )
-
-        Logger.error(
-          "[telemetry] sdk.error session_id=#{meta.session_id} reason=#{inspect(reason)}"
-        )
-
-        Process.exit(handler_pid, :kill)
-        {:error, reason}
-    end
+    run_session(:start, prompt, nil, opts)
   end
 
   @doc """
@@ -145,16 +118,19 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
   """
   @spec resume(String.t(), String.t(), opts()) :: {:ok, ref()} | {:error, term()}
   def resume(session_id, prompt, opts \\ []) do
+    run_session(:resume, prompt, session_id, opts)
+  end
+
+  defp run_session(mode, prompt, session_id, opts) do
     to = Keyword.fetch!(opts, :to)
     sdk_ref = make_ref()
-    meta = %{session_id: session_id, model: opts[:model]}
+    meta_session_id = if mode == :resume, do: session_id, else: opts[:session_id]
+    meta = %{session_id: meta_session_id, model: opts[:model]}
 
     :telemetry.execute([:eits, :sdk, :start], %{system_time: System.system_time()}, meta)
-    Logger.info("[telemetry] sdk.resume session_id=#{session_id} model=#{meta.model}")
+    Logger.info("[telemetry] sdk.#{mode} session_id=#{meta_session_id} model=#{meta.model}")
 
-    # Spawn handler first so we can pass its PID to CLI
     handler_pid = spawn_handler_process(sdk_ref, to)
-
     cli = Keyword.get(opts, :cli_module) || Utils.cli_module()
 
     cli_opts =
@@ -166,7 +142,13 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
       |> Keyword.delete(:to)
       |> Keyword.delete(:cli_module)
 
-    case cli.resume_session(session_id, prompt, cli_opts) do
+    cli_result =
+      case mode do
+        :start -> cli.spawn_new_session(prompt, cli_opts)
+        :resume -> cli.resume_session(session_id, prompt, cli_opts)
+      end
+
+    case cli_result do
       {:ok, port, _cli_ref} ->
         Registry.register(sdk_ref, port)
         send(handler_pid, {:start_handling, sdk_ref})
@@ -179,7 +161,10 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
           Map.put(meta, :reason, reason)
         )
 
-        Logger.error("[telemetry] sdk.error session_id=#{session_id} reason=#{inspect(reason)}")
+        Logger.error(
+          "[telemetry] sdk.error session_id=#{meta_session_id} reason=#{inspect(reason)}"
+        )
+
         Process.exit(handler_pid, :kill)
         {:error, reason}
     end

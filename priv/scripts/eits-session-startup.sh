@@ -4,6 +4,17 @@
 
 set -uo pipefail
 
+# --- EITS Workflow Guard ---
+EITS_WORKFLOW="${EITS_WORKFLOW:-}"
+if [ -z "$EITS_WORKFLOW" ]; then
+  EITS_URL="${EITS_API_URL:-http://localhost:5000/api/v1}"
+  ENABLED=$(curl -sf "${EITS_URL}/settings/eits_workflow_enabled" 2>/dev/null | jq -r '.enabled' 2>/dev/null || echo "true")
+  [ "$ENABLED" = "false" ] && exit 0
+elif [ "$EITS_WORKFLOW" = "0" ]; then
+  exit 0
+fi
+# --- End Workflow Guard ---
+
 EITS_PG_DB="${EITS_PG_DB:-eits_dev}"
 EITS_PG_USER="${EITS_PG_USER:-postgres}"
 EITS_PG_HOST="${EITS_PG_HOST:-localhost}"
@@ -17,9 +28,10 @@ _log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [startup] $*" >> "$LOG_FILE" 2>/de
 INPUT=$(cat)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || echo "")
 MODEL=$(echo "$INPUT" | jq -r '.model // empty' 2>/dev/null || echo "")
+ENTRYPOINT="${CLAUDE_CODE_ENTRYPOINT:-}"
 
-_log "--- session=$SESSION_ID model=${MODEL:-none}"
-echo "[EITS] startup: session=$SESSION_ID" >&2
+_log "--- session=$SESSION_ID model=${MODEL:-none} entrypoint=${ENTRYPOINT:-none}"
+echo "[EITS] startup: session=$SESSION_ID entrypoint=${ENTRYPOINT:-none}" >&2
 
 [ -z "$SESSION_ID" ] && exit 0
 
@@ -36,6 +48,22 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   [ -n "${EITS_API_KEY:-}" ] && echo "EITS_API_KEY=${EITS_API_KEY}" >> "$CLAUDE_ENV_FILE"
   echo "EITS_SESSION_UUID=$SESSION_ID" >> "$CLAUDE_ENV_FILE"
   _log "wrote EITS_SESSION_UUID=$SESSION_ID"
+  [ -n "$ENTRYPOINT" ] && echo "EITS_ENTRYPOINT=$ENTRYPOINT" >> "$CLAUDE_ENV_FILE" && _log "wrote EITS_ENTRYPOINT=$ENTRYPOINT"
+
+  # Check if this session was pre-registered (e.g. by workable task worker)
+  # If so, inject EITS_AGENT_UUID so eits-init skips interactive prompting
+  EXISTING_AGENT_UUID=$(_pgq "SELECT a.uuid FROM agents a JOIN sessions s ON s.agent_id = a.id WHERE s.uuid = '$SESSION_ID' LIMIT 1" || true)
+  if [ -n "$EXISTING_AGENT_UUID" ]; then
+    echo "EITS_AGENT_UUID=$EXISTING_AGENT_UUID" >> "$CLAUDE_ENV_FILE"
+    _log "pre-registered session: wrote EITS_AGENT_UUID=$EXISTING_AGENT_UUID"
+    # Patch entrypoint on pre-registered sessions
+    if [ -n "$ENTRYPOINT" ]; then
+      curl -sf -X PATCH -H "Content-Type: application/json" \
+        -d "{\"entrypoint\":\"$ENTRYPOINT\"}" \
+        "${EITS_BASE}/sessions/${SESSION_ID}" >/dev/null 2>&1 || true
+      _log "patched entrypoint=$ENTRYPOINT on pre-registered session"
+    fi
+  fi
 
   # Resolve or create project
   PROJECT_ID=$(_pgq "SELECT id FROM projects WHERE path = '$PROJECT_DIR_SQL' LIMIT 1" || true)
@@ -61,11 +89,15 @@ else
   _log "WARN: CLAUDE_ENV_FILE not set, skipping env writes"
 fi
 
-# Write session UUID to .git/eits-session for post-commit hook
+# Write session/agent UUIDs to .git/ for post-commit hook
 GIT_DIR=$(git -C "$PROJECT_DIR" rev-parse --git-dir 2>/dev/null || true)
 if [ -n "$GIT_DIR" ]; then
   echo "$SESSION_ID" > "$GIT_DIR/eits-session" 2>/dev/null || true
   _log "wrote session UUID to $GIT_DIR/eits-session"
+  if [ -n "${EXISTING_AGENT_UUID:-}" ]; then
+    echo "$EXISTING_AGENT_UUID" > "$GIT_DIR/eits-agent" 2>/dev/null || true
+    _log "wrote agent UUID to $GIT_DIR/eits-agent"
+  fi
 fi
 
 # NATS (fire-and-forget)
@@ -93,15 +125,23 @@ else
   PROJECT_TYPE="Git Repository"
 fi
 
+if [ -n "${EXISTING_AGENT_UUID:-}" ]; then
+  INIT_NOTE="Session pre-registered (spawned agent). EITS_AGENT_UUID is already set — skip /eits-init."
+  AGENT_UUID_LINE="**EITS_AGENT_UUID**: $EXISTING_AGENT_UUID (pre-registered)"
+else
+  INIT_NOTE="**IMPORTANT**: Call \`/eits-init\` to name and describe your session."
+  AGENT_UUID_LINE="**EITS_AGENT_UUID**: not yet set — available after /eits-init"
+fi
+
 CONTEXT="# Eye in the Sky Integration Active
 
-**IMPORTANT**: Call \`/eits-init\` to name and describe your session.
+$INIT_NOTE
 
 ## Session Context
 
 - **EITS_SESSION_UUID**: $SESSION_ID
 - **EITS_PROJECT_ID**: ${PROJECT_ID:-unresolved}
-- **EITS_AGENT_UUID**: not yet set — available after /eits-init via \`eits sessions get \$EITS_SESSION_UUID\`
+- $AGENT_UUID_LINE
 
 ## Required Workflow (enforced by hooks)
 
@@ -110,9 +150,10 @@ CONTEXT="# Eye in the Sky Integration Active
 \`\`\`bash
 # After /eits-init — env vars EITS_AGENT_UUID, EITS_PROJECT_ID, EITS_SESSION_UUID are set
 
-# Create + start (session linked automatically)
+# Create + start (start also calls link-session as a follow-up)
 eits tasks create --title \"Task name\" --description \"Details\"
 eits tasks start <task_id>
+# Or atomically: eits tasks quick --title \"Task name\" --description \"Details\"
 
 # Finish
 eits tasks annotate <task_id> --body \"What happened\"

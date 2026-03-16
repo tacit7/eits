@@ -96,7 +96,15 @@ defmodule EyeInTheSkyWeb.Agents do
   end
 
   @doc """
-  Populates the virtual project_name field from the project association.
+  Denormalization helper: copies project.name into agent.project_name.
+
+  `project_name` is a real DB column, but it is never written by the
+  application — it exists for external/legacy readers. At runtime we derive
+  the value from the preloaded `project` association and store it in the
+  struct field so callers can read it without an extra query.
+
+  Call this after any `Repo.get/list` that preloads `:project`. It is safe
+  to call on a bare map or a non-Agent value; the fallback clause is a no-op.
   """
   def populate_project_name(%Agent{} = agent) do
     project_name =

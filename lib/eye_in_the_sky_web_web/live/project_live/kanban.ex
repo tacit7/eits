@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   alias EyeInTheSkyWeb.Projects
   alias EyeInTheSkyWeb.Tasks
+  alias EyeInTheSkyWeb.Tasks.WorkflowState
   alias EyeInTheSkyWeb.Notes
   alias EyeInTheSkyWeb.Claude.AgentManager
   import EyeInTheSkyWebWeb.ControllerHelpers
@@ -45,10 +46,13 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       |> assign(:selected_tasks, MapSet.new())
       |> assign(:bulk_mode, false)
       |> assign(:all_projects, Projects.list_projects())
+      |> assign(:show_filters, false)
 
-    socket = if socket.assigns.project, do: load_tasks(socket), else: socket
-
-    {:ok, socket}
+    if socket.assigns.project do
+      {:ok, load_tasks(socket)}
+    else
+      {:ok, push_navigate(socket, to: ~p"/")}
+    end
   end
 
   @impl true
@@ -272,9 +276,14 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   end
 
   @impl true
+  def handle_event("toggle_select_task", _params, socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("select_all_column", %{"state-id" => state_id_str}, socket) do
     state_id = parse_int(state_id_str, 0)
-    column_uuids = Map.get(socket.assigns.tasks_by_state, state_id, []) |> Enum.map(& &1.uuid)
+    column_uuids = Map.get(socket.assigns.tasks_by_state, state_id, []) |> Enum.map(& &1.uuid) |> Enum.reject(&is_nil/1)
     current = socket.assigns.selected_tasks
     all_selected = Enum.all?(column_uuids, &MapSet.member?(current, &1))
 
@@ -291,7 +300,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     state_id = parse_int(state_id_str, 0)
     now = DateTime.utc_now() |> DateTime.to_iso8601()
 
-    Enum.each(socket.assigns.selected_tasks, fn uuid ->
+    socket.assigns.selected_tasks
+    |> Enum.reject(&is_nil/1)
+    |> Enum.each(fn uuid ->
       task = Tasks.get_task_by_uuid!(uuid)
       Tasks.update_task(task, %{state_id: state_id, updated_at: now})
     end)
@@ -301,7 +312,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("bulk_archive", _params, socket) do
-    Enum.each(socket.assigns.selected_tasks, fn uuid ->
+    socket.assigns.selected_tasks
+    |> Enum.reject(&is_nil/1)
+    |> Enum.each(fn uuid ->
       task = Tasks.get_task_by_uuid!(uuid)
       Tasks.archive_task(task)
     end)
@@ -311,7 +324,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("bulk_delete", _params, socket) do
-    Enum.each(socket.assigns.selected_tasks, fn uuid ->
+    socket.assigns.selected_tasks
+    |> Enum.reject(&is_nil/1)
+    |> Enum.each(fn uuid ->
       task = Tasks.get_task_by_uuid!(uuid)
       Tasks.delete_task_with_associations(task)
     end)
@@ -332,7 +347,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
              uuid: Ecto.UUID.generate(),
              title: task.title,
              description: task.description,
-             state_id: 1,
+             state_id: WorkflowState.todo_id(),
              priority: task.priority || 0,
              project_id: target_project_id,
              created_at: now,
@@ -456,6 +471,20 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   def handle_event("toggle_tag_filter_mode", _params, socket) do
     new_mode = if socket.assigns.filter_tag_mode == :and, do: :or, else: :and
     {:noreply, socket |> assign(:filter_tag_mode, new_mode) |> apply_filters()}
+  end
+
+  @impl true
+  def handle_event("archive_column", %{"state-id" => state_id_str}, socket) do
+    state_id = parse_int(state_id_str, 0)
+    column_tasks = Map.get(socket.assigns.tasks_by_state, state_id, [])
+    Enum.each(column_tasks, fn task -> Tasks.archive_task(task) end)
+
+    {:noreply, socket |> load_tasks() |> put_flash(:info, "#{length(column_tasks)} tasks archived")}
+  end
+
+  @impl true
+  def handle_event("toggle_filters", _params, socket) do
+    {:noreply, assign(socket, :show_filters, !socket.assigns.show_filters)}
   end
 
   @impl true
@@ -655,9 +684,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="px-4 sm:px-6 py-6 h-[calc(100dvh-7rem)] md:h-[calc(100dvh-4rem)] flex flex-col">
+    <div id="kanban-keyboard" phx-hook="KanbanKeyboard" class="px-4 sm:px-6 py-6 h-[calc(100dvh-7rem)] md:h-[calc(100dvh-4rem)] flex flex-col">
       <%!-- Search + New Task --%>
-      <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+      <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 sticky top-0 z-10 bg-base-100 -mx-4 px-4 sm:-mx-6 sm:px-6 pt-1 pb-2 md:static md:mx-0 md:px-0 md:pt-0 md:pb-0 md:bg-transparent">
         <form phx-change="search" class="w-full sm:flex-1 sm:max-w-sm">
           <div class="relative">
             <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -681,7 +710,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
         <div class="flex items-center gap-1.5">
           <button
             phx-click="toggle_show_completed"
-            class={"btn btn-xs gap-1 h-7 min-h-0 " <> if(@show_completed, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
+            class={"btn btn-sm sm:btn-xs gap-1 h-9 sm:h-7 min-h-0 " <> if(@show_completed, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
             title="Show completed tasks"
           >
             <.icon name="hero-check-circle-mini" class="w-3.5 h-3.5" />
@@ -689,7 +718,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
           </button>
           <button
             phx-click="toggle_show_archived"
-            class={"btn btn-xs gap-1 h-7 min-h-0 " <> if(@show_archived, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
+            class={"btn btn-sm sm:btn-xs gap-1 h-9 sm:h-7 min-h-0 " <> if(@show_archived, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
             title="Show archived tasks"
           >
             <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
@@ -697,7 +726,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
           </button>
           <button
             phx-click="toggle_bulk_mode"
-            class={"btn btn-xs gap-1 h-7 min-h-0 " <> if(@bulk_mode, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
+            class={"btn btn-sm sm:btn-xs gap-1 h-9 sm:h-7 min-h-0 " <> if(@bulk_mode, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
             title="Bulk select mode"
           >
             <.icon name="hero-check-mini" class="w-3.5 h-3.5" />
@@ -713,35 +742,52 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       </div>
 
       <%!-- Filter chips --%>
-      <%= if @available_tags != [] || @filter_priority || MapSet.size(@filter_tags) > 0 do %>
-        <div class="mb-3 flex flex-wrap items-center gap-1.5">
+      <% has_filters = @available_tags != [] || @filter_priority || MapSet.size(@filter_tags) > 0 %>
+      <% active_filter_count = (if @filter_priority, do: 1, else: 0) + MapSet.size(@filter_tags) %>
+      <%= if has_filters do %>
+        <%!-- Mobile filter toggle --%>
+        <div class="mb-2 sm:hidden">
+          <button
+            phx-click="toggle_filters"
+            class="btn btn-sm btn-ghost gap-1.5 border border-base-content/10 min-h-[36px]"
+          >
+            <.icon name="hero-funnel-mini" class="w-3.5 h-3.5" />
+            Filters
+            <%= if active_filter_count > 0 do %>
+              <span class="badge badge-primary badge-xs">{active_filter_count}</span>
+            <% end %>
+            <.icon name={if @show_filters, do: "hero-chevron-up-mini", else: "hero-chevron-down-mini"} class="w-3 h-3 text-base-content/30" />
+          </button>
+        </div>
+        <%!-- Filter chips (always visible on desktop, toggled on mobile) --%>
+        <div class={"mb-3 flex flex-wrap items-center gap-1 sm:gap-1.5 " <> if(@show_filters, do: "", else: "hidden sm:flex")}>
           <%!-- Priority filters --%>
           <%= for {label, value, color} <- [{"High", 3, "text-error"}, {"Med", 2, "text-warning"}, {"Low", 1, "text-info"}] do %>
             <button
               phx-click="set_priority_filter"
               phx-value-priority={value}
-              class={"btn btn-xs gap-1 " <> if(@filter_priority == value, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
+              class={"btn btn-sm sm:btn-xs gap-1 min-h-[36px] sm:min-h-0 " <> if(@filter_priority == value, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
             >
               <span class={color}>●</span> {label}
             </button>
           <% end %>
           <%= if @available_tags != [] do %>
-            <span class="text-base-content/15 text-xs">|</span>
+            <span class="text-base-content/15 text-xs hidden sm:inline">|</span>
             <%= for tag <- @available_tags do %>
               <div class="inline-flex items-center gap-0">
                 <button
                   type="button"
                   phx-click="cycle_tag_color"
                   phx-value-tag-id={tag.id}
-                  class="w-5 h-5 flex items-center justify-center rounded-l hover:bg-base-content/10 transition-colors"
+                  class="w-9 h-9 sm:w-5 sm:h-5 flex items-center justify-center rounded-l hover:bg-base-content/10 transition-colors"
                   title="Change tag color"
                 >
-                  <span class="w-2 h-2 rounded-full inline-block" style={"background-color: #{tag.color || "#6B7280"}"}></span>
+                  <span class="w-2.5 h-2.5 sm:w-2 sm:h-2 rounded-full inline-block" style={"background-color: #{tag.color || "#6B7280"}"}></span>
                 </button>
                 <button
                   phx-click="set_tag_filter"
                   phx-value-tag={tag.name}
-                  class={"btn btn-xs rounded-l-none gap-1 " <> if(MapSet.member?(@filter_tags, tag.name), do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
+                  class={"btn btn-sm sm:btn-xs rounded-l-none gap-1 min-h-[36px] sm:min-h-0 " <> if(MapSet.member?(@filter_tags, tag.name), do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
                 >
                   {tag.name}
                   <span class="text-[10px] opacity-50 tabular-nums">{Map.get(@tag_counts, tag.name, 0)}</span>
@@ -752,7 +798,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
           <%= if MapSet.size(@filter_tags) >= 2 do %>
             <button
               phx-click="toggle_tag_filter_mode"
-              class="btn btn-xs btn-ghost border border-base-content/10 text-base-content/50 font-mono"
+              class="btn btn-sm sm:btn-xs btn-ghost border border-base-content/10 text-base-content/50 font-mono min-h-[36px] sm:min-h-0"
               title={"Currently using #{@filter_tag_mode} logic. Click to switch."}
             >
               {if @filter_tag_mode == :and, do: "AND", else: "OR"}
@@ -761,7 +807,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
           <%= if @filter_priority || MapSet.size(@filter_tags) > 0 do %>
             <button
               phx-click="clear_filters"
-              class="btn btn-xs btn-ghost text-base-content/30 hover:text-base-content/60"
+              class="btn btn-sm sm:btn-xs btn-ghost text-base-content/30 hover:text-base-content/60 min-h-[36px] sm:min-h-0"
             >
               Clear
             </button>
@@ -771,33 +817,33 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
       <%!-- Bulk action bar --%>
       <%= if @bulk_mode and MapSet.size(@selected_tasks) > 0 do %>
-        <div class="mb-2 flex items-center gap-2 px-2 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
+        <div class="mb-2 flex flex-wrap items-center gap-1.5 sm:gap-2 px-2 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
           <span class="text-xs font-medium text-primary">
             {MapSet.size(@selected_tasks)} selected
           </span>
-          <span class="text-base-content/15">|</span>
-          <span class="text-[11px] text-base-content/40">Move to:</span>
+          <span class="text-base-content/15 hidden sm:inline">|</span>
+          <span class="text-[11px] text-base-content/40 hidden sm:inline">Move to:</span>
           <%= for state <- @workflow_states do %>
             <button
               phx-click="bulk_move"
               phx-value-state_id={state.id}
-              class="btn btn-xs btn-ghost gap-1"
+              class="btn btn-sm sm:btn-xs btn-ghost gap-1 min-h-[36px] sm:min-h-0"
             >
               <span class="w-1.5 h-1.5 rounded-full" style={"background-color: #{state_dot_color(state.color)}"}></span>
               {state.name}
             </button>
           <% end %>
-          <span class="text-base-content/15">|</span>
+          <span class="text-base-content/15 hidden sm:inline">|</span>
           <button
             phx-click="bulk_archive"
-            class="btn btn-xs btn-ghost text-warning gap-1"
+            class="btn btn-sm sm:btn-xs btn-ghost text-warning gap-1 min-h-[36px] sm:min-h-0"
           >
             <.icon name="hero-archive-box-mini" class="w-3 h-3" /> Archive
           </button>
           <button
             phx-click="bulk_delete"
             phx-confirm={"Delete #{MapSet.size(@selected_tasks)} tasks?"}
-            class="btn btn-xs btn-ghost text-error gap-1"
+            class="btn btn-sm sm:btn-xs btn-ghost text-error gap-1 min-h-[36px] sm:min-h-0"
           >
             <.icon name="hero-trash-mini" class="w-3 h-3" /> Delete
           </button>
@@ -805,7 +851,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       <% end %>
 
       <%!-- Kanban columns --%>
-      <div class="flex-1 min-h-0 overflow-x-auto">
+      <div class="flex-1 min-h-0 overflow-x-auto" id="kanban-scroll" phx-hook="KanbanScrollDots" data-column-count={length(@workflow_states)}>
         <div id="kanban-columns" phx-hook="SortableColumns" class="inline-flex gap-3 h-full min-w-full pb-2 snap-x snap-mandatory">
           <%= for state <- @workflow_states do %>
             <% column_tasks = Map.get(@tasks_by_state, state.id, []) %>
@@ -821,7 +867,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                   <%= if @bulk_mode do %>
                     <input
                       type="checkbox"
-                      class="checkbox checkbox-xs checkbox-primary"
+                      class="checkbox checkbox-sm sm:checkbox-xs checkbox-primary"
                       checked={column_tasks != [] and Enum.all?(column_tasks, &MapSet.member?(@selected_tasks, &1.uuid))}
                       phx-click="select_all_column"
                       phx-value-state-id={state.id}
@@ -840,6 +886,18 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                   <span class="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-medium tabular-nums bg-base-content/[0.06] text-base-content/40">
                     {task_count}
                   </span>
+                  <%= if state.name == "Done" and task_count > 0 do %>
+                    <button
+                      type="button"
+                      phx-click="archive_column"
+                      phx-value-state-id={state.id}
+                      phx-confirm={"Archive all #{task_count} done tasks?"}
+                      class="p-1 rounded text-base-content/20 hover:text-warning hover:bg-warning/10 transition-colors"
+                      title="Archive all done tasks"
+                    >
+                      <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
+                    </button>
+                  <% end %>
                 </div>
               </div>
 
@@ -864,7 +922,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                     <%= if @bulk_mode do %>
                       <input
                         type="checkbox"
-                        class="checkbox checkbox-xs checkbox-primary mt-3 flex-shrink-0"
+                        class="checkbox checkbox-sm sm:checkbox-xs checkbox-primary mt-3 flex-shrink-0"
                         checked={MapSet.member?(@selected_tasks, task.uuid)}
                         phx-click="toggle_select_task"
                         phx-value-task-uuid={task.uuid}
@@ -895,16 +953,16 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                       autofocus
                       phx-keydown="hide_quick_add"
                       phx-key="Escape"
-                      class="input input-sm w-full bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] border-base-content/10 text-sm placeholder:text-base-content/25 focus:border-primary/30"
+                      class="input input-md sm:input-sm w-full bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] border-base-content/10 text-sm placeholder:text-base-content/25 focus:border-primary/30"
                     />
                   </form>
                 <% else %>
                   <button
                     phx-click="show_quick_add"
                     phx-value-state_id={state.id}
-                    class="mt-1 w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] text-base-content/25 hover:text-base-content/50 hover:bg-base-content/[0.04] transition-colors"
+                    class="mt-1 w-full flex items-center gap-1.5 px-2 py-2.5 sm:py-1.5 rounded-lg text-xs sm:text-[11px] text-base-content/25 hover:text-base-content/50 hover:bg-base-content/[0.04] transition-colors"
                   >
-                    <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+                    <.icon name="hero-plus-mini" class="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                     <span>Add task</span>
                   </button>
                 <% end %>
@@ -912,11 +970,21 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
             </div>
           <% end %>
         </div>
+        <%!-- Column indicator dots (mobile only) --%>
+        <div id="kanban-dots" class="flex justify-center gap-1.5 py-2 md:hidden">
+          <%= for {state, idx} <- Enum.with_index(@workflow_states) do %>
+            <span
+              class="w-2 h-2 rounded-full transition-colors duration-200"
+              style={"background-color: #{state_dot_color(state.color)}"}
+              data-dot-index={idx}
+              id={"kanban-dot-#{idx}"}
+            />
+          <% end %>
+        </div>
       </div>
     </div>
 
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.NewTaskDrawer}
+    <EyeInTheSkyWebWeb.Components.NewTaskDrawer.new_task_drawer
       id="new-task-drawer"
       show={@show_new_task_drawer}
       workflow_states={@workflow_states}
@@ -924,8 +992,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       submit_event="create_new_task"
     />
 
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.TaskDetailDrawer}
+    <EyeInTheSkyWebWeb.Components.TaskDetailDrawer.task_detail_drawer
       id="task-detail-drawer"
       show={@show_task_detail_drawer}
       task={@selected_task}

@@ -307,7 +307,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Config do
     <%= if File.dir?(@claude_dir) do %>
       <!-- View Mode Toggle -->
       <div class="bg-base-100 border-b border-base-300">
-        <div class="px-4 sm:px-6 lg:px-8 py-2">
+        <div class="px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-2">
           <div class="join">
             <button
               class={"btn btn-sm join-item" <> if @view_mode == :tree, do: " btn-active", else: ""}
@@ -326,6 +326,14 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Config do
               List
             </button>
           </div>
+          <button
+            id="config-guide-chat-btn"
+            phx-hook="ConfigChatGuide"
+            class="btn btn-sm btn-ghost ml-auto"
+          >
+            <.icon name="hero-chat-bubble-left-ellipsis" class="w-4 h-4" />
+            Config Guide
+          </button>
         </div>
       </div>
 

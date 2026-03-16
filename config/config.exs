@@ -67,11 +67,6 @@ config :eye_in_the_sky_web, Oban,
      ]}
   ]
 
-# Anubis MCP session store — ETS-backed, survives session agent crashes
-config :anubis_mcp, :session_store,
-  enabled: true,
-  adapter: EyeInTheSkyWeb.MCP.SessionStore
-
 # Web Push / VAPID configuration
 config :web_push_encryption, :vapid_details,
   subject: "mailto:admin@eits.dev",

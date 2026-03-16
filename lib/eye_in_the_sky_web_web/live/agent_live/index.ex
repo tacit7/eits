@@ -3,9 +3,9 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   alias EyeInTheSkyWeb.Agents
   alias EyeInTheSkyWeb.Sessions
-  import EyeInTheSkyWebWeb.Helpers.ViewHelpers
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWebWeb.Components.Icons
+  import EyeInTheSkyWebWeb.Components.SessionCard
   import EyeInTheSkyWebWeb.Helpers.SessionFilters
 
   require Logger
@@ -35,6 +35,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       |> assign(:sidebar_project, nil)
       |> assign(:selected_ids, MapSet.new())
       |> assign(:show_delete_confirm, false)
+      |> assign(:editing_session_id, nil)
       |> load_agents()
       |> schedule_refresh()
 
@@ -235,6 +236,36 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   @impl true
+  def handle_event("rename_session", %{"session_id" => session_id}, socket) do
+    {:noreply, assign(socket, :editing_session_id, String.to_integer(session_id))}
+  end
+
+  @impl true
+  def handle_event("save_session_name", %{"session_id" => session_id, "name" => name}, socket) do
+    name = String.trim(name)
+
+    socket =
+      if name != "" do
+        case Sessions.get_session(session_id) do
+          {:ok, session} ->
+            Sessions.update_session(session, %{name: name})
+            socket
+          _ ->
+            socket
+        end
+      else
+        socket
+      end
+
+    {:noreply, assign(socket, :editing_session_id, nil)}
+  end
+
+  @impl true
+  def handle_event("cancel_rename", _params, socket) do
+    {:noreply, assign(socket, :editing_session_id, nil)}
+  end
+
+  @impl true
   def handle_event("toggle_new_session_drawer", _params, socket) do
     {:noreply, assign(socket, :show_new_session_drawer, !socket.assigns.show_new_session_drawer)}
   end
@@ -279,6 +310,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
         v -> String.trim(v)
       end
 
+    eits_workflow = params["eits_workflow"] || "1"
+
     opts = [
       agent_type: agent_type,
       model: model,
@@ -289,7 +322,8 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       description: agent_name,
       instructions: description,
       worktree: worktree,
-      agent: params["agent"]
+      agent: params["agent"],
+      eits_workflow: eits_workflow
     ]
 
     Logger.info(
@@ -372,7 +406,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   defp cancel_timer(socket), do: socket
 
   defp update_agent_status_in_list(socket, session_id, new_status) do
-    now = NaiveDateTime.utc_now()
+    now = DateTime.utc_now() |> DateTime.to_iso8601()
 
     updated_agents =
       socket.assigns.agents
@@ -427,126 +461,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     """
   end
 
-  @status_styles %{
-    "working" => {"text-success", "bg-success", "Working", true},
-    "compacting" => {"text-warning", "bg-warning", "Compacting", true},
-    "idle" => {"text-base-content/25", "bg-base-content/20", "Idle", false},
-    "idle_stale" => {"text-warning", "bg-warning", "Idle", false},
-    "idle_dead" => {"text-error", "bg-error", "Idle", false},
-    "completed" => {"text-base-content/25", "bg-base-content/20", "Done", false}
-  }
-  @default_status {"text-base-content/25", "bg-base-content/20", "Idle", false}
-
-  defp status_style(agent) do
-    display = EyeInTheSkyWebWeb.Helpers.ViewHelpers.derive_display_status(agent)
-    Map.get(@status_styles, display, @default_status)
-  end
-
-  defp status_indicator(assigns) do
-    ~H"""
-    <div class="flex-shrink-0 w-6 flex justify-center" title={@label}>
-      <%= if @active do %>
-        <span class="relative flex h-2 w-2">
-          <span class={"animate-ping absolute inline-flex h-full w-full rounded-full opacity-50 " <> @bg} />
-          <span class={"relative inline-flex rounded-full h-2 w-2 " <> @bg} />
-        </span>
-      <% else %>
-        <span class={"inline-flex rounded-full h-2 w-2 " <> @bg} />
-      <% end %>
-    </div>
-    """
-  end
-
-  defp agent_row(assigns) do
-    {color, bg, label, active} = status_style(assigns.agent)
-    assigns = assign(assigns, status_color: color, status_bg: bg, status_label: label, is_active: active)
-
-    ~H"""
-    <div
-      class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer"
-      phx-click="navigate_dm"
-      phx-value-id={@agent.id}
-    >
-      <%= if @archived do %>
-        <div class="flex-shrink-0 w-6 flex justify-center">
-          <input
-            type="checkbox"
-            checked={MapSet.member?(@selected_ids, to_string(@agent.id))}
-            phx-click="toggle_select"
-            phx-value-id={@agent.id}
-            class="checkbox checkbox-xs checkbox-primary"
-          />
-        </div>
-      <% else %>
-        <.status_indicator bg={@status_bg} label={@status_label} active={@is_active} />
-      <% end %>
-
-      <div class="flex-1 min-w-0">
-        <div class="flex items-baseline gap-2">
-          <span class="text-[13px] font-medium text-base-content/85 truncate">
-            {@agent.name || "Unnamed session"}
-          </span>
-          <span class={"text-[10px] font-medium uppercase tracking-wider " <> @status_color}>
-            {@status_label}
-          </span>
-        </div>
-        <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
-          <span class="font-mono">{Sessions.format_model_info(@agent)}</span>
-          <%= if @agent.project_name do %>
-            <span class="text-base-content/15">/</span>
-            <span>{@agent.project_name}</span>
-          <% end %>
-          <span class="text-base-content/15">/</span>
-          <span class="tabular-nums">{relative_time(@agent.started_at)}</span>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-0.5 flex-shrink-0" phx-click={%JS{}}>
-          <a
-            href={~p"/dm/#{@agent.id}"}
-            target="_blank"
-            class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-primary"
-            aria-label="Open in new tab"
-          >
-            <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
-          </a>
-        <%= if @agent.agent && @agent.agent.uuid && @agent.uuid do %>
-          <button
-            id={"bookmark-btn-#{@agent.uuid}"}
-            type="button"
-            phx-hook="BookmarkAgent"
-            data-agent-id={@agent.agent.uuid}
-            data-session-id={@agent.uuid}
-            data-agent-name={@agent.name || @agent.agent.description || "Agent"}
-            data-agent-status={@agent.status}
-            class="bookmark-button btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-error"
-            aria-label="Bookmark agent"
-          >
-            <.heart class="bookmark-icon w-3.5 h-3.5" />
-          </button>
-        <% end %>
-        <%= if @agent.uuid do %>
-          <%= if @agent.archived_at do %>
-            <button type="button" phx-click="unarchive_session" phx-value-session_id={@agent.id} class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-info" aria-label="Unarchive">
-              <.icon name="hero-arrow-up-tray-mini" class="w-3.5 h-3.5" />
-            </button>
-            <button type="button" phx-click="delete_session" phx-value-session_id={@agent.id} class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-error" aria-label="Delete">
-              <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
-            </button>
-          <% else %>
-            <button type="button" phx-click="archive_session" phx-value-session_id={@agent.id} class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-warning" aria-label="Archive">
-              <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
-            </button>
-          <% end %>
-        <% end %>
-      </div>
-
-      <div class="flex-shrink-0">
-        <.icon name="hero-chevron-right-mini" class="w-4 h-4 text-base-content/20" />
-      </div>
-    </div>
-    """
-  end
 
   # -- Render ---------------------------------------------------------------
 
@@ -617,12 +531,72 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
           <%= if @agents == [] do %>
             <.empty_state id="agents-empty" title="No agents found" subtitle="Try adjusting your search or filters" />
           <% else %>
-            <.agent_row
-              :for={agent <- @agents}
-              agent={agent}
-              archived={@session_filter == "archived"}
-              selected_ids={@selected_ids}
-            />
+            <div :for={agent <- @agents}>
+              <.session_row
+                session={agent}
+                select_mode={@session_filter == "archived"}
+                selected={MapSet.member?(@selected_ids, to_string(agent.id))}
+                project_name={agent.project_name}
+                editing_session_id={@editing_session_id}
+              >
+                <:actions>
+                  <%= if agent.id do %>
+                    <a
+                      href={~p"/dm/#{agent.id}"}
+                      target="_blank"
+                      class="hidden sm:inline-flex md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-base-content/30 hover:text-primary hover:bg-primary/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      aria-label="Open in new tab"
+                    >
+                      <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
+                    </a>
+                  <% end %>
+                  <%= if agent.agent && agent.agent.uuid && agent.uuid do %>
+                    <button
+                      id={"bookmark-btn-#{agent.uuid}"}
+                      type="button"
+                      phx-hook="BookmarkAgent"
+                      data-agent-id={agent.agent.uuid}
+                      data-session-id={agent.uuid}
+                      data-agent-name={agent.name || agent.agent.description || "Agent"}
+                      data-agent-status={agent.status}
+                      class="bookmark-button md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
+                      aria-label="Bookmark agent"
+                    >
+                      <.heart class="bookmark-icon w-3.5 h-3.5" />
+                    </button>
+                  <% end %>
+                  <%= if agent.uuid do %>
+                    <%= if agent.archived_at do %>
+                      <.icon_button
+                        icon="hero-arrow-up-tray-mini"
+                        on_click="unarchive_session"
+                        aria_label="Unarchive"
+                        color="info"
+                        show_on_hover={false}
+                        values={%{"session_id" => agent.id}}
+                      />
+                      <.icon_button
+                        icon="hero-trash-mini"
+                        on_click="delete_session"
+                        aria_label="Delete"
+                        color="error"
+                        show_on_hover={false}
+                        values={%{"session_id" => agent.id}}
+                      />
+                    <% else %>
+                      <.icon_button
+                        icon="hero-archive-box-mini"
+                        on_click="archive_session"
+                        aria_label="Archive"
+                        color="warning"
+                        class="hidden sm:flex"
+                        values={%{"session_id" => agent.id}}
+                      />
+                    <% end %>
+                  <% end %>
+                </:actions>
+              </.session_row>
+            </div>
           <% end %>
         </div>
       </div>

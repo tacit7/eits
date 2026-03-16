@@ -221,6 +221,43 @@ end
 
 ---
 
+## Mobile Optimizations (DM Page)
+
+**Top bar (Claude-style minimal design):**
+- Simplified header with session name only
+- Removed unlimited placeholder and token counter display
+- Tab navigation in mobile overflow menu for additional features
+- Agent status indicator in top bar
+
+**Tab navigation (mobile):**
+- Moved secondary features to a tab-based overflow menu
+- Supports tab activation via keyboard (Enter key)
+- Activates item when exactly one result is visible
+
+**Periodic sync loop:**
+- Automatically loads new messages when agent is running
+- Stops when agent completes or is no longer active
+- Prevents memory leaks from accumulation of periodic timers
+- Handler checks agent status before scheduling next poll
+
+**Color rendering (dark mode):**
+- Fixed dark mode code block rendering in dm-markdown
+- Proper contrast for syntax highlighting
+- Maintains readability in low-light conditions
+
+---
+
+## Mobile Navigation (FAB)
+
+**Floating Action Button (FAB):**
+- Located in bottom-right corner on mobile
+- Navigates to DM page on tap
+- Uses anchor element for reliable navigation
+- Visible on all pages except DM page itself
+- Fixed positioning, doesn't interfere with scrolling
+
+---
+
 ## Performance Considerations
 
 **Streaming:**

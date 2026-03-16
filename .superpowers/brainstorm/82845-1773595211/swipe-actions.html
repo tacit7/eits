@@ -1,0 +1,166 @@
+<h2>Swipe-to-Reveal: Session Row Actions</h2>
+<p class="subtitle">Swipe left on a row to reveal 3 action buttons. Two layout variants — pick the one that feels right.</p>
+
+<style>
+  .demo-list {
+    max-width: 420px;
+    margin: 0 auto;
+    border-radius: 12px;
+    overflow: hidden;
+    background: oklch(97% 0.005 80);
+    border: 1px solid rgba(0,0,0,0.08);
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  .demo-row-wrap {
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+  }
+  .demo-row-wrap:last-child { border-bottom: none; }
+  .action-panel {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    display: flex;
+    align-items: stretch;
+  }
+  .action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    border: none;
+    color: white;
+  }
+  .action-btn svg { width: 20px; height: 20px; }
+  .action-btn.fav  { background: #f43f5e; }
+  .action-btn.edit { background: #6366f1; }
+  .action-btn.arch { background: #f59e0b; }
+  .session-row {
+    background: oklch(97% 0.005 80);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    z-index: 1;
+  }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot-active { background: #22c55e; }
+  .dot-idle   { background: #d1d5db; }
+  .row-body { flex: 1; min-width: 0; }
+  .row-name { font-size: 13px; font-weight: 500; color: rgba(0,0,0,0.82); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-meta { font-size: 11px; color: rgba(0,0,0,0.35); margin-top: 2px; font-family: ui-monospace, monospace; }
+  .variant-a .session-row { transform: translateX(-192px); box-shadow: -4px 0 12px rgba(0,0,0,0.08); }
+  .variant-a .action-btn  { width: 64px; }
+  .variant-b .session-row { transform: translateX(-160px); box-shadow: -4px 0 12px rgba(0,0,0,0.08); }
+  .variant-b .action-btn  { width: 53px; font-size: 9px; }
+  .demo-label { text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(0,0,0,0.3); padding: 10px 0 4px; }
+  .demo-note  { font-size: 11px; color: rgba(0,0,0,0.4); text-align: center; padding: 0 16px 8px; }
+  .swipe-hint { font-size: 11px; color: rgba(0,0,0,0.3); padding: 6px 16px; background: rgba(0,0,0,0.02); border-bottom: 1px solid rgba(0,0,0,0.04); }
+</style>
+
+<div style="display:flex;flex-direction:column;gap:32px;max-width:480px;margin:0 auto">
+
+  <div>
+    <div class="demo-label">Option A — Wide buttons (64px × 3 = 192px reveal)</div>
+    <div class="demo-note">Labels clearly readable, bigger tap targets</div>
+    <div class="demo-list">
+      <div class="swipe-hint">← swiped left (simulated)</div>
+      <div class="demo-row-wrap variant-a">
+        <div class="action-panel">
+          <button class="action-btn fav">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+            Fav
+          </button>
+          <button class="action-btn edit">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            Rename
+          </button>
+          <button class="action-btn arch">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+            Archive
+          </button>
+        </div>
+        <div class="session-row">
+          <div class="status-dot dot-active"></div>
+          <div class="row-body">
+            <div class="row-name">Fix authentication bug in login flow</div>
+            <div class="row-meta">opus · 2m ago / web</div>
+          </div>
+        </div>
+      </div>
+      <div class="demo-row-wrap">
+        <div class="session-row">
+          <div class="status-dot dot-idle"></div>
+          <div class="row-body">
+            <div class="row-name">Refactor database queries</div>
+            <div class="row-meta">sonnet · 1h ago / api</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="demo-label">Option B — Compact buttons (53px × 3 = 160px reveal)</div>
+    <div class="demo-note">Tighter panel, more row content stays visible</div>
+    <div class="demo-list">
+      <div class="swipe-hint">← swiped left (simulated)</div>
+      <div class="demo-row-wrap variant-b">
+        <div class="action-panel">
+          <button class="action-btn fav">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+            Fav
+          </button>
+          <button class="action-btn edit">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            Rename
+          </button>
+          <button class="action-btn arch">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+            Archive
+          </button>
+        </div>
+        <div class="session-row">
+          <div class="status-dot dot-active"></div>
+          <div class="row-body">
+            <div class="row-name">Fix authentication bug in login flow</div>
+            <div class="row-meta">opus · 2m ago / web</div>
+          </div>
+        </div>
+      </div>
+      <div class="demo-row-wrap">
+        <div class="session-row">
+          <div class="status-dot dot-idle"></div>
+          <div class="row-body">
+            <div class="row-name">Refactor database queries</div>
+            <div class="row-meta">sonnet · 1h ago / api</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="options" style="margin-top:32px;max-width:480px;margin-left:auto;margin-right:auto">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Wide — 64px buttons</h3>
+      <p>192px reveal, labels easy to read, bigger tap targets</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Compact — 53px buttons</h3>
+      <p>160px reveal, more row content visible after swipe</p>
+    </div>
+  </div>
+</div>

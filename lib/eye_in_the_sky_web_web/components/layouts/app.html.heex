@@ -25,7 +25,7 @@
 
   <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
     <%!-- Mobile top bar — hidden on md+ since sidebar is always visible --%>
-    <header class="md:hidden flex-shrink-0 flex items-center gap-3 px-4 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)]">
+    <header class={["md:hidden flex-shrink-0 flex items-center gap-3 px-4 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)]", assigns[:hide_mobile_header] && "hidden"]}>
       <button
         phx-click={Phoenix.LiveView.JS.dispatch("sidebar:open", to: "#app-sidebar")}
         class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
@@ -135,18 +135,209 @@
     </nav>
 
     <dialog
+      id="quick-create-note"
+      phx-hook="QuickCreateNote"
+      class="modal modal-bottom sm:modal-middle p-0 bg-transparent"
+    >
+      <div class="modal-box max-w-lg p-0 overflow-hidden">
+        <div class="border-b border-base-content/10 px-4 py-3 flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-base-content">New Note</h2>
+          <button data-qcn-cancel type="button" class="btn btn-ghost btn-xs btn-square" aria-label="Close">
+            <span class="hero-x-mark w-4 h-4"></span>
+          </button>
+        </div>
+        <form data-qcn-form class="p-4 flex flex-col gap-3">
+          <div>
+            <label class="sr-only" for="qcn-title">Title</label>
+            <input
+              id="qcn-title"
+              type="text"
+              data-qcn-title
+              required
+              placeholder="Note title..."
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm"
+              autocomplete="off"
+            />
+          </div>
+          <div>
+            <label class="sr-only" for="qcn-body">Body</label>
+            <textarea
+              id="qcn-body"
+              data-qcn-body
+              placeholder="Note content..."
+              rows="4"
+              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm resize-none"
+            ></textarea>
+          </div>
+          <div class="flex justify-end gap-2 pt-1">
+            <button data-qcn-cancel type="button" class="btn btn-ghost btn-sm">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">Create Note</button>
+          </div>
+        </form>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+      </form>
+    </dialog>
+
+    <dialog
+      id="quick-create-agent"
+      phx-hook="QuickCreateAgent"
+      data-project-id={assigns[:sidebar_project] && assigns[:sidebar_project].id}
+      class="modal modal-bottom sm:modal-middle p-0 bg-transparent"
+    >
+      <div class="modal-box max-w-lg p-0 overflow-hidden">
+        <div class="border-b border-base-content/10 px-4 py-3 flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-base-content">New Agent</h2>
+          <button data-qca-cancel type="button" class="btn btn-ghost btn-xs btn-square" aria-label="Close">
+            <span class="hero-x-mark w-4 h-4"></span>
+          </button>
+        </div>
+        <form data-qca-form class="p-4 flex flex-col gap-3">
+          <div>
+            <label class="sr-only" for="qca-instructions">Instructions</label>
+            <textarea
+              id="qca-instructions"
+              data-qca-instructions
+              required
+              placeholder="What should this agent do?"
+              rows="4"
+              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm resize-none"
+            ></textarea>
+          </div>
+          <div>
+            <label class="sr-only" for="qca-model">Model</label>
+            <select
+              id="qca-model"
+              data-qca-model
+              class="select select-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm"
+            >
+              <option value="haiku">Haiku (fast)</option>
+              <option value="sonnet">Sonnet (balanced)</option>
+            </select>
+          </div>
+          <div class="flex justify-end gap-2 pt-1">
+            <button data-qca-cancel type="button" class="btn btn-ghost btn-sm">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">Spawn Agent</button>
+          </div>
+        </form>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+      </form>
+    </dialog>
+
+    <dialog
+      id="quick-create-chat"
+      phx-hook="QuickCreateChat"
+      data-project-id={assigns[:sidebar_project] && assigns[:sidebar_project].id}
+      class="modal modal-bottom sm:modal-middle p-0 bg-transparent"
+    >
+      <div class="modal-box max-w-lg p-0 overflow-hidden">
+        <div class="border-b border-base-content/10 px-4 py-3 flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-base-content">New Chat</h2>
+          <button data-qcc-cancel type="button" class="btn btn-ghost btn-xs btn-square" aria-label="Close">
+            <span class="hero-x-mark w-4 h-4"></span>
+          </button>
+        </div>
+        <form data-qcc-form class="p-4 flex flex-col gap-3">
+          <div>
+            <label class="sr-only" for="qcc-name">Name</label>
+            <input
+              id="qcc-name"
+              type="text"
+              data-qcc-name
+              placeholder="Session name (optional)..."
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm"
+              autocomplete="off"
+            />
+          </div>
+          <div class="flex justify-end gap-2 pt-1">
+            <button data-qcc-cancel type="button" class="btn btn-ghost btn-sm">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">Start Chat</button>
+          </div>
+        </form>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+      </form>
+    </dialog>
+
+    <dialog
+      id="quick-create-task"
+      phx-hook="QuickCreateTask"
+      data-project-id={assigns[:sidebar_project] && assigns[:sidebar_project].id}
+      class="modal modal-bottom sm:modal-middle p-0 bg-transparent"
+    >
+      <div class="modal-box max-w-lg p-0 overflow-hidden">
+        <div class="border-b border-base-content/10 px-4 py-3 flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-base-content">New Task</h2>
+          <button data-qct-cancel type="button" class="btn btn-ghost btn-xs btn-square" aria-label="Close">
+            <span class="hero-x-mark w-4 h-4"></span>
+          </button>
+        </div>
+        <form data-qct-form class="p-4 flex flex-col gap-3">
+          <div>
+            <label class="sr-only" for="qct-title">Title</label>
+            <input
+              id="qct-title"
+              type="text"
+              data-qct-title
+              required
+              placeholder="Task title..."
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm"
+              autocomplete="off"
+            />
+          </div>
+          <div>
+            <label class="sr-only" for="qct-description">Description</label>
+            <textarea
+              id="qct-description"
+              data-qct-description
+              placeholder="Description (optional)..."
+              rows="3"
+              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm resize-none"
+            ></textarea>
+          </div>
+          <div>
+            <label class="sr-only" for="qct-tags">Tags</label>
+            <input
+              id="qct-tags"
+              type="text"
+              data-qct-tags
+              placeholder="tag1, tag2, tag3"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm"
+              autocomplete="off"
+            />
+          </div>
+          <div class="flex justify-end gap-2 pt-1">
+            <button data-qct-cancel type="button" class="btn btn-ghost btn-sm">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">Create Task</button>
+          </div>
+        </form>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+      </form>
+    </dialog>
+
+    <dialog
       id="command-palette"
       phx-hook="CommandPalette"
       class="modal modal-bottom sm:modal-middle p-0 bg-transparent"
     >
-      <div class="modal-box max-w-2xl p-0 overflow-hidden">
+      <div class="modal-box max-w-2xl p-0 overflow-hidden bg-[oklch(100%_0_0)] dark:bg-[hsl(30,4%,20%)]">
         <div class="border-b border-base-content/10 p-3">
+          <div
+            data-palette-breadcrumb
+            class="hidden text-[11px] text-base-content/50 mb-2 select-none"
+          ></div>
           <label for="command-palette-input" class="sr-only">Search commands</label>
           <input
             id="command-palette-input"
             type="text"
             data-palette-input
-            placeholder="Search pages, projects, and commands..."
+            placeholder="Search commands..."
             class="w-full h-10 rounded-lg border border-base-content/10 bg-base-100 px-3 text-sm focus:outline-none focus:border-primary/40"
           />
         </div>
@@ -158,7 +349,7 @@
         >
         </div>
         <div class="px-3 py-2 text-[11px] text-base-content/55 border-t border-base-content/10">
-          Arrow keys to move • Enter to navigate • Esc to close • Cmd/Ctrl+K to open
+          ↑↓ to move · Enter to select · Esc to close/back · Backspace to go back
         </div>
       </div>
       <form method="dialog" class="modal-backdrop">

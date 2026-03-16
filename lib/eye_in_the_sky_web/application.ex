@@ -32,7 +32,7 @@ defmodule EyeInTheSkyWeb.Application do
       # DynamicSupervisor for per-session workers
       {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.SessionSupervisor, strategy: :one_for_one},
       # DynamicSupervisor for persistent agent workers
-      {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.AgentSupervisor, strategy: :one_for_one},
+      {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.AgentSupervisor, strategy: :one_for_one, max_children: 50},
       # DynamicSupervisor for per-channel chat workers
       {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.ChatSupervisor, strategy: :one_for_one},
       # Claude CLI session coordinator
@@ -43,17 +43,13 @@ defmodule EyeInTheSkyWeb.Application do
       EyeInTheSkyWeb.Tasks.Poller,
       # Poll for external message writes (Go MCP, spawned agents)
       EyeInTheSkyWeb.Messages.Broadcaster,
-      # MCP Server (Anubis) — Streamable HTTP at /mcp
-      # SessionStore is started by Anubis automatically via :session_store config (enabled: true)
-      Anubis.Server.Registry,
-      {EyeInTheSkyWeb.MCP.Server, transport: :streamable_http},
       # Start to serve requests, typically the last entry
       EyeInTheSkyWebWeb.Endpoint
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
-    opts = [strategy: :one_for_one, name: EyeInTheSkyWeb.Supervisor]
+    opts = [strategy: :rest_for_one, name: EyeInTheSkyWeb.Supervisor]
     Supervisor.start_link(children, opts)
   end
 

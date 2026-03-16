@@ -24,6 +24,7 @@ defmodule EyeInTheSkyWebWeb.FabHook do
       |> assign(:fab_mounted, true)
       |> assign(:fab_timer, nil)
       |> assign(:fab_active_session_id, nil)
+      |> assign(:config_guide_active_session_id, nil)
       |> attach_hook(:fab_events, :handle_event, &handle_fab_event/3)
       |> attach_hook(:fab_info, :handle_info, &handle_fab_info/2)
 
@@ -75,6 +76,52 @@ defmodule EyeInTheSkyWebWeb.FabHook do
     end
   end
 
+  defp handle_fab_event("config_guide_open_chat", %{"session_id" => session_id}, socket) do
+    socket =
+      case resolve_session(session_id) do
+        {:ok, session} ->
+          socket = unsubscribe_config_guide_session(socket)
+          Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
+          socket = assign(socket, :config_guide_active_session_id, session.id)
+
+          messages =
+            Messages.list_recent_messages(session.id, 20)
+            |> Enum.map(&%{
+              id: &1.id,
+              session_id: &1.session_id,
+              body: &1.body,
+              sender_role: &1.sender_role,
+              inserted_at: to_string(&1.inserted_at)
+            })
+
+          push_event(socket, "config_guide_history", %{messages: messages})
+
+        {:error, reason} ->
+          Logger.error("ConfigGuide open_chat error: #{inspect(reason)}")
+          push_event(socket, "config_guide_error", %{error: "Failed to open session"})
+      end
+
+    {:halt, socket}
+  end
+
+  defp handle_fab_event(
+         "config_guide_send_message",
+         %{"session_id" => session_id, "body" => body},
+         socket
+       ) do
+    case send_session_message(session_id, body) do
+      {:ok, _session_id_int} ->
+        {:halt, socket}
+
+      {:error, reason} ->
+        {:halt, push_event(socket, "config_guide_error", %{error: reason})}
+    end
+  end
+
+  defp handle_fab_event("config_guide_close_chat", _params, socket) do
+    {:halt, unsubscribe_config_guide_session(socket)}
+  end
+
   defp handle_fab_event(_event, _params, socket) do
     {:cont, socket}
   end
@@ -90,12 +137,34 @@ defmodule EyeInTheSkyWebWeb.FabHook do
     {:halt, socket}
   end
 
+  # Shared session message router — routes to FAB chat or Config Guide chat by session_id.
   defp handle_fab_info(
-         {:new_message, %EyeInTheSkyWeb.Messages.Message{sender_role: role, body: body}},
+         {:new_message,
+          %EyeInTheSkyWeb.Messages.Message{
+            session_id: session_id,
+            sender_role: role,
+            body: body
+          } = msg},
          socket
        )
        when role != "user" do
-    {:halt, push_event(socket, "fab_chat_message", %{body: body, sender_role: role})}
+    cond do
+      session_id == socket.assigns.fab_active_session_id ->
+        {:halt, push_event(socket, "fab_chat_message", %{body: body, sender_role: role})}
+
+      session_id == socket.assigns.config_guide_active_session_id ->
+        {:halt,
+         push_event(socket, "config_guide_message", %{
+           id: msg.id,
+           session_id: session_id,
+           body: body,
+           sender_role: role,
+           inserted_at: to_string(msg.inserted_at)
+         })}
+
+      true ->
+        {:cont, socket}
+    end
   end
 
   defp handle_fab_info({event, _}, socket)
@@ -130,6 +199,17 @@ defmodule EyeInTheSkyWebWeb.FabHook do
       id ->
         Phoenix.PubSub.unsubscribe(EyeInTheSkyWeb.PubSub, "session:#{id}")
         assign(socket, :fab_active_session_id, nil)
+    end
+  end
+
+  defp unsubscribe_config_guide_session(socket) do
+    case socket.assigns.config_guide_active_session_id do
+      nil ->
+        socket
+
+      id ->
+        Phoenix.PubSub.unsubscribe(EyeInTheSkyWeb.PubSub, "session:#{id}")
+        assign(socket, :config_guide_active_session_id, nil)
     end
   end
 

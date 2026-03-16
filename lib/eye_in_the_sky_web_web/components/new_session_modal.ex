@@ -113,6 +113,17 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
               </div>
             <% end %>
 
+            <%!-- Name --%>
+            <div>
+              <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Name</label>
+              <input
+                type="text"
+                name="agent_name"
+                class="input input-bordered w-full"
+                placeholder="e.g., Fix login bug, Code review..."
+              />
+            </div>
+
             <%!-- Description --%>
             <div>
               <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Description</label>
@@ -207,6 +218,13 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
                 Isolates work in its own branch (worktree-&lt;name&gt;) and enables automatic PR creation.
               </p>
             </div>
+
+            <%!-- EITS Workflow --%>
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+              <input type="hidden" name="eits_workflow" value="0" />
+              <input type="checkbox" name="eits_workflow" value="1" class="checkbox checkbox-sm" checked />
+              <span class="text-sm text-base-content/70">EITS Workflow</span>
+            </label>
 
             <%!-- Submit --%>
             <button type="submit" class="btn btn-primary w-full mt-2">

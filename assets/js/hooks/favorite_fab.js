@@ -321,7 +321,7 @@ export const FavoriteFab = {
         : `<span class="absolute -bottom-0.5 -right-0.5 inline-flex rounded-full h-3 w-3 ${style.dot} ring-2 ring-base-100"></span>`
 
       return `
-        <button
+        <a href="/dm/${agent.session_id}"
            class="btn btn-circle bg-base-100 shadow-md hover:bg-base-200 border border-base-content/10 relative group fab-agent-btn"
            style="position:absolute;bottom:0;right:0;opacity:0;transform:translate(0,0) scale(0.5);transition:opacity 0.18s,transform 0.18s;pointer-events:none"
            title="${(agent.name || 'Agent').replace(/"/g, '&quot;')}"
@@ -329,7 +329,7 @@ export const FavoriteFab = {
           <span class="font-bold text-xs text-base-content/70">${initials}</span>
           ${statusDot}
           <span class="fab-remove-btn absolute -top-1 -right-1 w-4 h-4 rounded-full bg-error text-error-content flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10 shadow-sm"
-                data-remove-index="${index}">
+                data-remove-index="${index}" style="pointer-events:auto">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-2.5 h-2.5">
               <path d="M5.28 4.22a.75.75 0 0 0-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 1 0 1.06 1.06L8 9.06l2.72 2.72a.75.75 0 1 0 1.06-1.06L9.06 8l2.72-2.72a.75.75 0 0 0-1.06-1.06L8 6.94 5.28 4.22Z" />
             </svg>
@@ -337,7 +337,7 @@ export const FavoriteFab = {
           <span class="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-base-300 text-base-content text-xs rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
             ${(agent.name || 'Agent').replace(/</g, '&lt;')}
           </span>
-        </button>`
+        </a>`
     }).join('')
 
     this.el.innerHTML = mainBtn + agentBtns
@@ -381,13 +381,16 @@ export const FavoriteFab = {
       })
     })
 
-    // Agent buttons: click opens chat
-    agentEls.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault()
+    // Agent links: open chat on desktop, navigate natively on mobile
+    agentEls.forEach(el => {
+      el.addEventListener('click', (e) => {
         e.stopPropagation()
-        const agent = this._agentMap[parseInt(btn.dataset.agentIndex, 10)]
-        if (agent) this._openChat(agent)
+        if (window.innerWidth >= 640) {
+          e.preventDefault()
+          const agent = this._agentMap[parseInt(el.dataset.agentIndex, 10)]
+          if (agent) this._openChat(agent)
+        }
+        // mobile: let <a href> navigate naturally
       })
     })
   }

@@ -2,6 +2,12 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.{Teams, Tasks, Notes}
+  alias EyeInTheSkyWeb.Tasks.WorkflowState
+
+  @state_todo WorkflowState.todo_id()
+  @state_in_progress WorkflowState.in_progress_id()
+  @state_in_review WorkflowState.in_review_id()
+  @state_done WorkflowState.done_id()
 
   @impl true
   def mount(_params, _session, socket) do
@@ -14,9 +20,11 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
      |> assign(:page_title, "Teams")
      |> assign(:sidebar_tab, :teams)
      |> assign(:sidebar_project, nil)
-     |> assign(:teams, load_teams())
+     |> assign(:show_archived, false)
+     |> assign(:teams, load_teams(false))
      |> assign(:selected_team_id, nil)
-     |> assign(:selected_team, nil)}
+     |> assign(:selected_team, nil)
+     |> assign(:mobile_view, :list)}
   end
 
   @impl true
@@ -24,7 +32,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
       when event in [:team_created, :team_deleted, :member_joined, :member_updated, :member_left] do
     {:noreply,
      socket
-     |> assign(:teams, load_teams())
+     |> assign(:teams, load_teams(socket.assigns.show_archived))
      |> maybe_refresh_selected_team()}
   end
 
@@ -32,12 +40,21 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   def handle_event("select_team", %{"id" => id}, socket) do
     team_id = String.to_integer(id)
     team = Teams.get_team!(team_id) |> load_team_detail()
-    {:noreply, socket |> assign(:selected_team_id, team_id) |> assign(:selected_team, team)}
+    {:noreply, show_team_detail(socket, team_id, team)}
   end
 
   @impl true
   def handle_event("close_team", _params, socket) do
-    {:noreply, socket |> assign(:selected_team_id, nil) |> assign(:selected_team, nil)}
+    {:noreply, show_team_list(socket)}
+  end
+
+  @impl true
+  def handle_event("toggle_archived", _params, socket) do
+    show_archived = !socket.assigns.show_archived
+    {:noreply,
+     socket
+     |> assign(:show_archived, show_archived)
+     |> assign(:teams, load_teams(show_archived))}
   end
 
   @impl true
@@ -53,15 +70,29 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="flex h-full gap-0">
+    <div class="flex h-full gap-0 flex-col sm:flex-row">
       <%!-- Team list sidebar --%>
-      <div class="w-72 border-r border-base-300 flex flex-col shrink-0">
+      <div class={[
+        "border-r border-base-300 flex flex-col flex-1 sm:flex-none w-full sm:w-72 sm:shrink-0",
+        @mobile_view == :detail && "hidden sm:flex"
+      ]}>
         <div class="px-4 py-3 border-b border-base-300 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <.icon name="hero-user-group" class="w-4 h-4 text-base-content/50" />
             <span class="text-xs font-semibold uppercase tracking-widest text-base-content/60">Teams</span>
           </div>
-          <span class="font-mono text-xs text-base-content/40"><%= length(@teams) %></span>
+          <div class="flex items-center gap-2">
+            <button
+              phx-click="toggle_archived"
+              class={["text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors",
+                if(@show_archived, do: "bg-base-content/10 text-base-content/60", else: "text-base-content/30 hover:text-base-content/50")
+              ]}
+              title={if @show_archived, do: "Showing archived", else: "Show archived"}
+            >
+              <%= if @show_archived, do: "archived", else: "archived" %>
+            </button>
+            <span class="font-mono text-xs text-base-content/40"><%= length(@teams) %></span>
+          </div>
         </div>
 
         <div class="flex-1 overflow-y-auto">
@@ -79,7 +110,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
                   class={[
                     "w-full text-left px-3 py-2.5 group transition-colors relative",
                     if(@selected_team_id == team.id,
-                      do: "bg-primary/8 border-l-2 border-l-primary",
+                      do: "bg-primary/10 border-l-2 border-l-primary",
                       else: "hover:bg-base-200 border-l-2 border-l-transparent"
                     )
                   ]}
@@ -125,7 +156,19 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
       </div>
 
       <%!-- Team detail panel --%>
-      <div class="flex-1 overflow-y-auto min-w-0">
+      <div class={[
+        "flex-1 overflow-y-auto min-w-0 w-full",
+        @mobile_view == :list && "hidden sm:block"
+      ]}>
+        <%= if @mobile_view == :detail do %>
+          <button
+            class="sm:hidden flex items-center gap-2 px-4 py-3 text-sm text-base-content/60 border-b border-base-300 w-full hover:bg-base-200"
+            phx-click="close_team"
+          >
+            <.icon name="hero-arrow-left" class="w-4 h-4" />
+            Teams
+          </button>
+        <% end %>
         <%= if @selected_team do %>
           <.team_detail team={@selected_team} />
         <% else %>
@@ -148,16 +191,16 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
 
   defp team_detail(assigns) do
     active_members = Enum.count(assigns.team.members, &(&1.status == "active"))
-    done_tasks = Enum.count(assigns.team.tasks, &(&1.state_id == 3))
+    done_tasks = Enum.count(assigns.team.tasks, &(&1.state_id == @state_done))
     total_tasks = length(assigns.team.tasks)
     assigns = assign(assigns, active_members: active_members, done_tasks: done_tasks, total_tasks: total_tasks)
 
     ~H"""
-    <div class="p-6 max-w-4xl space-y-6">
+    <div class="p-4 sm:p-6 max-w-4xl space-y-6">
       <%!-- Header --%>
       <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
-          <div class="flex items-center gap-3 mb-1">
+          <div class="flex items-center flex-wrap gap-3 mb-1">
             <h1 class="text-2xl font-bold text-base-content tracking-tight"><%= @team.name %></h1>
             <span class={["badge badge-sm font-medium", status_badge_class(@team.status)]}>
               <%= @team.status %>
@@ -170,7 +213,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
       </div>
 
       <%!-- Stats row --%>
-      <div class="grid grid-cols-4 gap-3">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div class="bg-base-200 rounded-lg px-4 py-3">
           <div class="text-2xl font-bold font-mono text-base-content"><%= length(@team.members) %></div>
           <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Members</div>
@@ -184,10 +227,26 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
           <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Tasks</div>
         </div>
         <div class="bg-base-200 rounded-lg px-4 py-3">
-          <div class="text-2xl font-bold font-mono text-info"><%= @done_tasks %></div>
+          <div class="text-2xl font-bold font-mono text-success"><%= @done_tasks %></div>
           <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Completed</div>
         </div>
       </div>
+
+      <%!-- Task progress bar --%>
+      <%= if @total_tasks > 0 do %>
+        <div class="space-y-1">
+          <div class="flex items-center justify-between text-[11px] text-base-content/40">
+            <span>Progress</span>
+            <span class="font-mono"><%= @done_tasks %>/<%= @total_tasks %></span>
+          </div>
+          <div class="h-1.5 bg-base-300 rounded-full overflow-hidden">
+            <div
+              class="h-full bg-success rounded-full transition-all"
+              style={"width: #{Float.round(@done_tasks / @total_tasks * 100, 1)}%"}
+            ></div>
+          </div>
+        </div>
+      <% end %>
 
       <%!-- Members --%>
       <section>
@@ -225,7 +284,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
                 <%= if member.session do %>
                   <.link
                     navigate={~p"/dm/#{member.session_id}"}
-                    class="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[10px] font-mono text-base-content/40 bg-base-content/5 px-2 py-1 rounded hover:text-base-content/60 transition-all shrink-0"
+                    class="sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-1 text-[10px] font-mono text-base-content/40 bg-base-content/5 px-2 py-1 rounded hover:text-base-content/60 transition-all shrink-0"
                   >
                     <%= String.slice(member.session.uuid || to_string(member.session_id), 0..7) %>
                     <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
@@ -238,7 +297,13 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
                   <%= for task <- member.tasks do %>
                     <div class="flex items-center gap-2">
                       <div class={["w-1.5 h-1.5 rounded-full shrink-0", task_state_dot(task.state_id)]}></div>
-                      <span class="flex-1 text-xs text-base-content/70 truncate"><%= task.title %></span>
+                      <%= if task.project_id do %>
+                        <.link navigate={~p"/projects/#{task.project_id}/tasks"} class="flex-1 text-xs text-base-content/70 truncate hover:text-base-content/90 hover:underline">
+                          <%= task.title %>
+                        </.link>
+                      <% else %>
+                        <span class="flex-1 text-xs text-base-content/70 truncate"><%= task.title %></span>
+                      <% end %>
                       <%= if task.state do %>
                         <span class={["text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0", task_state_chip(task.state_id)]}>
                           <%= task.state.name %>
@@ -272,12 +337,18 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
               <div class="rounded-lg bg-base-200 overflow-hidden">
                 <div class="flex items-center gap-3 px-3 py-2.5 group">
                   <div class={["w-1.5 h-1.5 rounded-full shrink-0", task_state_dot(task.state_id)]}></div>
-                  <span class="flex-1 text-sm text-base-content min-w-0 truncate"><%= task.title %></span>
+                  <%= if task.project_id do %>
+                    <.link navigate={~p"/projects/#{task.project_id}/tasks"} class="flex-1 text-sm text-base-content min-w-0 truncate hover:underline">
+                      <%= task.title %>
+                    </.link>
+                  <% else %>
+                    <span class="flex-1 text-sm text-base-content min-w-0 truncate"><%= task.title %></span>
+                  <% end %>
                   <div class="flex items-center gap-1.5 shrink-0">
-                    <%= if Map.get(task, :annotations, []) != [] do %>
+                    <%= if Map.get(task, :notes, []) != [] do %>
                       <span class="flex items-center gap-1 text-[10px] text-base-content/40 font-mono">
                         <.icon name="hero-chat-bubble-left-ellipsis" class="w-3 h-3" />
-                        <%= length(task.annotations) %>
+                        <%= length(task.notes) %>
                       </span>
                     <% end %>
                     <%= if task.state do %>
@@ -287,7 +358,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
                     <% end %>
                     <%!-- Assign to member picker --%>
                     <select
-                      class="opacity-0 group-hover:opacity-100 text-[10px] bg-base-300 border-0 rounded px-1.5 py-0.5 text-base-content/60 cursor-pointer focus:outline-none transition-opacity"
+                      class="sm:opacity-0 sm:group-hover:opacity-100 text-[10px] bg-base-300 border-0 rounded px-1.5 py-0.5 text-base-content/60 cursor-pointer focus:outline-none transition-opacity"
                       phx-change="assign_task"
                       phx-value-task-id={task.id}
                       name="session-id"
@@ -299,9 +370,9 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
                     </select>
                   </div>
                 </div>
-                <%= if Map.get(task, :annotations, []) != [] do %>
+                <%= if Map.get(task, :notes, []) != [] do %>
                   <div class="border-t border-base-300/50 px-3 pb-2.5 pt-2 space-y-2">
-                    <%= for note <- task.annotations do %>
+                    <%= for note <- task.notes do %>
                       <div class="text-xs text-base-content/50 pl-3 border-l-2 border-base-content/10">
                         <p class="whitespace-pre-wrap leading-relaxed"><%= note.body %></p>
                         <span class="text-[10px] text-base-content/25 mt-1 block font-mono">
@@ -320,8 +391,12 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
     """
   end
 
-  defp load_teams do
-    Teams.list_teams()
+  defp load_teams(show_archived) do
+    if show_archived do
+      Teams.list_teams(status: "archived")
+    else
+      Teams.list_teams()
+    end
   end
 
   defp load_team_detail(team) do
@@ -329,10 +404,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
 
     tasks =
       Tasks.list_tasks_for_team_with_sessions(team.id)
-      |> Enum.map(fn task ->
-        annotations = Notes.list_notes_for_task(task.id)
-        Map.put(task, :annotations, annotations)
-      end)
+      |> Notes.with_notes_count()
 
     # Group tasks by which member session owns them
     member_session_ids = Enum.map(team.members, & &1.session_id) |> MapSet.new()
@@ -366,9 +438,23 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
 
   defp maybe_refresh_selected_team(%{assigns: %{selected_team_id: id}} = socket) do
     case Teams.get_team(id) do
-      nil -> socket |> assign(:selected_team_id, nil) |> assign(:selected_team, nil)
+      nil -> show_team_list(socket)
       team -> assign(socket, :selected_team, load_team_detail(team))
     end
+  end
+
+  defp show_team_detail(socket, team_id, team) do
+    socket
+    |> assign(:selected_team_id, team_id)
+    |> assign(:selected_team, team)
+    |> assign(:mobile_view, :detail)
+  end
+
+  defp show_team_list(socket) do
+    socket
+    |> assign(:selected_team_id, nil)
+    |> assign(:selected_team, nil)
+    |> assign(:mobile_view, :list)
   end
 
   defp active_member_count(members), do: Enum.count(members, &(&1.status == "active"))
@@ -421,15 +507,15 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   defp member_avatar_class("done"), do: "bg-base-300 text-base-content/40"
   defp member_avatar_class(_), do: "bg-base-300 text-base-content/30"
 
-  defp task_state_dot(1), do: "bg-base-content/30"
-  defp task_state_dot(2), do: "bg-info"
-  defp task_state_dot(3), do: "bg-success"
-  defp task_state_dot(4), do: "bg-warning"
+  defp task_state_dot(@state_todo), do: "bg-base-content/30"
+  defp task_state_dot(@state_in_progress), do: "bg-info"
+  defp task_state_dot(@state_done), do: "bg-success"
+  defp task_state_dot(@state_in_review), do: "bg-warning"
   defp task_state_dot(_), do: "bg-base-content/20"
 
-  defp task_state_chip(1), do: "bg-base-300 text-base-content/40"
-  defp task_state_chip(2), do: "bg-info/15 text-info"
-  defp task_state_chip(3), do: "bg-success/15 text-success"
-  defp task_state_chip(4), do: "bg-warning/15 text-warning"
+  defp task_state_chip(@state_todo), do: "bg-base-300 text-base-content/40"
+  defp task_state_chip(@state_in_progress), do: "bg-info/15 text-info"
+  defp task_state_chip(@state_done), do: "bg-success/15 text-success"
+  defp task_state_chip(@state_in_review), do: "bg-warning/15 text-warning"
   defp task_state_chip(_), do: "bg-base-300 text-base-content/30"
 end

@@ -27,6 +27,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
         |> assign(:search_query, "")
         |> assign(:starred_filter, false)
         |> assign(:notes, [])
+        |> assign(:editing_note_id, nil)
         |> load_notes()
       else
         socket
@@ -34,6 +35,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
         |> assign(:project, nil)
         |> assign(:search_query, "")
         |> assign(:notes, [])
+        |> assign(:editing_note_id, nil)
         |> put_flash(:error, "Invalid project ID")
       end
 
@@ -55,6 +57,33 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
   @impl true
   def handle_event("delete_note", params, socket),
     do: handle_delete_note(params, socket, &load_notes/1)
+
+  @impl true
+  def handle_event("edit_note", %{"note_id" => note_id}, socket) do
+    {:noreply, assign(socket, :editing_note_id, String.to_integer(note_id))}
+  end
+
+  @impl true
+  def handle_event("note_saved", %{"note_id" => note_id, "body" => body}, socket) do
+    note = Notes.get_note!(String.to_integer(note_id))
+
+    case Notes.update_note(note, %{body: body}) do
+      {:ok, _note} ->
+        socket =
+          socket
+          |> assign(:editing_note_id, nil)
+          |> load_notes()
+        {:noreply, socket}
+
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, "Failed to save note.")}
+    end
+  end
+
+  @impl true
+  def handle_event("note_edit_cancelled", _params, socket) do
+    {:noreply, assign(socket, :editing_note_id, nil)}
+  end
 
   defp load_notes(socket) do
     project = socket.assigns.project
@@ -115,6 +144,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
           starred_filter={@starred_filter}
           search_query={@search_query}
           empty_id="project-notes-empty"
+          editing_note_id={@editing_note_id}
         />
       </div>
     </div>

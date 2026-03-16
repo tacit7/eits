@@ -13,16 +13,11 @@ defmodule EyeInTheSkyWeb.Tasks do
   alias EyeInTheSkyWeb.Search.FTS5
   alias EyeInTheSkyWeb.Notes
 
-  # Workflow state IDs (matches workflow_states table)
-  @state_todo 1
-  @state_in_progress 2
-  @state_in_review 4
-  @state_done 3
-
-  def state_todo, do: @state_todo
-  def state_in_progress, do: @state_in_progress
-  def state_in_review, do: @state_in_review
-  def state_done, do: @state_done
+  # Workflow state ID accessors — source of truth is WorkflowState
+  defdelegate state_todo, to: WorkflowState, as: :todo_id
+  defdelegate state_in_progress, to: WorkflowState, as: :in_progress_id
+  defdelegate state_in_review, to: WorkflowState, as: :in_review_id
+  defdelegate state_done, to: WorkflowState, as: :done_id
 
   # Task functions
 
@@ -36,7 +31,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   """
   def list_tasks(opts \\ []) do
     base_tasks_query(opts)
-    |> preload([:state, :tags, :agents, :checklist_items])
+    |> preload([:state, :tags, :sessions, :checklist_items])
     |> order_by([t], desc: t.created_at)
     |> QueryBuilder.maybe_limit(opts)
     |> QueryBuilder.maybe_offset(opts)
@@ -65,7 +60,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   def list_tasks_for_agent(agent_id) do
     Task
     |> where([t], t.agent_id == ^agent_id)
-    |> preload([:state, :tags, :agents, :checklist_items])
+    |> preload([:state, :tags, :sessions, :checklist_items])
     |> order_by([t],
       desc: fragment("CASE WHEN ? IS NULL THEN 0 ELSE 1 END", t.archived),
       desc: t.priority,
@@ -77,10 +72,12 @@ defmodule EyeInTheSkyWeb.Tasks do
   @doc """
   Returns the list of tasks for a specific session.
   """
-  def list_tasks_for_session(session_id) do
+  def list_tasks_for_session(session_id, opts \\ []) do
     QueryHelpers.for_session_join(Task, session_id, "task_sessions",
       preload: [:state, :tags],
-      order_by: [desc: :priority, asc: :created_at]
+      order_by: [desc: :priority, asc: :created_at],
+      limit: Keyword.get(opts, :limit),
+      offset: Keyword.get(opts, :offset)
     )
     |> Notes.with_notes_count()
   end
@@ -125,7 +122,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   def get_current_task_for_session(session_id) do
     Task
     |> join(:inner, [t], ts in "task_sessions", on: ts.task_id == t.id)
-    |> where([t, ts], ts.session_id == ^session_id and t.state_id == @state_in_progress)
+    |> where([t, ts], ts.session_id == ^session_id and t.state_id == ^WorkflowState.in_progress_id())
     |> order_by([t], desc: t.updated_at)
     |> limit(1)
     |> preload([:state])
@@ -146,7 +143,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   """
   def get_task!(id) do
     Task
-    |> preload([:state, :tags, :agents, :checklist_items])
+    |> preload([:state, :tags, :sessions, :checklist_items])
     |> Repo.get!(id)
   end
 
@@ -157,7 +154,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   """
   def get_task_by_uuid!(uuid) do
     Task
-    |> preload([:state, :tags, :agents, :checklist_items])
+    |> preload([:state, :tags, :sessions, :checklist_items])
     |> Repo.get_by!(uuid: uuid)
   end
 
@@ -179,7 +176,7 @@ defmodule EyeInTheSkyWeb.Tasks do
           task
       end
 
-    Repo.preload(task, [:state, :tags, :agents, :checklist_items])
+    Repo.preload(task, [:state, :tags, :sessions, :checklist_items])
   end
 
   @doc """
@@ -307,7 +304,7 @@ defmodule EyeInTheSkyWeb.Tasks do
       sql_params: if(project_id, do: [project_id], else: []),
       extra_where: extra_where,
       order_by: [desc: :priority, desc: :created_at],
-      preload: [:state, :tags, :agents, :checklist_items]
+      preload: [:state, :tags, :sessions, :checklist_items]
     )
   end
 
@@ -324,19 +321,11 @@ defmodule EyeInTheSkyWeb.Tasks do
 
   @doc """
   Reorder workflow states by a list of IDs in desired order.
-  Uses negative temp positions to avoid unique constraint violations.
+  The position unique constraint is DEFERRABLE INITIALLY DEFERRED, so uniqueness
+  is checked at commit rather than per-statement — no temp negative positions needed.
   """
   def reorder_workflow_states(ordered_ids) when is_list(ordered_ids) do
     Repo.transaction(fn ->
-      # First pass: negative temp positions to avoid unique constraint
-      ordered_ids
-      |> Enum.with_index(1)
-      |> Enum.each(fn {id, idx} ->
-        from(ws in WorkflowState, where: ws.id == ^id)
-        |> Repo.update_all(set: [position: -idx])
-      end)
-
-      # Second pass: final positive positions
       ordered_ids
       |> Enum.with_index(1)
       |> Enum.each(fn {id, idx} ->
@@ -406,9 +395,12 @@ defmodule EyeInTheSkyWeb.Tasks do
   """
   def link_session_to_task(task_id, session_id)
       when is_integer(task_id) and is_integer(session_id) do
-    Repo.insert_all("task_sessions", [%{task_id: task_id, session_id: session_id}],
-      on_conflict: :nothing
-    )
+    {count, _} =
+      Repo.insert_all("task_sessions", [%{task_id: task_id, session_id: session_id}],
+        on_conflict: :nothing
+      )
+
+    {:ok, count}
   end
 
   @doc """
@@ -419,19 +411,16 @@ defmodule EyeInTheSkyWeb.Tasks do
   def replace_task_tags(_task_id, []), do: :ok
 
   def replace_task_tags(task_id, tag_names) when is_list(tag_names) do
+    tag_rows =
+      Enum.flat_map(tag_names, fn tag_name ->
+        case get_or_create_tag(tag_name) do
+          {:ok, tag} -> [%{task_id: task_id, tag_id: tag.id}]
+          _ -> []
+        end
+      end)
+
     Repo.delete_all(from(t in "task_tags", where: t.task_id == ^task_id))
-
-    Enum.each(tag_names, fn tag_name ->
-      case get_or_create_tag(tag_name) do
-        {:ok, tag} ->
-          Repo.insert_all("task_tags", [%{task_id: task_id, tag_id: tag.id}],
-            on_conflict: :nothing
-          )
-
-        _ ->
-          :ok
-      end
-    end)
+    Repo.insert_all("task_tags", tag_rows, on_conflict: :nothing)
   end
 
   @doc """
@@ -439,7 +428,10 @@ defmodule EyeInTheSkyWeb.Tasks do
   """
   def link_tag_to_task(task_id, tag_id)
       when is_integer(task_id) and is_integer(tag_id) do
-    Repo.insert_all("task_tags", [%{task_id: task_id, tag_id: tag_id}], on_conflict: :nothing)
+    {count, _} =
+      Repo.insert_all("task_tags", [%{task_id: task_id, tag_id: tag_id}], on_conflict: :nothing)
+
+    {:ok, count}
   end
 
   @doc """
@@ -454,7 +446,7 @@ defmodule EyeInTheSkyWeb.Tasks do
       )
       |> Repo.delete_all()
 
-    count
+    {:ok, count}
   end
 
   # PubSub

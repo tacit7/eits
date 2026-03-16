@@ -2,9 +2,11 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.Tasks
+  alias EyeInTheSkyWeb.Tasks.WorkflowState
   alias EyeInTheSkyWebWeb.Components.FilterSheet
   alias EyeInTheSkyWebWeb.Components.TaskCard
   import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
+  import EyeInTheSkyWebWeb.ControllerHelpers, only: [parse_int: 2]
 
   @per_page 50
 
@@ -33,9 +35,19 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
       |> assign(:show_task_detail_drawer, false)
       |> assign(:selected_task, nil)
       |> assign(:task_notes, [])
+      |> assign(:show_create_task_drawer, false)
       |> load_tasks()
 
     {:ok, socket}
+  end
+
+  @impl true
+  def handle_params(%{"intent" => "create"}, _uri, socket) do
+    {:noreply, assign(socket, :show_create_task_drawer, true)}
+  end
+
+  def handle_params(_params, _uri, socket) do
+    {:noreply, socket}
   end
 
   @impl true
@@ -83,6 +95,36 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
   @impl true
   def handle_event("start_agent_for_task", _params, socket) do
     {:noreply, put_flash(socket, :info, "Open the project Kanban board to start agents")}
+  end
+
+  @impl true
+  def handle_event("toggle_create_task_drawer", _params, socket) do
+    {:noreply, assign(socket, :show_create_task_drawer, !socket.assigns.show_create_task_drawer)}
+  end
+
+  @impl true
+  def handle_event("create_new_task", params, socket) do
+    title = params["title"]
+    description = params["description"]
+    state_id = parse_int(params["state_id"], 0)
+
+    case Tasks.create_task(%{
+      title: title,
+      description: description,
+      state_id: if(state_id > 0, do: state_id, else: WorkflowState.todo_id()),
+      created_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+      updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
+    }) do
+      {:ok, _task} ->
+        {:noreply,
+         socket
+         |> assign(:show_create_task_drawer, false)
+         |> load_tasks()
+         |> put_flash(:info, "Task created")}
+
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, "Failed to create task")}
+    end
   end
 
   @impl true
@@ -274,9 +316,17 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
       </div>
     </div>
 
+    <!-- New Task Drawer -->
+    <EyeInTheSkyWebWeb.Components.NewTaskDrawer.new_task_drawer
+      id="tasks-new-task-drawer"
+      show={@show_create_task_drawer}
+      workflow_states={@workflow_states}
+      toggle_event="toggle_create_task_drawer"
+      submit_event="create_new_task"
+    />
+
     <!-- Task Detail Drawer -->
-    <.live_component
-      module={EyeInTheSkyWebWeb.Components.TaskDetailDrawer}
+    <EyeInTheSkyWebWeb.Components.TaskDetailDrawer.task_detail_drawer
       id="task-detail-drawer"
       show={@show_task_detail_drawer}
       task={@selected_task}

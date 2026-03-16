@@ -51,7 +51,7 @@ defmodule EyeInTheSkyWebWeb.Router do
   end
 
   scope "/", EyeInTheSkyWebWeb do
-    pipe_through [:browser, :require_auth]
+    pipe_through [:browser]
 
     live_session :app,
                  on_mount: [
@@ -93,12 +93,6 @@ defmodule EyeInTheSkyWebWeb.Router do
   scope "/oban" do
     pipe_through :browser
     oban_dashboard("/")
-  end
-
-  # MCP Server — Streamable HTTP
-  # Wrapped in MCPPlug to catch (EXIT) shutdown from hot-reload-induced transport restarts
-  scope "/mcp" do
-    forward "/", EyeInTheSkyWebWeb.MCPPlug, server: EyeInTheSkyWeb.MCP.Server
   end
 
   scope "/api/v1", EyeInTheSkyWebWeb.Api.V1 do
@@ -179,6 +173,9 @@ defmodule EyeInTheSkyWebWeb.Router do
     post "/teams/:team_id/members", TeamController, :join
     patch "/teams/:team_id/members/:member_id", TeamController, :update_member
     delete "/teams/:team_id/members/:member_id", TeamController, :leave
+
+    # Editor
+    post "/editor/open", EditorController, :open
   end
 
   # Gitea webhooks — no Bearer auth; controller validates HMAC signature from Gitea
@@ -186,6 +183,13 @@ defmodule EyeInTheSkyWebWeb.Router do
     pipe_through [:accepts_json]
 
     post "/webhooks/gitea", GiteaWebhookController, :handle
+  end
+
+  # Unauthenticated settings reads (read-only, no sensitive data)
+  scope "/api/v1", EyeInTheSkyWebWeb.Api.V1 do
+    pipe_through [:accepts_json]
+
+    get "/settings/eits_workflow_enabled", SettingsController, :eits_workflow_enabled
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
@@ -202,6 +206,9 @@ defmodule EyeInTheSkyWebWeb.Router do
 
       live_dashboard "/dashboard", metrics: EyeInTheSkyWebWeb.Telemetry
       forward "/mailbox", Plug.Swoosh.MailboxPreview
+
+      # Dev-only test login — sets session cookie without WebAuthn
+      get "/test-login", EyeInTheSkyWebWeb.DevController, :test_login
     end
   end
 end

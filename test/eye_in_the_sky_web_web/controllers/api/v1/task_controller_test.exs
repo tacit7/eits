@@ -1,7 +1,9 @@
 defmodule EyeInTheSkyWebWeb.Api.V1.TaskControllerTest do
   use EyeInTheSkyWebWeb.ConnCase, async: false
 
-  alias EyeInTheSkyWeb.{Agents, Sessions, Tasks}
+  import Ecto.Query, only: [from: 2]
+
+  alias EyeInTheSkyWeb.{Repo, Tasks}
 
   import EyeInTheSkyWeb.Factory
 
@@ -174,6 +176,128 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskControllerTest do
     test "returns 404 for missing task", %{conn: conn} do
       conn = patch(conn, ~p"/api/v1/tasks/9999999", %{"state" => "done"})
       assert json_response(conn, 404)["error"] == "Task not found"
+    end
+
+    test "links session atomically when starting a task", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+      task = create_task()
+
+      patch(conn, ~p"/api/v1/tasks/#{task.id}", %{
+        "state" => "start",
+        "session_id" => session.uuid
+      })
+
+      linked =
+        Repo.exists?(
+          from(ts in "task_sessions",
+            where: ts.task_id == ^task.id and ts.session_id == ^session.id
+          )
+        )
+
+      assert linked
+    end
+
+    test "start without session_id succeeds without linking", %{conn: conn} do
+      task = create_task()
+      conn = patch(conn, ~p"/api/v1/tasks/#{task.id}", %{"state" => "start"})
+      resp = json_response(conn, 200)
+
+      assert resp["success"] == true
+      assert resp["task"]["state_id"] == 2
+    end
+
+    test "start is idempotent for session linking", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+      task = create_task()
+
+      patch(conn, ~p"/api/v1/tasks/#{task.id}", %{"state" => "start", "session_id" => session.uuid})
+      patch(build_conn(), ~p"/api/v1/tasks/#{task.id}", %{"state" => "start", "session_id" => session.uuid})
+
+      count =
+        Repo.one(
+          from(ts in "task_sessions",
+            where: ts.task_id == ^task.id and ts.session_id == ^session.id,
+            select: count()
+          )
+        )
+
+      assert count == 1
+    end
+  end
+
+  # ---- tasks quick workflow (POST /tasks + PATCH /tasks/:id state=start) ----
+
+  describe "tasks quick workflow" do
+    test "create with session then start links session and sets state 2", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+
+      # Step 1: create with session_id (mirrors eits tasks create)
+      create_resp =
+        post(conn, ~p"/api/v1/tasks", %{
+          "title" => "quick workflow task",
+          "session_id" => session.uuid
+        })
+
+      task_id = json_response(create_resp, 201)["task_id"]
+      assert task_id != nil
+
+      # Step 2: start with session_id (mirrors eits tasks start)
+      patch(build_conn(), ~p"/api/v1/tasks/#{task_id}", %{
+        "state" => "start",
+        "session_id" => session.uuid
+      })
+
+      task = Tasks.get_task!(task_id)
+      assert task.state_id == 2
+
+      linked =
+        Repo.exists?(
+          from(ts in "task_sessions",
+            where: ts.task_id == ^task.id and ts.session_id == ^session.id
+          )
+        )
+
+      assert linked
+    end
+
+    test "quick workflow without session still sets state 2", %{conn: conn} do
+      create_resp = post(conn, ~p"/api/v1/tasks", %{"title" => "no session quick"})
+      task_id = json_response(create_resp, 201)["task_id"]
+
+      patch(build_conn(), ~p"/api/v1/tasks/#{task_id}", %{"state" => "start"})
+
+      task = Tasks.get_task!(task_id)
+      assert task.state_id == 2
+    end
+
+    test "double-starting the same task with same session is idempotent", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+
+      create_resp =
+        post(conn, ~p"/api/v1/tasks", %{
+          "title" => "idempotent quick",
+          "session_id" => session.uuid
+        })
+
+      task_id = json_response(create_resp, 201)["task_id"]
+      task = Tasks.get_task!(task_id)
+
+      patch(build_conn(), ~p"/api/v1/tasks/#{task_id}", %{"state" => "start", "session_id" => session.uuid})
+      patch(build_conn(), ~p"/api/v1/tasks/#{task_id}", %{"state" => "start", "session_id" => session.uuid})
+
+      count =
+        Repo.one(
+          from(ts in "task_sessions",
+            where: ts.task_id == ^task.id and ts.session_id == ^session.id,
+            select: count()
+          )
+        )
+
+      assert count == 1
     end
   end
 

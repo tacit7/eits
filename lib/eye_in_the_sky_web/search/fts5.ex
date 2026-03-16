@@ -51,7 +51,7 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
         fallback_query
       end
 
-    search(opts ++ [fallback_query: fallback_query])
+    search(opts ++ [query: query, fallback_query: fallback_query])
   end
 
   @doc """
@@ -99,6 +99,27 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
     else
       run_fallback(fallback_query, preloads, limit)
     end
+  end
+
+  @doc """
+  Returns a dynamic Ecto expression that matches rows where the tsvector of
+  `name || description` satisfies a plainto_tsquery for `search_query`.
+
+  The first named binding (`s`) must be the schema with `name` and `description` columns:
+
+      where(query, [s], ^FTS5.fts_name_description_match(search_query))
+      where(query, [s, a], ^FTS5.fts_name_description_match(search_query))
+  """
+  def fts_name_description_match(search_query) do
+    dynamic(
+      [s],
+      fragment(
+        "to_tsvector('english', coalesce(?.name, '') || ' ' || coalesce(?.description, '')) @@ plainto_tsquery('english', ?)",
+        s,
+        s,
+        ^search_query
+      )
+    )
   end
 
   defp safe_identifier?(value), do: Regex.match?(@safe_identifier, value)

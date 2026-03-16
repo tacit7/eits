@@ -27,6 +27,13 @@ defmodule EyeInTheSkyWebWeb.CoreComponents do
 
   """
   use Phoenix.Component
+
+  alias EyeInTheSkyWeb.Tasks.WorkflowState
+
+  @state_todo WorkflowState.todo_id()
+  @state_in_progress WorkflowState.in_progress_id()
+  @state_in_review WorkflowState.in_review_id()
+  @state_done WorkflowState.done_id()
   use Gettext, backend: EyeInTheSkyWebWeb.Gettext
 
   alias Phoenix.LiveView.JS
@@ -690,9 +697,9 @@ defmodule EyeInTheSkyWebWeb.CoreComponents do
     """
   end
 
-  defp state_badge_class(1), do: "badge-ghost"
-  defp state_badge_class(2), do: "badge-info"
-  defp state_badge_class(4), do: "badge-warning"
-  defp state_badge_class(3), do: "badge-success"
+  defp state_badge_class(@state_todo), do: "badge-ghost"
+  defp state_badge_class(@state_in_progress), do: "badge-info"
+  defp state_badge_class(@state_in_review), do: "badge-warning"
+  defp state_badge_class(@state_done), do: "badge-success"
   defp state_badge_class(_), do: "badge-ghost"
 end

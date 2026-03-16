@@ -19,12 +19,14 @@ defmodule EyeInTheSkyWeb.Tasks.Task do
     belongs_to :project, EyeInTheSkyWeb.Projects.Project, foreign_key: :project_id, type: :integer
     belongs_to :team, EyeInTheSkyWeb.Teams.Team, foreign_key: :team_id, type: :integer
 
-    belongs_to :agent, EyeInTheSkyWeb.Sessions.Session,
+    # agent_id is declared as a plain field above; define_field: false prevents a
+    # duplicate field error. tasks.agent_id is a FK to the agents table (not sessions).
+    belongs_to :agent, EyeInTheSkyWeb.Agents.Agent,
       define_field: false,
       foreign_key: :agent_id,
       type: :integer
 
-    many_to_many :agents, EyeInTheSkyWeb.Sessions.Session,
+    many_to_many :sessions, EyeInTheSkyWeb.Sessions.Session,
       join_through: "task_sessions",
       join_keys: [task_id: :id, session_id: :id],
       on_replace: :delete
@@ -45,6 +47,9 @@ defmodule EyeInTheSkyWeb.Tasks.Task do
     field :created_at, :string
     field :updated_at, :string
 
+    # Populated by EyeInTheSkyWeb.Notes.with_notes_count/1, which batch-loads
+    # annotations for a list of tasks. Called from EyeInTheSkyWeb.Tasks (tasks.ex)
+    # and EyeInTheSkyWeb.ProjectLive.Kanban (kanban.ex) after querying tasks.
     field :notes_count, :integer, virtual: true, default: 0
     field :notes, :any, virtual: true, default: []
   end
@@ -69,5 +74,8 @@ defmodule EyeInTheSkyWeb.Tasks.Task do
       :updated_at
     ])
     |> validate_required([:title])
+    |> validate_inclusion(:state_id, [1, 2, 3, 4], message: "must be a valid workflow state")
+    |> validate_number(:project_id, greater_than: 0)
+    |> foreign_key_constraint(:team_id)
   end
 end

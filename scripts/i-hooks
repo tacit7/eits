@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# i-hooks - Manage and track hookify rules in EITS
+# Usage:
+#   i-hooks list                              # list all hookify rules in .claude/
+#   i-hooks show RULE_NAME                    # show rule content
+#   i-hooks log --name RULE --event E --action A [--description STR]
+#                                             # log a new rule as an EITS task
+#   i-hooks annotate TASK_ID --body STR       # annotate a hook-related task
+
+set -euo pipefail
+
+BASE=${EITS_API_URL:-http://localhost:5000/api/v1}
+SESSION_ID=${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}
+PROJECT_ID=${EITS_PROJECT_ID:-}
+HOOKS_DIR="${CLAUDE_DIR:-.claude}"
+
+_curl() { curl -sk ${EITS_API_KEY:+-H "Authorization: Bearer ${EITS_API_KEY}"} "$@"; }
+_ok() { local r="$1"; echo "$r" | jq .; if echo "$r" | jq -e '.error' &>/dev/null; then exit 1; fi; }
+
+cmd="${1:-list}"
+shift || true
+
+case "$cmd" in
+  list)
+    echo "Hookify rules in ${HOOKS_DIR}/:"
+    echo ""
+    for f in "${HOOKS_DIR}"/hookify.*.local.md; do
+      [[ -f "$f" ]] || { echo "  (none found)"; break; }
+      name=$(basename "$f" .local.md | sed 's/^hookify\.//')
+      enabled=$(grep -m1 '^enabled:' "$f" 2>/dev/null | awk '{print $2}' || echo "?")
+      event=$(grep -m1 '^event:' "$f" 2>/dev/null | awk '{print $2}' || echo "?")
+      action=$(grep -m1 '^action:' "$f" 2>/dev/null | awk '{print $2}' || echo "warn")
+      printf "  %-40s  event=%-8s  action=%-6s  enabled=%s\n" "$name" "$event" "$action" "$enabled"
+    done
+    ;;
+
+  show)
+    name="${1:?rule name required}"
+    f="${HOOKS_DIR}/hookify.${name}.local.md"
+    [[ -f "$f" ]] || { echo "Rule not found: $f" >&2; exit 1; }
+    cat "$f"
+    ;;
+
+  log)
+    rule_name=""
+    event=""
+    action="warn"
+    description=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --name)        rule_name="$2"; shift 2 ;;
+        --event)       event="$2"; shift 2 ;;
+        --action)      action="$2"; shift 2 ;;
+        --description) description="$2"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    [[ -z "$rule_name" ]] && { echo "Error: --name required" >&2; exit 1; }
+
+    title="hookify: ${action} ${rule_name} (${event})"
+    desc="${description:-Hookify rule created: ${rule_name}, event=${event}, action=${action}}"
+
+    body=$(jq -n \
+      --arg t "$title" \
+      --arg d "$desc" \
+      '{title: $t, description: $d}')
+
+    [[ -n "$SESSION_ID" ]] && body=$(echo "$body" | jq --arg v "$SESSION_ID" '. + {session_id: $v}')
+    [[ -n "$PROJECT_ID" ]] && body=$(echo "$body" | jq --argjson v "$PROJECT_ID" '. + {project_id: $v}')
+
+    result=$(_curl -X POST "$BASE/tasks" -H 'Content-Type: application/json' -d "$body")
+    _ok "$result"
+
+    task_id=$(echo "$result" | jq -r '.task_id // .id // empty')
+    if [[ -n "$task_id" ]]; then
+      _ok "$(_curl -X PATCH "$BASE/tasks/$task_id" -H 'Content-Type: application/json' -d '{"state":"done"}')"
+    fi
+    ;;
+
+  annotate)
+    id="${1:?task id required}"; shift
+    body="{}"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --body)  body=$(echo "$body" | jq --arg v "$2" '. + {body: $v}'); shift 2 ;;
+        --title) body=$(echo "$body" | jq --arg v "$2" '. + {title: $v}'); shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    _ok "$(_curl -X POST "$BASE/tasks/$id/annotations" -H 'Content-Type: application/json' -d "$body")"
+    ;;
+
+  *)
+    echo "Usage: i-hooks <list|show|log|annotate> [args...]" >&2
+    exit 1
+    ;;
+esac

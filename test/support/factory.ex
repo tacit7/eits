@@ -46,7 +46,4 @@ defmodule EyeInTheSkyWeb.Factory do
     create_session(agent)
   end
 
-  def json_result({:reply, %Anubis.Server.Response{content: [%{"text" => json} | _]}, _frame}) do
-    Jason.decode!(json, keys: :atoms)
-  end
 end

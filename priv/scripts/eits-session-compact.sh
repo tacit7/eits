@@ -5,6 +5,17 @@
 
 set -uo pipefail
 
+# --- EITS Workflow Guard ---
+EITS_WORKFLOW="${EITS_WORKFLOW:-}"
+if [ -z "$EITS_WORKFLOW" ]; then
+  EITS_URL="${EITS_API_URL:-http://localhost:5000/api/v1}"
+  ENABLED=$(curl -sf "${EITS_URL}/settings/eits_workflow_enabled" 2>/dev/null | jq -r '.enabled' 2>/dev/null || echo "true")
+  [ "$ENABLED" = "false" ] && exit 0
+elif [ "$EITS_WORKFLOW" = "0" ]; then
+  exit 0
+fi
+# --- End Workflow Guard ---
+
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MAPPING_FILE="$HOME/.claude/hooks/session_agent_map.json"
 LOG_FILE="$HOME/.config/eye-in-the-sky/compact-hook.log"
@@ -25,13 +36,8 @@ fi
 # Log what we found
 echo "$(date -Iseconds) COMPACT: session=$SESSION_ID" >> "$LOG_FILE"
 
-BASE=${EITS_API_URL:-https://localhost:5001/api/v1}
-_curl() { curl ${EITS_API_KEY:+-H "Authorization: Bearer ${EITS_API_KEY}"} "$@"; }
-
-# Compaction done — set status back to working via REST
-_curl -sk -X PATCH "$BASE/sessions/$SESSION_ID" \
-  -H 'Content-Type: application/json' \
-  -d '{"status":"working"}' >/dev/null 2>&1
+# Compaction done — set status back to working via eits CLI
+EITS_URL="${EITS_API_URL:-http://localhost:5000/api/v1}" eits sessions update "$SESSION_ID" --status working >/dev/null 2>&1 || true
 
 echo "[EITS] Compact: done, session $SESSION_ID back to working" >&2
 

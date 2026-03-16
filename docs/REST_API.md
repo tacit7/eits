@@ -1,6 +1,6 @@
 # REST API v1
 
-Base URL: `http://localhost:4000/api/v1`
+Base URL: `http://localhost:5000/api/v1`
 
 All endpoints accept and return JSON. Set `Content-Type: application/json` on requests.
 
@@ -31,8 +31,8 @@ Register a new session. Creates a ChatAgent (chat identity) and Agent (execution
 {
   "id": 42,
   "uuid": "session-uuid",
-  "agent_id": 7,
-  "chat_agent_uuid": "agent-uuid",
+  "agent_id": "agent-uuid",
+  "agent_uuid": "agent-uuid",
   "status": "working"
 }
 ```
@@ -40,7 +40,7 @@ Register a new session. Creates a ChatAgent (chat identity) and Agent (execution
 **Example:**
 
 ```bash
-curl -X POST localhost:4000/api/v1/sessions \
+curl -X POST localhost:5000/api/v1/sessions \
   -H 'Content-Type: application/json' \
   -d '{"session_id":"abc-123","description":"implementing feature X","project_name":"web","model":"claude-sonnet-4-5-20250929"}'
 ```
@@ -80,9 +80,73 @@ For terminal states (`completed`, `failed`), `ended_at` is auto-set to now if no
 **Example:**
 
 ```bash
-curl -X PATCH localhost:4000/api/v1/sessions/abc-123 \
+curl -X PATCH localhost:5000/api/v1/sessions/abc-123 \
   -H 'Content-Type: application/json' \
   -d '{"status":"completed"}'
+```
+
+---
+
+### POST /agents
+
+Spawn a new Claude Code agent. Creates an Agent + Session, starts an AgentWorker, and sends the initial instructions as the first message.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `instructions` | string | yes | Initial prompt for the agent. Max 32,000 chars |
+| `model` | string | no | `haiku`, `sonnet`, or `opus`. Defaults to `"haiku"` |
+| `provider` | string | no | `claude` or `codex`. Defaults to `"claude"` |
+| `project_id` | integer\|string | no | Project ID to associate with |
+| `project_path` | string | no | Working directory for the Claude process |
+| `worktree` | string | no | Git worktree branch name. Appends push+PR instructions to prompt |
+| `effort_level` | string | no | Passed to Claude CLI as effort level |
+| `parent_agent_id` | integer\|string | no | Integer ID of the parent agent |
+| `parent_session_id` | integer\|string | no | Integer ID of the parent session |
+| `agent` | string | no | Named agent persona passed to Claude CLI via `--agent` |
+| `team_name` | string | no | Join this team on spawn. Team must exist |
+| `member_name` | string | no | Alias within the team. Defaults to agent UUID |
+
+**Response:** `201 Created`
+
+```json
+{
+  "success": true,
+  "message": "Agent spawned",
+  "agent_id": "agent-uuid",
+  "session_id": 42,
+  "session_uuid": "session-uuid"
+}
+```
+
+With `team_name`:
+
+```json
+{
+  "success": true,
+  "message": "Agent spawned",
+  "agent_id": "agent-uuid",
+  "session_id": 42,
+  "session_uuid": "session-uuid",
+  "team_id": 1,
+  "team_name": "my-team",
+  "member_name": "worker-1"
+}
+```
+
+**Example:**
+
+```bash
+curl -X POST localhost:5000/api/v1/agents \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "instructions": "Fix the auth bug in session_controller.ex and run the tests",
+    "model": "sonnet",
+    "project_id": 1,
+    "project_path": "/Users/me/projects/web",
+    "parent_session_id": 1074
+  }'
 ```
 
 ---
@@ -113,7 +177,7 @@ Track one or more git commits. Looks up the Agent by UUID to get the integer `se
 **Example:**
 
 ```bash
-curl -X POST localhost:4000/api/v1/commits \
+curl -X POST localhost:5000/api/v1/commits \
   -H 'Content-Type: application/json' \
   -d '{"agent_id":"abc-123","commit_hashes":["a1b2c3"],"commit_messages":["fix auth bug"]}'
 ```
@@ -152,7 +216,7 @@ Parent type plurals are normalized automatically: `"sessions"` -> `"session"`, `
 **Example:**
 
 ```bash
-curl -X POST localhost:4000/api/v1/notes \
+curl -X POST localhost:5000/api/v1/notes \
   -H 'Content-Type: application/json' \
   -d '{"parent_type":"sessions","parent_id":"42","body":"found the root cause"}'
 ```
@@ -184,7 +248,7 @@ Save or update session context (markdown). Upserts based on session_id. Looks up
 **Example:**
 
 ```bash
-curl -X POST localhost:4000/api/v1/session-context \
+curl -X POST localhost:5000/api/v1/session-context \
   -H 'Content-Type: application/json' \
   -d '{"agent_id":"abc-123","context":"# Context\n\nKey findings..."}'
 ```
@@ -278,7 +342,7 @@ Register a browser for web push notifications.
 
 ```bash
 # After service worker registers
-curl -X POST localhost:5001/api/v1/push/subscriptions \
+curl -X POST localhost:5000/api/v1/push/subscriptions \
   -H 'Content-Type: application/json' \
   -d @subscription.json  # from navigator.serviceWorker.ready.then(reg => reg.pushManager.getSubscription())
 ```

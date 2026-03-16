@@ -5,11 +5,15 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
 
   import EyeInTheSkyWebWeb.ControllerHelpers
 
-  alias EyeInTheSkyWeb.{Channels, Messages, Sessions}
+  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Sessions}
 
   @doc """
   POST /api/v1/dm - Send a direct message to an agent session.
-  Body: sender_id, target_session_id, message, response_required (optional)
+  Body:
+    - sender_id (required): UUID of the sending agent — must exist in the agents table
+    - target_session_id (required): UUID of the target session
+    - message (required): message body
+    - response_required (optional): boolean, defaults to false
   """
   def dm(conn, params) do
     target_uuid = params["target_session_id"]
@@ -25,42 +29,52 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
         conn |> put_status(:bad_request) |> json(%{error: "message is required"})
 
       true ->
-        case Sessions.get_session_by_uuid(target_uuid) do
-          {:ok, session} ->
-            attrs = %{
-              uuid: Ecto.UUID.generate(),
-              session_id: session.id,
-              body: params["message"],
-              sender_role: "agent",
-              recipient_role: "agent",
-              direction: "inbound",
-              status: "delivered",
-              provider: "claude",
-              metadata: %{
-                sender_id: params["sender_id"],
-                response_required: params["response_required"] || false
-              }
+        with {:sender, {:ok, _agent}} <- {:sender, Agents.get_agent_by_uuid(params["sender_id"])},
+             {:session, {:ok, session}} <- {:session, Sessions.get_session_by_uuid(target_uuid)} do
+          response_required = params["response_required"] in [true, "true", "1", 1]
+
+          attrs = %{
+            uuid: Ecto.UUID.generate(),
+            session_id: session.id,
+            body: params["message"],
+            sender_role: "agent",
+            recipient_role: "agent",
+            direction: "inbound",
+            status: "sent",
+            provider: "claude",
+            metadata: %{
+              sender_id: params["sender_id"],
+              response_required: response_required
             }
+          }
 
-            case Messages.create_message(attrs) do
-              {:ok, msg} ->
-                Phoenix.PubSub.broadcast(
-                  EyeInTheSkyWeb.PubSub,
-                  "session:#{session.id}",
-                  {:new_dm, msg}
-                )
+          case Messages.create_message(attrs) do
+            {:ok, msg} ->
+              Phoenix.PubSub.broadcast(
+                EyeInTheSkyWeb.PubSub,
+                "session:#{session.id}",
+                {:new_dm, msg}
+              )
 
-                conn
-                |> put_status(:created)
-                |> json(%{success: true, message: "DM delivered to session #{session.id}"})
+              conn
+              |> put_status(:created)
+              |> json(%{
+                success: true,
+                message: "DM delivered to session #{session.id}",
+                message_id: to_string(msg.id),
+                message_uuid: msg.uuid
+              })
 
-              {:error, cs} ->
-                conn
-                |> put_status(:unprocessable_entity)
-                |> json(%{error: "Failed to deliver DM", details: translate_errors(cs)})
-            end
+            {:error, cs} ->
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{error: "Failed to deliver DM", details: translate_errors(cs)})
+          end
+        else
+          {:sender, {:error, :not_found}} ->
+            conn |> put_status(:not_found) |> json(%{error: "Sender agent not found"})
 
-          {:error, :not_found} ->
+          {:session, {:error, :not_found}} ->
             conn |> put_status(:not_found) |> json(%{error: "Target session not found"})
         end
     end

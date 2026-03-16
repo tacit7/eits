@@ -20,13 +20,41 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     alias EyeInTheSkyWeb.Projects
 
     # Accept both integer ID and UUID in URL
-    session =
+    session_result =
       case Integer.parse(session_id_param) do
-        {id, ""} -> Sessions.get_session!(id)
-        _ -> Sessions.get_session_by_uuid!(session_id_param)
+        {id, ""} -> Sessions.get_session(id)
+        _ -> Sessions.get_session_by_uuid(session_id_param)
       end
 
-    agent = Agents.get_agent!(session.agent_id)
+    case session_result do
+      {:error, :not_found} ->
+        {:ok,
+         socket
+         |> put_flash(:error, "Session not found")
+         |> redirect(to: "/")}
+
+      {:ok, session} ->
+        mount_session(session, params, socket)
+    end
+  end
+
+  defp mount_session(session, params, socket) do
+    alias EyeInTheSkyWeb.Projects
+
+    case Agents.get_agent(session.agent_id) do
+      {:error, :not_found} ->
+        {:ok,
+         socket
+         |> put_flash(:error, "Agent not found for this session")
+         |> redirect(to: "/")}
+
+      {:ok, agent} ->
+        mount_session_with_agent(session, agent, params, socket)
+    end
+  end
+
+  defp mount_session_with_agent(session, agent, params, socket) do
+    alias EyeInTheSkyWeb.Projects
 
     # Preserve sidebar context when navigating from project sessions page
     {sidebar_tab, sidebar_project} =
@@ -405,27 +433,32 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   def handle_event("open_iterm", _params, socket) do
     session_uuid = socket.assigns.session_uuid
 
-    dir =
-      case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
-        {:ok, path} -> path
-        {:error, _} -> "~"
-      end
+    # Reject anything that isn't a canonical UUID to prevent AppleScript injection
+    unless Regex.match?(~r/\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/, session_uuid) do
+      {:noreply, put_flash(socket, :error, "Invalid session UUID")}
+    else
+      dir =
+        case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+          {:ok, path} -> path
+          {:error, _} -> "~"
+        end
 
-    # Escape double quotes in the path to prevent AppleScript string injection
-    safe_dir = String.replace(dir, "\"", "\\\"")
+      # Escape double quotes in the path to prevent AppleScript string injection
+      safe_dir = String.replace(dir, "\"", "\\\"")
 
-    script = """
-    tell application "iTerm"
-      activate
-      set newWindow to (create window with default profile)
-      tell current session of newWindow
-        write text "cd #{safe_dir} && claude --dangerously-skip-permissions -r #{session_uuid}"
+      script = """
+      tell application "iTerm"
+        activate
+        set newWindow to (create window with default profile)
+        tell current session of newWindow
+          write text "cd #{safe_dir} && claude --dangerously-skip-permissions -r #{session_uuid}"
+        end tell
       end tell
-    end tell
-    """
+      """
 
-    System.cmd("osascript", ["-e", script], stderr_to_stdout: true)
-    {:noreply, socket}
+      System.cmd("osascript", ["-e", script], stderr_to_stdout: true)
+      {:noreply, socket}
+    end
   end
 
   @impl true

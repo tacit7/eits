@@ -8,6 +8,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
   alias EyeInTheSkyWeb.{Agents, Claude.AgentManager, Sessions, Teams}
   alias EyeInTheSkyWebWeb.Presenters.ApiPresenter
 
+  require Logger
+
   @doc """
   GET /api/v1/agents - List agents.
   Query params: project_id, status, limit (default 20)
@@ -68,7 +70,6 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
           conn |> put_status(:created) |> json(build_response(agent, session, team, params["member_name"]))
 
         {:error, reason} ->
-          require Logger
           Logger.error("Agent spawn failed: #{inspect(reason)}")
 
           conn
@@ -78,6 +79,10 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
     else
       {:error, code, message} ->
         conn |> put_status(:bad_request) |> json(%{error_code: code, message: message})
+
+      error ->
+        Logger.error("Unexpected validation error in spawn: #{inspect(error)}")
+        conn |> put_status(:internal_server_error) |> json(%{error_code: "internal_error", message: "An unexpected error occurred"})
     end
   end
 
@@ -99,8 +104,6 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
         :ok
 
       {:error, reason} ->
-        require Logger
-
         Logger.warning(
           "Team join failed: agent_id=#{agent.id} team_id=#{team.id} reason=#{inspect(reason)}"
         )

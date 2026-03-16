@@ -434,7 +434,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   defp save_result(text, metadata, state) when is_binary(text) do
     session_id = state.session_id
     provider = state.provider
-    channel_id = get_in(state, [:current_job, :context, :channel_id])
+    channel_id = if state.current_job, do: state.current_job.context[:channel_id], else: nil
 
     Task.start(fn ->
       if String.trim(text) in ["", "[NO_RESPONSE]"] do

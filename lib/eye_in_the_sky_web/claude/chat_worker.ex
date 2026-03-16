@@ -149,9 +149,9 @@ defmodule EyeInTheSkyWeb.Claude.ChatWorker do
         end
 
       case result do
-        :ok ->
+        {:ok, admission} ->
           Logger.info(
-            "ChatWorker: routed to session=#{member.session_id} channel=#{channel_id} mode=#{mode}"
+            "ChatWorker: routed to session=#{member.session_id} channel=#{channel_id} mode=#{mode} admission=#{admission}"
           )
 
         {:error, reason} ->

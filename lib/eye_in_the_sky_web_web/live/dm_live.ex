@@ -673,7 +673,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
                full_body,
                continue_session_opts(model, effort_level, thinking_enabled, max_budget_usd)
              ) do
-          :ok ->
+          {:ok, _admission} ->
             Logger.info("Message forwarded to AgentManager for session=#{session_id}")
 
             {:noreply,

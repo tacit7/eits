@@ -46,9 +46,19 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     GenServer.start_link(__MODULE__, opts, name: name)
   end
 
-  def process_message(session_id, message, context) do
+  @doc """
+  Submit a message for processing. Returns synchronous admission result:
+
+    * `{:ok, :started}` — SDK started immediately
+    * `{:ok, :queued}` — busy, message queued for later
+    * `{:ok, :retry_queued}` — SDK start failed, queued for retry
+    * `{:error, :queue_full}` — queue at max depth, message rejected
+    * `{:error, :invalid_message}` — message was not a binary string
+    * `{:error, :not_found}` — no worker registered for this session
+  """
+  def submit_message(session_id, message, context) do
     with_worker(session_id, fn pid ->
-      GenServer.cast(pid, {:process_message, message, context})
+      GenServer.call(pid, {:submit_message, message, context})
     end, {:error, :not_found})
   end
 
@@ -132,27 +142,22 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   end
 
   @impl true
-  def handle_cast({:process_message, message, context}, state) when is_binary(message) do
+  def handle_call({:submit_message, message, context}, _from, state) when is_binary(message) do
     context = normalize_context(context)
 
     Logger.info(
-      "AgentWorker.process_message: session_id=#{state.session_id}, " <>
+      "AgentWorker.submit_message: session_id=#{state.session_id}, " <>
         "message_length=#{String.length(message)}, has_messages=#{context.has_messages}, " <>
         "model=#{inspect(context.model)}"
     )
 
     queue_len = length(state.queue)
-    has_msgs = context.has_messages
 
     :telemetry.execute([:eits, :agent, :job, :received], %{system_time: System.system_time()}, %{
       session_id: state.session_id,
       queue_length: queue_len,
-      has_messages: has_msgs
+      has_messages: context.has_messages
     })
-
-    Logger.info(
-      "[telemetry] agent.job.received session_id=#{state.session_id} queue=#{queue_len} has_messages=#{has_msgs}"
-    )
 
     job = %{
       message: message,
@@ -161,7 +166,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     }
 
     if state.sdk_ref == nil do
-      # Idle, start SDK immediately
       Logger.info("AgentWorker: starting SDK for session_id=#{state.session_id}")
 
       case start_sdk(state, job) do
@@ -171,17 +175,14 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
           :telemetry.execute(
             [:eits, :agent, :job, :started],
             %{system_time: System.system_time()},
-            %{
-              session_id: state.session_id
-            }
+            %{session_id: state.session_id}
           )
-
-          Logger.info("[telemetry] agent.job.started session_id=#{state.session_id}")
 
           update_agent_status(state.session_id, "working")
           broadcast_agent_working(state)
 
-          {:noreply, clear_retry_timer(%{state | sdk_ref: sdk_ref, current_job: job})}
+          {:reply, {:ok, :started},
+           clear_retry_timer(%{state | sdk_ref: sdk_ref, current_job: job})}
 
         {:error, reason} ->
           reason_str = inspect(reason)
@@ -196,16 +197,15 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
             "[spawn error] Failed to start Claude: #{reason_str}"
           )
 
-          {:noreply, state |> enqueue_job(job) |> schedule_retry_start()}
+          {:reply, {:ok, :retry_queued}, state |> enqueue_job(job) |> schedule_retry_start()}
       end
     else
-      # Busy — check queue depth before accepting
       if length(state.queue) >= @max_queue_depth do
         Logger.warning(
-          "AgentWorker: queue full (#{@max_queue_depth}) for session_id=#{state.session_id}, dropping message"
+          "AgentWorker: queue full (#{@max_queue_depth}) for session_id=#{state.session_id}, rejecting message"
         )
 
-        {:noreply, state}
+        {:reply, {:error, :queue_full}, state}
       else
         new_queue_length = length(state.queue) + 1
 
@@ -218,21 +218,17 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
           session_id: state.session_id
         })
 
-        Logger.info(
-          "[telemetry] agent.job.queued session_id=#{state.session_id} queue_length=#{new_queue_length}"
-        )
-
-        {:noreply, enqueue_job(state, job)}
+        {:reply, {:ok, :queued}, enqueue_job(state, job)}
       end
     end
   end
 
-  def handle_cast({:process_message, message, _context}, state) do
+  def handle_call({:submit_message, message, _context}, _from, state) do
     Logger.warning(
-      "AgentWorker.process_message: invalid message payload for session_id=#{state.session_id} message=#{inspect(message)}"
+      "AgentWorker.submit_message: invalid message payload for session_id=#{state.session_id} message=#{inspect(message)}"
     )
 
-    {:noreply, state}
+    {:reply, {:error, :invalid_message}, state}
   end
 
   @impl true

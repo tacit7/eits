@@ -240,7 +240,7 @@ defmodule EyeInTheSkyWebWeb.FabHook do
              provider: "claude",
              body: body
            }),
-         :ok <- AgentManager.continue_session(session.id, body, model: "sonnet") do
+         {:ok, _admission} <- AgentManager.continue_session(session.id, body, model: "sonnet") do
       {:ok, session.id}
     else
       {:error, reason} ->

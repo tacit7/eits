@@ -42,7 +42,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              agent: opts[:agent],
              eits_workflow: opts[:eits_workflow]
            ) do
-        :ok ->
+        {:ok, _admission} ->
           Logger.info(
             "✅ create_agent: initial message sent successfully to session.id=#{session.id}"
           )
@@ -195,9 +195,21 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
           eits_workflow: opts[:eits_workflow]
         }
 
-        GenServer.cast(pid, {:process_message, message, context})
-        Logger.debug("send_message: message queued for session_id=#{session_id}")
-        :ok
+        case GenServer.call(pid, {:submit_message, message, context}) do
+          {:ok, admission} ->
+            Logger.debug(
+              "send_message: #{admission} for session_id=#{session_id}"
+            )
+
+            {:ok, admission}
+
+          {:error, reason} = error ->
+            Logger.warning(
+              "send_message: rejected for session_id=#{session_id} - #{inspect(reason)}"
+            )
+
+            error
+        end
 
       {:error, reason} ->
         Logger.error(

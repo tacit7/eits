@@ -182,7 +182,8 @@ defmodule EyeInTheSkyWeb.Notes do
   """
   def update_note(%Note{} = note, attrs) do
     note
-    |> Note.changeset(attrs)
+    |> Ecto.Changeset.cast(attrs, [:body, :title])
+    |> Ecto.Changeset.validate_required([:body])
     |> Repo.update()
   end
 

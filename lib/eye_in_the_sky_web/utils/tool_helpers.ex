@@ -1,15 +1,8 @@
-defmodule EyeInTheSkyWeb.MCP.Tools.Helpers do
-  @moduledoc "Shared utilities for MCP tools"
+defmodule EyeInTheSkyWeb.Utils.ToolHelpers do
+  @moduledoc "Shared utilities for resolving entity IDs used by REST API and Claude workers"
 
   alias EyeInTheSkyWeb.{Agents, Sessions, Teams}
 
-  @doc """
-  Resolves a session identifier (integer, integer string, or UUID string) to an internal integer ID.
-
-  Returns:
-    - `{:ok, integer_id}` on success
-    - `{:error, reason}` on failure
-  """
   def resolve_session_int_id(nil), do: {:error, "session_id is required"}
 
   def resolve_session_int_id(id) when is_integer(id), do: {:ok, id}

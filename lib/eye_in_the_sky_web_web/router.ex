@@ -95,12 +95,6 @@ defmodule EyeInTheSkyWebWeb.Router do
     oban_dashboard("/")
   end
 
-  # MCP Server — Streamable HTTP
-  # Wrapped in MCPPlug to catch (EXIT) shutdown from hot-reload-induced transport restarts
-  scope "/mcp" do
-    forward "/", EyeInTheSkyWebWeb.MCPPlug, server: EyeInTheSkyWeb.MCP.Server
-  end
-
   scope "/api/v1", EyeInTheSkyWebWeb.Api.V1 do
     pipe_through :api
 

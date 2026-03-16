@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
 
   alias EyeInTheSkyWeb.{Agents, Notes, Projects, Sessions, Tasks}
   alias EyeInTheSkyWeb.Tasks.WorkflowState
-  alias EyeInTheSkyWeb.MCP.Tools.Helpers
+  alias EyeInTheSkyWeb.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWebWeb.Presenters.ApiPresenter
 
   @doc """

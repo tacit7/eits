@@ -51,7 +51,7 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
         fallback_query
       end
 
-    search(opts ++ [fallback_query: fallback_query])
+    search(opts ++ [query: query, fallback_query: fallback_query])
   end
 
   @doc """

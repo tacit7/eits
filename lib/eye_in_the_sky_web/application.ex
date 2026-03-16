@@ -43,10 +43,6 @@ defmodule EyeInTheSkyWeb.Application do
       EyeInTheSkyWeb.Tasks.Poller,
       # Poll for external message writes (Go MCP, spawned agents)
       EyeInTheSkyWeb.Messages.Broadcaster,
-      # MCP Server (Anubis) — Streamable HTTP at /mcp
-      # SessionStore is started by Anubis automatically via :session_store config (enabled: true)
-      Anubis.Server.Registry,
-      {EyeInTheSkyWeb.MCP.Server, transport: :streamable_http},
       # Start to serve requests, typically the last entry
       EyeInTheSkyWebWeb.Endpoint
     ]

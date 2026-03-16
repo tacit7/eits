@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
   require Logger
 
   alias EyeInTheSkyWeb.Claude.Utils
-  alias EyeInTheSkyWeb.MCP.Tools.Helpers
+  alias EyeInTheSkyWeb.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWeb.Messages
   alias EyeInTheSkyWeb.Sessions
 

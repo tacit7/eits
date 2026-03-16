@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
   import EyeInTheSkyWebWeb.ControllerHelpers
 
   alias EyeInTheSkyWeb.{Agents, Contexts, Sessions, Projects}
-  alias EyeInTheSkyWeb.MCP.Tools.Helpers
+  alias EyeInTheSkyWeb.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWebWeb.Presenters.ApiPresenter
 
   @doc """

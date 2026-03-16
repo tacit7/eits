@@ -42,24 +42,37 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
   @type opts :: keyword()
   @terminal_exit_wait_ms 2_000
 
-  # Agent to track running sessions for cancellation
+  # ETS-based registry for tracking running sessions (lock-free concurrent reads)
   defmodule Registry do
-    use Agent
+    use GenServer
+
+    @table __MODULE__
 
     def start_link(_) do
-      Agent.start_link(fn -> %{} end, name: __MODULE__)
+      GenServer.start_link(__MODULE__, [], name: __MODULE__)
+    end
+
+    @impl true
+    def init(_) do
+      :ets.new(@table, [:named_table, :public, :set])
+      {:ok, nil}
     end
 
     def register(ref, port) do
-      Agent.update(__MODULE__, &Map.put(&1, ref, port))
+      :ets.insert(@table, {ref, port})
+      :ok
     end
 
     def lookup(ref) do
-      Agent.get(__MODULE__, &Map.get(&1, ref))
+      case :ets.lookup(@table, ref) do
+        [{^ref, port}] -> port
+        [] -> nil
+      end
     end
 
     def unregister(ref) do
-      Agent.update(__MODULE__, &Map.delete(&1, ref))
+      :ets.delete(@table, ref)
+      :ok
     end
   end
 

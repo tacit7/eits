@@ -228,6 +228,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TeamController do
       status: m.status,
       agent_id: m.agent_id,
       session_id: m.session_id,
+      session_status: m.session && m.session.status,
       joined_at: m.joined_at && to_string(m.joined_at),
       last_activity_at: m.last_activity_at && to_string(m.last_activity_at)
     }

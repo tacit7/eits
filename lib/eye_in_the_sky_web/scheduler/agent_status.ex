@@ -14,13 +14,15 @@ defmodule EyeInTheSkyWeb.Scheduler.AgentStatus do
 
   import Ecto.Query
 
-  alias EyeInTheSkyWeb.{Agents, Repo}
+  alias EyeInTheSkyWeb.{Agents, Repo, Sessions}
   alias Agents.Agent
+  alias Sessions.Session
 
   # 5 minutes in milliseconds
   @interval 5 * 60 * 1000
   @one_hour_ago 60 * 60
   @one_day_ago 24 * 60 * 60
+  @thirty_minutes 30 * 60
 
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, nil, name: __MODULE__)
@@ -36,6 +38,7 @@ defmodule EyeInTheSkyWeb.Scheduler.AgentStatus do
   @impl GenServer
   def handle_info(:mark_stale, state) do
     mark_stale_agents()
+    archive_dead_idle_sessions()
     # Schedule the next run
     Process.send_after(self(), :mark_stale, @interval)
     {:noreply, state}
@@ -111,5 +114,71 @@ defmodule EyeInTheSkyWeb.Scheduler.AgentStatus do
   defp is_waiting(created_at, now) do
     seconds_since = NaiveDateTime.diff(now, created_at)
     seconds_since < @one_hour_ago
+  end
+
+  # Archive sessions that are idle, older than 30 min, and have no active tasks.
+  defp archive_dead_idle_sessions do
+    try do
+      now = DateTime.utc_now()
+      cutoff = DateTime.add(now, -@thirty_minutes, :second) |> DateTime.to_iso8601()
+      now_iso = DateTime.to_iso8601(now)
+
+      # Sessions that are idle, not archived, and started more than 30 min ago
+      idle_sessions =
+        from(s in Session,
+          where: s.status == "idle",
+          where: is_nil(s.archived_at),
+          where: not is_nil(s.started_at),
+          where: s.started_at < ^cutoff
+        )
+        |> Repo.all()
+
+      archived_count =
+        idle_sessions
+        |> Enum.filter(&no_active_tasks?/1)
+        |> Enum.reduce(0, fn session, count ->
+          archive_session_and_agent(session, now_iso)
+          count + 1
+        end)
+
+      if archived_count > 0 do
+        Logger.info("Auto-archived #{archived_count} dead idle session(s)")
+      end
+    rescue
+      e ->
+        Logger.error("Error archiving dead idle sessions: #{inspect(e)}")
+    end
+  end
+
+  # Returns true when a session has no linked tasks, or all linked tasks are done/archived.
+  # state_id 3 = Done (see workflow_states table)
+  defp no_active_tasks?(session) do
+    active_task_count =
+      from(ts in "task_sessions",
+        join: t in EyeInTheSkyWeb.Tasks.Task,
+        on: t.id == ts.task_id,
+        where: ts.session_id == ^session.id,
+        where: t.state_id != 3 and t.archived == false,
+        select: count()
+      )
+      |> Repo.one()
+
+    active_task_count == 0
+  end
+
+  defp archive_session_and_agent(session, now_iso) do
+    # Archive the session
+    Sessions.update_session(session, %{archived_at: now_iso, status: "archived"})
+
+    # Archive the associated agent if present
+    if session.agent_id do
+      case Repo.get(Agent, session.agent_id) do
+        nil -> :ok
+        agent ->
+          agent
+          |> Ecto.Changeset.change(%{archived_at: now_iso})
+          |> Repo.update()
+      end
+    end
   end
 end

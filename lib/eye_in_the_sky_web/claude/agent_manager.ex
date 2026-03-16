@@ -284,7 +284,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
 
       opts = [
         session_id: session.id,
-        session_uuid: session.uuid,
+        provider_conversation_id: session.uuid,
         agent_id: agent.id,
         project_path: project_path,
         provider: provider,

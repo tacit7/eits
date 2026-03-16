@@ -539,7 +539,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     # State should be an AgentWorker struct, not a plain map
     assert %EyeInTheSkyWeb.Claude.AgentWorker{} = worker_state
     assert worker_state.session_id == session.id
-    assert is_binary(worker_state.session_uuid)
+    assert is_binary(worker_state.provider_conversation_id)
     assert worker_state.provider == "claude"
     assert worker_state.stream_buffer == ""
     assert worker_state.retry_attempt == 0
@@ -676,7 +676,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
       Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session.id})
 
     worker_state = :sys.get_state(worker_pid)
-    assert worker_state.session_uuid == claude_uuid
+    assert worker_state.provider_conversation_id == claude_uuid
 
     # DB update happens via Task.start — poll briefly for it
     assert_eventually(fn ->

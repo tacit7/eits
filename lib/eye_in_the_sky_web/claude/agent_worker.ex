@@ -24,7 +24,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   defstruct [
     :session_id,
-    :session_uuid,
+    :provider_conversation_id,
     :agent_id,
     :project_path,
     :provider,
@@ -107,7 +107,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   @impl true
   def init(opts) do
     session_id = Keyword.fetch!(opts, :session_id)
-    session_uuid = Keyword.fetch!(opts, :session_uuid)
+    provider_conversation_id = Keyword.fetch!(opts, :provider_conversation_id)
     agent_id = Keyword.fetch!(opts, :agent_id)
     project_path = Keyword.get(opts, :project_path, File.cwd!())
     provider = Keyword.get(opts, :provider, "claude")
@@ -115,7 +115,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
     state = %__MODULE__{
       session_id: session_id,
-      session_uuid: session_uuid,
+      provider_conversation_id: provider_conversation_id,
       agent_id: agent_id,
       project_path: project_path,
       provider: provider,
@@ -325,7 +325,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   # SDK completion - process next queued job
   @impl true
   def handle_info({:claude_complete, ref, session_id}, %__MODULE__{sdk_ref: ref} = state) do
-    state = maybe_sync_session_uuid(state, session_id)
+    state = maybe_sync_provider_conversation_id(state, session_id)
     broadcast_stream_clear(state)
     state = reset_stream_state(state)
 
@@ -357,7 +357,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
     if Enum.any?(errors, &String.contains?(&1, "No conversation found")) && not is_nil(job) do
       Logger.warning(
-        "[#{state.session_id}] Stale Claude session UUID=#{state.session_uuid}, retrying as new session"
+        "[#{state.session_id}] Stale Claude session UUID=#{state.provider_conversation_id}, retrying as new session"
       )
 
       fresh_job = Job.as_fresh_session(job)
@@ -506,11 +506,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     opts = [
       to: self(),
       model: context[:model],
-      session_id: state.session_uuid,
+      session_id: state.provider_conversation_id,
       project_path: state.project_path,
       skip_permissions: true,
       use_script: true,
-      eits_session_id: state.session_uuid,
+      eits_session_id: state.provider_conversation_id,
       eits_agent_id: state.agent_id,
       eits_workflow: context[:eits_workflow] || "1",
       worktree: state.worktree,
@@ -539,10 +539,10 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       end
 
     if has_messages do
-      Logger.info("Resuming Claude session #{state.session_uuid}")
-      SDK.resume(state.session_uuid, prompt, opts)
+      Logger.info("Resuming Claude session #{state.provider_conversation_id}")
+      SDK.resume(state.provider_conversation_id, prompt, opts)
     else
-      Logger.info("Starting new Claude session #{state.session_uuid}")
+      Logger.info("Starting new Claude session #{state.provider_conversation_id}")
       SDK.start(prompt, opts)
     end
   end
@@ -555,35 +555,35 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     opts = [
       to: self(),
       model: context[:model],
-      session_id: state.session_uuid,
+      session_id: state.provider_conversation_id,
       project_path: state.project_path,
       full_auto: true,
-      eits_session_id: state.session_uuid,
+      eits_session_id: state.provider_conversation_id,
       eits_agent_id: state.agent_id,
       eits_model: context[:model]
     ]
 
     if has_messages do
-      Logger.info("Resuming Codex session #{state.session_uuid}")
-      Codex.SDK.resume(state.session_uuid, prompt, opts)
+      Logger.info("Resuming Codex session #{state.provider_conversation_id}")
+      Codex.SDK.resume(state.provider_conversation_id, prompt, opts)
     else
-      Logger.info("Starting new Codex session #{state.session_uuid}")
+      Logger.info("Starting new Codex session #{state.provider_conversation_id}")
 
       full_prompt =
-        codex_eits_init(state.session_uuid, context[:model]) <> "\n\n---\n\n" <> prompt
+        codex_eits_init(state.provider_conversation_id, context[:model]) <> "\n\n---\n\n" <> prompt
 
       Codex.SDK.start(full_prompt, opts)
     end
   end
 
-  defp codex_eits_init(session_uuid, model) do
+  defp codex_eits_init(provider_conversation_id, model) do
     """
     IMPORTANT: Before doing anything else, complete these EITS registration steps:
 
     1. Get your Codex session ID by running:
-       ~/.claude/eye-in-the-sky/codex-session-find #{session_uuid}
+       ~/.claude/eye-in-the-sky/codex-session-find #{provider_conversation_id}
 
-    2. Your EITS session UUID is: #{session_uuid}
+    2. Your EITS session UUID is: #{provider_conversation_id}
        Model: #{model || "unknown"}
        Provider: openai
 
@@ -593,13 +593,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
        b. Start the task (move to In Progress):
           i-todo start <task_id>
        c. Link task to your session:
-          i-todo add-session <task_id> --session_id #{session_uuid}
+          i-todo add-session <task_id> --session_id #{provider_conversation_id}
        d. Do the work.
        e. When done, move task to In Review (NOT Done):
           i-todo status <task_id> --state_id 4
 
     4. When all work is complete, end the session:
-       i-session end #{session_uuid}
+       i-session end #{provider_conversation_id}
 
     Now proceed with the task:
     """
@@ -622,7 +622,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     Phoenix.PubSub.broadcast(
       EyeInTheSkyWeb.PubSub,
       "dm:#{state.session_id}:stream",
-      {:agent_error, state.session_uuid, state.session_id, "Max retries exceeded"}
+      {:agent_error, state.provider_conversation_id, state.session_id, "Max retries exceeded"}
     )
 
     update_agent_status(state.session_id, "error")
@@ -690,22 +690,22 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     }
   end
 
-  defp maybe_sync_session_uuid(state, claude_session_uuid)
-       when is_binary(claude_session_uuid) and claude_session_uuid != "" do
-    if state.session_uuid == claude_session_uuid do
+  defp maybe_sync_provider_conversation_id(state, claude_provider_conversation_id)
+       when is_binary(claude_provider_conversation_id) and claude_provider_conversation_id != "" do
+    if state.provider_conversation_id == claude_provider_conversation_id do
       state
     else
       # Update state immediately, fire-and-forget the DB write
       session_id = state.session_id
-      old_uuid = state.session_uuid
+      old_uuid = state.provider_conversation_id
 
       Task.start(fn ->
         case Sessions.get_session(session_id) do
           {:ok, execution_agent} ->
-            case Sessions.update_session(execution_agent, %{uuid: claude_session_uuid}) do
+            case Sessions.update_session(execution_agent, %{uuid: claude_provider_conversation_id}) do
               {:ok, _updated} ->
                 Logger.info(
-                  "[#{session_id}] Updated execution session uuid #{old_uuid} -> #{claude_session_uuid}"
+                  "[#{session_id}] Updated execution session uuid #{old_uuid} -> #{claude_provider_conversation_id}"
                 )
 
               {:error, reason} ->
@@ -721,11 +721,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         end
       end)
 
-      %{state | session_uuid: claude_session_uuid}
+      %{state | provider_conversation_id: claude_provider_conversation_id}
     end
   end
 
-  defp maybe_sync_session_uuid(state, _), do: state
+  defp maybe_sync_provider_conversation_id(state, _), do: state
 
   # Text delta (from stream_event with --include-partial-messages)
   defp broadcast_stream_event(%Message{type: :text, content: text, delta: true}, state)
@@ -855,7 +855,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       Phoenix.PubSub.broadcast(
         EyeInTheSkyWeb.PubSub,
         "dm:#{state.session_id}:stream",
-        {:agent_error, state.session_uuid, state.session_id,
+        {:agent_error, state.provider_conversation_id, state.session_id,
          "Queued job dropped due to systemic error: #{reason_str}"}
       )
     end)
@@ -867,7 +867,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     Phoenix.PubSub.broadcast(
       EyeInTheSkyWeb.PubSub,
       "agent:working",
-      {:agent_working, state.session_uuid, state.session_id}
+      {:agent_working, state.provider_conversation_id, state.session_id}
     )
   end
 
@@ -875,7 +875,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     Phoenix.PubSub.broadcast(
       EyeInTheSkyWeb.PubSub,
       "agent:working",
-      {:agent_stopped, state.session_uuid, state.session_id}
+      {:agent_stopped, state.provider_conversation_id, state.session_id}
     )
   end
 
@@ -919,7 +919,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   defp notify_agent_complete(state) do
     session_id = state.session_id
-    session_uuid = state.session_uuid
+    provider_conversation_id = state.provider_conversation_id
 
     Task.start(fn ->
       title =
@@ -933,7 +933,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
       EyeInTheSkyWeb.Notifications.notify(title,
         category: :agent,
-        resource: {"session", session_uuid}
+        resource: {"session", provider_conversation_id}
       )
     end)
   end

@@ -7,6 +7,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
   import EyeInTheSkyWebWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWebWeb.Live.Shared.JobsHelpers
   import EyeInTheSkyWebWeb.Components.JobFormDrawer
+  import EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers
+  import EyeInTheSkyWebWeb.Components.AgentScheduleForm
 
   @impl true
   def mount(%{"id" => _} = params, _session, socket) do
@@ -42,12 +44,19 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
         |> assign(:global_jobs, [])
       end
 
+    socket = socket |> assign_agent_schedule_defaults()
+
     {:ok, socket}
   end
 
   @impl true
   def handle_info(:jobs_updated, socket) do
-    {:noreply, reload_jobs(socket)}
+    socket =
+      socket
+      |> reload_jobs()
+      |> maybe_reload_agent_schedule_data()
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -197,6 +206,26 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
     end
   end
 
+  @impl true
+  def handle_event("switch_tab", params, socket),
+    do: handle_switch_tab(params, socket)
+
+  @impl true
+  def handle_event("schedule_prompt", params, socket),
+    do: handle_schedule_prompt(params, socket)
+
+  @impl true
+  def handle_event("edit_schedule", params, socket),
+    do: handle_edit_schedule(params, socket)
+
+  @impl true
+  def handle_event("cancel_schedule", params, socket),
+    do: handle_cancel_schedule(params, socket)
+
+  @impl true
+  def handle_event("save_schedule", params, socket),
+    do: handle_save_schedule(params, socket)
+
   defp reload_jobs(socket) do
     socket
     |> assign(:project_jobs, ScheduledJobs.list_jobs_for_project(socket.assigns.project_id))
@@ -219,6 +248,21 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
   def render(assigns) do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-6">
+      <div class="flex border-b border-base-300 mb-4">
+        <button
+          class={"tab tab-bordered #{if @active_tab == :all_jobs, do: "tab-active"}"}
+          phx-click="switch_tab" phx-value-tab="all_jobs"
+        >
+          All Jobs
+        </button>
+        <button
+          class={"tab tab-bordered #{if @active_tab == :agent_schedules, do: "tab-active"}"}
+          phx-click="switch_tab" phx-value-tab="agent_schedules"
+        >
+          Agent Schedules
+        </button>
+      </div>
+
       <%!-- Job Form Drawer --%>
       <.job_form_drawer
         show={@show_form}
@@ -296,48 +340,110 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
         <div class="fixed inset-0 z-40 bg-black/30" phx-click="toggle_claude_drawer"></div>
       <% end %>
 
-      <%!-- Project Jobs --%>
-      <div class="mb-8">
-        <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 class="text-base font-semibold">Scheduled Jobs</h2>
-            <p class="text-xs text-base-content/50">Scoped to {@project.name}</p>
+      <%= if @active_tab == :all_jobs do %>
+        <%!-- Project Jobs --%>
+        <div class="mb-8">
+          <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="text-base font-semibold">Scheduled Jobs</h2>
+              <p class="text-xs text-base-content/50">Scoped to {@project.name}</p>
+            </div>
+            <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+              <button class="btn btn-outline btn-sm w-full sm:w-auto" phx-click="toggle_claude_drawer">
+                <.icon name="hero-sparkles" class="w-3.5 h-3.5" /> Create with Claude
+              </button>
+              <button
+                class="btn btn-primary btn-sm w-full sm:w-auto"
+                phx-click="new_job"
+                phx-value-scope="project"
+              >
+                + New Job
+              </button>
+            </div>
           </div>
-          <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-            <button class="btn btn-outline btn-sm w-full sm:w-auto" phx-click="toggle_claude_drawer">
-              <.icon name="hero-sparkles" class="w-3.5 h-3.5" /> Create with Claude
-            </button>
+          <.jobs_table jobs={@project_jobs} expanded_job_id={@expanded_job_id} runs={@runs} />
+        </div>
+
+        <div class="divider"></div>
+
+        <%!-- Global Jobs --%>
+        <div>
+          <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="text-base font-semibold">Global Jobs</h2>
+              <p class="text-xs text-base-content/50">Run across all projects</p>
+            </div>
             <button
-              class="btn btn-primary btn-sm w-full sm:w-auto"
+              class="btn btn-ghost btn-sm w-full sm:w-auto"
               phx-click="new_job"
-              phx-value-scope="project"
+              phx-value-scope="global"
             >
-              + New Job
+              + New Global Job
             </button>
           </div>
+          <.jobs_table jobs={@global_jobs} expanded_job_id={@expanded_job_id} runs={@runs} />
         </div>
-        <.jobs_table jobs={@project_jobs} expanded_job_id={@expanded_job_id} runs={@runs} />
-      </div>
+      <% end %>
 
-      <div class="divider"></div>
-
-      <%!-- Global Jobs --%>
-      <div>
-        <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 class="text-base font-semibold">Global Jobs</h2>
-            <p class="text-xs text-base-content/50">Run across all projects</p>
+      <%= if @active_tab == :agent_schedules do %>
+        <div class="p-4 space-y-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <%= for prompt <- @prompts do %>
+              <% job = Map.get(@prompt_job_map, prompt.id) %>
+              <div class={"card bg-base-200 border #{if job, do: "border-primary", else: "border-base-300"}"}>
+                <div class="card-body p-4 gap-2">
+                  <div class="flex items-start justify-between">
+                    <h3 class="font-semibold text-sm leading-tight">{prompt.name}</h3>
+                    <%= if job do %>
+                      <span class="badge badge-success badge-xs whitespace-nowrap">● active</span>
+                    <% end %>
+                  </div>
+                  <p class="text-xs text-base-content/60 line-clamp-2">{prompt.description}</p>
+                  <div class="flex items-center justify-between mt-1">
+                    <%= if job do %>
+                      <span class="font-mono text-xs text-base-content/50">{job.schedule_value}</span>
+                      <div class="flex gap-1">
+                        <button class="btn btn-ghost btn-xs" phx-click="edit_schedule" phx-value-job_id={job.id}>Edit</button>
+                        <button class="btn btn-ghost btn-xs" phx-click="run_now" phx-value-id={job.id}>▶</button>
+                      </div>
+                    <% else %>
+                      <span class="text-xs text-base-content/40">not scheduled</span>
+                      <button class="btn btn-primary btn-xs" phx-click="schedule_prompt" phx-value-id={prompt.id}>+ Schedule</button>
+                    <% end %>
+                  </div>
+                </div>
+              </div>
+            <% end %>
           </div>
-          <button
-            class="btn btn-ghost btn-sm w-full sm:w-auto"
-            phx-click="new_job"
-            phx-value-scope="global"
-          >
-            + New Global Job
-          </button>
+
+          <%= if @orphaned_jobs != [] do %>
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-2">Detached Schedules</p>
+              <div class="space-y-2">
+                <%= for job <- @orphaned_jobs do %>
+                  <div class="flex items-center gap-3 p-3 rounded-lg bg-base-200 border border-warning/40">
+                    <div class="flex-1 min-w-0">
+                      <span class="text-sm truncate">{job.name}</span>
+                      <span class="badge badge-warning badge-xs ml-2">Prompt deactivated</span>
+                    </div>
+                    <span class="font-mono text-xs text-base-content/50 shrink-0">{job.schedule_value}</span>
+                    <button class="btn btn-ghost btn-xs" phx-click="run_now" phx-value-id={job.id}>▶</button>
+                    <button class="btn btn-ghost btn-xs text-error" phx-click="delete_job" phx-value-id={job.id}>Delete</button>
+                  </div>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
         </div>
-        <.jobs_table jobs={@global_jobs} expanded_job_id={@expanded_job_id} runs={@runs} />
-      </div>
+      <% end %>
+
+      <.agent_schedule_form
+        show={@scheduling_prompt != nil}
+        prompt={@scheduling_prompt || %EyeInTheSkyWeb.Prompts.Prompt{name: ""}}
+        job={@scheduling_job}
+        projects={@projects}
+        context_project_id={@project_id}
+      />
     </div>
     """
   end

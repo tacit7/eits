@@ -303,4 +303,28 @@ defmodule EyeInTheSkyWeb.ScheduledJobsTest do
       assert updated.next_run_at != original
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # ScheduledJob schema
+  # ---------------------------------------------------------------------------
+
+  describe "ScheduledJob schema" do
+    test "cast includes prompt_id" do
+      attrs = %{
+        "name" => "Test",
+        "job_type" => "spawn_agent",
+        "schedule_type" => "cron",
+        "schedule_value" => "0 5 * * *",
+        "prompt_id" => 999
+      }
+      cs = ScheduledJob.changeset(%ScheduledJob{}, attrs)
+      assert cs.changes.prompt_id == 999
+    end
+
+    test "prompt_id uniqueness constraint is registered" do
+      cs = ScheduledJob.changeset(%ScheduledJob{}, %{})
+      constraint_names = Enum.map(cs.constraints, & &1.constraint)
+      assert "idx_scheduled_jobs_unique_prompt" in constraint_names
+    end
+  end
 end

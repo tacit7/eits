@@ -27,6 +27,21 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
     |> Repo.all()
   end
 
+  def list_spawn_agent_jobs_by_prompt_ids(prompt_ids) when is_list(prompt_ids) do
+    from(j in ScheduledJob, where: j.prompt_id in ^prompt_ids)
+    |> Repo.all()
+  end
+
+  def list_orphaned_agent_jobs do
+    from(j in ScheduledJob,
+      join: p in assoc(j, :prompt),
+      where: j.job_type == "spawn_agent",
+      where: not is_nil(j.prompt_id),
+      where: p.active == false
+    )
+    |> Repo.all()
+  end
+
   def get_job!(id), do: Repo.get!(ScheduledJob, id)
 
   def get_job(id) do
@@ -55,8 +70,10 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
         {:ok, _} = update_job_fields(job, %{next_run_at: next})
         {:ok, Repo.get!(ScheduledJob, job.id)}
 
-      error ->
-        error
+      {:error, %Ecto.Changeset{} = cs} ->
+        if Keyword.has_key?(cs.errors, :prompt_id),
+          do: {:error, :already_scheduled},
+          else: {:error, cs}
     end
   end
 

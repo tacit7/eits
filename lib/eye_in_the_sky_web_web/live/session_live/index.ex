@@ -125,7 +125,7 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
     effort_level = params["effort_level"]
     project_id = String.to_integer(params["project_id"])
     description = params["description"]
-    agent_name = String.slice(description || "", 0, 60)
+    agent_name = params["agent_name"] || String.slice(description || "", 0, 60)
 
     project = EyeInTheSkyWeb.Projects.get_project!(project_id)
 

@@ -92,7 +92,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewAgentDrawer do
             <.form_field label="Agent Name / Nickname">
               <input
                 type="text"
-                name="description"
+                name="agent_name"
                 class="input input-bordered"
                 placeholder="e.g., Code Reviewer, Bug Fixer..."
               />

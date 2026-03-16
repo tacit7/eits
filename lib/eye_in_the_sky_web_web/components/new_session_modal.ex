@@ -113,6 +113,17 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
               </div>
             <% end %>
 
+            <%!-- Name --%>
+            <div>
+              <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Name</label>
+              <input
+                type="text"
+                name="agent_name"
+                class="input input-bordered w-full"
+                placeholder="e.g., Fix login bug, Code review..."
+              />
+            </div>
+
             <%!-- Description --%>
             <div>
               <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Description</label>

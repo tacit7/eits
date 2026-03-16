@@ -178,6 +178,15 @@ defmodule EyeInTheSkyWeb.Notes do
   end
 
   @doc """
+  Updates a note's body (and optionally title).
+  """
+  def update_note(%Note{} = note, attrs) do
+    note
+    |> Note.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
   Toggles the starred status of a note.
   """
   def toggle_starred(note_id) do

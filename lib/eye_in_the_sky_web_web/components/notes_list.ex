@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWebWeb.Components.NotesList do
   attr :starred_filter, :boolean, default: false
   attr :search_query, :string, default: ""
   attr :empty_id, :string, default: "notes-empty"
+  attr :editing_note_id, :integer, default: nil
 
   def notes_list(assigns) do
     ~H"""
@@ -55,7 +56,7 @@ defmodule EyeInTheSkyWebWeb.Components.NotesList do
       <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-5">
         <%= for note <- @notes do %>
           <div class="collapse collapse-arrow">
-            <input type="checkbox" class="min-h-0 p-0" />
+            <input type="checkbox" class="min-h-0 p-0" checked={note.id == @editing_note_id} />
             <div class="collapse-title py-3.5 px-0 min-h-0 flex flex-col gap-1">
               <div class="flex items-center gap-2 pr-6">
                 <%= if note.starred == 1 do %>
@@ -78,39 +79,69 @@ defmodule EyeInTheSkyWebWeb.Components.NotesList do
               </div>
             </div>
             <div class="collapse-content px-0 pb-4">
-              <div
-                id={"note-body-#{note.id}"}
-                class="dm-markdown text-sm text-base-content/70 leading-relaxed"
-                phx-hook="MarkdownMessage"
-                data-raw-body={note.body}
-              >
-              </div>
-              <div class="mt-3 flex items-center gap-3">
-                <button
-                  type="button"
-                  phx-click="toggle_star"
-                  phx-value-note_id={note.id}
-                  class="flex items-center gap-1.5 text-xs text-base-content/30 hover:text-warning transition-colors min-h-[44px] md:min-h-0 px-1"
-                  aria-label={if note.starred == 1, do: "Unstar note", else: "Star note"}
-                  aria-pressed={note.starred == 1}
+              <%= if note.id == @editing_note_id do %>
+                <div
+                  id={"note-editor-#{note.id}"}
+                  phx-hook="NoteEditor"
+                  data-note-id={note.id}
+                  data-body={Base.encode64(note.body || "")}
+                  class="border border-base-content/10 rounded-lg overflow-hidden min-h-[200px]"
+                ></div>
+                <div class="mt-2 flex items-center gap-3">
+                  <span class="text-xs text-base-content/40">⌘S to save</span>
+                  <button
+                    type="button"
+                    phx-click="note_edit_cancelled"
+                    phx-value-note_id={note.id}
+                    class="flex items-center gap-1.5 text-xs text-base-content/30 hover:text-base-content/60 transition-colors px-1"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              <% else %>
+                <div
+                  id={"note-body-#{note.id}"}
+                  class="dm-markdown text-sm text-base-content/70 leading-relaxed"
+                  phx-hook="MarkdownMessage"
+                  data-raw-body={note.body}
                 >
-                  <.icon
-                    name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}
-                    class={"w-3.5 h-3.5 #{if note.starred == 1, do: "text-warning", else: ""}"}
-                  />
-                  {if note.starred == 1, do: "Starred", else: "Star"}
-                </button>
-                <button
-                  type="button"
-                  phx-click="delete_note"
-                  phx-value-note_id={note.id}
-                  data-confirm="Delete this note?"
-                  class="flex items-center gap-1.5 text-xs text-base-content/30 hover:text-error transition-colors min-h-[44px] md:min-h-0 px-1"
-                  aria-label="Delete note"
-                >
-                  <.icon name="hero-trash" class="w-3.5 h-3.5" /> Delete
-                </button>
-              </div>
+                </div>
+                <div class="mt-3 flex items-center gap-3">
+                  <button
+                    type="button"
+                    phx-click="toggle_star"
+                    phx-value-note_id={note.id}
+                    class="flex items-center gap-1.5 text-xs text-base-content/30 hover:text-warning transition-colors min-h-[44px] md:min-h-0 px-1"
+                    aria-label={if note.starred == 1, do: "Unstar note", else: "Star note"}
+                    aria-pressed={note.starred == 1}
+                  >
+                    <.icon
+                      name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}
+                      class={"w-3.5 h-3.5 #{if note.starred == 1, do: "text-warning", else: ""}"}
+                    />
+                    {if note.starred == 1, do: "Starred", else: "Star"}
+                  </button>
+                  <button
+                    type="button"
+                    phx-click="edit_note"
+                    phx-value-note_id={note.id}
+                    class="flex items-center gap-1.5 text-xs text-base-content/30 hover:text-primary transition-colors min-h-[44px] md:min-h-0 px-1"
+                    aria-label="Edit note"
+                  >
+                    <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit
+                  </button>
+                  <button
+                    type="button"
+                    phx-click="delete_note"
+                    phx-value-note_id={note.id}
+                    data-confirm="Delete this note?"
+                    class="flex items-center gap-1.5 text-xs text-base-content/30 hover:text-error transition-colors min-h-[44px] md:min-h-0 px-1"
+                    aria-label="Delete note"
+                  >
+                    <.icon name="hero-trash" class="w-3.5 h-3.5" /> Delete
+                  </button>
+                </div>
+              <% end %>
             </div>
           </div>
         <% end %>

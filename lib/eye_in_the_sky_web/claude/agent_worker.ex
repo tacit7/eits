@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   When Claude completes, processes the next queued message automatically.
   """
 
-  use GenServer
+  use GenServer, restart: :temporary
   require Logger
 
   alias EyeInTheSkyWeb.Claude.{Message, SDK}
@@ -15,6 +15,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   alias EyeInTheSkyWeb.{Messages, Sessions}
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
+  @pubsub EyeInTheSkyWeb.PubSub
   @retry_start_ms 1_000
   @retry_max_ms 30_000
   @max_queue_depth 5
@@ -30,7 +31,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     :current_job,
     :worktree,
     :retry_timer_ref,
-    queue: [],
+    queue: :queue.new(),
     stream_buffer: "",
     current_tool_id: nil,
     current_tool_name: nil,
@@ -123,7 +124,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   @impl true
   def handle_call(:get_queue, _from, state) do
-    {:reply, state.queue, state}
+    {:reply, :queue.to_list(state.queue), state}
   end
 
   @impl true
@@ -141,7 +142,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         "model=#{inspect(context.model)}"
     )
 
-    queue_len = length(state.queue)
+    queue_len = :queue.len(state.queue)
     has_msgs = context.has_messages
 
     :telemetry.execute([:eits, :agent, :job, :received], %{system_time: System.system_time()}, %{
@@ -149,10 +150,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       queue_length: queue_len,
       has_messages: has_msgs
     })
-
-    Logger.info(
-      "[telemetry] agent.job.received session_id=#{state.session_id} queue=#{queue_len} has_messages=#{has_msgs}"
-    )
 
     job = %{
       message: message,
@@ -176,8 +173,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
             }
           )
 
-          Logger.info("[telemetry] agent.job.started session_id=#{state.session_id}")
-
           update_agent_status(state.session_id, "working")
           broadcast_agent_working(state)
 
@@ -200,14 +195,14 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       end
     else
       # Busy — check queue depth before accepting
-      if length(state.queue) >= @max_queue_depth do
+      if :queue.len(state.queue) >= @max_queue_depth do
         Logger.warning(
           "AgentWorker: queue full (#{@max_queue_depth}) for session_id=#{state.session_id}, dropping message"
         )
 
         {:noreply, state}
       else
-        new_queue_length = length(state.queue) + 1
+        new_queue_length = :queue.len(state.queue) + 1
 
         Logger.info(
           "AgentWorker: busy, queueing message for session_id=#{state.session_id}, " <>
@@ -217,10 +212,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         :telemetry.execute([:eits, :agent, :job, :queued], %{queue_length: new_queue_length}, %{
           session_id: state.session_id
         })
-
-        Logger.info(
-          "[telemetry] agent.job.queued session_id=#{state.session_id} queue_length=#{new_queue_length}"
-        )
 
         {:noreply, enqueue_job(state, job)}
       end
@@ -247,7 +238,12 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   end
 
   def handle_cast({:remove_queued_prompt, prompt_id}, state) do
-    new_queue = Enum.reject(state.queue, fn job -> job[:id] == prompt_id end)
+    new_queue =
+      state.queue
+      |> :queue.to_list()
+      |> Enum.reject(fn job -> job[:id] == prompt_id end)
+      |> :queue.from_list()
+
     new_state = %{state | queue: new_queue}
     broadcast_queue_update(new_state)
     {:noreply, new_state}
@@ -265,14 +261,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
     :telemetry.execute(
       [:eits, :agent, :result, :saved],
-      %{
-        text_length: result_len
-      },
+      %{text_length: result_len},
       %{session_id: state.session_id}
-    )
-
-    Logger.info(
-      "[telemetry] agent.result.saved session_id=#{state.session_id} text_length=#{result_len}"
     )
 
     {:noreply, state}
@@ -310,7 +300,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
           end
 
         Phoenix.PubSub.broadcast(
-          EyeInTheSkyWeb.PubSub,
+          @pubsub,
           "dm:#{state.session_id}:stream",
           {:stream_tool_input, state.current_tool_name, input}
         )
@@ -339,8 +329,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     :telemetry.execute([:eits, :agent, :sdk, :complete], %{system_time: System.system_time()}, %{
       session_id: state.session_id
     })
-
-    Logger.info("[telemetry] agent.sdk.complete session_id=#{state.session_id}")
 
     update_agent_status(state.session_id, "idle")
     broadcast_agent_stopped(state)
@@ -404,13 +392,12 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   def handle_info({:claude_error, _ref, _reason}, state), do: {:noreply, state}
 
   @impl true
-  def handle_info(:retry_start, %__MODULE__{sdk_ref: nil, queue: [_ | _]} = state) do
-    process_next_job(%{state | retry_timer_ref: nil})
-  end
-
-  @impl true
-  def handle_info(:retry_start, state) do
-    {:noreply, %{state | retry_timer_ref: nil}}
+  def handle_info(:retry_start, %__MODULE__{sdk_ref: nil} = state) do
+    if :queue.is_empty(state.queue) do
+      {:noreply, %{state | retry_timer_ref: nil}}
+    else
+      process_next_job(%{state | retry_timer_ref: nil})
+    end
   end
 
   @impl true
@@ -436,7 +423,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     provider = state.provider
     channel_id = if state.current_job, do: state.current_job.context[:channel_id], else: nil
 
-    Task.start(fn ->
+    Task.Supervisor.start_child(EyeInTheSkyWeb.TaskSupervisor, fn ->
       if String.trim(text) in ["", "[NO_RESPONSE]"] do
         Logger.info("[#{session_id}] Skipping DB save — empty or suppressed response")
       else
@@ -467,26 +454,29 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     Logger.warning("[#{state.session_id}] Result has no text content")
   end
 
-  defp process_next_job(%__MODULE__{queue: []} = state) do
-    broadcast_queue_update(state)
-    {:noreply, state}
-  end
+  defp process_next_job(%__MODULE__{} = state) do
+    case :queue.out(state.queue) do
+      {:empty, _} ->
+        broadcast_queue_update(state)
+        {:noreply, state, :hibernate}
 
-  defp process_next_job(%__MODULE__{queue: [next_job | rest]} = state) do
-    case start_sdk(state, next_job) do
-      {:ok, sdk_ref} ->
-        update_agent_status(state.session_id, "working")
-        broadcast_agent_working(state)
+      {{:value, next_job}, rest} ->
+        case start_sdk(state, next_job) do
+          {:ok, sdk_ref} ->
+            update_agent_status(state.session_id, "working")
+            broadcast_agent_working(state)
 
-        new_state =
-          clear_retry_timer(%{state | sdk_ref: sdk_ref, current_job: next_job, queue: rest})
+            new_state =
+              clear_retry_timer(%{state | sdk_ref: sdk_ref, current_job: next_job, queue: rest})
 
-        broadcast_queue_update(new_state)
-        {:noreply, new_state}
+            broadcast_queue_update(new_state)
+            {:noreply, new_state}
 
-      {:error, reason} ->
-        Logger.error("Failed to start SDK for next job: #{inspect(reason)}")
-        {:noreply, %{state | queue: [next_job | rest]} |> schedule_retry_start()}
+          {:error, reason} ->
+            Logger.error("Failed to start SDK for next job: #{inspect(reason)}")
+            # Put the job back at the front of the queue
+            {:noreply, %{state | queue: :queue.in_r(next_job, rest)} |> schedule_retry_start()}
+        end
     end
   end
 
@@ -513,7 +503,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       eits_session_id: state.session_uuid,
       eits_agent_id: state.agent_id,
       eits_workflow: context[:eits_workflow] || "1",
-      worktree: state.worktree,
       agent: context[:agent]
     ]
 
@@ -610,7 +599,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   defp enqueue_job(state, job) do
     job = Map.put(job, :id, System.unique_integer([:positive, :monotonic]))
-    new_state = %{state | queue: state.queue ++ [job]}
+    new_state = %{state | queue: :queue.in(job, state.queue)}
     broadcast_queue_update(new_state)
     new_state
   end
@@ -620,7 +609,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     Logger.error("[#{state.session_id}] Max retries (#{@max_retries}) exceeded, giving up")
 
     Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
+      @pubsub,
       "dm:#{state.session_id}:stream",
       {:agent_error, state.session_uuid, state.session_id, "Max retries exceeded"}
     )
@@ -628,7 +617,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     update_agent_status(state.session_id, "error")
     broadcast_agent_stopped(state)
 
-    %{state | queue: [], retry_attempt: 0}
+    %{state | queue: :queue.new(), retry_attempt: 0}
   end
 
   defp schedule_retry_start(%__MODULE__{retry_timer_ref: nil} = state) do
@@ -699,7 +688,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       session_id = state.session_id
       old_uuid = state.session_uuid
 
-      Task.start(fn ->
+      Task.Supervisor.start_child(EyeInTheSkyWeb.TaskSupervisor, fn ->
         case Sessions.get_session(session_id) do
           {:ok, execution_agent} ->
             case Sessions.update_session(execution_agent, %{uuid: claude_session_uuid}) do
@@ -731,7 +720,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   defp broadcast_stream_event(%Message{type: :text, content: text, delta: true}, state)
        when is_binary(text) do
     Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
+      @pubsub,
       "dm:#{state.session_id}:stream",
       {:stream_delta, :text, text}
     )
@@ -741,7 +730,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   defp broadcast_stream_event(%Message{type: :text, content: text, delta: false}, state)
        when is_binary(text) and text != "" do
     Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
+      @pubsub,
       "dm:#{state.session_id}:stream",
       {:stream_replace, :text, text}
     )
@@ -751,7 +740,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   defp broadcast_stream_event(%Message{type: :tool_use, content: %{name: name}}, state)
        when is_binary(name) do
     Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
+      @pubsub,
       "dm:#{state.session_id}:stream",
       {:stream_delta, :tool_use, name}
     )
@@ -761,7 +750,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   defp broadcast_stream_event(%Message{type: :tool_use, content: name}, state)
        when is_binary(name) do
     Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
+      @pubsub,
       "dm:#{state.session_id}:stream",
       {:stream_delta, :tool_use, name}
     )
@@ -769,7 +758,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   defp broadcast_stream_event(%Message{type: :thinking, delta: true}, state) do
     Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
+      @pubsub,
       "dm:#{state.session_id}:stream",
       {:stream_delta, :thinking, nil}
     )
@@ -779,7 +768,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   defp broadcast_stream_event(%Message{type: :thinking, content: text, delta: false}, state)
        when is_binary(text) and text != "" do
     Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
+      @pubsub,
       "dm:#{state.session_id}:stream",
       {:stream_replace, :thinking, text}
     )
@@ -789,7 +778,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   defp broadcast_stream_clear(state) do
     Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
+      @pubsub,
       "dm:#{state.session_id}:stream",
       :stream_clear
     )
@@ -825,10 +814,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       reason: reason
     })
 
-    Logger.error(
-      "[telemetry] agent.sdk.error session_id=#{state.session_id} reason=#{inspect(reason)}"
-    )
-
     update_agent_status(state.session_id, "idle")
     broadcast_agent_stopped(state)
 
@@ -851,21 +836,23 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   defp drain_queue_with_error(state, reason) do
     reason_str = inspect(reason)
 
-    Enum.each(state.queue, fn _job ->
+    state.queue
+    |> :queue.to_list()
+    |> Enum.each(fn _job ->
       Phoenix.PubSub.broadcast(
-        EyeInTheSkyWeb.PubSub,
+        @pubsub,
         "dm:#{state.session_id}:stream",
         {:agent_error, state.session_uuid, state.session_id,
          "Queued job dropped due to systemic error: #{reason_str}"}
       )
     end)
 
-    {:noreply, %{state | sdk_ref: nil, current_job: nil, queue: []}}
+    {:noreply, %{state | sdk_ref: nil, current_job: nil, queue: :queue.new()}}
   end
 
   defp broadcast_agent_working(state) do
     Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
+      @pubsub,
       "agent:working",
       {:agent_working, state.session_uuid, state.session_id}
     )
@@ -873,7 +860,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   defp broadcast_agent_stopped(state) do
     Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
+      @pubsub,
       "agent:working",
       {:agent_stopped, state.session_uuid, state.session_id}
     )
@@ -881,14 +868,14 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   defp broadcast_queue_update(state) do
     Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
+      @pubsub,
       "dm:#{state.session_id}:queue",
-      {:queue_updated, state.queue}
+      {:queue_updated, :queue.to_list(state.queue)}
     )
   end
 
   defp update_agent_status(session_id, status) do
-    Task.start(fn ->
+    Task.Supervisor.start_child(EyeInTheSkyWeb.TaskSupervisor, fn ->
       case Sessions.get_session(session_id) do
         {:ok, agent} ->
           attrs = %{status: status}
@@ -921,7 +908,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     session_id = state.session_id
     session_uuid = state.session_uuid
 
-    Task.start(fn ->
+    Task.Supervisor.start_child(EyeInTheSkyWeb.TaskSupervisor, fn ->
       title =
         case Sessions.get_session(session_id) do
           {:ok, session} when is_binary(session.name) and session.name != "" ->

@@ -88,6 +88,31 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
           id
       end
 
+    # When a worktree name is given, create the git worktree so the directory
+    # exists before we validate it or spawn Claude. Claude JSONL is written
+    # under the worktree path, so we store the full path in git_worktree_path.
+    session_worktree_path =
+      case opts[:worktree] do
+        nil ->
+          opts[:project_path]
+
+        wt ->
+          wt_path = Path.join([opts[:project_path], ".claude", "worktrees", wt])
+          branch = "worktree-#{wt}"
+
+          case ensure_git_worktree(opts[:project_path], wt_path, branch) do
+            :ok ->
+              wt_path
+
+            {:error, reason} ->
+              Logger.warning(
+                "create_agent: git worktree creation failed for #{wt_path}: #{inspect(reason)}; continuing anyway"
+              )
+
+              wt_path
+          end
+      end
+
     Logger.info(
       "📝 create_agent: agent_uuid=#{agent_uuid}, session_uuid=#{inspect(session_uuid)}, model=#{opts[:model]}, project_id=#{project_id}"
     )
@@ -99,6 +124,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              project_id: project_id,
              status: "working",
              description: description,
+             git_worktree_path: session_worktree_path,
              parent_agent_id: opts[:parent_agent_id],
              parent_session_id: opts[:parent_session_id]
            }),
@@ -111,11 +137,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              model: opts[:model],
              provider: provider,
              project_id: project_id,
-             git_worktree_path: opts[:project_path],
+             git_worktree_path: session_worktree_path,
              started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
              parent_agent_id: opts[:parent_agent_id],
              parent_session_id: opts[:parent_session_id]
-           }) do
+           }),
+         # Link session back to agent so agent.session_id is not NULL
+         {:ok, agent} <- Agents.update_agent(agent, %{session_id: session.id}) do
       Logger.info(
         "✅ create_agent: DB records created - agent.id=#{agent.id}, session.id=#{session.id}, session_uuid=#{session.uuid}"
       )
@@ -216,20 +244,16 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   defp lookup_or_start(session_id, extra_opts) do
     case Registry.lookup(@registry, {:agent, session_id}) do
       [{pid, _}] ->
-        if Process.alive?(pid) do
-          Logger.debug(
-            "lookup_or_start: found existing worker for session_id=#{session_id}, pid=#{inspect(pid)}"
-          )
+        Logger.debug(
+          "lookup_or_start: found existing worker for session_id=#{session_id}, pid=#{inspect(pid)}"
+        )
 
-          provider = normalize_provider(extra_opts[:provider]) || @default_provider
-          {:ok, pid, provider}
-        else
-          start_agent_worker(session_id, extra_opts)
-        end
+        provider = normalize_provider(extra_opts[:provider]) || @default_provider
+        {:ok, pid, provider}
 
       [] ->
         Logger.info(
-          "🔍 lookup_or_start: no worker found for session_id=#{session_id}, starting new worker"
+          "lookup_or_start: no worker found for session_id=#{session_id}, starting new worker"
         )
 
         start_agent_worker(session_id, extra_opts)
@@ -316,4 +340,34 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
 
   defp normalize_provider(provider) when provider in @supported_providers, do: provider
   defp normalize_provider(_provider), do: nil
+
+  # Creates a git worktree at wt_path on branch. If the branch already exists,
+  # retries without -b (attaches to existing branch).
+  defp ensure_git_worktree(repo_path, wt_path, branch) do
+    case System.cmd("git", ["-C", repo_path, "worktree", "add", wt_path, "-b", branch],
+           stderr_to_stdout: true
+         ) do
+      {_, 0} ->
+        Logger.info("git worktree created: #{wt_path} (branch: #{branch})")
+        :ok
+
+      {output, _} ->
+        if String.contains?(output, "already exists") or
+             String.contains?(output, "already checked out") do
+          # Branch exists; attach worktree to it without creating a new branch
+          case System.cmd("git", ["-C", repo_path, "worktree", "add", wt_path, branch],
+                 stderr_to_stdout: true
+               ) do
+            {_, 0} ->
+              Logger.info("git worktree attached to existing branch: #{wt_path} (#{branch})")
+              :ok
+
+            {err, code} ->
+              {:error, {code, err}}
+          end
+        else
+          {:error, output}
+        end
+    end
+  end
 end

@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   When Claude completes, processes the next queued message automatically.
   """
 
-  use GenServer
+  use GenServer, restart: :transient
   require Logger
 
   alias EyeInTheSkyWeb.Claude.{Job, Message, SDK}

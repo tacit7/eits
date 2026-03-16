@@ -29,6 +29,37 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   Returns `{:ok, %{agent: agent, session: session}}` or `{:error, reason}`.
   """
   def create_agent(opts) do
+    with {:ok, %{agent: agent, session: session}} <- create_records(opts) do
+      instructions = build_instructions(opts, session)
+
+      Logger.info("📤 create_agent: sending initial message to session.id=#{session.id}")
+
+      case send_message(session.id, instructions,
+             model: opts[:model],
+             effort_level: opts[:effort_level],
+             max_budget_usd: opts[:max_budget_usd],
+             worktree: opts[:worktree],
+             agent: opts[:agent],
+             eits_workflow: opts[:eits_workflow]
+           ) do
+        :ok ->
+          Logger.info(
+            "✅ create_agent: initial message sent successfully to session.id=#{session.id}"
+          )
+
+          {:ok, %{agent: agent, session: session}}
+
+        {:error, reason} ->
+          Logger.error(
+            "❌ create_agent: initial message failed for session.id=#{session.id} - #{inspect(reason)}"
+          )
+
+          {:error, {:send_failed, reason}}
+      end
+    end
+  end
+
+  defp create_records(opts) do
     agent_uuid = Ecto.UUID.generate()
     provider = if opts[:agent_type] == "codex", do: "codex", else: "claude"
 
@@ -89,56 +120,36 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
         "✅ create_agent: DB records created - agent.id=#{agent.id}, session.id=#{session.id}, session_uuid=#{session.uuid}"
       )
 
-      instructions =
-        case opts[:worktree] do
-          nil ->
-            opts[:instructions] || description
-
-          worktree ->
-            base = opts[:instructions] || description
-            branch = "worktree-#{worktree}"
-
-            base <>
-              """
-
-
-              ---
-              When your work is complete:
-              1. Commit all changes with a clear message describing what was done.
-              2. Push your branch: git push gitea #{branch}
-              3. Create a pull request: tea pr create --login claude --repo eits-web --base main --head #{branch} --title "<your task summary>" --description "<what you did and why>"
-              4. Call i-end-session to mark your session complete.
-              """
-        end
-
-      Logger.info("📤 create_agent: sending initial message to session.id=#{session.id}")
-
-      case send_message(session.id, instructions,
-             model: opts[:model],
-             effort_level: opts[:effort_level],
-             max_budget_usd: opts[:max_budget_usd],
-             worktree: opts[:worktree],
-             agent: opts[:agent],
-             eits_workflow: opts[:eits_workflow]
-           ) do
-        :ok ->
-          Logger.info(
-            "✅ create_agent: initial message sent successfully to session.id=#{session.id}"
-          )
-
-          {:ok, %{agent: agent, session: session}}
-
-        {:error, reason} ->
-          Logger.error(
-            "❌ create_agent: initial message failed for session.id=#{session.id} - #{inspect(reason)}"
-          )
-
-          {:error, {:send_failed, reason}}
-      end
+      {:ok, %{agent: agent, session: session}}
     else
       {:error, reason} ->
         Logger.error("❌ create_agent: DB record creation failed - #{inspect(reason)}")
         {:error, reason}
+    end
+  end
+
+  defp build_instructions(opts, _session) do
+    description = opts[:description] || "Agent session"
+
+    case opts[:worktree] do
+      nil ->
+        opts[:instructions] || description
+
+      worktree ->
+        base = opts[:instructions] || description
+        branch = "worktree-#{worktree}"
+
+        base <>
+          """
+
+
+          ---
+          When your work is complete:
+          1. Commit all changes with a clear message describing what was done.
+          2. Push your branch: git push gitea #{branch}
+          3. Create a pull request: tea pr create --login claude --repo eits-web --base main --head #{branch} --title "<your task summary>" --description "<what you did and why>"
+          4. Call i-end-session to mark your session complete.
+          """
     end
   end
 

@@ -10,10 +10,10 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
 
   require Logger
 
-  # Fix 4: valid provider/model combos
+  # Fix 4: valid provider/model combos — keep in sync with ViewHelpers.claude_models/codex_models
   @valid_combos %{
-    "claude" => ~w(haiku sonnet opus),
-    "codex"  => ~w(gpt-4o gpt-4-turbo)
+    "claude" => ~w(haiku sonnet opus sonnet[1m]),
+    "codex"  => ~w(gpt-5.4 gpt-5.3-codex gpt-5.2-codex gpt-5.2 gpt-5.1 gpt-5.1-codex-max gpt-5.1-codex-mini gpt-5-codex-mini o3)
   }
 
   @doc """

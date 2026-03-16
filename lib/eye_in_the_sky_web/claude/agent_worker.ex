@@ -616,6 +616,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     Logger.error("[#{state.session_id}] Max retries (#{@max_retries}) exceeded, giving up")
 
     WorkerEvents.on_max_retries_exceeded(state.session_id, state.provider_conversation_id)
+    WorkerEvents.broadcast_queue_update(state.session_id, [])
 
     %{state | status: :failed, queue: [], retry_attempt: 0}
   end
@@ -720,6 +721,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         reason
       )
 
+      WorkerEvents.broadcast_queue_update(state.session_id, [])
       {:noreply, %{state | status: :failed, sdk_ref: nil, handler_monitor: nil, current_job: nil, queue: []}}
     else
       process_next_job(%{state | status: :idle, sdk_ref: nil, handler_monitor: nil, current_job: nil})

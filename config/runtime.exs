@@ -34,6 +34,11 @@ if config_env() != :test do
   config :eye_in_the_sky_web, :api_key, System.get_env("EITS_API_KEY")
 end
 
+# Disable passkey auth — set DISABLE_AUTH=true to skip LiveView session auth (dev only)
+if config_env() != :prod do
+  config :eye_in_the_sky_web, :disable_auth, System.get_env("DISABLE_AUTH") in ~w(true 1)
+end
+
 # WebAuthn — override origin/rp_id via env vars (useful for ngrok tunnels)
 if webauthn_origin = System.get_env("WEBAUTHN_ORIGIN") do
   rp_id = System.get_env("WEBAUTHN_RP_ID", URI.parse(webauthn_origin).host)

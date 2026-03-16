@@ -501,7 +501,7 @@ cmd_dm() {
   # Resolve integer session ID to UUID — /dm requires UUIDs
   if [[ "$target" =~ ^[0-9]+$ ]]; then
     local resolved
-    resolved=$(psql -d "${EITS_PG_DB:-eits_dev}" -tAq -c "SELECT uuid FROM sessions WHERE id = $target LIMIT 1" 2>/dev/null || true)
+    resolved=$(_curl "$BASE_URL/sessions/$target" | jq -r '.uuid // empty' 2>/dev/null || true)
     [[ -n "$resolved" ]] || die "could not resolve session integer ID $target to UUID"
     target="$resolved"
   fi

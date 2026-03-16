@@ -51,111 +51,65 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
   end
 
   @valid_models ~w(haiku sonnet opus)
-  @max_instructions_length 32_000
 
   @doc """
   POST /api/v1/agents - Spawn a new Claude Code agent.
   Body: instructions, model, project_path, parent_agent_id, parent_session_id
   """
   def create(conn, params) do
-    instructions = params["instructions"]
-    model = params["model"] || "haiku"
+    with {:ok, params} <- validate_params(params),
+         {:ok, team}   <- resolve_team(params) do
+      instructions = apply_team_context(params["instructions"], team, params["member_name"])
+      opts = build_spawn_opts(%{params | "instructions" => instructions}, team)
 
-    cond do
-      is_nil(instructions) or instructions == "" ->
-        conn |> put_status(:bad_request) |> json(%{error: "instructions is required"})
+      case AgentManager.create_agent(opts) do
+        {:ok, %{agent: agent, session: session}} ->
+          maybe_join_team(team, agent, session, params["member_name"])
+          conn |> put_status(:created) |> json(build_response(agent, session, team, params["member_name"]))
 
-      String.length(instructions) > @max_instructions_length ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "instructions exceeds #{@max_instructions_length} character limit"})
+        {:error, reason} ->
+          require Logger
+          Logger.error("Agent spawn failed: #{inspect(reason)}")
 
-      model not in @valid_models ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "invalid model; must be one of: #{Enum.join(@valid_models, ", ")}"})
-
-      true ->
-        # Resolve team before spawning so we can inject team context into instructions
-        team =
-          case params["team_name"] do
-            nil -> nil
-            name -> Teams.get_team_by_name(name)
-          end
-
-        if params["team_name"] && is_nil(team) do
           conn
-          |> put_status(:bad_request)
-          |> json(%{error: "team not found: #{params["team_name"]}"})
-        else
-          instructions =
-            case team do
-              nil -> instructions
-              t -> instructions <> "\n\n" <> build_team_context(t, params["member_name"])
-            end
-
-          opts = [
-            instructions: instructions,
-            model: model,
-            agent_type: params["provider"] || "claude",
-            project_id: parse_int(params["project_id"], nil),
-            project_path: params["project_path"],
-            description: String.slice(params["instructions"] || "Agent session", 0, 250),
-            worktree: params["worktree"],
-            effort_level: params["effort_level"],
-            parent_agent_id: parse_int(params["parent_agent_id"], nil),
-            parent_session_id: parse_int(params["parent_session_id"], nil),
-            agent: params["agent"]
-          ]
-
-          case AgentManager.create_agent(opts) do
-            {:ok, %{agent: agent, session: session}} ->
-              maybe_join_team(team, agent, session, params["member_name"])
-
-              base = %{
-                success: true,
-                message: "Agent spawned",
-                agent_id: agent.uuid,
-                session_id: session.id,
-                session_uuid: session.uuid
-              }
-
-              result =
-                if team do
-                  Map.merge(base, %{
-                    team_id: team.id,
-                    team_name: team.name,
-                    member_name: params["member_name"]
-                  })
-                else
-                  base
-                end
-
-              conn |> put_status(:created) |> json(result)
-
-            {:error, reason} ->
-              require Logger
-              Logger.error("Agent spawn failed: #{inspect(reason)}")
-
-              conn
-              |> put_status(:unprocessable_entity)
-              |> json(%{error: "Spawn failed"})
-          end
-        end
+          |> put_status(:unprocessable_entity)
+          |> json(%{error_code: "spawn_failed", message: "Agent could not be started"})
+      end
+    else
+      {:error, code, message} ->
+        conn |> put_status(:bad_request) |> json(%{error_code: code, message: message})
     end
   end
 
   defp maybe_join_team(nil, _agent, _session, _name), do: :ok
 
   defp maybe_join_team(team, agent, session, member_name) do
-    Teams.join_team(%{
-      team_id: team.id,
-      agent_id: agent.id,
-      session_id: session.id,
-      name: member_name || agent.uuid,
-      role: member_name || "agent",
-      status: "active"
-    })
+    result =
+      Teams.join_team(%{
+        team_id: team.id,
+        agent_id: agent.id,
+        session_id: session.id,
+        name: member_name || agent.uuid,
+        role: member_name || "agent",
+        status: "active"
+      })
+
+    case result do
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        require Logger
+
+        Logger.warning(
+          "Team join failed: agent_id=#{agent.id} team_id=#{team.id} reason=#{inspect(reason)}"
+        )
+
+        :ok
+
+      _ ->
+        :ok
+    end
   end
 
   defp build_team_context(team, member_name) do

@@ -541,7 +541,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     assert worker_state.session_id == session.id
     assert is_binary(worker_state.provider_conversation_id)
     assert worker_state.provider == "claude"
-    assert worker_state.stream_buffer == ""
+    assert worker_state.stream.buffer == ""
     assert worker_state.retry_attempt == 0
   end
 

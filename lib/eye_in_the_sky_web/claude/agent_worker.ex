@@ -10,7 +10,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   use GenServer, restart: :transient
   require Logger
 
-  alias EyeInTheSkyWeb.Claude.{Job, Message, SDK}
+  alias EyeInTheSkyWeb.Claude.{Job, Message, SDK, StreamAssembler}
   alias EyeInTheSkyWeb.Codex
   alias EyeInTheSkyWeb.{Messages, Sessions}
 
@@ -34,10 +34,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     :retry_timer_ref,
     status: :idle,
     queue: [],
-    stream_buffer: "",
-    current_tool_id: nil,
-    current_tool_name: nil,
-    current_tool_input: "",
+    stream: %StreamAssembler{},
     retry_attempt: 0
   ]
 
@@ -141,7 +138,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   @impl true
   def handle_call(:get_stream_state, _from, state) do
-    {:reply, state.stream_buffer, state}
+    {:reply, StreamAssembler.buffer(state.stream), state}
   end
 
   @impl true
@@ -280,42 +277,24 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         %__MODULE__{sdk_ref: ref} = state
       )
       when is_binary(json) do
-    state = %{state | current_tool_input: state.current_tool_input <> json}
-    {:noreply, state}
+    {stream, _events} = StreamAssembler.handle_tool_delta(state.stream, json)
+    {:noreply, %{state | stream: stream}}
   end
 
   # Other SDK messages (text deltas, tool use, thinking, etc.) - broadcast for live streaming
   @impl true
   def handle_info({:claude_message, ref, %Message{} = msg}, %__MODULE__{sdk_ref: ref} = state) do
-    state = update_tool_start(msg, state)
-    broadcast_stream_event(msg, state)
-    state = update_stream_buffer(msg, state)
-    {:noreply, state}
+    {stream, events} = StreamAssembler.handle_message(state.stream, msg)
+    broadcast_events(events, state)
+    {:noreply, %{state | stream: stream}}
   end
 
   # Tool block complete - decode accumulated input and broadcast
   @impl true
   def handle_info({:tool_block_stop, ref}, %__MODULE__{sdk_ref: ref} = state) do
-    state =
-      if state.current_tool_id do
-        input =
-          case Jason.decode(state.current_tool_input) do
-            {:ok, decoded} -> decoded
-            {:error, _} -> %{raw: state.current_tool_input}
-          end
-
-        Phoenix.PubSub.broadcast(
-          EyeInTheSkyWeb.PubSub,
-          "dm:#{state.session_id}:stream",
-          {:stream_tool_input, state.current_tool_name, input}
-        )
-
-        %{state | current_tool_id: nil, current_tool_name: nil, current_tool_input: ""}
-      else
-        state
-      end
-
-    {:noreply, state}
+    {stream, events} = StreamAssembler.handle_tool_block_stop(state.stream)
+    broadcast_events(events, state)
+    {:noreply, %{state | stream: stream}}
   end
 
   # Stale tool_block_stop from old sdk ref - ignore
@@ -327,7 +306,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   def handle_info({:claude_complete, ref, session_id}, %__MODULE__{sdk_ref: ref} = state) do
     state = maybe_sync_provider_conversation_id(state, session_id)
     broadcast_stream_clear(state)
-    state = reset_stream_state(state)
+    state = %{state | stream: StreamAssembler.reset(state.stream)}
 
     Logger.info("[#{state.session_id}] SDK complete")
 
@@ -353,7 +332,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       )
       when is_list(errors) do
     broadcast_stream_clear(state)
-    state = reset_stream_state(state)
+    state = %{state | stream: StreamAssembler.reset(state.stream)}
 
     if Enum.any?(errors, &String.contains?(&1, "No conversation found")) && not is_nil(job) do
       Logger.warning(
@@ -385,7 +364,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   @impl true
   def handle_info({:claude_error, ref, reason}, %__MODULE__{sdk_ref: ref} = state) do
     broadcast_stream_clear(state)
-    do_handle_sdk_error(reason, reset_stream_state(state))
+    do_handle_sdk_error(reason, %{state | stream: StreamAssembler.reset(state.stream)})
   end
 
   # Stale messages from previous SDK refs - ignore
@@ -427,8 +406,12 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   # --- Private ---
 
-  defp reset_stream_state(state) do
-    %{state | stream_buffer: "", current_tool_id: nil, current_tool_name: nil, current_tool_input: ""}
+  defp broadcast_events(events, state) do
+    topic = "dm:#{state.session_id}:stream"
+
+    Enum.each(events, fn event ->
+      Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, topic, event)
+    end)
   end
 
   defp save_result(text, metadata, state) when is_binary(text) do
@@ -727,65 +710,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   defp maybe_sync_provider_conversation_id(state, _), do: state
 
-  # Text delta (from stream_event with --include-partial-messages)
-  defp broadcast_stream_event(%Message{type: :text, content: text, delta: true}, state)
-       when is_binary(text) do
-    Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
-      "dm:#{state.session_id}:stream",
-      {:stream_delta, :text, text}
-    )
-  end
-
-  # Cumulative assistant text (full replacement, not delta)
-  defp broadcast_stream_event(%Message{type: :text, content: text, delta: false}, state)
-       when is_binary(text) and text != "" do
-    Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
-      "dm:#{state.session_id}:stream",
-      {:stream_replace, :text, text}
-    )
-  end
-
-  # Tool use with name in content map
-  defp broadcast_stream_event(%Message{type: :tool_use, content: %{name: name}}, state)
-       when is_binary(name) do
-    Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
-      "dm:#{state.session_id}:stream",
-      {:stream_delta, :tool_use, name}
-    )
-  end
-
-  # Tool use with name as string content (from content_block_start)
-  defp broadcast_stream_event(%Message{type: :tool_use, content: name}, state)
-       when is_binary(name) do
-    Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
-      "dm:#{state.session_id}:stream",
-      {:stream_delta, :tool_use, name}
-    )
-  end
-
-  defp broadcast_stream_event(%Message{type: :thinking, delta: true}, state) do
-    Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
-      "dm:#{state.session_id}:stream",
-      {:stream_delta, :thinking, nil}
-    )
-  end
-
-  # Thinking block (complete, not delta) - from Codex reasoning items
-  defp broadcast_stream_event(%Message{type: :thinking, content: text, delta: false}, state)
-       when is_binary(text) and text != "" do
-    Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
-      "dm:#{state.session_id}:stream",
-      {:stream_replace, :thinking, text}
-    )
-  end
-
-  defp broadcast_stream_event(_msg, _state), do: :ok
 
   defp broadcast_stream_clear(state) do
     Phoenix.PubSub.broadcast(
@@ -795,27 +719,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     )
   end
 
-  defp update_stream_buffer(%Message{type: :text, content: text, delta: true}, state)
-       when is_binary(text) do
-    %{state | stream_buffer: state.stream_buffer <> text}
-  end
-
-  defp update_stream_buffer(%Message{type: :text, content: text, delta: false}, state)
-       when is_binary(text) do
-    %{state | stream_buffer: text}
-  end
-
-  defp update_stream_buffer(_msg, state), do: state
-
-  # Track the start of a tool block so we can accumulate its input
-  defp update_tool_start(
-         %Message{type: :tool_use, delta: false, content: %{name: name}, metadata: %{id: id}},
-         state
-       ) do
-    %{state | current_tool_id: id, current_tool_name: name, current_tool_input: ""}
-  end
-
-  defp update_tool_start(_msg, state), do: state
 
   defp do_handle_sdk_error(reason, state) do
     Logger.error("[#{state.session_id}] SDK error: #{inspect(reason)}")

@@ -123,13 +123,20 @@ defmodule EyeInTheSkyWeb.Scheduler.AgentStatus do
       cutoff = DateTime.add(now, -@thirty_minutes, :second) |> DateTime.to_iso8601()
       now_iso = DateTime.to_iso8601(now)
 
-      # Sessions that are idle, not archived, and started more than 30 min ago
+      # Sessions that are idle, not archived, and inactive for >30 min.
+      # Use last_activity_at when available, fall back to started_at.
       idle_sessions =
         from(s in Session,
           where: s.status == "idle",
           where: is_nil(s.archived_at),
           where: not is_nil(s.started_at),
-          where: s.started_at < ^cutoff
+          where:
+            fragment(
+              "coalesce(?, ?) < ?",
+              s.last_activity_at,
+              s.started_at,
+              ^cutoff
+            )
         )
         |> Repo.all()
 

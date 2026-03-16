@@ -11,7 +11,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   alias EyeInTheSkyWeb.{Agents, Messages, Sessions}
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
-  @default_provider "claude"
   @supported_providers ["claude", "codex"]
 
   @doc """
@@ -227,13 +226,12 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
 
   defp lookup_or_start(session_id, extra_opts) do
     case Registry.lookup(@registry, {:agent, session_id}) do
-      [{pid, _}] ->
+      [{pid, provider}] ->
         if Process.alive?(pid) do
           Logger.debug(
-            "lookup_or_start: found existing worker for session_id=#{session_id}, pid=#{inspect(pid)}"
+            "lookup_or_start: found existing worker for session_id=#{session_id}, pid=#{inspect(pid)}, provider=#{provider}"
           )
 
-          provider = normalize_provider(extra_opts[:provider]) || @default_provider
           {:ok, pid, provider}
         else
           start_agent_worker(session_id, extra_opts)

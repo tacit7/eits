@@ -42,7 +42,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   def start_link(opts) do
     session_id = Keyword.fetch!(opts, :session_id)
-    name = {:via, Registry, {@registry, {:agent, session_id}}}
+    provider = Keyword.get(opts, :provider, "claude")
+    name = {:via, Registry, {@registry, {:agent, session_id}, provider}}
     GenServer.start_link(__MODULE__, opts, name: name)
   end
 
@@ -231,6 +232,14 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     Logger.info("[#{state.session_id}] Cancelling SDK process (provider=#{state.provider})")
     cancel_sdk(state.provider, ref)
     {:noreply, state}
+  end
+
+  # Cancel when in retry_wait or failed with no active SDK process — reset to idle
+  def handle_cast(:cancel, %__MODULE__{status: status} = state)
+      when status in [:retry_wait, :failed] do
+    Logger.info("[#{state.session_id}] Cancelling worker in #{status} state (no active SDK)")
+    state = clear_retry_timer(state)
+    {:noreply, %{state | status: :idle}}
   end
 
   def handle_cast({:remove_queued_prompt, prompt_id}, state) do

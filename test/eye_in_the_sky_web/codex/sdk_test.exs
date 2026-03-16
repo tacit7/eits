@@ -296,6 +296,33 @@ defmodule EyeInTheSkyWeb.Codex.SDKTest do
   end
 
   # ---------------------------------------------------------------------------
+  # Orphan handler cleanup
+  # ---------------------------------------------------------------------------
+
+  describe "orphan handler cleanup" do
+    test "handler cleans up registry when caller dies while in handle_messages" do
+      caller_pid = spawn(fn -> Process.sleep(:infinity) end)
+
+      {:ok, ref, _handler} = SDK.start("hello", to: caller_pid, project_path: "/tmp")
+
+      mock_port = Registry.lookup(ref)
+      assert is_pid(mock_port)
+
+      # Make mock port hang so handler stays in handle_messages waiting
+      send(mock_port, :hang)
+
+      Process.sleep(50)
+
+      # Kill the caller - without the fix, handler stays alive with orphan port
+      Process.exit(caller_pid, :kill)
+
+      # After fix: handler sees {:DOWN, ...} and calls stop_and_unregister
+      Process.sleep(100)
+      assert Registry.lookup(ref) == nil
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Skip/noise handling
   # ---------------------------------------------------------------------------
 

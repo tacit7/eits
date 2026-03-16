@@ -99,6 +99,33 @@ defmodule EyeInTheSkyWeb.Claude.SDKTest do
     end
   end
 
+  describe "orphan handler cleanup" do
+    test "handler cleans up registry when caller dies while in handle_messages" do
+      # Spawn a separate caller process so we can kill it independently
+      caller_pid = spawn(fn -> Process.sleep(:infinity) end)
+
+      {:ok, ref, _handler} =
+        SDK.start("hello", to: caller_pid, cli_module: EyeInTheSkyWeb.Claude.MockCLI, model: "haiku")
+
+      mock_port = SDK.Registry.lookup(ref)
+      assert is_pid(mock_port)
+
+      # Make mock port hang so handler stays in handle_messages waiting
+      send(mock_port, :hang)
+
+      # Give handler time to enter handle_messages
+      Process.sleep(50)
+
+      # Kill the caller - without the fix, the handler stays alive and the registry
+      # entry is never cleaned up (orphan port)
+      Process.exit(caller_pid, :kill)
+
+      # After fix: handler sees {:DOWN, ...} and calls stop_and_unregister
+      Process.sleep(100)
+      assert SDK.Registry.lookup(ref) == nil
+    end
+  end
+
   # Helper to collect messages until completion or timeout
   defp collect_messages(ref, acc) do
     receive do

@@ -311,6 +311,10 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
         send(caller_pid, {:claude_error, sdk_ref, reason})
         stop_and_unregister(sdk_ref)
         :ok
+
+      {:DOWN, _ref, :process, ^caller_pid, _reason} ->
+        stop_and_unregister(sdk_ref)
+        :ok
     end
   end
 

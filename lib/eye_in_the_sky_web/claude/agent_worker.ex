@@ -20,6 +20,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   @max_queue_depth 5
   @max_retries 5
 
+  @type status :: :idle | :running | :retry_wait | :failed
+
   defstruct [
     :session_id,
     :session_uuid,
@@ -30,6 +32,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     :current_job,
     :worktree,
     :retry_timer_ref,
+    status: :idle,
     queue: [],
     stream_buffer: "",
     current_tool_id: nil,
@@ -128,7 +131,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   @impl true
   def handle_call(:is_processing?, _from, state) do
-    {:reply, not is_nil(state.current_job), state}
+    {:reply, state.status == :running, state}
   end
 
   @impl true
@@ -161,7 +164,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
     job = Job.new(message, context)
 
-    if state.sdk_ref == nil do
+    if state.status == :idle do
       Logger.info("AgentWorker: starting SDK for session_id=#{state.session_id}")
 
       case start_sdk(state, job) do
@@ -178,7 +181,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
           broadcast_agent_working(state)
 
           {:reply, {:ok, :started},
-           clear_retry_timer(%{state | sdk_ref: sdk_ref, current_job: job})}
+           clear_retry_timer(%{state | status: :running, sdk_ref: sdk_ref, current_job: job})}
 
         {:error, reason} ->
           reason_str = inspect(reason)
@@ -228,11 +231,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   end
 
   @impl true
-  def handle_cast(:cancel, %__MODULE__{sdk_ref: nil} = state) do
+  def handle_cast(:cancel, %__MODULE__{status: :idle} = state) do
     {:noreply, state}
   end
 
-  def handle_cast(:cancel, %__MODULE__{sdk_ref: ref} = state) do
+  def handle_cast(:cancel, %__MODULE__{sdk_ref: ref} = state) when not is_nil(ref) do
     Logger.info("[#{state.session_id}] Cancelling SDK process (provider=#{state.provider})")
     cancel_sdk(state.provider, ref)
     {:noreply, state}
@@ -339,7 +342,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
     notify_agent_complete(state)
 
-    process_next_job(%{state | sdk_ref: nil, current_job: nil})
+    process_next_job(%{state | status: :idle, sdk_ref: nil, current_job: nil})
   end
 
   # Stale Claude session — retry current job as a fresh start
@@ -371,7 +374,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
           update_agent_status(state.session_id, "idle")
           broadcast_agent_stopped(state)
 
-          process_next_job(%{state | sdk_ref: nil, current_job: nil})
+          process_next_job(%{state | status: :idle, sdk_ref: nil, current_job: nil})
       end
     else
       do_handle_sdk_error(reason, state)
@@ -396,13 +399,18 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   def handle_info({:claude_error, _ref, _reason}, state), do: {:noreply, state}
 
   @impl true
-  def handle_info(:retry_start, %__MODULE__{sdk_ref: nil, queue: [_ | _]} = state) do
-    process_next_job(%{state | retry_timer_ref: nil})
+  def handle_info(:retry_start, %__MODULE__{status: :retry_wait, queue: [_ | _]} = state) do
+    process_next_job(%{state | status: :idle, retry_timer_ref: nil})
+  end
+
+  @impl true
+  def handle_info(:retry_start, %__MODULE__{status: :retry_wait} = state) do
+    {:noreply, %{state | status: :idle, retry_timer_ref: nil}}
   end
 
   @impl true
   def handle_info(:retry_start, state) do
-    {:noreply, %{state | retry_timer_ref: nil}}
+    {:noreply, state}
   end
 
   @impl true
@@ -471,7 +479,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         broadcast_agent_working(state)
 
         new_state =
-          clear_retry_timer(%{state | sdk_ref: sdk_ref, current_job: next_job, queue: rest})
+          clear_retry_timer(%{state | status: :running, sdk_ref: sdk_ref, current_job: next_job, queue: rest})
 
         broadcast_queue_update(new_state)
         {:noreply, new_state}
@@ -620,7 +628,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     update_agent_status(state.session_id, "error")
     broadcast_agent_stopped(state)
 
-    %{state | queue: [], retry_attempt: 0}
+    %{state | status: :failed, queue: [], retry_attempt: 0}
   end
 
   defp schedule_retry_start(%__MODULE__{retry_timer_ref: nil} = state) do
@@ -631,7 +639,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     )
 
     timer_ref = Process.send_after(self(), :retry_start, delay)
-    %{state | retry_timer_ref: timer_ref, retry_attempt: state.retry_attempt + 1}
+    %{state | status: :retry_wait, retry_timer_ref: timer_ref, retry_attempt: state.retry_attempt + 1}
   end
 
   defp schedule_retry_start(state), do: state
@@ -827,7 +835,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     if systemic_error?(reason) do
       drain_queue_with_error(state, reason)
     else
-      process_next_job(%{state | sdk_ref: nil, current_job: nil})
+      process_next_job(%{state | status: :idle, sdk_ref: nil, current_job: nil})
     end
   end
 
@@ -852,7 +860,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       )
     end)
 
-    {:noreply, %{state | sdk_ref: nil, current_job: nil, queue: []}}
+    {:noreply, %{state | status: :failed, sdk_ref: nil, current_job: nil, queue: []}}
   end
 
   defp broadcast_agent_working(state) do

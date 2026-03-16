@@ -67,7 +67,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
     # For claude sessions, pre-generate so the worker can reference it immediately.
     session_uuid = if provider == "codex", do: nil, else: opts[:session_uuid] || Ecto.UUID.generate()
 
-    description = opts[:description] || "Agent session"
+    description = opts[:name] || opts[:description] || "Agent session"
 
     # Inherit project_id from parent session if not explicitly provided
     project_id =
@@ -88,28 +88,33 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
           id
       end
 
-    # When a worktree name is given, create the git worktree so the directory
-    # exists before we validate it or spawn Claude. Claude JSONL is written
-    # under the worktree path, so we store the full path in git_worktree_path.
-    session_worktree_path =
+    # Fix 3: When a worktree name is given, verify the working tree is clean
+    # before creating the worktree. Return {:error, :dirty_working_tree} if not.
+    worktree_result =
       case opts[:worktree] do
         nil ->
-          opts[:project_path]
+          {:ok, opts[:project_path]}
 
         wt ->
           wt_path = Path.join([opts[:project_path], ".claude", "worktrees", wt])
           branch = "worktree-#{wt}"
 
-          case ensure_git_worktree(opts[:project_path], wt_path, branch) do
+          case check_clean_working_tree(opts[:project_path]) do
             :ok ->
-              wt_path
+              case ensure_git_worktree(opts[:project_path], wt_path, branch) do
+                :ok ->
+                  {:ok, wt_path}
 
-            {:error, reason} ->
-              Logger.warning(
-                "create_agent: git worktree creation failed for #{wt_path}: #{inspect(reason)}; continuing anyway"
-              )
+                {:error, reason} ->
+                  Logger.warning(
+                    "create_agent: git worktree creation failed for #{wt_path}: #{inspect(reason)}; continuing anyway"
+                  )
 
-              wt_path
+                  {:ok, wt_path}
+              end
+
+            {:error, :dirty_working_tree} = err ->
+              err
           end
       end
 
@@ -117,11 +122,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
       "📝 create_agent: agent_uuid=#{agent_uuid}, session_uuid=#{inspect(session_uuid)}, model=#{opts[:model]}, project_id=#{project_id}"
     )
 
-    with {:ok, agent} <-
+    with {:ok, session_worktree_path} <- worktree_result,
+         {:ok, agent} <-
            Agents.create_agent(%{
              uuid: agent_uuid,
              agent_type: opts[:agent_type] || "claude",
              project_id: project_id,
+             project_name: opts[:project_name],
              status: "working",
              description: description,
              git_worktree_path: session_worktree_path,
@@ -150,6 +157,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
 
       {:ok, %{agent: agent, session: session}}
     else
+      {:error, :dirty_working_tree} = err ->
+        err
+
       {:error, reason} ->
         Logger.error("❌ create_agent: DB record creation failed - #{inspect(reason)}")
         {:error, reason}
@@ -340,6 +350,17 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
 
   defp normalize_provider(provider) when provider in @supported_providers, do: provider
   defp normalize_provider(_provider), do: nil
+
+  # Verifies the working tree at repo_path has no uncommitted changes.
+  # Returns :ok if clean, {:error, :dirty_working_tree} otherwise.
+  defp check_clean_working_tree(repo_path) do
+    with {_, 0} <- System.cmd("git", ["-C", repo_path, "diff", "--quiet"], stderr_to_stdout: true),
+         {_, 0} <- System.cmd("git", ["-C", repo_path, "diff", "--cached", "--quiet"], stderr_to_stdout: true) do
+      :ok
+    else
+      _ -> {:error, :dirty_working_tree}
+    end
+  end
 
   # Creates a git worktree at wt_path on branch. If the branch already exists,
   # retries without -b (attaches to existing branch).

@@ -127,12 +127,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentControllerTest do
       assert resp["message"] =~ "parent_session_id"
     end
 
-    test "succeeds when parent_agent_id is absent", %{conn: conn} do
-      conn = post_spawn(conn, @valid_params)
-      assert json_response(conn, 201)["success"] == true
-    end
-
-    test "succeeds when parent_session_id is absent", %{conn: conn} do
+    test "succeeds with baseline params (no parent IDs)", %{conn: conn} do
       conn = post_spawn(conn, @valid_params)
       assert json_response(conn, 201)["success"] == true
     end

@@ -3,9 +3,11 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
 
   action_fallback EyeInTheSkyWebWeb.Api.V1.FallbackController
 
+  require Logger
   import EyeInTheSkyWebWeb.ControllerHelpers
 
   alias EyeInTheSkyWeb.{Agents, Channels, Messages, Sessions}
+  alias EyeInTheSkyWeb.Claude.AgentManager
 
   @doc """
   POST /api/v1/dm - Send a direct message to an agent session.
@@ -56,14 +58,26 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
                 {:new_dm, msg}
               )
 
-              conn
-              |> put_status(:created)
-              |> json(%{
-                success: true,
-                message: "DM delivered to session #{session.id}",
-                message_id: to_string(msg.id),
-                message_uuid: msg.uuid
-              })
+              case agent_manager_mod().send_message(session.id, params["message"]) do
+                :ok ->
+                  conn
+                  |> put_status(:created)
+                  |> json(%{
+                    success: true,
+                    message: "DM delivered to session #{session.id}",
+                    message_id: to_string(msg.id),
+                    message_uuid: msg.uuid
+                  })
+
+                {:error, reason} ->
+                  Logger.error(
+                    "DM routing failed for session #{session.id}: #{inspect(reason)}"
+                  )
+
+                  conn
+                  |> put_status(:internal_server_error)
+                  |> json(%{error: "Failed to route message to agent", reason: inspect(reason)})
+              end
 
             {:error, cs} ->
               conn
@@ -175,4 +189,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
     end
   end
 
+  defp agent_manager_mod do
+    Application.get_env(:eye_in_the_sky_web, :agent_manager_module, AgentManager)
+  end
 end

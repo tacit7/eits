@@ -351,6 +351,53 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
                    5_000
   end
 
+  # --- Regression: double registry lookup bug ---
+
+  test "send_message delivers message to newly started worker (regression: double registry lookup)", %{track: track} do
+    # Previously send_message called lookup_or_start (got pid), then called
+    # AgentWorker.process_message which did a SECOND Registry.lookup.
+    # If that second lookup raced or failed, the message was silently dropped
+    # and the session was never prompted. Now we cast directly to the pid.
+    {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+
+    Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
+    session_id = session.id
+
+    assert :ok == EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, "test prompt")
+
+    # :agent_working is broadcast only when the SDK actually starts, which only
+    # happens if the cast reached the worker. If the old double-lookup dropped
+    # the message this assertion would time out.
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+  end
+
+  test "create_agent delivers initial instructions to the worker", %{track: track} do
+    # Regression: create_agent created DB records successfully but send_message
+    # silently dropped the instructions via the second registry lookup.
+    # The session existed but the agent was never told what to work on.
+    Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
+
+    opts = [
+      model: "haiku",
+      description: "Instruction delivery test",
+      instructions: "You are working on task #999: Do something important"
+    ]
+
+    {:ok, %{session: session}} = EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts)
+    Agent.update(track, fn ids -> [session.id | ids] end)
+
+    session_id = session.id
+
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    [{worker_pid, _}] =
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session_id})
+
+    worker_state = :sys.get_state(worker_pid)
+    assert worker_state.current_job != nil
+    assert String.contains?(worker_state.current_job.message, "task #999")
+  end
+
   defp wait_for_mock_port(session_id, attempts \\ 20)
 
   defp wait_for_mock_port(_session_id, 0), do: nil

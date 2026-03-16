@@ -184,18 +184,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
           agent: opts[:agent]
         }
 
-        case AgentWorker.process_message(session_id, message, context) do
-          :ok ->
-            Logger.debug("send_message: message queued for session_id=#{session_id}")
-            :ok
-
-          {:error, reason} ->
-            Logger.error(
-              "❌ send_message: failed to queue message for session_id=#{session_id} - #{inspect(reason)}"
-            )
-
-            {:error, reason}
-        end
+        GenServer.cast(pid, {:process_message, message, context})
+        Logger.debug("send_message: message queued for session_id=#{session_id}")
+        :ok
 
       {:error, reason} ->
         Logger.error(

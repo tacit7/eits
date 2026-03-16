@@ -1,5 +1,24 @@
 # Documentation Update Suggestions
 
+## 2026-03-16
+**Commits reviewed**: 0fae369..6b55196
+
+- Document MCP server removal: all MCP tools (`spawn_agent`, `send_message`, `todo`, `team_*`, etc.) must now use REST API endpoints (`POST /agents`, `POST /messages`, `/tasks`, `/teams`)
+- Update REST_API.md: add POST `/agents` spawn validation pipeline, structured error response codes, status endpoint `/agents/:id/status`
+- Add AgentWorker queue management docs: max queue depth (5), retry logic (exponential backoff 1s-30s), max retries (5), queue overflow handling
+- Document DM endpoint audit: validation improvements, error handling, status code standardization (201 Created, 400 Bad Request, 404 Not Found, 409 Conflict)
+- Document agent worker refactors: ETS registry (replace Agent-based), `current_job` struct, stream buffer management, queue persistence patterns
+- Add CodeMirror 6 LiveView hook documentation: language detection, Cmd+S save handler, syntax highlighting integration for inline note editor
+- Document inline note editor component: CodeMirror wrapper, save/cancel handlers, parent_type validation, edit mode state management
+- Add settings page redesign docs: tabbed layout (settings, config guide), CodeMirror editor preference, EITS_WORKFLOW toggle for hook disable, preferred_editor persistence
+- Document auth refactoring: browser auth vs API auth separation, new auth tables (User, Passkey, RegistrationToken), DISABLE_AUTH env var for dev
+- Add swipe actions documentation: mobile session list right-swipe for archive/rename, SwipeRow JS hook, editing_session_id state tracking
+- Document teams mobile template: responsive grid layout, progress tracking, task links, archived toggle, mobile_view state tracking
+- Add config guide chat handler docs: FabHook integration, ConfigChatGuide JS hook, chat button behavior, messaging flow to DM page
+- Document spawn endpoint improvements: validation helpers, structured error codes, rollback behavior on failure, name field validation
+- Add session list improvements: session name/description as independent fields, atomic task-session linking, session intent field (text type)
+- Document Codex tool changes: deprecated tools removed (spawn_agent, etc.), REST API migration complete
+
 ## 2026-03-12
 **Commits reviewed**: b02aafb..1b8fce0
 

@@ -5,7 +5,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
 
   import EyeInTheSkyWebWeb.ControllerHelpers
 
-  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Sessions}
+  import Ecto.Query, only: [from: 2]
+
+  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Repo, Sessions, Teams}
 
   @doc """
   POST /api/v1/dm - Send a direct message to an agent session.
@@ -29,14 +31,15 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
         conn |> put_status(:bad_request) |> json(%{error: "message is required"})
 
       true ->
-        with {:sender, {:ok, _agent}} <- {:sender, Agents.get_agent_by_uuid(params["sender_id"])},
+        with {:sender, {:ok, agent}} <- {:sender, Agents.get_agent_by_uuid(params["sender_id"])},
              {:session, {:ok, session}} <- {:session, Sessions.get_session_by_uuid(target_uuid)} do
           response_required = params["response_required"] in [true, "true", "1", 1]
+          sender_name = resolve_sender_name(agent)
 
           attrs = %{
             uuid: Ecto.UUID.generate(),
             session_id: session.id,
-            body: params["message"],
+            body: "DM from:#{sender_name} #{params["message"]}",
             sender_role: "agent",
             recipient_role: "agent",
             direction: "inbound",
@@ -44,6 +47,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
             provider: "claude",
             metadata: %{
               sender_id: params["sender_id"],
+              sender_name: sender_name,
               response_required: response_required
             }
           }
@@ -171,6 +175,29 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
         case Sessions.get_session_by_uuid(raw) do
           {:ok, session} -> {:ok, session.id}
           {:error, :not_found} -> {:error, "Session not found: #{raw}"}
+        end
+    end
+  end
+
+  # Resolve a readable name for the sender agent.
+  # Priority: team member name > session name > agent description > "agent"
+  defp resolve_sender_name(agent) do
+    case Teams.get_member_by_agent_id(agent.id) do
+      %{name: name} when is_binary(name) and name != "" ->
+        name
+
+      _ ->
+        # Fall back to the agent's latest session name or description
+        case Repo.one(
+               from s in EyeInTheSkyWeb.Sessions.Session,
+                 where: s.agent_id == ^agent.id,
+                 where: not is_nil(s.name) and s.name != "",
+                 order_by: [desc: s.id],
+                 limit: 1,
+                 select: s.name
+             ) do
+          name when is_binary(name) -> name
+          _ -> agent.description || agent.project_name || "agent"
         end
     end
   end

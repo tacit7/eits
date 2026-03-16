@@ -66,6 +66,14 @@ defmodule EyeInTheSkyWeb.Teams do
     Repo.get_by(TeamMember, team_id: team_id, name: name)
   end
 
+  def get_member_by_agent_id(agent_id) do
+    TeamMember
+    |> where([m], m.agent_id == ^agent_id)
+    |> order_by([m], desc: m.joined_at)
+    |> limit(1)
+    |> Repo.one()
+  end
+
   def join_team(attrs) do
     attrs = Map.put(attrs, :joined_at, DateTime.utc_now() |> DateTime.truncate(:second))
 

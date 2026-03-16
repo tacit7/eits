@@ -26,11 +26,12 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingControllerTest do
   describe "POST /api/v1/dm" do
     test "sends a DM to a valid session", %{conn: conn} do
       agent = create_agent()
+      sender = create_agent()
       session = create_session(agent)
 
       conn =
         post(conn, ~p"/api/v1/dm", %{
-          "sender_id" => Ecto.UUID.generate(),
+          "sender_id" => sender.uuid,
           "target_session_id" => session.uuid,
           "message" => "Hello agent!"
         })
@@ -72,9 +73,11 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingControllerTest do
     end
 
     test "returns 404 when target session is not found", %{conn: conn} do
+      sender = create_agent()
+
       conn =
         post(conn, ~p"/api/v1/dm", %{
-          "sender_id" => Ecto.UUID.generate(),
+          "sender_id" => sender.uuid,
           "target_session_id" => Ecto.UUID.generate(),
           "message" => "Hello!"
         })

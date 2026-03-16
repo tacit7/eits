@@ -59,7 +59,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
               )
 
               case agent_manager_mod().send_message(session.id, params["message"]) do
-                :ok ->
+                result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
                   conn
                   |> put_status(:created)
                   |> json(%{

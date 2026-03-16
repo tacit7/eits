@@ -29,7 +29,8 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
     {status_label, status_border} =
       case display_status do
         "working" -> {"Working", "border-success"}
-        "compacting" -> {"Compacting", "border-warning"}
+        "waiting" -> {"Waiting", "border-warning"}
+        "compacting" -> {"Compacting", "border-orange-500"}
         "idle" -> {"Idle", "border-transparent"}
         "idle_stale" -> {"Idle", "border-transparent"}
         "idle_dead" -> {"Idle", "border-transparent"}
@@ -148,6 +149,9 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
             <% end %>
           </div>
           <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
+            <%= if @session.entrypoint == "cli" do %>
+              <.icon name="hero-command-line" class="w-3 h-3 text-base-content/40 flex-shrink-0" />
+            <% end %>
             <span class="font-mono">{Sessions.format_model_info(@session)}</span>
             <span class="text-base-content/15">/</span>
             <span class="tabular-nums">{relative_time(@session.started_at)}</span>

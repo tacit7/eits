@@ -76,6 +76,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     if connected?(socket) do
       subscribe_session(session.id)
       subscribe_agent_working()
+      subscribe_agents()
       subscribe_dm_stream(session.id)
       subscribe_dm_queue(session.id)
       subscribe_tasks()
@@ -819,6 +820,16 @@ defmodule EyeInTheSkyWebWeb.DmLive do
        |> stop_sync_timer()
        |> sync_and_reload()
        |> push_event("focus-input", %{})}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  # Session field update (e.g. entrypoint change) — keep @session in sync
+  @impl true
+  def handle_info({:agent_updated, %{id: session_id} = updated_session}, socket) do
+    if session_id == socket.assigns.session_id do
+      {:noreply, assign(socket, :session, updated_session)}
     else
       {:noreply, socket}
     end

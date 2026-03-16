@@ -166,12 +166,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
     )
 
     case lookup_or_start(session_id, opts) do
-      {:ok, pid} ->
+      {:ok, pid, provider} ->
         Logger.debug(
           "send_message: worker found/started for session_id=#{session_id}, pid=#{inspect(pid)}"
         )
 
-        provider = resolve_provider(session_id, opts)
         has_messages = Messages.has_inbound_reply?(session_id, provider)
 
         context = %{
@@ -211,7 +210,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
             "lookup_or_start: found existing worker for session_id=#{session_id}, pid=#{inspect(pid)}"
           )
 
-          {:ok, pid}
+          provider = normalize_provider(extra_opts[:provider]) || @default_provider
+          {:ok, pid, provider}
         else
           start_agent_worker(session_id, extra_opts)
         end
@@ -272,19 +272,19 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              EyeInTheSkyWeb.Claude.AgentSupervisor,
              {AgentWorker, opts}
            ) do
-        {:ok, pid} = result ->
+        {:ok, pid} ->
           Logger.info(
             "✅ start_agent_worker: AgentWorker started for session.id=#{session_id}, pid=#{inspect(pid)}"
           )
 
-          result
+          {:ok, pid, provider}
 
         {:error, {:already_started, pid}} ->
           Logger.info(
             "start_agent_worker: worker already started for session.id=#{session_id}, pid=#{inspect(pid)}"
           )
 
-          {:ok, pid}
+          {:ok, pid, provider}
 
         {:error, reason} = error ->
           Logger.error(
@@ -300,21 +300,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
         )
 
         {:error, reason}
-    end
-  end
-
-  defp resolve_provider(session_id, opts) do
-    opts[:provider]
-    |> normalize_provider()
-    |> case do
-      nil ->
-        case Sessions.get_session(session_id) do
-          {:ok, session} -> normalize_provider(session.provider) || @default_provider
-          _ -> @default_provider
-        end
-
-      provider ->
-        provider
     end
   end
 

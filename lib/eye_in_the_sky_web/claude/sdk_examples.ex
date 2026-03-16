@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.Claude.SDKExamples do
   Starts a Claude session, collects all text output, and returns it as a string.
   """
   def simple_request(prompt, opts \\ []) do
-    {:ok, ref} = SDK.start(prompt, Keyword.put(opts, :to, self()))
+    {:ok, ref, _handler} = SDK.start(prompt, Keyword.put(opts, :to, self()))
 
     collect_text(ref, [])
   end
@@ -40,7 +40,7 @@ defmodule EyeInTheSkyWeb.Claude.SDKExamples do
   """
   def conversation_example do
     # First message
-    {:ok, ref} = SDK.start("What is Elixir?", to: self(), model: "haiku")
+    {:ok, ref, _handler} = SDK.start("What is Elixir?", to: self(), model: "haiku")
 
     session_id =
       receive do
@@ -52,7 +52,7 @@ defmodule EyeInTheSkyWeb.Claude.SDKExamples do
     IO.puts("Session ID: #{session_id}")
 
     # Follow-up message
-    {:ok, ref2} = SDK.resume(session_id, "Give me a code example", to: self())
+    {:ok, ref2, _handler2} = SDK.resume(session_id, "Give me a code example", to: self())
 
     receive do
       {:claude_complete, ^ref2, _sid} -> :ok
@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWeb.Claude.SDKExamples do
   Shows how to handle different message types including tool uses.
   """
   def background_agent(prompt, opts \\ []) do
-    {:ok, ref} = SDK.start(prompt, Keyword.put(opts, :to, self()))
+    {:ok, ref, _handler} = SDK.start(prompt, Keyword.put(opts, :to, self()))
 
     process_messages(ref)
   end
@@ -133,10 +133,10 @@ defmodule EyeInTheSkyWeb.Claude.SDKExamples do
     def handle_call({:send, prompt}, from, state) do
       ref =
         if state.session_id do
-          {:ok, ref} = SDK.resume(state.session_id, prompt, to: self())
+          {:ok, ref, _handler} = SDK.resume(state.session_id, prompt, to: self())
           ref
         else
-          {:ok, ref} = SDK.start(prompt, Keyword.put(state.opts, :to, self()))
+          {:ok, ref, _handler} = SDK.start(prompt, Keyword.put(state.opts, :to, self()))
           ref
         end
 

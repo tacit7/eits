@@ -15,8 +15,8 @@ defmodule EyeInTheSkyWeb.Codex.SDKTest do
       end
     end
 
-    test "returns {:ok, ref} with mock CLI" do
-      {:ok, ref} = SDK.start("say hello", to: self(), project_path: "/tmp")
+    test "returns {:ok, ref, handler_pid} with mock CLI" do
+      {:ok, ref, _handler} = SDK.start("say hello", to: self(), project_path: "/tmp")
       assert is_reference(ref)
 
       # Clean up
@@ -24,7 +24,7 @@ defmodule EyeInTheSkyWeb.Codex.SDKTest do
     end
 
     test "registers ref in SDK.Registry" do
-      {:ok, ref} = SDK.start("test", to: self(), project_path: "/tmp")
+      {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       mock_port = Registry.lookup(ref)
       assert mock_port != nil
 
@@ -43,8 +43,8 @@ defmodule EyeInTheSkyWeb.Codex.SDKTest do
       end
     end
 
-    test "returns {:ok, ref} with mock CLI" do
-      {:ok, ref} = SDK.resume("thread-123", "continue", to: self(), project_path: "/tmp")
+    test "returns {:ok, ref, handler_pid} with mock CLI" do
+      {:ok, ref, _handler} = SDK.resume("thread-123", "continue", to: self(), project_path: "/tmp")
       assert is_reference(ref)
 
       SDK.cancel(ref)
@@ -62,7 +62,7 @@ defmodule EyeInTheSkyWeb.Codex.SDKTest do
     end
 
     test "returns :ok for running session" do
-      {:ok, ref} = SDK.start("test", to: self(), project_path: "/tmp")
+      {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       assert :ok = SDK.cancel(ref)
     end
   end
@@ -73,7 +73,7 @@ defmodule EyeInTheSkyWeb.Codex.SDKTest do
 
   describe "message flow" do
     test "agent_message text is delivered as :text message" do
-      {:ok, ref} = SDK.start("test", to: self(), project_path: "/tmp")
+      {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       mock_port = Registry.lookup(ref)
 
       # Send thread.started
@@ -101,7 +101,7 @@ defmodule EyeInTheSkyWeb.Codex.SDKTest do
     end
 
     test "turn.completed sends result with accumulated text then complete" do
-      {:ok, ref} = SDK.start("test", to: self(), project_path: "/tmp")
+      {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       mock_port = Registry.lookup(ref)
 
       # thread.started
@@ -148,7 +148,7 @@ defmodule EyeInTheSkyWeb.Codex.SDKTest do
     end
 
     test "multiple agent_messages accumulate into result" do
-      {:ok, ref} = SDK.start("test", to: self(), project_path: "/tmp")
+      {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       mock_port = Registry.lookup(ref)
 
       send(
@@ -208,7 +208,7 @@ defmodule EyeInTheSkyWeb.Codex.SDKTest do
 
   describe "thinking messages" do
     test "reasoning items delivered as thinking messages" do
-      {:ok, ref} = SDK.start("test", to: self(), project_path: "/tmp")
+      {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       mock_port = Registry.lookup(ref)
 
       send(
@@ -232,7 +232,7 @@ defmodule EyeInTheSkyWeb.Codex.SDKTest do
 
   describe "tool use messages" do
     test "command_execution item delivered as tool_use" do
-      {:ok, ref} = SDK.start("test", to: self(), project_path: "/tmp")
+      {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       mock_port = Registry.lookup(ref)
 
       send(
@@ -261,7 +261,7 @@ defmodule EyeInTheSkyWeb.Codex.SDKTest do
 
   describe "error handling" do
     test "error event sends claude_error" do
-      {:ok, ref} = SDK.start("test", to: self(), project_path: "/tmp")
+      {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       mock_port = Registry.lookup(ref)
 
       send(
@@ -277,7 +277,7 @@ defmodule EyeInTheSkyWeb.Codex.SDKTest do
     end
 
     test "non-zero exit sends claude_error" do
-      {:ok, ref} = SDK.start("test", to: self(), project_path: "/tmp")
+      {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       mock_port = Registry.lookup(ref)
 
       send(mock_port, {:exit, 1})
@@ -286,7 +286,7 @@ defmodule EyeInTheSkyWeb.Codex.SDKTest do
     end
 
     test "clean exit without turn.completed sends complete" do
-      {:ok, ref} = SDK.start("test", to: self(), project_path: "/tmp")
+      {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       mock_port = Registry.lookup(ref)
 
       send(mock_port, {:exit, 0})
@@ -301,7 +301,7 @@ defmodule EyeInTheSkyWeb.Codex.SDKTest do
 
   describe "noise handling" do
     test "non-JSON lines are silently skipped" do
-      {:ok, ref} = SDK.start("test", to: self(), project_path: "/tmp")
+      {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       mock_port = Registry.lookup(ref)
 
       # Send stderr/tracing noise

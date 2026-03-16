@@ -28,6 +28,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     :project_path,
     :provider,
     :sdk_ref,
+    :handler_monitor,
     :current_job,
     :worktree,
     :retry_timer_ref,
@@ -164,7 +165,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       Logger.info("AgentWorker: starting SDK for session_id=#{state.session_id}")
 
       case start_sdk(state, job) do
-        {:ok, sdk_ref} ->
+        {:ok, sdk_ref, handler_monitor} ->
           Logger.info("AgentWorker: SDK started for session_id=#{state.session_id}")
 
           :telemetry.execute(
@@ -176,7 +177,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
           WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
 
           {:reply, {:ok, :started},
-           clear_retry_timer(%{state | status: :running, sdk_ref: sdk_ref, current_job: job})}
+           clear_retry_timer(%{state | status: :running, sdk_ref: sdk_ref, handler_monitor: handler_monitor, current_job: job})}
 
         {:error, reason} ->
           reason_str = inspect(reason)
@@ -313,7 +314,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
     WorkerEvents.on_sdk_completed(state.session_id, state.provider_conversation_id)
 
-    process_next_job(%{state | status: :idle, sdk_ref: nil, current_job: nil})
+    demonitor_handler(state.handler_monitor)
+    process_next_job(%{state | status: :idle, sdk_ref: nil, handler_monitor: nil, current_job: nil})
   end
 
   # Stale Claude session — retry current job as a fresh start
@@ -334,8 +336,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       fresh_job = Job.as_fresh_session(job)
 
       case start_sdk(state, fresh_job) do
-        {:ok, sdk_ref} ->
-          {:noreply, %{state | sdk_ref: sdk_ref, current_job: fresh_job}}
+        {:ok, sdk_ref, handler_monitor} ->
+          {:noreply, %{state | sdk_ref: sdk_ref, handler_monitor: handler_monitor, current_job: fresh_job}}
 
         {:error, start_reason} ->
           Logger.error(
@@ -343,8 +345,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
           )
 
           WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
+          demonitor_handler(state.handler_monitor)
 
-          process_next_job(%{state | status: :idle, sdk_ref: nil, current_job: nil})
+          process_next_job(%{state | status: :idle, sdk_ref: nil, handler_monitor: nil, current_job: nil})
       end
     else
       do_handle_sdk_error(reason, state)
@@ -383,6 +386,28 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     {:noreply, state}
   end
 
+  # Handler process crashed — treat as SDK error so worker survives
+  @impl true
+  def handle_info(
+        {:DOWN, monitor_ref, :process, _pid, reason},
+        %__MODULE__{handler_monitor: monitor_ref, status: :running} = state
+      ) do
+    Logger.error(
+      "[#{state.session_id}] SDK handler crashed: #{inspect(reason)}"
+    )
+
+    WorkerEvents.broadcast_stream_clear(state.session_id)
+
+    do_handle_sdk_error(
+      {:handler_crash, reason},
+      %{state | stream: StreamAssembler.reset(state.stream), handler_monitor: nil}
+    )
+  end
+
+  # Stale handler DOWN (already cleaned up) — ignore
+  @impl true
+  def handle_info({:DOWN, _ref, :process, _pid, _reason}, state), do: {:noreply, state}
+
   @impl true
   def handle_info(msg, state) do
     Logger.debug("Unhandled message in AgentWorker: #{inspect(msg)}")
@@ -413,11 +438,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   defp process_next_job(%__MODULE__{queue: [next_job | rest]} = state) do
     case start_sdk(state, next_job) do
-      {:ok, sdk_ref} ->
+      {:ok, sdk_ref, handler_monitor} ->
         WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
 
         new_state =
-          clear_retry_timer(%{state | status: :running, sdk_ref: sdk_ref, current_job: next_job, queue: rest})
+          clear_retry_timer(%{state | status: :running, sdk_ref: sdk_ref, handler_monitor: handler_monitor, current_job: next_job, queue: rest})
 
         WorkerEvents.broadcast_queue_update(state.session_id, new_state.queue)
         {:noreply, new_state}
@@ -429,12 +454,20 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   end
 
   defp start_sdk(%__MODULE__{provider: "codex"} = state, job) do
-    start_codex_sdk(state, job)
+    monitor_handler(start_codex_sdk(state, job))
   end
 
   defp start_sdk(state, job) do
-    start_claude_sdk(state, job)
+    monitor_handler(start_claude_sdk(state, job))
   end
+
+  # Convert {:ok, sdk_ref, handler_pid} to {:ok, sdk_ref, monitor_ref}
+  defp monitor_handler({:ok, sdk_ref, handler_pid}) do
+    monitor_ref = Process.monitor(handler_pid)
+    {:ok, sdk_ref, monitor_ref}
+  end
+
+  defp monitor_handler({:error, _} = error), do: error
 
   defp start_claude_sdk(state, job) do
     context = job.context
@@ -546,6 +579,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   defp cancel_sdk("codex", ref), do: Codex.SDK.cancel(ref)
   defp cancel_sdk(_provider, ref), do: SDK.cancel(ref)
 
+  defp demonitor_handler(nil), do: :ok
+  defp demonitor_handler(ref), do: Process.demonitor(ref, [:flush])
+
   defp enqueue_job(state, %Job{} = job) do
     job = Job.assign_id(job)
     new_queue = state.queue ++ [job]
@@ -653,6 +689,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     )
 
     WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
+    demonitor_handler(state.handler_monitor)
 
     if systemic_error?(reason) do
       WorkerEvents.on_queue_drained(
@@ -662,9 +699,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         reason
       )
 
-      {:noreply, %{state | status: :failed, sdk_ref: nil, current_job: nil, queue: []}}
+      {:noreply, %{state | status: :failed, sdk_ref: nil, handler_monitor: nil, current_job: nil, queue: []}}
     else
-      process_next_job(%{state | status: :idle, sdk_ref: nil, current_job: nil})
+      process_next_job(%{state | status: :idle, sdk_ref: nil, handler_monitor: nil, current_job: nil})
     end
   end
 

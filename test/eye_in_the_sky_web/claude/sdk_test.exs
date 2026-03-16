@@ -10,10 +10,10 @@ defmodule EyeInTheSkyWeb.Claude.SDKTest do
       end
     end
 
-    test "returns {:ok, ref} when successful" do
+    test "returns {:ok, ref, handler_pid} when successful" do
       # This would spawn a real Claude process - skip in CI
       unless System.get_env("CI") do
-        {:ok, ref} = SDK.start("Say hello", to: self(), model: "haiku", max_turns: 1)
+        {:ok, ref, _handler} = SDK.start("Say hello", to: self(), model: "haiku", max_turns: 1)
         assert is_reference(ref)
 
         # Receive at least one message
@@ -26,7 +26,7 @@ defmodule EyeInTheSkyWeb.Claude.SDKTest do
 
     test "sends parsed messages to caller" do
       unless System.get_env("CI") do
-        {:ok, ref} = SDK.start("Count to 3", to: self(), model: "haiku", max_turns: 1)
+        {:ok, ref, _handler} = SDK.start("Count to 3", to: self(), model: "haiku", max_turns: 1)
 
         messages = collect_messages(ref, [])
 
@@ -52,7 +52,7 @@ defmodule EyeInTheSkyWeb.Claude.SDKTest do
   describe "SDK.cancel/1" do
     test "returns :ok for running session" do
       unless System.get_env("CI") do
-        {:ok, ref} = SDK.start("Write a long essay", to: self(), model: "haiku")
+        {:ok, ref, _handler} = SDK.start("Write a long essay", to: self(), model: "haiku")
 
         # Give it a moment to start
         Process.sleep(100)
@@ -70,7 +70,7 @@ defmodule EyeInTheSkyWeb.Claude.SDKTest do
     end
 
     test "result is_error closes stream and sends claude_error" do
-      {:ok, ref} =
+      {:ok, ref, _handler} =
         SDK.start("hello", to: self(), cli_module: EyeInTheSkyWeb.Claude.MockCLI, model: "haiku")
 
       mock_port = SDK.Registry.lookup(ref)

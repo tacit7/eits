@@ -50,16 +50,16 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
             }
           }
 
-          case Messages.create_message(attrs) do
-            {:ok, msg} ->
-              Phoenix.PubSub.broadcast(
-                EyeInTheSkyWeb.PubSub,
-                "session:#{session.id}",
-                {:new_dm, msg}
-              )
+          case agent_manager_mod().send_message(session.id, params["message"]) do
+            result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
+              case Messages.create_message(attrs) do
+                {:ok, msg} ->
+                  Phoenix.PubSub.broadcast(
+                    EyeInTheSkyWeb.PubSub,
+                    "session:#{session.id}",
+                    {:new_dm, msg}
+                  )
 
-              case agent_manager_mod().send_message(session.id, params["message"]) do
-                result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
                   conn
                   |> put_status(:created)
                   |> json(%{
@@ -69,20 +69,20 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
                     message_uuid: msg.uuid
                   })
 
-                {:error, reason} ->
-                  Logger.error(
-                    "DM routing failed for session #{session.id}: #{inspect(reason)}"
-                  )
-
+                {:error, cs} ->
                   conn
-                  |> put_status(:internal_server_error)
-                  |> json(%{error: "Failed to route message to agent", reason: inspect(reason)})
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to persist DM", details: translate_errors(cs)})
               end
 
-            {:error, cs} ->
+            {:error, reason} ->
+              Logger.error(
+                "DM routing failed for session #{session.id}: #{inspect(reason)}"
+              )
+
               conn
-              |> put_status(:unprocessable_entity)
-              |> json(%{error: "Failed to deliver DM", details: translate_errors(cs)})
+              |> put_status(:internal_server_error)
+              |> json(%{error: "Failed to route message to agent", reason: inspect(reason)})
           end
         else
           {:sender, {:error, :not_found}} ->

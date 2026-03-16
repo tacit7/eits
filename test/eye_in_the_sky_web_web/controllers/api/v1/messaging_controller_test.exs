@@ -109,6 +109,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingControllerTest do
       resp = json_response(conn, 500)
       assert resp["error"] == "Failed to route message to agent"
       assert resp["reason"] == ":worker_failed"
+
+      # Message must NOT be persisted when routing fails (no duplicates on retry)
+      assert EyeInTheSkyWeb.Messages.list_messages_for_session(session.id) == []
     end
   end
 

@@ -162,6 +162,18 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
     job = Job.new(message, context)
 
+    # Recover from :failed state — reset so we can attempt to start the SDK again
+    state =
+      if state.status == :failed do
+        Logger.info(
+          "AgentWorker: recovering from :failed state for session_id=#{state.session_id}"
+        )
+
+        %{state | status: :idle, retry_attempt: 0}
+      else
+        state
+      end
+
     if state.status == :idle do
       Logger.info("AgentWorker: starting SDK for session_id=#{state.session_id}")
 

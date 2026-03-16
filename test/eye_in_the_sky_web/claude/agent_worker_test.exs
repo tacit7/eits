@@ -685,6 +685,90 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     end)
   end
 
+  # --- Failed state recovery ---
+
+  test "failed worker recovers and processes new message", %{track: track} do
+    {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+
+    Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
+    session_id = session.id
+
+    # Start worker to get it registered
+    assert {:ok, _} = EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, "msg-1")
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    mock_port = wait_for_mock_port(session.id)
+    assert mock_port != nil
+
+    send(mock_port, {:exit, 0})
+    assert_receive {:agent_stopped, _, ^session_id}, 5_000
+
+    [{worker_pid, _}] =
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session.id})
+
+    # Force into :failed state (simulating max retries exceeded)
+    :sys.replace_state(worker_pid, fn state ->
+      %{state | status: :failed, sdk_ref: nil, current_job: nil, queue: [], retry_attempt: 0, retry_timer_ref: nil}
+    end)
+
+    assert :sys.get_state(worker_pid).status == :failed
+
+    # New message should recover the worker, not black-hole it
+    assert {:ok, :started} =
+             EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, "recovery-msg")
+
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    worker_state = :sys.get_state(worker_pid)
+    assert worker_state.status == :running
+    assert worker_state.current_job != nil
+    assert worker_state.current_job.message == "recovery-msg"
+
+    new_mock = wait_for_mock_port(session.id)
+    if new_mock, do: send(new_mock, {:exit, 0})
+  end
+
+  test "failed worker with queued messages processes them on next submit", %{track: track} do
+    {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+
+    Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
+    session_id = session.id
+
+    assert {:ok, _} = EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, "msg-1")
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    mock_port = wait_for_mock_port(session.id)
+    send(mock_port, {:exit, 0})
+    assert_receive {:agent_stopped, _, ^session_id}, 5_000
+
+    [{worker_pid, _}] =
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session.id})
+
+    # Force into :failed with a queued job that was stranded
+    stranded_job = EyeInTheSkyWeb.Claude.Job.new("stranded-msg", %{has_messages: false})
+
+    :sys.replace_state(worker_pid, fn state ->
+      %{state | status: :failed, sdk_ref: nil, current_job: nil, queue: [stranded_job], retry_attempt: 0, retry_timer_ref: nil}
+    end)
+
+    assert :sys.get_state(worker_pid).status == :failed
+
+    # Submitting a new message should kick the worker back to life
+    assert {:ok, :started} =
+             EyeInTheSkyWeb.Claude.AgentManager.send_message(session.id, "trigger-msg")
+
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    worker_state = :sys.get_state(worker_pid)
+    assert worker_state.status == :running
+    # The stranded job should still be queued behind the trigger
+    assert length(worker_state.queue) == 1
+    assert hd(worker_state.queue).message == "stranded-msg"
+
+    new_mock = wait_for_mock_port(session.id)
+    if new_mock, do: send(new_mock, {:exit, 0})
+  end
+
   # --- Error recovery: next job after transient error ---
 
   test "transient error processes next queued job", %{track: track} do

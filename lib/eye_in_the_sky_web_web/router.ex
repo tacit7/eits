@@ -206,6 +206,9 @@ defmodule EyeInTheSkyWebWeb.Router do
 
       live_dashboard "/dashboard", metrics: EyeInTheSkyWebWeb.Telemetry
       forward "/mailbox", Plug.Swoosh.MailboxPreview
+
+      # Dev-only test login — sets session cookie without WebAuthn
+      get "/test-login", EyeInTheSkyWebWeb.DevController, :test_login
     end
   end
 end

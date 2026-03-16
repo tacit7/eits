@@ -55,94 +55,94 @@ defmodule EyeInTheSkyWebWeb.Components.NotesList do
     <%= if length(@notes) > 0 do %>
       <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-5">
         <%= for note <- @notes do %>
-          <div class="collapse collapse-arrow">
-            <input type="checkbox" class="min-h-0 p-0" checked={note.id == @editing_note_id} />
-            <div class="collapse-title py-3.5 px-0 min-h-0 flex flex-col gap-1">
-              <div class="flex items-center gap-2 pr-6">
-                <%= if note.starred == 1 do %>
-                  <.icon name="hero-star-solid" class="w-3.5 h-3.5 text-warning flex-shrink-0" />
-                <% end %>
-                <span class="text-sm font-medium text-base-content/85 truncate">
-                  {note.title || extract_title(note.body)}
-                </span>
-              </div>
-              <div class="flex items-center gap-1.5 text-xs text-base-content/40">
-                <span class={[
-                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium",
-                  parent_type_class(note.parent_type)
-                ]}>
-                  <.icon name={parent_type_icon(note.parent_type)} class="w-2.5 h-2.5" />
-                  {parent_type_label(note.parent_type)}
-                </span>
-                <span class="text-base-content/20">&middot;</span>
-                <span class="font-mono tabular-nums">{format_date(note.created_at)}</span>
-              </div>
-            </div>
-            <div class="collapse-content px-0 pb-4">
-              <%= if note.id == @editing_note_id do %>
-                <div
-                  id={"note-editor-#{note.id}"}
-                  phx-hook="NoteEditor"
-                  data-note-id={note.id}
-                  data-body={Base.encode64(note.body || "")}
-                  class="border border-base-content/10 rounded-lg overflow-hidden min-h-[200px]"
-                ></div>
-                <div class="mt-2 flex items-center gap-3">
-                  <span class="text-xs text-base-content/40">⌘S to save</span>
-                  <button
-                    type="button"
-                    phx-click="note_edit_cancelled"
-                    phx-value-note_id={note.id}
-                    class="flex items-center gap-1.5 text-xs text-base-content/30 hover:text-base-content/60 transition-colors px-1"
-                  >
-                    Cancel
-                  </button>
+          <div class="py-1">
+            <%!-- Note header row: title, metadata, and action buttons --%>
+            <div class="flex items-start gap-2 py-2.5">
+              <div class="flex-1 min-w-0 flex flex-col gap-1">
+                <div class="flex items-center gap-2">
+                  <%= if note.starred == 1 do %>
+                    <.icon name="hero-star-solid" class="w-3.5 h-3.5 text-warning flex-shrink-0" />
+                  <% end %>
+                  <span class="text-sm font-medium text-base-content/85 truncate">
+                    {note.title || extract_title(note.body)}
+                  </span>
                 </div>
-              <% else %>
-                <div
-                  id={"note-body-#{note.id}"}
-                  class="dm-markdown text-sm text-base-content/70 leading-relaxed"
-                  phx-hook="MarkdownMessage"
-                  data-raw-body={note.body}
+                <div class="flex items-center gap-1.5 text-xs text-base-content/40">
+                  <span class={[
+                    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium",
+                    parent_type_class(note.parent_type)
+                  ]}>
+                    <.icon name={parent_type_icon(note.parent_type)} class="w-2.5 h-2.5" />
+                    {parent_type_label(note.parent_type)}
+                  </span>
+                  <span class="text-base-content/20">&middot;</span>
+                  <span class="font-mono tabular-nums">{format_date(note.created_at)}</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-1 flex-shrink-0">
+                <button
+                  type="button"
+                  phx-click="toggle_star"
+                  phx-value-note_id={note.id}
+                  class="flex items-center gap-1 text-xs text-base-content/30 hover:text-warning transition-colors px-1 py-0.5"
+                  aria-label={if note.starred == 1, do: "Unstar note", else: "Star note"}
+                  aria-pressed={note.starred == 1}
                 >
-                </div>
-                <div class="mt-3 flex items-center gap-3">
-                  <button
-                    type="button"
-                    phx-click="toggle_star"
-                    phx-value-note_id={note.id}
-                    class="flex items-center gap-1.5 text-xs text-base-content/30 hover:text-warning transition-colors min-h-[44px] md:min-h-0 px-1"
-                    aria-label={if note.starred == 1, do: "Unstar note", else: "Star note"}
-                    aria-pressed={note.starred == 1}
-                  >
-                    <.icon
-                      name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}
-                      class={"w-3.5 h-3.5 #{if note.starred == 1, do: "text-warning", else: ""}"}
-                    />
-                    {if note.starred == 1, do: "Starred", else: "Star"}
-                  </button>
-                  <button
-                    type="button"
-                    phx-click="edit_note"
-                    phx-value-note_id={note.id}
-                    class="flex items-center gap-1.5 text-xs text-base-content/30 hover:text-primary transition-colors min-h-[44px] md:min-h-0 px-1"
-                    aria-label="Edit note"
-                  >
-                    <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit
-                  </button>
-                  <button
-                    type="button"
-                    phx-click="delete_note"
-                    phx-value-note_id={note.id}
-                    data-confirm="Delete this note?"
-                    class="flex items-center gap-1.5 text-xs text-base-content/30 hover:text-error transition-colors min-h-[44px] md:min-h-0 px-1"
-                    aria-label="Delete note"
-                  >
-                    <.icon name="hero-trash" class="w-3.5 h-3.5" /> Delete
-                  </button>
-                </div>
-              <% end %>
+                  <.icon
+                    name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}
+                    class={"w-3.5 h-3.5 #{if note.starred == 1, do: "text-warning", else: ""}"}
+                  />
+                </button>
+                <button
+                  type="button"
+                  phx-click="edit_note"
+                  phx-value-note_id={note.id}
+                  class="flex items-center gap-1 text-xs text-base-content/30 hover:text-primary transition-colors px-1 py-0.5"
+                  aria-label="Edit note"
+                >
+                  <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit
+                </button>
+                <button
+                  type="button"
+                  phx-click="delete_note"
+                  phx-value-note_id={note.id}
+                  data-confirm="Delete this note?"
+                  class="flex items-center gap-1 text-xs text-base-content/30 hover:text-error transition-colors px-1 py-0.5"
+                  aria-label="Delete note"
+                >
+                  <.icon name="hero-trash" class="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
+            <%!-- Note body: editor or markdown renderer --%>
+            <%= if note.id == @editing_note_id do %>
+              <div
+                id={"note-editor-#{note.id}"}
+                phx-hook="NoteEditor"
+                data-note-id={note.id}
+                data-body={Base.encode64(note.body || "")}
+                class="border border-base-content/10 rounded-lg overflow-hidden min-h-[200px] mb-2"
+              ></div>
+              <div class="mb-2 flex items-center gap-3">
+                <span class="text-xs text-base-content/40">⌘S to save</span>
+                <button
+                  type="button"
+                  phx-click="note_edit_cancelled"
+                  phx-value-note_id={note.id}
+                  class="flex items-center gap-1.5 text-xs text-base-content/30 hover:text-base-content/60 transition-colors px-1"
+                >
+                  Cancel
+                </button>
+              </div>
+            <% else %>
+              <div
+                id={"note-body-#{note.id}"}
+                class="dm-markdown text-sm text-base-content/70 leading-relaxed pb-2"
+                phx-hook="MarkdownMessage"
+                data-raw-body={note.body}
+              >
+              </div>
+            <% end %>
           </div>
         <% end %>
       </div>

@@ -557,7 +557,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       eits_agent_id: state.agent_id,
       eits_project_id: state.project_id,
       eits_model: context[:model],
-      eits_url: "http://localhost:5000/api/v1"
+      eits_url: System.get_env("EITS_URL", "http://localhost:5000/api/v1")
     ]
 
     if has_messages do

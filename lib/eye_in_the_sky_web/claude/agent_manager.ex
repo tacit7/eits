@@ -106,10 +106,10 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
 
                 {:error, reason} ->
                   Logger.warning(
-                    "create_agent: git worktree creation failed for #{wt_path}: #{inspect(reason)}; continuing anyway"
+                    "create_agent: git worktree creation failed for #{wt_path}: #{inspect(reason)}; falling back to project path"
                   )
 
-                  {:ok, wt_path}
+                  {:ok, opts[:project_path]}
               end
 
             {:error, :dirty_working_tree} = err ->

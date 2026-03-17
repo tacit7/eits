@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.Messages do
   @doc """
   Returns the list of messages.
   """
+  @spec list_messages() :: [Message.t()]
   def list_messages do
     Repo.all(Message)
   end
@@ -24,6 +25,7 @@ defmodule EyeInTheSkyWeb.Messages do
   Returns the list of messages for a specific session from JSONL file (opcode-style).
   Falls back to database if file doesn't exist.
   """
+  @spec list_messages_for_session(integer()) :: [Message.t()]
   def list_messages_for_session(session_id) do
     list_messages_for_session(session_id, nil)
   end
@@ -74,6 +76,7 @@ defmodule EyeInTheSkyWeb.Messages do
 
   Raises `Ecto.NoResultsError` if the Message does not exist.
   """
+  @spec get_message!(integer()) :: Message.t()
   def get_message!(id) do
     Repo.get!(Message, id)
   end
@@ -81,6 +84,7 @@ defmodule EyeInTheSkyWeb.Messages do
   @doc """
   Gets a message by ID, returning {:ok, message} or {:error, :not_found}.
   """
+  @spec get_message(integer()) :: {:ok, Message.t()} | {:error, :not_found}
   def get_message(id) do
     case Repo.get(Message, id) do
       nil -> {:error, :not_found}
@@ -143,6 +147,7 @@ defmodule EyeInTheSkyWeb.Messages do
   @doc """
   Creates a message.
   """
+  @spec create_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def create_message(attrs \\ %{}) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
@@ -158,6 +163,7 @@ defmodule EyeInTheSkyWeb.Messages do
   @doc """
   Sends a message (creates an outbound message).
   """
+  @spec send_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def send_message(attrs) do
     result =
       attrs
@@ -257,6 +263,7 @@ defmodule EyeInTheSkyWeb.Messages do
   @doc """
   Updates a message.
   """
+  @spec update_message(Message.t(), map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def update_message(%Message{} = message, attrs) do
     message
     |> Message.changeset(attrs)
@@ -273,6 +280,7 @@ defmodule EyeInTheSkyWeb.Messages do
   @doc """
   Deletes a message.
   """
+  @spec delete_message(Message.t()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def delete_message(%Message{} = message) do
     Repo.delete(message)
   end
@@ -417,6 +425,7 @@ defmodule EyeInTheSkyWeb.Messages do
   @doc """
   Counts messages for a session.
   """
+  @spec count_messages_for_session(integer()) :: non_neg_integer()
   def count_messages_for_session(session_id) do
     QueryHelpers.count_for_session(Message, session_id)
   end
@@ -501,6 +510,7 @@ defmodule EyeInTheSkyWeb.Messages do
 
   Used to decide if the next prompt should resume an existing conversation.
   """
+  @spec has_inbound_reply?(integer(), String.t()) :: boolean()
   def has_inbound_reply?(session_id, provider) when is_binary(provider) do
     Message
     |> where(

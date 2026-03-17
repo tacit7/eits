@@ -22,6 +22,7 @@ defmodule EyeInTheSkyWeb.Sessions do
   Returns the list of sessions, excluding archived by default.
   Pass `include_archived: true` to include archived sessions.
   """
+  @spec list_sessions(keyword()) :: [Session.t()]
   def list_sessions(opts \\ []) do
     Session
     |> Archivable.include_archived(opts)
@@ -45,6 +46,7 @@ defmodule EyeInTheSkyWeb.Sessions do
 
   Raises `Ecto.NoResultsError` if the Session does not exist.
   """
+  @spec get_session!(integer()) :: Session.t()
   def get_session!(id), do: get!(id)
 
   @doc """
@@ -52,16 +54,19 @@ defmodule EyeInTheSkyWeb.Sessions do
 
   Raises `Ecto.NoResultsError` if the Session does not exist.
   """
+  @spec get_session_by_uuid!(String.t()) :: Session.t()
   def get_session_by_uuid!(uuid), do: get_by_uuid!(uuid)
 
   @doc """
   Gets a single session by UUID, returning {:ok, session} or {:error, :not_found}.
   """
+  @spec get_session_by_uuid(String.t()) :: {:ok, Session.t()} | {:error, :not_found}
   def get_session_by_uuid(uuid), do: get_by_uuid(uuid)
 
   @doc """
   Gets a single session, returning {:ok, session} or {:error, :not_found}.
   """
+  @spec get_session(integer()) :: {:ok, Session.t()} | {:error, :not_found}
   def get_session(id), do: get(id)
 
   @doc """
@@ -76,6 +81,7 @@ defmodule EyeInTheSkyWeb.Sessions do
   @doc """
   Creates a session.
   """
+  @spec create_session(map()) :: {:ok, Session.t()} | {:error, Ecto.Changeset.t()}
   def create_session(attrs \\ %{}), do: create(attrs)
 
   @doc """
@@ -98,6 +104,7 @@ defmodule EyeInTheSkyWeb.Sessions do
   Model information is immutable per session.
   Attempting to change model_provider or model_name will be ignored.
   """
+  @spec update_session(Session.t(), map()) :: {:ok, Session.t()} | {:error, Ecto.Changeset.t()}
   def update_session(%Session{} = session, attrs) do
     # Remove model fields if present - they are immutable
     attrs =

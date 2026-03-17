@@ -508,40 +508,28 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     has_messages = context[:has_messages] || false
     prompt = job.message
 
-    opts = [
-      to: self(),
-      model: context[:model],
-      session_id: state.provider_conversation_id,
-      project_path: state.project_path,
-      skip_permissions: true,
-      use_script: true,
-      eits_session_id: state.provider_conversation_id,
-      eits_agent_id: state.agent_id,
-      eits_workflow: context[:eits_workflow] || "1",
-      worktree: state.worktree,
-      agent: context[:agent]
-    ]
+    optional_opts =
+      [
+        effort_level: context[:effort_level],
+        thinking_budget: context[:thinking_budget],
+        max_budget_usd: context[:max_budget_usd]
+      ]
+      |> Keyword.filter(fn {k, v} -> v != nil && (k != :effort_level || v != "") end)
 
     opts =
-      if context[:effort_level] && context[:effort_level] != "" do
-        opts ++ [effort_level: context[:effort_level]]
-      else
-        opts
-      end
-
-    opts =
-      if context[:thinking_budget] do
-        opts ++ [thinking_budget: context[:thinking_budget]]
-      else
-        opts
-      end
-
-    opts =
-      if context[:max_budget_usd] do
-        opts ++ [max_budget_usd: context[:max_budget_usd]]
-      else
-        opts
-      end
+      [
+        to: self(),
+        model: context[:model],
+        session_id: state.provider_conversation_id,
+        project_path: state.project_path,
+        skip_permissions: true,
+        use_script: true,
+        eits_session_id: state.provider_conversation_id,
+        eits_agent_id: state.agent_id,
+        eits_workflow: context[:eits_workflow] || "1",
+        worktree: state.worktree,
+        agent: context[:agent]
+      ] ++ optional_opts
 
     if has_messages do
       Logger.info("Resuming Claude session #{state.provider_conversation_id}")

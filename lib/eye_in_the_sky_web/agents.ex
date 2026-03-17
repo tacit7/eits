@@ -15,6 +15,7 @@ defmodule EyeInTheSkyWeb.Agents do
   @doc """
   Returns the list of agents.
   """
+  @spec list_agents() :: [Agent.t()]
   def list_agents do
     Repo.all(Agent)
   end
@@ -61,6 +62,7 @@ defmodule EyeInTheSkyWeb.Agents do
 
   Raises `Ecto.NoResultsError` if the Agent does not exist.
   """
+  @spec get_agent!(integer()) :: Agent.t()
   def get_agent!(id) do
     Agent
     |> preload([:project])
@@ -73,6 +75,7 @@ defmodule EyeInTheSkyWeb.Agents do
 
   This is the safe version that doesn't raise exceptions.
   """
+  @spec get_agent(integer()) :: {:ok, Agent.t()} | {:error, :not_found}
   def get_agent(id) do
     case Agent
          |> preload([:project])
@@ -118,6 +121,7 @@ defmodule EyeInTheSkyWeb.Agents do
   @doc """
   Creates an agent.
   """
+  @spec create_agent(map()) :: {:ok, Agent.t()} | {:error, Ecto.Changeset.t()}
   def create_agent(attrs \\ %{}) do
     result = %Agent{} |> Agent.changeset(attrs) |> Repo.insert()
     with {:ok, agent} <- result, do: EyeInTheSkyWeb.Events.agent_created(agent)
@@ -127,6 +131,7 @@ defmodule EyeInTheSkyWeb.Agents do
   @doc """
   Updates an agent.
   """
+  @spec update_agent(Agent.t(), map()) :: {:ok, Agent.t()} | {:error, Ecto.Changeset.t()}
   def update_agent(%Agent{} = agent, attrs) do
     result = agent |> Agent.changeset(attrs) |> Repo.update()
     with {:ok, updated} <- result, do: EyeInTheSkyWeb.Events.agent_updated(updated)
@@ -146,6 +151,7 @@ defmodule EyeInTheSkyWeb.Agents do
   @doc """
   Deletes an agent.
   """
+  @spec delete_agent(Agent.t()) :: {:ok, Agent.t()} | {:error, Ecto.Changeset.t()}
   def delete_agent(%Agent{} = agent) do
     result = Repo.delete(agent)
     with {:ok, deleted} <- result, do: EyeInTheSkyWeb.Events.agent_deleted(deleted)
@@ -155,6 +161,7 @@ defmodule EyeInTheSkyWeb.Agents do
   @doc """
   Returns an `%Ecto.Changeset{}` for tracking agent changes.
   """
+  @spec change_agent(Agent.t(), map()) :: Ecto.Changeset.t()
   def change_agent(%Agent{} = agent, attrs \\ %{}) do
     Agent.changeset(agent, attrs)
   end

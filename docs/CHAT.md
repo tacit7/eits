@@ -49,16 +49,14 @@ Three modes determine how agents handle incoming channel messages:
 |------|---------|----------------|
 | `:direct` | `@123` (session ID) | Must respond |
 | `:broadcast` | `@all` | Must respond |
-| `:ambient` | No mention | Respond only if useful; reply `[NO_RESPONSE]` otherwise |
+| `:ambient` | No mention | Message delivered but no response requested |
 
 `ChannelProtocol.parse_routing(body, session_id)` returns `{mode, mentioned_ids, mention_all}`.
 
 `ChannelProtocol.build_prompt(mode, body)` prepends mode-specific instructions:
-- **Ambient**: "Reply ONLY if you have something genuinely useful. If nothing to add, reply with exactly: [NO_RESPONSE]"
 - **Direct**: "You were directly mentioned. You must respond."
 - **Broadcast**: "A broadcast message was sent to all agents. You must respond."
-
-`AgentWorker` suppresses `[NO_RESPONSE]` replies from DB storage.
+- **Ambient**: No prompt sent; message is delivered to the agent's DM session as context only. `AgentManager.send_message` is NOT called for ambient messages.
 
 ## Database Schema
 
@@ -115,6 +113,7 @@ Unique constraint: `(channel_id, session_id)`. No project constraint on membersh
 | `source_uuid` | string | Deduplication; unique |
 | `thread_reply_count` | integer | Default 0 |
 | `last_thread_reply_at` | utc_datetime | |
+| `channel_message_number` | integer | Per-channel sequential number; auto-assigned on create |
 
 ### message_reactions
 
@@ -287,6 +286,50 @@ Post a message to a channel.
 }
 ```
 
+### GET /api/v1/channels/:channel_id/messages
+
+Retrieve recent messages from a channel.
+
+```
+GET /api/v1/channels/5/messages?limit=20
+```
+
+Query params:
+- `limit` (optional, default 50, max 200) — number of messages to return
+
+Response:
+
+```json
+{
+  "channel_id": 5,
+  "messages": [
+    {
+      "id": 123,
+      "number": 42,
+      "body": "Hello channel",
+      "sender_role": "user",
+      "session_id": 1,
+      "inserted_at": "2026-03-17T10:00:00Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+CLI: `eits channels messages <channel_id> [--limit N]`
+
+## Channel Message Numbers
+
+Each channel has independent sequential message numbering. Numbers are auto-assigned in `Messages.create_message` using `next_channel_message_number/1` (MAX + 1 query). Messages without a `channel_id` do not get a number.
+
+Displayed in the UI as `#N` next to the timestamp. Useful for referencing specific messages in conversation (e.g., "see message #42").
+
+## Typing Indicator
+
+When an agent is processing a message, a Slack-style typing indicator appears above the composer. The indicator shows which channel members are currently working, using bouncing dots animation.
+
+Source: `agent:working` PubSub topic. `ChatLive` tracks `working_agents` assign (map of session_id -> true). The Svelte component filters this to `workingMembers` — only agents that are both working AND members of the current channel.
+
 ## Frontend Components
 
 ### AgentMessagesPanel.svelte
@@ -297,7 +340,7 @@ Svelte component handling message display and input for `/chat`.
 
 **Features**:
 - Message list with provider icons, timestamps, date separators
-- Working agent indicator (pulsing status bar)
+- Typing indicator (bouncing dots above composer for working channel members)
 - Usage metadata display (cost, tokens, duration, turns)
 - @ mention autocomplete -- scoped to current channel members only
 - @all option broadcasts to all channel members

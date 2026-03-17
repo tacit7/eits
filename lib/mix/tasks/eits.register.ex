@@ -17,9 +17,9 @@ defmodule Mix.Tasks.Eits.Register do
     Application.ensure_all_started(:eye_in_the_sky_web)
 
     case EyeInTheSkyWeb.Accounts.create_registration_token(username) do
-      {:ok, token} ->
+      {:ok, raw_token, _rt} ->
         origin = Application.get_env(:wax_, :origin, "https://localhost:5001")
-        url = "#{origin}/auth/register?token=#{token.token}"
+        url = "#{origin}/auth/register?token=#{raw_token}"
         Mix.shell().info("\nPasskey registration link for #{username}:")
         Mix.shell().info("  #{url}")
         Mix.shell().info("\nExpires in 15 minutes. Open this URL in your browser.\n")

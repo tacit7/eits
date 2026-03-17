@@ -48,17 +48,37 @@ defmodule EyeInTheSkyWeb.Accounts do
 
   # --- Registration tokens ---
 
-  def create_registration_token(username, ttl_minutes \\ 15) do
-    token = :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
-    expires_at = NaiveDateTime.add(NaiveDateTime.utc_now(), ttl_minutes * 60, :second)
+  defp hash_registration_token(raw_token) do
+    secret =
+      Application.get_env(:eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint)[:secret_key_base]
 
-    %RegistrationToken{}
-    |> RegistrationToken.changeset(%{token: token, username: username, expires_at: expires_at})
-    |> Repo.insert()
+    :crypto.mac(:hmac, :sha256, secret, raw_token) |> Base.url_encode64(padding: false)
   end
 
-  def peek_registration_token(token) do
-    case Repo.get_by(RegistrationToken, token: token) do
+  def create_registration_token(username, ttl_minutes \\ 15) do
+    raw_token = :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
+    hashed_token = hash_registration_token(raw_token)
+    expires_at = NaiveDateTime.add(NaiveDateTime.utc_now(), ttl_minutes * 60, :second)
+
+    result =
+      %RegistrationToken{}
+      |> RegistrationToken.changeset(%{
+        token: hashed_token,
+        username: username,
+        expires_at: expires_at
+      })
+      |> Repo.insert()
+
+    case result do
+      {:ok, rt} -> {:ok, raw_token, rt}
+      error -> error
+    end
+  end
+
+  def peek_registration_token(raw_token) do
+    hashed_token = hash_registration_token(raw_token)
+
+    case Repo.get_by(RegistrationToken, token: hashed_token) do
       nil ->
         {:error, :not_found}
 
@@ -69,8 +89,10 @@ defmodule EyeInTheSkyWeb.Accounts do
     end
   end
 
-  def consume_registration_token(token) do
-    case Repo.get_by(RegistrationToken, token: token) do
+  def consume_registration_token(raw_token) do
+    hashed_token = hash_registration_token(raw_token)
+
+    case Repo.get_by(RegistrationToken, token: hashed_token) do
       nil ->
         {:error, :not_found}
 

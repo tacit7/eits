@@ -80,6 +80,10 @@ config :wax_,
   rp_id: "eits.dev",
   trusted_attestation_types: [:none, :self]
 
+# Additional allowed WebAuthn origins (e.g. ngrok tunnels). Primary origin
+# above is always included; add extras via WEBAUTHN_EXTRA_ORIGINS env var.
+config :eye_in_the_sky_web, :webauthn_extra_origins, []
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

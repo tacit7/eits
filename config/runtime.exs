@@ -39,13 +39,25 @@ if config_env() != :prod do
   config :eye_in_the_sky_web, :disable_auth, System.get_env("DISABLE_AUTH") in ~w(true 1)
 end
 
-# WebAuthn — override origin/rp_id via env vars (useful for ngrok tunnels)
-if webauthn_origin = System.get_env("WEBAUTHN_ORIGIN") do
-  rp_id = System.get_env("WEBAUTHN_RP_ID", URI.parse(webauthn_origin).host)
+# WebAuthn — extra allowed origins (comma-separated). Read directly from
+# parsed .env to work around dotenvy not setting new system env vars.
+webauthn_extra_raw =
+  System.get_env("WEBAUTHN_EXTRA_ORIGINS") ||
+    (case Dotenvy.source([".env"]) do
+       {:ok, env} -> env["WEBAUTHN_EXTRA_ORIGINS"]
+       _ -> nil
+     end)
 
-  config :wax_,
-    origin: webauthn_origin,
-    rp_id: rp_id
+if webauthn_extra_raw do
+  origins =
+    webauthn_extra_raw
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+
+  if origins != [] do
+    config :eye_in_the_sky_web, :webauthn_extra_origins, origins
+  end
 end
 
 if config_env() == :prod do

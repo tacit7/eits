@@ -9,7 +9,8 @@ defmodule EyeInTheSkyWebWeb.AuthController do
   def register_challenge(conn, %{"token" => token}) when is_binary(token) and token != "" do
     case Accounts.peek_registration_token(token) do
       {:ok, username} ->
-        challenge = Wax.new_registration_challenge(trusted_attestation_types: [:none, :self])
+        wax_opts = webauthn_opts_for(conn)
+        challenge = Wax.new_registration_challenge(wax_opts)
 
         rp_id = challenge.rp_id
         challenge_b64 = Base.url_encode64(challenge.bytes, padding: false)
@@ -112,7 +113,8 @@ defmodule EyeInTheSkyWebWeb.AuthController do
           |> put_status(:bad_request)
           |> json(%{error: "no passkeys registered for this user"})
         else
-          challenge = Wax.new_authentication_challenge(allow_credentials: allow_credentials)
+          wax_opts = webauthn_opts_for(conn, allow_credentials: allow_credentials)
+          challenge = Wax.new_authentication_challenge(wax_opts)
 
           challenge_b64 = Base.url_encode64(challenge.bytes, padding: false)
           serialized = challenge |> :erlang.term_to_binary() |> Base.encode64()
@@ -192,4 +194,20 @@ defmodule EyeInTheSkyWebWeb.AuthController do
   defp decode_b64url(str), do: Base.url_decode64(str, padding: false)
 
   defp decode_b64url!(str), do: Base.url_decode64!(str, padding: false)
+
+  # Builds Wax options for the current request. If the request Origin header
+  # matches an allowed extra origin, overrides origin/rp_id for that call.
+  # Falls back to the global wax_ config (eits.dev) for all other requests.
+  defp webauthn_opts_for(conn, extra_opts \\ []) do
+    base_opts = [trusted_attestation_types: [:none, :self]] ++ extra_opts
+    request_origin = get_req_header(conn, "origin") |> List.first()
+    extra_origins = Application.get_env(:eye_in_the_sky_web, :webauthn_extra_origins, [])
+
+    if request_origin && request_origin in extra_origins do
+      rp_id = URI.parse(request_origin).host
+      [origin: request_origin, rp_id: rp_id] ++ base_opts
+    else
+      base_opts
+    end
+  end
 end

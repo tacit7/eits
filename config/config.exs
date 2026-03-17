@@ -69,7 +69,7 @@ config :eye_in_the_sky_web, Oban,
 
 # Web Push / VAPID — both keys loaded from VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY env vars (see runtime.exs)
 
-# WebAuthn / Passkey configuration (dev/test default — override via WEBAUTHN_ORIGIN env var in runtime.exs)
+# WebAuthn / Passkey configuration (dev/test defaults — override via WEBAUTHN_ORIGIN and WEBAUTHN_RP_ID env vars in runtime.exs)
 config :wax_,
   origin: "https://eits.dev",
   rp_id: "eits.dev",

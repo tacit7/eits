@@ -182,6 +182,7 @@ All secrets are loaded from environment variables via `.env` file (loaded by `do
 | Database URL | `DATABASE_URL` | Prod |
 | Secret key base | `SECRET_KEY_BASE` | Prod |
 | WebAuthn primary origin | `WEBAUTHN_ORIGIN` | Prod (raises without it) |
+| WebAuthn RP ID | `WEBAUTHN_RP_ID` | Prod (raises without it) |
 | WebAuthn extra origins | `WEBAUTHN_EXTRA_ORIGINS` | Optional (for ngrok tunnels) |
 
 No secrets are committed to source code. The `.env` file is in `.gitignore`. `.env.example` contains placeholders and generation instructions.

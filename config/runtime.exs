@@ -85,6 +85,19 @@ else
   end
 end
 
+# WebAuthn RP ID — configurable via WEBAUTHN_RP_ID. Required in prod.
+# Dev/test falls back to the compile-time default in config.exs ("eits.dev").
+if webauthn_rp_id = System.get_env("WEBAUTHN_RP_ID") do
+  config :wax_, rp_id: webauthn_rp_id
+else
+  if config_env() == :prod do
+    raise """
+    environment variable WEBAUTHN_RP_ID is missing.
+    Set it to your app's RP ID (the registrable domain), e.g.: eits.dev
+    """
+  end
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

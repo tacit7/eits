@@ -20,7 +20,7 @@ defmodule EyeInTheSky.Notes.Note do
     |> maybe_generate_uuid()
     |> maybe_set_created_at()
     |> validate_required([:parent_type, :parent_id, :body])
-    |> validate_inclusion(:parent_type, ["session", "task", "agent", "project", "system"])
+    |> validate_inclusion(:parent_type, ["session", "task", "agent", "project", "system", "assistant"])
   end
 
   defp maybe_generate_uuid(changeset) do

@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
       |> assign(:search_query, "")
       |> assign(:starred_filter, false)
       |> assign(:notes, [])
+      |> assign(:editing_note_id, nil)
       |> assign(:sidebar_tab, :notes)
       |> assign(:sidebar_project, nil)
       |> load_notes()
@@ -38,6 +39,34 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
   @impl true
   def handle_event("delete_note", params, socket),
     do: handle_delete_note(params, socket, &load_notes/1)
+
+  @impl true
+  def handle_event("edit_note", %{"note_id" => note_id}, socket) do
+    {:noreply, assign(socket, :editing_note_id, String.to_integer(note_id))}
+  end
+
+  @impl true
+  def handle_event("note_saved", %{"note_id" => note_id, "body" => body}, socket) do
+    note = Notes.get_note!(String.to_integer(note_id))
+
+    case Notes.update_note(note, %{body: body}) do
+      {:ok, _note} ->
+        socket =
+          socket
+          |> assign(:editing_note_id, nil)
+          |> load_notes()
+
+        {:noreply, socket}
+
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, "Failed to save note.")}
+    end
+  end
+
+  @impl true
+  def handle_event("note_edit_cancelled", _params, socket) do
+    {:noreply, assign(socket, :editing_note_id, nil)}
+  end
 
   defp load_notes(socket) do
     query = socket.assigns.search_query
@@ -79,6 +108,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
           starred_filter={@starred_filter}
           search_query={@search_query}
           empty_id="overview-notes-empty"
+          editing_note_id={@editing_note_id}
           current_path="/notes"
         />
       </div>

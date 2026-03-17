@@ -90,7 +90,7 @@ defmodule EyeInTheSkyWebWeb.NoteLive.EditTest do
       note = create_note()
       {:ok, view, _html} = live(conn, ~p"/notes/#{note.id}/edit")
 
-      render_hook(view, "update_title", %{"title" => "  New Title  "})
+      render_hook(view, "update_title", %{"value" => "  New Title  "})
 
       updated = Notes.get_note!(note.id)
       assert updated.title == "New Title"
@@ -100,7 +100,7 @@ defmodule EyeInTheSkyWebWeb.NoteLive.EditTest do
       note = create_note(%{title: "Original"})
       {:ok, view, _html} = live(conn, ~p"/notes/#{note.id}/edit")
 
-      render_hook(view, "update_title", %{"title" => "   "})
+      render_hook(view, "update_title", %{"value" => "   "})
 
       updated = Notes.get_note!(note.id)
       assert updated.title == "Original"

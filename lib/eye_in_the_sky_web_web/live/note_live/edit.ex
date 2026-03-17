@@ -84,7 +84,7 @@ defmodule EyeInTheSkyWebWeb.NoteLive.Edit do
   end
 
   @impl true
-  def handle_event("update_title", %{"title" => title}, socket) do
+  def handle_event("update_title", %{"value" => title}, socket) do
     trimmed = String.trim(title)
 
     if trimmed == "" do
@@ -161,6 +161,7 @@ defmodule EyeInTheSkyWebWeb.NoteLive.Edit do
         <div
           id={"note-full-editor-#{@note.id}"}
           phx-hook="NoteFullEditor"
+          phx-update="ignore"
           data-body={@note.body || ""}
           data-return-to={@return_to}
           class="flex-1 overflow-hidden"

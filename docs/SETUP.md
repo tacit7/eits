@@ -147,14 +147,12 @@ cp .env.example .env
 
 Phoenix loads `.env` automatically at startup via `dotenvy`.
 
-Also export the key in your shell so CLI scripts pick it up:
+Add both to `~/.zshrc` for persistence:
 
 ```bash
 export EITS_API_KEY="<generated-key>"
-export EITS_API_URL="https://eits.dev/api/v1"
+export EITS_URL="http://localhost:5000/api/v1"
 ```
-
-Add both to `~/.zshrc` for persistence.
 
 **Webhook configuration (optional for dev):**
 
@@ -209,7 +207,7 @@ The `scripts/eits` script provides shell access to the REST API.
 ```bash
 export PATH="$HOME/projects/eits/web/scripts:$PATH"
 export EITS_API_KEY="<generated-key>"
-export EITS_API_URL="https://eits.dev/api/v1"
+export EITS_URL="http://localhost:5000/api/v1"
 ```
 
 **Usage:**

@@ -1,29 +1,13 @@
 #!/bin/bash
 # EITS Session Hook — resume
-# Resolves integer IDs from API and overwrites env vars in CLAUDE_ENV_FILE.
+# Resolves session/agent/project via eits CLI and writes env vars to CLAUDE_ENV_FILE.
 
 set -uo pipefail
 
 # --- EITS Workflow Guard ---
-EITS_WORKFLOW="${EITS_WORKFLOW:-}"
-if [ -z "$EITS_WORKFLOW" ]; then
-  EITS_URL="${EITS_API_URL:-http://localhost:5000/api/v1}"
-  ENABLED=$(curl -sf "${EITS_URL}/settings/eits_workflow_enabled" 2>/dev/null | jq -r '.enabled' 2>/dev/null || echo "true")
-  [ "$ENABLED" = "false" ] && exit 0
-elif [ "$EITS_WORKFLOW" = "0" ]; then
-  exit 0
-fi
+[ "${EITS_WORKFLOW:-}" = "0" ] && exit 0
 # --- End Workflow Guard ---
 
-EITS_PG_DB="${EITS_PG_DB:-eits_dev}"
-EITS_PG_USER="${EITS_PG_USER:-postgres}"
-EITS_PG_HOST="${EITS_PG_HOST:-localhost}"
-export PGPASSWORD="${EITS_PG_PASSWORD:-postgres}"
-_pgq() { psql -U "$EITS_PG_USER" -h "$EITS_PG_HOST" -d "$EITS_PG_DB" -t -A --no-psqlrc -c "$1" 2>/dev/null | grep -v '^Time:'; }
-
-MAPPING_FILE="$HOME/.claude/hooks/session_agent_map.json"
-EITS_BASE="${EITS_API_URL:-http://localhost:5000/api/v1}"
-_curl() { curl ${EITS_API_KEY:+-H "Authorization: Bearer ${EITS_API_KEY}"} "$@"; }
 LOG_FILE="${HOME}/.claude/hooks/eits.log"
 _log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [resume] $*" >> "$LOG_FILE" 2>/dev/null; }
 
@@ -39,46 +23,40 @@ echo "[EITS] resume: session=$SESSION_ID entrypoint=${ENTRYPOINT:-none}" >&2
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 PROJECT_NAME=$(basename "$PROJECT_DIR")
-PROJECT_DIR_SQL="${PROJECT_DIR//\'/\'\'}"
-PROJECT_NAME_SQL="${PROJECT_NAME//\'/\'\'}"
 
-# Resolve integer IDs — API first, psql fallback
+# Resolve session info via eits CLI
+SESSION_INFO=$(eits sessions get "$SESSION_ID" 2>/dev/null || true)
+
 SESSION_INT_ID=""
 AGENT_INT_ID=""
 AGENT_ID=""
+SESSION_NAME=""
+PROJECT_ID=""
 
-_log "resolving IDs via API: $EITS_BASE/sessions/$SESSION_ID"
-SESSION_INFO=$(_curl -sf "$EITS_BASE/sessions/$SESSION_ID" 2>/dev/null || true)
-
-if [ -n "$SESSION_INFO" ] && echo "$SESSION_INFO" | jq -e '.initialized == true' >/dev/null 2>&1; then
+if [ -n "$SESSION_INFO" ]; then
   SESSION_INT_ID=$(echo "$SESSION_INFO" | jq -r '.id // empty')
   AGENT_INT_ID=$(echo "$SESSION_INFO" | jq -r '.agent_int_id // empty')
   AGENT_ID=$(echo "$SESSION_INFO" | jq -r '.agent_id // empty')
-  _log "resolved via API: session_int=$SESSION_INT_ID agent_int=$AGENT_INT_ID agent_uuid=$AGENT_ID"
-  echo "[EITS] resume resolved via API: session=$SESSION_INT_ID agent=$AGENT_INT_ID" >&2
+  SESSION_NAME=$(echo "$SESSION_INFO" | jq -r '.name // empty')
+  PROJECT_ID=$(echo "$SESSION_INFO" | jq -r '.project_id // empty')
+  _log "resolved: session_int=$SESSION_INT_ID agent_int=$AGENT_INT_ID agent_uuid=$AGENT_ID project_id=$PROJECT_ID"
 else
-  _log "API failed or session not initialized, falling back to psql"
-  SESSION_INT_ID=$(_pgq "SELECT id FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1" || true)
-  EXISTING_AGENT=$(_pgq "SELECT agent_id FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1" || true)
-  if [ -n "$EXISTING_AGENT" ]; then
-    AGENT_INT_ID="$EXISTING_AGENT"
-    AGENT_ID=$(_pgq "SELECT uuid FROM agents WHERE id = $EXISTING_AGENT LIMIT 1" || true)
-  fi
-  _log "resolved via psql: session_int=${SESSION_INT_ID:-empty} agent_int=${AGENT_INT_ID:-empty} agent_uuid=${AGENT_ID:-empty}"
-  echo "[EITS] resume resolved via psql: session=$SESSION_INT_ID agent=$AGENT_INT_ID" >&2
+  _log "WARN: eits sessions get failed, continuing with empty IDs"
 fi
 
-# Update mapping file
-if [ -n "$AGENT_ID" ]; then
-  if [ -f "$MAPPING_FILE" ]; then
-    UPDATED=$(jq --arg sid "$SESSION_ID" --arg aid "$AGENT_ID" '.[$sid] = $aid' "$MAPPING_FILE" 2>/dev/null)
+# Resolve project if not set on session
+if [ -z "$PROJECT_ID" ]; then
+  PROJECT_ID=$(eits projects list 2>/dev/null | jq -r --arg path "$PROJECT_DIR" '.projects[]? | select(.path == $path) | .id' | head -1 || true)
+  if [ -z "$PROJECT_ID" ]; then
+    _log "project not found, creating: $PROJECT_NAME"
+    PROJECT_ID=$(eits projects create --name "$PROJECT_NAME" --path "$PROJECT_DIR" 2>/dev/null | jq -r '.id // empty' || true)
+    _log "project created: id=${PROJECT_ID:-FAILED}"
   else
-    UPDATED=$(jq -n --arg sid "$SESSION_ID" --arg aid "$AGENT_ID" '{($sid): $aid}')
+    _log "project found by path: id=$PROJECT_ID"
   fi
-  echo "$UPDATED" > "$MAPPING_FILE"
 fi
 
-# Overwrite env vars — resume always wins over startup
+# Write env vars to CLAUDE_ENV_FILE
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   _log "env_file=$CLAUDE_ENV_FILE"
   _set() {
@@ -92,55 +70,14 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
     fi
   }
 
-  [ -n "$ENTRYPOINT" ] && _set "EITS_ENTRYPOINT" "$ENTRYPOINT"
+  [ -n "$ENTRYPOINT" ]     && _set "EITS_ENTRYPOINT" "$ENTRYPOINT"
   _set "EITS_SESSION_UUID" "$SESSION_ID"
-  if [ -n "${SESSION_INT_ID:-}" ]; then
-    _set "EITS_SESSION_ID" "$SESSION_INT_ID"
-  else
-    _log "WARN: SESSION_INT_ID empty, skipping EITS_SESSION_ID update"
-  fi
-  if [ -n "${AGENT_INT_ID:-}" ]; then
-    _set "EITS_AGENT_ID" "$AGENT_INT_ID"
-  else
-    _log "WARN: AGENT_INT_ID empty, skipping EITS_AGENT_ID update"
-  fi
-  if [ -n "${AGENT_ID:-}" ]; then
-    _set "EITS_AGENT_UUID" "$AGENT_ID"
-    _log "wrote EITS_AGENT_UUID=$AGENT_ID"
-  else
-    _log "WARN: AGENT_ID (UUID) empty, skipping EITS_AGENT_UUID update"
-  fi
+  [ -n "$SESSION_INT_ID" ] && _set "EITS_SESSION_ID" "$SESSION_INT_ID"
+  [ -n "$AGENT_INT_ID" ]   && _set "EITS_AGENT_ID" "$AGENT_INT_ID"
+  [ -n "$AGENT_ID" ]       && _set "EITS_AGENT_UUID" "$AGENT_ID"
+  [ -n "$PROJECT_ID" ]     && _set "EITS_PROJECT_ID" "$PROJECT_ID"
 
-  # Resolve project by path and set EITS_PROJECT_ID
-  PROJECT_ID=$(_pgq "SELECT id FROM projects WHERE path = '$PROJECT_DIR_SQL' LIMIT 1" || true)
-  if [ -z "$PROJECT_ID" ]; then
-    _log "project not found, creating: $PROJECT_NAME"
-    PROJECT_ID=$(_pgq "
-      INSERT INTO projects (name, path, active, inserted_at, updated_at)
-      VALUES ('$PROJECT_NAME_SQL', '$PROJECT_DIR_SQL', true, NOW(), NOW())
-      RETURNING id
-    " || true)
-    _log "project created: id=${PROJECT_ID:-FAILED}"
-  else
-    _log "project found: id=$PROJECT_ID"
-  fi
-  if [ -n "$PROJECT_ID" ]; then
-    _set "EITS_PROJECT_ID" "$PROJECT_ID"
-    _pgq "UPDATE sessions SET project_id = $PROJECT_ID WHERE uuid = '$SESSION_ID' AND project_id IS NULL" >/dev/null || true
-    _log "updated sessions.project_id=$PROJECT_ID for uuid=$SESSION_ID"
-  else
-    _log "WARN: project_id not resolved, skipping"
-  fi
-
-  # Patch entrypoint on resumed session
-  if [ -n "$ENTRYPOINT" ]; then
-    curl -sf -X PATCH -H "Content-Type: application/json" \
-      -d "{\"entrypoint\":\"$ENTRYPOINT\"}" \
-      "${EITS_BASE}/sessions/${SESSION_ID}" >/dev/null 2>&1 || true
-    _log "patched entrypoint=$ENTRYPOINT"
-  fi
-
-  echo "[EITS] env vars updated: SESSION_UUID=$SESSION_ID SESSION_ID=${SESSION_INT_ID:-} AGENT_ID=${AGENT_INT_ID:-} PROJECT_ID=${PROJECT_ID:-}" >&2
+  _log "env vars written: SESSION_UUID=$SESSION_ID SESSION_ID=${SESSION_INT_ID:-} AGENT_ID=${AGENT_INT_ID:-} PROJECT_ID=${PROJECT_ID:-}"
 else
   _log "WARN: CLAUDE_ENV_FILE not set, skipping env writes"
 fi
@@ -156,27 +93,11 @@ if [ -n "$GIT_DIR" ]; then
   fi
 fi
 
-# NATS (fire-and-forget)
-DESCRIPTION=$(_pgq "SELECT description FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1" || true)
-SESSION_NAME=$(_pgq "SELECT name FROM sessions WHERE uuid = '$SESSION_ID' LIMIT 1" || true)
+# Patch entrypoint and mark session as working
+[ -n "$ENTRYPOINT" ] && eits sessions update "$SESSION_ID" --entrypoint "$ENTRYPOINT" >/dev/null 2>&1 || true
+eits sessions update "$SESSION_ID" --status "working" >/dev/null 2>&1 &
 
-nats pub "events.session.start" "$(jq -nc \
-  --arg session_id "$SESSION_ID" \
-  --arg agent_id "${AGENT_ID:-$SESSION_ID}" \
-  --arg description "${DESCRIPTION:-}" \
-  --arg name "${SESSION_NAME:-}" \
-  --arg project_name "$PROJECT_NAME" \
-  --arg model "${MODEL:-}" \
-  --arg provider "claude" \
-  --arg worktree_path "$PROJECT_DIR" \
-  '{session_id: $session_id, agent_id: $agent_id, description: $description, name: $name, project_name: $project_name, model: $model, provider: $provider, worktree_path: $worktree_path}')" 2>/dev/null &
-
-nats pub "events.session.update" "$(jq -nc \
-  --arg session_id "$SESSION_ID" \
-  --arg status "working" \
-  '{session_id: $session_id, status: $status}')" 2>/dev/null &
-
-# Inject context with session info
+# Inject context
 CONTEXT="# Eye in the Sky — Session Resumed
 
 ## Session Context
@@ -204,13 +125,4 @@ eits tasks update <task_id> --state 4
 eits commits create --hash <hash>
 \`\`\`"
 
-cat <<EOF
-{
-  "continue": true,
-  "suppressOutput": true,
-  "hookSpecificOutput": {
-    "hookEventName": "SessionStart",
-    "additionalContext": $(printf '%s\n' "$CONTEXT" | jq -Rs .)
-  }
-}
-EOF
+echo "$CONTEXT"

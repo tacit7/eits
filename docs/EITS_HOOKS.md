@@ -1,177 +1,262 @@
 # EITS Hook Scripts
 
-Claude Code integration scripts that manage session lifecycle and tool-use logging.
+Claude Code integration scripts that manage session lifecycle, context injection, and tool-use enforcement.
 
 **Location:** `priv/scripts/eits-*.sh`
+**Registered in:** `~/.claude/settings.json`
 
 ---
 
-## Session Lifecycle
+## How Context Injection Works
 
-### eits-session-startup.sh
+Context injection differs by hook type:
 
-Runs when Claude Code session starts (SessionStart hook).
+**SessionStart hooks** — anything printed to `stdout` is automatically injected into Claude's context.
 
-**Responsibilities:**
-- Create session via REST API POST `/api/v1/sessions`
-- Resolve project_name to project_id
-- Set environment variables: `EITS_SESSION_ID`, `EITS_AGENT_ID`, `EITS_PROJECT_ID`
-- Return session UUID to Claude Code
-
-**Flow:**
-1. Parse Claude Code context (session_id, description, project, model)
-2. Call REST API with `session_id`, `project_name`, `description`, `model`, `provider`
-3. Extract `uuid` and `agent_id` from response
-4. Export env vars for hook scripts and spawned agents
-5. Return UUID (stored in `.claude/eits/session_uuid`)
-
-**Env vars set:**
 ```bash
-EITS_SESSION_ID="<uuid>"
-EITS_AGENT_ID=<integer_id>
-EITS_PROJECT_ID=<integer> (or unset if project not found)
+echo "$CONTEXT"   # injected directly into conversation context
+```
+
+**Turn-based hooks** (`PreToolUse`, `PostToolUse`, `Stop`) — use `hookSpecificOutput` in a JSON response:
+
+```json
+{
+  "continue": true,
+  "suppressOutput": true,
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "additionalContext": "...markdown string..."
+  }
+}
+```
+
+`PreToolUse` hooks use `permissionDecision` to allow or deny tool calls instead of `additionalContext`.
+
+---
+
+## CLAUDE_ENV_FILE
+
+`SessionStart` and `SessionStart(resume)` hooks write environment variables to a temp file at `$CLAUDE_ENV_FILE`. These vars persist for the entire session and are available to all subsequent Bash tool calls.
+
+```bash
+echo "EITS_SESSION_UUID=$SESSION_ID" >> "$CLAUDE_ENV_FILE"
+echo "EITS_AGENT_UUID=$AGENT_UUID"   >> "$CLAUDE_ENV_FILE"
+echo "EITS_PROJECT_ID=$PROJECT_ID"   >> "$CLAUDE_ENV_FILE"
+```
+
+| Variable | Set By | Purpose |
+|---|---|---|
+| `EITS_SESSION_UUID` | startup / resume | Session UUID for all API calls |
+| `EITS_AGENT_UUID` | startup (pre-registered) / resume | Agent UUID |
+| `EITS_PROJECT_ID` | startup / resume | Resolved project integer ID |
+| `EITS_URL` | startup | REST API base URL |
+| `EITS_ENTRYPOINT` | startup / resume | CLI entrypoint identifier |
+
+---
+
+## Workflow Guard
+
+Every hook checks the `EITS_WORKFLOW` env var before doing any work:
+
+```bash
+[ "${EITS_WORKFLOW:-}" = "0" ] && exit 0
+```
+
+Set `EITS_WORKFLOW=0` to disable all hook behavior for a session.
+
+---
+
+## Session Lifecycle Hooks
+
+### SessionStart (startup / clear) — `eits-session-startup.sh`
+
+Fires when a new session starts or is cleared (`/clear`).
+
+**What it does:**
+1. Calls `eits sessions get $SESSION_ID` to check for a pre-registered session (spawned by workable task worker)
+2. Resolves or creates the project via `eits projects list` / `eits projects create` by path
+3. Writes env vars to `$CLAUDE_ENV_FILE`: `EITS_URL`, `EITS_SESSION_UUID`, `EITS_ENTRYPOINT`, `EITS_AGENT_UUID` (if pre-registered), `EITS_PROJECT_ID`
+4. Patches entrypoint on pre-registered sessions via `eits sessions update`
+5. Writes `$SESSION_ID` to `.git/eits-session` (used by post-commit hook)
+6. Updates session status to `working` via `eits sessions update --status working`
+7. Echoes a `$CONTEXT` markdown block to stdout for injection
+
+**Context injected (new sessions):**
+```
+# Eye in the Sky Integration Active
+**IMPORTANT**: Immediately invoke the Skill tool with `skill: "eits-init"` ...
+```
+
+**Context injected (pre-registered / spawned sessions):**
+```
+Session pre-registered. EITS_AGENT_UUID is already set — skip /eits-init.
 ```
 
 ---
 
-### eits-session-end.sh
+### SessionStart (resume) — `eits-session-resume.sh`
 
-Runs when Claude Code session ends (SessionEnd hook).
+Fires when an existing session is resumed.
 
-**Responsibilities:**
-- Mark session as completed via REST API PATCH `/api/v1/sessions/:uuid`
-- Clean up local temp files (session_uuid, etc.)
-- Log session summary (commits, notes, tasks completed)
+**What it does:**
+1. Calls `eits sessions get $SESSION_ID` — returns `id`, `agent_int_id`, `agent_id`, `name`, `project_id`
+2. Resolves project via `eits projects list` / `eits projects create` if `project_id` is null
+3. Writes/overwrites env vars in `$CLAUDE_ENV_FILE` (resume always wins)
+4. Patches entrypoint via `eits sessions update --entrypoint`
+5. Writes session/agent UUIDs to `.git/eits-session` / `.git/eits-agent`
+6. Updates session status to `working` via `eits sessions update --status working`
+7. Echoes `$CONTEXT` markdown to stdout for injection
 
-**Flow:**
-1. Read `EITS_SESSION_ID` from `.claude/eits/session_uuid`
-2. Call PATCH `/api/v1/sessions/{uuid}` with `status: "completed"`
-3. Optionally call end-session workflow (upload session context, etc.)
-4. Remove temp files
+---
 
-**Exit behavior:**
-- Returns 0 (success) even if REST call fails (session may have already ended)
-- Logs errors but doesn't block session exit
+### SessionStart (compact) — `eits-session-compact.sh`
+
+Fires after context compaction completes.
+
+**What it does:**
+- Sets session status back to `working` via `eits sessions update`
+
+> Also followed by `eits-session-startup.sh` in the compact hook chain (see settings.json).
+
+---
+
+### SessionEnd — `eits-session-end.sh`
+
+Fires when the session window closes.
+
+**What it does:**
+1. Lists in-progress tasks for the session via `eits tasks list --session $session_id --state 2`
+2. Moves each to In Review (`state_id=4`) via `eits tasks update --state 4`
+3. Marks session as `completed` via `eits sessions update --status completed`
+
+---
+
+### Stop — `eits-session-stop.sh`
+
+Fires after every Claude turn completes.
+
+**What it does:**
+- Sets session status to `idle` via `eits sessions update --status idle`
+- Guards against infinite loops via `stop_hook_active` field in input JSON
 
 ---
 
 ## Tool-Use Hooks
 
-### eits-pre-tool-use.sh
+### PreToolUse (Edit|Write) — `eits-pre-tool-use.sh`
 
-Runs before Claude Code executes a tool (PreToolUse hook).
+Fires before any `Edit` or `Write` tool call. Enforces the EITS workflow.
 
-**Responsibilities:**
-- Validate that an active task exists for the session
-- Check that task is in "In Progress" state (state_id 2)
-- Block tool execution if no active task
+**What it does:**
+1. Calls `eits sessions get` — fails open if API is unreachable
+2. **Non-spawned sessions**: denies if session has no name (requires `/eits-init`)
+3. **Non-spawned sessions**: denies if no active task (`state_id=2`) via `eits tasks list --session $session_id --state 2`
 
-**Validation:**
-```bash
-# Query: SELECT * FROM tasks WHERE session_id = $EITS_SESSION_ID AND state_id = 2 LIMIT 1
-psql -t -c "SELECT id FROM tasks WHERE session_id = $EITS_SESSION_ID AND state_id = 2 LIMIT 1"
+**Deny response format:**
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": "..."
+  }
+}
 ```
 
-**Exit codes:**
-- `0` — Active task found; allow tool execution
-- `1` — No active task; block execution (outputs helpful error message)
-
-**Error message:**
-```
-No active EITS todo for session {project_id}. Workflow:
-(1) i-todo create --title "Task"
-(2) i-todo start --task_id <id>
-(3) i-todo add-session --task_id <id> --session_id {uuid}
-(4) do work
-(5) i-todo status --task_id <id> --state_id 4 to move to In Review when done
-```
+Spawned agents bypass all checks.
 
 ---
 
-### eits-post-tool-use.sh (Future)
+### PostToolUse (Bash) — `eits-post-tool-commit.sh`
 
-Will run after tool execution to log tool use and results. Currently not implemented.
+Fires after every Bash tool call. Filters for git commit commands.
+
+**What it does:**
+1. Checks `tool_input.command` contains `git commit` — exits immediately if not
+2. Reads the commit hash via `git rev-parse HEAD` in `$CLAUDE_PROJECT_DIR`
+3. Logs commit to EITS via `eits commits create --hash $HASH --message $MSG`
+
+Silent — exits 0, no feedback to Claude.
 
 ---
 
-## Installation
+### PostToolUse (all) — `eits-post-tool-use.sh`
 
-```bash
-./priv/scripts/install.sh
-# Manually merge output into ~/.claude/settings.json
-```
+No-op placeholder, reserved for future tool result tracking.
 
-**Hooks registered:**
+---
+
+### UserPromptSubmit — `eits-prompt-submit.sh`
+
+Fires before Claude processes each user prompt.
+
+**What it does:**
+- Sets session to `working` via `eits sessions update --status working` (async)
+
+---
+
+## Utility Hooks
+
+### `eits-agent-working.sh`
+
+Sets session to `working` on SessionStart. Runs alongside startup/resume/clear in settings.json.
+
+### `eits-pre-compact.sh`
+
+Sets session to `compacting` before context compaction begins so the UI can show a reason for slow response.
+
+---
+
+## settings.json Registration
+
 ```json
 {
   "hooks": {
-    "SessionStart": "path/to/eits-session-startup.sh",
-    "SessionEnd": "path/to/eits-session-end.sh",
-    "PreToolUse": "path/to/eits-pre-tool-use.sh"
+    "SessionStart": [
+      { "matcher": "startup", "hooks": [
+        { "command": "eits-session-startup.sh" },
+        { "command": "eits-agent-working.sh" }
+      ]},
+      { "matcher": "resume", "hooks": [
+        { "command": "eits-session-resume.sh" },
+        { "command": "eits-agent-working.sh" }
+      ]},
+      { "matcher": "compact", "hooks": [
+        { "command": "eits-session-compact.sh" },
+        { "command": "eits-session-startup.sh" }
+      ]},
+      { "matcher": "clear", "hooks": [
+        { "command": "eits-session-startup.sh" },
+        { "command": "eits-agent-working.sh" }
+      ]}
+    ],
+    "PreToolUse": [
+      { "matcher": "Edit|Write", "hooks": [{ "command": "eits-pre-tool-use.sh" }] },
+      { "hooks": [{ "command": "eits-nats-tool-pre.sh", "async": true }] }
+    ],
+    "PostToolUse": [
+      { "hooks": [{ "command": "eits-post-tool-use.sh" }] },
+      { "matcher": "Bash", "hooks": [{ "command": "eits-post-tool-commit.sh" }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "command": "eits-prompt-submit.sh", "async": true }] }
+    ],
+    "PreCompact": [
+      { "hooks": [{ "command": "eits-pre-compact.sh", "async": true }] }
+    ],
+    "SessionEnd": [
+      { "hooks": [{ "command": "eits-session-end.sh" }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "command": "eits-session-stop.sh" }] }
+    ]
   }
 }
 ```
 
 ---
 
-## Helper Scripts
+## Cleanup TODO
 
-### sql/postgresql/check-active-todo.sh
-
-Checks if an active task exists in PostgreSQL.
-
-**Usage:**
-```bash
-./priv/scripts/sql/postgresql/check-active-todo.sh <session_uuid>
-```
-
-**Returns:**
-- `0` and task ID — if task found
-- `1` — if no active task
-
-**Database query:**
-```sql
-SELECT id FROM tasks
-WHERE session_id = (SELECT id FROM sessions WHERE uuid = $1)
-  AND state_id = 2  -- In Progress
-LIMIT 1
-```
-
----
-
-## Environment Variables
-
-| Var | Set By | Purpose |
-|-----|--------|---------|
-| `EITS_SESSION_ID` | eits-session-startup.sh | Session UUID for API calls |
-| `EITS_AGENT_ID` | eits-session-startup.sh | Integer agent ID for task ownership |
-| `EITS_PROJECT_ID` | eits-session-startup.sh | Project ID (may be unset) |
-| `EITS_API_KEY` | User (in .zshrc) | Bearer token for REST API |
-| `EITS_URL` | User (optional) | REST API base URL (defaults to localhost:5001) |
-
----
-
-## Troubleshooting
-
-**"No active EITS todo" error:**
-- Before running any tool, create a task: `i-todo create --title "..."`
-- Start it: `i-todo start --task_id <id>`
-- Link to session: `i-todo add-session --task_id <id> --session_id <uuid>`
-
-**API connection failures:**
-- Ensure EITS web server is running on port 5001
-- Check `EITS_URL` env var (defaults to `http://localhost:5001`)
-- Verify `EITS_API_KEY` is set in Claude Code environment
-
-**Database errors:**
-- PostgreSQL must be running and `eits_dev` database must exist
-- Check `.claude/last_session_uuid` doesn't reference a deleted session
-- Run `mix ecto.setup` to reset DB
-
----
-
-## Future Enhancements
-
-- PostToolUse hook to log tool use results and errors
-- Automatic task creation for new sessions (instead of manual i-todo create)
-- Session context auto-save on tool completion
+- Remove `eits-nats-tool-pre.sh` from settings.json and delete the script — NATS is no longer used
+- Remove `.git/hooks/post-commit` (`eits-post-commit.sh`) to avoid double-logging commits now that `eits-post-tool-commit.sh` handles it via Claude Code hooks

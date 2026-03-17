@@ -194,14 +194,19 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     body = String.trim(body)
 
     if body != "" do
-      Notes.create_note(%{
-        parent_type: "task",
-        parent_id: task.uuid || to_string(task.id),
-        body: body
-      })
+      case Notes.create_note(%{
+             parent_type: "task",
+             parent_id: task.uuid || to_string(task.id),
+             body: body
+           }) do
+        {:ok, _note} ->
+          notes = Notes.list_notes_for_task(task.id)
+          {:noreply, assign(socket, :task_notes, notes)}
 
-      notes = Notes.list_notes_for_task(task.id)
-      {:noreply, assign(socket, :task_notes, notes)}
+        {:error, changeset} ->
+          Logger.error("Failed to create task annotation: #{inspect(changeset.errors)}")
+          {:noreply, put_flash(socket, :error, "Failed to save annotation")}
+      end
     else
       {:noreply, socket}
     end
@@ -306,7 +311,16 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   def handle_event("select_model", %{"model" => model, "effort" => effort}, socket) do
     # Persist model selection to database
     session = socket.assigns.session
-    Sessions.update_session(session, %{model: model})
+
+    socket =
+      case Sessions.update_session(session, %{model: model}) do
+        {:ok, _updated} ->
+          socket
+
+        {:error, changeset} ->
+          Logger.error("Failed to persist model selection: #{inspect(changeset.errors)}")
+          put_flash(socket, :error, "Failed to save model selection")
+      end
 
     effort = if effort == "" and model == "opus", do: "medium", else: effort
 
@@ -334,16 +348,30 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   def handle_event("update_session_name", %{"value" => value}, socket) do
     session = socket.assigns.session
     value = String.trim(value)
-    Sessions.update_session(session, %{name: if(value == "", do: nil, else: value)})
-    {:noreply, assign(socket, :session, %{session | name: value})}
+
+    case Sessions.update_session(session, %{name: if(value == "", do: nil, else: value)}) do
+      {:ok, updated} ->
+        {:noreply, assign(socket, :session, updated)}
+
+      {:error, changeset} ->
+        Logger.error("Failed to update session name: #{inspect(changeset.errors)}")
+        {:noreply, put_flash(socket, :error, "Failed to update session name")}
+    end
   end
 
   @impl true
   def handle_event("update_session_description", %{"value" => value}, socket) do
     session = socket.assigns.session
     value = String.trim(value)
-    Sessions.update_session(session, %{description: if(value == "", do: nil, else: value)})
-    {:noreply, assign(socket, :session, %{session | description: value})}
+
+    case Sessions.update_session(session, %{description: if(value == "", do: nil, else: value)}) do
+      {:ok, updated} ->
+        {:noreply, assign(socket, :session, updated)}
+
+      {:error, changeset} ->
+        Logger.error("Failed to update session description: #{inspect(changeset.errors)}")
+        {:noreply, put_flash(socket, :error, "Failed to update session description")}
+    end
   end
 
   @impl true

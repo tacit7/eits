@@ -61,11 +61,11 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   _log "env_file=$CLAUDE_ENV_FILE"
   _set() {
     local key="$1" val="$2"
-    if grep -q "^${key}=" "$CLAUDE_ENV_FILE" 2>/dev/null; then
-      sed -i '' "s|^${key}=.*|${key}=${val}|" "$CLAUDE_ENV_FILE"
+    if grep -q "^export ${key}=" "$CLAUDE_ENV_FILE" 2>/dev/null; then
+      sed -i '' "s|^export ${key}=.*|export ${key}=${val}|" "$CLAUDE_ENV_FILE"
       _log "updated $key=$val"
     else
-      echo "${key}=${val}" >> "$CLAUDE_ENV_FILE"
+      echo "export ${key}=${val}" >> "$CLAUDE_ENV_FILE"
       _log "wrote $key=$val"
     fi
   }

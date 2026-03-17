@@ -45,11 +45,11 @@ else
 fi
 
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
-  echo "EITS_URL=http://localhost:5000/api/v1"  >> "$CLAUDE_ENV_FILE"
-  echo "EITS_SESSION_UUID=$SESSION_ID"          >> "$CLAUDE_ENV_FILE"
-  [ -n "$ENTRYPOINT" ]        && echo "EITS_ENTRYPOINT=$ENTRYPOINT"             >> "$CLAUDE_ENV_FILE"
-  [ -n "$EXISTING_AGENT_UUID" ] && echo "EITS_AGENT_UUID=$EXISTING_AGENT_UUID"  >> "$CLAUDE_ENV_FILE"
-  [ -n "$PROJECT_ID" ]        && echo "EITS_PROJECT_ID=$PROJECT_ID"             >> "$CLAUDE_ENV_FILE"
+  echo "export EITS_URL=http://localhost:5000/api/v1"  >> "$CLAUDE_ENV_FILE"
+  echo "export EITS_SESSION_UUID=$SESSION_ID"          >> "$CLAUDE_ENV_FILE"
+  [ -n "$ENTRYPOINT" ]        && echo "export EITS_ENTRYPOINT=$ENTRYPOINT"             >> "$CLAUDE_ENV_FILE"
+  [ -n "$EXISTING_AGENT_UUID" ] && echo "export EITS_AGENT_UUID=$EXISTING_AGENT_UUID"  >> "$CLAUDE_ENV_FILE"
+  [ -n "$PROJECT_ID" ]        && echo "export EITS_PROJECT_ID=$PROJECT_ID"             >> "$CLAUDE_ENV_FILE"
   _log "env vars written"
 
   # Patch entrypoint on pre-registered sessions

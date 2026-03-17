@@ -92,7 +92,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             value={@agent.name || ""}
             placeholder="Session name"
             phx-blur="update_session_name"
-            phx-keydown="update_session_name"
+            phx-keydown={JS.push("update_session_name") |> JS.focus(to: "#message-input")}
             phx-key="Enter"
             class="text-sm font-semibold text-base-content/85 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 flex-1 text-center placeholder:text-base-content/20 transition-colors"
           />
@@ -172,7 +172,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                     value={@agent.name || ""}
                     placeholder="Session name"
                     phx-blur="update_session_name"
-                    phx-keydown="update_session_name"
+                    phx-keydown={JS.push("update_session_name") |> JS.focus(to: "#message-input")}
                     phx-key="Enter"
                     class="text-base sm:text-lg font-bold text-base-content bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 flex-1 placeholder:text-base-content/20 transition-colors"
                   />

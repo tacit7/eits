@@ -98,11 +98,7 @@ defmodule EyeInTheSkyWeb.Settings do
       [meta_key, val]
     )
 
-    Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
-      "settings",
-      {:settings_changed, key, val}
-    )
+    EyeInTheSkyWeb.Events.settings_changed(key, val)
 
     :ok
   end
@@ -121,11 +117,7 @@ defmodule EyeInTheSkyWeb.Settings do
     meta_key = @prefix <> key
     Repo.query!("DELETE FROM meta WHERE key = $1", [meta_key])
 
-    Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
-      "settings",
-      {:settings_changed, key, Map.get(@defaults, key)}
-    )
+    EyeInTheSkyWeb.Events.settings_changed(key, Map.get(@defaults, key))
 
     :ok
   end

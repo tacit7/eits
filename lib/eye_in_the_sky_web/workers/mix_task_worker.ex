@@ -46,6 +46,6 @@ defmodule EyeInTheSkyWeb.Workers.MixTaskWorker do
   defp blank_to_nil(s), do: s
 
   defp broadcast do
-    Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "scheduled_jobs", :jobs_updated)
+    EyeInTheSkyWeb.Events.jobs_updated()
   end
 end

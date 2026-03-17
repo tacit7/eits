@@ -57,6 +57,6 @@ defmodule EyeInTheSkyWeb.Tasks.Poller do
   end
 
   defp broadcast_tasks_changed do
-    Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "tasks", :tasks_changed)
+    EyeInTheSkyWeb.Events.tasks_changed()
   end
 end

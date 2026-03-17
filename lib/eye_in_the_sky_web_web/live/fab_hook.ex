@@ -16,7 +16,7 @@ defmodule EyeInTheSkyWebWeb.FabHook do
 
   def on_mount(:default, _params, _session, socket) do
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "notifications")
+      EyeInTheSkyWeb.Events.subscribe_notifications()
     end
 
     socket =
@@ -81,7 +81,7 @@ defmodule EyeInTheSkyWebWeb.FabHook do
       case resolve_session(session_id) do
         {:ok, session} ->
           socket = unsubscribe_config_guide_session(socket)
-          Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
+          EyeInTheSkyWeb.Events.subscribe_session(session.id)
           socket = assign(socket, :config_guide_active_session_id, session.id)
 
           messages =
@@ -185,7 +185,7 @@ defmodule EyeInTheSkyWebWeb.FabHook do
     socket = unsubscribe_active_session(socket)
 
     if socket.assigns.fab_active_session_id != session_id do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session_id}")
+      EyeInTheSkyWeb.Events.subscribe_session(session_id)
     end
 
     assign(socket, :fab_active_session_id, session_id)

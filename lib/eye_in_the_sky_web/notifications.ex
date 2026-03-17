@@ -11,9 +11,6 @@ defmodule EyeInTheSkyWeb.Notifications do
   alias EyeInTheSkyWeb.Notifications.Notification
   alias EyeInTheSkyWeb.PushSubscriptions
 
-  @pubsub EyeInTheSkyWeb.PubSub
-  @topic "notifications"
-
   @doc """
   Create a notification and broadcast it via PubSub.
 
@@ -103,11 +100,11 @@ defmodule EyeInTheSkyWeb.Notifications do
   end
 
   def subscribe do
-    Phoenix.PubSub.subscribe(@pubsub, @topic)
+    EyeInTheSkyWeb.Events.subscribe_notifications()
   end
 
   defp broadcast(event, payload \\ nil) do
-    Phoenix.PubSub.broadcast(@pubsub, @topic, {event, payload})
+    EyeInTheSkyWeb.Events.notification(event, payload)
   end
 
   defp maybe_push(%{category: "agent"} = notification) do

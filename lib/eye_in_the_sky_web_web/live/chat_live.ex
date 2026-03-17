@@ -197,11 +197,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
          }) do
       {:ok, message} ->
         # 2. Broadcast to channel PubSub
-        Phoenix.PubSub.broadcast(
-          EyeInTheSkyWeb.PubSub,
-          "channel:#{channel_id}:messages",
-          {:new_message, message}
-        )
+        EyeInTheSkyWeb.Events.channel_message(channel_id, message)
 
         # Mark channel as read
         Channels.mark_as_read(channel_id, session_id)
@@ -286,11 +282,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
            body: body
          }) do
       {:ok, message} ->
-        Phoenix.PubSub.broadcast(
-          EyeInTheSkyWeb.PubSub,
-          "channel:#{channel_id}:messages",
-          {:new_message, message}
-        )
+        EyeInTheSkyWeb.Events.channel_message(channel_id, message)
 
         if target_session_id do
           prompt = ChannelProtocol.build_prompt(:direct, body)
@@ -326,11 +318,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
               body: "Agent @#{session_id} (#{session.name || "unnamed"}) joined the channel"
             })
 
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "channel:#{channel_id}:messages",
-            {:new_message, sys_msg}
-          )
+          EyeInTheSkyWeb.Events.channel_message(channel_id, sys_msg)
 
           # Reload channel members
           channel_members = load_channel_members(channel_id)
@@ -367,11 +355,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
           body: "Agent @#{session_id} (#{session.name || "unnamed"}) left the channel"
         })
 
-      Phoenix.PubSub.broadcast(
-        EyeInTheSkyWeb.PubSub,
-        "channel:#{channel_id}:messages",
-        {:new_message, sys_msg}
-      )
+      EyeInTheSkyWeb.Events.channel_message(channel_id, sys_msg)
 
       Logger.info("Removed agent session=#{session_id} from channel=#{channel_id}")
 
@@ -415,11 +399,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
          }) do
       {:ok, message} ->
         # Broadcast to channel subscribers
-        Phoenix.PubSub.broadcast(
-          EyeInTheSkyWeb.PubSub,
-          "channel:#{channel_id}:messages",
-          {:new_message, message}
-        )
+        EyeInTheSkyWeb.Events.channel_message(channel_id, message)
 
         # Reload thread
         active_thread = load_thread(parent_id)
@@ -549,11 +529,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
                   body: "Agent @#{session.id} (#{agent_description}) joined the channel"
                 })
 
-              Phoenix.PubSub.broadcast(
-                EyeInTheSkyWeb.PubSub,
-                "channel:#{channel_id}:messages",
-                {:new_message, sys_msg}
-              )
+              EyeInTheSkyWeb.Events.channel_message(channel_id, sys_msg)
 
             {:error, _} ->
               :ok

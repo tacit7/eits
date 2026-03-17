@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "scheduled_jobs")
+      EyeInTheSkyWeb.Events.subscribe_scheduled_jobs()
     end
 
     all_jobs = ScheduledJobs.list_jobs()

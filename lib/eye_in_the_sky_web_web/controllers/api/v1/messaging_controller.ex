@@ -56,11 +56,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
             result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
               case Messages.create_message(attrs) do
                 {:ok, msg} ->
-                  Phoenix.PubSub.broadcast(
-                    EyeInTheSkyWeb.PubSub,
-                    "session:#{session.id}",
-                    {:new_dm, msg}
-                  )
+                  EyeInTheSkyWeb.Events.session_new_dm(session.id, msg)
 
                   conn
                   |> put_status(:created)
@@ -156,11 +152,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
 
             case Messages.create_channel_message(attrs) do
               {:ok, msg} ->
-                Phoenix.PubSub.broadcast(
-                  EyeInTheSkyWeb.PubSub,
-                  "channel:#{channel_id}:messages",
-                  {:new_message, msg}
-                )
+                EyeInTheSkyWeb.Events.channel_message(channel_id, msg)
 
                 conn
                 |> put_status(:created)

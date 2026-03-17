@@ -94,11 +94,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
         broadcast_status(session_id, :working)
 
         if session_int_id do
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "agent:working",
-            {:agent_working, session_id, session_int_id}
-          )
+          EyeInTheSkyWeb.Events.agent_working(session_id, session_int_id)
         end
 
         {:ok, state}
@@ -217,11 +213,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
 
     # Broadcast completion to session topic
     if state.session_int_id do
-      Phoenix.PubSub.broadcast(
-        EyeInTheSkyWeb.PubSub,
-        "session:#{state.session_int_id}",
-        {:claude_complete, state.session_ref, exit_code}
-      )
+      EyeInTheSkyWeb.Events.session_cli_complete(state.session_int_id, state.session_ref, exit_code)
     end
 
     # Process next queued message or go idle
@@ -230,11 +222,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
         broadcast_status(state.session_id, :idle)
 
         if state.session_int_id do
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "agent:working",
-            {:agent_stopped, state.session_id, state.session_int_id}
-          )
+          EyeInTheSkyWeb.Events.agent_stopped(state.session_id, state.session_int_id)
 
           case Sessions.get_session(state.session_int_id) do
             {:ok, session} ->
@@ -285,11 +273,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
     end
 
     if state[:session_id] && state[:session_int_id] do
-      Phoenix.PubSub.broadcast(
-        EyeInTheSkyWeb.PubSub,
-        "agent:working",
-        {:agent_stopped, state.session_id, state.session_int_id}
-      )
+      EyeInTheSkyWeb.Events.agent_stopped(state.session_id, state.session_int_id)
     end
 
     Utils.close_port_safely(state[:port])
@@ -318,11 +302,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
         broadcast_status(state.session_id, :working)
 
         if state.session_int_id do
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "agent:working",
-            {:agent_working, state.session_id, state.session_int_id}
-          )
+          EyeInTheSkyWeb.Events.agent_working(state.session_id, state.session_int_id)
         end
 
         {:ok,
@@ -348,11 +328,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
   end
 
   defp broadcast_status(session_id, status) do
-    Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
-      "session:#{session_id}:status",
-      {:session_status, session_id, status}
-    )
+    EyeInTheSkyWeb.Events.session_status(session_id, status)
   end
 
   # --- Output handling ---
@@ -436,11 +412,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
       updated_buffer = [parsed | state.output_buffer]
 
       if state.session_int_id do
-        Phoenix.PubSub.broadcast(
-          EyeInTheSkyWeb.PubSub,
-          "session:#{state.session_int_id}",
-          {:claude_response, state.session_ref, parsed}
-        )
+        EyeInTheSkyWeb.Events.session_output(state.session_int_id, state.session_ref, parsed)
       end
 
       {:noreply, %{state | output_buffer: updated_buffer}}

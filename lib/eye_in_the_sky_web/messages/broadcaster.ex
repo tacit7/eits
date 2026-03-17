@@ -91,27 +91,15 @@ defmodule EyeInTheSkyWeb.Messages.Broadcaster do
   end
 
   defp broadcast_message(%Message{session_id: sid} = msg) when not is_nil(sid) do
-    Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
-      "session:#{sid}",
-      {:new_message, msg}
-    )
+    EyeInTheSkyWeb.Events.session_new_message(sid, msg)
 
     if msg.channel_id do
-      Phoenix.PubSub.broadcast(
-        EyeInTheSkyWeb.PubSub,
-        "channel:#{msg.channel_id}:messages",
-        {:new_message, msg}
-      )
+      EyeInTheSkyWeb.Events.channel_message(msg.channel_id, msg)
     end
   end
 
   defp broadcast_message(%Message{channel_id: cid}) when not is_nil(cid) do
-    Phoenix.PubSub.broadcast(
-      EyeInTheSkyWeb.PubSub,
-      "channel:#{cid}:messages",
-      {:new_message, %{channel_id: cid}}
-    )
+    EyeInTheSkyWeb.Events.channel_message(cid, %{channel_id: cid})
   end
 
   defp broadcast_message(_), do: :ok

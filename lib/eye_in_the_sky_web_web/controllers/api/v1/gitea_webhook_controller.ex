@@ -214,11 +214,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
 
         case Messages.create_message(attrs) do
           {:ok, msg} ->
-            Phoenix.PubSub.broadcast(
-              EyeInTheSkyWeb.PubSub,
-              "session:#{session.id}",
-              {:new_dm, msg}
-            )
+            EyeInTheSkyWeb.Events.session_new_dm(session.id, msg)
 
             Logger.info("DM sent to session #{session_uuid} for PR ##{pr_number} comment")
             json(conn, %{success: true, message: "Session notified"})

@@ -452,23 +452,11 @@ defmodule EyeInTheSkyWeb.Tasks do
   # PubSub
 
   defp broadcast_change({tag, task}) when tag in [:ok, :deleted] do
-    do_broadcast_tasks_changed(task)
+    EyeInTheSkyWeb.Events.task_updated(task)
   end
 
   defp broadcast_change(_) do
-    Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "tasks", :tasks_changed)
-  end
-
-  defp do_broadcast_tasks_changed(task) do
-    Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "tasks", :tasks_changed)
-
-    if task.project_id do
-      Phoenix.PubSub.broadcast(
-        EyeInTheSkyWeb.PubSub,
-        "tasks:#{task.project_id}",
-        :tasks_changed
-      )
-    end
+    EyeInTheSkyWeb.Events.tasks_changed()
   end
 
   # Checklist Items

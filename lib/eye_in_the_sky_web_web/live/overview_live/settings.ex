@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Settings do
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "settings")
+      EyeInTheSkyWeb.Events.subscribe_settings()
     end
 
     settings = Settings.all()

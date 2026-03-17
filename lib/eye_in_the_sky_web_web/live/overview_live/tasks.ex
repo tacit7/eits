@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "tasks")
+      EyeInTheSkyWeb.Events.subscribe_tasks()
     end
 
     workflow_states = Tasks.list_workflow_states()

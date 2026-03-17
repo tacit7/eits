@@ -444,10 +444,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   # --- Private ---
 
   defp broadcast_events(events, state) do
-    topic = "dm:#{state.session_id}:stream"
-
     Enum.each(events, fn event ->
-      Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, topic, event)
+      EyeInTheSkyWeb.Events.stream_event(state.session_id, event)
     end)
   end
 

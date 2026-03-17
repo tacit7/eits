@@ -12,7 +12,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "teams")
+      EyeInTheSkyWeb.Events.subscribe_teams()
     end
 
     {:ok,

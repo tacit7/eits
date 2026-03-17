@@ -97,6 +97,6 @@ defmodule EyeInTheSkyWeb.Workers.SpawnAgentWorker do
   defp parse_int(val) when is_integer(val), do: val
 
   defp broadcast do
-    Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "scheduled_jobs", :jobs_updated)
+    EyeInTheSkyWeb.Events.jobs_updated()
   end
 end

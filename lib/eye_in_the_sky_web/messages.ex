@@ -168,20 +168,10 @@ defmodule EyeInTheSkyWeb.Messages do
 
     case result do
       {:ok, message} ->
-        # Broadcast new message to session topic
-        Phoenix.PubSub.broadcast(
-          EyeInTheSkyWeb.PubSub,
-          "session:#{message.session_id}",
-          {:new_message, message}
-        )
+        EyeInTheSkyWeb.Events.session_new_message(message.session_id, message)
 
-        # Also broadcast to channel topic if this is a channel message
         if message.channel_id do
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "channel:#{message.channel_id}:messages",
-            {:new_message, message}
-          )
+          EyeInTheSkyWeb.Events.channel_message(message.channel_id, message)
         end
 
         {:ok, message}
@@ -251,19 +241,10 @@ defmodule EyeInTheSkyWeb.Messages do
 
     case result do
       {:ok, message} ->
-        Phoenix.PubSub.broadcast(
-          EyeInTheSkyWeb.PubSub,
-          "session:#{message.session_id}",
-          {:new_message, message}
-        )
+        EyeInTheSkyWeb.Events.session_new_message(message.session_id, message)
 
-        # Also broadcast to channel topic if this is a channel message
         if message.channel_id do
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "channel:#{message.channel_id}:messages",
-            {:new_message, message}
-          )
+          EyeInTheSkyWeb.Events.channel_message(message.channel_id, message)
         end
 
         {:ok, message}
@@ -591,11 +572,7 @@ defmodule EyeInTheSkyWeb.Messages do
     case result do
       {:ok, message} ->
         if message.channel_id do
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "channel:#{message.channel_id}:messages",
-            {:new_message, message}
-          )
+          EyeInTheSkyWeb.Events.channel_message(message.channel_id, message)
         end
 
         {:ok, message}

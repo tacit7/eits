@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWeb.Teams do
   alias EyeInTheSkyWeb.Teams.{Team, TeamMember}
 
   defp broadcast(event, payload) do
-    Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "teams", {event, payload})
+    EyeInTheSkyWeb.Events.team_event(event, payload)
   end
 
   # ── Teams ──────────────────────────────────────────────────

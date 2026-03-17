@@ -16,7 +16,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     id = params["id"]
 
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "tasks:#{id}")
+      EyeInTheSkyWeb.Events.subscribe_project_tasks(id)
     end
 
     socket =

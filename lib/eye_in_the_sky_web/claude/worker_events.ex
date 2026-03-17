@@ -12,38 +12,34 @@ defmodule EyeInTheSkyWeb.Claude.WorkerEvents do
 
   alias EyeInTheSkyWeb.{Messages, Sessions}
 
-  @pubsub EyeInTheSkyWeb.PubSub
+  alias EyeInTheSkyWeb.Events
 
   # --- Lifecycle Events ---
 
   @doc "SDK started processing a job."
   def on_sdk_started(session_id, provider_conversation_id) do
     update_session_status(session_id, "working")
-    broadcast("agent:working", {:agent_working, provider_conversation_id, session_id})
+    Events.agent_working(provider_conversation_id, session_id)
   end
 
   @doc "SDK completed successfully."
   def on_sdk_completed(session_id, provider_conversation_id) do
     update_session_status(session_id, "idle")
-    broadcast("agent:working", {:agent_stopped, provider_conversation_id, session_id})
+    Events.agent_stopped(provider_conversation_id, session_id)
     notify_agent_complete(session_id, provider_conversation_id)
   end
 
   @doc "SDK errored (transient or systemic)."
   def on_sdk_errored(session_id, provider_conversation_id) do
     update_session_status(session_id, "idle")
-    broadcast("agent:working", {:agent_stopped, provider_conversation_id, session_id})
+    Events.agent_stopped(provider_conversation_id, session_id)
   end
 
   @doc "Max retries exceeded — worker giving up."
   def on_max_retries_exceeded(session_id, provider_conversation_id) do
-    broadcast(
-      "dm:#{session_id}:stream",
-      {:agent_error, provider_conversation_id, session_id, "Max retries exceeded"}
-    )
-
+    Events.stream_error(session_id, provider_conversation_id, "Max retries exceeded")
     update_session_status(session_id, "error")
-    broadcast("agent:working", {:agent_stopped, provider_conversation_id, session_id})
+    Events.agent_stopped(provider_conversation_id, session_id)
   end
 
   @doc "SDK spawn failed — record system error message."
@@ -62,10 +58,10 @@ defmodule EyeInTheSkyWeb.Claude.WorkerEvents do
     reason_str = inspect(reason)
 
     Enum.each(queue, fn _job ->
-      broadcast(
-        "dm:#{session_id}:stream",
-        {:agent_error, provider_conversation_id, session_id,
-         "Queued job dropped due to systemic error: #{reason_str}"}
+      Events.stream_error(
+        session_id,
+        provider_conversation_id,
+        "Queued job dropped due to systemic error: #{reason_str}"
       )
     end)
   end
@@ -130,18 +126,12 @@ defmodule EyeInTheSkyWeb.Claude.WorkerEvents do
 
   @doc "Clear the stream display."
   def broadcast_stream_clear(session_id) do
-    broadcast("dm:#{session_id}:stream", :stream_clear)
+    Events.stream_clear(session_id)
   end
 
   @doc "Broadcast queue state change."
   def broadcast_queue_update(session_id, queue) do
-    broadcast("dm:#{session_id}:queue", {:queue_updated, queue})
-  end
-
-  # --- Private ---
-
-  defp broadcast(topic, message) do
-    Phoenix.PubSub.broadcast(@pubsub, topic, message)
+    Events.queue_updated(session_id, queue)
   end
 
   defp update_session_status(session_id, status) do

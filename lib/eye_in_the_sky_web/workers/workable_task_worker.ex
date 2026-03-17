@@ -186,7 +186,7 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
   end
 
   defp broadcast do
-    Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "scheduled_jobs", :jobs_updated)
+    EyeInTheSkyWeb.Events.jobs_updated()
   end
 
   defp notify(output) do

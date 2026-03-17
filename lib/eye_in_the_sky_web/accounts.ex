@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.Accounts do
   import Ecto.Query
 
   alias EyeInTheSkyWeb.Repo
-  alias EyeInTheSkyWeb.Accounts.{User, Passkey, RegistrationToken}
+  alias EyeInTheSkyWeb.Accounts.{User, Passkey, RegistrationToken, UserSession}
 
   # --- Users ---
 
@@ -85,13 +85,56 @@ defmodule EyeInTheSkyWeb.Accounts do
     end
   end
 
+  # --- User Sessions ---
+
+  def create_user_session(user_id) do
+    token = :crypto.strong_rand_bytes(32) |> Base.encode16()
+    expires_at = NaiveDateTime.add(NaiveDateTime.utc_now(), 86_400 * 7, :second)
+
+    result =
+      %UserSession{}
+      |> UserSession.changeset(%{user_id: user_id, session_token: token, expires_at: expires_at})
+      |> Repo.insert()
+
+    case result do
+      {:ok, _} -> {:ok, token}
+      error -> error
+    end
+  end
+
+  def get_valid_user_session(token) when is_binary(token) do
+    case Repo.get_by(UserSession, session_token: token) do
+      nil ->
+        nil
+
+      session ->
+        if NaiveDateTime.compare(session.expires_at, NaiveDateTime.utc_now()) == :gt,
+          do: session,
+          else: nil
+    end
+  end
+
+  def delete_user_session(token) when is_binary(token) do
+    case Repo.get_by(UserSession, session_token: token) do
+      nil -> :ok
+      session -> Repo.delete(session) && :ok
+    end
+  end
+
   # Builds the allow_credentials list that wax_ expects for authentication:
   # [{credential_id_binary, cose_key_term}]
   def build_allowed_credentials(user_id) do
     user_id
     |> list_passkeys_for_user()
     |> Enum.map(fn pk ->
-      cose_key = :erlang.binary_to_term(pk.cose_key, [:safe])
+      cose_key =
+        pk.cose_key
+        |> Jason.decode!()
+        |> Map.new(fn {k, v} ->
+          val = if is_map(v) and Map.has_key?(v, "b64"), do: Base.decode64!(v["b64"]), else: v
+          {String.to_integer(k), val}
+        end)
+
       {pk.credential_id, cose_key}
     end)
   end

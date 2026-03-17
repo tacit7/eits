@@ -44,7 +44,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
         |> assign(:global_jobs, [])
       end
 
-    socket = socket |> assign_agent_schedule_defaults()
+    socket =
+      socket
+      |> assign(:running_ids, MapSet.new(ScheduledJobs.list_running_job_ids()))
+      |> assign(:last_run_map, ScheduledJobs.last_run_status_map())
+      |> assign_agent_schedule_defaults()
 
     {:ok, socket}
   end
@@ -54,6 +58,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
     socket =
       socket
       |> reload_jobs()
+      |> assign(:running_ids, MapSet.new(ScheduledJobs.list_running_job_ids()))
+      |> assign(:last_run_map, ScheduledJobs.last_run_status_map())
       |> maybe_reload_agent_schedule_data()
 
     {:noreply, socket}
@@ -232,18 +238,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
     |> assign(:global_jobs, ScheduledJobs.list_global_jobs())
   end
 
-  defp format_schedule(%{schedule_type: "interval", schedule_value: val}) do
-    case Integer.parse(val) do
-      {s, _} when s >= 3600 -> "Every #{div(s, 3600)}h"
-      {s, _} when s >= 60 -> "Every #{div(s, 60)}m"
-      {s, _} -> "Every #{s}s"
-      _ -> val
-    end
-  end
-
-  defp format_schedule(%{schedule_type: "cron", schedule_value: val}), do: val
-  defp format_schedule(_), do: "?"
-
   @impl true
   def render(assigns) do
     ~H"""
@@ -361,7 +355,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
               </button>
             </div>
           </div>
-          <.jobs_table jobs={@project_jobs} expanded_job_id={@expanded_job_id} runs={@runs} />
+          <.jobs_table jobs={@project_jobs} expanded_job_id={@expanded_job_id} runs={@runs} running_ids={@running_ids} last_run_map={@last_run_map} />
         </div>
 
         <div class="divider"></div>
@@ -381,7 +375,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
               + New Global Job
             </button>
           </div>
-          <.jobs_table jobs={@global_jobs} expanded_job_id={@expanded_job_id} runs={@runs} />
+          <.jobs_table jobs={@global_jobs} expanded_job_id={@expanded_job_id} runs={@runs} running_ids={@running_ids} last_run_map={@last_run_map} />
         </div>
       <% end %>
 
@@ -453,19 +447,26 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
     <%= if length(@jobs) > 0 do %>
       <div class="md:hidden space-y-3">
         <%= for job <- @jobs do %>
-          <article class="rounded-xl border border-base-content/10 bg-base-100 p-3 shadow-sm">
+          <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
+          <article class={"rounded-xl border border-base-content/10 bg-base-100 p-3 shadow-sm #{row_border_class(job_state)}"}>
             <button class="w-full text-left" phx-click="expand_job" phx-value-id={job.id}>
               <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0">
-                  <h3 class="font-medium text-sm truncate">{job.name}</h3>
+                  <div class="flex items-center gap-1.5">
+                    <h3 class="font-medium text-sm truncate">{job.name}</h3>
+                    <%= if job_state == :running do %>
+                      <span class="badge badge-warning badge-xs animate-pulse shrink-0">running</span>
+                    <% end %>
+                  </div>
                   <%= if job.description do %>
                     <p class="text-[11px] text-base-content/60 mt-0.5 truncate">{job.description}</p>
                   <% end %>
                   <p class="text-[11px] font-mono text-base-content/50 mt-1 truncate">
                     {format_schedule(job)}
+                    <span class="text-base-content/30 not-italic ml-1">{system_timezone()}</span>
                   </p>
                 </div>
-                <span class={"badge badge-sm #{type_badge_class(job.job_type)}"}>
+                <span class="badge badge-xs badge-ghost">
                   {type_label(job.job_type)}
                 </span>
               </div>
@@ -483,9 +484,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
 
             <div class="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
               <span class="text-base-content/50">Last Run</span>
-              <span class="text-right">{format_time(job.last_run_at)}</span>
+              <span class="text-right" title={format_time(job.last_run_at)}>{format_relative_time(job.last_run_at)}</span>
               <span class="text-base-content/50">Next Run</span>
-              <span class="text-right">{format_time(job.next_run_at)}</span>
+              <span class="text-right" title={format_time(job.next_run_at)}>{format_relative_time(job.next_run_at)}</span>
               <span class="text-base-content/50">Runs</span>
               <span class="text-right">{job.run_count || 0}</span>
             </div>
@@ -534,9 +535,15 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
           </thead>
           <tbody>
             <%= for job <- @jobs do %>
+              <% row_state = job_row_state(job, @running_ids, @last_run_map) %>
               <tr class={"hover #{if @expanded_job_id == job.id, do: "bg-base-200"}"}>
-                <td class="cursor-pointer" phx-click="expand_job" phx-value-id={job.id}>
-                  <div class="font-medium">{job.name}</div>
+                <td class={"cursor-pointer #{row_border_class(row_state)}"} phx-click="expand_job" phx-value-id={job.id}>
+                  <div class="flex items-center gap-1.5">
+                    <div class="font-medium">{job.name}</div>
+                    <%= if row_state == :running do %>
+                      <span class="badge badge-warning badge-xs animate-pulse">running</span>
+                    <% end %>
+                  </div>
                   <%= if job.description do %>
                     <p class="text-xs text-base-content/50 mt-0.5">{job.description}</p>
                   <% end %>
@@ -545,11 +552,14 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
                   <% end %>
                 </td>
                 <td>
-                  <span class={"badge badge-sm #{type_badge_class(job.job_type)}"}>
+                  <span class="badge badge-xs badge-ghost">
                     {type_label(job.job_type)}
                   </span>
                 </td>
-                <td class="text-xs font-mono">{format_schedule(job)}</td>
+                <td class="text-xs">
+                  <span class="font-mono">{format_schedule(job)}</span>
+                  <span class="text-base-content/40 ml-1 text-[10px]">{system_timezone()}</span>
+                </td>
                 <td>
                   <input
                     type="checkbox"
@@ -559,8 +569,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
                     phx-value-id={job.id}
                   />
                 </td>
-                <td class="text-xs">{format_time(job.last_run_at)}</td>
-                <td class="text-xs">{format_time(job.next_run_at)}</td>
+                <td class="text-xs" title={format_time(job.last_run_at)}>{format_relative_time(job.last_run_at)}</td>
+                <td class="text-xs" title={format_time(job.next_run_at)}>{format_relative_time(job.next_run_at)}</td>
                 <td class="text-xs">{job.run_count || 0}</td>
                 <td>
                   <div class="flex items-center gap-1">

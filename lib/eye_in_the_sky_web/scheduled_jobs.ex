@@ -128,6 +128,26 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
     update_job_fields(job, %{enabled: new_enabled, updated_at: iso_now()})
   end
 
+  def list_running_job_ids do
+    from(r in JobRun,
+      where: r.status == "running",
+      distinct: r.job_id,
+      select: r.job_id
+    )
+    |> Repo.all()
+  end
+
+  def last_run_status_map do
+    from(r in JobRun,
+      where: r.status != "running",
+      distinct: r.job_id,
+      order_by: [asc: r.job_id, desc: r.started_at],
+      select: {r.job_id, r.status}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
   def list_runs_for_job(job_id, opts \\ []) do
     limit = Keyword.get(opts, :limit, 20)
 
@@ -137,6 +157,18 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
       limit: ^limit
     )
     |> Repo.all()
+  end
+
+  def last_run_per_job([]), do: %{}
+
+  def last_run_per_job(job_ids) when is_list(job_ids) do
+    from(r in JobRun,
+      where: r.job_id in ^job_ids,
+      distinct: r.job_id,
+      order_by: [asc: r.job_id, desc: r.started_at]
+    )
+    |> Repo.all()
+    |> Map.new(fn r -> {r.job_id, r} end)
   end
 
   def record_run_start(job) do

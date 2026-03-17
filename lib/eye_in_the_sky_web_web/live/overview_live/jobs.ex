@@ -22,6 +22,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
       |> assign(:sidebar_tab, :jobs)
       |> assign(:sidebar_project, nil)
       |> assign(:jobs, ScheduledJobs.list_jobs())
+      |> assign(:running_ids, MapSet.new(ScheduledJobs.list_running_job_ids()))
+      |> assign(:last_run_map, ScheduledJobs.last_run_status_map())
       |> assign(:show_form, false)
       |> assign(:editing_job, nil)
       |> assign(:changeset, ScheduledJobs.change_job(%ScheduledJob{}))
@@ -43,6 +45,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
     socket =
       socket
       |> assign(:jobs, ScheduledJobs.list_jobs())
+      |> assign(:running_ids, MapSet.new(ScheduledJobs.list_running_job_ids()))
+      |> assign(:last_run_map, ScheduledJobs.last_run_status_map())
       |> maybe_reload_agent_schedule_data()
 
     {:noreply, socket}
@@ -196,144 +200,6 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
   def handle_event("save_schedule", params, socket),
     do: handle_save_schedule(params, socket)
 
-  defp format_schedule(%{schedule_type: "interval", schedule_value: val}) do
-    case Integer.parse(val) do
-      {s, _} when s >= 3600 -> "Every #{div(s, 3600)}h"
-      {s, _} when s >= 60 -> "Every #{div(s, 60)}m"
-      {s, _} -> "Every #{s}s"
-      _ -> val
-    end
-  end
-
-  defp format_schedule(%{schedule_type: "cron", schedule_value: val}), do: describe_cron(val)
-  defp format_schedule(_), do: "?"
-
-  @days_of_week %{
-    0 => "Sun",
-    1 => "Mon",
-    2 => "Tue",
-    3 => "Wed",
-    4 => "Thu",
-    5 => "Fri",
-    6 => "Sat",
-    7 => "Sun"
-  }
-
-  defp describe_cron(expr) do
-    case String.split(String.trim(expr), ~r/\s+/) do
-      [min, hour, dom, mon, dow] ->
-        time = format_cron_time(min, hour)
-        day = format_cron_day(dow, dom, mon)
-
-        case {time, day} do
-          {nil, nil} -> expr
-          {t, nil} -> t
-          {nil, d} -> d
-          {t, d} -> "#{d} at #{t}"
-        end
-
-      _ ->
-        expr
-    end
-  end
-
-  defp format_cron_time(min, hour) do
-    case {parse_cron_num(min), parse_cron_num(hour)} do
-      {{:ok, m}, {:ok, h}} ->
-        period = if h >= 12, do: "PM", else: "AM"
-
-        display_h =
-          cond do
-            h == 0 -> 12
-            h > 12 -> h - 12
-            true -> h
-          end
-
-        if m == 0,
-          do: "#{display_h} #{period}",
-          else: "#{display_h}:#{String.pad_leading("#{m}", 2, "0")} #{period}"
-
-      {_, {:step, n}} ->
-        "Every #{n}h"
-
-      {{:step, n}, _} ->
-        "Every #{n}m"
-
-      _ ->
-        nil
-    end
-  end
-
-  defp format_cron_day(dow, dom, mon) do
-    cond do
-      dow != "*" and dom == "*" and mon == "*" ->
-        format_dow(dow)
-
-      dow == "*" and dom != "*" and mon == "*" ->
-        "Day #{dom}"
-
-      dow == "*" and dom != "*" and mon != "*" ->
-        "#{month_name(mon)} #{dom}"
-
-      dow == "*" and dom == "*" and mon == "*" ->
-        "Daily"
-
-      true ->
-        nil
-    end
-  end
-
-  defp format_dow(dow) do
-    cond do
-      dow == "1-5" ->
-        "Weekdays"
-
-      dow == "0,6" or dow == "6,0" ->
-        "Weekends"
-
-      String.contains?(dow, ",") ->
-        dow |> String.split(",") |> Enum.map_join(", ", &day_name/1)
-
-      String.contains?(dow, "-") ->
-        [from, to] = String.split(dow, "-", parts: 2)
-        "#{day_name(from)}-#{day_name(to)}"
-
-      true ->
-        day_name(dow)
-    end
-  end
-
-  defp day_name(n) do
-    case Integer.parse(to_string(n)) do
-      {num, _} -> Map.get(@days_of_week, num, "?")
-      _ -> "?"
-    end
-  end
-
-  defp month_name("1"), do: "Jan"
-  defp month_name("2"), do: "Feb"
-  defp month_name("3"), do: "Mar"
-  defp month_name("4"), do: "Apr"
-  defp month_name("5"), do: "May"
-  defp month_name("6"), do: "Jun"
-  defp month_name("7"), do: "Jul"
-  defp month_name("8"), do: "Aug"
-  defp month_name("9"), do: "Sep"
-  defp month_name("10"), do: "Oct"
-  defp month_name("11"), do: "Nov"
-  defp month_name("12"), do: "Dec"
-  defp month_name(m), do: m
-
-  defp parse_cron_num("*"), do: {:ok, :any}
-  defp parse_cron_num("*/" <> step), do: {:step, String.to_integer(step)}
-
-  defp parse_cron_num(s) do
-    case Integer.parse(s) do
-      {n, ""} -> {:ok, n}
-      _ -> :error
-    end
-  end
-
   @impl true
   def render(assigns) do
     ~H"""
@@ -342,10 +208,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
         <h1 class="text-xl font-semibold">Scheduled Jobs</h1>
         <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <button class="btn btn-outline btn-sm w-full sm:w-auto" phx-click="toggle_claude_drawer">
-            <svg class="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-7v4h4l-5 7z" />
-            </svg>
-            Create with Claude
+            <.icon name="hero-sparkles" class="w-3.5 h-3.5" /> Create with Claude
           </button>
           <button class="btn btn-primary btn-sm w-full sm:w-auto" phx-click="new_job">
             + New Job
@@ -388,14 +251,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
             <h2 class="text-lg font-semibold">Create Job with Claude</h2>
             <button class="btn btn-ghost btn-sm btn-square" phx-click="toggle_claude_drawer">
               <span class="sr-only">Close Claude drawer</span>
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
+              <.icon name="hero-x-mark" class="w-4 h-4" />
             </button>
           </div>
           <form phx-submit="create_with_claude" class="flex flex-col gap-4">
@@ -461,7 +317,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
       <%= if length(@jobs) > 0 do %>
         <div class="md:hidden space-y-3">
           <%= for job <- @jobs do %>
-            <article class="rounded-xl border border-base-content/10 bg-base-100 p-3 shadow-sm">
+            <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
+            <article class={"rounded-xl border border-base-content/10 bg-base-100 p-3 shadow-sm #{row_border_class(job_state)}"}>
               <button
                 class="w-full text-left"
                 phx-click="expand_job"
@@ -469,15 +326,21 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
               >
                 <div class="flex items-start justify-between gap-2">
                   <div class="min-w-0">
-                    <h3 class="font-medium text-sm truncate">{job.name}</h3>
+                    <div class="flex items-center gap-1.5">
+                      <h3 class="font-medium text-sm truncate">{job.name}</h3>
+                      <%= if job_state == :running do %>
+                        <span class="badge badge-warning badge-xs animate-pulse shrink-0">running</span>
+                      <% end %>
+                    </div>
                     <%= if job.description do %>
                       <p class="text-[11px] text-base-content/60 mt-0.5 truncate">{job.description}</p>
                     <% end %>
                     <p class="text-[11px] font-mono text-base-content/50 mt-1 truncate">
                       {format_schedule(job)}
+                      <span class="text-base-content/30 not-italic ml-1">{system_timezone()}</span>
                     </p>
                   </div>
-                  <span class={"badge badge-sm #{type_badge_class(job.job_type)}"}>
+                  <span class={"badge badge-xs badge-ghost"}>
                     {type_label(job.job_type)}
                   </span>
                 </div>
@@ -495,9 +358,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
 
               <div class="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
                 <span class="text-base-content/50">Last Run</span>
-                <span class="text-right">{format_time(job.last_run_at)}</span>
+                <span class="text-right" title={format_time(job.last_run_at)}>{format_relative_time(job.last_run_at)}</span>
                 <span class="text-base-content/50">Next Run</span>
-                <span class="text-right">{format_time(job.next_run_at)}</span>
+                <span class="text-right" title={format_time(job.next_run_at)}>{format_relative_time(job.next_run_at)}</span>
                 <span class="text-base-content/50">Runs</span>
                 <span class="text-right">{job.run_count || 0}</span>
               </div>
@@ -547,30 +410,39 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
             </thead>
             <tbody>
               <%= for job <- @jobs do %>
+                <% row_state = job_row_state(job, @running_ids, @last_run_map) %>
                 <tr class={"hover #{if @expanded_job_id == job.id, do: "bg-base-200"}"}>
                   <td
-                    class="cursor-pointer"
+                    class={"cursor-pointer #{row_border_class(row_state)}"}
                     phx-click="expand_job"
                     phx-value-id={job.id}
                   >
-                    <span class="font-medium">{job.name}</span>
+                    <div class="flex items-center gap-1.5">
+                      <span class="font-medium">{job.name}</span>
+                      <%= if row_state == :running do %>
+                        <span class="badge badge-warning badge-xs animate-pulse">running</span>
+                      <% end %>
+                    </div>
                     <%= if job.description do %>
                       <p class="text-xs text-base-content/50 mt-0.5">{job.description}</p>
                     <% end %>
                   </td>
                   <td>
                     <%= if job.origin == "system" do %>
-                      <span class="badge badge-sm badge-neutral">System</span>
+                      <span class="badge badge-xs badge-neutral">System</span>
                     <% else %>
-                      <span class="badge badge-sm badge-ghost">User</span>
+                      <span class="badge badge-xs badge-ghost">User</span>
                     <% end %>
                   </td>
                   <td>
-                    <span class={"badge badge-sm #{type_badge_class(job.job_type)}"}>
+                    <span class="badge badge-xs badge-ghost">
                       {type_label(job.job_type)}
                     </span>
                   </td>
-                  <td class="text-xs font-mono">{format_schedule(job)}</td>
+                  <td class="text-xs">
+                    <span class="font-mono">{format_schedule(job)}</span>
+                    <span class="text-base-content/40 ml-1 text-[10px]">{system_timezone()}</span>
+                  </td>
                   <td>
                     <input
                       type="checkbox"
@@ -580,8 +452,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
                       phx-value-id={job.id}
                     />
                   </td>
-                  <td class="text-xs">{format_time(job.last_run_at)}</td>
-                  <td class="text-xs">{format_time(job.next_run_at)}</td>
+                  <td class="text-xs" title={format_time(job.last_run_at)}>{format_relative_time(job.last_run_at)}</td>
+                  <td class="text-xs" title={format_time(job.next_run_at)}>{format_relative_time(job.next_run_at)}</td>
                   <td>{job.run_count || 0}</td>
                   <td>
                     <div class="flex items-center gap-1">
@@ -592,9 +464,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
                         title="Run Now"
                         aria-label="Run job now"
                       >
-                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                        </svg>
+                        <.icon name="hero-play" class="w-3.5 h-3.5" />
                       </button>
                       <button
                         class="btn btn-ghost btn-xs"
@@ -603,14 +473,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
                         title="Edit"
                         aria-label="Edit job"
                       >
-                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                          />
-                        </svg>
+                        <.icon name="hero-pencil-square" class="w-3.5 h-3.5" />
                       </button>
                       <%= if job.origin != "system" do %>
                         <button
@@ -621,19 +484,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
                           title="Delete"
                           aria-label="Delete job"
                         >
-                          <svg
-                            class="w-3.5 h-3.5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                          </svg>
+                          <.icon name="hero-trash" class="w-3.5 h-3.5" />
                         </button>
                       <% end %>
                     </div>
@@ -684,19 +535,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
       <% else %>
         <div class="text-center py-16">
           <div class="mx-auto w-24 h-24 bg-base-200 rounded-full flex items-center justify-center mb-4">
-            <svg
-              class="w-12 h-12 text-base-content/40"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-            </svg>
+            <.icon name="hero-calendar" class="w-12 h-12 text-base-content/40" />
           </div>
           <h3 class="text-lg font-semibold text-base-content mb-2">No scheduled jobs</h3>
           <p class="text-sm text-base-content/60">

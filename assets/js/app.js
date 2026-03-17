@@ -43,6 +43,7 @@ import {ConfigChatGuide} from "./hooks/config_chat_guide"
 import {CodeMirrorHook} from "./hooks/codemirror"
 import {NoteEditorHook} from "./hooks/note_editor"
 import {NoteFullEditorHook} from "./hooks/note_full_editor"
+import {InlineNoteCreatorHook} from "./hooks/inline_note_creator"
 import {getHooks} from "live_svelte"
 import "./theme"
 import hljs from 'highlight.js'
@@ -102,6 +103,7 @@ Hooks.ConfigChatGuide = ConfigChatGuide
 Hooks.CodeMirror = CodeMirrorHook
 Hooks.NoteEditor = NoteEditorHook
 Hooks.NoteFullEditor = NoteFullEditorHook
+Hooks.InlineNoteCreator = InlineNoteCreatorHook
 Hooks.RefreshDot = {
   mounted() { this._flash() },
   updated() { this._flash() },

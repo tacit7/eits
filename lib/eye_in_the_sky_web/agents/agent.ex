@@ -47,6 +47,7 @@ defmodule EyeInTheSkyWeb.Agents.Agent do
       :uuid,
       :persona_id,
       :project_id,
+      :project_name,
       :source,
       :description,
       :status,

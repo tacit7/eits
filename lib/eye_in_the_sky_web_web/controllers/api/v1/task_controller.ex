@@ -72,6 +72,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
       priority: params["priority"],
       state_id: params["state_id"] || WorkflowState.todo_id(),
       project_id: params["project_id"],
+      team_id: parse_int(params["team_id"], nil),
       agent_id: resolve_agent_int_id(params["agent_id"]),
       due_at: params["due_at"],
       created_at: DateTime.utc_now() |> DateTime.to_iso8601()

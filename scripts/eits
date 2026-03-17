@@ -127,9 +127,9 @@ cmd_tasks() {
       _get "/tasks/$id"
       ;;
     create)
-      # eits tasks create --title <t> [--description <d>] [--project <id>] [--priority <p>] [--session <uuid>] [--agent <uuid>] [--tags <id1,id2,...>]
+      # eits tasks create --title <t> [--description <d>] [--project <id>] [--priority <p>] [--session <uuid>] [--agent <uuid>] [--tags <id1,id2,...>] [--team <id>]
       # Defaults: --agent from $EITS_AGENT_UUID, --project from $EITS_PROJECT_ID, --session from $EITS_SESSION_UUID (falls back to $EITS_SESSION_ID)
-      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" agent_id="${EITS_AGENT_UUID:-}" tags=""
+      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" agent_id="${EITS_AGENT_UUID:-}" tags="" team_id=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --title)       title="$2";       shift 2 ;;
@@ -139,12 +139,13 @@ cmd_tasks() {
           --session)     session_id="$2";  shift 2 ;;
           --agent)       agent_id="$2";    shift 2 ;;
           --tags)        tags="$2";        shift 2 ;;
+          --team)        team_id="$2";     shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
       need title
       local body
-      body="$(json title "$title" description "$description" project_id "$project_id" priority "$priority" session_id "$session_id" agent_id "$agent_id")"
+      body="$(json title "$title" description "$description" project_id "$project_id" priority "$priority" session_id "$session_id" agent_id "$agent_id" team_id "$team_id")"
       if [[ -n "$tags" ]]; then
         local tag_array
         tag_array=$(echo "$tags" | jq -R 'split(",") | map(tonumber)')

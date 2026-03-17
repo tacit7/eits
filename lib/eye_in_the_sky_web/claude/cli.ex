@@ -279,7 +279,6 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     args = maybe_flag(args, "--allowedTools", opts[:allowedTools])
     args = maybe_flag(args, "--permission-mode", opts[:permission_mode])
     args = maybe_flag(args, "--mcp-config", opts[:mcp_config])
-    args = maybe_flag(args, "--worktree", opts[:worktree])
     args = maybe_flag(args, "--thinking-budget-tokens", opts[:thinking_budget])
     args = maybe_flag(args, "--max-budget-usd", opts[:max_budget_usd])
     args = maybe_flag(args, "--agent", opts[:agent])

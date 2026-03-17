@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
   require Logger
   import EyeInTheSkyWebWeb.ControllerHelpers
 
-  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Sessions}
+  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Sessions, Teams}
   alias EyeInTheSkyWeb.Claude.AgentManager
 
   @doc """
@@ -31,14 +31,15 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
         conn |> put_status(:bad_request) |> json(%{error: "message is required"})
 
       true ->
-        with {:sender, {:ok, _agent}} <- {:sender, Agents.get_agent_by_uuid(params["sender_id"])},
+        with {:sender, {:ok, agent}} <- {:sender, Agents.get_agent_by_uuid(params["sender_id"])},
              {:session, {:ok, session}} <- {:session, Sessions.get_session_by_uuid(target_uuid)} do
           response_required = params["response_required"] in [true, "true", "1", 1]
+          sender_name = resolve_sender_name(agent)
 
           attrs = %{
             uuid: Ecto.UUID.generate(),
             session_id: session.id,
-            body: params["message"],
+            body: "DM from:#{sender_name} #{params["message"]}",
             sender_role: "agent",
             recipient_role: "agent",
             direction: "inbound",
@@ -46,6 +47,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
             provider: "claude",
             metadata: %{
               sender_id: params["sender_id"],
+              sender_name: sender_name,
               response_required: response_required
             }
           }
@@ -191,5 +193,14 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
 
   defp agent_manager_mod do
     Application.get_env(:eye_in_the_sky_web, :agent_manager_module, AgentManager)
+  end
+
+  # Resolve a readable name for the sender agent.
+  # Priority: team member name > session name > agent description > "agent"
+  defp resolve_sender_name(agent) do
+    case Teams.get_member_by_agent_id(agent.id) do
+      %{name: name} when is_binary(name) and name != "" -> name
+      _ -> agent.description || agent.name || "agent"
+    end
   end
 end

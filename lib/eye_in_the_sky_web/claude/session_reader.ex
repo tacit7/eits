@@ -101,6 +101,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
   def escape_project_path(path) do
     path
     |> String.replace("/", "-")
+    |> String.replace(".", "-")
   end
 
   @doc """

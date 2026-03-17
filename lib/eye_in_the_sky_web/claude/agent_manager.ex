@@ -87,17 +87,49 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
           id
       end
 
+    # When a worktree name is given, create the git worktree before DB records
+    worktree_result =
+      case opts[:worktree] do
+        nil ->
+          {:ok, opts[:project_path]}
+
+        wt ->
+          wt_path = Path.join([opts[:project_path], ".claude", "worktrees", wt])
+          branch = "worktree-#{wt}"
+
+          case check_clean_working_tree(opts[:project_path]) do
+            :ok ->
+              case ensure_git_worktree(opts[:project_path], wt_path, branch) do
+                :ok ->
+                  {:ok, wt_path}
+
+                {:error, reason} ->
+                  Logger.warning(
+                    "create_agent: git worktree creation failed for #{wt_path}: #{inspect(reason)}; continuing anyway"
+                  )
+
+                  {:ok, wt_path}
+              end
+
+            {:error, :dirty_working_tree} = err ->
+              err
+          end
+      end
+
     Logger.info(
       "📝 create_agent: agent_uuid=#{agent_uuid}, session_uuid=#{inspect(session_uuid)}, model=#{opts[:model]}, project_id=#{project_id}"
     )
 
-    with {:ok, agent} <-
+    with {:ok, session_worktree_path} <- worktree_result,
+         {:ok, agent} <-
            Agents.create_agent(%{
              uuid: agent_uuid,
              agent_type: opts[:agent_type] || "claude",
              project_id: project_id,
+             project_name: opts[:project_name],
              status: "working",
              description: description,
+             git_worktree_path: session_worktree_path,
              parent_agent_id: opts[:parent_agent_id],
              parent_session_id: opts[:parent_session_id]
            }),
@@ -110,7 +142,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              model: opts[:model],
              provider: provider,
              project_id: project_id,
-             git_worktree_path: opts[:project_path],
+             git_worktree_path: session_worktree_path,
              started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
              parent_agent_id: opts[:parent_agent_id],
              parent_session_id: opts[:parent_session_id]
@@ -326,4 +358,39 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
 
   defp normalize_provider(provider) when provider in @supported_providers, do: provider
   defp normalize_provider(_provider), do: nil
+
+  defp check_clean_working_tree(repo_path) do
+    with {_, 0} <-
+           System.cmd("git", ["-C", repo_path, "diff", "--quiet"], stderr_to_stdout: true),
+         {_, 0} <-
+           System.cmd("git", ["-C", repo_path, "diff", "--cached", "--quiet"],
+             stderr_to_stdout: true
+           ) do
+      :ok
+    else
+      _ -> {:error, :dirty_working_tree}
+    end
+  end
+
+  defp ensure_git_worktree(repo_path, wt_path, branch) do
+    case System.cmd("git", ["-C", repo_path, "worktree", "add", wt_path, "-b", branch],
+           stderr_to_stdout: true
+         ) do
+      {_, 0} ->
+        :ok
+
+      {output, _} ->
+        if String.contains?(output, "already exists") or
+             String.contains?(output, "already checked out") do
+          case System.cmd("git", ["-C", repo_path, "worktree", "add", wt_path, branch],
+                 stderr_to_stdout: true
+               ) do
+            {_, 0} -> :ok
+            {err, code} -> {:error, {code, err}}
+          end
+        else
+          {:error, output}
+        end
+    end
+  end
 end

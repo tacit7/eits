@@ -32,7 +32,7 @@ defmodule EyeInTheSkyWeb.Application do
       # DynamicSupervisor for per-session workers
       {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.SessionSupervisor, strategy: :one_for_one},
       # DynamicSupervisor for persistent agent workers
-      {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.AgentSupervisor, strategy: :one_for_one},
+      {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.AgentSupervisor, strategy: :one_for_one, max_children: 50},
       # DynamicSupervisor for per-channel chat workers
       {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.ChatSupervisor, strategy: :one_for_one},
       # Claude CLI session coordinator
@@ -49,7 +49,7 @@ defmodule EyeInTheSkyWeb.Application do
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
-    opts = [strategy: :one_for_one, name: EyeInTheSkyWeb.Supervisor]
+    opts = [strategy: :rest_for_one, name: EyeInTheSkyWeb.Supervisor]
     Supervisor.start_link(children, opts)
   end
 

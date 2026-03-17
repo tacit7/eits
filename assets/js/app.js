@@ -42,6 +42,7 @@ import {SwipeRow} from "./hooks/swipe_row"
 import {ConfigChatGuide} from "./hooks/config_chat_guide"
 import {CodeMirrorHook} from "./hooks/codemirror"
 import {NoteEditorHook} from "./hooks/note_editor"
+import {NoteFullEditorHook} from "./hooks/note_full_editor"
 import {getHooks} from "live_svelte"
 import "./theme"
 import hljs from 'highlight.js'
@@ -100,6 +101,7 @@ Hooks.SwipeRow = SwipeRow
 Hooks.ConfigChatGuide = ConfigChatGuide
 Hooks.CodeMirror = CodeMirrorHook
 Hooks.NoteEditor = NoteEditorHook
+Hooks.NoteFullEditor = NoteFullEditorHook
 Hooks.RefreshDot = {
   mounted() { this._flash() },
   updated() { this._flash() },

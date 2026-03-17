@@ -80,6 +80,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
           starred_filter={@starred_filter}
           search_query={@search_query}
           empty_id="overview-notes-empty"
+          current_path="/notes"
         />
       </div>
     </div>

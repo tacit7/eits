@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWebWeb.Components.NotesList do
   attr :search_query, :string, default: ""
   attr :empty_id, :string, default: "notes-empty"
   attr :editing_note_id, :integer, default: nil
+  attr :current_path, :string, default: "/notes"
 
   def notes_list(assigns) do
     ~H"""
@@ -102,6 +103,13 @@ defmodule EyeInTheSkyWebWeb.Components.NotesList do
                 >
                   <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit
                 </button>
+                <.link
+                  navigate={"/notes/#{note.id}/edit?return_to=#{URI.encode_www_form(@current_path)}"}
+                  class="flex items-center gap-1 text-xs text-base-content/30 hover:text-secondary transition-colors px-1 py-0.5"
+                  aria-label="Open full editor"
+                >
+                  <.icon name="hero-arrows-pointing-out" class="w-3.5 h-3.5" />
+                </.link>
                 <button
                   type="button"
                   phx-click="delete_note"

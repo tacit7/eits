@@ -3,6 +3,8 @@ import Config
 # Gitea webhook HMAC secret — set this in Gitea webhook settings and here
 config :eye_in_the_sky_web, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SECRET", "")
 config :eye_in_the_sky_web, :env, :dev
+# Allow unsigned webhooks in dev when no secret is set (never enable in prod)
+config :eye_in_the_sky_web, :allow_unsigned_webhooks, true
 
 # Configure your database
 config :eye_in_the_sky_web, EyeInTheSkyWeb.Repo,

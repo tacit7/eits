@@ -144,16 +144,17 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
     secret = Application.get_env(:eye_in_the_sky_web, :gitea_webhook_secret, "")
 
     cond do
-      secret == "" and Application.get_env(:eye_in_the_sky_web, :env, :prod) == :prod ->
-        Logger.error(
-          "Gitea webhook: GITEA_WEBHOOK_SECRET not set in production — rejecting request"
-        )
-
-        {:error, :unauthorized}
-
       secret == "" ->
-        Logger.warning("Gitea webhook: no secret configured, skipping signature check")
-        :ok
+        if Application.get_env(:eye_in_the_sky_web, :allow_unsigned_webhooks, false) do
+          Logger.warning("Gitea webhook: no secret configured, allowing unsigned (dev opt-in)")
+          :ok
+        else
+          Logger.error(
+            "Gitea webhook: GITEA_WEBHOOK_SECRET not set — rejecting unsigned request"
+          )
+
+          {:error, :unauthorized}
+        end
 
       true ->
         sig_header = get_req_header(conn, "x-gitea-signature") |> List.first()

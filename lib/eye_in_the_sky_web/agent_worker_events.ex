@@ -157,7 +157,7 @@ defmodule EyeInTheSkyWeb.AgentWorkerEvents do
           end
 
           if status == "idle" do
-            EyeInTheSkyWeb.Teams.mark_member_done_by_session(session_id, "done")
+            Events.session_idle(session_id)
           end
 
         {:error, _} ->

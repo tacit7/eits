@@ -46,8 +46,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
      |> assign(:sidebar_project, sidebar_project)
      |> assign(:active_channel_id, assigns[:active_channel_id])
      |> assign(:expanded_chat, expanded_chat)
-     |> assign(:mobile_open, false)
-     |> assign(:notification_count, Notifications.unread_count())}
+     |> assign(:mobile_open, false)}
   end
 
   @impl true
@@ -148,6 +147,32 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
 
   @impl true
   def handle_event("show_new_project", _params, socket) do
+    {:noreply,
+     start_async(socket, :pick_folder, fn ->
+       System.cmd(
+         "osascript",
+         ["-e", ~s[POSIX path of (choose folder with prompt "Select project folder:")]],
+         stderr_to_stdout: true
+       )
+     end)}
+  end
+
+  @impl true
+  def handle_async(:pick_folder, {:ok, {path, 0}}, socket) do
+    path = String.trim(path)
+    name = path |> String.split("/") |> Enum.reject(&(&1 == "")) |> List.last() || path
+
+    case Projects.create_project(%{name: name, path: path}) do
+      {:ok, _project} ->
+        {:noreply, assign(socket, :projects, Projects.list_projects())}
+
+      {:error, _} ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_async(:pick_folder, _result, socket) do
+    # User cancelled or osascript failed — fall back to text input
     {:noreply, assign(socket, :new_project_path, "")}
   end
 

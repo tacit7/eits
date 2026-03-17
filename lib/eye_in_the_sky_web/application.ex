@@ -39,6 +39,8 @@ defmodule EyeInTheSkyWeb.Application do
       EyeInTheSkyWeb.Claude.SessionManager,
       # Oban job processing (includes Cron plugin for JobDispatcherWorker)
       {Oban, Application.fetch_env!(:eye_in_the_sky_web, Oban)},
+      # React to session lifecycle events and update team member state
+      EyeInTheSkyWeb.Teams.Subscriber,
       # Poll for external task changes (Go MCP i-todo writes)
       EyeInTheSkyWeb.Tasks.Poller,
       # Poll for external message writes (Go MCP, spawned agents)

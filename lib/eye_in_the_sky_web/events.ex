@@ -22,6 +22,7 @@ defmodule EyeInTheSkyWeb.Events do
   | `"teams"`                      | TeamLive                          |
   | `"settings"`                   | OverviewSettings                  |
   | `"scheduled_jobs"`             | JobsLive                          |
+  | `"session_lifecycle"`          | Teams.Subscriber                  |
 
   ## Note on payload shape inconsistency
 
@@ -78,6 +79,9 @@ defmodule EyeInTheSkyWeb.Events do
 
   @doc "Subscribe to scheduled job status updates."
   def subscribe_scheduled_jobs, do: sub("scheduled_jobs")
+
+  @doc "Subscribe to session lifecycle transitions (idle, completed, etc.)."
+  def subscribe_session_lifecycle, do: sub("session_lifecycle")
 
   # ---------------------------------------------------------------------------
   # Session events — required initial set
@@ -262,6 +266,13 @@ defmodule EyeInTheSkyWeb.Events do
 
   @doc "Scheduled job list updated."
   def jobs_updated, do: broadcast("scheduled_jobs", :jobs_updated)
+
+  # ---------------------------------------------------------------------------
+  # Session lifecycle events — topic: "session_lifecycle"
+  # ---------------------------------------------------------------------------
+
+  @doc "Session transitioned to idle (completed or errored). Used to decouple domain reactions."
+  def session_idle(session_id), do: broadcast("session_lifecycle", {:session_idle, session_id})
 
   # ---------------------------------------------------------------------------
   # Private

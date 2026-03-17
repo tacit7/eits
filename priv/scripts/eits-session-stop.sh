@@ -17,6 +17,6 @@ stop_hook_active=$(echo "$input_json" | jq -r '.stop_hook_active // false' 2>/de
 session_id=$(echo "$input_json" | jq -r '.session_id // empty' 2>/dev/null) || exit 0
 [ -z "$session_id" ] && exit 0
 
-eits sessions update "$session_id" --status idle >/dev/null 2>&1 &
+eits sessions update "$session_id" --status stopped >/dev/null 2>&1 &
 
 exit 0

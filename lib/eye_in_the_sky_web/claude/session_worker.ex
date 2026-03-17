@@ -226,8 +226,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionWorker do
 
           case Sessions.get_session(state.session_int_id) do
             {:ok, session} ->
-              final_status = if exit_code == 0, do: "completed", else: "failed"
-              Sessions.end_session(session, %{final_status: final_status})
+              Sessions.end_session(session, %{})
 
             _ ->
               :ok

@@ -154,7 +154,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
         case Sessions.update_session(session, attrs) do
           {:ok, updated} ->
             if status do
-              if status in ["completed", "failed", "waiting"] do
+              if status in ["completed", "failed", "waiting", "stopped"] do
                 EyeInTheSkyWeb.Events.agent_stopped(updated)
               else
                 EyeInTheSkyWeb.Events.agent_working(updated)

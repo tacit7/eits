@@ -31,6 +31,7 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
         "working" -> {"Working", "border-success"}
         "waiting" -> {"Waiting", "border-warning"}
         "compacting" -> {"Compacting", "border-orange-500"}
+        "stopped" -> {"Stopped", "border-warning"}
         "idle" -> {"Idle", "border-transparent"}
         "idle_stale" -> {"Idle", "border-transparent"}
         "idle_dead" -> {"Idle", "border-transparent"}

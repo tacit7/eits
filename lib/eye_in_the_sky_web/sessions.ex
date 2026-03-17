@@ -130,7 +130,7 @@ defmodule EyeInTheSkyWeb.Sessions do
       |> then(fn m ->
         if opts[:final_status],
           do: Map.put(m, :status, opts[:final_status]),
-          else: Map.put(m, :status, "completed")
+          else: m
       end)
 
     update_session(session, attrs)

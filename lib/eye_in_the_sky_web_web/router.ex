@@ -92,7 +92,7 @@ defmodule EyeInTheSkyWebWeb.Router do
   import Oban.Web.Router
 
   scope "/oban" do
-    pipe_through :browser
+    pipe_through [:browser, :require_auth]
     oban_dashboard("/")
   end
 

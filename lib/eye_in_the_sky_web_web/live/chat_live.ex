@@ -237,9 +237,9 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
             prompt = ChannelProtocol.build_prompt(mode, body)
 
             # Mirror the user message into the agent's session so DM page shows context
+            # Do NOT set channel_id — that would re-broadcast to the channel per member
             Messages.send_message(%{
               session_id: member.session_id,
-              channel_id: channel_id,
               sender_role: "user",
               recipient_role: "agent",
               provider: "claude",
@@ -807,6 +807,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
               activeChannelId: @active_channel_id,
               messages: @messages,
               activeAgents: @active_agents,
+              channelMembers: @channel_members,
               workingAgents: @working_agents,
               slashItems: @slash_items
             }

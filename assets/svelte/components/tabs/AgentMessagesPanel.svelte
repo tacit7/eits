@@ -5,6 +5,7 @@
   export let activeChannelId = null
   export let messages = []
   export let activeAgents = []
+  export let channelMembers = []
   export let workingAgents = {}
   export let slashItems = []
   export let live
@@ -122,14 +123,19 @@
       if (!textAfterAt.includes(' ')) {
         const searchTerm = textAfterAt.toLowerCase()
 
-        const filtered = activeAgents
-          .map(a => ({
-            id: a.id,
-            name: a.name || a.agent_description || `Session ${a.id}`,
-            provider: a.provider || 'claude',
-            model: a.model,
-            description: a.agent_description
-          }))
+        // Use channel members for @ autocomplete, fall back to activeAgents for display info
+        const memberOptions = channelMembers.map(m => {
+          const agent = activeAgents.find(a => a.id === m.session_id)
+          return {
+            id: m.session_id,
+            name: m.session_name || agent?.name || agent?.agent_description || `Session ${m.session_id}`,
+            provider: agent?.provider || 'claude',
+            model: agent?.model,
+            description: agent?.agent_description
+          }
+        })
+
+        const filtered = memberOptions
           .filter(a =>
             String(a.id).includes(searchTerm) ||
             (a.name && a.name.toLowerCase().includes(searchTerm)) ||
@@ -138,16 +144,10 @@
           )
 
         // Prepend @all option
-        const allOption = { id: 'all', name: 'All Agents', provider: 'system', model: null, description: 'Require all channel agents to respond' }
+        const allOption = { id: 'all', name: 'All Channel Members', provider: 'system', model: null, description: 'Require all channel members to respond' }
 
         if (filtered.length > 0 || searchTerm === '') {
-          const agentOptions = searchTerm === '' ? activeAgents.map(a => ({
-            id: a.id,
-            name: a.name || a.agent_description || `Session ${a.id}`,
-            provider: a.provider || 'claude',
-            model: a.model,
-            description: a.agent_description
-          })) : filtered
+          const agentOptions = searchTerm === '' ? memberOptions : filtered
           const showAll = searchTerm === '' || 'all'.includes(searchTerm)
           autocompleteOptions = showAll ? [allOption, ...agentOptions] : agentOptions
           selectedAutocompleteIndex = 0

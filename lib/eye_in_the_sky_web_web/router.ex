@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWebWeb.Router do
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
+    plug EyeInTheSkyWebWeb.Plugs.ValidateSession
     plug :fetch_live_flash
     plug :put_root_layout, html: {EyeInTheSkyWebWeb.Layouts, :root}
     plug :protect_from_forgery
@@ -20,6 +21,7 @@ defmodule EyeInTheSkyWebWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
+    plug EyeInTheSkyWebWeb.Plugs.RateLimit, default: {60, :timer.minutes(1)}
     plug EyeInTheSkyWebWeb.Plugs.RequireAuth
   end
 

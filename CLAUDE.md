@@ -100,6 +100,7 @@ Project docs live in `docs/`. Key references:
 - [docs/SEARCH.md](docs/SEARCH.md) — Full-text search: PgSearch implementation, prefix-aware tsquery, callers
 - [docs/CODEX_SDK.md](docs/CODEX_SDK.md) — Codex SDK: session lifecycle, JSONL events, resume flow, env vars
 - [docs/CHAT.md](docs/CHAT.md) — Chat system: channels, routing protocol, @mentions, cross-project membership
+- [docs/EVENTS.md](docs/EVENTS.md) — PubSub Events module: all topics, payload shapes, subscribe helpers, how to add new events
 
 ## UI Standards
 

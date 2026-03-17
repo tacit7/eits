@@ -14,6 +14,10 @@ defmodule EyeInTheSkyWebWeb.Router do
     plug EyeInTheSkyWebWeb.Plugs.RequireAuth
   end
 
+  pipeline :session_auth do
+    plug EyeInTheSkyWebWeb.Plugs.SessionAuth
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
     plug EyeInTheSkyWebWeb.Plugs.RequireAuth
@@ -29,6 +33,7 @@ defmodule EyeInTheSkyWebWeb.Router do
   pipeline :webauthn do
     plug :accepts, ["json"]
     plug :fetch_session
+    plug EyeInTheSkyWebWeb.Plugs.RateLimit
   end
 
   # Auth LiveView pages (HTML, with CSRF)
@@ -92,7 +97,7 @@ defmodule EyeInTheSkyWebWeb.Router do
   import Oban.Web.Router
 
   scope "/oban" do
-    pipe_through [:browser, :require_auth]
+    pipe_through [:browser, :session_auth]
     oban_dashboard("/")
   end
 
@@ -175,8 +180,6 @@ defmodule EyeInTheSkyWebWeb.Router do
     patch "/teams/:team_id/members/:member_id", TeamController, :update_member
     delete "/teams/:team_id/members/:member_id", TeamController, :leave
 
-    # Editor
-    post "/editor/open", EditorController, :open
   end
 
   # Gitea webhooks — no Bearer auth; controller validates HMAC signature from Gitea
@@ -203,13 +206,10 @@ defmodule EyeInTheSkyWebWeb.Router do
     import Phoenix.LiveDashboard.Router
 
     scope "/dev" do
-      pipe_through :browser
+      pipe_through [:browser, :session_auth]
 
       live_dashboard "/dashboard", metrics: EyeInTheSkyWebWeb.Telemetry
       forward "/mailbox", Plug.Swoosh.MailboxPreview
-
-      # Dev-only test login — sets session cookie without WebAuthn
-      get "/test-login", EyeInTheSkyWebWeb.DevController, :test_login
     end
   end
 end

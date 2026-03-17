@@ -10,7 +10,7 @@ defmodule EyeInTheSkyWebWeb.Endpoint do
     signing_salt: "Zx+j4lGh",
     same_site: "Lax",
     http_only: true,
-    secure: true
+    secure: Application.compile_env(:eye_in_the_sky_web, :env) != :dev
   ]
 
   socket "/live", Phoenix.LiveView.Socket,
@@ -52,6 +52,11 @@ defmodule EyeInTheSkyWebWeb.Endpoint do
 
   plug Plug.MethodOverride
   plug Plug.Head
+  # Rewrite conn.remote_ip from X-Forwarded-For when behind ngrok/Tailscale/reverse proxy.
+  # 100.64.0.0/10 is Tailscale's CGNAT range — trust XFF from those peers.
+  # For ngrok the tunnel agent runs on localhost so 127.0.0.1 is already in RemoteIp's
+  # reserved set; ngrok controls the XFF header so spoofing isn't possible through it.
+  plug RemoteIp, proxies: ~w[100.64.0.0/10]
   plug Plug.Session, @session_options
   plug EyeInTheSkyWebWeb.Router
 end

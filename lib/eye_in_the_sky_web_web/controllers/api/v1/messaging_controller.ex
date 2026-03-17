@@ -17,6 +17,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
     - message (required): message body
     - response_required (optional): boolean, defaults to false
   """
+  # 30 DMs per sender per minute — prevents injection flooding into agent sessions
+  @dm_rate_limit {30, :timer.minutes(1)}
+
   def dm(conn, params) do
     target_uuid = params["target_session_id"]
 
@@ -31,7 +34,21 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
         conn |> put_status(:bad_request) |> json(%{error: "message is required"})
 
       true ->
-        with {:sender, {:ok, agent}} <- {:sender, Agents.get_agent_by_uuid(params["sender_id"])},
+        {limit, scale} = @dm_rate_limit
+        key = "dm:#{params["sender_id"]}"
+
+        case EyeInTheSkyWeb.RateLimiter.hit(key, scale, limit) do
+          {:deny, _} ->
+            conn |> put_status(429) |> json(%{error: "too many requests"})
+
+          {:allow, _} ->
+            do_dm(conn, params, target_uuid)
+        end
+    end
+  end
+
+  defp do_dm(conn, params, target_uuid) do
+    with {:sender, {:ok, agent}} <- {:sender, Agents.get_agent_by_uuid(params["sender_id"])},
              {:session, {:ok, session}} <- {:session, Sessions.get_session_by_uuid(target_uuid)} do
           response_required = params["response_required"] in [true, "true", "1", 1]
           sender_name = resolve_sender_name(agent)
@@ -89,7 +106,6 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
           {:session, {:error, :not_found}} ->
             conn |> put_status(:not_found) |> json(%{error: "Target session not found"})
         end
-    end
   end
 
   @doc """

@@ -45,8 +45,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
 
     notes =
       if query != "" and String.trim(query) != "" do
-        results = Notes.search_notes(query)
-        if starred_only, do: Enum.filter(results, &(&1.starred == 1)), else: results
+        Notes.search_notes(query, [], starred: starred_only)
       else
         base =
           from(n in Note,

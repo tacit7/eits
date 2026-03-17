@@ -2,8 +2,9 @@ defmodule EyeInTheSkyWeb.Search.PgSearch do
   @moduledoc """
   Reusable full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback.
 
-  Replaces the previous SQLite FTS5 implementation. Uses plainto_tsquery for
-  user-friendly search (no special syntax required) and ts_rank for relevance ordering.
+  Replaces the previous SQLite FTS5 implementation. Uses a prefix-aware tsquery
+  so that partial last words (e.g. "plural fo") match full lexemes ("form").
+  Falls back to ILIKE when the FTS query errors.
   """
 
   import Ecto.Query, warn: false
@@ -11,6 +12,30 @@ defmodule EyeInTheSkyWeb.Search.PgSearch do
 
   # Only lowercase letters, digits, and underscores — no injection vectors
   @safe_identifier ~r/^[a-z][a-z0-9_]*$/
+
+  # Prefix-aware tsquery CASE expression (parameterized with $1 for raw SQL).
+  # - All-special-char last word: plain plainto_tsquery (safe fallback)
+  # - Single word: OR between plainto (handles dotted identifiers) and to_tsquery(:*)
+  # - Multi-word: plainto for complete words AND to_tsquery(:*) for the last word
+  @tsquery_case_sql """
+  CASE
+    WHEN length(regexp_replace(lower(regexp_replace(trim($1), '^.*\\s', '')), '[^a-z0-9]', '', 'g')) = 0
+      THEN plainto_tsquery('english', $1)
+    WHEN position(' ' IN trim($1)) = 0
+      THEN plainto_tsquery('english', $1)
+        || to_tsquery('simple', regexp_replace(lower(trim($1)), '[^a-z0-9]', '', 'g') || ':*')
+    ELSE
+      plainto_tsquery('english',
+        left(trim($1), length(trim($1)) - length(regexp_replace(trim($1), '^.*\\s', ''))))
+      && to_tsquery('simple',
+        regexp_replace(lower(regexp_replace(trim($1), '^.*\\s', '')), '[^a-z0-9]', '', 'g') || ':*')
+  END
+  """
+
+  # Full fragment for use in fts_name_description_match/1.
+  # Ecto fragment/1 requires a compile-time string literal or module attribute as first arg.
+  # The 11 ? positions: s (?.name), s (?.description), then search_query × 9.
+  @fts_name_description_fragment "to_tsvector('english', coalesce(?.name, '') || ' ' || coalesce(?.description, '')) @@ (CASE WHEN length(regexp_replace(lower(regexp_replace(trim(?), '^.*\\s', '')), '[^a-z0-9]', '', 'g')) = 0 THEN plainto_tsquery('english', ?) WHEN position(' ' IN trim(?)) = 0 THEN plainto_tsquery('english', ?) || to_tsquery('simple', regexp_replace(lower(trim(?)), '[^a-z0-9]', '', 'g') || ':*') ELSE plainto_tsquery('english', left(trim(?), length(trim(?)) - length(regexp_replace(trim(?), '^.*\\s', '')))) && to_tsquery('simple', regexp_replace(lower(regexp_replace(trim(?), '^.*\\s', '')), '[^a-z0-9]', '', 'g') || ':*') END)"
 
   @doc """
   Convenience wrapper around `search/1` that builds the ILIKE fallback query automatically.
@@ -103,7 +128,10 @@ defmodule EyeInTheSkyWeb.Search.PgSearch do
 
   @doc """
   Returns a dynamic Ecto expression that matches rows where the tsvector of
-  `name || description` satisfies a plainto_tsquery for `search_query`.
+  `name || description` satisfies a prefix-aware tsquery for `search_query`.
+
+  Partial last words are matched via `to_tsquery(:*)` prefix, so "session li"
+  matches rows containing "list". Dotted identifiers still work via plainto_tsquery.
 
   The first named binding (`s`) must be the schema with `name` and `description` columns:
 
@@ -114,9 +142,17 @@ defmodule EyeInTheSkyWeb.Search.PgSearch do
     dynamic(
       [s],
       fragment(
-        "to_tsvector('english', coalesce(?.name, '') || ' ' || coalesce(?.description, '')) @@ plainto_tsquery('english', ?)",
+        @fts_name_description_fragment,
         s,
         s,
+        ^search_query,
+        ^search_query,
+        ^search_query,
+        ^search_query,
+        ^search_query,
+        ^search_query,
+        ^search_query,
+        ^search_query,
         ^search_query
       )
     )
@@ -156,31 +192,14 @@ defmodule EyeInTheSkyWeb.Search.PgSearch do
 
     effective_limit = limit || 50
 
-    # Build a prefix-aware tsquery so partial last words match (e.g. "plural fo" matches "form").
-    # Single-word: OR between plainto_tsquery (handles dotted identifiers) and to_tsquery with :*
-    # Multi-word:  plainto_tsquery for complete words AND to_tsquery(:*) for the last word
-    # regexp_replace strips non-alphanumeric chars before prefix matching to avoid tsquery syntax errors.
-    tsquery_expr = """
-    CASE
-      WHEN length(regexp_replace(lower(regexp_replace(trim($1), '^.*\\s', '')), '[^a-z0-9]', '', 'g')) = 0
-        THEN plainto_tsquery('english', $1)
-      WHEN position(' ' IN trim($1)) = 0
-        THEN plainto_tsquery('english', $1)
-          || to_tsquery('simple', regexp_replace(lower(trim($1)), '[^a-z0-9]', '', 'g') || ':*')
-      ELSE
-        plainto_tsquery('english',
-          left(trim($1), length(trim($1)) - length(regexp_replace(trim($1), '^.*\\s', ''))))
-        && to_tsquery('simple',
-          regexp_replace(lower(regexp_replace(trim($1), '^.*\\s', '')), '[^a-z0-9]', '', 'g') || ':*')
-    END
-    """
-
+    # CTE pre-computes the tsquery once; WHERE and ORDER BY reference it without re-evaluation.
     sql = """
+    WITH _q AS (SELECT (#{@tsquery_case_sql}) AS tsq)
     SELECT #{alias_letter}.*
-    FROM #{table} #{alias_letter}
-    WHERE to_tsvector('english', #{tsvector_expr}) @@ (#{tsquery_expr})
+    FROM #{table} #{alias_letter}, _q
+    WHERE to_tsvector('english', #{tsvector_expr}) @@ _q.tsq
     #{sql_filter}
-    ORDER BY ts_rank(to_tsvector('english', #{tsvector_expr}), (#{tsquery_expr})) DESC
+    ORDER BY ts_rank(to_tsvector('english', #{tsvector_expr}), _q.tsq) DESC
     LIMIT #{effective_limit}
     """
 

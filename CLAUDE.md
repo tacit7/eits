@@ -97,6 +97,7 @@ Project docs live in `docs/`. Key references:
 - [docs/chat-mention-workflow.md](docs/chat-mention-workflow.md) — Chat @mention system
 - [docs/claude-cli-flags.md](docs/claude-cli-flags.md) — Claude CLI flag reference
 - [docs/CONTEXT_WINDOW.md](docs/CONTEXT_WINDOW.md) — Context window handling
+- [docs/SEARCH.md](docs/SEARCH.md) — Full-text search: PgSearch implementation, prefix-aware tsquery, callers
 
 ## UI Standards
 

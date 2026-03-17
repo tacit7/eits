@@ -205,6 +205,7 @@ defmodule EyeInTheSkyWeb.Notes do
   Options:
   - `:project_id` - restrict to notes parented to this project
   - `:session_ids` - restrict to notes parented to these sessions
+  - `:starred` - when true, restrict to starred notes (pushed into query, not post-filtered)
   - `:limit` - max results
   """
   def search_notes(query, agent_ids \\ [], opts \\ []) when is_binary(query) do
@@ -212,19 +213,31 @@ defmodule EyeInTheSkyWeb.Notes do
     project_id = Keyword.get(opts, :project_id)
     project_id_str = if project_id, do: to_string(project_id), else: nil
     session_ids_str = opts |> Keyword.get(:session_ids, []) |> Enum.map(&to_string/1)
+    starred_only = Keyword.get(opts, :starred, false)
 
     has_scope = agent_ids_str != [] or project_id_str != nil or session_ids_str != []
 
+    scope_dynamic =
+      if has_scope, do: build_scope_dynamic(project_id_str, agent_ids_str, session_ids_str)
+
     extra_where =
-      if has_scope do
-        build_scope_dynamic(project_id_str, agent_ids_str, session_ids_str)
+      case {scope_dynamic, starred_only} do
+        {nil, false} -> nil
+        {nil, true} -> dynamic([n], n.starred == 1)
+        {scope, false} -> scope
+        {scope, true} -> dynamic([n], ^scope and n.starred == 1)
       end
 
+    {scope_sql, scope_params} =
+      if has_scope, do: build_scope_sql(project_id_str, agent_ids_str, session_ids_str), else: {"", []}
+
     {sql_filter, sql_params} =
-      if has_scope do
-        build_scope_sql(project_id_str, agent_ids_str, session_ids_str)
+      if starred_only do
+        next_idx = length(scope_params) + 2
+        starred_clause = "AND n.starred = $#{next_idx}"
+        {scope_sql <> " " <> starred_clause, scope_params ++ [1]}
       else
-        {"", []}
+        {scope_sql, scope_params}
       end
 
     PgSearch.search_for(query,

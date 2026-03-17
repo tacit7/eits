@@ -192,7 +192,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
   defp resolve_sender_name(agent) do
     case Teams.get_member_by_agent_id(agent.id) do
       %{name: name} when is_binary(name) and name != "" -> name
-      _ -> agent.description || agent.name || "agent"
+      _ -> agent.description || "agent"
     end
   end
 end

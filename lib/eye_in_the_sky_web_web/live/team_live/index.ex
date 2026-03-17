@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.{Teams, Tasks, Notes}
+  alias EyeInTheSkyWeb.{Teams, Tasks, Notes, Messages}
   alias EyeInTheSkyWeb.Tasks.WorkflowState
 
   @state_todo WorkflowState.todo_id()
@@ -24,7 +24,10 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
      |> assign(:teams, load_teams(false))
      |> assign(:selected_team_id, nil)
      |> assign(:selected_team, nil)
-     |> assign(:mobile_view, :list)}
+     |> assign(:mobile_view, :list)
+     |> assign(:selected_agent, nil)
+     |> assign(:agent_messages, [])
+     |> assign(:agent_session_id, nil)}
   end
 
   @impl true
@@ -37,15 +40,52 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   end
 
   @impl true
+  def handle_info({:new_message, message}, socket) do
+    if socket.assigns.agent_session_id && message.session_id == socket.assigns.agent_session_id do
+      {:noreply, assign(socket, :agent_messages, socket.assigns.agent_messages ++ [message])}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_event("select_team", %{"id" => id}, socket) do
     team_id = String.to_integer(id)
     team = Teams.get_team!(team_id) |> load_team_detail()
-    {:noreply, show_team_detail(socket, team_id, team)}
+    {:noreply, socket |> clear_agent_selection() |> show_team_detail(team_id, team)}
   end
 
   @impl true
   def handle_event("close_team", _params, socket) do
-    {:noreply, show_team_list(socket)}
+    {:noreply, socket |> clear_agent_selection() |> show_team_list()}
+  end
+
+  @impl true
+  def handle_event("select_agent", %{"session-id" => session_id_str}, socket) do
+    session_id = String.to_integer(session_id_str)
+
+    # Unsubscribe from previous session if switching agents
+    if socket.assigns.agent_session_id && socket.assigns.agent_session_id != session_id do
+      Phoenix.PubSub.unsubscribe(EyeInTheSkyWeb.PubSub, "session:#{socket.assigns.agent_session_id}")
+    end
+
+    if is_nil(socket.assigns.agent_session_id) || socket.assigns.agent_session_id != session_id do
+      EyeInTheSkyWeb.Events.subscribe_session(session_id)
+    end
+
+    messages = Messages.list_messages_for_session(session_id) |> Enum.take(-50)
+    member = Enum.find(socket.assigns.selected_team.members, &(&1.session_id == session_id))
+
+    {:noreply,
+     socket
+     |> assign(:selected_agent, member)
+     |> assign(:agent_messages, messages)
+     |> assign(:agent_session_id, session_id)}
+  end
+
+  @impl true
+  def handle_event("close_agent", _params, socket) do
+    {:noreply, clear_agent_selection(socket)}
   end
 
   @impl true
@@ -157,33 +197,118 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
 
       <%!-- Team detail panel --%>
       <div class={[
-        "flex-1 overflow-y-auto min-w-0 w-full",
+        "flex-1 min-w-0 w-full flex",
         @mobile_view == :list && "hidden"
       ]}>
-        <%= if @mobile_view == :detail do %>
-          <button
-            class="flex items-center gap-2 px-4 py-3 text-sm text-base-content/60 border-b border-base-300 w-full hover:bg-base-200"
-            phx-click="close_team"
-          >
-            <.icon name="hero-arrow-left" class="w-4 h-4" />
-            Teams
-          </button>
-        <% end %>
-        <%= if @selected_team do %>
-          <.team_detail team={@selected_team} />
-        <% else %>
-          <div class="flex items-center justify-center h-full">
-            <div class="text-center space-y-3">
-              <div class="w-16 h-16 rounded-2xl bg-base-200 flex items-center justify-center mx-auto">
-                <.icon name="hero-user-group" class="w-8 h-8 text-base-content/20" />
+        <%!-- Left: team detail --%>
+        <div class={[
+          "flex flex-col overflow-hidden",
+          @selected_agent && "w-1/2 border-r border-base-300",
+          !@selected_agent && "flex-1"
+        ]}>
+          <%= if @mobile_view == :detail do %>
+            <button
+              class="flex items-center gap-2 px-4 py-3 text-sm text-base-content/60 border-b border-base-300 w-full hover:bg-base-200 shrink-0"
+              phx-click="close_team"
+            >
+              <.icon name="hero-arrow-left" class="w-4 h-4" />
+              Teams
+            </button>
+          <% end %>
+          <div class="flex-1 overflow-y-auto">
+            <%= if @selected_team do %>
+              <.team_detail team={@selected_team} selected_agent_session_id={@agent_session_id} />
+            <% else %>
+              <div class="flex items-center justify-center h-full">
+                <div class="text-center space-y-3">
+                  <div class="w-16 h-16 rounded-2xl bg-base-200 flex items-center justify-center mx-auto">
+                    <.icon name="hero-user-group" class="w-8 h-8 text-base-content/20" />
+                  </div>
+                  <div>
+                    <p class="text-sm font-medium text-base-content/30">No team selected</p>
+                    <p class="text-xs text-base-content/20 mt-1">Choose a team from the list</p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p class="text-sm font-medium text-base-content/30">No team selected</p>
-                <p class="text-xs text-base-content/20 mt-1">Choose a team from the list</p>
+            <% end %>
+          </div>
+        </div>
+
+        <%!-- Right: agent messages pane --%>
+        <%= if @selected_agent do %>
+          <div class="w-1/2 flex flex-col overflow-hidden">
+            <div class="px-4 py-3 border-b border-base-300 flex items-center justify-between shrink-0">
+              <div class="flex items-center gap-2 min-w-0">
+                <div class={[
+                  "w-6 h-6 rounded-md shrink-0 flex items-center justify-center text-[10px] font-bold",
+                  member_avatar_class(@selected_agent.status)
+                ]}>
+                  <%= member_initials(@selected_agent.name) %>
+                </div>
+                <span class="font-medium text-sm truncate"><%= @selected_agent.name %></span>
+                <span class={["text-[10px] font-medium shrink-0", member_status_text(@selected_agent.status)]}>
+                  <%= @selected_agent.status %>
+                </span>
               </div>
+              <button
+                phx-click="close_agent"
+                class="shrink-0 p-1 rounded hover:bg-base-200 text-base-content/40 hover:text-base-content/70 transition-colors"
+              >
+                <.icon name="hero-x-mark" class="w-4 h-4" />
+              </button>
             </div>
+
+            <%= if @agent_messages == [] do %>
+              <div class="flex-1 flex items-center justify-center">
+                <div class="text-center space-y-2">
+                  <.icon name="hero-chat-bubble-left-right" class="w-8 h-8 text-base-content/15 mx-auto" />
+                  <p class="text-sm text-base-content/30">No messages</p>
+                </div>
+              </div>
+            <% else %>
+              <div class="flex-1 overflow-y-auto px-3 py-3 space-y-3" id="agent-messages-panel">
+                <%= for message <- @agent_messages do %>
+                  <.agent_message message={message} />
+                <% end %>
+              </div>
+            <% end %>
           </div>
         <% end %>
+      </div>
+    </div>
+    """
+  end
+
+  defp agent_message(assigns) do
+    assigns = assign(assigns, :is_user, assigns.message.sender_role == "user")
+
+    ~H"""
+    <div class="flex items-start gap-2">
+      <%= if @is_user do %>
+        <div class="w-3.5 h-3.5 rounded-full mt-1 shrink-0 bg-success/20 flex items-center justify-center">
+          <div class="w-1 h-1 rounded-full bg-success" />
+        </div>
+      <% else %>
+        <div class="w-3.5 h-3.5 rounded-full mt-1 shrink-0 bg-primary/20 flex items-center justify-center">
+          <div class="w-1 h-1 rounded-full bg-primary" />
+        </div>
+      <% end %>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-baseline gap-2 mb-0.5">
+          <span class={[
+            "text-[11px] font-semibold",
+            @is_user && "text-success/80",
+            !@is_user && "text-primary/80"
+          ]}>
+            <%= if @is_user, do: "You", else: "Agent" %>
+          </span>
+          <span class="text-[10px] text-base-content/25 font-mono">
+            <%= format_message_time(@message.inserted_at) %>
+          </span>
+        </div>
+        <p class="text-xs text-base-content/70 whitespace-pre-wrap leading-relaxed break-words">
+          <%= truncate_message(@message.body, 500) %>
+        </p>
       </div>
     </div>
     """
@@ -258,8 +383,19 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
 
         <div class="space-y-2">
           <%= for member <- @team.members do %>
-            <div class="rounded-lg bg-base-200 overflow-hidden">
-              <div class="flex items-center gap-3 p-3 hover:bg-base-300/60 transition-colors group">
+            <div class={[
+              "rounded-lg bg-base-200 overflow-hidden",
+              member.session_id && @selected_agent_session_id == member.session_id && "ring-1 ring-primary/40"
+            ]}>
+              <div
+                class={[
+                  "flex items-center gap-3 p-3 transition-colors group",
+                  member.session_id && "cursor-pointer hover:bg-base-300/60",
+                  !member.session_id && "hover:bg-base-300/30"
+                ]}
+                phx-click={member.session_id && "select_agent"}
+                phx-value-session-id={member.session_id}
+              >
                 <%!-- Avatar initials --%>
                 <div class={[
                   "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
@@ -457,6 +593,17 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
     |> assign(:mobile_view, :list)
   end
 
+  defp clear_agent_selection(socket) do
+    if socket.assigns.agent_session_id do
+      Phoenix.PubSub.unsubscribe(EyeInTheSkyWeb.PubSub, "session:#{socket.assigns.agent_session_id}")
+    end
+
+    socket
+    |> assign(:selected_agent, nil)
+    |> assign(:agent_messages, [])
+    |> assign(:agent_session_id, nil)
+  end
+
   defp active_member_count(members), do: Enum.count(members, &(&1.status == "active"))
 
   defp member_initials(nil), do: "?"
@@ -470,18 +617,32 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
     |> String.upcase()
   end
 
-  defp format_note_time(nil), do: ""
+  defp truncate_message(nil, _), do: ""
+  defp truncate_message(body, max) when byte_size(body) > max do
+    String.slice(body, 0, max) <> "…"
+  end
+  defp truncate_message(body, _), do: body
 
+  defp format_message_time(nil), do: ""
+  defp format_message_time(%DateTime{} = dt), do: Calendar.strftime(dt, "%H:%M")
+  defp format_message_time(%NaiveDateTime{} = dt), do: Calendar.strftime(dt, "%H:%M")
+  defp format_message_time(str) when is_binary(str) do
+    case DateTime.from_iso8601(str) do
+      {:ok, dt, _} -> Calendar.strftime(dt, "%H:%M")
+      _ -> ""
+    end
+  end
+  defp format_message_time(_), do: ""
+
+  defp format_note_time(nil), do: ""
   defp format_note_time(%DateTime{} = dt), do: Calendar.strftime(dt, "%b %d, %H:%M")
   defp format_note_time(%NaiveDateTime{} = dt), do: Calendar.strftime(dt, "%b %d, %H:%M")
-
   defp format_note_time(str) when is_binary(str) do
     case DateTime.from_iso8601(str) do
       {:ok, dt, _} -> Calendar.strftime(dt, "%b %d, %H:%M")
       _ -> str
     end
   end
-
   defp format_note_time(_), do: ""
 
   defp status_badge_class("active"), do: "badge-success"

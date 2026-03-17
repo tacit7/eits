@@ -450,4 +450,13 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
     </span>
     """
   end
+
+  def truncate_text(nil), do: nil
+  def truncate_text(text) when is_binary(text) do
+    if String.length(text) > 50 do
+      String.slice(text, 0, 50) <> "..."
+    else
+      text
+    end
+  end
 end

@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.Components.SessionCard do
   use Phoenix.Component
   import EyeInTheSkyWebWeb.CoreComponents
-  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1, derive_display_status: 1]
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1, derive_display_status: 1, truncate_text: 1]
 
   alias EyeInTheSkyWeb.Sessions
 
@@ -144,7 +144,7 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
               </form>
             <% else %>
               <span class="text-[13px] font-medium text-base-content/85 truncate">
-                {@session.name || "Unnamed session"}
+                {@session.name || truncate_text(@session.agent && @session.agent.description) || "Unnamed session"}
               </span>
             <% end %>
           </div>

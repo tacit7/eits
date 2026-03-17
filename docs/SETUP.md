@@ -73,7 +73,7 @@ App is available at `https://eits.dev`.
 WebAuthn registration requires a one-time token. Generate one with:
 
 ```bash
-mix eits.register
+mix eits.register <username>
 ```
 
 Open the printed URL in the browser. It will prompt you to register a passkey (Touch ID, Face ID, or hardware key). Token expires in 15 minutes.
@@ -81,6 +81,15 @@ Open the printed URL in the browser. It will prompt you to register a passkey (T
 After registering, log in at `https://eits.dev/auth/login`.
 
 Subsequent users also need a registration token — there is no self-signup.
+
+### Logging in
+
+1. Go to `https://eits.dev/auth/login`
+2. Enter your username
+3. Your browser/device will prompt for a passkey (Touch ID, Face ID, hardware key, or phone)
+4. Approve — you're in
+
+Sessions are stored as browser cookies. No password involved.
 
 ## 6. Claude Code Hooks
 
@@ -286,6 +295,40 @@ ngrok will display a public URL like `https://abc123.ngrok-free.app`. Use that t
 - Free tier gives one tunnel at a time with random subdomain
 - The public URL changes each restart unless you have a paid plan with reserved domains
 - LiveView WebSocket connections work through ngrok out of the box
+
+### WebAuthn via ngrok
+
+WebAuthn ties credentials to an origin. To register or log in through an ngrok URL, you must tell the server to accept that origin.
+
+**1. Add the ngrok URL to `.env`:**
+
+```bash
+WEBAUTHN_EXTRA_ORIGINS=https://your-subdomain.ngrok-free.app
+```
+
+Comma-separate multiple origins if needed. This is read at boot via `Dotenvy.source/1` — restart the server after editing.
+
+**2. Restart Phoenix:**
+
+```bash
+mix phx.server
+```
+
+**3. Generate a registration token:**
+
+```bash
+mix eits.register <username>
+```
+
+Replace the domain in the printed URL with your ngrok URL:
+
+```
+https://your-subdomain.ngrok-free.app/auth/register?token=<token>
+```
+
+Open that URL on the device you want to register (e.g., iPhone). The passkey will be bound to the ngrok `rp_id` and will work for login via that ngrok URL.
+
+**Note:** Passkeys registered via ngrok (`rp_id: your-subdomain.ngrok-free.app`) are separate credentials from those registered via `eits.dev`. Both can coexist — the server accepts challenges from either origin independently.
 
 ---
 

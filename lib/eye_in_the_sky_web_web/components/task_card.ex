@@ -18,6 +18,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   attr :variant, :string, default: "kanban", values: ["kanban", "grid", "list"]
   attr :on_click, :string, default: nil
   attr :on_delete, :string, default: nil
+  attr :working_session_ids, :any, default: nil
   attr :rest, :global
 
   def task_card(assigns) do
@@ -32,7 +33,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
         <div class={[card_class(@variant), @aging && elem(@aging, 0)]} {@rest}>
           <div class={card_body_class(@variant)}>
             <%= if @variant == "kanban" do %>
-              <.kanban_card_content task={@task} on_click={@on_click} on_delete={@on_delete} aging={@aging} />
+              <.kanban_card_content task={@task} on_click={@on_click} on_delete={@on_delete} aging={@aging} working_session_ids={@working_session_ids} />
             <% else %>
               <.grid_card_content task={@task} on_click={@on_click} />
             <% end %>
@@ -203,14 +204,20 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
           </span>
         <% end %>
         <%= if @dm_session do %>
+          <% is_working = @working_session_ids && MapSet.member?(@working_session_ids, @dm_session.id) %>
           <a
             href={"/dm/#{@dm_session.uuid}"}
             target="_blank"
             class="ml-auto flex-shrink-0 text-base-content/30 hover:text-primary transition-colors"
             onclick="event.stopPropagation();"
-            title="Open agent DM"
+            title={if is_working, do: "Agent is working", else: "Open agent DM"}
           >
-            <.icon name="hero-user-circle" class="w-3.5 h-3.5" />
+            <span class="relative inline-flex">
+              <.icon name="hero-user-circle" class={"w-3.5 h-3.5 #{if is_working, do: "text-primary", else: ""}"} />
+              <%= if is_working do %>
+                <span class="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-success rounded-full animate-pulse" />
+              <% end %>
+            </span>
           </a>
         <% end %>
       </div>

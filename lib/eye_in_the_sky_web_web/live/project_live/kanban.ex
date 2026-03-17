@@ -17,6 +17,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
     if connected?(socket) do
       EyeInTheSkyWeb.Events.subscribe_project_tasks(id)
+      EyeInTheSkyWeb.Events.subscribe_agents()
+      EyeInTheSkyWeb.Events.subscribe_agent_working()
     end
 
     socket =
@@ -47,6 +49,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       |> assign(:bulk_mode, false)
       |> assign(:all_projects, Projects.list_projects())
       |> assign(:show_filters, false)
+      |> assign(:working_session_ids, MapSet.new())
 
     if socket.assigns.project do
       {:ok, load_tasks(socket)}
@@ -603,6 +606,35 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_info({:agent_working, session} , socket) when is_map(session) do
+    {:noreply, update(socket, :working_session_ids, &MapSet.put(&1, session.id))}
+  end
+
+  @impl true
+  def handle_info({:agent_working, _ref, session_int_id}, socket) do
+    {:noreply, update(socket, :working_session_ids, &MapSet.put(&1, session_int_id))}
+  end
+
+  @impl true
+  def handle_info({:agent_stopped, session}, socket) when is_map(session) do
+    {:noreply, update(socket, :working_session_ids, &MapSet.delete(&1, session.id))}
+  end
+
+  @impl true
+  def handle_info({:agent_stopped, _ref, session_int_id}, socket) do
+    {:noreply, update(socket, :working_session_ids, &MapSet.delete(&1, session_int_id))}
+  end
+
+  @impl true
+  def handle_info({:agent_updated, _}, socket), do: {:noreply, load_tasks(socket)}
+
+  @impl true
+  def handle_info({:agent_created, _}, socket), do: {:noreply, load_tasks(socket)}
+
+  @impl true
+  def handle_info({:agent_deleted, _}, socket), do: {:noreply, socket}
+
   defp load_tasks(socket) do
     project_id = socket.assigns.project_id
     query = socket.assigns.search_query
@@ -937,6 +969,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                         id={"kanban-task-#{task.id}"}
                         phx-click="open_task_detail"
                         phx-value-task_id={task.uuid}
+                        working_session_ids={@working_session_ids}
                       />
                     </div>
                   </div>

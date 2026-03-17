@@ -43,6 +43,8 @@ defmodule EyeInTheSkyWeb.Application do
       EyeInTheSkyWeb.Tasks.Poller,
       # Poll for external message writes (Go MCP, spawned agents)
       EyeInTheSkyWeb.Messages.Broadcaster,
+      # Rate limiter ETS backend for auth endpoint throttling
+      EyeInTheSkyWeb.RateLimiter,
       # Start to serve requests, typically the last entry
       EyeInTheSkyWebWeb.Endpoint
     ]
@@ -62,7 +64,7 @@ defmodule EyeInTheSkyWeb.Application do
   end
 
   defp skip_migrations?() do
-    # By default, sqlite migrations are run when using a release
+    # By default, migrations are run when using a release
     System.get_env("RELEASE_NAME") == nil
   end
 end

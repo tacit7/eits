@@ -10,7 +10,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   use GenServer, restart: :transient
   require Logger
 
-  alias EyeInTheSkyWeb.Claude.{Job, Message, SDK, StreamAssembler, WorkerEvents}
+  alias EyeInTheSkyWeb.Claude.{Job, Message, SDK, StreamAssembler}
+  alias EyeInTheSkyWeb.AgentWorkerEvents, as: WorkerEvents
   alias EyeInTheSkyWeb.Codex
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
@@ -25,6 +26,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     :session_id,
     :provider_conversation_id,
     :agent_id,
+    :project_id,
     :project_path,
     :provider,
     :sdk_ref,
@@ -107,6 +109,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     session_id = Keyword.fetch!(opts, :session_id)
     provider_conversation_id = Keyword.fetch!(opts, :provider_conversation_id)
     agent_id = Keyword.fetch!(opts, :agent_id)
+    project_id = Keyword.get(opts, :project_id)
     project_path = Keyword.get(opts, :project_path, File.cwd!())
     provider = Keyword.get(opts, :provider, "claude")
     worktree = Keyword.get(opts, :worktree)
@@ -115,6 +118,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       session_id: session_id,
       provider_conversation_id: provider_conversation_id,
       agent_id: agent_id,
+      project_id: project_id,
       project_path: project_path,
       provider: provider,
       worktree: worktree
@@ -317,6 +321,17 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   # Stale tool_block_stop from old sdk ref - ignore
   @impl true
   def handle_info({:tool_block_stop, _ref}, state), do: {:noreply, state}
+
+  # Codex thread_id arrived via thread.started — sync immediately so resume works
+  @impl true
+  def handle_info({:codex_session_id, ref, thread_id}, %__MODULE__{sdk_ref: ref} = state) do
+    state = maybe_sync_provider_conversation_id(state, thread_id)
+    {:noreply, state}
+  end
+
+  # Stale codex_session_id from old sdk ref - ignore
+  @impl true
+  def handle_info({:codex_session_id, _ref, _thread_id}, state), do: {:noreply, state}
 
   # SDK completion - process next queued job
   @impl true
@@ -548,9 +563,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       session_id: state.provider_conversation_id,
       project_path: state.project_path,
       full_auto: true,
-      eits_session_id: state.provider_conversation_id,
+      eits_session_uuid: state.provider_conversation_id,
+      eits_session_id: state.session_id,
+      eits_agent_uuid: state.agent_id,
       eits_agent_id: state.agent_id,
-      eits_model: context[:model]
+      eits_project_id: state.project_id,
+      eits_model: context[:model],
+      eits_url: "http://localhost:5000/api/v1"
     ]
 
     if has_messages do
@@ -560,36 +579,26 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       Logger.info("Starting new Codex session #{state.provider_conversation_id}")
 
       full_prompt =
-        codex_eits_init(state.provider_conversation_id, context[:model]) <> "\n\n---\n\n" <> prompt
+        codex_eits_init(state) <> "\n\n---\n\n" <> prompt
 
       Codex.SDK.start(full_prompt, opts)
     end
   end
 
-  defp codex_eits_init(provider_conversation_id, model) do
+  defp codex_eits_init(state) do
     """
-    IMPORTANT: Before doing anything else, complete these EITS registration steps:
+    EITS environment variables are pre-set in your shell via shell_environment_policy:
+    - EITS_SESSION_UUID=#{state.provider_conversation_id}
+    - EITS_SESSION_ID=#{state.session_id}
+    - EITS_AGENT_UUID=#{state.agent_id}
+    - EITS_PROJECT_ID=#{state.project_id}
+    - EITS_URL=http://localhost:5000/api/v1
 
-    1. Get your Codex session ID by running:
-       ~/.claude/eye-in-the-sky/codex-session-find #{provider_conversation_id}
-
-    2. Your EITS session UUID is: #{provider_conversation_id}
-       Model: #{model || "unknown"}
-       Provider: openai
-
-    3. Follow the EITS workflow for all work:
-       a. Create a task:
-          i-todo create --title "<task title>" --description "<details>"
-       b. Start the task (move to In Progress):
-          i-todo start <task_id>
-       c. Link task to your session:
-          i-todo add-session <task_id> --session_id #{provider_conversation_id}
-       d. Do the work.
-       e. When done, move task to In Review (NOT Done):
-          i-todo status <task_id> --state_id 4
-
-    4. When all work is complete, end the session:
-       i-session end #{provider_conversation_id}
+    Use `eits` CLI for task tracking:
+    - `eits tasks create --title "Task name" --description "Details"`
+    - `eits tasks start <task_id>`
+    - `eits tasks update <task_id> --state 4` (when done)
+    - `eits notes create --parent-type session --parent-id $EITS_SESSION_UUID --title "Note" --body "Content"`
 
     Now proceed with the task:
     """
@@ -703,10 +712,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       session_id: state.session_id,
       reason: reason
     })
-
-    Logger.error(
-      "[telemetry] agent.sdk.error session_id=#{state.session_id} reason=#{inspect(reason)}"
-    )
 
     WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
     demonitor_handler(state.handler_monitor)

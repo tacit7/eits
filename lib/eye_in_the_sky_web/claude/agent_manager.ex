@@ -29,7 +29,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   """
   def create_agent(opts) do
     with {:ok, %{agent: agent, session: session}} <- create_records(opts) do
-      instructions = build_instructions(opts, session)
+      instructions = build_instructions(opts)
 
       Logger.info("📤 create_agent: sending initial message to session.id=#{session.id}")
 
@@ -62,7 +62,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
     agent_uuid = Ecto.UUID.generate()
     provider = if opts[:agent_type] == "codex", do: "codex", else: "claude"
 
-    # For codex sessions, leave uuid null — Codex sets it via i-session start.
+    # For codex sessions, leave uuid null — Codex thread_id arrives via thread.started event
+    # and gets synced to the session via maybe_sync_provider_conversation_id.
     # For claude sessions, pre-generate so the worker can reference it immediately.
     session_uuid = if provider == "codex", do: nil, else: opts[:session_uuid] || Ecto.UUID.generate()
 
@@ -159,7 +160,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
     end
   end
 
-  defp build_instructions(opts, _session) do
+  defp build_instructions(opts) do
     description = opts[:description] || "Agent session"
 
     case opts[:worktree] do
@@ -312,10 +313,22 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
 
       provider = normalize_provider(session.provider) || "claude"
 
+      # Ensure session has a UUID — Codex sessions created from the UI may not have one
+      session =
+        if is_nil(session.uuid) or session.uuid == "" do
+          uuid = Ecto.UUID.generate()
+          Logger.info("start_agent_worker: generating UUID=#{uuid} for session.id=#{session.id}")
+          {:ok, updated} = Sessions.update_session(session, %{uuid: uuid})
+          updated
+        else
+          session
+        end
+
       opts = [
         session_id: session.id,
         provider_conversation_id: session.uuid,
         agent_id: agent.id,
+        project_id: session.project_id,
         project_path: project_path,
         provider: provider,
         worktree: extra_opts[:worktree]

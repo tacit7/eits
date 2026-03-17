@@ -311,7 +311,9 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     ]
     |> Keyword.filter(fn {_k, v} -> v != nil end)
   rescue
-    _ -> []
+    e ->
+      Logger.error("[cli_db_defaults] failed to load settings: #{inspect(e)}")
+      []
   end
 
   defp parse_setting_integer(nil), do: nil
@@ -356,7 +358,10 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
         err
 
       :ok ->
-        project_path = Keyword.get(merged, :project_path, File.cwd!())
+        project_path =
+          merged
+          |> Keyword.get(:project_path, File.cwd!())
+          |> Path.expand()
 
         if !File.dir?(project_path) do
           {:error, {:invalid_project_path, project_path}}

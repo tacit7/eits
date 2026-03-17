@@ -534,8 +534,19 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_event("kill_session", _params, socket) do
-    AgentManager.cancel_session(socket.assigns.session_id)
-    {:noreply, socket |> assign(:processing, false)}
+    session_id = socket.assigns.session_id
+    AgentManager.cancel_session(session_id)
+
+    # Force-terminate the worker process if still registered (handles stuck :running state)
+    case Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session_id}) do
+      [{pid, _}] ->
+        Logger.warning("kill_session: force-exiting stuck worker pid=#{inspect(pid)} for session=#{session_id}")
+        Process.exit(pid, :kill)
+      [] ->
+        :ok
+    end
+
+    {:noreply, socket |> assign(:processing, false) |> stop_sync_timer()}
   end
 
   @impl true

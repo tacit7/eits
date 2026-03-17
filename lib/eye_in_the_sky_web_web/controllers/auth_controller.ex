@@ -75,6 +75,7 @@ defmodule EyeInTheSkyWebWeb.AuthController do
                sign_count: sign_count
              }) do
         conn
+        |> configure_session(renew: true)
         |> delete_session(:webauthn_challenge)
         |> delete_session(:webauthn_username)
         |> delete_session(:webauthn_reg_token)
@@ -156,6 +157,7 @@ defmodule EyeInTheSkyWebWeb.AuthController do
       if passkey, do: Accounts.update_sign_count(passkey, auth_data.sign_count)
 
       conn
+      |> configure_session(renew: true)
       |> delete_session(:webauthn_challenge)
       |> delete_session(:webauthn_user_id)
       |> put_session(:user_id, user_id)

@@ -8,7 +8,9 @@ defmodule EyeInTheSkyWebWeb.Endpoint do
     store: :cookie,
     key: "_eye_in_the_sky_web_key",
     signing_salt: "Zx+j4lGh",
-    same_site: "Lax"
+    same_site: "Lax",
+    http_only: true,
+    secure: true
   ]
 
   socket "/live", Phoenix.LiveView.Socket,

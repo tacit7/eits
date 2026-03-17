@@ -63,6 +63,22 @@ PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. **T
 - `lib/eye_in_the_sky_web_web/` - Web layer (LiveViews, components, router)
 - `lib/eye_in_the_sky_web/search/fts5.ex` - Full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback (module name is legacy from SQLite era)
 
+## PubSub
+
+All PubSub broadcasting and subscribing goes through `EyeInTheSkyWeb.Events` (`lib/eye_in_the_sky_web/events.ex`). **Never call `Phoenix.PubSub.broadcast` or `Phoenix.PubSub.subscribe` directly** — use the named functions in Events.
+
+```elixir
+# GOOD
+EyeInTheSkyWeb.Events.agent_updated(agent)
+EyeInTheSkyWeb.Events.subscribe_session(session_id)
+
+# BAD
+Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, agent})
+Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session_id}")
+```
+
+Events owns all topic strings. If you need a new broadcast, add a named function to Events — don't hardcode a topic anywhere else. `EyeInTheSkyWebWeb.Helpers.PubSubHelpers` is a thin compatibility wrapper that delegates to Events; prefer calling Events directly in new code.
+
 ## UI Standards
 
 ### Icons

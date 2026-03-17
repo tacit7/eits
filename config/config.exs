@@ -68,11 +68,11 @@ config :eye_in_the_sky_web, Oban,
   ]
 
 # Web Push / VAPID configuration
+# public_key is non-secret and safe to commit; private_key loaded from VAPID_PRIVATE_KEY env var (see runtime.exs)
 config :web_push_encryption, :vapid_details,
   subject: "mailto:admin@eits.dev",
   public_key:
-    "BCeer_3Bsec6cpZU-NAcYLmeF5zqinfsZBYzXoDlA62Gp8nJhtnhKI0OGdPqEJAe5b9lpHuyNZjIDIrOgCjhUIc",
-  private_key: "UjvINIZfpbgbtSEyPrxK41I5Sy-uE6gtxek7Vq9W6ck"
+    "BCeer_3Bsec6cpZU-NAcYLmeF5zqinfsZBYzXoDlA62Gp8nJhtnhKI0OGdPqEJAe5b9lpHuyNZjIDIrOgCjhUIc"
 
 # WebAuthn / Passkey configuration
 config :wax_,

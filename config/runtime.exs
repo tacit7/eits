@@ -27,6 +27,16 @@ end
 # Gitea webhook HMAC secret — required for signature verification in all envs
 config :eye_in_the_sky_web, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SECRET", "")
 
+# VAPID private key — loaded from env in all envs (never hardcoded)
+config :web_push_encryption, :vapid_details,
+  subject: "mailto:admin@eits.dev",
+  public_key:
+    System.get_env("VAPID_PUBLIC_KEY") ||
+      "BCeer_3Bsec6cpZU-NAcYLmeF5zqinfsZBYzXoDlA62Gp8nJhtnhKI0OGdPqEJAe5b9lpHuyNZjIDIrOgCjhUIc",
+  private_key:
+    System.get_env("VAPID_PRIVATE_KEY") ||
+      raise("VAPID_PRIVATE_KEY environment variable is not set")
+
 # REST API key — set EITS_API_KEY to require bearer auth on /api/v1.
 # Leave unset to disable auth (dev default).
 # Generate with: mix eits.gen.api_key
@@ -102,7 +112,8 @@ if config_env() == :prod do
       ip: {0, 0, 0, 0, 0, 0, 0, 0},
       port: port
     ],
-    secret_key_base: secret_key_base
+    secret_key_base: secret_key_base,
+    force_ssl: [hsts: true, rewrite_on: [:x_forwarded_proto]]
 
   # ## SSL Support
   #

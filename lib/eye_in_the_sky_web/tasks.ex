@@ -10,7 +10,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   alias EyeInTheSkyWeb.Tasks.{Task, WorkflowState, Tag, ChecklistItem}
   alias EyeInTheSkyWeb.QueryHelpers
   alias EyeInTheSkyWeb.QueryBuilder
-  alias EyeInTheSkyWeb.Search.FTS5
+  alias EyeInTheSkyWeb.Search.PgSearch
   alias EyeInTheSkyWeb.Notes
 
   # Workflow state ID accessors — source of truth is WorkflowState
@@ -289,14 +289,13 @@ defmodule EyeInTheSkyWeb.Tasks do
   end
 
   @doc """
-  Search tasks using FTS5.
-  Requires task_search FTS5 table in database.
+  Search tasks using PostgreSQL full-text search.
   """
   def search_tasks(query, project_id \\ nil) when is_binary(query) do
     extra_where =
       if project_id, do: dynamic([t], t.project_id == ^project_id)
 
-    FTS5.search_for(query,
+    PgSearch.search_for(query,
       table: "tasks",
       schema: Task,
       search_columns: ["title", "description"],

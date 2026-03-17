@@ -61,7 +61,7 @@ PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. **T
 
 - `lib/eye_in_the_sky_web/` - Contexts (Sessions, Tasks, Agents, Projects, Notes, Prompts, Commits)
 - `lib/eye_in_the_sky_web_web/` - Web layer (LiveViews, components, router)
-- `lib/eye_in_the_sky_web/search/fts5.ex` - Full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback (module name is legacy from SQLite era)
+- `lib/eye_in_the_sky_web/search/pg_search.ex` - Full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback (`EyeInTheSkyWeb.Search.PgSearch`)
 
 ## PubSub
 
@@ -78,6 +78,25 @@ Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session_id}")
 ```
 
 Events owns all topic strings. If you need a new broadcast, add a named function to Events — don't hardcode a topic anywhere else. `EyeInTheSkyWebWeb.Helpers.PubSubHelpers` is a thin compatibility wrapper that delegates to Events; prefer calling Events directly in new code.
+
+## Documentation
+
+Project docs live in `docs/`. Key references:
+
+- [docs/SECURITY.md](docs/SECURITY.md) — Security architecture: auth, session handling, rate limiting, secrets, transport security
+- [docs/REST_API.md](docs/REST_API.md) — Full API endpoint reference
+- [docs/SETUP.md](docs/SETUP.md) — Project setup guide
+- [docs/CODE_GUIDELINES.md](docs/CODE_GUIDELINES.md) — Coding standards
+- [docs/EITS_CLI.md](docs/EITS_CLI.md) — CLI reference
+- [docs/EITS_HOOKS.md](docs/EITS_HOOKS.md) — Hook system
+- [docs/DM_FEATURES.md](docs/DM_FEATURES.md) — DM/messaging features
+- [docs/SESSION_MANAGER.md](docs/SESSION_MANAGER.md) — Session lifecycle
+- [docs/WORKERS.md](docs/WORKERS.md) — Background workers
+- [docs/KANBAN.md](docs/KANBAN.md) — Kanban board
+- [docs/COMMAND_PALETTE.md](docs/COMMAND_PALETTE.md) — Command palette
+- [docs/chat-mention-workflow.md](docs/chat-mention-workflow.md) — Chat @mention system
+- [docs/claude-cli-flags.md](docs/claude-cli-flags.md) — Claude CLI flag reference
+- [docs/CONTEXT_WINDOW.md](docs/CONTEXT_WINDOW.md) — Context window handling
 
 ## UI Standards
 
@@ -104,20 +123,11 @@ Common icons:
 - `hero-x-mark` - Close buttons
 - `hero-pencil-square` - Edit buttons
 
-### NATS Processing (Currently Disabled)
-
-NATS message processing is **currently disabled** to prevent duplicate messages. The following are disabled:
-- `JetStreamConsumer` - V1/V2 channel messages, DM handling all disabled
-- DM LiveView - NATS message handler disabled
-- SessionWorker - Result message saving disabled (only assistant messages saved)
-
-Original code is kept as comments for future re-enablement when proper deduplication is implemented.
-
 ### Full-Text Search
 
-`lib/eye_in_the_sky_web/search/fts5.ex` wraps PostgreSQL `tsvector/tsquery` full-text search with an ILIKE fallback. The module name is a legacy artifact from the SQLite era — it is not FTS5. Use `FTS5.search_for/2` for all full-text queries across sessions, tasks, and notes.
+`lib/eye_in_the_sky_web/search/pg_search.ex` (`EyeInTheSkyWeb.Search.PgSearch`) wraps PostgreSQL `tsvector/tsquery` full-text search with an ILIKE fallback. Use `PgSearch.search_for/2` for all full-text queries across sessions, tasks, and notes.
 
-**Helper Function: `FTS5.fts_name_description_match/1`**
+**Helper Function: `PgSearch.fts_name_description_match/1`**
 
 Extracts reusable tsvector query fragments for common search patterns across sessions, tasks, and notes. This helper:
 - Builds PostgreSQL `@@` operator queries on indexed columns

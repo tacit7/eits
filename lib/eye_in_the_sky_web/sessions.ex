@@ -16,7 +16,7 @@ defmodule EyeInTheSkyWeb.Sessions do
   alias EyeInTheSkyWeb.Tasks.WorkflowState
   alias EyeInTheSkyWeb.Scopes.Archivable
   alias EyeInTheSkyWeb.QueryBuilder
-  alias EyeInTheSkyWeb.Search.FTS5
+  alias EyeInTheSkyWeb.Search.PgSearch
 
   @doc """
   Returns the list of sessions, excluding archived by default.
@@ -222,7 +222,7 @@ defmodule EyeInTheSkyWeb.Sessions do
   end
 
   @doc """
-  Lists sessions filtered by search query and status filter using FTS5 full-text search.
+  Lists sessions filtered by search query and status filter using PostgreSQL full-text search.
   Excludes archived sessions by default. Pass `include_archived: true` to include archived sessions.
 
   Options:
@@ -251,7 +251,7 @@ defmodule EyeInTheSkyWeb.Sessions do
     # Apply full-text search filter
     base_query =
       if search_query != "" do
-        where(base_query, [s, a], ^FTS5.fts_name_description_match(search_query))
+        where(base_query, [s, a], ^PgSearch.fts_name_description_match(search_query))
       else
         base_query
       end
@@ -290,7 +290,7 @@ defmodule EyeInTheSkyWeb.Sessions do
   - `:limit` - Maximum number of results (default: 20)
   - `:include_archived` - Include archived sessions (default: false)
   - `:project_id` - Filter by project ID
-  - `:search_query` - FTS5 search query across all searchable fields
+  - `:search_query` - PostgreSQL full-text search query across all searchable fields
   """
   def list_session_overview_rows(opts \\ []) do
     limit = Keyword.get(opts, :limit, 20)
@@ -347,7 +347,7 @@ defmodule EyeInTheSkyWeb.Sessions do
     query = if project_id, do: where(query, [s, a], a.project_id == ^project_id), else: query
 
     if search_query != "" do
-      where(query, [s], ^FTS5.fts_name_description_match(search_query))
+      where(query, [s], ^PgSearch.fts_name_description_match(search_query))
     else
       query
     end

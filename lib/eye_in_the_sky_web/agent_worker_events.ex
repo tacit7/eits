@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Claude.WorkerEvents do
+defmodule EyeInTheSkyWeb.AgentWorkerEvents do
   @moduledoc """
   Handles all side effects triggered by AgentWorker state transitions.
 

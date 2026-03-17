@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Search.FTS5 do
+defmodule EyeInTheSkyWeb.Search.PgSearch do
   @moduledoc """
   Reusable full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback.
 
@@ -107,8 +107,8 @@ defmodule EyeInTheSkyWeb.Search.FTS5 do
 
   The first named binding (`s`) must be the schema with `name` and `description` columns:
 
-      where(query, [s], ^FTS5.fts_name_description_match(search_query))
-      where(query, [s, a], ^FTS5.fts_name_description_match(search_query))
+      where(query, [s], ^PgSearch.fts_name_description_match(search_query))
+      where(query, [s, a], ^PgSearch.fts_name_description_match(search_query))
   """
   def fts_name_description_match(search_query) do
     dynamic(

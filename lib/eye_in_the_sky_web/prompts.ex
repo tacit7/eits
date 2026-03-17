@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Prompts do
   import Ecto.Query, warn: false
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Prompts.Prompt
-  alias EyeInTheSkyWeb.Search.FTS5
+  alias EyeInTheSkyWeb.Search.PgSearch
 
   @doc """
   Returns the list of prompts with optional project filter.
@@ -146,8 +146,7 @@ defmodule EyeInTheSkyWeb.Prompts do
   end
 
   @doc """
-  Search prompts using FTS5.
-  Requires prompt_search FTS5 table in database.
+  Search prompts using PostgreSQL full-text search.
   """
   def search_prompts(query, project_id \\ nil) when is_binary(query) do
     extra_where =
@@ -157,7 +156,7 @@ defmodule EyeInTheSkyWeb.Prompts do
         dynamic([p], p.active == true)
       end
 
-    FTS5.search_for(query,
+    PgSearch.search_for(query,
       table: "subagent_prompts",
       schema: Prompt,
       search_columns: ["name", "description", "prompt_text"],

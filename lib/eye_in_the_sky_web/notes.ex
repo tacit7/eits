@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Notes do
   import Ecto.Query, warn: false
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Notes.Note
-  alias EyeInTheSkyWeb.Search.FTS5
+  alias EyeInTheSkyWeb.Search.PgSearch
 
   @doc """
   Returns the list of notes.
@@ -200,8 +200,7 @@ defmodule EyeInTheSkyWeb.Notes do
   end
 
   @doc """
-  Search notes using FTS5.
-  Requires notes_fts FTS5 table in database.
+  Search notes using PostgreSQL full-text search.
   """
   def search_notes(query, agent_ids \\ [], opts \\ []) when is_binary(query) do
     agent_ids_str = Enum.map(agent_ids, &to_string/1)
@@ -225,7 +224,7 @@ defmodule EyeInTheSkyWeb.Notes do
         {"", []}
       end
 
-    FTS5.search_for(query,
+    PgSearch.search_for(query,
       table: "notes",
       schema: Note,
       search_columns: ["title", "body"],

@@ -49,14 +49,16 @@ Three modes determine how agents handle incoming channel messages:
 |------|---------|----------------|
 | `:direct` | `@123` (session ID) | Must respond |
 | `:broadcast` | `@all` | Must respond |
-| `:ambient` | No mention | Message delivered but no response requested |
+| `:ambient` | No mention | Respond only if useful; reply `[NO_RESPONSE]` otherwise |
 
 `ChannelProtocol.parse_routing(body, session_id)` returns `{mode, mentioned_ids, mention_all}`.
 
 `ChannelProtocol.build_prompt(mode, body)` prepends mode-specific instructions:
 - **Direct**: "You were directly mentioned. You must respond."
 - **Broadcast**: "A broadcast message was sent to all agents. You must respond."
-- **Ambient**: No prompt sent; message is delivered to the agent's DM session as context only. `AgentManager.send_message` is NOT called for ambient messages.
+- **Ambient**: "Reply ONLY if you have something genuinely useful. If nothing to add, reply with exactly: [NO_RESPONSE]"
+
+`AgentWorker` suppresses `[NO_RESPONSE]` replies from DB storage.
 
 ## Database Schema
 

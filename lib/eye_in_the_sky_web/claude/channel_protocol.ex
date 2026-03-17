@@ -3,12 +3,12 @@ defmodule EyeInTheSkyWeb.Claude.ChannelProtocol do
   Defines the channel messaging protocol for agents.
 
   Three routing modes:
-  - :direct   — agent was @mentioned by ID; must respond
+  - :direct    — agent was @mentioned by ID; must respond
   - :broadcast — @all was used; everyone must respond
-  - :ambient  — no mention; agent decides whether it has something relevant to say
+  - :ambient   — no mention; agent should respond only if it has something useful to say
 
-  Agents in :ambient mode are instructed to reply [NO_RESPONSE] if they have
-  nothing relevant. AgentWorker already suppresses [NO_RESPONSE] from DB storage.
+  All modes fan out to every channel member. AgentWorker suppresses [NO_RESPONSE]
+  replies from DB storage.
   """
 
   @ambient_instruction """

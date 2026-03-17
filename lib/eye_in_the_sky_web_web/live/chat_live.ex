@@ -246,17 +246,13 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
               body: body
             })
 
-            if mode in [:direct, :broadcast] do
-              prompt = ChannelProtocol.build_prompt(mode, body)
-              Logger.info("Routing to session=#{member.session_id} mode=#{mode}")
+            prompt = ChannelProtocol.build_prompt(mode, body)
+            Logger.info("Routing to session=#{member.session_id} mode=#{mode}")
 
-              AgentManager.send_message(member.session_id, prompt,
-                model: "sonnet",
-                channel_id: channel_id
-              )
-            else
-              Logger.info("Ambient message to session=#{member.session_id} — no response requested")
-            end
+            AgentManager.send_message(member.session_id, prompt,
+              model: "sonnet",
+              channel_id: channel_id
+            )
           end
         end)
 

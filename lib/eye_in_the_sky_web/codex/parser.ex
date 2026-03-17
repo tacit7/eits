@@ -93,6 +93,11 @@ defmodule EyeInTheSkyWeb.Codex.Parser do
     {:ok, Message.tool_use(type, item, %{partial: true})}
   end
 
+  defp parse_event(%{"type" => "item.started", "item" => %{"type" => type} = item})
+       when type in ["file_change", "file_changes", "mcp_tool_call", "mcp_tool_calls"] do
+    {:ok, Message.tool_use(type, item, %{partial: true})}
+  end
+
   defp parse_event(%{"type" => "item.started"}) do
     :skip
   end
@@ -158,20 +163,24 @@ defmodule EyeInTheSkyWeb.Codex.Parser do
     {:ok, Message.tool_use("command_execution", input)}
   end
 
-  # Item completed - file_changes (tool use)
+  # Item completed - file_changes / file_change (tool use)
+  # Codex docs use singular "file_change", but some versions emit plural
   defp parse_event(%{
          "type" => "item.completed",
-         "item" => %{"type" => "file_changes"} = item
-       }) do
-    {:ok, Message.tool_use("file_changes", item)}
+         "item" => %{"type" => type} = item
+       })
+       when type in ["file_changes", "file_change"] do
+    {:ok, Message.tool_use(type, item)}
   end
 
-  # Item completed - mcp_tool_calls (tool use)
+  # Item completed - mcp_tool_calls / mcp_tool_call (tool use)
+  # Codex docs use singular "mcp_tool_call", but some versions emit plural
   defp parse_event(%{
          "type" => "item.completed",
-         "item" => %{"type" => "mcp_tool_calls"} = item
-       }) do
-    {:ok, Message.tool_use("mcp_tool_calls", item)}
+         "item" => %{"type" => type} = item
+       })
+       when type in ["mcp_tool_calls", "mcp_tool_call"] do
+    {:ok, Message.tool_use(type, item)}
   end
 
   # Item completed - web_search (tool use)

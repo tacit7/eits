@@ -71,6 +71,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         |> assign(:show_live_stream, false)
         |> assign(:stream_content, AgentWorker.get_stream_state(session.id))
         |> assign(:stream_tool, nil)
+        |> assign(:stream_thinking, nil)
         |> assign(:slash_items, build_slash_items())
         |> assign(:diff_cache, %{})
         |> assign(:selected_task, nil)
@@ -700,8 +701,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     uploaded_files = consume_uploaded_files(socket)
     full_body = build_message_body(body, uploaded_files)
     session_id = socket.assigns.session_id
+    provider = socket.assigns.session.provider
 
-    case create_user_message(session_id, full_body) do
+    case create_user_message(session_id, full_body, provider) do
       {:ok, message} ->
         Logger.info("Message created in DB with id=#{message.id}")
         persist_upload_attachments(uploaded_files, message.id)
@@ -930,6 +932,12 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_info({:stream_replace, :thinking, text}, socket) do
+    Logger.info("[DmLive] stream_replace thinking, len=#{String.length(text)}")
+    {:noreply, assign(socket, :stream_thinking, text)}
+  end
+
+  @impl true
   def handle_info(:stream_clear, socket) do
     Logger.info("[DmLive] stream_clear")
 
@@ -937,6 +945,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       socket
       |> assign(:stream_content, "")
       |> assign(:stream_tool, nil)
+      |> assign(:stream_thinking, nil)
 
     {:noreply, socket}
   end
@@ -1236,12 +1245,12 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     end
   end
 
-  defp create_user_message(session_id, body) do
+  defp create_user_message(session_id, body, provider) do
     Messages.send_message(%{
       session_id: session_id,
       sender_role: "user",
       recipient_role: "agent",
-      provider: "claude",
+      provider: provider || "claude",
       body: body
     })
   end
@@ -1309,6 +1318,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         show_live_stream={@show_live_stream}
         stream_content={@stream_content}
         stream_tool={@stream_tool}
+        stream_thinking={@stream_thinking}
+        session={@session}
         tasks={@tasks}
         commits={@commits}
         diff_cache={@diff_cache}

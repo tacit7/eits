@@ -31,6 +31,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :show_live_stream, :boolean, default: false
   attr :stream_content, :string, default: ""
   attr :stream_tool, :string, default: nil
+  attr :stream_thinking, :string, default: nil
+  attr :session, :map, default: nil
   attr :slash_items, :list, default: []
   attr :show_new_task_drawer, :boolean, default: false
   attr :workflow_states, :list, default: []
@@ -383,6 +385,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               show_live_stream={@show_live_stream}
               stream_content={@stream_content}
               stream_tool={@stream_tool}
+              stream_thinking={@stream_thinking}
+              session={@session}
               agent={@agent}
             />
           <% "tasks" -> %>
@@ -403,6 +407,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               show_live_stream={@show_live_stream}
               stream_content={@stream_content}
               stream_tool={@stream_tool}
+              stream_thinking={@stream_thinking}
+              session={@session}
               agent={@agent}
             />
         <% end %>
@@ -443,6 +449,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :show_live_stream, :boolean, default: false
   attr :stream_content, :string, default: ""
   attr :stream_tool, :string, default: nil
+  attr :stream_thinking, :string, default: nil
+  attr :session, :map, default: nil
   attr :agent, :map, default: nil
 
   defp messages_tab(assigns) do
@@ -490,16 +498,19 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             </div>
 
             <%!-- Live streaming bubble --%>
-            <%= if @show_live_stream && (@stream_content != "" || @stream_tool) do %>
+            <%= if @show_live_stream && (@stream_content != "" || @stream_tool || @stream_thinking) do %>
               <div class="py-3 px-2" id="live-stream-bubble">
                 <div class="flex items-start gap-2.5">
-                  <img
-                    src="/images/claude.svg"
-                    class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
-                    alt="Claude"
-                  />
+                  <.stream_provider_avatar session={@session} />
                   <div class="min-w-0 flex-1">
-                    <span class="text-[13px] font-semibold text-primary/80">Agent</span>
+                    <span class="text-[13px] font-semibold text-primary/80">
+                      {stream_provider_label(@session)}
+                    </span>
+                    <%= if @stream_thinking do %>
+                      <div class="text-xs text-base-content/30 italic font-mono mt-1 line-clamp-3">
+                        {String.slice(@stream_thinking, -200, 200)}
+                      </div>
+                    <% end %>
                     <%= if @stream_tool do %>
                       <div class="text-xs text-base-content/40 font-mono mt-1">
                         Using {@stream_tool}...
@@ -1979,4 +1990,32 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   end
 
   defp format_checkpoint_time(_), do: "—"
+
+  attr :session, :map, default: nil
+
+  defp stream_provider_avatar(assigns) do
+    provider = if assigns.session, do: assigns.session.provider, else: "claude"
+    assigns = assign(assigns, :provider, provider)
+
+    ~H"""
+    <%= if @provider == "codex" do %>
+      <img
+        src="/images/openai.svg"
+        class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
+        alt="Codex"
+      />
+    <% else %>
+      <img
+        src="/images/claude.svg"
+        class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
+        alt="Claude"
+      />
+    <% end %>
+    """
+  end
+
+  defp stream_provider_label(nil), do: "Agent"
+  defp stream_provider_label(%{provider: "codex"}), do: "Codex"
+  defp stream_provider_label(%{provider: "openai"}), do: "Codex"
+  defp stream_provider_label(_session), do: "Claude"
 end

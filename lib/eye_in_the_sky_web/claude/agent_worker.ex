@@ -11,6 +11,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   require Logger
 
   alias EyeInTheSkyWeb.Claude.{Job, Message, SDK, StreamAssembler}
+  alias EyeInTheSkyWeb.Codex.StreamAssembler, as: CodexStreamAssembler
   alias EyeInTheSkyWeb.AgentWorkerEvents, as: WorkerEvents
   alias EyeInTheSkyWeb.Codex
 
@@ -36,7 +37,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     :retry_timer_ref,
     status: :idle,
     queue: [],
-    stream: %StreamAssembler{},
+    stream: nil,
     retry_attempt: 0
   ]
 
@@ -121,7 +122,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       project_id: project_id,
       project_path: project_path,
       provider: provider,
-      worktree: worktree
+      worktree: worktree,
+      stream: stream_assembler_for(provider)
     }
 
     Logger.info(
@@ -143,7 +145,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   @impl true
   def handle_call(:get_stream_state, _from, state) do
-    {:reply, StreamAssembler.buffer(state.stream), state}
+    {:reply, stream_buffer(state.stream), state}
   end
 
   @impl true
@@ -298,14 +300,14 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         %__MODULE__{sdk_ref: ref} = state
       )
       when is_binary(json) do
-    {stream, _events} = StreamAssembler.handle_tool_delta(state.stream, json)
+    {stream, _events} = stream_handle_tool_delta(state.stream, json)
     {:noreply, %{state | stream: stream}}
   end
 
   # Other SDK messages (text deltas, tool use, thinking, etc.) - broadcast for live streaming
   @impl true
   def handle_info({:claude_message, ref, %Message{} = msg}, %__MODULE__{sdk_ref: ref} = state) do
-    {stream, events} = StreamAssembler.handle_message(state.stream, msg)
+    {stream, events} = stream_handle_message(state.stream, msg)
     broadcast_events(events, state)
     {:noreply, %{state | stream: stream}}
   end
@@ -313,7 +315,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   # Tool block complete - decode accumulated input and broadcast
   @impl true
   def handle_info({:tool_block_stop, ref}, %__MODULE__{sdk_ref: ref} = state) do
-    {stream, events} = StreamAssembler.handle_tool_block_stop(state.stream)
+    {stream, events} = stream_handle_tool_block_stop(state.stream)
     broadcast_events(events, state)
     {:noreply, %{state | stream: stream}}
   end
@@ -338,7 +340,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   def handle_info({:claude_complete, ref, session_id}, %__MODULE__{sdk_ref: ref} = state) do
     state = maybe_sync_provider_conversation_id(state, session_id)
     WorkerEvents.broadcast_stream_clear(state.session_id)
-    state = %{state | stream: StreamAssembler.reset(state.stream)}
+    state = %{state | stream: stream_reset(state.stream)}
 
     Logger.info("[#{state.session_id}] SDK complete")
 
@@ -362,7 +364,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       )
       when is_list(errors) do
     WorkerEvents.broadcast_stream_clear(state.session_id)
-    state = %{state | stream: StreamAssembler.reset(state.stream)}
+    state = %{state | stream: stream_reset(state.stream)}
 
     if Enum.any?(errors, &String.contains?(&1, "No conversation found")) && not is_nil(job) do
       Logger.warning(
@@ -394,7 +396,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   @impl true
   def handle_info({:claude_error, ref, reason}, %__MODULE__{sdk_ref: ref} = state) do
     WorkerEvents.broadcast_stream_clear(state.session_id)
-    do_handle_sdk_error(reason, %{state | stream: StreamAssembler.reset(state.stream)})
+    do_handle_sdk_error(reason, %{state | stream: stream_reset(state.stream)})
   end
 
   # Stale messages from previous SDK refs - ignore
@@ -436,7 +438,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
     do_handle_sdk_error(
       {:handler_crash, reason},
-      %{state | stream: StreamAssembler.reset(state.stream), handler_monitor: nil}
+      %{state | stream: stream_reset(state.stream), handler_monitor: nil}
     )
   end
 
@@ -457,6 +459,26 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   end
 
   # --- Private ---
+
+  # Provider-polymorphic stream assembler dispatch
+  defp stream_assembler_for("codex"), do: CodexStreamAssembler.new()
+  defp stream_assembler_for(_provider), do: StreamAssembler.new()
+
+  defp stream_reset(%CodexStreamAssembler{} = s), do: CodexStreamAssembler.reset(s)
+  defp stream_reset(%StreamAssembler{} = s), do: StreamAssembler.reset(s)
+
+  defp stream_buffer(%CodexStreamAssembler{} = s), do: CodexStreamAssembler.buffer(s)
+  defp stream_buffer(%StreamAssembler{} = s), do: StreamAssembler.buffer(s)
+  defp stream_buffer(nil), do: ""
+
+  defp stream_handle_message(%CodexStreamAssembler{} = s, msg), do: CodexStreamAssembler.handle_message(s, msg)
+  defp stream_handle_message(%StreamAssembler{} = s, msg), do: StreamAssembler.handle_message(s, msg)
+
+  defp stream_handle_tool_delta(%CodexStreamAssembler{} = s, json), do: CodexStreamAssembler.handle_tool_delta(s, json)
+  defp stream_handle_tool_delta(%StreamAssembler{} = s, json), do: StreamAssembler.handle_tool_delta(s, json)
+
+  defp stream_handle_tool_block_stop(%CodexStreamAssembler{} = s), do: CodexStreamAssembler.handle_tool_block_stop(s)
+  defp stream_handle_tool_block_stop(%StreamAssembler{} = s), do: StreamAssembler.handle_tool_block_stop(s)
 
   defp broadcast_events(events, state) do
     Enum.each(events, fn event ->

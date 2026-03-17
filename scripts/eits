@@ -486,8 +486,8 @@ cmd_jobs() {
 
 cmd_dm() {
   # eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
-  # --from defaults to $EITS_SESSION_UUID when omitted
-  local from="${EITS_SESSION_UUID:-}" to="" message="" response_required="false"
+  # --from defaults to $EITS_SESSION_UUID or $EITS_SESSION_ID when omitted
+  local from="${EITS_SESSION_UUID:-$EITS_SESSION_ID}" to="" message="" response_required="false"
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --from)              from="$2";              shift 2 ;;

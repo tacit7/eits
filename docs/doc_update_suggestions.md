@@ -1,5 +1,17 @@
 # Documentation Update Suggestions
 
+## 2026-03-17
+**Commits reviewed**: 569410e..435f772
+
+- **REST_API.md**: Remove deleted endpoints `/dev/test-login` and `/api/v1/editor/open` from endpoint listings; update webhook handler docs for new Gitea signature format handling (both 'sha256=<hex>' and raw hex headers)
+- **SECURITY.md**: Document SessionAuth plug (session-cookie based auth for /oban and /dev/dashboard instead of RequireAuth); add API key validation behavior change in RequireAuth (rejects all traffic in prod if EITS_API_KEY unset, allows passthrough in dev); document webhook signature verification now rejects unsigned requests by default (configurable via allow_unsigned_webhooks flag in dev)
+- **SETUP.md**: Add VAPID_PRIVATE_KEY to required environment variables section (moved from config/config.exs to runtime.exs); document allow_unsigned_webhooks dev config flag for webhook testing; add RemoteIp proxy configuration for Tailscale CGNAT range (100.64.0.0/10) and X-Forwarded-For rewriting
+- **REST_API.md**: Document POST /api/v1/dm rate-limiting: 30 requests/min per sender_id via Hammer; add error response code (429 Too Many Requests) for rate-limit violations
+- **CLAUDE.md**: Update module name references: PgSearch (formerly FTS5 in search/), AgentWorkerEvents (formerly WorkerEvents in claude/); both updated in existing commit
+- **DM_FEATURES.md**: Document DmLive mount structure refactoring: single with chain (previously 3-level delegation); document active_overlay atom-based state management replacing 5 boolean assigns (effort_menu, model_menu, task_drawer, task_detail, checkpoint); note overlay state controls 5 drawer/menu components
+- **REST_API.md**: Document webhook controller improvements: repository.full_name validation returns 400 if missing (no 'claude/eits-web' fallback); project_path validation returns 500 if not configured (no File.cwd!() fallback); signature comparison handles both new and legacy header formats
+- **CODE_GUIDELINES.md**: Document agent context typespecs additions to Agents, Sessions, Messages contexts (public function @spec annotations); note Keyword.filter pattern usage in optional parameter handling (build_instructions/1, start_claude_sdk/2)
+
 ## 2026-03-16
 **Commits reviewed**: 0fae369..6b55196
 

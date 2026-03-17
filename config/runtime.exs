@@ -72,6 +72,19 @@ if webauthn_extra_raw do
   end
 end
 
+# WebAuthn primary origin — configurable via WEBAUTHN_ORIGIN. Required in prod.
+# Dev/test falls back to the compile-time default in config.exs ("https://eits.dev").
+if webauthn_origin = System.get_env("WEBAUTHN_ORIGIN") do
+  config :wax_, origin: webauthn_origin
+else
+  if config_env() == :prod do
+    raise """
+    environment variable WEBAUTHN_ORIGIN is missing.
+    Set it to your app's origin, e.g.: https://eits.dev
+    """
+  end
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

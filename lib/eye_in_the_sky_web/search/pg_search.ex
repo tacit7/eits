@@ -156,12 +156,31 @@ defmodule EyeInTheSkyWeb.Search.PgSearch do
 
     effective_limit = limit || 50
 
+    # Build a prefix-aware tsquery so partial last words match (e.g. "plural fo" matches "form").
+    # Single-word: OR between plainto_tsquery (handles dotted identifiers) and to_tsquery with :*
+    # Multi-word:  plainto_tsquery for complete words AND to_tsquery(:*) for the last word
+    # regexp_replace strips non-alphanumeric chars before prefix matching to avoid tsquery syntax errors.
+    tsquery_expr = """
+    CASE
+      WHEN length(regexp_replace(lower(regexp_replace(trim($1), '^.*\\s', '')), '[^a-z0-9]', '', 'g')) = 0
+        THEN plainto_tsquery('english', $1)
+      WHEN position(' ' IN trim($1)) = 0
+        THEN plainto_tsquery('english', $1)
+          || to_tsquery('simple', regexp_replace(lower(trim($1)), '[^a-z0-9]', '', 'g') || ':*')
+      ELSE
+        plainto_tsquery('english',
+          left(trim($1), length(trim($1)) - length(regexp_replace(trim($1), '^.*\\s', ''))))
+        && to_tsquery('simple',
+          regexp_replace(lower(regexp_replace(trim($1), '^.*\\s', '')), '[^a-z0-9]', '', 'g') || ':*')
+    END
+    """
+
     sql = """
     SELECT #{alias_letter}.*
     FROM #{table} #{alias_letter}
-    WHERE to_tsvector('english', #{tsvector_expr}) @@ plainto_tsquery('english', $1)
+    WHERE to_tsvector('english', #{tsvector_expr}) @@ (#{tsquery_expr})
     #{sql_filter}
-    ORDER BY ts_rank(to_tsvector('english', #{tsvector_expr}), plainto_tsquery('english', $1)) DESC
+    ORDER BY ts_rank(to_tsvector('english', #{tsvector_expr}), (#{tsquery_expr})) DESC
     LIMIT #{effective_limit}
     """
 

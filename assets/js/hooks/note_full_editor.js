@@ -46,6 +46,11 @@ export const NoteFullEditorHook = {
       statusEl.textContent = `Ln ${line.number}, Col ${col}`
     })
 
+    const fillHeight = EditorView.theme({
+      "&": { height: "100%" },
+      ".cm-scroller": { overflow: "auto" }
+    })
+
     const extensions = [
       lineNumbers(),
       highlightActiveLine(),
@@ -55,6 +60,7 @@ export const NoteFullEditorHook = {
       markdown(),
       EditorView.lineWrapping,
       statusUpdate,
+      fillHeight,
     ]
 
     if (isDark) extensions.push(oneDark)

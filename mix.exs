@@ -72,7 +72,9 @@ defmodule EyeInTheSkyWeb.MixProject do
       {:tz, "~> 0.28"},
 {:wax_, "~> 0.7.0"},
       {:web_push_encryption, "~> 0.3"},
-      {:dotenvy, "~> 0.8.0"}
+      {:dotenvy, "~> 0.8.0"},
+      {:hammer, "~> 7.0"},
+      {:remote_ip, "~> 1.2"}
     ]
   end
 

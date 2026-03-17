@@ -101,7 +101,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
 
     notes =
       if query != "" and String.trim(query) != "" do
-        results = Notes.search_notes(query, agent_ids)
+        results = Notes.search_notes(query, agent_ids, project_id: project.id, session_ids: session_ids)
         if starred_only, do: Enum.filter(results, &(&1.starred == 1)), else: results
       else
         project_id_str = to_string(project.id)

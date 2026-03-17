@@ -216,6 +216,8 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
             )
 
           {:session_id, sid} ->
+            # Notify the worker immediately so it can sync the provider_conversation_id
+            send(caller_pid, {:codex_session_id, sdk_ref, sid})
             handle_messages(sdk_ref, caller_pid, sid, accumulated_text, fallback_session_id)
 
           {:result, data} ->

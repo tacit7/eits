@@ -148,6 +148,25 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
     # Skip git repo check — allow running outside git repos
     args = args ++ ["--skip-git-repo-check"]
 
+    # Inject EITS env vars via shell_environment_policy.set so they're
+    # available to shell commands the agent runs (bypasses default filters)
+    args =
+      Enum.reduce(
+        [
+          {"EITS_SESSION_UUID", opts[:eits_session_uuid]},
+          {"EITS_SESSION_ID", opts[:eits_session_id]},
+          {"EITS_AGENT_UUID", opts[:eits_agent_uuid]},
+          {"EITS_AGENT_ID", opts[:eits_agent_id]},
+          {"EITS_PROJECT_ID", opts[:eits_project_id]},
+          {"EITS_MODEL", opts[:eits_model]},
+          {"EITS_URL", opts[:eits_url] || "http://localhost:5000/api/v1"}
+        ],
+        args,
+        fn {key, val}, acc ->
+          if val, do: acc ++ ["-c", "shell_environment_policy.set.#{key}=#{val}"], else: acc
+        end
+      )
+
     # Prompt goes last as positional argument
     if prompt = opts[:prompt] do
       args ++ [prompt]
@@ -165,10 +184,7 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
   """
   @spec clear_binary_cache() :: :ok
   def clear_binary_cache do
-    :persistent_term.erase(@persistent_term_key)
-    :ok
-  rescue
-    ArgumentError -> :ok
+    EyeInTheSkyWeb.CLI.Port.clear_binary_cache(@persistent_term_key)
   end
 
   # ---------------------------------------------------------------------------
@@ -176,7 +192,10 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
   # ---------------------------------------------------------------------------
 
   defp spawn_cli(opts) do
-    project_path = Keyword.get(opts, :project_path, File.cwd!())
+    project_path =
+      opts
+      |> Keyword.get(:project_path, File.cwd!())
+      |> Path.expand()
 
     if !File.dir?(project_path) do
       {:error, {:invalid_project_path, project_path}}
@@ -212,7 +231,16 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
         handler_pid =
           spawn_link(fn ->
             receive do
-              {:port, port} -> handle_port_output(port, session_ref, caller, "", idle_timeout_ms)
+              {:port, port} ->
+                EyeInTheSkyWeb.CLI.Port.handle_port_output(
+                  port,
+                  session_ref,
+                  caller,
+                  "",
+                  idle_timeout_ms,
+                  telemetry_prefix: [:eits, :codex, :cli],
+                  log_prefix: "Codex.CLI"
+                )
             end
           end)
 
@@ -262,72 +290,16 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
       end
 
     base_env
-    |> maybe_add_env("EITS_SESSION_ID", opts[:eits_session_id])
-    |> maybe_add_env("EITS_AGENT_ID", opts[:eits_agent_id])
-    |> maybe_add_env("EITS_MODEL", opts[:eits_model])
-  end
-
-  defp maybe_add_env(env, _key, nil), do: env
-  defp maybe_add_env(env, _key, ""), do: env
-
-  defp maybe_add_env(env, key, value) do
-    env ++ [{String.to_charlist(key), String.to_charlist(to_string(value))}]
-  end
-
-  # ---------------------------------------------------------------------------
-  # Port output handler
-  # ---------------------------------------------------------------------------
-
-  defp handle_port_output(port, session_ref, caller, buffer, idle_timeout_ms) do
-    receive do
-      {^port, {:data, data}} ->
-        new_buffer = buffer <> data
-        lines = String.split(new_buffer, "\n")
-
-        {complete_lines, remaining} =
-          case List.pop_at(lines, -1) do
-            {last, rest} ->
-              if String.ends_with?(data, "\n"),
-                do: {lines, ""},
-                else: {rest, last || ""}
-          end
-
-        Enum.each(complete_lines, fn line ->
-          unless line == "" do
-            send(caller, {:claude_output, session_ref, line})
-          end
-        end)
-
-        handle_port_output(port, session_ref, caller, remaining, idle_timeout_ms)
-
-      {^port, {:exit_status, status}} ->
-        unless buffer == "" do
-          send(caller, {:claude_output, session_ref, buffer})
-        end
-
-        Logger.info("[Codex.CLI] Process exited with status #{status}")
-
-        :telemetry.execute([:eits, :codex, :cli, :exit], %{exit_code: status}, %{})
-        Logger.info("[telemetry] codex.cli.exit exit_code=#{status}")
-
-        send(caller, {:claude_exit, session_ref, status})
-        :ok
-    after
-      idle_timeout_ms ->
-        Logger.warning(
-          "[Codex.CLI] No output after #{div(idle_timeout_ms, 60_000)} minutes, timing out"
-        )
-
-        :telemetry.execute(
-          [:eits, :codex, :cli, :timeout],
-          %{system_time: System.system_time()},
-          %{timeout_ms: idle_timeout_ms}
-        )
-
-        Port.close(port)
-        send(caller, {:claude_exit, session_ref, :timeout})
-        :ok
-    end
+    |> EyeInTheSkyWeb.CLI.Port.maybe_add_env("EITS_SESSION_UUID", opts[:eits_session_uuid])
+    |> EyeInTheSkyWeb.CLI.Port.maybe_add_env("EITS_SESSION_ID", opts[:eits_session_id])
+    |> EyeInTheSkyWeb.CLI.Port.maybe_add_env("EITS_AGENT_UUID", opts[:eits_agent_uuid])
+    |> EyeInTheSkyWeb.CLI.Port.maybe_add_env("EITS_AGENT_ID", opts[:eits_agent_id])
+    |> EyeInTheSkyWeb.CLI.Port.maybe_add_env("EITS_PROJECT_ID", opts[:eits_project_id])
+    |> EyeInTheSkyWeb.CLI.Port.maybe_add_env("EITS_MODEL", opts[:eits_model])
+    |> EyeInTheSkyWeb.CLI.Port.maybe_add_env(
+      "EITS_URL",
+      opts[:eits_url] || "http://localhost:5000/api/v1"
+    )
   end
 
   # ---------------------------------------------------------------------------
@@ -335,25 +307,7 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
   # ---------------------------------------------------------------------------
 
   defp find_codex_binary do
-    case :persistent_term.get(@persistent_term_key, :not_cached) do
-      :not_cached ->
-        case do_find_codex_binary() do
-          {:ok, path} = ok ->
-            :persistent_term.put(@persistent_term_key, path)
-            ok
-
-          error ->
-            error
-        end
-
-      cached_path ->
-        if File.exists?(cached_path) do
-          {:ok, cached_path}
-        else
-          :persistent_term.erase(@persistent_term_key)
-          find_codex_binary()
-        end
-    end
+    EyeInTheSkyWeb.CLI.Port.find_binary(@persistent_term_key, &do_find_codex_binary/0)
   end
 
   defp do_find_codex_binary do
@@ -361,16 +315,11 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
       path = System.find_executable("codex") ->
         {:ok, path}
 
-      path = find_in_standard_paths() ->
+      path = EyeInTheSkyWeb.CLI.Port.find_in_standard_paths(@standard_paths) ->
         {:ok, path}
 
       true ->
         {:error, {:binary_not_found, checked_paths: @standard_paths}}
     end
-  end
-
-  defp find_in_standard_paths do
-    @standard_paths
-    |> Enum.find(&File.exists?/1)
   end
 end

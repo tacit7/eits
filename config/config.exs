@@ -12,6 +12,7 @@ config :eye_in_the_sky,
   generators: [timestamp_type: :utc_datetime]
 
 config :elixir, :time_zone_database, Tz.TimeZoneDatabase
+config :eye_in_the_sky, EyeInTheSky.Repo, types: EyeInTheSkyWeb.PostgrexTypes
 
 # Configures the endpoint
 config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
@@ -60,7 +61,7 @@ config :phoenix, :json_library, Jason
 config :eye_in_the_sky, Oban,
   engine: Oban.Engines.Basic,
   notifier: Oban.Notifiers.PG,
-  queues: [jobs: 5, default: 5],
+  queues: [jobs: 5, default: 5, embeddings: 2],
   repo: EyeInTheSky.Repo,
   plugins: [
     {Oban.Plugins.Cron,

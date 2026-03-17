@@ -74,7 +74,9 @@ defmodule EyeInTheSky.MixProject do
       {:web_push_encryption, "~> 0.3"},
       {:dotenvy, "~> 0.8.0"},
       {:hammer, "~> 7.0"},
-      {:remote_ip, "~> 1.2"}
+      {:remote_ip, "~> 1.2"},
+      {:pgvector, "~> 0.2"},
+      {:finch, "~> 0.21"}
     ]
   end
 

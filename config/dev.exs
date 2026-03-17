@@ -5,6 +5,7 @@ config :eye_in_the_sky, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SEC
 config :eye_in_the_sky, Oban, testing: :inline
 config :eye_in_the_sky, :env, :dev
 config :eye_in_the_sky, :bypass_auth, true
+config :eye_in_the_sky, :openai_api_key, System.get_env("OPENAI_API_KEY")
 # Allow unsigned webhooks in dev when no secret is set (never enable in prod)
 config :eye_in_the_sky, :allow_unsigned_webhooks, true
 
@@ -18,7 +19,8 @@ config :eye_in_the_sky, EyeInTheSky.Repo,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10,
   log: false,
-  prepare: :unnamed
+  prepare: :unnamed,
+  types: EyeInTheSkyWeb.PostgrexTypes
 
 # For development, we disable any cache and enable
 # debugging and code reloading.

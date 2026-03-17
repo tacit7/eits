@@ -46,6 +46,10 @@ if config_env() != :test do
   config :eye_in_the_sky, :api_key, System.get_env("EITS_API_KEY")
 end
 
+# OpenAI API key — used for assistant memory embeddings (text-embedding-3-small).
+# Optional: without this, memory falls back to full-text search only.
+config :eye_in_the_sky_web, :openai_api_key, System.get_env("OPENAI_API_KEY")
+
 # Disable passkey auth — set DISABLE_AUTH=true to skip LiveView session auth (dev only)
 if config_env() != :prod do
   config :eye_in_the_sky, :disable_auth, System.get_env("DISABLE_AUTH") in ~w(true 1)

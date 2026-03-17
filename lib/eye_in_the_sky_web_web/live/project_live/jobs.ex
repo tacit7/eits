@@ -34,18 +34,30 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
     socket =
       if socket.assigns.project do
         project_id = socket.assigns.project_id
+        all_project = ScheduledJobs.list_jobs_for_project(project_id)
+        all_global = ScheduledJobs.list_global_jobs()
 
         socket
-        |> assign(:project_jobs, ScheduledJobs.list_jobs_for_project(project_id))
-        |> assign(:global_jobs, ScheduledJobs.list_global_jobs())
+        |> assign(:all_project_jobs, all_project)
+        |> assign(:all_global_jobs, all_global)
+        |> assign(:project_jobs, all_project)
+        |> assign(:global_jobs, all_global)
+        |> assign(:last_failed_runs, load_last_failed_runs(all_project ++ all_global))
       else
         socket
+        |> assign(:all_project_jobs, [])
+        |> assign(:all_global_jobs, [])
         |> assign(:project_jobs, [])
         |> assign(:global_jobs, [])
+        |> assign(:last_failed_runs, %{})
       end
 
     socket =
       socket
+      |> assign(:search_query, "")
+      |> assign(:filter_type, "all")
+      |> assign(:filter_status, "all")
+      |> assign(:filter_origin, "all")
       |> assign(:running_ids, MapSet.new(ScheduledJobs.list_running_job_ids()))
       |> assign(:last_run_map, ScheduledJobs.last_run_status_map())
       |> assign_agent_schedule_defaults()
@@ -233,9 +245,30 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
     do: handle_save_schedule(params, socket)
 
   defp reload_jobs(socket) do
+    all_project = ScheduledJobs.list_jobs_for_project(socket.assigns.project_id)
+    all_global = ScheduledJobs.list_global_jobs()
+
     socket
-    |> assign(:project_jobs, ScheduledJobs.list_jobs_for_project(socket.assigns.project_id))
-    |> assign(:global_jobs, ScheduledJobs.list_global_jobs())
+    |> assign(:all_project_jobs, all_project)
+    |> assign(:all_global_jobs, all_global)
+    |> assign(:project_jobs, apply_job_filters(all_project, socket.assigns))
+    |> assign(:global_jobs, apply_job_filters(all_global, socket.assigns))
+    |> assign(:last_failed_runs, load_last_failed_runs(all_project ++ all_global))
+  end
+
+  @impl true
+  def handle_event("filter_jobs", params, socket) do
+    socket =
+      socket
+      |> assign(:search_query, params["search"] || "")
+      |> assign(:filter_type, params["type"] || "all")
+      |> assign(:filter_status, params["status"] || "all")
+      |> assign(:filter_origin, params["origin"] || "all")
+
+    {:noreply,
+     socket
+     |> assign(:project_jobs, apply_job_filters(socket.assigns.all_project_jobs, socket.assigns))
+     |> assign(:global_jobs, apply_job_filters(socket.assigns.all_global_jobs, socket.assigns))}
   end
 
   @impl true
@@ -335,6 +368,33 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
       <% end %>
 
       <%= if @active_tab == :all_jobs do %>
+        <%!-- Filter Toolbar --%>
+        <form phx-change="filter_jobs" class="flex flex-wrap gap-2 my-4">
+          <input
+            type="text"
+            name="search"
+            class="input input-bordered input-sm flex-1 min-w-[200px]"
+            placeholder="Search by name or description…"
+            value={@search_query}
+            phx-debounce="200"
+          />
+          <select name="type" class="select select-bordered select-sm">
+            <option value="all" selected={@filter_type == "all"}>All Types</option>
+            <option value="shell_command" selected={@filter_type == "shell_command"}>Shell</option>
+            <option value="spawn_agent" selected={@filter_type == "spawn_agent"}>Agent</option>
+            <option value="mix_task" selected={@filter_type == "mix_task"}>Mix</option>
+          </select>
+          <select name="status" class="select select-bordered select-sm">
+            <option value="all" selected={@filter_status == "all"}>All Status</option>
+            <option value="enabled" selected={@filter_status == "enabled"}>Enabled</option>
+            <option value="disabled" selected={@filter_status == "disabled"}>Disabled</option>
+          </select>
+          <select name="origin" class="select select-bordered select-sm">
+            <option value="all" selected={@filter_origin == "all"}>All Origins</option>
+            <option value="system" selected={@filter_origin == "system"}>System</option>
+            <option value="user" selected={@filter_origin == "user"}>User</option>
+          </select>
+        </form>
         <%!-- Project Jobs --%>
         <div class="mb-8">
           <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -355,7 +415,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
               </button>
             </div>
           </div>
-          <.jobs_table jobs={@project_jobs} expanded_job_id={@expanded_job_id} runs={@runs} running_ids={@running_ids} last_run_map={@last_run_map} />
+          <.jobs_table jobs={@project_jobs} expanded_job_id={@expanded_job_id} runs={@runs} running_ids={@running_ids} last_run_map={@last_run_map} last_failed_runs={@last_failed_runs} />
         </div>
 
         <div class="divider"></div>
@@ -375,7 +435,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
               + New Global Job
             </button>
           </div>
-          <.jobs_table jobs={@global_jobs} expanded_job_id={@expanded_job_id} runs={@runs} running_ids={@running_ids} last_run_map={@last_run_map} />
+          <.jobs_table jobs={@global_jobs} expanded_job_id={@expanded_job_id} runs={@runs} running_ids={@running_ids} last_run_map={@last_run_map} last_failed_runs={@last_failed_runs} />
         </div>
       <% end %>
 
@@ -472,6 +532,24 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
               </div>
             </button>
 
+            <% mobile_failed_run = Map.get(@last_failed_runs, job.id) %>
+            <%= if mobile_failed_run do %>
+              <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+                <span class="badge badge-xs badge-error">failed</span>
+                <span class="text-xs text-error/70 truncate flex-1">
+                  {format_relative_time(mobile_failed_run.started_at)}{if mobile_failed_run.result, do: ": #{String.slice(mobile_failed_run.result, 0, 60)}", else: ""}
+                </span>
+                <button
+                  class="btn btn-ghost btn-xs text-error shrink-0"
+                  phx-click="run_now"
+                  phx-value-id={job.id}
+                  title="Retry"
+                >
+                  <.icon name="hero-arrow-path" class="w-3 h-3" />
+                </button>
+              </div>
+            <% end %>
+
             <div class="mt-3 flex items-center justify-between">
               <span class="text-xs text-base-content/60">Enabled</span>
               <span class={[
@@ -549,6 +627,23 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
                   <% end %>
                   <%= if job.origin == "system" do %>
                     <span class="badge badge-xs badge-ghost">system</span>
+                  <% end %>
+                  <% failed_run = Map.get(@last_failed_runs, job.id) %>
+                  <%= if failed_run do %>
+                    <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                      <span class="badge badge-xs badge-error">failed</span>
+                      <span class="text-xs text-error/70">
+                        {format_relative_time(failed_run.started_at)}{if failed_run.result, do: ": #{String.slice(failed_run.result, 0, 60)}", else: ""}
+                      </span>
+                      <button
+                        class="btn btn-ghost btn-xs text-error"
+                        phx-click="run_now"
+                        phx-value-id={job.id}
+                        title="Retry"
+                      >
+                        <.icon name="hero-arrow-path" class="w-3 h-3" />
+                      </button>
+                    </div>
                   <% end %>
                 </td>
                 <td>

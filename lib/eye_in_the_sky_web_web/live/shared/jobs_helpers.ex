@@ -331,4 +331,57 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.JobsHelpers do
       _ -> ""
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Last-failed-run helpers (Task 1408)
+  # ---------------------------------------------------------------------------
+
+  # Returns %{job_id => %JobRun{}} for jobs whose most recent run was a failure.
+  def load_last_failed_runs(jobs) do
+    ids = Enum.map(jobs, & &1.id)
+
+    ids
+    |> ScheduledJobs.last_run_per_job()
+    |> Enum.filter(fn {_id, run} -> run.status == "failed" end)
+    |> Map.new()
+  end
+
+  # ---------------------------------------------------------------------------
+  # Job filtering (Task 1409)
+  # ---------------------------------------------------------------------------
+
+  def apply_job_filters(jobs, assigns) do
+    q = String.trim(assigns[:search_query] || "")
+    type = assigns[:filter_type] || "all"
+    status = assigns[:filter_status] || "all"
+    origin = assigns[:filter_origin] || "all"
+
+    jobs
+    |> filter_jobs_by_search(q)
+    |> filter_jobs_by_type(type)
+    |> filter_jobs_by_status(status)
+    |> filter_jobs_by_origin(origin)
+  end
+
+  defp filter_jobs_by_search(jobs, ""), do: jobs
+
+  defp filter_jobs_by_search(jobs, q) do
+    lq = String.downcase(q)
+
+    Enum.filter(jobs, fn j ->
+      String.contains?(String.downcase(j.name || ""), lq) ||
+        String.contains?(String.downcase(j.description || ""), lq)
+    end)
+  end
+
+  defp filter_jobs_by_type(jobs, "all"), do: jobs
+  defp filter_jobs_by_type(jobs, type), do: Enum.filter(jobs, &(&1.job_type == type))
+
+  defp filter_jobs_by_status(jobs, "all"), do: jobs
+  defp filter_jobs_by_status(jobs, "enabled"), do: Enum.filter(jobs, &(&1.enabled == 1))
+  defp filter_jobs_by_status(jobs, "disabled"), do: Enum.filter(jobs, &(&1.enabled != 1))
+  defp filter_jobs_by_status(jobs, _), do: jobs
+
+  defp filter_jobs_by_origin(jobs, "all"), do: jobs
+  defp filter_jobs_by_origin(jobs, origin), do: Enum.filter(jobs, &(&1.origin == origin))
 end

@@ -1,3 +1,8 @@
+defmodule EyeInTheSkyWebWeb.Api.V1.MockFailingAgentManager do
+  @moduledoc "Test double that always returns an error from send_message."
+  def send_message(_session_id, _message, _opts \\ []), do: {:error, :worker_failed}
+end
+
 defmodule EyeInTheSkyWebWeb.Api.V1.MessagingControllerTest do
   use EyeInTheSkyWebWeb.ConnCase, async: false
 
@@ -21,11 +26,12 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingControllerTest do
   describe "POST /api/v1/dm" do
     test "sends a DM to a valid session", %{conn: conn} do
       agent = create_agent()
+      sender = create_agent()
       session = create_session(agent)
 
       conn =
         post(conn, ~p"/api/v1/dm", %{
-          "sender_id" => Ecto.UUID.generate(),
+          "sender_id" => sender.uuid,
           "target_session_id" => session.uuid,
           "message" => "Hello agent!"
         })
@@ -67,14 +73,45 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingControllerTest do
     end
 
     test "returns 404 when target session is not found", %{conn: conn} do
+      sender = create_agent()
+
       conn =
         post(conn, ~p"/api/v1/dm", %{
-          "sender_id" => Ecto.UUID.generate(),
+          "sender_id" => sender.uuid,
           "target_session_id" => Ecto.UUID.generate(),
           "message" => "Hello!"
         })
 
       assert json_response(conn, 404)["error"] == "Target session not found"
+    end
+
+    test "returns 500 when agent manager fails to route the message", %{conn: conn} do
+      Application.put_env(
+        :eye_in_the_sky_web,
+        :agent_manager_module,
+        EyeInTheSkyWebWeb.Api.V1.MockFailingAgentManager
+      )
+
+      on_exit(fn ->
+        Application.delete_env(:eye_in_the_sky_web, :agent_manager_module)
+      end)
+
+      agent = create_agent()
+      session = create_session(agent)
+
+      conn =
+        post(conn, ~p"/api/v1/dm", %{
+          "sender_id" => agent.uuid,
+          "target_session_id" => session.uuid,
+          "message" => "Hello agent!"
+        })
+
+      resp = json_response(conn, 500)
+      assert resp["error"] == "Failed to route message to agent"
+      assert resp["reason"] == ":worker_failed"
+
+      # Message must NOT be persisted when routing fails (no duplicates on retry)
+      assert EyeInTheSkyWeb.Messages.list_messages_for_session(session.id) == []
     end
   end
 

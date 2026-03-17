@@ -40,7 +40,7 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
     * `:project_path` - working directory for Codex
     * `:full_auto` - autonomous mode (default: true)
   """
-  @spec start(String.t(), opts()) :: {:ok, ref()} | {:error, term()}
+  @spec start(String.t(), opts()) :: {:ok, ref(), pid()} | {:error, term()}
   def start(prompt, opts \\ []) do
     to = Keyword.fetch!(opts, :to)
     sdk_ref = make_ref()
@@ -62,7 +62,7 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
       {:ok, port, _cli_ref} ->
         Registry.register(sdk_ref, port)
         send(handler_pid, {:start_handling, sdk_ref})
-        {:ok, sdk_ref}
+        {:ok, sdk_ref, handler_pid}
 
       {:error, reason} ->
         :telemetry.execute(
@@ -85,7 +85,7 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
 
   Same as `start/2` but resumes a conversation by thread/session ID.
   """
-  @spec resume(String.t(), String.t(), opts()) :: {:ok, ref()} | {:error, term()}
+  @spec resume(String.t(), String.t(), opts()) :: {:ok, ref(), pid()} | {:error, term()}
   def resume(session_id, prompt, opts \\ []) do
     to = Keyword.fetch!(opts, :to)
     sdk_ref = make_ref()
@@ -108,7 +108,7 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
       {:ok, port, _cli_ref} ->
         Registry.register(sdk_ref, port)
         send(handler_pid, {:start_handling, sdk_ref})
-        {:ok, sdk_ref}
+        {:ok, sdk_ref, handler_pid}
 
       {:error, reason} ->
         :telemetry.execute(
@@ -152,7 +152,9 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
   # ---------------------------------------------------------------------------
 
   defp spawn_handler_process(sdk_ref, caller_pid, fallback_session_id) do
-    spawn_link(fn ->
+    spawn(fn ->
+      Process.monitor(caller_pid)
+
       receive do
         {:start_handling, ^sdk_ref} ->
           :telemetry.execute(
@@ -169,6 +171,9 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
             _accumulated_text = "",
             fallback_session_id
           )
+
+        {:DOWN, _ref, :process, ^caller_pid, _reason} ->
+          stop_and_unregister(sdk_ref)
       after
         5_000 ->
           send(caller_pid, {:claude_error, sdk_ref, :handler_timeout})
@@ -304,6 +309,10 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
           end
 
         send(caller_pid, {:claude_error, sdk_ref, reason})
+        stop_and_unregister(sdk_ref)
+        :ok
+
+      {:DOWN, _ref, :process, ^caller_pid, _reason} ->
         stop_and_unregister(sdk_ref)
         :ok
     end

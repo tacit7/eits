@@ -149,9 +149,9 @@ defmodule EyeInTheSkyWeb.Claude.ChatWorker do
         end
 
       case result do
-        :ok ->
+        {:ok, admission} ->
           Logger.info(
-            "ChatWorker: routed to session=#{member.session_id} channel=#{channel_id} mode=#{mode}"
+            "ChatWorker: routed to session=#{member.session_id} channel=#{channel_id} mode=#{mode} admission=#{admission}"
           )
 
         {:error, reason} ->
@@ -176,7 +176,7 @@ defmodule EyeInTheSkyWeb.Claude.ChatWorker do
   defp enqueue_job(state, job), do: %{state | queue: state.queue ++ [job]}
 
   defp log_results(results, channel_id) do
-    ok_count = Enum.count(results, fn {_, r} -> r == :ok end)
+    ok_count = Enum.count(results, fn {_, r} -> match?(:ok, r) or match?({:ok, _}, r) end)
     err_count = length(results) - ok_count
 
     Logger.info(

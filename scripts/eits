@@ -485,8 +485,9 @@ cmd_jobs() {
 # ── dm ────────────────────────────────────────────────────────────────────────
 
 cmd_dm() {
-  # eits dm --from <sender_id> --to <target_session_uuid> --message <text> [--response-required]
-  local sender_id="" target="" message="" response_required="false"
+  # eits dm [--from <sender_id>] --to <target_session_uuid|session_int_id> --message <text> [--response-required]
+  # --from defaults to $EITS_AGENT_UUID when omitted
+  local sender_id="${EITS_AGENT_UUID:-}" target="" message="" response_required="false"
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --from)              sender_id="$2";         shift 2 ;;
@@ -497,6 +498,15 @@ cmd_dm() {
     esac
   done
   need sender_id; need target; need message
+
+  # Resolve integer session ID to UUID — /dm requires UUIDs
+  if [[ "$target" =~ ^[0-9]+$ ]]; then
+    local resolved
+    resolved=$(_curl "$BASE_URL/sessions/$target" | jq -r '.uuid // empty' 2>/dev/null || true)
+    [[ -n "$resolved" ]] || die "could not resolve session integer ID $target to UUID"
+    target="$resolved"
+  fi
+
   local payload
   payload=$(jq -n --arg s "$sender_id" --arg t "$target" --arg m "$message" --argjson r "$response_required" \
     '{sender_id: $s, target_session_id: $t, message: $m, response_required: $r}')
@@ -641,8 +651,22 @@ cmd_teams() {
       local member_id="${1:-}"; need member_id
       _delete "/teams/$team_id/members/$member_id"
       ;;
+    my-teams)
+      # List teams where the current agent is a member (by EITS_AGENT_UUID)
+      local agent_uuid="${EITS_AGENT_UUID:-}"; need agent_uuid
+      local resp
+      resp=$(_curl "$BASE_URL/teams" | jq .)
+      # Filter to teams where agent is a member — requires iterating .teams[]
+      echo "$resp" | jq --arg uuid "$agent_uuid" '.teams[] | select(.id) | .id' 2>/dev/null | while read -r tid; do
+        local members_resp
+        members_resp=$(_curl "$BASE_URL/teams/$tid/members" 2>/dev/null || true)
+        if echo "$members_resp" | jq -e --arg uuid "$agent_uuid" '.members[] | select(.agent_uuid == $uuid)' >/dev/null 2>&1; then
+          echo "$members_resp" | jq --arg uuid "$agent_uuid" '{team_id: .team_id, member: (.members[] | select(.agent_uuid == $uuid))}'
+        fi
+      done
+      ;;
     *)
-      echo "usage: eits teams <list|get|create|delete|members|join|status|update-member|leave>"
+      echo "usage: eits teams <list|get|create|delete|members|join|status|update-member|leave|my-teams>"
       ;;
   esac
 }
@@ -662,10 +686,10 @@ Commands:
   agents    list|get
   commits   list|create
   jobs      list|get|run|delete
-  dm        --from <id> --to <session_uuid> --message <text> [--response-required]
+  dm        [--from <id>] --to <session_uuid|int_id> --message <text> [--response-required]
   channels  list [--project <id>] | send <channel_id> --session <uuid> --body <text>
   prompts   list|get
-  teams     list|get|create|delete|members|join|status|update-member|leave
+  teams     list|get|create|delete|members|join|status|update-member|leave|my-teams
 
 Requires: curl, jq
 EOF

@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
   ## Usage
 
       # Start a new streaming session
-      {:ok, ref} = SDK.start("Write hello world in Python", to: self())
+      {:ok, ref, _handler} = SDK.start("Write hello world in Python", to: self())
 
       # Handle messages
       receive do
@@ -23,7 +23,7 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
       end
 
       # Resume a conversation
-      {:ok, ref} = SDK.resume(session_id, "Now add error handling", to: self())
+      {:ok, ref, _handler} = SDK.resume(session_id, "Now add error handling", to: self())
 
   ## Messages
 
@@ -98,7 +98,7 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
     * `{:error, reason}` - failed to start
 
   """
-  @spec start(String.t(), opts()) :: {:ok, ref()} | {:error, term()}
+  @spec start(String.t(), opts()) :: {:ok, ref(), pid()} | {:error, term()}
   def start(prompt, opts \\ []) do
     run_session(:start, prompt, nil, opts)
   end
@@ -116,7 +116,7 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
   Optional: same as `start/2`
 
   """
-  @spec resume(String.t(), String.t(), opts()) :: {:ok, ref()} | {:error, term()}
+  @spec resume(String.t(), String.t(), opts()) :: {:ok, ref(), pid()} | {:error, term()}
   def resume(session_id, prompt, opts \\ []) do
     run_session(:resume, prompt, session_id, opts)
   end
@@ -152,7 +152,7 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
       {:ok, port, _cli_ref} ->
         Registry.register(sdk_ref, port)
         send(handler_pid, {:start_handling, sdk_ref})
-        {:ok, sdk_ref}
+        {:ok, sdk_ref, handler_pid}
 
       {:error, reason} ->
         :telemetry.execute(
@@ -193,10 +193,13 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
     end
   end
 
-  # Spawn a handler process that will receive CLI messages
+  # Spawn a monitored handler process that will receive CLI messages.
+  # Uses spawn (not spawn_link) so handler crashes don't kill the caller.
+  # Handler monitors caller so it exits cleanly if caller goes down.
   defp spawn_handler_process(sdk_ref, caller_pid) do
-    spawn_link(fn ->
-      # Wait for start signal with sdk_ref
+    spawn(fn ->
+      Process.monitor(caller_pid)
+
       receive do
         {:start_handling, ^sdk_ref} ->
           :telemetry.execute(
@@ -206,6 +209,9 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
           )
 
           handle_messages(sdk_ref, caller_pid, nil)
+
+        {:DOWN, _ref, :process, ^caller_pid, _reason} ->
+          stop_and_unregister(sdk_ref)
       after
         5_000 ->
           send(caller_pid, {:claude_error, sdk_ref, :handler_timeout})
@@ -337,6 +343,10 @@ defmodule EyeInTheSkyWeb.Claude.SDK do
           end
 
         send(caller_pid, {:claude_error, sdk_ref, reason})
+        stop_and_unregister(sdk_ref)
+        :ok
+
+      {:DOWN, _ref, :process, ^caller_pid, _reason} ->
         stop_and_unregister(sdk_ref)
         :ok
     end

@@ -3,11 +3,11 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
 
   action_fallback EyeInTheSkyWebWeb.Api.V1.FallbackController
 
+  require Logger
   import EyeInTheSkyWebWeb.ControllerHelpers
 
-  import Ecto.Query, only: [from: 2]
-
-  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Repo, Sessions, Teams}
+  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Sessions, Teams}
+  alias EyeInTheSkyWeb.Claude.AgentManager
 
   @doc """
   POST /api/v1/dm - Send a direct message to an agent session.
@@ -52,27 +52,39 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
             }
           }
 
-          case Messages.create_message(attrs) do
-            {:ok, msg} ->
-              Phoenix.PubSub.broadcast(
-                EyeInTheSkyWeb.PubSub,
-                "session:#{session.id}",
-                {:new_dm, msg}
+          case agent_manager_mod().send_message(session.id, params["message"]) do
+            result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
+              case Messages.create_message(attrs) do
+                {:ok, msg} ->
+                  Phoenix.PubSub.broadcast(
+                    EyeInTheSkyWeb.PubSub,
+                    "session:#{session.id}",
+                    {:new_dm, msg}
+                  )
+
+                  conn
+                  |> put_status(:created)
+                  |> json(%{
+                    success: true,
+                    message: "DM delivered to session #{session.id}",
+                    message_id: to_string(msg.id),
+                    message_uuid: msg.uuid
+                  })
+
+                {:error, cs} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to persist DM", details: translate_errors(cs)})
+              end
+
+            {:error, reason} ->
+              Logger.error(
+                "DM routing failed for session #{session.id}: #{inspect(reason)}"
               )
 
               conn
-              |> put_status(:created)
-              |> json(%{
-                success: true,
-                message: "DM delivered to session #{session.id}",
-                message_id: to_string(msg.id),
-                message_uuid: msg.uuid
-              })
-
-            {:error, cs} ->
-              conn
-              |> put_status(:unprocessable_entity)
-              |> json(%{error: "Failed to deliver DM", details: translate_errors(cs)})
+              |> put_status(:internal_server_error)
+              |> json(%{error: "Failed to route message to agent", reason: inspect(reason)})
           end
         else
           {:sender, {:error, :not_found}} ->
@@ -179,27 +191,16 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
     end
   end
 
+  defp agent_manager_mod do
+    Application.get_env(:eye_in_the_sky_web, :agent_manager_module, AgentManager)
+  end
+
   # Resolve a readable name for the sender agent.
   # Priority: team member name > session name > agent description > "agent"
   defp resolve_sender_name(agent) do
     case Teams.get_member_by_agent_id(agent.id) do
-      %{name: name} when is_binary(name) and name != "" ->
-        name
-
-      _ ->
-        # Fall back to the agent's latest session name or description
-        case Repo.one(
-               from s in EyeInTheSkyWeb.Sessions.Session,
-                 where: s.agent_id == ^agent.id,
-                 where: not is_nil(s.name) and s.name != "",
-                 order_by: [desc: s.id],
-                 limit: 1,
-                 select: s.name
-             ) do
-          name when is_binary(name) -> name
-          _ -> agent.description || agent.project_name || "agent"
-        end
+      %{name: name} when is_binary(name) and name != "" -> name
+      _ -> agent.description || agent.name || "agent"
     end
   end
-
 end

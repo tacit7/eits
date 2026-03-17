@@ -11,7 +11,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   alias EyeInTheSkyWeb.{Agents, Messages, Sessions}
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
-  @default_provider "claude"
   @supported_providers ["claude", "codex"]
 
   @doc """
@@ -42,7 +41,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              agent: opts[:agent],
              eits_workflow: opts[:eits_workflow]
            ) do
-        :ok ->
+        {:ok, _admission} ->
           Logger.info(
             "✅ create_agent: initial message sent successfully to session.id=#{session.id}"
           )
@@ -67,7 +66,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
     # For claude sessions, pre-generate so the worker can reference it immediately.
     session_uuid = if provider == "codex", do: nil, else: opts[:session_uuid] || Ecto.UUID.generate()
 
-    description = opts[:name] || opts[:description] || "Agent session"
+    description = opts[:description] || "Agent session"
 
     # Inherit project_id from parent session if not explicitly provided
     project_id =
@@ -88,8 +87,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
           id
       end
 
-    # Fix 3: When a worktree name is given, verify the working tree is clean
-    # before creating the worktree. Return {:error, :dirty_working_tree} if not.
+    # When a worktree name is given, create the git worktree before DB records
     worktree_result =
       case opts[:worktree] do
         nil ->
@@ -148,18 +146,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
              started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
              parent_agent_id: opts[:parent_agent_id],
              parent_session_id: opts[:parent_session_id]
-           }),
-         # Link session back to agent so agent.session_id is not NULL
-         {:ok, agent} <- Agents.update_agent(agent, %{session_id: session.id}) do
+           }) do
       Logger.info(
         "✅ create_agent: DB records created - agent.id=#{agent.id}, session.id=#{session.id}, session_uuid=#{session.uuid}"
       )
 
       {:ok, %{agent: agent, session: session}}
     else
-      {:error, :dirty_working_tree} = err ->
-        err
-
       {:error, reason} ->
         Logger.error("❌ create_agent: DB record creation failed - #{inspect(reason)}")
         {:error, reason}
@@ -233,9 +226,21 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
           eits_workflow: opts[:eits_workflow]
         }
 
-        GenServer.cast(pid, {:process_message, message, context})
-        Logger.debug("send_message: message queued for session_id=#{session_id}")
-        :ok
+        case GenServer.call(pid, {:submit_message, message, context}) do
+          {:ok, admission} ->
+            Logger.debug(
+              "send_message: #{admission} for session_id=#{session_id}"
+            )
+
+            {:ok, admission}
+
+          {:error, reason} = error ->
+            Logger.warning(
+              "send_message: rejected for session_id=#{session_id} - #{inspect(reason)}"
+            )
+
+            error
+        end
 
       {:error, reason} ->
         Logger.error(
@@ -253,17 +258,20 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
 
   defp lookup_or_start(session_id, extra_opts) do
     case Registry.lookup(@registry, {:agent, session_id}) do
-      [{pid, _}] ->
-        Logger.debug(
-          "lookup_or_start: found existing worker for session_id=#{session_id}, pid=#{inspect(pid)}"
-        )
+      [{pid, provider}] ->
+        if Process.alive?(pid) do
+          Logger.debug(
+            "lookup_or_start: found existing worker for session_id=#{session_id}, pid=#{inspect(pid)}, provider=#{provider}"
+          )
 
-        provider = normalize_provider(extra_opts[:provider]) || @default_provider
-        {:ok, pid, provider}
+          {:ok, pid, provider}
+        else
+          start_agent_worker(session_id, extra_opts)
+        end
 
       [] ->
         Logger.info(
-          "lookup_or_start: no worker found for session_id=#{session_id}, starting new worker"
+          "🔍 lookup_or_start: no worker found for session_id=#{session_id}, starting new worker"
         )
 
         start_agent_worker(session_id, extra_opts)
@@ -306,7 +314,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
 
       opts = [
         session_id: session.id,
-        session_uuid: session.uuid,
+        provider_conversation_id: session.uuid,
         agent_id: agent.id,
         project_path: project_path,
         provider: provider,
@@ -351,40 +359,34 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   defp normalize_provider(provider) when provider in @supported_providers, do: provider
   defp normalize_provider(_provider), do: nil
 
-  # Verifies the working tree at repo_path has no uncommitted changes.
-  # Returns :ok if clean, {:error, :dirty_working_tree} otherwise.
   defp check_clean_working_tree(repo_path) do
-    with {_, 0} <- System.cmd("git", ["-C", repo_path, "diff", "--quiet"], stderr_to_stdout: true),
-         {_, 0} <- System.cmd("git", ["-C", repo_path, "diff", "--cached", "--quiet"], stderr_to_stdout: true) do
+    with {_, 0} <-
+           System.cmd("git", ["-C", repo_path, "diff", "--quiet"], stderr_to_stdout: true),
+         {_, 0} <-
+           System.cmd("git", ["-C", repo_path, "diff", "--cached", "--quiet"],
+             stderr_to_stdout: true
+           ) do
       :ok
     else
       _ -> {:error, :dirty_working_tree}
     end
   end
 
-  # Creates a git worktree at wt_path on branch. If the branch already exists,
-  # retries without -b (attaches to existing branch).
   defp ensure_git_worktree(repo_path, wt_path, branch) do
     case System.cmd("git", ["-C", repo_path, "worktree", "add", wt_path, "-b", branch],
            stderr_to_stdout: true
          ) do
       {_, 0} ->
-        Logger.info("git worktree created: #{wt_path} (branch: #{branch})")
         :ok
 
       {output, _} ->
         if String.contains?(output, "already exists") or
              String.contains?(output, "already checked out") do
-          # Branch exists; attach worktree to it without creating a new branch
           case System.cmd("git", ["-C", repo_path, "worktree", "add", wt_path, branch],
                  stderr_to_stdout: true
                ) do
-            {_, 0} ->
-              Logger.info("git worktree attached to existing branch: #{wt_path} (#{branch})")
-              :ok
-
-            {err, code} ->
-              {:error, {code, err}}
+            {_, 0} -> :ok
+            {err, code} -> {:error, {code, err}}
           end
         else
           {:error, output}

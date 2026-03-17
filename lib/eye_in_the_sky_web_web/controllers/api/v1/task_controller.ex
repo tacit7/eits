@@ -102,10 +102,17 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
     try do
       task = Tasks.get_task!(id)
       annotations = Notes.list_notes_for_task(id)
+      presented = ApiPresenter.present_task(task)
 
       json(conn, %{
         success: true,
-        task: ApiPresenter.present_task(task),
+        task: presented,
+        # Top-level convenience fields so scripts can read .project_id / .title
+        # without reaching into .task (backwards-compat with callers that assumed flat response)
+        id: presented.id,
+        title: presented.title,
+        project_id: task.project_id,
+        state_id: presented.state_id,
         annotations: Enum.map(annotations, &ApiPresenter.present_note/1)
       })
     rescue

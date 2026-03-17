@@ -302,9 +302,10 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
 
   @doc """
   GET /api/v1/sessions/:uuid - Get session info.
+  Accepts UUID string or integer session ID.
   """
-  def show(conn, %{"uuid" => uuid}) do
-    case Sessions.get_session_by_uuid(uuid) do
+  def show(conn, %{"uuid" => id_or_uuid}) do
+    case resolve_session(id_or_uuid) do
       {:ok, session} ->
         agent_uuid = Helpers.resolve_agent_uuid(session.agent_id)
 
@@ -316,9 +317,10 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
 
         json(conn, %{
           id: session.id,
+          uuid: session.uuid,
           agent_id: agent_uuid,
           agent_int_id: session.agent_id,
-          session_id: uuid,
+          session_id: session.uuid,
           project_id: session.project_id,
           status: session.status,
           name: session.name,
@@ -328,6 +330,13 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
 
       {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+    end
+  end
+
+  defp resolve_session(id_or_uuid) do
+    case Integer.parse(id_or_uuid) do
+      {int_id, ""} -> Sessions.get_session(int_id)
+      _ -> Sessions.get_session_by_uuid(id_or_uuid)
     end
   end
 

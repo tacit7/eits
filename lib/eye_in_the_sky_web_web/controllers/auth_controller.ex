@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWebWeb.AuthController do
            Wax.register(attestation_object, client_data_json, challenge) do
       cred_id = auth_data.attested_credential_data.credential_id
       cose_key = auth_data.attested_credential_data.credential_public_key
-      cose_key_bin = cose_key |> serialize_cose_key() |> Jason.encode!()
+      cose_key_bin = :erlang.term_to_binary(cose_key)
       sign_count = auth_data.sign_count || 0
 
       with {:ok, user} <- Accounts.get_or_create_user(username),

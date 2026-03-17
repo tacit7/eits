@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.DmLive do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.{Sessions, Agents, Checkpoints, Commits, Messages, Notes, Repo, Tasks}
+  alias EyeInTheSkyWeb.{Sessions, Agents, Checkpoints, Commits, Messages, Notes, Repo, Tasks, Projects}
   alias EyeInTheSkyWeb.Claude.{AgentManager, AgentWorker, SessionReader}
   alias EyeInTheSkyWeb.FileAttachments
   alias EyeInTheSkyWebWeb.Components.DmPage
@@ -17,8 +17,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def mount(%{"session_id" => session_id_param} = params, _session, socket) do
-    alias EyeInTheSkyWeb.Projects
-
     # Accept both integer ID and UUID in URL
     session_result =
       case Integer.parse(session_id_param) do
@@ -26,115 +24,86 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         _ -> Sessions.get_session_by_uuid(session_id_param)
       end
 
-    case session_result do
-      {:error, :not_found} ->
-        {:ok,
-         socket
-         |> put_flash(:error, "Session not found")
-         |> redirect(to: "/")}
+    with {:session, {:ok, session}} <- {:session, session_result},
+         {:agent, {:ok, agent}} <- {:agent, Agents.get_agent(session.agent_id)} do
+      # Preserve sidebar context when navigating from project sessions page
+      {sidebar_tab, sidebar_project} =
+        case {params["from"], params["project_id"]} do
+          {"project", project_id_str} when is_binary(project_id_str) ->
+            case Integer.parse(project_id_str) do
+              {pid, ""} -> {:sessions, Projects.get_project!(pid)}
+              _ -> {:chat, nil}
+            end
 
-      {:ok, session} ->
-        mount_session(session, params, socket)
-    end
-  end
+          _ ->
+            {:chat, nil}
+        end
 
-  defp mount_session(session, params, socket) do
-    alias EyeInTheSkyWeb.Projects
-
-    case Agents.get_agent(session.agent_id) do
-      {:error, :not_found} ->
-        {:ok,
-         socket
-         |> put_flash(:error, "Agent not found for this session")
-         |> redirect(to: "/")}
-
-      {:ok, agent} ->
-        mount_session_with_agent(session, agent, params, socket)
-    end
-  end
-
-  defp mount_session_with_agent(session, agent, params, socket) do
-    alias EyeInTheSkyWeb.Projects
-
-    # Preserve sidebar context when navigating from project sessions page
-    {sidebar_tab, sidebar_project} =
-      case {params["from"], params["project_id"]} do
-        {"project", project_id_str} when is_binary(project_id_str) ->
-          case Integer.parse(project_id_str) do
-            {pid, ""} ->
-              project = Projects.get_project!(pid)
-              {:sessions, project}
-
-            _ ->
-              {:chat, nil}
-          end
-
-        _ ->
-          {:chat, nil}
+      if connected?(socket) do
+        subscribe_session(session.id)
+        subscribe_agent_working()
+        subscribe_agents()
+        subscribe_dm_stream(session.id)
+        subscribe_dm_queue(session.id)
+        subscribe_tasks()
+        send(self(), :sync_from_session_file)
       end
 
-    if connected?(socket) do
-      subscribe_session(session.id)
-      subscribe_agent_working()
-      subscribe_agents()
-      subscribe_dm_stream(session.id)
-      subscribe_dm_queue(session.id)
-      subscribe_tasks()
-      send(self(), :sync_from_session_file)
+      socket =
+        socket
+        |> assign(:page_title, session.name || "Session")
+        |> assign(:hide_mobile_header, true)
+        |> assign(:sidebar_tab, sidebar_tab)
+        |> assign(:sidebar_project, sidebar_project)
+        |> assign(:session_id, session.id)
+        |> assign(:session_uuid, session.uuid)
+        |> assign(:agent_id, session.agent_id)
+        |> assign(:session, session)
+        |> assign(:agent, agent)
+        |> assign(:active_tab, "messages")
+        |> assign(:session_ref, nil)
+        |> assign(:processing, AgentWorker.is_processing?(session.id))
+        |> assign(:message_limit, @default_message_limit)
+        |> assign(:has_more_messages, false)
+        |> assign(:selected_model, session.model || "opus")
+        |> assign(:selected_effort, "medium")
+        |> assign(:active_overlay, nil)
+        |> assign(:show_live_stream, false)
+        |> assign(:stream_content, AgentWorker.get_stream_state(session.id))
+        |> assign(:stream_tool, nil)
+        |> assign(:slash_items, build_slash_items())
+        |> assign(:diff_cache, %{})
+        |> assign(:selected_task, nil)
+        |> assign(:task_notes, [])
+        |> assign(:workflow_states, Tasks.list_workflow_states())
+        |> assign(:current_task, Tasks.get_current_task_for_session(session.id))
+        |> assign(:sync_timer, nil)
+        |> assign(:reload_timer, nil)
+        |> assign(:total_tokens, 0)
+        |> assign(:total_cost, 0.0)
+        |> assign(:context_used, 0)
+        |> assign(:context_window, 0)
+        |> assign(:queued_prompts, AgentWorker.get_queue(session.id))
+        |> assign(:thinking_enabled, false)
+        |> assign(:max_budget_usd, nil)
+        |> assign(:compacting, session.status == "compacting")
+        |> assign(:checkpoints, [])
+        |> allow_upload(:files,
+          accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
+          max_entries: 10,
+          max_file_size: 50_000_000,
+          auto_upload: true
+        )
+        |> load_tab_data("messages", session.id)
+
+      {:ok, socket}
+    else
+      {:session, {:error, :not_found}} ->
+        {:ok, socket |> put_flash(:error, "Session not found") |> redirect(to: "/")}
+
+      {:agent, {:error, :not_found}} ->
+        {:ok, socket |> put_flash(:error, "Agent not found for this session") |> redirect(to: "/")}
     end
-
-    socket =
-      socket
-      |> assign(:page_title, session.name || "Session")
-      |> assign(:hide_mobile_header, true)
-      |> assign(:sidebar_tab, sidebar_tab)
-      |> assign(:sidebar_project, sidebar_project)
-      |> assign(:session_id, session.id)
-      |> assign(:session_uuid, session.uuid)
-      |> assign(:agent_id, session.agent_id)
-      |> assign(:session, session)
-      |> assign(:agent, agent)
-      |> assign(:active_tab, "messages")
-      |> assign(:session_ref, nil)
-      |> assign(:processing, AgentWorker.is_processing?(session.id))
-      |> assign(:message_limit, @default_message_limit)
-      |> assign(:has_more_messages, false)
-      |> assign(:selected_model, session.model || "opus")
-      |> assign(:selected_effort, "medium")
-      |> assign(:show_effort_menu, false)
-      |> assign(:show_model_menu, false)
-      |> assign(:show_live_stream, false)
-      |> assign(:stream_content, AgentWorker.get_stream_state(session.id))
-      |> assign(:stream_tool, nil)
-      |> assign(:slash_items, build_slash_items())
-      |> assign(:diff_cache, %{})
-      |> assign(:show_new_task_drawer, false)
-      |> assign(:show_task_detail_drawer, false)
-      |> assign(:selected_task, nil)
-      |> assign(:task_notes, [])
-      |> assign(:workflow_states, Tasks.list_workflow_states())
-      |> assign(:current_task, Tasks.get_current_task_for_session(session.id))
-      |> assign(:sync_timer, nil)
-      |> assign(:reload_timer, nil)
-      |> assign(:total_tokens, 0)
-      |> assign(:total_cost, 0.0)
-      |> assign(:context_used, 0)
-      |> assign(:context_window, 0)
-      |> assign(:queued_prompts, AgentWorker.get_queue(session.id))
-      |> assign(:thinking_enabled, false)
-      |> assign(:max_budget_usd, nil)
-      |> assign(:compacting, session.status == "compacting")
-      |> assign(:checkpoints, [])
-      |> assign(:show_create_checkpoint, false)
-      |> allow_upload(:files,
-        accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
-        max_entries: 10,
-        max_file_size: 50_000_000,
-        auto_upload: true
-      )
-      |> load_tab_data("messages", session.id)
-
-    {:ok, socket}
   end
 
   @impl true
@@ -149,29 +118,57 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_event("toggle_model_menu", _params, socket) do
-    {:noreply, assign(socket, :show_model_menu, !socket.assigns.show_model_menu)}
+    overlay = if socket.assigns.active_overlay == :model_menu, do: nil, else: :model_menu
+    {:noreply, assign(socket, :active_overlay, overlay)}
   end
 
   @impl true
   def handle_event("toggle_new_task_drawer", _params, socket) do
-    {:noreply, assign(socket, :show_new_task_drawer, !socket.assigns.show_new_task_drawer)}
+    overlay = if socket.assigns.active_overlay == :task_drawer, do: nil, else: :task_drawer
+    {:noreply, assign(socket, :active_overlay, overlay)}
   end
 
   @impl true
-  def handle_event("open_task_detail", params, socket),
-    do: handle_open_task_detail(params, socket)
+  def handle_event("open_task_detail", %{"task_id" => task_id}, socket) do
+    task = Tasks.get_task_by_uuid_or_id!(task_id)
+    notes = Notes.list_notes_for_task(task.id)
+
+    {:noreply,
+     socket
+     |> assign(:selected_task, task)
+     |> assign(:task_notes, notes)
+     |> assign(:active_overlay, :task_detail)}
+  end
+
+  def handle_event("open_task_detail", _params, socket), do: {:noreply, socket}
 
   @impl true
-  def handle_event("toggle_task_detail_drawer", params, socket),
-    do: handle_toggle_task_detail_drawer(params, socket)
+  def handle_event("toggle_task_detail_drawer", _params, socket) do
+    overlay = if socket.assigns.active_overlay == :task_detail, do: nil, else: :task_detail
+    {:noreply, assign(socket, :active_overlay, overlay)}
+  end
 
   @impl true
   def handle_event("update_task", params, socket),
     do: handle_update_task(params, socket, &reload_tasks/1)
 
   @impl true
-  def handle_event("delete_task", params, socket),
-    do: handle_delete_task(params, socket, &reload_tasks/1)
+  def handle_event("delete_task", %{"task_id" => task_id}, socket) do
+    task = Tasks.get_task_by_uuid_or_id!(task_id)
+
+    case Tasks.delete_task_with_associations(task) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:active_overlay, nil)
+         |> assign(:selected_task, nil)
+         |> reload_tasks()
+         |> put_flash(:info, "Task deleted")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to delete task")}
+    end
+  end
 
   @impl true
   def handle_event("archive_task", %{"task_id" => task_id}, socket) do
@@ -181,7 +178,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       {:ok, _} ->
         {:noreply,
          socket
-         |> assign(:show_task_detail_drawer, false)
+         |> assign(:active_overlay, nil)
          |> assign(:selected_task, nil)
          |> reload_tasks()
          |> put_flash(:info, "Task archived")}
@@ -237,7 +234,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
         {:noreply,
          socket
-         |> assign(:show_task_detail_drawer, false)
+         |> assign(:active_overlay, nil)
          |> put_flash(:info, "Agent spawned for: #{String.slice(task.title, 0..40)}")}
 
       {:error, reason} ->
@@ -247,7 +244,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_event("keydown", %{"key" => "k", "ctrlKey" => true}, socket) do
-    {:noreply, assign(socket, :show_new_task_drawer, !socket.assigns.show_new_task_drawer)}
+    overlay = if socket.assigns.active_overlay == :task_drawer, do: nil, else: :task_drawer
+    {:noreply, assign(socket, :active_overlay, overlay)}
   end
 
   def handle_event("keydown", _params, socket), do: {:noreply, socket}
@@ -291,7 +289,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
         socket =
           socket
-          |> assign(:show_new_task_drawer, false)
+          |> assign(:active_overlay, nil)
           |> assign(:active_tab, "tasks")
           |> load_tab_data("tasks", session_id)
           |> put_flash(:info, "Task created")
@@ -316,7 +314,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       socket
       |> assign(:selected_model, model)
       |> assign(:selected_effort, effort)
-      |> assign(:show_model_menu, false)
+      |> assign(:active_overlay, nil)
 
     {:noreply, socket}
   end
@@ -350,12 +348,13 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_event("toggle_effort_menu", _params, socket) do
-    {:noreply, assign(socket, :show_effort_menu, !socket.assigns.show_effort_menu)}
+    overlay = if socket.assigns.active_overlay == :effort_menu, do: nil, else: :effort_menu
+    {:noreply, assign(socket, :active_overlay, overlay)}
   end
 
   @impl true
   def handle_event("select_effort", %{"effort" => effort}, socket) do
-    {:noreply, socket |> assign(:selected_effort, effort) |> assign(:show_effort_menu, false)}
+    {:noreply, socket |> assign(:selected_effort, effort) |> assign(:active_overlay, nil)}
   end
 
   @impl true
@@ -564,7 +563,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_event("toggle_create_checkpoint", _params, socket) do
-    {:noreply, assign(socket, :show_create_checkpoint, !socket.assigns.show_create_checkpoint)}
+    overlay = if socket.assigns.active_overlay == :checkpoint, do: nil, else: :checkpoint
+    {:noreply, assign(socket, :active_overlay, overlay)}
   end
 
   @impl true
@@ -589,7 +589,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       {:ok, _checkpoint} ->
         socket =
           socket
-          |> assign(:show_create_checkpoint, false)
+          |> assign(:active_overlay, nil)
           |> assign(:checkpoints, Checkpoints.list_checkpoints_for_session(session_id))
 
         {:noreply, put_flash(socket, :info, "Checkpoint saved")}
@@ -1191,11 +1191,21 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     file_list =
       uploaded_files
       |> Enum.map(fn file_data ->
-        "- #{file_data.storage_path} (#{file_data.original_filename})"
+        relative = relative_upload_path(file_data.storage_path)
+        "- #{relative} (#{file_data.original_filename})"
       end)
       |> Enum.join("\n")
 
     "#{body}\n\nAttached files:\n#{file_list}"
+  end
+
+  defp relative_upload_path(abs_path) do
+    priv_static = Path.join(:code.priv_dir(:eye_in_the_sky_web), "static")
+
+    case String.split(abs_path, priv_static, parts: 2) do
+      [_, relative] -> relative
+      _ -> Path.basename(abs_path)
+    end
   end
 
   defp create_user_message(session_id, body) do
@@ -1265,8 +1275,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         uploads={@uploads}
         selected_model={@selected_model}
         selected_effort={@selected_effort}
-        show_effort_menu={@show_effort_menu}
-        show_model_menu={@show_model_menu}
+        show_effort_menu={@active_overlay == :effort_menu}
+        show_model_menu={@active_overlay == :model_menu}
         processing={@processing}
         show_live_stream={@show_live_stream}
         stream_content={@stream_content}
@@ -1276,7 +1286,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         diff_cache={@diff_cache}
         notes={@notes}
         slash_items={@slash_items}
-        show_new_task_drawer={@show_new_task_drawer}
+        show_new_task_drawer={@active_overlay == :task_drawer}
         workflow_states={@workflow_states}
         current_task={@current_task}
         total_tokens={@total_tokens}
@@ -1288,12 +1298,12 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         context_used={@context_used}
         context_window={@context_window}
         checkpoints={@checkpoints}
-        show_create_checkpoint={@show_create_checkpoint}
+        show_create_checkpoint={@active_overlay == :checkpoint}
       />
 
     <EyeInTheSkyWebWeb.Components.NewTaskDrawer.new_task_drawer
       id="dm-new-task-drawer"
-      show={@show_new_task_drawer}
+      show={@active_overlay == :task_drawer}
       workflow_states={@workflow_states}
       toggle_event="toggle_new_task_drawer"
       submit_event="create_new_task"
@@ -1301,7 +1311,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
     <EyeInTheSkyWebWeb.Components.TaskDetailDrawer.task_detail_drawer
       id="dm-task-detail-drawer"
-      show={@show_task_detail_drawer}
+      show={@active_overlay == :task_detail}
       task={@selected_task}
       notes={@task_notes}
       workflow_states={@workflow_states}

@@ -74,6 +74,7 @@ defmodule EyeInTheSkyWeb.Router do
       live "/config", OverviewLive.Config, :index
       live "/jobs", OverviewLive.Jobs, :index
       live "/notifications", OverviewLive.Notifications, :index
+      live "/approvals", OverviewLive.Approvals, :index
       live "/settings", OverviewLive.Settings, :index
       live "/sessions", SessionLive.Index, :index
       live "/prompts", PromptLive.Index, :index

@@ -502,6 +502,13 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
           collapsed={@collapsed}
           count={@notification_count}
         />
+        <.section_sub_item
+          href="/approvals"
+          icon="hero-shield-check"
+          label="Approvals"
+          active={@sidebar_tab == :approvals}
+          collapsed={@collapsed}
+        />
       </div>
     <% end %>
     """

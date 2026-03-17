@@ -311,53 +311,57 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
         "✅ start_agent_worker: loaded session.uuid=#{session.uuid}, agent.id=#{agent.id}, project_path=#{project_path}"
       )
 
-      provider = normalize_provider(session.provider) || "claude"
+      case normalize_provider(session.provider) do
+        nil ->
+          {:error, {:unsupported_provider, session.provider}}
 
-      # Ensure session has a UUID — Codex sessions created from the UI may not have one
-      session =
-        if is_nil(session.uuid) or session.uuid == "" do
-          uuid = Ecto.UUID.generate()
-          Logger.info("start_agent_worker: generating UUID=#{uuid} for session.id=#{session.id}")
-          {:ok, updated} = Sessions.update_session(session, %{uuid: uuid})
-          updated
-        else
-          session
-        end
+        provider ->
+          # Ensure session has a UUID — Codex sessions created from the UI may not have one
+          session =
+            if is_nil(session.uuid) or session.uuid == "" do
+              uuid = Ecto.UUID.generate()
+              Logger.info("start_agent_worker: generating UUID=#{uuid} for session.id=#{session.id}")
+              {:ok, updated} = Sessions.update_session(session, %{uuid: uuid})
+              updated
+            else
+              session
+            end
 
-      opts = [
-        session_id: session.id,
-        provider_conversation_id: session.uuid,
-        agent_id: agent.id,
-        project_id: session.project_id,
-        project_path: project_path,
-        provider: provider,
-        worktree: extra_opts[:worktree]
-      ]
+          opts = [
+            session_id: session.id,
+            provider_conversation_id: session.uuid,
+            agent_id: agent.id,
+            project_id: session.project_id,
+            project_path: project_path,
+            provider: provider,
+            worktree: extra_opts[:worktree]
+          ]
 
-      case DynamicSupervisor.start_child(
-             EyeInTheSkyWeb.Claude.AgentSupervisor,
-             {AgentWorker, opts}
-           ) do
-        {:ok, pid} ->
-          Logger.info(
-            "✅ start_agent_worker: AgentWorker started for session.id=#{session_id}, pid=#{inspect(pid)}"
-          )
+          case DynamicSupervisor.start_child(
+                 EyeInTheSkyWeb.Claude.AgentSupervisor,
+                 {AgentWorker, opts}
+               ) do
+            {:ok, pid} ->
+              Logger.info(
+                "✅ start_agent_worker: AgentWorker started for session.id=#{session_id}, pid=#{inspect(pid)}"
+              )
 
-          {:ok, pid, provider}
+              {:ok, pid, provider}
 
-        {:error, {:already_started, pid}} ->
-          Logger.info(
-            "start_agent_worker: worker already started for session.id=#{session_id}, pid=#{inspect(pid)}"
-          )
+            {:error, {:already_started, pid}} ->
+              Logger.info(
+                "start_agent_worker: worker already started for session.id=#{session_id}, pid=#{inspect(pid)}"
+              )
 
-          {:ok, pid, provider}
+              {:ok, pid, provider}
 
-        {:error, reason} = error ->
-          Logger.error(
-            "❌ start_agent_worker: failed to start AgentWorker for session.id=#{session_id} - #{inspect(reason)}"
-          )
+            {:error, reason} = error ->
+              Logger.error(
+                "❌ start_agent_worker: failed to start AgentWorker for session.id=#{session_id} - #{inspect(reason)}"
+              )
 
-          error
+              error
+          end
       end
     else
       {:error, reason} ->

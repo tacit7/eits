@@ -217,7 +217,12 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.JobsHelpers do
   def month_name(m), do: m
 
   def parse_cron_num("*"), do: {:ok, :any}
-  def parse_cron_num("*/" <> step), do: {:step, String.to_integer(step)}
+  def parse_cron_num("*/" <> step) do
+    case Integer.parse(step) do
+      {n, ""} -> {:step, n}
+      _ -> :error
+    end
+  end
 
   def parse_cron_num(s) do
     case Integer.parse(s) do
@@ -277,13 +282,23 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.JobsHelpers do
   # Timezone
   # ---------------------------------------------------------------------------
 
-  # Returns the system timezone abbreviation for display next to schedule values.
-  # Falls back to "UTC" if TZ env var is not set.
+  # Returns the system timezone for display next to schedule values.
+  # Tries: TZ env var, then macOS `readlink /etc/localtime`, then "UTC".
   def system_timezone do
-    tz = System.get_env("TZ") || "UTC"
-    # Show just the city/region part for brevity: "America/Chicago" -> "America/Chicago"
-    # Abbreviations like "CST" are not reliably available without tzdata, so show full name.
-    tz
+    System.get_env("TZ") || detect_macos_timezone() || "UTC"
+  end
+
+  defp detect_macos_timezone do
+    case System.cmd("readlink", ["/etc/localtime"], stderr_to_stdout: true) do
+      {path, 0} ->
+        case Regex.run(~r"zoneinfo/(.+)$", String.trim(path)) do
+          [_, tz] -> tz
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
   end
 
   # ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Assistants do
 
   import Ecto.Query, warn: false
   alias EyeInTheSkyWeb.Repo
-  alias EyeInTheSkyWeb.Assistants.Assistant
+  alias EyeInTheSkyWeb.Assistants.{Assistant, Tool}
 
   @doc """
   Returns all assistants, optionally filtered by project.
@@ -123,5 +123,76 @@ defmodule EyeInTheSkyWeb.Assistants do
     |> order_by([a], desc: a.updated_at)
     |> preload([:prompt])
     |> Repo.all()
+  end
+
+  # ── Tool Registry ─────────────────────────────────────────────────────────────
+
+  @doc """
+  Lists all active tools in the catalog.
+  """
+  def list_tools(opts \\ []) do
+    include_inactive = Keyword.get(opts, :include_inactive, false)
+
+    Tool
+    |> then(fn q -> if include_inactive, do: q, else: where(q, [t], t.active == true) end)
+    |> order_by([t], asc: t.name)
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets a tool by name. Returns nil if not found.
+  """
+  def get_tool_by_name(name), do: Repo.get_by(Tool, name: name, active: true)
+
+  @doc """
+  Gets a tool by ID.
+  """
+  def get_tool!(id), do: Repo.get!(Tool, id)
+
+  @doc """
+  Checks if a tool is allowed for a given assistant.
+  Returns {:ok, :allowed}, {:ok, :requires_approval}, or {:error, :denied}.
+
+  Policy precedence:
+    1. If tool is in assistant's denied list — denied
+    2. If tool is in assistant's requires_approval list — requires_approval
+    3. If tool is in assistant's allowed list — allowed
+    4. Falls back to tool's requires_approval_default
+    5. If no tool_policy set on assistant — allowed (open policy)
+  """
+  def check_tool_policy(%Assistant{tool_policy: nil}, _tool_name), do: {:ok, :allowed}
+  def check_tool_policy(%Assistant{tool_policy: policy}, tool_name) when is_map(policy) do
+    denied   = Map.get(policy, "denied", [])
+    approval = Map.get(policy, "requires_approval", [])
+    allowed  = Map.get(policy, "allowed", [])
+
+    cond do
+      tool_name in denied   -> {:error, :denied}
+      tool_name in approval -> {:ok, :requires_approval}
+      tool_name in allowed  -> {:ok, :allowed}
+      allowed == []         -> {:ok, :allowed}
+      true                  -> {:error, :denied}
+    end
+  end
+
+  @doc """
+  Returns the list of tool names allowed for an assistant (no approval check).
+  Used for prompt construction — tells the assistant which tools it can use.
+  """
+  def allowed_tool_names(%Assistant{tool_policy: nil}) do
+    list_tools() |> Enum.map(& &1.name)
+  end
+
+  def allowed_tool_names(%Assistant{tool_policy: policy}) when is_map(policy) do
+    denied  = Map.get(policy, "denied", [])
+    allowed = Map.get(policy, "allowed", [])
+
+    if allowed == [] do
+      list_tools()
+      |> Enum.map(& &1.name)
+      |> Enum.reject(& &1 in denied)
+    else
+      allowed -- denied
+    end
   end
 end

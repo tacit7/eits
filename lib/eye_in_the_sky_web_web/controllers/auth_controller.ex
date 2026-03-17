@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.AuthController do
   use EyeInTheSkyWebWeb, :controller
 
+  require Logger
+
   alias EyeInTheSkyWeb.Accounts
 
   # --- Registration (token-gated) ---
@@ -74,23 +76,28 @@ defmodule EyeInTheSkyWebWeb.AuthController do
                cose_key: cose_key_bin,
                sign_count: sign_count
              }) do
+        {:ok, session_token} = Accounts.create_user_session(user.id)
+
         conn
         |> configure_session(renew: true)
         |> delete_session(:webauthn_challenge)
         |> delete_session(:webauthn_username)
         |> delete_session(:webauthn_reg_token)
         |> put_session(:user_id, user.id)
+        |> put_session(:session_token, session_token)
         |> json(%{ok: true})
       else
         {:error, reason} ->
-          conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+          Logger.error("WebAuthn registration complete failed: #{inspect(reason)}")
+          conn |> put_status(:unprocessable_entity) |> json(%{error: "Registration failed"})
       end
     else
       {:error, :expired} ->
         conn |> put_status(:gone) |> json(%{error: "registration link has expired"})
 
       {:error, reason} ->
-        conn |> put_status(:bad_request) |> json(%{error: inspect(reason)})
+        Logger.error("WebAuthn registration challenge failed: #{inspect(reason)}")
+        conn |> put_status(:bad_request) |> json(%{error: "Registration failed"})
 
       nil ->
         conn |> put_status(:bad_request) |> json(%{error: "session expired"})
@@ -168,16 +175,20 @@ defmodule EyeInTheSkyWebWeb.AuthController do
       else
         if passkey, do: Accounts.update_sign_count(passkey, auth_data.sign_count)
 
+        {:ok, session_token} = Accounts.create_user_session(user_id)
+
         conn
         |> configure_session(renew: true)
         |> delete_session(:webauthn_challenge)
         |> delete_session(:webauthn_user_id)
         |> put_session(:user_id, user_id)
+        |> put_session(:session_token, session_token)
         |> json(%{ok: true})
       end
     else
       {:error, reason} ->
-        conn |> put_status(:unauthorized) |> json(%{error: inspect(reason)})
+        Logger.error("WebAuthn authentication failed: #{inspect(reason)}")
+        conn |> put_status(:unauthorized) |> json(%{error: "Authentication failed"})
 
       nil ->
         conn |> put_status(:bad_request) |> json(%{error: "session expired"})
@@ -187,6 +198,11 @@ defmodule EyeInTheSkyWebWeb.AuthController do
   # --- Logout ---
 
   def logout(conn, _params) do
+    case get_session(conn, :session_token) do
+      nil -> :ok
+      token -> Accounts.delete_user_session(token)
+    end
+
     conn
     |> clear_session()
     |> redirect(to: "/auth/login")

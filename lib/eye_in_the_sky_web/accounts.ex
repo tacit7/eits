@@ -149,15 +149,23 @@ defmodule EyeInTheSkyWeb.Accounts do
     user_id
     |> list_passkeys_for_user()
     |> Enum.map(fn pk ->
-      cose_key =
-        pk.cose_key
-        |> Jason.decode!()
-        |> Map.new(fn {k, v} ->
-          val = if is_map(v) and Map.has_key?(v, "b64"), do: Base.decode64!(v["b64"]), else: v
-          {String.to_integer(k), val}
-        end)
-
+      cose_key = decode_cose_key(pk.cose_key)
       {pk.credential_id, cose_key}
+    end)
+  end
+
+  # Decodes a cose_key stored either as JSON (new format) or Erlang binary term (legacy).
+  # 0x83 is the Erlang external term format magic byte.
+  defp decode_cose_key(<<0x83, _::binary>> = bin) do
+    :erlang.binary_to_term(bin, [:safe])
+  end
+
+  defp decode_cose_key(json) do
+    json
+    |> Jason.decode!()
+    |> Map.new(fn {k, v} ->
+      val = if is_map(v) and Map.has_key?(v, "b64"), do: Base.decode64!(v["b64"]), else: v
+      {String.to_integer(k), val}
     end)
   end
 end

@@ -145,6 +145,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
           search_query={@search_query}
           empty_id="project-notes-empty"
           editing_note_id={@editing_note_id}
+          current_path={~p"/projects/#{@project.id}/notes"}
         />
       </div>
     </div>

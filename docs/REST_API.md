@@ -310,7 +310,18 @@ Gitea webhook must be signed with `GITEA_WEBHOOK_SECRET` env var. Plug validates
 sha256_hmac(raw_body, GITEA_WEBHOOK_SECRET)
 ```
 
-Requests without valid signature return `401 Unauthorized`. In production, unsigned requests fail closed (return 403) when `GITEA_WEBHOOK_SECRET` is missing.
+The signature header can be in two formats:
+- **New format**: `X-Gitea-Signature: sha256=<hex_digest>`
+- **Legacy format**: Raw hex digest
+
+Both formats are supported. Signature comparison is case-insensitive.
+
+**Validation requirements:**
+- `repository.full_name` is required; returns `400 Bad Request` if missing
+- `project_path` must be configured; returns `500 Internal Server Error` if not configured or derivable
+- Requests without valid signature return `401 Unauthorized`
+- In production, unsigned requests fail closed (return 403) when `GITEA_WEBHOOK_SECRET` is missing
+- In development, unsigned requests can be allowed via `allow_unsigned_webhooks` config flag
 
 **Response:** `202 Accepted` (async processing)
 
@@ -363,6 +374,56 @@ List all registered push subscriptions for the current user.
     "inserted_at": "2026-03-12T10:30:00Z"
   }
 ]
+```
+
+---
+
+### POST /api/v1/dm
+
+Send a message to an agent session. Rate-limited to protect against message injection flooding.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `session_id` | integer | yes | Session ID |
+| `content` | string | yes | Message content (markdown) |
+| `sender_id` | string | yes | Sender UUID or identifier |
+
+**Response:** `201 Created`
+
+```json
+{
+  "id": 123,
+  "session_id": 42,
+  "sender_id": "user-uuid",
+  "content": "Looking at the error logs...",
+  "inserted_at": "2026-03-17T10:30:00Z"
+}
+```
+
+**Rate limiting:**
+
+- 30 requests per minute per `sender_id`
+- Exceeding limit returns `429 Too Many Requests`:
+
+```json
+{
+  "error": "Rate limit exceeded",
+  "retry_after": 5
+}
+```
+
+**Example:**
+
+```bash
+curl -X POST localhost:5000/api/v1/dm \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "session_id": 42,
+    "sender_id": "user-123",
+    "content": "Can you check the test output?"
+  }'
 ```
 
 ---

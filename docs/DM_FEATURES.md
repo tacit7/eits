@@ -50,6 +50,65 @@ The DM page (`/dm`) is the central hub for agent communication, task management,
 
 ---
 
+## DmLive Mount Structure
+
+**Refactored (2026-03-17):** Mount chain flattened from 3-level delegation to single `with` chain.
+
+**Before:**
+```
+mount/3 → mount_session/3 → mount_session_with_agent/3
+```
+
+**After:**
+```
+mount/3 (single with chain)
+```
+
+**Benefits:**
+- Reduced cognitive load (no delegation hops)
+- Easier to trace state setup
+- Simplified error handling
+
+---
+
+## Overlay State Management
+
+**State pattern:** Single `:active_overlay` atom instead of 5 boolean assigns.
+
+**Previous approach (boolean assigns):**
+```elixir
+@assign show_effort_menu: false
+@assign show_model_menu: false
+@assign show_new_task_drawer: false
+@assign show_task_detail_drawer: false
+@assign show_create_checkpoint: false
+```
+
+**Current approach (atom):**
+```elixir
+@assign active_overlay: nil  # or :effort_menu | :model_menu | :task_drawer | :task_detail | :checkpoint
+```
+
+**Overlay components controlled by active_overlay:**
+1. **Effort menu** — opened with `:effort_menu`
+2. **Model menu** — opened with `:model_menu`
+3. **New task drawer** — opened with `:task_drawer`
+4. **Task detail drawer** — opened with `:task_detail`
+5. **Create checkpoint** — opened with `:checkpoint`
+
+**Render logic:**
+```elixir
+<.open_task_detail open={@active_overlay == :task_detail} />
+<.toggle_task_detail_drawer @click={handle_overlay(:task_detail)} />
+```
+
+**Event handlers:**
+- `open_task_detail/1` — opens task detail overlay
+- `toggle_task_detail_drawer/1` — toggles task drawer visibility
+- `delete_task/2` — deletes task from detail view
+
+---
+
 ## Chat Interface
 
 **Display:** Message stream with agent context.

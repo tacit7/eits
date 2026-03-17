@@ -22,9 +22,19 @@ All browser routes require WebAuthn passkey authentication via `AuthHook` (LiveV
 All `/api/v1/*` routes (except webhooks and public settings) require a Bearer token via the `RequireAuth` plug.
 
 - **Token comparison**: Uses `Plug.Crypto.secure_compare/2` (constant-time) to prevent timing attacks.
-- **Secure by default in production**: If `EITS_API_KEY` is not set, the plug rejects all requests in production. Dev/test environments allow passthrough for convenience.
+- **Production validation**: If `EITS_API_KEY` is not set or empty, the plug rejects all requests with `401 Unauthorized`.
+- **Development validation**: Dev/test environments allow passthrough for convenience when `EITS_API_KEY` is unset.
 - **Token generation**: `mix eits.gen.api_key` generates a cryptographically random key.
 - **Single shared token**: No per-user scoping. Suitable for single-user deployments.
+
+### Session Auth — Cookie-Based
+
+The `SessionAuth` plug authenticates requests via signed session cookies. Used for browser-based access to admin dashboards.
+
+- **Routes**: `/oban` (Oban job dashboard) and `/dev/dashboard` (LiveDashboard)
+- **Mechanism**: Requires an active session cookie (set by WebAuthn login)
+- **Difference from RequireAuth**: SessionAuth works with cookies (for browsers), while RequireAuth works with Bearer tokens (for API/CLI)
+- **Pipeline**: `:browser` pipeline with `SessionAuth` plug
 
 ### Webhook — HMAC Signature
 
@@ -67,7 +77,9 @@ Defined in `endpoint.ex` `@session_options`:
 
 - `RemoteIp` plug in `endpoint.ex` rewrites `conn.remote_ip` from `X-Forwarded-For` headers.
 - Placed before `Plug.Session` and the router so all downstream plugs and rate limiting see the real client IP.
-- Trusts only loopback and private ranges as proxies by default.
+- **Default trusted ranges**: Loopback (127.0.0.1/8) and RFC 1918 private ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16).
+- **Tailscale support**: Includes explicit trust for Tailscale CGNAT range `100.64.0.0/10` to properly rewrite `X-Forwarded-For` headers from Tailscale Funnel and other Tailscale reverse proxies.
+- **Configuration**: Configured via `RemoteIp` plug with `proxies` option in `endpoint.ex`.
 
 ## Rate Limiting
 
@@ -94,23 +106,16 @@ Hammer v7 with ETS backend, applied to the `:webauthn` pipeline.
 | `/auth/logout` | Session (clears it) | `:browser` |
 | `/auth/*/challenge`, `/auth/*/complete` | Rate-limited, challenge-bound | `:webauthn` |
 | `/` and all LiveView routes | Session + AuthHook | `:browser` + `AuthHook` |
-| `/oban` dashboard | Session + RequireAuth | `:browser` + `:require_auth` |
+| `/oban` dashboard | Session + SessionAuth | `:browser` + `SessionAuth` |
+| `/dev/dashboard` | Session + SessionAuth | `:browser` + `SessionAuth` |
 | `/api/v1/*` | Bearer token | `:api` (includes `RequireAuth`) |
 | `/api/v1/webhooks/gitea` | HMAC signature | `:accepts_json` (no Bearer) |
 | `/api/v1/settings/eits_workflow_enabled` | Public (read-only) | `:accepts_json` |
-| `/dev/*` | Dev-only (compile-time flag) | `:browser` |
 | Static assets | Public | `Plug.Static` (allowlisted paths only) |
 
 ### Static File Serving
 
 `Plug.Static` is configured with an `only` allowlist: `~w(assets fonts images favicon.ico robots.txt sw.js manifest.json)`. The `uploads/` directory is deliberately excluded — uploaded files are stored in `priv/static/uploads/` but are not served via HTTP.
-
-### EditorController
-
-`POST /api/v1/editor/open` executes a system editor on a file path. Hardened with:
-
-- **Editor allowlist**: Only `code`, `vim`, `nvim`, `nano`, `emacs`, `cursor`, `zed` are permitted.
-- **Path prefix validation**: Paths are expanded with `Path.expand/1` and must start with the configured `allowed_path_prefix` (defaults to user home directory). Paths outside this prefix are rejected with 422.
 
 ## Input Validation
 
@@ -200,9 +205,8 @@ The Gitea webhook controller spawns review agents with project path from config 
 
 These features are gated behind `Application.compile_env(:eye_in_the_sky_web, :dev_routes)` — they do not exist in production builds:
 
-- `/dev/dashboard` — Phoenix LiveDashboard (telemetry metrics)
+- `/dev/dashboard` — Phoenix LiveDashboard (telemetry metrics), protected by SessionAuth
 - `/dev/mailbox` — Swoosh email preview
-- `/dev/test-login` — Sets session cookie without WebAuthn (for testing)
 
 ## Dependencies
 

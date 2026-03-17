@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
 
   alias EyeInTheSky.{Agents, Projects, Sessions, Teams}
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSkyWeb.Assistants
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   require Logger
@@ -58,10 +59,12 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
   @doc """
   POST /api/v1/agents - Spawn a new Claude Code agent.
   Body: instructions, model, provider, project_path, project_id, name, member_name,
-        parent_agent_id, parent_session_id, worktree, team_name
+        parent_agent_id, parent_session_id, worktree, team_name,
+        assistant_id, trigger_type, run_context
   """
   def create(conn, params) do
     with {:ok, params} <- validate_params(params),
+         {:ok, params} <- resolve_assistant(params),
          {:ok, project_id, project_name} <- Projects.resolve_project(params),
          {:ok, team} <- resolve_team(params) do
       params = Map.merge(params, %{"project_id" => project_id, "project_name" => project_name})
@@ -243,6 +246,56 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
     end
   end
 
+  # When assistant_id is provided, resolve the assistant and merge its config into params.
+  # The assistant's prompt_text becomes instructions if instructions are not explicitly provided.
+  # model and effort_level from the assistant are used as defaults if not overridden.
+  defp resolve_assistant(%{"assistant_id" => id} = params) when not is_nil(id) and id != "" do
+    assistant_id =
+      case id do
+        i when is_integer(i) -> i
+        s when is_binary(s)  ->
+          case Integer.parse(s) do
+            {int, ""} -> int
+            _         -> nil
+          end
+      end
+
+    if is_nil(assistant_id) do
+      {:error, "invalid_parameter", "assistant_id must be an integer"}
+    else
+      case Assistants.get_assistant(assistant_id) do
+        nil ->
+          {:error, "assistant_not_found", "assistant_id #{assistant_id} does not exist"}
+
+        assistant ->
+          # Use assistant's prompt as instructions if not explicitly provided
+          instructions =
+            params["instructions"] ||
+              (assistant.prompt && assistant.prompt.prompt_text) ||
+              assistant.name
+
+          # Use assistant's model/effort as defaults if not overridden
+          model = params["model"] || assistant.model || "haiku"
+          effort_level = params["effort_level"] || assistant.reasoning_effort
+
+          # Default trigger_type from assistant if not in params
+          trigger_type = params["trigger_type"] || assistant.default_trigger_type
+
+          updated = Map.merge(params, %{
+            "instructions"  => instructions,
+            "model"         => model,
+            "effort_level"  => effort_level,
+            "trigger_type"  => trigger_type,
+            "assistant_id"  => assistant.id
+          })
+
+          {:ok, updated}
+      end
+    end
+  end
+
+  defp resolve_assistant(params), do: {:ok, params}
+
   defp validate_params(params) do
     provider = params["provider"] || "claude"
     model = params["model"] || if(provider == "codex", do: "gpt-5.3-codex", else: "haiku")
@@ -319,7 +372,10 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
       parent_agent_id: params["parent_agent_id"],
       parent_session_id: params["parent_session_id"],
       agent: params["agent"],
-      bypass_sandbox: params["bypass_sandbox"] == true
+      bypass_sandbox: params["bypass_sandbox"] == true,
+      assistant_id: params["assistant_id"],
+      trigger_type: params["trigger_type"],
+      run_context: params["run_context"]
     ]
   end
 

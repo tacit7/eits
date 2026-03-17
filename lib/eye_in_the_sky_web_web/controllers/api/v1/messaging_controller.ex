@@ -186,6 +186,45 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
     end
   end
 
+  @doc """
+  GET /api/v1/channels/:channel_id/messages - List recent messages for a channel.
+  Query params: limit (optional, default 20, max 200)
+  """
+  def list_channel_messages(conn, %{"channel_id" => channel_id} = params) do
+    limit =
+      case Integer.parse(params["limit"] || "20") do
+        {n, ""} when n > 0 and n <= 200 -> n
+        _ -> 20
+      end
+
+    messages = Messages.list_messages_for_channel(channel_id, limit: limit)
+
+    json(conn, %{
+      success: true,
+      channel_id: channel_id,
+      count: length(messages),
+      messages:
+        Enum.map(messages, fn msg ->
+          %{
+            id: msg.id,
+            number: msg.channel_message_number,
+            uuid: msg.uuid,
+            session_id: msg.session_id,
+            session_name:
+              if(Ecto.assoc_loaded?(msg.session) && msg.session,
+                do: msg.session.name,
+                else: nil
+              ),
+            sender_role: msg.sender_role,
+            provider: msg.provider,
+            body: msg.body,
+            status: msg.status,
+            inserted_at: msg.inserted_at
+          }
+        end)
+    })
+  end
+
   defp resolve_session_id(raw) when is_binary(raw) do
     case Integer.parse(raw) do
       {int_id, ""} ->

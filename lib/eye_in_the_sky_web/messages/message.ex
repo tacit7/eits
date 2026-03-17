@@ -14,6 +14,7 @@ defmodule EyeInTheSkyWeb.Messages.Message do
     field :body, :string
     field :status, :string, default: "sent"
     field :metadata, :map
+    field :channel_message_number, :integer
     field :thread_reply_count, :integer, default: 0
     field :last_thread_reply_at, :utc_datetime
 
@@ -64,6 +65,7 @@ defmodule EyeInTheSkyWeb.Messages.Message do
       :status,
       :metadata,
       :source_uuid,
+      :channel_message_number,
       :thread_reply_count,
       :last_thread_reply_at,
       :inserted_at,

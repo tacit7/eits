@@ -170,6 +170,7 @@ defmodule EyeInTheSkyWebWeb.Router do
     # Messaging
     post "/dm", MessagingController, :dm
     get "/channels", MessagingController, :list_channels
+    get "/channels/:channel_id/messages", MessagingController, :list_channel_messages
     post "/channels/:channel_id/messages", MessagingController, :send_channel_message
 
     # Teams

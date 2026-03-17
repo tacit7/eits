@@ -3,6 +3,7 @@
 Security architecture and controls for the Eye in the Sky web application.
 
 Last audited: 2026-03-17
+Last updated: 2026-03-17 (security hardening pass — 7 findings closed)
 
 ## Authentication
 
@@ -11,10 +12,11 @@ Last audited: 2026-03-17
 All browser routes require WebAuthn passkey authentication via `AuthHook` (LiveView `on_mount`).
 
 - **Library**: `wax_` ~> 0.7
-- **Registration**: Token-gated. Registration tokens are generated with `:crypto.strong_rand_bytes(32)`, Base64URL-encoded, with a 15-minute TTL. Tokens are consumed (deleted) after use — single-use only.
+- **Registration**: Token-gated. Registration tokens are generated with `:crypto.strong_rand_bytes(32)`, Base64URL-encoded, with a 15-minute TTL. Tokens are consumed (deleted) after use — single-use only. The raw token is returned to the caller; only an HMAC-SHA256 hash (keyed on `secret_key_base`) is stored in the DB. Comparison hashes the presented token before lookup — plaintext is never persisted.
 - **Login**: Challenge-response with passkey. Challenges are serialized to JSON in the session cookie (no Erlang `binary_to_term`).
 - **Session rotation**: `configure_session(renew: true)` is called after both `login_complete` and `register_complete` to prevent session fixation.
-- **Sign count tracking**: Passkey sign counts are verified and updated on each authentication to detect cloned authenticators.
+- **Sign count tracking**: Passkey sign counts are verified and updated on each authentication. Per FIDO2 spec §6.1, authentication is rejected if `auth_data.sign_count <= passkey.sign_count` and either counter is non-zero — this detects cloned authenticators.
+- **WebAuthn origin**: Configured via `WEBAUTHN_ORIGIN` env var. Required in production (raises on startup if unset). Falls back to the hardcoded default in dev/test.
 - **DISABLE_AUTH bypass**: The `DISABLE_AUTH=true` env var skips LiveView auth. Guarded at both compile time (`config_env() != :prod`) and runtime (`env != :prod`). Cannot be activated in production.
 
 ### API — Bearer Token
@@ -22,10 +24,11 @@ All browser routes require WebAuthn passkey authentication via `AuthHook` (LiveV
 All `/api/v1/*` routes (except webhooks and public settings) require a Bearer token via the `RequireAuth` plug.
 
 - **Token comparison**: Uses `Plug.Crypto.secure_compare/2` (constant-time) to prevent timing attacks.
-- **Production validation**: If `EITS_API_KEY` is not set or empty, the plug rejects all requests with `401 Unauthorized`.
-- **Development validation**: Dev/test environments allow passthrough for convenience when `EITS_API_KEY` is unset.
-- **Token generation**: `mix eits.gen.api_key` generates a cryptographically random key.
-- **Single shared token**: No per-user scoping. Suitable for single-user deployments.
+- **Key storage**: Active keys are stored as HMAC-SHA256 hashes in the `api_keys` table. The plug hashes the presented token and checks it against all active rows. The `EITS_API_KEY` env var is also checked for backward compatibility.
+- **Rotation and revocation**: Multiple active keys are supported simultaneously. Each key has an optional `valid_until` (naive datetime) field — expired keys are rejected without requiring a redeploy. Revoking a key is a DB row delete.
+- **Key generation**: `mix eits.gen.api_key` generates a cryptographically random key and inserts its hash into the `api_keys` table. An optional `--label` flag names the key for tracking.
+- **Production validation**: If no active keys exist and `EITS_API_KEY` is unset, all requests are rejected with `401 Unauthorized`.
+- **Development validation**: Dev/test environments allow passthrough for convenience when no keys are configured.
 
 ### Session Auth — Cookie-Based
 
@@ -35,6 +38,15 @@ The `SessionAuth` plug authenticates requests via signed session cookies. Used f
 - **Mechanism**: Requires an active session cookie (set by WebAuthn login)
 - **Difference from RequireAuth**: SessionAuth works with cookies (for browsers), while RequireAuth works with Bearer tokens (for API/CLI)
 - **Pipeline**: `:browser` pipeline with `SessionAuth` plug
+
+### Server-Side Session Tracking
+
+Browser sessions are tracked in the `user_sessions` table in addition to the signed cookie. The `ValidateSession` plug runs on every browser request and rejects sessions that are missing from the DB or past their `expires_at`.
+
+- **Schema**: `user_sessions(id uuid, user_id, session_token string unique, expires_at naive_datetime, inserted_at)`
+- **TTL**: 7 days from login. Token stored in the Phoenix session cookie; hash checked server-side on each request.
+- **Logout**: Deletes the `user_sessions` row, immediately invalidating the session regardless of cookie lifetime.
+- **Expiry enforcement**: `ValidateSession` plug in the `:browser` pipeline redirects to `/login` on missing or expired rows.
 
 ### Webhook — HMAC Signature
 
@@ -83,7 +95,7 @@ Defined in `endpoint.ex` `@session_options`:
 
 ## Rate Limiting
 
-Hammer v7 with ETS backend, applied to the `:webauthn` pipeline.
+Hammer v7 with ETS backend, applied to the `:webauthn` and `:api` pipelines.
 
 | Endpoint | Limit | Window | Purpose |
 |----------|-------|--------|---------|
@@ -91,10 +103,12 @@ Hammer v7 with ETS backend, applied to the `:webauthn` pipeline.
 | `POST /auth/login/complete` | 5 | 5 minutes | Brute force prevention |
 | `POST /auth/register/challenge` | 5 | 1 hour | Registration abuse prevention |
 | `POST /auth/register/complete` | 5 | 1 hour | Registration abuse prevention |
+| All `/api/v1/*` routes | 60 | 1 minute | API bearer token brute force prevention |
 
 - Keyed by remote IP (real IP via `RemoteIp` plug).
 - Returns `429 Too Many Requests` with JSON error body when exceeded.
 - Supervised via `EyeInTheSkyWeb.RateLimiter` in the application supervision tree.
+- The `RateLimit` plug accepts configurable limits via opts; the `:api` pipeline uses a default of 60 req/min.
 
 ## Authorization
 
@@ -161,12 +175,13 @@ All secrets are loaded from environment variables via `.env` file (loaded by `do
 
 | Secret | Env Var | Required In |
 |--------|---------|-------------|
-| API bearer token | `EITS_API_KEY` | Prod (rejects without it) |
+| API bearer token (legacy) | `EITS_API_KEY` | Optional (superseded by `api_keys` table) |
 | VAPID public key | `VAPID_PUBLIC_KEY` | All (for web push) |
 | VAPID private key | `VAPID_PRIVATE_KEY` | Prod (raises without it) |
 | Gitea webhook secret | `GITEA_WEBHOOK_SECRET` | All (rejects unsigned without it) |
 | Database URL | `DATABASE_URL` | Prod |
 | Secret key base | `SECRET_KEY_BASE` | Prod |
+| WebAuthn primary origin | `WEBAUTHN_ORIGIN` | Prod (raises without it) |
 | WebAuthn extra origins | `WEBAUTHN_EXTRA_ORIGINS` | Optional (for ngrok tunnels) |
 
 No secrets are committed to source code. The `.env` file is in `.gitignore`. `.env.example` contains placeholders and generation instructions.
@@ -179,11 +194,12 @@ mix run -e '{pub, priv} = :crypto.generate_key(:ecdh, :prime256v1); IO.puts("VAP
 ```
 Update `.env`, restart server, delete stale `push_subscriptions` rows. Clients must re-subscribe.
 
-**API key**:
+**API keys**:
 ```bash
-mix eits.gen.api_key
+mix eits.gen.api_key                    # generate and insert a new key
+mix eits.gen.api_key --label "ci-bot"   # named key for tracking
 ```
-Update `.env` and all hook/CLI configurations that use it.
+Keys are stored as HMAC-SHA256 hashes in the `api_keys` table. To revoke a key, delete its row. To rotate, generate a new key, update consumer configs, then delete the old row. Multiple keys can be active simultaneously — no downtime needed for rotation.
 
 ## Process Execution
 
@@ -225,5 +241,5 @@ Security-relevant dependencies:
 ## Known Gaps
 
 - **No Content-Security-Policy header** — inline theme script and Google Fonts CDN need nonce-based or hash-based CSP. Planned but deferred.
-- **Single shared API key** — no per-user/per-scope token model. Acceptable for single-user deployment.
+- **No per-scope API keys** — `api_keys` table supports multiple keys but no scope/permission model. All keys have full API access. Acceptable for single-user deployment.
 - **No audit logging** — auth failures and webhook rejections log to application logger but there is no structured security event store.

@@ -229,12 +229,12 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         agent_members = Channels.list_members(channel_id)
 
         # 5. Route message to each member using ChannelProtocol
+        # Only :direct and :broadcast trigger agent responses.
+        # :ambient messages are mirrored for context but don't ask the agent to respond.
         Enum.each(agent_members, fn member ->
           unless ChannelProtocol.skip?(member.session_id, session_id) do
             {mode, _mentioned_ids, _mention_all} =
               ChannelProtocol.parse_routing(body, member.session_id)
-
-            prompt = ChannelProtocol.build_prompt(mode, body)
 
             # Mirror the user message into the agent's session so DM page shows context
             # Do NOT set channel_id — that would re-broadcast to the channel per member
@@ -246,12 +246,17 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
               body: body
             })
 
-            Logger.info("Routing to session=#{member.session_id} mode=#{mode}")
+            if mode in [:direct, :broadcast] do
+              prompt = ChannelProtocol.build_prompt(mode, body)
+              Logger.info("Routing to session=#{member.session_id} mode=#{mode}")
 
-            AgentManager.send_message(member.session_id, prompt,
-              model: "sonnet",
-              channel_id: channel_id
-            )
+              AgentManager.send_message(member.session_id, prompt,
+                model: "sonnet",
+                channel_id: channel_id
+              )
+            else
+              Logger.info("Ambient message to session=#{member.session_id} — no response requested")
+            end
           end
         end)
 
@@ -930,6 +935,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
     %{
       id: message.id,
+      number: message.channel_message_number,
       session_id: message.session_id,
       session_name: session_name,
       sender_role: message.sender_role,

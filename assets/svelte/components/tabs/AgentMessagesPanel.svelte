@@ -24,6 +24,17 @@
   let selectedSlashIndex = 0
   let slashTriggerPos = -1
 
+  // Reactive: channel members currently working
+  $: workingMembers = channelMembers
+    .filter(m => workingAgents && workingAgents[m.session_id])
+    .map(m => {
+      const agent = activeAgents.find(a => a.id === m.session_id)
+      return {
+        id: m.session_id,
+        name: m.session_name || agent?.name || agent?.agent_description || `@${m.session_id}`
+      }
+    })
+
   // Message history for up/down navigation
   let messageHistory = []
   let historyIndex = -1
@@ -303,25 +314,6 @@
     class="flex-1 overflow-y-auto px-4 py-2"
     style="scrollbar-width: none; -ms-overflow-style: none;"
   >
-    <!-- Working Agents Indicator -->
-    {#if workingAgents && Object.keys(workingAgents).length > 0}
-      <div class="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-warning/10 border border-warning/10 text-xs text-warning">
-        <span class="w-2 h-2 rounded-full bg-warning animate-pulse flex-shrink-0"></span>
-        <span>
-          {#each Object.entries(workingAgents) as [sessionId, isWorking]}
-            {#if isWorking}
-              {@const agent = activeAgents.find(a => a.id == sessionId)}
-              {#if agent}
-                @{sessionId} ({agent.name || agent.description || 'unknown'}) working
-              {:else}
-                @{sessionId} working
-              {/if}
-            {/if}
-          {/each}
-        </span>
-      </div>
-    {/if}
-
     {#if messages && messages.length > 0}
       <div class="space-y-0">
         {#each messages as message, idx}
@@ -379,6 +371,9 @@
                       </button>
                     {/if}
 
+                    {#if message.number}
+                      <span class="font-mono text-[10px] text-base-content/20">#{message.number}</span>
+                    {/if}
                     <span class="text-[11px] text-base-content/25">{formatTime(message.inserted_at)}</span>
                     <button
                       class="opacity-0 group-hover:opacity-100 ml-auto text-base-content/20 hover:text-error transition-all cursor-pointer"
@@ -439,6 +434,28 @@
       </div>
     {/if}
   </div>
+
+  <!-- Typing indicator -->
+  {#if workingMembers.length > 0}
+    <div class="flex-shrink-0 px-4 py-1">
+      <div class="flex items-center gap-2 text-xs text-base-content/40">
+        <span class="inline-flex gap-[3px]">
+          <span class="w-1.5 h-1.5 rounded-full bg-base-content/30 animate-bounce" style="animation-delay: 0ms"></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-base-content/30 animate-bounce" style="animation-delay: 150ms"></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-base-content/30 animate-bounce" style="animation-delay: 300ms"></span>
+        </span>
+        <span>
+          {#if workingMembers.length === 1}
+            <span class="font-medium text-base-content/50">{workingMembers[0].name}</span> is working
+          {:else if workingMembers.length === 2}
+            <span class="font-medium text-base-content/50">{workingMembers[0].name}</span> and <span class="font-medium text-base-content/50">{workingMembers[1].name}</span> are working
+          {:else}
+            <span class="font-medium text-base-content/50">{workingMembers[0].name}</span> and {workingMembers.length - 1} others are working
+          {/if}
+        </span>
+      </div>
+    </div>
+  {/if}
 
   <!-- Composer (matches DM page card style) -->
   <div class="flex-shrink-0 pt-2">

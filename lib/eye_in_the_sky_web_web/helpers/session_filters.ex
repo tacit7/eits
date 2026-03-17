@@ -94,7 +94,10 @@ defmodule EyeInTheSkyWebWeb.Helpers.SessionFilters do
         haystack =
           [
             s.uuid,
+            s.id,
             s.name,
+            s.agent && s.agent.uuid,
+            s.agent && s.agent.id,
             s.agent && s.agent.description,
             s.agent && s.agent.project_name
           ]

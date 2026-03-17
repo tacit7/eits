@@ -155,9 +155,32 @@ defmodule EyeInTheSkyWeb.Messages do
       %{inserted_at: now, updated_at: now}
       |> Map.merge(attrs)
 
+    # Auto-assign channel_message_number for channel messages
+    # Handles both atom and string key maps
+    cid = Map.get(attrs, :channel_id) || Map.get(attrs, "channel_id")
+    has_number = Map.get(attrs, :channel_message_number) || Map.get(attrs, "channel_message_number")
+
+    attrs =
+      if cid && is_nil(has_number) do
+        Map.put(attrs, :channel_message_number, next_channel_message_number(cid))
+      else
+        attrs
+      end
+
     %Message{}
     |> Message.changeset(attrs)
     |> Repo.insert()
+  end
+
+  defp next_channel_message_number(channel_id) do
+    current_max =
+      from(m in Message,
+        where: m.channel_id == ^channel_id and not is_nil(m.channel_message_number),
+        select: max(m.channel_message_number)
+      )
+      |> Repo.one()
+
+    (current_max || 0) + 1
   end
 
   @doc """

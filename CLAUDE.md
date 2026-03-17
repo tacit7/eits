@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with the Eye in the Sky 
 
 ## Project Overview
 
-Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky. MCP server is Anubis (HTTP MCP), not Go.
+Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky.
 
 This project uses Phoenix LiveView with Elixir. Primary languages: TypeScript, JavaScript, Elixir/HEEx, Go, Rust. Use Tailwind CSS for styling.
 
@@ -98,6 +98,8 @@ Project docs live in `docs/`. Key references:
 - [docs/claude-cli-flags.md](docs/claude-cli-flags.md) — Claude CLI flag reference
 - [docs/CONTEXT_WINDOW.md](docs/CONTEXT_WINDOW.md) — Context window handling
 - [docs/SEARCH.md](docs/SEARCH.md) — Full-text search: PgSearch implementation, prefix-aware tsquery, callers
+- [docs/CODEX_SDK.md](docs/CODEX_SDK.md) — Codex SDK: session lifecycle, JSONL events, resume flow, env vars
+- [docs/CHAT.md](docs/CHAT.md) — Chat system: channels, routing protocol, @mentions, cross-project membership
 
 ## UI Standards
 

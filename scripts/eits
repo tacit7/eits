@@ -546,8 +546,34 @@ cmd_channels() {
       need session_id; need body
       _post "/channels/$channel_id/messages" "$(json session_id "$session_id" body "$body")"
       ;;
+    messages)
+      # eits channels messages <channel_id> [--limit N]
+      local channel_id="${1:-}"; need channel_id; shift
+      local limit="20"
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --limit|-n) limit="$2"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      _curl "$BASE_URL/channels/$channel_id/messages?limit=$limit" | jq .
+      ;;
     *)
-      echo "usage: eits channels <list|send>"
+      cat <<USAGE
+usage: eits channels <subcommand>
+
+Subcommands:
+  list     [--project <id>]                         List channels (optionally filter by project)
+  send     <channel_id> --session <id> --body <text> Send a message to a channel
+  messages <channel_id> [--limit|-n <N>]            Get last N messages (default 20, max 200)
+
+Examples:
+  eits channels list
+  eits channels list --project 1
+  eits channels send 1 --session 1179 --body "hello"
+  eits channels messages 1
+  eits channels messages 1 -n 5
+USAGE
       ;;
   esac
 }
@@ -687,7 +713,7 @@ Commands:
   commits   list|create
   jobs      list|get|run|delete
   dm        [--from <id>] --to <session_uuid|int_id> --message <text> [--response-required]
-  channels  list [--project <id>] | send <channel_id> --session <uuid> --body <text>
+  channels  list|send|messages
   prompts   list|get
   teams     list|get|create|delete|members|join|status|update-member|leave|my-teams
 

@@ -428,6 +428,117 @@ curl -X POST localhost:5000/api/v1/dm \
 
 ---
 
+### GET /api/v1/channels
+
+List available chat channels.
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `project_id` | integer | no | Filter by project ID |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "2 channel(s) found",
+  "channels": [
+    {
+      "id": "1",
+      "name": "general",
+      "description": null,
+      "channel_type": "public",
+      "project_id": 1
+    }
+  ]
+}
+```
+
+**Example:**
+
+```bash
+eits channels list
+eits channels list --project 1
+```
+
+---
+
+### GET /api/v1/channels/:channel_id/messages
+
+Get recent messages for a channel.
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `limit` | integer | no | Number of messages (default 20, max 200) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "channel_id": "1",
+  "count": 3,
+  "messages": [
+    {
+      "id": 402400,
+      "uuid": "b49fcd7e-...",
+      "session_id": 1172,
+      "session_name": "arch deep dive",
+      "sender_role": "agent",
+      "provider": "claude",
+      "body": "Message content here...",
+      "status": "delivered",
+      "inserted_at": "2026-03-17T10:02:57Z"
+    }
+  ]
+}
+```
+
+**Example:**
+
+```bash
+eits channels messages 1
+eits channels messages 1 -n 5
+```
+
+---
+
+### POST /api/v1/channels/:channel_id/messages
+
+Send a message to a channel.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `session_id` | string | yes | Session ID (integer or UUID) |
+| `body` | string | yes | Message content |
+| `sender_role` | string | no | Default: `"agent"` |
+| `recipient_role` | string | no | Default: `"user"` |
+| `provider` | string | no | Default: `"claude"` |
+
+**Response:** `201 Created`
+
+```json
+{
+  "success": true,
+  "message": "Message sent",
+  "message_id": "12345"
+}
+```
+
+**Example:**
+
+```bash
+eits channels send 1 --session 1179 --body "hello from CLI"
+```
+
+---
+
 ## Hook Integration
 
 These endpoints map to Claude Code hooks:

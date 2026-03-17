@@ -244,18 +244,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
   def handle_event("save_schedule", params, socket),
     do: handle_save_schedule(params, socket)
 
-  defp reload_jobs(socket) do
-    all_project = ScheduledJobs.list_jobs_for_project(socket.assigns.project_id)
-    all_global = ScheduledJobs.list_global_jobs()
-
-    socket
-    |> assign(:all_project_jobs, all_project)
-    |> assign(:all_global_jobs, all_global)
-    |> assign(:project_jobs, apply_job_filters(all_project, socket.assigns))
-    |> assign(:global_jobs, apply_job_filters(all_global, socket.assigns))
-    |> assign(:last_failed_runs, load_last_failed_runs(all_project ++ all_global))
-  end
-
   @impl true
   def handle_event("filter_jobs", params, socket) do
     socket =
@@ -269,6 +257,18 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
      socket
      |> assign(:project_jobs, apply_job_filters(socket.assigns.all_project_jobs, socket.assigns))
      |> assign(:global_jobs, apply_job_filters(socket.assigns.all_global_jobs, socket.assigns))}
+  end
+
+  defp reload_jobs(socket) do
+    all_project = ScheduledJobs.list_jobs_for_project(socket.assigns.project_id)
+    all_global = ScheduledJobs.list_global_jobs()
+
+    socket
+    |> assign(:all_project_jobs, all_project)
+    |> assign(:all_global_jobs, all_global)
+    |> assign(:project_jobs, apply_job_filters(all_project, socket.assigns))
+    |> assign(:global_jobs, apply_job_filters(all_global, socket.assigns))
+    |> assign(:last_failed_runs, load_last_failed_runs(all_project ++ all_global))
   end
 
   @impl true

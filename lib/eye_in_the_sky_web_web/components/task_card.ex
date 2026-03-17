@@ -107,133 +107,114 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   end
 
   defp kanban_card_content(assigns) do
+    dm_session =
+      case assigns.task do
+        %{sessions: [s | _]} -> s
+        _ -> nil
+      end
+
+    assigns = assign(assigns, :dm_session, dm_session)
+
     ~H"""
-    <!-- Task Title + Priority -->
-    <div class="flex items-start gap-2 mb-2">
+    <%!-- Priority top bar --%>
+    <%= if @task.priority && @task.priority > 0 do %>
+      <div
+        class="-mx-3.5 sm:-mx-3 -mt-3.5 sm:-mt-3 mb-2.5 h-0.5"
+        style={"background-color: #{priority_bar_color(@task.priority)}"}
+      />
+    <% end %>
+
+    <%!-- Title + drag handle + delete --%>
+    <div class="flex items-start gap-1.5">
       <div
         data-drag-handle
-        class="flex-shrink-0 mt-1 touch-none cursor-grab active:cursor-grabbing flex md:hidden items-center justify-center w-5 h-5 rounded text-base-content/20 hover:text-base-content/40"
+        class="flex-shrink-0 mt-0.5 touch-none cursor-grab active:cursor-grabbing flex md:hidden text-base-content/20 hover:text-base-content/40"
         aria-label="Drag to reorder"
       >
         <.icon name="hero-bars-2" class="w-3.5 h-3.5" />
       </div>
-      <h4
-        class={
-          "text-sm font-medium flex-1 hover:text-primary transition-colors cursor-pointer " <>
-            if @task.completed_at do
-              "text-base-content/50 line-through"
-            else
-              "text-base-content"
-            end
-        }
-      >
+      <h4 class={[
+        "text-sm font-medium flex-1 leading-snug cursor-pointer hover:text-primary transition-colors",
+        @task.completed_at && "text-base-content/40 line-through",
+        !@task.completed_at && "text-base-content"
+      ]}>
         {@task.title}
       </h4>
-      <%= if @task.priority && @task.priority > 0 do %>
-        <span class={priority_class(@task.priority)}>
-          {priority_label(@task.priority)}
-        </span>
-      <% end %>
       <%= if @on_delete do %>
         <button
           type="button"
           phx-click={@on_delete}
           phx-value-task_id={@task.uuid || to_string(@task.id)}
           phx-confirm="Delete this task?"
-          class="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover/card:opacity-100 flex items-center justify-center w-7 h-7 sm:w-5 sm:h-5 rounded text-base-content/25 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-error"
+          class="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover/card:opacity-100 flex items-center justify-center w-6 h-6 rounded text-base-content/25 hover:text-error hover:bg-error/10 transition-all"
           aria-label={"Delete task #{@task.title}"}
           onclick="event.stopPropagation();"
         >
-          <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
+          <.icon name="hero-x-mark-mini" class="w-3 h-3" />
         </button>
       <% end %>
     </div>
 
-    <!-- Description -->
-    <%= if @task.description do %>
-      <p class="text-xs text-base-content/60 line-clamp-2 mb-2">
-        {@task.description}
-      </p>
-    <% end %>
-
-    <!-- Checklist progress -->
-    <% checklist = Map.get(@task, :checklist_items, []) %>
-    <%= if checklist != [] do %>
-      <% cl_total = length(checklist) %>
-      <% cl_done = Enum.count(checklist, & &1.completed) %>
-      <div class="mb-2 flex items-center gap-2">
-        <div class="flex-1 bg-base-300 rounded-full h-1">
-          <div
-            class={"h-1 rounded-full " <> if(cl_done == cl_total, do: "bg-success", else: "bg-primary")}
-            style={"width: #{round(cl_done / cl_total * 100)}%"}
-          />
-        </div>
-        <span class="text-[10px] text-base-content/40 tabular-nums">{cl_done}/{cl_total}</span>
-      </div>
-    <% end %>
-
-    <!-- Annotations -->
-    <%= if Map.get(@task, :notes, []) != [] do %>
-      <div class="mb-2 space-y-1">
-        <%= for note <- Map.get(@task, :notes, []) do %>
-          <div class="text-[11px] text-base-content/50 bg-base-200 rounded px-2 py-1 line-clamp-2">
-            <%= if note.title do %>
-              <span class="font-semibold text-base-content/60">{note.title}: </span>
-            <% end %>
-            {note.body}
-          </div>
-        <% end %>
-      </div>
-    <% end %>
-
-    <!-- Meta Info -->
-    <div class="flex items-center gap-1.5 sm:gap-2 text-xs text-base-content/60 flex-wrap">
-      <%= if @aging do %>
-        <span class={"flex items-center gap-0.5 " <> if(String.contains?(elem(@aging, 1), "stale"), do: "text-error/70", else: "text-warning/70")}>
-          <.icon name="hero-clock" class="w-3 h-3" />
-          {elem(@aging, 1)}
-        </span>
-      <% end %>
-      <span class="font-mono text-xs hidden sm:inline">
-        {String.slice(@task.uuid || "", 0..7)}
-      </span>
-      <button
-        type="button"
-        class="inline-flex items-center justify-center p-1.5 -m-1 cursor-pointer hover:text-primary transition-colors z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
-        phx-hook="CopyToClipboard"
-        id={"copy-task-kanban-#{@task.id}"}
-        data-copy={@task.uuid}
-        onclick="event.stopPropagation(); event.preventDefault();"
-        aria-label="Copy task ID"
-      >
-        <.icon name="hero-clipboard-document" class="w-3 h-3" />
-      </button>
-      <%= if @task.due_at do %>
-        <span class="flex items-center gap-1">
-          <.icon name="hero-calendar" class="w-3 h-3" />
-          {format_due_date(@task.due_at)}
-        </span>
-      <% end %>
-      <%= if @task.agent_id do %>
-        <span class="flex items-center gap-1">
-          <.icon name="hero-user" class="w-3 h-3" /> Agent #{@task.agent_id}
-        </span>
-      <% end %>
-      <%= if @task.tags && length(@task.tags) > 0 do %>
-        <%= for tag <- Enum.take(@task.tags, 2) do %>
-          <span class="badge badge-xs badge-ghost gap-1">
-            <span class="w-1.5 h-1.5 rounded-full inline-block" style={"background-color: #{tag.color || "#6B7280"}"}></span>
+    <%!-- Tags --%>
+    <%= if @task.tags && length(@task.tags) > 0 do %>
+      <div class="flex flex-wrap gap-1 mt-2">
+        <%= for tag <- Enum.take(@task.tags, 3) do %>
+          <span
+            class="text-[10px] px-1.5 py-0.5 rounded font-medium leading-none"
+            style={"background-color: #{tag.color || "#6B7280"}26; color: #{tag.color || "#6B7280"}"}
+          >
             {tag.name}
           </span>
         <% end %>
-      <% end %>
-      <%= if Map.get(@task, :notes_count, 0) > 0 do %>
-        <span class="flex items-center gap-0.5 text-base-content/40">
-          <.icon name="hero-chat-bubble-bottom-center-text" class="w-3 h-3" />
-          {Map.get(@task, :notes_count)}
-        </span>
-      <% end %>
-    </div>
+      </div>
+    <% end %>
+
+    <%!-- Footer icon row --%>
+    <% checklist = Map.get(@task, :checklist_items, []) %>
+    <% notes_count = Map.get(@task, :notes_count, 0) %>
+    <% has_footer = @task.description || @aging || @task.due_at || checklist != [] || notes_count > 0 || @dm_session %>
+    <%= if has_footer do %>
+      <div class="flex items-center gap-2 mt-2 text-base-content/35 text-[11px]">
+        <%= if @task.description do %>
+          <.icon name="hero-document-text" class="w-3 h-3 flex-shrink-0" />
+        <% end %>
+        <%= if @aging do %>
+          <span class={if String.contains?(elem(@aging, 1), "stale"), do: "text-error/60", else: "text-warning/60"} title={elem(@aging, 1)}>
+            <.icon name="hero-clock-mini" class="w-3 h-3 flex-shrink-0" />
+          </span>
+        <% end %>
+        <%= if @task.due_at do %>
+          <span class="flex items-center gap-0.5">
+            <.icon name="hero-calendar" class="w-3 h-3" />
+            <span>{format_due_date(@task.due_at)}</span>
+          </span>
+        <% end %>
+        <%= if checklist != [] do %>
+          <% cl_done = Enum.count(checklist, & &1.completed) %>
+          <span class="flex items-center gap-0.5">
+            <.icon name="hero-check-circle" class="w-3 h-3" />
+            <span>{cl_done}/{length(checklist)}</span>
+          </span>
+        <% end %>
+        <%= if notes_count > 0 do %>
+          <span class="flex items-center gap-0.5">
+            <.icon name="hero-chat-bubble-bottom-center-text" class="w-3 h-3" />
+            <span>{notes_count}</span>
+          </span>
+        <% end %>
+        <%= if @dm_session do %>
+          <a
+            href={"/dm/#{@dm_session.uuid}"}
+            target="_blank"
+            class="ml-auto flex-shrink-0 text-base-content/30 hover:text-primary transition-colors"
+            onclick="event.stopPropagation();"
+            title="Open agent DM"
+          >
+            <.icon name="hero-user-circle" class="w-3.5 h-3.5" />
+          </a>
+        <% end %>
+      </div>
+    <% end %>
     """
   end
 
@@ -299,7 +280,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   end
 
   defp card_class("kanban") do
-    "group/card card bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] border border-base-content/8 hover:shadow-md transition-all cursor-pointer"
+    "group/card card bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] border border-base-content/8 hover:shadow-md transition-all cursor-pointer overflow-hidden"
   end
 
   defp card_class("grid") do
@@ -319,21 +300,12 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   defp state_text_color(@state_done), do: "text-success/80"
   defp state_text_color(_), do: "text-base-content/55"
 
-  defp priority_class(priority) do
+  defp priority_bar_color(priority) do
     cond do
-      priority >= 3 -> "text-xs text-error"
-      priority == 2 -> "text-xs text-warning"
-      priority == 1 -> "text-xs text-info"
-      true -> "text-xs text-base-content/40"
-    end
-  end
-
-  defp priority_label(priority) do
-    cond do
-      priority >= 3 -> "High"
-      priority == 2 -> "Med"
-      priority == 1 -> "Low"
-      true -> ""
+      priority >= 3 -> "#EF4444"
+      priority == 2 -> "#F59E0B"
+      priority == 1 -> "#3B82F6"
+      true -> "transparent"
     end
   end
 

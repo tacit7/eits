@@ -63,7 +63,7 @@ defmodule EyeInTheSkyWebWeb.AuthController do
            Wax.register(attestation_object, client_data_json, challenge) do
       cred_id = auth_data.attested_credential_data.credential_id
       cose_key = auth_data.attested_credential_data.credential_public_key
-      cose_key_bin = :erlang.term_to_binary(cose_key)
+      cose_key_bin = cose_key |> serialize_cose_key() |> Jason.encode!()
       sign_count = auth_data.sign_count || 0
 
       with {:ok, user} <- Accounts.get_or_create_user(username),
@@ -155,14 +155,26 @@ defmodule EyeInTheSkyWebWeb.AuthController do
          {:ok, auth_data} <-
            Wax.authenticate(credential_id, auth_data_bin, sig, client_data_json, challenge) do
       passkey = Accounts.get_passkey_by_credential_id(credential_id)
-      if passkey, do: Accounts.update_sign_count(passkey, auth_data.sign_count)
 
-      conn
-      |> configure_session(renew: true)
-      |> delete_session(:webauthn_challenge)
-      |> delete_session(:webauthn_user_id)
-      |> put_session(:user_id, user_id)
-      |> json(%{ok: true})
+      cloning_detected =
+        passkey != nil and
+          (passkey.sign_count > 0 or auth_data.sign_count > 0) and
+          auth_data.sign_count <= passkey.sign_count
+
+      if cloning_detected do
+        conn
+        |> put_status(:unauthorized)
+        |> json(%{error: "credential cloning detected"})
+      else
+        if passkey, do: Accounts.update_sign_count(passkey, auth_data.sign_count)
+
+        conn
+        |> configure_session(renew: true)
+        |> delete_session(:webauthn_challenge)
+        |> delete_session(:webauthn_user_id)
+        |> put_session(:user_id, user_id)
+        |> json(%{ok: true})
+      end
     else
       {:error, reason} ->
         conn |> put_status(:unauthorized) |> json(%{error: inspect(reason)})

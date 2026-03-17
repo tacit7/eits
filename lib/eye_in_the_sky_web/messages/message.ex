@@ -43,6 +43,8 @@ defmodule EyeInTheSkyWeb.Messages.Message do
     field :session_id, :integer
     field :channel_id, :integer
     field :parent_message_id, :integer
+    field :from_session_id, :integer
+    field :to_session_id, :integer
     field :inserted_at, :utc_datetime
     field :updated_at, :utc_datetime
   end
@@ -65,6 +67,8 @@ defmodule EyeInTheSkyWeb.Messages.Message do
       :status,
       :metadata,
       :source_uuid,
+      :from_session_id,
+      :to_session_id,
       :channel_message_number,
       :thread_reply_count,
       :last_thread_reply_at,

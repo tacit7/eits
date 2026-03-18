@@ -132,6 +132,7 @@ Hooks.SortableKanban = {
       ghostClass: "opacity-30",
       draggable: "[data-task-id]",
       handle: isTouchDevice ? "[data-drag-handle]" : null,
+      filter: "button, a, input, select, textarea",
       delay: isTouchDevice ? 150 : 0,
       delayOnTouchOnly: true,
       touchStartThreshold: 5,

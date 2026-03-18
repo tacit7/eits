@@ -92,6 +92,7 @@ defmodule EyeInTheSkyWebWeb.Router do
       live "/teams", TeamLive.Index, :index
       live "/chat", ChatLive, :index
       live "/dm/:session_id", DmLive, :show
+      live "/notes/new", NoteLive.New, :new
       live "/notes/:id/edit", NoteLive.Edit, :edit
     end
   end

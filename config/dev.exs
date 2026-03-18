@@ -3,6 +3,7 @@ import Config
 # Gitea webhook HMAC secret — set this in Gitea webhook settings and here
 config :eye_in_the_sky_web, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SECRET", "")
 config :eye_in_the_sky_web, :env, :dev
+config :eye_in_the_sky_web, :bypass_auth, true
 # Allow unsigned webhooks in dev when no secret is set (never enable in prod)
 config :eye_in_the_sky_web, :allow_unsigned_webhooks, true
 
@@ -27,7 +28,7 @@ config :eye_in_the_sky_web, EyeInTheSkyWeb.Repo,
 config :eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [port: 5000],
+  http: [port: 5002],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,

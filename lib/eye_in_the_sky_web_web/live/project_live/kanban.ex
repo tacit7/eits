@@ -98,6 +98,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   end
 
   @impl true
+  def handle_event("open_task_detail", _params, socket), do: {:noreply, socket}
+
+  @impl true
   def handle_event("update_task", params, socket) do
     task = socket.assigns.selected_task
     title = params["title"]

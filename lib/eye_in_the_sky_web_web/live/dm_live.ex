@@ -569,7 +569,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     case Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session_id}) do
       [{pid, _}] ->
         Logger.warning("kill_session: force-exiting stuck worker pid=#{inspect(pid)} for session=#{session_id}")
-        Process.exit(pid, :kill)
+        Process.exit(pid, :shutdown)
       [] ->
         :ok
     end

@@ -9,15 +9,19 @@ defmodule EyeInTheSkyWebWeb.Plugs.SessionAuth do
   def init(opts), do: opts
 
   def call(conn, _opts) do
-    case get_session(conn, :user_id) do
-      nil ->
-        conn
-        |> put_resp_header("location", "/auth/login")
-        |> send_resp(302, "")
-        |> halt()
+    if Application.get_env(:eye_in_the_sky_web, :bypass_auth, false) do
+      conn
+    else
+      case get_session(conn, :user_id) do
+        nil ->
+          conn
+          |> put_resp_header("location", "/auth/login")
+          |> send_resp(302, "")
+          |> halt()
 
-      _user_id ->
-        conn
+        _user_id ->
+          conn
+      end
     end
   end
 end

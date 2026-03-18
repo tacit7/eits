@@ -29,7 +29,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
         |> assign(:notes, [])
         |> assign(:editing_note_id, nil)
         |> assign(:show_quick_note_modal, false)
-        |> assign(:show_new_note_editor, false)
         |> load_notes()
       else
         socket
@@ -117,39 +116,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
     end
   end
 
-  @impl true
-  def handle_event("open_new_note_editor", _params, socket) do
-    {:noreply, assign(socket, :show_new_note_editor, true)}
-  end
-
-  @impl true
-  def handle_event("close_new_note_editor", _params, socket) do
-    {:noreply, assign(socket, :show_new_note_editor, false)}
-  end
-
-  @impl true
-  def handle_event("save_new_note", params, socket) do
-    project = socket.assigns.project
-    body = params["body"] || ""
-
-    if String.trim(body) == "" do
-      {:noreply, put_flash(socket, :error, "Note body cannot be empty")}
-    else
-      case Notes.create_note(%{
-             parent_type: "project",
-             parent_id: to_string(project.id),
-             title: params["title"] || "",
-             body: body
-           }) do
-        {:ok, _note} ->
-          {:noreply, socket |> assign(:show_new_note_editor, false) |> load_notes()}
-
-        {:error, _changeset} ->
-          {:noreply, put_flash(socket, :error, "Failed to save note")}
-      end
-    end
-  end
-
   defp load_notes(socket) do
     project = socket.assigns.project
     agent_ids = Enum.map(project.agents, & &1.id)
@@ -209,45 +175,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
             >
               <.icon name="hero-bolt" class="w-3.5 h-3.5" /> Quick Note
             </button>
-            <button
-              type="button"
-              phx-click="open_new_note_editor"
+            <.link
+              navigate={~p"/notes/new?#{%{parent_type: "project", parent_id: @project.id, return_to: "/projects/#{@project.id}/notes"}}"}
               class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-content hover:bg-primary/80 transition-colors"
             >
               <.icon name="hero-plus" class="w-3.5 h-3.5" /> New Note
-            </button>
-          </div>
-        </div>
-
-        <%!-- Inline new note editor --%>
-        <div :if={@show_new_note_editor} class="mb-5 rounded-xl border border-base-content/10 bg-base-100 overflow-hidden shadow-sm">
-          <div class="flex items-center justify-between px-4 py-2.5 border-b border-base-content/8">
-            <span class="text-sm font-semibold text-base-content/80">New Note</span>
-            <button type="button" phx-click="close_new_note_editor" class="btn btn-ghost btn-xs btn-square" aria-label="Close">
-              <.icon name="hero-x-mark" class="w-4 h-4" />
-            </button>
-          </div>
-          <div class="px-4 pt-3">
-            <input
-              type="text"
-              id="new-note-title-input"
-              placeholder="Title (optional)..."
-              class="input input-sm w-full bg-transparent border-base-content/10 focus:border-primary/30"
-              autocomplete="off"
-            />
-          </div>
-          <div
-            id="inline-note-creator"
-            phx-hook="InlineNoteCreator"
-            phx-update="ignore"
-            class="min-h-[220px] px-1"
-          ></div>
-          <div class="flex items-center justify-between px-4 py-2.5 border-t border-base-content/8">
-            <span class="text-xs text-base-content/35">⌘S to save</span>
-            <div class="flex gap-2">
-              <button type="button" phx-click="close_new_note_editor" class="btn btn-ghost btn-xs">Cancel</button>
-              <button type="button" id="inline-note-save-btn" class="btn btn-primary btn-xs">Save Note</button>
-            </div>
+            </.link>
           </div>
         </div>
 

@@ -251,13 +251,17 @@ defmodule EyeInTheSkyWeb.Agents.CmdDispatcher do
   # ---------------------------------------------------------------------------
 
   # note task <id> <body>
-  defp dispatch_note("task " <> rest, _from_session_id) do
+  defp dispatch_note("task " <> rest, from_session_id) do
     case String.split(rest, " ", parts: 2) do
       [id_str, body] ->
         case Integer.parse(String.trim(id_str)) do
           {id, ""} ->
-            Notes.create_note(%{body: body, parent_id: id, parent_type: "task"})
-            Logger.info("[CmdDispatcher] note on task #{id}")
+            if Tasks.task_linked_to_session?(id, from_session_id) do
+              Notes.create_note(%{body: body, parent_id: id, parent_type: "task"})
+              Logger.info("[CmdDispatcher] note on task #{id}")
+            else
+              Logger.warning("[CmdDispatcher] note task: task #{id} not linked to session #{from_session_id}")
+            end
 
           _ ->
             Logger.warning("[CmdDispatcher] note task: invalid id '#{id_str}'")

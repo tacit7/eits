@@ -43,18 +43,22 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
              agent: opts[:agent],
              eits_workflow: opts[:eits_workflow]
            ) do
-        {:ok, _admission} ->
+        {:ok, admission} ->
+          # Only mark "running" when the SDK actually started. :retry_queued means
+          # the spawn failed and was queued for retry — agent stays "pending".
+          status = if admission == :started, do: "running", else: "pending"
+
           Logger.info(
-            "✅ create_agent: initial message sent successfully to session.id=#{session.id}"
+            "✅ create_agent: admission=#{admission} for session.id=#{session.id}, setting status=#{status}"
           )
 
-          case Agents.update_agent(agent, %{status: "running"}) do
+          case Agents.update_agent(agent, %{status: status}) do
             {:ok, updated_agent} ->
               {:ok, %{agent: updated_agent, session: session}}
 
             {:error, reason} ->
               Logger.warning(
-                "create_agent: agent status update to 'running' failed for agent.id=#{agent.id} - #{inspect(reason)}"
+                "create_agent: agent status update to '#{status}' failed for agent.id=#{agent.id} - #{inspect(reason)}"
               )
 
               # Non-fatal: dispatch succeeded, return original agent

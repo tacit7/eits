@@ -20,33 +20,39 @@ defmodule EyeInTheSkyWeb.Git.Worktrees do
     wt_path = Path.join([project_path, ".claude", "worktrees", worktree_name])
     branch = "worktree-#{worktree_name}"
 
-    with :ok <- check_clean_working_tree(project_path),
-         :ok <- ensure_git_worktree(project_path, wt_path, branch) do
+    # If the worktree already exists, reuse it without rechecking tree cleanliness
+    if worktree_exists?(wt_path) do
+      Logger.info("prepare_session_worktree: reusing existing worktree at #{wt_path}")
       {:ok, wt_path}
+    else
+      with :ok <- check_clean_working_tree(project_path),
+           :ok <- ensure_git_worktree(project_path, wt_path, branch) do
+        {:ok, wt_path}
+      end
     end
   end
 
+  defp worktree_exists?(wt_path) do
+    File.dir?(wt_path) and
+      (File.dir?(Path.join(wt_path, ".git")) or File.regular?(Path.join(wt_path, ".git")))
+  end
+
   @doc """
-  Checks that the repo at `repo_path` has no staged or unstaged changes.
+  Checks that the repo at `repo_path` has no staged changes, unstaged changes, or untracked files.
   Returns `:ok` or `{:error, :dirty_working_tree}`.
   """
   @spec check_clean_working_tree(String.t()) :: :ok | {:error, :dirty_working_tree}
   def check_clean_working_tree(repo_path) do
-    with {_, 0} <-
-           System.cmd("git", ["-C", repo_path, "diff", "--quiet"], stderr_to_stdout: true),
-         {_, 0} <-
-           System.cmd("git", ["-C", repo_path, "diff", "--cached", "--quiet"],
-             stderr_to_stdout: true
-           ) do
-      :ok
-    else
+    case System.cmd("git", ["-C", repo_path, "status", "--porcelain"], stderr_to_stdout: true) do
+      {"", 0} -> :ok
+      {_, 0} -> {:error, :dirty_working_tree}
       _ -> {:error, :dirty_working_tree}
     end
   end
 
   @doc """
-  Creates a git worktree at `wt_path` on `branch`. If the branch already exists, retries
-  without `-b`. Returns `:ok` or `{:error, reason}`.
+  Creates or reuses a git worktree at `wt_path` on `branch`. If the worktree path already
+  exists and is a valid git directory, reuses it. Returns `:ok` or `{:error, reason}`.
   """
   @spec ensure_git_worktree(String.t(), String.t(), String.t()) :: :ok | {:error, term()}
   def ensure_git_worktree(repo_path, wt_path, branch) do
@@ -59,6 +65,7 @@ defmodule EyeInTheSkyWeb.Git.Worktrees do
       {output, _} ->
         if String.contains?(output, "already exists") or
              String.contains?(output, "already checked out") do
+          # Branch exists but path doesn't — attach without -b
           case System.cmd("git", ["-C", repo_path, "worktree", "add", wt_path, branch],
                  stderr_to_stdout: true
                ) do

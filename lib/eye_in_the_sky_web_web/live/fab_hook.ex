@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWebWeb.FabHook do
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSkyWeb.{Messages, Sessions}
-  alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Agents.AgentManager
 
   require Logger
 

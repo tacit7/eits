@@ -2,7 +2,8 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.{Agents, Channels, Messages, Projects, Prompts, Sessions}
-  alias EyeInTheSkyWeb.Claude.{AgentManager, ChannelProtocol}
+  alias EyeInTheSkyWeb.Agents.AgentManager
+  alias EyeInTheSkyWeb.Claude.ChannelProtocol
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
 
   # Deterministic UUIDs for the web UI user

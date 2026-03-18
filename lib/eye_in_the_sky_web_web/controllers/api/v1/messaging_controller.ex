@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
   import EyeInTheSkyWebWeb.ControllerHelpers
 
   alias EyeInTheSkyWeb.{Agents, Channels, Messages, Sessions, Teams}
-  alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Agents.AgentManager
 
   @doc """
   POST /api/v1/dm - Send a direct message to an agent session.

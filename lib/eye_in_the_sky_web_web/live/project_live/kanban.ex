@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   alias EyeInTheSkyWeb.Tasks
   alias EyeInTheSkyWeb.Tasks.WorkflowState
   alias EyeInTheSkyWeb.Notes
-  alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Agents.AgentManager
   import EyeInTheSkyWebWeb.ControllerHelpers
 
   import EyeInTheSkyWebWeb.Helpers.ProjectLiveHelpers

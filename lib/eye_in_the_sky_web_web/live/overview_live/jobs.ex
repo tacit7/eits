@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
   alias EyeInTheSkyWeb.ScheduledJobs
   alias EyeInTheSkyWeb.ScheduledJobs.{ScheduledJob, JobHelper}
   alias EyeInTheSkyWeb.Projects
-  alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Agents.AgentManager
   import EyeInTheSkyWebWeb.Live.Shared.JobsHelpers
   import EyeInTheSkyWebWeb.Components.JobFormDrawer
   import EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers

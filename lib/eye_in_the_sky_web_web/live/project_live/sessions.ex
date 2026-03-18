@@ -241,7 +241,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
       agent: params["agent"]
     ]
 
-    case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
+    case EyeInTheSkyWeb.Agents.AgentManager.create_agent(opts) do
       {:ok, _result} ->
         socket =
           socket

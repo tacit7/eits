@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWeb.Workers.SpawnAgentWorker do
   require Logger
 
   alias EyeInTheSkyWeb.ScheduledJobs
-  alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Agents.AgentManager
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"job_id" => job_id}}) do

@@ -2,7 +2,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.{Sessions, Agents, Checkpoints, Commits, Messages, Notes, Repo, Tasks, Projects}
-  alias EyeInTheSkyWeb.Claude.{AgentManager, AgentWorker, SessionReader}
+  alias EyeInTheSkyWeb.Agents.AgentManager
+  alias EyeInTheSkyWeb.Claude.{AgentWorker, SessionReader}
   alias EyeInTheSkyWeb.FileAttachments
   alias EyeInTheSkyWebWeb.Components.DmPage
   import EyeInTheSkyWebWeb.ControllerHelpers

@@ -101,7 +101,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                 User message: #{body}
                 """
 
-                EyeInTheSkyWeb.Claude.AgentManager.continue_session(
+                EyeInTheSkyWeb.Agents.AgentManager.continue_session(
                   session.id,
                   prompt_with_reminder,
                   model: "sonnet",
@@ -330,7 +330,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       "create_new_session: model=#{model}, effort=#{inspect(effort_level)}, project_id=#{project.id}, project_path=#{project.path}"
     )
 
-    case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
+    case EyeInTheSkyWeb.Agents.AgentManager.create_agent(opts) do
       {:ok, result} ->
         Logger.info(
           "create_new_session: agent created - agent_id=#{result.agent.id}, session_id=#{result.agent.id}, session_uuid=#{result.agent.uuid}"

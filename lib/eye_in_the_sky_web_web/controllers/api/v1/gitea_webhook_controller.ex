@@ -14,7 +14,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
 
   require Logger
 
-  alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Agents.AgentManager
   alias EyeInTheSkyWeb.{Messages, Sessions}
 
   defp unauthorized(conn),

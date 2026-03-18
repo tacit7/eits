@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Claude.AgentManager do
+defmodule EyeInTheSkyWeb.Agents.AgentManager do
   @moduledoc """
   Manages AgentWorker lifecycle - spawn on demand, lookup existing workers.
 
@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
 
   require Logger
 
+  alias EyeInTheSkyWeb.Agents.InstructionBuilder
   alias EyeInTheSkyWeb.Claude.AgentWorker
   alias EyeInTheSkyWeb.{Agents, Messages, Sessions}
 
@@ -29,7 +30,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
   """
   def create_agent(opts) do
     with {:ok, %{agent: agent, session: session}} <- create_records(opts) do
-      instructions = build_instructions(opts)
+      instructions = InstructionBuilder.build(opts)
 
       Logger.info("📤 create_agent: sending initial message to session.id=#{session.id}")
 
@@ -157,31 +158,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentManager do
       {:error, reason} ->
         Logger.error("❌ create_agent: DB record creation failed - #{inspect(reason)}")
         {:error, reason}
-    end
-  end
-
-  defp build_instructions(opts) do
-    description = opts[:description] || "Agent session"
-
-    case opts[:worktree] do
-      nil ->
-        opts[:instructions] || description
-
-      worktree ->
-        base = opts[:instructions] || description
-        branch = "worktree-#{worktree}"
-
-        base <>
-          """
-
-
-          ---
-          When your work is complete:
-          1. Commit all changes with a clear message describing what was done.
-          2. Push your branch: git push gitea #{branch}
-          3. Create a pull request: tea pr create --login claude --repo eits-web --base main --head #{branch} --title "<your task summary>" --description "<what you did and why>"
-          4. Call i-end-session to mark your session complete.
-          """
     end
   end
 

@@ -166,7 +166,7 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
       worktree: worktree
     ]
 
-    case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
+    case EyeInTheSkyWeb.Agents.AgentManager.create_agent(opts) do
       {:ok, _result} ->
         sessions = Sessions.list_session_overview_rows(limit: @per_page, offset: 0)
         total = Sessions.count_session_overview_rows()

@@ -5,7 +5,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
 
   import EyeInTheSkyWebWeb.ControllerHelpers
 
-  alias EyeInTheSkyWeb.{Agents, Claude.AgentManager, Projects, Sessions, Teams}
+  alias EyeInTheSkyWeb.{Agents, Projects, Sessions, Teams}
+  alias EyeInTheSkyWeb.Agents.AgentManager
   alias EyeInTheSkyWebWeb.Presenters.ApiPresenter
 
   require Logger

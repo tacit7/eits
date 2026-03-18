@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
 
   alias EyeInTheSkyWeb.{Projects, Channels, Notifications}
   alias EyeInTheSkyWeb.Channels.Channel
-  alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Agents.AgentManager
 
   @impl true
   def mount(socket) do
@@ -158,25 +158,6 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   end
 
   @impl true
-  def handle_async(:pick_folder, {:ok, {path, 0}}, socket) do
-    path = String.trim(path)
-    name = path |> String.split("/") |> Enum.reject(&(&1 == "")) |> List.last() || path
-
-    case Projects.create_project(%{name: name, path: path}) do
-      {:ok, _project} ->
-        {:noreply, assign(socket, :projects, Projects.list_projects())}
-
-      {:error, _} ->
-        {:noreply, socket}
-    end
-  end
-
-  def handle_async(:pick_folder, _result, socket) do
-    # User cancelled or osascript failed — fall back to text input
-    {:noreply, assign(socket, :new_project_path, "")}
-  end
-
-  @impl true
   def handle_event("cancel_new_project", _params, socket) do
     {:noreply, assign(socket, :new_project_path, nil)}
   end
@@ -206,6 +187,25 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     else
       {:noreply, assign(socket, :new_project_path, nil)}
     end
+  end
+
+  @impl true
+  def handle_async(:pick_folder, {:ok, {path, 0}}, socket) do
+    path = String.trim(path)
+    name = path |> String.split("/") |> Enum.reject(&(&1 == "")) |> List.last() || path
+
+    case Projects.create_project(%{name: name, path: path}) do
+      {:ok, _project} ->
+        {:noreply, assign(socket, :projects, Projects.list_projects())}
+
+      {:error, _} ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_async(:pick_folder, _result, socket) do
+    # User cancelled or osascript failed — fall back to text input
+    {:noreply, assign(socket, :new_project_path, "")}
   end
 
   @impl true

@@ -15,7 +15,7 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
   require Logger
 
   alias EyeInTheSkyWeb.{Repo, ScheduledJobs, Tasks}
-  alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Agents.AgentManager
   alias EyeInTheSkyWeb.Notifications
   alias EyeInTheSkyWeb.Workers.SpeakWorker
 

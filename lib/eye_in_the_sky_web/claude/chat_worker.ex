@@ -11,7 +11,8 @@ defmodule EyeInTheSkyWeb.Claude.ChatWorker do
   use GenServer
   require Logger
 
-  alias EyeInTheSkyWeb.Claude.{AgentManager, ChannelProtocol}
+  alias EyeInTheSkyWeb.Agents.AgentManager
+  alias EyeInTheSkyWeb.Claude.ChannelProtocol
   alias EyeInTheSkyWeb.Channels
 
   @registry EyeInTheSkyWeb.Claude.ChatRegistry

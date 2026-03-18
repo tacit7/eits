@@ -79,25 +79,31 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
 
   @impl true
   def handle_event("new_job", %{"scope" => scope}, socket) do
+    default_type =
+      if socket.assigns.active_tab == :agent_schedules, do: "spawn_agent", else: "shell_command"
+
     {:noreply,
      socket
      |> assign(:show_form, true)
      |> assign(:editing_job, nil)
      |> assign(:form_scope, scope)
      |> assign(:changeset, ScheduledJobs.change_job(%ScheduledJob{}))
-     |> assign(:form_job_type, "shell_command")
+     |> assign(:form_job_type, default_type)
      |> assign(:form_schedule_type, "interval")
      |> assign(:form_config, %{})}
   end
 
   def handle_event("new_job", _params, socket) do
+    default_type =
+      if socket.assigns.active_tab == :agent_schedules, do: "spawn_agent", else: "shell_command"
+
     {:noreply,
      socket
      |> assign(:show_form, true)
      |> assign(:editing_job, nil)
      |> assign(:form_scope, "project")
      |> assign(:changeset, ScheduledJobs.change_job(%ScheduledJob{}))
-     |> assign(:form_job_type, "shell_command")
+     |> assign(:form_job_type, default_type)
      |> assign(:form_schedule_type, "interval")
      |> assign(:form_config, %{})}
   end
@@ -286,7 +292,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
           class={"tab tab-bordered #{if @active_tab == :agent_schedules, do: "tab-active"}"}
           phx-click="switch_tab" phx-value-tab="agent_schedules"
         >
-          Agent Schedules
+          Schedule Agents
         </button>
       </div>
 
@@ -447,7 +453,14 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
               <div class={"card bg-base-200 border #{if job, do: "border-primary", else: "border-base-300"}"}>
                 <div class="card-body p-4 gap-2">
                   <div class="flex items-start justify-between">
-                    <h3 class="font-semibold text-sm leading-tight">{prompt.name}</h3>
+                    <div class="flex items-center gap-1.5">
+                      <h3 class="font-semibold text-sm leading-tight">{prompt.name}</h3>
+                      <%= if Map.get(prompt, :source) do %>
+                        <span class={"badge badge-xs #{if prompt.source == :project, do: "badge-info", else: "badge-ghost"}"}>
+                          {if prompt.source == :project, do: "project", else: "global"}
+                        </span>
+                      <% end %>
+                    </div>
                     <%= if job do %>
                       <span class="badge badge-success badge-xs whitespace-nowrap">● active</span>
                     <% end %>
@@ -493,7 +506,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
 
       <.agent_schedule_form
         show={@scheduling_prompt != nil}
-        prompt={@scheduling_prompt || %EyeInTheSkyWeb.Prompts.Prompt{name: ""}}
+        prompt={@scheduling_prompt || %{id: nil, name: "", description: nil, project_id: nil}}
         job={@scheduling_job}
         projects={@projects}
         context_project_id={@project_id}

@@ -32,6 +32,15 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
     |> Repo.all()
   end
 
+  def list_filesystem_agent_jobs do
+    from(j in ScheduledJob,
+      where: j.job_type == "spawn_agent",
+      where: is_nil(j.prompt_id),
+      where: like(j.config, "%agent_file_id%")
+    )
+    |> Repo.all()
+  end
+
   def list_orphaned_agent_jobs do
     from(j in ScheduledJob,
       join: p in assoc(j, :prompt),

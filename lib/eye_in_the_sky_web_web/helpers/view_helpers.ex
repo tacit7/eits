@@ -31,6 +31,30 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
   end
 
   @doc """
+  Returns {value, label} tuples for the given provider.
+  """
+  def models_for_provider("codex"), do: codex_models()
+  def models_for_provider(_), do: claude_models()
+
+  @doc """
+  Returns a flat list of valid model slugs for the given provider.
+  Used for API validation.
+  """
+  def valid_model_slugs(provider) do
+    provider |> models_for_provider() |> Enum.map(&elem(&1, 0))
+  end
+
+  @doc """
+  Returns a map of provider => list of valid model slugs.
+  """
+  def valid_model_combos do
+    %{
+      "claude" => valid_model_slugs("claude"),
+      "codex" => valid_model_slugs("codex")
+    }
+  end
+
+  @doc """
   Parse an integer ID from a string route param. Returns nil for invalid input.
   """
   def parse_id(str) when is_binary(str) do

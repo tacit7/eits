@@ -46,6 +46,12 @@ _pgq "
 # Update session status to completed via eits CLI
 EITS_URL="${EITS_API_URL:-http://localhost:5000/api/v1}" eits sessions update "$session_id" --status completed >/dev/null 2>&1 || true
 
+# Clear entrypoint so the CLI icon disappears in the UI
+_curl() { curl -sf ${EITS_API_KEY:+-H "Authorization: Bearer ${EITS_API_KEY}"} "$@"; }
+_curl -X PATCH -H "Content-Type: application/json" \
+  -d '{"clear_entrypoint": true}' \
+  "${EITS_URL:-${EITS_API_URL:-http://localhost:5000/api/v1}}/sessions/${session_id}" >/dev/null 2>&1 || true
+
 # Publish to NATS
 "$HOOK_DIR/nats/publish-session-end.sh" "$session_id" "completed"
 

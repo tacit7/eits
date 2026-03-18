@@ -135,6 +135,14 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
           |> maybe_put(:entrypoint, params["entrypoint"])
           |> maybe_put(:last_activity_at, DateTime.utc_now() |> DateTime.to_iso8601())
 
+        # Explicit entrypoint clear — set to nil so LiveView removes the CLI icon
+        attrs =
+          if params["clear_entrypoint"] do
+            Map.put(attrs, :entrypoint, nil)
+          else
+            attrs
+          end
+
         # For terminal states, set ended_at
         attrs =
           if status in ["completed", "failed"] do
@@ -152,7 +160,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
             # Only broadcast a status-change event when status is explicitly provided
             if status do
               topic =
-                if status in ["completed", "failed"] do
+                if status in ["completed", "failed", "waiting"] do
                   {:agent_stopped, updated}
                 else
                   {:agent_working, updated}
@@ -346,12 +354,17 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
   def end_session(conn, %{"uuid" => uuid} = params) do
     case Sessions.get_session_by_uuid(uuid) do
       {:ok, session} ->
-        status = params["final_status"] || "completed"
+        status = params["final_status"] || "waiting"
 
-        attrs = %{
-          status: status,
-          ended_at: DateTime.utc_now() |> DateTime.to_iso8601()
-        }
+        attrs =
+          if status in ["completed", "failed"] do
+            %{
+              status: status,
+              ended_at: DateTime.utc_now() |> DateTime.to_iso8601()
+            }
+          else
+            %{status: status}
+          end
 
         case Sessions.update_session(session, attrs) do
           {:ok, updated} ->

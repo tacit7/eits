@@ -78,7 +78,15 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           <.icon name="hero-bars-3" class="w-5 h-5" />
         </button>
         <div class="flex-1 flex items-center justify-center gap-1.5 min-w-0 px-1">
-          <div class={"w-1.5 h-1.5 rounded-full flex-shrink-0 " <> if(is_nil(@agent.ended_at) || @agent.ended_at == "", do: "bg-success animate-pulse", else: "bg-base-content/20")} />
+          <div class={"w-1.5 h-1.5 rounded-full flex-shrink-0 " <> case @agent.status do
+            "working" -> "bg-success animate-pulse"
+            "waiting" -> "bg-warning animate-pulse"
+            "compacting" -> "bg-orange-500 animate-pulse"
+            _ -> "bg-base-content/20"
+          end} />
+          <%= if @agent.entrypoint == "cli" do %>
+            <.icon name="hero-command-line" class="w-3.5 h-3.5 text-base-content/40 flex-shrink-0" />
+          <% end %>
           <input
             type="text"
             value={@agent.name || ""}
@@ -148,9 +156,17 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           <div class="flex items-center gap-2 min-w-0">
             <%!-- Left: status + name + badges --%>
             <div class="flex items-start gap-2 min-w-0 flex-1">
-              <div class={"w-2 h-2 rounded-full flex-shrink-0 mt-[5px] " <> if(is_nil(@agent.ended_at) || @agent.ended_at == "", do: "bg-success animate-pulse", else: "bg-base-content/20")} />
+              <div class={"w-2 h-2 rounded-full flex-shrink-0 mt-[5px] " <> case @agent.status do
+                "working" -> "bg-success animate-pulse"
+                "waiting" -> "bg-warning animate-pulse"
+                "compacting" -> "bg-orange-500 animate-pulse"
+                _ -> "bg-base-content/20"
+              end} />
               <div class="flex flex-col min-w-0 flex-1">
                 <div class="flex items-center gap-2 min-w-0">
+                  <%= if @agent.entrypoint == "cli" do %>
+                    <.icon name="hero-command-line" class="w-4 h-4 text-base-content/40 flex-shrink-0" />
+                  <% end %>
                   <input
                     type="text"
                     value={@agent.name || ""}
@@ -327,9 +343,9 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
 
         <%!-- Compacting indicator --%>
         <%= if @compacting do %>
-          <div class="px-5 py-2 border-t border-warning/20 bg-warning/5" id="dm-compacting-strip">
+          <div class="px-5 py-2 border-t border-orange-500/20 bg-orange-500/5" id="dm-compacting-strip">
             <div class="flex items-center gap-2">
-              <div class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse flex-shrink-0" />
+              <div class="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse flex-shrink-0" />
               <span class="text-[11px] font-medium text-warning/80">Compacting context...</span>
             </div>
           </div>
@@ -511,11 +527,15 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
 
   defp message_item(assigns) do
     is_user = assigns.message.sender_role == "user"
-    assigns = assign(assigns, :is_user, is_user)
+    is_dm = dm_message?(assigns.message)
+    assigns = assign(assigns, :is_user, is_user) |> assign(:is_dm, is_dm)
 
     ~H"""
     <div
-      class="py-3 px-2 -mx-2 rounded-lg opacity-0"
+      class={[
+        "py-3 px-2 -mx-2 rounded-lg opacity-0",
+        @is_dm && "border-l-2 border-primary/30 pl-3 bg-primary/[0.03]"
+      ]}
       id={"dm-message-#{@message.id}"}
       phx-mounted={
         JS.transition(
@@ -546,6 +566,13 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               @is_user && "text-base-content/70"
             ]}>
               {message_sender_name(@message)}
+            </span>
+            <%!-- DM badge --%>
+            <span
+              :if={@is_dm}
+              class="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/40 uppercase tracking-wide"
+            >
+              <.icon name="hero-envelope-mini" class="w-2.5 h-2.5" /> dm
             </span>
             <span
               :if={!@is_user && message_model(@message)}
@@ -992,19 +1019,18 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           <% end %>
         </div>
 
-        <%!-- Center: context remaining --%>
+        <%!-- Center: context used --%>
         <div class="inline-flex items-center gap-2">
-          <% remaining = max(0, @context_window - @context_used) %>
-          <%= if @context_window > 0 and remaining > 0 do %>
-            <% pct = Float.round(remaining / @context_window * 100, 1) %>
+          <%= if @context_window > 0 and @context_used > 0 do %>
+            <% pct = Float.round(@context_used / @context_window * 100, 1) %>
             <% color_class = cond do
-              pct > 40 -> "text-base-content/30"
-              pct > 20 -> "text-warning/70"
+              pct < 60 -> "text-base-content/30"
+              pct < 80 -> "text-warning/70"
               true -> "text-error/70"
             end %>
             <span
               class={"inline-flex items-center gap-1 text-[11px] font-mono tabular-nums " <> color_class}
-              title={"#{format_number(remaining)} / #{format_number(@context_window)} tokens remaining"}
+              title={"#{format_number(@context_used)} / #{format_number(@context_window)} tokens used"}
             >
               {pct}% ctx
             </span>
@@ -1535,7 +1561,17 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
     """
   end
 
+  defp dm_message?(%{metadata: %{"sender_id" => sid}}) when is_binary(sid) and sid != "", do: true
+  defp dm_message?(_), do: false
+
   defp message_sender_name(%{sender_role: "user"}), do: "You"
+
+  defp message_sender_name(%{metadata: %{"sender_id" => sid}} = msg)
+       when is_binary(sid) and sid != "" do
+    short = String.slice(sid, 0, 8)
+    "s:#{short} (#{msg.provider || "agent"})"
+  end
+
   defp message_sender_name(message), do: message.provider || "Agent"
 
   defp provider_icon("openai"), do: "/images/openai.svg"

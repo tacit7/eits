@@ -7,6 +7,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
   import EyeInTheSkyWebWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWebWeb.Live.Shared.JobsHelpers
   import EyeInTheSkyWebWeb.Components.JobFormDrawer
+  import EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers
+  import EyeInTheSkyWebWeb.Components.AgentScheduleForm
 
   @impl true
   def mount(%{"id" => _} = params, _session, socket) do
@@ -32,45 +34,76 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
     socket =
       if socket.assigns.project do
         project_id = socket.assigns.project_id
+        all_project = ScheduledJobs.list_jobs_for_project(project_id)
+        all_global = ScheduledJobs.list_global_jobs()
 
         socket
-        |> assign(:project_jobs, ScheduledJobs.list_jobs_for_project(project_id))
-        |> assign(:global_jobs, ScheduledJobs.list_global_jobs())
+        |> assign(:all_project_jobs, all_project)
+        |> assign(:all_global_jobs, all_global)
+        |> assign(:project_jobs, all_project)
+        |> assign(:global_jobs, all_global)
+        |> assign(:last_failed_runs, load_last_failed_runs(all_project ++ all_global))
       else
         socket
+        |> assign(:all_project_jobs, [])
+        |> assign(:all_global_jobs, [])
         |> assign(:project_jobs, [])
         |> assign(:global_jobs, [])
+        |> assign(:last_failed_runs, %{})
       end
+
+    socket =
+      socket
+      |> assign(:search_query, "")
+      |> assign(:filter_type, "all")
+      |> assign(:filter_status, "all")
+      |> assign(:filter_origin, "all")
+      |> assign(:running_ids, MapSet.new(ScheduledJobs.list_running_job_ids()))
+      |> assign(:last_run_map, ScheduledJobs.last_run_status_map())
+      |> assign_agent_schedule_defaults()
 
     {:ok, socket}
   end
 
   @impl true
   def handle_info(:jobs_updated, socket) do
-    {:noreply, reload_jobs(socket)}
+    socket =
+      socket
+      |> reload_jobs()
+      |> assign(:running_ids, MapSet.new(ScheduledJobs.list_running_job_ids()))
+      |> assign(:last_run_map, ScheduledJobs.last_run_status_map())
+      |> maybe_reload_agent_schedule_data()
+
+    {:noreply, socket}
   end
 
   @impl true
   def handle_event("new_job", %{"scope" => scope}, socket) do
+    default_type =
+      if socket.assigns.active_tab == :agent_schedules, do: "spawn_agent", else: "shell_command"
+
     {:noreply,
      socket
      |> assign(:show_form, true)
      |> assign(:editing_job, nil)
      |> assign(:form_scope, scope)
      |> assign(:changeset, ScheduledJobs.change_job(%ScheduledJob{}))
-     |> assign(:form_job_type, "shell_command")
+     |> assign(:form_job_type, default_type)
      |> assign(:form_schedule_type, "interval")
      |> assign(:form_config, %{})}
   end
 
   def handle_event("new_job", _params, socket) do
+    default_type =
+      if socket.assigns.active_tab == :agent_schedules, do: "spawn_agent", else: "shell_command"
+
     {:noreply,
      socket
      |> assign(:show_form, true)
      |> assign(:editing_job, nil)
      |> assign(:form_scope, "project")
      |> assign(:changeset, ScheduledJobs.change_job(%ScheduledJob{}))
-     |> assign(:form_job_type, "shell_command")
+     |> assign(:form_job_type, default_type)
      |> assign(:form_schedule_type, "interval")
      |> assign(:form_config, %{})}
   end
@@ -197,28 +230,72 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
     end
   end
 
+  @impl true
+  def handle_event("switch_tab", params, socket),
+    do: handle_switch_tab(params, socket)
+
+  @impl true
+  def handle_event("schedule_prompt", params, socket),
+    do: handle_schedule_prompt(params, socket)
+
+  @impl true
+  def handle_event("edit_schedule", params, socket),
+    do: handle_edit_schedule(params, socket)
+
+  @impl true
+  def handle_event("cancel_schedule", params, socket),
+    do: handle_cancel_schedule(params, socket)
+
+  @impl true
+  def handle_event("save_schedule", params, socket),
+    do: handle_save_schedule(params, socket)
+
+  @impl true
+  def handle_event("filter_jobs", params, socket) do
+    socket =
+      socket
+      |> assign(:search_query, params["search"] || "")
+      |> assign(:filter_type, params["type"] || "all")
+      |> assign(:filter_status, params["status"] || "all")
+      |> assign(:filter_origin, params["origin"] || "all")
+
+    {:noreply,
+     socket
+     |> assign(:project_jobs, apply_job_filters(socket.assigns.all_project_jobs, socket.assigns))
+     |> assign(:global_jobs, apply_job_filters(socket.assigns.all_global_jobs, socket.assigns))}
+  end
+
   defp reload_jobs(socket) do
+    all_project = ScheduledJobs.list_jobs_for_project(socket.assigns.project_id)
+    all_global = ScheduledJobs.list_global_jobs()
+
     socket
-    |> assign(:project_jobs, ScheduledJobs.list_jobs_for_project(socket.assigns.project_id))
-    |> assign(:global_jobs, ScheduledJobs.list_global_jobs())
+    |> assign(:all_project_jobs, all_project)
+    |> assign(:all_global_jobs, all_global)
+    |> assign(:project_jobs, apply_job_filters(all_project, socket.assigns))
+    |> assign(:global_jobs, apply_job_filters(all_global, socket.assigns))
+    |> assign(:last_failed_runs, load_last_failed_runs(all_project ++ all_global))
   end
-
-  defp format_schedule(%{schedule_type: "interval", schedule_value: val}) do
-    case Integer.parse(val) do
-      {s, _} when s >= 3600 -> "Every #{div(s, 3600)}h"
-      {s, _} when s >= 60 -> "Every #{div(s, 60)}m"
-      {s, _} -> "Every #{s}s"
-      _ -> val
-    end
-  end
-
-  defp format_schedule(%{schedule_type: "cron", schedule_value: val}), do: val
-  defp format_schedule(_), do: "?"
 
   @impl true
   def render(assigns) do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-6">
+      <div class="flex border-b border-base-300 mb-4">
+        <button
+          class={"tab tab-bordered #{if @active_tab == :all_jobs, do: "tab-active"}"}
+          phx-click="switch_tab" phx-value-tab="all_jobs"
+        >
+          All Jobs
+        </button>
+        <button
+          class={"tab tab-bordered #{if @active_tab == :agent_schedules, do: "tab-active"}"}
+          phx-click="switch_tab" phx-value-tab="agent_schedules"
+        >
+          Schedule Agents
+        </button>
+      </div>
+
       <%!-- Job Form Drawer --%>
       <.job_form_drawer
         show={@show_form}
@@ -296,48 +373,144 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
         <div class="fixed inset-0 z-40 bg-black/30" phx-click="toggle_claude_drawer"></div>
       <% end %>
 
-      <%!-- Project Jobs --%>
-      <div class="mb-8">
-        <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 class="text-base font-semibold">Scheduled Jobs</h2>
-            <p class="text-xs text-base-content/50">Scoped to {@project.name}</p>
+      <%= if @active_tab == :all_jobs do %>
+        <%!-- Filter Toolbar --%>
+        <form phx-change="filter_jobs" class="flex flex-wrap gap-2 my-4">
+          <input
+            type="text"
+            name="search"
+            class="input input-bordered input-sm flex-1 min-w-[200px]"
+            placeholder="Search by name or description…"
+            value={@search_query}
+            phx-debounce="200"
+          />
+          <select name="type" class="select select-bordered select-sm">
+            <option value="all" selected={@filter_type == "all"}>All Types</option>
+            <option value="shell_command" selected={@filter_type == "shell_command"}>Shell</option>
+            <option value="spawn_agent" selected={@filter_type == "spawn_agent"}>Agent</option>
+            <option value="mix_task" selected={@filter_type == "mix_task"}>Mix</option>
+          </select>
+          <select name="status" class="select select-bordered select-sm">
+            <option value="all" selected={@filter_status == "all"}>All Status</option>
+            <option value="enabled" selected={@filter_status == "enabled"}>Enabled</option>
+            <option value="disabled" selected={@filter_status == "disabled"}>Disabled</option>
+          </select>
+          <select name="origin" class="select select-bordered select-sm">
+            <option value="all" selected={@filter_origin == "all"}>All Origins</option>
+            <option value="system" selected={@filter_origin == "system"}>System</option>
+            <option value="user" selected={@filter_origin == "user"}>User</option>
+          </select>
+        </form>
+        <%!-- Project Jobs --%>
+        <div class="mb-8">
+          <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="text-base font-semibold">Scheduled Jobs</h2>
+              <p class="text-xs text-base-content/50">Scoped to {@project.name}</p>
+            </div>
+            <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+              <button class="btn btn-outline btn-sm w-full sm:w-auto" phx-click="toggle_claude_drawer">
+                <.icon name="hero-sparkles" class="w-3.5 h-3.5" /> Create with Claude
+              </button>
+              <button
+                class="btn btn-primary btn-sm w-full sm:w-auto"
+                phx-click="new_job"
+                phx-value-scope="project"
+              >
+                + New Job
+              </button>
+            </div>
           </div>
-          <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-            <button class="btn btn-outline btn-sm w-full sm:w-auto" phx-click="toggle_claude_drawer">
-              <.icon name="hero-sparkles" class="w-3.5 h-3.5" /> Create with Claude
-            </button>
+          <.jobs_table jobs={@project_jobs} expanded_job_id={@expanded_job_id} runs={@runs} running_ids={@running_ids} last_run_map={@last_run_map} last_failed_runs={@last_failed_runs} />
+        </div>
+
+        <div class="divider"></div>
+
+        <%!-- Global Jobs --%>
+        <div>
+          <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="text-base font-semibold">Global Jobs</h2>
+              <p class="text-xs text-base-content/50">Run across all projects</p>
+            </div>
             <button
-              class="btn btn-primary btn-sm w-full sm:w-auto"
+              class="btn btn-ghost btn-sm w-full sm:w-auto"
               phx-click="new_job"
-              phx-value-scope="project"
+              phx-value-scope="global"
             >
-              + New Job
+              + New Global Job
             </button>
           </div>
+          <.jobs_table jobs={@global_jobs} expanded_job_id={@expanded_job_id} runs={@runs} running_ids={@running_ids} last_run_map={@last_run_map} last_failed_runs={@last_failed_runs} />
         </div>
-        <.jobs_table jobs={@project_jobs} expanded_job_id={@expanded_job_id} runs={@runs} />
-      </div>
+      <% end %>
 
-      <div class="divider"></div>
-
-      <%!-- Global Jobs --%>
-      <div>
-        <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 class="text-base font-semibold">Global Jobs</h2>
-            <p class="text-xs text-base-content/50">Run across all projects</p>
+      <%= if @active_tab == :agent_schedules do %>
+        <div class="p-4 space-y-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <%= for prompt <- @prompts do %>
+              <% job = Map.get(@prompt_job_map, prompt.id) %>
+              <div class={"card bg-base-200 border #{if job, do: "border-primary", else: "border-base-300"}"}>
+                <div class="card-body p-4 gap-2">
+                  <div class="flex items-start justify-between">
+                    <div class="flex items-center gap-1.5">
+                      <h3 class="font-semibold text-sm leading-tight">{prompt.name}</h3>
+                      <%= if Map.get(prompt, :source) do %>
+                        <span class={"badge badge-xs #{if prompt.source == :project, do: "badge-info", else: "badge-ghost"}"}>
+                          {if prompt.source == :project, do: "project", else: "global"}
+                        </span>
+                      <% end %>
+                    </div>
+                    <%= if job do %>
+                      <span class="badge badge-success badge-xs whitespace-nowrap">● active</span>
+                    <% end %>
+                  </div>
+                  <p class="text-xs text-base-content/60 line-clamp-2">{prompt.description}</p>
+                  <div class="flex items-center justify-between mt-1">
+                    <%= if job do %>
+                      <span class="font-mono text-xs text-base-content/50">{job.schedule_value}</span>
+                      <div class="flex gap-1">
+                        <button class="btn btn-ghost btn-xs" phx-click="edit_schedule" phx-value-job_id={job.id}>Edit</button>
+                        <button class="btn btn-ghost btn-xs" phx-click="run_now" phx-value-id={job.id}>▶</button>
+                      </div>
+                    <% else %>
+                      <span class="text-xs text-base-content/40">not scheduled</span>
+                      <button class="btn btn-primary btn-xs" phx-click="schedule_prompt" phx-value-id={prompt.id}>+ Schedule</button>
+                    <% end %>
+                  </div>
+                </div>
+              </div>
+            <% end %>
           </div>
-          <button
-            class="btn btn-ghost btn-sm w-full sm:w-auto"
-            phx-click="new_job"
-            phx-value-scope="global"
-          >
-            + New Global Job
-          </button>
+
+          <%= if @orphaned_jobs != [] do %>
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-2">Detached Schedules</p>
+              <div class="space-y-2">
+                <%= for job <- @orphaned_jobs do %>
+                  <div class="flex items-center gap-3 p-3 rounded-lg bg-base-200 border border-warning/40">
+                    <div class="flex-1 min-w-0">
+                      <span class="text-sm truncate">{job.name}</span>
+                      <span class="badge badge-warning badge-xs ml-2">Prompt deactivated</span>
+                    </div>
+                    <span class="font-mono text-xs text-base-content/50 shrink-0">{job.schedule_value}</span>
+                    <button class="btn btn-ghost btn-xs" phx-click="run_now" phx-value-id={job.id}>▶</button>
+                    <button class="btn btn-ghost btn-xs text-error" phx-click="delete_job" phx-value-id={job.id}>Delete</button>
+                  </div>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
         </div>
-        <.jobs_table jobs={@global_jobs} expanded_job_id={@expanded_job_id} runs={@runs} />
-      </div>
+      <% end %>
+
+      <.agent_schedule_form
+        show={@scheduling_prompt != nil}
+        prompt={@scheduling_prompt || %{id: nil, name: "", description: nil, project_id: nil}}
+        job={@scheduling_job}
+        projects={@projects}
+        context_project_id={@project_id}
+      />
     </div>
     """
   end
@@ -347,23 +520,48 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
     <%= if length(@jobs) > 0 do %>
       <div class="md:hidden space-y-3">
         <%= for job <- @jobs do %>
-          <article class="rounded-xl border border-base-content/10 bg-base-100 p-3 shadow-sm">
+          <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
+          <article class={"rounded-xl border border-base-content/10 bg-base-100 p-3 shadow-sm #{row_border_class(job_state)}"}>
             <button class="w-full text-left" phx-click="expand_job" phx-value-id={job.id}>
               <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0">
-                  <h3 class="font-medium text-sm truncate">{job.name}</h3>
+                  <div class="flex items-center gap-1.5">
+                    <h3 class="font-medium text-sm truncate">{job.name}</h3>
+                    <%= if job_state == :running do %>
+                      <span class="badge badge-warning badge-xs animate-pulse shrink-0">running</span>
+                    <% end %>
+                  </div>
                   <%= if job.description do %>
                     <p class="text-[11px] text-base-content/60 mt-0.5 truncate">{job.description}</p>
                   <% end %>
                   <p class="text-[11px] font-mono text-base-content/50 mt-1 truncate">
                     {format_schedule(job)}
+                    <span class="text-base-content/30 not-italic ml-1">{job.timezone || "UTC"}</span>
                   </p>
                 </div>
-                <span class={"badge badge-sm #{type_badge_class(job.job_type)}"}>
+                <span class="badge badge-xs badge-ghost">
                   {type_label(job.job_type)}
                 </span>
               </div>
             </button>
+
+            <% mobile_failed_run = Map.get(@last_failed_runs, job.id) %>
+            <%= if mobile_failed_run do %>
+              <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+                <span class="badge badge-xs badge-error">failed</span>
+                <span class="text-xs text-error/70 truncate flex-1">
+                  {format_relative_time(mobile_failed_run.started_at)}{if mobile_failed_run.result, do: ": #{String.slice(mobile_failed_run.result, 0, 60)}", else: ""}
+                </span>
+                <button
+                  class="btn btn-ghost btn-xs text-error shrink-0"
+                  phx-click="run_now"
+                  phx-value-id={job.id}
+                  title="Retry"
+                >
+                  <.icon name="hero-arrow-path" class="w-3 h-3" />
+                </button>
+              </div>
+            <% end %>
 
             <div class="mt-3 flex items-center justify-between">
               <span class="text-xs text-base-content/60">Enabled</span>
@@ -377,9 +575,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
 
             <div class="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
               <span class="text-base-content/50">Last Run</span>
-              <span class="text-right">{format_time(job.last_run_at)}</span>
+              <span class="text-right" title={format_time(job.last_run_at)}>{format_relative_time(job.last_run_at)}</span>
               <span class="text-base-content/50">Next Run</span>
-              <span class="text-right">{format_time(job.next_run_at)}</span>
+              <span class="text-right" title={format_time(job.next_run_at)}>{format_relative_time(job.next_run_at)}</span>
               <span class="text-base-content/50">Runs</span>
               <span class="text-right">{job.run_count || 0}</span>
             </div>
@@ -428,22 +626,48 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
           </thead>
           <tbody>
             <%= for job <- @jobs do %>
+              <% row_state = job_row_state(job, @running_ids, @last_run_map) %>
               <tr class={"hover #{if @expanded_job_id == job.id, do: "bg-base-200"}"}>
-                <td class="cursor-pointer" phx-click="expand_job" phx-value-id={job.id}>
-                  <div class="font-medium">{job.name}</div>
+                <td class={"cursor-pointer #{row_border_class(row_state)}"} phx-click="expand_job" phx-value-id={job.id}>
+                  <div class="flex items-center gap-1.5">
+                    <div class="font-medium">{job.name}</div>
+                    <%= if row_state == :running do %>
+                      <span class="badge badge-warning badge-xs animate-pulse">running</span>
+                    <% end %>
+                  </div>
                   <%= if job.description do %>
                     <p class="text-xs text-base-content/50 mt-0.5">{job.description}</p>
                   <% end %>
                   <%= if job.origin == "system" do %>
                     <span class="badge badge-xs badge-ghost">system</span>
                   <% end %>
+                  <% failed_run = Map.get(@last_failed_runs, job.id) %>
+                  <%= if failed_run do %>
+                    <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                      <span class="badge badge-xs badge-error">failed</span>
+                      <span class="text-xs text-error/70">
+                        {format_relative_time(failed_run.started_at)}{if failed_run.result, do: ": #{String.slice(failed_run.result, 0, 60)}", else: ""}
+                      </span>
+                      <button
+                        class="btn btn-ghost btn-xs text-error"
+                        phx-click="run_now"
+                        phx-value-id={job.id}
+                        title="Retry"
+                      >
+                        <.icon name="hero-arrow-path" class="w-3 h-3" />
+                      </button>
+                    </div>
+                  <% end %>
                 </td>
                 <td>
-                  <span class={"badge badge-sm #{type_badge_class(job.job_type)}"}>
+                  <span class="badge badge-xs badge-ghost">
                     {type_label(job.job_type)}
                   </span>
                 </td>
-                <td class="text-xs font-mono">{format_schedule(job)}</td>
+                <td class="text-xs">
+                  <span class="font-mono">{format_schedule(job)}</span>
+                  <span class="text-base-content/40 ml-1 text-[10px]">{job.timezone || "UTC"}</span>
+                </td>
                 <td>
                   <input
                     type="checkbox"
@@ -453,8 +677,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
                     phx-value-id={job.id}
                   />
                 </td>
-                <td class="text-xs">{format_time(job.last_run_at)}</td>
-                <td class="text-xs">{format_time(job.next_run_at)}</td>
+                <td class="text-xs" title={format_time(job.last_run_at)}>{format_relative_time(job.last_run_at)}</td>
+                <td class="text-xs" title={format_time(job.next_run_at)}>{format_relative_time(job.next_run_at)}</td>
                 <td class="text-xs">{job.run_count || 0}</td>
                 <td>
                   <div class="flex items-center gap-1">

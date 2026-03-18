@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.Components.SessionCard do
   use Phoenix.Component
   import EyeInTheSkyWebWeb.CoreComponents
-  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1, derive_display_status: 1]
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1, derive_display_status: 1, truncate_text: 1]
 
   alias EyeInTheSkyWeb.Sessions
 
@@ -29,7 +29,8 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
     {status_label, status_border} =
       case display_status do
         "working" -> {"Working", "border-success"}
-        "compacting" -> {"Compacting", "border-warning"}
+        "waiting" -> {"Waiting", "border-warning"}
+        "compacting" -> {"Compacting", "border-orange-500"}
         "idle" -> {"Idle", "border-transparent"}
         "idle_stale" -> {"Idle", "border-transparent"}
         "idle_dead" -> {"Idle", "border-transparent"}
@@ -143,11 +144,14 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
               </form>
             <% else %>
               <span class="text-[13px] font-medium text-base-content/85 truncate">
-                {@session.name || "Unnamed session"}
+                {@session.name || truncate_text(@session.agent && @session.agent.description) || "Unnamed session"}
               </span>
             <% end %>
           </div>
           <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
+            <%= if @session.entrypoint == "cli" do %>
+              <.icon name="hero-command-line" class="w-3 h-3 text-base-content/40 flex-shrink-0" />
+            <% end %>
             <span class="font-mono">{Sessions.format_model_info(@session)}</span>
             <span class="text-base-content/15">/</span>
             <span class="tabular-nums">{relative_time(@session.started_at)}</span>

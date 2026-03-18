@@ -69,6 +69,7 @@ defmodule EyeInTheSkyWeb.MixProject do
       {:oban, "~> 2.19"},
       {:oban_web, "~> 2.11"},
       {:crontab, "~> 1.1"},
+      {:tz, "~> 0.28"},
 {:wax_, "~> 0.7.0"},
       {:web_push_encryption, "~> 0.3"},
       {:dotenvy, "~> 0.8.0"}

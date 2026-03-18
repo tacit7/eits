@@ -27,6 +27,30 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
     |> Repo.all()
   end
 
+  def list_spawn_agent_jobs_by_prompt_ids(prompt_ids) when is_list(prompt_ids) do
+    from(j in ScheduledJob, where: j.prompt_id in ^prompt_ids)
+    |> Repo.all()
+  end
+
+  def list_filesystem_agent_jobs do
+    from(j in ScheduledJob,
+      where: j.job_type == "spawn_agent",
+      where: is_nil(j.prompt_id),
+      where: like(j.config, "%agent_file_id%")
+    )
+    |> Repo.all()
+  end
+
+  def list_orphaned_agent_jobs do
+    from(j in ScheduledJob,
+      join: p in assoc(j, :prompt),
+      where: j.job_type == "spawn_agent",
+      where: not is_nil(j.prompt_id),
+      where: p.active == false
+    )
+    |> Repo.all()
+  end
+
   def get_job!(id), do: Repo.get!(ScheduledJob, id)
 
   def get_job(id) do
@@ -47,16 +71,27 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
       |> Map.put_new("updated_at", now)
       |> maybe_encode_config()
 
+    # For fs: agents (prompt_id is nil), check config for duplicate agent_file_id
+    if fs_agent_already_scheduled?(attrs) do
+      {:error, :already_scheduled}
+    else
+      create_job_insert(attrs)
+    end
+  end
+
+  defp create_job_insert(attrs) do
     changeset = ScheduledJob.changeset(%ScheduledJob{}, attrs)
 
     case Repo.insert(changeset) do
       {:ok, job} ->
-        next = compute_next_run_at(job.schedule_type, job.schedule_value)
+        next = compute_next_run_at(job.schedule_type, job.schedule_value, nil, job.timezone || "Etc/UTC")
         {:ok, _} = update_job_fields(job, %{next_run_at: next})
         {:ok, Repo.get!(ScheduledJob, job.id)}
 
-      error ->
-        error
+      {:error, %Ecto.Changeset{} = cs} ->
+        if Keyword.has_key?(cs.errors, :prompt_id),
+          do: {:error, :already_scheduled},
+          else: {:error, cs}
     end
   end
 
@@ -75,7 +110,7 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
         if Map.has_key?(attrs, "next_run_at") do
           {:ok, Repo.get!(ScheduledJob, updated.id)}
         else
-          next = compute_next_run_at(updated.schedule_type, updated.schedule_value)
+          next = compute_next_run_at(updated.schedule_type, updated.schedule_value, nil, updated.timezone || "Etc/UTC")
           update_job_fields(updated, %{next_run_at: next})
           {:ok, Repo.get!(ScheduledJob, updated.id)}
         end
@@ -111,6 +146,26 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
     update_job_fields(job, %{enabled: new_enabled, updated_at: iso_now()})
   end
 
+  def list_running_job_ids do
+    from(r in JobRun,
+      where: r.status == "running",
+      distinct: r.job_id,
+      select: r.job_id
+    )
+    |> Repo.all()
+  end
+
+  def last_run_status_map do
+    from(r in JobRun,
+      where: r.status != "running",
+      distinct: r.job_id,
+      order_by: [asc: r.job_id, desc: r.started_at],
+      select: {r.job_id, r.status}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
   def list_runs_for_job(job_id, opts \\ []) do
     limit = Keyword.get(opts, :limit, 20)
 
@@ -120,6 +175,18 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
       limit: ^limit
     )
     |> Repo.all()
+  end
+
+  def last_run_per_job([]), do: %{}
+
+  def last_run_per_job(job_ids) when is_list(job_ids) do
+    from(r in JobRun,
+      where: r.job_id in ^job_ids,
+      distinct: r.job_id,
+      order_by: [asc: r.job_id, desc: r.started_at]
+    )
+    |> Repo.all()
+    |> Map.new(fn r -> {r.job_id, r} end)
   end
 
   def record_run_start(job) do
@@ -146,26 +213,51 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
     |> Repo.update()
   end
 
-  def compute_next_run_at(schedule_type, schedule_value, from \\ nil) do
-    from = from || NaiveDateTime.utc_now()
+  def compute_next_run_at(schedule_type, schedule_value, from \\ nil, timezone \\ "Etc/UTC") do
+    utc_now = from || NaiveDateTime.utc_now()
 
     case schedule_type do
       "interval" ->
         seconds = String.to_integer(schedule_value)
-        NaiveDateTime.add(from, seconds) |> NaiveDateTime.to_iso8601() |> Kernel.<>("Z")
+        NaiveDateTime.add(utc_now, seconds) |> NaiveDateTime.to_iso8601() |> Kernel.<>("Z")
 
       "cron" ->
         case Crontab.CronExpression.Parser.parse(schedule_value) do
           {:ok, parsed} ->
-            case Crontab.Scheduler.get_next_run_date(parsed, from) do
-              {:ok, next} -> NaiveDateTime.to_iso8601(next) <> "Z"
-              _ -> nil
+            local_now = utc_to_local(utc_now, timezone)
+
+            case Crontab.Scheduler.get_next_run_date(parsed, local_now) do
+              {:ok, next_local} ->
+                local_to_utc(next_local, timezone)
+                |> NaiveDateTime.to_iso8601()
+                |> Kernel.<>("Z")
+
+              _ ->
+                nil
             end
 
           {:error, _} ->
             nil
         end
     end
+  end
+
+  defp utc_to_local(naive_utc, "Etc/UTC"), do: naive_utc
+
+  defp utc_to_local(naive_utc, timezone) do
+    naive_utc
+    |> DateTime.from_naive!("Etc/UTC")
+    |> DateTime.shift_zone!(timezone)
+    |> DateTime.to_naive()
+  end
+
+  defp local_to_utc(naive_local, "Etc/UTC"), do: naive_local
+
+  defp local_to_utc(naive_local, timezone) do
+    naive_local
+    |> DateTime.from_naive!(timezone)
+    |> DateTime.shift_zone!("Etc/UTC")
+    |> DateTime.to_naive()
   end
 
   @doc "Enqueue the appropriate Oban worker for a scheduled job."
@@ -195,7 +287,7 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
 
   def mark_job_executed(job) do
     now = NaiveDateTime.utc_now()
-    next = compute_next_run_at(job.schedule_type, job.schedule_value, now)
+    next = compute_next_run_at(job.schedule_type, job.schedule_value, now, job.timezone || "Etc/UTC")
 
     update_job_fields(job, %{
       last_run_at: iso_now(),
@@ -232,6 +324,39 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
       {k, v} when is_atom(k) -> {Atom.to_string(k), v}
       {k, v} -> {k, v}
     end)
+  end
+
+  defp fs_agent_already_scheduled?(attrs) do
+    # Only applies to fs: agents (no prompt_id, agent_file_id in config)
+    prompt_id = attrs["prompt_id"]
+
+    if prompt_id != nil and prompt_id != "" do
+      false
+    else
+      config_str = attrs["config"]
+
+      agent_file_id =
+        case config_str do
+          str when is_binary(str) ->
+            case Jason.decode(str) do
+              {:ok, %{"agent_file_id" => id}} when is_binary(id) -> id
+              _ -> nil
+            end
+
+          _ ->
+            nil
+        end
+
+      if agent_file_id do
+        from(j in ScheduledJob,
+          where: j.job_type == "spawn_agent" and is_nil(j.prompt_id),
+          where: fragment("config::jsonb->>'agent_file_id' = ?", ^agent_file_id)
+        )
+        |> Repo.exists?()
+      else
+        false
+      end
+    end
   end
 
   defp maybe_encode_config(attrs) do

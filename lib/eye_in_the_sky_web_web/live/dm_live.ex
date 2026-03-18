@@ -76,6 +76,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     if connected?(socket) do
       subscribe_session(session.id)
       subscribe_agent_working()
+      subscribe_agents()
       subscribe_dm_stream(session.id)
       subscribe_dm_queue(session.id)
       subscribe_tasks()
@@ -533,8 +534,19 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_event("kill_session", _params, socket) do
-    AgentManager.cancel_session(socket.assigns.session_id)
-    {:noreply, socket |> assign(:processing, false)}
+    session_id = socket.assigns.session_id
+    AgentManager.cancel_session(session_id)
+
+    # Force-terminate the worker process if still registered (handles stuck :running state)
+    case Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session_id}) do
+      [{pid, _}] ->
+        Logger.warning("kill_session: force-exiting stuck worker pid=#{inspect(pid)} for session=#{session_id}")
+        Process.exit(pid, :kill)
+      [] ->
+        :ok
+    end
+
+    {:noreply, socket |> assign(:processing, false) |> stop_sync_timer()}
   end
 
   @impl true
@@ -819,6 +831,16 @@ defmodule EyeInTheSkyWebWeb.DmLive do
        |> stop_sync_timer()
        |> sync_and_reload()
        |> push_event("focus-input", %{})}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  # Session field update (e.g. entrypoint change) — keep @session in sync
+  @impl true
+  def handle_info({:agent_updated, %{id: session_id} = updated_session}, socket) do
+    if session_id == socket.assigns.session_id do
+      {:noreply, assign(socket, :session, updated_session)}
     else
       {:noreply, socket}
     end

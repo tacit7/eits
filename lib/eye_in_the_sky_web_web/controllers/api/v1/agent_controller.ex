@@ -10,11 +10,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
 
   require Logger
 
-  # Fix 4: valid provider/model combos — keep in sync with ViewHelpers.claude_models/codex_models
-  @valid_combos %{
-    "claude" => ~w(haiku sonnet opus sonnet[1m]),
-    "codex"  => ~w(gpt-5.4 gpt-5.3-codex gpt-5.2-codex gpt-5.2 gpt-5.1 gpt-5.1-codex-max gpt-5.1-codex-mini gpt-5-codex-mini o3)
-  }
+  alias EyeInTheSkyWebWeb.Helpers.ViewHelpers
 
   @doc """
   GET /api/v1/agents - List agents.
@@ -181,11 +177,12 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
     end
   end
 
-  # Fix 4: validate provider+model combo
   defp validate_provider_model(provider, model) do
-    case Map.get(@valid_combos, provider) do
+    combos = ViewHelpers.valid_model_combos()
+
+    case Map.get(combos, provider) do
       nil ->
-        valid_providers = @valid_combos |> Map.keys() |> Enum.join(", ")
+        valid_providers = combos |> Map.keys() |> Enum.join(", ")
         {:error, "invalid_provider", "invalid provider '#{provider}'; must be one of: #{valid_providers}"}
 
       valid_models ->

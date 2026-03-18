@@ -19,8 +19,14 @@ defmodule EyeInTheSkyWeb.ScheduledJobs.ScheduledJob do
     field :created_at, :string
     field :updated_at, :string
     field :project_id, :integer
+    field :prompt_id, :id  # :id = bigint, matches subagent_prompts PK
+    field :timezone, :string, default: "Etc/UTC"
 
     has_many :runs, EyeInTheSkyWeb.ScheduledJobs.JobRun, foreign_key: :job_id
+    belongs_to :prompt, EyeInTheSkyWeb.Prompts.Prompt,
+      foreign_key: :prompt_id,
+      references: :id,
+      define_field: false
   end
 
   def changeset(job, attrs) do
@@ -39,11 +45,14 @@ defmodule EyeInTheSkyWeb.ScheduledJobs.ScheduledJob do
       :run_count,
       :created_at,
       :updated_at,
-      :project_id
+      :project_id,
+      :prompt_id,
+      :timezone
     ])
     |> validate_required([:name, :job_type, :schedule_type, :schedule_value])
     |> validate_inclusion(:job_type, ["spawn_agent", "shell_command", "mix_task", "daily_digest"])
     |> validate_inclusion(:origin, ["system", "user"])
     |> validate_inclusion(:schedule_type, ["interval", "cron"])
+    |> unique_constraint(:prompt_id, name: :idx_scheduled_jobs_unique_prompt)
   end
 end

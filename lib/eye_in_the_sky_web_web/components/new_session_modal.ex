@@ -6,9 +6,9 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
 
   use Phoenix.LiveComponent
   import EyeInTheSkyWebWeb.CoreComponents, only: [icon: 1, modal_header: 1]
-  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [claude_models: 0, codex_models: 0]
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [models_for_provider: 1]
 
-  @global_agents_dir Path.expand("~/.claude/agents")
+  alias EyeInTheSkyWeb.Claude.AgentFileScanner
 
   @impl true
   def mount(socket) do
@@ -238,43 +238,8 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
     """
   end
 
-  defp models_for_provider("codex"), do: codex_models()
-  defp models_for_provider(_), do: claude_models()
-
-  # Returns [{name, scope}] where scope is :project or :global.
-  # Project agents take priority and are listed first; duplicates deduped by name.
   defp list_agents(project_path) do
-    project_agents =
-      if project_path do
-        dir = Path.join([project_path, ".claude", "agents"])
-        scan_agent_dir(dir, :project)
-      else
-        []
-      end
-
-    global_agents = scan_agent_dir(@global_agents_dir, :global)
-
-    project_names = MapSet.new(project_agents, fn {name, _} -> name end)
-
-    deduped_global =
-      Enum.reject(global_agents, fn {name, _} -> MapSet.member?(project_names, name) end)
-
-    project_agents ++ deduped_global
-  end
-
-  defp scan_agent_dir(dir, scope) do
-    if File.dir?(dir) do
-      dir
-      |> File.ls!()
-      |> Enum.filter(&String.ends_with?(&1, ".md"))
-      |> Enum.reject(&(&1 == "README.md"))
-      |> Enum.map(fn filename ->
-        name = Path.rootname(filename)
-        {name, scope}
-      end)
-      |> Enum.sort_by(fn {name, _} -> name end)
-    else
-      []
-    end
+    AgentFileScanner.scan(project_path)
+    |> Enum.map(fn agent -> {agent.name, agent.source} end)
   end
 end

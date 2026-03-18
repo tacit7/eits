@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Sessions
   alias EyeInTheSkyWeb.Commits
-  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1]
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1, truncate_text: 1]
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -176,8 +176,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
                             {String.slice(session.uuid || to_string(session.id), 0..7)}
                           </code>
                           <span class="text-sm text-base-content/80 truncate">
-                            {session.name || (session.agent && session.agent.description) ||
-                              "Unnamed"}
+                            {session.name || truncate_text(session.agent && session.agent.description) || "Unnamed"}
                           </span>
                         </div>
                       </div>

@@ -240,7 +240,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
       </div>
 
       <%!-- Scrollable nav --%>
-      <nav class="flex-1 overflow-y-auto overflow-x-hidden py-2">
+      <nav class="flex-1 overflow-y-auto overflow-x-hidden py-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <.main_nav
           sidebar_tab={@sidebar_tab}
           sidebar_project={@sidebar_project}

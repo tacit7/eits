@@ -204,6 +204,65 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionControllerTest do
       conn = patch(conn, ~p"/api/v1/sessions/#{Ecto.UUID.generate()}", %{"status" => "idle"})
       assert json_response(conn, 404)["error"] == "Session not found"
     end
+
+    test "sets entrypoint to cli", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+
+      patch(conn, ~p"/api/v1/sessions/#{session.uuid}", %{"entrypoint" => "cli"})
+
+      {:ok, updated} = Sessions.get_session_by_uuid(session.uuid)
+      assert updated.entrypoint == "cli"
+    end
+
+    test "clear_entrypoint true sets entrypoint to nil", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent, %{entrypoint: "cli"})
+
+      patch(conn, ~p"/api/v1/sessions/#{session.uuid}", %{"clear_entrypoint" => true})
+
+      {:ok, updated} = Sessions.get_session_by_uuid(session.uuid)
+      assert updated.entrypoint == nil
+    end
+
+    test "clear_entrypoint false does not clear entrypoint", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent, %{entrypoint: "cli"})
+
+      patch(conn, ~p"/api/v1/sessions/#{session.uuid}", %{"clear_entrypoint" => false})
+
+      {:ok, updated} = Sessions.get_session_by_uuid(session.uuid)
+      assert updated.entrypoint == "cli"
+    end
+  end
+
+  # ---- entrypoint on session create ----
+
+  describe "POST /api/v1/sessions entrypoint" do
+    test "persists entrypoint on create", %{conn: conn} do
+      uuid = Ecto.UUID.generate()
+
+      post(conn, ~p"/api/v1/sessions", %{
+        "session_id" => uuid,
+        "name" => "cli session",
+        "entrypoint" => "cli"
+      })
+
+      {:ok, session} = Sessions.get_session_by_uuid(uuid)
+      assert session.entrypoint == "cli"
+    end
+
+    test "entrypoint defaults to nil when not provided", %{conn: conn} do
+      uuid = Ecto.UUID.generate()
+
+      post(conn, ~p"/api/v1/sessions", %{
+        "session_id" => uuid,
+        "name" => "no entrypoint"
+      })
+
+      {:ok, session} = Sessions.get_session_by_uuid(uuid)
+      assert session.entrypoint == nil
+    end
   end
 
   # ---- POST /api/v1/sessions/:uuid/end ----

@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.ScheduledJobsTest do
   alias EyeInTheSkyWeb.ScheduledJobs
   alias EyeInTheSkyWeb.ScheduledJobs.ScheduledJob
   alias EyeInTheSkyWeb.Projects
+  alias EyeInTheSkyWeb.Prompts
 
   # ---------------------------------------------------------------------------
   # Helpers
@@ -18,6 +19,32 @@ defmodule EyeInTheSkyWeb.ScheduledJobsTest do
       })
 
     project
+  end
+
+  defp create_prompt(name \\ "Test Prompt") do
+    slug =
+      name
+      |> String.downcase()
+      |> String.replace(~r/[^a-z0-9]+/, "-")
+      |> String.trim("-")
+      |> then(&"#{&1}-#{System.unique_integer([:positive])}")
+
+    {:ok, p} = Prompts.create_prompt(%{
+      name: name,
+      slug: slug,
+      prompt_text: "Do the thing",
+      active: true
+    })
+    p
+  end
+
+  defp spawn_agent_attrs(overrides \\ %{}) do
+    Map.merge(%{
+      "name" => "Test Agent Job",
+      "job_type" => "spawn_agent",
+      "schedule_type" => "cron",
+      "schedule_value" => "0 5 * * *"
+    }, overrides)
   end
 
   defp job_attrs(overrides \\ %{}) do
@@ -301,6 +328,81 @@ defmodule EyeInTheSkyWeb.ScheduledJobsTest do
       original = job.next_run_at
       {:ok, updated} = ScheduledJobs.mark_job_executed(job)
       assert updated.next_run_at != original
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # ScheduledJob schema
+  # ---------------------------------------------------------------------------
+
+  describe "ScheduledJob schema" do
+    test "cast includes prompt_id" do
+      attrs = %{
+        "name" => "Test",
+        "job_type" => "spawn_agent",
+        "schedule_type" => "cron",
+        "schedule_value" => "0 5 * * *",
+        "prompt_id" => 999
+      }
+      cs = ScheduledJob.changeset(%ScheduledJob{}, attrs)
+      assert cs.changes.prompt_id == 999
+    end
+
+    test "prompt_id uniqueness constraint is registered" do
+      cs = ScheduledJob.changeset(%ScheduledJob{}, %{})
+      constraint_names = Enum.map(cs.constraints, & &1.constraint)
+      assert "idx_scheduled_jobs_unique_prompt" in constraint_names
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # list_spawn_agent_jobs_by_prompt_ids/1
+  # ---------------------------------------------------------------------------
+
+  describe "list_spawn_agent_jobs_by_prompt_ids/1" do
+    test "returns jobs matching given prompt_ids" do
+      prompt = create_prompt()
+      {:ok, job} = ScheduledJobs.create_job(spawn_agent_attrs(%{"prompt_id" => prompt.id}))
+      results = ScheduledJobs.list_spawn_agent_jobs_by_prompt_ids([prompt.id])
+      assert Enum.any?(results, &(&1.id == job.id))
+    end
+
+    test "returns empty list for unknown ids" do
+      assert ScheduledJobs.list_spawn_agent_jobs_by_prompt_ids([999_999]) == []
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # list_orphaned_agent_jobs/0
+  # ---------------------------------------------------------------------------
+
+  describe "list_orphaned_agent_jobs/0" do
+    test "returns spawn_agent jobs whose prompt is inactive" do
+      prompt = create_prompt("Inactive")
+      {:ok, job} = ScheduledJobs.create_job(spawn_agent_attrs(%{"prompt_id" => prompt.id}))
+      {:ok, _} = Prompts.update_prompt(prompt, %{active: false})
+      orphans = ScheduledJobs.list_orphaned_agent_jobs()
+      assert Enum.any?(orphans, &(&1.id == job.id))
+    end
+
+    test "does not return jobs whose prompt is active" do
+      prompt = create_prompt("Active")
+      {:ok, job} = ScheduledJobs.create_job(spawn_agent_attrs(%{"prompt_id" => prompt.id}))
+      orphans = ScheduledJobs.list_orphaned_agent_jobs()
+      refute Enum.any?(orphans, &(&1.id == job.id))
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # create_job/1 duplicate prompt_id
+  # ---------------------------------------------------------------------------
+
+  describe "create_job/1 duplicate prompt_id" do
+    test "returns {:error, :already_scheduled}" do
+      prompt = create_prompt("Dupe")
+      {:ok, _} = ScheduledJobs.create_job(spawn_agent_attrs(%{"prompt_id" => prompt.id, "name" => "First"}))
+      result = ScheduledJobs.create_job(spawn_agent_attrs(%{"prompt_id" => prompt.id, "name" => "Second"}))
+      assert result == {:error, :already_scheduled}
     end
   end
 end

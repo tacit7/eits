@@ -58,10 +58,12 @@ defmodule EyeInTheSkyWeb.Claude.AgentFileScanner do
 
   defp allowed_agent_path?(path) do
     expanded = Path.expand(path)
+    dir = Path.dirname(expanded)
     global = global_agents_dir()
 
-    String.starts_with?(expanded, global <> "/") or
-      String.contains?(expanded, "/.claude/agents/")
+    # Must be a .md file directly inside an agents directory (no subdirectory traversal)
+    String.ends_with?(expanded, ".md") and
+      (dir == global or String.ends_with?(dir, "/.claude/agents"))
   end
 
   defp global_agents_dir do

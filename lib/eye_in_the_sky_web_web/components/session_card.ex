@@ -39,10 +39,21 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
         _ -> {"Idle", "border-transparent"}
       end
 
+    status_class =
+      case display_status do
+        "working" -> "text-success"
+        "waiting" -> "text-warning"
+        "compacting" -> "text-orange-500"
+        "stopped" -> "text-warning"
+        "completed" -> "text-base-content/50"
+        _ -> "text-base-content/55"
+      end
+
     assigns =
       assigns
       |> assign(:status_label, status_label)
       |> assign(:status_border, status_border)
+      |> assign(:status_class, status_class)
 
     ~H"""
     <div
@@ -58,9 +69,9 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
           id={"swipe-fav-#{@session.id}"}
           phx-hook="BookmarkAgent"
           phx-update="ignore"
-          data-agent-id={@session.agent && @session.agent.uuid}
+          data-agent-id={Map.get(@session, :agent) && Map.get(@session, :agent).uuid}
           data-session-id={@session.uuid}
-          data-agent-name={@session.name || (@session.agent && @session.agent.description) || "Agent"}
+          data-agent-name={@session.name || (Map.get(@session, :agent) && Map.get(@session, :agent).description) || "Agent"}
           data-agent-status={@session.status}
           data-swipe-fav="true"
           class="bookmark-button w-[53px] flex flex-col items-center justify-center gap-1 bg-[#f43f5e] text-white text-[9px] font-bold uppercase tracking-wide border-none"
@@ -145,12 +156,14 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
               </form>
             <% else %>
               <span class="text-[13px] font-medium text-base-content/85 truncate">
-                {@session.name || truncate_text(@session.agent && @session.agent.description) || "Unnamed session"}
+                {@session.name || truncate_text(Map.get(@session, :agent) && Map.get(@session, :agent).description) || "Unnamed session"}
               </span>
             <% end %>
           </div>
           <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
-            <%= if @session.entrypoint == "cli" do %>
+            <span class={["font-medium shrink-0", @status_class]}>{@status_label}</span>
+            <span class="text-base-content/15">/</span>
+            <%= if Map.get(@session, :entrypoint) == "cli" do %>
               <.icon name="hero-command-line" class="w-3 h-3 text-base-content/40 flex-shrink-0" />
             <% end %>
             <span class="font-mono">{Sessions.format_model_info(@session)}</span>

@@ -22,7 +22,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   attr :rest, :global
 
   def task_card(assigns) do
-    aging = if assigns.variant == "kanban", do: card_aging_indicator(assigns.task.updated_at), else: nil
+    aging = if assigns.variant == "kanban", do: card_aging_indicator(Map.get(assigns.task, :updated_at)), else: nil
     assigns = assign(assigns, :aging, aging)
 
     ~H"""
@@ -134,22 +134,48 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       >
         <.icon name="hero-bars-2" class="w-3.5 h-3.5" />
       </div>
-      <h4 class={[
-        "text-sm font-medium flex-1 leading-snug cursor-pointer hover:text-primary transition-colors",
-        @task.completed_at && "text-base-content/40 line-through",
-        !@task.completed_at && "text-base-content"
-      ]}>
+      <%!-- Completion toggle --%>
+      <button
+        type="button"
+        phx-click="toggle_task_complete"
+        phx-value-task_id={@task.uuid || to_string(@task.id)}
+        aria-label={if @task.completed_at, do: "Mark task incomplete", else: "Mark task complete"}
+        aria-pressed={to_string(!is_nil(@task.completed_at))}
+        class="flex-shrink-0 mt-0.5 flex items-center justify-center w-4 h-4 rounded text-base-content/30 hover:text-success transition-colors"
+      >
+        <.icon name={if @task.completed_at, do: "hero-check-circle-mini", else: "hero-circle-mini"} class="w-4 h-4" />
+      </button>
+      <h4
+        class={[
+          "text-sm font-medium flex-1 leading-snug cursor-pointer hover:text-primary transition-colors",
+          @task.completed_at && "text-base-content/40 line-through",
+          !@task.completed_at && "text-base-content"
+        ]}
+        phx-click={@on_click}
+        phx-value-task_id={@task.uuid || to_string(@task.id)}
+      >
         {@task.title}
       </h4>
+      <%!-- Copy task ID --%>
+      <button
+        type="button"
+        phx-hook="CopyToClipboard"
+        id={"copy-task-kanban-#{@task.id}"}
+        data-copy={@task.uuid || to_string(@task.id)}
+        onclick="event.stopPropagation(); event.preventDefault();"
+        aria-label="Copy task ID"
+        class="flex-shrink-0 opacity-0 group-hover/card:opacity-100 flex items-center justify-center w-6 h-6 rounded text-base-content/25 hover:text-base-content/60 transition-all"
+      >
+        <.icon name="hero-clipboard-document-mini" class="w-3 h-3" />
+      </button>
       <%= if @on_delete do %>
         <button
           type="button"
           phx-click={@on_delete}
           phx-value-task_id={@task.uuid || to_string(@task.id)}
           phx-confirm="Delete this task?"
-          class="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover/card:opacity-100 flex items-center justify-center w-6 h-6 rounded text-base-content/25 hover:text-error hover:bg-error/10 transition-all"
+          class="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover/card:opacity-100 flex items-center justify-center w-6 h-6 rounded text-base-content/25 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error focus-visible:ring-inset"
           aria-label={"Delete task #{@task.title}"}
-          onclick="event.stopPropagation();"
         >
           <.icon name="hero-x-mark-mini" class="w-3 h-3" />
         </button>

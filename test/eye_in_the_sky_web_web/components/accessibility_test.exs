@@ -154,7 +154,7 @@ defmodule EyeInTheSkyWebWeb.Components.AccessibilityTest do
     end
 
     test "list DM link has min 44px touch target classes" do
-      task = sample_task(%{agents: [%{uuid: "sess-uuid"}]})
+      task = sample_task(%{sessions: [%{uuid: "sess-uuid"}]})
 
       html =
         render_component(&TaskCard.task_card/1,

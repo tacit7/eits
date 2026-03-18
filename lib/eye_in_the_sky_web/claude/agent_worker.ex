@@ -13,6 +13,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   alias EyeInTheSkyWeb.Claude.{Job, Message, SDK, StreamAssembler}
   alias EyeInTheSkyWeb.Codex.StreamAssembler, as: CodexStreamAssembler
   alias EyeInTheSkyWeb.AgentWorkerEvents, as: WorkerEvents
+  alias EyeInTheSkyWeb.Agents.CmdDispatcher
   alias EyeInTheSkyWeb.Codex
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
@@ -352,6 +353,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   # Other SDK messages (text deltas, tool use, thinking, etc.) - broadcast for live streaming
   @impl true
   def handle_info({:claude_message, ref, %Message{} = msg}, %__MODULE__{sdk_ref: ref} = state) do
+    msg = maybe_dispatch_commands(msg, state)
     {stream, events} = stream_handle_message(state.stream, msg)
     broadcast_events(events, state)
     {:noreply, %{state | stream: stream}}
@@ -551,6 +553,18 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       EyeInTheSkyWeb.Events.stream_event(state.session_id, event)
     end)
   end
+
+  defp maybe_dispatch_commands(%Message{type: :text, content: content} = msg, state)
+       when is_binary(content) do
+    case CmdDispatcher.extract_commands(content) do
+      {[], _} -> msg
+      {cmds, clean} ->
+        CmdDispatcher.dispatch_all(cmds, state.session_id)
+        %{msg | content: clean}
+    end
+  end
+
+  defp maybe_dispatch_commands(msg, _state), do: msg
 
   defp process_next_job(%__MODULE__{queue: []} = state) do
     WorkerEvents.broadcast_queue_update(state.session_id, state.queue)

@@ -10,19 +10,30 @@ defmodule EyeInTheSkyWeb.Agents.CmdDispatcher do
   ## Supported commands
 
       EITS-CMD: dm --to <session_uuid> --message <text>
+
+      EITS-CMD: task create <title>
+      EITS-CMD: task begin <title>
+      EITS-CMD: task update <id> <state_id>
       EITS-CMD: task done <id>
       EITS-CMD: task annotate <id> <body>
 
-  ## Usage from an agent
+      EITS-CMD: note <body>
+      EITS-CMD: note task <id> <body>
 
-      EITS-CMD: dm --to 0c77344b-52bc-4c3d-97a1-cf3c421cb325 --message "LGTM, no issues found"
+      EITS-CMD: commit <hash>
+
+  ## Usage from a spawned agent (CLAUDE_CODE_ENTRYPOINT=cli)
+
+      EITS-CMD: dm --to 0c77344b-52bc-4c3d-97a1-cf3c421cb325 --message "done"
+      EITS-CMD: commit abc1234
+      EITS-CMD: task begin Fix broken import in dm_page
       EITS-CMD: task done 1234
-      EITS-CMD: task annotate 1234 Fixed the broken import in dm_page.ex
+      EITS-CMD: note Deployed hotfix for shift_zone crash
   """
 
   require Logger
 
-  alias EyeInTheSkyWeb.{Messages, Notes, Sessions, Tasks}
+  alias EyeInTheSkyWeb.{Commits, Messages, Notes, Sessions, Tasks}
   alias EyeInTheSkyWeb.Agents.AgentManager
 
   @cmd_prefix "EITS-CMD:"
@@ -55,20 +66,24 @@ defmodule EyeInTheSkyWeb.Agents.CmdDispatcher do
   end
 
   # ---------------------------------------------------------------------------
-  # Private dispatch
+  # Dispatch router
   # ---------------------------------------------------------------------------
 
   defp dispatch(@cmd_prefix <> rest, from_session_id) do
     case String.split(String.trim(rest), " ", parts: 2) do
-      ["dm", args] -> dispatch_dm(args, from_session_id)
-      ["task", args] -> dispatch_task(args, from_session_id)
-      _ -> Logger.warning("[CmdDispatcher] Unknown command: #{rest}")
+      ["dm", args]     -> dispatch_dm(args, from_session_id)
+      ["task", args]   -> dispatch_task(args, from_session_id)
+      ["note", args]   -> dispatch_note(args, from_session_id)
+      ["commit", hash] -> dispatch_commit(String.trim(hash), from_session_id)
+      _                -> Logger.warning("[CmdDispatcher] Unknown command: #{rest}")
     end
   end
 
   defp dispatch(line, _), do: Logger.warning("[CmdDispatcher] Malformed line: #{line}")
 
-  # --- dm ---
+  # ---------------------------------------------------------------------------
+  # dm
+  # ---------------------------------------------------------------------------
 
   defp dispatch_dm(args, from_session_id) do
     with {:ok, to_uuid} <- extract_flag(args, "--to"),
@@ -111,29 +126,86 @@ defmodule EyeInTheSkyWeb.Agents.CmdDispatcher do
     end
   end
 
-  # --- task ---
+  # ---------------------------------------------------------------------------
+  # task
+  # ---------------------------------------------------------------------------
 
+  # task create <title>
+  defp dispatch_task("create " <> title, from_session_id) do
+    title = String.trim(title)
+    session = get_session!(from_session_id)
+
+    case Tasks.create_task(%{
+           title: title,
+           state_id: 1,
+           project_id: session && session.project_id
+         }) do
+      {:ok, task} ->
+        Tasks.link_session_to_task(task.id, from_session_id)
+        Logger.info("[CmdDispatcher] task created id=#{task.id} title=#{title}")
+
+      {:error, reason} ->
+        Logger.warning("[CmdDispatcher] task create failed: #{inspect(reason)}")
+    end
+  end
+
+  # task begin <title> — create + move to In Progress
+  defp dispatch_task("begin " <> title, from_session_id) do
+    title = String.trim(title)
+    session = get_session!(from_session_id)
+
+    case Tasks.create_task(%{
+           title: title,
+           state_id: 2,
+           project_id: session && session.project_id
+         }) do
+      {:ok, task} ->
+        Tasks.link_session_to_task(task.id, from_session_id)
+        Logger.info("[CmdDispatcher] task begun id=#{task.id} title=#{title}")
+
+      {:error, reason} ->
+        Logger.warning("[CmdDispatcher] task begin failed: #{inspect(reason)}")
+    end
+  end
+
+  # task update <id> <state_id>
+  defp dispatch_task("update " <> rest, _from_session_id) do
+    case String.split(rest, " ", parts: 2) do
+      [id_str, state_str] ->
+        with {id, ""} <- Integer.parse(String.trim(id_str)),
+             {state_id, ""} <- Integer.parse(String.trim(state_str)),
+             task <- Tasks.get_task!(id) do
+          Tasks.update_task_state(task, state_id)
+          Logger.info("[CmdDispatcher] task #{id} state -> #{state_id}")
+        else
+          err -> Logger.warning("[CmdDispatcher] task update failed: #{inspect(err)}")
+        end
+
+      _ ->
+        Logger.warning("[CmdDispatcher] task update: expected <id> <state_id>")
+    end
+  rescue
+    _ -> Logger.warning("[CmdDispatcher] task update: task not found")
+  end
+
+  # task done <id> — shortcut for state 3 (Done)
   defp dispatch_task("done " <> id_str, _from_session_id) do
     id_str = String.trim(id_str)
 
     case Integer.parse(id_str) do
       {id, ""} ->
-        case Tasks.get_task!(id) do
-          nil ->
-            Logger.warning("[CmdDispatcher] task done: #{id} not found")
-
-          task ->
-            Tasks.update_task_state(task, 4)
-            Logger.info("[CmdDispatcher] task #{id} -> done")
-        end
+        task = Tasks.get_task!(id)
+        Tasks.update_task_state(task, 3)
+        Logger.info("[CmdDispatcher] task #{id} -> done")
 
       _ ->
         Logger.warning("[CmdDispatcher] task done: invalid id '#{id_str}'")
     end
   rescue
-    _ -> Logger.warning("[CmdDispatcher] task done: #{id_str} not found")
+    _ -> Logger.warning("[CmdDispatcher] task done: task not found")
   end
 
+  # task annotate <id> <body>
   defp dispatch_task("annotate " <> rest, _from_session_id) do
     case String.split(rest, " ", parts: 2) do
       [id_str, body] ->
@@ -153,7 +225,7 @@ defmodule EyeInTheSkyWeb.Agents.CmdDispatcher do
         end
 
       _ ->
-        Logger.warning("[CmdDispatcher] task annotate: missing body in '#{rest}'")
+        Logger.warning("[CmdDispatcher] task annotate: missing body")
     end
   end
 
@@ -161,8 +233,61 @@ defmodule EyeInTheSkyWeb.Agents.CmdDispatcher do
     do: Logger.warning("[CmdDispatcher] Unknown task sub-command: #{unknown}")
 
   # ---------------------------------------------------------------------------
-  # Flag parser
+  # note
   # ---------------------------------------------------------------------------
+
+  # note task <id> <body>
+  defp dispatch_note("task " <> rest, _from_session_id) do
+    case String.split(rest, " ", parts: 2) do
+      [id_str, body] ->
+        case Integer.parse(String.trim(id_str)) do
+          {id, ""} ->
+            Notes.create_note(%{body: body, parent_id: id, parent_type: "task"})
+            Logger.info("[CmdDispatcher] note on task #{id}")
+
+          _ ->
+            Logger.warning("[CmdDispatcher] note task: invalid id '#{id_str}'")
+        end
+
+      _ ->
+        Logger.warning("[CmdDispatcher] note task: missing body")
+    end
+  end
+
+  # note <body> — note on the current session
+  defp dispatch_note(body, from_session_id) when body != "" do
+    Notes.create_note(%{body: body, parent_id: from_session_id, parent_type: "session"})
+    Logger.info("[CmdDispatcher] note on session #{from_session_id}")
+  end
+
+  defp dispatch_note(_, _), do: Logger.warning("[CmdDispatcher] note: empty body")
+
+  # ---------------------------------------------------------------------------
+  # commit
+  # ---------------------------------------------------------------------------
+
+  defp dispatch_commit(hash, from_session_id) when hash != "" do
+    case Commits.create_commit(%{commit_hash: hash, session_id: from_session_id}) do
+      {:ok, _} ->
+        Logger.info("[CmdDispatcher] commit #{hash} logged for session #{from_session_id}")
+
+      {:error, reason} ->
+        Logger.warning("[CmdDispatcher] commit failed: #{inspect(reason)}")
+    end
+  end
+
+  defp dispatch_commit(_, _), do: Logger.warning("[CmdDispatcher] commit: empty hash")
+
+  # ---------------------------------------------------------------------------
+  # Helpers
+  # ---------------------------------------------------------------------------
+
+  defp get_session!(session_id) do
+    case Sessions.get_session(session_id) do
+      {:ok, session} -> session
+      _ -> nil
+    end
+  end
 
   # Handles: --flag "quoted value"  or  --flag unquoted_value
   defp extract_flag(str, flag) do

@@ -297,113 +297,109 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
     Logger.info("🚀 start_agent_worker: loading session.id=#{session_id}")
 
     with {:ok, session} <- Sessions.get_session(session_id),
-         {:ok, agent} <- Agents.get_agent(session.agent_id) do
-      project_path_from_project = if agent.project, do: agent.project.path, else: nil
-
-      resolved_path =
-        session.git_worktree_path ||
-          agent.git_worktree_path ||
-          project_path_from_project
-
-      project_path =
-        if is_nil(resolved_path) do
-          fallback = File.cwd!()
-
-          Logger.error(
-            "start_agent_worker: no project_path for session.id=#{session_id}; " <>
-              "session.git_worktree_path=#{inspect(session.git_worktree_path)}, " <>
-              "agent.git_worktree_path=#{inspect(agent.git_worktree_path)}, " <>
-              "project.path=#{inspect(project_path_from_project)} — falling back to cwd=#{fallback}"
-          )
-
-          fallback
-        else
-          resolved_path
-        end
+         {:ok, agent} <- Agents.get_agent(session.agent_id),
+         provider when not is_nil(provider) <- normalize_provider(session.provider),
+         {:ok, session} <- ensure_session_uuid(session) do
+      project_path = resolve_project_path(session, agent)
 
       Logger.info(
         "✅ start_agent_worker: loaded session.uuid=#{session.uuid}, agent.id=#{agent.id}, project_path=#{project_path}"
       )
 
-      case normalize_provider(session.provider) do
-        nil ->
-          {:error, {:unsupported_provider, session.provider}}
-
-        provider ->
-          # Ensure session has a UUID — Codex sessions created from the UI may not have one
-          session_result =
-            if is_nil(session.uuid) or session.uuid == "" do
-              uuid = Ecto.UUID.generate()
-              Logger.info("start_agent_worker: generating UUID=#{uuid} for session.id=#{session.id}")
-
-              case Sessions.update_session(session, %{uuid: uuid}) do
-                {:ok, updated} -> {:ok, updated}
-                {:error, reason} -> {:error, {:session_update_failed, reason}}
-              end
-            else
-              {:ok, session}
-            end
-
-          case session_result do
-            {:error, reason} ->
-              Logger.error(
-                "❌ start_agent_worker: UUID assignment failed for session.id=#{session_id} - #{inspect(reason)}"
-              )
-
-              {:error, reason}
-
-            {:ok, session} ->
-              opts = [
-                session_id: session.id,
-                # eits_session_uuid: stable EITS session UUID, never changes after assignment.
-                # Used for EITS tracking, env vars, and hooks. Distinct from provider_conversation_id.
-                eits_session_uuid: session.uuid,
-                # provider_conversation_id: the provider's resume key.
-                #   Claude: pre-generated UUID matching Claude's --session-id flag
-                #   Codex:  same value initially, but gets overwritten by the Codex thread_id
-                #           when the thread.started event fires (via maybe_sync_provider_conversation_id)
-                provider_conversation_id: session.uuid,
-                agent_id: agent.id,
-                project_id: session.project_id,
-                project_path: project_path,
-                provider: provider,
-                worktree: extra_opts[:worktree]
-              ]
-
-              case DynamicSupervisor.start_child(
-                     EyeInTheSkyWeb.Claude.AgentSupervisor,
-                     {AgentWorker, opts}
-                   ) do
-                {:ok, pid} ->
-                  Logger.info(
-                    "✅ start_agent_worker: AgentWorker started for session.id=#{session_id}, pid=#{inspect(pid)}"
-                  )
-
-                  {:ok, pid, provider}
-
-                {:error, {:already_started, pid}} ->
-                  Logger.info(
-                    "start_agent_worker: worker already started for session.id=#{session_id}, pid=#{inspect(pid)}"
-                  )
-
-                  {:ok, pid, provider}
-
-                {:error, reason} = error ->
-                  Logger.error(
-                    "❌ start_agent_worker: failed to start AgentWorker for session.id=#{session_id} - #{inspect(reason)}"
-                  )
-
-                  error
-              end
-          end
-      end
+      spawn_worker(session, agent, provider, project_path, extra_opts)
     else
+      nil ->
+        {:error, {:unsupported_provider, nil}}
+
       {:error, reason} ->
         Logger.error(
-          "❌ start_agent_worker: failed to load session/agent for session.id=#{session_id} - #{inspect(reason)}"
+          "❌ start_agent_worker: failed for session.id=#{session_id} - #{inspect(reason)}"
         )
 
         {:error, reason}
+    end
+  end
+
+  defp resolve_project_path(session, agent) do
+    project_path_from_project = if agent.project, do: agent.project.path, else: nil
+
+    resolved =
+      session.git_worktree_path ||
+        agent.git_worktree_path ||
+        project_path_from_project
+
+    if is_nil(resolved) do
+      fallback = File.cwd!()
+
+      Logger.error(
+        "resolve_project_path: no path for session.id=#{session.id}; " <>
+          "session.git_worktree_path=#{inspect(session.git_worktree_path)}, " <>
+          "agent.git_worktree_path=#{inspect(agent.git_worktree_path)}, " <>
+          "project.path=#{inspect(project_path_from_project)} — falling back to cwd=#{fallback}"
+      )
+
+      fallback
+    else
+      resolved
+    end
+  end
+
+  defp ensure_session_uuid(session) do
+    if is_nil(session.uuid) or session.uuid == "" do
+      uuid = Ecto.UUID.generate()
+      Logger.info("ensure_session_uuid: generating UUID=#{uuid} for session.id=#{session.id}")
+
+      case Sessions.update_session(session, %{uuid: uuid}) do
+        {:ok, updated} -> {:ok, updated}
+        {:error, reason} -> {:error, {:session_update_failed, reason}}
+      end
+    else
+      {:ok, session}
+    end
+  end
+
+  defp spawn_worker(session, agent, provider, project_path, extra_opts) do
+    opts = [
+      session_id: session.id,
+      # eits_session_uuid: stable EITS session UUID, never changes after assignment.
+      # Used for EITS tracking, env vars, and hooks. Distinct from provider_conversation_id.
+      eits_session_uuid: session.uuid,
+      # provider_conversation_id: the provider's resume key.
+      #   Claude: pre-generated UUID matching Claude's --session-id flag
+      #   Codex:  same value initially, but gets overwritten by the Codex thread_id
+      #           when the thread.started event fires (via maybe_sync_provider_conversation_id)
+      provider_conversation_id: session.uuid,
+      agent_id: agent.id,
+      project_id: session.project_id,
+      project_path: project_path,
+      provider: provider,
+      worktree: extra_opts[:worktree]
+    ]
+
+    case DynamicSupervisor.start_child(
+           EyeInTheSkyWeb.Claude.AgentSupervisor,
+           {AgentWorker, opts}
+         ) do
+      {:ok, pid} ->
+        Logger.info(
+          "✅ spawn_worker: started for session.id=#{session.id}, pid=#{inspect(pid)}"
+        )
+
+        {:ok, pid, provider}
+
+      {:error, {:already_started, pid}} ->
+        Logger.info(
+          "spawn_worker: already started for session.id=#{session.id}, pid=#{inspect(pid)}"
+        )
+
+        {:ok, pid, provider}
+
+      {:error, reason} = error ->
+        Logger.error(
+          "❌ spawn_worker: failed for session.id=#{session.id} - #{inspect(reason)}"
+        )
+
+        error
     end
   end
 

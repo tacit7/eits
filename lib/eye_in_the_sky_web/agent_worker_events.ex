@@ -167,30 +167,30 @@ defmodule EyeInTheSkyWeb.AgentWorkerEvents do
     end)
   end
 
+  # Synchronous — no Task.start. The promotion must complete before the next
+  # event fires, and Task.start spawns a process outside the SQL sandbox in tests.
   defp promote_agent_if_pending(session_id) do
-    Task.start(fn ->
-      case Sessions.get_session(session_id) do
-        {:ok, session} when not is_nil(session.agent_id) ->
-          case Agents.get_agent(session.agent_id) do
-            {:ok, agent} when agent.status == "pending" ->
-              case Agents.update_agent(agent, %{status: "running"}) do
-                {:ok, _} ->
-                  Logger.info("[#{session_id}] Promoted agent #{agent.id} from pending to running")
+    case Sessions.get_session(session_id) do
+      {:ok, session} when not is_nil(session.agent_id) ->
+        case Agents.get_agent(session.agent_id) do
+          {:ok, agent} when agent.status == "pending" ->
+            case Agents.update_agent(agent, %{status: "running"}) do
+              {:ok, _} ->
+                Logger.info("[#{session_id}] Promoted agent #{agent.id} from pending to running")
 
-                {:error, reason} ->
-                  Logger.warning(
-                    "[#{session_id}] Failed to promote agent #{agent.id}: #{inspect(reason)}"
-                  )
-              end
+              {:error, reason} ->
+                Logger.warning(
+                  "[#{session_id}] Failed to promote agent #{agent.id}: #{inspect(reason)}"
+                )
+            end
 
-            _ ->
-              :ok
-          end
+          _ ->
+            :ok
+        end
 
-        _ ->
-          :ok
-      end
-    end)
+      _ ->
+        :ok
+    end
   end
 
   defp notify_agent_complete(session_id, provider_conversation_id) do

@@ -1,5 +1,23 @@
 # Documentation Update Suggestions
 
+## 2026-03-18
+**Commits reviewed**: 435f772..cdb8acd
+
+- **CODE_GUIDELINES.md**: Update module location references: AgentManager moved from `lib/eye_in_the_sky_web/claude/agent_manager.ex` to `lib/eye_in_the_sky_web/agents/agent_manager.ex`; document new modules InstructionBuilder, RuntimeContext, and Git.Worktrees with their responsibilities
+- **WORKERS.md** or **SESSION_MANAGER.md**: Document agent state lifecycle transitions: `:pending` (on :queued/:retry_queued admission) → `:running` (on SDK :started event) → `:failed` (on dispatch error); explain promote_agent_if_pending synchronous execution requirement for test sandbox safety
+- **WORKERS.md** or **SESSION_MANAGER.md**: Document worktree handling improvements: worktree reuse on repeated prepare calls, untracked file filtering in dirty check (git status --porcelain with ?? filter), and Git.Worktrees module structure
+- **REST_API.md**: Update DM endpoint docs: POST /api/v1/dm now accepts from_session_id/to_session_id (int FK) instead of sender_id/target_session_id; legacy params still supported for backward compatibility
+- **EITS_HOOKS.md** or **CHAT.md**: Document eits-dm skill for agents: teaches DM parsing of "DM from:<name> (session:<uuid>) <body>" format and reply flow via eits dm CLI; update eits CLI docs to show --from defaults to $EITS_SESSION_UUID
+- **CHAT.md**: Update typing indicator docs; clarify that ambient messages no longer trigger agent responses (only @direct and @all do); document per-channel sequential message numbering with backfill migration
+- **REST_API.md**: Add GET /api/v1/channels/:channel_id/messages endpoint documentation with pagination and CLI support via eits cli
+- **SESSION_MANAGER.md**: Document "stopped" session status (set by Stop hook, displays yellow left bar); clarify that "completed" status is now set explicitly via i-end-session skill (not auto-set on CLI exit)
+- **CODE_GUIDELINES.md** or **DM_FEATURES.md**: Document Quick Note modal and New Note CodeMirror editor: title/body textarea in modal, inline CodeMirror editor with Cmd+S save handler, parent_type resolution (system vs project), and InlineNoteCreatorHook JS integration
+- **CODE_GUIDELINES.md**: Document new Opus 4.6 1M model and Sonnet 4.5 1M addition to claude_models(), model_display_name helpers, and max effort option availability across all forms (DM page, agent drawer, session modal, jobs)
+- **CODEX_SDK.md**: Document restored Codex streaming pipeline: CodexStreamAssembler module for provider-polymorphic stream dispatch; provider-aware avatar/label in DM UI; stream_thinking assign for UI display
+- **SECURITY.md**: Document API key rotation system: api_keys table (key_hash, label, valid_until), HMAC-SHA256 hashing in hash_token/1, RequireAuth plug validation via valid_db_token?/1, eits.gen.api_key mix task integration, and backward compatibility with EITS_API_KEY env var
+- **SECURITY.md**: Document server-side session expiry: user_sessions table (uuid pk, session_token unique, expires_at), ValidateSession plug in :browser pipeline, 7-day TTL, and session token cookie handling
+- **UI_IMPROVEMENTS.md**: Document DM page textarea scroll fix for max-height input fields; kanban card accessibility fix (exclude interactive elements from SortableJS drag)
+
 ## 2026-03-17
 **Commits reviewed**: 569410e..435f772
 

@@ -62,61 +62,95 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
 
   defp create_records(opts) do
     agent_uuid = Ecto.UUID.generate()
-    provider = if opts[:agent_type] == "codex", do: "codex", else: "claude"
-
-    # For codex sessions, leave uuid null — Codex thread_id arrives via thread.started event
-    # and gets synced to the session via maybe_sync_provider_conversation_id.
-    # For claude sessions, pre-generate so the worker can reference it immediately.
-    session_uuid = if provider == "codex", do: nil, else: opts[:session_uuid] || Ecto.UUID.generate()
-
-    description = opts[:description] || "Agent session"
-
-    # Inherit project_id from parent session if not explicitly provided
-    project_id =
-      case opts[:project_id] do
-        nil ->
-          case opts[:parent_session_id] do
-            nil ->
-              nil
-
-            parent_id ->
-              case Sessions.get_session(parent_id) do
-                {:ok, parent} -> parent.project_id
-                _ -> nil
-              end
-          end
-
-        id ->
-          id
-      end
-
-    # When a worktree name is given, create the git worktree before DB records.
-    # If creation fails, return an error — do NOT silently fall back to the main project path.
-    worktree_result =
-      case opts[:worktree] do
-        nil ->
-          {:ok, opts[:project_path]}
-
-        wt ->
-          case Worktrees.prepare_session_worktree(opts[:project_path], wt) do
-            {:ok, _} = ok ->
-              ok
-
-            {:error, reason} = err ->
-              Logger.error(
-                "create_agent: git worktree setup failed for #{wt}: #{inspect(reason)}"
-              )
-
-              err
-          end
-      end
+    provider = resolve_provider(opts)
+    session_uuid = resolve_session_uuid(provider, opts)
+    description = resolve_description(opts)
+    project_id = resolve_project_id(opts)
 
     Logger.info(
       "📝 create_agent: agent_uuid=#{agent_uuid}, session_uuid=#{inspect(session_uuid)}, model=#{opts[:model]}, project_id=#{project_id}"
     )
 
-    with {:ok, session_worktree_path} <- worktree_result,
-         {:ok, agent} <-
+    with {:ok, worktree_path} <- resolve_worktree_path(opts) do
+      insert_agent_and_session(%{
+        agent_uuid: agent_uuid,
+        provider: provider,
+        session_uuid: session_uuid,
+        description: description,
+        project_id: project_id,
+        worktree_path: worktree_path,
+        opts: opts
+      })
+    end
+  end
+
+  defp resolve_provider(opts) do
+    if opts[:agent_type] == "codex", do: "codex", else: "claude"
+  end
+
+  defp resolve_session_uuid(provider, opts) do
+    # For codex sessions, leave uuid null — Codex thread_id arrives via thread.started event
+    # and gets synced to the session via maybe_sync_provider_conversation_id.
+    # For claude sessions, pre-generate so the worker can reference it immediately.
+    if provider == "codex", do: nil, else: opts[:session_uuid] || Ecto.UUID.generate()
+  end
+
+  defp resolve_description(opts) do
+    opts[:description] || "Agent session"
+  end
+
+  defp resolve_project_id(opts) do
+    # Inherit project_id from parent session if not explicitly provided
+    case opts[:project_id] do
+      nil ->
+        case opts[:parent_session_id] do
+          nil ->
+            nil
+
+          parent_id ->
+            case Sessions.get_session(parent_id) do
+              {:ok, parent} -> parent.project_id
+              _ -> nil
+            end
+        end
+
+      id ->
+        id
+    end
+  end
+
+  defp resolve_worktree_path(opts) do
+    # When a worktree name is given, create the git worktree before DB records.
+    # If creation fails, return an error — do NOT silently fall back to the main project path.
+    case opts[:worktree] do
+      nil ->
+        {:ok, opts[:project_path]}
+
+      wt ->
+        case Worktrees.prepare_session_worktree(opts[:project_path], wt) do
+          {:ok, _} = ok ->
+            ok
+
+          {:error, reason} = err ->
+            Logger.error(
+              "create_agent: git worktree setup failed for #{wt}: #{inspect(reason)}"
+            )
+
+            err
+        end
+    end
+  end
+
+  defp insert_agent_and_session(%{
+         agent_uuid: agent_uuid,
+         provider: provider,
+         session_uuid: session_uuid,
+         description: description,
+         project_id: project_id,
+         worktree_path: worktree_path,
+         opts: opts
+       }) do
+    with {:ok, agent} <-
            Agents.create_agent(%{
              uuid: agent_uuid,
              agent_type: opts[:agent_type] || "claude",
@@ -124,7 +158,7 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
              project_name: opts[:project_name],
              status: "working",
              description: description,
-             git_worktree_path: session_worktree_path,
+             git_worktree_path: worktree_path,
              parent_agent_id: opts[:parent_agent_id],
              parent_session_id: opts[:parent_session_id]
            }),
@@ -137,7 +171,7 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
              model: opts[:model],
              provider: provider,
              project_id: project_id,
-             git_worktree_path: session_worktree_path,
+             git_worktree_path: worktree_path,
              started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
              parent_agent_id: opts[:parent_agent_id],
              parent_session_id: opts[:parent_session_id]

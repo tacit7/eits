@@ -115,6 +115,26 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
   end
 
   @impl true
+  def handle_event("delete_session", %{"session_id" => session_id}, socket) do
+    with {:ok, session} <- Sessions.get_session(session_id),
+         {:ok, _} <- Sessions.delete_session(session) do
+      sessions = Sessions.list_session_overview_rows(limit: socket.assigns.page * @per_page, offset: 0)
+      total = Sessions.count_session_overview_rows()
+
+      socket =
+        socket
+        |> assign(:has_more, length(sessions) < total)
+        |> assign(:total_sessions, total)
+        |> stream(:sessions, sessions, reset: true)
+        |> put_flash(:info, "Session deleted")
+
+      {:noreply, socket}
+    else
+      {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to delete session")}
+    end
+  end
+
+  @impl true
   def handle_event("toggle_new_session_modal", _params, socket) do
     {:noreply, assign(socket, :show_new_session_modal, !socket.assigns.show_new_session_modal)}
   end
@@ -215,7 +235,18 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
                 project_name={session.project_name}
                 click_event="navigate_dm"
                 editing_session_id={@editing_session_id}
-              />
+              >
+                <:actions>
+                  <.icon_button
+                    icon="hero-archive-box-mini"
+                    on_click="archive_session"
+                    aria_label="Archive"
+                    color="warning"
+                    class="hidden sm:flex"
+                    values={%{"session_id" => session.id}}
+                  />
+                </:actions>
+              </.session_row>
             </div>
           </div>
         </div>

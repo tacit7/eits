@@ -362,10 +362,10 @@ cmd_agents() {
       # eits agents spawn --instructions <text> [--model <m>] [--provider <p>]
       #   [--project-id <n>] [--project-path <path>] [--worktree <branch>]
       #   [--effort-level <level>] [--parent-session-id <n>] [--parent-agent-id <n>]
-      #   [--team-name <name>] [--member-name <alias>] [--agent <name>]
+      #   [--team-name <name>] [--member-name <alias>] [--agent <name>] [--yolo]
       local instructions="" model="" provider="" project_id="" project_path=""
       local worktree="" effort_level="" parent_session_id="" parent_agent_id=""
-      local team_name="" member_name="" agent_name=""
+      local team_name="" member_name="" agent_name="" bypass_sandbox="false"
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --instructions)      instructions="$2";      shift 2 ;;
@@ -380,6 +380,7 @@ cmd_agents() {
           --team-name)         team_name="$2";         shift 2 ;;
           --member-name)       member_name="$2";       shift 2 ;;
           --agent)             agent_name="$2";        shift 2 ;;
+          --yolo)              bypass_sandbox="true";  shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -398,6 +399,7 @@ cmd_agents() {
         --argjson project_id        "${project_id:-null}" \
         --argjson parent_session_id "${parent_session_id:-null}" \
         --argjson parent_agent_id   "${parent_agent_id:-null}" \
+        --argjson bypass_sandbox    "$bypass_sandbox" \
         '{instructions: $instructions}
          + (if $model             != "" then {model: $model}                           else {} end)
          + (if $provider          != "" then {provider: $provider}                     else {} end)
@@ -409,7 +411,8 @@ cmd_agents() {
          + (if $agent             != "" then {agent: $agent}                           else {} end)
          + (if $project_id        != null then {project_id: $project_id}               else {} end)
          + (if $parent_session_id != null then {parent_session_id: $parent_session_id} else {} end)
-         + (if $parent_agent_id   != null then {parent_agent_id: $parent_agent_id}     else {} end)')
+         + (if $parent_agent_id   != null then {parent_agent_id: $parent_agent_id}     else {} end)
+         + (if $bypass_sandbox           then {bypass_sandbox: true}                   else {} end)')
       _post "/agents" "$payload"
       ;;
     *)

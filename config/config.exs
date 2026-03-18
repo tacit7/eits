@@ -11,6 +11,8 @@ config :eye_in_the_sky_web,
   ecto_repos: [EyeInTheSkyWeb.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+config :elixir, :time_zone_database, Tz.TimeZoneDatabase
+
 # Configures the endpoint
 config :eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint,
   url: [host: "localhost"],

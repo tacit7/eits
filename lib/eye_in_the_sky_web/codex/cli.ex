@@ -113,6 +113,7 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
     * `:resume` - `--resume <thread_id>`
     * `:model` - `-m <model>`
     * `:full_auto` - `--full-auto` (default: true)
+    * `:bypass_sandbox` - `--dangerously-bypass-approvals-and-sandbox` (overrides full_auto)
     * `:max_turns` - not directly supported by Codex; ignored
   """
   @spec build_args(cli_opts()) :: [String.t()]
@@ -141,9 +142,14 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
         args
       end
 
-    # Full auto mode (default true)
-    full_auto = Keyword.get(opts, :full_auto, true)
-    args = if full_auto, do: args ++ ["--full-auto"], else: args
+    # Bypass sandbox takes precedence over full_auto
+    args =
+      if Keyword.get(opts, :bypass_sandbox, false) do
+        args ++ ["--dangerously-bypass-approvals-and-sandbox"]
+      else
+        full_auto = Keyword.get(opts, :full_auto, true)
+        if full_auto, do: args ++ ["--full-auto"], else: args
+      end
 
     # Skip git repo check — allow running outside git repos
     args = args ++ ["--skip-git-repo-check"]

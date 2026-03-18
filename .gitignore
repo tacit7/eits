@@ -67,6 +67,8 @@ test_*.js
 
 # Git worktrees managed by Claude Code
 .claude/worktrees/
+/.claude/
+/priv/static/uploads/
 priv/cert/
 
 # Local env vars (use .env.example as template)

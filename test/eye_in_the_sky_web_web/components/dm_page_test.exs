@@ -102,12 +102,20 @@ defmodule EyeInTheSkyWebWeb.Components.DmPageTest do
   describe "mobile keyboard layout" do
     @project_root Path.expand("../../..", __DIR__)
     @dm_page_source Path.join([@project_root, "lib/eye_in_the_sky_web_web/components/dm_page.ex"])
+    @composer_source Path.join([
+                       @project_root,
+                       "lib/eye_in_the_sky_web_web/components/dm_page/composer.ex"
+                     ])
+    @messages_tab_source Path.join([
+                           @project_root,
+                           "lib/eye_in_the_sky_web_web/components/dm_page/messages_tab.ex"
+                         ])
     @dm_composer_js Path.join([@project_root, "assets/js/hooks/dm_composer.js"])
     @app_js Path.join([@project_root, "assets/js/app.js"])
 
     test "message form source declares DmComposer hook" do
       # Prevents regressions where the hook gets removed from the form.
-      source = File.read!(@dm_page_source)
+      source = File.read!(@composer_source)
 
       assert source =~ ~s(phx-hook="DmComposer"),
              "message-form must declare phx-hook=\"DmComposer\" for keyboard-aware scroll"
@@ -124,7 +132,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPageTest do
     end
 
     test "scroll anchor sentinel is present in messages list" do
-      source = File.read!(@dm_page_source)
+      source = File.read!(@messages_tab_source)
 
       assert source =~ ~s(id="messages-scroll-anchor"),
              "messages list must include the scroll anchor sentinel div"
@@ -134,7 +142,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPageTest do
     end
 
     test "send button has mobile-adequate touch target" do
-      source = File.read!(@dm_page_source)
+      source = File.read!(@composer_source)
 
       # Send button should be at least w-10 h-10 on mobile (40x40px meets WCAG 2.5.5)
       assert source =~ ~r/id="dm-send-button"[^>]*w-10 h-10|w-10 h-10[^>]*id="dm-send-button"/s,
@@ -142,14 +150,14 @@ defmodule EyeInTheSkyWebWeb.Components.DmPageTest do
     end
 
     test "stop button has mobile-adequate touch target" do
-      source = File.read!(@dm_page_source)
+      source = File.read!(@composer_source)
 
       assert source =~ ~r/id="dm-stop-button"[^>]*w-10 h-10|w-10 h-10[^>]*id="dm-stop-button"/s,
              "stop button must have w-10 h-10 touch target on mobile"
     end
 
     test "attach label has mobile-adequate touch target" do
-      source = File.read!(@dm_page_source)
+      source = File.read!(@composer_source)
 
       # Attach button (label wrapping file input) should be w-10 h-10 on mobile
       assert source =~ "w-10 h-10 sm:w-8 sm:h-8",

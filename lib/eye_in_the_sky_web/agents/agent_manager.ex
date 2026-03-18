@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
 
   alias EyeInTheSkyWeb.Agents.InstructionBuilder
   alias EyeInTheSkyWeb.Claude.AgentWorker
+  alias EyeInTheSkyWeb.Git.Worktrees
   alias EyeInTheSkyWeb.{Agents, Messages, Sessions}
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
@@ -89,31 +90,23 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
           id
       end
 
-    # When a worktree name is given, create the git worktree before DB records
+    # When a worktree name is given, create the git worktree before DB records.
+    # If creation fails, return an error — do NOT silently fall back to the main project path.
     worktree_result =
       case opts[:worktree] do
         nil ->
           {:ok, opts[:project_path]}
 
         wt ->
-          wt_path = Path.join([opts[:project_path], ".claude", "worktrees", wt])
-          branch = "worktree-#{wt}"
+          case Worktrees.prepare_session_worktree(opts[:project_path], wt) do
+            {:ok, _} = ok ->
+              ok
 
-          case check_clean_working_tree(opts[:project_path]) do
-            :ok ->
-              case ensure_git_worktree(opts[:project_path], wt_path, branch) do
-                :ok ->
-                  {:ok, wt_path}
+            {:error, reason} = err ->
+              Logger.error(
+                "create_agent: git worktree setup failed for #{wt}: #{inspect(reason)}"
+              )
 
-                {:error, reason} ->
-                  Logger.warning(
-                    "create_agent: git worktree creation failed for #{wt_path}: #{inspect(reason)}; falling back to project path"
-                  )
-
-                  {:ok, opts[:project_path]}
-              end
-
-            {:error, :dirty_working_tree} = err ->
               err
           end
       end
@@ -351,39 +344,4 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
 
   defp normalize_provider(provider) when provider in @supported_providers, do: provider
   defp normalize_provider(_provider), do: nil
-
-  defp check_clean_working_tree(repo_path) do
-    with {_, 0} <-
-           System.cmd("git", ["-C", repo_path, "diff", "--quiet"], stderr_to_stdout: true),
-         {_, 0} <-
-           System.cmd("git", ["-C", repo_path, "diff", "--cached", "--quiet"],
-             stderr_to_stdout: true
-           ) do
-      :ok
-    else
-      _ -> {:error, :dirty_working_tree}
-    end
-  end
-
-  defp ensure_git_worktree(repo_path, wt_path, branch) do
-    case System.cmd("git", ["-C", repo_path, "worktree", "add", wt_path, "-b", branch],
-           stderr_to_stdout: true
-         ) do
-      {_, 0} ->
-        :ok
-
-      {output, _} ->
-        if String.contains?(output, "already exists") or
-             String.contains?(output, "already checked out") do
-          case System.cmd("git", ["-C", repo_path, "worktree", "add", wt_path, branch],
-                 stderr_to_stdout: true
-               ) do
-            {_, 0} -> :ok
-            {err, code} -> {:error, {code, err}}
-          end
-        else
-          {:error, output}
-        end
-    end
-  end
 end

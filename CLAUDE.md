@@ -18,7 +18,8 @@ When using git worktrees, always verify you are editing files in the worktree di
 
 ```bash
 mix deps.get
-mix phx.server          # Start dev server on http://localhost:5001
+mix phx.server          # Start dev server on http://localhost:5000
+PORT=5002 mix phx.server # Override port via PORT env var (range 5000-5020)
 mix compile              # Compile only
 ```
 

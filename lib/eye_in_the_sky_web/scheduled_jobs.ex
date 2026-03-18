@@ -71,6 +71,15 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
       |> Map.put_new("updated_at", now)
       |> maybe_encode_config()
 
+    # For fs: agents (prompt_id is nil), check config for duplicate agent_file_id
+    if fs_agent_already_scheduled?(attrs) do
+      {:error, :already_scheduled}
+    else
+      create_job_insert(attrs)
+    end
+  end
+
+  defp create_job_insert(attrs) do
     changeset = ScheduledJob.changeset(%ScheduledJob{}, attrs)
 
     case Repo.insert(changeset) do
@@ -290,6 +299,39 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
       {k, v} when is_atom(k) -> {Atom.to_string(k), v}
       {k, v} -> {k, v}
     end)
+  end
+
+  defp fs_agent_already_scheduled?(attrs) do
+    # Only applies to fs: agents (no prompt_id, agent_file_id in config)
+    prompt_id = attrs["prompt_id"]
+
+    if prompt_id != nil and prompt_id != "" do
+      false
+    else
+      config_str = attrs["config"]
+
+      agent_file_id =
+        case config_str do
+          str when is_binary(str) ->
+            case Jason.decode(str) do
+              {:ok, %{"agent_file_id" => id}} when is_binary(id) -> id
+              _ -> nil
+            end
+
+          _ ->
+            nil
+        end
+
+      if agent_file_id do
+        from(j in ScheduledJob,
+          where: j.job_type == "spawn_agent" and is_nil(j.prompt_id),
+          where: fragment("config::jsonb->>'agent_file_id' = ?", ^agent_file_id)
+        )
+        |> Repo.exists?()
+      else
+        false
+      end
+    end
   end
 
   defp maybe_encode_config(attrs) do

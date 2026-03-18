@@ -37,7 +37,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentFileScanner do
   Returns nil if the ID is not a filesystem ID or the file doesn't exist.
   """
   def get_by_id("fs:" <> path) do
-    if File.regular?(path) do
+    if allowed_agent_path?(path) and File.regular?(path) do
       parse_agent_file(path, :unknown)
     else
       nil
@@ -55,6 +55,14 @@ defmodule EyeInTheSkyWeb.Claude.AgentFileScanner do
   # ---------------------------------------------------------------------------
   # Private
   # ---------------------------------------------------------------------------
+
+  defp allowed_agent_path?(path) do
+    expanded = Path.expand(path)
+    global = global_agents_dir()
+
+    String.starts_with?(expanded, global <> "/") or
+      String.contains?(expanded, "/.claude/agents/")
+  end
 
   defp global_agents_dir do
     Path.expand("~/.claude/agents")

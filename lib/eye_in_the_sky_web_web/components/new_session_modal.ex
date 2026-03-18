@@ -198,6 +198,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
+                  <option value="max">Max</option>
                 </select>
               </div>
             <% end %>

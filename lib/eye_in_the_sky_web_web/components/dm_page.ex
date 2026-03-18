@@ -1185,6 +1185,20 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                   <li>
                     <a
                       phx-click="select_model"
+                      phx-value-model="opus[1m]"
+                      phx-value-effort=""
+                      class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
+                    >
+                      <.icon name="hero-bolt" class="w-4 h-4 text-warning" />
+                      <div>
+                        <div class="text-sm font-semibold text-base-content/80">Opus 4.6 (1M)</div>
+                        <div class="text-[11px] text-base-content/40">Most capable, extended context</div>
+                      </div>
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      phx-click="select_model"
                       phx-value-model="sonnet"
                       phx-value-effort=""
                       class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
@@ -1193,6 +1207,20 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                       <div>
                         <div class="text-sm font-semibold text-base-content/80">Sonnet 4.5</div>
                         <div class="text-[11px] text-base-content/40">Everyday tasks</div>
+                      </div>
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      phx-click="select_model"
+                      phx-value-model="sonnet[1m]"
+                      phx-value-effort=""
+                      class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
+                    >
+                      <.icon name="hero-bolt" class="w-4 h-4 text-info" />
+                      <div>
+                        <div class="text-sm font-semibold text-base-content/80">Sonnet 4.5 (1M)</div>
+                        <div class="text-[11px] text-base-content/40">Everyday tasks, extended context</div>
                       </div>
                     </a>
                   </li>
@@ -1643,7 +1671,9 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   defp to_utc_string(_), do: ""
 
   defp model_display_name("opus"), do: "Opus 4.6"
+  defp model_display_name("opus[1m]"), do: "Opus 4.6 (1M)"
   defp model_display_name("sonnet"), do: "Sonnet 4.5"
+  defp model_display_name("sonnet[1m]"), do: "Sonnet 4.5 (1M)"
   defp model_display_name("haiku"), do: "Haiku 4.5"
   defp model_display_name("gpt-5.4"), do: "gpt-5.4"
   defp model_display_name("gpt-5.3-codex"), do: "gpt-5.3-codex"

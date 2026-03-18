@@ -13,6 +13,7 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
       {"sonnet", "Sonnet 4.5"},
       {"opus", "Opus 4.6"},
       {"sonnet[1m]", "Sonnet 4.5 (1M)"},
+      {"opus[1m]", "Opus 4.6 (1M)"},
       {"haiku", "Haiku 4.5"}
     ]
   end

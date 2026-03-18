@@ -60,6 +60,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewAgentDrawer do
                 <option value="low">Low • Faster and cheaper</option>
                 <option value="medium">Medium • Balanced approach</option>
                 <option value="high">High • Deeper reasoning (default)</option>
+                <option value="max">Max • Maximum effort</option>
               </select>
             </.form_field>
 

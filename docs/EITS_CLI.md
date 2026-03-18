@@ -164,9 +164,11 @@ eits jobs delete <id>
 ## dm
 
 ```bash
-eits dm [--from <sender_id>] --to <target_session_uuid> --message <text> [--response-required]
-# --from defaults to $EITS_AGENT_UUID
+eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
+# --from defaults to $EITS_SESSION_UUID or $EITS_SESSION_ID
 ```
+
+Both `--from` and `--to` accept either an integer session ID or a session UUID. `--from` is optional when running inside a Claude Code session.
 
 ---
 

@@ -30,6 +30,10 @@ defmodule EyeInTheSkyWebWeb.DmLive.StreamState do
     {:noreply, socket}
   end
 
+  def handle_stream_delta(_type, _content, socket) do
+    {:noreply, socket}
+  end
+
   def handle_stream_replace(:text, text, socket) do
     Logger.info(
       "[DmLive] stream_replace text, len=#{String.length(text)}, show=#{socket.assigns.show_live_stream}"
@@ -41,6 +45,10 @@ defmodule EyeInTheSkyWebWeb.DmLive.StreamState do
   def handle_stream_replace(:thinking, text, socket) do
     Logger.info("[DmLive] stream_replace thinking, len=#{String.length(text)}")
     {:noreply, assign(socket, :stream_thinking, text)}
+  end
+
+  def handle_stream_replace(_type, _content, socket) do
+    {:noreply, socket}
   end
 
   def handle_stream_clear(socket) do

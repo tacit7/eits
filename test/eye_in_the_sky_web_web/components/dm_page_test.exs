@@ -161,6 +161,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPageTest do
              "dm_composer.js hook must exist at assets/js/hooks/dm_composer.js"
 
       content = File.read!(@dm_composer_js)
+
       assert content =~ "visualViewport",
              "DmComposer hook must subscribe to visualViewport events"
 
@@ -194,7 +195,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPageTest do
     @project_root Path.expand("../../..", __DIR__)
     @dm_page_source Path.join([@project_root, "lib/eye_in_the_sky_web_web/components/dm_page.ex"])
     @dm_live_source Path.join([@project_root, "lib/eye_in_the_sky_web_web/live/dm_live.ex"])
-    @new_task_drawer_source Path.join([@project_root, "lib/eye_in_the_sky_web_web/components/new_task_drawer.ex"])
+    @new_task_drawer_source Path.join([
+                              @project_root,
+                              "lib/eye_in_the_sky_web_web/components/new_task_drawer.ex"
+                            ])
 
     test "NewTaskDrawer is NOT rendered inside dm_page.ex (notes_tab)" do
       source = File.read!(@dm_page_source)

@@ -84,7 +84,14 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
 
     case Repo.insert(changeset) do
       {:ok, job} ->
-        next = compute_next_run_at(job.schedule_type, job.schedule_value, nil, job.timezone || "Etc/UTC")
+        next =
+          compute_next_run_at(
+            job.schedule_type,
+            job.schedule_value,
+            nil,
+            job.timezone || "Etc/UTC"
+          )
+
         {:ok, _} = update_job_fields(job, %{next_run_at: next})
         {:ok, Repo.get!(ScheduledJob, job.id)}
 
@@ -110,7 +117,14 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
         if Map.has_key?(attrs, "next_run_at") do
           {:ok, Repo.get!(ScheduledJob, updated.id)}
         else
-          next = compute_next_run_at(updated.schedule_type, updated.schedule_value, nil, updated.timezone || "Etc/UTC")
+          next =
+            compute_next_run_at(
+              updated.schedule_type,
+              updated.schedule_value,
+              nil,
+              updated.timezone || "Etc/UTC"
+            )
+
           update_job_fields(updated, %{next_run_at: next})
           {:ok, Repo.get!(ScheduledJob, updated.id)}
         end
@@ -287,7 +301,9 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
 
   def mark_job_executed(job) do
     now = NaiveDateTime.utc_now()
-    next = compute_next_run_at(job.schedule_type, job.schedule_value, now, job.timezone || "Etc/UTC")
+
+    next =
+      compute_next_run_at(job.schedule_type, job.schedule_value, now, job.timezone || "Etc/UTC")
 
     update_job_fields(job, %{
       last_run_at: iso_now(),

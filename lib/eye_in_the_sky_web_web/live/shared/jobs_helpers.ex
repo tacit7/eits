@@ -217,6 +217,7 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.JobsHelpers do
   def month_name(m), do: m
 
   def parse_cron_num("*"), do: {:ok, :any}
+
   def parse_cron_num("*/" <> step) do
     case Integer.parse(step) do
       {n, ""} -> {:step, n}

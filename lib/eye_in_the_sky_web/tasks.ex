@@ -122,7 +122,10 @@ defmodule EyeInTheSkyWeb.Tasks do
   def get_current_task_for_session(session_id) do
     Task
     |> join(:inner, [t], ts in "task_sessions", on: ts.task_id == t.id)
-    |> where([t, ts], ts.session_id == ^session_id and t.state_id == ^WorkflowState.in_progress_id())
+    |> where(
+      [t, ts],
+      ts.session_id == ^session_id and t.state_id == ^WorkflowState.in_progress_id()
+    )
     |> order_by([t], desc: t.updated_at)
     |> limit(1)
     |> preload([:state])
@@ -224,11 +227,14 @@ defmodule EyeInTheSkyWeb.Tasks do
   Archives a task (sets archived = true). Non-destructive.
   """
   def archive_task(%Task{} = task) do
-    result = update_task(task, %{archived: true, updated_at: DateTime.utc_now() |> DateTime.to_iso8601()})
+    result =
+      update_task(task, %{archived: true, updated_at: DateTime.utc_now() |> DateTime.to_iso8601()})
+
     case result do
       {:ok, updated} -> broadcast_change({:updated, updated})
       _ -> :ok
     end
+
     result
   end
 

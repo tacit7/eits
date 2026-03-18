@@ -29,22 +29,27 @@ defmodule EyeInTheSkyWeb.ScheduledJobsTest do
       |> String.trim("-")
       |> then(&"#{&1}-#{System.unique_integer([:positive])}")
 
-    {:ok, p} = Prompts.create_prompt(%{
-      name: name,
-      slug: slug,
-      prompt_text: "Do the thing",
-      active: true
-    })
+    {:ok, p} =
+      Prompts.create_prompt(%{
+        name: name,
+        slug: slug,
+        prompt_text: "Do the thing",
+        active: true
+      })
+
     p
   end
 
   defp spawn_agent_attrs(overrides \\ %{}) do
-    Map.merge(%{
-      "name" => "Test Agent Job",
-      "job_type" => "spawn_agent",
-      "schedule_type" => "cron",
-      "schedule_value" => "0 5 * * *"
-    }, overrides)
+    Map.merge(
+      %{
+        "name" => "Test Agent Job",
+        "job_type" => "spawn_agent",
+        "schedule_type" => "cron",
+        "schedule_value" => "0 5 * * *"
+      },
+      overrides
+    )
   end
 
   defp job_attrs(overrides \\ %{}) do
@@ -344,6 +349,7 @@ defmodule EyeInTheSkyWeb.ScheduledJobsTest do
         "schedule_value" => "0 5 * * *",
         "prompt_id" => 999
       }
+
       cs = ScheduledJob.changeset(%ScheduledJob{}, attrs)
       assert cs.changes.prompt_id == 999
     end
@@ -400,8 +406,17 @@ defmodule EyeInTheSkyWeb.ScheduledJobsTest do
   describe "create_job/1 duplicate prompt_id" do
     test "returns {:error, :already_scheduled}" do
       prompt = create_prompt("Dupe")
-      {:ok, _} = ScheduledJobs.create_job(spawn_agent_attrs(%{"prompt_id" => prompt.id, "name" => "First"}))
-      result = ScheduledJobs.create_job(spawn_agent_attrs(%{"prompt_id" => prompt.id, "name" => "Second"}))
+
+      {:ok, _} =
+        ScheduledJobs.create_job(
+          spawn_agent_attrs(%{"prompt_id" => prompt.id, "name" => "First"})
+        )
+
+      result =
+        ScheduledJobs.create_job(
+          spawn_agent_attrs(%{"prompt_id" => prompt.id, "name" => "Second"})
+        )
+
       assert result == {:error, :already_scheduled}
     end
   end

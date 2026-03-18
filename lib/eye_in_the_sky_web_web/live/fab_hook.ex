@@ -86,13 +86,15 @@ defmodule EyeInTheSkyWebWeb.FabHook do
 
           messages =
             Messages.list_recent_messages(session.id, 20)
-            |> Enum.map(&%{
-              id: &1.id,
-              session_id: &1.session_id,
-              body: &1.body,
-              sender_role: &1.sender_role,
-              inserted_at: to_string(&1.inserted_at)
-            })
+            |> Enum.map(
+              &%{
+                id: &1.id,
+                session_id: &1.session_id,
+                body: &1.body,
+                sender_role: &1.sender_role,
+                inserted_at: to_string(&1.inserted_at)
+              }
+            )
 
           push_event(socket, "config_guide_history", %{messages: messages})
 

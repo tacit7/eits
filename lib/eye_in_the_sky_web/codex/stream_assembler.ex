@@ -85,7 +85,11 @@ defmodule EyeInTheSkyWeb.Codex.StreamAssembler do
   end
 
   # Thinking block (complete) — Codex reasoning items
-  def handle_message(%__MODULE__{} = stream, %Message{type: :thinking, content: text, delta: false})
+  def handle_message(%__MODULE__{} = stream, %Message{
+        type: :thinking,
+        content: text,
+        delta: false
+      })
       when is_binary(text) and text != "" do
     {stream, [{:stream_replace, :thinking, text}]}
   end
@@ -93,7 +97,11 @@ defmodule EyeInTheSkyWeb.Codex.StreamAssembler do
   # Tool use — partial (item.started) shows tool name as in-progress
   def handle_message(
         %__MODULE__{} = stream,
-        %Message{type: :tool_use, content: %{name: name, input: input}, metadata: %{partial: true}}
+        %Message{
+          type: :tool_use,
+          content: %{name: name, input: input},
+          metadata: %{partial: true}
+        }
       ) do
     events = [{:stream_delta, :tool_use, name}]
 

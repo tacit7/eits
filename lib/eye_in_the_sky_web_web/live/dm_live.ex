@@ -1,7 +1,18 @@
 defmodule EyeInTheSkyWebWeb.DmLive do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.{Sessions, Agents, Checkpoints, Commits, Messages, Notes, Repo, Tasks, Projects}
+  alias EyeInTheSkyWeb.{
+    Sessions,
+    Agents,
+    Checkpoints,
+    Commits,
+    Messages,
+    Notes,
+    Repo,
+    Tasks,
+    Projects
+  }
+
   alias EyeInTheSkyWeb.Agents.AgentManager
   alias EyeInTheSkyWeb.Claude.{AgentWorker, SessionReader}
   alias EyeInTheSkyWeb.FileAttachments
@@ -104,7 +115,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         {:ok, socket |> put_flash(:error, "Session not found") |> redirect(to: "/")}
 
       {:agent, {:error, :not_found}} ->
-        {:ok, socket |> put_flash(:error, "Agent not found for this session") |> redirect(to: "/")}
+        {:ok,
+         socket |> put_flash(:error, "Agent not found for this session") |> redirect(to: "/")}
     end
   end
 
@@ -464,7 +476,10 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     session_uuid = socket.assigns.session_uuid
 
     # Reject anything that isn't a canonical UUID to prevent AppleScript injection
-    unless Regex.match?(~r/\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/, session_uuid) do
+    unless Regex.match?(
+             ~r/\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/,
+             session_uuid
+           ) do
       {:noreply, put_flash(socket, :error, "Invalid session UUID")}
     else
       dir =
@@ -569,7 +584,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     # Process.exit does NOT call terminate/2 for non-trapping GenServers, so the CLI keeps running.
     case Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session_id}) do
       [{pid, _}] ->
-        Logger.warning("kill_session: stopping worker pid=#{inspect(pid)} for session=#{session_id}")
+        Logger.warning(
+          "kill_session: stopping worker pid=#{inspect(pid)} for session=#{session_id}"
+        )
 
         try do
           GenServer.stop(pid, :shutdown, 3000)
@@ -655,7 +672,10 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       socket =
         socket
         |> load_tab_data("messages", socket.assigns.session_id)
-        |> assign(:checkpoints, Checkpoints.list_checkpoints_for_session(socket.assigns.session_id))
+        |> assign(
+          :checkpoints,
+          Checkpoints.list_checkpoints_for_session(socket.assigns.session_id)
+        )
 
       {:noreply, put_flash(socket, :info, "Restored to checkpoint")}
     else
@@ -699,7 +719,11 @@ defmodule EyeInTheSkyWebWeb.DmLive do
          true <- checkpoint.session_id == socket.assigns.session_id,
          {:ok, _} <- Checkpoints.delete_checkpoint(checkpoint) do
       {:noreply,
-       assign(socket, :checkpoints, Checkpoints.list_checkpoints_for_session(socket.assigns.session_id))}
+       assign(
+         socket,
+         :checkpoints,
+         Checkpoints.list_checkpoints_for_session(socket.assigns.session_id)
+       )}
     else
       _ ->
         {:noreply, put_flash(socket, :error, "Failed to delete checkpoint")}
@@ -1028,12 +1052,17 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
       {:ok, project_path} ->
         case SessionReader.read_usage(socket.assigns.session_uuid, project_path) do
-          {:ok, tokens, cost} -> {tokens, cost}
-          _ -> {Messages.total_tokens_for_session(session_id), Messages.total_cost_for_session(session_id)}
+          {:ok, tokens, cost} ->
+            {tokens, cost}
+
+          _ ->
+            {Messages.total_tokens_for_session(session_id),
+             Messages.total_cost_for_session(session_id)}
         end
 
       _ ->
-        {Messages.total_tokens_for_session(session_id), Messages.total_cost_for_session(session_id)}
+        {Messages.total_tokens_for_session(session_id),
+         Messages.total_cost_for_session(session_id)}
     end
   end
 
@@ -1042,9 +1071,14 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     {messages, has_more} = load_message_data(socket, tab, session_id)
 
     {total_tokens, total_cost} =
-      maybe_load_value(tab, "messages", {socket.assigns[:total_tokens], socket.assigns[:total_cost]}, fn ->
-        read_session_usage_stats(socket, session_id)
-      end)
+      maybe_load_value(
+        tab,
+        "messages",
+        {socket.assigns[:total_tokens], socket.assigns[:total_cost]},
+        fn ->
+          read_session_usage_stats(socket, session_id)
+        end
+      )
 
     current_task =
       maybe_load_value(tab, ["messages", "tasks"], socket.assigns[:current_task], fn ->
@@ -1052,9 +1086,14 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       end)
 
     {context_used, context_window} =
-      maybe_load_value(tab, "messages", {socket.assigns[:context_used], socket.assigns[:context_window]}, fn ->
-        extract_context_window(messages)
-      end)
+      maybe_load_value(
+        tab,
+        "messages",
+        {socket.assigns[:context_used], socket.assigns[:context_window]},
+        fn ->
+          extract_context_window(messages)
+        end
+      )
 
     socket
     |> assign(:messages, messages)
@@ -1363,24 +1402,24 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         show_create_checkpoint={@active_overlay == :checkpoint}
       />
 
-    <EyeInTheSkyWebWeb.Components.NewTaskDrawer.new_task_drawer
-      id="dm-new-task-drawer"
-      show={@active_overlay == :task_drawer}
-      workflow_states={@workflow_states}
-      toggle_event="toggle_new_task_drawer"
-      submit_event="create_new_task"
-    />
+      <EyeInTheSkyWebWeb.Components.NewTaskDrawer.new_task_drawer
+        id="dm-new-task-drawer"
+        show={@active_overlay == :task_drawer}
+        workflow_states={@workflow_states}
+        toggle_event="toggle_new_task_drawer"
+        submit_event="create_new_task"
+      />
 
-    <EyeInTheSkyWebWeb.Components.TaskDetailDrawer.task_detail_drawer
-      id="dm-task-detail-drawer"
-      show={@active_overlay == :task_detail}
-      task={@selected_task}
-      notes={@task_notes}
-      workflow_states={@workflow_states}
-      toggle_event="toggle_task_detail_drawer"
-      update_event="update_task"
-      delete_event="delete_task"
-    />
+      <EyeInTheSkyWebWeb.Components.TaskDetailDrawer.task_detail_drawer
+        id="dm-task-detail-drawer"
+        show={@active_overlay == :task_detail}
+        task={@selected_task}
+        notes={@task_notes}
+        workflow_states={@workflow_states}
+        toggle_event="toggle_task_detail_drawer"
+        update_event="update_task"
+        delete_event="delete_task"
+      />
     </div>
     """
   end
@@ -1450,5 +1489,4 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         {:error, :no_project_path}
     end
   end
-
 end

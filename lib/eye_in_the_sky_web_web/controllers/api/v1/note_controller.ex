@@ -136,11 +136,11 @@ defmodule EyeInTheSkyWebWeb.Api.V1.NoteController do
   defp parse_starred(val) when is_integer(val), do: val
   defp parse_starred(true), do: 1
   defp parse_starred(false), do: 0
+
   defp parse_starred(val) when is_binary(val) do
     case Integer.parse(val) do
       {n, ""} -> n
       _ -> nil
     end
   end
-
 end

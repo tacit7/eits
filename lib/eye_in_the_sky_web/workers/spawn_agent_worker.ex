@@ -57,7 +57,10 @@ defmodule EyeInTheSkyWeb.Workers.SpawnAgentWorker do
       |> maybe_put(:skip_permissions, config["skip_permissions"])
 
     log_opts = Keyword.drop(opts, [:instructions])
-    Logger.info("[telemetry] spawn_agent_worker job_id=#{job.id} name=#{job.name} opts=#{inspect(log_opts)}")
+
+    Logger.info(
+      "[telemetry] spawn_agent_worker job_id=#{job.id} name=#{job.name} opts=#{inspect(log_opts)}"
+    )
 
     case AgentManager.create_agent(opts) do
       {:ok, %{session: session}} ->

@@ -167,7 +167,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               <div class="flex flex-col min-w-0 flex-1">
                 <div class="flex items-center gap-2 min-w-0">
                   <%= if @agent.entrypoint == "cli" do %>
-                    <.icon name="hero-command-line" class="w-4 h-4 text-base-content/40 flex-shrink-0" />
+                    <.icon
+                      name="hero-command-line"
+                      class="w-4 h-4 text-base-content/40 flex-shrink-0"
+                    />
                   <% end %>
                   <input
                     type="text"
@@ -294,8 +297,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                       data-confirm="This will delete all messages and re-import from the JSONL file. Continue?"
                       class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
                     >
-                      <.icon name="hero-arrow-path" class="w-3.5 h-3.5" />
-                      Reload from file
+                      <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Reload from file
                     </button>
                   </li>
                   <li>
@@ -303,8 +305,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                       phx-click="export_jsonl"
                       class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
                     >
-                      <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" />
-                      Export as JSONL
+                      <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Export as JSONL
                     </button>
                   </li>
                   <li>
@@ -312,8 +313,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                       phx-click="export_markdown"
                       class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
                     >
-                      <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" />
-                      Export as Markdown
+                      <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Export as Markdown
                     </button>
                   </li>
                   <li><hr class="border-base-content/10 my-1" /></li>
@@ -345,7 +345,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
 
         <%!-- Compacting indicator --%>
         <%= if @compacting do %>
-          <div class="px-5 py-2 border-t border-orange-500/20 bg-orange-500/5" id="dm-compacting-strip">
+          <div
+            class="px-5 py-2 border-t border-orange-500/20 bg-orange-500/5"
+            id="dm-compacting-strip"
+          >
             <div class="flex items-center gap-2">
               <div class="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse flex-shrink-0" />
               <span class="text-[11px] font-medium text-warning/80">Compacting context...</span>
@@ -416,7 +419,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
 
       <%!-- Composer (pinned to bottom) --%>
       <%= if @active_tab in ["messages", nil] do %>
-        <div id="dm-page-composer" class="flex-shrink-0 max-w-4xl mx-auto w-full pt-2 safe-inset-bottom">
+        <div
+          id="dm-page-composer"
+          class="flex-shrink-0 max-w-4xl mx-auto w-full pt-2 safe-inset-bottom"
+        >
           <%!-- Prompt queue panel (shown when queue non-empty) --%>
           <%= if @queued_prompts != [] do %>
             <.prompt_queue prompts={@queued_prompts} />
@@ -439,7 +445,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           />
         </div>
       <% end %>
-
     </div>
     """
   end
@@ -692,7 +697,11 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :message, :map, required: true
 
   defp message_body(assigns) do
-    body = if dm_message?(assigns.message), do: strip_dm_prefix(assigns.message.body), else: assigns.message.body
+    body =
+      if dm_message?(assigns.message),
+        do: strip_dm_prefix(assigns.message.body),
+        else: assigns.message.body
+
     segments = parse_body_segments(body)
     thinking = get_in(assigns.message.metadata || %{}, ["thinking"])
     stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
@@ -749,9 +758,11 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :body, :string, default: ""
 
   defp tool_result_body(assigns) do
-
     ~H"""
-    <details open class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden">
+    <details
+      open
+      class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden"
+    >
       <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
         <.icon name="hero-code-bracket" class="w-3.5 h-3.5 flex-shrink-0 text-base-content/30" />
         <span class="text-[11px] font-mono font-semibold text-base-content/40 uppercase tracking-wide flex-shrink-0">
@@ -990,7 +1001,9 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                   class="dropdown-content menu z-[1] w-52 rounded-xl border border-base-content/8 bg-base-100 p-1.5 shadow-lg"
                   id="effort-selector-menu"
                 >
-                  <li class="menu-title text-[10px] px-3 pt-1 pb-0.5 text-base-content/40">Effort Level</li>
+                  <li class="menu-title text-[10px] px-3 pt-1 pb-0.5 text-base-content/40">
+                    Effort Level
+                  </li>
                   <%= for {label, value, desc, icon_color} <- [
                     {"Low", "low", "Faster and cheaper", "text-success"},
                     {"Medium", "medium", "Balanced (default)", "text-info"},
@@ -1027,11 +1040,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         <div class="inline-flex items-center gap-2">
           <%= if @context_window > 0 and @context_used > 0 do %>
             <% pct = Float.round(@context_used / @context_window * 100, 1) %>
-            <% color_class = cond do
-              pct < 60 -> "text-base-content/30"
-              pct < 80 -> "text-warning/70"
-              true -> "text-error/70"
-            end %>
+            <% color_class =
+              cond do
+                pct < 60 -> "text-base-content/30"
+                pct < 80 -> "text-warning/70"
+                true -> "text-error/70"
+              end %>
             <span
               class={"inline-flex items-center gap-1 text-[11px] font-mono tabular-nums " <> color_class}
               title={"#{format_number(@context_used)} / #{format_number(@context_window)} tokens used"}
@@ -1183,7 +1197,9 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                       <.icon name="hero-bolt" class="w-4 h-4 text-warning" />
                       <div>
                         <div class="text-sm font-semibold text-base-content/80">Opus 4.6 (1M)</div>
-                        <div class="text-[11px] text-base-content/40">Most capable, extended context</div>
+                        <div class="text-[11px] text-base-content/40">
+                          Most capable, extended context
+                        </div>
                       </div>
                     </a>
                   </li>
@@ -1211,7 +1227,9 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                       <.icon name="hero-bolt" class="w-4 h-4 text-info" />
                       <div>
                         <div class="text-sm font-semibold text-base-content/80">Sonnet 4.5 (1M)</div>
-                        <div class="text-[11px] text-base-content/40">Everyday tasks, extended context</div>
+                        <div class="text-[11px] text-base-content/40">
+                          Everyday tasks, extended context
+                        </div>
                       </div>
                     </a>
                   </li>
@@ -1338,85 +1356,99 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 <.icon name="hero-pencil-square" class="w-4 h-4 md:w-3.5 md:h-3.5" />
               </button>
 
-            <%!-- Collapse (status dot + title + expandable content) --%>
-            <div class={["collapse flex-1", has_expandable && "collapse-arrow"]}>
-              <input type="checkbox" class="min-h-0 p-0" disabled={!has_expandable} />
-              <div class="collapse-title py-3.5 px-0 min-h-0 flex items-center gap-3">
-                <%!-- Status dot --%>
-                <div class="flex-shrink-0 w-5 flex justify-center">
-                  <%= if task.state_id == WorkflowState.in_progress_id() do %>
-                    <span class="relative flex h-2 w-2">
-                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-info opacity-50"></span>
-                      <span class="relative inline-flex rounded-full h-2 w-2 bg-info"></span>
-                    </span>
-                  <% else %>
-                    <span class={[
-                      "inline-flex rounded-full h-2 w-2",
-                      task.state_id == WorkflowState.done_id() && "bg-success",
-                      task.state_id == WorkflowState.in_review_id() && "bg-warning",
-                      task.state_id not in [WorkflowState.in_progress_id(), WorkflowState.done_id(), WorkflowState.in_review_id()] && "bg-base-content/20"
-                    ]}></span>
-                  <% end %>
-                </div>
-
-                <%!-- Content --%>
-                <div class="flex-1 min-w-0">
-                  <span class={[
-                    "text-[13px] font-medium truncate block",
-                    task.completed_at && "text-base-content/40 line-through",
-                    !task.completed_at && "text-base-content/85"
-                  ]}>
-                    {String.trim(task.title || "")}
-                  </span>
-                  <div class="flex items-center gap-1.5 mt-0.5 text-[11px]">
-                    <%= if task.state do %>
+              <%!-- Collapse (status dot + title + expandable content) --%>
+              <div class={["collapse flex-1", has_expandable && "collapse-arrow"]}>
+                <input type="checkbox" class="min-h-0 p-0" disabled={!has_expandable} />
+                <div class="collapse-title py-3.5 px-0 min-h-0 flex items-center gap-3">
+                  <%!-- Status dot --%>
+                  <div class="flex-shrink-0 w-5 flex justify-center">
+                    <%= if task.state_id == WorkflowState.in_progress_id() do %>
+                      <span class="relative flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-info opacity-50">
+                        </span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-info"></span>
+                      </span>
+                    <% else %>
                       <span class={[
-                        "font-medium",
-                        task.state_id == WorkflowState.in_progress_id() && "text-info/80",
-                        task.state_id == WorkflowState.done_id() && "text-success/80",
-                        task.state_id == WorkflowState.in_review_id() && "text-warning/80",
-                        task.state_id not in [WorkflowState.in_progress_id(), WorkflowState.done_id(), WorkflowState.in_review_id()] && "text-base-content/45"
+                        "inline-flex rounded-full h-2 w-2",
+                        task.state_id == WorkflowState.done_id() && "bg-success",
+                        task.state_id == WorkflowState.in_review_id() && "bg-warning",
+                        task.state_id not in [
+                          WorkflowState.in_progress_id(),
+                          WorkflowState.done_id(),
+                          WorkflowState.in_review_id()
+                        ] && "bg-base-content/20"
                       ]}>
-                        {task.state.name}
-                      </span>
-                    <% end %>
-                    <%= if task.tags && length(task.tags) > 0 do %>
-                      <span class="text-base-content/15">&middot;</span>
-                      <span class="text-base-content/35">
-                        {Enum.map_join(Enum.take(task.tags, 2), ", ", & &1.name)}
-                      </span>
-                    <% end %>
-                    <span class="text-base-content/15">&middot;</span>
-                    <span class="font-mono text-base-content/30">
-                      {String.slice(task.uuid || to_string(task.id), 0..7)}
-                    </span>
-                    <%= if Map.get(task, :notes_count, 0) > 0 do %>
-                      <span class="text-base-content/15">&middot;</span>
-                      <span class="flex items-center gap-0.5 text-base-content/35">
-                        <.icon name="hero-chat-bubble-bottom-center-text" class="w-3 h-3" />
-                        {Map.get(task, :notes_count)}
                       </span>
                     <% end %>
                   </div>
-                </div>
-              </div>
-              <%= if has_expandable do %>
-                <div class="collapse-content px-0 pt-0 pb-4 pl-8">
-                  <%= if task.description do %>
-                    <div class="text-sm text-base-content/65 leading-relaxed whitespace-pre-wrap mb-2">{String.trim(task.description)}</div>
-                  <% end %>
-                  <%= for note <- Map.get(task, :notes, []) do %>
-                    <div class="mt-1.5 rounded-lg bg-base-200/60 px-3 py-2">
-                      <%= if note.title do %>
-                        <div class="text-[11px] font-semibold text-base-content/60 mb-0.5">{note.title}</div>
+
+                  <%!-- Content --%>
+                  <div class="flex-1 min-w-0">
+                    <span class={[
+                      "text-[13px] font-medium truncate block",
+                      task.completed_at && "text-base-content/40 line-through",
+                      !task.completed_at && "text-base-content/85"
+                    ]}>
+                      {String.trim(task.title || "")}
+                    </span>
+                    <div class="flex items-center gap-1.5 mt-0.5 text-[11px]">
+                      <%= if task.state do %>
+                        <span class={[
+                          "font-medium",
+                          task.state_id == WorkflowState.in_progress_id() && "text-info/80",
+                          task.state_id == WorkflowState.done_id() && "text-success/80",
+                          task.state_id == WorkflowState.in_review_id() && "text-warning/80",
+                          task.state_id not in [
+                            WorkflowState.in_progress_id(),
+                            WorkflowState.done_id(),
+                            WorkflowState.in_review_id()
+                          ] && "text-base-content/45"
+                        ]}>
+                          {task.state.name}
+                        </span>
                       <% end %>
-                      <pre class="whitespace-pre-wrap text-xs text-base-content/55 font-mono leading-relaxed">{note.body}</pre>
+                      <%= if task.tags && length(task.tags) > 0 do %>
+                        <span class="text-base-content/15">&middot;</span>
+                        <span class="text-base-content/35">
+                          {Enum.map_join(Enum.take(task.tags, 2), ", ", & &1.name)}
+                        </span>
+                      <% end %>
+                      <span class="text-base-content/15">&middot;</span>
+                      <span class="font-mono text-base-content/30">
+                        {String.slice(task.uuid || to_string(task.id), 0..7)}
+                      </span>
+                      <%= if Map.get(task, :notes_count, 0) > 0 do %>
+                        <span class="text-base-content/15">&middot;</span>
+                        <span class="flex items-center gap-0.5 text-base-content/35">
+                          <.icon name="hero-chat-bubble-bottom-center-text" class="w-3 h-3" />
+                          {Map.get(task, :notes_count)}
+                        </span>
+                      <% end %>
                     </div>
-                  <% end %>
+                  </div>
                 </div>
-              <% end %>
+                <%= if has_expandable do %>
+                  <div class="collapse-content px-0 pt-0 pb-4 pl-8">
+                    <%= if task.description do %>
+                      <div class="text-sm text-base-content/65 leading-relaxed whitespace-pre-wrap mb-2">
+                        {String.trim(task.description)}
+                      </div>
+                    <% end %>
+                    <%= for note <- Map.get(task, :notes, []) do %>
+                      <div class="mt-1.5 rounded-lg bg-base-200/60 px-3 py-2">
+                        <%= if note.title do %>
+                          <div class="text-[11px] font-semibold text-base-content/60 mb-0.5">
+                            {note.title}
+                          </div>
+                        <% end %>
+                        <pre class="whitespace-pre-wrap text-xs text-base-content/55 font-mono leading-relaxed">{note.body}</pre>
+                      </div>
+                    <% end %>
+                  </div>
+                <% end %>
+              </div>
             </div>
-          </div>
           <% end %>
         </div>
       <% end %>
@@ -1424,8 +1456,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         phx-click="toggle_new_task_drawer"
         class="flex items-center gap-2 w-full px-3 py-3 rounded-xl text-sm text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 active:bg-base-content/10 transition-colors border border-dashed border-base-content/15 hover:border-base-content/25"
       >
-        <.icon name="hero-plus" class="w-4 h-4" />
-        Add task
+        <.icon name="hero-plus" class="w-4 h-4" /> Add task
       </button>
     </div>
     """
@@ -1589,12 +1620,14 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         <% end %>
       </div>
     <% end %>
-
     """
   end
 
   defp dm_message?(%{from_session_id: id}) when is_integer(id), do: true
-  defp dm_message?(%{metadata: %{"from_session_uuid" => uuid}}) when is_binary(uuid) and uuid != "", do: true
+
+  defp dm_message?(%{metadata: %{"from_session_uuid" => uuid}})
+       when is_binary(uuid) and uuid != "", do: true
+
   defp dm_message?(_), do: false
 
   defp message_sender_name(%{sender_role: "user"}), do: "You"
@@ -1743,7 +1776,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
         [name, rest] = match
         {:tool_call, name, String.trim(rest)}
 
-      # session_worker format: Tool: ToolName\n{json}
+      # Tool: ToolName\n{json} format
       match = Regex.run(~r/^Tool: ([^\n]+)\n(.*)/s, trimmed, capture: :all_but_first) ->
         [name, json_rest] = match
         {:tool_call, String.trim(name), String.trim(json_rest)}

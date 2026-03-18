@@ -55,10 +55,10 @@ end
 # parsed .env to work around dotenvy not setting new system env vars.
 webauthn_extra_raw =
   System.get_env("WEBAUTHN_EXTRA_ORIGINS") ||
-    (case Dotenvy.source([".env"]) do
-       {:ok, env} -> env["WEBAUTHN_EXTRA_ORIGINS"]
-       _ -> nil
-     end)
+    case Dotenvy.source([".env"]) do
+      {:ok, env} -> env["WEBAUTHN_EXTRA_ORIGINS"]
+      _ -> nil
+    end
 
 if webauthn_extra_raw do
   origins =

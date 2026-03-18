@@ -1,21 +1,21 @@
-# Codex SDK — Session Lifecycle
+# Codex Integration
 
-How EITS creates, runs, and resumes Codex (OpenAI) sessions.
+How EITS creates, runs, streams, and resumes Codex (OpenAI) sessions.
 
 ## Architecture
 
 ```
-UI (new agent form)
-  → AgentManager.create_agent/1
-    → create_records/1          (Agent + Session rows, uuid=nil for Codex)
-    → send_message/3            (initial prompt)
-      → lookup_or_start/2       (starts AgentWorker GenServer)
-        → start_agent_worker/2  (auto-generates UUID if nil, saves to DB)
-          → AgentWorker.init/1  (provider_conversation_id = session.uuid)
-            → start_codex_sdk/2
-              → Codex.SDK.start/2
-                → Codex.CLI.spawn_new_session/2
-                  → Port.open (codex exec --json ...)
+UI (new agent form, agent_type="codex")
+  -> AgentManager.create_agent/1
+    -> create_records/1          (Agent + Session rows, uuid=nil for Codex)
+    -> send_message/3            (initial prompt)
+      -> lookup_or_start/2       (starts AgentWorker GenServer)
+        -> start_agent_worker/2  (auto-generates UUID if nil, saves to DB)
+          -> AgentWorker.init/1  (stream = CodexStreamAssembler.new())
+            -> start_codex_sdk/2
+              -> Codex.SDK.start/2
+                -> Codex.CLI.spawn_new_session/2
+                  -> Port.open (codex exec --json ...)
 ```
 
 ## Session UUID Lifecycle
@@ -36,7 +36,7 @@ This is intentional. The real session identifier is the Codex **thread_id**, whi
 When the worker starts and `session.uuid` is nil, `start_agent_worker/2` generates a temporary UUID and saves it to the DB. This ensures `provider_conversation_id` is never nil in the worker state:
 
 ```elixir
-# agent_manager.ex — start_agent_worker/2
+# agent_manager.ex -- start_agent_worker/2
 session =
   if is_nil(session.uuid) or session.uuid == "" do
     uuid = Ecto.UUID.generate()
@@ -74,6 +74,46 @@ On subsequent messages to the same session:
 4. CLI builds: `codex exec resume <thread_id> --json --full-auto ...`
 
 Codex stores session history locally at `$CODEX_HOME/sessions` for up to 30 days.
+
+## Streaming Pipeline
+
+### Provider-Polymorphic Dispatch
+
+AgentWorker uses struct-based dispatch to route stream events to the correct assembler module. The `stream` field in the worker state holds either a `%StreamAssembler{}` (Claude) or `%CodexStreamAssembler{}` (Codex):
+
+```elixir
+# AgentWorker.init/1
+stream: stream_assembler_for(provider)
+
+# Dispatch helpers pattern-match on struct type
+defp stream_assembler_for("codex"), do: CodexStreamAssembler.new()
+defp stream_assembler_for(_provider), do: StreamAssembler.new()
+
+defp stream_handle_message(%CodexStreamAssembler{} = s, msg), do: CodexStreamAssembler.handle_message(s, msg)
+defp stream_handle_message(%StreamAssembler{} = s, msg), do: StreamAssembler.handle_message(s, msg)
+```
+
+All message handlers in AgentWorker call these dispatch helpers instead of any assembler module directly.
+
+### Codex.StreamAssembler
+
+Unlike Claude's delta-based `StreamAssembler`, the Codex version handles complete items:
+
+- **Text blocks** replace the buffer entirely (`{:stream_replace, :text, text}`)
+- **Thinking blocks** emit `{:stream_replace, :thinking, text}`
+- **Tool use** (partial/complete) emits `{:stream_delta, :tool_use, name}` and `{:stream_tool_input, name, input}`
+- **Tool deltas and block stops** are no-ops (Codex items arrive complete)
+
+The assembler implements the same interface as Claude's (`new/0`, `reset/1`, `buffer/1`, `handle_message/2`, `handle_tool_delta/2`, `handle_tool_block_stop/1`) so the worker dispatches uniformly.
+
+### DM LiveView Streaming UI
+
+The DM page renders stream events provider-aware:
+
+- **Provider avatar**: Claude shows `claude.svg`, Codex shows `openai.svg`
+- **Provider label**: "Claude" vs "Codex" in the stream bubble header
+- **Thinking display**: Codex reasoning items render as italic text above tool/content output
+- **Message provider**: User messages are tagged with the session's provider, not hardcoded "claude"
 
 ## JSONL Event Types
 
@@ -113,7 +153,9 @@ Passed to the `codex` process itself via `Port.open {:env, env}`. These are avai
 
 ### 2. CLI `-c` flags (`build_args`)
 
-Injected as `shell_environment_policy.set.VAR=value` args. These bypass Codex's default env var filtering (which excludes patterns like `KEY`, `SECRET`, `TOKEN`) and are available in all shell commands the agent runs.
+Injected as `-c shell_environment_policy.set.VAR="value"` args. These bypass Codex's default env var filtering (which excludes patterns like `KEY`, `SECRET`, `TOKEN`) and are available in all shell commands the agent runs.
+
+**Important**: All values MUST be quoted as TOML strings. Codex's config parser uses TOML, so bare integers like `1756` cause `invalid type: integer, expected a string` errors. The CLI wraps all values: `shell_environment_policy.set.KEY="value"`.
 
 Variables passed:
 
@@ -137,11 +179,12 @@ The first message to a new Codex session is prepended with `codex_eits_init/1`, 
 |--------|------|------|
 | `Codex.CLI` | `lib/eye_in_the_sky_web/codex/cli.ex` | Port spawning, arg building, env setup |
 | `Codex.SDK` | `lib/eye_in_the_sky_web/codex/sdk.ex` | High-level API; message protocol adapter |
-| `Codex.Parser` | `lib/eye_in_the_sky_web/codex/parser.ex` | JSONL line → Message struct |
-| `Codex.StreamAssembler` | `lib/eye_in_the_sky_web/codex/stream_assembler.ex` | Stream state for PubSub events |
+| `Codex.Parser` | `lib/eye_in_the_sky_web/codex/parser.ex` | JSONL line -> Message struct |
+| `Codex.StreamAssembler` | `lib/eye_in_the_sky_web/codex/stream_assembler.ex` | Stream state for Codex PubSub events |
+| `Claude.StreamAssembler` | `lib/eye_in_the_sky_web/claude/stream_assembler.ex` | Stream state for Claude PubSub events |
 | `AgentWorker` | `lib/eye_in_the_sky_web/claude/agent_worker.ex` | Provider-polymorphic worker |
 | `AgentManager` | `lib/eye_in_the_sky_web/claude/agent_manager.ex` | Session creation, worker lifecycle |
-| `WorkerEvents` | `lib/eye_in_the_sky_web/claude/worker_events.ex` | DB persistence, PubSub broadcasts |
+| `WorkerEvents` | `lib/eye_in_the_sky_web/agent_worker_events.ex` | DB persistence, PubSub broadcasts |
 
 ## Streaming vs Claude
 
@@ -149,7 +192,20 @@ The first message to a new Codex session is prepended with `codex_eits_init/1`, 
 |--------|--------|-------|
 | Output format | SSE (Server-Sent Events) | JSONL (one JSON object per line) |
 | Text delivery | Character-by-character deltas | Complete blocks per item |
-| Stream event | `{:stream_delta, :text, delta}` | `{:stream_replace, :text, text}` |
+| Stream assembler | `Claude.StreamAssembler` | `Codex.StreamAssembler` |
+| Text event | `{:stream_delta, :text, delta}` | `{:stream_replace, :text, text}` |
+| Thinking event | `{:stream_delta, :thinking, delta}` | `{:stream_replace, :thinking, text}` |
+| Tool deltas | Accumulates JSON fragments | No-op (items arrive complete) |
 | Session ID source | First API response | `thread.started` event |
 | Resume command | `claude --resume <uuid>` | `codex exec resume <thread_id>` |
 | Local persistence | `~/.claude/sessions/` | `$CODEX_HOME/sessions/` (30 days) |
+| Binary | `claude` (Node.js) | `codex` (Rust) |
+| Auth env var | `ANTHROPIC_API_KEY` | `OPENAI_API_KEY` |
+
+## Known Issues and Gotchas
+
+- **TOML quoting**: All `-c shell_environment_policy.set.*` values must be double-quoted. Bare integers cause Codex to exit with code 1 and no output.
+- **No stderr separation**: Codex CLI merges stderr into stdout (`:stderr_to_stdout`). Parse errors or startup failures appear as raw text lines, not structured JSONL.
+- **Singular/plural item types**: Codex docs reference singular names (`file_change`) but some builds emit plural (`file_changes`). Parser accepts both.
+- **thread_id vs session UUID**: The auto-generated fallback UUID is temporary. After `thread.started` fires, the real thread_id replaces it. Any external reference to the session UUID may see the old value if captured before sync.
+- **Exit code 1 with no output**: Usually means a config error (bad model name, TOML parse failure, missing API key). The Codex binary validates config before producing any JSONL.

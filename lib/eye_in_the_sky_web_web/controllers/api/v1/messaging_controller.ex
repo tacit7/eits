@@ -137,9 +137,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
           end
 
         {:error, reason} ->
-          Logger.error(
-            "DM routing failed for session #{to_session.id}: #{inspect(reason)}"
-          )
+          Logger.error("DM routing failed for session #{to_session.id}: #{inspect(reason)}")
 
           conn
           |> put_status(:internal_server_error)

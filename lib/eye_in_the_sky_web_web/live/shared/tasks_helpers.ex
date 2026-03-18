@@ -31,8 +31,7 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.TasksHelpers do
   def handle_open_task_detail(_params, socket), do: {:noreply, socket}
 
   def handle_toggle_task_detail_drawer(_params, socket) do
-    {:noreply,
-     assign(socket, :show_task_detail_drawer, !socket.assigns.show_task_detail_drawer)}
+    {:noreply, assign(socket, :show_task_detail_drawer, !socket.assigns.show_task_detail_drawer)}
   end
 
   # ---------------------------------------------------------------------------

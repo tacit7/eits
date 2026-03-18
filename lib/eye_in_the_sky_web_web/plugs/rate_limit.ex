@@ -18,10 +18,10 @@ defmodule EyeInTheSkyWebWeb.Plugs.RateLimit do
   import Plug.Conn
 
   @rules %{
-    ["auth", "login", "challenge"]    => {10, :timer.minutes(1)},
-    ["auth", "login", "complete"]     => {5, :timer.minutes(5)},
+    ["auth", "login", "challenge"] => {10, :timer.minutes(1)},
+    ["auth", "login", "complete"] => {5, :timer.minutes(5)},
     ["auth", "register", "challenge"] => {5, :timer.hours(1)},
-    ["auth", "register", "complete"]  => {5, :timer.hours(1)}
+    ["auth", "register", "complete"] => {5, :timer.hours(1)}
   }
 
   def init(opts), do: opts

@@ -67,7 +67,8 @@ defmodule EyeInTheSkyWeb.Checkpoints do
   Returns `{:ok, deleted_count}` or `{:error, reason}`.
   """
   def restore_checkpoint(%Checkpoint{} = checkpoint) do
-    deleted = Messages.truncate_messages_after_index(checkpoint.session_id, checkpoint.message_index)
+    deleted =
+      Messages.truncate_messages_after_index(checkpoint.session_id, checkpoint.message_index)
 
     if checkpoint.git_stash_ref do
       session = Repo.get(EyeInTheSkyWeb.Sessions.Session, checkpoint.session_id)
@@ -107,11 +108,21 @@ defmodule EyeInTheSkyWeb.Checkpoints do
     else
       with {:ok, agent} <- get_or_create_fork_agent(original_session, attrs),
            {:ok, new_session} <- create_fork_session(original_session, agent, checkpoint, attrs),
-           :ok <- copy_messages_to_fork(checkpoint.session_id, new_session.id, checkpoint.message_index) do
+           :ok <-
+             copy_messages_to_fork(
+               checkpoint.session_id,
+               new_session.id,
+               checkpoint.message_index
+             ) do
         if checkpoint.git_stash_ref && original_session.git_worktree_path &&
              File.dir?(original_session.git_worktree_path) do
           branch_name = attrs[:branch_name] || "fork/session-#{new_session.id}"
-          create_branch_from_stash(original_session.git_worktree_path, checkpoint.git_stash_ref, branch_name)
+
+          create_branch_from_stash(
+            original_session.git_worktree_path,
+            checkpoint.git_stash_ref,
+            branch_name
+          )
         end
 
         {:ok, new_session}
@@ -209,7 +220,9 @@ defmodule EyeInTheSkyWeb.Checkpoints do
   end
 
   defp create_fork_session(original_session, agent, checkpoint, attrs) do
-    name = attrs[:session_name] || "Fork: #{original_session.name || "session #{original_session.id}"}"
+    name =
+      attrs[:session_name] || "Fork: #{original_session.name || "session #{original_session.id}"}"
+
     now = DateTime.utc_now() |> DateTime.to_iso8601()
 
     Sessions.create_session(%{

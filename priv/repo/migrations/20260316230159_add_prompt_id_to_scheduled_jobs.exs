@@ -9,14 +9,17 @@ defmodule EyeInTheSkyWeb.Repo.Migrations.AddPromptIdToScheduledJobs do
     create index(:scheduled_jobs, [:prompt_id])
 
     create unique_index(:scheduled_jobs, [:prompt_id],
-      where: "prompt_id IS NOT NULL",
-      name: :idx_scheduled_jobs_unique_prompt
-    )
+             where: "prompt_id IS NOT NULL",
+             name: :idx_scheduled_jobs_unique_prompt
+           )
   end
 
   def down do
     drop_if_exists index(:scheduled_jobs, [:prompt_id])
-    drop_if_exists unique_index(:scheduled_jobs, [:prompt_id], name: :idx_scheduled_jobs_unique_prompt)
+
+    drop_if_exists unique_index(:scheduled_jobs, [:prompt_id],
+                     name: :idx_scheduled_jobs_unique_prompt
+                   )
 
     alter table(:scheduled_jobs) do
       remove :prompt_id

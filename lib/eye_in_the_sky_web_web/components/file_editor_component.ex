@@ -41,17 +41,17 @@ defmodule EyeInTheSkyWebWeb.Components.FileEditorComponent do
   @doc "Infer CodeMirror language string from file path extension."
   def infer_lang(path) when is_binary(path) do
     case Path.extname(path) do
-      ".ex"   -> "elixir"
-      ".exs"  -> "elixir"
-      ".js"   -> "javascript"
-      ".ts"   -> "javascript"
-      ".css"  -> "css"
+      ".ex" -> "elixir"
+      ".exs" -> "elixir"
+      ".js" -> "javascript"
+      ".ts" -> "javascript"
+      ".css" -> "css"
       ".html" -> "html"
       ".heex" -> "html"
-      ".md"   -> "markdown"
-      ".sh"   -> "shell"
+      ".md" -> "markdown"
+      ".sh" -> "shell"
       ".bash" -> "shell"
-      _       -> "text"
+      _ -> "text"
     end
   end
 

@@ -136,19 +136,59 @@ defmodule EyeInTheSkyWebWeb.Helpers.FileHelpers do
   def is_binary_file?(path) do
     binary_extensions = [
       # Executables and libraries
-      ".so", ".dll", ".dylib", ".exe", ".bin", ".o", ".a", ".lib",
+      ".so",
+      ".dll",
+      ".dylib",
+      ".exe",
+      ".bin",
+      ".o",
+      ".a",
+      ".lib",
       # Archives
-      ".zip", ".tar", ".gz", ".bz2", ".xz", ".7z", ".rar",
+      ".zip",
+      ".tar",
+      ".gz",
+      ".bz2",
+      ".xz",
+      ".7z",
+      ".rar",
       # Images
-      ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".ico", ".svg", ".webp",
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".gif",
+      ".bmp",
+      ".ico",
+      ".svg",
+      ".webp",
       # Media
-      ".mp3", ".mp4", ".avi", ".mov", ".mkv", ".wav", ".flac",
+      ".mp3",
+      ".mp4",
+      ".avi",
+      ".mov",
+      ".mkv",
+      ".wav",
+      ".flac",
       # Documents
-      ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+      ".pdf",
+      ".doc",
+      ".docx",
+      ".xls",
+      ".xlsx",
+      ".ppt",
+      ".pptx",
       # Databases
-      ".db", ".sqlite", ".sqlite3", ".db-shm", ".db-wal",
+      ".db",
+      ".sqlite",
+      ".sqlite3",
+      ".db-shm",
+      ".db-wal",
       # Others
-      ".wasm", ".beam", ".class", ".jar", ".war"
+      ".wasm",
+      ".beam",
+      ".class",
+      ".jar",
+      ".war"
     ]
 
     extension = path |> Path.extname() |> String.downcase()

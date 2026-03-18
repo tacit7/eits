@@ -1,7 +1,9 @@
 defmodule EyeInTheSkyWebWeb.Components.SessionCard do
   use Phoenix.Component
   import EyeInTheSkyWebWeb.CoreComponents
-  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1, derive_display_status: 1, truncate_text: 1]
+
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers,
+    only: [relative_time: 1, derive_display_status: 1, truncate_text: 1]
 
   alias EyeInTheSkyWeb.Sessions
 
@@ -71,14 +73,16 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
           phx-update="ignore"
           data-agent-id={Map.get(@session, :agent) && Map.get(@session, :agent).uuid}
           data-session-id={@session.uuid}
-          data-agent-name={@session.name || (Map.get(@session, :agent) && Map.get(@session, :agent).description) || "Agent"}
+          data-agent-name={
+            @session.name || (Map.get(@session, :agent) && Map.get(@session, :agent).description) ||
+              "Agent"
+          }
           data-agent-status={@session.status}
           data-swipe-fav="true"
           class="bookmark-button w-[53px] flex flex-col items-center justify-center gap-1 bg-[#f43f5e] text-white text-[9px] font-bold uppercase tracking-wide border-none"
           aria-label="Bookmark session"
         >
-          <.icon name="hero-heart" class="bookmark-icon w-5 h-5" />
-          Fav
+          <.icon name="hero-heart" class="bookmark-icon w-5 h-5" /> Fav
         </button>
         <%!-- Rename --%>
         <button
@@ -88,8 +92,7 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
           class="w-[53px] flex flex-col items-center justify-center gap-1 bg-[#6366f1] text-white text-[9px] font-bold uppercase tracking-wide border-none"
           aria-label="Rename session"
         >
-          <.icon name="hero-pencil-square" class="w-5 h-5" />
-          Rename
+          <.icon name="hero-pencil-square" class="w-5 h-5" /> Rename
         </button>
         <%!-- Archive --%>
         <button
@@ -99,8 +102,7 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
           class="w-[53px] flex flex-col items-center justify-center gap-1 bg-[#f59e0b] text-white text-[9px] font-bold uppercase tracking-wide border-none"
           aria-label="Archive session"
         >
-          <.icon name="hero-archive-box" class="w-5 h-5" />
-          Archive
+          <.icon name="hero-archive-box" class="w-5 h-5" /> Archive
         </button>
       </div>
 
@@ -156,7 +158,9 @@ defmodule EyeInTheSkyWebWeb.Components.SessionCard do
               </form>
             <% else %>
               <span class="text-[13px] font-medium text-base-content/85 truncate">
-                {@session.name || truncate_text(Map.get(@session, :agent) && Map.get(@session, :agent).description) || "Unnamed session"}
+                {@session.name ||
+                  truncate_text(Map.get(@session, :agent) && Map.get(@session, :agent).description) ||
+                  "Unnamed session"}
               </span>
             <% end %>
           </div>

@@ -21,22 +21,17 @@ defmodule EyeInTheSkyWeb.Application do
       {Phoenix.PubSub, name: EyeInTheSkyWeb.PubSub},
       # Task supervisor for fire-and-forget async work
       {Task.Supervisor, name: EyeInTheSkyWeb.TaskSupervisor},
-      # Registry for per-session worker lookups (duplicate keys: ref + session_id)
-      {Registry, keys: :duplicate, name: EyeInTheSkyWeb.Claude.Registry},
       # Unique registry for agent worker naming (:via requires unique keys)
       {Registry, keys: :unique, name: EyeInTheSkyWeb.Claude.AgentRegistry},
       # Unique registry for chat worker naming (one per channel)
       {Registry, keys: :unique, name: EyeInTheSkyWeb.Claude.ChatRegistry},
       # SDK registry for tracking running Claude CLI processes
       EyeInTheSkyWeb.Claude.SDK.Registry,
-      # DynamicSupervisor for per-session workers
-      {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.SessionSupervisor, strategy: :one_for_one},
       # DynamicSupervisor for persistent agent workers
-      {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.AgentSupervisor, strategy: :one_for_one, max_children: 50},
+      {DynamicSupervisor,
+       name: EyeInTheSkyWeb.Claude.AgentSupervisor, strategy: :one_for_one, max_children: 50},
       # DynamicSupervisor for per-channel chat workers
       {DynamicSupervisor, name: EyeInTheSkyWeb.Claude.ChatSupervisor, strategy: :one_for_one},
-      # Claude CLI session coordinator
-      EyeInTheSkyWeb.Claude.SessionManager,
       # Oban job processing (includes Cron plugin for JobDispatcherWorker)
       {Oban, Application.fetch_env!(:eye_in_the_sky_web, Oban)},
       # React to session lifecycle events and update team member state

@@ -44,7 +44,9 @@ defmodule EyeInTheSkyWeb.Codex.SDKTest do
     end
 
     test "returns {:ok, ref, handler_pid} with mock CLI" do
-      {:ok, ref, _handler} = SDK.resume("thread-123", "continue", to: self(), project_path: "/tmp")
+      {:ok, ref, _handler} =
+        SDK.resume("thread-123", "continue", to: self(), project_path: "/tmp")
+
       assert is_reference(ref)
 
       SDK.cancel(ref)

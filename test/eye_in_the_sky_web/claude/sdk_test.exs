@@ -105,7 +105,11 @@ defmodule EyeInTheSkyWeb.Claude.SDKTest do
       caller_pid = spawn(fn -> Process.sleep(:infinity) end)
 
       {:ok, ref, _handler} =
-        SDK.start("hello", to: caller_pid, cli_module: EyeInTheSkyWeb.Claude.MockCLI, model: "haiku")
+        SDK.start("hello",
+          to: caller_pid,
+          cli_module: EyeInTheSkyWeb.Claude.MockCLI,
+          model: "haiku"
+        )
 
       mock_port = SDK.Registry.lookup(ref)
       assert is_pid(mock_port)

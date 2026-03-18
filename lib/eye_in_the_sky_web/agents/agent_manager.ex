@@ -157,9 +157,7 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
             ok
 
           {:error, reason} = err ->
-            Logger.error(
-              "create_agent: git worktree setup failed for #{wt}: #{inspect(reason)}"
-            )
+            Logger.error("create_agent: git worktree setup failed for #{wt}: #{inspect(reason)}")
 
             err
         end
@@ -246,9 +244,7 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
 
         case GenServer.call(pid, {:submit_message, message, context}) do
           {:ok, admission} ->
-            Logger.debug(
-              "send_message: #{admission} for session_id=#{session_id}"
-            )
+            Logger.debug("send_message: #{admission} for session_id=#{session_id}")
 
             {:ok, admission}
 
@@ -385,9 +381,7 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
            {AgentWorker, opts}
          ) do
       {:ok, pid} ->
-        Logger.info(
-          "✅ spawn_worker: started for session.id=#{session.id}, pid=#{inspect(pid)}"
-        )
+        Logger.info("✅ spawn_worker: started for session.id=#{session.id}, pid=#{inspect(pid)}")
 
         {:ok, pid, provider}
 
@@ -399,9 +393,7 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
         {:ok, pid, provider}
 
       {:error, reason} = error ->
-        Logger.error(
-          "❌ spawn_worker: failed for session.id=#{session.id} - #{inspect(reason)}"
-        )
+        Logger.error("❌ spawn_worker: failed for session.id=#{session.id} - #{inspect(reason)}")
 
         error
     end

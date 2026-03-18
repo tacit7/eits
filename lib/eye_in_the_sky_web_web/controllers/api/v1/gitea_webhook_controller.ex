@@ -66,11 +66,18 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
         json(conn, %{success: true, message: "Ignored: #{event} #{params["action"]}"})
       end
     else
-      {:error, :unauthorized} -> unauthorized(conn)
+      {:error, :unauthorized} ->
+        unauthorized(conn)
+
       {:error, :missing_repo} ->
-        conn |> put_status(:bad_request) |> json(%{error: "Missing repository.full_name in payload"})
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Missing repository.full_name in payload"})
+
       {:error, :project_path_not_configured} ->
-        conn |> put_status(:internal_server_error) |> json(%{error: "Server misconfigured: project_path not set"})
+        conn
+        |> put_status(:internal_server_error)
+        |> json(%{error: "Server misconfigured: project_path not set"})
     end
   end
 
@@ -102,9 +109,13 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
         json(conn, %{success: true, message: "Ignored: #{event} by #{commenter}"})
       end
     else
-      {:error, :unauthorized} -> unauthorized(conn)
+      {:error, :unauthorized} ->
+        unauthorized(conn)
+
       {:error, :missing_repo} ->
-        conn |> put_status(:bad_request) |> json(%{error: "Missing repository.full_name in payload"})
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Missing repository.full_name in payload"})
     end
   end
 
@@ -156,9 +167,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
           Logger.warning("Gitea webhook: no secret configured, allowing unsigned (dev opt-in)")
           :ok
         else
-          Logger.error(
-            "Gitea webhook: GITEA_WEBHOOK_SECRET not set — rejecting unsigned request"
-          )
+          Logger.error("Gitea webhook: GITEA_WEBHOOK_SECRET not set — rejecting unsigned request")
 
           {:error, :unauthorized}
         end

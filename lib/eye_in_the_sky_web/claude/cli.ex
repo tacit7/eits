@@ -392,7 +392,10 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
 
         cmd_string = "claude " <> Enum.join(safe_log_args(args), " ")
         Logger.info("Spawning Claude in #{project_path}: #{cmd_string}")
-        Logger.info("CLI env: CLAUDE_CODE_EFFORT_LEVEL=#{inspect(opts[:effort_level])} max_budget_usd=#{inspect(opts[:max_budget_usd])}")
+
+        Logger.info(
+          "CLI env: CLAUDE_CODE_EFFORT_LEVEL=#{inspect(opts[:effort_level])} max_budget_usd=#{inspect(opts[:max_budget_usd])}"
+        )
 
         handler_pid =
           spawn_link(fn ->
@@ -416,7 +419,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
 
         port =
           if use_script do
-            # Use script wrapper for interactive sessions (SessionWorker)
+            # Use script wrapper for interactive sessions
             script_args = ["-q", "/dev/null", claude_path] ++ args
 
             Port.open(

@@ -11,7 +11,6 @@ defmodule EyeInTheSkyWeb.Agents do
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Agents.Agent
 
-
   @doc """
   Returns the list of agents.
   """

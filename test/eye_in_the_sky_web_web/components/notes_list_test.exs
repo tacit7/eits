@@ -7,16 +7,25 @@ defmodule EyeInTheSkyWebWeb.Components.NotesListTest do
   alias EyeInTheSkyWeb.Projects
 
   defp build_note(overrides \\ %{}) do
-    {:ok, project} = Projects.create_project(%{
-      name: "test-#{System.unique_integer()}",
-      path: "/tmp/test",
-      slug: "test-#{System.unique_integer()}"
-    })
-    {:ok, note} = Notes.create_note(Map.merge(%{
-      parent_type: "project",
-      parent_id: to_string(project.id),
-      body: "# Test note\n\nsome content"
-    }, overrides))
+    {:ok, project} =
+      Projects.create_project(%{
+        name: "test-#{System.unique_integer()}",
+        path: "/tmp/test",
+        slug: "test-#{System.unique_integer()}"
+      })
+
+    {:ok, note} =
+      Notes.create_note(
+        Map.merge(
+          %{
+            parent_type: "project",
+            parent_id: to_string(project.id),
+            body: "# Test note\n\nsome content"
+          },
+          overrides
+        )
+      )
+
     note
   end
 

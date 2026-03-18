@@ -251,13 +251,15 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
       <div class="flex border-b border-base-300 px-4">
         <button
           class={"tab tab-bordered #{if @active_tab == :all_jobs, do: "tab-active"}"}
-          phx-click="switch_tab" phx-value-tab="all_jobs"
+          phx-click="switch_tab"
+          phx-value-tab="all_jobs"
         >
           All Jobs
         </button>
         <button
           class={"tab tab-bordered #{if @active_tab == :agent_schedules, do: "tab-active"}"}
-          phx-click="switch_tab" phx-value-tab="agent_schedules"
+          phx-click="switch_tab"
+          phx-value-tab="agent_schedules"
         >
           Schedule Agents
         </button>
@@ -346,298 +348,318 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
       <% end %>
 
       <%= if @active_tab == :all_jobs do %>
-      <%!-- Filter Toolbar --%>
-      <form phx-change="filter_jobs" class="flex flex-wrap gap-2 my-4">
-        <input
-          type="text"
-          name="search"
-          class="input input-bordered input-sm flex-1 min-w-[200px]"
-          placeholder="Search by name or description…"
-          value={@search_query}
-          phx-debounce="200"
-        />
-        <select name="type" class="select select-bordered select-sm">
-          <option value="all" selected={@filter_type == "all"}>All Types</option>
-          <option value="shell_command" selected={@filter_type == "shell_command"}>Shell</option>
-          <option value="spawn_agent" selected={@filter_type == "spawn_agent"}>Agent</option>
-          <option value="mix_task" selected={@filter_type == "mix_task"}>Mix</option>
-        </select>
-        <select name="status" class="select select-bordered select-sm">
-          <option value="all" selected={@filter_status == "all"}>All Status</option>
-          <option value="enabled" selected={@filter_status == "enabled"}>Enabled</option>
-          <option value="disabled" selected={@filter_status == "disabled"}>Disabled</option>
-        </select>
-        <select name="origin" class="select select-bordered select-sm">
-          <option value="all" selected={@filter_origin == "all"}>All Origins</option>
-          <option value="system" selected={@filter_origin == "system"}>System</option>
-          <option value="user" selected={@filter_origin == "user"}>User</option>
-        </select>
-      </form>
-      <%!-- Jobs Table --%>
-      <%= if length(@jobs) > 0 do %>
-        <div class="md:hidden space-y-3">
-          <%= for job <- @jobs do %>
-            <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
-            <article class={"rounded-xl border border-base-content/10 bg-base-100 p-3 shadow-sm #{row_border_class(job_state)}"}>
-              <button
-                class="w-full text-left"
-                phx-click="expand_job"
-                phx-value-id={job.id}
-              >
-                <div class="flex items-start justify-between gap-2">
-                  <div class="min-w-0">
-                    <div class="flex items-center gap-1.5">
-                      <h3 class="font-medium text-sm truncate">{job.name}</h3>
-                      <%= if job_state == :running do %>
-                        <span class="badge badge-warning badge-xs animate-pulse shrink-0">running</span>
-                      <% end %>
-                    </div>
-                    <%= if job.description do %>
-                      <p class="text-[11px] text-base-content/60 mt-0.5 truncate">{job.description}</p>
-                    <% end %>
-                    <p class="text-[11px] font-mono text-base-content/50 mt-1 truncate">
-                      {format_schedule(job)}
-                      <span class="text-base-content/30 not-italic ml-1">{job.timezone || "UTC"}</span>
-                    </p>
-                  </div>
-                  <span class={"badge badge-xs badge-ghost"}>
-                    {type_label(job.job_type)}
-                  </span>
-                </div>
-              </button>
-
-              <% mobile_failed_run = Map.get(@last_failed_runs, job.id) %>
-              <%= if mobile_failed_run do %>
-                <div class="flex items-center gap-1.5 mt-2 flex-wrap">
-                  <span class="badge badge-xs badge-error">failed</span>
-                  <span class="text-xs text-error/70 truncate flex-1">
-                    {format_relative_time(mobile_failed_run.started_at)}{if mobile_failed_run.result, do: ": #{String.slice(mobile_failed_run.result, 0, 60)}", else: ""}
-                  </span>
-                  <button
-                    class="btn btn-ghost btn-xs text-error shrink-0"
-                    phx-click="run_now"
-                    phx-value-id={job.id}
-                    title="Retry"
-                  >
-                    <.icon name="hero-arrow-path" class="w-3 h-3" />
-                  </button>
-                </div>
-              <% end %>
-
-              <div class="mt-3 flex items-center justify-between">
-                <span class="text-xs text-base-content/60">Enabled</span>
-                <span class={[
-                  "badge badge-xs",
-                  if(job.enabled == 1, do: "badge-success", else: "badge-ghost")
-                ]}>
-                  {if job.enabled == 1, do: "Yes", else: "No"}
-                </span>
-              </div>
-
-              <div class="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
-                <span class="text-base-content/50">Last Run</span>
-                <span class="text-right" title={format_time(job.last_run_at)}>{format_relative_time(job.last_run_at)}</span>
-                <span class="text-base-content/50">Next Run</span>
-                <span class="text-right" title={format_time(job.next_run_at)}>{format_relative_time(job.next_run_at)}</span>
-                <span class="text-base-content/50">Runs</span>
-                <span class="text-right">{job.run_count || 0}</span>
-              </div>
-
-              <%= if @expanded_job_id == job.id do %>
-                <div class="mt-3 rounded-lg bg-base-200/50 p-2">
-                  <p class="text-xs font-medium mb-2">Recent Runs</p>
-                  <%= if length(@runs) > 0 do %>
-                    <div class="space-y-1.5">
-                      <%= for run <- @runs do %>
-                        <div class="rounded-md bg-base-100/70 p-2 text-xs">
-                          <div class="flex items-center justify-between gap-2">
-                            <span class={"badge badge-xs #{status_badge_class(run.status)}"}>
-                              {run.status}
-                            </span>
-                            <span class="text-base-content/60 truncate">
-                              {format_time(run.started_at)}
-                            </span>
-                          </div>
-                          <p class="mt-1 text-base-content/60 truncate">{run.result || "-"}</p>
-                        </div>
-                      <% end %>
-                    </div>
-                  <% else %>
-                    <p class="text-xs text-base-content/50">No runs yet</p>
-                  <% end %>
-                </div>
-              <% end %>
-            </article>
-          <% end %>
-        </div>
-
-        <div class="hidden md:block -mx-4 sm:mx-0 overflow-x-auto px-4 sm:px-0">
-          <table class="table table-sm">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Origin</th>
-                <th>Type</th>
-                <th>Schedule</th>
-                <th>Enabled</th>
-                <th>Last Run</th>
-                <th>Next Run</th>
-                <th>Runs</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <%= for job <- @jobs do %>
-                <% row_state = job_row_state(job, @running_ids, @last_run_map) %>
-                <tr class={"hover #{if @expanded_job_id == job.id, do: "bg-base-200"}"}>
-                  <td
-                    class={"cursor-pointer #{row_border_class(row_state)}"}
-                    phx-click="expand_job"
-                    phx-value-id={job.id}
-                  >
-                    <div class="flex items-center gap-1.5">
-                      <span class="font-medium">{job.name}</span>
-                      <%= if row_state == :running do %>
-                        <span class="badge badge-warning badge-xs animate-pulse">running</span>
-                      <% end %>
-                    </div>
-                    <%= if job.description do %>
-                      <p class="text-xs text-base-content/50 mt-0.5">{job.description}</p>
-                    <% end %>
-                    <% failed_run = Map.get(@last_failed_runs, job.id) %>
-                    <%= if failed_run do %>
-                      <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                        <span class="badge badge-xs badge-error">failed</span>
-                        <span class="text-xs text-error/70">
-                          {format_relative_time(failed_run.started_at)}{if failed_run.result, do: ": #{String.slice(failed_run.result, 0, 60)}", else: ""}
-                        </span>
-                        <button
-                          class="btn btn-ghost btn-xs text-error"
-                          phx-click="run_now"
-                          phx-value-id={job.id}
-                          title="Retry"
-                        >
-                          <.icon name="hero-arrow-path" class="w-3 h-3" />
-                        </button>
+        <%!-- Filter Toolbar --%>
+        <form phx-change="filter_jobs" class="flex flex-wrap gap-2 my-4">
+          <input
+            type="text"
+            name="search"
+            class="input input-bordered input-sm flex-1 min-w-[200px]"
+            placeholder="Search by name or description…"
+            value={@search_query}
+            phx-debounce="200"
+          />
+          <select name="type" class="select select-bordered select-sm">
+            <option value="all" selected={@filter_type == "all"}>All Types</option>
+            <option value="shell_command" selected={@filter_type == "shell_command"}>Shell</option>
+            <option value="spawn_agent" selected={@filter_type == "spawn_agent"}>Agent</option>
+            <option value="mix_task" selected={@filter_type == "mix_task"}>Mix</option>
+          </select>
+          <select name="status" class="select select-bordered select-sm">
+            <option value="all" selected={@filter_status == "all"}>All Status</option>
+            <option value="enabled" selected={@filter_status == "enabled"}>Enabled</option>
+            <option value="disabled" selected={@filter_status == "disabled"}>Disabled</option>
+          </select>
+          <select name="origin" class="select select-bordered select-sm">
+            <option value="all" selected={@filter_origin == "all"}>All Origins</option>
+            <option value="system" selected={@filter_origin == "system"}>System</option>
+            <option value="user" selected={@filter_origin == "user"}>User</option>
+          </select>
+        </form>
+        <%!-- Jobs Table --%>
+        <%= if length(@jobs) > 0 do %>
+          <div class="md:hidden space-y-3">
+            <%= for job <- @jobs do %>
+              <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
+              <article class={"rounded-xl border border-base-content/10 bg-base-100 p-3 shadow-sm #{row_border_class(job_state)}"}>
+                <button
+                  class="w-full text-left"
+                  phx-click="expand_job"
+                  phx-value-id={job.id}
+                >
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-1.5">
+                        <h3 class="font-medium text-sm truncate">{job.name}</h3>
+                        <%= if job_state == :running do %>
+                          <span class="badge badge-warning badge-xs animate-pulse shrink-0">
+                            running
+                          </span>
+                        <% end %>
                       </div>
-                    <% end %>
-                  </td>
-                  <td>
-                    <%= if job.origin == "system" do %>
-                      <span class="badge badge-xs badge-neutral">System</span>
-                    <% else %>
-                      <span class="badge badge-xs badge-ghost">User</span>
-                    <% end %>
-                  </td>
-                  <td>
+                      <%= if job.description do %>
+                        <p class="text-[11px] text-base-content/60 mt-0.5 truncate">
+                          {job.description}
+                        </p>
+                      <% end %>
+                      <p class="text-[11px] font-mono text-base-content/50 mt-1 truncate">
+                        {format_schedule(job)}
+                        <span class="text-base-content/30 not-italic ml-1">
+                          {job.timezone || "UTC"}
+                        </span>
+                      </p>
+                    </div>
                     <span class="badge badge-xs badge-ghost">
                       {type_label(job.job_type)}
                     </span>
-                  </td>
-                  <td class="text-xs">
-                    <span class="font-mono">{format_schedule(job)}</span>
-                    <span class="text-base-content/40 ml-1 text-[10px]">{job.timezone || "UTC"}</span>
-                  </td>
-                  <td>
-                    <input
-                      type="checkbox"
-                      class="toggle toggle-sm toggle-primary"
-                      checked={job.enabled == 1}
-                      phx-click="toggle_job"
+                  </div>
+                </button>
+
+                <% mobile_failed_run = Map.get(@last_failed_runs, job.id) %>
+                <%= if mobile_failed_run do %>
+                  <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+                    <span class="badge badge-xs badge-error">failed</span>
+                    <span class="text-xs text-error/70 truncate flex-1">
+                      {format_relative_time(mobile_failed_run.started_at)}{if mobile_failed_run.result,
+                        do: ": #{String.slice(mobile_failed_run.result, 0, 60)}",
+                        else: ""}
+                    </span>
+                    <button
+                      class="btn btn-ghost btn-xs text-error shrink-0"
+                      phx-click="run_now"
                       phx-value-id={job.id}
-                    />
-                  </td>
-                  <td class="text-xs" title={format_time(job.last_run_at)}>{format_relative_time(job.last_run_at)}</td>
-                  <td class="text-xs" title={format_time(job.next_run_at)}>{format_relative_time(job.next_run_at)}</td>
-                  <td>{job.run_count || 0}</td>
-                  <td>
-                    <div class="flex items-center gap-1">
-                      <button
-                        class="btn btn-ghost btn-xs"
-                        phx-click="run_now"
-                        phx-value-id={job.id}
-                        title="Run Now"
-                        aria-label="Run job now"
-                      >
-                        <.icon name="hero-play" class="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        class="btn btn-ghost btn-xs"
-                        phx-click="edit_job"
-                        phx-value-id={job.id}
-                        title="Edit"
-                        aria-label="Edit job"
-                      >
-                        <.icon name="hero-pencil-square" class="w-3.5 h-3.5" />
-                      </button>
-                      <%= if job.origin != "system" do %>
-                        <button
-                          class="btn btn-ghost btn-xs text-error"
-                          phx-click="delete_job"
-                          phx-value-id={job.id}
-                          data-confirm="Delete this job?"
-                          title="Delete"
-                          aria-label="Delete job"
-                        >
-                          <.icon name="hero-trash" class="w-3.5 h-3.5" />
-                        </button>
-                      <% end %>
-                    </div>
-                  </td>
-                </tr>
-                <%!-- Expanded Run History --%>
+                      title="Retry"
+                    >
+                      <.icon name="hero-arrow-path" class="w-3 h-3" />
+                    </button>
+                  </div>
+                <% end %>
+
+                <div class="mt-3 flex items-center justify-between">
+                  <span class="text-xs text-base-content/60">Enabled</span>
+                  <span class={[
+                    "badge badge-xs",
+                    if(job.enabled == 1, do: "badge-success", else: "badge-ghost")
+                  ]}>
+                    {if job.enabled == 1, do: "Yes", else: "No"}
+                  </span>
+                </div>
+
+                <div class="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
+                  <span class="text-base-content/50">Last Run</span>
+                  <span class="text-right" title={format_time(job.last_run_at)}>
+                    {format_relative_time(job.last_run_at)}
+                  </span>
+                  <span class="text-base-content/50">Next Run</span>
+                  <span class="text-right" title={format_time(job.next_run_at)}>
+                    {format_relative_time(job.next_run_at)}
+                  </span>
+                  <span class="text-base-content/50">Runs</span>
+                  <span class="text-right">{job.run_count || 0}</span>
+                </div>
+
                 <%= if @expanded_job_id == job.id do %>
-                  <tr>
-                    <td colspan="9" class="bg-base-200 p-4">
-                      <div class="text-sm font-medium mb-2">Recent Runs</div>
-                      <%= if length(@runs) > 0 do %>
-                        <table class="table table-xs">
-                          <thead>
-                            <tr>
-                              <th>Status</th>
-                              <th>Started</th>
-                              <th>Completed</th>
-                              <th>Result</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <%= for run <- @runs do %>
-                              <tr>
-                                <td>
-                                  <span class={"badge badge-xs #{status_badge_class(run.status)}"}>
-                                    {run.status}
-                                  </span>
-                                </td>
-                                <td class="text-xs">{format_time(run.started_at)}</td>
-                                <td class="text-xs">{format_time(run.completed_at)}</td>
-                                <td class="text-xs max-w-xs truncate" title={run.result || ""}>
-                                  {String.slice(run.result || "-", 0, 120)}
-                                </td>
-                              </tr>
-                            <% end %>
-                          </tbody>
-                        </table>
-                      <% else %>
-                        <p class="text-xs text-base-content/50">No runs yet</p>
+                  <div class="mt-3 rounded-lg bg-base-200/50 p-2">
+                    <p class="text-xs font-medium mb-2">Recent Runs</p>
+                    <%= if length(@runs) > 0 do %>
+                      <div class="space-y-1.5">
+                        <%= for run <- @runs do %>
+                          <div class="rounded-md bg-base-100/70 p-2 text-xs">
+                            <div class="flex items-center justify-between gap-2">
+                              <span class={"badge badge-xs #{status_badge_class(run.status)}"}>
+                                {run.status}
+                              </span>
+                              <span class="text-base-content/60 truncate">
+                                {format_time(run.started_at)}
+                              </span>
+                            </div>
+                            <p class="mt-1 text-base-content/60 truncate">{run.result || "-"}</p>
+                          </div>
+                        <% end %>
+                      </div>
+                    <% else %>
+                      <p class="text-xs text-base-content/50">No runs yet</p>
+                    <% end %>
+                  </div>
+                <% end %>
+              </article>
+            <% end %>
+          </div>
+
+          <div class="hidden md:block -mx-4 sm:mx-0 overflow-x-auto px-4 sm:px-0">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Origin</th>
+                  <th>Type</th>
+                  <th>Schedule</th>
+                  <th>Enabled</th>
+                  <th>Last Run</th>
+                  <th>Next Run</th>
+                  <th>Runs</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <%= for job <- @jobs do %>
+                  <% row_state = job_row_state(job, @running_ids, @last_run_map) %>
+                  <tr class={"hover #{if @expanded_job_id == job.id, do: "bg-base-200"}"}>
+                    <td
+                      class={"cursor-pointer #{row_border_class(row_state)}"}
+                      phx-click="expand_job"
+                      phx-value-id={job.id}
+                    >
+                      <div class="flex items-center gap-1.5">
+                        <span class="font-medium">{job.name}</span>
+                        <%= if row_state == :running do %>
+                          <span class="badge badge-warning badge-xs animate-pulse">running</span>
+                        <% end %>
+                      </div>
+                      <%= if job.description do %>
+                        <p class="text-xs text-base-content/50 mt-0.5">{job.description}</p>
+                      <% end %>
+                      <% failed_run = Map.get(@last_failed_runs, job.id) %>
+                      <%= if failed_run do %>
+                        <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                          <span class="badge badge-xs badge-error">failed</span>
+                          <span class="text-xs text-error/70">
+                            {format_relative_time(failed_run.started_at)}{if failed_run.result,
+                              do: ": #{String.slice(failed_run.result, 0, 60)}",
+                              else: ""}
+                          </span>
+                          <button
+                            class="btn btn-ghost btn-xs text-error"
+                            phx-click="run_now"
+                            phx-value-id={job.id}
+                            title="Retry"
+                          >
+                            <.icon name="hero-arrow-path" class="w-3 h-3" />
+                          </button>
+                        </div>
                       <% end %>
                     </td>
+                    <td>
+                      <%= if job.origin == "system" do %>
+                        <span class="badge badge-xs badge-neutral">System</span>
+                      <% else %>
+                        <span class="badge badge-xs badge-ghost">User</span>
+                      <% end %>
+                    </td>
+                    <td>
+                      <span class="badge badge-xs badge-ghost">
+                        {type_label(job.job_type)}
+                      </span>
+                    </td>
+                    <td class="text-xs">
+                      <span class="font-mono">{format_schedule(job)}</span>
+                      <span class="text-base-content/40 ml-1 text-[10px]">
+                        {job.timezone || "UTC"}
+                      </span>
+                    </td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        class="toggle toggle-sm toggle-primary"
+                        checked={job.enabled == 1}
+                        phx-click="toggle_job"
+                        phx-value-id={job.id}
+                      />
+                    </td>
+                    <td class="text-xs" title={format_time(job.last_run_at)}>
+                      {format_relative_time(job.last_run_at)}
+                    </td>
+                    <td class="text-xs" title={format_time(job.next_run_at)}>
+                      {format_relative_time(job.next_run_at)}
+                    </td>
+                    <td>{job.run_count || 0}</td>
+                    <td>
+                      <div class="flex items-center gap-1">
+                        <button
+                          class="btn btn-ghost btn-xs"
+                          phx-click="run_now"
+                          phx-value-id={job.id}
+                          title="Run Now"
+                          aria-label="Run job now"
+                        >
+                          <.icon name="hero-play" class="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          class="btn btn-ghost btn-xs"
+                          phx-click="edit_job"
+                          phx-value-id={job.id}
+                          title="Edit"
+                          aria-label="Edit job"
+                        >
+                          <.icon name="hero-pencil-square" class="w-3.5 h-3.5" />
+                        </button>
+                        <%= if job.origin != "system" do %>
+                          <button
+                            class="btn btn-ghost btn-xs text-error"
+                            phx-click="delete_job"
+                            phx-value-id={job.id}
+                            data-confirm="Delete this job?"
+                            title="Delete"
+                            aria-label="Delete job"
+                          >
+                            <.icon name="hero-trash" class="w-3.5 h-3.5" />
+                          </button>
+                        <% end %>
+                      </div>
+                    </td>
                   </tr>
+                  <%!-- Expanded Run History --%>
+                  <%= if @expanded_job_id == job.id do %>
+                    <tr>
+                      <td colspan="9" class="bg-base-200 p-4">
+                        <div class="text-sm font-medium mb-2">Recent Runs</div>
+                        <%= if length(@runs) > 0 do %>
+                          <table class="table table-xs">
+                            <thead>
+                              <tr>
+                                <th>Status</th>
+                                <th>Started</th>
+                                <th>Completed</th>
+                                <th>Result</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <%= for run <- @runs do %>
+                                <tr>
+                                  <td>
+                                    <span class={"badge badge-xs #{status_badge_class(run.status)}"}>
+                                      {run.status}
+                                    </span>
+                                  </td>
+                                  <td class="text-xs">{format_time(run.started_at)}</td>
+                                  <td class="text-xs">{format_time(run.completed_at)}</td>
+                                  <td class="text-xs max-w-xs truncate" title={run.result || ""}>
+                                    {String.slice(run.result || "-", 0, 120)}
+                                  </td>
+                                </tr>
+                              <% end %>
+                            </tbody>
+                          </table>
+                        <% else %>
+                          <p class="text-xs text-base-content/50">No runs yet</p>
+                        <% end %>
+                      </td>
+                    </tr>
+                  <% end %>
                 <% end %>
-              <% end %>
-            </tbody>
-          </table>
-        </div>
-      <% else %>
-        <div class="text-center py-16">
-          <div class="mx-auto w-24 h-24 bg-base-200 rounded-full flex items-center justify-center mb-4">
-            <.icon name="hero-calendar" class="w-12 h-12 text-base-content/40" />
+              </tbody>
+            </table>
           </div>
-          <h3 class="text-lg font-semibold text-base-content mb-2">No scheduled jobs</h3>
-          <p class="text-sm text-base-content/60">
-            Create a job to schedule agent spawns, shell commands, or mix tasks
-          </p>
-        </div>
-      <% end %>
+        <% else %>
+          <div class="text-center py-16">
+            <div class="mx-auto w-24 h-24 bg-base-200 rounded-full flex items-center justify-center mb-4">
+              <.icon name="hero-calendar" class="w-12 h-12 text-base-content/40" />
+            </div>
+            <h3 class="text-lg font-semibold text-base-content mb-2">No scheduled jobs</h3>
+            <p class="text-sm text-base-content/60">
+              Create a job to schedule agent spawns, shell commands, or mix tasks
+            </p>
+          </div>
+        <% end %>
       <% end %>
 
       <%= if @active_tab == :agent_schedules do %>
@@ -665,12 +687,26 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
                     <%= if job do %>
                       <span class="font-mono text-xs text-base-content/50">{job.schedule_value}</span>
                       <div class="flex gap-1">
-                        <button class="btn btn-ghost btn-xs" phx-click="edit_schedule" phx-value-job_id={job.id}>Edit</button>
-                        <button class="btn btn-ghost btn-xs" phx-click="run_now" phx-value-id={job.id}>▶</button>
+                        <button
+                          class="btn btn-ghost btn-xs"
+                          phx-click="edit_schedule"
+                          phx-value-job_id={job.id}
+                        >
+                          Edit
+                        </button>
+                        <button class="btn btn-ghost btn-xs" phx-click="run_now" phx-value-id={job.id}>
+                          ▶
+                        </button>
                       </div>
                     <% else %>
                       <span class="text-xs text-base-content/40">not scheduled</span>
-                      <button class="btn btn-primary btn-xs" phx-click="schedule_prompt" phx-value-id={prompt.id}>+ Schedule</button>
+                      <button
+                        class="btn btn-primary btn-xs"
+                        phx-click="schedule_prompt"
+                        phx-value-id={prompt.id}
+                      >
+                        + Schedule
+                      </button>
                     <% end %>
                   </div>
                 </div>
@@ -680,7 +716,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
 
           <%= if @orphaned_jobs != [] do %>
             <div>
-              <p class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-2">Detached Schedules</p>
+              <p class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-2">
+                Detached Schedules
+              </p>
               <div class="space-y-2">
                 <%= for job <- @orphaned_jobs do %>
                   <div class="flex items-center gap-3 p-3 rounded-lg bg-base-200 border border-warning/40">
@@ -688,9 +726,19 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
                       <span class="text-sm truncate">{job.name}</span>
                       <span class="badge badge-warning badge-xs ml-2">Prompt deactivated</span>
                     </div>
-                    <span class="font-mono text-xs text-base-content/50 shrink-0">{job.schedule_value}</span>
-                    <button class="btn btn-ghost btn-xs" phx-click="run_now" phx-value-id={job.id}>▶</button>
-                    <button class="btn btn-ghost btn-xs text-error" phx-click="delete_job" phx-value-id={job.id}>Delete</button>
+                    <span class="font-mono text-xs text-base-content/50 shrink-0">
+                      {job.schedule_value}
+                    </span>
+                    <button class="btn btn-ghost btn-xs" phx-click="run_now" phx-value-id={job.id}>
+                      ▶
+                    </button>
+                    <button
+                      class="btn btn-ghost btn-xs text-error"
+                      phx-click="delete_job"
+                      phx-value-id={job.id}
+                    >
+                      Delete
+                    </button>
                   </div>
                 <% end %>
               </div>

@@ -23,7 +23,9 @@ defmodule EyeInTheSkyWebWeb.NoteLive.New do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    parent_type = if params["parent_type"] in @valid_parent_types, do: params["parent_type"], else: "system"
+    parent_type =
+      if params["parent_type"] in @valid_parent_types, do: params["parent_type"], else: "system"
+
     parent_id = params["parent_id"] || "0"
     return_to = safe_return_to(params["return_to"])
 
@@ -101,15 +103,15 @@ defmodule EyeInTheSkyWebWeb.NoteLive.New do
           data-body=""
           data-return-to={@return_to}
           class="flex-1 overflow-hidden"
-        ></div>
+        >
+        </div>
       </div>
 
       <%!-- Status bar --%>
       <div class="flex items-center justify-between px-4 py-1 border-t border-base-content/8 bg-base-100 flex-shrink-0 text-[10px] text-base-content/35">
         <div class="flex items-center gap-4">
           <span class="flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-success inline-block"></span>
-            Markdown
+            <span class="w-1.5 h-1.5 rounded-full bg-success inline-block"></span> Markdown
           </span>
           <span id="note-editor-status">Ln 1, Col 1</span>
         </div>

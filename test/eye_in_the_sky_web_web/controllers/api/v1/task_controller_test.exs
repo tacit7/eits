@@ -63,7 +63,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskControllerTest do
 
       EyeInTheSkyWeb.Repo.insert_all(
         "task_sessions",
-        [%{task_id: task.id, session_id: session.id}], on_conflict: :nothing)
+        [%{task_id: task.id, session_id: session.id}],
+        on_conflict: :nothing
+      )
 
       conn = get(conn, ~p"/api/v1/tasks?session_id=#{session.uuid}")
       resp = json_response(conn, 200)
@@ -212,8 +214,15 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskControllerTest do
       session = create_session(agent)
       task = create_task()
 
-      patch(conn, ~p"/api/v1/tasks/#{task.id}", %{"state" => "start", "session_id" => session.uuid})
-      patch(build_conn(), ~p"/api/v1/tasks/#{task.id}", %{"state" => "start", "session_id" => session.uuid})
+      patch(conn, ~p"/api/v1/tasks/#{task.id}", %{
+        "state" => "start",
+        "session_id" => session.uuid
+      })
+
+      patch(build_conn(), ~p"/api/v1/tasks/#{task.id}", %{
+        "state" => "start",
+        "session_id" => session.uuid
+      })
 
       count =
         Repo.one(
@@ -286,8 +295,15 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskControllerTest do
       task_id = json_response(create_resp, 201)["task_id"]
       task = Tasks.get_task!(task_id)
 
-      patch(build_conn(), ~p"/api/v1/tasks/#{task_id}", %{"state" => "start", "session_id" => session.uuid})
-      patch(build_conn(), ~p"/api/v1/tasks/#{task_id}", %{"state" => "start", "session_id" => session.uuid})
+      patch(build_conn(), ~p"/api/v1/tasks/#{task_id}", %{
+        "state" => "start",
+        "session_id" => session.uuid
+      })
+
+      patch(build_conn(), ~p"/api/v1/tasks/#{task_id}", %{
+        "state" => "start",
+        "session_id" => session.uuid
+      })
 
       count =
         Repo.one(
@@ -376,7 +392,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskControllerTest do
 
       EyeInTheSkyWeb.Repo.insert_all(
         "task_sessions",
-        [%{task_id: task.id, session_id: session.id}], on_conflict: :nothing)
+        [%{task_id: task.id, session_id: session.id}],
+        on_conflict: :nothing
+      )
 
       conn = delete(conn, ~p"/api/v1/tasks/#{task.id}/sessions/#{session.uuid}")
       resp = json_response(conn, 200)

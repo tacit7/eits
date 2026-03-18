@@ -269,7 +269,8 @@ defmodule EyeInTheSkyWebWeb.AuthController do
       allow_credentials: allow_creds,
       attestation: m["attestation"],
       timeout: m["timeout"],
-      trusted_attestation_types: Enum.map(m["trusted_attestation_types"], &String.to_existing_atom/1),
+      trusted_attestation_types:
+        Enum.map(m["trusted_attestation_types"], &String.to_existing_atom/1),
       user_verification: m["user_verification"],
       verify_trust_root: m["verify_trust_root"],
       silent_authentication_enabled: m["silent_authentication_enabled"],

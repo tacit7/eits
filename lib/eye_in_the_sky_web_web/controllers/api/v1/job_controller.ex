@@ -139,5 +139,4 @@ defmodule EyeInTheSkyWebWeb.Api.V1.JobController do
       _ -> params
     end
   end
-
 end

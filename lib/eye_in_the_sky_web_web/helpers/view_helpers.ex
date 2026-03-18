@@ -442,7 +442,9 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
 
   def days_since_update(str) when is_binary(str) do
     case DateTime.from_iso8601(str) do
-      {:ok, dt, _} -> days_since_update(dt)
+      {:ok, dt, _} ->
+        days_since_update(dt)
+
       _ ->
         case parse_datetime(str) do
           {:ok, dt} -> days_since_update(dt)
@@ -477,6 +479,7 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
   end
 
   def truncate_text(nil), do: nil
+
   def truncate_text(text) when is_binary(text) do
     if String.length(text) > 50 do
       String.slice(text, 0, 50) <> "..."

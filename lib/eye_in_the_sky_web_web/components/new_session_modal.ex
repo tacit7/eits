@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
                 <select name="agent" class="select select-bordered w-full">
                   <option value="">-- None --</option>
                   <%= for {name, scope} <- @available_agents do %>
-                    <option value={name}>{name}<%= if scope == :project, do: " (project)" %></option>
+                    <option value={name}>{name}{if scope == :project, do: " (project)"}</option>
                   <% end %>
                 </select>
               </div>
@@ -139,7 +139,9 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
               >{@prefill_text}</textarea>
               <label class="flex items-center gap-1.5 mt-2 cursor-pointer w-fit">
                 <.icon name="hero-paper-clip-mini" class="w-3.5 h-3.5 text-base-content/40" />
-                <span class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">Attach file</span>
+                <span class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">
+                  Attach file
+                </span>
                 <input
                   type="file"
                   class="hidden"
@@ -223,7 +225,13 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
             <%!-- EITS Workflow --%>
             <label class="flex items-center gap-2 cursor-pointer select-none">
               <input type="hidden" name="eits_workflow" value="0" />
-              <input type="checkbox" name="eits_workflow" value="1" class="checkbox checkbox-sm" checked />
+              <input
+                type="checkbox"
+                name="eits_workflow"
+                value="1"
+                class="checkbox checkbox-sm"
+                checked
+              />
               <span class="text-sm text-base-content/70">EITS Workflow</span>
             </label>
 

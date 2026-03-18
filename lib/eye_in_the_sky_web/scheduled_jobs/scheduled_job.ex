@@ -19,10 +19,12 @@ defmodule EyeInTheSkyWeb.ScheduledJobs.ScheduledJob do
     field :created_at, :string
     field :updated_at, :string
     field :project_id, :integer
-    field :prompt_id, :id  # :id = bigint, matches subagent_prompts PK
+    # :id = bigint, matches subagent_prompts PK
+    field :prompt_id, :id
     field :timezone, :string, default: "Etc/UTC"
 
     has_many :runs, EyeInTheSkyWeb.ScheduledJobs.JobRun, foreign_key: :job_id
+
     belongs_to :prompt, EyeInTheSkyWeb.Prompts.Prompt,
       foreign_key: :prompt_id,
       references: :id,

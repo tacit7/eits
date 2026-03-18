@@ -70,39 +70,63 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     * `{:error, :not_found}` — no worker registered for this session
   """
   def submit_message(session_id, message, context) do
-    with_worker(session_id, fn pid ->
-      GenServer.call(pid, {:submit_message, message, context})
-    end, {:error, :not_found})
+    with_worker(
+      session_id,
+      fn pid ->
+        GenServer.call(pid, {:submit_message, message, context})
+      end,
+      {:error, :not_found}
+    )
   end
 
   def cancel(session_id) do
-    with_worker(session_id, fn pid ->
-      GenServer.cast(pid, :cancel)
-    end, {:error, :not_found})
+    with_worker(
+      session_id,
+      fn pid ->
+        GenServer.cast(pid, :cancel)
+      end,
+      {:error, :not_found}
+    )
   end
 
   def is_processing?(session_id) do
-    with_worker(session_id, fn pid ->
-      GenServer.call(pid, :is_processing?)
-    end, false)
+    with_worker(
+      session_id,
+      fn pid ->
+        GenServer.call(pid, :is_processing?)
+      end,
+      false
+    )
   end
 
   def get_queue(session_id) do
-    with_worker(session_id, fn pid ->
-      GenServer.call(pid, :get_queue)
-    end, [])
+    with_worker(
+      session_id,
+      fn pid ->
+        GenServer.call(pid, :get_queue)
+      end,
+      []
+    )
   end
 
   def get_stream_state(session_id) do
-    with_worker(session_id, fn pid ->
-      GenServer.call(pid, :get_stream_state)
-    end, "")
+    with_worker(
+      session_id,
+      fn pid ->
+        GenServer.call(pid, :get_stream_state)
+      end,
+      ""
+    )
   end
 
   def remove_queued_prompt(session_id, prompt_id) do
-    with_worker(session_id, fn pid ->
-      GenServer.cast(pid, {:remove_queued_prompt, prompt_id})
-    end, :ok)
+    with_worker(
+      session_id,
+      fn pid ->
+        GenServer.cast(pid, {:remove_queued_prompt, prompt_id})
+      end,
+      :ok
+    )
   end
 
   defp with_worker(session_id, fun, default) do
@@ -119,7 +143,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     session_id = Keyword.fetch!(opts, :session_id)
     # eits_session_uuid: stable EITS UUID for this session, used for EITS tracking/env vars.
     # Falls back to provider_conversation_id for backward compat with callers that only pass one.
-    eits_session_uuid = Keyword.get(opts, :eits_session_uuid) || Keyword.get(opts, :provider_conversation_id)
+    eits_session_uuid =
+      Keyword.get(opts, :eits_session_uuid) || Keyword.get(opts, :provider_conversation_id)
+
     provider_conversation_id = Keyword.fetch!(opts, :provider_conversation_id)
     agent_id = Keyword.fetch!(opts, :agent_id)
     project_id = Keyword.get(opts, :project_id)
@@ -209,7 +235,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
           WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
 
           {:reply, {:ok, :started},
-           clear_retry_timer(%{state | status: :running, sdk_ref: sdk_ref, handler_monitor: handler_monitor, current_job: job})}
+           clear_retry_timer(%{
+             state
+             | status: :running,
+               sdk_ref: sdk_ref,
+               handler_monitor: handler_monitor,
+               current_job: job
+           })}
 
         {:error, reason} ->
           reason_str = inspect(reason)
@@ -366,7 +398,14 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     WorkerEvents.on_sdk_completed(state.session_id, state.provider_conversation_id)
 
     demonitor_handler(state.handler_monitor)
-    process_next_job(%{state | status: :idle, sdk_ref: nil, handler_monitor: nil, current_job: nil})
+
+    process_next_job(%{
+      state
+      | status: :idle,
+        sdk_ref: nil,
+        handler_monitor: nil,
+        current_job: nil
+    })
   end
 
   # Stale Claude session — retry current job as a fresh start
@@ -388,7 +427,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
       case start_sdk(state, fresh_job) do
         {:ok, sdk_ref, handler_monitor} ->
-          {:noreply, %{state | sdk_ref: sdk_ref, handler_monitor: handler_monitor, current_job: fresh_job}}
+          {:noreply,
+           %{state | sdk_ref: sdk_ref, handler_monitor: handler_monitor, current_job: fresh_job}}
 
         {:error, start_reason} ->
           Logger.error(
@@ -398,7 +438,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
           WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
           demonitor_handler(state.handler_monitor)
 
-          process_next_job(%{state | status: :idle, sdk_ref: nil, handler_monitor: nil, current_job: nil})
+          process_next_job(%{
+            state
+            | status: :idle,
+              sdk_ref: nil,
+              handler_monitor: nil,
+              current_job: nil
+          })
       end
     else
       do_handle_sdk_error(reason, state)
@@ -443,9 +489,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         {:DOWN, monitor_ref, :process, _pid, reason},
         %__MODULE__{handler_monitor: monitor_ref, status: :running} = state
       ) do
-    Logger.error(
-      "[#{state.session_id}] SDK handler crashed: #{inspect(reason)}"
-    )
+    Logger.error("[#{state.session_id}] SDK handler crashed: #{inspect(reason)}")
 
     WorkerEvents.broadcast_stream_clear(state.session_id)
 
@@ -484,21 +528,29 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   defp stream_buffer(%StreamAssembler{} = s), do: StreamAssembler.buffer(s)
   defp stream_buffer(nil), do: ""
 
-  defp stream_handle_message(%CodexStreamAssembler{} = s, msg), do: CodexStreamAssembler.handle_message(s, msg)
-  defp stream_handle_message(%StreamAssembler{} = s, msg), do: StreamAssembler.handle_message(s, msg)
+  defp stream_handle_message(%CodexStreamAssembler{} = s, msg),
+    do: CodexStreamAssembler.handle_message(s, msg)
 
-  defp stream_handle_tool_delta(%CodexStreamAssembler{} = s, json), do: CodexStreamAssembler.handle_tool_delta(s, json)
-  defp stream_handle_tool_delta(%StreamAssembler{} = s, json), do: StreamAssembler.handle_tool_delta(s, json)
+  defp stream_handle_message(%StreamAssembler{} = s, msg),
+    do: StreamAssembler.handle_message(s, msg)
 
-  defp stream_handle_tool_block_stop(%CodexStreamAssembler{} = s), do: CodexStreamAssembler.handle_tool_block_stop(s)
-  defp stream_handle_tool_block_stop(%StreamAssembler{} = s), do: StreamAssembler.handle_tool_block_stop(s)
+  defp stream_handle_tool_delta(%CodexStreamAssembler{} = s, json),
+    do: CodexStreamAssembler.handle_tool_delta(s, json)
+
+  defp stream_handle_tool_delta(%StreamAssembler{} = s, json),
+    do: StreamAssembler.handle_tool_delta(s, json)
+
+  defp stream_handle_tool_block_stop(%CodexStreamAssembler{} = s),
+    do: CodexStreamAssembler.handle_tool_block_stop(s)
+
+  defp stream_handle_tool_block_stop(%StreamAssembler{} = s),
+    do: StreamAssembler.handle_tool_block_stop(s)
 
   defp broadcast_events(events, state) do
     Enum.each(events, fn event ->
       EyeInTheSkyWeb.Events.stream_event(state.session_id, event)
     end)
   end
-
 
   defp process_next_job(%__MODULE__{queue: []} = state) do
     WorkerEvents.broadcast_queue_update(state.session_id, state.queue)
@@ -511,7 +563,14 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
         WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
 
         new_state =
-          clear_retry_timer(%{state | status: :running, sdk_ref: sdk_ref, handler_monitor: handler_monitor, current_job: next_job, queue: rest})
+          clear_retry_timer(%{
+            state
+            | status: :running,
+              sdk_ref: sdk_ref,
+              handler_monitor: handler_monitor,
+              current_job: next_job,
+              queue: rest
+          })
 
         WorkerEvents.broadcast_queue_update(state.session_id, new_state.queue)
         {:noreply, new_state}
@@ -663,12 +722,19 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     )
 
     timer_ref = Process.send_after(self(), :retry_start, delay)
-    %{state | status: :retry_wait, retry_timer_ref: timer_ref, retry_attempt: state.retry_attempt + 1}
+
+    %{
+      state
+      | status: :retry_wait,
+        retry_timer_ref: timer_ref,
+        retry_attempt: state.retry_attempt + 1
+    }
   end
 
   defp schedule_retry_start(state), do: state
 
-  defp clear_retry_timer(%__MODULE__{retry_timer_ref: nil} = state), do: %{state | retry_attempt: 0}
+  defp clear_retry_timer(%__MODULE__{retry_timer_ref: nil} = state),
+    do: %{state | retry_attempt: 0}
 
   defp clear_retry_timer(state) do
     Process.cancel_timer(state.retry_timer_ref)
@@ -731,7 +797,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   defp maybe_sync_provider_conversation_id(state, _), do: state
 
-
   defp do_handle_sdk_error(reason, state) do
     Logger.error("[#{state.session_id}] SDK error: #{inspect(reason)}")
 
@@ -752,9 +817,17 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       )
 
       WorkerEvents.broadcast_queue_update(state.session_id, [])
-      {:noreply, %{state | status: :failed, sdk_ref: nil, handler_monitor: nil, current_job: nil, queue: []}}
+
+      {:noreply,
+       %{state | status: :failed, sdk_ref: nil, handler_monitor: nil, current_job: nil, queue: []}}
     else
-      process_next_job(%{state | status: :idle, sdk_ref: nil, handler_monitor: nil, current_job: nil})
+      process_next_job(%{
+        state
+        | status: :idle,
+          sdk_ref: nil,
+          handler_monitor: nil,
+          current_job: nil
+      })
     end
   end
 

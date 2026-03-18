@@ -74,6 +74,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
           socket
           |> assign(:editing_note_id, nil)
           |> load_notes()
+
         {:noreply, socket}
 
       {:error, _changeset} ->
@@ -132,7 +133,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
 
     notes =
       if query != "" and String.trim(query) != "" do
-        Notes.search_notes(query, agent_ids, project_id: project.id, session_ids: session_ids, starred: starred_only)
+        Notes.search_notes(query, agent_ids,
+          project_id: project.id,
+          session_ids: session_ids,
+          starred: starred_only
+        )
       else
         project_id_str = to_string(project.id)
         agent_id_strs = Enum.map(agent_ids, &to_string/1)
@@ -176,7 +181,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
               <.icon name="hero-bolt" class="w-3.5 h-3.5" /> Quick Note
             </button>
             <.link
-              navigate={~p"/notes/new?#{%{parent_type: "project", parent_id: @project.id, return_to: "/projects/#{@project.id}/notes"}}"}
+              navigate={
+                ~p"/notes/new?#{%{parent_type: "project", parent_id: @project.id, return_to: "/projects/#{@project.id}/notes"}}"
+              }
               class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-content hover:bg-primary/80 transition-colors"
             >
               <.icon name="hero-plus" class="w-3.5 h-3.5" /> New Note
@@ -196,11 +203,21 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
     </div>
 
     <%!-- Quick Note Modal --%>
-    <div :if={@show_quick_note_modal} class="modal modal-open" phx-window-keydown="close_quick_note_modal" phx-key="Escape">
+    <div
+      :if={@show_quick_note_modal}
+      class="modal modal-open"
+      phx-window-keydown="close_quick_note_modal"
+      phx-key="Escape"
+    >
       <div class="modal-box max-w-md p-0 overflow-hidden">
         <div class="flex items-center justify-between px-4 py-3 border-b border-base-content/10">
           <h2 class="text-sm font-semibold text-base-content">Quick Note</h2>
-          <button type="button" phx-click="close_quick_note_modal" class="btn btn-ghost btn-xs btn-square" aria-label="Close">
+          <button
+            type="button"
+            phx-click="close_quick_note_modal"
+            class="btn btn-ghost btn-xs btn-square"
+            aria-label="Close"
+          >
             <.icon name="hero-x-mark" class="w-4 h-4" />
           </button>
         </div>
@@ -234,7 +251,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
             <span class="text-sm text-base-content/70">Star this note</span>
           </label>
           <div class="flex justify-end gap-2 pt-1">
-            <button type="button" phx-click="close_quick_note_modal" class="btn btn-ghost btn-sm">Cancel</button>
+            <button type="button" phx-click="close_quick_note_modal" class="btn btn-ghost btn-sm">
+              Cancel
+            </button>
             <button type="submit" class="btn btn-primary btn-sm">Create Note</button>
           </div>
         </form>

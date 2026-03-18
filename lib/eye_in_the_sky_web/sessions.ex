@@ -217,7 +217,9 @@ defmodule EyeInTheSkyWeb.Sessions do
       from(t in EyeInTheSkyWeb.Tasks.Task,
         join: ts in "task_sessions",
         on: ts.task_id == t.id,
-        where: ts.session_id in ^session_ids and t.state_id == ^WorkflowState.in_progress_id() and t.archived == false,
+        where:
+          ts.session_id in ^session_ids and t.state_id == ^WorkflowState.in_progress_id() and
+            t.archived == false,
         select: {ts.session_id, t.title}
       )
       |> Repo.all()
@@ -324,7 +326,8 @@ defmodule EyeInTheSkyWeb.Sessions do
       last_activity_at: a.last_activity_at,
       current_task_title:
         fragment(
-          "(SELECT t.title FROM tasks t JOIN task_sessions ts ON ts.task_id = t.id WHERE ts.session_id = ? AND t.state_id = 2 AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)", # 2 = WorkflowState.in_progress_id()
+          # 2 = WorkflowState.in_progress_id()
+          "(SELECT t.title FROM tasks t JOIN task_sessions ts ON ts.task_id = t.id WHERE ts.session_id = ? AND t.state_id = 2 AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)",
           s.id
         )
     })

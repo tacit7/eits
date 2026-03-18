@@ -25,7 +25,10 @@
 
   <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
     <%!-- Mobile top bar — hidden on md+ since sidebar is always visible --%>
-    <header class={["md:hidden flex-shrink-0 flex items-center gap-3 px-4 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)]", assigns[:hide_mobile_header] && "hidden"]}>
+    <header class={[
+      "md:hidden flex-shrink-0 flex items-center gap-3 px-4 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)]",
+      assigns[:hide_mobile_header] && "hidden"
+    ]}>
       <button
         phx-click={Phoenix.LiveView.JS.dispatch("sidebar:open", to: "#app-sidebar")}
         class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
@@ -142,7 +145,12 @@
       <div class="modal-box max-w-lg p-0 overflow-hidden">
         <div class="border-b border-base-content/10 px-4 py-3 flex items-center justify-between">
           <h2 class="text-sm font-semibold text-base-content">New Note</h2>
-          <button data-qcn-cancel type="button" class="btn btn-ghost btn-xs btn-square" aria-label="Close">
+          <button
+            data-qcn-cancel
+            type="button"
+            class="btn btn-ghost btn-xs btn-square"
+            aria-label="Close"
+          >
             <span class="hero-x-mark w-4 h-4"></span>
           </button>
         </div>
@@ -189,7 +197,12 @@
       <div class="modal-box max-w-lg p-0 overflow-hidden">
         <div class="border-b border-base-content/10 px-4 py-3 flex items-center justify-between">
           <h2 class="text-sm font-semibold text-base-content">New Agent</h2>
-          <button data-qca-cancel type="button" class="btn btn-ghost btn-xs btn-square" aria-label="Close">
+          <button
+            data-qca-cancel
+            type="button"
+            class="btn btn-ghost btn-xs btn-square"
+            aria-label="Close"
+          >
             <span class="hero-x-mark w-4 h-4"></span>
           </button>
         </div>
@@ -236,7 +249,12 @@
       <div class="modal-box max-w-lg p-0 overflow-hidden">
         <div class="border-b border-base-content/10 px-4 py-3 flex items-center justify-between">
           <h2 class="text-sm font-semibold text-base-content">New Chat</h2>
-          <button data-qcc-cancel type="button" class="btn btn-ghost btn-xs btn-square" aria-label="Close">
+          <button
+            data-qcc-cancel
+            type="button"
+            class="btn btn-ghost btn-xs btn-square"
+            aria-label="Close"
+          >
             <span class="hero-x-mark w-4 h-4"></span>
           </button>
         </div>
@@ -272,7 +290,12 @@
       <div class="modal-box max-w-lg p-0 overflow-hidden">
         <div class="border-b border-base-content/10 px-4 py-3 flex items-center justify-between">
           <h2 class="text-sm font-semibold text-base-content">New Task</h2>
-          <button data-qct-cancel type="button" class="btn btn-ghost btn-xs btn-square" aria-label="Close">
+          <button
+            data-qct-cancel
+            type="button"
+            class="btn btn-ghost btn-xs btn-square"
+            aria-label="Close"
+          >
             <span class="hero-x-mark w-4 h-4"></span>
           </button>
         </div>
@@ -331,7 +354,8 @@
           <div
             data-palette-breadcrumb
             class="hidden text-[11px] text-base-content/50 mb-2 select-none"
-          ></div>
+          >
+          </div>
           <label for="command-palette-input" class="sr-only">Search commands</label>
           <input
             id="command-palette-input"

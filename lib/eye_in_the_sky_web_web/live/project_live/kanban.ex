@@ -42,7 +42,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       |> assign(:selected_task, nil)
       |> assign(:task_notes, [])
       |> assign(:quick_add_column, nil)
-
       |> assign(:show_completed, false)
       |> assign(:show_archived, false)
       |> assign(:selected_tasks, MapSet.new())
@@ -292,7 +291,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   @impl true
   def handle_event("select_all_column", %{"state-id" => state_id_str}, socket) do
     state_id = parse_int(state_id_str, 0)
-    column_uuids = Map.get(socket.assigns.tasks_by_state, state_id, []) |> Enum.map(& &1.uuid) |> Enum.reject(&is_nil/1)
+
+    column_uuids =
+      Map.get(socket.assigns.tasks_by_state, state_id, [])
+      |> Enum.map(& &1.uuid)
+      |> Enum.reject(&is_nil/1)
+
     current = socket.assigns.selected_tasks
     all_selected = Enum.all?(column_uuids, &MapSet.member?(current, &1))
 
@@ -328,7 +332,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       Tasks.archive_task(task)
     end)
 
-    {:noreply, socket |> assign(:selected_tasks, MapSet.new()) |> load_tasks() |> put_flash(:info, "Tasks archived")}
+    {:noreply,
+     socket
+     |> assign(:selected_tasks, MapSet.new())
+     |> load_tasks()
+     |> put_flash(:info, "Tasks archived")}
   end
 
   @impl true
@@ -340,7 +348,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       Tasks.delete_task_with_associations(task)
     end)
 
-    {:noreply, socket |> assign(:selected_tasks, MapSet.new()) |> load_tasks() |> put_flash(:info, "Tasks deleted")}
+    {:noreply,
+     socket
+     |> assign(:selected_tasks, MapSet.new())
+     |> load_tasks()
+     |> put_flash(:info, "Tasks deleted")}
   end
 
   @impl true
@@ -522,7 +534,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     column_tasks = Map.get(socket.assigns.tasks_by_state, state_id, [])
     Enum.each(column_tasks, fn task -> Tasks.archive_task(task) end)
 
-    {:noreply, socket |> load_tasks() |> put_flash(:info, "#{length(column_tasks)} tasks archived")}
+    {:noreply,
+     socket |> load_tasks() |> put_flash(:info, "#{length(column_tasks)} tasks archived")}
   end
 
   @impl true
@@ -557,7 +570,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   end
 
   @impl true
-  def handle_event("reorder_columns", %{"column_ids" => column_ids}, socket) when is_list(column_ids) do
+  def handle_event("reorder_columns", %{"column_ids" => column_ids}, socket)
+      when is_list(column_ids) do
     ids = Enum.map(column_ids, &parse_int(&1, 0))
     Tasks.reorder_workflow_states(ids)
     {:noreply, assign(socket, :workflow_states, Tasks.list_workflow_states())}
@@ -647,7 +661,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   end
 
   @impl true
-  def handle_info({:agent_working, session} , socket) when is_map(session) do
+  def handle_info({:agent_working, session}, socket) when is_map(session) do
     {:noreply, update(socket, :working_session_ids, &MapSet.put(&1, session.id))}
   end
 
@@ -753,11 +767,15 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   defp filter_by_due_date(tasks, nil), do: tasks
   defp filter_by_due_date(tasks, :no_date), do: Enum.filter(tasks, &is_nil(&1.due_at))
+
   defp filter_by_due_date(tasks, filter) do
     today = Date.utc_today()
+
     Enum.filter(tasks, fn task ->
       case task.due_at do
-        nil -> false
+        nil ->
+          false
+
         due_str ->
           case Date.from_iso8601(String.slice(due_str, 0, 10)) do
             {:ok, due} ->
@@ -768,19 +786,25 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                 :next_month -> Date.compare(due, today) != :lt && Date.diff(due, today) <= 30
                 _ -> true
               end
-            _ -> false
+
+            _ ->
+              false
           end
       end
     end)
   end
 
   defp filter_by_activity(tasks, nil), do: tasks
+
   defp filter_by_activity(tasks, filter) do
     now = DateTime.utc_now()
+
     Enum.filter(tasks, fn task ->
       days_ago =
         case task.updated_at do
-          nil -> 999
+          nil ->
+            999
+
           str ->
             case DateTime.from_iso8601(str) do
               {:ok, dt, _} -> DateTime.diff(now, dt, :second) |> div(86400)
@@ -814,12 +838,14 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   defp state_dot_color(color) when is_binary(color), do: color
   defp state_dot_color(_), do: "#6B7280"
 
-
-
   @impl true
   def render(assigns) do
     ~H"""
-    <div id="kanban-keyboard" phx-hook="KanbanKeyboard" class="px-4 sm:px-6 py-6 h-[calc(100dvh-7rem)] md:h-[calc(100dvh-4rem)] flex flex-col">
+    <div
+      id="kanban-keyboard"
+      phx-hook="KanbanKeyboard"
+      class="px-4 sm:px-6 py-6 h-[calc(100dvh-7rem)] md:h-[calc(100dvh-4rem)] flex flex-col"
+    >
       <%!-- Search + New Task --%>
       <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 sticky top-0 z-10 bg-base-100 -mx-4 px-4 sm:-mx-6 sm:px-6 pt-1 pb-2 md:static md:mx-0 md:px-0 md:pt-0 md:pb-0 md:bg-transparent">
         <form phx-change="search" class="w-full sm:flex-1 sm:max-w-sm">
@@ -842,7 +868,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
           <% end %>
         </form>
 
-        <% active_filter_count = (if @filter_priority, do: 1, else: 0) + MapSet.size(@filter_tags) + (if @filter_due_date, do: 1, else: 0) + (if @filter_activity, do: 1, else: 0) %>
+        <% active_filter_count =
+          if(@filter_priority, do: 1, else: 0) + MapSet.size(@filter_tags) +
+            if(@filter_due_date, do: 1, else: 0) + if @filter_activity, do: 1, else: 0 %>
         <div class="flex items-center gap-1.5">
           <button
             phx-click="toggle_show_completed"
@@ -894,7 +922,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
               phx-value-state_id={state.id}
               class="btn btn-sm sm:btn-xs btn-ghost gap-1 min-h-[36px] sm:min-h-0"
             >
-              <span class="w-1.5 h-1.5 rounded-full" style={"background-color: #{state_dot_color(state.color)}"}></span>
+              <span
+                class="w-1.5 h-1.5 rounded-full"
+                style={"background-color: #{state_dot_color(state.color)}"}
+              >
+              </span>
               {state.name}
             </button>
           <% end %>
@@ -916,12 +948,24 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       <% end %>
 
       <%!-- Kanban columns --%>
-      <div class="flex-1 min-h-0 overflow-x-auto" id="kanban-scroll" phx-hook="KanbanScrollDots" data-column-count={length(@workflow_states)}>
-        <div id="kanban-columns" phx-hook="SortableColumns" class="inline-flex gap-3 h-full min-w-full pb-2 snap-x snap-mandatory">
+      <div
+        class="flex-1 min-h-0 overflow-x-auto"
+        id="kanban-scroll"
+        phx-hook="KanbanScrollDots"
+        data-column-count={length(@workflow_states)}
+      >
+        <div
+          id="kanban-columns"
+          phx-hook="SortableColumns"
+          class="inline-flex gap-3 h-full min-w-full pb-2 snap-x snap-mandatory"
+        >
           <%= for state <- @workflow_states do %>
             <% column_tasks = Map.get(@tasks_by_state, state.id, []) %>
             <% task_count = length(column_tasks) %>
-            <div class="flex-shrink-0 w-[84vw] max-w-80 md:w-72 flex flex-col h-full snap-start" data-column-id={state.id}>
+            <div
+              class="flex-shrink-0 w-[84vw] max-w-80 md:w-72 flex flex-col h-full snap-start"
+              data-column-id={state.id}
+            >
               <%!-- Column header with colored accent --%>
               <div class="mb-2">
                 <div
@@ -933,13 +977,19 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                     <input
                       type="checkbox"
                       class="checkbox checkbox-sm sm:checkbox-xs checkbox-primary"
-                      checked={column_tasks != [] and Enum.all?(column_tasks, &MapSet.member?(@selected_tasks, &1.uuid))}
+                      checked={
+                        column_tasks != [] and
+                          Enum.all?(column_tasks, &MapSet.member?(@selected_tasks, &1.uuid))
+                      }
                       phx-click="select_all_column"
                       phx-value-state-id={state.id}
                     />
                   <% end %>
                   <div class="flex items-center gap-1.5 cursor-grab active:cursor-grabbing">
-                    <.icon name="hero-bars-2" class="w-3 h-3 text-base-content/20 hover:text-base-content/40" />
+                    <.icon
+                      name="hero-bars-2"
+                      class="w-3 h-3 text-base-content/20 hover:text-base-content/40"
+                    />
                     <div
                       class="w-2 h-2 rounded-full flex-shrink-0"
                       style={"background-color: #{state_dot_color(state.color)}"}
@@ -1072,24 +1122,31 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
     <%!-- Filter Drawer --%>
     <%= if @show_filter_drawer do %>
-      <% active_filter_count = (if @filter_priority, do: 1, else: 0) + MapSet.size(@filter_tags) + (if @filter_due_date, do: 1, else: 0) + (if @filter_activity, do: 1, else: 0) %>
+      <% active_filter_count =
+        if(@filter_priority, do: 1, else: 0) + MapSet.size(@filter_tags) +
+          if(@filter_due_date, do: 1, else: 0) + if @filter_activity, do: 1, else: 0 %>
       <div class="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label="Filter">
         <div class="absolute inset-0 bg-black/20" phx-click="toggle_filter_drawer" />
         <div class="absolute right-0 top-0 h-full w-72 bg-base-200 shadow-xl flex flex-col overflow-hidden border-l border-base-content/8">
           <%!-- Header --%>
           <div class="flex items-center justify-between px-4 py-3 border-b border-base-content/10">
             <h2 class="text-sm font-semibold text-base-content/80">Filter</h2>
-            <button phx-click="toggle_filter_drawer" class="btn btn-ghost btn-xs btn-circle" aria-label="Close">
+            <button
+              phx-click="toggle_filter_drawer"
+              class="btn btn-ghost btn-xs btn-circle"
+              aria-label="Close"
+            >
               <.icon name="hero-x-mark-mini" class="w-4 h-4" />
             </button>
           </div>
 
           <%!-- Scrollable body --%>
           <div class="flex-1 overflow-y-auto px-4 py-4 space-y-5">
-
             <%!-- Keyword --%>
             <div>
-              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">Keyword</h3>
+              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+                Keyword
+              </h3>
               <form phx-change="search">
                 <div class="relative">
                   <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -1111,14 +1168,26 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
             <%!-- Card Status --%>
             <div>
-              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">Card status</h3>
+              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+                Card status
+              </h3>
               <div class="space-y-0.5">
                 <label class="flex items-center gap-3 cursor-pointer py-1.5 hover:text-base-content transition-colors">
-                  <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" checked={@show_completed} phx-click="toggle_show_completed" />
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-sm checkbox-primary"
+                    checked={@show_completed}
+                    phx-click="toggle_show_completed"
+                  />
                   <span class="text-sm text-base-content/70">Marked as complete</span>
                 </label>
                 <label class="flex items-center gap-3 cursor-pointer py-1.5 hover:text-base-content transition-colors">
-                  <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" checked={@show_archived} phx-click="toggle_show_archived" />
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-sm checkbox-primary"
+                    checked={@show_archived}
+                    phx-click="toggle_show_archived"
+                  />
                   <span class="text-sm text-base-content/70">Archived</span>
                 </label>
               </div>
@@ -1126,7 +1195,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
             <%!-- Due Date --%>
             <div>
-              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">Due date</h3>
+              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+                Due date
+              </h3>
               <div class="space-y-0.5">
                 <%= for {label, value, atom, icon, icon_class} <- [
                   {"No date", "no_date", :no_date, "hero-calendar", "text-base-content/35"},
@@ -1136,7 +1207,13 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                   {"Due in the next month", "next_month", :next_month, "hero-clock", "text-base-content/30"}
                 ] do %>
                   <label class="flex items-center gap-3 cursor-pointer py-1.5 hover:text-base-content transition-colors">
-                    <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" checked={@filter_due_date == atom} phx-click="set_due_date_filter" phx-value-value={value} />
+                    <input
+                      type="checkbox"
+                      class="checkbox checkbox-sm checkbox-primary"
+                      checked={@filter_due_date == atom}
+                      phx-click="set_due_date_filter"
+                      phx-value-value={value}
+                    />
                     <.icon name={icon} class={"w-3.5 h-3.5 flex-shrink-0 #{icon_class}"} />
                     <span class="text-sm text-base-content/70">{label}</span>
                   </label>
@@ -1146,13 +1223,23 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
             <%!-- Priority --%>
             <div>
-              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">Priority</h3>
+              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+                Priority
+              </h3>
               <div class="space-y-1.5">
                 <%= for {label, value, color} <- [{"High", 3, "#EF4444"}, {"Med", 2, "#F59E0B"}, {"Low", 1, "#3B82F6"}] do %>
                   <label class="flex items-center gap-3 cursor-pointer py-0.5 group">
-                    <input type="checkbox" class="checkbox checkbox-sm checkbox-primary flex-shrink-0" checked={@filter_priority == value} phx-click="set_priority_filter" phx-value-priority={value} />
+                    <input
+                      type="checkbox"
+                      class="checkbox checkbox-sm checkbox-primary flex-shrink-0"
+                      checked={@filter_priority == value}
+                      phx-click="set_priority_filter"
+                      phx-value-priority={value}
+                    />
                     <div class="flex-1 h-5 rounded" style={"background-color: #{color}"} />
-                    <span class="text-[11px] text-base-content/45 w-7 text-right shrink-0">{label}</span>
+                    <span class="text-[11px] text-base-content/45 w-7 text-right shrink-0">
+                      {label}
+                    </span>
                   </label>
                 <% end %>
               </div>
@@ -1161,12 +1248,23 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
             <%!-- Labels / Tags --%>
             <%= if @available_tags != [] do %>
               <div>
-                <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">Labels</h3>
+                <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+                  Labels
+                </h3>
                 <div class="space-y-1.5">
                   <%= for tag <- @available_tags do %>
                     <label class="flex items-center gap-3 cursor-pointer py-0.5 group">
-                      <input type="checkbox" class="checkbox checkbox-sm checkbox-primary flex-shrink-0" checked={MapSet.member?(@filter_tags, tag.name)} phx-click="set_tag_filter" phx-value-tag={tag.name} />
-                      <div class="flex-1 h-5 rounded flex items-center px-2" style={"background-color: #{tag.color || "#6B7280"}"}>
+                      <input
+                        type="checkbox"
+                        class="checkbox checkbox-sm checkbox-primary flex-shrink-0"
+                        checked={MapSet.member?(@filter_tags, tag.name)}
+                        phx-click="set_tag_filter"
+                        phx-value-tag={tag.name}
+                      />
+                      <div
+                        class="flex-1 h-5 rounded flex items-center px-2"
+                        style={"background-color: #{tag.color || "#6B7280"}"}
+                      >
                         <span class="text-[11px] font-medium text-white/90 truncate">{tag.name}</span>
                       </div>
                       <button
@@ -1187,7 +1285,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
             <%!-- Activity --%>
             <div>
-              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">Activity</h3>
+              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+                Activity
+              </h3>
               <div class="space-y-0.5">
                 <%= for {label, value, atom} <- [
                   {"Active in the last week", "week", :week},
@@ -1196,13 +1296,18 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                   {"Without activity in the last four weeks", "inactive", :inactive}
                 ] do %>
                   <label class="flex items-center gap-3 cursor-pointer py-1.5 hover:text-base-content transition-colors">
-                    <input type="checkbox" class="checkbox checkbox-sm checkbox-primary flex-shrink-0" checked={@filter_activity == atom} phx-click="set_activity_filter" phx-value-value={value} />
+                    <input
+                      type="checkbox"
+                      class="checkbox checkbox-sm checkbox-primary flex-shrink-0"
+                      checked={@filter_activity == atom}
+                      phx-click="set_activity_filter"
+                      phx-value-value={value}
+                    />
                     <span class="text-sm text-base-content/70">{label}</span>
                   </label>
                 <% end %>
               </div>
             </div>
-
           </div>
 
           <%!-- Footer --%>
@@ -1210,14 +1315,20 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
             <%= if MapSet.size(@filter_tags) >= 2 do %>
               <form phx-change="toggle_tag_filter_mode" class="flex items-center gap-2">
                 <label class="text-xs text-base-content/40 flex-shrink-0">Tag match</label>
-                <select name="mode" class="select select-xs flex-1 bg-base-100 border-base-content/10 text-sm">
+                <select
+                  name="mode"
+                  class="select select-xs flex-1 bg-base-100 border-base-content/10 text-sm"
+                >
                   <option value="or" selected={@filter_tag_mode == :or}>Any match</option>
                   <option value="and" selected={@filter_tag_mode == :and}>All match</option>
                 </select>
               </form>
             <% end %>
             <%= if active_filter_count > 0 do %>
-              <button phx-click="clear_filters" class="btn btn-ghost btn-sm w-full text-base-content/40 hover:text-base-content/80">
+              <button
+                phx-click="clear_filters"
+                class="btn btn-ghost btn-sm w-full text-base-content/40 hover:text-base-content/80"
+              >
                 Clear all filters
               </button>
             <% end %>

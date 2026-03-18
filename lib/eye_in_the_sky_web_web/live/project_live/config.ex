@@ -359,16 +359,14 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
               phx-click="toggle_view_mode"
               phx-value-mode="tree"
             >
-              <.icon name="hero-folder" class="w-4 h-4" />
-              Explore
+              <.icon name="hero-folder" class="w-4 h-4" /> Explore
             </button>
             <button
               class={"btn btn-sm join-item" <> if @view_mode == :list, do: " btn-active", else: ""}
               phx-click="toggle_view_mode"
               phx-value-mode="list"
             >
-              <.icon name="hero-bars-3" class="w-4 h-4" />
-              List
+              <.icon name="hero-bars-3" class="w-4 h-4" /> List
             </button>
           </div>
         </div>
@@ -392,8 +390,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
               </ul>
             </div>
           </div>
-
-          <!-- Content viewer -->
+          
+    <!-- Content viewer -->
           <div class="flex-1 min-h-0 overflow-y-auto">
             <%= if @selected_file do %>
               <div class="p-6">
@@ -402,7 +400,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
                     <div class="flex items-center justify-between px-4 py-2 border-b border-base-300 bg-base-200/50">
                       <code class="text-sm font-semibold text-base-content">{@selected_file}</code>
                       <div class="flex items-center gap-1">
-                        <button phx-click="open_file" class="btn btn-ghost btn-xs" title="Open in editor">
+                        <button
+                          phx-click="open_file"
+                          class="btn btn-ghost btn-xs"
+                          title="Open in editor"
+                        >
                           <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit
                         </button>
                         <button phx-click="close_viewer" class="btn btn-ghost btn-xs btn-circle">
@@ -429,15 +431,19 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
             <% else %>
               <div class="flex items-center justify-center h-full">
                 <div class="text-center">
-                  <.icon name="hero-document-text" class="w-16 h-16 mx-auto text-base-content/20 mb-4" />
+                  <.icon
+                    name="hero-document-text"
+                    class="w-16 h-16 mx-auto text-base-content/20 mb-4"
+                  />
                   <h3 class="text-lg font-semibold text-base-content/60 mb-2">Select a file</h3>
-                  <p class="text-sm text-base-content/40">Choose a file from the tree to view its contents</p>
+                  <p class="text-sm text-base-content/40">
+                    Choose a file from the tree to view its contents
+                  </p>
                 </div>
               </div>
             <% end %>
           </div>
         </div>
-
       <% else %>
         <!-- List View -->
         <div class="h-[calc(100dvh-10rem)]">
@@ -470,7 +476,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
                     </h2>
                     <p class="text-sm text-base-content/60">.claude/{@current_path}</p>
                   </div>
-                  <button phx-click="open_file" class="btn btn-sm btn-ghost ml-auto" title="Open in editor">
+                  <button
+                    phx-click="open_file"
+                    class="btn btn-sm btn-ghost ml-auto"
+                    title="Open in editor"
+                  >
                     <.icon name="hero-pencil-square" class="w-4 h-4" /> Edit
                   </button>
                 </div>
@@ -509,8 +519,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
                     .claude/{@current_path || ""}
                   </h2>
                 </div>
-
-                <!-- Mobile list -->
+                
+    <!-- Mobile list -->
                 <div class="md:hidden space-y-2">
                   <%= for file <- @files do %>
                     <.link
@@ -531,8 +541,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
                     </.link>
                   <% end %>
                 </div>
-
-                <!-- Desktop table -->
+                
+    <!-- Desktop table -->
                 <div class="hidden md:block overflow-x-auto">
                   <table class="table table-sm">
                     <thead>
@@ -568,7 +578,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
               <% else %>
                 <div class="flex items-center justify-center h-[calc(100dvh-20rem)]">
                   <div class="text-center">
-                    <.icon name="hero-document-text" class="w-16 h-16 mx-auto text-base-content/20 mb-4" />
+                    <.icon
+                      name="hero-document-text"
+                      class="w-16 h-16 mx-auto text-base-content/20 mb-4"
+                    />
                     <h3 class="text-lg font-semibold text-base-content/60 mb-2">Empty directory</h3>
                     <p class="text-sm text-base-content/40">No files in this directory</p>
                   </div>
@@ -578,7 +591,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Config do
           </div>
         </div>
       <% end %>
-
     <% else %>
       <div class="flex items-center justify-center h-[calc(100dvh-10rem)]">
         <div class="text-center py-12">

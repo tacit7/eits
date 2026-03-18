@@ -26,7 +26,9 @@ defmodule EyeInTheSkyWeb.Accounts.ApiKey do
   Hash a raw token using HMAC-SHA256 with the app's secret_key_base.
   """
   def hash_token(token) do
-    secret = Application.fetch_env!(:eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint)[:secret_key_base]
+    secret =
+      Application.fetch_env!(:eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint)[:secret_key_base]
+
     :crypto.mac(:hmac, :sha256, secret, token) |> Base.encode16(case: :lower)
   end
 

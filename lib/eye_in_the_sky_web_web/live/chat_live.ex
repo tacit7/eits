@@ -774,7 +774,14 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
                             <.icon name="hero-plus-mini" class="w-2.5 h-2.5 opacity-50" />
                             @{session.id}
                             <span class="text-base-content/25">
-                              {String.slice(session.name || session.agent_description || "", 0, 20)}{if String.length(session.name || session.agent_description || "") > 20, do: "…"}
+                              {String.slice(session.name || session.agent_description || "", 0, 20)}{if String.length(
+                                                                                                          session.name ||
+                                                                                                            session.agent_description ||
+                                                                                                            ""
+                                                                                                        ) >
+                                                                                                          20,
+                                                                                                        do:
+                                                                                                          "…"}
                             </span>
                             <span class="text-[9px] text-base-content/15">{session.model}</span>
                             <%= if session.ended_at do %>
@@ -789,7 +796,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
               <% else %>
                 <p class="text-xs text-base-content/25 py-1">
                   <%= if @session_search != "" do %>
-                    No sessions match "<%= @session_search %>"
+                    No sessions match "{@session_search}"
                   <% else %>
                     No available sessions
                   <% end %>

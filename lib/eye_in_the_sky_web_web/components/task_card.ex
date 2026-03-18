@@ -5,7 +5,9 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
 
   use Phoenix.Component
   import EyeInTheSkyWebWeb.CoreComponents
-  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [format_due_date: 1, card_aging_indicator: 1]
+
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers,
+    only: [format_due_date: 1, card_aging_indicator: 1]
 
   alias EyeInTheSkyWeb.Tasks.WorkflowState
 
@@ -22,7 +24,11 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   attr :rest, :global
 
   def task_card(assigns) do
-    aging = if assigns.variant == "kanban", do: card_aging_indicator(Map.get(assigns.task, :updated_at)), else: nil
+    aging =
+      if assigns.variant == "kanban",
+        do: card_aging_indicator(Map.get(assigns.task, :updated_at)),
+        else: nil
+
     assigns = assign(assigns, :aging, aging)
 
     ~H"""
@@ -33,7 +39,13 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
         <div class={[card_class(@variant), @aging && elem(@aging, 0)]} {@rest}>
           <div class={card_body_class(@variant)}>
             <%= if @variant == "kanban" do %>
-              <.kanban_card_content task={@task} on_click={@on_click} on_delete={@on_delete} aging={@aging} working_session_ids={@working_session_ids} />
+              <.kanban_card_content
+                task={@task}
+                on_click={@on_click}
+                on_delete={@on_delete}
+                aging={@aging}
+                working_session_ids={@working_session_ids}
+              />
             <% else %>
               <.grid_card_content task={@task} on_click={@on_click} />
             <% end %>
@@ -143,7 +155,10 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
         aria-pressed={to_string(!is_nil(@task.completed_at))}
         class="flex-shrink-0 mt-0.5 flex items-center justify-center w-4 h-4 rounded text-base-content/30 hover:text-success transition-colors"
       >
-        <.icon name={if @task.completed_at, do: "hero-check-circle-mini", else: "hero-circle-mini"} class="w-4 h-4" />
+        <.icon
+          name={if @task.completed_at, do: "hero-check-circle-mini", else: "hero-circle-mini"}
+          class="w-4 h-4"
+        />
       </button>
       <h4
         class={[
@@ -199,14 +214,22 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
     <%!-- Footer icon row --%>
     <% checklist = Map.get(@task, :checklist_items, []) %>
     <% notes_count = Map.get(@task, :notes_count, 0) %>
-    <% has_footer = @task.description || @aging || @task.due_at || checklist != [] || notes_count > 0 || @dm_session %>
+    <% has_footer =
+      @task.description || @aging || @task.due_at || checklist != [] || notes_count > 0 || @dm_session %>
     <%= if has_footer do %>
       <div class="flex items-center gap-2 mt-2 text-base-content/35 text-[11px]">
         <%= if @task.description do %>
           <.icon name="hero-document-text" class="w-3 h-3 flex-shrink-0" />
         <% end %>
         <%= if @aging do %>
-          <span class={if String.contains?(elem(@aging, 1), "stale"), do: "text-error/60", else: "text-warning/60"} title={elem(@aging, 1)}>
+          <span
+            class={
+              if String.contains?(elem(@aging, 1), "stale"),
+                do: "text-error/60",
+                else: "text-warning/60"
+            }
+            title={elem(@aging, 1)}
+          >
             <.icon name="hero-clock-mini" class="w-3 h-3 flex-shrink-0" />
           </span>
         <% end %>
@@ -239,7 +262,10 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
             title={if is_working, do: "Agent is working", else: "Open agent DM"}
           >
             <span class="relative inline-flex">
-              <.icon name="hero-user-circle" class={"w-3.5 h-3.5 #{if is_working, do: "text-primary", else: ""}"} />
+              <.icon
+                name="hero-user-circle"
+                class={"w-3.5 h-3.5 #{if is_working, do: "text-primary", else: ""}"}
+              />
               <%= if is_working do %>
                 <span class="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-success rounded-full animate-pulse" />
               <% end %>
@@ -341,5 +367,4 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       true -> "transparent"
     end
   end
-
 end

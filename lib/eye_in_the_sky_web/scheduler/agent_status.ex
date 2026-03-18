@@ -180,7 +180,9 @@ defmodule EyeInTheSkyWeb.Scheduler.AgentStatus do
     # Archive the associated agent if present
     if session.agent_id do
       case Repo.get(Agent, session.agent_id) do
-        nil -> :ok
+        nil ->
+          :ok
+
         agent ->
           agent
           |> Ecto.Changeset.change(%{archived_at: now_iso})

@@ -135,5 +135,4 @@ defmodule EyeInTheSkyWebWeb.BookmarkController do
       updated_at: bookmark.updated_at
     }
   end
-
 end

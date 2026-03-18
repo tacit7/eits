@@ -160,11 +160,21 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
     </div>
 
     <%!-- Quick Note Modal --%>
-    <div :if={@show_quick_note_modal} class="modal modal-open" phx-window-keydown="close_quick_note_modal" phx-key="Escape">
+    <div
+      :if={@show_quick_note_modal}
+      class="modal modal-open"
+      phx-window-keydown="close_quick_note_modal"
+      phx-key="Escape"
+    >
       <div class="modal-box max-w-md p-0 overflow-hidden">
         <div class="flex items-center justify-between px-4 py-3 border-b border-base-content/10">
           <h2 class="text-sm font-semibold text-base-content">Quick Note</h2>
-          <button type="button" phx-click="close_quick_note_modal" class="btn btn-ghost btn-xs btn-square" aria-label="Close">
+          <button
+            type="button"
+            phx-click="close_quick_note_modal"
+            class="btn btn-ghost btn-xs btn-square"
+            aria-label="Close"
+          >
             <.icon name="hero-x-mark" class="w-4 h-4" />
           </button>
         </div>
@@ -198,7 +208,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
             <span class="text-sm text-base-content/70">Star this note</span>
           </label>
           <div class="flex justify-end gap-2 pt-1">
-            <button type="button" phx-click="close_quick_note_modal" class="btn btn-ghost btn-sm">Cancel</button>
+            <button type="button" phx-click="close_quick_note_modal" class="btn btn-ghost btn-sm">
+              Cancel
+            </button>
             <button type="submit" class="btn btn-primary btn-sm">Create Note</button>
           </div>
         </form>

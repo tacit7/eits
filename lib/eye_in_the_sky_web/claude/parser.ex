@@ -41,7 +41,9 @@ defmodule EyeInTheSkyWeb.Claude.Parser do
 
       true ->
         case Jason.decode(line) do
-          {:ok, json} -> parse_event(json)
+          {:ok, json} ->
+            parse_event(json)
+
           {:error, _reason} ->
             Logger.debug("[Parser] skipping non-JSON line: #{inspect(line)}")
             :skip

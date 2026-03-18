@@ -149,12 +149,11 @@ defmodule EyeInTheSkyWeb.AgentWorkerEvents do
             end
 
           case Sessions.update_session(session, attrs) do
-            {:ok, _} -> :ok
+            {:ok, _} ->
+              :ok
 
             {:error, reason} ->
-              Logger.warning(
-                "[#{session_id}] update_session_status failed: #{inspect(reason)}"
-              )
+              Logger.warning("[#{session_id}] update_session_status failed: #{inspect(reason)}")
           end
 
           if status == "idle" do

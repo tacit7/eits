@@ -40,8 +40,11 @@ defmodule Mix.Tasks.Eits.Gen.ApiKey do
 
         s ->
           case NaiveDateTime.from_iso8601(s) do
-            {:ok, dt} -> dt
-            {:error, _} -> Mix.raise("Invalid --valid-until format. Use ISO8601: 2027-01-01T00:00:00")
+            {:ok, dt} ->
+              dt
+
+            {:error, _} ->
+              Mix.raise("Invalid --valid-until format. Use ISO8601: 2027-01-01T00:00:00")
           end
       end
 

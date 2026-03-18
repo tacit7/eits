@@ -109,10 +109,12 @@ defmodule EyeInTheSkyWeb.Events do
   # ---------------------------------------------------------------------------
 
   @doc "Tool approval requested."
-  def tool_approval_requested(approval), do: broadcast("tool_approvals", {:approval_requested, approval})
+  def tool_approval_requested(approval),
+    do: broadcast("tool_approvals", {:approval_requested, approval})
 
   @doc "Tool approval decision recorded."
-  def tool_approval_updated(approval), do: broadcast("tool_approvals", {:approval_updated, approval})
+  def tool_approval_updated(approval),
+    do: broadcast("tool_approvals", {:approval_updated, approval})
 
   @doc "Subscribe to tool approval events."
   def subscribe_tool_approvals, do: sub("tool_approvals")

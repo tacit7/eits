@@ -367,7 +367,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
 
   # --- Regression: double registry lookup bug ---
 
-  test "send_message delivers message to newly started worker (regression: double registry lookup)", %{track: track} do
+  test "send_message delivers message to newly started worker (regression: double registry lookup)",
+       %{track: track} do
     # Previously send_message called lookup_or_start (got pid), then called
     # AgentWorker.process_message which did a SECOND Registry.lookup.
     # If that second lookup raced or failed, the message was silently dropped
@@ -377,7 +378,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
     session_id = session.id
 
-    assert {:ok, :started} = EyeInTheSkyWeb.Agents.AgentManager.send_message(session.id, "test prompt")
+    assert {:ok, :started} =
+             EyeInTheSkyWeb.Agents.AgentManager.send_message(session.id, "test prompt")
 
     # :agent_working is broadcast only when the SDK actually starts, which only
     # happens if the cast reached the worker. If the old double-lookup dropped
@@ -425,11 +427,13 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
 
     # Queue 5 more while SDK is busy (fills the queue to max)
     for i <- 2..6 do
-      assert {:ok, :queued} = EyeInTheSkyWeb.Agents.AgentManager.send_message(session.id, "msg-#{i}")
+      assert {:ok, :queued} =
+               EyeInTheSkyWeb.Agents.AgentManager.send_message(session.id, "msg-#{i}")
     end
 
     # 7th message should be rejected (queue full at 5)
-    assert {:error, :queue_full} = EyeInTheSkyWeb.Agents.AgentManager.send_message(session.id, "msg-7")
+    assert {:error, :queue_full} =
+             EyeInTheSkyWeb.Agents.AgentManager.send_message(session.id, "msg-7")
 
     [{worker_pid, _}] =
       Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
@@ -611,14 +615,22 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     fake_job = EyeInTheSkyWeb.Claude.Job.new("will-be-drained", %{has_messages: false})
 
     :sys.replace_state(worker_pid, fn state ->
-      %{state | queue: [fake_job], retry_attempt: 5, retry_timer_ref: nil, sdk_ref: nil, current_job: nil}
+      %{
+        state
+        | queue: [fake_job],
+          retry_attempt: 5,
+          retry_timer_ref: nil,
+          sdk_ref: nil,
+          current_job: nil
+      }
     end)
 
     # Send a new message. The handler sees sdk_ref == nil, tries start_sdk.
     # MockCLI will succeed and clear_retry_timer resets retry_attempt.
     # We can't directly test max retry drain with MockCLI,
     # but we verify the retry_attempt field exists and resets on success.
-    assert {:ok, :started} = GenServer.call(worker_pid, {:submit_message, "new-msg", %{has_messages: false}})
+    assert {:ok, :started} =
+             GenServer.call(worker_pid, {:submit_message, "new-msg", %{has_messages: false}})
 
     assert_receive {:agent_working, _, ^session_id}, 5_000
 
@@ -708,7 +720,15 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
 
     # Force into :failed state (simulating max retries exceeded)
     :sys.replace_state(worker_pid, fn state ->
-      %{state | status: :failed, sdk_ref: nil, current_job: nil, queue: [], retry_attempt: 0, retry_timer_ref: nil}
+      %{
+        state
+        | status: :failed,
+          sdk_ref: nil,
+          current_job: nil,
+          queue: [],
+          retry_attempt: 0,
+          retry_timer_ref: nil
+      }
     end)
 
     assert :sys.get_state(worker_pid).status == :failed
@@ -748,7 +768,15 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     stranded_job = EyeInTheSkyWeb.Claude.Job.new("stranded-msg", %{has_messages: false})
 
     :sys.replace_state(worker_pid, fn state ->
-      %{state | status: :failed, sdk_ref: nil, current_job: nil, queue: [stranded_job], retry_attempt: 0, retry_timer_ref: nil}
+      %{
+        state
+        | status: :failed,
+          sdk_ref: nil,
+          current_job: nil,
+          queue: [stranded_job],
+          retry_attempt: 0,
+          retry_timer_ref: nil
+      }
     end)
 
     assert :sys.get_state(worker_pid).status == :failed
@@ -844,7 +872,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     assert {:ok, _} = EyeInTheSkyWeb.Agents.AgentManager.send_message(session.id, "first")
     assert_receive {:agent_working, _, ^session_id}, 5_000
 
-    [{first_pid, _}] = Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
+    [{first_pid, _}] =
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
 
     # Kill the worker process directly
     DynamicSupervisor.terminate_child(EyeInTheSkyWeb.Claude.AgentSupervisor, first_pid)
@@ -856,7 +885,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     assert {:ok, _} = EyeInTheSkyWeb.Agents.AgentManager.send_message(session.id, "second")
     assert_receive {:agent_working, _, ^session_id}, 5_000
 
-    [{second_pid, _}] = Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
+    [{second_pid, _}] =
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
+
     assert is_pid(second_pid)
     assert Process.alive?(second_pid)
     assert second_pid != first_pid
@@ -878,7 +909,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     assert_receive {:agent_working, _, ^session_id}, 5_000
 
     # Now exactly one worker must be registered
-    assert [{pid, _}] = Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
+    assert [{pid, _}] =
+             Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
+
     assert Process.alive?(pid)
 
     mock_port = wait_for_mock_port(session.id)

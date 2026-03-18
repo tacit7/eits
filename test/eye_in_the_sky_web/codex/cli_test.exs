@@ -74,16 +74,14 @@ defmodule EyeInTheSkyWeb.Codex.CLITest do
   # ---------------------------------------------------------------------------
 
   describe "build_args/1 resume" do
-    test "resume adds --resume flag with thread_id" do
+    test "resume adds resume subcommand with thread_id" do
       args = CLI.build_args(prompt: "continue", resume: "thread-abc-123")
-      idx = Enum.find_index(args, &(&1 == "--resume"))
-      assert idx != nil
-      assert Enum.at(args, idx + 1) == "thread-abc-123"
+      assert Enum.take(args, 3) == ["exec", "resume", "thread-abc-123"]
     end
 
-    test "no resume omits --resume" do
+    test "no resume omits resume subcommand" do
       args = CLI.build_args(prompt: "x")
-      refute "--resume" in args
+      refute "resume" in args
     end
   end
 
@@ -95,7 +93,7 @@ defmodule EyeInTheSkyWeb.Codex.CLITest do
     test "nil values are filtered out" do
       args = CLI.build_args(prompt: "x", model: nil, resume: nil)
       refute "-m" in args
-      refute "--resume" in args
+      refute "resume" in args
     end
   end
 
@@ -118,9 +116,10 @@ defmodule EyeInTheSkyWeb.Codex.CLITest do
       assert last == "test"
 
       middle = args |> Enum.drop(1) |> Enum.drop(-1)
+      assert Enum.take(args, 3) == ["exec", "resume", "tid"]
       assert "--json" in middle
       assert "-m" in middle
-      assert "--resume" in middle
+      assert "resume" in middle
     end
   end
 

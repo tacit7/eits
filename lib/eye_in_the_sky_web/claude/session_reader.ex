@@ -417,8 +417,11 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
     rate = Map.get(input, "rate")
 
     parts =
-      ["message: #{msg}", if(voice != "", do: "voice: #{voice}", else: nil),
-       if(rate, do: "rate: #{rate}", else: nil)]
+      [
+        "message: #{msg}",
+        if(voice != "", do: "voice: #{voice}", else: nil),
+        if(rate, do: "rate: #{rate}", else: nil)
+      ]
       |> Enum.reject(&is_nil/1)
       |> Enum.join(", ")
 

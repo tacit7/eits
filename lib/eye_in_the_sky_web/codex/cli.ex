@@ -159,11 +159,12 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
           {"EITS_AGENT_ID", opts[:eits_agent_id]},
           {"EITS_PROJECT_ID", opts[:eits_project_id]},
           {"EITS_MODEL", opts[:eits_model]},
-          {"EITS_URL", opts[:eits_url] || System.get_env("EITS_URL", "http://localhost:5000/api/v1")}
+          {"EITS_URL",
+           opts[:eits_url] || System.get_env("EITS_URL", "http://localhost:5000/api/v1")}
         ],
         args,
         fn {key, val}, acc ->
-          if val, do: acc ++ ["-c", "shell_environment_policy.set.#{key}=#{val}"], else: acc
+          if val, do: acc ++ ["-c", "shell_environment_policy.set.#{key}=\"#{val}\""], else: acc
         end
       )
 

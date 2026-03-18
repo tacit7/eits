@@ -51,5 +51,4 @@ defmodule EyeInTheSkyWeb.Factory do
     agent = create_agent()
     create_session(agent)
   end
-
 end

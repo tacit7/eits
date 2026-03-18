@@ -22,7 +22,15 @@ defmodule EyeInTheSkyWeb.Checkpoints.Checkpoint do
   @doc false
   def changeset(checkpoint, attrs) do
     checkpoint
-    |> cast(attrs, [:session_id, :name, :description, :message_index, :git_stash_ref, :metadata, :inserted_at])
+    |> cast(attrs, [
+      :session_id,
+      :name,
+      :description,
+      :message_index,
+      :git_stash_ref,
+      :metadata,
+      :inserted_at
+    ])
     |> validate_required([:session_id, :message_index])
   end
 end

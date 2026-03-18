@@ -18,7 +18,16 @@ defmodule EyeInTheSkyWeb.Teams.TeamMember do
 
   def changeset(member, attrs) do
     member
-    |> cast(attrs, [:team_id, :agent_id, :session_id, :name, :role, :status, :joined_at, :last_activity_at])
+    |> cast(attrs, [
+      :team_id,
+      :agent_id,
+      :session_id,
+      :name,
+      :role,
+      :status,
+      :joined_at,
+      :last_activity_at
+    ])
     |> validate_required([:team_id, :name])
     |> unique_constraint([:team_id, :name], name: :team_members_team_id_name_index)
   end

@@ -158,7 +158,9 @@ defmodule EyeInTheSkyWeb.Messages do
     # Auto-assign channel_message_number for channel messages
     # Handles both atom and string key maps
     cid = Map.get(attrs, :channel_id) || Map.get(attrs, "channel_id")
-    has_number = Map.get(attrs, :channel_message_number) || Map.get(attrs, "channel_message_number")
+
+    has_number =
+      Map.get(attrs, :channel_message_number) || Map.get(attrs, "channel_message_number")
 
     attrs =
       if cid && is_nil(has_number) do
@@ -238,8 +240,8 @@ defmodule EyeInTheSkyWeb.Messages do
       cond do
         source_uuid && message_exists_by_source_uuid?(source_uuid) ->
           # Already recorded by source_uuid — enrich with metadata if provided
-          # (session file sync imports messages without usage data; the session_worker
-          # calls this function later with usage metadata and the same source_uuid)
+          # (session file sync imports messages without usage data; later calls
+          # may enrich with usage metadata using the same source_uuid)
           existing = Repo.get_by!(Message, source_uuid: source_uuid)
 
           if metadata && metadata != %{} do
@@ -457,7 +459,8 @@ defmodule EyeInTheSkyWeb.Messages do
   Deletes messages for a session beyond the given index (keeps the N oldest).
   Returns the number of deleted rows.
   """
-  def truncate_messages_after_index(session_id, keep_count) when is_integer(keep_count) and keep_count >= 0 do
+  def truncate_messages_after_index(session_id, keep_count)
+      when is_integer(keep_count) and keep_count >= 0 do
     # Find the ID of the Nth oldest message to use as a cutoff
     cutoff_id =
       Message

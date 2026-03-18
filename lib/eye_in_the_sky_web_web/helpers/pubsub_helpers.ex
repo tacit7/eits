@@ -35,14 +35,12 @@ defmodule EyeInTheSkyWebWeb.Helpers.PubSubHelpers do
 
   ### `"agent:working"`
 
-  Broadcast by `SessionWorker` and `AgentWorker` on idle/active transitions.
+  Broadcast by `AgentWorker` on idle/active transitions.
 
   | Payload                                        | Broadcaster     | Meaning                     |
   |------------------------------------------------|-----------------|-----------------------------|
   | `{:agent_working, session_uuid, session_id}`   | `AgentWorker`   | SDK started processing      |
   | `{:agent_stopped, session_uuid, session_id}`   | `AgentWorker`   | SDK idle / error / done     |
-  | `{:agent_working, session_id, session_int_id}` | `SessionWorker` | Claude CLI started          |
-  | `{:agent_stopped, session_id, session_int_id}` | `SessionWorker` | Claude CLI stopped / error  |
 
   Subscribers: `subscribe_agent_working/0` — `ChatLive`, `DMLive`.
 
@@ -54,8 +52,8 @@ defmodule EyeInTheSkyWebWeb.Helpers.PubSubHelpers do
   | Payload                                       | Broadcaster            | Meaning                  |
   |-----------------------------------------------|------------------------|--------------------------|
   | `{:new_message, %Message{}}`                  | `Messages.Broadcaster` | New message polled from DB |
-  | `{:claude_response, session_ref, parsed}`     | `SessionWorker`        | Claude CLI output chunk  |
-  | `{:claude_complete, session_ref, exit_code}`  | `SessionWorker`        | Claude CLI process exited |
+  | `{:claude_response, session_ref, parsed}`     | `AgentWorker`          | Claude CLI output chunk  |
+  | `{:claude_complete, session_ref, exit_code}`  | `AgentWorker`          | Claude CLI process exited |
 
   Subscribers: `subscribe_session/1` — `DMLive`, `FabHook`.
 
@@ -65,7 +63,7 @@ defmodule EyeInTheSkyWebWeb.Helpers.PubSubHelpers do
 
   | Payload                                  | Broadcaster     |
   |------------------------------------------|-----------------|
-  | `{:session_status, session_id, status}`  | `SessionWorker` |
+  | `{:session_status, session_id, status}`  | `AgentWorker`   |
 
   Use `EyeInTheSkyWeb.Events.subscribe_*` helpers.
 

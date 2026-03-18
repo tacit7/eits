@@ -23,14 +23,24 @@ defmodule EyeInTheSkyWebWeb.Components.AgentScheduleForm do
       <%!-- Mobile drawer --%>
       <div class="sm:hidden fixed inset-y-0 right-0 z-50 w-full max-w-sm bg-base-100 shadow-xl overflow-y-auto">
         <div class="p-5">
-          <.form_body prompt={@prompt} job={@job} projects={@projects} context_project_id={@context_project_id} />
+          <.form_body
+            prompt={@prompt}
+            job={@job}
+            projects={@projects}
+            context_project_id={@context_project_id}
+          />
         </div>
       </div>
 
       <%!-- Desktop modal --%>
       <div class="hidden sm:flex fixed inset-0 z-50 items-center justify-center">
         <div class="bg-base-100 rounded-xl shadow-2xl w-full max-w-lg p-6 border border-base-300 max-h-[90vh] overflow-y-auto">
-          <.form_body prompt={@prompt} job={@job} projects={@projects} context_project_id={@context_project_id} />
+          <.form_body
+            prompt={@prompt}
+            job={@job}
+            projects={@projects}
+            context_project_id={@context_project_id}
+          />
         </div>
       </div>
     <% end %>
@@ -66,9 +76,13 @@ defmodule EyeInTheSkyWebWeb.Components.AgentScheduleForm do
     ~H"""
     <div class="flex items-start justify-between mb-4">
       <div>
-        <h2 class="text-base font-semibold">{if @editing, do: "Edit Schedule", else: "Schedule Agent"}</h2>
+        <h2 class="text-base font-semibold">
+          {if @editing, do: "Edit Schedule", else: "Schedule Agent"}
+        </h2>
         <p class="text-xs text-base-content/50 mt-0.5">{@prompt.name}</p>
-        <p class="text-xs text-base-content/40 mt-1 italic">Instructions captured at time of scheduling</p>
+        <p class="text-xs text-base-content/40 mt-1 italic">
+          Instructions captured at time of scheduling
+        </p>
       </div>
       <button class="btn btn-ghost btn-sm btn-square" phx-click="cancel_schedule">
         <.icon name="hero-x-mark" class="w-4 h-4" />
@@ -119,8 +133,7 @@ defmodule EyeInTheSkyWebWeb.Components.AgentScheduleForm do
         <div class="collapse collapse-arrow bg-base-200 rounded-lg">
           <input type="checkbox" class="min-h-0" />
           <div class="collapse-title min-h-0 py-2 px-3 flex items-center gap-1.5 text-xs text-base-content/60">
-            <.icon name="hero-question-mark-circle" class="w-3.5 h-3.5" />
-            Cron syntax reference
+            <.icon name="hero-question-mark-circle" class="w-3.5 h-3.5" /> Cron syntax reference
           </div>
           <div class="collapse-content px-3 pb-3">
             <table class="table table-xs w-full">
@@ -132,11 +145,31 @@ defmodule EyeInTheSkyWebWeb.Components.AgentScheduleForm do
                 </tr>
               </thead>
               <tbody class="text-xs">
-                <tr><td class="pl-0 font-medium">Minute</td><td>0 - 59</td><td class="pr-0 font-mono text-base-content/50">* , - /</td></tr>
-                <tr><td class="pl-0 font-medium">Hour</td><td>0 - 23</td><td class="pr-0 font-mono text-base-content/50">* , - /</td></tr>
-                <tr><td class="pl-0 font-medium">Day of month</td><td>1 - 31</td><td class="pr-0 font-mono text-base-content/50">* , - /</td></tr>
-                <tr><td class="pl-0 font-medium">Month</td><td>1 - 12</td><td class="pr-0 font-mono text-base-content/50">* , - /</td></tr>
-                <tr><td class="pl-0 font-medium">Day of week</td><td>0 - 6 (Sun=0)</td><td class="pr-0 font-mono text-base-content/50">* , - /</td></tr>
+                <tr>
+                  <td class="pl-0 font-medium">Minute</td>
+                  <td>0 - 59</td>
+                  <td class="pr-0 font-mono text-base-content/50">* , - /</td>
+                </tr>
+                <tr>
+                  <td class="pl-0 font-medium">Hour</td>
+                  <td>0 - 23</td>
+                  <td class="pr-0 font-mono text-base-content/50">* , - /</td>
+                </tr>
+                <tr>
+                  <td class="pl-0 font-medium">Day of month</td>
+                  <td>1 - 31</td>
+                  <td class="pr-0 font-mono text-base-content/50">* , - /</td>
+                </tr>
+                <tr>
+                  <td class="pl-0 font-medium">Month</td>
+                  <td>1 - 12</td>
+                  <td class="pr-0 font-mono text-base-content/50">* , - /</td>
+                </tr>
+                <tr>
+                  <td class="pl-0 font-medium">Day of week</td>
+                  <td>0 - 6 (Sun=0)</td>
+                  <td class="pr-0 font-mono text-base-content/50">* , - /</td>
+                </tr>
               </tbody>
             </table>
             <div class="divider my-1"></div>
@@ -163,7 +196,9 @@ defmodule EyeInTheSkyWebWeb.Components.AgentScheduleForm do
       <% end %>
 
       <div class="form-control">
-        <label class="label"><span class="label-text text-xs">Project (optional override)</span></label>
+        <label class="label">
+          <span class="label-text text-xs">Project (optional override)</span>
+        </label>
         <select name="schedule[project_override_id]" class="select select-bordered select-sm w-full">
           <option value="">— use prompt default —</option>
           <%= for p <- @projects do %>
@@ -171,8 +206,8 @@ defmodule EyeInTheSkyWebWeb.Components.AgentScheduleForm do
               value={p.id}
               selected={
                 is_nil(@prompt.project_id) &&
-                @context_project_id &&
-                @context_project_id == p.id
+                  @context_project_id &&
+                  @context_project_id == p.id
               }
             >
               {p.name}
@@ -226,7 +261,9 @@ defmodule EyeInTheSkyWebWeb.Components.AgentScheduleForm do
             <option value="" selected={@output_format == ""}>Default</option>
             <option value="text" selected={@output_format == "text"}>Text</option>
             <option value="json" selected={@output_format == "json"}>JSON</option>
-            <option value="stream-json" selected={@output_format == "stream-json"}>Stream JSON</option>
+            <option value="stream-json" selected={@output_format == "stream-json"}>
+              Stream JSON
+            </option>
           </select>
         </div>
       </div>
@@ -240,7 +277,11 @@ defmodule EyeInTheSkyWebWeb.Components.AgentScheduleForm do
           placeholder="e.g. Bash,Read,Edit,Write,Grep,Glob"
           class="input input-bordered input-sm w-full font-mono"
         />
-        <label class="label"><span class="label-text-alt text-base-content/40">Comma-separated. Supports wildcards: Bash(git *)</span></label>
+        <label class="label">
+          <span class="label-text-alt text-base-content/40">
+            Comma-separated. Supports wildcards: Bash(git *)
+          </span>
+        </label>
       </div>
 
       <div class="form-control">
@@ -284,7 +325,10 @@ defmodule EyeInTheSkyWebWeb.Components.AgentScheduleForm do
 
   defp timezone_options(selected) do
     # Ensure selected timezone is always in the list
-    all = if selected in @common_timezones, do: @common_timezones, else: [selected | @common_timezones]
+    all =
+      if selected in @common_timezones,
+        do: @common_timezones,
+        else: [selected | @common_timezones]
 
     assigns = %{timezones: all, selected: selected}
 

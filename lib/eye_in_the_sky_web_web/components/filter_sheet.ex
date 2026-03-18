@@ -91,11 +91,13 @@ defmodule EyeInTheSkyWebWeb.Components.FilterSheet do
             </legend>
             <div class="flex flex-wrap gap-2">
               <button
-                :for={{label, val} <- [
-                  {"Newest", "created_desc"},
-                  {"Oldest", "created_asc"},
-                  {"Priority", "priority"}
-                ]}
+                :for={
+                  {label, val} <- [
+                    {"Newest", "created_desc"},
+                    {"Oldest", "created_asc"},
+                    {"Priority", "priority"}
+                  ]
+                }
                 phx-click="sort_by"
                 phx-value-value={val}
                 aria-pressed={@sort_by == val}

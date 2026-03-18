@@ -65,8 +65,8 @@ defmodule EyeInTheSkyWeb.QueryBuilder do
 
   def maybe_where(_query, _opts, field) do
     raise ArgumentError,
-      "maybe_where/3 does not allow filtering on :#{field}. " <>
-        "Add it to @allowed_where_fields in QueryBuilder if it is intentional."
+          "maybe_where/3 does not allow filtering on :#{field}. " <>
+            "Add it to @allowed_where_fields in QueryBuilder if it is intentional."
   end
 
   @doc """

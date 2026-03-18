@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.Notes do
     Enum.map(tasks, fn task ->
       notes =
         (Map.get(notes_by_parent, to_string(task.id), []) ++
-           if task.uuid, do: Map.get(notes_by_parent, task.uuid, []), else: [])
+           if(task.uuid, do: Map.get(notes_by_parent, task.uuid, []), else: []))
         |> Enum.uniq_by(& &1.id)
 
       task
@@ -229,7 +229,9 @@ defmodule EyeInTheSkyWeb.Notes do
       end
 
     {scope_sql, scope_params} =
-      if has_scope, do: build_scope_sql(project_id_str, agent_ids_str, session_ids_str), else: {"", []}
+      if has_scope,
+        do: build_scope_sql(project_id_str, agent_ids_str, session_ids_str),
+        else: {"", []}
 
     {sql_filter, sql_params} =
       if starred_only do
@@ -287,7 +289,12 @@ defmodule EyeInTheSkyWeb.Notes do
       |> add_sql_clause(
         agent_ids_str != [],
         fn {clauses, params, idx} ->
-          placeholders = agent_ids_str |> Enum.with_index(idx) |> Enum.map(fn {_, i} -> "$#{i}" end) |> Enum.join(",")
+          placeholders =
+            agent_ids_str
+            |> Enum.with_index(idx)
+            |> Enum.map(fn {_, i} -> "$#{i}" end)
+            |> Enum.join(",")
+
           clause = "(n.parent_type IN ('agent', 'agents') AND n.parent_id IN (#{placeholders}))"
           {[clause | clauses], params ++ agent_ids_str, idx + length(agent_ids_str)}
         end
@@ -295,8 +302,15 @@ defmodule EyeInTheSkyWeb.Notes do
       |> add_sql_clause(
         session_ids_str != [],
         fn {clauses, params, idx} ->
-          placeholders = session_ids_str |> Enum.with_index(idx) |> Enum.map(fn {_, i} -> "$#{i}" end) |> Enum.join(",")
-          clause = "(n.parent_type IN ('session', 'sessions') AND n.parent_id IN (#{placeholders}))"
+          placeholders =
+            session_ids_str
+            |> Enum.with_index(idx)
+            |> Enum.map(fn {_, i} -> "$#{i}" end)
+            |> Enum.join(",")
+
+          clause =
+            "(n.parent_type IN ('session', 'sessions') AND n.parent_id IN (#{placeholders}))"
+
           {[clause | clauses], params ++ session_ids_str, idx + length(session_ids_str)}
         end
       )

@@ -61,11 +61,11 @@ defmodule EyeInTheSkyWebWeb.Router do
     pipe_through [:browser]
 
     live_session :app,
-                 on_mount: [
-                   EyeInTheSkyWebWeb.AuthHook,
-                   EyeInTheSkyWebWeb.FabHook,
-                   EyeInTheSkyWebWeb.NavHook
-                 ] do
+      on_mount: [
+        EyeInTheSkyWebWeb.AuthHook,
+        EyeInTheSkyWebWeb.FabHook,
+        EyeInTheSkyWebWeb.NavHook
+      ] do
       live "/", AgentLive.Index, :index
       live "/notes", OverviewLive.Notes, :index
       live "/tasks", OverviewLive.Tasks, :index
@@ -183,7 +183,6 @@ defmodule EyeInTheSkyWebWeb.Router do
     post "/teams/:team_id/members", TeamController, :join
     patch "/teams/:team_id/members/:member_id", TeamController, :update_member
     delete "/teams/:team_id/members/:member_id", TeamController, :leave
-
   end
 
   # Gitea webhooks — no Bearer auth; controller validates HMAC signature from Gitea

@@ -27,7 +27,8 @@ defmodule EyeInTheSkyWebWeb.TeamLive.IndexTest do
 
       {:ok, lv, _html} = live(conn, ~p"/teams")
 
-      html = lv |> element("[phx-click='select_team'][phx-value-id='#{team.id}']") |> render_click()
+      html =
+        lv |> element("[phx-click='select_team'][phx-value-id='#{team.id}']") |> render_click()
 
       # Team name visible in detail view
       assert html =~ "Test Team Select"

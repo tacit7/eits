@@ -300,10 +300,15 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Settings do
                   type="number"
                   name="value"
                   value={
-                    div(String.to_integer(case @settings["cli_idle_timeout_ms"] do
-                      v when v in [nil, ""] -> "300000"
-                      v -> v
-                    end), 1000)
+                    div(
+                      String.to_integer(
+                        case @settings["cli_idle_timeout_ms"] do
+                          v when v in [nil, ""] -> "300000"
+                          v -> v
+                        end
+                      ),
+                      1000
+                    )
                   }
                   min="30"
                   max="3600"
@@ -410,7 +415,9 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Settings do
             <div class="flex items-center justify-between px-5 py-4">
               <div>
                 <p class="text-sm font-medium text-base-content">Anthropic API Key</p>
-                <p class="text-xs text-base-content/50 mt-0.5">Set via ANTHROPIC_API_KEY in your .env</p>
+                <p class="text-xs text-base-content/50 mt-0.5">
+                  Set via ANTHROPIC_API_KEY in your .env
+                </p>
               </div>
               <%= case mask_env_var("ANTHROPIC_API_KEY") do %>
                 <% {:set, masked} -> %>
@@ -437,7 +444,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Settings do
                 <div class="alert alert-warning mt-2 p-3 text-xs">
                   <p class="font-semibold mb-1">Copy this key now — it will not be shown again.</p>
                   <p class="mb-2">
-                    Add to .env: <code class="font-mono">EITS_API_KEY=&lt;value&gt;</code> then restart.
+                    Add to .env: <code class="font-mono">EITS_API_KEY=&lt;value&gt;</code>
+                    then restart.
                   </p>
                   <input
                     type="text"
@@ -677,6 +685,6 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Settings do
   end
 
   defp render_tab(%{active_tab: _} = assigns) do
-    ~H"<p class='text-sm text-base-content/50 px-2 py-4'>Coming soon</p>"
+    ~H"<p class=\"text-sm text-base-content/50 px-2 py-4\">Coming soon</p>"
   end
 end

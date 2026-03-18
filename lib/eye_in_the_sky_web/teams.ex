@@ -40,14 +40,19 @@ defmodule EyeInTheSkyWeb.Teams do
 
   def create_team(attrs) do
     %Team{}
-    |> Team.changeset(Map.put(attrs, :created_at, DateTime.utc_now() |> DateTime.truncate(:second)))
+    |> Team.changeset(
+      Map.put(attrs, :created_at, DateTime.utc_now() |> DateTime.truncate(:second))
+    )
     |> Repo.insert()
     |> tap_broadcast(:team_created)
   end
 
   def delete_team(%Team{} = team) do
     team
-    |> Team.changeset(%{status: "archived", archived_at: DateTime.utc_now() |> DateTime.truncate(:second)})
+    |> Team.changeset(%{
+      status: "archived",
+      archived_at: DateTime.utc_now() |> DateTime.truncate(:second)
+    })
     |> Repo.update()
     |> tap_broadcast(:team_deleted)
   end
@@ -97,7 +102,8 @@ defmodule EyeInTheSkyWeb.Teams do
   Marks any team member linked to the given session_id as done/failed.
   Called when a session ends to keep member status in sync.
   """
-  def mark_member_done_by_session(session_id, status \\ "done") when status in ["done", "failed", "idle"] do
+  def mark_member_done_by_session(session_id, status \\ "done")
+      when status in ["done", "failed", "idle"] do
     case Repo.get_by(TeamMember, session_id: session_id) do
       nil -> :ok
       member -> update_member_status(member, status)

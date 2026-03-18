@@ -61,9 +61,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
         parent_agent_id, parent_session_id, worktree, team_name
   """
   def create(conn, params) do
-    with {:ok, params}                   <- validate_params(params),
+    with {:ok, params} <- validate_params(params),
          {:ok, project_id, project_name} <- resolve_project_id(params),
-         {:ok, team}                     <- resolve_team(params) do
+         {:ok, team} <- resolve_team(params) do
       params = Map.merge(params, %{"project_id" => project_id, "project_name" => project_name})
       instructions = apply_team_context(params["instructions"], team, params["member_name"])
       opts = build_spawn_opts(%{params | "instructions" => instructions}, team)
@@ -71,14 +71,18 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
       case AgentManager.create_agent(opts) do
         {:ok, %{agent: agent, session: session}} ->
           maybe_join_team(team, agent, session, params["member_name"])
-          conn |> put_status(:created) |> json(build_response(agent, session, team, params["member_name"]))
+
+          conn
+          |> put_status(:created)
+          |> json(build_response(agent, session, team, params["member_name"]))
 
         {:error, :dirty_working_tree} ->
           conn
           |> put_status(:unprocessable_entity)
           |> json(%{
             error_code: "dirty_working_tree",
-            message: "project_path has uncommitted changes; commit or stash before spawning a worktree agent"
+            message:
+              "project_path has uncommitted changes; commit or stash before spawning a worktree agent"
           })
 
         {:error, reason} ->
@@ -94,7 +98,10 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
 
       error ->
         Logger.error("Unexpected validation error in spawn: #{inspect(error)}")
-        conn |> put_status(:internal_server_error) |> json(%{error_code: "internal_error", message: "An unexpected error occurred"})
+
+        conn
+        |> put_status(:internal_server_error)
+        |> json(%{error_code: "internal_error", message: "An unexpected error occurred"})
     end
   end
 
@@ -153,7 +160,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
   defp coerce_parent_id(val, field) when is_binary(val) do
     case Integer.parse(val) do
       {int, ""} -> {:ok, int}
-      _         -> {:error, "invalid_parameter", "#{field} must be an integer"}
+      _ -> {:error, "invalid_parameter", "#{field} must be an integer"}
     end
   end
 
@@ -184,7 +191,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
     case Map.get(combos, provider) do
       nil ->
         valid_providers = combos |> Map.keys() |> Enum.join(", ")
-        {:error, "invalid_provider", "invalid provider '#{provider}'; must be one of: #{valid_providers}"}
+
+        {:error, "invalid_provider",
+         "invalid provider '#{provider}'; must be one of: #{valid_providers}"}
 
       valid_models ->
         if model in valid_models do
@@ -200,7 +209,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
 
   defp validate_parent_agent(id) do
     case Agents.get_agent(id) do
-      {:ok, _}             -> {:ok, id}
+      {:ok, _} -> {:ok, id}
       {:error, :not_found} -> {:error, "parent_not_found", "parent_agent_id #{id} does not exist"}
     end
   end
@@ -209,27 +218,31 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
 
   defp validate_parent_session(id) do
     case Sessions.get_session(id) do
-      {:ok, _}             -> {:ok, id}
-      {:error, :not_found} -> {:error, "parent_not_found", "parent_session_id #{id} does not exist"}
+      {:ok, _} ->
+        {:ok, id}
+
+      {:error, :not_found} ->
+        {:error, "parent_not_found", "parent_session_id #{id} does not exist"}
     end
   end
 
   defp validate_params(params) do
     provider = params["provider"] || "claude"
-    model    = params["model"] || "haiku"
+    model = params["model"] || "haiku"
 
-    with {:ok, instructions}      <- validate_instructions(params["instructions"]),
-         {:ok, _}                 <- validate_provider_model(provider, model),
-         {:ok, parent_agent_id}   <- coerce_parent_id(params["parent_agent_id"], "parent_agent_id"),
-         {:ok, parent_session_id} <- coerce_parent_id(params["parent_session_id"], "parent_session_id"),
-         {:ok, _}                 <- validate_parent_agent(parent_agent_id),
-         {:ok, _}                 <- validate_parent_session(parent_session_id) do
+    with {:ok, instructions} <- validate_instructions(params["instructions"]),
+         {:ok, _} <- validate_provider_model(provider, model),
+         {:ok, parent_agent_id} <- coerce_parent_id(params["parent_agent_id"], "parent_agent_id"),
+         {:ok, parent_session_id} <-
+           coerce_parent_id(params["parent_session_id"], "parent_session_id"),
+         {:ok, _} <- validate_parent_agent(parent_agent_id),
+         {:ok, _} <- validate_parent_session(parent_session_id) do
       {:ok,
        Map.merge(params, %{
-         "instructions"      => instructions,
-         "provider"          => provider,
-         "model"             => model,
-         "parent_agent_id"   => parent_agent_id,
+         "instructions" => instructions,
+         "provider" => provider,
+         "model" => model,
+         "parent_agent_id" => parent_agent_id,
          "parent_session_id" => parent_session_id
        })}
     end
@@ -237,13 +250,13 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
 
   # Fix 1: resolve or create project from project_id / project_path
   defp resolve_project_id(params) do
-    project_id   = parse_int(params["project_id"], nil)
+    project_id = parse_int(params["project_id"], nil)
     project_path = params["project_path"]
 
     cond do
       project_id != nil ->
         case Projects.get_project(project_id) do
-          nil     -> {:error, "project_not_found", "project_id #{project_id} does not exist"}
+          nil -> {:error, "project_not_found", "project_id #{project_id} does not exist"}
           project -> {:ok, project.id, project.name}
         end
 
@@ -251,16 +264,24 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
         case Projects.get_project_by_path(project_path) do
           nil ->
             name = Path.basename(project_path)
+
             case Projects.create_project(%{name: name, path: project_path, active: true}) do
               {:ok, project} ->
-                Logger.info("resolve_project_id: created project id=#{project.id} for path=#{project_path}")
+                Logger.info(
+                  "resolve_project_id: created project id=#{project.id} for path=#{project_path}"
+                )
+
                 {:ok, project.id, project.name}
 
               {:error, _changeset} ->
                 # Race condition: try lookup again
                 case Projects.get_project_by_path(project_path) do
-                  nil     -> {:error, "project_creation_failed", "failed to create project for path: #{project_path}"}
-                  project -> {:ok, project.id, project.name}
+                  nil ->
+                    {:error, "project_creation_failed",
+                     "failed to create project for path: #{project_path}"}
+
+                  project ->
+                    {:ok, project.id, project.name}
                 end
             end
 
@@ -280,7 +301,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
 
       name ->
         case Teams.get_team_by_name(name) do
-          nil  -> {:error, "team_not_found", "team not found: #{name}"}
+          nil -> {:error, "team_not_found", "team not found: #{name}"}
           team -> {:ok, team}
         end
     end
@@ -300,12 +321,12 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
       String.trim(name)
     else
       member_name = params["member_name"]
-      team_name   = team && team.name
+      team_name = team && team.name
 
       cond do
         member_name && team_name -> "#{member_name} @ #{team_name}"
-        member_name              -> member_name
-        true                     -> String.slice(params["instructions"] || "Agent session", 0, 250)
+        member_name -> member_name
+        true -> String.slice(params["instructions"] || "Agent session", 0, 250)
       end
     end
   end
@@ -314,42 +335,42 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
     name = resolve_session_name(params, team)
 
     [
-      instructions:      params["instructions"],
-      model:             params["model"],
-      agent_type:        params["provider"] || "claude",
-      project_id:        params["project_id"],
-      project_name:      params["project_name"],
-      project_path:      params["project_path"],
-      name:              name,
-      description:       name,
-      worktree:          params["worktree"],
-      effort_level:      params["effort_level"],
-      parent_agent_id:   params["parent_agent_id"],
+      instructions: params["instructions"],
+      model: params["model"],
+      agent_type: params["provider"] || "claude",
+      project_id: params["project_id"],
+      project_name: params["project_name"],
+      project_path: params["project_path"],
+      name: name,
+      description: name,
+      worktree: params["worktree"],
+      effort_level: params["effort_level"],
+      parent_agent_id: params["parent_agent_id"],
       parent_session_id: params["parent_session_id"],
-      agent:             params["agent"]
+      agent: params["agent"]
     ]
   end
 
   defp build_response(agent, session, nil, _member_name) do
     %{
-      success:      true,
-      message:      "Agent spawned",
-      agent_id:     agent.uuid,
-      session_id:   session.id,
+      success: true,
+      message: "Agent spawned",
+      agent_id: agent.uuid,
+      session_id: session.id,
       session_uuid: session.uuid
     }
   end
 
   defp build_response(agent, session, team, member_name) do
     %{
-      success:      true,
-      message:      "Agent spawned",
-      agent_id:     agent.uuid,
-      session_id:   session.id,
+      success: true,
+      message: "Agent spawned",
+      agent_id: agent.uuid,
+      session_id: session.id,
       session_uuid: session.uuid,
-      team_id:      team.id,
-      team_name:    team.name,
-      member_name:  member_name
+      team_id: team.id,
+      team_name: team.name,
+      member_name: member_name
     }
   end
 end

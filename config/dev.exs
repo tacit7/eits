@@ -28,7 +28,7 @@ config :eye_in_the_sky_web, EyeInTheSkyWeb.Repo,
 config :eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [port: 5002],
+  http: [port: 5000],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,

@@ -692,7 +692,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :message, :map, required: true
 
   defp message_body(assigns) do
-    segments = parse_body_segments(assigns.message.body)
+    body = if dm_message?(assigns.message), do: strip_dm_prefix(assigns.message.body), else: assigns.message.body
+    segments = parse_body_segments(body)
     thinking = get_in(assigns.message.metadata || %{}, ["thinking"])
     stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
 
@@ -1572,18 +1573,31 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
     """
   end
 
-  defp dm_message?(%{metadata: %{"sender_id" => sid}}) when is_binary(sid) and sid != "", do: true
+  defp dm_message?(%{from_session_id: id}) when is_integer(id), do: true
+  defp dm_message?(%{metadata: %{"from_session_uuid" => uuid}}) when is_binary(uuid) and uuid != "", do: true
   defp dm_message?(_), do: false
 
   defp message_sender_name(%{sender_role: "user"}), do: "You"
 
-  defp message_sender_name(%{metadata: %{"sender_id" => sid}} = msg)
-       when is_binary(sid) and sid != "" do
-    short = String.slice(sid, 0, 8)
-    "s:#{short} (#{msg.provider || "agent"})"
+  defp message_sender_name(%{metadata: %{"sender_name" => name}} = _msg)
+       when is_binary(name) and name != "" do
+    name
+  end
+
+  defp message_sender_name(%{from_session_id: id}) when is_integer(id) do
+    "session:#{id}"
   end
 
   defp message_sender_name(message), do: message.provider || "Agent"
+
+  defp strip_dm_prefix(body) when is_binary(body) do
+    case Regex.run(~r/^DM from:[^\(]+\(session:[^\)]+\) (.+)$/s, body) do
+      [_, content] -> content
+      _ -> body
+    end
+  end
+
+  defp strip_dm_prefix(body), do: body
 
   defp provider_icon("openai"), do: "/images/openai.svg"
   defp provider_icon("codex"), do: "/images/openai.svg"

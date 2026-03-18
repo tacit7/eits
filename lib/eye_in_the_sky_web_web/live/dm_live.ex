@@ -203,28 +203,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
-  def handle_event("add_task_annotation", %{"task_id" => task_id, "body" => body}, socket) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-    body = String.trim(body)
-
-    if body != "" do
-      case Notes.create_note(%{
-             parent_type: "task",
-             parent_id: task.uuid || to_string(task.id),
-             body: body
-           }) do
-        {:ok, _note} ->
-          notes = Notes.list_notes_for_task(task.id)
-          {:noreply, assign(socket, :task_notes, notes)}
-
-        {:error, changeset} ->
-          Logger.error("Failed to create task annotation: #{inspect(changeset.errors)}")
-          {:noreply, put_flash(socket, :error, "Failed to save annotation")}
-      end
-    else
-      {:noreply, socket}
-    end
-  end
+  def handle_event("add_task_annotation", params, socket),
+    do: handle_add_task_annotation(params, socket)
 
   @impl true
   def handle_event("start_agent_for_task", %{"task_id" => task_id}, socket) do

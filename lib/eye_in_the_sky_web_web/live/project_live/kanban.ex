@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
 
   import EyeInTheSkyWebWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWebWeb.Components.TaskCard, only: [task_card: 1]
+  import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
 
   @impl true
   def mount(%{"id" => _} = params, _session, socket) do
@@ -81,88 +82,16 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   end
 
   @impl true
-  def handle_event("open_task_detail", %{"task_id" => task_id}, socket) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-
-    # Load notes for this task (handles both "task" and "tasks" parent_type)
-    notes = Notes.list_notes_for_task(task.id)
-
-    socket =
-      socket
-      |> assign(:selected_task, task)
-      |> assign(:task_notes, notes)
-      |> assign(:show_task_detail_drawer, true)
-
-    {:noreply, socket}
-  end
+  def handle_event("open_task_detail", params, socket),
+    do: handle_open_task_detail(params, socket)
 
   @impl true
-  def handle_event("open_task_detail", _params, socket), do: {:noreply, socket}
+  def handle_event("update_task", params, socket),
+    do: handle_update_task(params, socket, &load_tasks/1)
 
   @impl true
-  def handle_event("update_task", params, socket) do
-    task = socket.assigns.selected_task
-    title = params["title"]
-    description = params["description"]
-    state_id = parse_int(params["state_id"], 0)
-    priority = parse_int(params["priority"], 0)
-    due_at = if params["due_at"] != "", do: params["due_at"], else: nil
-    tags_string = params["tags"] || ""
-
-    # Parse tags
-    tag_names =
-      tags_string
-      |> String.split(",")
-      |> Enum.map(&String.trim/1)
-      |> Enum.reject(&(&1 == ""))
-
-    # Update task
-    case Tasks.update_task(task, %{
-           title: title,
-           description: description,
-           state_id: state_id,
-           priority: priority,
-           due_at: due_at,
-           updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
-         }) do
-      {:ok, updated_task} ->
-        Tasks.replace_task_tags(task.id, tag_names)
-
-        # Reload task with associations
-        updated_task = Tasks.get_task!(updated_task.id)
-
-        socket =
-          socket
-          |> assign(:selected_task, updated_task)
-          |> load_tasks()
-          |> put_flash(:info, "Task updated successfully")
-
-        {:noreply, socket}
-
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to update task")}
-    end
-  end
-
-  @impl true
-  def handle_event("delete_task", %{"task_id" => task_id}, socket) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-
-    case Tasks.delete_task_with_associations(task) do
-      {:ok, _} ->
-        socket =
-          socket
-          |> assign(:show_task_detail_drawer, false)
-          |> assign(:selected_task, nil)
-          |> load_tasks()
-          |> put_flash(:info, "Task deleted successfully")
-
-        {:noreply, socket}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to delete task")}
-    end
-  end
+  def handle_event("delete_task", params, socket),
+    do: handle_delete_task(params, socket, &load_tasks/1)
 
   @impl true
   def handle_event("start_agent_for_task", %{"task_id" => task_id}, socket) do
@@ -244,24 +173,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   end
 
   @impl true
-  def handle_event("archive_task", %{"task_id" => task_id}, socket) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-
-    case Tasks.archive_task(task) do
-      {:ok, _} ->
-        socket =
-          socket
-          |> assign(:show_task_detail_drawer, false)
-          |> assign(:selected_task, nil)
-          |> load_tasks()
-          |> put_flash(:info, "Task archived")
-
-        {:noreply, socket}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to archive task")}
-    end
-  end
+  def handle_event("archive_task", params, socket),
+    do: handle_archive_task(params, socket, &load_tasks/1)
 
   @impl true
   def handle_event("toggle_bulk_mode", _params, socket) do
@@ -394,23 +307,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   end
 
   @impl true
-  def handle_event("add_task_annotation", %{"task_id" => task_id, "body" => body}, socket) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-    body = String.trim(body)
-
-    if body != "" do
-      Notes.create_note(%{
-        parent_type: "task",
-        parent_id: task.uuid || to_string(task.id),
-        body: body
-      })
-
-      notes = Notes.list_notes_for_task(task.id)
-      {:noreply, assign(socket, :task_notes, notes)}
-    else
-      {:noreply, socket}
-    end
-  end
+  def handle_event("add_task_annotation", params, socket),
+    do: handle_add_task_annotation(params, socket)
 
   @impl true
   def handle_event("add_checklist_item", %{"task_id" => task_id, "title" => title}, socket) do

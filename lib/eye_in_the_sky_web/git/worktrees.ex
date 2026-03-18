@@ -38,15 +38,24 @@ defmodule EyeInTheSkyWeb.Git.Worktrees do
   end
 
   @doc """
-  Checks that the repo at `repo_path` has no staged changes, unstaged changes, or untracked files.
+  Checks that the repo at `repo_path` has no staged or unstaged changes to tracked files.
+  Untracked files are ignored — they don't affect worktree creation since worktrees
+  branch from HEAD regardless of untracked content.
   Returns `:ok` or `{:error, :dirty_working_tree}`.
   """
   @spec check_clean_working_tree(String.t()) :: :ok | {:error, :dirty_working_tree}
   def check_clean_working_tree(repo_path) do
     case System.cmd("git", ["-C", repo_path, "status", "--porcelain"], stderr_to_stdout: true) do
-      {"", 0} -> :ok
-      {_, 0} -> {:error, :dirty_working_tree}
-      _ -> {:error, :dirty_working_tree}
+      {output, 0} ->
+        has_tracked_changes =
+          output
+          |> String.split("\n", trim: true)
+          |> Enum.any?(fn line -> not String.starts_with?(line, "??") end)
+
+        if has_tracked_changes, do: {:error, :dirty_working_tree}, else: :ok
+
+      _ ->
+        {:error, :dirty_working_tree}
     end
   end
 

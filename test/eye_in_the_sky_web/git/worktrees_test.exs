@@ -25,10 +25,10 @@ defmodule EyeInTheSkyWeb.Git.WorktreesTest do
       assert {:error, :dirty_working_tree} = Worktrees.check_clean_working_tree(tmp_dir)
     end
 
-    test "returns error for untracked files", %{tmp_dir: tmp_dir} do
+    test "ignores untracked files (they don't affect worktree creation)", %{tmp_dir: tmp_dir} do
       init_git_repo(tmp_dir)
       File.write!(Path.join(tmp_dir, "untracked.txt"), "new file")
-      assert {:error, :dirty_working_tree} = Worktrees.check_clean_working_tree(tmp_dir)
+      assert :ok = Worktrees.check_clean_working_tree(tmp_dir)
     end
   end
 

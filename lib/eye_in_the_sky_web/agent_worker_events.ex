@@ -10,15 +10,16 @@ defmodule EyeInTheSkyWeb.AgentWorkerEvents do
 
   require Logger
 
-  alias EyeInTheSkyWeb.{Messages, Sessions}
+  alias EyeInTheSkyWeb.{Agents, Messages, Sessions}
 
   alias EyeInTheSkyWeb.Events
 
   # --- Lifecycle Events ---
 
-  @doc "SDK started processing a job."
+  @doc "SDK started processing a job. Promotes agent to running if still pending."
   def on_sdk_started(session_id, provider_conversation_id) do
     update_session_status(session_id, "working")
+    promote_agent_if_pending(session_id)
     Events.agent_working(provider_conversation_id, session_id)
   end
 
@@ -161,6 +162,32 @@ defmodule EyeInTheSkyWeb.AgentWorkerEvents do
           end
 
         {:error, _} ->
+          :ok
+      end
+    end)
+  end
+
+  defp promote_agent_if_pending(session_id) do
+    Task.start(fn ->
+      case Sessions.get_session(session_id) do
+        {:ok, session} when not is_nil(session.agent_id) ->
+          case Agents.get_agent(session.agent_id) do
+            {:ok, agent} when agent.status == "pending" ->
+              case Agents.update_agent(agent, %{status: "running"}) do
+                {:ok, _} ->
+                  Logger.info("[#{session_id}] Promoted agent #{agent.id} from pending to running")
+
+                {:error, reason} ->
+                  Logger.warning(
+                    "[#{session_id}] Failed to promote agent #{agent.id}: #{inspect(reason)}"
+                  )
+              end
+
+            _ ->
+              :ok
+          end
+
+        _ ->
           :ok
       end
     end)

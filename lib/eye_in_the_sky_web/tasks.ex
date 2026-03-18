@@ -409,6 +409,22 @@ defmodule EyeInTheSkyWeb.Tasks do
   end
 
   @doc """
+  Returns true if the given task is linked to the given session via task_sessions.
+  Used to gate EITS-CMD task mutations to tasks the session created or was linked to.
+  """
+  def task_linked_to_session?(task_id, session_id)
+      when is_integer(task_id) and is_integer(session_id) do
+    import Ecto.Query
+
+    Repo.exists?(
+      from ts in "task_sessions",
+        where: ts.task_id == ^task_id and ts.session_id == ^session_id
+    )
+  end
+
+  def task_linked_to_session?(_, _), do: false
+
+  @doc """
   Replaces all tags on a task with the given list of tag names.
   Deletes existing tag associations and inserts new ones.
   No-op if tag_names is empty (leaves existing tags unchanged).

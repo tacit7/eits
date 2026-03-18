@@ -111,15 +111,19 @@ defmodule EyeInTheSkyWeb.Agents.CmdDispatcher do
         }
       }
 
-      AgentManager.send_message(to_session.id, dm_body)
+      case AgentManager.send_message(to_session.id, dm_body) do
+        {:ok, _} ->
+          case Messages.create_message(attrs) do
+            {:ok, msg} ->
+              EyeInTheSkyWeb.Events.session_new_dm(to_session.id, msg)
+              Logger.info("[CmdDispatcher] dm #{from_session_id} -> #{to_uuid}")
 
-      case Messages.create_message(attrs) do
-        {:ok, msg} ->
-          EyeInTheSkyWeb.Events.session_new_dm(to_session.id, msg)
-          Logger.info("[CmdDispatcher] dm #{from_session_id} -> #{to_uuid}")
+            {:error, reason} ->
+              Logger.warning("[CmdDispatcher] dm persist failed: #{inspect(reason)}")
+          end
 
         {:error, reason} ->
-          Logger.warning("[CmdDispatcher] dm persist failed: #{inspect(reason)}")
+          Logger.warning("[CmdDispatcher] dm send failed (not persisted): #{inspect(reason)}")
       end
     else
       err -> Logger.warning("[CmdDispatcher] dm failed: #{inspect(err)}")
@@ -169,15 +173,17 @@ defmodule EyeInTheSkyWeb.Agents.CmdDispatcher do
   end
 
   # task update <id> <state_id>
-  defp dispatch_task("update " <> rest, _from_session_id) do
+  defp dispatch_task("update " <> rest, from_session_id) do
     case String.split(rest, " ", parts: 2) do
       [id_str, state_str] ->
         with {id, ""} <- Integer.parse(String.trim(id_str)),
              {state_id, ""} <- Integer.parse(String.trim(state_str)),
+             true <- Tasks.task_linked_to_session?(id, from_session_id),
              task <- Tasks.get_task!(id) do
           Tasks.update_task_state(task, state_id)
           Logger.info("[CmdDispatcher] task #{id} state -> #{state_id}")
         else
+          false -> Logger.warning("[CmdDispatcher] task update: task #{rest} not linked to session #{from_session_id}")
           err -> Logger.warning("[CmdDispatcher] task update failed: #{inspect(err)}")
         end
 
@@ -189,14 +195,18 @@ defmodule EyeInTheSkyWeb.Agents.CmdDispatcher do
   end
 
   # task done <id> — shortcut for state 3 (Done)
-  defp dispatch_task("done " <> id_str, _from_session_id) do
+  defp dispatch_task("done " <> id_str, from_session_id) do
     id_str = String.trim(id_str)
 
     case Integer.parse(id_str) do
       {id, ""} ->
-        task = Tasks.get_task!(id)
-        Tasks.update_task_state(task, 3)
-        Logger.info("[CmdDispatcher] task #{id} -> done")
+        if Tasks.task_linked_to_session?(id, from_session_id) do
+          task = Tasks.get_task!(id)
+          Tasks.update_task_state(task, 3)
+          Logger.info("[CmdDispatcher] task #{id} -> done")
+        else
+          Logger.warning("[CmdDispatcher] task done: task #{id} not linked to session #{from_session_id}")
+        end
 
       _ ->
         Logger.warning("[CmdDispatcher] task done: invalid id '#{id_str}'")
@@ -206,19 +216,23 @@ defmodule EyeInTheSkyWeb.Agents.CmdDispatcher do
   end
 
   # task annotate <id> <body>
-  defp dispatch_task("annotate " <> rest, _from_session_id) do
+  defp dispatch_task("annotate " <> rest, from_session_id) do
     case String.split(rest, " ", parts: 2) do
       [id_str, body] ->
         case Integer.parse(String.trim(id_str)) do
           {id, ""} ->
-            Notes.create_note(%{
-              title: "Agent annotation",
-              body: body,
-              parent_id: id,
-              parent_type: "task"
-            })
+            if Tasks.task_linked_to_session?(id, from_session_id) do
+              Notes.create_note(%{
+                title: "Agent annotation",
+                body: body,
+                parent_id: id,
+                parent_type: "task"
+              })
 
-            Logger.info("[CmdDispatcher] task #{id} annotated")
+              Logger.info("[CmdDispatcher] task #{id} annotated")
+            else
+              Logger.warning("[CmdDispatcher] task annotate: task #{id} not linked to session #{from_session_id}")
+            end
 
           _ ->
             Logger.warning("[CmdDispatcher] task annotate: invalid id '#{id_str}'")
@@ -289,7 +303,7 @@ defmodule EyeInTheSkyWeb.Agents.CmdDispatcher do
     end
   end
 
-  # Handles: --flag "quoted value"  or  --flag unquoted_value
+  # Handles: --flag "quoted value"  or  --flag multi word value (to next flag or EOL)
   defp extract_flag(str, flag) do
     escaped = Regex.escape(flag)
 
@@ -298,8 +312,9 @@ defmodule EyeInTheSkyWeb.Agents.CmdDispatcher do
         {:ok, value}
 
       nil ->
-        case Regex.run(~r/#{escaped}\s+(\S+)/, str) do
-          [_, value] -> {:ok, value}
+        # Capture from the flag to the next --flag or end of string
+        case Regex.run(~r/#{escaped}\s+(.+?)(?=\s+--\S|\z)/s, str) do
+          [_, value] -> {:ok, String.trim(value)}
           nil -> {:error, {:missing_flag, flag}}
         end
     end

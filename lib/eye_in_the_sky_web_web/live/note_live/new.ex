@@ -76,6 +76,7 @@ defmodule EyeInTheSkyWebWeb.NoteLive.New do
 
         <input
           type="text"
+          id="note-title-input"
           name="title"
           placeholder="Untitled note"
           phx-blur="update_title"

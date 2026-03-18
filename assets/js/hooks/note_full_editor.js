@@ -68,6 +68,18 @@ export const NoteFullEditorHook = {
     const state = EditorState.create({ doc: body, extensions })
     this._view = new EditorView({ state, parent: this.el })
 
+    // Wire Tab on title input to focus the editor
+    const titleInput = document.getElementById("note-title-input")
+    if (titleInput) {
+      this._titleTabHandler = (e) => {
+        if (e.key === "Tab" && !e.shiftKey) {
+          e.preventDefault()
+          self._view.focus()
+        }
+      }
+      titleInput.addEventListener("keydown", this._titleTabHandler)
+    }
+
     // Wire save button click (button is outside hook el)
     const saveBtn = document.getElementById("note-save-btn")
     if (saveBtn) {
@@ -81,6 +93,10 @@ export const NoteFullEditorHook = {
   },
 
   destroyed() {
+    const titleInput = document.getElementById("note-title-input")
+    if (titleInput && this._titleTabHandler) {
+      titleInput.removeEventListener("keydown", this._titleTabHandler)
+    }
     const saveBtn = document.getElementById("note-save-btn")
     if (saveBtn && this._saveBtnHandler) {
       saveBtn.removeEventListener("click", this._saveBtnHandler)

@@ -48,12 +48,33 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
             "✅ create_agent: initial message sent successfully to session.id=#{session.id}"
           )
 
-          {:ok, %{agent: agent, session: session}}
+          case Agents.update_agent(agent, %{status: "running"}) do
+            {:ok, updated_agent} ->
+              {:ok, %{agent: updated_agent, session: session}}
+
+            {:error, reason} ->
+              Logger.warning(
+                "create_agent: agent status update to 'running' failed for agent.id=#{agent.id} - #{inspect(reason)}"
+              )
+
+              # Non-fatal: dispatch succeeded, return original agent
+              {:ok, %{agent: agent, session: session}}
+          end
 
         {:error, reason} ->
           Logger.error(
             "❌ create_agent: initial message failed for session.id=#{session.id} - #{inspect(reason)}"
           )
+
+          case Agents.update_agent(agent, %{status: "failed"}) do
+            {:ok, _} ->
+              :ok
+
+            {:error, update_err} ->
+              Logger.warning(
+                "create_agent: agent status update to 'failed' failed for agent.id=#{agent.id} - #{inspect(update_err)}"
+              )
+          end
 
           {:error, {:send_failed, reason}}
       end
@@ -156,7 +177,7 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
              agent_type: opts[:agent_type] || "claude",
              project_id: project_id,
              project_name: opts[:project_name],
-             status: "working",
+             status: "pending",
              description: description,
              git_worktree_path: worktree_path,
              parent_agent_id: opts[:parent_agent_id],
@@ -320,50 +341,63 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
 
         provider ->
           # Ensure session has a UUID — Codex sessions created from the UI may not have one
-          session =
+          session_result =
             if is_nil(session.uuid) or session.uuid == "" do
               uuid = Ecto.UUID.generate()
               Logger.info("start_agent_worker: generating UUID=#{uuid} for session.id=#{session.id}")
-              {:ok, updated} = Sessions.update_session(session, %{uuid: uuid})
-              updated
+
+              case Sessions.update_session(session, %{uuid: uuid}) do
+                {:ok, updated} -> {:ok, updated}
+                {:error, reason} -> {:error, {:session_update_failed, reason}}
+              end
             else
-              session
+              {:ok, session}
             end
 
-          opts = [
-            session_id: session.id,
-            provider_conversation_id: session.uuid,
-            agent_id: agent.id,
-            project_id: session.project_id,
-            project_path: project_path,
-            provider: provider,
-            worktree: extra_opts[:worktree]
-          ]
-
-          case DynamicSupervisor.start_child(
-                 EyeInTheSkyWeb.Claude.AgentSupervisor,
-                 {AgentWorker, opts}
-               ) do
-            {:ok, pid} ->
-              Logger.info(
-                "✅ start_agent_worker: AgentWorker started for session.id=#{session_id}, pid=#{inspect(pid)}"
-              )
-
-              {:ok, pid, provider}
-
-            {:error, {:already_started, pid}} ->
-              Logger.info(
-                "start_agent_worker: worker already started for session.id=#{session_id}, pid=#{inspect(pid)}"
-              )
-
-              {:ok, pid, provider}
-
-            {:error, reason} = error ->
+          case session_result do
+            {:error, reason} ->
               Logger.error(
-                "❌ start_agent_worker: failed to start AgentWorker for session.id=#{session_id} - #{inspect(reason)}"
+                "❌ start_agent_worker: UUID assignment failed for session.id=#{session_id} - #{inspect(reason)}"
               )
 
-              error
+              {:error, reason}
+
+            {:ok, session} ->
+              opts = [
+                session_id: session.id,
+                provider_conversation_id: session.uuid,
+                agent_id: agent.id,
+                project_id: session.project_id,
+                project_path: project_path,
+                provider: provider,
+                worktree: extra_opts[:worktree]
+              ]
+
+              case DynamicSupervisor.start_child(
+                     EyeInTheSkyWeb.Claude.AgentSupervisor,
+                     {AgentWorker, opts}
+                   ) do
+                {:ok, pid} ->
+                  Logger.info(
+                    "✅ start_agent_worker: AgentWorker started for session.id=#{session_id}, pid=#{inspect(pid)}"
+                  )
+
+                  {:ok, pid, provider}
+
+                {:error, {:already_started, pid}} ->
+                  Logger.info(
+                    "start_agent_worker: worker already started for session.id=#{session_id}, pid=#{inspect(pid)}"
+                  )
+
+                  {:ok, pid, provider}
+
+                {:error, reason} = error ->
+                  Logger.error(
+                    "❌ start_agent_worker: failed to start AgentWorker for session.id=#{session_id} - #{inspect(reason)}"
+                  )
+
+                  error
+              end
           end
       end
     else

@@ -176,7 +176,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
                             {String.slice(session.uuid || to_string(session.id), 0..7)}
                           </code>
                           <span class="text-sm text-base-content/80 truncate">
-                            {session.name || truncate_text(session.agent && session.agent.description) || "Unnamed"}
+                            {session.name || truncate_text(session.agent && session.agent.description) ||
+                              "Unnamed"}
                           </span>
                         </div>
                       </div>
@@ -291,7 +292,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
     entries =
       if File.exists?(claude_md) do
         size = file_size_label(claude_md)
-        entries ++ [%{rel_path: "CLAUDE.md", type: :file, detail: "Project instructions · #{size}"}]
+
+        entries ++
+          [%{rel_path: "CLAUDE.md", type: :file, detail: "Project instructions · #{size}"}]
       else
         entries
       end
@@ -312,7 +315,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Show do
 
             if File.dir?(full) do
               count = count_files_recursive(full)
-              %{rel_path: rel, type: :dir, detail: "#{count} #{if count == 1, do: "item", else: "items"}"}
+
+              %{
+                rel_path: rel,
+                type: :dir,
+                detail: "#{count} #{if count == 1, do: "item", else: "items"}"
+              }
             else
               size = file_size_label(full)
               %{rel_path: rel, type: :file, detail: size}

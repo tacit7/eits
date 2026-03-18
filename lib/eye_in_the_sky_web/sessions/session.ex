@@ -110,7 +110,9 @@ defmodule EyeInTheSkyWeb.Sessions.Session do
     |> validate_inclusion(:status, [
       "idle",
       "working",
+      "waiting",
       "compacting",
+      "stopped",
       "completed",
       "failed",
       "archived"

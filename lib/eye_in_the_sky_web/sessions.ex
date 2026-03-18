@@ -16,12 +16,13 @@ defmodule EyeInTheSkyWeb.Sessions do
   alias EyeInTheSkyWeb.Tasks.WorkflowState
   alias EyeInTheSkyWeb.Scopes.Archivable
   alias EyeInTheSkyWeb.QueryBuilder
-  alias EyeInTheSkyWeb.Search.FTS5
+  alias EyeInTheSkyWeb.Search.PgSearch
 
   @doc """
   Returns the list of sessions, excluding archived by default.
   Pass `include_archived: true` to include archived sessions.
   """
+  @spec list_sessions(keyword()) :: [Session.t()]
   def list_sessions(opts \\ []) do
     Session
     |> Archivable.include_archived(opts)
@@ -45,6 +46,7 @@ defmodule EyeInTheSkyWeb.Sessions do
 
   Raises `Ecto.NoResultsError` if the Session does not exist.
   """
+  @spec get_session!(integer()) :: Session.t()
   def get_session!(id), do: get!(id)
 
   @doc """
@@ -52,16 +54,19 @@ defmodule EyeInTheSkyWeb.Sessions do
 
   Raises `Ecto.NoResultsError` if the Session does not exist.
   """
+  @spec get_session_by_uuid!(String.t()) :: Session.t()
   def get_session_by_uuid!(uuid), do: get_by_uuid!(uuid)
 
   @doc """
   Gets a single session by UUID, returning {:ok, session} or {:error, :not_found}.
   """
+  @spec get_session_by_uuid(String.t()) :: {:ok, Session.t()} | {:error, :not_found}
   def get_session_by_uuid(uuid), do: get_by_uuid(uuid)
 
   @doc """
   Gets a single session, returning {:ok, session} or {:error, :not_found}.
   """
+  @spec get_session(integer()) :: {:ok, Session.t()} | {:error, :not_found}
   def get_session(id), do: get(id)
 
   @doc """
@@ -76,6 +81,7 @@ defmodule EyeInTheSkyWeb.Sessions do
   @doc """
   Creates a session.
   """
+  @spec create_session(map()) :: {:ok, Session.t()} | {:error, Ecto.Changeset.t()}
   def create_session(attrs \\ %{}), do: create(attrs)
 
   @doc """
@@ -98,6 +104,7 @@ defmodule EyeInTheSkyWeb.Sessions do
   Model information is immutable per session.
   Attempting to change model_provider or model_name will be ignored.
   """
+  @spec update_session(Session.t(), map()) :: {:ok, Session.t()} | {:error, Ecto.Changeset.t()}
   def update_session(%Session{} = session, attrs) do
     # Remove model fields if present - they are immutable
     attrs =
@@ -123,7 +130,7 @@ defmodule EyeInTheSkyWeb.Sessions do
       |> then(fn m ->
         if opts[:final_status],
           do: Map.put(m, :status, opts[:final_status]),
-          else: Map.put(m, :status, "completed")
+          else: m
       end)
 
     update_session(session, attrs)
@@ -210,7 +217,9 @@ defmodule EyeInTheSkyWeb.Sessions do
       from(t in EyeInTheSkyWeb.Tasks.Task,
         join: ts in "task_sessions",
         on: ts.task_id == t.id,
-        where: ts.session_id in ^session_ids and t.state_id == ^WorkflowState.in_progress_id() and t.archived == false,
+        where:
+          ts.session_id in ^session_ids and t.state_id == ^WorkflowState.in_progress_id() and
+            t.archived == false,
         select: {ts.session_id, t.title}
       )
       |> Repo.all()
@@ -222,7 +231,7 @@ defmodule EyeInTheSkyWeb.Sessions do
   end
 
   @doc """
-  Lists sessions filtered by search query and status filter using FTS5 full-text search.
+  Lists sessions filtered by search query and status filter using PostgreSQL full-text search.
   Excludes archived sessions by default. Pass `include_archived: true` to include archived sessions.
 
   Options:
@@ -251,7 +260,7 @@ defmodule EyeInTheSkyWeb.Sessions do
     # Apply full-text search filter
     base_query =
       if search_query != "" do
-        where(base_query, [s, a], ^FTS5.fts_name_description_match(search_query))
+        where(base_query, [s, a], ^PgSearch.fts_name_description_match(search_query))
       else
         base_query
       end
@@ -290,7 +299,7 @@ defmodule EyeInTheSkyWeb.Sessions do
   - `:limit` - Maximum number of results (default: 20)
   - `:include_archived` - Include archived sessions (default: false)
   - `:project_id` - Filter by project ID
-  - `:search_query` - FTS5 search query across all searchable fields
+  - `:search_query` - PostgreSQL full-text search query across all searchable fields
   """
   def list_session_overview_rows(opts \\ []) do
     limit = Keyword.get(opts, :limit, 20)
@@ -317,7 +326,8 @@ defmodule EyeInTheSkyWeb.Sessions do
       last_activity_at: a.last_activity_at,
       current_task_title:
         fragment(
-          "(SELECT t.title FROM tasks t JOIN task_sessions ts ON ts.task_id = t.id WHERE ts.session_id = ? AND t.state_id = 2 AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)", # 2 = WorkflowState.in_progress_id()
+          # 2 = WorkflowState.in_progress_id()
+          "(SELECT t.title FROM tasks t JOIN task_sessions ts ON ts.task_id = t.id WHERE ts.session_id = ? AND t.state_id = 2 AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)",
           s.id
         )
     })
@@ -347,7 +357,7 @@ defmodule EyeInTheSkyWeb.Sessions do
     query = if project_id, do: where(query, [s, a], a.project_id == ^project_id), else: query
 
     if search_query != "" do
-      where(query, [s], ^FTS5.fts_name_description_match(search_query))
+      where(query, [s], ^PgSearch.fts_name_description_match(search_query))
     else
       query
     end

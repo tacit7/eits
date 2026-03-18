@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWebWeb.Router do
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
+    plug EyeInTheSkyWebWeb.Plugs.ValidateSession
     plug :fetch_live_flash
     plug :put_root_layout, html: {EyeInTheSkyWebWeb.Layouts, :root}
     plug :protect_from_forgery
@@ -14,8 +15,13 @@ defmodule EyeInTheSkyWebWeb.Router do
     plug EyeInTheSkyWebWeb.Plugs.RequireAuth
   end
 
+  pipeline :session_auth do
+    plug EyeInTheSkyWebWeb.Plugs.SessionAuth
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
+    plug EyeInTheSkyWebWeb.Plugs.RateLimit, default: {60, :timer.minutes(1)}
     plug EyeInTheSkyWebWeb.Plugs.RequireAuth
   end
 
@@ -29,6 +35,7 @@ defmodule EyeInTheSkyWebWeb.Router do
   pipeline :webauthn do
     plug :accepts, ["json"]
     plug :fetch_session
+    plug EyeInTheSkyWebWeb.Plugs.RateLimit
   end
 
   # Auth LiveView pages (HTML, with CSRF)
@@ -54,11 +61,11 @@ defmodule EyeInTheSkyWebWeb.Router do
     pipe_through [:browser]
 
     live_session :app,
-                 on_mount: [
-                   EyeInTheSkyWebWeb.AuthHook,
-                   EyeInTheSkyWebWeb.FabHook,
-                   EyeInTheSkyWebWeb.NavHook
-                 ] do
+      on_mount: [
+        EyeInTheSkyWebWeb.AuthHook,
+        EyeInTheSkyWebWeb.FabHook,
+        EyeInTheSkyWebWeb.NavHook
+      ] do
       live "/", AgentLive.Index, :index
       live "/notes", OverviewLive.Notes, :index
       live "/tasks", OverviewLive.Tasks, :index
@@ -85,6 +92,7 @@ defmodule EyeInTheSkyWebWeb.Router do
       live "/teams", TeamLive.Index, :index
       live "/chat", ChatLive, :index
       live "/dm/:session_id", DmLive, :show
+      live "/notes/new", NoteLive.New, :new
       live "/notes/:id/edit", NoteLive.Edit, :edit
     end
   end
@@ -92,7 +100,7 @@ defmodule EyeInTheSkyWebWeb.Router do
   import Oban.Web.Router
 
   scope "/oban" do
-    pipe_through :browser
+    pipe_through [:browser, :session_auth]
     oban_dashboard("/")
   end
 
@@ -163,6 +171,7 @@ defmodule EyeInTheSkyWebWeb.Router do
     # Messaging
     post "/dm", MessagingController, :dm
     get "/channels", MessagingController, :list_channels
+    get "/channels/:channel_id/messages", MessagingController, :list_channel_messages
     post "/channels/:channel_id/messages", MessagingController, :send_channel_message
 
     # Teams
@@ -174,9 +183,6 @@ defmodule EyeInTheSkyWebWeb.Router do
     post "/teams/:team_id/members", TeamController, :join
     patch "/teams/:team_id/members/:member_id", TeamController, :update_member
     delete "/teams/:team_id/members/:member_id", TeamController, :leave
-
-    # Editor
-    post "/editor/open", EditorController, :open
   end
 
   # Gitea webhooks — no Bearer auth; controller validates HMAC signature from Gitea
@@ -203,13 +209,10 @@ defmodule EyeInTheSkyWebWeb.Router do
     import Phoenix.LiveDashboard.Router
 
     scope "/dev" do
-      pipe_through :browser
+      pipe_through [:browser, :session_auth]
 
       live_dashboard "/dashboard", metrics: EyeInTheSkyWebWeb.Telemetry
       forward "/mailbox", Plug.Swoosh.MailboxPreview
-
-      # Dev-only test login — sets session cookie without WebAuthn
-      get "/test-login", EyeInTheSkyWebWeb.DevController, :test_login
     end
   end
 end

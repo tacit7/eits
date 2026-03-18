@@ -10,7 +10,7 @@ defmodule EyeInTheSkyWeb.Tasks do
   alias EyeInTheSkyWeb.Tasks.{Task, WorkflowState, Tag, ChecklistItem}
   alias EyeInTheSkyWeb.QueryHelpers
   alias EyeInTheSkyWeb.QueryBuilder
-  alias EyeInTheSkyWeb.Search.FTS5
+  alias EyeInTheSkyWeb.Search.PgSearch
   alias EyeInTheSkyWeb.Notes
 
   # Workflow state ID accessors — source of truth is WorkflowState
@@ -122,7 +122,10 @@ defmodule EyeInTheSkyWeb.Tasks do
   def get_current_task_for_session(session_id) do
     Task
     |> join(:inner, [t], ts in "task_sessions", on: ts.task_id == t.id)
-    |> where([t, ts], ts.session_id == ^session_id and t.state_id == ^WorkflowState.in_progress_id())
+    |> where(
+      [t, ts],
+      ts.session_id == ^session_id and t.state_id == ^WorkflowState.in_progress_id()
+    )
     |> order_by([t], desc: t.updated_at)
     |> limit(1)
     |> preload([:state])
@@ -224,11 +227,14 @@ defmodule EyeInTheSkyWeb.Tasks do
   Archives a task (sets archived = true). Non-destructive.
   """
   def archive_task(%Task{} = task) do
-    result = update_task(task, %{archived: true, updated_at: DateTime.utc_now() |> DateTime.to_iso8601()})
+    result =
+      update_task(task, %{archived: true, updated_at: DateTime.utc_now() |> DateTime.to_iso8601()})
+
     case result do
       {:ok, updated} -> broadcast_change({:updated, updated})
       _ -> :ok
     end
+
     result
   end
 
@@ -289,14 +295,13 @@ defmodule EyeInTheSkyWeb.Tasks do
   end
 
   @doc """
-  Search tasks using FTS5.
-  Requires task_search FTS5 table in database.
+  Search tasks using PostgreSQL full-text search.
   """
   def search_tasks(query, project_id \\ nil) when is_binary(query) do
     extra_where =
       if project_id, do: dynamic([t], t.project_id == ^project_id)
 
-    FTS5.search_for(query,
+    PgSearch.search_for(query,
       table: "tasks",
       schema: Task,
       search_columns: ["title", "description"],
@@ -452,23 +457,11 @@ defmodule EyeInTheSkyWeb.Tasks do
   # PubSub
 
   defp broadcast_change({tag, task}) when tag in [:ok, :deleted] do
-    do_broadcast_tasks_changed(task)
+    EyeInTheSkyWeb.Events.task_updated(task)
   end
 
   defp broadcast_change(_) do
-    Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "tasks", :tasks_changed)
-  end
-
-  defp do_broadcast_tasks_changed(task) do
-    Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "tasks", :tasks_changed)
-
-    if task.project_id do
-      Phoenix.PubSub.broadcast(
-        EyeInTheSkyWeb.PubSub,
-        "tasks:#{task.project_id}",
-        :tasks_changed
-      )
-    end
+    EyeInTheSkyWeb.Events.tasks_changed()
   end
 
   # Checklist Items

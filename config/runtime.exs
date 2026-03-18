@@ -27,6 +27,18 @@ end
 # Gitea webhook HMAC secret — required for signature verification in all envs
 config :eye_in_the_sky_web, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SECRET", "")
 
+# VAPID keys — loaded from env vars. Required in prod, optional in dev.
+if vapid_private = System.get_env("VAPID_PRIVATE_KEY") do
+  config :web_push_encryption, :vapid_details,
+    subject: "mailto:admin@eits.dev",
+    public_key: System.get_env("VAPID_PUBLIC_KEY"),
+    private_key: vapid_private
+else
+  if config_env() == :prod do
+    raise "VAPID_PRIVATE_KEY environment variable is required in production"
+  end
+end
+
 # REST API key — set EITS_API_KEY to require bearer auth on /api/v1.
 # Leave unset to disable auth (dev default).
 # Generate with: mix eits.gen.api_key
@@ -43,10 +55,10 @@ end
 # parsed .env to work around dotenvy not setting new system env vars.
 webauthn_extra_raw =
   System.get_env("WEBAUTHN_EXTRA_ORIGINS") ||
-    (case Dotenvy.source([".env"]) do
-       {:ok, env} -> env["WEBAUTHN_EXTRA_ORIGINS"]
-       _ -> nil
-     end)
+    case Dotenvy.source([".env"]) do
+      {:ok, env} -> env["WEBAUTHN_EXTRA_ORIGINS"]
+      _ -> nil
+    end
 
 if webauthn_extra_raw do
   origins =
@@ -57,6 +69,32 @@ if webauthn_extra_raw do
 
   if origins != [] do
     config :eye_in_the_sky_web, :webauthn_extra_origins, origins
+  end
+end
+
+# WebAuthn primary origin — configurable via WEBAUTHN_ORIGIN. Required in prod.
+# Dev/test falls back to the compile-time default in config.exs ("https://eits.dev").
+if webauthn_origin = System.get_env("WEBAUTHN_ORIGIN") do
+  config :wax_, origin: webauthn_origin
+else
+  if config_env() == :prod do
+    raise """
+    environment variable WEBAUTHN_ORIGIN is missing.
+    Set it to your app's origin, e.g.: https://eits.dev
+    """
+  end
+end
+
+# WebAuthn RP ID — configurable via WEBAUTHN_RP_ID. Required in prod.
+# Dev/test falls back to the compile-time default in config.exs ("eits.dev").
+if webauthn_rp_id = System.get_env("WEBAUTHN_RP_ID") do
+  config :wax_, rp_id: webauthn_rp_id
+else
+  if config_env() == :prod do
+    raise """
+    environment variable WEBAUTHN_RP_ID is missing.
+    Set it to your app's RP ID (the registrable domain), e.g.: eits.dev
+    """
   end
 end
 
@@ -102,7 +140,8 @@ if config_env() == :prod do
       ip: {0, 0, 0, 0, 0, 0, 0, 0},
       port: port
     ],
-    secret_key_base: secret_key_base
+    secret_key_base: secret_key_base,
+    force_ssl: [hsts: true, rewrite_on: [:x_forwarded_proto]]
 
   # ## SSL Support
   #

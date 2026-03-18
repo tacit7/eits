@@ -217,6 +217,108 @@ Guidelines:
 
 ---
 
+## Type Signatures and Typespecs
+
+Add `@spec` annotations to public functions in context modules for clarity and IDE/documentation support.
+
+**Guidelines:**
+
+### Agent Context (Agents)
+
+All primary public functions should have `@spec` annotations:
+
+```elixir
+@spec get_agent(String.t()) :: {:ok, Agent.t()} | {:error, String.t()}
+def get_agent(id) do
+  # ...
+end
+
+@spec list_agents(Keyword.t()) :: [Agent.t()]
+def list_agents(opts \\ []) do
+  # ...
+end
+
+@spec create_agent(map()) :: {:ok, Agent.t()} | {:error, Changeset.t()}
+def create_agent(attrs) do
+  # ...
+end
+```
+
+### Sessions Context (Sessions)
+
+Consistent `@spec` for session operations:
+
+```elixir
+@spec get_session(integer() | String.t()) :: Session.t() | nil
+def get_session(id) do
+  # ...
+end
+
+@spec update_session(Session.t(), map()) :: {:ok, Session.t()} | {:error, Changeset.t()}
+def update_session(session, attrs) do
+  # ...
+end
+```
+
+### Messages Context (Messages)
+
+Type signatures for message operations:
+
+```elixir
+@spec add_message(Session.t(), map()) :: {:ok, Message.t()} | {:error, Changeset.t()}
+def add_message(session, attrs) do
+  # ...
+end
+
+@spec list_session_messages(integer()) :: [Message.t()]
+def list_session_messages(session_id) do
+  # ...
+end
+```
+
+---
+
+## Optional Parameter Patterns
+
+Use `Keyword.filter/2` to simplify optional parameter handling instead of sequential `if/else` blocks.
+
+### ❌ Before (verbose)
+
+```elixir
+def start_claude_sdk(session_id, opts \\ []) do
+  args = []
+  args = if Keyword.has_key?(opts, :effort), do: args ++ ["--effort-level", opts[:effort]], else: args
+  args = if Keyword.has_key?(opts, :model), do: args ++ ["--model", opts[:model]], else: args
+  args = if Keyword.has_key?(opts, :provider), do: args ++ ["--provider", opts[:provider]], else: args
+
+  run_claude_cli(args)
+end
+```
+
+### ✅ After (clean)
+
+```elixir
+def start_claude_sdk(session_id, opts \\ []) do
+  args =
+    opts
+    |> Keyword.filter(fn {key, _} -> key in [:effort, :model, :provider] end)
+    |> Enum.flat_map(fn {key, val} -> [flag_name(key), val] end)
+
+  run_claude_cli(args)
+end
+
+defp flag_name(:effort), do: "--effort-level"
+defp flag_name(:model), do: "--model"
+defp flag_name(:provider), do: "--provider"
+```
+
+Benefits:
+- **Readable**: Intent is clear (filter valid options, then map to flags)
+- **Maintainable**: Adding new options doesn't require adding new if blocks
+- **Safe**: Unknown options are silently filtered (no accidental passthrough)
+
+---
+
 ## Testing (LiveView-first)
 
 Tooling:

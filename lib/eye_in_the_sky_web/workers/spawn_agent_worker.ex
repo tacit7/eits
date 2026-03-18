@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWeb.Workers.SpawnAgentWorker do
   require Logger
 
   alias EyeInTheSkyWeb.ScheduledJobs
-  alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Agents.AgentManager
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"job_id" => job_id}}) do
@@ -57,7 +57,10 @@ defmodule EyeInTheSkyWeb.Workers.SpawnAgentWorker do
       |> maybe_put(:skip_permissions, config["skip_permissions"])
 
     log_opts = Keyword.drop(opts, [:instructions])
-    Logger.info("[telemetry] spawn_agent_worker job_id=#{job.id} name=#{job.name} opts=#{inspect(log_opts)}")
+
+    Logger.info(
+      "[telemetry] spawn_agent_worker job_id=#{job.id} name=#{job.name} opts=#{inspect(log_opts)}"
+    )
 
     case AgentManager.create_agent(opts) do
       {:ok, %{session: session}} ->
@@ -97,6 +100,6 @@ defmodule EyeInTheSkyWeb.Workers.SpawnAgentWorker do
   defp parse_int(val) when is_integer(val), do: val
 
   defp broadcast do
-    Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "scheduled_jobs", :jobs_updated)
+    EyeInTheSkyWeb.Events.jobs_updated()
   end
 end

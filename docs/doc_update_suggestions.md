@@ -1,5 +1,35 @@
 # Documentation Update Suggestions
 
+## 2026-03-18
+**Commits reviewed**: 435f772..cdb8acd
+
+- **CODE_GUIDELINES.md**: Update module location references: AgentManager moved from `lib/eye_in_the_sky_web/claude/agent_manager.ex` to `lib/eye_in_the_sky_web/agents/agent_manager.ex`; document new modules InstructionBuilder, RuntimeContext, and Git.Worktrees with their responsibilities
+- **WORKERS.md** or **SESSION_MANAGER.md**: Document agent state lifecycle transitions: `:pending` (on :queued/:retry_queued admission) → `:running` (on SDK :started event) → `:failed` (on dispatch error); explain promote_agent_if_pending synchronous execution requirement for test sandbox safety
+- **WORKERS.md** or **SESSION_MANAGER.md**: Document worktree handling improvements: worktree reuse on repeated prepare calls, untracked file filtering in dirty check (git status --porcelain with ?? filter), and Git.Worktrees module structure
+- **REST_API.md**: Update DM endpoint docs: POST /api/v1/dm now accepts from_session_id/to_session_id (int FK) instead of sender_id/target_session_id; legacy params still supported for backward compatibility
+- **EITS_HOOKS.md** or **CHAT.md**: Document eits-dm skill for agents: teaches DM parsing of "DM from:<name> (session:<uuid>) <body>" format and reply flow via eits dm CLI; update eits CLI docs to show --from defaults to $EITS_SESSION_UUID
+- **CHAT.md**: Update typing indicator docs; clarify that ambient messages no longer trigger agent responses (only @direct and @all do); document per-channel sequential message numbering with backfill migration
+- **REST_API.md**: Add GET /api/v1/channels/:channel_id/messages endpoint documentation with pagination and CLI support via eits cli
+- **SESSION_MANAGER.md**: Document "stopped" session status (set by Stop hook, displays yellow left bar); clarify that "completed" status is now set explicitly via i-end-session skill (not auto-set on CLI exit)
+- **CODE_GUIDELINES.md** or **DM_FEATURES.md**: Document Quick Note modal and New Note CodeMirror editor: title/body textarea in modal, inline CodeMirror editor with Cmd+S save handler, parent_type resolution (system vs project), and InlineNoteCreatorHook JS integration
+- **CODE_GUIDELINES.md**: Document new Opus 4.6 1M model and Sonnet 4.5 1M addition to claude_models(), model_display_name helpers, and max effort option availability across all forms (DM page, agent drawer, session modal, jobs)
+- **CODEX_SDK.md**: Document restored Codex streaming pipeline: CodexStreamAssembler module for provider-polymorphic stream dispatch; provider-aware avatar/label in DM UI; stream_thinking assign for UI display
+- **SECURITY.md**: Document API key rotation system: api_keys table (key_hash, label, valid_until), HMAC-SHA256 hashing in hash_token/1, RequireAuth plug validation via valid_db_token?/1, eits.gen.api_key mix task integration, and backward compatibility with EITS_API_KEY env var
+- **SECURITY.md**: Document server-side session expiry: user_sessions table (uuid pk, session_token unique, expires_at), ValidateSession plug in :browser pipeline, 7-day TTL, and session token cookie handling
+- **UI_IMPROVEMENTS.md**: Document DM page textarea scroll fix for max-height input fields; kanban card accessibility fix (exclude interactive elements from SortableJS drag)
+
+## 2026-03-17
+**Commits reviewed**: 569410e..435f772
+
+- **REST_API.md**: Remove deleted endpoints `/dev/test-login` and `/api/v1/editor/open` from endpoint listings; update webhook handler docs for new Gitea signature format handling (both 'sha256=<hex>' and raw hex headers)
+- **SECURITY.md**: Document SessionAuth plug (session-cookie based auth for /oban and /dev/dashboard instead of RequireAuth); add API key validation behavior change in RequireAuth (rejects all traffic in prod if EITS_API_KEY unset, allows passthrough in dev); document webhook signature verification now rejects unsigned requests by default (configurable via allow_unsigned_webhooks flag in dev)
+- **SETUP.md**: Add VAPID_PRIVATE_KEY to required environment variables section (moved from config/config.exs to runtime.exs); document allow_unsigned_webhooks dev config flag for webhook testing; add RemoteIp proxy configuration for Tailscale CGNAT range (100.64.0.0/10) and X-Forwarded-For rewriting
+- **REST_API.md**: Document POST /api/v1/dm rate-limiting: 30 requests/min per sender_id via Hammer; add error response code (429 Too Many Requests) for rate-limit violations
+- **CLAUDE.md**: Update module name references: PgSearch (formerly FTS5 in search/), AgentWorkerEvents (formerly WorkerEvents in claude/); both updated in existing commit
+- **DM_FEATURES.md**: Document DmLive mount structure refactoring: single with chain (previously 3-level delegation); document active_overlay atom-based state management replacing 5 boolean assigns (effort_menu, model_menu, task_drawer, task_detail, checkpoint); note overlay state controls 5 drawer/menu components
+- **REST_API.md**: Document webhook controller improvements: repository.full_name validation returns 400 if missing (no 'claude/eits-web' fallback); project_path validation returns 500 if not configured (no File.cwd!() fallback); signature comparison handles both new and legacy header formats
+- **CODE_GUIDELINES.md**: Document agent context typespecs additions to Agents, Sessions, Messages contexts (public function @spec annotations); note Keyword.filter pattern usage in optional parameter handling (build_instructions/1, start_claude_sdk/2)
+
 ## 2026-03-16
 **Commits reviewed**: 0fae369..6b55196
 

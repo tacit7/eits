@@ -7,7 +7,6 @@ defmodule EyeInTheSkyWebWeb.ChatLiveE2ETest do
   """
 
   use EyeInTheSkyWebWeb.ConnCase
-  use EyeInTheSkyWeb.SessionManagerCase
 
   import Phoenix.LiveViewTest
 

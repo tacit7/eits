@@ -11,17 +11,26 @@ defmodule EyeInTheSkyWebWeb.NoteLive.EditTest do
   end
 
   defp create_note(overrides \\ %{}) do
-    {:ok, project} = Projects.create_project(%{
-      name: "test-#{System.unique_integer()}",
-      path: "/tmp/test",
-      slug: "test-#{System.unique_integer()}"
-    })
-    {:ok, note} = Notes.create_note(Map.merge(%{
-      parent_type: "project",
-      parent_id: to_string(project.id),
-      body: "# Hello\n\nWorld",
-      title: "Test Note"
-    }, overrides))
+    {:ok, project} =
+      Projects.create_project(%{
+        name: "test-#{System.unique_integer()}",
+        path: "/tmp/test",
+        slug: "test-#{System.unique_integer()}"
+      })
+
+    {:ok, note} =
+      Notes.create_note(
+        Map.merge(
+          %{
+            parent_type: "project",
+            parent_id: to_string(project.id),
+            body: "# Hello\n\nWorld",
+            title: "Test Note"
+          },
+          overrides
+        )
+      )
+
     note
   end
 

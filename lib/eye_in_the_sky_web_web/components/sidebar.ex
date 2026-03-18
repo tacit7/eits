@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
 
   alias EyeInTheSkyWeb.{Projects, Channels, Notifications}
   alias EyeInTheSkyWeb.Channels.Channel
-  alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Agents.AgentManager
 
   @impl true
   def mount(socket) do
@@ -46,8 +46,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
      |> assign(:sidebar_project, sidebar_project)
      |> assign(:active_channel_id, assigns[:active_channel_id])
      |> assign(:expanded_chat, expanded_chat)
-     |> assign(:mobile_open, false)
-     |> assign(:notification_count, Notifications.unread_count())}
+     |> assign(:mobile_open, false)}
   end
 
   @impl true
@@ -148,7 +147,14 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
 
   @impl true
   def handle_event("show_new_project", _params, socket) do
-    {:noreply, assign(socket, :new_project_path, "")}
+    {:noreply,
+     start_async(socket, :pick_folder, fn ->
+       System.cmd(
+         "osascript",
+         ["-e", ~s[POSIX path of (choose folder with prompt "Select project folder:")]],
+         stderr_to_stdout: true
+       )
+     end)}
   end
 
   @impl true
@@ -184,120 +190,145 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   end
 
   @impl true
+  def handle_async(:pick_folder, {:ok, {path, 0}}, socket) do
+    path = String.trim(path)
+    name = path |> String.split("/") |> Enum.reject(&(&1 == "")) |> List.last() || path
+
+    case Projects.create_project(%{name: name, path: path}) do
+      {:ok, _project} ->
+        {:noreply, assign(socket, :projects, Projects.list_projects())}
+
+      {:error, _} ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_async(:pick_folder, _result, socket) do
+    # User cancelled or osascript failed — fall back to text input
+    {:noreply, assign(socket, :new_project_path, "")}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <div>
-    <%!-- Backdrop — mobile only, closes sidebar on tap --%>
-    <div
-      :if={@mobile_open}
-      phx-click="close_mobile"
-      phx-target={@myself}
-      class="md:hidden fixed inset-0 z-40 bg-black/40"
-    />
+      <%!-- Backdrop — mobile only, closes sidebar on tap --%>
+      <div
+        :if={@mobile_open}
+        phx-click="close_mobile"
+        phx-target={@myself}
+        class="md:hidden fixed inset-0 z-40 bg-black/40"
+      />
 
-    <aside
-      id="app-sidebar"
-      phx-hook="SidebarState"
-      phx-target={@myself}
-      data-active-project-id={@sidebar_project && @sidebar_project.id}
-      class={[
-        "flex flex-col h-full border-r border-base-content/10 bg-base-100 lg:bg-gradient-to-t lg:from-base-300/5 lg:to-base-300/30 shadow-lg lg:shadow-none transition-[background-color,border-color,box-shadow] duration-[35ms] flex-shrink-0 overflow-hidden",
-        "fixed inset-y-0 left-0 z-50 md:relative md:inset-auto md:z-auto",
-        if(@mobile_open, do: "translate-x-0", else: "-translate-x-full md:translate-x-0"),
-        if(@collapsed, do: "w-16", else: "w-60")
-      ]}
-    >
-      <%!-- Branding --%>
-      <div class="flex items-center gap-2 px-3 py-3 border-b border-base-content/5">
-        <.link navigate="/" class="flex items-center gap-2 min-w-0 flex-1">
-          <img src="/images/logo.svg" class="w-7 h-7 flex-shrink-0" />
-          <span class={[
-            "text-sm font-semibold text-base-content/80 truncate",
-            if(@collapsed, do: "hidden")
-          ]}>
-            Eye in the Sky
-          </span>
-        </.link>
-        <button
-          phx-click="new_chat"
-          phx-target={@myself}
-          class={[
-            "btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-primary hover:bg-primary/10 transition-colors",
-            if(@mobile_open, do: "hidden")
-          ]}
-          title="New Chat"
-        >
-          <.icon name="hero-pencil-square" class="w-4 h-4" />
-        </button>
-        <button
-          :if={@mobile_open}
-          phx-click="close_mobile"
-          phx-target={@myself}
-          class="md:hidden btn btn-ghost btn-xs btn-square text-base-content/40"
-        >
-          <.icon name="hero-x-mark" class="w-4 h-4" />
-        </button>
-      </div>
+      <aside
+        id="app-sidebar"
+        phx-hook="SidebarState"
+        phx-target={@myself}
+        data-active-project-id={@sidebar_project && @sidebar_project.id}
+        class={[
+          "flex flex-col h-full border-r border-base-content/10 bg-base-100 lg:bg-gradient-to-t lg:from-base-300/5 lg:to-base-300/30 shadow-lg lg:shadow-none transition-[background-color,border-color,box-shadow] duration-[35ms] flex-shrink-0 overflow-hidden safe-inset-y",
+          "fixed inset-y-0 left-0 z-50 md:relative md:inset-auto md:z-auto",
+          "w-[85vw] max-w-72",
+          if(@mobile_open, do: "translate-x-0", else: "-translate-x-full md:translate-x-0"),
+          if(@collapsed, do: "md:w-16", else: "md:w-60")
+        ]}
+      >
+        <%!-- Branding --%>
+        <div class="flex items-center gap-2 px-3 py-3 border-b border-base-content/5">
+          <.link navigate="/" class="flex items-center gap-2 min-w-0 flex-1">
+            <img src="/images/logo.svg" class="w-7 h-7 flex-shrink-0" />
+            <span class={[
+              "text-sm font-semibold text-base-content/80 truncate",
+              if(@collapsed, do: "hidden")
+            ]}>
+              Eye in the Sky
+            </span>
+          </.link>
+          <button
+            phx-click="new_chat"
+            phx-target={@myself}
+            class={[
+              "btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-primary hover:bg-primary/10 transition-colors",
+              if(@mobile_open, do: "hidden")
+            ]}
+            title="New Chat"
+          >
+            <.icon name="hero-pencil-square" class="w-4 h-4" />
+          </button>
+          <button
+            :if={@mobile_open}
+            phx-click="close_mobile"
+            phx-target={@myself}
+            class="md:hidden btn btn-ghost btn-xs btn-square text-base-content/40"
+          >
+            <.icon name="hero-x-mark" class="w-4 h-4" />
+          </button>
+        </div>
 
-      <%!-- Scrollable nav --%>
-      <nav class="flex-1 overflow-y-auto overflow-x-hidden py-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-        <.main_nav
-          sidebar_tab={@sidebar_tab}
-          sidebar_project={@sidebar_project}
-          collapsed={@collapsed}
-          notification_count={@notification_count}
-        />
-        <.chat_section
-          sidebar_tab={@sidebar_tab}
-          collapsed={@collapsed}
-          expanded_chat={@expanded_chat}
-          channels={@channels}
-          active_channel_id={@active_channel_id}
-          new_channel_name={@new_channel_name}
-          myself={@myself}
-        />
-        <.projects_section
-          projects={@projects}
-          sidebar_project={@sidebar_project}
-          sidebar_tab={@sidebar_tab}
-          collapsed={@collapsed}
-          new_project_path={@new_project_path}
-          myself={@myself}
-        />
-        <.system_nav
-          sidebar_tab={@sidebar_tab}
-          sidebar_project={@sidebar_project}
-          collapsed={@collapsed}
-        />
-      </nav>
+        <%!-- Scrollable nav --%>
+        <nav class="flex-1 overflow-y-auto overflow-x-hidden py-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <.main_nav
+            sidebar_tab={@sidebar_tab}
+            sidebar_project={@sidebar_project}
+            collapsed={@collapsed}
+            notification_count={@notification_count}
+          />
+          <.chat_section
+            sidebar_tab={@sidebar_tab}
+            collapsed={@collapsed}
+            expanded_chat={@expanded_chat}
+            channels={@channels}
+            active_channel_id={@active_channel_id}
+            new_channel_name={@new_channel_name}
+            myself={@myself}
+          />
+          <.projects_section
+            projects={@projects}
+            sidebar_project={@sidebar_project}
+            sidebar_tab={@sidebar_tab}
+            collapsed={@collapsed}
+            new_project_path={@new_project_path}
+            myself={@myself}
+          />
+          <.system_nav
+            sidebar_tab={@sidebar_tab}
+            sidebar_project={@sidebar_project}
+            collapsed={@collapsed}
+          />
+        </nav>
 
-      <%!-- Bottom controls --%>
-      <div class="border-t border-base-content/5 p-2 flex items-center gap-2">
-        <%= if !@collapsed do %>
-          <div class="flex-1">
-            <.theme_toggle />
-          </div>
-        <% end %>
-        <.link
-          href="/auth/logout"
-          method="delete"
-          class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-red-500"
-          title="Sign out"
-        >
-          <.icon name="hero-arrow-right-on-rectangle-mini" class="w-4 h-4" />
-        </.link>
-        <button
-          phx-click="toggle_collapsed"
-          phx-target={@myself}
-          class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-base-content/70"
-          title={if @collapsed, do: "Expand sidebar", else: "Collapse sidebar"}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-            <path d="M16.5 4C17.3284 4 18 4.67157 18 5.5V14.5C18 15.3284 17.3284 16 16.5 16H3.5C2.67157 16 2 15.3284 2 14.5V5.5C2 4.67157 2.67157 4 3.5 4H16.5ZM7 15H16.5C16.7761 15 17 14.7761 17 14.5V5.5C17 5.22386 16.7761 5 16.5 5H7V15ZM3.5 5C3.22386 5 3 5.22386 3 5.5V14.5C3 14.7761 3.22386 15 3.5 15H6V5H3.5Z" />
-          </svg>
-        </button>
-      </div>
-    </aside>
+        <%!-- Bottom controls --%>
+        <div class="border-t border-base-content/5 p-2 flex items-center gap-2">
+          <%= if !@collapsed do %>
+            <div class="flex-1">
+              <.theme_toggle />
+            </div>
+          <% end %>
+          <.link
+            href="/auth/logout"
+            method="delete"
+            class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-red-500"
+            title="Sign out"
+          >
+            <.icon name="hero-arrow-right-on-rectangle-mini" class="w-4 h-4" />
+          </.link>
+          <button
+            phx-click="toggle_collapsed"
+            phx-target={@myself}
+            class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-base-content/70"
+            title={if @collapsed, do: "Expand sidebar", else: "Collapse sidebar"}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              class="w-4 h-4"
+            >
+              <path d="M16.5 4C17.3284 4 18 4.67157 18 5.5V14.5C18 15.3284 17.3284 16 16.5 16H3.5C2.67157 16 2 15.3284 2 14.5V5.5C2 4.67157 2.67157 4 3.5 4H16.5ZM7 15H16.5C16.7761 15 17 14.7761 17 14.5V5.5C17 5.22386 16.7761 5 16.5 5H7V15ZM3.5 5C3.22386 5 3 5.22386 3 5.5V14.5C3 14.7761 3.22386 15 3.5 15H6V5H3.5Z" />
+            </svg>
+          </button>
+        </div>
+      </aside>
     </div>
     """
   end
@@ -453,7 +484,10 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
 
   defp projects_section(assigns) do
     ~H"""
-    <div class={["mt-3 mb-0.5 flex items-center justify-between", if(@collapsed, do: "px-2", else: "px-3")]}>
+    <div class={[
+      "mt-3 mb-0.5 flex items-center justify-between",
+      if(@collapsed, do: "px-2", else: "px-3")
+    ]}>
       <span class={[
         "text-[10px] uppercase tracking-wider font-medium text-base-content/30",
         if(@collapsed, do: "hidden")

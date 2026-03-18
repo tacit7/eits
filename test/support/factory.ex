@@ -3,7 +3,13 @@ defmodule EyeInTheSkyWeb.Factory do
   Shared test factory helpers for controller and MCP tool tests.
   """
 
-  alias EyeInTheSkyWeb.{Agents, Sessions}
+  alias EyeInTheSkyWeb.{Accounts, Agents, Sessions}
+
+  def user_fixture(attrs \\ %{}) do
+    username = Map.get(attrs, :username, "user_#{System.unique_integer([:positive])}")
+    {:ok, user} = Accounts.get_or_create_user(username)
+    user
+  end
 
   def uniq, do: System.unique_integer([:positive])
 
@@ -45,5 +51,4 @@ defmodule EyeInTheSkyWeb.Factory do
     agent = create_agent()
     create_session(agent)
   end
-
 end

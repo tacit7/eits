@@ -67,14 +67,9 @@ config :eye_in_the_sky_web, Oban,
      ]}
   ]
 
-# Web Push / VAPID configuration
-config :web_push_encryption, :vapid_details,
-  subject: "mailto:admin@eits.dev",
-  public_key:
-    "BCeer_3Bsec6cpZU-NAcYLmeF5zqinfsZBYzXoDlA62Gp8nJhtnhKI0OGdPqEJAe5b9lpHuyNZjIDIrOgCjhUIc",
-  private_key: "UjvINIZfpbgbtSEyPrxK41I5Sy-uE6gtxek7Vq9W6ck"
+# Web Push / VAPID — both keys loaded from VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY env vars (see runtime.exs)
 
-# WebAuthn / Passkey configuration
+# WebAuthn / Passkey configuration (dev/test defaults — override via WEBAUTHN_ORIGIN and WEBAUTHN_RP_ID env vars in runtime.exs)
 config :wax_,
   origin: "https://eits.dev",
   rp_id: "eits.dev",

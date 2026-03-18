@@ -73,7 +73,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentControllerTest do
 
   @valid_params %{
     "instructions" => "Do the thing",
-    "model"        => "haiku",
+    "model" => "haiku",
     "project_path" => "/tmp"
   }
 
@@ -102,7 +102,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentControllerTest do
     end
 
     test "returns instructions_too_long when over 32000 chars", %{conn: conn} do
-      conn = post_spawn(conn, Map.put(@valid_params, "instructions", String.duplicate("a", 32_001)))
+      conn =
+        post_spawn(conn, Map.put(@valid_params, "instructions", String.duplicate("a", 32_001)))
+
       resp = json_response(conn, 400)
       assert resp["error_code"] == "instructions_too_long"
     end

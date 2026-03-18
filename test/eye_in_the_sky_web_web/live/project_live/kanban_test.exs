@@ -211,10 +211,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.KanbanTest do
       |> element("[phx-click='open_task_detail'][phx-value-task_id='#{task.uuid}']")
       |> render_click()
 
-      # Use the drawer's delete button (has data-confirm attribute, distinct from card inline button)
+      # Use the drawer's delete button (data-drawer-delete, distinct from card inline button)
       view
       |> element(
-        "button[data-confirm][phx-click='delete_task'][phx-value-task_id='#{task.uuid}']"
+        "button[data-drawer-delete][phx-click='delete_task'][phx-value-task_id='#{task.uuid}']"
       )
       |> render_click()
 

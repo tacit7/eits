@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.Messages do
   @doc """
   Returns the list of messages.
   """
+  @spec list_messages() :: [Message.t()]
   def list_messages do
     Repo.all(Message)
   end
@@ -24,6 +25,7 @@ defmodule EyeInTheSkyWeb.Messages do
   Returns the list of messages for a specific session from JSONL file (opcode-style).
   Falls back to database if file doesn't exist.
   """
+  @spec list_messages_for_session(integer()) :: [Message.t()]
   def list_messages_for_session(session_id) do
     list_messages_for_session(session_id, nil)
   end
@@ -74,6 +76,7 @@ defmodule EyeInTheSkyWeb.Messages do
 
   Raises `Ecto.NoResultsError` if the Message does not exist.
   """
+  @spec get_message!(integer()) :: Message.t()
   def get_message!(id) do
     Repo.get!(Message, id)
   end
@@ -81,6 +84,7 @@ defmodule EyeInTheSkyWeb.Messages do
   @doc """
   Gets a message by ID, returning {:ok, message} or {:error, :not_found}.
   """
+  @spec get_message(integer()) :: {:ok, Message.t()} | {:error, :not_found}
   def get_message(id) do
     case Repo.get(Message, id) do
       nil -> {:error, :not_found}
@@ -143,6 +147,7 @@ defmodule EyeInTheSkyWeb.Messages do
   @doc """
   Creates a message.
   """
+  @spec create_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def create_message(attrs \\ %{}) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
@@ -150,14 +155,40 @@ defmodule EyeInTheSkyWeb.Messages do
       %{inserted_at: now, updated_at: now}
       |> Map.merge(attrs)
 
+    # Auto-assign channel_message_number for channel messages
+    # Handles both atom and string key maps
+    cid = Map.get(attrs, :channel_id) || Map.get(attrs, "channel_id")
+
+    has_number =
+      Map.get(attrs, :channel_message_number) || Map.get(attrs, "channel_message_number")
+
+    attrs =
+      if cid && is_nil(has_number) do
+        Map.put(attrs, :channel_message_number, next_channel_message_number(cid))
+      else
+        attrs
+      end
+
     %Message{}
     |> Message.changeset(attrs)
     |> Repo.insert()
   end
 
+  defp next_channel_message_number(channel_id) do
+    current_max =
+      from(m in Message,
+        where: m.channel_id == ^channel_id and not is_nil(m.channel_message_number),
+        select: max(m.channel_message_number)
+      )
+      |> Repo.one()
+
+    (current_max || 0) + 1
+  end
+
   @doc """
   Sends a message (creates an outbound message).
   """
+  @spec send_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def send_message(attrs) do
     result =
       attrs
@@ -168,20 +199,10 @@ defmodule EyeInTheSkyWeb.Messages do
 
     case result do
       {:ok, message} ->
-        # Broadcast new message to session topic
-        Phoenix.PubSub.broadcast(
-          EyeInTheSkyWeb.PubSub,
-          "session:#{message.session_id}",
-          {:new_message, message}
-        )
+        EyeInTheSkyWeb.Events.session_new_message(message.session_id, message)
 
-        # Also broadcast to channel topic if this is a channel message
         if message.channel_id do
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "channel:#{message.channel_id}:messages",
-            {:new_message, message}
-          )
+          EyeInTheSkyWeb.Events.channel_message(message.channel_id, message)
         end
 
         {:ok, message}
@@ -219,8 +240,8 @@ defmodule EyeInTheSkyWeb.Messages do
       cond do
         source_uuid && message_exists_by_source_uuid?(source_uuid) ->
           # Already recorded by source_uuid — enrich with metadata if provided
-          # (session file sync imports messages without usage data; the session_worker
-          # calls this function later with usage metadata and the same source_uuid)
+          # (session file sync imports messages without usage data; later calls
+          # may enrich with usage metadata using the same source_uuid)
           existing = Repo.get_by!(Message, source_uuid: source_uuid)
 
           if metadata && metadata != %{} do
@@ -251,19 +272,10 @@ defmodule EyeInTheSkyWeb.Messages do
 
     case result do
       {:ok, message} ->
-        Phoenix.PubSub.broadcast(
-          EyeInTheSkyWeb.PubSub,
-          "session:#{message.session_id}",
-          {:new_message, message}
-        )
+        EyeInTheSkyWeb.Events.session_new_message(message.session_id, message)
 
-        # Also broadcast to channel topic if this is a channel message
         if message.channel_id do
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "channel:#{message.channel_id}:messages",
-            {:new_message, message}
-          )
+          EyeInTheSkyWeb.Events.channel_message(message.channel_id, message)
         end
 
         {:ok, message}
@@ -276,6 +288,7 @@ defmodule EyeInTheSkyWeb.Messages do
   @doc """
   Updates a message.
   """
+  @spec update_message(Message.t(), map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def update_message(%Message{} = message, attrs) do
     message
     |> Message.changeset(attrs)
@@ -292,6 +305,7 @@ defmodule EyeInTheSkyWeb.Messages do
   @doc """
   Deletes a message.
   """
+  @spec delete_message(Message.t()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def delete_message(%Message{} = message) do
     Repo.delete(message)
   end
@@ -436,6 +450,7 @@ defmodule EyeInTheSkyWeb.Messages do
   @doc """
   Counts messages for a session.
   """
+  @spec count_messages_for_session(integer()) :: non_neg_integer()
   def count_messages_for_session(session_id) do
     QueryHelpers.count_for_session(Message, session_id)
   end
@@ -444,7 +459,8 @@ defmodule EyeInTheSkyWeb.Messages do
   Deletes messages for a session beyond the given index (keeps the N oldest).
   Returns the number of deleted rows.
   """
-  def truncate_messages_after_index(session_id, keep_count) when is_integer(keep_count) and keep_count >= 0 do
+  def truncate_messages_after_index(session_id, keep_count)
+      when is_integer(keep_count) and keep_count >= 0 do
     # Find the ID of the Nth oldest message to use as a cutoff
     cutoff_id =
       Message
@@ -520,6 +536,7 @@ defmodule EyeInTheSkyWeb.Messages do
 
   Used to decide if the next prompt should resume an existing conversation.
   """
+  @spec has_inbound_reply?(integer(), String.t()) :: boolean()
   def has_inbound_reply?(session_id, provider) when is_binary(provider) do
     Message
     |> where(
@@ -591,11 +608,7 @@ defmodule EyeInTheSkyWeb.Messages do
     case result do
       {:ok, message} ->
         if message.channel_id do
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "channel:#{message.channel_id}:messages",
-            {:new_message, message}
-          )
+          EyeInTheSkyWeb.Events.channel_message(message.channel_id, message)
         end
 
         {:ok, message}

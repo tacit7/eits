@@ -33,6 +33,38 @@ defmodule EyeInTheSkyWebWeb.ConnCase do
 
   setup tags do
     EyeInTheSkyWeb.DataCase.setup_sandbox(tags)
-    {:ok, conn: Phoenix.ConnTest.build_conn()}
+    user = EyeInTheSkyWeb.Factory.user_fixture()
+    conn = Phoenix.ConnTest.build_conn() |> log_in_user(user)
+    {:ok, conn: conn, user: user}
+  end
+
+  @doc """
+  Creates a user session token via the real Accounts code path and puts
+  :user_id + :session_token into the conn's session, matching exactly what
+  the ValidateSession plug and auth controller write.
+  """
+  def log_in_user(conn, user) do
+    {:ok, token} = EyeInTheSkyWeb.Accounts.create_user_session(user.id)
+
+    conn
+    |> Plug.Test.init_test_session(%{})
+    |> Plug.Conn.put_session(:user_id, user.id)
+    |> Plug.Conn.put_session(:session_token, token)
+  end
+
+  @doc """
+  Setup helper that builds an authenticated conn and user for LiveView tests.
+
+  Usage:
+
+      use EyeInTheSkyWebWeb.ConnCase
+      import EyeInTheSkyWebWeb.ConnCase, only: [setup_with_auth: 0]
+
+      setup :setup_with_auth
+  """
+  def setup_with_auth(_tags \\ %{}) do
+    user = EyeInTheSkyWeb.Factory.user_fixture()
+    conn = Phoenix.ConnTest.build_conn() |> log_in_user(user)
+    {:ok, conn: conn, user: user}
   end
 end

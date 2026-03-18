@@ -28,6 +28,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
 
   @known_permission_modes ~w(acceptEdits bypassPermissions default delegate dontAsk plan)
   @fallback_idle_timeout_ms 300_000
+  @max_buffer_bytes 4 * 1024 * 1024
   @standard_paths [
     "/usr/local/bin/claude",
     "/opt/homebrew/bin/claude",
@@ -311,7 +312,9 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     ]
     |> Keyword.filter(fn {_k, v} -> v != nil end)
   rescue
-    _ -> []
+    e ->
+      Logger.error("[cli_db_defaults] failed to load settings: #{inspect(e)}")
+      []
   end
 
   defp parse_setting_integer(nil), do: nil
@@ -337,10 +340,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   """
   @spec clear_binary_cache() :: :ok
   def clear_binary_cache do
-    :persistent_term.erase(@persistent_term_key)
-    :ok
-  rescue
-    ArgumentError -> :ok
+    EyeInTheSkyWeb.CLI.Port.clear_binary_cache(@persistent_term_key)
   end
 
   # ---------------------------------------------------------------------------
@@ -356,7 +356,10 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
         err
 
       :ok ->
-        project_path = Keyword.get(merged, :project_path, File.cwd!())
+        project_path =
+          merged
+          |> Keyword.get(:project_path, File.cwd!())
+          |> Path.expand()
 
         if !File.dir?(project_path) do
           {:error, {:invalid_project_path, project_path}}
@@ -389,12 +392,25 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
 
         cmd_string = "claude " <> Enum.join(safe_log_args(args), " ")
         Logger.info("Spawning Claude in #{project_path}: #{cmd_string}")
-        Logger.info("CLI env: CLAUDE_CODE_EFFORT_LEVEL=#{inspect(opts[:effort_level])} max_budget_usd=#{inspect(opts[:max_budget_usd])}")
+
+        Logger.info(
+          "CLI env: CLAUDE_CODE_EFFORT_LEVEL=#{inspect(opts[:effort_level])} max_budget_usd=#{inspect(opts[:max_budget_usd])}"
+        )
 
         handler_pid =
           spawn_link(fn ->
             receive do
-              {:port, port} -> handle_port_output(port, session_ref, caller, "", idle_timeout_ms)
+              {:port, port} ->
+                EyeInTheSkyWeb.CLI.Port.handle_port_output(
+                  port,
+                  session_ref,
+                  caller,
+                  "",
+                  idle_timeout_ms,
+                  telemetry_prefix: [:eits, :cli],
+                  log_prefix: "CLI",
+                  max_buffer_bytes: @max_buffer_bytes
+                )
             end
           end)
 
@@ -403,7 +419,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
 
         port =
           if use_script do
-            # Use script wrapper for interactive sessions (SessionWorker)
+            # Use script wrapper for interactive sessions
             script_args = ["-q", "/dev/null", claude_path] ++ args
 
             Port.open(
@@ -480,75 +496,8 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
     maybe_add_env(env, "CLAUDE_CODE_EFFORT_LEVEL", opts[:effort_level])
   end
 
-  defp maybe_add_env(env, _key, nil), do: env
-  defp maybe_add_env(env, _key, ""), do: env
-
   defp maybe_add_env(env, key, value) do
-    env ++ [{String.to_charlist(key), String.to_charlist(to_string(value))}]
-  end
-
-  # ---------------------------------------------------------------------------
-  # Port output handler
-  # ---------------------------------------------------------------------------
-
-  @max_buffer_bytes 4 * 1024 * 1024
-
-  defp handle_port_output(port, session_ref, caller, buffer, idle_timeout_ms) do
-    receive do
-      {^port, {:data, data}} ->
-        new_buffer = buffer <> data
-
-        new_buffer =
-          if byte_size(new_buffer) > @max_buffer_bytes do
-            Logger.warning("[CLI] port buffer exceeded #{@max_buffer_bytes} bytes, flushing")
-            ""
-          else
-            new_buffer
-          end
-
-        lines = String.split(new_buffer, "\n")
-
-        {complete_lines, remaining} =
-          case List.pop_at(lines, -1) do
-            {last, rest} ->
-              if String.ends_with?(data, "\n"),
-                do: {lines, ""},
-                else: {rest, last || ""}
-          end
-
-        Enum.each(complete_lines, fn line ->
-          unless line == "" do
-            send(caller, {:claude_output, session_ref, line})
-          end
-        end)
-
-        handle_port_output(port, session_ref, caller, remaining, idle_timeout_ms)
-
-      {^port, {:exit_status, status}} ->
-        unless buffer == "" do
-          send(caller, {:claude_output, session_ref, buffer})
-        end
-
-        Logger.info("Claude process exited with status #{status}")
-        :telemetry.execute([:eits, :cli, :exit], %{exit_code: status}, %{})
-        Logger.info("[telemetry] cli.exit exit_code=#{status}")
-        send(caller, {:claude_exit, session_ref, status})
-        :ok
-    after
-      idle_timeout_ms ->
-        Logger.warning(
-          "No output from Claude after #{div(idle_timeout_ms, 60_000)} minutes, timing out"
-        )
-
-        :telemetry.execute([:eits, :cli, :timeout], %{system_time: System.system_time()}, %{
-          timeout_ms: idle_timeout_ms
-        })
-
-        Logger.warning("[telemetry] cli.timeout after #{div(idle_timeout_ms, 1000)}s")
-        Port.close(port)
-        send(caller, {:claude_exit, session_ref, :timeout})
-        :ok
-    end
+    EyeInTheSkyWeb.CLI.Port.maybe_add_env(env, key, value)
   end
 
   # ---------------------------------------------------------------------------
@@ -556,25 +505,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   # ---------------------------------------------------------------------------
 
   defp find_claude_binary do
-    case :persistent_term.get(@persistent_term_key, :not_cached) do
-      :not_cached ->
-        case do_find_claude_binary() do
-          {:ok, path} = ok ->
-            :persistent_term.put(@persistent_term_key, path)
-            ok
-
-          error ->
-            error
-        end
-
-      cached_path ->
-        if File.exists?(cached_path) do
-          {:ok, cached_path}
-        else
-          :persistent_term.erase(@persistent_term_key)
-          find_claude_binary()
-        end
-    end
+    EyeInTheSkyWeb.CLI.Port.find_binary(@persistent_term_key, &do_find_claude_binary/0)
   end
 
   defp do_find_claude_binary do
@@ -596,8 +527,7 @@ defmodule EyeInTheSkyWeb.Claude.CLI do
   end
 
   defp find_in_standard_paths do
-    @standard_paths
-    |> Enum.find(&File.exists?/1)
+    EyeInTheSkyWeb.CLI.Port.find_in_standard_paths(@standard_paths)
   end
 
   defp find_in_nvm do

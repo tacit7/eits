@@ -4,12 +4,14 @@ defmodule EyeInTheSkyWeb.PromptsTest do
   alias EyeInTheSkyWeb.{Prompts, ScheduledJobs}
 
   defp create_prompt(name \\ "Test") do
-    {:ok, p} = Prompts.create_prompt(%{
-      name: name,
-      slug: "test-#{System.unique_integer([:positive])}",
-      prompt_text: "Do something",
-      active: true
-    })
+    {:ok, p} =
+      Prompts.create_prompt(%{
+        name: name,
+        slug: "test-#{System.unique_integer([:positive])}",
+        prompt_text: "Do something",
+        active: true
+      })
+
     p
   end
 
@@ -21,13 +23,16 @@ defmodule EyeInTheSkyWeb.PromptsTest do
 
     test "returns {:error, :has_active_schedule} when a schedule exists" do
       prompt = create_prompt("Scheduled")
-      {:ok, _} = ScheduledJobs.create_job(%{
-        "name" => "Guard Test",
-        "job_type" => "spawn_agent",
-        "schedule_type" => "cron",
-        "schedule_value" => "0 5 * * *",
-        "prompt_id" => prompt.id
-      })
+
+      {:ok, _} =
+        ScheduledJobs.create_job(%{
+          "name" => "Guard Test",
+          "job_type" => "spawn_agent",
+          "schedule_type" => "cron",
+          "schedule_value" => "0 5 * * *",
+          "prompt_id" => prompt.id
+        })
+
       assert Prompts.delete_prompt(prompt) == {:error, :has_active_schedule}
     end
   end

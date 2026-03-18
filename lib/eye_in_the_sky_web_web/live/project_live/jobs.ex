@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
 
   alias EyeInTheSkyWeb.ScheduledJobs
   alias EyeInTheSkyWeb.ScheduledJobs.{ScheduledJob, JobHelper}
-  alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Agents.AgentManager
   import EyeInTheSkyWebWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWebWeb.Live.Shared.JobsHelpers
   import EyeInTheSkyWebWeb.Components.JobFormDrawer
@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
   @impl true
   def mount(%{"id" => _} = params, _session, socket) do
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "scheduled_jobs")
+      EyeInTheSkyWeb.Events.subscribe_scheduled_jobs()
     end
 
     socket =
@@ -284,13 +284,15 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
       <div class="flex border-b border-base-300 mb-4">
         <button
           class={"tab tab-bordered #{if @active_tab == :all_jobs, do: "tab-active"}"}
-          phx-click="switch_tab" phx-value-tab="all_jobs"
+          phx-click="switch_tab"
+          phx-value-tab="all_jobs"
         >
           All Jobs
         </button>
         <button
           class={"tab tab-bordered #{if @active_tab == :agent_schedules, do: "tab-active"}"}
-          phx-click="switch_tab" phx-value-tab="agent_schedules"
+          phx-click="switch_tab"
+          phx-value-tab="agent_schedules"
         >
           Schedule Agents
         </button>
@@ -348,6 +350,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
+                  <option value="max">Max</option>
                 </select>
               </div>
             <% end %>
@@ -421,7 +424,14 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
               </button>
             </div>
           </div>
-          <.jobs_table jobs={@project_jobs} expanded_job_id={@expanded_job_id} runs={@runs} running_ids={@running_ids} last_run_map={@last_run_map} last_failed_runs={@last_failed_runs} />
+          <.jobs_table
+            jobs={@project_jobs}
+            expanded_job_id={@expanded_job_id}
+            runs={@runs}
+            running_ids={@running_ids}
+            last_run_map={@last_run_map}
+            last_failed_runs={@last_failed_runs}
+          />
         </div>
 
         <div class="divider"></div>
@@ -441,7 +451,14 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
               + New Global Job
             </button>
           </div>
-          <.jobs_table jobs={@global_jobs} expanded_job_id={@expanded_job_id} runs={@runs} running_ids={@running_ids} last_run_map={@last_run_map} last_failed_runs={@last_failed_runs} />
+          <.jobs_table
+            jobs={@global_jobs}
+            expanded_job_id={@expanded_job_id}
+            runs={@runs}
+            running_ids={@running_ids}
+            last_run_map={@last_run_map}
+            last_failed_runs={@last_failed_runs}
+          />
         </div>
       <% end %>
 
@@ -470,12 +487,26 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
                     <%= if job do %>
                       <span class="font-mono text-xs text-base-content/50">{job.schedule_value}</span>
                       <div class="flex gap-1">
-                        <button class="btn btn-ghost btn-xs" phx-click="edit_schedule" phx-value-job_id={job.id}>Edit</button>
-                        <button class="btn btn-ghost btn-xs" phx-click="run_now" phx-value-id={job.id}>▶</button>
+                        <button
+                          class="btn btn-ghost btn-xs"
+                          phx-click="edit_schedule"
+                          phx-value-job_id={job.id}
+                        >
+                          Edit
+                        </button>
+                        <button class="btn btn-ghost btn-xs" phx-click="run_now" phx-value-id={job.id}>
+                          ▶
+                        </button>
                       </div>
                     <% else %>
                       <span class="text-xs text-base-content/40">not scheduled</span>
-                      <button class="btn btn-primary btn-xs" phx-click="schedule_prompt" phx-value-id={prompt.id}>+ Schedule</button>
+                      <button
+                        class="btn btn-primary btn-xs"
+                        phx-click="schedule_prompt"
+                        phx-value-id={prompt.id}
+                      >
+                        + Schedule
+                      </button>
                     <% end %>
                   </div>
                 </div>
@@ -485,7 +516,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
 
           <%= if @orphaned_jobs != [] do %>
             <div>
-              <p class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-2">Detached Schedules</p>
+              <p class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-2">
+                Detached Schedules
+              </p>
               <div class="space-y-2">
                 <%= for job <- @orphaned_jobs do %>
                   <div class="flex items-center gap-3 p-3 rounded-lg bg-base-200 border border-warning/40">
@@ -493,9 +526,19 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
                       <span class="text-sm truncate">{job.name}</span>
                       <span class="badge badge-warning badge-xs ml-2">Prompt deactivated</span>
                     </div>
-                    <span class="font-mono text-xs text-base-content/50 shrink-0">{job.schedule_value}</span>
-                    <button class="btn btn-ghost btn-xs" phx-click="run_now" phx-value-id={job.id}>▶</button>
-                    <button class="btn btn-ghost btn-xs text-error" phx-click="delete_job" phx-value-id={job.id}>Delete</button>
+                    <span class="font-mono text-xs text-base-content/50 shrink-0">
+                      {job.schedule_value}
+                    </span>
+                    <button class="btn btn-ghost btn-xs" phx-click="run_now" phx-value-id={job.id}>
+                      ▶
+                    </button>
+                    <button
+                      class="btn btn-ghost btn-xs text-error"
+                      phx-click="delete_job"
+                      phx-value-id={job.id}
+                    >
+                      Delete
+                    </button>
                   </div>
                 <% end %>
               </div>
@@ -550,7 +593,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
               <div class="flex items-center gap-1.5 mt-2 flex-wrap">
                 <span class="badge badge-xs badge-error">failed</span>
                 <span class="text-xs text-error/70 truncate flex-1">
-                  {format_relative_time(mobile_failed_run.started_at)}{if mobile_failed_run.result, do: ": #{String.slice(mobile_failed_run.result, 0, 60)}", else: ""}
+                  {format_relative_time(mobile_failed_run.started_at)}{if mobile_failed_run.result,
+                    do: ": #{String.slice(mobile_failed_run.result, 0, 60)}",
+                    else: ""}
                 </span>
                 <button
                   class="btn btn-ghost btn-xs text-error shrink-0"
@@ -575,9 +620,13 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
 
             <div class="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
               <span class="text-base-content/50">Last Run</span>
-              <span class="text-right" title={format_time(job.last_run_at)}>{format_relative_time(job.last_run_at)}</span>
+              <span class="text-right" title={format_time(job.last_run_at)}>
+                {format_relative_time(job.last_run_at)}
+              </span>
               <span class="text-base-content/50">Next Run</span>
-              <span class="text-right" title={format_time(job.next_run_at)}>{format_relative_time(job.next_run_at)}</span>
+              <span class="text-right" title={format_time(job.next_run_at)}>
+                {format_relative_time(job.next_run_at)}
+              </span>
               <span class="text-base-content/50">Runs</span>
               <span class="text-right">{job.run_count || 0}</span>
             </div>
@@ -628,7 +677,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
             <%= for job <- @jobs do %>
               <% row_state = job_row_state(job, @running_ids, @last_run_map) %>
               <tr class={"hover #{if @expanded_job_id == job.id, do: "bg-base-200"}"}>
-                <td class={"cursor-pointer #{row_border_class(row_state)}"} phx-click="expand_job" phx-value-id={job.id}>
+                <td
+                  class={"cursor-pointer #{row_border_class(row_state)}"}
+                  phx-click="expand_job"
+                  phx-value-id={job.id}
+                >
                   <div class="flex items-center gap-1.5">
                     <div class="font-medium">{job.name}</div>
                     <%= if row_state == :running do %>
@@ -646,7 +699,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
                     <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
                       <span class="badge badge-xs badge-error">failed</span>
                       <span class="text-xs text-error/70">
-                        {format_relative_time(failed_run.started_at)}{if failed_run.result, do: ": #{String.slice(failed_run.result, 0, 60)}", else: ""}
+                        {format_relative_time(failed_run.started_at)}{if failed_run.result,
+                          do: ": #{String.slice(failed_run.result, 0, 60)}",
+                          else: ""}
                       </span>
                       <button
                         class="btn btn-ghost btn-xs text-error"
@@ -677,8 +732,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
                     phx-value-id={job.id}
                   />
                 </td>
-                <td class="text-xs" title={format_time(job.last_run_at)}>{format_relative_time(job.last_run_at)}</td>
-                <td class="text-xs" title={format_time(job.next_run_at)}>{format_relative_time(job.next_run_at)}</td>
+                <td class="text-xs" title={format_time(job.last_run_at)}>
+                  {format_relative_time(job.last_run_at)}
+                </td>
+                <td class="text-xs" title={format_time(job.next_run_at)}>
+                  {format_relative_time(job.next_run_at)}
+                </td>
                 <td class="text-xs">{job.run_count || 0}</td>
                 <td>
                   <div class="flex items-center gap-1">

@@ -61,7 +61,10 @@ defmodule EyeInTheSkyWeb.QueryHelpersTest do
       for _ <- 1..3, do: link_task_to_session(make_task(), session)
 
       result =
-        QueryHelpers.for_session_join(Task, session.id, "task_sessions",
+        QueryHelpers.for_session_join(
+          Task,
+          session.id,
+          "task_sessions",
           @task_order ++ [limit: 1]
         )
 
@@ -74,7 +77,10 @@ defmodule EyeInTheSkyWeb.QueryHelpersTest do
       link_task_to_session(task, session)
 
       result =
-        QueryHelpers.for_session_join(Task, session.id, "task_sessions",
+        QueryHelpers.for_session_join(
+          Task,
+          session.id,
+          "task_sessions",
           @task_order ++ [entity_key: :task_id, session_key: :session_id]
         )
 
@@ -87,7 +93,10 @@ defmodule EyeInTheSkyWeb.QueryHelpersTest do
       link_task_to_session(task, session)
 
       result =
-        QueryHelpers.for_session_join(Task, session.id, "task_sessions",
+        QueryHelpers.for_session_join(
+          Task,
+          session.id,
+          "task_sessions",
           @task_order ++ [preload: [:state]]
         )
 

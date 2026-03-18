@@ -1,4 +1,6 @@
 defmodule EyeInTheSkyWebWeb.Live.Shared.TasksHelpers do
+  require Logger
+
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3]
   import EyeInTheSkyWebWeb.ControllerHelpers, only: [parse_int: 2]
@@ -31,8 +33,7 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.TasksHelpers do
   def handle_open_task_detail(_params, socket), do: {:noreply, socket}
 
   def handle_toggle_task_detail_drawer(_params, socket) do
-    {:noreply,
-     assign(socket, :show_task_detail_drawer, !socket.assigns.show_task_detail_drawer)}
+    {:noreply, assign(socket, :show_task_detail_drawer, !socket.assigns.show_task_detail_drawer)}
   end
 
   # ---------------------------------------------------------------------------
@@ -110,6 +111,46 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.TasksHelpers do
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Failed to delete task")}
+    end
+  end
+
+  def handle_archive_task(%{"task_id" => task_id}, socket, reload_fn) do
+    task = Tasks.get_task_by_uuid_or_id!(task_id)
+
+    case Tasks.archive_task(task) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:show_task_detail_drawer, false)
+         |> assign(:selected_task, nil)
+         |> reload_fn.()
+         |> put_flash(:info, "Task archived")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to archive task")}
+    end
+  end
+
+  def handle_add_task_annotation(%{"task_id" => task_id, "body" => body}, socket) do
+    task = Tasks.get_task_by_uuid_or_id!(task_id)
+    body = String.trim(body)
+
+    if body != "" do
+      case Notes.create_note(%{
+             parent_type: "task",
+             parent_id: task.uuid || to_string(task.id),
+             body: body
+           }) do
+        {:ok, _note} ->
+          notes = Notes.list_notes_for_task(task.id)
+          {:noreply, assign(socket, :task_notes, notes)}
+
+        {:error, changeset} ->
+          Logger.error("Failed to create task annotation: #{inspect(changeset.errors)}")
+          {:noreply, put_flash(socket, :error, "Failed to save annotation")}
+      end
+    else
+      {:noreply, socket}
     end
   end
 

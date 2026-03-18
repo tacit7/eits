@@ -89,7 +89,8 @@ defmodule EyeInTheSkyWebWeb.Components.NotesList do
                     data-note-id={note.id}
                     data-body={Base.encode64(note.body || "")}
                     class="border border-base-content/10 rounded-lg overflow-hidden min-h-[200px] mb-2"
-                  ></div>
+                  >
+                  </div>
                   <div class="mb-2 flex items-center gap-3">
                     <span class="text-xs text-base-content/40">⌘S to save</span>
                     <button
@@ -178,7 +179,10 @@ defmodule EyeInTheSkyWebWeb.Components.NotesList do
   defp parent_type_icon(type) when type in ["session", "sessions"], do: "hero-clock-mini"
   defp parent_type_icon(type) when type in ["agent", "agents"], do: "hero-cpu-chip-mini"
   defp parent_type_icon(type) when type in ["project", "projects"], do: "hero-folder-mini"
-  defp parent_type_icon(type) when type in ["task", "tasks"], do: "hero-clipboard-document-list-mini"
+
+  defp parent_type_icon(type) when type in ["task", "tasks"],
+    do: "hero-clipboard-document-list-mini"
+
   defp parent_type_icon(_), do: "hero-document-text-mini"
 
   defp parent_type_class(type) when type in ["session", "sessions"],
@@ -210,7 +214,9 @@ defmodule EyeInTheSkyWebWeb.Components.NotesList do
 
   def format_date(timestamp) when is_binary(timestamp) do
     case NaiveDateTime.from_iso8601(timestamp) do
-      {:ok, ndt} -> format_naive_date(ndt)
+      {:ok, ndt} ->
+        format_naive_date(ndt)
+
       _ ->
         case String.split(timestamp, [" ", "T"], parts: 2) do
           [date | _] -> date
@@ -228,10 +234,13 @@ defmodule EyeInTheSkyWebWeb.Components.NotesList do
     cond do
       Date.compare(date, today) == :eq ->
         Calendar.strftime(ndt, "Today at %H:%M")
+
       Date.compare(date, Date.add(today, -1)) == :eq ->
         "Yesterday"
+
       Date.diff(today, date) < 7 ->
         Calendar.strftime(ndt, "%a %b %d")
+
       true ->
         Calendar.strftime(ndt, "%b %d, %Y")
     end

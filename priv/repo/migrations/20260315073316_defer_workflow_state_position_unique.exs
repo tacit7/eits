@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.Repo.Migrations.DeferWorkflowStatePositionUnique do
 
   def down do
     execute "ALTER TABLE workflow_states DROP CONSTRAINT IF EXISTS workflow_states_position_unique"
+
     execute "CREATE UNIQUE INDEX IF NOT EXISTS workflow_states_position_index ON workflow_states (position)"
   end
 end

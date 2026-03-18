@@ -44,7 +44,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
 
           case Sessions.update_session(existing, update_attrs) do
             {:ok, updated} ->
-              Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, updated})
+              EyeInTheSkyWeb.Events.session_updated(updated)
 
               json(conn, %{
                 id: updated.id,
@@ -89,11 +89,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
 
             case create_fn.(session_attrs) do
               {:ok, session} ->
-                Phoenix.PubSub.broadcast(
-                  EyeInTheSkyWeb.PubSub,
-                  "agents",
-                  {:agent_updated, session}
-                )
+                EyeInTheSkyWeb.Events.session_started(session)
 
                 conn
                 |> put_status(:created)
@@ -108,7 +104,10 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
               {:error, changeset} ->
                 conn
                 |> put_status(:unprocessable_entity)
-                |> json(%{error: "Failed to create session", details: translate_errors(changeset)})
+                |> json(%{
+                  error: "Failed to create session",
+                  details: translate_errors(changeset)
+                })
             end
           else
             {:error, changeset} ->
@@ -157,18 +156,15 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
 
         case Sessions.update_session(session, attrs) do
           {:ok, updated} ->
-            # Only broadcast a status-change event when status is explicitly provided
             if status do
-              topic =
-                if status in ["completed", "failed", "waiting"] do
-                  {:agent_stopped, updated}
-                else
-                  {:agent_working, updated}
-                end
-
-              Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agent:working", topic)
+              if status in ["completed", "failed", "waiting", "stopped"] do
+                EyeInTheSkyWeb.Events.agent_stopped(updated)
+              else
+                EyeInTheSkyWeb.Events.agent_working(updated)
+              end
             end
-            Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, updated})
+
+            EyeInTheSkyWeb.Events.session_updated(updated)
 
             # Sync team member status when session completes/fails
             if status in ["completed", "failed"] do
@@ -236,17 +232,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
                 }
               })
 
-              Phoenix.PubSub.broadcast(
-                EyeInTheSkyWeb.PubSub,
-                "agent:working",
-                {:agent_working, session}
-              )
-
-              Phoenix.PubSub.broadcast(
-                EyeInTheSkyWeb.PubSub,
-                "session:#{session.id}",
-                {:tool_use, tool_name, tool_input}
-              )
+              EyeInTheSkyWeb.Events.agent_working(session)
+              EyeInTheSkyWeb.Events.session_tool_use(session.id, tool_name, tool_input)
 
             "post" ->
               input_json = Jason.encode!(tool_input)
@@ -264,11 +251,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
                 metadata: %{"stream_type" => "tool_result", "tool_name" => tool_name}
               })
 
-              Phoenix.PubSub.broadcast(
-                EyeInTheSkyWeb.PubSub,
-                "session:#{session.id}",
-                {:tool_result, tool_name, false}
-              )
+              EyeInTheSkyWeb.Events.session_tool_result(session.id, tool_name, false)
 
             _ ->
               nil
@@ -297,7 +280,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
         do: Keyword.put(opts, :project_id, parse_int(params["project_id"], nil)),
         else: opts
 
-    opts = if params["status"], do: Keyword.put(opts, :status_filter, params["status"]), else: opts
+    opts =
+      if params["status"], do: Keyword.put(opts, :status_filter, params["status"]), else: opts
 
     results = Sessions.list_sessions_filtered(opts) |> Enum.take(limit)
 
@@ -368,13 +352,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
 
         case Sessions.update_session(session, attrs) do
           {:ok, updated} ->
-            Phoenix.PubSub.broadcast(
-              EyeInTheSkyWeb.PubSub,
-              "agent:working",
-              {:agent_stopped, updated}
-            )
-
-            Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, updated})
+            EyeInTheSkyWeb.Events.agent_stopped(updated)
+            EyeInTheSkyWeb.Events.session_updated(updated)
 
             # Sync team member status on session end
             member_status = if status == "failed", do: "failed", else: "done"

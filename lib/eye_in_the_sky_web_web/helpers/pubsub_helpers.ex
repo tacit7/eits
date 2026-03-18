@@ -35,14 +35,12 @@ defmodule EyeInTheSkyWebWeb.Helpers.PubSubHelpers do
 
   ### `"agent:working"`
 
-  Broadcast by `SessionWorker` and `AgentWorker` on idle/active transitions.
+  Broadcast by `AgentWorker` on idle/active transitions.
 
   | Payload                                        | Broadcaster     | Meaning                     |
   |------------------------------------------------|-----------------|-----------------------------|
   | `{:agent_working, session_uuid, session_id}`   | `AgentWorker`   | SDK started processing      |
   | `{:agent_stopped, session_uuid, session_id}`   | `AgentWorker`   | SDK idle / error / done     |
-  | `{:agent_working, session_id, session_int_id}` | `SessionWorker` | Claude CLI started          |
-  | `{:agent_stopped, session_id, session_int_id}` | `SessionWorker` | Claude CLI stopped / error  |
 
   Subscribers: `subscribe_agent_working/0` — `ChatLive`, `DMLive`.
 
@@ -54,8 +52,8 @@ defmodule EyeInTheSkyWebWeb.Helpers.PubSubHelpers do
   | Payload                                       | Broadcaster            | Meaning                  |
   |-----------------------------------------------|------------------------|--------------------------|
   | `{:new_message, %Message{}}`                  | `Messages.Broadcaster` | New message polled from DB |
-  | `{:claude_response, session_ref, parsed}`     | `SessionWorker`        | Claude CLI output chunk  |
-  | `{:claude_complete, session_ref, exit_code}`  | `SessionWorker`        | Claude CLI process exited |
+  | `{:claude_response, session_ref, parsed}`     | `AgentWorker`          | Claude CLI output chunk  |
+  | `{:claude_complete, session_ref, exit_code}`  | `AgentWorker`          | Claude CLI process exited |
 
   Subscribers: `subscribe_session/1` — `DMLive`, `FabHook`.
 
@@ -65,9 +63,9 @@ defmodule EyeInTheSkyWebWeb.Helpers.PubSubHelpers do
 
   | Payload                                  | Broadcaster     |
   |------------------------------------------|-----------------|
-  | `{:session_status, session_id, status}`  | `SessionWorker` |
+  | `{:session_status, session_id, status}`  | `AgentWorker`   |
 
-  No helper wrapper; subscribe directly via `Phoenix.PubSub.subscribe/2`.
+  Use `EyeInTheSkyWeb.Events.subscribe_*` helpers.
 
   ### `"dm:<session_id>:stream"`
 
@@ -131,43 +129,29 @@ defmodule EyeInTheSkyWebWeb.Helpers.PubSubHelpers do
   | `{:member_updated, member}`| Member updated |
   | `{:member_left, member}`   | Member removed |
 
-  No helper wrapper; subscribe directly via `Phoenix.PubSub.subscribe/2`.
+  Use `EyeInTheSkyWeb.Events.subscribe_*` helpers.
   """
 
-  @pubsub EyeInTheSkyWeb.PubSub
+  alias EyeInTheSkyWeb.Events
 
   @doc "Subscribe to agent lifecycle events (created/updated/deleted)."
-  def subscribe_agents do
-    Phoenix.PubSub.subscribe(@pubsub, "agents")
-  end
+  def subscribe_agents, do: Events.subscribe_agents()
 
   @doc "Subscribe to agent working/stopped status events."
-  def subscribe_agent_working do
-    Phoenix.PubSub.subscribe(@pubsub, "agent:working")
-  end
+  def subscribe_agent_working, do: Events.subscribe_agent_working()
 
   @doc "Subscribe to task change events."
-  def subscribe_tasks do
-    Phoenix.PubSub.subscribe(@pubsub, "tasks")
-  end
+  def subscribe_tasks, do: Events.subscribe_tasks()
 
   @doc "Subscribe to session-specific events for the given session id."
-  def subscribe_session(session_id) do
-    Phoenix.PubSub.subscribe(@pubsub, "session:#{session_id}")
-  end
+  def subscribe_session(session_id), do: Events.subscribe_session(session_id)
 
   @doc "Subscribe to live-stream deltas for the given session id."
-  def subscribe_dm_stream(session_id) do
-    Phoenix.PubSub.subscribe(@pubsub, "dm:#{session_id}:stream")
-  end
+  def subscribe_dm_stream(session_id), do: Events.subscribe_dm_stream(session_id)
 
   @doc "Subscribe to the queued-prompt updates for the given session id."
-  def subscribe_dm_queue(session_id) do
-    Phoenix.PubSub.subscribe(@pubsub, "dm:#{session_id}:queue")
-  end
+  def subscribe_dm_queue(session_id), do: Events.subscribe_dm_queue(session_id)
 
   @doc "Subscribe to new messages broadcast on the given channel."
-  def subscribe_channel_messages(channel_id) do
-    Phoenix.PubSub.subscribe(@pubsub, "channel:#{channel_id}:messages")
-  end
+  def subscribe_channel_messages(channel_id), do: Events.subscribe_channel_messages(channel_id)
 end

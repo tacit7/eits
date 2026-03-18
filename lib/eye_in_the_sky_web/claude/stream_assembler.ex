@@ -63,7 +63,8 @@ defmodule EyeInTheSkyWeb.Claude.StreamAssembler do
         {:error, _} -> %{raw: raw}
       end
 
-    {%{stream | tool_id: nil, tool_name: nil, tool_input: ""}, [{:stream_tool_input, name, input}]}
+    {%{stream | tool_id: nil, tool_name: nil, tool_input: ""},
+     [{:stream_tool_input, name, input}]}
   end
 
   @doc """

@@ -289,16 +289,14 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
             phx-click="toggle_view_mode"
             phx-value-mode="list"
           >
-            <.icon name="hero-bars-3" class="w-4 h-4" />
-            List
+            <.icon name="hero-bars-3" class="w-4 h-4" /> List
           </button>
           <button
             class={"btn btn-sm" <> if @view_mode == :tree, do: " btn-active", else: ""}
             phx-click="toggle_view_mode"
             phx-value-mode="tree"
           >
-            <.icon name="hero-folder" class="w-4 h-4" />
-            Explore
+            <.icon name="hero-folder" class="w-4 h-4" /> Explore
           </button>
         </div>
       </div>
@@ -380,8 +378,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
                     patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
                     class="btn btn-sm btn-ghost"
                   >
-                    <.icon name="hero-arrow-left" class="w-4 h-4" />
-                    Back
+                    <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
                   </.link>
                 <% end %>
                 <div>
@@ -403,8 +400,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
                     patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
                     class="btn btn-sm btn-ghost mb-4"
                   >
-                    <.icon name="hero-arrow-left" class="w-4 h-4" />
-                    Back
+                    <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
                   </.link>
                 <% end %>
                 <h2 class="text-lg font-semibold text-base-content mb-2">
@@ -466,7 +462,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Files do
               <!-- Empty State -->
               <div class="flex items-center justify-center h-[calc(100dvh-20rem)]">
                 <div class="text-center">
-                  <.icon name="hero-document-text" class="w-16 h-16 mx-auto text-base-content/20 mb-4" />
+                  <.icon
+                    name="hero-document-text"
+                    class="w-16 h-16 mx-auto text-base-content/20 mb-4"
+                  />
                   <h3 class="text-lg font-semibold text-base-content/60 mb-2">No files</h3>
                   <p class="text-sm text-base-content/40">This directory is empty</p>
                 </div>

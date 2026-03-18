@@ -382,7 +382,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionReaderTest do
       assert content =~ "**/*.ex"
     end
 
-    test "formats Bash with truncation for long commands" do
+    test "formats Bash without truncation for long commands" do
       long_cmd = String.duplicate("a", 200)
 
       messages = [
@@ -407,9 +407,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionReaderTest do
       formatted = SessionReader.format_messages(messages)
       content = hd(formatted).content
       assert content =~ "`Bash`"
-      assert content =~ "..."
-      # Truncated to 121 chars + ...
-      assert String.length(content) < String.length(long_cmd)
+      assert content =~ long_cmd
     end
 
     test "formats Task with truncation" do

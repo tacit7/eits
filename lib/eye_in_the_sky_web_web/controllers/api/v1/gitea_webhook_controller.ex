@@ -14,7 +14,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
 
   require Logger
 
-  alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Agents.AgentManager
   alias EyeInTheSkyWeb.{Messages, Sessions}
 
   defp unauthorized(conn),
@@ -22,7 +22,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
 
   # PR opened -> spawn codex reviewer
   def handle(conn, %{"action" => "opened", "pull_request" => pr} = params) do
-    with :ok <- verify_signature(conn) do
+    with :ok <- verify_signature(conn),
+         {:ok, repo} <- require_repo(params),
+         {:ok, project_path} <- require_project_path() do
       event = get_req_header(conn, "x-gitea-event") |> List.first()
 
       if event in ["pull_request", "pull_request_sync"] do
@@ -32,7 +34,6 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
         pr_url = pr["html_url"] || ""
         # head.ref is the plain branch name; head.label is "owner:branch"
         head_branch = get_in(pr, ["head", "ref"]) || "unknown"
-        repo = get_in(params, ["repository", "full_name"]) || "claude/eits-web"
 
         Logger.info("Gitea webhook: PR ##{pr_number} opened - spawning codex reviewer")
 
@@ -43,7 +44,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
                agent_type: "codex",
                description: "PR Review: #{pr_title} (##{pr_number})",
                instructions: instructions,
-               project_path: "/Users/urielmaldonado/projects/eits/web"
+               project_path: project_path
              ) do
           {:ok, %{session: session}} ->
             Logger.info("Codex reviewer spawned for PR ##{pr_number}, session=#{session.uuid}")
@@ -65,19 +66,30 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
         json(conn, %{success: true, message: "Ignored: #{event} #{params["action"]}"})
       end
     else
-      {:error, :unauthorized} -> unauthorized(conn)
+      {:error, :unauthorized} ->
+        unauthorized(conn)
+
+      {:error, :missing_repo} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Missing repository.full_name in payload"})
+
+      {:error, :project_path_not_configured} ->
+        conn
+        |> put_status(:internal_server_error)
+        |> json(%{error: "Server misconfigured: project_path not set"})
     end
   end
 
   # PR comment by codex -> DM the claude session
   def handle(conn, %{"action" => "created", "comment" => comment, "issue" => issue} = params) do
-    with :ok <- verify_signature(conn) do
+    with :ok <- verify_signature(conn),
+         {:ok, repo} <- require_repo(params) do
       event = get_req_header(conn, "x-gitea-event") |> List.first()
       commenter = get_in(comment, ["user", "login"]) || ""
       pr_number = issue["number"]
       pr_body = get_in(issue, ["body"]) || ""
       comment_body = comment["body"] || ""
-      repo = get_in(params, ["repository", "full_name"]) || "claude/eits-web"
 
       is_pr = not is_nil(issue["pull_request"])
       is_codex = commenter == "codex"
@@ -97,7 +109,13 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
         json(conn, %{success: true, message: "Ignored: #{event} by #{commenter}"})
       end
     else
-      {:error, :unauthorized} -> unauthorized(conn)
+      {:error, :unauthorized} ->
+        unauthorized(conn)
+
+      {:error, :missing_repo} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Missing repository.full_name in payload"})
     end
   end
 
@@ -144,28 +162,47 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
     secret = Application.get_env(:eye_in_the_sky_web, :gitea_webhook_secret, "")
 
     cond do
-      secret == "" and Application.get_env(:eye_in_the_sky_web, :env, :prod) == :prod ->
-        Logger.error(
-          "Gitea webhook: GITEA_WEBHOOK_SECRET not set in production — rejecting request"
-        )
-
-        {:error, :unauthorized}
-
       secret == "" ->
-        Logger.warning("Gitea webhook: no secret configured, skipping signature check")
-        :ok
+        if Application.get_env(:eye_in_the_sky_web, :allow_unsigned_webhooks, false) do
+          Logger.warning("Gitea webhook: no secret configured, allowing unsigned (dev opt-in)")
+          :ok
+        else
+          Logger.error("Gitea webhook: GITEA_WEBHOOK_SECRET not set — rejecting unsigned request")
+
+          {:error, :unauthorized}
+        end
 
       true ->
         sig_header = get_req_header(conn, "x-gitea-signature") |> List.first()
         body = conn.assigns[:raw_body] || ""
         expected = :crypto.mac(:hmac, :sha256, secret, body) |> Base.encode16(case: :lower)
+        # Normalize: strip "sha256=" prefix if present so we compare raw hex to raw hex
+        normalized_sig = (sig_header || "") |> String.replace_prefix("sha256=", "")
 
-        if Plug.Crypto.secure_compare("sha256=#{expected}", sig_header || "") do
+        if Plug.Crypto.secure_compare(expected, normalized_sig) do
           :ok
         else
           Logger.warning("Gitea webhook: invalid signature")
           {:error, :unauthorized}
         end
+    end
+  end
+
+  defp require_repo(params) do
+    case get_in(params, ["repository", "full_name"]) do
+      nil -> {:error, :missing_repo}
+      repo -> {:ok, repo}
+    end
+  end
+
+  defp require_project_path do
+    case Application.get_env(:eye_in_the_sky_web, :project_path) do
+      nil ->
+        Logger.error("Gitea webhook: :project_path not configured in application env")
+        {:error, :project_path_not_configured}
+
+      path ->
+        {:ok, path}
     end
   end
 
@@ -214,11 +251,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.GiteaWebhookController do
 
         case Messages.create_message(attrs) do
           {:ok, msg} ->
-            Phoenix.PubSub.broadcast(
-              EyeInTheSkyWeb.PubSub,
-              "session:#{session.id}",
-              {:new_dm, msg}
-            )
+            EyeInTheSkyWeb.Events.session_new_dm(session.id, msg)
 
             Logger.info("DM sent to session #{session_uuid} for PR ##{pr_number} comment")
             json(conn, %{success: true, message: "Session notified"})

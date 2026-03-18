@@ -2,7 +2,8 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.{Agents, Channels, Messages, Projects, Prompts, Sessions}
-  alias EyeInTheSkyWeb.Claude.{AgentManager, ChannelProtocol}
+  alias EyeInTheSkyWeb.Agents.AgentManager
+  alias EyeInTheSkyWeb.Claude.ChannelProtocol
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
 
   # Deterministic UUIDs for the web UI user
@@ -131,6 +132,9 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     # Load channel members
     channel_members = load_channel_members(channel_id)
 
+    # Load all projects for the session drawer
+    all_projects = Projects.list_projects()
+
     # Load active sessions for @ autocomplete
     active_sessions =
       Sessions.list_active_sessions()
@@ -143,6 +147,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
           description: session.description,
           provider: session.provider || "claude",
           model: session.model,
+          project_id: session.project_id,
           agent_description:
             if(Ecto.assoc_loaded?(session.agent) && session.agent,
               do: session.agent.description,
@@ -151,8 +156,9 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         }
       end)
 
-    # Load all projects for the session drawer
-    all_projects = Projects.list_projects()
+    # Build project-grouped sessions for the "Add Agent" picker
+    session_search = socket.assigns[:session_search] || ""
+    sessions_by_project = build_sessions_by_project(channel_members, all_projects, session_search)
 
     socket =
       socket
@@ -169,8 +175,10 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       |> assign(:agent_templates, agent_templates)
       |> assign(:active_agents, active_sessions)
       |> assign(:channel_members, channel_members)
+      |> assign(:sessions_by_project, sessions_by_project)
       |> assign(:show_agent_drawer, false)
       |> assign(:show_members, false)
+      |> assign_new(:session_search, fn -> "" end)
       |> assign(:slash_items, EyeInTheSkyWebWeb.Helpers.SlashItems.build())
 
     {:noreply, socket}
@@ -197,11 +205,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
          }) do
       {:ok, message} ->
         # 2. Broadcast to channel PubSub
-        Phoenix.PubSub.broadcast(
-          EyeInTheSkyWeb.PubSub,
-          "channel:#{channel_id}:messages",
-          {:new_message, message}
-        )
+        EyeInTheSkyWeb.Events.channel_message(channel_id, message)
 
         # Mark channel as read
         Channels.mark_as_read(channel_id, session_id)
@@ -226,23 +230,24 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         agent_members = Channels.list_members(channel_id)
 
         # 5. Route message to each member using ChannelProtocol
+        # Only :direct and :broadcast trigger agent responses.
+        # :ambient messages are mirrored for context but don't ask the agent to respond.
         Enum.each(agent_members, fn member ->
           unless ChannelProtocol.skip?(member.session_id, session_id) do
             {mode, _mentioned_ids, _mention_all} =
               ChannelProtocol.parse_routing(body, member.session_id)
 
-            prompt = ChannelProtocol.build_prompt(mode, body)
-
             # Mirror the user message into the agent's session so DM page shows context
+            # Do NOT set channel_id — that would re-broadcast to the channel per member
             Messages.send_message(%{
               session_id: member.session_id,
-              channel_id: channel_id,
               sender_role: "user",
               recipient_role: "agent",
               provider: "claude",
               body: body
             })
 
+            prompt = ChannelProtocol.build_prompt(mode, body)
             Logger.info("Routing to session=#{member.session_id} mode=#{mode}")
 
             AgentManager.send_message(member.session_id, prompt,
@@ -252,9 +257,8 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
           end
         end)
 
-        # Reload channel members in assigns (in case auto-added)
-        channel_members = load_channel_members(channel_id)
-        {:noreply, assign(socket, :channel_members, channel_members)}
+        # Reload channel members + picker in case auto-added via @mention
+        {:noreply, refresh_members_and_picker(socket)}
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Failed to send message")}
@@ -286,11 +290,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
            body: body
          }) do
       {:ok, message} ->
-        Phoenix.PubSub.broadcast(
-          EyeInTheSkyWeb.PubSub,
-          "channel:#{channel_id}:messages",
-          {:new_message, message}
-        )
+        EyeInTheSkyWeb.Events.channel_message(channel_id, message)
 
         if target_session_id do
           prompt = ChannelProtocol.build_prompt(:direct, body)
@@ -326,17 +326,10 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
               body: "Agent @#{session_id} (#{session.name || "unnamed"}) joined the channel"
             })
 
-          Phoenix.PubSub.broadcast(
-            EyeInTheSkyWeb.PubSub,
-            "channel:#{channel_id}:messages",
-            {:new_message, sys_msg}
-          )
-
-          # Reload channel members
-          channel_members = load_channel_members(channel_id)
+          EyeInTheSkyWeb.Events.channel_message(channel_id, sys_msg)
           Logger.info("Added agent session=#{session_id} to channel=#{channel_id}")
 
-          {:noreply, assign(socket, :channel_members, channel_members)}
+          {:noreply, refresh_members_and_picker(socket)}
 
         {:error, changeset} ->
           Logger.warning("Failed to add member: #{inspect(changeset)}")
@@ -367,16 +360,11 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
           body: "Agent @#{session_id} (#{session.name || "unnamed"}) left the channel"
         })
 
-      Phoenix.PubSub.broadcast(
-        EyeInTheSkyWeb.PubSub,
-        "channel:#{channel_id}:messages",
-        {:new_message, sys_msg}
-      )
+      EyeInTheSkyWeb.Events.channel_message(channel_id, sys_msg)
 
       Logger.info("Removed agent session=#{session_id} from channel=#{channel_id}")
 
-      channel_members = load_channel_members(channel_id)
-      {:noreply, assign(socket, :channel_members, channel_members)}
+      {:noreply, refresh_members_and_picker(socket)}
     else
       _ ->
         {:noreply, put_flash(socket, :error, "Invalid session ID")}
@@ -415,11 +403,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
          }) do
       {:ok, message} ->
         # Broadcast to channel subscribers
-        Phoenix.PubSub.broadcast(
-          EyeInTheSkyWeb.PubSub,
-          "channel:#{channel_id}:messages",
-          {:new_message, message}
-        )
+        EyeInTheSkyWeb.Events.channel_message(channel_id, message)
 
         # Reload thread
         active_thread = load_thread(parent_id)
@@ -460,6 +444,21 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       |> serialize_messages()
 
     {:noreply, assign(socket, :messages, messages)}
+  end
+
+  @impl true
+  def handle_event("search_sessions", %{"session_search" => query}, socket) do
+    sessions_by_project =
+      build_sessions_by_project(
+        socket.assigns.channel_members,
+        socket.assigns.all_projects,
+        query
+      )
+
+    {:noreply,
+     socket
+     |> assign(:session_search, query)
+     |> assign(:sessions_by_project, sessions_by_project)}
   end
 
   @impl true
@@ -549,23 +548,17 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
                   body: "Agent @#{session.id} (#{agent_description}) joined the channel"
                 })
 
-              Phoenix.PubSub.broadcast(
-                EyeInTheSkyWeb.PubSub,
-                "channel:#{channel_id}:messages",
-                {:new_message, sys_msg}
-              )
+              EyeInTheSkyWeb.Events.channel_message(channel_id, sys_msg)
 
             {:error, _} ->
               :ok
           end
         end
 
-        channel_members = load_channel_members(channel_id)
-
         {:noreply,
          socket
          |> assign(:show_agent_drawer, false)
-         |> assign(:channel_members, channel_members)}
+         |> refresh_members_and_picker()}
 
       {:error, reason} ->
         {:noreply,
@@ -694,7 +687,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
                 phx-click="toggle_agent_drawer"
                 class="btn btn-xs btn-primary gap-1"
               >
-                <.icon name="hero-plus-mini" class="w-3 h-3" /> Agent
+                <.icon name="hero-plus-mini" class="w-3 h-3" /> New Agent
               </button>
             </div>
           </div>
@@ -709,6 +702,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
               </span>
             </div>
 
+            <%!-- Current channel members --%>
             <%= if @channel_members != [] do %>
               <div class="flex flex-wrap gap-1.5 mb-3">
                 <%= for member <- @channel_members do %>
@@ -740,22 +734,75 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
               </div>
             <% else %>
               <p class="text-xs text-base-content/30 mb-3">
-                No agents in this channel yet. Add one by session ID or spawn a new one.
+                No agents in this channel yet.
               </p>
             <% end %>
 
-            <%!-- Add agent by session ID --%>
-            <form phx-submit="add_agent_to_channel" class="flex gap-1.5" id="add-agent-form">
-              <input
-                type="text"
-                name="session_id"
-                placeholder="Session ID to add..."
-                class="flex-1 input input-xs bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 font-mono text-xs"
-                autocomplete="off"
-                id="add-agent-session-id"
-              />
-              <button type="submit" class="btn btn-xs btn-primary">Add</button>
-            </form>
+            <%!-- Add existing agent: searchable project-grouped picker --%>
+            <div class="border-t border-base-content/5 pt-2 mt-1">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-[10px] uppercase tracking-wider font-medium text-base-content/30">
+                  Add Agent
+                </span>
+              </div>
+              <form phx-change="search_sessions" class="mb-2">
+                <input
+                  type="text"
+                  name="session_search"
+                  value={@session_search}
+                  placeholder="Search sessions..."
+                  class="w-full input input-xs bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 text-xs"
+                  autocomplete="off"
+                  phx-debounce="200"
+                />
+              </form>
+              <%= if @sessions_by_project != [] do %>
+                <div class="max-h-48 overflow-y-auto space-y-2">
+                  <%= for group <- @sessions_by_project do %>
+                    <div>
+                      <span class="text-[10px] font-medium text-base-content/25 uppercase tracking-wider">
+                        {group.project_name}
+                      </span>
+                      <div class="flex flex-wrap gap-1 mt-0.5">
+                        <%= for session <- group.sessions do %>
+                          <button
+                            phx-click="add_agent_to_channel"
+                            phx-value-session_id={session.id}
+                            class="inline-flex items-center gap-1 font-mono text-[11px] px-2 py-0.5 rounded bg-base-content/[0.03] text-base-content/40 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
+                            title={"Add @#{session.id} to channel"}
+                          >
+                            <.icon name="hero-plus-mini" class="w-2.5 h-2.5 opacity-50" />
+                            @{session.id}
+                            <span class="text-base-content/25">
+                              {String.slice(session.name || session.agent_description || "", 0, 20)}{if String.length(
+                                                                                                          session.name ||
+                                                                                                            session.agent_description ||
+                                                                                                            ""
+                                                                                                        ) >
+                                                                                                          20,
+                                                                                                        do:
+                                                                                                          "…"}
+                            </span>
+                            <span class="text-[9px] text-base-content/15">{session.model}</span>
+                            <%= if session.ended_at do %>
+                              <span class="text-[9px] text-base-content/15">ended</span>
+                            <% end %>
+                          </button>
+                        <% end %>
+                      </div>
+                    </div>
+                  <% end %>
+                </div>
+              <% else %>
+                <p class="text-xs text-base-content/25 py-1">
+                  <%= if @session_search != "" do %>
+                    No sessions match "{@session_search}"
+                  <% else %>
+                    No available sessions
+                  <% end %>
+                </p>
+              <% end %>
+            </div>
           </div>
         <% end %>
       </div>
@@ -769,6 +816,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
               activeChannelId: @active_channel_id,
               messages: @messages,
               activeAgents: @active_agents,
+              channelMembers: @channel_members,
               workingAgents: @working_agents,
               slashItems: @slash_items
             }
@@ -891,6 +939,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
     %{
       id: message.id,
+      number: message.channel_message_number,
       session_id: message.session_id,
       session_name: session_name,
       sender_role: message.sender_role,
@@ -949,6 +998,58 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         session_uuid: session_data && session_data.uuid
       }
     end)
+  end
+
+  defp refresh_members_and_picker(socket) do
+    channel_id = socket.assigns.active_channel_id
+    channel_members = load_channel_members(channel_id)
+    search = socket.assigns[:session_search] || ""
+
+    sessions_by_project =
+      build_sessions_by_project(channel_members, socket.assigns.all_projects, search)
+
+    socket
+    |> assign(:channel_members, channel_members)
+    |> assign(:sessions_by_project, sessions_by_project)
+  end
+
+  defp build_sessions_by_project(channel_members, all_projects, search) do
+    member_session_ids = channel_members |> Enum.map(& &1.session_id) |> MapSet.new()
+    projects_by_id = Enum.into(all_projects, %{}, fn p -> {p.id, p} end)
+
+    all_sessions =
+      Sessions.list_sessions_filtered(
+        status_filter: "all",
+        search_query: search,
+        limit: 100
+      )
+
+    all_sessions
+    |> Enum.reject(fn s -> MapSet.member?(member_session_ids, s.id) end)
+    |> Enum.group_by(fn s -> s.project_id end)
+    |> Enum.map(fn {pid, sessions} ->
+      project = Map.get(projects_by_id, pid)
+
+      %{
+        project_id: pid,
+        project_name: if(project, do: project.name, else: "Unassigned"),
+        sessions:
+          Enum.map(sessions, fn s ->
+            %{
+              id: s.id,
+              name: s.name,
+              model: s.model,
+              ended_at: s.ended_at,
+              agent_description:
+                if(Ecto.assoc_loaded?(s.agent) && s.agent,
+                  do: s.agent.description,
+                  else: nil
+                )
+            }
+          end)
+      }
+    end)
+    |> Enum.sort_by(fn g -> g.project_name end)
   end
 
   defp serialize_prompts(prompts) do

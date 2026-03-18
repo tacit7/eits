@@ -79,6 +79,7 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
           {:ok, session} ->
             Sessions.update_session(session, %{name: name})
             socket
+
           _ ->
             socket
         end
@@ -98,7 +99,9 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
   def handle_event("archive_session", %{"session_id" => session_id}, socket) do
     with {:ok, session} <- Sessions.get_session(session_id),
          {:ok, _} <- Sessions.archive_session(session) do
-      sessions = Sessions.list_session_overview_rows(limit: socket.assigns.page * @per_page, offset: 0)
+      sessions =
+        Sessions.list_session_overview_rows(limit: socket.assigns.page * @per_page, offset: 0)
+
       total = Sessions.count_session_overview_rows()
 
       socket =
@@ -111,6 +114,28 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
       {:noreply, socket}
     else
       {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to archive session")}
+    end
+  end
+
+  @impl true
+  def handle_event("delete_session", %{"session_id" => session_id}, socket) do
+    with {:ok, session} <- Sessions.get_session(session_id),
+         {:ok, _} <- Sessions.delete_session(session) do
+      sessions =
+        Sessions.list_session_overview_rows(limit: socket.assigns.page * @per_page, offset: 0)
+
+      total = Sessions.count_session_overview_rows()
+
+      socket =
+        socket
+        |> assign(:has_more, length(sessions) < total)
+        |> assign(:total_sessions, total)
+        |> stream(:sessions, sessions, reset: true)
+        |> put_flash(:info, "Session deleted")
+
+      {:noreply, socket}
+    else
+      {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to delete session")}
     end
   end
 
@@ -129,11 +154,12 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
 
     project = EyeInTheSkyWeb.Projects.get_project!(project_id)
 
-    worktree = case params["worktree"] do
-      nil -> nil
-      "" -> nil
-      w -> w
-    end
+    worktree =
+      case params["worktree"] do
+        nil -> nil
+        "" -> nil
+        w -> w
+      end
 
     opts = [
       model: model,
@@ -146,7 +172,7 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
       worktree: worktree
     ]
 
-    case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
+    case EyeInTheSkyWeb.Agents.AgentManager.create_agent(opts) do
       {:ok, _result} ->
         sessions = Sessions.list_session_overview_rows(limit: @per_page, offset: 0)
         total = Sessions.count_session_overview_rows()
@@ -215,7 +241,18 @@ defmodule EyeInTheSkyWebWeb.SessionLive.Index do
                 project_name={session.project_name}
                 click_event="navigate_dm"
                 editing_session_id={@editing_session_id}
-              />
+              >
+                <:actions>
+                  <.icon_button
+                    icon="hero-archive-box-mini"
+                    on_click="archive_session"
+                    aria_label="Archive"
+                    color="warning"
+                    class="hidden sm:flex"
+                    values={%{"session_id" => session.id}}
+                  />
+                </:actions>
+              </.session_row>
             </div>
           </div>
         </div>

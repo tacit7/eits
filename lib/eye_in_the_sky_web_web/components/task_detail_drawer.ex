@@ -4,7 +4,9 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
   """
 
   use EyeInTheSkyWebWeb, :html
-  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1, is_overdue?: 1, is_due_today?: 1, format_date_input: 1]
+
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers,
+    only: [relative_time: 1, is_overdue?: 1, is_due_today?: 1, format_date_input: 1]
 
   attr :id, :string, required: true
   attr :show, :boolean, required: true
@@ -211,7 +213,10 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                     placeholder="Add item..."
                     class="input input-xs flex-1 bg-base-200 border-base-300 text-sm placeholder:text-base-content/20 focus:border-primary/30"
                   />
-                  <button type="submit" class="btn btn-xs btn-ghost text-base-content/30 hover:text-base-content/60">
+                  <button
+                    type="submit"
+                    class="btn btn-xs btn-ghost text-base-content/30 hover:text-base-content/60"
+                  >
                     <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
                   </button>
                 </form>
@@ -255,7 +260,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                 <%= if @task.agent_id do %>
                   <span class="font-mono">
                     <%= if is_list(@task.sessions) && @task.sessions != [] do %>
-                      <%= (List.first(@task.sessions).description || "Agent") |> String.slice(0..30) %>
+                      {(List.first(@task.sessions).description || "Agent") |> String.slice(0..30)}
                     <% else %>
                       Agent #{@task.agent_id}
                     <% end %>
@@ -277,7 +282,10 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                     class="w-full bg-base-200 border border-base-300 rounded-lg px-3 py-2 text-sm focus:border-primary/30 focus:outline-none resize-none"
                     required
                   ></textarea>
-                  <button type="submit" class="btn btn-sm btn-ghost text-xs self-end gap-1.5 text-base-content/50 hover:text-base-content/80">
+                  <button
+                    type="submit"
+                    class="btn btn-sm btn-ghost text-xs self-end gap-1.5 text-base-content/50 hover:text-base-content/80"
+                  >
                     <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> Add
                   </button>
                 </form>
@@ -299,7 +307,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
               </button>
               <div class="ml-auto flex items-center gap-1">
                 <%= if @copy_event && @projects != [] do %>
-                  <% other_projects = Enum.reject(@projects, & &1.id == @current_project_id) %>
+                  <% other_projects = Enum.reject(@projects, &(&1.id == @current_project_id)) %>
                   <%= if other_projects != [] do %>
                     <div class="dropdown dropdown-top dropdown-end">
                       <button
@@ -310,7 +318,10 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                       >
                         <.icon name="hero-document-duplicate" class="w-3.5 h-3.5" />
                       </button>
-                      <ul tabindex="0" class="dropdown-content menu p-1 shadow-lg bg-base-200 rounded-lg w-48 z-50">
+                      <ul
+                        tabindex="0"
+                        class="dropdown-content menu p-1 shadow-lg bg-base-200 rounded-lg w-48 z-50"
+                      >
                         <%= for project <- other_projects do %>
                           <li>
                             <button
@@ -342,6 +353,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                   phx-click={@delete_event}
                   phx-value-task_id={@task.uuid || to_string(@task.id)}
                   phx-confirm="Delete this task?"
+                  data-drawer-delete="true"
                   class="btn btn-sm btn-ghost text-xs text-error/50 hover:text-error hover:bg-error/10"
                 >
                   <.icon name="hero-trash" class="w-3.5 h-3.5" />

@@ -5,17 +5,8 @@
 set -uo pipefail
 
 # --- EITS Workflow Guard ---
-EITS_WORKFLOW="${EITS_WORKFLOW:-}"
-if [ -z "$EITS_WORKFLOW" ]; then
-  EITS_URL="${EITS_API_URL:-http://localhost:5000/api/v1}"
-  ENABLED=$(curl -sf "${EITS_URL}/settings/eits_workflow_enabled" 2>/dev/null | jq -r '.enabled' 2>/dev/null || echo "true")
-  [ "$ENABLED" = "false" ] && exit 0
-elif [ "$EITS_WORKFLOW" = "0" ]; then
-  exit 0
-fi
+[ "${EITS_WORKFLOW:-}" = "0" ] && exit 0
 # --- End Workflow Guard ---
-
-HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 input_json=$(timeout 2 cat 2>/dev/null) || exit 0
 [ -z "$input_json" ] && exit 0
@@ -56,7 +47,8 @@ if [ "$is_spawned" != "true" ]; then
   fi
 
   # Check for active EITS todo before allowing edits
-  if ! "$HOOK_DIR/sql/postgresql/check-active-todo.sh" "$session_id"; then
+  active_count=$(eits tasks list --session "$session_id" --state 2 2>/dev/null | jq -r '.tasks | length' 2>/dev/null || echo "0")
+  if [ "${active_count:-0}" -eq 0 ]; then
     jq -n \
       --arg reason "No active EITS todo for session $session_ref. Workflow: (1) eits tasks create --title \"Task\" (2) eits tasks start <id> (3) eits tasks update <id> --state 4 when done" \
       '{

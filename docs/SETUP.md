@@ -128,23 +128,51 @@ The REST API requires a bearer token. Generate one with:
 mix eits.gen.api_key
 ```
 
-Copy `.env.example` to `.env` and fill in the generated key:
+Copy `.env.example` to `.env` and fill in all required variables:
 
 ```bash
 cp .env.example .env
-# edit .env and set EITS_API_KEY
+# edit .env and set:
+# - EITS_API_KEY (generated above)
+# - VAPID_PRIVATE_KEY (for web push notifications)
 ```
+
+**Required environment variables for production:**
+
+| Variable | Source | Purpose |
+|----------|--------|---------|
+| `EITS_API_KEY` | `mix eits.gen.api_key` | REST API authentication |
+| `VAPID_PRIVATE_KEY` | Generate via `mix run -e '{pub, priv} = :crypto.generate_key(:ecdh, :prime256v1); IO.puts(Base.url_encode64(priv, padding: false))'` | Web push notifications (raises at startup if missing in prod) |
+| `VAPID_PUBLIC_KEY` | Same command above | Public key for service worker (optional in dev, defaults to committed value) |
 
 Phoenix loads `.env` automatically at startup via `dotenvy`.
 
-Also export the key in your shell so CLI scripts pick it up:
+Add both to `~/.zshrc` for persistence:
 
 ```bash
 export EITS_API_KEY="<generated-key>"
-export EITS_API_URL="https://eits.dev/api/v1"
+export EITS_URL="http://localhost:5000/api/v1"
 ```
 
-Add both to `~/.zshrc` for persistence.
+**Webhook configuration (optional for dev):**
+
+By default, unsigned Gitea webhooks are rejected in all environments. To allow unsigned webhooks in dev for testing:
+
+```elixir
+# config/dev.exs
+config :eye_in_the_sky_web, :allow_unsigned_webhooks, true
+```
+
+**Reverse proxy configuration (Tailscale, ngrok):**
+
+If you're accessing the app via a reverse proxy (Tailscale Funnel, ngrok, etc.), the `RemoteIp` plug needs to trust that proxy to correctly rewrite `X-Forwarded-For` headers.
+
+The app is configured to trust:
+- Loopback (127.0.0.1/8)
+- RFC 1918 private ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
+- Tailscale CGNAT (100.64.0.0/10) — for Tailscale Funnel and other Tailscale reverse proxies
+
+No additional configuration is needed for Tailscale. The CGNAT range is already configured in `endpoint.ex`.
 
 ## 9. PWA & Web Push (Optional)
 
@@ -179,7 +207,7 @@ The `scripts/eits` script provides shell access to the REST API.
 ```bash
 export PATH="$HOME/projects/eits/web/scripts:$PATH"
 export EITS_API_KEY="<generated-key>"
-export EITS_API_URL="https://eits.dev/api/v1"
+export EITS_URL="http://localhost:5000/api/v1"
 ```
 
 **Usage:**

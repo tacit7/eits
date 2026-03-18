@@ -1,7 +1,9 @@
 defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.{Teams, Tasks, Notes}
+  import EyeInTheSkyWebWeb.Components.SessionCard, only: [session_row: 1]
+
+  alias EyeInTheSkyWeb.{Teams, Tasks, Notes, Messages}
   alias EyeInTheSkyWeb.Tasks.WorkflowState
 
   @state_todo WorkflowState.todo_id()
@@ -12,7 +14,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "teams")
+      EyeInTheSkyWeb.Events.subscribe_teams()
     end
 
     {:ok,
@@ -24,7 +26,10 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
      |> assign(:teams, load_teams(false))
      |> assign(:selected_team_id, nil)
      |> assign(:selected_team, nil)
-     |> assign(:mobile_view, :list)}
+     |> assign(:mobile_view, :list)
+     |> assign(:selected_agent, nil)
+     |> assign(:agent_messages, [])
+     |> assign(:agent_session_id, nil)}
   end
 
   @impl true
@@ -37,20 +42,75 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   end
 
   @impl true
+  def handle_info({:new_message, message}, socket) do
+    if socket.assigns.agent_session_id && message.session_id == socket.assigns.agent_session_id do
+      {:noreply, assign(socket, :agent_messages, socket.assigns.agent_messages ++ [message])}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_event("select_team", %{"id" => id}, socket) do
     team_id = String.to_integer(id)
     team = Teams.get_team!(team_id) |> load_team_detail()
-    {:noreply, show_team_detail(socket, team_id, team)}
+    {:noreply, socket |> clear_agent_selection() |> show_team_detail(team_id, team)}
   end
 
   @impl true
   def handle_event("close_team", _params, socket) do
-    {:noreply, show_team_list(socket)}
+    {:noreply, socket |> clear_agent_selection() |> show_team_list()}
+  end
+
+  @impl true
+  def handle_event("select_agent", %{"id" => session_id_str}, socket) do
+    session_id = String.to_integer(session_id_str)
+
+    # Unsubscribe from previous session if switching agents
+    if socket.assigns.agent_session_id && socket.assigns.agent_session_id != session_id do
+      Phoenix.PubSub.unsubscribe(
+        EyeInTheSkyWeb.PubSub,
+        "session:#{socket.assigns.agent_session_id}"
+      )
+    end
+
+    if is_nil(socket.assigns.agent_session_id) || socket.assigns.agent_session_id != session_id do
+      EyeInTheSkyWeb.Events.subscribe_session(session_id)
+    end
+
+    messages = Messages.list_messages_for_session(session_id) |> Enum.take(-50)
+    member = Enum.find(socket.assigns.selected_team.members, &(&1.session_id == session_id))
+
+    {:noreply,
+     socket
+     |> assign(:selected_agent, member)
+     |> assign(:agent_messages, messages)
+     |> assign(:agent_session_id, session_id)}
+  end
+
+  @impl true
+  def handle_event("close_agent", _params, socket) do
+    {:noreply, clear_agent_selection(socket)}
+  end
+
+  # No-ops for session_row swipe actions (not applicable in teams context)
+  @impl true
+  def handle_event(event, _params, socket)
+      when event in [
+             "archive_session",
+             "rename_session",
+             "save_session_name",
+             "cancel_rename",
+             "toggle_select",
+             "noop"
+           ] do
+    {:noreply, socket}
   end
 
   @impl true
   def handle_event("toggle_archived", _params, socket) do
     show_archived = !socket.assigns.show_archived
+
     {:noreply,
      socket
      |> assign(:show_archived, show_archived)
@@ -70,28 +130,34 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="flex h-full gap-0 flex-col sm:flex-row">
+    <div class="flex h-full gap-0 flex-col">
       <%!-- Team list sidebar --%>
       <div class={[
-        "border-r border-base-300 flex flex-col flex-1 sm:flex-none w-full sm:w-72 sm:shrink-0",
-        @mobile_view == :detail && "hidden sm:flex"
+        "border-b border-base-300 flex flex-col flex-1 w-full",
+        @mobile_view == :detail && "hidden"
       ]}>
         <div class="px-4 py-3 border-b border-base-300 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <.icon name="hero-user-group" class="w-4 h-4 text-base-content/50" />
-            <span class="text-xs font-semibold uppercase tracking-widest text-base-content/60">Teams</span>
+            <span class="text-xs font-semibold uppercase tracking-widest text-base-content/60">
+              Teams
+            </span>
           </div>
           <div class="flex items-center gap-2">
             <button
               phx-click="toggle_archived"
-              class={["text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors",
-                if(@show_archived, do: "bg-base-content/10 text-base-content/60", else: "text-base-content/30 hover:text-base-content/50")
+              class={[
+                "text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors",
+                if(@show_archived,
+                  do: "bg-base-content/10 text-base-content/60",
+                  else: "text-base-content/30 hover:text-base-content/50"
+                )
               ]}
               title={if @show_archived, do: "Showing archived", else: "Show archived"}
             >
-              <%= if @show_archived, do: "archived", else: "archived" %>
+              {if @show_archived, do: "archived", else: "archived"}
             </button>
-            <span class="font-mono text-xs text-base-content/40"><%= length(@teams) %></span>
+            <span class="font-mono text-xs text-base-content/40">{length(@teams)}</span>
           </div>
         </div>
 
@@ -104,51 +170,36 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
               <p class="text-xs text-base-content/30">No active teams</p>
             </div>
           <% else %>
-            <div class="py-1">
+            <div class="space-y-px">
               <%= for team <- @teams do %>
-                <button
-                  class={[
-                    "w-full text-left px-3 py-2.5 group transition-colors relative",
-                    if(@selected_team_id == team.id,
-                      do: "bg-primary/10 border-l-2 border-l-primary",
-                      else: "hover:bg-base-200 border-l-2 border-l-transparent"
-                    )
-                  ]}
-                  phx-click="select_team"
-                  phx-value-id={team.id}
-                >
-                  <div class="flex items-start justify-between gap-2 mb-1">
-                    <span class={[
-                      "font-medium text-sm leading-tight truncate",
-                      @selected_team_id == team.id && "text-primary"
-                    ]}>
-                      <%= team.name %>
-                    </span>
-                    <div class="flex items-center gap-1 shrink-0 mt-0.5">
-                      <%= if team.status == "active" do %>
-                        <span class="relative flex h-1.5 w-1.5">
-                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
-                          <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-success"></span>
-                        </span>
-                      <% end %>
-                      <span class={["text-[10px] font-medium uppercase tracking-wide", status_text_class(team.status)]}>
-                        <%= team.status %>
+                <div class={[
+                  "relative overflow-hidden bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] border-l-2 pl-2",
+                  team_status_border(team.status),
+                  @selected_team_id == team.id && "ring-inset ring-1 ring-primary/30"
+                ]}>
+                  <div
+                    class="group flex items-center gap-3 py-3 px-2 cursor-pointer"
+                    phx-click="select_team"
+                    phx-value-id={team.id}
+                    role="button"
+                    tabindex="0"
+                  >
+                    <div class="flex-1 min-w-0">
+                      <span class="text-[13px] font-medium text-base-content/85 truncate block">
+                        {team.name}
                       </span>
+                      <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
+                        <span class="font-mono">{length(team.members)} members</span>
+                        <%= if active_member_count(team.members) > 0 do %>
+                          <span class="text-base-content/15">/</span>
+                          <span class="text-success/70">
+                            {active_member_count(team.members)} active
+                          </span>
+                        <% end %>
+                      </div>
                     </div>
                   </div>
-                  <div class="flex items-center gap-3 text-[11px] text-base-content/40">
-                    <span class="flex items-center gap-1">
-                      <.icon name="hero-users" class="w-3 h-3" />
-                      <%= length(team.members) %>
-                    </span>
-                    <%= if active_member_count(team.members) > 0 do %>
-                      <span class="flex items-center gap-1 text-success/70">
-                        <span class="w-1.5 h-1.5 rounded-full bg-success/70 inline-block"></span>
-                        <%= active_member_count(team.members) %> active
-                      </span>
-                    <% end %>
-                  </div>
-                </button>
+                </div>
               <% end %>
             </div>
           <% end %>
@@ -157,33 +208,123 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
 
       <%!-- Team detail panel --%>
       <div class={[
-        "flex-1 overflow-y-auto min-w-0 w-full",
+        "flex-1 min-w-0 w-full flex",
         @mobile_view == :list && "hidden sm:block"
       ]}>
-        <%= if @mobile_view == :detail do %>
-          <button
-            class="sm:hidden flex items-center gap-2 px-4 py-3 text-sm text-base-content/60 border-b border-base-300 w-full hover:bg-base-200"
-            phx-click="close_team"
-          >
-            <.icon name="hero-arrow-left" class="w-4 h-4" />
-            Teams
-          </button>
-        <% end %>
-        <%= if @selected_team do %>
-          <.team_detail team={@selected_team} />
-        <% else %>
-          <div class="flex items-center justify-center h-full">
-            <div class="text-center space-y-3">
-              <div class="w-16 h-16 rounded-2xl bg-base-200 flex items-center justify-center mx-auto">
-                <.icon name="hero-user-group" class="w-8 h-8 text-base-content/20" />
+        <%!-- Left: team detail --%>
+        <div class={[
+          "flex flex-col overflow-hidden",
+          @selected_agent && "w-1/2 border-r border-base-300",
+          !@selected_agent && "flex-1"
+        ]}>
+          <%= if @mobile_view == :detail do %>
+            <button
+              class="flex items-center gap-2 px-4 py-3 text-sm text-base-content/60 border-b border-base-300 w-full hover:bg-base-200 shrink-0"
+              phx-click="close_team"
+            >
+              <.icon name="hero-arrow-left" class="w-4 h-4" /> Teams
+            </button>
+          <% end %>
+          <div class="flex-1 overflow-y-auto">
+            <%= if @selected_team do %>
+              <.team_detail team={@selected_team} selected_agent_session_id={@agent_session_id} />
+            <% else %>
+              <div class="flex items-center justify-center h-full">
+                <div class="text-center space-y-3">
+                  <div class="w-16 h-16 rounded-2xl bg-base-200 flex items-center justify-center mx-auto">
+                    <.icon name="hero-user-group" class="w-8 h-8 text-base-content/20" />
+                  </div>
+                  <div>
+                    <p class="text-sm font-medium text-base-content/30">No team selected</p>
+                    <p class="text-xs text-base-content/20 mt-1">Choose a team from the list</p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p class="text-sm font-medium text-base-content/30">No team selected</p>
-                <p class="text-xs text-base-content/20 mt-1">Choose a team from the list</p>
+            <% end %>
+          </div>
+        </div>
+
+        <%!-- Right: agent messages pane --%>
+        <%= if @selected_agent do %>
+          <div class="w-1/2 flex flex-col overflow-hidden">
+            <div class="px-4 py-3 border-b border-base-300 flex items-center justify-between shrink-0">
+              <div class="flex items-center gap-2 min-w-0">
+                <div class={[
+                  "w-6 h-6 rounded-md shrink-0 flex items-center justify-center text-[10px] font-bold",
+                  member_avatar_class(@selected_agent.status)
+                ]}>
+                  {member_initials(@selected_agent.name)}
+                </div>
+                <span class="font-medium text-sm truncate">{@selected_agent.name}</span>
+                <span class={[
+                  "text-[10px] font-medium shrink-0",
+                  member_status_text(@selected_agent.status)
+                ]}>
+                  {@selected_agent.status}
+                </span>
               </div>
+              <button
+                phx-click="close_agent"
+                class="shrink-0 p-1 rounded hover:bg-base-200 text-base-content/40 hover:text-base-content/70 transition-colors"
+              >
+                <.icon name="hero-x-mark" class="w-4 h-4" />
+              </button>
             </div>
+
+            <%= if @agent_messages == [] do %>
+              <div class="flex-1 flex items-center justify-center">
+                <div class="text-center space-y-2">
+                  <.icon
+                    name="hero-chat-bubble-left-right"
+                    class="w-8 h-8 text-base-content/15 mx-auto"
+                  />
+                  <p class="text-sm text-base-content/30">No messages</p>
+                </div>
+              </div>
+            <% else %>
+              <div class="flex-1 overflow-y-auto px-3 py-3 space-y-3" id="agent-messages-panel">
+                <%= for message <- @agent_messages do %>
+                  <.agent_message message={message} />
+                <% end %>
+              </div>
+            <% end %>
           </div>
         <% end %>
+      </div>
+    </div>
+    """
+  end
+
+  defp agent_message(assigns) do
+    assigns = assign(assigns, :is_user, assigns.message.sender_role == "user")
+
+    ~H"""
+    <div class="flex items-start gap-2">
+      <%= if @is_user do %>
+        <div class="w-3.5 h-3.5 rounded-full mt-1 shrink-0 bg-success/20 flex items-center justify-center">
+          <div class="w-1 h-1 rounded-full bg-success" />
+        </div>
+      <% else %>
+        <div class="w-3.5 h-3.5 rounded-full mt-1 shrink-0 bg-primary/20 flex items-center justify-center">
+          <div class="w-1 h-1 rounded-full bg-primary" />
+        </div>
+      <% end %>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-baseline gap-2 mb-0.5">
+          <span class={[
+            "text-[11px] font-semibold",
+            @is_user && "text-success/80",
+            !@is_user && "text-primary/80"
+          ]}>
+            {if @is_user, do: "You", else: "Agent"}
+          </span>
+          <span class="text-[10px] text-base-content/25 font-mono">
+            {format_message_time(@message.inserted_at)}
+          </span>
+        </div>
+        <p class="text-xs text-base-content/70 whitespace-pre-wrap leading-relaxed break-words">
+          {truncate_message(@message.body, 500)}
+        </p>
       </div>
     </div>
     """
@@ -193,41 +334,47 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
     active_members = Enum.count(assigns.team.members, &(&1.status == "active"))
     done_tasks = Enum.count(assigns.team.tasks, &(&1.state_id == @state_done))
     total_tasks = length(assigns.team.tasks)
-    assigns = assign(assigns, active_members: active_members, done_tasks: done_tasks, total_tasks: total_tasks)
+
+    assigns =
+      assign(assigns,
+        active_members: active_members,
+        done_tasks: done_tasks,
+        total_tasks: total_tasks
+      )
 
     ~H"""
-    <div class="p-4 sm:p-6 max-w-4xl space-y-6">
+    <div class="p-4 max-w-4xl space-y-6">
       <%!-- Header --%>
       <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
           <div class="flex items-center flex-wrap gap-3 mb-1">
-            <h1 class="text-2xl font-bold text-base-content tracking-tight"><%= @team.name %></h1>
+            <h1 class="text-2xl font-bold text-base-content tracking-tight">{@team.name}</h1>
             <span class={["badge badge-sm font-medium", status_badge_class(@team.status)]}>
-              <%= @team.status %>
+              {@team.status}
             </span>
           </div>
           <%= if @team.description do %>
-            <p class="text-sm text-base-content/50"><%= @team.description %></p>
+            <p class="text-sm text-base-content/50">{@team.description}</p>
           <% end %>
         </div>
       </div>
 
       <%!-- Stats row --%>
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="grid grid-cols-2 gap-3">
         <div class="bg-base-200 rounded-lg px-4 py-3">
-          <div class="text-2xl font-bold font-mono text-base-content"><%= length(@team.members) %></div>
+          <div class="text-2xl font-bold font-mono text-base-content">{length(@team.members)}</div>
           <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Members</div>
         </div>
         <div class="bg-base-200 rounded-lg px-4 py-3">
-          <div class="text-2xl font-bold font-mono text-success"><%= @active_members %></div>
+          <div class="text-2xl font-bold font-mono text-success">{@active_members}</div>
           <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Active</div>
         </div>
         <div class="bg-base-200 rounded-lg px-4 py-3">
-          <div class="text-2xl font-bold font-mono text-base-content"><%= @total_tasks %></div>
+          <div class="text-2xl font-bold font-mono text-base-content">{@total_tasks}</div>
           <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Tasks</div>
         </div>
         <div class="bg-base-200 rounded-lg px-4 py-3">
-          <div class="text-2xl font-bold font-mono text-success"><%= @done_tasks %></div>
+          <div class="text-2xl font-bold font-mono text-success">{@done_tasks}</div>
           <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Completed</div>
         </div>
       </div>
@@ -237,13 +384,14 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
         <div class="space-y-1">
           <div class="flex items-center justify-between text-[11px] text-base-content/40">
             <span>Progress</span>
-            <span class="font-mono"><%= @done_tasks %>/<%= @total_tasks %></span>
+            <span class="font-mono">{@done_tasks}/{@total_tasks}</span>
           </div>
           <div class="h-1.5 bg-base-300 rounded-full overflow-hidden">
             <div
               class="h-full bg-success rounded-full transition-all"
               style={"width: #{Float.round(@done_tasks / @total_tasks * 100, 1)}%"}
-            ></div>
+            >
+            </div>
           </div>
         </div>
       <% end %>
@@ -251,62 +399,73 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
       <%!-- Members --%>
       <section>
         <div class="flex items-center gap-2 mb-3">
-          <h2 class="text-[11px] font-semibold text-base-content/50 uppercase tracking-widest">Members</h2>
+          <h2 class="text-[11px] font-semibold text-base-content/50 uppercase tracking-widest">
+            Members
+          </h2>
           <div class="h-px flex-1 bg-base-300"></div>
-          <span class="font-mono text-[11px] text-base-content/30"><%= length(@team.members) %></span>
+          <span class="font-mono text-[11px] text-base-content/30">{length(@team.members)}</span>
         </div>
 
         <div class="space-y-2">
           <%= for member <- @team.members do %>
-            <div class="rounded-lg bg-base-200 overflow-hidden">
-              <div class="flex items-center gap-3 p-3 hover:bg-base-300/60 transition-colors group">
-                <%!-- Avatar initials --%>
-                <div class={[
-                  "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
-                  member_avatar_class(member.status)
-                ]}>
-                  <%= member_initials(member.name) %>
-                </div>
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2">
-                    <span class="font-medium text-sm text-base-content truncate"><%= member.name %></span>
-                    <%= if member.role && member.role != "" do %>
-                      <span class="text-[10px] text-base-content/40 font-mono shrink-0"><%= member.role %></span>
-                    <% end %>
+            <div class={[
+              "rounded-lg overflow-hidden",
+              member.session_id && @selected_agent_session_id == member.session_id &&
+                "ring-1 ring-primary/40"
+            ]}>
+              <%= if member.session do %>
+                <.session_row
+                  session={member.session}
+                  click_event="select_agent"
+                  project_name={if member.role && member.role != "", do: member.role}
+                />
+              <% else %>
+                <%!-- Member without an associated session --%>
+                <div class="flex items-center gap-3 p-3 bg-base-200">
+                  <div class={[
+                    "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
+                    member_avatar_class(member.status)
+                  ]}>
+                    {member_initials(member.name)}
                   </div>
-                  <div class="flex items-center gap-2 mt-0.5">
-                    <span class={["w-1.5 h-1.5 rounded-full shrink-0", member_status_dot(member.status)]}></span>
-                    <span class={["text-[11px] font-medium", member_status_text(member.status)]}>
-                      <%= member.status %>
-                    </span>
+                  <div class="flex-1 min-w-0">
+                    <span class="font-medium text-sm text-base-content truncate">{member.name}</span>
+                    <div class="flex items-center gap-2 mt-0.5">
+                      <span class={[
+                        "w-1.5 h-1.5 rounded-full shrink-0",
+                        member_status_dot(member.status)
+                      ]}>
+                      </span>
+                      <span class={["text-[11px] font-medium", member_status_text(member.status)]}>
+                        {member.status}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <%= if member.session do %>
-                  <.link
-                    navigate={~p"/dm/#{member.session_id}"}
-                    class="sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-1 text-[10px] font-mono text-base-content/40 bg-base-content/5 px-2 py-1 rounded hover:text-base-content/60 transition-all shrink-0"
-                  >
-                    <%= String.slice(member.session.uuid || to_string(member.session_id), 0..7) %>
-                    <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
-                  </.link>
-                <% end %>
-              </div>
+              <% end %>
               <%!-- Per-member tasks --%>
               <%= if Map.get(member, :tasks, []) != [] do %>
-                <div class="border-t border-base-300/50 px-3 py-2 space-y-1">
+                <div class="border-t border-base-300/50 px-3 py-2 space-y-1 bg-base-200">
                   <%= for task <- member.tasks do %>
                     <div class="flex items-center gap-2">
-                      <div class={["w-1.5 h-1.5 rounded-full shrink-0", task_state_dot(task.state_id)]}></div>
+                      <div class={["w-1.5 h-1.5 rounded-full shrink-0", task_state_dot(task.state_id)]}>
+                      </div>
                       <%= if task.project_id do %>
-                        <.link navigate={~p"/projects/#{task.project_id}/tasks"} class="flex-1 text-xs text-base-content/70 truncate hover:text-base-content/90 hover:underline">
-                          <%= task.title %>
+                        <.link
+                          navigate={~p"/projects/#{task.project_id}/tasks"}
+                          class="flex-1 text-xs text-base-content/70 truncate hover:text-base-content/90 hover:underline"
+                        >
+                          {task.title}
                         </.link>
                       <% else %>
-                        <span class="flex-1 text-xs text-base-content/70 truncate"><%= task.title %></span>
+                        <span class="flex-1 text-xs text-base-content/70 truncate">{task.title}</span>
                       <% end %>
                       <%= if task.state do %>
-                        <span class={["text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0", task_state_chip(task.state_id)]}>
-                          <%= task.state.name %>
+                        <span class={[
+                          "text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0",
+                          task_state_chip(task.state_id)
+                        ]}>
+                          {task.state.name}
                         </span>
                       <% end %>
                     </div>
@@ -321,9 +480,13 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
       <%!-- Unowned Tasks --%>
       <section>
         <div class="flex items-center gap-2 mb-3">
-          <h2 class="text-[11px] font-semibold text-base-content/50 uppercase tracking-widest">Unassigned Tasks</h2>
+          <h2 class="text-[11px] font-semibold text-base-content/50 uppercase tracking-widest">
+            Unassigned Tasks
+          </h2>
           <div class="h-px flex-1 bg-base-300"></div>
-          <span class="font-mono text-[11px] text-base-content/30"><%= length(Map.get(@team, :unowned_tasks, [])) %></span>
+          <span class="font-mono text-[11px] text-base-content/30">
+            {length(Map.get(@team, :unowned_tasks, []))}
+          </span>
         </div>
 
         <%= if Map.get(@team, :unowned_tasks, []) == [] do %>
@@ -336,36 +499,45 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
             <%= for task <- @team.unowned_tasks do %>
               <div class="rounded-lg bg-base-200 overflow-hidden">
                 <div class="flex items-center gap-3 px-3 py-2.5 group">
-                  <div class={["w-1.5 h-1.5 rounded-full shrink-0", task_state_dot(task.state_id)]}></div>
+                  <div class={["w-1.5 h-1.5 rounded-full shrink-0", task_state_dot(task.state_id)]}>
+                  </div>
                   <%= if task.project_id do %>
-                    <.link navigate={~p"/projects/#{task.project_id}/tasks"} class="flex-1 text-sm text-base-content min-w-0 truncate hover:underline">
-                      <%= task.title %>
+                    <.link
+                      navigate={~p"/projects/#{task.project_id}/tasks"}
+                      class="flex-1 text-sm text-base-content min-w-0 truncate hover:underline"
+                    >
+                      {task.title}
                     </.link>
                   <% else %>
-                    <span class="flex-1 text-sm text-base-content min-w-0 truncate"><%= task.title %></span>
+                    <span class="flex-1 text-sm text-base-content min-w-0 truncate">
+                      {task.title}
+                    </span>
                   <% end %>
                   <div class="flex items-center gap-1.5 shrink-0">
                     <%= if Map.get(task, :notes, []) != [] do %>
                       <span class="flex items-center gap-1 text-[10px] text-base-content/40 font-mono">
                         <.icon name="hero-chat-bubble-left-ellipsis" class="w-3 h-3" />
-                        <%= length(task.notes) %>
+                        {length(task.notes)}
                       </span>
                     <% end %>
                     <%= if task.state do %>
-                      <span class={["text-[10px] font-medium px-1.5 py-0.5 rounded", task_state_chip(task.state_id)]}>
-                        <%= task.state.name %>
+                      <span class={[
+                        "text-[10px] font-medium px-1.5 py-0.5 rounded",
+                        task_state_chip(task.state_id)
+                      ]}>
+                        {task.state.name}
                       </span>
                     <% end %>
                     <%!-- Assign to member picker --%>
                     <select
-                      class="sm:opacity-0 sm:group-hover:opacity-100 text-[10px] bg-base-300 border-0 rounded px-1.5 py-0.5 text-base-content/60 cursor-pointer focus:outline-none transition-opacity"
+                      class="text-[10px] bg-base-300 border-0 rounded px-1.5 py-0.5 text-base-content/60 cursor-pointer focus:outline-none"
                       phx-change="assign_task"
                       phx-value-task-id={task.id}
                       name="session-id"
                     >
                       <option value="">Assign to...</option>
                       <%= for member <- Enum.filter(@team.members, & &1.session_id) do %>
-                        <option value={member.session_id}><%= member.name %></option>
+                        <option value={member.session_id}>{member.name}</option>
                       <% end %>
                     </select>
                   </div>
@@ -374,9 +546,9 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
                   <div class="border-t border-base-300/50 px-3 pb-2.5 pt-2 space-y-2">
                     <%= for note <- task.notes do %>
                       <div class="text-xs text-base-content/50 pl-3 border-l-2 border-base-content/10">
-                        <p class="whitespace-pre-wrap leading-relaxed"><%= note.body %></p>
+                        <p class="whitespace-pre-wrap leading-relaxed">{note.body}</p>
                         <span class="text-[10px] text-base-content/25 mt-1 block font-mono">
-                          <%= format_note_time(note.created_at) %>
+                          {format_note_time(note.created_at)}
                         </span>
                       </div>
                     <% end %>
@@ -400,7 +572,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   end
 
   defp load_team_detail(team) do
-    team = EyeInTheSkyWeb.Repo.preload(team, members: [:session])
+    team = EyeInTheSkyWeb.Repo.preload(team, members: [session: [:agent]])
 
     tasks =
       Tasks.list_tasks_for_team_with_sessions(team.id)
@@ -414,14 +586,18 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
         matched_sessions = Enum.filter(task.session_ids, &MapSet.member?(member_session_ids, &1))
 
         case matched_sessions do
-          [] -> acc
-          sids -> Enum.reduce(sids, acc, fn sid, a -> Map.update(a, sid, [task], &(&1 ++ [task])) end)
+          [] ->
+            acc
+
+          sids ->
+            Enum.reduce(sids, acc, fn sid, a -> Map.update(a, sid, [task], &(&1 ++ [task])) end)
         end
       end)
 
-    unowned_tasks = Enum.filter(tasks, fn t ->
-      Enum.empty?(Enum.filter(t.session_ids, &MapSet.member?(member_session_ids, &1)))
-    end)
+    unowned_tasks =
+      Enum.filter(tasks, fn t ->
+        Enum.empty?(Enum.filter(t.session_ids, &MapSet.member?(member_session_ids, &1)))
+      end)
 
     members_with_tasks =
       Enum.map(team.members, fn m ->
@@ -457,6 +633,20 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
     |> assign(:mobile_view, :list)
   end
 
+  defp clear_agent_selection(socket) do
+    if socket.assigns.agent_session_id do
+      Phoenix.PubSub.unsubscribe(
+        EyeInTheSkyWeb.PubSub,
+        "session:#{socket.assigns.agent_session_id}"
+      )
+    end
+
+    socket
+    |> assign(:selected_agent, nil)
+    |> assign(:agent_messages, [])
+    |> assign(:agent_session_id, nil)
+  end
+
   defp active_member_count(members), do: Enum.count(members, &(&1.status == "active"))
 
   defp member_initials(nil), do: "?"
@@ -470,8 +660,28 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
     |> String.upcase()
   end
 
-  defp format_note_time(nil), do: ""
+  defp truncate_message(nil, _), do: ""
 
+  defp truncate_message(body, max) when byte_size(body) > max do
+    String.slice(body, 0, max) <> "…"
+  end
+
+  defp truncate_message(body, _), do: body
+
+  defp format_message_time(nil), do: ""
+  defp format_message_time(%DateTime{} = dt), do: Calendar.strftime(dt, "%H:%M")
+  defp format_message_time(%NaiveDateTime{} = dt), do: Calendar.strftime(dt, "%H:%M")
+
+  defp format_message_time(str) when is_binary(str) do
+    case DateTime.from_iso8601(str) do
+      {:ok, dt, _} -> Calendar.strftime(dt, "%H:%M")
+      _ -> ""
+    end
+  end
+
+  defp format_message_time(_), do: ""
+
+  defp format_note_time(nil), do: ""
   defp format_note_time(%DateTime{} = dt), do: Calendar.strftime(dt, "%b %d, %H:%M")
   defp format_note_time(%NaiveDateTime{} = dt), do: Calendar.strftime(dt, "%b %d, %H:%M")
 
@@ -484,13 +694,12 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
 
   defp format_note_time(_), do: ""
 
+  defp team_status_border("active"), do: "border-success"
+  defp team_status_border(_), do: "border-transparent"
+
   defp status_badge_class("active"), do: "badge-success"
   defp status_badge_class("archived"), do: "badge-ghost"
   defp status_badge_class(_), do: "badge-neutral"
-
-  defp status_text_class("active"), do: "text-success"
-  defp status_text_class("archived"), do: "text-base-content/30"
-  defp status_text_class(_), do: "text-base-content/40"
 
   defp member_status_dot("active"), do: "bg-success"
   defp member_status_dot("idle"), do: "bg-warning"

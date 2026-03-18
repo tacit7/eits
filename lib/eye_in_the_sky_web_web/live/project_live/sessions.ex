@@ -194,9 +194,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
         |> assign(:visible_count, new_count)
         |> assign(:has_more, length(agents) > new_count)
 
-      socket = Enum.reduce(new_items, socket, fn agent, acc ->
-        stream_insert(acc, :session_list, agent)
-      end)
+      socket =
+        Enum.reduce(new_items, socket, fn agent, acc ->
+          stream_insert(acc, :session_list, agent)
+        end)
 
       {:noreply, socket}
     else
@@ -241,7 +242,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
       agent: params["agent"]
     ]
 
-    case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
+    case EyeInTheSkyWeb.Agents.AgentManager.create_agent(opts) do
       {:ok, _result} ->
         socket =
           socket
@@ -356,6 +357,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
           {:ok, session} ->
             Sessions.update_session(session, %{name: name})
             socket
+
           _ ->
             socket
         end
@@ -486,7 +488,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
             >
               <.icon name="hero-funnel-mini" class="w-4 h-4" />
               <%= if @session_filter != "all" || @sort_by != "last_message" do %>
-                <span class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full" aria-hidden="true"></span>
+                <span
+                  class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full"
+                  aria-hidden="true"
+                >
+                </span>
               <% end %>
             </button>
           </div>
@@ -525,7 +531,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
               </div>
 
               <fieldset class="mb-5">
-                <legend class="text-xs font-medium text-base-content/50 uppercase tracking-wider mb-2">Status</legend>
+                <legend class="text-xs font-medium text-base-content/50 uppercase tracking-wider mb-2">
+                  Status
+                </legend>
                 <div class="flex flex-wrap gap-2">
                   <%= for {label, filter} <- [
                     {"All", "all"},
@@ -550,7 +558,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
               </fieldset>
 
               <fieldset class="mb-6">
-                <legend class="text-xs font-medium text-base-content/50 uppercase tracking-wider mb-2">Sort by</legend>
+                <legend class="text-xs font-medium text-base-content/50 uppercase tracking-wider mb-2">
+                  Sort by
+                </legend>
                 <div class="flex flex-wrap gap-2">
                   <%= for {label, sort} <- [{"Last Message", "last_message"}, {"Created", "created"}, {"Name", "name"}, {"Status", "status"}] do %>
                     <button
@@ -633,11 +643,15 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
               phx-update="stream"
               class="divide-y divide-base-content/5 bg-base-200 rounded-xl px-4"
             >
-            <div
-              :for={{dom_id, agent} <- @streams.session_list}
-              id={dom_id}
-              class={if Map.get(@depths, agent.id, 0) > 0, do: "ml-5 border-l-2 border-primary/20 pl-3", else: ""}
-            >
+              <div
+                :for={{dom_id, agent} <- @streams.session_list}
+                id={dom_id}
+                class={
+                  if Map.get(@depths, agent.id, 0) > 0,
+                    do: "ml-5 border-l-2 border-primary/20 pl-3",
+                    else: ""
+                }
+              >
                 <.session_row
                   session={agent}
                   select_mode={@session_filter == "archived"}

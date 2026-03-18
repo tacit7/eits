@@ -1,58 +1,32 @@
 #!/usr/bin/env bash
-# Hook: Mark session as completed on SessionEnd
+# Hook: Mark session status on SessionEnd based on entrypoint
+# cli (spawned/print) → completed; cli_sdk (interactive) → waiting
 # Also moves any in-progress tasks linked to this session to In Review (state_id=4)
 set -uo pipefail
 
 # --- EITS Workflow Guard ---
-EITS_WORKFLOW="${EITS_WORKFLOW:-}"
-if [ -z "$EITS_WORKFLOW" ]; then
-  EITS_URL="${EITS_API_URL:-http://localhost:5000/api/v1}"
-  ENABLED=$(curl -sf "${EITS_URL}/settings/eits_workflow_enabled" 2>/dev/null | jq -r '.enabled' 2>/dev/null || echo "true")
-  [ "$ENABLED" = "false" ] && exit 0
-elif [ "$EITS_WORKFLOW" = "0" ]; then
-  exit 0
-fi
+[ "${EITS_WORKFLOW:-}" = "0" ] && exit 0
 # --- End Workflow Guard ---
 
-HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-EITS_PG_DB="${EITS_PG_DB:-eits_dev}"
-EITS_PG_USER="${EITS_PG_USER:-postgres}"
-EITS_PG_HOST="${EITS_PG_HOST:-localhost}"
-export PGPASSWORD="${EITS_PG_PASSWORD:-postgres}"
-_pgq() { psql -U "$EITS_PG_USER" -h "$EITS_PG_HOST" -d "$EITS_PG_DB" -t -A -c "$1" 2>/dev/null; }
-
-# Parse stdin JSON for session info
 input_json=$(timeout 2 cat 2>/dev/null) || exit 0
 [ -z "$input_json" ] && exit 0
 
-# Extract session_id from JSON input
 session_id=$(echo "$input_json" | jq -r '.session_id // empty' 2>/dev/null) || exit 0
 [ -z "$session_id" ] && exit 0
 
 # Move any in-progress tasks linked to this session to In Review (state_id=4)
-# This is a safety net in case the agent didn't do it manually
-_pgq "
-  UPDATE tasks t
-  SET state_id = 4, updated_at = NOW()
-  FROM task_sessions ts
-  JOIN sessions s ON s.id = ts.session_id
-  WHERE t.id = ts.task_id
-    AND s.uuid = '$session_id'
-    AND t.state_id = 2
-    AND t.archived = false
-" || true
+eits tasks list --session "$session_id" --state 2 2>/dev/null \
+  | jq -r '.tasks[]?.id' \
+  | while read -r task_id; do
+      eits tasks update "$task_id" --state 4 >/dev/null 2>&1 || true
+    done
 
-# Update session status to completed via eits CLI
-EITS_URL="${EITS_API_URL:-http://localhost:5000/api/v1}" eits sessions update "$session_id" --status completed >/dev/null 2>&1 || true
-
-# Clear entrypoint so the CLI icon disappears in the UI
-_curl() { curl -sf ${EITS_API_KEY:+-H "Authorization: Bearer ${EITS_API_KEY}"} "$@"; }
-_curl -X PATCH -H "Content-Type: application/json" \
-  -d '{"clear_entrypoint": true}' \
-  "${EITS_URL:-${EITS_API_URL:-http://localhost:5000/api/v1}}/sessions/${session_id}" >/dev/null 2>&1 || true
-
-# Publish to NATS
-"$HOOK_DIR/nats/publish-session-end.sh" "$session_id" "completed"
+# cli = spawned/print mode → completed; cli_sdk = interactive → waiting
+entrypoint="${CLAUDE_CODE_ENTRYPOINT:-}"
+if [ "$entrypoint" = "cli" ]; then
+  eits sessions update "$session_id" --status completed >/dev/null 2>&1 || true
+else
+  eits sessions update "$session_id" --status waiting >/dev/null 2>&1 || true
+fi
 
 exit 0

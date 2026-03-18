@@ -133,7 +133,7 @@ defmodule EyeInTheSkyWebWeb.NoteLive.Edit do
             parent_type_class(@note.parent_type)
           ]}>
             <.icon name={parent_type_icon(@note.parent_type)} class="w-2.5 h-2.5" />
-            <%= parent_type_label(@note.parent_type) %><%= context_suffix(@note) %>
+            {parent_type_label(@note.parent_type)}{context_suffix(@note)}
           </span>
         <% end %>
 
@@ -165,15 +165,15 @@ defmodule EyeInTheSkyWebWeb.NoteLive.Edit do
           data-body={@note.body || ""}
           data-return-to={@return_to}
           class="flex-1 overflow-hidden"
-        ></div>
+        >
+        </div>
       </div>
 
       <%!-- Status bar --%>
       <div class="flex items-center justify-between px-4 py-1 border-t border-base-content/8 bg-base-100 flex-shrink-0 text-[10px] text-base-content/35">
         <div class="flex items-center gap-4">
           <span class="flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-success inline-block"></span>
-            Markdown
+            <span class="w-1.5 h-1.5 rounded-full bg-success inline-block"></span> Markdown
           </span>
           <span id="note-editor-status">Ln 1, Col 1</span>
         </div>
@@ -221,7 +221,10 @@ defmodule EyeInTheSkyWebWeb.NoteLive.Edit do
   defp parent_type_icon(type) when type in ["session", "sessions"], do: "hero-clock-mini"
   defp parent_type_icon(type) when type in ["agent", "agents"], do: "hero-cpu-chip-mini"
   defp parent_type_icon(type) when type in ["project", "projects"], do: "hero-folder-mini"
-  defp parent_type_icon(type) when type in ["task", "tasks"], do: "hero-clipboard-document-list-mini"
+
+  defp parent_type_icon(type) when type in ["task", "tasks"],
+    do: "hero-clipboard-document-list-mini"
+
   defp parent_type_icon(_), do: "hero-document-text-mini"
 
   defp parent_type_class(type) when type in ["session", "sessions"],

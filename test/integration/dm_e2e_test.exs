@@ -5,16 +5,13 @@ defmodule EyeInTheSkyWeb.DME2ETest do
   NO MOCKS. Tests the complete DM flow:
   1. User sends DM to agent
   2. Message persisted to database
-  3. SessionManager receives the message
-  4. NATS publishes the message
-  5. Recipient can view the message
+  3. Recipient can view the message
   """
 
   use EyeInTheSkyWebWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
 
   alias EyeInTheSkyWeb.{Agents, Channels, Messages, Projects, Sessions}
-  alias EyeInTheSkyWeb.Claude.SessionManager
 
   @moduletag :integration
 
@@ -188,46 +185,6 @@ defmodule EyeInTheSkyWeb.DME2ETest do
       # Verify each has unique ID
       ids = Enum.map(sent_messages, & &1.id)
       assert length(Enum.uniq(ids)) == 3, "Each message should have unique ID"
-    end
-
-    test "DM to agent triggers SessionManager.resume_session",
-         %{conn: conn, recipient_session: recipient, channel: channel} do
-      {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
-
-      # Subscribe to recipient session status
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{recipient.uuid}:status")
-
-      # Send DM to agent (this automatically triggers their Claude session)
-      render_hook(view, "send_direct_message", %{
-        "session_id" => to_string(recipient.id),
-        "channel_id" => to_string(channel.id),
-        "body" => "Please help me with this task"
-      })
-
-      # Wait for SessionManager processing
-      Process.sleep(500)
-
-      # Check if worker was spawned for recipient session
-      registry = EyeInTheSkyWeb.Claude.Registry
-      workers = Registry.lookup(registry, {:session, recipient.uuid})
-
-      # Verify the DM was stored
-      messages = Messages.list_messages_for_channel(channel.id)
-
-      dm =
-        Enum.find(messages, fn m ->
-          String.contains?(m.body, "Please help me")
-        end)
-
-      assert dm, "DM should be stored in database"
-
-      # SessionManager should have been triggered (worker spawned or message queued)
-      # This is the E2E validation that ChatLive → SessionManager integration works
-      if length(workers) > 0 do
-        [{worker_pid, _}] = workers
-        assert Process.alive?(worker_pid), "Worker should be spawned for DM"
-        IO.puts("✓ SessionManager.resume_session triggered by DM")
-      end
     end
 
     test "DM with invalid recipient shows error",

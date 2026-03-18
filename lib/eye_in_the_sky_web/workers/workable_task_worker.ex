@@ -15,7 +15,7 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
   require Logger
 
   alias EyeInTheSkyWeb.{Repo, ScheduledJobs, Tasks}
-  alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Agents.AgentManager
   alias EyeInTheSkyWeb.Notifications
   alias EyeInTheSkyWeb.Workers.SpeakWorker
 
@@ -186,7 +186,7 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
   end
 
   defp broadcast do
-    Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "scheduled_jobs", :jobs_updated)
+    EyeInTheSkyWeb.Events.jobs_updated()
   end
 
   defp notify(output) do

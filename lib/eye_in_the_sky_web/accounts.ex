@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.Accounts do
   import Ecto.Query
 
   alias EyeInTheSkyWeb.Repo
-  alias EyeInTheSkyWeb.Accounts.{User, Passkey, RegistrationToken}
+  alias EyeInTheSkyWeb.Accounts.{User, Passkey, RegistrationToken, UserSession}
 
   # --- Users ---
 
@@ -48,17 +48,37 @@ defmodule EyeInTheSkyWeb.Accounts do
 
   # --- Registration tokens ---
 
-  def create_registration_token(username, ttl_minutes \\ 15) do
-    token = :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
-    expires_at = NaiveDateTime.add(NaiveDateTime.utc_now(), ttl_minutes * 60, :second)
+  defp hash_registration_token(raw_token) do
+    secret =
+      Application.get_env(:eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint)[:secret_key_base]
 
-    %RegistrationToken{}
-    |> RegistrationToken.changeset(%{token: token, username: username, expires_at: expires_at})
-    |> Repo.insert()
+    :crypto.mac(:hmac, :sha256, secret, raw_token) |> Base.url_encode64(padding: false)
   end
 
-  def peek_registration_token(token) do
-    case Repo.get_by(RegistrationToken, token: token) do
+  def create_registration_token(username, ttl_minutes \\ 15) do
+    raw_token = :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
+    hashed_token = hash_registration_token(raw_token)
+    expires_at = NaiveDateTime.add(NaiveDateTime.utc_now(), ttl_minutes * 60, :second)
+
+    result =
+      %RegistrationToken{}
+      |> RegistrationToken.changeset(%{
+        token: hashed_token,
+        username: username,
+        expires_at: expires_at
+      })
+      |> Repo.insert()
+
+    case result do
+      {:ok, rt} -> {:ok, raw_token, rt}
+      error -> error
+    end
+  end
+
+  def peek_registration_token(raw_token) do
+    hashed_token = hash_registration_token(raw_token)
+
+    case Repo.get_by(RegistrationToken, token: hashed_token) do
       nil ->
         {:error, :not_found}
 
@@ -69,8 +89,10 @@ defmodule EyeInTheSkyWeb.Accounts do
     end
   end
 
-  def consume_registration_token(token) do
-    case Repo.get_by(RegistrationToken, token: token) do
+  def consume_registration_token(raw_token) do
+    hashed_token = hash_registration_token(raw_token)
+
+    case Repo.get_by(RegistrationToken, token: hashed_token) do
       nil ->
         {:error, :not_found}
 
@@ -85,14 +107,52 @@ defmodule EyeInTheSkyWeb.Accounts do
     end
   end
 
+  # --- User Sessions ---
+
+  def create_user_session(user_id) do
+    token = :crypto.strong_rand_bytes(32) |> Base.encode16()
+    expires_at = NaiveDateTime.add(NaiveDateTime.utc_now(), 86_400 * 7, :second)
+
+    result =
+      %UserSession{}
+      |> UserSession.changeset(%{user_id: user_id, session_token: token, expires_at: expires_at})
+      |> Repo.insert()
+
+    case result do
+      {:ok, _} -> {:ok, token}
+      error -> error
+    end
+  end
+
+  def get_valid_user_session(token) when is_binary(token) do
+    case Repo.get_by(UserSession, session_token: token) do
+      nil ->
+        nil
+
+      session ->
+        if NaiveDateTime.compare(session.expires_at, NaiveDateTime.utc_now()) == :gt,
+          do: session,
+          else: nil
+    end
+  end
+
+  def delete_user_session(token) when is_binary(token) do
+    case Repo.get_by(UserSession, session_token: token) do
+      nil -> :ok
+      session -> Repo.delete(session) && :ok
+    end
+  end
+
   # Builds the allow_credentials list that wax_ expects for authentication:
   # [{credential_id_binary, cose_key_term}]
   def build_allowed_credentials(user_id) do
     user_id
     |> list_passkeys_for_user()
     |> Enum.map(fn pk ->
-      cose_key = :erlang.binary_to_term(pk.cose_key, [:safe])
+      cose_key = decode_cose_key(pk.cose_key)
       {pk.credential_id, cose_key}
     end)
   end
+
+  defp decode_cose_key(bin), do: :erlang.binary_to_term(bin, [:safe])
 end

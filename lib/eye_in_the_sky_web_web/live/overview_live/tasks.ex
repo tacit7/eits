@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "tasks")
+      EyeInTheSkyWeb.Events.subscribe_tasks()
     end
 
     workflow_states = Tasks.list_workflow_states()
@@ -109,12 +109,12 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
     state_id = parse_int(params["state_id"], 0)
 
     case Tasks.create_task(%{
-      title: title,
-      description: description,
-      state_id: if(state_id > 0, do: state_id, else: WorkflowState.todo_id()),
-      created_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-      updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
-    }) do
+           title: title,
+           description: description,
+           state_id: if(state_id > 0, do: state_id, else: WorkflowState.todo_id()),
+           created_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+           updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
+         }) do
       {:ok, _task} ->
         {:noreply,
          socket
@@ -216,7 +216,11 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
           >
             <.icon name="hero-funnel-mini" class="w-4 h-4" />
             <%= if !is_nil(@filter_state_id) do %>
-              <span class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full" aria-hidden="true"></span>
+              <span
+                class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full"
+                aria-hidden="true"
+              >
+              </span>
             <% end %>
           </button>
 

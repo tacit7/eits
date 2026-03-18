@@ -101,5 +101,4 @@ defmodule EyeInTheSkyWebWeb.Api.V1.CommitController do
         end
     end
   end
-
 end

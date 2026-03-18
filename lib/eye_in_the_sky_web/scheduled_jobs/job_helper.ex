@@ -109,12 +109,12 @@ defmodule EyeInTheSkyWeb.ScheduledJobs.JobHelper do
         case execute(job) do
           {:ok, output} ->
             ScheduledJobs.record_run_complete(run, "completed", result: output)
-            Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "scheduled_jobs", :jobs_updated)
+            EyeInTheSkyWeb.Events.jobs_updated()
             :ok
 
           {:error, reason} ->
             ScheduledJobs.record_run_complete(run, "failed", result: reason)
-            Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "scheduled_jobs", :jobs_updated)
+            EyeInTheSkyWeb.Events.jobs_updated()
             {:error, reason}
         end
       end

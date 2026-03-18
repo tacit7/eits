@@ -4,11 +4,19 @@ defmodule EyeInTheSkyWebWeb.AuthHook do
 
   alias EyeInTheSkyWeb.Accounts
 
+  # :env is set only in compile-time configs (config/dev.exs, config/test.exs);
+  # resolve it once at compile time rather than on every mount.
+  @env Application.compile_env(:eye_in_the_sky_web, :env, :prod)
+
   def on_mount(:default, params, session, socket),
     do: on_mount(:require_auth, params, session, socket)
 
   def on_mount(:require_auth, _params, session, socket) do
-    if Application.get_env(:eye_in_the_sky_web, :disable_auth, false) do
+    # :disable_auth is configured in runtime.exs via DISABLE_AUTH env var;
+    # must remain Application.get_env (resolved at startup, not compile time).
+    disable_auth = Application.get_env(:eye_in_the_sky_web, :disable_auth, false)
+
+    if disable_auth and @env != :prod do
       {:cont, assign(socket, :current_user, nil)}
     else
       case session["user_id"] do

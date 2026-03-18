@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Notes do
   import Ecto.Query, warn: false
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Notes.Note
-  alias EyeInTheSkyWeb.Search.FTS5
+  alias EyeInTheSkyWeb.Search.PgSearch
 
   @doc """
   Returns the list of notes.
@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.Notes do
     Enum.map(tasks, fn task ->
       notes =
         (Map.get(notes_by_parent, to_string(task.id), []) ++
-           if task.uuid, do: Map.get(notes_by_parent, task.uuid, []), else: [])
+           if(task.uuid, do: Map.get(notes_by_parent, task.uuid, []), else: []))
         |> Enum.uniq_by(& &1.id)
 
       task
@@ -200,32 +200,49 @@ defmodule EyeInTheSkyWeb.Notes do
   end
 
   @doc """
-  Search notes using FTS5.
-  Requires notes_fts FTS5 table in database.
+  Search notes using PostgreSQL full-text search.
+
+  Options:
+  - `:project_id` - restrict to notes parented to this project
+  - `:session_ids` - restrict to notes parented to these sessions
+  - `:starred` - when true, restrict to starred notes (pushed into query, not post-filtered)
+  - `:limit` - max results
   """
   def search_notes(query, agent_ids \\ [], opts \\ []) when is_binary(query) do
     agent_ids_str = Enum.map(agent_ids, &to_string/1)
+    project_id = Keyword.get(opts, :project_id)
+    project_id_str = if project_id, do: to_string(project_id), else: nil
+    session_ids_str = opts |> Keyword.get(:session_ids, []) |> Enum.map(&to_string/1)
+    starred_only = Keyword.get(opts, :starred, false)
+
+    has_scope = agent_ids_str != [] or project_id_str != nil or session_ids_str != []
+
+    scope_dynamic =
+      if has_scope, do: build_scope_dynamic(project_id_str, agent_ids_str, session_ids_str)
 
     extra_where =
-      if agent_ids_str != [] do
-        dynamic([n], n.parent_type == "agent" and n.parent_id in ^agent_ids_str)
+      case {scope_dynamic, starred_only} do
+        {nil, false} -> nil
+        {nil, true} -> dynamic([n], n.starred == 1)
+        {scope, false} -> scope
+        {scope, true} -> dynamic([n], ^scope and n.starred == 1)
       end
 
-    # Build SQL filter for agent_ids (params start at $2 since $1 is the search query)
+    {scope_sql, scope_params} =
+      if has_scope,
+        do: build_scope_sql(project_id_str, agent_ids_str, session_ids_str),
+        else: {"", []}
+
     {sql_filter, sql_params} =
-      if agent_ids_str != [] do
-        placeholders =
-          agent_ids_str
-          |> Enum.with_index(2)
-          |> Enum.map(fn {_, i} -> "$#{i}" end)
-          |> Enum.join(",")
-
-        {"AND n.parent_type = 'agent' AND n.parent_id IN (#{placeholders})", agent_ids_str}
+      if starred_only do
+        next_idx = length(scope_params) + 2
+        starred_clause = "AND n.starred = $#{next_idx}"
+        {scope_sql <> " " <> starred_clause, scope_params ++ [1]}
       else
-        {"", []}
+        {scope_sql, scope_params}
       end
 
-    FTS5.search_for(query,
+    PgSearch.search_for(query,
       table: "notes",
       schema: Note,
       search_columns: ["title", "body"],
@@ -236,4 +253,75 @@ defmodule EyeInTheSkyWeb.Notes do
       limit: Keyword.get(opts, :limit)
     )
   end
+
+  # Builds an Ecto dynamic OR filter across all parent types in scope.
+  defp build_scope_dynamic(project_id_str, agent_ids_str, session_ids_str) do
+    clauses =
+      []
+      |> maybe_add_dynamic(project_id_str != nil, fn ->
+        dynamic([n], n.parent_type in ["project", "projects"] and n.parent_id == ^project_id_str)
+      end)
+      |> maybe_add_dynamic(agent_ids_str != [], fn ->
+        dynamic([n], n.parent_type in ["agent", "agents"] and n.parent_id in ^agent_ids_str)
+      end)
+      |> maybe_add_dynamic(session_ids_str != [], fn ->
+        dynamic([n], n.parent_type in ["session", "sessions"] and n.parent_id in ^session_ids_str)
+      end)
+
+    Enum.reduce(clauses, fn clause, acc -> dynamic([n], ^acc or ^clause) end)
+  end
+
+  defp maybe_add_dynamic(list, false, _fun), do: list
+  defp maybe_add_dynamic(list, true, fun), do: list ++ [fun.()]
+
+  # Builds a raw SQL AND-clause and param list for the FTS query.
+  # Params are numbered starting at $2 (since $1 is the FTS search term).
+  defp build_scope_sql(project_id_str, agent_ids_str, session_ids_str) do
+    {clauses, params, _idx} =
+      {[], [], 2}
+      |> add_sql_clause(
+        project_id_str != nil,
+        fn {clauses, params, idx} ->
+          clause = "(n.parent_type IN ('project', 'projects') AND n.parent_id = $#{idx})"
+          {[clause | clauses], params ++ [project_id_str], idx + 1}
+        end
+      )
+      |> add_sql_clause(
+        agent_ids_str != [],
+        fn {clauses, params, idx} ->
+          placeholders =
+            agent_ids_str
+            |> Enum.with_index(idx)
+            |> Enum.map(fn {_, i} -> "$#{i}" end)
+            |> Enum.join(",")
+
+          clause = "(n.parent_type IN ('agent', 'agents') AND n.parent_id IN (#{placeholders}))"
+          {[clause | clauses], params ++ agent_ids_str, idx + length(agent_ids_str)}
+        end
+      )
+      |> add_sql_clause(
+        session_ids_str != [],
+        fn {clauses, params, idx} ->
+          placeholders =
+            session_ids_str
+            |> Enum.with_index(idx)
+            |> Enum.map(fn {_, i} -> "$#{i}" end)
+            |> Enum.join(",")
+
+          clause =
+            "(n.parent_type IN ('session', 'sessions') AND n.parent_id IN (#{placeholders}))"
+
+          {[clause | clauses], params ++ session_ids_str, idx + length(session_ids_str)}
+        end
+      )
+
+    if clauses == [] do
+      {"", []}
+    else
+      {"AND (" <> (clauses |> Enum.reverse() |> Enum.join(" OR ")) <> ")", params}
+    end
+  end
+
+  defp add_sql_clause(acc, false, _fun), do: acc
+  defp add_sql_clause(acc, true, fun), do: fun.(acc)
 end

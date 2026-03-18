@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with the Eye in the Sky 
 
 ## Project Overview
 
-Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky. MCP server is Anubis (HTTP MCP), not Go.
+Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky.
 
 This project uses Phoenix LiveView with Elixir. Primary languages: TypeScript, JavaScript, Elixir/HEEx, Go, Rust. Use Tailwind CSS for styling.
 
@@ -18,7 +18,8 @@ When using git worktrees, always verify you are editing files in the worktree di
 
 ```bash
 mix deps.get
-mix phx.server          # Start dev server on http://localhost:5001
+mix phx.server          # Start dev server on http://localhost:5000
+PORT=5002 mix phx.server # Override port via PORT env var (range 5000-5020)
 mix compile              # Compile only
 ```
 
@@ -33,6 +34,27 @@ After completing code changes, always run `mix compile --warnings-as-errors` to 
 ## Bug Fixes
 
 When fixing bugs, search the entire file for ALL occurrences of the problematic pattern before committing. Don't fix just the first occurrence.
+
+## Session Status Lifecycle
+
+Session status is driven by Claude Code hooks and explicit commands:
+
+| Status | Set by | Meaning |
+|--------|--------|---------|
+| `working` | `UserPromptSubmit` hook | Claude is processing a message |
+| `stopped` | `Stop` hook | Claude finished responding (resets to `working` on next message) |
+| `waiting` | `SessionEnd` hook (`cli_sdk`) | Interactive session ended; can be resumed |
+| `completed` | `SessionEnd` hook (`cli`) or `/i-end-session` | Spawned agent finished; or manually closed |
+| `failed` | `SessionWorker` on non-zero exit | Process crashed |
+
+`CLAUDE_CODE_ENTRYPOINT` distinguishes `cli` (spawned/print mode) from `cli_sdk` (interactive).
+
+**Task workflow — use `begin` to create and start in one shot:**
+```bash
+eits tasks begin --title "Task name"   # replaces: create + start
+eits tasks annotate <id> --body "..."
+eits tasks update <id> --state 4
+```
 
 ## REST API
 
@@ -61,7 +83,46 @@ PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. **T
 
 - `lib/eye_in_the_sky_web/` - Contexts (Sessions, Tasks, Agents, Projects, Notes, Prompts, Commits)
 - `lib/eye_in_the_sky_web_web/` - Web layer (LiveViews, components, router)
-- `lib/eye_in_the_sky_web/search/fts5.ex` - Full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback (module name is legacy from SQLite era)
+- `lib/eye_in_the_sky_web/search/pg_search.ex` - Full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback (`EyeInTheSkyWeb.Search.PgSearch`)
+
+## PubSub
+
+All PubSub broadcasting and subscribing goes through `EyeInTheSkyWeb.Events` (`lib/eye_in_the_sky_web/events.ex`). **Never call `Phoenix.PubSub.broadcast` or `Phoenix.PubSub.subscribe` directly** — use the named functions in Events.
+
+```elixir
+# GOOD
+EyeInTheSkyWeb.Events.agent_updated(agent)
+EyeInTheSkyWeb.Events.subscribe_session(session_id)
+
+# BAD
+Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, agent})
+Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session_id}")
+```
+
+Events owns all topic strings. If you need a new broadcast, add a named function to Events — don't hardcode a topic anywhere else. `EyeInTheSkyWebWeb.Helpers.PubSubHelpers` is a thin compatibility wrapper that delegates to Events; prefer calling Events directly in new code.
+
+## Documentation
+
+Project docs live in `docs/`. Key references:
+
+- [docs/SECURITY.md](docs/SECURITY.md) — Security architecture: auth, session handling, rate limiting, secrets, transport security
+- [docs/REST_API.md](docs/REST_API.md) — Full API endpoint reference
+- [docs/SETUP.md](docs/SETUP.md) — Project setup guide
+- [docs/CODE_GUIDELINES.md](docs/CODE_GUIDELINES.md) — Coding standards
+- [docs/EITS_CLI.md](docs/EITS_CLI.md) — CLI reference
+- [docs/EITS_HOOKS.md](docs/EITS_HOOKS.md) — Hook system
+- [docs/DM_FEATURES.md](docs/DM_FEATURES.md) — DM/messaging features
+- [docs/SESSION_MANAGER.md](docs/SESSION_MANAGER.md) — Session lifecycle
+- [docs/WORKERS.md](docs/WORKERS.md) — Background workers
+- [docs/KANBAN.md](docs/KANBAN.md) — Kanban board
+- [docs/COMMAND_PALETTE.md](docs/COMMAND_PALETTE.md) — Command palette
+- [docs/chat-mention-workflow.md](docs/chat-mention-workflow.md) — Chat @mention system
+- [docs/claude-cli-flags.md](docs/claude-cli-flags.md) — Claude CLI flag reference
+- [docs/CONTEXT_WINDOW.md](docs/CONTEXT_WINDOW.md) — Context window handling
+- [docs/SEARCH.md](docs/SEARCH.md) — Full-text search: PgSearch implementation, prefix-aware tsquery, callers
+- [docs/CODEX_SDK.md](docs/CODEX_SDK.md) — Codex SDK: session lifecycle, JSONL events, resume flow, env vars
+- [docs/CHAT.md](docs/CHAT.md) — Chat system: channels, routing protocol, @mentions, cross-project membership
+- [docs/EVENTS.md](docs/EVENTS.md) — PubSub Events module: all topics, payload shapes, subscribe helpers, how to add new events
 
 ## UI Standards
 
@@ -88,20 +149,11 @@ Common icons:
 - `hero-x-mark` - Close buttons
 - `hero-pencil-square` - Edit buttons
 
-### NATS Processing (Currently Disabled)
-
-NATS message processing is **currently disabled** to prevent duplicate messages. The following are disabled:
-- `JetStreamConsumer` - V1/V2 channel messages, DM handling all disabled
-- DM LiveView - NATS message handler disabled
-- SessionWorker - Result message saving disabled (only assistant messages saved)
-
-Original code is kept as comments for future re-enablement when proper deduplication is implemented.
-
 ### Full-Text Search
 
-`lib/eye_in_the_sky_web/search/fts5.ex` wraps PostgreSQL `tsvector/tsquery` full-text search with an ILIKE fallback. The module name is a legacy artifact from the SQLite era — it is not FTS5. Use `FTS5.search_for/2` for all full-text queries across sessions, tasks, and notes.
+`lib/eye_in_the_sky_web/search/pg_search.ex` (`EyeInTheSkyWeb.Search.PgSearch`) wraps PostgreSQL `tsvector/tsquery` full-text search with an ILIKE fallback. Use `PgSearch.search_for/2` for all full-text queries across sessions, tasks, and notes.
 
-**Helper Function: `FTS5.fts_name_description_match/1`**
+**Helper Function: `PgSearch.fts_name_description_match/1`**
 
 Extracts reusable tsvector query fragments for common search patterns across sessions, tasks, and notes. This helper:
 - Builds PostgreSQL `@@` operator queries on indexed columns

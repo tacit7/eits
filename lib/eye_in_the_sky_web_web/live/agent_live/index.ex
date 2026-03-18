@@ -101,7 +101,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                 User message: #{body}
                 """
 
-                EyeInTheSkyWeb.Claude.AgentManager.continue_session(
+                EyeInTheSkyWeb.Agents.AgentManager.continue_session(
                   session.id,
                   prompt_with_reminder,
                   model: "sonnet",
@@ -111,7 +111,10 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
                 {:noreply, socket}
 
               _ ->
-                Logger.warning("send_direct_message: agent #{session.agent_id} not found, message sent but session not continued")
+                Logger.warning(
+                  "send_direct_message: agent #{session.agent_id} not found, message sent but session not continued"
+                )
+
                 {:noreply, socket}
             end
 
@@ -250,6 +253,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
           {:ok, session} ->
             Sessions.update_session(session, %{name: name})
             socket
+
           _ ->
             socket
         end
@@ -330,7 +334,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       "create_new_session: model=#{model}, effort=#{inspect(effort_level)}, project_id=#{project.id}, project_path=#{project.path}"
     )
 
-    case EyeInTheSkyWeb.Claude.AgentManager.create_agent(opts) do
+    case EyeInTheSkyWeb.Agents.AgentManager.create_agent(opts) do
       {:ok, result} ->
         Logger.info(
           "create_new_session: agent created - agent_id=#{result.agent.id}, session_id=#{result.agent.id}, session_uuid=#{result.agent.uuid}"
@@ -461,7 +465,6 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
     """
   end
 
-
   # -- Render ---------------------------------------------------------------
 
   @impl true
@@ -474,7 +477,10 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
             {length(@agents)} agents
           </span>
           <div class="flex items-center gap-2">
-            <button phx-click="toggle_new_session_drawer" class="btn btn-sm btn-primary gap-1.5 min-h-0 h-7 text-xs">
+            <button
+              phx-click="toggle_new_session_drawer"
+              class="btn btn-sm btn-primary gap-1.5 min-h-0 h-7 text-xs"
+            >
               <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Agent
             </button>
             <label class="swap swap-rotate btn btn-ghost btn-xs btn-circle">
@@ -517,8 +523,13 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
               class="checkbox checkbox-xs checkbox-primary"
             />
             <%= if MapSet.size(@selected_ids) > 0 do %>
-              <span class="text-[11px] text-base-content/50 font-medium">{MapSet.size(@selected_ids)} selected</span>
-              <button phx-click="confirm_delete_selected" class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1">
+              <span class="text-[11px] text-base-content/50 font-medium">
+                {MapSet.size(@selected_ids)} selected
+              </span>
+              <button
+                phx-click="confirm_delete_selected"
+                class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1"
+              >
                 <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
               </button>
             <% else %>
@@ -529,7 +540,11 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
         <div class="mt-2 divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-4">
           <%= if @agents == [] do %>
-            <.empty_state id="agents-empty" title="No agents found" subtitle="Try adjusting your search or filters" />
+            <.empty_state
+              id="agents-empty"
+              title="No agents found"
+              subtitle="Try adjusting your search or filters"
+            />
           <% else %>
             <div :for={agent <- @agents}>
               <.session_row
@@ -602,11 +617,16 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       </div>
     </div>
 
-    <dialog id="delete-confirm-modal" class={"modal " <> if(@show_delete_confirm, do: "modal-open", else: "")}>
+    <dialog
+      id="delete-confirm-modal"
+      class={"modal " <> if(@show_delete_confirm, do: "modal-open", else: "")}
+    >
       <div class="modal-box max-w-sm">
         <h3 class="text-lg font-bold">Delete sessions</h3>
         <p class="py-4 text-sm text-base-content/70">
-          Permanently delete {MapSet.size(@selected_ids)} selected session{if MapSet.size(@selected_ids) != 1, do: "s"}? This cannot be undone.
+          Permanently delete {MapSet.size(@selected_ids)} selected session{if MapSet.size(
+                                                                                @selected_ids
+                                                                              ) != 1, do: "s"}? This cannot be undone.
         </p>
         <div class="modal-action">
           <button phx-click="cancel_delete_selected" class="btn btn-sm btn-ghost">Cancel</button>

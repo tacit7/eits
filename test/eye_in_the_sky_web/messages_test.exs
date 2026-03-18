@@ -148,7 +148,7 @@ defmodule EyeInTheSkyWeb.MessagesTest do
       #
       # Sequence:
       #   1. Session file sync imports message, assigns source_uuid from JSONL (no metadata)
-      #   2. session_worker calls record_incoming_reply with same source_uuid + usage data
+      #   2. record_incoming_reply called with same source_uuid + usage data
       #   3. record_incoming_reply finds the existing message and enriches its metadata
       #   4. Token count increases correctly
       session = create_session()
@@ -158,7 +158,7 @@ defmodule EyeInTheSkyWeb.MessagesTest do
       insert_message(session.id, source_uuid: source_uuid, body: "done")
       assert Messages.total_tokens_for_session(session.id) == 0
 
-      # Step 2: session_worker calls record_incoming_reply with usage metadata
+      # Step 2: record_incoming_reply called with usage metadata
       usage = %{"input_tokens" => 500, "output_tokens" => 200}
 
       {:ok, msg} =

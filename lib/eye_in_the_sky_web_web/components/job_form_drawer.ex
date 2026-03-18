@@ -8,18 +8,35 @@ defmodule EyeInTheSkyWebWeb.Components.JobFormDrawer do
   import EyeInTheSkyWebWeb.CoreComponents
   import EyeInTheSkyWebWeb.Live.Shared.JobsHelpers, only: [cfg: 2]
 
+  @common_timezones [
+    "Etc/UTC",
+    "US/Eastern",
+    "US/Central",
+    "US/Mountain",
+    "US/Pacific",
+    "US/Alaska",
+    "US/Hawaii",
+    "Europe/London",
+    "Europe/Paris",
+    "Europe/Berlin",
+    "Asia/Tokyo",
+    "Asia/Shanghai",
+    "Asia/Kolkata",
+    "Australia/Sydney",
+    "Pacific/Auckland"
+  ]
+
+  defp common_timezones, do: @common_timezones
+
   attr :show, :boolean, required: true
   attr :editing_job, :any, default: nil
   attr :changeset, :any, required: true
   attr :form_job_type, :string, required: true
   attr :form_schedule_type, :string, required: true
   attr :form_config, :map, required: true
-  # project_id: when set, injects a hidden job[project_id] input
   attr :project_id, :any, default: nil
-  # project + form_scope: when set, shows scope subtitle in header
   attr :project, :any, default: nil
   attr :form_scope, :string, default: nil
-  # show_daily_digest: enables the daily_digest job type option
   attr :show_daily_digest, :boolean, default: false
 
   def job_form_drawer(assigns) do
@@ -117,10 +134,18 @@ defmodule EyeInTheSkyWebWeb.Components.JobFormDrawer do
 
             <div class="form-control">
               <label class="label">
-                <span class="label-text">
+                <span class="label-text flex items-center gap-1">
                   {if @form_schedule_type == "interval",
                     do: "Interval (seconds)",
                     else: "Cron Expression"}
+                  <%= if @form_schedule_type == "cron" do %>
+                    <span
+                      class="tooltip tooltip-bottom cursor-help"
+                      data-tip="minute (0-59)  hour (0-23)  day-of-month (1-31)  month (1-12)  day-of-week (0-6, Sun=0)&#10;&#10;Examples:&#10;*/5 * * * *  = every 5 min&#10;0 9 * * 1-5  = 9 AM weekdays&#10;0 0 1 * *    = midnight, 1st of month"
+                    >
+                      <.icon name="hero-question-mark-circle" class="w-4 h-4 text-base-content/40" />
+                    </span>
+                  <% end %>
                 </span>
               </label>
               <input
@@ -132,6 +157,25 @@ defmodule EyeInTheSkyWebWeb.Components.JobFormDrawer do
                 required
               />
             </div>
+
+            <%= if @form_schedule_type == "cron" do %>
+              <div class="form-control">
+                <label class="label"><span class="label-text">Timezone</span></label>
+                <select name="job[timezone]" class="select select-bordered w-full">
+                  <%= for tz <- common_timezones() do %>
+                    <option
+                      value={tz}
+                      selected={
+                        (@editing_job && @editing_job.timezone) == tz ||
+                          (is_nil(@editing_job) && tz == "Etc/UTC")
+                      }
+                    >
+                      {tz}
+                    </option>
+                  <% end %>
+                </select>
+              </div>
+            <% end %>
 
             <%= if @form_job_type == "shell_command" do %>
               <div class="form-control">

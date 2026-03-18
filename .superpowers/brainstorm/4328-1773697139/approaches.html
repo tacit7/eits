@@ -1,0 +1,40 @@
+<h2>Agent Cron Scheduling — Pick an approach</h2>
+<p class="subtitle">How should users create scheduled agent runs? Pick the one that fits your mental model best.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Enhance existing Job form</h3>
+      <p>When job type = "Spawn Agent", replace the free-text instructions field with an <strong>agent template picker</strong> (dropdown of saved prompts). Still lives inside the current job drawer. Minimal change, maximum reuse.</p>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>Pros</h4><ul><li>No new pages</li><li>Works in both global + project job views</li><li>Consistent with how other job types work</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Drawer is already getting tall</li><li>Agent-specific context is buried in a generic form</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Dedicated "Agent Scheduler" tab/page</h3>
+      <p>A first-class page (or tab inside Jobs) specifically for scheduling agents. Shows <strong>agent cards</strong> with a schedule button. Scheduling opens a stripped-down form: just schedule + model, with the agent/project already locked in.</p>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>Pros</h4><ul><li>Clean agent-centric UX</li><li>Surfaced as its own feature, not buried in job types</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>New page/route needed</li><li>Duplicates some job management UI</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>"Schedule this agent" from Prompts page</h3>
+      <p>Add a <strong>Schedule button</strong> directly on each prompt card in the existing Prompts UI. Clicking it pre-fills a job creation form with that agent's instructions and project, so the user just picks a schedule and saves.</p>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>Pros</h4><ul><li>Contextual — schedule from where you manage agents</li><li>Least new code</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Discoverability — user has to go to Prompts to create a job</li><li>Doesn't help from the Jobs page</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

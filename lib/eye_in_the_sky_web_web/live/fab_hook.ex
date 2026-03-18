@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWebWeb.FabHook do
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSkyWeb.{Messages, Sessions}
-  alias EyeInTheSkyWeb.Claude.AgentManager
+  alias EyeInTheSkyWeb.Agents.AgentManager
 
   require Logger
 
@@ -16,7 +16,7 @@ defmodule EyeInTheSkyWebWeb.FabHook do
 
   def on_mount(:default, _params, _session, socket) do
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "notifications")
+      EyeInTheSkyWeb.Events.subscribe_notifications()
     end
 
     socket =
@@ -81,18 +81,20 @@ defmodule EyeInTheSkyWebWeb.FabHook do
       case resolve_session(session_id) do
         {:ok, session} ->
           socket = unsubscribe_config_guide_session(socket)
-          Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session.id}")
+          EyeInTheSkyWeb.Events.subscribe_session(session.id)
           socket = assign(socket, :config_guide_active_session_id, session.id)
 
           messages =
             Messages.list_recent_messages(session.id, 20)
-            |> Enum.map(&%{
-              id: &1.id,
-              session_id: &1.session_id,
-              body: &1.body,
-              sender_role: &1.sender_role,
-              inserted_at: to_string(&1.inserted_at)
-            })
+            |> Enum.map(
+              &%{
+                id: &1.id,
+                session_id: &1.session_id,
+                body: &1.body,
+                sender_role: &1.sender_role,
+                inserted_at: to_string(&1.inserted_at)
+              }
+            )
 
           push_event(socket, "config_guide_history", %{messages: messages})
 
@@ -185,7 +187,7 @@ defmodule EyeInTheSkyWebWeb.FabHook do
     socket = unsubscribe_active_session(socket)
 
     if socket.assigns.fab_active_session_id != session_id do
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session_id}")
+      EyeInTheSkyWeb.Events.subscribe_session(session_id)
     end
 
     assign(socket, :fab_active_session_id, session_id)

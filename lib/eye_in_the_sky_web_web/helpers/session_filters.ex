@@ -68,7 +68,10 @@ defmodule EyeInTheSkyWebWeb.Helpers.SessionFilters do
   def filter_agents_by_status(sessions, filter) do
     case filter do
       "active" ->
-        Enum.filter(sessions, &(&1.status in ["working", "idle", nil] and is_nil(&1.archived_at)))
+        Enum.filter(
+          sessions,
+          &(&1.status in ["working", "idle", "stopped", nil] and is_nil(&1.archived_at))
+        )
 
       "completed" ->
         Enum.filter(sessions, &(&1.status == "completed" and is_nil(&1.archived_at)))
@@ -94,7 +97,10 @@ defmodule EyeInTheSkyWebWeb.Helpers.SessionFilters do
         haystack =
           [
             s.uuid,
+            s.id,
             s.name,
+            s.agent && s.agent.uuid,
+            s.agent && s.agent.id,
             s.agent && s.agent.description,
             s.agent && s.agent.project_name
           ]

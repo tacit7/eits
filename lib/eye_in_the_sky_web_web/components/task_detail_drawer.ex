@@ -342,6 +342,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskDetailDrawer do
                   phx-click={@delete_event}
                   phx-value-task_id={@task.uuid || to_string(@task.id)}
                   phx-confirm="Delete this task?"
+                  data-drawer-delete="true"
                   class="btn btn-sm btn-ghost text-xs text-error/50 hover:text-error hover:bg-error/10"
                 >
                   <.icon name="hero-trash" class="w-3.5 h-3.5" />

@@ -196,7 +196,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.TasksFilterTest do
       view |> element(~s|button[aria-label="Open filters"]|) |> render_click()
 
       view
-      |> element(~s|#overview-tasks-filter-sheet button[phx-value-state="3"]|)
+      |> element(~s|#overview-tasks-filter-sheet button[phx-value-state_id="3"]|)
       |> render_click()
 
       html = render(view)

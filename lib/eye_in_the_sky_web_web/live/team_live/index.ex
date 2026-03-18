@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   use EyeInTheSkyWebWeb, :live_view
 
+  import EyeInTheSkyWebWeb.Components.SessionCard, only: [session_row: 1]
+
   alias EyeInTheSkyWeb.{Teams, Tasks, Notes, Messages}
   alias EyeInTheSkyWeb.Tasks.WorkflowState
 
@@ -61,7 +63,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   end
 
   @impl true
-  def handle_event("select_agent", %{"session-id" => session_id_str}, socket) do
+  def handle_event("select_agent", %{"id" => session_id_str}, socket) do
     session_id = String.to_integer(session_id_str)
 
     # Unsubscribe from previous session if switching agents
@@ -86,6 +88,13 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   @impl true
   def handle_event("close_agent", _params, socket) do
     {:noreply, clear_agent_selection(socket)}
+  end
+
+  # No-ops for session_row swipe actions (not applicable in teams context)
+  @impl true
+  def handle_event(event, _params, socket)
+      when event in ["archive_session", "rename_session", "save_session_name", "cancel_rename", "toggle_select", "noop"] do
+    {:noreply, socket}
   end
 
   @impl true
@@ -144,51 +153,34 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
               <p class="text-xs text-base-content/30">No active teams</p>
             </div>
           <% else %>
-            <div class="py-1">
+            <div class="space-y-px">
               <%= for team <- @teams do %>
-                <button
-                  class={[
-                    "w-full text-left px-3 py-2.5 group transition-colors relative",
-                    if(@selected_team_id == team.id,
-                      do: "bg-primary/10 border-l-2 border-l-primary",
-                      else: "hover:bg-base-200 border-l-2 border-l-transparent"
-                    )
-                  ]}
-                  phx-click="select_team"
-                  phx-value-id={team.id}
-                >
-                  <div class="flex items-start justify-between gap-2 mb-1">
-                    <span class={[
-                      "font-medium text-sm leading-tight truncate",
-                      @selected_team_id == team.id && "text-primary"
-                    ]}>
-                      <%= team.name %>
-                    </span>
-                    <div class="flex items-center gap-1 shrink-0 mt-0.5">
-                      <%= if team.status == "active" do %>
-                        <span class="relative flex h-1.5 w-1.5">
-                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
-                          <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-success"></span>
-                        </span>
-                      <% end %>
-                      <span class={["text-[10px] font-medium uppercase tracking-wide", status_text_class(team.status)]}>
-                        <%= team.status %>
+                <div class={[
+                  "relative overflow-hidden bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] border-l-2 pl-2",
+                  team_status_border(team.status),
+                  @selected_team_id == team.id && "ring-inset ring-1 ring-primary/30"
+                ]}>
+                  <div
+                    class="group flex items-center gap-3 py-3 px-2 cursor-pointer"
+                    phx-click="select_team"
+                    phx-value-id={team.id}
+                    role="button"
+                    tabindex="0"
+                  >
+                    <div class="flex-1 min-w-0">
+                      <span class="text-[13px] font-medium text-base-content/85 truncate block">
+                        <%= team.name %>
                       </span>
+                      <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
+                        <span class="font-mono"><%= length(team.members) %> members</span>
+                        <%= if active_member_count(team.members) > 0 do %>
+                          <span class="text-base-content/15">/</span>
+                          <span class="text-success/70"><%= active_member_count(team.members) %> active</span>
+                        <% end %>
+                      </div>
                     </div>
                   </div>
-                  <div class="flex items-center gap-3 text-[11px] text-base-content/40">
-                    <span class="flex items-center gap-1">
-                      <.icon name="hero-users" class="w-3 h-3" />
-                      <%= length(team.members) %>
-                    </span>
-                    <%= if active_member_count(team.members) > 0 do %>
-                      <span class="flex items-center gap-1 text-success/70">
-                        <span class="w-1.5 h-1.5 rounded-full bg-success/70 inline-block"></span>
-                        <%= active_member_count(team.members) %> active
-                      </span>
-                    <% end %>
-                  </div>
-                </button>
+                </div>
               <% end %>
             </div>
           <% end %>
@@ -198,7 +190,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
       <%!-- Team detail panel --%>
       <div class={[
         "flex-1 min-w-0 w-full flex",
-        @mobile_view == :list && "hidden"
+        @mobile_view == :list && "hidden sm:block"
       ]}>
         <%!-- Left: team detail --%>
         <div class={[
@@ -384,52 +376,38 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
         <div class="space-y-2">
           <%= for member <- @team.members do %>
             <div class={[
-              "rounded-lg bg-base-200 overflow-hidden",
+              "rounded-lg overflow-hidden",
               member.session_id && @selected_agent_session_id == member.session_id && "ring-1 ring-primary/40"
             ]}>
-              <div
-                class={[
-                  "flex items-center gap-3 p-3 transition-colors group",
-                  member.session_id && "cursor-pointer hover:bg-base-300/60",
-                  !member.session_id && "hover:bg-base-300/30"
-                ]}
-                phx-click={member.session_id && "select_agent"}
-                phx-value-session-id={member.session_id}
-              >
-                <%!-- Avatar initials --%>
-                <div class={[
-                  "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
-                  member_avatar_class(member.status)
-                ]}>
-                  <%= member_initials(member.name) %>
-                </div>
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2">
+              <%= if member.session do %>
+                <.session_row
+                  session={member.session}
+                  click_event="select_agent"
+                  project_name={if member.role && member.role != "", do: member.role}
+                />
+              <% else %>
+                <%!-- Member without an associated session --%>
+                <div class="flex items-center gap-3 p-3 bg-base-200">
+                  <div class={[
+                    "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
+                    member_avatar_class(member.status)
+                  ]}>
+                    <%= member_initials(member.name) %>
+                  </div>
+                  <div class="flex-1 min-w-0">
                     <span class="font-medium text-sm text-base-content truncate"><%= member.name %></span>
-                    <%= if member.role && member.role != "" do %>
-                      <span class="text-[10px] text-base-content/40 font-mono shrink-0"><%= member.role %></span>
-                    <% end %>
-                  </div>
-                  <div class="flex items-center gap-2 mt-0.5">
-                    <span class={["w-1.5 h-1.5 rounded-full shrink-0", member_status_dot(member.status)]}></span>
-                    <span class={["text-[11px] font-medium", member_status_text(member.status)]}>
-                      <%= member.status %>
-                    </span>
+                    <div class="flex items-center gap-2 mt-0.5">
+                      <span class={["w-1.5 h-1.5 rounded-full shrink-0", member_status_dot(member.status)]}></span>
+                      <span class={["text-[11px] font-medium", member_status_text(member.status)]}>
+                        <%= member.status %>
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <%= if member.session do %>
-                  <.link
-                    navigate={~p"/dm/#{member.session_id}"}
-                    class="flex items-center gap-1 text-[10px] font-mono text-base-content/40 bg-base-content/5 px-2 py-1 rounded hover:text-base-content/60 transition-all shrink-0"
-                  >
-                    <%= String.slice(member.session.uuid || to_string(member.session_id), 0..7) %>
-                    <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
-                  </.link>
-                <% end %>
-              </div>
+              <% end %>
               <%!-- Per-member tasks --%>
               <%= if Map.get(member, :tasks, []) != [] do %>
-                <div class="border-t border-base-300/50 px-3 py-2 space-y-1">
+                <div class="border-t border-base-300/50 px-3 py-2 space-y-1 bg-base-200">
                   <%= for task <- member.tasks do %>
                     <div class="flex items-center gap-2">
                       <div class={["w-1.5 h-1.5 rounded-full shrink-0", task_state_dot(task.state_id)]}></div>
@@ -536,7 +514,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   end
 
   defp load_team_detail(team) do
-    team = EyeInTheSkyWeb.Repo.preload(team, members: [:session])
+    team = EyeInTheSkyWeb.Repo.preload(team, members: [session: [:agent]])
 
     tasks =
       Tasks.list_tasks_for_team_with_sessions(team.id)
@@ -645,13 +623,12 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   end
   defp format_note_time(_), do: ""
 
+  defp team_status_border("active"), do: "border-success"
+  defp team_status_border(_), do: "border-transparent"
+
   defp status_badge_class("active"), do: "badge-success"
   defp status_badge_class("archived"), do: "badge-ghost"
   defp status_badge_class(_), do: "badge-neutral"
-
-  defp status_text_class("active"), do: "text-success"
-  defp status_text_class("archived"), do: "text-base-content/30"
-  defp status_text_class(_), do: "text-base-content/40"
 
   defp member_status_dot("active"), do: "bg-success"
   defp member_status_dot("idle"), do: "bg-warning"

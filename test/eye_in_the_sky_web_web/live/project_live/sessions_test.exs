@@ -28,7 +28,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.SessionsTest do
 
       view |> element("button", "New Agent") |> render_click()
 
-      assert has_element?(view, "h3", "New Agent")
+      assert has_element?(view, "h2", "New Agent")
       assert has_element?(view, "select[name='model']")
       assert has_element?(view, "textarea[name='description']")
     end

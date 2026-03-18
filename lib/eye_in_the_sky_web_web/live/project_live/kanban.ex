@@ -57,7 +57,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     if socket.assigns.project do
       {:ok, load_tasks(socket)}
     else
-      {:ok, push_navigate(socket, to: ~p"/")}
+      {:ok, socket}
     end
   end
 
@@ -682,7 +682,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     show_completed = socket.assigns.show_completed
 
     all_tasks =
-      if String.length(String.trim(query)) >= 2 do
+      if String.length(String.trim(query)) >= 4 do
         Tasks.search_tasks(query, project_id)
       else
         Projects.get_project_tasks(project_id, include_archived: show_archived)
@@ -1000,8 +1000,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                         on_click="open_task_detail"
                         on_delete="delete_task"
                         id={"kanban-task-#{task.id}"}
-                        phx-click="open_task_detail"
-                        phx-value-task_id={task.uuid}
                         working_session_ids={@working_session_ids}
                       />
                     </div>

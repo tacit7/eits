@@ -226,10 +226,11 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
       phx-target={@myself}
       data-active-project-id={@sidebar_project && @sidebar_project.id}
       class={[
-        "flex flex-col h-full border-r border-base-content/10 bg-base-100 lg:bg-gradient-to-t lg:from-base-300/5 lg:to-base-300/30 shadow-lg lg:shadow-none transition-[background-color,border-color,box-shadow] duration-[35ms] flex-shrink-0 overflow-hidden",
+        "flex flex-col h-full border-r border-base-content/10 bg-base-100 lg:bg-gradient-to-t lg:from-base-300/5 lg:to-base-300/30 shadow-lg lg:shadow-none transition-[background-color,border-color,box-shadow] duration-[35ms] flex-shrink-0 overflow-hidden safe-inset-y",
         "fixed inset-y-0 left-0 z-50 md:relative md:inset-auto md:z-auto",
+        "w-[85vw] max-w-72",
         if(@mobile_open, do: "translate-x-0", else: "-translate-x-full md:translate-x-0"),
-        if(@collapsed, do: "w-16", else: "w-60")
+        if(@collapsed, do: "md:w-16", else: "md:w-60")
       ]}
     >
       <%!-- Branding --%>

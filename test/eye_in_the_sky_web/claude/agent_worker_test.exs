@@ -18,7 +18,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
       session_ids = Agent.get(:"test_sessions_#{inspect(test_pid)}", & &1)
 
       Enum.each(session_ids, fn session_id ->
-        case Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session_id}) do
+        case Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session_id}) do
           [{pid, _}] when is_pid(pid) ->
             DynamicSupervisor.terminate_child(EyeInTheSkyWeb.Claude.AgentSupervisor, pid)
 
@@ -182,7 +182,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     assert_receive {:agent_working, _, ^session_id}, 5_000
 
     [{worker_pid, _}] =
-      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session.id})
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
 
     worker_state = :sys.get_state(worker_pid)
     assert worker_state.current_job.context.has_messages == false
@@ -225,7 +225,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     assert_receive {:agent_working, _, ^session_id}, 5_000
 
     [{worker_pid, _}] =
-      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session.id})
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
 
     worker_state = :sys.get_state(worker_pid)
     assert worker_state.project_path == File.cwd!()
@@ -405,7 +405,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     assert_receive {:agent_working, _, ^session_id}, 5_000
 
     [{worker_pid, _}] =
-      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session_id})
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session_id})
 
     worker_state = :sys.get_state(worker_pid)
     assert worker_state.current_job != nil
@@ -432,7 +432,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     assert {:error, :queue_full} = EyeInTheSkyWeb.Agents.AgentManager.send_message(session.id, "msg-7")
 
     [{worker_pid, _}] =
-      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session.id})
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
 
     worker_state = :sys.get_state(worker_pid)
     assert length(worker_state.queue) == 5
@@ -511,7 +511,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     Process.sleep(100)
 
     [{worker_pid, _}] =
-      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session.id})
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
 
     worker_state = :sys.get_state(worker_pid)
 
@@ -532,7 +532,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     Process.sleep(100)
 
     [{worker_pid, _}] =
-      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session.id})
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
 
     worker_state = :sys.get_state(worker_pid)
 
@@ -558,7 +558,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     assert_receive {:agent_working, _, ^session_id}, 5_000
 
     [{worker_pid, _}] =
-      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session.id})
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
 
     mock_port = wait_for_mock_port(session.id)
 
@@ -592,7 +592,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     assert_receive {:agent_working, _, ^session_id}, 5_000
 
     [{worker_pid, _}] =
-      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session.id})
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
 
     mock_port = wait_for_mock_port(session.id)
 
@@ -673,7 +673,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
 
     # The in-memory state should be updated immediately
     [{worker_pid, _}] =
-      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session.id})
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
 
     worker_state = :sys.get_state(worker_pid)
     assert worker_state.provider_conversation_id == claude_uuid
@@ -704,7 +704,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     assert_receive {:agent_stopped, _, ^session_id}, 5_000
 
     [{worker_pid, _}] =
-      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session.id})
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
 
     # Force into :failed state (simulating max retries exceeded)
     :sys.replace_state(worker_pid, fn state ->
@@ -742,7 +742,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     assert_receive {:agent_stopped, _, ^session_id}, 5_000
 
     [{worker_pid, _}] =
-      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session.id})
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
 
     # Force into :failed with a queued job that was stranded
     stranded_job = EyeInTheSkyWeb.Claude.Job.new("stranded-msg", %{has_messages: false})
@@ -797,7 +797,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
 
     # Verify worker picked up msg-2
     [{worker_pid, _}] =
-      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session.id})
+      Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
 
     worker_state = :sys.get_state(worker_pid)
     assert worker_state.current_job != nil
@@ -806,6 +806,83 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
     # Clean up
     new_mock = wait_for_mock_port(session.id)
     if new_mock, do: send(new_mock, {:exit, 0})
+  end
+
+  # --- Registry Invariant Tests ---
+  # Invariant: exactly one AgentWorker per session, keyed by {:session, session_id}
+
+  test "lookup finds existing worker by {:session, session_id}", %{track: track} do
+    {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+
+    Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
+    session_id = session.id
+
+    assert {:ok, _} = EyeInTheSkyWeb.Agents.AgentManager.send_message(session.id, "hello")
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    # Must find exactly one worker under the {:session, id} key
+    result = Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
+    assert [{pid, provider}] = result
+    assert is_pid(pid)
+    assert Process.alive?(pid)
+    assert provider == "claude"
+
+    # Old {:agent, id} key must NOT be registered
+    assert [] == Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session.id})
+
+    mock_port = wait_for_mock_port(session.id)
+    if mock_port, do: send(mock_port, {:exit, 0})
+  end
+
+  test "dead worker is replaced by new worker on next message", %{track: track} do
+    {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+
+    Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
+    session_id = session.id
+
+    # Start first worker
+    assert {:ok, _} = EyeInTheSkyWeb.Agents.AgentManager.send_message(session.id, "first")
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    [{first_pid, _}] = Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
+
+    # Kill the worker process directly
+    DynamicSupervisor.terminate_child(EyeInTheSkyWeb.Claude.AgentSupervisor, first_pid)
+    Process.sleep(100)
+
+    refute Process.alive?(first_pid)
+
+    # Sending another message should start a fresh worker
+    assert {:ok, _} = EyeInTheSkyWeb.Agents.AgentManager.send_message(session.id, "second")
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    [{second_pid, _}] = Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
+    assert is_pid(second_pid)
+    assert Process.alive?(second_pid)
+    assert second_pid != first_pid
+
+    mock_port = wait_for_mock_port(session.id)
+    if mock_port, do: send(mock_port, {:exit, 0})
+  end
+
+  test "no worker is started when none exists until send_message is called", %{track: track} do
+    {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+
+    # Before any message is sent, registry must be empty for this session
+    assert [] == Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
+
+    Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "agent:working")
+    session_id = session.id
+
+    assert {:ok, _} = EyeInTheSkyWeb.Agents.AgentManager.send_message(session.id, "hello")
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    # Now exactly one worker must be registered
+    assert [{pid, _}] = Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session.id})
+    assert Process.alive?(pid)
+
+    mock_port = wait_for_mock_port(session.id)
+    if mock_port, do: send(mock_port, {:exit, 0})
   end
 
   # --- Helper: poll until condition is true ---
@@ -828,7 +905,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorkerTest do
   defp wait_for_mock_port(_session_id, 0), do: nil
 
   defp wait_for_mock_port(session_id, attempts) do
-    case Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session_id}) do
+    case Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session_id}) do
       [{worker_pid, _}] when is_pid(worker_pid) ->
         if Process.alive?(worker_pid) do
           mock_port =

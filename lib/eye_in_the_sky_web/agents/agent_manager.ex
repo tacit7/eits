@@ -7,10 +7,10 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
 
   require Logger
 
-  alias EyeInTheSkyWeb.Agents.InstructionBuilder
+  alias EyeInTheSkyWeb.Agents.{InstructionBuilder, RuntimeContext}
   alias EyeInTheSkyWeb.Claude.AgentWorker
   alias EyeInTheSkyWeb.Git.Worktrees
-  alias EyeInTheSkyWeb.{Agents, Messages, Sessions}
+  alias EyeInTheSkyWeb.{Agents, Sessions}
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
   @supported_providers ["claude", "codex"]
@@ -238,18 +238,7 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
           "send_message: worker found/started for session_id=#{session_id}, pid=#{inspect(pid)}"
         )
 
-        has_messages = Messages.has_inbound_reply?(session_id, provider)
-
-        context = %{
-          model: opts[:model],
-          effort_level: opts[:effort_level],
-          has_messages: has_messages,
-          channel_id: opts[:channel_id],
-          thinking_budget: opts[:thinking_budget],
-          max_budget_usd: opts[:max_budget_usd],
-          agent: opts[:agent],
-          eits_workflow: opts[:eits_workflow]
-        }
+        context = RuntimeContext.build(session_id, provider, opts)
 
         case GenServer.call(pid, {:submit_message, message, context}) do
           {:ok, admission} ->
@@ -282,7 +271,8 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
   end
 
   defp lookup_or_start(session_id, extra_opts) do
-    case Registry.lookup(@registry, {:agent, session_id}) do
+    # Invariant: exactly one AgentWorker per session, keyed by {:session, session_id}
+    case Registry.lookup(@registry, {:session, session_id}) do
       [{pid, provider}] ->
         if Process.alive?(pid) do
           Logger.debug(
@@ -365,6 +355,13 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
             {:ok, session} ->
               opts = [
                 session_id: session.id,
+                # eits_session_uuid: stable EITS session UUID, never changes after assignment.
+                # Used for EITS tracking, env vars, and hooks. Distinct from provider_conversation_id.
+                eits_session_uuid: session.uuid,
+                # provider_conversation_id: the provider's resume key.
+                #   Claude: pre-generated UUID matching Claude's --session-id flag
+                #   Codex:  same value initially, but gets overwritten by the Codex thread_id
+                #           when the thread.started event fires (via maybe_sync_provider_conversation_id)
                 provider_conversation_id: session.uuid,
                 agent_id: agent.id,
                 project_id: session.project_id,

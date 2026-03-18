@@ -567,7 +567,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
     # Properly stop the worker — GenServer.stop calls terminate/2 which cancels the SDK subprocess.
     # Process.exit does NOT call terminate/2 for non-trapping GenServers, so the CLI keeps running.
-    case Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session_id}) do
+    case Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session_id}) do
       [{pid, _}] ->
         Logger.warning("kill_session: stopping worker pid=#{inspect(pid)} for session=#{session_id}")
 

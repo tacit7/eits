@@ -24,7 +24,15 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   @type status :: :idle | :running | :retry_wait | :failed
 
   defstruct [
+    # Internal EITS session integer PK — used for DB lookups, PubSub topics, registry key
     :session_id,
+    # Internal EITS session UUID — stable identifier for this session in EITS tracking.
+    # Distinct from provider_conversation_id: this never changes after the worker starts.
+    :eits_session_uuid,
+    # Provider conversation ID — tracks the resume key for the underlying provider:
+    #   Claude: pre-generated UUID matching Claude's `--session-id` flag (stable)
+    #   Codex:  starts as nil, gets synced from the Codex thread_id on thread.started
+    # Use eits_session_uuid (not this field) for EITS env vars and tracking calls.
     :provider_conversation_id,
     :agent_id,
     :project_id,
@@ -46,7 +54,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   def start_link(opts) do
     session_id = Keyword.fetch!(opts, :session_id)
     provider = Keyword.get(opts, :provider, "claude")
-    name = {:via, Registry, {@registry, {:agent, session_id}, provider}}
+    # Invariant: exactly one AgentWorker per session, keyed by {:session, session_id}
+    name = {:via, Registry, {@registry, {:session, session_id}, provider}}
     GenServer.start_link(__MODULE__, opts, name: name)
   end
 
@@ -97,7 +106,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   end
 
   defp with_worker(session_id, fun, default) do
-    case Registry.lookup(@registry, {:agent, session_id}) do
+    case Registry.lookup(@registry, {:session, session_id}) do
       [{pid, _}] -> fun.(pid)
       [] -> default
     end
@@ -108,6 +117,9 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   @impl true
   def init(opts) do
     session_id = Keyword.fetch!(opts, :session_id)
+    # eits_session_uuid: stable EITS UUID for this session, used for EITS tracking/env vars.
+    # Falls back to provider_conversation_id for backward compat with callers that only pass one.
+    eits_session_uuid = Keyword.get(opts, :eits_session_uuid) || Keyword.get(opts, :provider_conversation_id)
     provider_conversation_id = Keyword.fetch!(opts, :provider_conversation_id)
     agent_id = Keyword.fetch!(opts, :agent_id)
     project_id = Keyword.get(opts, :project_id)
@@ -117,6 +129,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
     state = %__MODULE__{
       session_id: session_id,
+      eits_session_uuid: eits_session_uuid,
       provider_conversation_id: provider_conversation_id,
       agent_id: agent_id,
       project_id: project_id,
@@ -570,10 +583,12 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     opts = [
       to: self(),
       model: context[:model],
+      # provider_conversation_id = Codex thread_id (synced from thread.started); used for resume
       session_id: state.provider_conversation_id,
       project_path: state.project_path,
       full_auto: true,
-      eits_session_uuid: state.provider_conversation_id,
+      # eits_session_uuid: stable EITS UUID — distinct from the Codex thread_id
+      eits_session_uuid: state.eits_session_uuid,
       eits_session_id: state.session_id,
       eits_agent_uuid: state.agent_id,
       eits_agent_id: state.agent_id,
@@ -596,9 +611,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   end
 
   defp codex_eits_init(state) do
+    # eits_session_uuid is the stable EITS session UUID for tracking.
+    # provider_conversation_id (Codex thread_id) may differ and is used only for resume.
     """
     EITS environment variables are pre-set in your shell via shell_environment_policy:
-    - EITS_SESSION_UUID=#{state.provider_conversation_id}
+    - EITS_SESSION_UUID=#{state.eits_session_uuid}
     - EITS_SESSION_ID=#{state.session_id}
     - EITS_AGENT_UUID=#{state.agent_id}
     - EITS_PROJECT_ID=#{state.project_id}

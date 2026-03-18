@@ -563,14 +563,31 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   @impl true
   def handle_event("kill_session", _params, socket) do
     session_id = socket.assigns.session_id
-    AgentManager.cancel_session(session_id)
 
-    # Force-terminate the worker process if still registered (handles stuck :running state)
+    # Properly stop the worker — GenServer.stop calls terminate/2 which cancels the SDK subprocess.
+    # Process.exit does NOT call terminate/2 for non-trapping GenServers, so the CLI keeps running.
     case Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:agent, session_id}) do
       [{pid, _}] ->
-        Logger.warning("kill_session: force-exiting stuck worker pid=#{inspect(pid)} for session=#{session_id}")
-        Process.exit(pid, :shutdown)
+        Logger.warning("kill_session: stopping worker pid=#{inspect(pid)} for session=#{session_id}")
+
+        try do
+          GenServer.stop(pid, :shutdown, 3000)
+        catch
+          :exit, _ -> :ok
+        end
+
       [] ->
+        # Worker not running — just cancel via AgentManager in case SDK ref exists elsewhere
+        AgentManager.cancel_session(session_id)
+    end
+
+    # Update session status so stale agent_working PubSub events don't revive the UI
+    case Sessions.get_session(session_id) do
+      {:ok, session} ->
+        Sessions.update_session(session, %{status: "stopped"})
+        EyeInTheSkyWeb.Events.agent_stopped(session)
+
+      _ ->
         :ok
     end
 

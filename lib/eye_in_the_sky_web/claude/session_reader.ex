@@ -277,32 +277,75 @@ defmodule EyeInTheSkyWeb.Claude.SessionReader do
   @doc """
   Formats messages for the UI.
   Extracts role, content, and timestamp from Claude session JSON.
-  Filters out messages with empty content (tool results).
+  Tool result blocks from "user" messages are emitted as separate entries.
   """
   def format_messages(messages) when is_list(messages) do
+    count = Enum.count(messages)
+
     messages
     |> Enum.with_index()
-    |> Enum.map(fn {msg, idx} ->
-      # Use timestamp from message, or generate one based on index
-      # (assuming messages are in chronological order)
+    |> Enum.flat_map(fn {msg, idx} ->
       timestamp =
         msg["timestamp"] || msg["created_at"] ||
           DateTime.utc_now()
-          |> DateTime.add(-Enum.count(messages) + idx, :second)
+          |> DateTime.add(-count + idx, :second)
           |> DateTime.to_iso8601()
 
-      %{
+      tool_results = extract_tool_result_messages(msg, timestamp)
+
+      base = %{
         uuid: msg["uuid"],
         role: get_in(msg, ["message", "role"]) || msg["type"],
         content: extract_content(msg),
         timestamp: timestamp,
-        usage: get_in(msg, ["message", "usage"])
+        usage: get_in(msg, ["message", "usage"]),
+        stream_type: nil
       }
-    end)
-    |> Enum.reject(fn msg ->
-      msg.content == "" || String.starts_with?(String.trim(msg.content), "<")
+
+      regular =
+        if base.content == "" || String.starts_with?(String.trim(base.content), "<") do
+          []
+        else
+          [base]
+        end
+
+      regular ++ tool_results
     end)
   end
+
+  defp extract_tool_result_messages(
+         %{"type" => "user", "message" => %{"content" => content}} = _msg,
+         timestamp
+       )
+       when is_list(content) do
+    content
+    |> Enum.filter(&match?(%{"type" => "tool_result"}, &1))
+    |> Enum.map(fn block ->
+      tool_use_id = block["tool_use_id"] || ""
+      result_content = block["content"] || ""
+      body = if is_binary(result_content), do: result_content, else: Jason.encode!(result_content)
+      body = String.slice(body, 0..4000)
+
+      %{
+        uuid: derive_tool_result_uuid(tool_use_id),
+        role: "tool_result",
+        content: body,
+        timestamp: timestamp,
+        usage: nil,
+        stream_type: "tool_result"
+      }
+    end)
+  end
+
+  defp extract_tool_result_messages(_, _), do: []
+
+  defp derive_tool_result_uuid(seed) when is_binary(seed) and seed != "" do
+    hex = :crypto.hash(:sha, seed) |> Base.encode16(case: :lower)
+
+    "#{String.slice(hex, 0, 8)}-#{String.slice(hex, 8, 4)}-#{String.slice(hex, 12, 4)}-#{String.slice(hex, 16, 4)}-#{String.slice(hex, 20, 12)}"
+  end
+
+  defp derive_tool_result_uuid(_), do: nil
 
   defp extract_content(%{"message" => %{"content" => content}}) when is_binary(content) do
     content

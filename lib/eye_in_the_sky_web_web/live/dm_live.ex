@@ -1164,7 +1164,12 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     # Check for an existing unlinked message (created before sync) with matching content.
     # This prevents duplicates when save_result or create_user_message already persisted the
     # message without a source_uuid, and the session file sync tries to create it again.
-    metadata = if msg.usage, do: %{"usage" => msg.usage}, else: nil
+    metadata =
+      cond do
+        msg[:stream_type] == "tool_result" -> %{"stream_type" => "tool_result"}
+        msg.usage -> %{"usage" => msg.usage}
+        true -> nil
+      end
 
     case Messages.find_unlinked_message(session_id, sender_role, msg.content) do
       {:ok, existing} ->

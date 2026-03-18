@@ -10,6 +10,10 @@ This project uses Phoenix LiveView with Elixir. Primary languages: TypeScript, J
 
 ## Git Worktrees
 
+**Always start any code change work in a worktree.** Never modify files directly in the main project directory. Create a worktree first, make changes there, then merge/PR back.
+
+Worktrees live in `.claude/worktrees/` relative to the project root.
+
 When working in git worktrees, always compile from the main project directory or symlink deps/build directories first. Never attempt to compile directly in a worktree without verifying deps are available.
 
 When using git worktrees, always verify you are editing files in the worktree directory, NOT the main project directory. Check `pwd` before making edits.
@@ -43,11 +47,11 @@ Session status is driven by Claude Code hooks and explicit commands:
 |--------|--------|---------|
 | `working` | `UserPromptSubmit` hook | Claude is processing a message |
 | `stopped` | `Stop` hook | Claude finished responding (resets to `working` on next message) |
-| `waiting` | `SessionEnd` hook (`cli_sdk`) | Interactive session ended; can be resumed |
+| `waiting` | `SessionEnd` hook (`sdk-cli`) | Interactive session ended; can be resumed |
 | `completed` | `SessionEnd` hook (`cli`) or `/i-end-session` | Spawned agent finished; or manually closed |
 | `failed` | `SessionWorker` on non-zero exit | Process crashed |
 
-`CLAUDE_CODE_ENTRYPOINT` distinguishes `cli` (spawned/print mode) from `cli_sdk` (interactive).
+`CLAUDE_CODE_ENTRYPOINT` distinguishes `cli` (spawned/print mode) from `sdk-cli` (interactive).
 
 **Task workflow — use `begin` to create and start in one shot:**
 ```bash

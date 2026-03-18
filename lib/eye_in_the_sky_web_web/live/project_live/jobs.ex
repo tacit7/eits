@@ -536,7 +536,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
                   <% end %>
                   <p class="text-[11px] font-mono text-base-content/50 mt-1 truncate">
                     {format_schedule(job)}
-                    <span class="text-base-content/30 not-italic ml-1">{system_timezone()}</span>
+                    <span class="text-base-content/30 not-italic ml-1">{job.timezone || "UTC"}</span>
                   </p>
                 </div>
                 <span class="badge badge-xs badge-ghost">
@@ -666,7 +666,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
                 </td>
                 <td class="text-xs">
                   <span class="font-mono">{format_schedule(job)}</span>
-                  <span class="text-base-content/40 ml-1 text-[10px]">{system_timezone()}</span>
+                  <span class="text-base-content/40 ml-1 text-[10px]">{job.timezone || "UTC"}</span>
                 </td>
                 <td>
                   <input

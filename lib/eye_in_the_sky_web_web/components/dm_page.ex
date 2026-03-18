@@ -1003,7 +1003,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                   <%= for {label, value, desc, icon_color} <- [
                     {"Low", "low", "Faster and cheaper", "text-success"},
                     {"Medium", "medium", "Balanced (default)", "text-info"},
-                    {"High", "high", "Deeper reasoning", "text-warning"}
+                    {"High", "high", "Deeper reasoning", "text-warning"},
+                    {"Max", "max", "Maximum effort", "text-error"}
                   ] do %>
                     <li>
                       <a
@@ -1655,6 +1656,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   defp effort_display_name("low"), do: "Low"
   defp effort_display_name("medium"), do: "Medium"
   defp effort_display_name("high"), do: "High"
+  defp effort_display_name("max"), do: "Max"
   defp effort_display_name(_), do: "Medium"
 
   defp format_size(bytes) when bytes < 1024, do: "#{bytes} B"

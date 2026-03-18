@@ -749,22 +749,13 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :body, :string, default: ""
 
   defp tool_result_body(assigns) do
-    body = assigns.body || ""
-    preview = body |> String.slice(0..100) |> then(&if String.length(body) > 100, do: &1 <> "…", else: &1)
-    assigns = assign(assigns, :preview, preview)
 
     ~H"""
-    <details class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden">
+    <details open class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden">
       <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
         <.icon name="hero-code-bracket" class="w-3.5 h-3.5 flex-shrink-0 text-base-content/30" />
         <span class="text-[11px] font-mono font-semibold text-base-content/40 uppercase tracking-wide flex-shrink-0">
           Output
-        </span>
-        <span
-          :if={@preview != ""}
-          class="text-[11px] font-mono text-base-content/25 truncate flex-1 min-w-0"
-        >
-          {@preview}
         </span>
         <.icon
           name="hero-chevron-right"

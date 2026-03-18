@@ -646,6 +646,7 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       session_id: state.provider_conversation_id,
       project_path: state.project_path,
       full_auto: true,
+      bypass_sandbox: context[:bypass_sandbox] || false,
       # eits_session_uuid: stable EITS UUID — distinct from the Codex thread_id
       eits_session_uuid: state.eits_session_uuid,
       eits_session_id: state.session_id,
@@ -750,7 +751,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       thinking_budget: Map.get(context, :thinking_budget),
       max_budget_usd: Map.get(context, :max_budget_usd),
       agent: Map.get(context, :agent),
-      eits_workflow: Map.get(context, :eits_workflow, "1")
+      eits_workflow: Map.get(context, :eits_workflow, "1"),
+      bypass_sandbox: Map.get(context, :bypass_sandbox, false)
     }
   end
 
@@ -763,7 +765,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
       thinking_budget: context[:thinking_budget],
       max_budget_usd: context[:max_budget_usd],
       agent: context[:agent],
-      eits_workflow: context[:eits_workflow] || "1"
+      eits_workflow: context[:eits_workflow] || "1",
+      bypass_sandbox: context[:bypass_sandbox] || false
     }
   end
 

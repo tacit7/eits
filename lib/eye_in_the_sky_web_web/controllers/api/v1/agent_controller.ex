@@ -228,7 +228,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
 
   defp validate_params(params) do
     provider = params["provider"] || "claude"
-    model = params["model"] || "haiku"
+    model = params["model"] || if(provider == "codex", do: "gpt-5.3-codex", else: "haiku")
 
     with {:ok, instructions} <- validate_instructions(params["instructions"]),
          {:ok, _} <- validate_provider_model(provider, model),
@@ -347,7 +347,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
       effort_level: params["effort_level"],
       parent_agent_id: params["parent_agent_id"],
       parent_session_id: params["parent_session_id"],
-      agent: params["agent"]
+      agent: params["agent"],
+      bypass_sandbox: params["bypass_sandbox"] == true
     ]
   end
 

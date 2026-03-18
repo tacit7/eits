@@ -4,7 +4,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   alias EyeInTheSkyWeb.{
     Sessions,
     Agents,
-    Checkpoints,
     Commits,
     Messages,
     Notes,
@@ -17,7 +16,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   alias EyeInTheSkyWeb.Claude.{AgentWorker, SessionReader}
   alias EyeInTheSkyWeb.FileAttachments
   alias EyeInTheSkyWebWeb.Components.DmPage
-  alias EyeInTheSkyWebWeb.DmLive.Checkpoints, as: CheckpointHandlers
   alias EyeInTheSkyWebWeb.DmLive.StreamState
   import EyeInTheSkyWebWeb.ControllerHelpers
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
@@ -512,30 +510,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   # ---------------------------------------------------------------------------
-  # Checkpoints — delegated to DmLive.CheckpointHandlers
-  # ---------------------------------------------------------------------------
-
-  @impl true
-  def handle_event("toggle_create_checkpoint", _params, socket),
-    do: CheckpointHandlers.handle_toggle_create(socket)
-
-  @impl true
-  def handle_event("create_checkpoint", params, socket),
-    do: CheckpointHandlers.handle_create(params, socket)
-
-  @impl true
-  def handle_event("restore_checkpoint", params, socket),
-    do: CheckpointHandlers.handle_restore(params, socket)
-
-  @impl true
-  def handle_event("fork_checkpoint", params, socket),
-    do: CheckpointHandlers.handle_fork(params, socket)
-
-  @impl true
-  def handle_event("delete_checkpoint", params, socket),
-    do: CheckpointHandlers.handle_delete(params, socket)
-
-  # ---------------------------------------------------------------------------
   # Session control
   # ---------------------------------------------------------------------------
 
@@ -813,8 +787,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         compacting={@compacting}
         context_used={@context_used}
         context_window={@context_window}
-        checkpoints={@checkpoints}
-        show_create_checkpoint={@active_overlay == :checkpoint}
       />
 
       <EyeInTheSkyWebWeb.Components.NewTaskDrawer.new_task_drawer
@@ -914,7 +886,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     |> assign(:thinking_enabled, false)
     |> assign(:max_budget_usd, nil)
     |> assign(:compacting, session.status == "compacting")
-    |> assign(:checkpoints, [])
     |> allow_upload(:files,
       accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
       max_entries: 10,
@@ -1077,12 +1048,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       :notes,
       maybe_load_tab_data(tab, "notes", socket.assigns[:notes], fn ->
         Notes.list_notes_for_session(session_id)
-      end)
-    )
-    |> assign(
-      :checkpoints,
-      maybe_load_tab_data(tab, "timeline", socket.assigns[:checkpoints], fn ->
-        Checkpoints.list_checkpoints_for_session(session_id)
       end)
     )
   end

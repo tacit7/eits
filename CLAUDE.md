@@ -34,6 +34,27 @@ After completing code changes, always run `mix compile --warnings-as-errors` to 
 
 When fixing bugs, search the entire file for ALL occurrences of the problematic pattern before committing. Don't fix just the first occurrence.
 
+## Session Status Lifecycle
+
+Session status is driven by Claude Code hooks and explicit commands:
+
+| Status | Set by | Meaning |
+|--------|--------|---------|
+| `working` | `UserPromptSubmit` hook | Claude is processing a message |
+| `stopped` | `Stop` hook | Claude finished responding (resets to `working` on next message) |
+| `waiting` | `SessionEnd` hook (`cli_sdk`) | Interactive session ended; can be resumed |
+| `completed` | `SessionEnd` hook (`cli`) or `/i-end-session` | Spawned agent finished; or manually closed |
+| `failed` | `SessionWorker` on non-zero exit | Process crashed |
+
+`CLAUDE_CODE_ENTRYPOINT` distinguishes `cli` (spawned/print mode) from `cli_sdk` (interactive).
+
+**Task workflow — use `begin` to create and start in one shot:**
+```bash
+eits tasks begin --title "Task name"   # replaces: create + start
+eits tasks annotate <id> --body "..."
+eits tasks update <id> --state 4
+```
+
 ## REST API
 
 JSON API at `/api/v1` for Claude Code hooks and external integrations. See [docs/REST_API.md](docs/REST_API.md) for full endpoint reference, request/response formats, and PubSub broadcast details.

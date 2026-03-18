@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Hook: Mark session as completed on SessionEnd
+# Hook: Mark session status on SessionEnd based on entrypoint
+# cli (spawned/print) → completed; cli_sdk (interactive) → waiting
 # Also moves any in-progress tasks linked to this session to In Review (state_id=4)
 set -uo pipefail
 
@@ -20,7 +21,12 @@ eits tasks list --session "$session_id" --state 2 2>/dev/null \
       eits tasks update "$task_id" --state 4 >/dev/null 2>&1 || true
     done
 
-# Mark session completed
-eits sessions update "$session_id" --status completed >/dev/null 2>&1 || true
+# cli = spawned/print mode → completed; cli_sdk = interactive → waiting
+entrypoint="${CLAUDE_CODE_ENTRYPOINT:-}"
+if [ "$entrypoint" = "cli" ]; then
+  eits sessions update "$session_id" --status completed >/dev/null 2>&1 || true
+else
+  eits sessions update "$session_id" --status waiting >/dev/null 2>&1 || true
+fi
 
 exit 0

@@ -108,9 +108,8 @@ $INIT_NOTE
 \`\`\`bash
 # After /eits-init — env vars EITS_AGENT_UUID, EITS_PROJECT_ID, EITS_SESSION_UUID are set
 
-# Create + start
-eits tasks create --title \"Task name\" --description \"Details\"
-eits tasks start <task_id>
+# Create + start in one shot
+eits tasks begin --title \"Task name\"
 
 # Finish
 eits tasks annotate <task_id> --body \"What happened\"

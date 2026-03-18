@@ -216,7 +216,7 @@ cmd_tasks() {
       local session_id="${1:-}"; need session_id
       _delete "/tasks/$id/sessions/$session_id"
       ;;
-    quick)
+    begin|quick)
       # eits tasks quick --title <t> [--description <d>] [--project <id>] [--priority <p>]
       # Creates a task, links the current session, and starts it — all in one command.
       local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority=""
@@ -253,7 +253,7 @@ cmd_tasks() {
       echo "{\"success\":true,\"task_id\":\"$task_id\",\"tag_id\":\"$tag_id\"}"
       ;;
     *)
-      echo "usage: eits tasks <list|get|create|update|done|quick|start|delete|annotate|link-session|unlink-session|tag>"
+      echo "usage: eits tasks <list|get|create|update|done|begin|start|delete|annotate|link-session|unlink-session|tag>"
       ;;
   esac
 }

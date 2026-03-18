@@ -3,12 +3,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
 
   use EyeInTheSkyWebWeb, :html
 
-  import EyeInTheSkyWebWeb.Components.DmHelpers
-  import EyeInTheSkyWebWeb.Components.DmMessageComponents
-  import EyeInTheSkyWebWeb.Components.DmComposerComponents
-  import EyeInTheSkyWebWeb.Components.DmTabComponents
-
-  alias EyeInTheSkyWeb.Tasks.WorkflowState
+  alias EyeInTheSkyWebWeb.Components.DmPage.MessagesTab
+  alias EyeInTheSkyWebWeb.Components.DmPage.TasksTab
+  alias EyeInTheSkyWebWeb.Components.DmPage.CommitsTab
+  alias EyeInTheSkyWebWeb.Components.DmPage.NotesTab
+  alias EyeInTheSkyWebWeb.Components.DmPage.TimelineTab
+  alias EyeInTheSkyWebWeb.Components.DmPage.Composer
 
   @tabs [
     {"messages", "hero-chat-bubble-left-right", "Messages"},
@@ -75,7 +75,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           </div>
         </div>
       </div>
-      <%!-- Mobile slim top bar (replaces global app header on DM page) --%>
+
+      <%!-- Mobile slim top bar --%>
       <div class="md:hidden sticky top-0 z-30 flex-shrink-0 flex items-center gap-1 px-2 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-base-100">
         <button
           phx-click={Phoenix.LiveView.JS.dispatch("sidebar:open", to: "#app-sidebar")}
@@ -116,7 +117,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             tabindex="0"
             class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-52 text-xs"
           >
-            <%!-- Tab navigation --%>
             <%= for {tab, icon, label} <- @tabs do %>
               <li>
                 <button
@@ -161,7 +161,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
       >
         <div class="px-4 sm:px-5 py-3" id="dm-header">
           <div class="flex items-center gap-2 min-w-0">
-            <%!-- Left: status + name + badges --%>
             <div class="flex items-start gap-2 min-w-0 flex-1">
               <div class={"w-2 h-2 rounded-full flex-shrink-0 mt-[5px] " <> case @agent.status do
                 "working" -> "bg-success animate-pulse"
@@ -216,7 +215,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 />
               </div>
             </div>
-            <%!-- Right: controls --%>
             <div class="flex items-center gap-1 flex-shrink-0">
               <button
                 phx-click="toggle_live_stream"
@@ -283,7 +281,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
                 <.icon name="hero-bell" class="w-3.5 h-3.5" />
                 <span>Notify</span>
               </button>
-              <%!-- Mobile overflow menu --%>
               <div class="sm:hidden dropdown dropdown-end" id="dm-mobile-menu">
                 <button
                   tabindex="0"
@@ -387,7 +384,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
       <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full" id="dm-tab-content">
         <%= case @active_tab do %>
           <% "messages" -> %>
-            <.messages_tab
+            <MessagesTab.messages_tab
               messages={@messages}
               has_more_messages={@has_more_messages}
               show_live_stream={@show_live_stream}
@@ -398,18 +395,18 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               agent={@agent}
             />
           <% "tasks" -> %>
-            <.tasks_tab tasks={@tasks} />
+            <TasksTab.tasks_tab tasks={@tasks} />
           <% "commits" -> %>
-            <.commits_tab commits={@commits} diff_cache={@diff_cache} />
+            <CommitsTab.commits_tab commits={@commits} diff_cache={@diff_cache} />
           <% "notes" -> %>
-            <.notes_tab notes={@notes} />
+            <NotesTab.notes_tab notes={@notes} />
           <% "timeline" -> %>
-            <.timeline_tab
+            <TimelineTab.timeline_tab
               checkpoints={@checkpoints}
               show_create_checkpoint={@show_create_checkpoint}
             />
           <% _ -> %>
-            <.messages_tab
+            <MessagesTab.messages_tab
               messages={@messages}
               has_more_messages={@has_more_messages}
               show_live_stream={@show_live_stream}
@@ -428,11 +425,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
           id="dm-page-composer"
           class="flex-shrink-0 max-w-4xl mx-auto w-full pt-2 safe-inset-bottom"
         >
-          <%!-- Prompt queue panel (shown when queue non-empty) --%>
           <%= if @queued_prompts != [] do %>
-            <.prompt_queue prompts={@queued_prompts} />
+            <Composer.prompt_queue prompts={@queued_prompts} />
           <% end %>
-          <.message_form
+          <Composer.message_form
             uploads={@uploads}
             selected_model={@selected_model}
             selected_effort={@selected_effort}

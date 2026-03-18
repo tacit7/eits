@@ -17,6 +17,7 @@ defmodule EyeInTheSkyWeb.Agents.RuntimeContext do
   - `:max_budget_usd` — USD cap for the run
   - `:agent` — agent identifier forwarded to CLI flags
   - `:eits_workflow` — EITS workflow identifier string (default: "1")
+  - `:bypass_sandbox` — skip all confirmations and sandboxing (Codex only; maps to --dangerously-bypass-approvals-and-sandbox)
   """
 
   alias EyeInTheSkyWeb.Messages
@@ -29,7 +30,8 @@ defmodule EyeInTheSkyWeb.Agents.RuntimeContext do
           thinking_budget: integer() | nil,
           max_budget_usd: float() | nil,
           agent: String.t() | nil,
-          eits_workflow: String.t()
+          eits_workflow: String.t(),
+          bypass_sandbox: boolean()
         }
 
   @doc """
@@ -48,7 +50,8 @@ defmodule EyeInTheSkyWeb.Agents.RuntimeContext do
       thinking_budget: opts[:thinking_budget],
       max_budget_usd: opts[:max_budget_usd],
       agent: opts[:agent],
-      eits_workflow: opts[:eits_workflow]
+      eits_workflow: opts[:eits_workflow],
+      bypass_sandbox: opts[:bypass_sandbox] || false
     }
   end
 end

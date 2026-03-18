@@ -347,7 +347,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
       effort_level: params["effort_level"],
       parent_agent_id: params["parent_agent_id"],
       parent_session_id: params["parent_session_id"],
-      agent: params["agent"]
+      agent: params["agent"],
+      bypass_sandbox: params["bypass_sandbox"] == true
     ]
   end
 

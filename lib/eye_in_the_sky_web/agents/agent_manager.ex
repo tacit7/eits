@@ -41,7 +41,8 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
              max_budget_usd: opts[:max_budget_usd],
              worktree: opts[:worktree],
              agent: opts[:agent],
-             eits_workflow: opts[:eits_workflow]
+             eits_workflow: opts[:eits_workflow],
+             bypass_sandbox: opts[:bypass_sandbox]
            ) do
         {:ok, admission} ->
           # Only mark "running" when the SDK actually started. :retry_queued means

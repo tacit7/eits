@@ -5,7 +5,10 @@
 set -uo pipefail
 
 # --- EITS Workflow Guard ---
-[ "${EITS_WORKFLOW:-}" = "0" ] && exit 0
+if [ "${EITS_WORKFLOW:-}" = "0" ]; then
+  echo "EITS_WORKFLOW=0 — EITS integration disabled. Skip /eits-init and all EITS workflows."
+  exit 0
+fi
 # --- End Workflow Guard ---
 
 LOG_FILE="${HOME}/.claude/hooks/eits.log"

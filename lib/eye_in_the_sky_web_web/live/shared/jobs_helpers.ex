@@ -30,20 +30,44 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.JobsHelpers do
     {:noreply, assign(socket, :claude_model, model)}
   end
 
-  def handle_expand_job(%{"id" => id}, socket) do
-    job_id = String.to_integer(id)
+  def parse_job_id(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {int_id, ""} -> {:ok, int_id}
+      _ -> :error
+    end
+  end
 
-    if socket.assigns.expanded_job_id == job_id do
-      {:noreply, assign(socket, expanded_job_id: nil, runs: [])}
-    else
-      runs = ScheduledJobs.list_runs_for_job(job_id)
-      {:noreply, assign(socket, expanded_job_id: job_id, runs: runs)}
+  def parse_job_id(id) when is_integer(id), do: {:ok, id}
+  def parse_job_id(_), do: :error
+
+  def handle_expand_job(%{"id" => id}, socket) do
+    case parse_job_id(id) do
+      {:ok, job_id} ->
+        if socket.assigns.expanded_job_id == job_id do
+          {:noreply, assign(socket, expanded_job_id: nil, runs: [])}
+        else
+          runs = ScheduledJobs.list_runs_for_job(job_id)
+          {:noreply, assign(socket, expanded_job_id: job_id, runs: runs)}
+        end
+
+      :error ->
+        {:noreply, put_flash(socket, :error, "Invalid job ID")}
     end
   end
 
   def handle_run_now(%{"id" => id}, socket) do
-    ScheduledJobs.run_now(String.to_integer(id))
-    {:noreply, put_flash(socket, :info, "Job triggered")}
+    caller_project_id = Map.get(socket.assigns, :project_id)
+
+    with {:ok, int_id} <- parse_job_id(id),
+         result <- ScheduledJobs.run_now(int_id, caller_project_id) do
+      case result do
+        {:ok, _} -> {:noreply, put_flash(socket, :info, "Job triggered")}
+        {:error, :unauthorized} -> {:noreply, put_flash(socket, :error, "Access denied")}
+        {:error, reason} -> {:noreply, put_flash(socket, :error, "Failed to trigger job: #{inspect(reason)}")}
+      end
+    else
+      :error -> {:noreply, put_flash(socket, :error, "Invalid job ID")}
+    end
   end
 
   # ---------------------------------------------------------------------------

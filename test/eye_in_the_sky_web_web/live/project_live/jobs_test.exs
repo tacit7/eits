@@ -180,4 +180,132 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.JobsTest do
       assert has_element?(view, "div", "Recent Runs")
     end
   end
+
+  describe "cross-project access guard" do
+    test "edit_job on another project's job shows error flash and does not open edit form",
+         %{conn: conn, project: project} do
+      {:ok, other_project} =
+        Projects.create_project(%{name: "other-ej", path: "/tmp/other-ej", slug: "other-ej"})
+
+      {:ok, other_job} =
+        ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Other Edit Job"}))
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      render_click(view, "edit_job", %{"id" => "#{other_job.id}"})
+
+      assert has_element?(view, "#flash-error", "Access denied")
+      refute has_element?(view, "h2", "Edit Job")
+    end
+
+    test "edit_schedule on another project's job shows error flash",
+         %{conn: conn, project: project} do
+      {:ok, other_project} =
+        Projects.create_project(%{name: "other-es", path: "/tmp/other-es", slug: "other-es"})
+
+      {:ok, other_job} =
+        ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Sched Target"}))
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      render_click(view, "edit_schedule", %{"job_id" => "#{other_job.id}"})
+
+      assert has_element?(view, "#flash-error", "Access denied")
+    end
+
+    test "crafted event with non-existent job id shows flash error not crash",
+         %{conn: conn, project: project} do
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      render_click(view, "edit_job", %{"id" => "999999"})
+
+      assert has_element?(view, "#flash-error", "Job not found")
+    end
+
+    test "toggling a job from another project shows error flash and leaves job unchanged",
+         %{conn: conn, project: project} do
+      {:ok, other_project} =
+        Projects.create_project(%{name: "other-xp", path: "/tmp/other-xp", slug: "other-xp"})
+
+      {:ok, other_job} =
+        ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Other Job"}))
+
+      original_enabled = other_job.enabled
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      render_click(view, "toggle_job", %{"id" => "#{other_job.id}"})
+
+      assert has_element?(view, "#flash-error", "Access denied")
+
+      {:ok, unchanged} = ScheduledJobs.get_job(other_job.id)
+      assert unchanged.enabled == original_enabled
+    end
+
+    test "deleting a job from another project shows error flash and leaves job in DB",
+         %{conn: conn, project: project} do
+      {:ok, other_project} =
+        Projects.create_project(%{name: "other-del", path: "/tmp/other-del", slug: "other-del"})
+
+      {:ok, other_job} =
+        ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Delete Target"}))
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      render_click(view, "delete_job", %{"id" => "#{other_job.id}"})
+
+      assert has_element?(view, "#flash-error", "Access denied")
+      assert {:ok, _} = ScheduledJobs.get_job(other_job.id)
+    end
+
+    test "run_now on a job from another project shows error flash",
+         %{conn: conn, project: project} do
+      {:ok, other_project} =
+        Projects.create_project(%{
+          name: "other-run",
+          path: "/tmp/other-run",
+          slug: "other-run"
+        })
+
+      {:ok, other_job} =
+        ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Run Target"}))
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      render_click(view, "run_now", %{"id" => "#{other_job.id}"})
+
+      assert has_element?(view, "#flash-error", "Access denied")
+    end
+  end
+
+  describe "malformed job_id on schedule paths" do
+    test "edit_schedule with non-integer job_id shows flash error not crash",
+         %{conn: conn, project: project} do
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      render_click(view, "edit_schedule", %{"job_id" => "abc"})
+
+      assert has_element?(view, "#flash-error", "Invalid job ID")
+    end
+
+    test "edit_schedule with empty string job_id shows flash error not crash",
+         %{conn: conn, project: project} do
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      render_click(view, "edit_schedule", %{"job_id" => "1abc2"})
+
+      assert has_element?(view, "#flash-error", "Invalid job ID")
+    end
+  end
+
+  describe "run_now failure" do
+    # Tests via the overview /jobs page where handle_run_now is called without
+    # get_job! first, so a non-existent ID returns {:error, :not_found} cleanly.
+    test "run_now on non-existent job ID shows error flash not success", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/jobs")
+      render_click(view, "run_now", %{"id" => "999999"})
+
+      assert has_element?(view, "#flash-error", "Failed to trigger job")
+      refute has_element?(view, "#flash-info", "Job triggered")
+    end
+  end
+
+  describe "nil project redirect" do
+    test "redirects to /projects when project ID does not exist", %{conn: conn} do
+      assert {:error, {:redirect, %{to: "/projects"}}} =
+               live(conn, ~p"/projects/99999/jobs")
+    end
+  end
 end

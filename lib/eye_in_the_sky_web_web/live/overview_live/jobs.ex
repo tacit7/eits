@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
       |> assign(:last_run_map, ScheduledJobs.last_run_status_map())
       |> assign(:show_form, false)
       |> assign(:editing_job, nil)
-      |> assign(:changeset, ScheduledJobs.change_job(%ScheduledJob{}))
+      |> assign(:form, to_form(ScheduledJobs.change_job(%ScheduledJob{})))
       |> assign(:form_job_type, "shell_command")
       |> assign(:form_schedule_type, "interval")
       |> assign(:form_config, %{})
@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
      socket
      |> assign(:show_form, true)
      |> assign(:editing_job, nil)
-     |> assign(:changeset, ScheduledJobs.change_job(%ScheduledJob{}))
+     |> assign(:form, to_form(ScheduledJobs.change_job(%ScheduledJob{})))
      |> assign(:form_job_type, default_type)
      |> assign(:form_schedule_type, "interval")
      |> assign(:form_config, %{})}
@@ -90,38 +90,47 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
     description = params["description"]
     project = socket.assigns.web_project
 
-    case AgentManager.create_agent(
-           model: model,
-           effort_level: effort_level,
-           project_id: project.id,
-           project_path: project.path,
-           description: "Job Helper",
-           instructions: JobHelper.prompt(description)
-         ) do
-      {:ok, %{session: session}} ->
-        {:noreply,
-         socket
-         |> assign(:show_claude_drawer, false)
-         |> push_navigate(to: ~p"/dm/#{session.id}")}
+    if is_nil(project) do
+      {:noreply, put_flash(socket, :error, "EITS Web project not found")}
+    else
+      case AgentManager.create_agent(
+             model: model,
+             effort_level: effort_level,
+             project_id: project.id,
+             project_path: project.path,
+             description: "Job Helper",
+             instructions: JobHelper.prompt(description)
+           ) do
+        {:ok, %{session: session}} ->
+          {:noreply,
+           socket
+           |> assign(:show_claude_drawer, false)
+           |> push_navigate(to: ~p"/dm/#{session.id}")}
 
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to start session: #{inspect(reason)}")}
+        {:error, reason} ->
+          {:noreply, put_flash(socket, :error, "Failed to start session: #{inspect(reason)}")}
+      end
     end
   end
 
   @impl true
   def handle_event("edit_job", %{"id" => id}, socket) do
-    job = ScheduledJobs.get_job!(String.to_integer(id))
-    config = ScheduledJobs.decode_config(job)
+    with {:ok, int_id} <- parse_job_id(id),
+         {:ok, job} <- ScheduledJobs.get_job(int_id) do
+      config = ScheduledJobs.decode_config(job)
 
-    {:noreply,
-     socket
-     |> assign(:show_form, true)
-     |> assign(:editing_job, job)
-     |> assign(:changeset, ScheduledJobs.change_job(job))
-     |> assign(:form_job_type, job.job_type)
-     |> assign(:form_schedule_type, job.schedule_type)
-     |> assign(:form_config, config)}
+      {:noreply,
+       socket
+       |> assign(:show_form, true)
+       |> assign(:editing_job, job)
+       |> assign(:form, to_form(ScheduledJobs.change_job(job)))
+       |> assign(:form_job_type, job.job_type)
+       |> assign(:form_schedule_type, job.schedule_type)
+       |> assign(:form_config, config)}
+    else
+      :error -> {:noreply, put_flash(socket, :error, "Invalid job ID")}
+      {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Job not found")}
+    end
   end
 
   @impl true
@@ -155,7 +164,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
          |> put_flash(:info, "Job saved")}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign(socket, :changeset, changeset)}
+        {:noreply, assign(socket, :form, to_form(changeset, action: :validate))}
 
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Error: #{inspect(reason)}")}
@@ -164,9 +173,14 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
 
   @impl true
   def handle_event("toggle_job", %{"id" => id}, socket) do
-    job = ScheduledJobs.get_job!(String.to_integer(id))
-    ScheduledJobs.toggle_job(job)
-    {:noreply, reload_all_jobs(socket)}
+    with {:ok, int_id} <- parse_job_id(id),
+         {:ok, job} <- ScheduledJobs.get_job(int_id) do
+      ScheduledJobs.toggle_job(job)
+      {:noreply, reload_all_jobs(socket)}
+    else
+      :error -> {:noreply, put_flash(socket, :error, "Invalid job ID")}
+      {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Job not found")}
+    end
   end
 
   @impl true
@@ -174,17 +188,21 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
 
   @impl true
   def handle_event("delete_job", %{"id" => id}, socket) do
-    job = ScheduledJobs.get_job!(String.to_integer(id))
+    with {:ok, int_id} <- parse_job_id(id),
+         {:ok, job} <- ScheduledJobs.get_job(int_id) do
+      case ScheduledJobs.delete_job(job) do
+        {:ok, _} ->
+          {:noreply,
+           socket
+           |> reload_all_jobs()
+           |> put_flash(:info, "Job deleted")}
 
-    case ScheduledJobs.delete_job(job) do
-      {:ok, _} ->
-        {:noreply,
-         socket
-         |> reload_all_jobs()
-         |> put_flash(:info, "Job deleted")}
-
-      {:error, :system_job} ->
-        {:noreply, put_flash(socket, :error, "Cannot delete system jobs")}
+        {:error, :system_job} ->
+          {:noreply, put_flash(socket, :error, "Cannot delete system jobs")}
+      end
+    else
+      :error -> {:noreply, put_flash(socket, :error, "Invalid job ID")}
+      {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Job not found")}
     end
   end
 
@@ -269,7 +287,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
       <.job_form_drawer
         show={@show_form}
         editing_job={@editing_job}
-        changeset={@changeset}
+        form={@form}
         form_job_type={@form_job_type}
         form_schedule_type={@form_schedule_type}
         form_config={@form_config}
@@ -455,6 +473,41 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
                   </span>
                   <span class="text-base-content/50">Runs</span>
                   <span class="text-right">{job.run_count || 0}</span>
+                </div>
+
+                <div class="mt-3 flex items-center justify-end gap-1 border-t border-base-content/10 pt-2">
+                  <input
+                    type="checkbox"
+                    class="toggle toggle-xs toggle-primary"
+                    checked={job.enabled == 1}
+                    phx-click="toggle_job"
+                    phx-value-id={job.id}
+                  />
+                  <button
+                    class="btn btn-ghost btn-xs"
+                    phx-click="run_now"
+                    phx-value-id={job.id}
+                    title="Run Now"
+                  >
+                    <.icon name="hero-play" class="w-3 h-3" />
+                  </button>
+                  <button
+                    class="btn btn-ghost btn-xs"
+                    phx-click="edit_job"
+                    phx-value-id={job.id}
+                    title="Edit"
+                  >
+                    <.icon name="hero-pencil-square" class="w-3 h-3" />
+                  </button>
+                  <button
+                    class="btn btn-ghost btn-xs text-error"
+                    phx-click="delete_job"
+                    phx-value-id={job.id}
+                    data-confirm="Delete this job?"
+                    title="Delete"
+                  >
+                    <.icon name="hero-trash" class="w-3 h-3" />
+                  </button>
                 </div>
 
                 <%= if @expanded_job_id == job.id do %>

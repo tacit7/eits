@@ -36,9 +36,9 @@ defmodule EyeInTheSkyWeb.Application do
       {Oban, Application.fetch_env!(:eye_in_the_sky_web, Oban)},
       # React to session lifecycle events and update team member state
       EyeInTheSkyWeb.Teams.Subscriber,
-      # Poll for external task changes (Go MCP i-todo writes)
+      # Poll for external task changes from spawned agents
       EyeInTheSkyWeb.Tasks.Poller,
-      # Poll for external message writes (Go MCP, spawned agents)
+      # Poll for external message writes from spawned agents
       EyeInTheSkyWeb.Messages.Broadcaster,
       # Rate limiter ETS backend for auth endpoint throttling
       EyeInTheSkyWeb.RateLimiter,

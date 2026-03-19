@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers do
 
   import Phoenix.Component, only: [assign: 2, assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3]
+  import EyeInTheSkyWebWeb.Live.Shared.JobsHelpers, only: [parse_job_id: 1]
 
   alias EyeInTheSkyWeb.{Prompts, ScheduledJobs, Projects}
   alias EyeInTheSkyWeb.Claude.AgentFileScanner
@@ -39,21 +40,32 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers do
   end
 
   def handle_edit_schedule(%{"job_id" => job_id}, socket) do
-    job = ScheduledJobs.get_job!(String.to_integer(job_id))
+    with {:ok, int_id} <- parse_job_id(job_id),
+         {:ok, job} <- ScheduledJobs.get_job(int_id) do
+      if not job_accessible?(job, socket) do
+        {:noreply, put_flash(socket, :error, "Access denied")}
+      else
+        prompt =
+          cond do
+            job.prompt_id ->
+              Prompts.get_prompt!(job.prompt_id)
 
-    prompt =
-      cond do
-        job.prompt_id ->
-          Prompts.get_prompt!(job.prompt_id)
+            agent_file_id = get_config_field(job, "agent_file_id") ->
+              AgentFileScanner.get_by_id(agent_file_id)
 
-        agent_file_id = get_config_field(job, "agent_file_id") ->
-          AgentFileScanner.get_by_id(agent_file_id)
+            true ->
+              nil
+          end
 
-        true ->
-          nil
+        {:noreply, socket |> assign(:scheduling_prompt, prompt) |> assign(:scheduling_job, job)}
       end
+    else
+      :error ->
+        {:noreply, put_flash(socket, :error, "Invalid job ID")}
 
-    {:noreply, socket |> assign(:scheduling_prompt, prompt) |> assign(:scheduling_job, job)}
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Job not found")}
+    end
   end
 
   def handle_cancel_schedule(_params, socket) do
@@ -84,7 +96,10 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers do
               if is_fs do
                 Map.put(c, "agent_file_id", prompt_id_raw)
               else
-                Map.put(c, "prompt_id", String.to_integer(prompt_id_raw))
+                case Integer.parse(prompt_id_raw || "") do
+                  {int_id, ""} -> Map.put(c, "prompt_id", int_id)
+                  _ -> c
+                end
               end
             end)
             |> put_if_present("max_budget_usd", params["max_budget_usd"])
@@ -103,17 +118,36 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers do
               "schedule_type" => params["schedule_type"],
               "schedule_value" => params["schedule_value"],
               "config" => config,
-              "prompt_id" => if(is_fs, do: nil, else: String.to_integer(prompt_id_raw)),
+              "prompt_id" => if(is_fs, do: nil, else: case Integer.parse(prompt_id_raw || "") do
+                {int_id, ""} -> int_id
+                _ -> nil
+              end),
               "enabled" => 1
             }
             |> put_if_present("timezone", params["timezone"])
 
+          caller_project_id = Map.get(socket.assigns, :project_id)
+
           result =
             if params["job_id"] && params["job_id"] != "" do
-              job = ScheduledJobs.get_job!(String.to_integer(params["job_id"]))
-              ScheduledJobs.update_job(job, job_attrs)
+              case parse_job_id(params["job_id"]) do
+                :error ->
+                  {:error, :invalid_id}
+
+                {:ok, int_id} ->
+                  case ScheduledJobs.get_job(int_id) do
+                    {:error, :not_found} -> {:error, :not_found}
+                    {:ok, job} ->
+                      if not job_accessible?(job, socket) do
+                        {:error, :access_denied}
+                      else
+                        ScheduledJobs.update_job(job, job_attrs, caller_project_id)
+                      end
+                  end
+              end
             else
-              ScheduledJobs.create_job(job_attrs)
+              attrs = if caller_project_id, do: Map.put(job_attrs, "project_id", caller_project_id), else: job_attrs
+              ScheduledJobs.create_job(attrs)
             end
 
           case result do
@@ -124,6 +158,15 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers do
                |> assign(:scheduling_job, nil)
                |> load_agent_schedule_data()
                |> put_flash(:info, "Schedule saved")}
+
+            {:error, :not_found} ->
+              {:noreply, put_flash(socket, :error, "Job not found")}
+
+            {:error, :invalid_id} ->
+              {:noreply, put_flash(socket, :error, "Invalid job ID")}
+
+            {:error, :access_denied} ->
+              {:noreply, put_flash(socket, :error, "Access denied")}
 
             {:error, :already_scheduled} ->
               {:noreply, put_flash(socket, :error, "This agent already has a schedule")}
@@ -206,10 +249,28 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers do
   end
 
   defp resolve_prompt(id, _socket) do
-    if AgentFileScanner.filesystem_id?(id) do
-      AgentFileScanner.get_by_id(id)
-    else
-      Prompts.get_prompt!(String.to_integer(id))
+    cond do
+      is_nil(id) || id == "" ->
+        nil
+
+      AgentFileScanner.filesystem_id?(id) ->
+        AgentFileScanner.get_by_id(id)
+
+      true ->
+        case Integer.parse(id) do
+          {int_id, ""} -> Prompts.get_prompt(int_id)
+          _ -> nil
+        end
+    end
+  end
+
+  # A job is accessible from a project-scoped page only if it belongs to that exact project.
+  # Global jobs (project_id nil) are blocked from project pages. No restriction from the
+  # overview page (no project_id in assigns).
+  defp job_accessible?(job, socket) do
+    case Map.get(socket.assigns, :project_id) do
+      nil -> true
+      project_id -> job.project_id == project_id
     end
   end
 
@@ -230,8 +291,13 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers do
 
     cond do
       override_id && override_id != "" ->
-        project = Projects.get_project(String.to_integer(override_id))
-        if project && project.path, do: {:ok, project.path}, else: {:error, :no_project}
+        case Integer.parse(override_id) do
+          {int_id, ""} ->
+            project = Projects.get_project(int_id)
+            if project && project.path, do: {:ok, project.path}, else: {:error, :no_project}
+          _ ->
+            {:error, :no_project}
+        end
 
       prompt[:project_id] || Map.get(prompt, :project_id) ->
         pid = prompt[:project_id] || Map.get(prompt, :project_id)

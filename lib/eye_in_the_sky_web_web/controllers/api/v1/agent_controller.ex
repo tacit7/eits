@@ -139,16 +139,33 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
     ## Team Context
     You are member "#{member_name || "agent"}" of team "#{team.name}" (team_id: #{team.id}).
     You have been registered as a team member automatically.
-    Use i-team-members with team_id: #{team.id} to discover your teammates.
-    Use i-todo list with team_id: #{team.id} to see shared tasks and claim work.
-    Use i-team-join with command: "status" to update your status (active/idle/done).
+
+    ## EITS Command Protocol
+
+    How you issue EITS commands depends on your CLAUDE_CODE_ENTRYPOINT:
+
+    **If CLAUDE_CODE_ENTRYPOINT=sdk-cli (headless/spawned agent):** emit EITS-CMD: lines in your output.
+    The AgentWorker intercepts these in-process — no eits script, no HTTP calls needed.
+
+      EITS-CMD: task begin <title>
+      EITS-CMD: task annotate <task_id> <body>
+      EITS-CMD: task done <task_id>
+      EITS-CMD: dm --to <session_uuid> --message <msg>
+      EITS-CMD: commit <hash>
+
+    **If CLAUDE_CODE_ENTRYPOINT=cli (interactive session):** use the eits CLI script.
+
+      eits tasks begin --title "Task name"
+      eits tasks annotate <id> --body "What was done"
+      eits tasks update <id> --state 4
+      eits dm --to <session_uuid> --message "done"
 
     ## Task Completion
-    When you finish a task or move it to in-review (state 4), follow this sequence exactly:
-    1. Call `i-todo` with command: "annotate", task_id: "<task_id>", body: "Summary of what was done, decisions made, and any issues encountered"
-    2. Call `i-todo` with command: "done", task_id: "<task_id>" (or command: "status", task_id: "<task_id>", state_id: 4 for in-review)
-    3. Call `i-team-join` with command: "status", status: "done"
-    4. Run the `/i-update-status` slash command to commit your work and update session tracking
+    When you finish a task, follow this sequence exactly:
+    1. Annotate the task with a summary of what was done
+    2. Mark it done (or move to in-review, state 4)
+    3. DM the orchestrator session to report completion
+    4. Run the `/i-update-status` slash command to commit work and update session tracking
     Do NOT skip any steps. The orchestrator needs to see what you did.
     """
   end

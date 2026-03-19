@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workspace Overlay — Layout Design</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-base-300 min-h-screen p-6">
+
+  <div class="max-w-7xl mx-auto space-y-8">
+
+    <div>
+      <h1 class="text-2xl font-bold">Option B — Workspace Overlay: Layout Design</h1>
+      <p class="text-base-content/50 text-sm mt-1">Full-screen overlay triggered from the sidebar. Review each section and confirm in the terminal.</p>
+    </div>
+
+    <!-- Section 1: App with workspace toggle -->
+    <div class="space-y-2">
+      <div class="badge badge-ghost">Section 1 — App layout with workspace toggle in sidebar</div>
+      <div class="card bg-base-100 shadow-xl overflow-hidden">
+        <div class="card-body p-0">
+          <div class="flex h-[420px]">
+
+            <!-- Sidebar -->
+            <div class="w-52 bg-base-200 border-r border-base-300 flex flex-col">
+              <div class="p-4 border-b border-base-300">
+                <div class="flex items-center gap-2">
+                  <div class="w-6 h-6 rounded bg-primary/30 flex items-center justify-center">
+                    <span class="text-primary text-xs font-bold">E</span>
+                  </div>
+                  <span class="font-semibold text-sm">Eye in the Sky</span>
+                </div>
+              </div>
+              <nav class="flex-1 p-2 space-y-0.5 text-sm">
+                <div class="flex items-center gap-2 px-3 py-2 rounded bg-base-300 text-base-content">
+                  <span class="opacity-60">⊡</span> Sessions
+                </div>
+                <div class="flex items-center gap-2 px-3 py-2 rounded hover:bg-base-300 text-base-content/60">
+                  <span class="opacity-60">✓</span> Tasks
+                </div>
+                <div class="flex items-center gap-2 px-3 py-2 rounded hover:bg-base-300 text-base-content/60">
+                  <span class="opacity-60">✎</span> Notes
+                </div>
+                <div class="flex items-center gap-2 px-3 py-2 rounded hover:bg-base-300 text-base-content/60">
+                  <span class="opacity-60">◈</span> Chat
+                </div>
+
+                <div class="pt-4 pb-1 px-3">
+                  <span class="text-[10px] uppercase tracking-widest text-base-content/30 font-semibold">Workspace</span>
+                </div>
+
+                <!-- Workspace toggle button -->
+                <div class="flex items-center gap-2 px-3 py-2 rounded bg-secondary/15 border border-secondary/30 text-secondary cursor-pointer hover:bg-secondary/25 transition-colors">
+                  <span>⬡</span>
+                  <span class="font-medium">Open Workspace</span>
+                </div>
+
+                <!-- Workspace list -->
+                <div class="pl-3 space-y-0.5 text-xs">
+                  <div class="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-base-300 text-base-content/50 cursor-pointer">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success/60 inline-block"></span> Design Sprint
+                  </div>
+                  <div class="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-base-300 text-base-content/50 cursor-pointer">
+                    <span class="w-1.5 h-1.5 rounded-full bg-base-content/20 inline-block"></span> Research
+                  </div>
+                  <div class="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-base-300 text-base-content/40 cursor-pointer">
+                    <span class="text-base-content/30">+</span> New workspace
+                  </div>
+                </div>
+              </nav>
+            </div>
+
+            <!-- Main content (dimmed, behind overlay) -->
+            <div class="flex-1 relative">
+              <!-- Page content (blurred/dimmed) -->
+              <div class="absolute inset-0 bg-base-100 p-4 opacity-30 blur-[1px] pointer-events-none select-none">
+                <div class="text-base font-semibold mb-3">Sessions</div>
+                <div class="space-y-2">
+                  <div class="h-12 bg-base-200 rounded-lg"></div>
+                  <div class="h-12 bg-base-200 rounded-lg"></div>
+                  <div class="h-12 bg-base-200 rounded-lg"></div>
+                </div>
+              </div>
+
+              <!-- Workspace Overlay -->
+              <div class="absolute inset-0 bg-base-100/80 backdrop-blur-md">
+
+                <!-- Overlay top bar -->
+                <div class="flex items-center justify-between px-4 py-2 border-b border-base-300 bg-base-200/70">
+                  <div class="flex items-center gap-3">
+                    <span class="text-secondary font-semibold text-sm">⬡ Workspace</span>
+                    <div class="tabs tabs-boxed tabs-xs bg-base-300">
+                      <a class="tab tab-active tab-xs">Design Sprint</a>
+                      <a class="tab tab-xs text-base-content/50">Research</a>
+                      <a class="tab tab-xs text-base-content/30">+ New</a>
+                    </div>
+                  </div>
+                  <button class="btn btn-ghost btn-xs gap-1">✕ Close</button>
+                </div>
+
+                <!-- Canvas area with floating windows -->
+                <div class="relative w-full" style="height: calc(100% - 40px);">
+
+                  <!-- Floating chat window 1 -->
+                  <div class="absolute bg-base-100 rounded-xl shadow-2xl border border-base-300 flex flex-col overflow-hidden"
+                       style="left: 24px; top: 16px; width: 240px; height: 180px;">
+                    <div class="flex items-center justify-between px-3 py-2 bg-base-200 border-b border-base-300 cursor-move select-none shrink-0">
+                      <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-success inline-block"></span>
+                        <span class="text-xs font-medium truncate">session-42 · design</span>
+                      </div>
+                      <div class="flex gap-1">
+                        <div class="w-3 h-3 rounded-full bg-warning/60 cursor-pointer"></div>
+                        <div class="w-3 h-3 rounded-full bg-error/60 cursor-pointer"></div>
+                      </div>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-2 space-y-1.5 text-xs">
+                      <div class="chat chat-end">
+                        <div class="chat-bubble chat-bubble-primary text-xs py-1 px-2">What color palette should I use?</div>
+                      </div>
+                      <div class="chat chat-start">
+                        <div class="chat-bubble text-xs py-1 px-2 bg-base-200">Try slate + indigo — clean and modern.</div>
+                      </div>
+                    </div>
+                    <div class="flex gap-1 p-1.5 border-t border-base-300 shrink-0">
+                      <input class="input input-xs flex-1 bg-base-200 text-xs" placeholder="Message..." />
+                      <button class="btn btn-primary btn-xs px-2">↑</button>
+                    </div>
+                  </div>
+
+                  <!-- Floating chat window 2 -->
+                  <div class="absolute bg-base-100 rounded-xl shadow-2xl border border-primary/30 flex flex-col overflow-hidden"
+                       style="left: 290px; top: 60px; width: 240px; height: 180px;">
+                    <div class="flex items-center justify-between px-3 py-2 bg-base-200 border-b border-primary/20 cursor-move select-none shrink-0">
+                      <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-warning inline-block"></span>
+                        <span class="text-xs font-medium truncate text-primary">session-99 · backend</span>
+                      </div>
+                      <div class="flex gap-1">
+                        <div class="w-3 h-3 rounded-full bg-warning/60 cursor-pointer"></div>
+                        <div class="w-3 h-3 rounded-full bg-error/60 cursor-pointer"></div>
+                      </div>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-2 space-y-1.5 text-xs">
+                      <div class="chat chat-end">
+                        <div class="chat-bubble chat-bubble-primary text-xs py-1 px-2">Debug the auth flow</div>
+                      </div>
+                      <div class="chat chat-start">
+                        <div class="chat-bubble text-xs py-1 px-2 bg-base-200 text-warning">Working on it...</div>
+                      </div>
+                    </div>
+                    <div class="flex gap-1 p-1.5 border-t border-base-300 shrink-0">
+                      <input class="input input-xs flex-1 bg-base-200 text-xs" placeholder="Message..." />
+                      <button class="btn btn-primary btn-xs px-2">↑</button>
+                    </div>
+                  </div>
+
+                  <div class="absolute bottom-3 right-3 text-[10px] text-base-content/20 select-none">
+                    Drag to move · corner to resize
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: "Add to Workspace" flow on session card -->
+    <div class="space-y-2">
+      <div class="badge badge-ghost">Section 2 — "Add to Workspace" dropdown on a session card</div>
+      <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+          <div class="flex items-start gap-8 flex-wrap">
+
+            <div class="space-y-2">
+              <p class="text-xs text-base-content/40 uppercase tracking-wide">Session card (existing)</p>
+              <div class="card bg-base-200 w-72 shadow border border-base-300">
+                <div class="card-body p-3">
+                  <div class="flex items-start justify-between">
+                    <div>
+                      <div class="font-semibold text-sm">design-sprint-ui</div>
+                      <div class="text-xs text-base-content/50 mt-0.5">Working · GPT-4o</div>
+                    </div>
+                    <div class="badge badge-success badge-sm">working</div>
+                  </div>
+                  <div class="text-xs text-base-content/40 mt-1">Refactoring the dashboard layout...</div>
+                  <div class="flex gap-1 mt-2">
+                    <button class="btn btn-ghost btn-xs">Open</button>
+                    <button class="btn btn-ghost btn-xs">⋯</button>
+                    <div class="dropdown dropdown-top">
+                      <button tabindex="0" class="btn btn-secondary btn-xs gap-1">
+                        ⬡ Add to Workspace
+                      </button>
+                      <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-10 w-44 p-1 shadow-xl border border-base-300 text-xs">
+                        <li class="menu-title text-[10px]">Select workspace</li>
+                        <li><a>⬡ Design Sprint</a></li>
+                        <li><a>⬡ Research</a></li>
+                        <hr class="border-base-300 my-1" />
+                        <li><a class="text-secondary">+ New workspace</a></li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center self-center text-base-content/30 text-2xl">→</div>
+
+            <div class="space-y-2">
+              <p class="text-xs text-base-content/40 uppercase tracking-wide">Result: toast + workspace opens</p>
+              <div class="alert alert-success text-xs w-72 py-2">
+                <span>✓ Added to <strong>Design Sprint</strong>. <a class="link">Open workspace →</a></span>
+              </div>
+              <p class="text-[11px] text-base-content/40">Workspace overlay opens automatically with the new chat window visible.</p>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: New workspace creation inline -->
+    <div class="space-y-2">
+      <div class="badge badge-ghost">Section 3 — Creating a new workspace inline</div>
+      <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+          <div class="flex items-start gap-8 flex-wrap">
+            <div class="space-y-2">
+              <p class="text-xs text-base-content/40 uppercase tracking-wide">User clicks "+ New workspace"</p>
+              <div class="card bg-base-200 w-72 border border-base-300">
+                <div class="card-body p-3 space-y-2">
+                  <p class="text-xs font-medium">New workspace</p>
+                  <input class="input input-sm w-full bg-base-100" placeholder="Workspace name..." value="Sprint Review" />
+                  <div class="flex gap-2">
+                    <button class="btn btn-primary btn-sm flex-1">Create &amp; Add Session</button>
+                    <button class="btn btn-ghost btn-sm">Cancel</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert alert-info text-sm">
+      <span>Does this layout look right? Confirm in the terminal — or let me know what to adjust.</span>
+    </div>
+
+  </div>
+
+</body>
+</html>

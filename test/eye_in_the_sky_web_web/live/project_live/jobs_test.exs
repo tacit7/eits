@@ -272,6 +272,24 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.JobsTest do
     end
   end
 
+  describe "malformed job_id on schedule paths" do
+    test "edit_schedule with non-integer job_id shows flash error not crash",
+         %{conn: conn, project: project} do
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      render_click(view, "edit_schedule", %{"job_id" => "abc"})
+
+      assert has_element?(view, "#flash-error", "Invalid job ID")
+    end
+
+    test "edit_schedule with empty string job_id shows flash error not crash",
+         %{conn: conn, project: project} do
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      render_click(view, "edit_schedule", %{"job_id" => "1abc2"})
+
+      assert has_element?(view, "#flash-error", "Invalid job ID")
+    end
+  end
+
   describe "run_now failure" do
     # Tests via the overview /jobs page where handle_run_now is called without
     # get_job! first, so a non-existent ID returns {:error, :not_found} cleanly.

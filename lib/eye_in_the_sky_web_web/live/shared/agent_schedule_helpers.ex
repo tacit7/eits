@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers do
 
   import Phoenix.Component, only: [assign: 2, assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3]
+  import EyeInTheSkyWebWeb.Live.Shared.JobsHelpers, only: [parse_job_id: 1]
 
   alias EyeInTheSkyWeb.{Prompts, ScheduledJobs, Projects}
   alias EyeInTheSkyWeb.Claude.AgentFileScanner
@@ -39,28 +40,31 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers do
   end
 
   def handle_edit_schedule(%{"job_id" => job_id}, socket) do
-    case ScheduledJobs.get_job(String.to_integer(job_id)) do
+    with {:ok, int_id} <- parse_job_id(job_id),
+         {:ok, job} <- ScheduledJobs.get_job(int_id) do
+      if not job_accessible?(job, socket) do
+        {:noreply, put_flash(socket, :error, "Access denied")}
+      else
+        prompt =
+          cond do
+            job.prompt_id ->
+              Prompts.get_prompt!(job.prompt_id)
+
+            agent_file_id = get_config_field(job, "agent_file_id") ->
+              AgentFileScanner.get_by_id(agent_file_id)
+
+            true ->
+              nil
+          end
+
+        {:noreply, socket |> assign(:scheduling_prompt, prompt) |> assign(:scheduling_job, job)}
+      end
+    else
+      :error ->
+        {:noreply, put_flash(socket, :error, "Invalid job ID")}
+
       {:error, :not_found} ->
         {:noreply, put_flash(socket, :error, "Job not found")}
-
-      {:ok, job} ->
-        if not job_accessible?(job, socket) do
-          {:noreply, put_flash(socket, :error, "Access denied")}
-        else
-          prompt =
-            cond do
-              job.prompt_id ->
-                Prompts.get_prompt!(job.prompt_id)
-
-              agent_file_id = get_config_field(job, "agent_file_id") ->
-                AgentFileScanner.get_by_id(agent_file_id)
-
-              true ->
-                nil
-            end
-
-          {:noreply, socket |> assign(:scheduling_prompt, prompt) |> assign(:scheduling_job, job)}
-        end
     end
   end
 
@@ -116,20 +120,28 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers do
             }
             |> put_if_present("timezone", params["timezone"])
 
+          caller_project_id = Map.get(socket.assigns, :project_id)
+
           result =
             if params["job_id"] && params["job_id"] != "" do
-              case ScheduledJobs.get_job(String.to_integer(params["job_id"])) do
-                {:error, :not_found} -> {:error, :not_found}
-                {:ok, job} ->
-                  if not job_accessible?(job, socket) do
-                    {:error, :access_denied}
-                  else
-                    caller_project_id = Map.get(socket.assigns, :project_id)
-                    ScheduledJobs.update_job(job, job_attrs, caller_project_id)
+              case parse_job_id(params["job_id"]) do
+                :error ->
+                  {:error, :invalid_id}
+
+                {:ok, int_id} ->
+                  case ScheduledJobs.get_job(int_id) do
+                    {:error, :not_found} -> {:error, :not_found}
+                    {:ok, job} ->
+                      if not job_accessible?(job, socket) do
+                        {:error, :access_denied}
+                      else
+                        ScheduledJobs.update_job(job, job_attrs, caller_project_id)
+                      end
                   end
               end
             else
-              ScheduledJobs.create_job(job_attrs)
+              attrs = if caller_project_id, do: Map.put(job_attrs, "project_id", caller_project_id), else: job_attrs
+              ScheduledJobs.create_job(attrs)
             end
 
           case result do
@@ -143,6 +155,9 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers do
 
             {:error, :not_found} ->
               {:noreply, put_flash(socket, :error, "Job not found")}
+
+            {:error, :invalid_id} ->
+              {:noreply, put_flash(socket, :error, "Invalid job ID")}
 
             {:error, :access_denied} ->
               {:noreply, put_flash(socket, :error, "Access denied")}

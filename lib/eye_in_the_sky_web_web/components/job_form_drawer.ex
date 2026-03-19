@@ -94,7 +94,6 @@ defmodule EyeInTheSkyWebWeb.Components.JobFormDrawer do
                 name="job[description]"
                 value={(@editing_job && @editing_job.description) || ""}
                 class="input input-bordered w-full"
-                required
               />
             </div>
 
@@ -185,6 +184,7 @@ defmodule EyeInTheSkyWebWeb.Components.JobFormDrawer do
                   name="job[config_command]"
                   value={cfg(@form_config, "command")}
                   class="input input-bordered w-full font-mono"
+                  required
                 />
               </div>
               <div class="form-control">
@@ -251,6 +251,7 @@ defmodule EyeInTheSkyWebWeb.Components.JobFormDrawer do
                   name="job[config_task]"
                   value={cfg(@form_config, "task")}
                   class="input input-bordered w-full font-mono"
+                  required
                 />
               </div>
               <div class="form-control">

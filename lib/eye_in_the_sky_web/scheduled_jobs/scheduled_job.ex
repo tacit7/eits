@@ -55,6 +55,29 @@ defmodule EyeInTheSkyWeb.ScheduledJobs.ScheduledJob do
     |> validate_inclusion(:job_type, ["spawn_agent", "shell_command", "mix_task", "daily_digest"])
     |> validate_inclusion(:origin, ["system", "user"])
     |> validate_inclusion(:schedule_type, ["interval", "cron"])
+    |> validate_job_config()
     |> unique_constraint(:prompt_id, name: :idx_scheduled_jobs_unique_prompt)
+  end
+
+  defp validate_job_config(changeset) do
+    job_type = get_field(changeset, :job_type)
+    config_raw = get_field(changeset, :config) || "{}"
+
+    config =
+      case Jason.decode(config_raw) do
+        {:ok, map} -> map
+        _ -> %{}
+      end
+
+    cond do
+      job_type == "shell_command" and (config["command"] || "") |> String.trim() == "" ->
+        add_error(changeset, :config, "command is required for shell jobs")
+
+      job_type == "mix_task" and (config["task"] || "") |> String.trim() == "" ->
+        add_error(changeset, :config, "task is required for mix jobs")
+
+      true ->
+        changeset
+    end
   end
 end

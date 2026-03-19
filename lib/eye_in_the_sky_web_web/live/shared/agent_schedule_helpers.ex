@@ -39,24 +39,28 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers do
   end
 
   def handle_edit_schedule(%{"job_id" => job_id}, socket) do
-    job = ScheduledJobs.get_job!(String.to_integer(job_id))
+    case ScheduledJobs.get_job(String.to_integer(job_id)) do
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Job not found")}
 
-    if not job_accessible?(job, socket) do
-      {:noreply, put_flash(socket, :error, "Access denied")}
-    else
-      prompt =
-        cond do
-          job.prompt_id ->
-            Prompts.get_prompt!(job.prompt_id)
+      {:ok, job} ->
+        if not job_accessible?(job, socket) do
+          {:noreply, put_flash(socket, :error, "Access denied")}
+        else
+          prompt =
+            cond do
+              job.prompt_id ->
+                Prompts.get_prompt!(job.prompt_id)
 
-          agent_file_id = get_config_field(job, "agent_file_id") ->
-            AgentFileScanner.get_by_id(agent_file_id)
+              agent_file_id = get_config_field(job, "agent_file_id") ->
+                AgentFileScanner.get_by_id(agent_file_id)
 
-          true ->
-            nil
+              true ->
+                nil
+            end
+
+          {:noreply, socket |> assign(:scheduling_prompt, prompt) |> assign(:scheduling_job, job)}
         end
-
-      {:noreply, socket |> assign(:scheduling_prompt, prompt) |> assign(:scheduling_job, job)}
     end
   end
 
@@ -114,12 +118,14 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers do
 
           result =
             if params["job_id"] && params["job_id"] != "" do
-              job = ScheduledJobs.get_job!(String.to_integer(params["job_id"]))
-
-              if not job_accessible?(job, socket) do
-                {:error, :access_denied}
-              else
-                ScheduledJobs.update_job(job, job_attrs)
+              case ScheduledJobs.get_job(String.to_integer(params["job_id"])) do
+                {:error, :not_found} -> {:error, :not_found}
+                {:ok, job} ->
+                  if not job_accessible?(job, socket) do
+                    {:error, :access_denied}
+                  else
+                    ScheduledJobs.update_job(job, job_attrs)
+                  end
               end
             else
               ScheduledJobs.create_job(job_attrs)
@@ -133,6 +139,9 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers do
                |> assign(:scheduling_job, nil)
                |> load_agent_schedule_data()
                |> put_flash(:info, "Schedule saved")}
+
+            {:error, :not_found} ->
+              {:noreply, put_flash(socket, :error, "Job not found")}
 
             {:error, :access_denied} ->
               {:noreply, put_flash(socket, :error, "Access denied")}

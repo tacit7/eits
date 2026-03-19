@@ -687,6 +687,41 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
               <span class="text-right">{job.run_count || 0}</span>
             </div>
 
+            <div class="mt-3 flex items-center justify-end gap-1 border-t border-base-content/10 pt-2">
+              <input
+                type="checkbox"
+                class="toggle toggle-xs toggle-primary"
+                checked={job.enabled == 1}
+                phx-click="toggle_job"
+                phx-value-id={job.id}
+              />
+              <button
+                class="btn btn-ghost btn-xs"
+                phx-click="run_now"
+                phx-value-id={job.id}
+                title="Run Now"
+              >
+                <.icon name="hero-play" class="w-3 h-3" />
+              </button>
+              <button
+                class="btn btn-ghost btn-xs"
+                phx-click="edit_job"
+                phx-value-id={job.id}
+                title="Edit"
+              >
+                <.icon name="hero-pencil-square" class="w-3 h-3" />
+              </button>
+              <button
+                class="btn btn-ghost btn-xs text-error"
+                phx-click="delete_job"
+                phx-value-id={job.id}
+                data-confirm="Delete this job?"
+                title="Delete"
+              >
+                <.icon name="hero-trash" class="w-3 h-3" />
+              </button>
+            </div>
+
             <%= if @expanded_job_id == job.id do %>
               <div class="mt-3 rounded-lg bg-base-200/50 p-2">
                 <p class="text-xs font-medium mb-2">Recent Runs</p>

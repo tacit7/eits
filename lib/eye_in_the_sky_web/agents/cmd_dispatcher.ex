@@ -302,7 +302,7 @@ defmodule EyeInTheSkyWeb.Agents.CmdDispatcher do
         instructions: instructions,
         description: description,
         project_id: session && session.project_id,
-        project_path: session && session.project_path
+        project_path: session && session.git_worktree_path
       ]
       opts = if model, do: Keyword.put(opts, :model, model), else: opts
 

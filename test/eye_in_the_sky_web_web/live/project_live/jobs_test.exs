@@ -180,4 +180,77 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.JobsTest do
       assert has_element?(view, "div", "Recent Runs")
     end
   end
+
+  describe "cross-project access guard" do
+    test "toggling a job from another project shows error flash and leaves job unchanged",
+         %{conn: conn, project: project} do
+      {:ok, other_project} =
+        Projects.create_project(%{name: "other-xp", path: "/tmp/other-xp", slug: "other-xp"})
+
+      {:ok, other_job} =
+        ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Other Job"}))
+
+      original_enabled = other_job.enabled
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      render_click(view, "toggle_job", %{"id" => "#{other_job.id}"})
+
+      assert render(view) =~ "Access denied"
+
+      {:ok, unchanged} = ScheduledJobs.get_job(other_job.id)
+      assert unchanged.enabled == original_enabled
+    end
+
+    test "deleting a job from another project shows error flash and leaves job in DB",
+         %{conn: conn, project: project} do
+      {:ok, other_project} =
+        Projects.create_project(%{name: "other-del", path: "/tmp/other-del", slug: "other-del"})
+
+      {:ok, other_job} =
+        ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Delete Target"}))
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      render_click(view, "delete_job", %{"id" => "#{other_job.id}"})
+
+      assert render(view) =~ "Access denied"
+      assert {:ok, _} = ScheduledJobs.get_job(other_job.id)
+    end
+
+    test "run_now on a job from another project shows error flash",
+         %{conn: conn, project: project} do
+      {:ok, other_project} =
+        Projects.create_project(%{
+          name: "other-run",
+          path: "/tmp/other-run",
+          slug: "other-run"
+        })
+
+      {:ok, other_job} =
+        ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Run Target"}))
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      render_click(view, "run_now", %{"id" => "#{other_job.id}"})
+
+      assert render(view) =~ "Access denied"
+    end
+  end
+
+  describe "run_now failure" do
+    test "run_now on non-existent job shows error flash not success",
+         %{conn: conn, project: project} do
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      render_click(view, "run_now", %{"id" => "999999"})
+
+      html = render(view)
+      assert html =~ "Failed to trigger job"
+      refute html =~ "Job triggered"
+    end
+  end
+
+  describe "nil project redirect" do
+    test "redirects to /projects when project ID does not exist", %{conn: conn} do
+      assert {:error, {:redirect, %{to: "/projects"}}} =
+               live(conn, ~p"/projects/99999/jobs")
+    end
+  end
 end

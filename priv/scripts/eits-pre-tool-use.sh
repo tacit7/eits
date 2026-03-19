@@ -50,7 +50,7 @@ if [ "$is_spawned" != "true" ]; then
   active_count=$(eits tasks list --session "$session_id" --state 2 2>/dev/null | jq -r '.tasks | length' 2>/dev/null || echo "0")
   if [ "${active_count:-0}" -eq 0 ]; then
     jq -n \
-      --arg reason "No active EITS todo for session $session_ref. Workflow: (1) eits tasks create --title \"Task\" (2) eits tasks start <id> (3) eits tasks update <id> --state 4 when done" \
+      --arg reason "No active EITS todo for session $session_ref. Run: eits tasks begin --title \"Task name\" (creates, links, and starts in one shot). Complete with: eits tasks update <id> --state 4" \
       '{
         hookSpecificOutput: {
           hookEventName: "PreToolUse",

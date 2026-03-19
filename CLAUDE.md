@@ -53,11 +53,31 @@ Session status is driven by Claude Code hooks and explicit commands:
 
 `CLAUDE_CODE_ENTRYPOINT` distinguishes `cli` (spawned/print mode) from `sdk-cli` (interactive).
 
-**Task workflow — use `begin` to create and start in one shot:**
+## Entrypoint-Based Command Protocol
+
+**How you dispatch EITS commands depends on your `CLAUDE_CODE_ENTRYPOINT`:**
+
+| Entrypoint | Mode | Use |
+|------------|------|-----|
+| `cli` | Spawned/print agent | `EITS-CMD:` directives in output |
+| `sdk-cli` | Interactive session | `eits` CLI script |
+
+**`cli` (spawned agents) — use `EITS-CMD:` lines:**
+```
+EITS-CMD: task begin Fix broken import
+EITS-CMD: task done 1234
+EITS-CMD: task annotate 1234 What I did and why
+EITS-CMD: dm --to <session_uuid> --message "done"
+EITS-CMD: commit abc1234
+```
+These are intercepted by AgentWorker in-process — no HTTP round-trips. Never use the `eits` bash script when running as `cli`.
+
+**`sdk-cli` (interactive sessions) — use `eits` script:**
 ```bash
 eits tasks begin --title "Task name"   # replaces: create + start
 eits tasks annotate <id> --body "..."
 eits tasks update <id> --state 4
+eits dm --to <session_uuid> --message "done"
 ```
 
 ## REST API

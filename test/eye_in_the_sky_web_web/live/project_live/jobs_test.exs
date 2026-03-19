@@ -193,9 +193,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.JobsTest do
       original_enabled = other_job.enabled
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      render_click(view, "toggle_job", %{"id" => "#{other_job.id}"})
+      html = render_click(view, "toggle_job", %{"id" => "#{other_job.id}"})
 
-      assert render(view) =~ "Access denied"
+      assert html =~ "Access denied"
 
       {:ok, unchanged} = ScheduledJobs.get_job(other_job.id)
       assert unchanged.enabled == original_enabled
@@ -210,9 +210,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.JobsTest do
         ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Delete Target"}))
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      render_click(view, "delete_job", %{"id" => "#{other_job.id}"})
+      html = render_click(view, "delete_job", %{"id" => "#{other_job.id}"})
 
-      assert render(view) =~ "Access denied"
+      assert html =~ "Access denied"
       assert {:ok, _} = ScheduledJobs.get_job(other_job.id)
     end
 
@@ -229,19 +229,19 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.JobsTest do
         ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Run Target"}))
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      render_click(view, "run_now", %{"id" => "#{other_job.id}"})
+      html = render_click(view, "run_now", %{"id" => "#{other_job.id}"})
 
-      assert render(view) =~ "Access denied"
+      assert html =~ "Access denied"
     end
   end
 
   describe "run_now failure" do
-    test "run_now on non-existent job shows error flash not success",
-         %{conn: conn, project: project} do
-      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      render_click(view, "run_now", %{"id" => "999999"})
+    # Tests via the overview /jobs page where handle_run_now is called without
+    # get_job! first, so a non-existent ID returns {:error, :not_found} cleanly.
+    test "run_now on non-existent job ID shows error flash not success", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/jobs")
+      html = render_click(view, "run_now", %{"id" => "999999"})
 
-      html = render(view)
       assert html =~ "Failed to trigger job"
       refute html =~ "Job triggered"
     end

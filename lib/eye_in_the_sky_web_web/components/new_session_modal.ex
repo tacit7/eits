@@ -24,9 +24,14 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
 
   @impl true
   def update(assigns, socket) do
-    project_path = assigns[:current_project] && assigns[:current_project].path
-    available_agents = list_agents(project_path)
-    {:ok, assign(socket, Map.put(assigns, :available_agents, available_agents))}
+    # When the form is open, skip parent re-renders to avoid DOM patches disrupting the modal
+    if socket.assigns[:show] == true && assigns[:show] == true do
+      {:ok, socket}
+    else
+      project_path = assigns[:current_project] && assigns[:current_project].path
+      available_agents = list_agents(project_path)
+      {:ok, assign(socket, Map.put(assigns, :available_agents, available_agents))}
+    end
   end
 
   @impl true

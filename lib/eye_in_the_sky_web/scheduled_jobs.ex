@@ -286,7 +286,7 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
       end
 
     %{"job_id" => job.id}
-    |> worker.new()
+    |> worker.new(unique: [period: 30, fields: [:args, :worker], states: [:available, :scheduled, :executing]])
     |> Oban.insert()
   end
 

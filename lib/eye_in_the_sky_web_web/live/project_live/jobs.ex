@@ -136,7 +136,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
 
     result =
       if socket.assigns.editing_job do
-        ScheduledJobs.update_job(socket.assigns.editing_job, attrs)
+        ScheduledJobs.update_job(socket.assigns.editing_job, attrs, socket.assigns.project_id)
       else
         ScheduledJobs.create_job(attrs)
       end
@@ -193,7 +193,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
         if not job_belongs_to_project?(job, socket.assigns.project_id) do
           {:noreply, put_flash(socket, :error, "Access denied")}
         else
-          ScheduledJobs.toggle_job(job)
+          ScheduledJobs.toggle_job(job, socket.assigns.project_id)
           {:noreply, reload_jobs(socket)}
         end
     end
@@ -224,12 +224,15 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
         if not job_belongs_to_project?(job, socket.assigns.project_id) do
           {:noreply, put_flash(socket, :error, "Access denied")}
         else
-          case ScheduledJobs.delete_job(job) do
+          case ScheduledJobs.delete_job(job, socket.assigns.project_id) do
             {:ok, _} ->
               {:noreply, socket |> reload_jobs() |> put_flash(:info, "Job deleted")}
 
             {:error, :system_job} ->
               {:noreply, put_flash(socket, :error, "Cannot delete system jobs")}
+
+            {:error, :unauthorized} ->
+              {:noreply, put_flash(socket, :error, "Access denied")}
           end
         end
     end
@@ -311,10 +314,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
      |> assign(:global_jobs, apply_job_filters(socket.assigns.all_global_jobs, socket.assigns))}
   end
 
-  # A job is accessible from a project-scoped page if it belongs to that project
-  # or has no project (global job). Prevents cross-project mutation via crafted events.
+  # A job is accessible from a project-scoped page only if it belongs to that exact project.
+  # Global jobs (project_id nil) are NOT accessible from project pages — they are only
+  # mutable from the overview page. This removes the previous is_nil bypass.
   defp job_belongs_to_project?(job, project_id) do
-    is_nil(job.project_id) or job.project_id == project_id
+    job.project_id == project_id
   end
 
   defp reload_jobs(socket) do

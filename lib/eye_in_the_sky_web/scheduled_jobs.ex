@@ -102,48 +102,56 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
     end
   end
 
-  def update_job(%ScheduledJob{} = job, attrs) do
-    now = iso_now()
+  def update_job(%ScheduledJob{} = job, attrs, caller_project_id \\ nil) do
+    if not authorized?(job, caller_project_id) do
+      {:error, :unauthorized}
+    else
+      now = iso_now()
 
-    attrs =
-      attrs
-      |> stringify_keys()
-      |> Map.delete("origin")
-      |> Map.put("updated_at", now)
-      |> maybe_encode_config()
+      attrs =
+        attrs
+        |> stringify_keys()
+        |> Map.delete("origin")
+        |> Map.put("updated_at", now)
+        |> maybe_encode_config()
 
-    case job |> ScheduledJob.changeset(attrs) |> Repo.update() do
-      {:ok, updated} ->
-        if Map.has_key?(attrs, "next_run_at") do
-          {:ok, Repo.get!(ScheduledJob, updated.id)}
-        else
-          next =
-            compute_next_run_at(
-              updated.schedule_type,
-              updated.schedule_value,
-              nil,
-              updated.timezone || "Etc/UTC"
-            )
+      case job |> ScheduledJob.changeset(attrs) |> Repo.update() do
+        {:ok, updated} ->
+          if Map.has_key?(attrs, "next_run_at") do
+            {:ok, Repo.get!(ScheduledJob, updated.id)}
+          else
+            next =
+              compute_next_run_at(
+                updated.schedule_type,
+                updated.schedule_value,
+                nil,
+                updated.timezone || "Etc/UTC"
+              )
 
-          update_job_fields(updated, %{next_run_at: next})
-          {:ok, Repo.get!(ScheduledJob, updated.id)}
-        end
+            update_job_fields(updated, %{next_run_at: next})
+            {:ok, Repo.get!(ScheduledJob, updated.id)}
+          end
 
-      error ->
-        error
+        error ->
+          error
+      end
     end
   end
 
-  def run_now(job_id) do
+  def run_now(job_id, caller_project_id \\ nil) do
     case get_job(job_id) do
       {:ok, job} ->
-        case enqueue_job(job) do
-          {:ok, _} = result ->
-            mark_job_executed(job)
-            result
+        if not authorized?(job, caller_project_id) do
+          {:error, :unauthorized}
+        else
+          case enqueue_job(job) do
+            {:ok, _} = result ->
+              mark_job_executed(job)
+              result
 
-          error ->
-            error
+            error ->
+              error
+          end
         end
 
       {:error, _} = err ->
@@ -151,13 +159,26 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
     end
   end
 
-  def delete_job(%ScheduledJob{origin: "system"}), do: {:error, :system_job}
+  def delete_job(job, caller_project_id \\ nil)
 
-  def delete_job(%ScheduledJob{} = job), do: Repo.delete(job)
+  def delete_job(%ScheduledJob{origin: "system"}, _caller_project_id),
+    do: {:error, :system_job}
 
-  def toggle_job(%ScheduledJob{} = job) do
-    new_enabled = if job.enabled == 1, do: 0, else: 1
-    update_job_fields(job, %{enabled: new_enabled, updated_at: iso_now()})
+  def delete_job(%ScheduledJob{} = job, caller_project_id) do
+    if not authorized?(job, caller_project_id) do
+      {:error, :unauthorized}
+    else
+      Repo.delete(job)
+    end
+  end
+
+  def toggle_job(%ScheduledJob{} = job, caller_project_id \\ nil) do
+    if not authorized?(job, caller_project_id) do
+      {:error, :unauthorized}
+    else
+      new_enabled = if job.enabled == 1, do: 0, else: 1
+      update_job_fields(job, %{enabled: new_enabled, updated_at: iso_now()})
+    end
   end
 
   def list_running_job_ids do
@@ -330,6 +351,13 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
   end
 
   # Private helpers
+
+  # Returns true if the caller is allowed to mutate the job.
+  # nil = overview/admin caller (no restriction).
+  # integer = project-scoped caller: job must belong to that exact project.
+  # Global jobs (job.project_id nil) are blocked from project-scoped callers.
+  defp authorized?(_job, nil), do: true
+  defp authorized?(job, caller_project_id), do: job.project_id == caller_project_id
 
   defp update_job_fields(job, fields) do
     job |> ScheduledJob.changeset(fields) |> Repo.update()

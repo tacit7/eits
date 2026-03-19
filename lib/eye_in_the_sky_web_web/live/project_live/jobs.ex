@@ -160,40 +160,62 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
   @impl true
   def handle_event("edit_job", %{"id" => id}, socket) do
     job = ScheduledJobs.get_job!(String.to_integer(id))
-    config = ScheduledJobs.decode_config(job)
-    scope = if is_nil(job.project_id), do: "global", else: "project"
 
-    {:noreply,
-     socket
-     |> assign(:show_form, true)
-     |> assign(:editing_job, job)
-     |> assign(:form_scope, scope)
-     |> assign(:changeset, ScheduledJobs.change_job(job))
-     |> assign(:form_job_type, job.job_type)
-     |> assign(:form_schedule_type, job.schedule_type)
-     |> assign(:form_config, config)}
+    if not job_belongs_to_project?(job, socket.assigns.project_id) do
+      {:noreply, put_flash(socket, :error, "Access denied")}
+    else
+      config = ScheduledJobs.decode_config(job)
+      scope = if is_nil(job.project_id), do: "global", else: "project"
+
+      {:noreply,
+       socket
+       |> assign(:show_form, true)
+       |> assign(:editing_job, job)
+       |> assign(:form_scope, scope)
+       |> assign(:changeset, ScheduledJobs.change_job(job))
+       |> assign(:form_job_type, job.job_type)
+       |> assign(:form_schedule_type, job.schedule_type)
+       |> assign(:form_config, config)}
+    end
   end
 
   @impl true
   def handle_event("toggle_job", %{"id" => id}, socket) do
     job = ScheduledJobs.get_job!(String.to_integer(id))
-    ScheduledJobs.toggle_job(job)
-    {:noreply, reload_jobs(socket)}
+
+    if not job_belongs_to_project?(job, socket.assigns.project_id) do
+      {:noreply, put_flash(socket, :error, "Access denied")}
+    else
+      ScheduledJobs.toggle_job(job)
+      {:noreply, reload_jobs(socket)}
+    end
   end
 
   @impl true
-  def handle_event("run_now", params, socket), do: handle_run_now(params, socket)
+  def handle_event("run_now", %{"id" => id} = params, socket) do
+    job = ScheduledJobs.get_job!(String.to_integer(id))
+
+    if not job_belongs_to_project?(job, socket.assigns.project_id) do
+      {:noreply, put_flash(socket, :error, "Access denied")}
+    else
+      handle_run_now(params, socket)
+    end
+  end
 
   @impl true
   def handle_event("delete_job", %{"id" => id}, socket) do
     job = ScheduledJobs.get_job!(String.to_integer(id))
 
-    case ScheduledJobs.delete_job(job) do
-      {:ok, _} ->
-        {:noreply, socket |> reload_jobs() |> put_flash(:info, "Job deleted")}
+    if not job_belongs_to_project?(job, socket.assigns.project_id) do
+      {:noreply, put_flash(socket, :error, "Access denied")}
+    else
+      case ScheduledJobs.delete_job(job) do
+        {:ok, _} ->
+          {:noreply, socket |> reload_jobs() |> put_flash(:info, "Job deleted")}
 
-      {:error, :system_job} ->
-        {:noreply, put_flash(socket, :error, "Cannot delete system jobs")}
+        {:error, :system_job} ->
+          {:noreply, put_flash(socket, :error, "Cannot delete system jobs")}
+      end
     end
   end
 
@@ -271,6 +293,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
      socket
      |> assign(:project_jobs, apply_job_filters(socket.assigns.all_project_jobs, socket.assigns))
      |> assign(:global_jobs, apply_job_filters(socket.assigns.all_global_jobs, socket.assigns))}
+  end
+
+  # A job is accessible from a project-scoped page if it belongs to that project
+  # or has no project (global job). Prevents cross-project mutation via crafted events.
+  defp job_belongs_to_project?(job, project_id) do
+    is_nil(job.project_id) or job.project_id == project_id
   end
 
   defp reload_jobs(socket) do

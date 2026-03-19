@@ -22,6 +22,8 @@ defmodule EyeInTheSkyWeb.Agents.CmdDispatcher do
 
       EITS-CMD: commit <hash>
 
+      EITS-CMD: spawn --instructions <text> [--description <text>] [--model <model>]
+
   ## Usage from a spawned agent (CLAUDE_CODE_ENTRYPOINT=cli)
 
       EITS-CMD: dm --to 0c77344b-52bc-4c3d-97a1-cf3c421cb325 --message "done"
@@ -29,6 +31,7 @@ defmodule EyeInTheSkyWeb.Agents.CmdDispatcher do
       EITS-CMD: task begin Fix broken import in dm_page
       EITS-CMD: task done 1234
       EITS-CMD: note Deployed hotfix for shift_zone crash
+      EITS-CMD: spawn --instructions "Review PR #38 and DM me back" --model sonnet
   """
 
   require Logger
@@ -75,6 +78,7 @@ defmodule EyeInTheSkyWeb.Agents.CmdDispatcher do
       ["task", args]   -> dispatch_task(args, from_session_id)
       ["note", args]   -> dispatch_note(args, from_session_id)
       ["commit", hash] -> dispatch_commit(String.trim(hash), from_session_id)
+      ["spawn", args]  -> dispatch_spawn(args, from_session_id)
       _                -> Logger.warning("[CmdDispatcher] Unknown command: #{rest}")
     end
   end
@@ -295,6 +299,42 @@ defmodule EyeInTheSkyWeb.Agents.CmdDispatcher do
   end
 
   defp dispatch_commit(_, _), do: Logger.warning("[CmdDispatcher] commit: empty hash")
+
+  # ---------------------------------------------------------------------------
+  # spawn
+  # ---------------------------------------------------------------------------
+
+  defp dispatch_spawn(args, from_session_id) do
+    with {:ok, instructions} <- extract_flag(args, "--instructions") do
+      session = get_session!(from_session_id)
+      description = case extract_flag(args, "--description") do
+        {:ok, d} -> d
+        _ -> "Spawned by session #{from_session_id}"
+      end
+      model = case extract_flag(args, "--model") do
+        {:ok, m} -> m
+        _ -> nil
+      end
+
+      opts = [
+        instructions: instructions,
+        description: description,
+        project_id: session && session.project_id,
+        project_path: session && session.project_path
+      ]
+      opts = if model, do: Keyword.put(opts, :model, model), else: opts
+
+      case AgentManager.create_agent(opts) do
+        {:ok, %{agent: agent, session: new_session}} ->
+          Logger.info("[CmdDispatcher] spawned agent=#{agent.id} session=#{new_session.id} from=#{from_session_id}")
+
+        {:error, reason} ->
+          Logger.warning("[CmdDispatcher] spawn failed: #{inspect(reason)}")
+      end
+    else
+      err -> Logger.warning("[CmdDispatcher] spawn: missing --instructions flag: #{inspect(err)}")
+    end
+  end
 
   # ---------------------------------------------------------------------------
   # Helpers

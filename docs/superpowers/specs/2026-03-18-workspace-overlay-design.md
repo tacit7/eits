@@ -59,9 +59,11 @@ Every page in the `:app` live_session renders inside a LiveView, making it a val
 
 ### Toggle State & Cross-Component Events
 
-The overlay's `open` boolean and `active_canvas_id` live in `CanvasOverlayComponent`'s own assigns. Since the sidebar is a separate LiveComponent, it cannot directly update the overlay's state. The sidebar sends `phx-click="toggle_canvas"` that bubbles to the parent LiveView via `handle_event/3`, which calls `send_update(CanvasOverlayComponent, id: "canvas-overlay", action: :toggle)`. The overlay handles `update/2` for the `:toggle` action and flips its `open` assign.
+The overlay's `open` boolean and `active_canvas_id` live in `CanvasOverlayComponent`'s own assigns. All events that open or toggle the overlay use `phx-target="#canvas-overlay"` to route directly to the component — bypassing the parent LiveView entirely. No `handle_event` needs to be added to any individual LiveView; behavior is consistent across all pages.
 
-Opening to a specific canvas tab (e.g., from "Add to Canvas") uses a JS `CustomEvent` dispatched on the window. A `phx-hook` on the overlay element listens for `canvas:open` events and calls `pushEvent("open_canvas", %{canvas_id: id})`, which the LiveComponent handles via `handle_event/3`. This avoids the flash/JS bridge pattern entirely.
+- **Sidebar toggle button:** `phx-click="toggle" phx-target="#canvas-overlay"` → `CanvasOverlayComponent.handle_event("toggle", ...)`
+- **Sidebar canvas list items:** `phx-click="open" phx-value-canvas-id={id} phx-target="#canvas-overlay"` → `handle_event("open", %{"canvas-id" => id}, ...)`
+- **Session card "Add to Canvas":** after creating the `canvas_sessions` record, calls `send_update(CanvasOverlayComponent, id: "canvas-overlay", action: :open_canvas, canvas_id: id)` from the parent LiveView's `handle_event`. The overlay opens automatically to the correct tab — no flash link needed.
 
 ---
 
@@ -70,16 +72,16 @@ Opening to a specific canvas tab (e.g., from "Add to Canvas") uses a JS `CustomE
 ### 1. Sidebar Entry
 
 - Section labelled **Canvas** below existing nav items
-- **"Open Canvas"** button (secondary style) — `phx-click="toggle_canvas"` handled in parent LiveView
-- Below it: list of canvas names with a colored dot if any session in that canvas is currently `working`
-- **"+ New canvas"** at the bottom of the list
+- **"Open Canvas"** button (secondary style) — `phx-click="toggle" phx-target="#canvas-overlay"`
+- Below it: list of canvas names with a colored dot if any session in that canvas is currently `working`; each item uses `phx-click="open" phx-value-canvas-id={id} phx-target="#canvas-overlay"`
+- **"+ New canvas"** at the bottom (inline name input)
 
 ### 2. Canvas Overlay
 
 **Layout:**
 - Full-screen fixed layer (`position: fixed; inset: 0; z-index: 60`) with `bg-base-100/80 backdrop-blur-md`
 - Z-index layering: mobile nav `z-40`, sidebar grab `z-45`, overlay `z-60`, flash `z-70`, command palette `z-80`
-- **Top bar:** "⬡ Canvas" label + DaisyUI `tabs tabs-boxed` canvas switcher + "✕ Close" button (ghost, xs)
+- **Top bar:** "⬡ Canvas" label + DaisyUI `tabs tabs-boxed` canvas switcher + "✕ Close" button (`phx-click="toggle" phx-target="#canvas-overlay"`)
 - **Surface area:** remaining viewport height, `position: relative`, `overflow: hidden`
 
 **Canvas tab switcher:**
@@ -128,13 +130,14 @@ New button in `session_card.ex` alongside existing action buttons.
 - Separator + **"+ New canvas"** at bottom
 
 **Selecting an existing canvas:**
-1. `phx-click="add_to_canvas"` with `canvas_id` and `session_id` params (integer session ID)
-2. `Canvases.add_session/2` upserts a `canvas_sessions` record (no-op if already present due to unique constraint)
-3. Flash confirmation: `"Added to Design Sprint. Open canvas →"` — the link dispatches `JS.dispatch("canvas:open", to: "#canvas-overlay", detail: %{canvas_id: id})`, caught by the hook on the overlay element
+1. `phx-click="add_to_canvas"` with `canvas_id` and `session_id` params (integer session ID), handled by the parent LiveView
+2. `Canvases.add_session/2` upserts a `canvas_sessions` record (unique constraint makes this idempotent)
+3. `send_update(CanvasOverlayComponent, id: "canvas-overlay", action: :open_canvas, canvas_id: id)` — overlay opens automatically to that canvas tab
+4. Plain `put_flash(:info, "Added to #{canvas.name}")` — no interactive link
 
 **Creating a new canvas:**
 - Selecting "+ New canvas" reveals an inline `input` in the dropdown
-- Submitting creates canvas + canvas_session in one transaction, then dispatches `canvas:open`
+- Submitting creates canvas + canvas_session in one transaction, then `send_update` opens the overlay on the new tab
 
 ### 6. Sending Messages
 

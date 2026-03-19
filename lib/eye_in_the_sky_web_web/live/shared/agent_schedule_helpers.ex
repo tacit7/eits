@@ -124,7 +124,8 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers do
                   if not job_accessible?(job, socket) do
                     {:error, :access_denied}
                   else
-                    ScheduledJobs.update_job(job, job_attrs)
+                    caller_project_id = Map.get(socket.assigns, :project_id)
+                    ScheduledJobs.update_job(job, job_attrs, caller_project_id)
                   end
               end
             else
@@ -234,13 +235,13 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.AgentScheduleHelpers do
     end
   end
 
-  # When a project_id is present in assigns, only allow jobs belonging to that project
-  # or global jobs (project_id nil). No restriction when there is no project context
-  # (e.g. the global overview page).
+  # A job is accessible from a project-scoped page only if it belongs to that exact project.
+  # Global jobs (project_id nil) are blocked from project pages. No restriction from the
+  # overview page (no project_id in assigns).
   defp job_accessible?(job, socket) do
     case Map.get(socket.assigns, :project_id) do
       nil -> true
-      project_id -> is_nil(job.project_id) or job.project_id == project_id
+      project_id -> job.project_id == project_id
     end
   end
 

@@ -155,9 +155,9 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
     #{task.description}
 
     When done, move the task to In Review. Use the appropriate method for your entrypoint:
-    - cli entrypoint:     EITS-CMD: task annotate #{task.id} <summary>
+    - sdk-cli entrypoint: EITS-CMD: task annotate #{task.id} <summary>
                           EITS-CMD: task done #{task.id}
-    - sdk-cli entrypoint: eits tasks annotate #{task.id} --body "<summary>"
+    - cli entrypoint:     eits tasks annotate #{task.id} --body "<summary>"
                           eits tasks update #{task.id} --state 4
     """
 

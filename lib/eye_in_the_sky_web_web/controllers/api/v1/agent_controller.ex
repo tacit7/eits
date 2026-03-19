@@ -144,7 +144,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
 
     How you issue EITS commands depends on your CLAUDE_CODE_ENTRYPOINT:
 
-    **If CLAUDE_CODE_ENTRYPOINT=cli (spawned/print agent):** emit EITS-CMD: lines in your output.
+    **If CLAUDE_CODE_ENTRYPOINT=sdk-cli (headless/spawned agent):** emit EITS-CMD: lines in your output.
     The AgentWorker intercepts these in-process — no eits script, no HTTP calls needed.
 
       EITS-CMD: task begin <title>
@@ -153,7 +153,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
       EITS-CMD: dm --to <session_uuid> --message <msg>
       EITS-CMD: commit <hash>
 
-    **If CLAUDE_CODE_ENTRYPOINT=sdk-cli (interactive session):** use the eits CLI script.
+    **If CLAUDE_CODE_ENTRYPOINT=cli (interactive session):** use the eits CLI script.
 
       eits tasks begin --title "Task name"
       eits tasks annotate <id> --body "What was done"

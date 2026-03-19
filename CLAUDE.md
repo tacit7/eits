@@ -47,11 +47,11 @@ Session status is driven by Claude Code hooks and explicit commands:
 |--------|--------|---------|
 | `working` | `UserPromptSubmit` hook | Claude is processing a message |
 | `stopped` | `Stop` hook | Claude finished responding (resets to `working` on next message) |
-| `waiting` | `SessionEnd` hook (`sdk-cli`) | Interactive session ended; can be resumed |
-| `completed` | `SessionEnd` hook (`cli`) or `/i-end-session` | Spawned agent finished; or manually closed |
+| `waiting` | `SessionEnd` hook (`sdk-cli`) | Headless session ended; can be resumed |
+| `completed` | `SessionEnd` hook (`cli`) or `/i-end-session` | Interactive session finished; or manually closed |
 | `failed` | `SessionWorker` on non-zero exit | Process crashed |
 
-`CLAUDE_CODE_ENTRYPOINT` distinguishes `cli` (spawned/print mode) from `sdk-cli` (interactive).
+`CLAUDE_CODE_ENTRYPOINT` distinguishes `cli` (interactive) from `sdk-cli` (headless/spawned).
 
 ## Entrypoint-Based Command Protocol
 
@@ -59,10 +59,10 @@ Session status is driven by Claude Code hooks and explicit commands:
 
 | Entrypoint | Mode | Use |
 |------------|------|-----|
-| `cli` | Spawned/print agent | `EITS-CMD:` directives in output |
-| `sdk-cli` | Interactive session | `eits` CLI script |
+| `cli` | Interactive | `eits` CLI script |
+| `sdk-cli` | Headless/spawned agent | `EITS-CMD:` directives in output |
 
-**`cli` (spawned agents) — use `EITS-CMD:` lines:**
+**`sdk-cli` (headless/spawned agents) — use `EITS-CMD:` lines:**
 ```
 EITS-CMD: task begin Fix broken import
 EITS-CMD: task done 1234
@@ -70,9 +70,9 @@ EITS-CMD: task annotate 1234 What I did and why
 EITS-CMD: dm --to <session_uuid> --message "done"
 EITS-CMD: commit abc1234
 ```
-These are intercepted by AgentWorker in-process — no HTTP round-trips. Never use the `eits` bash script when running as `cli`.
+These are intercepted by AgentWorker in-process — no HTTP round-trips. Never use the `eits` bash script when running as `sdk-cli`.
 
-**`sdk-cli` (interactive sessions) — use `eits` script:**
+**`cli` (interactive sessions) — use `eits` script:**
 ```bash
 eits tasks begin --title "Task name"   # replaces: create + start
 eits tasks annotate <id> --body "..."

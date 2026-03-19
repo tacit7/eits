@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
       |> assign(:last_run_map, ScheduledJobs.last_run_status_map())
       |> assign(:show_form, false)
       |> assign(:editing_job, nil)
-      |> assign(:changeset, ScheduledJobs.change_job(%ScheduledJob{}))
+      |> assign(:form, to_form(ScheduledJobs.change_job(%ScheduledJob{})))
       |> assign(:form_job_type, "shell_command")
       |> assign(:form_schedule_type, "interval")
       |> assign(:form_config, %{})
@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
      socket
      |> assign(:show_form, true)
      |> assign(:editing_job, nil)
-     |> assign(:changeset, ScheduledJobs.change_job(%ScheduledJob{}))
+     |> assign(:form, to_form(ScheduledJobs.change_job(%ScheduledJob{})))
      |> assign(:form_job_type, default_type)
      |> assign(:form_schedule_type, "interval")
      |> assign(:form_config, %{})}
@@ -126,7 +126,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
          socket
          |> assign(:show_form, true)
          |> assign(:editing_job, job)
-         |> assign(:changeset, ScheduledJobs.change_job(job))
+         |> assign(:form, to_form(ScheduledJobs.change_job(job)))
          |> assign(:form_job_type, job.job_type)
          |> assign(:form_schedule_type, job.schedule_type)
          |> assign(:form_config, config)}
@@ -164,7 +164,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
          |> put_flash(:info, "Job saved")}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign(socket, :changeset, changeset)}
+        {:noreply, assign(socket, :form, to_form(changeset, action: :validate))}
 
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Error: #{inspect(reason)}")}
@@ -287,7 +287,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
       <.job_form_drawer
         show={@show_form}
         editing_job={@editing_job}
-        changeset={@changeset}
+        form={@form}
         form_job_type={@form_job_type}
         form_schedule_type={@form_schedule_type}
         form_config={@form_config}

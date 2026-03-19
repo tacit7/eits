@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWebWeb.Components.JobFormDrawer do
 
   attr :show, :boolean, required: true
   attr :editing_job, :any, default: nil
-  attr :changeset, :any, required: true
+  attr :form, :any, required: true
   attr :form_job_type, :string, required: true
   attr :form_schedule_type, :string, required: true
   attr :form_config, :map, required: true
@@ -67,7 +67,7 @@ defmodule EyeInTheSkyWebWeb.Components.JobFormDrawer do
           </div>
 
           <.form
-            for={@changeset}
+            for={@form}
             phx-submit="save_job"
             phx-change="change_job_type"
             class="space-y-4"
@@ -81,10 +81,12 @@ defmodule EyeInTheSkyWebWeb.Components.JobFormDrawer do
               <input
                 type="text"
                 name="job[name]"
-                value={(@editing_job && @editing_job.name) || ""}
-                class="input input-bordered w-full"
-                required
+                value={@form[:name].value || ""}
+                class={["input input-bordered w-full", @form[:name].errors != [] && "input-error"]}
               />
+              <p :for={err <- @form[:name].errors} class="mt-1 text-xs text-error">
+                {translate_error(err)}
+              </p>
             </div>
 
             <div class="form-control">
@@ -92,7 +94,7 @@ defmodule EyeInTheSkyWebWeb.Components.JobFormDrawer do
               <input
                 type="text"
                 name="job[description]"
-                value={(@editing_job && @editing_job.description) || ""}
+                value={@form[:description].value || ""}
                 class="input input-bordered w-full"
               />
             </div>
@@ -150,11 +152,16 @@ defmodule EyeInTheSkyWebWeb.Components.JobFormDrawer do
               <input
                 type="text"
                 name="job[schedule_value]"
-                value={(@editing_job && @editing_job.schedule_value) || ""}
+                value={@form[:schedule_value].value || ""}
                 placeholder={if @form_schedule_type == "interval", do: "60", else: "*/5 * * * *"}
-                class="input input-bordered w-full font-mono"
-                required
+                class={[
+                  "input input-bordered w-full font-mono",
+                  @form[:schedule_value].errors != [] && "input-error"
+                ]}
               />
+              <p :for={err <- @form[:schedule_value].errors} class="mt-1 text-xs text-error">
+                {translate_error(err)}
+              </p>
             </div>
 
             <%= if @form_schedule_type == "cron" do %>
@@ -164,10 +171,7 @@ defmodule EyeInTheSkyWebWeb.Components.JobFormDrawer do
                   <%= for tz <- common_timezones() do %>
                     <option
                       value={tz}
-                      selected={
-                        (@editing_job && @editing_job.timezone) == tz ||
-                          (is_nil(@editing_job) && tz == "Etc/UTC")
-                      }
+                      selected={@form[:timezone].value == tz}
                     >
                       {tz}
                     </option>

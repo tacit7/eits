@@ -115,17 +115,22 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
 
   @impl true
   def handle_event("edit_job", %{"id" => id}, socket) do
-    job = ScheduledJobs.get_job!(String.to_integer(id))
-    config = ScheduledJobs.decode_config(job)
+    case ScheduledJobs.get_job(String.to_integer(id)) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Job not found")}
 
-    {:noreply,
-     socket
-     |> assign(:show_form, true)
-     |> assign(:editing_job, job)
-     |> assign(:changeset, ScheduledJobs.change_job(job))
-     |> assign(:form_job_type, job.job_type)
-     |> assign(:form_schedule_type, job.schedule_type)
-     |> assign(:form_config, config)}
+      job ->
+        config = ScheduledJobs.decode_config(job)
+
+        {:noreply,
+         socket
+         |> assign(:show_form, true)
+         |> assign(:editing_job, job)
+         |> assign(:changeset, ScheduledJobs.change_job(job))
+         |> assign(:form_job_type, job.job_type)
+         |> assign(:form_schedule_type, job.schedule_type)
+         |> assign(:form_config, config)}
+    end
   end
 
   @impl true
@@ -168,9 +173,14 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
 
   @impl true
   def handle_event("toggle_job", %{"id" => id}, socket) do
-    job = ScheduledJobs.get_job!(String.to_integer(id))
-    ScheduledJobs.toggle_job(job)
-    {:noreply, reload_all_jobs(socket)}
+    case ScheduledJobs.get_job(String.to_integer(id)) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Job not found")}
+
+      job ->
+        ScheduledJobs.toggle_job(job)
+        {:noreply, reload_all_jobs(socket)}
+    end
   end
 
   @impl true
@@ -178,17 +188,21 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
 
   @impl true
   def handle_event("delete_job", %{"id" => id}, socket) do
-    job = ScheduledJobs.get_job!(String.to_integer(id))
+    case ScheduledJobs.get_job(String.to_integer(id)) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Job not found")}
 
-    case ScheduledJobs.delete_job(job) do
-      {:ok, _} ->
-        {:noreply,
-         socket
-         |> reload_all_jobs()
-         |> put_flash(:info, "Job deleted")}
+      job ->
+        case ScheduledJobs.delete_job(job) do
+          {:ok, _} ->
+            {:noreply,
+             socket
+             |> reload_all_jobs()
+             |> put_flash(:info, "Job deleted")}
 
-      {:error, :system_job} ->
-        {:noreply, put_flash(socket, :error, "Cannot delete system jobs")}
+          {:error, :system_job} ->
+            {:noreply, put_flash(socket, :error, "Cannot delete system jobs")}
+        end
     end
   end
 

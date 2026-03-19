@@ -42,8 +42,10 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.JobsHelpers do
   end
 
   def handle_run_now(%{"id" => id}, socket) do
-    ScheduledJobs.run_now(String.to_integer(id))
-    {:noreply, put_flash(socket, :info, "Job triggered")}
+    case ScheduledJobs.run_now(String.to_integer(id)) do
+      {:ok, _} -> {:noreply, put_flash(socket, :info, "Job triggered")}
+      {:error, reason} -> {:noreply, put_flash(socket, :error, "Failed to trigger job: #{inspect(reason)}")}
+    end
   end
 
   # ---------------------------------------------------------------------------

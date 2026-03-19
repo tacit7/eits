@@ -62,7 +62,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
       |> assign(:last_run_map, ScheduledJobs.last_run_status_map())
       |> assign_agent_schedule_defaults()
 
-    {:ok, socket}
+    if is_nil(socket.assigns.project) do
+      {:ok, redirect(socket, to: "/projects")}
+    else
+      {:ok, socket}
+    end
   end
 
   @impl true
@@ -211,22 +215,26 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
     description = params["description"]
     project = socket.assigns.project
 
-    case AgentManager.create_agent(
-           model: model,
-           effort_level: effort_level,
-           project_id: project.id,
-           project_path: project.path,
-           description: "Job Helper",
-           instructions: JobHelper.prompt(description, project: project)
-         ) do
-      {:ok, %{session: session}} ->
-        {:noreply,
-         socket
-         |> assign(:show_claude_drawer, false)
-         |> push_navigate(to: ~p"/dm/#{session.id}")}
+    if is_nil(project) do
+      {:noreply, put_flash(socket, :error, "Project not found")}
+    else
+      case AgentManager.create_agent(
+             model: model,
+             effort_level: effort_level,
+             project_id: project.id,
+             project_path: project.path,
+             description: "Job Helper",
+             instructions: JobHelper.prompt(description, project: project)
+           ) do
+        {:ok, %{session: session}} ->
+          {:noreply,
+           socket
+           |> assign(:show_claude_drawer, false)
+           |> push_navigate(to: ~p"/dm/#{session.id}")}
 
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to start session: #{inspect(reason)}")}
+        {:error, reason} ->
+          {:noreply, put_flash(socket, :error, "Failed to start session: #{inspect(reason)}")}
+      end
     end
   end
 

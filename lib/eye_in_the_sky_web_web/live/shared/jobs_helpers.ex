@@ -38,6 +38,7 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.JobsHelpers do
   end
 
   def parse_job_id(id) when is_integer(id), do: {:ok, id}
+  def parse_job_id(_), do: :error
 
   def handle_expand_job(%{"id" => id}, socket) do
     case parse_job_id(id) do

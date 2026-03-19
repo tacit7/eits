@@ -42,6 +42,9 @@ defmodule EyeInTheSkyWeb.Prompts do
   """
   def get_prompt!(id), do: Repo.get!(Prompt, id)
 
+  @doc "Gets a single prompt by ID. Returns nil if not found."
+  def get_prompt(id), do: Repo.get(Prompt, id)
+
   @doc """
   Gets a single prompt by UUID.
 

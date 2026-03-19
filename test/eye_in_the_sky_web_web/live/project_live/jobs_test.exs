@@ -191,9 +191,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.JobsTest do
         ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Other Edit Job"}))
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      html = render_click(view, "edit_job", %{"id" => "#{other_job.id}"})
+      render_click(view, "edit_job", %{"id" => "#{other_job.id}"})
 
-      assert html =~ "Access denied"
+      assert has_element?(view, "#flash-error", "Access denied")
       refute has_element?(view, "h2", "Edit Job")
     end
 
@@ -206,17 +206,17 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.JobsTest do
         ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Sched Target"}))
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      html = render_click(view, "edit_schedule", %{"job_id" => "#{other_job.id}"})
+      render_click(view, "edit_schedule", %{"job_id" => "#{other_job.id}"})
 
-      assert html =~ "Access denied"
+      assert has_element?(view, "#flash-error", "Access denied")
     end
 
     test "crafted event with non-existent job id shows flash error not crash",
          %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      html = render_click(view, "edit_job", %{"id" => "999999"})
+      render_click(view, "edit_job", %{"id" => "999999"})
 
-      assert html =~ "Job not found"
+      assert has_element?(view, "#flash-error", "Job not found")
     end
 
     test "toggling a job from another project shows error flash and leaves job unchanged",
@@ -230,9 +230,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.JobsTest do
       original_enabled = other_job.enabled
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      html = render_click(view, "toggle_job", %{"id" => "#{other_job.id}"})
+      render_click(view, "toggle_job", %{"id" => "#{other_job.id}"})
 
-      assert html =~ "Access denied"
+      assert has_element?(view, "#flash-error", "Access denied")
 
       {:ok, unchanged} = ScheduledJobs.get_job(other_job.id)
       assert unchanged.enabled == original_enabled
@@ -247,9 +247,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.JobsTest do
         ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Delete Target"}))
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      html = render_click(view, "delete_job", %{"id" => "#{other_job.id}"})
+      render_click(view, "delete_job", %{"id" => "#{other_job.id}"})
 
-      assert html =~ "Access denied"
+      assert has_element?(view, "#flash-error", "Access denied")
       assert {:ok, _} = ScheduledJobs.get_job(other_job.id)
     end
 
@@ -266,9 +266,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.JobsTest do
         ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Run Target"}))
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      html = render_click(view, "run_now", %{"id" => "#{other_job.id}"})
+      render_click(view, "run_now", %{"id" => "#{other_job.id}"})
 
-      assert html =~ "Access denied"
+      assert has_element?(view, "#flash-error", "Access denied")
     end
   end
 
@@ -277,10 +277,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.JobsTest do
     # get_job! first, so a non-existent ID returns {:error, :not_found} cleanly.
     test "run_now on non-existent job ID shows error flash not success", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/jobs")
-      html = render_click(view, "run_now", %{"id" => "999999"})
+      render_click(view, "run_now", %{"id" => "999999"})
 
-      assert html =~ "Failed to trigger job"
-      refute html =~ "Job triggered"
+      assert has_element?(view, "#flash-error", "Failed to trigger job")
+      refute has_element?(view, "#flash-info", "Job triggered")
     end
   end
 

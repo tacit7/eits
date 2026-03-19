@@ -510,17 +510,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   # ---------------------------------------------------------------------------
-  # Checkpoints — removed; no-op handlers prevent crashes from DmPage events
-  # ---------------------------------------------------------------------------
-
-  @impl true
-  def handle_event("toggle_create_checkpoint", _p, socket), do: {:noreply, socket}
-  def handle_event("create_checkpoint", _p, socket), do: {:noreply, socket}
-  def handle_event("restore_checkpoint", _p, socket), do: {:noreply, socket}
-  def handle_event("fork_checkpoint", _p, socket), do: {:noreply, socket}
-  def handle_event("delete_checkpoint", _p, socket), do: {:noreply, socket}
-
-  # ---------------------------------------------------------------------------
   # Session control
   # ---------------------------------------------------------------------------
 

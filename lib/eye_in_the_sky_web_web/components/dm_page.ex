@@ -7,15 +7,13 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   alias EyeInTheSkyWebWeb.Components.DmPage.TasksTab
   alias EyeInTheSkyWebWeb.Components.DmPage.CommitsTab
   alias EyeInTheSkyWebWeb.Components.DmPage.NotesTab
-  alias EyeInTheSkyWebWeb.Components.DmPage.TimelineTab
   alias EyeInTheSkyWebWeb.Components.DmPage.Composer
 
   @tabs [
     {"messages", "hero-chat-bubble-left-right", "Messages"},
     {"tasks", "hero-clipboard-document-list", "Tasks"},
     {"commits", "hero-code-bracket", "Commits"},
-    {"notes", "hero-document-text", "Notes"},
-    {"timeline", "hero-clock", "Timeline"}
+    {"notes", "hero-document-text", "Notes"}
   ]
 
   attr :agent, :map, required: true
@@ -50,9 +48,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :compacting, :boolean, default: false
   attr :context_used, :integer, default: 0
   attr :context_window, :integer, default: 0
-  attr :checkpoints, :list, default: []
-  attr :show_create_checkpoint, :boolean, default: false
-
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
 
@@ -400,11 +395,6 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
             <CommitsTab.commits_tab commits={@commits} diff_cache={@diff_cache} />
           <% "notes" -> %>
             <NotesTab.notes_tab notes={@notes} />
-          <% "timeline" -> %>
-            <TimelineTab.timeline_tab
-              checkpoints={@checkpoints}
-              show_create_checkpoint={@show_create_checkpoint}
-            />
           <% _ -> %>
             <MessagesTab.messages_tab
               messages={@messages}

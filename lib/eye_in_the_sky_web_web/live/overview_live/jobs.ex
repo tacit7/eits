@@ -115,21 +115,21 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
 
   @impl true
   def handle_event("edit_job", %{"id" => id}, socket) do
-    case ScheduledJobs.get_job(String.to_integer(id)) do
-      nil ->
-        {:noreply, put_flash(socket, :error, "Job not found")}
+    with {:ok, int_id} <- parse_job_id(id),
+         {:ok, job} <- ScheduledJobs.get_job(int_id) do
+      config = ScheduledJobs.decode_config(job)
 
-      job ->
-        config = ScheduledJobs.decode_config(job)
-
-        {:noreply,
-         socket
-         |> assign(:show_form, true)
-         |> assign(:editing_job, job)
-         |> assign(:form, to_form(ScheduledJobs.change_job(job)))
-         |> assign(:form_job_type, job.job_type)
-         |> assign(:form_schedule_type, job.schedule_type)
-         |> assign(:form_config, config)}
+      {:noreply,
+       socket
+       |> assign(:show_form, true)
+       |> assign(:editing_job, job)
+       |> assign(:form, to_form(ScheduledJobs.change_job(job)))
+       |> assign(:form_job_type, job.job_type)
+       |> assign(:form_schedule_type, job.schedule_type)
+       |> assign(:form_config, config)}
+    else
+      :error -> {:noreply, put_flash(socket, :error, "Invalid job ID")}
+      {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Job not found")}
     end
   end
 
@@ -173,13 +173,13 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
 
   @impl true
   def handle_event("toggle_job", %{"id" => id}, socket) do
-    case ScheduledJobs.get_job(String.to_integer(id)) do
-      nil ->
-        {:noreply, put_flash(socket, :error, "Job not found")}
-
-      job ->
-        ScheduledJobs.toggle_job(job)
-        {:noreply, reload_all_jobs(socket)}
+    with {:ok, int_id} <- parse_job_id(id),
+         {:ok, job} <- ScheduledJobs.get_job(int_id) do
+      ScheduledJobs.toggle_job(job)
+      {:noreply, reload_all_jobs(socket)}
+    else
+      :error -> {:noreply, put_flash(socket, :error, "Invalid job ID")}
+      {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Job not found")}
     end
   end
 
@@ -188,21 +188,21 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
 
   @impl true
   def handle_event("delete_job", %{"id" => id}, socket) do
-    case ScheduledJobs.get_job(String.to_integer(id)) do
-      nil ->
-        {:noreply, put_flash(socket, :error, "Job not found")}
+    with {:ok, int_id} <- parse_job_id(id),
+         {:ok, job} <- ScheduledJobs.get_job(int_id) do
+      case ScheduledJobs.delete_job(job) do
+        {:ok, _} ->
+          {:noreply,
+           socket
+           |> reload_all_jobs()
+           |> put_flash(:info, "Job deleted")}
 
-      job ->
-        case ScheduledJobs.delete_job(job) do
-          {:ok, _} ->
-            {:noreply,
-             socket
-             |> reload_all_jobs()
-             |> put_flash(:info, "Job deleted")}
-
-          {:error, :system_job} ->
-            {:noreply, put_flash(socket, :error, "Cannot delete system jobs")}
-        end
+        {:error, :system_job} ->
+          {:noreply, put_flash(socket, :error, "Cannot delete system jobs")}
+      end
+    else
+      :error -> {:noreply, put_flash(socket, :error, "Invalid job ID")}
+      {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Job not found")}
     end
   end
 

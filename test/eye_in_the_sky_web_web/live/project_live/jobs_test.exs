@@ -182,6 +182,43 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.JobsTest do
   end
 
   describe "cross-project access guard" do
+    test "edit_job on another project's job shows error flash and does not open edit form",
+         %{conn: conn, project: project} do
+      {:ok, other_project} =
+        Projects.create_project(%{name: "other-ej", path: "/tmp/other-ej", slug: "other-ej"})
+
+      {:ok, other_job} =
+        ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Other Edit Job"}))
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      html = render_click(view, "edit_job", %{"id" => "#{other_job.id}"})
+
+      assert html =~ "Access denied"
+      refute has_element?(view, "h2", "Edit Job")
+    end
+
+    test "edit_schedule on another project's job shows error flash",
+         %{conn: conn, project: project} do
+      {:ok, other_project} =
+        Projects.create_project(%{name: "other-es", path: "/tmp/other-es", slug: "other-es"})
+
+      {:ok, other_job} =
+        ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Sched Target"}))
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      html = render_click(view, "edit_schedule", %{"job_id" => "#{other_job.id}"})
+
+      assert html =~ "Access denied"
+    end
+
+    test "crafted event with non-existent job id shows flash error not crash",
+         %{conn: conn, project: project} do
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      html = render_click(view, "edit_job", %{"id" => "999999"})
+
+      assert html =~ "Job not found"
+    end
+
     test "toggling a job from another project shows error flash and leaves job unchanged",
          %{conn: conn, project: project} do
       {:ok, other_project} =

@@ -42,8 +42,11 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.JobsHelpers do
   end
 
   def handle_run_now(%{"id" => id}, socket) do
-    case ScheduledJobs.run_now(String.to_integer(id)) do
+    caller_project_id = Map.get(socket.assigns, :project_id)
+
+    case ScheduledJobs.run_now(String.to_integer(id), caller_project_id) do
       {:ok, _} -> {:noreply, put_flash(socket, :info, "Job triggered")}
+      {:error, :unauthorized} -> {:noreply, put_flash(socket, :error, "Access denied")}
       {:error, reason} -> {:noreply, put_flash(socket, :error, "Failed to trigger job: #{inspect(reason)}")}
     end
   end

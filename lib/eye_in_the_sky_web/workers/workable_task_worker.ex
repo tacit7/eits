@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
       available_slots = @max_active_agents - active_count
       limit = min(@batch_limit, available_slots)
 
-      tasks = fetch_workable_tasks(tag_name, limit)
+      tasks = fetch_workable_tasks(tag_name, limit, job.project_id)
 
       if tasks == [] do
         {:ok, :no_work}
@@ -105,10 +105,10 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
     ) || 0
   end
 
-  defp fetch_workable_tasks(tag_name, limit) do
+  defp fetch_workable_tasks(tag_name, limit, project_id) do
     state_todo = Tasks.state_todo()
 
-    Repo.all(
+    base_query =
       from t in "tasks",
         join: tt in "task_tags",
         on: tt.task_id == t.id,
@@ -123,7 +123,15 @@ defmodule EyeInTheSkyWeb.Workers.WorkableTaskWorker do
           description: t.description,
           project_id: t.project_id
         }
-    )
+
+    query =
+      if project_id do
+        from t in base_query, where: t.project_id == ^project_id
+      else
+        base_query
+      end
+
+    Repo.all(query)
   end
 
   defp mark_in_progress(task_id) do

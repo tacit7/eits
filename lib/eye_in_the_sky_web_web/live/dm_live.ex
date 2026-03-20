@@ -326,6 +326,18 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
+  def handle_event("search_messages", %{"query" => query}, socket) do
+    query = String.trim(query)
+
+    socket =
+      socket
+      |> assign(:message_search_query, query)
+      |> load_tab_data("messages", socket.assigns.session_id)
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("export_jsonl", _params, socket) do
     messages = socket.assigns[:messages] || []
 
@@ -755,6 +767,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         compacting={@compacting}
         context_used={@context_used}
         context_window={@context_window}
+        message_search_query={@message_search_query}
       />
 
       <EyeInTheSkyWebWeb.Components.NewTaskDrawer.new_task_drawer
@@ -854,6 +867,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     |> assign(:thinking_enabled, false)
     |> assign(:max_budget_usd, nil)
     |> assign(:compacting, session.status == "compacting")
+    |> assign(:message_search_query, "")
     |> allow_upload(:files,
       accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
       max_entries: 10,
@@ -1025,18 +1039,32 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   defp load_message_data(socket, "messages", session_id) do
-    limit = socket.assigns[:message_limit] || @default_message_limit
+    query = socket.assigns[:message_search_query] || ""
 
-    fetched_messages =
-      Messages.list_recent_messages(session_id, limit + 1)
-      |> Repo.preload(:attachments)
+    if query != "" do
+      messages =
+        Messages.search_messages_for_session(session_id, query)
+        |> Repo.preload(:attachments)
 
-    Logger.info("Loaded #{length(fetched_messages)} messages for session=#{session_id}")
+      Logger.info(
+        "Searched #{length(messages)} messages for session=#{session_id} query=#{inspect(query)}"
+      )
 
-    if length(fetched_messages) > limit do
-      {Enum.drop(fetched_messages, 1), true}
+      {messages, false}
     else
-      {fetched_messages, false}
+      limit = socket.assigns[:message_limit] || @default_message_limit
+
+      fetched_messages =
+        Messages.list_recent_messages(session_id, limit + 1)
+        |> Repo.preload(:attachments)
+
+      Logger.info("Loaded #{length(fetched_messages)} messages for session=#{session_id}")
+
+      if length(fetched_messages) > limit do
+        {Enum.drop(fetched_messages, 1), true}
+      else
+        {fetched_messages, false}
+      end
     end
   end
 

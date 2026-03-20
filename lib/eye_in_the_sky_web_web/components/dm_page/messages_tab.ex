@@ -11,11 +11,46 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage.MessagesTab do
   attr :stream_thinking, :string, default: nil
   attr :session, :map, default: nil
   attr :agent, :map, default: nil
+  attr :message_search_query, :string, default: ""
 
   def messages_tab(assigns) do
     ~H"""
     <div class="flex h-full flex-col" id="dm-messages-tab">
       <div class="flex-1 min-h-0 flex flex-col">
+        <%!-- Search bar --%>
+        <div class="px-4 pt-2 pb-1 flex-shrink-0">
+          <form phx-change="search_messages" phx-submit="search_messages" class="relative">
+            <.icon
+              name="hero-magnifying-glass"
+              class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-base-content/30 pointer-events-none"
+            />
+            <input
+              type="text"
+              name="query"
+              value={@message_search_query}
+              placeholder="Search messages..."
+              autocomplete="off"
+              phx-debounce="300"
+              class="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30 placeholder:text-base-content/25 text-base-content/70 transition-colors"
+            />
+            <%= if @message_search_query != "" do %>
+              <button
+                type="button"
+                phx-click="search_messages"
+                phx-value-query=""
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-base-content/30 hover:text-base-content/60 transition-colors"
+              >
+                <.icon name="hero-x-mark" class="w-3.5 h-3.5" />
+              </button>
+            <% end %>
+          </form>
+          <%= if @message_search_query != "" do %>
+            <p class="mt-1 text-[10px] text-base-content/30">
+              {length(@messages)} result{if length(@messages) == 1, do: "", else: "s"}
+            </p>
+          <% end %>
+        </div>
+
         <div
           class="px-4 py-2 overflow-y-auto flex-1 min-h-0"
           id="messages-container"

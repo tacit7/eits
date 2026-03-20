@@ -48,6 +48,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
   attr :compacting, :boolean, default: false
   attr :context_used, :integer, default: 0
   attr :context_window, :integer, default: 0
+  attr :message_search_query, :string, default: ""
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
 
@@ -388,6 +389,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               stream_thinking={@stream_thinking}
               session={@session}
               agent={@agent}
+              message_search_query={@message_search_query}
             />
           <% "tasks" -> %>
             <TasksTab.tasks_tab tasks={@tasks} />
@@ -405,6 +407,7 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage do
               stream_thinking={@stream_thinking}
               session={@session}
               agent={@agent}
+              message_search_query={@message_search_query}
             />
         <% end %>
       </div>

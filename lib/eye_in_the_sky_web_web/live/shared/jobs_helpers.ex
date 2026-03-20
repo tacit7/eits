@@ -1,9 +1,16 @@
 defmodule EyeInTheSkyWebWeb.Live.Shared.JobsHelpers do
-  import Phoenix.Component, only: [assign: 2, assign: 3]
-  import Phoenix.LiveView, only: [put_flash: 3]
+  import Phoenix.Component, only: [assign: 2, assign: 3, to_form: 2]
+  import Phoenix.LiveView, only: [put_flash: 3, push_navigate: 2]
   import EyeInTheSkyWebWeb.ControllerHelpers, only: [parse_int: 2]
 
+  use Phoenix.VerifiedRoutes,
+    endpoint: EyeInTheSkyWebWeb.Endpoint,
+    router: EyeInTheSkyWebWeb.Router,
+    statics: EyeInTheSkyWebWeb.static_paths()
+
   alias EyeInTheSkyWeb.ScheduledJobs
+  alias EyeInTheSkyWeb.ScheduledJobs.JobHelper
+  alias EyeInTheSkyWeb.Agents.AgentManager
 
   # ---------------------------------------------------------------------------
   # Event handler helpers — return {:noreply, socket}
@@ -424,4 +431,92 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.JobsHelpers do
 
   defp filter_jobs_by_origin(jobs, "all"), do: jobs
   defp filter_jobs_by_origin(jobs, origin), do: Enum.filter(jobs, &(&1.origin == origin))
+
+  # ---------------------------------------------------------------------------
+  # create_with_claude — shared across overview and project jobs pages
+  # opts:
+  #   :error_msg       - flash message when project is nil (default: "Project not found")
+  #   :prompt_project  - project struct to include in JobHelper.prompt/2 context (default: nil)
+  # ---------------------------------------------------------------------------
+
+  def handle_create_with_claude(params, socket, project, opts \\ []) do
+    model = params["model"] || "sonnet"
+    effort_level = params["effort_level"]
+    description = params["description"]
+    error_msg = Keyword.get(opts, :error_msg, "Project not found")
+    prompt_project = Keyword.get(opts, :prompt_project)
+
+    if is_nil(project) do
+      {:noreply, put_flash(socket, :error, error_msg)}
+    else
+      case AgentManager.create_agent(
+             model: model,
+             effort_level: effort_level,
+             project_id: project.id,
+             project_path: project.path,
+             description: "Job Helper",
+             instructions: JobHelper.prompt(description, project: prompt_project)
+           ) do
+        {:ok, %{session: session}} ->
+          {:noreply,
+           socket
+           |> assign(:show_claude_drawer, false)
+           |> push_navigate(to: ~p"/dm/#{session.id}")}
+
+        {:error, reason} ->
+          {:noreply, put_flash(socket, :error, "Failed to start session: #{inspect(reason)}")}
+      end
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # save_job — shared across overview and project jobs pages
+  # reload_fun: fn socket -> socket — called on success to refresh job lists
+  # opts:
+  #   :scoping_project_id - when set, adds project_id to attrs (respecting form_scope)
+  #                         and passes it as 3rd arg to update_job for auth checks
+  # ---------------------------------------------------------------------------
+
+  def handle_save_job(%{"job" => params}, socket, reload_fun, opts \\ []) do
+    config = build_config(params)
+    scoping_project_id = Keyword.get(opts, :scoping_project_id)
+
+    attrs =
+      if scoping_project_id do
+        project_id =
+          if socket.assigns.form_scope == "global", do: nil, else: scoping_project_id
+
+        params
+        |> Map.put("config", Jason.encode!(config))
+        |> Map.put("project_id", project_id)
+      else
+        Map.put(params, "config", Jason.encode!(config))
+      end
+
+    result =
+      if socket.assigns.editing_job do
+        if scoping_project_id do
+          ScheduledJobs.update_job(socket.assigns.editing_job, attrs, scoping_project_id)
+        else
+          ScheduledJobs.update_job(socket.assigns.editing_job, attrs)
+        end
+      else
+        ScheduledJobs.create_job(attrs)
+      end
+
+    case result do
+      {:ok, _job} ->
+        {:noreply,
+         socket
+         |> assign(:show_form, false)
+         |> reload_fun.()
+         |> put_flash(:info, "Job saved")}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply, assign(socket, :form, to_form(changeset, action: :validate))}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Error: #{inspect(reason)}")}
+    end
+  end
 end

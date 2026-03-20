@@ -1,15 +1,13 @@
 defmodule EyeInTheSkyWeb.Messages do
   @moduledoc """
   The Messages context for managing agent-user messaging.
-
-  Supports both database storage and JSONL file storage (opcode-style).
-  JSONL files are stored in ~/.claude/projects/{projectId}/{sessionId}.jsonl
   """
 
   import Ecto.Query, warn: false
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Messages.Message
   alias EyeInTheSkyWeb.Messages.JsonlStorage
+  alias EyeInTheSkyWeb.Messages.MessageReaction
   alias EyeInTheSkyWeb.QueryHelpers
   require Logger
 
@@ -22,8 +20,7 @@ defmodule EyeInTheSkyWeb.Messages do
   end
 
   @doc """
-  Returns the list of messages for a specific session from JSONL file (opcode-style).
-  Falls back to database if file doesn't exist.
+  Returns messages for a session. Delegates to list_messages_for_session/2 with no project_id.
   """
   @spec list_messages_for_session(integer()) :: [Message.t()]
   def list_messages_for_session(session_id) do
@@ -162,16 +159,27 @@ defmodule EyeInTheSkyWeb.Messages do
     has_number =
       Map.get(attrs, :channel_message_number) || Map.get(attrs, "channel_message_number")
 
-    attrs =
-      if cid && is_nil(has_number) do
-        Map.put(attrs, :channel_message_number, next_channel_message_number(cid))
-      else
-        attrs
-      end
+    if cid && is_nil(has_number) do
+      # Advisory lock on the channel prevents two concurrent inserts from reading
+      # the same MAX and assigning duplicate channel_message_numbers.
+      Repo.transaction(fn ->
+        lock_key = :erlang.phash2(cid)
+        Repo.query!("SELECT pg_advisory_xact_lock($1)", [lock_key])
 
-    %Message{}
-    |> Message.changeset(attrs)
-    |> Repo.insert()
+        attrs = Map.put(attrs, :channel_message_number, next_channel_message_number(cid))
+
+        case %Message{}
+             |> Message.changeset(attrs)
+             |> Repo.insert() do
+          {:ok, message} -> message
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
+      end)
+    else
+      %Message{}
+      |> Message.changeset(attrs)
+      |> Repo.insert()
+    end
   end
 
   defp next_channel_message_number(channel_id) do
@@ -311,7 +319,7 @@ defmodule EyeInTheSkyWeb.Messages do
   end
 
   @doc """
-  Deletes all messages for a session. Used for full reload from JSONL file.
+  Deletes all messages for a session.
   """
   def delete_session_messages(session_id) do
     Message
@@ -401,52 +409,6 @@ defmodule EyeInTheSkyWeb.Messages do
     |> Repo.all()
   end
 
-  # JSONL File-based Storage Functions (opcode-style)
-
-  @doc """
-  Loads recent messages for a session from JSONL file.
-  If project_id provided, loads from JSONL file. Otherwise uses database.
-  """
-  def list_recent_messages(session_id, limit, project_id) when is_binary(project_id) do
-    Logger.debug("Loading recent messages from JSONL for session: #{session_id}, limit: #{limit}")
-
-    messages = list_messages_for_session(session_id, project_id)
-
-    messages
-    |> Enum.sort_by(fn msg -> msg.inserted_at || DateTime.utc_now() end, {:desc, DateTime})
-    |> Enum.take(limit)
-    |> Enum.reverse()
-  end
-
-  @doc """
-  Appends a message to a session's JSONL file.
-  """
-  def append_to_jsonl(project_id, session_id, message_attrs) when is_binary(project_id) do
-    Logger.debug("Appending message to JSONL: session=#{session_id}")
-
-    JsonlStorage.append_message(project_id, session_id, message_attrs)
-  end
-
-  @doc """
-  Writes all messages for a session to JSONL file.
-  Useful for bulk initialization or migration from database to file storage.
-  """
-  def write_session_to_jsonl(project_id, session_id) when is_binary(project_id) do
-    Logger.info(
-      "Writing session messages to JSONL file: project=#{project_id}, session=#{session_id}"
-    )
-
-    messages = list_messages_for_session_db(session_id)
-    JsonlStorage.write_session_messages(project_id, session_id, messages)
-  end
-
-  @doc """
-  Gets the path to a session's JSONL file.
-  """
-  def get_session_jsonl_path(project_id, session_id) when is_binary(project_id) do
-    JsonlStorage.get_session_file_path(project_id, session_id)
-  end
-
   @doc """
   Counts messages for a session.
   """
@@ -513,6 +475,8 @@ defmodule EyeInTheSkyWeb.Messages do
 
   # Finds the most recent agent message in the session matching the given body,
   # within the last minute. Used to detect duplicates before creating a new record.
+  # Unlike find_unlinked_message, this does NOT filter on is_nil(source_uuid) because
+  # a concurrent sync may have already stamped the source_uuid on an existing message.
   defp find_recent_agent_message(session_id, body) do
     one_minute_ago =
       DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
@@ -674,8 +638,6 @@ defmodule EyeInTheSkyWeb.Messages do
   Adds a reaction to a message.
   """
   def add_reaction(message_id, session_id, emoji) do
-    alias EyeInTheSkyWeb.Messages.MessageReaction
-
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     attrs = %{
@@ -694,8 +656,6 @@ defmodule EyeInTheSkyWeb.Messages do
   Removes a reaction from a message.
   """
   def remove_reaction(message_id, session_id, emoji) do
-    alias EyeInTheSkyWeb.Messages.MessageReaction
-
     from(r in MessageReaction,
       where: r.message_id == ^message_id and r.session_id == ^session_id and r.emoji == ^emoji
     )
@@ -706,8 +666,6 @@ defmodule EyeInTheSkyWeb.Messages do
   Lists all reactions for a message, grouped by emoji.
   """
   def list_reactions_for_message(message_id) do
-    alias EyeInTheSkyWeb.Messages.MessageReaction
-
     from(r in MessageReaction,
       where: r.message_id == ^message_id,
       order_by: [asc: r.inserted_at]
@@ -727,8 +685,6 @@ defmodule EyeInTheSkyWeb.Messages do
   Toggles a reaction (adds if not present, removes if present).
   """
   def toggle_reaction(message_id, session_id, emoji) do
-    alias EyeInTheSkyWeb.Messages.MessageReaction
-
     existing =
       from(r in MessageReaction,
         where: r.message_id == ^message_id and r.session_id == ^session_id and r.emoji == ^emoji

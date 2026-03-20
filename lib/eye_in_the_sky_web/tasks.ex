@@ -261,7 +261,7 @@ defmodule EyeInTheSkyWeb.Tasks do
 
     case create_task(attrs) do
       {:ok, task} ->
-        if tag_names != [], do: EyeInTheSkyWeb.TaskTags.replace_task_tags(task.id, tag_names)
+        if tag_names != [], do: replace_task_tags(task.id, tag_names)
         if session_id, do: link_session_to_task(task.id, session_id)
         {:ok, Repo.preload(task, [:state, :tags, :sessions, :checklist_items])}
 

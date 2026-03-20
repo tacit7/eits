@@ -516,6 +516,20 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
   def format_number(_), do: "0"
 
   @doc """
+  Extract the date portion from a timestamp string (e.g. "2026-01-15 10:30:00" → "2026-01-15").
+  """
+  def format_date(nil), do: "—"
+
+  def format_date(ts) when is_binary(ts) do
+    case String.split(ts, " ") do
+      [date | _] -> date
+      _ -> ts
+    end
+  end
+
+  def format_date(_), do: "—"
+
+  @doc """
   Return a short display name for a Claude model ID.
   """
   def short_model(nil), do: "—"

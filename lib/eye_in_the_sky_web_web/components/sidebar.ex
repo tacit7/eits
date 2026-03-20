@@ -21,6 +21,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
        channels: channels,
        collapsed: false,
        mobile_open: false,
+       expanded_all_projects: true,
        expanded_system: true,
        expanded_chat: false,
        new_channel_name: nil,
@@ -50,6 +51,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
      |> assign(:active_channel_id, assigns[:active_channel_id])
      |> assign(:expanded_chat, expanded_chat)
      |> assign(:mobile_open, false)
+     |> assign(:expanded_all_projects, socket.assigns[:expanded_all_projects] != false)
      |> assign(:expanded_system, socket.assigns[:expanded_system] != false)}
   end
 
@@ -76,6 +78,11 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   @impl true
   def handle_event("close_mobile", _params, socket) do
     {:noreply, assign(socket, :mobile_open, false)}
+  end
+
+  @impl true
+  def handle_event("toggle_all_projects", _params, socket) do
+    {:noreply, assign(socket, :expanded_all_projects, !socket.assigns.expanded_all_projects)}
   end
 
   @impl true
@@ -318,6 +325,13 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
 
         <%!-- Scrollable nav --%>
         <nav class="flex-1 overflow-y-auto overflow-x-hidden py-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <.all_projects_section
+            sidebar_tab={@sidebar_tab}
+            sidebar_project={@sidebar_project}
+            collapsed={@collapsed}
+            expanded_all_projects={@expanded_all_projects}
+            myself={@myself}
+          />
           <.system_section
             sidebar_tab={@sidebar_tab}
             sidebar_project={@sidebar_project}
@@ -386,6 +400,69 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   attr :sidebar_tab, :atom, required: true
   attr :sidebar_project, :any, default: nil
   attr :collapsed, :boolean, required: true
+  attr :expanded_all_projects, :boolean, required: true
+  attr :myself, :any, required: true
+
+  defp all_projects_section(assigns) do
+    ~H"""
+    <button
+      phx-click="toggle_all_projects"
+      phx-target={@myself}
+      class={[
+        "flex items-center gap-2.5 w-full text-left text-sm transition-colors",
+        if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
+        "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5"
+      ]}
+      title="All Projects"
+    >
+      <%= if !@collapsed do %>
+        <.icon
+          name={if @expanded_all_projects, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"}
+          class="w-3.5 h-3.5 flex-shrink-0"
+        />
+      <% end %>
+      <.icon name="hero-rectangle-stack" class="w-4 h-4 flex-shrink-0" />
+      <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>All Projects</span>
+    </button>
+
+    <%= if @expanded_all_projects || @collapsed do %>
+      <div class={if !@collapsed, do: "ml-5 border-l border-base-content/8"}>
+        <.section_sub_item
+          href="/"
+          icon="hero-cpu-chip"
+          label="Sessions"
+          active={@sidebar_tab == :sessions && is_nil(@sidebar_project)}
+          collapsed={@collapsed}
+        />
+        <.section_sub_item
+          href="/tasks"
+          icon="hero-clipboard-document-list"
+          label="Tasks"
+          active={@sidebar_tab == :tasks && is_nil(@sidebar_project)}
+          collapsed={@collapsed}
+        />
+        <.section_sub_item
+          href="/prompts"
+          icon="hero-chat-bubble-left-right"
+          label="Prompts"
+          active={@sidebar_tab == :prompts && is_nil(@sidebar_project)}
+          collapsed={@collapsed}
+        />
+        <.section_sub_item
+          href="/teams"
+          icon="hero-users"
+          label="Teams"
+          active={@sidebar_tab == :teams}
+          collapsed={@collapsed}
+        />
+      </div>
+    <% end %>
+    """
+  end
+
+  attr :sidebar_tab, :atom, required: true
+  attr :sidebar_project, :any, default: nil
+  attr :collapsed, :boolean, required: true
   attr :expanded_system, :boolean, required: true
   attr :notification_count, :integer, required: true
   attr :myself, :any, required: true
@@ -415,20 +492,6 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     <%= if @expanded_system || @collapsed do %>
       <div class={if !@collapsed, do: "ml-5 border-l border-base-content/8"}>
         <.section_sub_item
-          href="/"
-          icon="hero-cpu-chip"
-          label="Sessions"
-          active={@sidebar_tab == :sessions && is_nil(@sidebar_project)}
-          collapsed={@collapsed}
-        />
-        <.section_sub_item
-          href="/tasks"
-          icon="hero-clipboard-document-list"
-          label="Tasks"
-          active={@sidebar_tab == :tasks && is_nil(@sidebar_project)}
-          collapsed={@collapsed}
-        />
-        <.section_sub_item
           href="/notes"
           icon="hero-document-text"
           label="Notes"
@@ -440,13 +503,6 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           icon="hero-chart-bar"
           label="Usage"
           active={@sidebar_tab == :usage}
-          collapsed={@collapsed}
-        />
-        <.section_sub_item
-          href="/prompts"
-          icon="hero-chat-bubble-left-right"
-          label="Prompts"
-          active={@sidebar_tab == :prompts && is_nil(@sidebar_project)}
           collapsed={@collapsed}
         />
         <.section_sub_item
@@ -467,13 +523,6 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           icon="hero-cog-6-tooth"
           label="Claude Config"
           active={@sidebar_tab == :config && is_nil(@sidebar_project)}
-          collapsed={@collapsed}
-        />
-        <.section_sub_item
-          href="/teams"
-          icon="hero-users"
-          label="Teams"
-          active={@sidebar_tab == :teams}
           collapsed={@collapsed}
         />
         <.section_sub_item

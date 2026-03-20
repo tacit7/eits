@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Messages do
   alias EyeInTheSkyWeb.Repo
   alias EyeInTheSkyWeb.Messages.Message
   alias EyeInTheSkyWeb.Messages.JsonlStorage
+  alias EyeInTheSkyWeb.Messages.MessageReaction
   alias EyeInTheSkyWeb.QueryHelpers
   require Logger
 
@@ -19,8 +20,7 @@ defmodule EyeInTheSkyWeb.Messages do
   end
 
   @doc """
-  Returns the list of messages for a specific session from JSONL file (opcode-style).
-  Falls back to database if file doesn't exist.
+  Returns messages for a session. Delegates to list_messages_for_session/2 with no project_id.
   """
   @spec list_messages_for_session(integer()) :: [Message.t()]
   def list_messages_for_session(session_id) do
@@ -159,16 +159,24 @@ defmodule EyeInTheSkyWeb.Messages do
     has_number =
       Map.get(attrs, :channel_message_number) || Map.get(attrs, "channel_message_number")
 
-    attrs =
-      if cid && is_nil(has_number) do
-        Map.put(attrs, :channel_message_number, next_channel_message_number(cid))
-      else
-        attrs
-      end
+    if cid && is_nil(has_number) do
+      # Advisory lock on the channel prevents two concurrent inserts from reading
+      # the same MAX and assigning duplicate channel_message_numbers.
+      Repo.transaction(fn ->
+        lock_key = :erlang.phash2(cid)
+        Repo.query!("SELECT pg_advisory_xact_lock($1)", [lock_key])
 
-    %Message{}
-    |> Message.changeset(attrs)
-    |> Repo.insert()
+        attrs = Map.put(attrs, :channel_message_number, next_channel_message_number(cid))
+
+        %Message{}
+        |> Message.changeset(attrs)
+        |> Repo.insert!()
+      end)
+    else
+      %Message{}
+      |> Message.changeset(attrs)
+      |> Repo.insert()
+    end
   end
 
   defp next_channel_message_number(channel_id) do
@@ -308,7 +316,7 @@ defmodule EyeInTheSkyWeb.Messages do
   end
 
   @doc """
-  Deletes all messages for a session. Used for full reload from JSONL file.
+  Deletes all messages for a session.
   """
   def delete_session_messages(session_id) do
     Message
@@ -465,20 +473,10 @@ defmodule EyeInTheSkyWeb.Messages do
   # Finds the most recent agent message in the session matching the given body,
   # within the last minute. Used to detect duplicates before creating a new record.
   defp find_recent_agent_message(session_id, body) do
-    one_minute_ago =
-      DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
-
-    Message
-    |> where(
-      [m],
-      m.session_id == ^session_id and
-        m.sender_role == "agent" and
-        m.body == ^body and
-        m.inserted_at >= ^one_minute_ago
-    )
-    |> order_by([m], desc: m.inserted_at)
-    |> limit(1)
-    |> Repo.one()
+    case find_unlinked_message(session_id, "agent", body) do
+      {:ok, message} -> message
+      :not_found -> nil
+    end
   end
 
   @doc """
@@ -625,8 +623,6 @@ defmodule EyeInTheSkyWeb.Messages do
   Adds a reaction to a message.
   """
   def add_reaction(message_id, session_id, emoji) do
-    alias EyeInTheSkyWeb.Messages.MessageReaction
-
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     attrs = %{
@@ -645,8 +641,6 @@ defmodule EyeInTheSkyWeb.Messages do
   Removes a reaction from a message.
   """
   def remove_reaction(message_id, session_id, emoji) do
-    alias EyeInTheSkyWeb.Messages.MessageReaction
-
     from(r in MessageReaction,
       where: r.message_id == ^message_id and r.session_id == ^session_id and r.emoji == ^emoji
     )
@@ -657,8 +651,6 @@ defmodule EyeInTheSkyWeb.Messages do
   Lists all reactions for a message, grouped by emoji.
   """
   def list_reactions_for_message(message_id) do
-    alias EyeInTheSkyWeb.Messages.MessageReaction
-
     from(r in MessageReaction,
       where: r.message_id == ^message_id,
       order_by: [asc: r.inserted_at]
@@ -678,8 +670,6 @@ defmodule EyeInTheSkyWeb.Messages do
   Toggles a reaction (adds if not present, removes if present).
   """
   def toggle_reaction(message_id, session_id, emoji) do
-    alias EyeInTheSkyWeb.Messages.MessageReaction
-
     existing =
       from(r in MessageReaction,
         where: r.message_id == ^message_id and r.session_id == ^session_id and r.emoji == ^emoji

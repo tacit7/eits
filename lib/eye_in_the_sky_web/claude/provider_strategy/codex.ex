@@ -5,13 +5,12 @@ defmodule EyeInTheSkyWeb.Claude.ProviderStrategy.Codex do
 
   @behaviour EyeInTheSkyWeb.Claude.ProviderStrategy
 
-  alias EyeInTheSkyWeb.Claude.AgentWorker
   alias EyeInTheSkyWeb.Codex
 
   require Logger
 
   @impl true
-  def start(%AgentWorker{} = state, job) do
+  def start(state, job) do
     context = job.context
     prompt = job.message
 
@@ -24,7 +23,7 @@ defmodule EyeInTheSkyWeb.Claude.ProviderStrategy.Codex do
   end
 
   @impl true
-  def resume(%AgentWorker{} = state, job) do
+  def resume(state, job) do
     context = job.context
     prompt = job.message
 

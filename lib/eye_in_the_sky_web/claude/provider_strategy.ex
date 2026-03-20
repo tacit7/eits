@@ -8,15 +8,13 @@ defmodule EyeInTheSkyWeb.Claude.ProviderStrategy do
   All implementations return `{:ok, sdk_ref, handler_pid}` or `{:error, reason}`.
   """
 
-  alias EyeInTheSkyWeb.Claude.AgentWorker
-
   @type sdk_result :: {:ok, reference(), pid()} | {:error, term()}
 
   @doc "Start a new provider session."
-  @callback start(state :: %AgentWorker{}, job :: struct()) :: sdk_result()
+  @callback start(state :: map(), job :: struct()) :: sdk_result()
 
   @doc "Resume an existing provider session."
-  @callback resume(state :: %AgentWorker{}, job :: struct()) :: sdk_result()
+  @callback resume(state :: map(), job :: struct()) :: sdk_result()
 
   @doc "Cancel a running provider session by SDK ref."
   @callback cancel(ref :: reference()) :: :ok | {:error, term()}

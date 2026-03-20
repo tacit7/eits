@@ -23,12 +23,55 @@ All browser routes require WebAuthn passkey authentication via `AuthHook` (LiveV
 
 All `/api/v1/*` routes (except webhooks and public settings) require a Bearer token via the `RequireAuth` plug.
 
+#### Token Validation
+
 - **Token comparison**: Uses `Plug.Crypto.secure_compare/2` (constant-time) to prevent timing attacks.
-- **Key storage**: Active keys are stored as HMAC-SHA256 hashes in the `api_keys` table. The plug hashes the presented token and checks it against all active rows. The `EITS_API_KEY` env var is also checked for backward compatibility.
-- **Rotation and revocation**: Multiple active keys are supported simultaneously. Each key has an optional `valid_until` (naive datetime) field — expired keys are rejected without requiring a redeploy. Revoking a key is a DB row delete.
-- **Key generation**: `mix eits.gen.api_key` generates a cryptographically random key and inserts its hash into the `api_keys` table. An optional `--label` flag names the key for tracking.
+- **Validation flow**: The `RequireAuth` plug calls `valid_db_token?/1` to:
+  1. Check the `EITS_API_KEY` env var first (backward compatibility with existing deployments)
+  2. Hash the presented Bearer token using HMAC-SHA256
+  3. Query the `api_keys` table for a row with matching `key_hash`
+  4. Reject expired keys (where `valid_until` is in the past)
+  5. Return `true` if any active key matches; otherwise `false`
 - **Production validation**: If no active keys exist and `EITS_API_KEY` is unset, all requests are rejected with `401 Unauthorized`.
 - **Development validation**: Dev/test environments allow passthrough for convenience when no keys are configured.
+
+#### Key Storage and Rotation
+
+Keys are stored as HMAC-SHA256 hashes in the `api_keys` table with the following schema:
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `id` | binary UUID | Primary key |
+| `key_hash` | string | HMAC-SHA256 hash of the generated key (never store plaintext) |
+| `label` | string (optional) | Human-readable name for audit trails (e.g., "ci-bot", "production-agent") |
+| `valid_until` | naive_datetime (optional) | Expiry timestamp; `null` means never expires |
+| `inserted_at` | naive_datetime | Creation timestamp |
+| `updated_at` | naive_datetime | Last update timestamp |
+
+**Key generation flow:**
+1. `mix eits.gen.api_key` generates a cryptographically random 32-byte key via `:crypto.strong_rand_bytes(32)`
+2. The key is Base64URL-encoded for display
+3. The plaintext key is hashed using HMAC-SHA256 via `hash_token/1` (keyed on `secret_key_base`)
+4. Only the hash is inserted into the `api_keys` table; plaintext is never stored
+5. The generated key is displayed once to the user (cannot be recovered later)
+
+**Rotation and revocation:**
+- Multiple active keys can coexist simultaneously — no downtime needed for rotation
+- Each key has an optional `valid_until` field for time-bound key rotation
+- To revoke a key: delete its `api_keys` row (immediate effect, no redeploy)
+- To rotate a key: generate a new key, update consumer configs, then delete the old row
+- Expired keys are silently rejected; deletion is clean and immediate
+
+#### Mix Task Integration
+
+The `eits.gen.api_key` mix task provides the command-line interface for key generation:
+
+```bash
+mix eits.gen.api_key                    # Generate and insert a new key, print once
+mix eits.gen.api_key --label "ci-bot"   # Named key for audit tracking
+```
+
+The task outputs the Base64URL-encoded key once; this is the only time the plaintext key is visible. Store this key in your consumer's configuration (e.g., environment variables, secrets manager).
 
 ### Session Auth — Cookie-Based
 
@@ -43,10 +86,61 @@ The `SessionAuth` plug authenticates requests via signed session cookies. Used f
 
 Browser sessions are tracked in the `user_sessions` table in addition to the signed cookie. The `ValidateSession` plug runs on every browser request and rejects sessions that are missing from the DB or past their `expires_at`.
 
-- **Schema**: `user_sessions(id uuid, user_id, session_token string unique, expires_at naive_datetime, inserted_at)`
-- **TTL**: 7 days from login. Token stored in the Phoenix session cookie; hash checked server-side on each request.
-- **Logout**: Deletes the `user_sessions` row, immediately invalidating the session regardless of cookie lifetime.
-- **Expiry enforcement**: `ValidateSession` plug in the `:browser` pipeline redirects to `/login` on missing or expired rows.
+#### Session Table Schema
+
+The `user_sessions` table holds server-side session records with the following columns:
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `id` | binary UUID | Primary key |
+| `user_id` | string | Reference to the authenticated user |
+| `session_token` | string | Unique, cryptographically random session identifier |
+| `expires_at` | naive_datetime | Session expiry timestamp (7 days from login) |
+| `inserted_at` | naive_datetime | Session creation timestamp |
+| `updated_at` | naive_datetime | Last update timestamp |
+
+**Unique constraint**: `session_token` has a unique index to prevent duplicate active sessions.
+
+#### Session Lifecycle
+
+1. **Creation**: On successful WebAuthn login, a new `user_sessions` row is created with:
+   - A random `session_token` via `:crypto.strong_rand_bytes(16)` (128 bits)
+   - `expires_at` set to 7 days in the future
+   - The token is stored in the Phoenix session cookie (signed, not encrypted)
+
+2. **Validation**: The `ValidateSession` plug in the `:browser` pipeline runs on every request and:
+   - Extracts the session token from the signed cookie
+   - Queries the `user_sessions` table for a matching `session_token`
+   - Checks if the row exists and if `expires_at` is in the future
+   - Rejects the request (redirects to `/login`) if the row is missing or expired
+
+3. **Logout**: The logout action deletes the `user_sessions` row:
+   - The session is immediately invalidated server-side
+   - The cookie is cleared on the client
+   - No TTL wait; logout takes effect instantly
+
+#### TTL and Expiry Enforcement
+
+- **TTL**: 7 days from login. Sessions do not auto-renew; users must re-authenticate after 7 days.
+- **Enforcement**: The `ValidateSession` plug checks both conditions on every request:
+  - Row exists in the `user_sessions` table
+  - `expires_at` is greater than `DateTime.utc_now()`
+- **Early termination**: Admins can revoke sessions by deleting the `user_sessions` row; this invalidates the session immediately even if the cookie is still valid.
+
+#### Cookie Handling
+
+The session token is stored in a signed Phoenix session cookie configured with:
+
+| Option | Value | Purpose |
+|--------|-------|---------|
+| `store` | `:cookie` | Signed cookie (tamper-proof via HMAC) |
+| `signing_salt` | Configured in endpoint | Salt for HMAC key derivation |
+| `same_site` | `"Lax"` | CSRF protection |
+| `http_only` | `true` | Prevents JavaScript access (XSS protection) |
+| `secure` | `true` in prod, `false` in dev | HTTPS-only in production |
+| `max_age` | Not set (browser session cookie) | Browser deletes on close; TTL is enforced server-side via `expires_at` |
+
+The browser deletes the session cookie on close (no persistent storage), and the server enforces the 7-day TTL via the `expires_at` column.
 
 ### Webhook — HMAC Signature
 

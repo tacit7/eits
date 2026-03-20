@@ -21,6 +21,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
        channels: channels,
        collapsed: false,
        mobile_open: false,
+       expanded_system: true,
        expanded_chat: false,
        new_channel_name: nil,
        new_project_path: nil,
@@ -48,7 +49,8 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
      |> assign(:sidebar_project, sidebar_project)
      |> assign(:active_channel_id, assigns[:active_channel_id])
      |> assign(:expanded_chat, expanded_chat)
-     |> assign(:mobile_open, false)}
+     |> assign(:mobile_open, false)
+     |> assign(:expanded_system, socket.assigns[:expanded_system] != false)}
   end
 
   @impl true
@@ -74,6 +76,11 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   @impl true
   def handle_event("close_mobile", _params, socket) do
     {:noreply, assign(socket, :mobile_open, false)}
+  end
+
+  @impl true
+  def handle_event("toggle_system", _params, socket) do
+    {:noreply, assign(socket, :expanded_system, !socket.assigns.expanded_system)}
   end
 
   @impl true
@@ -311,11 +318,13 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
 
         <%!-- Scrollable nav --%>
         <nav class="flex-1 overflow-y-auto overflow-x-hidden py-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          <.main_nav
+          <.system_section
             sidebar_tab={@sidebar_tab}
             sidebar_project={@sidebar_project}
             collapsed={@collapsed}
+            expanded_system={@expanded_system}
             notification_count={@notification_count}
+            myself={@myself}
           />
           <.chat_section
             sidebar_tab={@sidebar_tab}
@@ -335,11 +344,6 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
             renaming_project_id={@renaming_project_id}
             rename_value={@rename_value}
             myself={@myself}
-          />
-          <.system_nav
-            sidebar_tab={@sidebar_tab}
-            sidebar_project={@sidebar_project}
-            collapsed={@collapsed}
           />
         </nav>
 
@@ -382,65 +386,119 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   attr :sidebar_tab, :atom, required: true
   attr :sidebar_project, :any, default: nil
   attr :collapsed, :boolean, required: true
+  attr :expanded_system, :boolean, required: true
   attr :notification_count, :integer, required: true
+  attr :myself, :any, required: true
 
-  defp main_nav(assigns) do
+  defp system_section(assigns) do
     ~H"""
-    <.nav_item
-      href="/"
-      icon="hero-cpu-chip"
-      label="Sessions"
-      active={@sidebar_tab == :sessions && is_nil(@sidebar_project)}
-      collapsed={@collapsed}
-    />
-    <.nav_item
-      href="/tasks"
-      icon="hero-clipboard-document-list"
-      label="Tasks"
-      active={@sidebar_tab == :tasks && is_nil(@sidebar_project)}
-      collapsed={@collapsed}
-    />
-    <.nav_item
-      href="/notes"
-      icon="hero-document-text"
-      label="Notes"
-      active={@sidebar_tab == :notes && is_nil(@sidebar_project)}
-      collapsed={@collapsed}
-    />
-    <.nav_item
-      href="/usage"
-      icon="hero-chart-bar"
-      label="Usage"
-      active={@sidebar_tab == :usage}
-      collapsed={@collapsed}
-    />
-    <.nav_item
-      href="/prompts"
-      icon="hero-chat-bubble-left-right"
-      label="Prompts"
-      active={@sidebar_tab == :prompts && is_nil(@sidebar_project)}
-      collapsed={@collapsed}
-    />
-    <.nav_item
-      href="/skills"
-      icon="hero-bolt"
-      label="Skills"
-      active={@sidebar_tab == :skills}
-      collapsed={@collapsed}
-    />
-    <.notification_nav_item
-      href="/notifications"
-      active={@sidebar_tab == :notifications}
-      collapsed={@collapsed}
-      count={@notification_count}
-    />
-    <.nav_item
-      href="/config"
-      icon="hero-cog-6-tooth"
-      label="Claude Config"
-      active={@sidebar_tab == :config && is_nil(@sidebar_project)}
-      collapsed={@collapsed}
-    />
+    <button
+      phx-click="toggle_system"
+      phx-target={@myself}
+      class={[
+        "flex items-center gap-2.5 w-full text-left text-sm transition-colors",
+        if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
+        "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5"
+      ]}
+      title="System"
+    >
+      <%= if !@collapsed do %>
+        <.icon
+          name={if @expanded_system, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"}
+          class="w-3.5 h-3.5 flex-shrink-0"
+        />
+      <% end %>
+      <.icon name="hero-squares-2x2" class="w-4 h-4 flex-shrink-0" />
+      <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>System</span>
+    </button>
+
+    <%= if @expanded_system || @collapsed do %>
+      <div class={if !@collapsed, do: "ml-5 border-l border-base-content/8"}>
+        <.section_sub_item
+          href="/"
+          icon="hero-cpu-chip"
+          label="Sessions"
+          active={@sidebar_tab == :sessions && is_nil(@sidebar_project)}
+          collapsed={@collapsed}
+        />
+        <.section_sub_item
+          href="/tasks"
+          icon="hero-clipboard-document-list"
+          label="Tasks"
+          active={@sidebar_tab == :tasks && is_nil(@sidebar_project)}
+          collapsed={@collapsed}
+        />
+        <.section_sub_item
+          href="/notes"
+          icon="hero-document-text"
+          label="Notes"
+          active={@sidebar_tab == :notes && is_nil(@sidebar_project)}
+          collapsed={@collapsed}
+        />
+        <.section_sub_item
+          href="/usage"
+          icon="hero-chart-bar"
+          label="Usage"
+          active={@sidebar_tab == :usage}
+          collapsed={@collapsed}
+        />
+        <.section_sub_item
+          href="/prompts"
+          icon="hero-chat-bubble-left-right"
+          label="Prompts"
+          active={@sidebar_tab == :prompts && is_nil(@sidebar_project)}
+          collapsed={@collapsed}
+        />
+        <.section_sub_item
+          href="/skills"
+          icon="hero-bolt"
+          label="Skills"
+          active={@sidebar_tab == :skills}
+          collapsed={@collapsed}
+        />
+        <.section_notification_item
+          href="/notifications"
+          active={@sidebar_tab == :notifications}
+          collapsed={@collapsed}
+          count={@notification_count}
+        />
+        <.section_sub_item
+          href="/config"
+          icon="hero-cog-6-tooth"
+          label="Claude Config"
+          active={@sidebar_tab == :config && is_nil(@sidebar_project)}
+          collapsed={@collapsed}
+        />
+        <.section_sub_item
+          href="/teams"
+          icon="hero-users"
+          label="Teams"
+          active={@sidebar_tab == :teams}
+          collapsed={@collapsed}
+        />
+        <.section_sub_item
+          href="/jobs"
+          icon="hero-calendar-days"
+          label="Jobs"
+          active={@sidebar_tab == :jobs}
+          collapsed={@collapsed}
+        />
+        <.section_sub_item
+          href="/oban"
+          icon="hero-queue-list"
+          label="Oban"
+          active={false}
+          collapsed={@collapsed}
+        />
+        <.section_sub_item
+          href="/settings"
+          icon="hero-cog-8-tooth"
+          label="Settings"
+          active={@sidebar_tab == :settings}
+          collapsed={@collapsed}
+        />
+      </div>
+    <% end %>
     """
   end
 
@@ -751,41 +809,61 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     """
   end
 
-  attr :sidebar_tab, :atom, required: true
-  attr :sidebar_project, :any, default: nil
-  attr :collapsed, :boolean, required: true
+  attr :href, :string, required: true
+  attr :icon, :string, required: true
+  attr :label, :string, required: true
+  attr :active, :boolean, default: false
+  attr :collapsed, :boolean, default: false
 
-  defp system_nav(assigns) do
+  defp section_sub_item(assigns) do
     ~H"""
-    <.section_label collapsed={@collapsed} label="System" />
-    <.nav_item
-      href="/teams"
-      icon="hero-users"
-      label="Teams"
-      active={@sidebar_tab == :teams}
-      collapsed={@collapsed}
-    />
-    <.nav_item
-      href="/jobs"
-      icon="hero-calendar-days"
-      label="Jobs"
-      active={@sidebar_tab == :jobs}
-      collapsed={@collapsed}
-    />
-    <.nav_item
-      href="/oban"
-      icon="hero-queue-list"
-      label="Oban"
-      active={false}
-      collapsed={@collapsed}
-    />
-    <.nav_item
-      href="/settings"
-      icon="hero-cog-8-tooth"
-      label="Settings"
-      active={@sidebar_tab == :settings}
-      collapsed={@collapsed}
-    />
+    <.link
+      navigate={@href}
+      class={[
+        "flex items-center gap-2 text-sm transition-colors",
+        if(@collapsed, do: "px-4 py-1 justify-center", else: "pl-3 pr-3 py-0.5"),
+        if(@active,
+          do: "text-primary bg-primary/5 font-medium",
+          else: "text-base-content/50 hover:text-base-content/75 hover:bg-base-content/5"
+        )
+      ]}
+      title={@label}
+    >
+      <.icon name={@icon} class="w-3.5 h-3.5 flex-shrink-0" />
+      <span class={["truncate", if(@collapsed, do: "hidden")]}>{@label}</span>
+    </.link>
+    """
+  end
+
+  attr :href, :string, required: true
+  attr :active, :boolean, default: false
+  attr :collapsed, :boolean, default: false
+  attr :count, :integer, default: 0
+
+  defp section_notification_item(assigns) do
+    ~H"""
+    <.link
+      navigate={@href}
+      class={[
+        "flex items-center gap-2 text-sm transition-colors",
+        if(@collapsed, do: "px-4 py-1 justify-center", else: "pl-3 pr-3 py-0.5"),
+        if(@active,
+          do: "text-primary bg-primary/5 font-medium",
+          else: "text-base-content/50 hover:text-base-content/75 hover:bg-base-content/5"
+        )
+      ]}
+      title="Notifications"
+    >
+      <div class="relative">
+        <.icon name="hero-bell" class="w-3.5 h-3.5 flex-shrink-0" />
+        <%= if @count > 0 do %>
+          <span class="absolute -top-1.5 -right-1.5 badge badge-xs badge-primary text-[9px] min-w-[14px] h-[14px] p-0">
+            {if @count > 99, do: "99+", else: @count}
+          </span>
+        <% end %>
+      </div>
+      <span class={["truncate", if(@collapsed, do: "hidden")]}>Notifications</span>
+    </.link>
     """
   end
 

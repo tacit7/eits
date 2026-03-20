@@ -280,6 +280,10 @@ defmodule EyeInTheSkyWeb.Events do
   # Private
   # ---------------------------------------------------------------------------
 
+  @doc "Unsubscribe from session-scoped events."
+  def unsubscribe_session(session_id), do: unsub("session:#{session_id}")
+
   defp broadcast(topic, message), do: Phoenix.PubSub.broadcast(@pubsub, topic, message)
   defp sub(topic), do: Phoenix.PubSub.subscribe(@pubsub, topic)
+  defp unsub(topic), do: Phoenix.PubSub.unsubscribe(@pubsub, topic)
 end

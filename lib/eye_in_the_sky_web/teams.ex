@@ -34,6 +34,11 @@ defmodule EyeInTheSkyWeb.Teams do
 
   def get_team!(id), do: Repo.get!(Team, id)
 
+  @doc "Preload members with their associated session and agent for a team struct."
+  def preload_members(%Team{} = team) do
+    Repo.preload(team, members: [session: [:agent]])
+  end
+
   def get_team_by_uuid(uuid), do: Repo.get_by(Team, uuid: uuid)
 
   def get_team_by_name(name), do: Repo.get_by(Team, name: name)

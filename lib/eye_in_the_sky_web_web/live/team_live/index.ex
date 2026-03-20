@@ -68,10 +68,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
 
     # Unsubscribe from previous session if switching agents
     if socket.assigns.agent_session_id && socket.assigns.agent_session_id != session_id do
-      Phoenix.PubSub.unsubscribe(
-        EyeInTheSkyWeb.PubSub,
-        "session:#{socket.assigns.agent_session_id}"
-      )
+      EyeInTheSkyWeb.Events.unsubscribe_session(socket.assigns.agent_session_id)
     end
 
     if is_nil(socket.assigns.agent_session_id) || socket.assigns.agent_session_id != session_id do
@@ -572,7 +569,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   end
 
   defp load_team_detail(team) do
-    team = EyeInTheSkyWeb.Repo.preload(team, members: [session: [:agent]])
+    team = Teams.preload_members(team)
 
     tasks =
       Tasks.list_tasks_for_team_with_sessions(team.id)
@@ -635,10 +632,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
 
   defp clear_agent_selection(socket) do
     if socket.assigns.agent_session_id do
-      Phoenix.PubSub.unsubscribe(
-        EyeInTheSkyWeb.PubSub,
-        "session:#{socket.assigns.agent_session_id}"
-      )
+      EyeInTheSkyWeb.Events.unsubscribe_session(socket.assigns.agent_session_id)
     end
 
     socket
@@ -662,7 +656,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
 
   defp truncate_message(nil, _), do: ""
 
-  defp truncate_message(body, max) when byte_size(body) > max do
+  defp truncate_message(body, max) when String.length(body) > max do
     String.slice(body, 0, max) <> "…"
   end
 

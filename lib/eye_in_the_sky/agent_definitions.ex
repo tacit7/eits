@@ -1,0 +1,300 @@
+defmodule EyeInTheSky.AgentDefinitions do
+  @moduledoc """
+  Context for managing agent definition files.
+
+  Catalogs `.md` agent files from global (`~/.claude/agents/`) and
+  project-scoped (`.claude/agents/`) directories. Sync reads the filesystem,
+  parses frontmatter metadata, and upserts into the `agent_definitions` table.
+
+  ## Resolution order
+
+  When resolving a slug for a given project, project-scoped definitions
+  take precedence over global definitions (project override resolution,
+  fallback to global).
+  """
+
+  import Ecto.Query, warn: false
+
+  alias EyeInTheSky.Repo
+  alias EyeInTheSky.AgentDefinitions.AgentDefinition
+
+  @global_agents_dir Path.expand("~/.claude/agents")
+
+  # ── Queries ──────────────────────────────────────────────────────────────
+
+  @doc """
+  Lists all non-missing definitions, optionally filtered by project.
+  """
+  def list_definitions(project_id \\ nil) do
+    AgentDefinition
+    |> where([d], is_nil(d.missing_at))
+    |> maybe_filter_project(project_id)
+    |> order_by([d], [asc: d.scope, asc: d.slug])
+    |> Repo.all()
+  end
+
+  @doc """
+  Lists definitions available for a given project: project-scoped + global.
+  Project definitions first, then global.
+  """
+  def list_for_project(project_id) do
+    AgentDefinition
+    |> where([d], is_nil(d.missing_at))
+    |> where([d], d.project_id == ^project_id or d.scope == "global")
+    |> order_by([d], [asc: d.scope, asc: d.slug])
+    |> Repo.all()
+  end
+
+  @doc """
+  Resolves a definition by slug for a given project.
+  Project-scoped definitions take precedence over global.
+  Returns `{:ok, definition}` or `{:error, :not_found}`.
+  """
+  def resolve(slug, project_id) do
+    result =
+      AgentDefinition
+      |> where([d], d.slug == ^slug and is_nil(d.missing_at))
+      |> where([d], d.project_id == ^project_id and d.scope == "project")
+      |> Repo.one()
+
+    case result do
+      %AgentDefinition{} = defn ->
+        {:ok, defn}
+
+      nil ->
+        case Repo.one(
+               from d in AgentDefinition,
+                 where: d.slug == ^slug and d.scope == "global" and is_nil(d.missing_at)
+             ) do
+          %AgentDefinition{} = defn -> {:ok, defn}
+          nil -> {:error, :not_found}
+        end
+    end
+  end
+
+  @doc """
+  Resolves a definition by slug without project context (global only).
+  """
+  def resolve_global(slug) do
+    case Repo.one(
+           from d in AgentDefinition,
+             where: d.slug == ^slug and d.scope == "global" and is_nil(d.missing_at)
+         ) do
+      %AgentDefinition{} = defn -> {:ok, defn}
+      nil -> {:error, :not_found}
+    end
+  end
+
+  @doc """
+  Gets a single definition by ID.
+  """
+  def get_definition(id) do
+    case Repo.get(AgentDefinition, id) do
+      nil -> {:error, :not_found}
+      defn -> {:ok, defn}
+    end
+  end
+
+  # ── Sync ─────────────────────────────────────────────────────────────────
+
+  @doc """
+  Syncs global agent definitions from `~/.claude/agents/`.
+  """
+  def sync_global do
+    sync_directory(@global_agents_dir, "global", nil)
+  end
+
+  @doc """
+  Syncs project-scoped agent definitions from `<project_path>/.claude/agents/`.
+  """
+  def sync_project(%{id: project_id, path: project_path}) do
+    dir = Path.join(project_path, ".claude/agents")
+    sync_directory(dir, "project", project_id)
+  end
+
+  def sync_project(project_id, project_path) do
+    dir = Path.join(project_path, ".claude/agents")
+    sync_directory(dir, "project", project_id)
+  end
+
+  defp sync_directory(dir, scope, project_id) do
+    now = DateTime.utc_now()
+
+    if File.dir?(dir) do
+      md_files =
+        dir
+        |> File.ls!()
+        |> Enum.filter(&String.ends_with?(&1, ".md"))
+        |> Enum.reject(&(&1 == "README.md"))
+
+      synced_slugs =
+        Enum.map(md_files, fn filename ->
+          slug = Path.rootname(filename)
+          file_path = Path.join(dir, filename)
+
+          case sync_one(file_path, slug, scope, project_id, now) do
+            {:ok, _defn} -> slug
+            {:error, _reason} -> nil
+          end
+        end)
+        |> Enum.reject(&is_nil/1)
+
+      mark_missing(scope, project_id, synced_slugs, now)
+
+      {:ok, synced_slugs}
+    else
+      {:ok, []}
+    end
+  end
+
+  defp sync_one(file_path, slug, scope, project_id, now) do
+    content = File.read!(file_path)
+    checksum = :crypto.hash(:sha256, content) |> Base.encode16(case: :lower)
+
+    existing = find_existing(slug, scope, project_id)
+
+    case existing do
+      %AgentDefinition{checksum: ^checksum} = defn ->
+        defn
+        |> AgentDefinition.changeset(%{last_synced_at: now, missing_at: nil})
+        |> Repo.update()
+
+      %AgentDefinition{} = defn ->
+        metadata = parse_frontmatter(content)
+
+        defn
+        |> AgentDefinition.changeset(
+          Map.merge(metadata, %{checksum: checksum, last_synced_at: now, missing_at: nil})
+        )
+        |> Repo.update()
+
+      nil ->
+        metadata = parse_frontmatter(content)
+        stored_path = stored_path(file_path, scope)
+
+        %AgentDefinition{}
+        |> AgentDefinition.changeset(
+          Map.merge(metadata, %{
+            slug: slug,
+            scope: scope,
+            project_id: project_id,
+            path: stored_path,
+            checksum: checksum,
+            last_synced_at: now
+          })
+        )
+        |> Repo.insert()
+    end
+  end
+
+  defp find_existing(slug, "global", _project_id) do
+    Repo.one(from d in AgentDefinition, where: d.slug == ^slug and d.scope == "global")
+  end
+
+  defp find_existing(slug, "project", project_id) do
+    Repo.one(
+      from d in AgentDefinition,
+        where: d.slug == ^slug and d.scope == "project" and d.project_id == ^project_id
+    )
+  end
+
+  defp mark_missing(scope, project_id, synced_slugs, now) do
+    query =
+      from d in AgentDefinition,
+        where: d.scope == ^scope and is_nil(d.missing_at)
+
+    query =
+      if project_id do
+        where(query, [d], d.project_id == ^project_id)
+      else
+        where(query, [d], is_nil(d.project_id))
+      end
+
+    query =
+      if synced_slugs != [] do
+        where(query, [d], d.slug not in ^synced_slugs)
+      else
+        query
+      end
+
+    Repo.update_all(query, set: [missing_at: now])
+  end
+
+  # ── Path semantics ──────────────────────────────────────────────────────
+
+  defp stored_path(file_path, "global"), do: file_path
+
+  defp stored_path(file_path, "project") do
+    case Regex.run(~r{(\.claude/agents/.+)$}, file_path) do
+      [_, relative] -> relative
+      _ -> file_path
+    end
+  end
+
+  @doc """
+  Returns the absolute path for a definition, resolving project-relative paths.
+  """
+  def absolute_path(%AgentDefinition{scope: "global", path: path}), do: path
+
+  def absolute_path(%AgentDefinition{scope: "project", path: path, project_id: project_id}) do
+    case EyeInTheSky.Projects.get_project(project_id) do
+      {:ok, project} -> Path.join(project.path, path)
+      _ -> path
+    end
+  end
+
+  # ── Frontmatter parsing ────────────────────────────────────────────────
+
+  @doc """
+  Parses YAML-like frontmatter from an agent `.md` file.
+  Returns a map with `:display_name`, `:description`, `:model`, `:tools`.
+  """
+  def parse_frontmatter(content) do
+    case Regex.run(~r/\A---\n(.*?)\n---/s, content) do
+      [_, yaml_block] ->
+        lines = String.split(yaml_block, "\n")
+
+        attrs =
+          Enum.reduce(lines, %{}, fn line, acc ->
+            case Regex.run(~r/^(\w+):\s*(.+)$/, String.trim(line)) do
+              [_, key, value] -> Map.put(acc, key, clean_value(value))
+              _ -> acc
+            end
+          end)
+
+        %{
+          display_name: attrs["name"],
+          description: extract_description(attrs["description"]),
+          model: attrs["model"],
+          tools: parse_tools(attrs["tools"])
+        }
+
+      _ ->
+        %{display_name: nil, description: nil, model: nil, tools: []}
+    end
+  end
+
+  defp clean_value(value) do
+    value |> String.trim() |> String.trim("\"") |> String.trim("'")
+  end
+
+  defp extract_description(nil), do: nil
+
+  defp extract_description(desc) do
+    desc |> String.split("\\n") |> List.first() |> String.trim()
+  end
+
+  defp parse_tools(nil), do: []
+
+  defp parse_tools(tools_str) do
+    tools_str |> String.split(~r/[,\s]+/) |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
+  end
+
+  # ── Helpers ─────────────────────────────────────────────────────────────
+
+  defp maybe_filter_project(query, nil), do: query
+
+  defp maybe_filter_project(query, project_id) do
+    where(query, [d], d.project_id == ^project_id or d.scope == "global")
+  end
+end

@@ -52,6 +52,8 @@ defmodule EyeInTheSkyWebWeb do
     quote do
       use Phoenix.LiveView, layout: {EyeInTheSkyWebWeb.Layouts, :app}
 
+      import EyeInTheSkyWebWeb.Helpers.ViewHelpers
+
       unquote(html_helpers())
     end
   end

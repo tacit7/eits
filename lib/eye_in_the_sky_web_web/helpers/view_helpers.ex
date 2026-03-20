@@ -552,6 +552,62 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
   def format_datetime_short_time(_), do: ""
 
   @doc """
+  Format relative time including future times (e.g. "in 5m", "3h ago").
+  Used for cron job scheduling display (next_run_at, last_run_at).
+  """
+  def format_relative_time(nil), do: "-"
+
+  def format_relative_time(iso) when is_binary(iso) do
+    with cleaned <- String.replace(iso, "Z", ""),
+         {:ok, ndt} <- NaiveDateTime.from_iso8601(cleaned) do
+      now = NaiveDateTime.utc_now()
+      diff = NaiveDateTime.diff(ndt, now, :second)
+      format_relative_diff(diff)
+    else
+      _ -> "-"
+    end
+  end
+
+  def format_relative_time(_), do: "-"
+
+  defp format_relative_diff(secs) when secs > 0 do
+    cond do
+      secs < 60 -> "in #{secs}s"
+      secs < 3600 -> "in #{div(secs, 60)}m"
+      secs < 86_400 -> "in #{div(secs, 3600)}h"
+      true -> "in #{div(secs, 86_400)}d"
+    end
+  end
+
+  defp format_relative_diff(secs) do
+    abs_secs = abs(secs)
+
+    cond do
+      abs_secs < 60 -> "#{abs_secs}s ago"
+      abs_secs < 3600 -> "#{div(abs_secs, 60)}m ago"
+      abs_secs < 86_400 -> "#{div(abs_secs, 3600)}h ago"
+      true -> "#{div(abs_secs, 86_400)}d ago"
+    end
+  end
+
+  @doc """
+  Month abbreviation from cron month field ("1"-"12").
+  """
+  def month_name("1"), do: "Jan"
+  def month_name("2"), do: "Feb"
+  def month_name("3"), do: "Mar"
+  def month_name("4"), do: "Apr"
+  def month_name("5"), do: "May"
+  def month_name("6"), do: "Jun"
+  def month_name("7"), do: "Jul"
+  def month_name("8"), do: "Aug"
+  def month_name("9"), do: "Sep"
+  def month_name("10"), do: "Oct"
+  def month_name("11"), do: "Nov"
+  def month_name("12"), do: "Dec"
+  def month_name(m), do: m
+
+  @doc """
   Format a cost value as a dollar string (e.g. "$1.23").
   """
   def format_cost(value) when is_float(value),

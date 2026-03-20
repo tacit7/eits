@@ -21,6 +21,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   attr :on_click, :string, default: nil
   attr :on_delete, :string, default: nil
   attr :working_session_ids, :any, default: nil
+  attr :workflow_states, :list, default: []
   attr :rest, :global
 
   def task_card(assigns) do
@@ -45,6 +46,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
                 on_delete={@on_delete}
                 aging={@aging}
                 working_session_ids={@working_session_ids}
+                workflow_states={@workflow_states}
               />
             <% else %>
               <.grid_card_content task={@task} on_click={@on_click} />
@@ -126,7 +128,10 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
         _ -> nil
       end
 
-    assigns = assign(assigns, :dm_session, dm_session)
+    assigns =
+      assigns
+      |> assign(:dm_session, dm_session)
+      |> assign_new(:workflow_states, fn -> [] end)
 
     ~H"""
     <%!-- Priority top bar --%>
@@ -180,7 +185,8 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
           <summary class="flex items-center justify-center w-6 h-6 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/8 cursor-pointer list-none transition-colors">
             <.icon name="hero-ellipsis-horizontal-mini" class="w-3.5 h-3.5" />
           </summary>
-          <div class="dropdown-content z-50 mt-1 w-44 rounded-xl bg-base-300 dark:bg-[hsl(220,13%,18%)] shadow-xl p-1.5 flex flex-col gap-0.5">
+          <div class="dropdown-content z-50 mt-1 w-48 rounded-xl bg-base-300 dark:bg-[hsl(220,13%,18%)] shadow-xl p-1.5 flex flex-col gap-0.5">
+            <%!-- Open card --%>
             <button
               type="button"
               phx-click={@on_click}
@@ -190,6 +196,27 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
               <.icon name="hero-rectangle-stack-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
               Open card
             </button>
+            <%!-- Edit labels --%>
+            <button
+              type="button"
+              phx-click={@on_click}
+              phx-value-task_id={@task.uuid || to_string(@task.id)}
+              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+            >
+              <.icon name="hero-tag-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+              Edit labels
+            </button>
+            <%!-- Edit dates --%>
+            <button
+              type="button"
+              phx-click={@on_click}
+              phx-value-task_id={@task.uuid || to_string(@task.id)}
+              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+            >
+              <.icon name="hero-clock-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+              Edit dates
+            </button>
+            <%!-- Copy link --%>
             <button
               type="button"
               phx-hook="CopyToClipboard"
@@ -201,16 +228,58 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
               <.icon name="hero-link-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
               Copy link
             </button>
+            <%!-- Move submenu --%>
+            <%= if @workflow_states != [] do %>
+              <div class="border-t border-base-content/10 my-0.5" />
+              <details class="group/move">
+                <summary class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors cursor-pointer list-none">
+                  <.icon name="hero-arrow-right-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+                  <span class="flex-1">Move</span>
+                  <.icon name="hero-chevron-right-mini" class="w-3 h-3 text-base-content/40" />
+                </summary>
+                <div class="mt-0.5 ml-3 flex flex-col gap-0.5">
+                  <%= for state <- @workflow_states do %>
+                    <button
+                      type="button"
+                      phx-click="move_task"
+                      phx-value-task_id={@task.uuid || to_string(@task.id)}
+                      phx-value-state_id={state.id}
+                      onclick="event.stopPropagation();"
+                      class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-base-content/80 hover:bg-base-content/10 transition-colors text-left"
+                    >
+                      <span
+                        class="w-2 h-2 rounded-full flex-shrink-0"
+                        style={"background-color: #{state.color || "#6B7280"}"}
+                      />
+                      {state.name}
+                    </button>
+                  <% end %>
+                </div>
+              </details>
+            <% end %>
+            <%!-- Archive / Delete --%>
             <%= if @on_delete do %>
               <div class="border-t border-base-content/10 my-0.5" />
+              <button
+                type="button"
+                phx-click="archive_task"
+                phx-value-task_id={@task.uuid || to_string(@task.id)}
+                phx-confirm="Archive this task?"
+                onclick="event.stopPropagation();"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+              >
+                <.icon name="hero-archive-box-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+                Archive
+              </button>
               <button
                 type="button"
                 phx-click={@on_delete}
                 phx-value-task_id={@task.uuid || to_string(@task.id)}
                 phx-confirm="Delete this task?"
+                onclick="event.stopPropagation();"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-error hover:bg-error/10 transition-colors text-left"
               >
-                <.icon name="hero-archive-box-mini" class="w-4 h-4 flex-shrink-0" />
+                <.icon name="hero-trash-mini" class="w-4 h-4 flex-shrink-0" />
                 Delete
               </button>
             <% end %>

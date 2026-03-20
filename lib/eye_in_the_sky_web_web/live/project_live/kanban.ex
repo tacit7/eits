@@ -809,6 +809,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
                         on_delete="delete_task"
                         id={"kanban-task-#{task.id}"}
                         working_session_ids={@working_session_ids}
+                        workflow_states={@workflow_states}
                       />
                     </div>
                   </div>

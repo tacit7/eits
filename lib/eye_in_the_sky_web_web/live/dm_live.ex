@@ -13,10 +13,11 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   }
 
   alias EyeInTheSkyWeb.Agents.AgentManager
-  alias EyeInTheSkyWeb.Claude.{AgentWorker, SessionReader}
+  alias EyeInTheSkyWeb.Claude.{AgentWorker, SessionImporter, SessionReader}
   alias EyeInTheSkyWeb.FileAttachments
   alias EyeInTheSkyWebWeb.Components.DmPage
   alias EyeInTheSkyWebWeb.DmLive.StreamState
+  alias EyeInTheSkyWebWeb.Live.Shared.SessionHelpers
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
 
@@ -167,7 +168,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     project_id = agent.project_id
 
     project_path =
-      case resolve_project_path(session, agent) do
+      case SessionHelpers.resolve_project_path(session, agent) do
         {:ok, path} -> path
         _ -> nil
       end
@@ -376,11 +377,11 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     session_uuid = socket.assigns.session_uuid
 
     with {:ok, project_path} <-
-           resolve_project_path(socket.assigns.session, socket.assigns.agent),
+           SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent),
          {:ok, raw_messages} <-
            SessionReader.read_messages_after_uuid(session_uuid, project_path, nil) do
       Messages.delete_session_messages(session_id)
-      imported = import_session_messages(raw_messages, session_id)
+      imported = SessionImporter.import_messages(raw_messages, session_id)
       socket = load_tab_data(socket, "messages", session_id)
       {:noreply, put_flash(socket, :info, "Reloaded #{imported} messages from session file")}
     else
@@ -419,7 +420,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       {:noreply, socket}
     else
       diff =
-        case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+        case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
           {:ok, project_path} ->
             case System.cmd("git", ["-C", project_path, "show", hash, "--unified=5"],
                    stderr_to_stdout: false
@@ -449,7 +450,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       {:noreply, put_flash(socket, :error, "Invalid session UUID")}
     else
       dir =
-        case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+        case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
           {:ok, path} -> path
           {:error, _} -> "~"
         end
@@ -905,7 +906,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         case AgentManager.continue_session(
                session_id,
                full_body,
-               continue_session_opts(model, effort_level, thinking_enabled, max_budget_usd)
+               SessionHelpers.continue_session_opts(model, effort_level, thinking_enabled, max_budget_usd)
              ) do
           {:ok, _admission} ->
             Logger.info("Message forwarded to AgentManager for session=#{session_id}")
@@ -941,36 +942,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       provider: provider || "claude",
       body: body
     })
-  end
-
-  defp continue_session_opts(model, effort_level, thinking_enabled, max_budget_usd) do
-    opts = [model: model]
-
-    opts =
-      if is_binary(effort_level) and effort_level != "" do
-        opts ++ [effort_level: effort_level]
-      else
-        opts
-      end
-
-    opts =
-      if thinking_enabled do
-        budget =
-          case model do
-            "opus" -> 16000
-            _ -> 10000
-          end
-
-        opts ++ [thinking_budget: budget]
-      else
-        opts
-      end
-
-    if max_budget_usd do
-      opts ++ [max_budget_usd: max_budget_usd]
-    else
-      opts
-    end
   end
 
   # ---------------------------------------------------------------------------
@@ -1099,87 +1070,11 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     session_uuid = socket.assigns.session_uuid
 
     with {:ok, project_path} <-
-           resolve_project_path(socket.assigns.session, socket.assigns.agent),
-         {:ok, raw_messages} <- read_session_messages(session_uuid, project_path, session_id) do
-      imported = import_session_messages(raw_messages, session_id)
+           SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent),
+         {:ok, imported} <- SessionImporter.sync(session_uuid, project_path, session_id) do
       {:ok, load_tab_data(socket, "messages", session_id), imported}
     end
   end
-
-  defp read_session_messages(session_uuid, project_path, session_id) do
-    last_uuid = Messages.get_last_source_uuid(session_id)
-    SessionReader.read_messages_after_uuid(session_uuid, project_path, last_uuid)
-  end
-
-  defp import_session_messages(raw_messages, session_id) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
-
-    raw_messages
-    |> SessionReader.format_messages()
-    |> Enum.filter(& &1.uuid)
-    |> Enum.count(&import_single_session_message(&1, session_id, now))
-  end
-
-  defp import_single_session_message(msg, session_id, now) do
-    {sender_role, recipient_role, direction} = session_message_roles(msg.role)
-    inserted_at = parse_session_timestamp(msg.timestamp, now)
-
-    # Check for an existing unlinked message (created before sync) with matching content.
-    # This prevents duplicates when save_result or create_user_message already persisted the
-    # message without a source_uuid, and the session file sync tries to create it again.
-    metadata =
-      cond do
-        msg[:stream_type] == "tool_result" -> %{"stream_type" => "tool_result"}
-        msg.usage -> %{"usage" => msg.usage}
-        true -> nil
-      end
-
-    case Messages.find_unlinked_message(session_id, sender_role, msg.content) do
-      {:ok, existing} ->
-        update_attrs = %{source_uuid: msg.uuid, updated_at: now}
-
-        update_attrs =
-          if metadata, do: Map.put(update_attrs, :metadata, metadata), else: update_attrs
-
-        Messages.update_message(existing, update_attrs)
-        true
-
-      :not_found ->
-        case Messages.create_message(%{
-               uuid: Ecto.UUID.generate(),
-               source_uuid: msg.uuid,
-               session_id: session_id,
-               sender_role: sender_role,
-               recipient_role: recipient_role,
-               direction: direction,
-               body: msg.content,
-               status: "delivered",
-               provider: "claude",
-               metadata: metadata,
-               inserted_at: inserted_at,
-               updated_at: now
-             }) do
-          {:ok, _message} ->
-            true
-
-          {:error, reason} ->
-            Logger.debug("Skipping imported message source_uuid=#{msg.uuid}: #{inspect(reason)}")
-            false
-        end
-    end
-  end
-
-  defp session_message_roles("user"), do: {"user", "agent", "outbound"}
-  defp session_message_roles(_role), do: {"agent", "user", "inbound"}
-
-  defp parse_session_timestamp(timestamp, fallback) when is_binary(timestamp) do
-    case DateTime.from_iso8601(timestamp) do
-      {:ok, dt, _offset} -> DateTime.truncate(dt, :second)
-      _ -> fallback
-    end
-  end
-
-  defp parse_session_timestamp(_timestamp, fallback), do: fallback
 
   # ---------------------------------------------------------------------------
   # Context window extraction
@@ -1220,7 +1115,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   defp read_session_usage_stats(socket, session_id) do
-    case resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+    case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
       {:ok, project_path} ->
         case SessionReader.read_usage(socket.assigns.session_uuid, project_path) do
           {:ok, tokens, cost} ->
@@ -1360,21 +1255,5 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   defp build_slash_items do
     EyeInTheSkyWebWeb.Helpers.SlashItems.build()
-  end
-
-  defp resolve_project_path(session, agent) do
-    cond do
-      session.git_worktree_path ->
-        {:ok, session.git_worktree_path}
-
-      agent.git_worktree_path ->
-        {:ok, agent.git_worktree_path}
-
-      agent.project && agent.project.path ->
-        {:ok, agent.project.path}
-
-      true ->
-        {:error, :no_project_path}
-    end
   end
 end

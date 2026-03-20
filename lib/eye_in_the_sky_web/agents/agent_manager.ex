@@ -11,6 +11,7 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
   alias EyeInTheSkyWeb.Claude.AgentWorker
   alias EyeInTheSkyWeb.Git.Worktrees
   alias EyeInTheSkyWeb.{Agents, Sessions}
+  alias EyeInTheSkyWebWeb.Live.Shared.SessionHelpers
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
   @supported_providers ["claude", "codex"]
@@ -301,7 +302,7 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
          {:ok, agent} <- Agents.get_agent(session.agent_id),
          provider when not is_nil(provider) <- normalize_provider(session.provider),
          {:ok, session} <- ensure_session_uuid(session) do
-      project_path = resolve_project_path(session, agent)
+      project_path = resolve_project_path_with_fallback(session, agent)
 
       Logger.info(
         "✅ start_agent_worker: loaded session.uuid=#{session.uuid}, agent.id=#{agent.id}, project_path=#{project_path}"
@@ -321,27 +322,22 @@ defmodule EyeInTheSkyWeb.Agents.AgentManager do
     end
   end
 
-  defp resolve_project_path(session, agent) do
-    project_path_from_project = if agent.project, do: agent.project.path, else: nil
+  defp resolve_project_path_with_fallback(session, agent) do
+    case SessionHelpers.resolve_project_path(session, agent) do
+      {:ok, path} ->
+        path
 
-    resolved =
-      session.git_worktree_path ||
-        agent.git_worktree_path ||
-        project_path_from_project
+      {:error, :no_project_path} ->
+        fallback = File.cwd!()
 
-    if is_nil(resolved) do
-      fallback = File.cwd!()
+        Logger.error(
+          "resolve_project_path: no path for session.id=#{session.id}; " <>
+            "session.git_worktree_path=#{inspect(session.git_worktree_path)}, " <>
+            "agent.git_worktree_path=#{inspect(agent.git_worktree_path)}, " <>
+            "project.path=#{inspect(if agent.project, do: agent.project.path)} — falling back to cwd=#{fallback}"
+        )
 
-      Logger.error(
-        "resolve_project_path: no path for session.id=#{session.id}; " <>
-          "session.git_worktree_path=#{inspect(session.git_worktree_path)}, " <>
-          "agent.git_worktree_path=#{inspect(agent.git_worktree_path)}, " <>
-          "project.path=#{inspect(project_path_from_project)} — falling back to cwd=#{fallback}"
-      )
-
-      fallback
-    else
-      resolved
+        fallback
     end
   end
 

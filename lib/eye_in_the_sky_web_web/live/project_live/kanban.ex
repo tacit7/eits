@@ -11,6 +11,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   import EyeInTheSkyWebWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWebWeb.Components.TaskCard, only: [task_card: 1]
   import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
+  import EyeInTheSkyWebWeb.Live.Shared.KanbanFilters, only: [apply_filters: 1, parse_due_date_filter: 1, parse_activity_filter: 1]
+  import EyeInTheSkyWebWeb.Components.KanbanFilterDrawer, only: [kanban_filter_drawer: 1]
 
   @impl true
   def mount(%{"id" => _} = params, _session, socket) do
@@ -61,14 +63,13 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # Events: search, drawers, task CRUD (delegated to TasksHelpers)
+  # ---------------------------------------------------------------------------
+
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
-    socket =
-      socket
-      |> assign(:search_query, query)
-      |> load_tasks()
-
-    {:noreply, socket}
+    {:noreply, socket |> assign(:search_query, query) |> load_tasks()}
   end
 
   @impl true
@@ -92,6 +93,26 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   @impl true
   def handle_event("delete_task", params, socket),
     do: handle_delete_task(params, socket, &load_tasks/1)
+
+  @impl true
+  def handle_event("create_new_task", params, socket),
+    do: handle_create_new_task(params, socket, &load_tasks/1)
+
+  @impl true
+  def handle_event("quick_add_task", params, socket),
+    do: handle_quick_add_task(params, socket, &load_tasks/1)
+
+  @impl true
+  def handle_event("archive_task", params, socket),
+    do: handle_archive_task(params, socket, &load_tasks/1)
+
+  @impl true
+  def handle_event("add_task_annotation", params, socket),
+    do: handle_add_task_annotation(params, socket)
+
+  # ---------------------------------------------------------------------------
+  # Events: agent spawning
+  # ---------------------------------------------------------------------------
 
   @impl true
   def handle_event("start_agent_for_task", %{"task_id" => task_id}, socket) do
@@ -124,57 +145,105 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # Events: copy task to another project
+  # ---------------------------------------------------------------------------
+
   @impl true
-  def handle_event("create_new_task", params, socket) do
-    # Extract form data
-    title = params["title"]
-    description = params["description"]
-    state_id = parse_int(params["state_id"], 0)
-    priority = parse_int(params["priority"], 1)
-    tags_string = params["tags"] || ""
+  def handle_event("copy_task_to_project", %{"project_id" => project_id_str}, socket) do
+    task = socket.assigns.selected_task
+    target_project_id = parse_int(project_id_str, 0)
 
-    # Parse tags
-    tag_names =
-      tags_string
-      |> String.split(",")
-      |> Enum.map(&String.trim/1)
-      |> Enum.reject(&(&1 == ""))
+    if target_project_id > 0 and task do
+      now = DateTime.utc_now() |> DateTime.to_iso8601()
+      tag_names = Enum.map(task.tags || [], & &1.name)
 
-    # Generate UUID for task
-    task_uuid = Ecto.UUID.generate()
-    now = DateTime.utc_now() |> DateTime.to_iso8601()
+      case Tasks.create_task(%{
+             uuid: Ecto.UUID.generate(),
+             title: task.title,
+             description: task.description,
+             state_id: WorkflowState.todo_id(),
+             priority: task.priority || 0,
+             project_id: target_project_id,
+             created_at: now,
+             updated_at: now
+           }) do
+        {:ok, new_task} ->
+          if tag_names != [], do: Tasks.replace_task_tags(new_task.id, tag_names)
+          target = Projects.get_project!(target_project_id)
 
-    # Create task
-    case Tasks.create_task(%{
-           uuid: task_uuid,
-           title: title,
-           description: description,
-           state_id: state_id,
-           priority: priority,
-           project_id: socket.assigns.project_id,
-           created_at: now,
-           updated_at: now
-         }) do
-      {:ok, task} ->
-        Tasks.replace_task_tags(task.id, tag_names)
+          socket =
+            socket
+            |> assign(:show_task_detail_drawer, false)
+            |> put_flash(:info, "Task copied to #{target.name}")
 
-        socket =
-          socket
-          |> assign(:show_new_task_drawer, false)
-          |> load_tasks()
-          |> put_flash(:info, "Task created successfully")
+          {:noreply, socket}
 
-        {:noreply, socket}
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Failed to copy task")}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
 
-      {:error, changeset} ->
-        {:noreply,
-         put_flash(socket, :error, "Failed to create task: #{inspect(changeset.errors)}")}
+  # ---------------------------------------------------------------------------
+  # Events: checklist items
+  # ---------------------------------------------------------------------------
+
+  @impl true
+  def handle_event("add_checklist_item", %{"task_id" => task_id, "title" => title}, socket) do
+    title = String.trim(title)
+
+    if title != "" do
+      task = Tasks.get_task_by_uuid_or_id!(task_id)
+      items = Tasks.list_checklist_items(task.id)
+      next_position = if items == [], do: 0, else: length(items)
+
+      case Tasks.create_checklist_item(%{task_id: task.id, title: title, position: next_position}) do
+        {:ok, _} ->
+          updated_task = Tasks.get_task!(task.id)
+          {:noreply, socket |> assign(:selected_task, updated_task) |> load_tasks()}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Failed to add checklist item")}
+      end
+    else
+      {:noreply, socket}
     end
   end
 
   @impl true
-  def handle_event("archive_task", params, socket),
-    do: handle_archive_task(params, socket, &load_tasks/1)
+  def handle_event("toggle_checklist_item", %{"item-id" => item_id_str}, socket) do
+    item_id = parse_int(item_id_str, 0)
+
+    case Tasks.toggle_checklist_item(item_id) do
+      {:ok, item} ->
+        updated_task = Tasks.get_task!(item.task_id)
+        {:noreply, socket |> assign(:selected_task, updated_task) |> load_tasks()}
+
+      {:error, _} ->
+        {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("delete_checklist_item", %{"item-id" => item_id_str}, socket) do
+    item_id = parse_int(item_id_str, 0)
+
+    case Tasks.delete_checklist_item(item_id) do
+      {:ok, item} ->
+        updated_task = Tasks.get_task!(item.task_id)
+        {:noreply, socket |> assign(:selected_task, updated_task) |> load_tasks()}
+
+      {:error, _} ->
+        {:noreply, socket}
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Events: bulk operations
+  # ---------------------------------------------------------------------------
 
   @impl true
   def handle_event("toggle_bulk_mode", _params, socket) do
@@ -268,97 +337,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
      |> put_flash(:info, "Tasks deleted")}
   end
 
-  @impl true
-  def handle_event("copy_task_to_project", %{"project_id" => project_id_str}, socket) do
-    task = socket.assigns.selected_task
-    target_project_id = parse_int(project_id_str, 0)
-
-    if target_project_id > 0 and task do
-      now = DateTime.utc_now() |> DateTime.to_iso8601()
-      tag_names = Enum.map(task.tags || [], & &1.name)
-
-      case Tasks.create_task(%{
-             uuid: Ecto.UUID.generate(),
-             title: task.title,
-             description: task.description,
-             state_id: WorkflowState.todo_id(),
-             priority: task.priority || 0,
-             project_id: target_project_id,
-             created_at: now,
-             updated_at: now
-           }) do
-        {:ok, new_task} ->
-          if tag_names != [], do: Tasks.replace_task_tags(new_task.id, tag_names)
-          target = Projects.get_project!(target_project_id)
-
-          socket =
-            socket
-            |> assign(:show_task_detail_drawer, false)
-            |> put_flash(:info, "Task copied to #{target.name}")
-
-          {:noreply, socket}
-
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to copy task")}
-      end
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("add_task_annotation", params, socket),
-    do: handle_add_task_annotation(params, socket)
-
-  @impl true
-  def handle_event("add_checklist_item", %{"task_id" => task_id, "title" => title}, socket) do
-    title = String.trim(title)
-
-    if title != "" do
-      task = Tasks.get_task_by_uuid_or_id!(task_id)
-      items = Tasks.list_checklist_items(task.id)
-      next_position = if items == [], do: 0, else: length(items)
-
-      case Tasks.create_checklist_item(%{task_id: task.id, title: title, position: next_position}) do
-        {:ok, _} ->
-          updated_task = Tasks.get_task!(task.id)
-          {:noreply, socket |> assign(:selected_task, updated_task) |> load_tasks()}
-
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to add checklist item")}
-      end
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("toggle_checklist_item", %{"item-id" => item_id_str}, socket) do
-    item_id = parse_int(item_id_str, 0)
-
-    case Tasks.toggle_checklist_item(item_id) do
-      {:ok, item} ->
-        updated_task = Tasks.get_task!(item.task_id)
-        {:noreply, socket |> assign(:selected_task, updated_task) |> load_tasks()}
-
-      {:error, _} ->
-        {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("delete_checklist_item", %{"item-id" => item_id_str}, socket) do
-    item_id = parse_int(item_id_str, 0)
-
-    case Tasks.delete_checklist_item(item_id) do
-      {:ok, item} ->
-        updated_task = Tasks.get_task!(item.task_id)
-        {:noreply, socket |> assign(:selected_task, updated_task) |> load_tasks()}
-
-      {:error, _} ->
-        {:noreply, socket}
-    end
-  end
+  # ---------------------------------------------------------------------------
+  # Events: filters (delegates to KanbanFilters for logic)
+  # ---------------------------------------------------------------------------
 
   @impl true
   def handle_event("clear_filters", _params, socket) do
@@ -427,16 +408,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   end
 
   @impl true
-  def handle_event("archive_column", %{"state-id" => state_id_str}, socket) do
-    state_id = parse_int(state_id_str, 0)
-    column_tasks = Map.get(socket.assigns.tasks_by_state, state_id, [])
-    Enum.each(column_tasks, fn task -> Tasks.archive_task(task) end)
-
-    {:noreply,
-     socket |> load_tasks() |> put_flash(:info, "#{length(column_tasks)} tasks archived")}
-  end
-
-  @impl true
   def handle_event("toggle_filters", _params, socket) do
     {:noreply, assign(socket, :show_filters, !socket.assigns.show_filters)}
   end
@@ -450,6 +421,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   def handle_event("toggle_show_archived", _params, socket) do
     {:noreply, socket |> assign(:show_archived, !socket.assigns.show_archived) |> load_tasks()}
   end
+
+  # ---------------------------------------------------------------------------
+  # Events: column / task ordering, quick-add, tag colors
+  # ---------------------------------------------------------------------------
 
   @tag_colors ~w(#6B7280 #EF4444 #F59E0B #10B981 #3B82F6 #8B5CF6 #EC4899 #06B6D4)
 
@@ -509,38 +484,18 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   end
 
   @impl true
-  def handle_event("quick_add_task", %{"title" => title, "state_id" => state_id_str}, socket) do
-    title = String.trim(title)
+  def handle_event("archive_column", %{"state-id" => state_id_str}, socket) do
+    state_id = parse_int(state_id_str, 0)
+    column_tasks = Map.get(socket.assigns.tasks_by_state, state_id, [])
+    Enum.each(column_tasks, fn task -> Tasks.archive_task(task) end)
 
-    if title == "" do
-      {:noreply, assign(socket, :quick_add_column, nil)}
-    else
-      state_id = parse_int(state_id_str, 0)
-      task_uuid = Ecto.UUID.generate()
-      now = DateTime.utc_now() |> DateTime.to_iso8601()
-
-      case Tasks.create_task(%{
-             uuid: task_uuid,
-             title: title,
-             state_id: state_id,
-             priority: 0,
-             project_id: socket.assigns.project_id,
-             created_at: now,
-             updated_at: now
-           }) do
-        {:ok, _task} ->
-          socket =
-            socket
-            |> assign(:quick_add_column, nil)
-            |> load_tasks()
-
-          {:noreply, socket}
-
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to create task")}
-      end
-    end
+    {:noreply,
+     socket |> load_tasks() |> put_flash(:info, "#{length(column_tasks)} tasks archived")}
   end
+
+  # ---------------------------------------------------------------------------
+  # PubSub handlers
+  # ---------------------------------------------------------------------------
 
   @impl true
   def handle_info(:tasks_changed, socket) do
@@ -587,6 +542,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   @impl true
   def handle_info({:agent_deleted, _}, socket), do: {:noreply, socket}
 
+  # ---------------------------------------------------------------------------
+  # Private: task loading
+  # ---------------------------------------------------------------------------
+
   defp load_tasks(socket) do
     project_id = socket.assigns.project_id
     query = socket.assigns.search_query
@@ -622,119 +581,12 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     |> apply_filters()
   end
 
-  defp apply_filters(socket) do
-    tasks = socket.assigns.tasks
-    priority_filter = socket.assigns.filter_priority
-    filter_tags = socket.assigns.filter_tags
-    tag_mode = socket.assigns.filter_tag_mode
-    filter_due_date = socket.assigns.filter_due_date
-    filter_activity = socket.assigns.filter_activity
-
-    filtered =
-      tasks
-      |> filter_by_priority(priority_filter)
-      |> filter_by_tags(filter_tags, tag_mode)
-      |> filter_by_due_date(filter_due_date)
-      |> filter_by_activity(filter_activity)
-
-    tasks_by_state =
-      Enum.group_by(filtered, fn task ->
-        if task.state, do: task.state.id, else: nil
-      end)
-
-    assign(socket, :tasks_by_state, tasks_by_state)
-  end
-
-  defp filter_by_priority(tasks, nil), do: tasks
-  defp filter_by_priority(tasks, priority), do: Enum.filter(tasks, &(&1.priority == priority))
-
-  defp filter_by_tags(tasks, %MapSet{} = tags, mode) do
-    if MapSet.size(tags) == 0 do
-      tasks
-    else
-      Enum.filter(tasks, fn t ->
-        task_tag_names = MapSet.new(t.tags || [], & &1.name)
-
-        case mode do
-          :and -> MapSet.subset?(tags, task_tag_names)
-          :or -> MapSet.size(MapSet.intersection(tags, task_tag_names)) > 0
-        end
-      end)
-    end
-  end
-
-  defp filter_by_due_date(tasks, nil), do: tasks
-  defp filter_by_due_date(tasks, :no_date), do: Enum.filter(tasks, &is_nil(&1.due_at))
-
-  defp filter_by_due_date(tasks, filter) do
-    today = Date.utc_today()
-
-    Enum.filter(tasks, fn task ->
-      case task.due_at do
-        nil ->
-          false
-
-        due_str ->
-          case Date.from_iso8601(String.slice(due_str, 0, 10)) do
-            {:ok, due} ->
-              case filter do
-                :overdue -> Date.compare(due, today) == :lt
-                :next_day -> Date.compare(due, today) != :lt && Date.diff(due, today) <= 1
-                :next_week -> Date.compare(due, today) != :lt && Date.diff(due, today) <= 7
-                :next_month -> Date.compare(due, today) != :lt && Date.diff(due, today) <= 30
-                _ -> true
-              end
-
-            _ ->
-              false
-          end
-      end
-    end)
-  end
-
-  defp filter_by_activity(tasks, nil), do: tasks
-
-  defp filter_by_activity(tasks, filter) do
-    now = DateTime.utc_now()
-
-    Enum.filter(tasks, fn task ->
-      days_ago =
-        case task.updated_at do
-          nil ->
-            999
-
-          str ->
-            case DateTime.from_iso8601(str) do
-              {:ok, dt, _} -> DateTime.diff(now, dt, :second) |> div(86400)
-              _ -> 999
-            end
-        end
-
-      case filter do
-        :week -> days_ago <= 7
-        :two_weeks -> days_ago <= 14
-        :four_weeks -> days_ago <= 28
-        :inactive -> days_ago > 28
-        _ -> true
-      end
-    end)
-  end
-
-  defp parse_due_date_filter("no_date"), do: :no_date
-  defp parse_due_date_filter("overdue"), do: :overdue
-  defp parse_due_date_filter("next_day"), do: :next_day
-  defp parse_due_date_filter("next_week"), do: :next_week
-  defp parse_due_date_filter("next_month"), do: :next_month
-  defp parse_due_date_filter(_), do: nil
-
-  defp parse_activity_filter("week"), do: :week
-  defp parse_activity_filter("two_weeks"), do: :two_weeks
-  defp parse_activity_filter("four_weeks"), do: :four_weeks
-  defp parse_activity_filter("inactive"), do: :inactive
-  defp parse_activity_filter(_), do: nil
-
   defp state_dot_color(color) when is_binary(color), do: color
   defp state_dot_color(_), do: "#6B7280"
+
+  # ---------------------------------------------------------------------------
+  # Render
+  # ---------------------------------------------------------------------------
 
   @impl true
   def render(assigns) do
@@ -1018,222 +870,18 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       copy_event="copy_task_to_project"
     />
 
-    <%!-- Filter Drawer --%>
-    <%= if @show_filter_drawer do %>
-      <% active_filter_count =
-        if(@filter_priority, do: 1, else: 0) + MapSet.size(@filter_tags) +
-          if(@filter_due_date, do: 1, else: 0) + if @filter_activity, do: 1, else: 0 %>
-      <div class="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label="Filter">
-        <div class="absolute inset-0 bg-black/20" phx-click="toggle_filter_drawer" />
-        <div class="absolute right-0 top-0 h-full w-72 bg-base-200 shadow-xl flex flex-col overflow-hidden border-l border-base-content/8">
-          <%!-- Header --%>
-          <div class="flex items-center justify-between px-4 py-3 border-b border-base-content/10">
-            <h2 class="text-sm font-semibold text-base-content/80">Filter</h2>
-            <button
-              phx-click="toggle_filter_drawer"
-              class="btn btn-ghost btn-xs btn-circle"
-              aria-label="Close"
-            >
-              <.icon name="hero-x-mark-mini" class="w-4 h-4" />
-            </button>
-          </div>
-
-          <%!-- Scrollable body --%>
-          <div class="flex-1 overflow-y-auto px-4 py-4 space-y-5">
-            <%!-- Keyword --%>
-            <div>
-              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
-                Keyword
-              </h3>
-              <form phx-change="search">
-                <div class="relative">
-                  <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <.icon name="hero-magnifying-glass-mini" class="w-3.5 h-3.5 text-base-content/25" />
-                  </div>
-                  <input
-                    type="text"
-                    name="query"
-                    value={@search_query}
-                    placeholder="Enter a keyword..."
-                    phx-debounce="300"
-                    class="input input-sm w-full pl-8 bg-base-100 border-base-content/10 placeholder:text-base-content/25 text-sm"
-                    autocomplete="off"
-                  />
-                </div>
-                <p class="text-[11px] text-base-content/30 mt-1">Search cards, labels, and more.</p>
-              </form>
-            </div>
-
-            <%!-- Card Status --%>
-            <div>
-              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
-                Card status
-              </h3>
-              <div class="space-y-0.5">
-                <label class="flex items-center gap-3 cursor-pointer py-1.5 hover:text-base-content transition-colors">
-                  <input
-                    type="checkbox"
-                    class="checkbox checkbox-sm checkbox-primary"
-                    checked={@show_completed}
-                    phx-click="toggle_show_completed"
-                  />
-                  <span class="text-sm text-base-content/70">Marked as complete</span>
-                </label>
-                <label class="flex items-center gap-3 cursor-pointer py-1.5 hover:text-base-content transition-colors">
-                  <input
-                    type="checkbox"
-                    class="checkbox checkbox-sm checkbox-primary"
-                    checked={@show_archived}
-                    phx-click="toggle_show_archived"
-                  />
-                  <span class="text-sm text-base-content/70">Archived</span>
-                </label>
-              </div>
-            </div>
-
-            <%!-- Due Date --%>
-            <div>
-              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
-                Due date
-              </h3>
-              <div class="space-y-0.5">
-                <%= for {label, value, atom, icon, icon_class} <- [
-                  {"No date", "no_date", :no_date, "hero-calendar", "text-base-content/35"},
-                  {"Overdue", "overdue", :overdue, "hero-clock", "text-error/80"},
-                  {"Due in the next day", "next_day", :next_day, "hero-clock", "text-warning/80"},
-                  {"Due in the next week", "next_week", :next_week, "hero-clock", "text-base-content/45"},
-                  {"Due in the next month", "next_month", :next_month, "hero-clock", "text-base-content/30"}
-                ] do %>
-                  <label class="flex items-center gap-3 cursor-pointer py-1.5 hover:text-base-content transition-colors">
-                    <input
-                      type="checkbox"
-                      class="checkbox checkbox-sm checkbox-primary"
-                      checked={@filter_due_date == atom}
-                      phx-click="set_due_date_filter"
-                      phx-value-value={value}
-                    />
-                    <.icon name={icon} class={"w-3.5 h-3.5 flex-shrink-0 #{icon_class}"} />
-                    <span class="text-sm text-base-content/70">{label}</span>
-                  </label>
-                <% end %>
-              </div>
-            </div>
-
-            <%!-- Priority --%>
-            <div>
-              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
-                Priority
-              </h3>
-              <div class="space-y-1.5">
-                <%= for {label, value, color} <- [{"High", 3, "#EF4444"}, {"Med", 2, "#F59E0B"}, {"Low", 1, "#3B82F6"}] do %>
-                  <label class="flex items-center gap-3 cursor-pointer py-0.5 group">
-                    <input
-                      type="checkbox"
-                      class="checkbox checkbox-sm checkbox-primary flex-shrink-0"
-                      checked={@filter_priority == value}
-                      phx-click="set_priority_filter"
-                      phx-value-priority={value}
-                    />
-                    <div class="flex-1 h-5 rounded" style={"background-color: #{color}"} />
-                    <span class="text-[11px] text-base-content/45 w-7 text-right shrink-0">
-                      {label}
-                    </span>
-                  </label>
-                <% end %>
-              </div>
-            </div>
-
-            <%!-- Labels / Tags --%>
-            <%= if @available_tags != [] do %>
-              <div>
-                <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
-                  Labels
-                </h3>
-                <div class="space-y-1.5">
-                  <%= for tag <- @available_tags do %>
-                    <label class="flex items-center gap-3 cursor-pointer py-0.5 group">
-                      <input
-                        type="checkbox"
-                        class="checkbox checkbox-sm checkbox-primary flex-shrink-0"
-                        checked={MapSet.member?(@filter_tags, tag.name)}
-                        phx-click="set_tag_filter"
-                        phx-value-tag={tag.name}
-                      />
-                      <div
-                        class="flex-1 h-5 rounded flex items-center px-2"
-                        style={"background-color: #{tag.color || "#6B7280"}"}
-                      >
-                        <span class="text-[11px] font-medium text-white/90 truncate">{tag.name}</span>
-                      </div>
-                      <button
-                        type="button"
-                        phx-click="cycle_tag_color"
-                        phx-value-tag-id={tag.id}
-                        class="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity flex-shrink-0"
-                        onclick="event.stopPropagation();"
-                        title="Change color"
-                      >
-                        <.icon name="hero-swatch-mini" class="w-3.5 h-3.5 text-base-content/50" />
-                      </button>
-                    </label>
-                  <% end %>
-                </div>
-              </div>
-            <% end %>
-
-            <%!-- Activity --%>
-            <div>
-              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
-                Activity
-              </h3>
-              <div class="space-y-0.5">
-                <%= for {label, value, atom} <- [
-                  {"Active in the last week", "week", :week},
-                  {"Active in the last two weeks", "two_weeks", :two_weeks},
-                  {"Active in the last four weeks", "four_weeks", :four_weeks},
-                  {"Without activity in the last four weeks", "inactive", :inactive}
-                ] do %>
-                  <label class="flex items-center gap-3 cursor-pointer py-1.5 hover:text-base-content transition-colors">
-                    <input
-                      type="checkbox"
-                      class="checkbox checkbox-sm checkbox-primary flex-shrink-0"
-                      checked={@filter_activity == atom}
-                      phx-click="set_activity_filter"
-                      phx-value-value={value}
-                    />
-                    <span class="text-sm text-base-content/70">{label}</span>
-                  </label>
-                <% end %>
-              </div>
-            </div>
-          </div>
-
-          <%!-- Footer --%>
-          <div class="border-t border-base-content/10 px-4 py-3 space-y-2">
-            <%= if MapSet.size(@filter_tags) >= 2 do %>
-              <form phx-change="toggle_tag_filter_mode" class="flex items-center gap-2">
-                <label class="text-xs text-base-content/40 flex-shrink-0">Tag match</label>
-                <select
-                  name="mode"
-                  class="select select-xs flex-1 bg-base-100 border-base-content/10 text-sm"
-                >
-                  <option value="or" selected={@filter_tag_mode == :or}>Any match</option>
-                  <option value="and" selected={@filter_tag_mode == :and}>All match</option>
-                </select>
-              </form>
-            <% end %>
-            <%= if active_filter_count > 0 do %>
-              <button
-                phx-click="clear_filters"
-                class="btn btn-ghost btn-sm w-full text-base-content/40 hover:text-base-content/80"
-              >
-                Clear all filters
-              </button>
-            <% end %>
-          </div>
-        </div>
-      </div>
-    <% end %>
+    <.kanban_filter_drawer
+      show={@show_filter_drawer}
+      search_query={@search_query}
+      show_completed={@show_completed}
+      show_archived={@show_archived}
+      filter_due_date={@filter_due_date}
+      filter_priority={@filter_priority}
+      filter_tags={@filter_tags}
+      filter_tag_mode={@filter_tag_mode}
+      filter_activity={@filter_activity}
+      available_tags={@available_tags}
+    />
     """
   end
 end

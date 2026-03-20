@@ -154,6 +154,50 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.TasksHelpers do
     end
   end
 
+  def handle_create_new_task(params, socket, reload_fn) do
+    project_id = socket.assigns[:project_id]
+    session_id = socket.assigns[:session_id]
+
+    opts =
+      [project_id: project_id, session_id: session_id]
+      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+
+    case Tasks.create_task_from_form(params, opts) do
+      {:ok, _task} ->
+        {:noreply,
+         socket
+         |> assign(:show_new_task_drawer, false)
+         |> assign(:show_create_task_drawer, false)
+         |> reload_fn.()
+         |> put_flash(:info, "Task created")}
+
+      {:error, changeset} ->
+        {:noreply,
+         put_flash(socket, :error, "Failed to create task: #{inspect(changeset.errors)}")}
+    end
+  end
+
+  def handle_quick_add_task(%{"title" => title, "state_id" => state_id_str}, socket, reload_fn) do
+    title = String.trim(title)
+
+    if title == "" do
+      {:noreply, assign(socket, :quick_add_column, nil)}
+    else
+      state_id = parse_int(state_id_str, 0)
+
+      case Tasks.quick_create_task(title, state_id, socket.assigns.project_id) do
+        {:ok, _task} ->
+          {:noreply,
+           socket
+           |> assign(:quick_add_column, nil)
+           |> reload_fn.()}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Failed to create task")}
+      end
+    end
+  end
+
   def handle_tasks_changed(socket, reload_fn) do
     {:noreply, reload_fn.(socket)}
   end

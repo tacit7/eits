@@ -132,7 +132,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
     <%!-- Priority top bar --%>
     <%= if @task.priority && @task.priority > 0 do %>
       <div
-        class="-mx-3.5 sm:-mx-3 -mt-3.5 sm:-mt-3 mb-2.5 h-0.5"
+        class="-mx-2 -mt-2 mb-2 h-0.5"
         style={"background-color: #{priority_bar_color(@task.priority)}"}
       />
     <% end %>
@@ -162,7 +162,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       </button>
       <h4
         class={[
-          "text-sm font-medium flex-1 leading-snug cursor-pointer hover:text-primary transition-colors",
+          "text-xs font-medium flex-1 leading-snug cursor-pointer hover:text-primary transition-colors",
           @task.completed_at && "text-base-content/40 line-through",
           !@task.completed_at && "text-base-content"
         ]}
@@ -348,7 +348,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
 
   defp card_class(_), do: ""
 
-  defp card_body_class("kanban"), do: "card-body p-3.5 sm:p-3"
+  defp card_body_class("kanban"), do: "card-body p-2"
   defp card_body_class("grid"), do: "card-body p-5"
   defp card_body_class(_), do: ""
 

@@ -112,7 +112,8 @@ defmodule EyeInTheSkyWebWeb.Components.KanbanFilterDrawer do
                       type="checkbox"
                       class="checkbox checkbox-sm checkbox-primary"
                       checked={@filter_due_date == atom}
-                      phx-click="set_due_date_filter"
+                      phx-click="update_filter"
+                      phx-value-field="due_date"
                       phx-value-value={value}
                     />
                     <.icon name={icon} class={"w-3.5 h-3.5 flex-shrink-0 #{icon_class}"} />
@@ -134,8 +135,9 @@ defmodule EyeInTheSkyWebWeb.Components.KanbanFilterDrawer do
                       type="checkbox"
                       class="checkbox checkbox-sm checkbox-primary flex-shrink-0"
                       checked={@filter_priority == value}
-                      phx-click="set_priority_filter"
-                      phx-value-priority={value}
+                      phx-click="update_filter"
+                      phx-value-field="priority"
+                      phx-value-value={value}
                     />
                     <div class="flex-1 h-5 rounded" style={"background-color: #{color}"} />
                     <span class="text-[11px] text-base-content/45 w-7 text-right shrink-0">
@@ -159,8 +161,9 @@ defmodule EyeInTheSkyWebWeb.Components.KanbanFilterDrawer do
                         type="checkbox"
                         class="checkbox checkbox-sm checkbox-primary flex-shrink-0"
                         checked={MapSet.member?(@filter_tags, tag.name)}
-                        phx-click="set_tag_filter"
-                        phx-value-tag={tag.name}
+                        phx-click="update_filter"
+                        phx-value-field="tag"
+                        phx-value-value={tag.name}
                       />
                       <div
                         class="flex-1 h-5 rounded flex items-center px-2"
@@ -201,7 +204,8 @@ defmodule EyeInTheSkyWebWeb.Components.KanbanFilterDrawer do
                       type="checkbox"
                       class="checkbox checkbox-sm checkbox-primary flex-shrink-0"
                       checked={@filter_activity == atom}
-                      phx-click="set_activity_filter"
+                      phx-click="update_filter"
+                      phx-value-field="activity"
                       phx-value-value={value}
                     />
                     <span class="text-sm text-base-content/70">{label}</span>
@@ -214,10 +218,11 @@ defmodule EyeInTheSkyWebWeb.Components.KanbanFilterDrawer do
           <%!-- Footer --%>
           <div class="border-t border-base-content/10 px-4 py-3 space-y-2">
             <%= if MapSet.size(@filter_tags) >= 2 do %>
-              <form phx-change="toggle_tag_filter_mode" class="flex items-center gap-2">
+              <form phx-change="update_filter" class="flex items-center gap-2">
+                <input type="hidden" name="field" value="tag_mode" />
                 <label class="text-xs text-base-content/40 flex-shrink-0">Tag match</label>
                 <select
-                  name="mode"
+                  name="value"
                   class="select select-xs flex-1 bg-base-100 border-base-content/10 text-sm"
                 >
                   <option value="or" selected={@filter_tag_mode == :or}>Any match</option>

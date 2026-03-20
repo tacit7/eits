@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
       global_channel = Enum.find(channels, fn c -> c.name == "#global" end)
 
       if global_channel do
-        case EyeInTheSkyWeb.Messages.send_channel_message(%{
+        case EyeInTheSkyWeb.ChannelMessages.send_channel_message(%{
                channel_id: global_channel.id,
                session_id: "web-user",
                sender_role: "user",

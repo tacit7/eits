@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWebWeb.ChatLive do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Projects, Prompts, Sessions}
+  alias EyeInTheSkyWeb.{Agents, ChannelMessages, Channels, MessageReactions, Messages, Projects, Prompts, Sessions}
   alias EyeInTheSkyWeb.Agents.AgentManager
   alias EyeInTheSkyWeb.Claude.ChannelProtocol
   alias EyeInTheSkyWebWeb.ChatPresenter
@@ -88,7 +88,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
     messages =
       if channel_id do
-        Messages.list_messages_for_channel(channel_id)
+        ChannelMessages.list_messages_for_channel(channel_id)
         |> ChatPresenter.serialize_messages()
       else
         []
@@ -172,7 +172,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     require Logger
     session_id = get_session_id(socket)
 
-    case Messages.send_channel_message(%{
+    case ChannelMessages.send_channel_message(%{
            channel_id: channel_id,
            session_id: session_id,
            sender_role: "user",
@@ -247,7 +247,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         _ -> nil
       end
 
-    case Messages.send_channel_message(%{
+    case ChannelMessages.send_channel_message(%{
            channel_id: channel_id,
            session_id: session_id,
            sender_role: "user",
@@ -282,7 +282,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       case Channels.add_member(channel_id, agent_id, session_id) do
         {:ok, _member} ->
           {:ok, sys_msg} =
-            Messages.send_channel_message(%{
+            ChannelMessages.send_channel_message(%{
               channel_id: channel_id,
               session_id: nil,
               sender_role: "system",
@@ -316,7 +316,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       Channels.remove_member(channel_id, session_id)
 
       {:ok, sys_msg} =
-        Messages.send_channel_message(%{
+        ChannelMessages.send_channel_message(%{
           channel_id: channel_id,
           session_id: nil,
           sender_role: "system",
@@ -357,7 +357,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     session_id = get_session_id(socket)
     channel_id = socket.assigns.active_channel_id
 
-    case Messages.create_thread_reply(parent_id, %{
+    case ChannelMessages.create_thread_reply(parent_id, %{
            channel_id: channel_id,
            session_id: session_id,
            sender_role: "user",
@@ -379,10 +379,10 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   def handle_event("toggle_reaction", %{"message_id" => message_id, "emoji" => emoji}, socket) do
     session_id = get_session_id(socket)
 
-    case Messages.toggle_reaction(message_id, session_id, emoji) do
+    case MessageReactions.toggle_reaction(message_id, session_id, emoji) do
       {:ok, _action} ->
         messages =
-          Messages.list_messages_for_channel(socket.assigns.active_channel_id)
+          ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)
           |> ChatPresenter.serialize_messages()
 
         {:noreply, assign(socket, :messages, messages)}
@@ -399,7 +399,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     {:ok, _} = Messages.delete_message(message)
 
     messages =
-      Messages.list_messages_for_channel(socket.assigns.active_channel_id)
+      ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)
       |> ChatPresenter.serialize_messages()
 
     {:noreply, assign(socket, :messages, messages)}
@@ -460,7 +460,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       end
 
     {:ok, _creating_msg} =
-      Messages.send_channel_message(%{
+      ChannelMessages.send_channel_message(%{
         channel_id: channel_id,
         session_id: nil,
         sender_role: "system",
@@ -491,7 +491,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
           case Channels.add_member(channel_id, agent.id, session.id) do
             {:ok, _member} ->
               {:ok, sys_msg} =
-                Messages.send_channel_message(%{
+                ChannelMessages.send_channel_message(%{
                   channel_id: channel_id,
                   session_id: nil,
                   sender_role: "system",
@@ -553,7 +553,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     )
 
     messages =
-      Messages.list_messages_for_channel(socket.assigns.active_channel_id)
+      ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)
       |> ChatPresenter.serialize_messages()
 
     Logger.info("📬 Loaded #{length(messages)} messages from DB")
@@ -882,7 +882,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   defp load_thread(nil), do: nil
 
   defp load_thread(message_id) do
-    parent_message = Messages.get_message_with_thread!(message_id)
+    parent_message = ChannelMessages.get_message_with_thread!(message_id)
 
     %{
       parent_message: ChatPresenter.serialize_message(parent_message),

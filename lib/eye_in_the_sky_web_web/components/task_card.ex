@@ -238,7 +238,6 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
                       phx-click="move_task"
                       phx-value-task_id={@task.uuid || to_string(@task.id)}
                       phx-value-state_id={state.id}
-                      onclick="event.stopPropagation();"
                       class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-base-content/80 hover:bg-base-content/10 transition-colors text-left"
                     >
                       <span
@@ -259,7 +258,6 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
                 phx-click="archive_task"
                 phx-value-task_id={@task.uuid || to_string(@task.id)}
                 phx-confirm="Archive this task?"
-                onclick="event.stopPropagation();"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
               >
                 <.icon name="hero-archive-box-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
@@ -270,7 +268,6 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
                 phx-click={@on_delete}
                 phx-value-task_id={@task.uuid || to_string(@task.id)}
                 phx-confirm="Delete this task?"
-                onclick="event.stopPropagation();"
                 class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-error hover:bg-error/10 transition-colors text-left"
               >
                 <.icon name="hero-trash-mini" class="w-4 h-4 flex-shrink-0" />

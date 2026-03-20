@@ -18,14 +18,19 @@ This project uses Phoenix LiveView with Elixir. Primary languages: TypeScript, J
 
 Worktrees live in `.claude/worktrees/` relative to the project root.
 
-When working in git worktrees, always compile from the main project directory or symlink deps/build directories first. Never attempt to compile directly in a worktree without verifying deps are available.
+When using git worktrees, always verify you are editing files in the worktree directory, NOT the main project directory. Check `pwd` before making edits.
 
 If deps are missing in the worktree, symlink them before compiling:
 ```bash
 ln -s ../../deps deps && ln -s ../../_build _build
 ```
 
-When using git worktrees, always verify you are editing files in the worktree directory, NOT the main project directory. Check `pwd` before making edits.
+**Exception: when adding new Elixir modules or deps**, do NOT symlink `_build`. A symlinked `_build` causes stale module conflicts when the worktree introduces modules that don't exist in the main tree (compiled beams collide). For tasks that add new modules, run `mix deps.get` and `mix compile` directly in the worktree to get an isolated `_build`.
+
+**CRITICAL: `rm` is aliased to `rm-trash` on this system.** It follows symlinks and trashes the target, not the symlink. To remove symlinks, always use `unlink`:
+```bash
+unlink _build && unlink deps
+```
 
 ## Build & Run
 

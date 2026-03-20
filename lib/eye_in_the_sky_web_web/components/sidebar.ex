@@ -139,7 +139,8 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
            AgentManager.create_agent(
              project_id: project.id,
              project_path: project.path,
-             model: "sonnet"
+             model: "sonnet",
+             eits_workflow: "0"
            ) do
       {:noreply, push_navigate(socket, to: "/dm/#{session.id}")}
     else

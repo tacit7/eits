@@ -337,6 +337,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
             sidebar_project={@sidebar_project}
             collapsed={@collapsed}
             expanded_all_projects={@expanded_all_projects}
+            notification_count={@notification_count}
             myself={@myself}
           />
           <.chat_section
@@ -364,7 +365,6 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
             sidebar_project={@sidebar_project}
             collapsed={@collapsed}
             expanded_system={@expanded_system}
-            notification_count={@notification_count}
             myself={@myself}
           />
         </nav>
@@ -409,19 +409,24 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   attr :sidebar_project, :any, default: nil
   attr :collapsed, :boolean, required: true
   attr :expanded_all_projects, :boolean, required: true
+  attr :notification_count, :integer, required: true
   attr :myself, :any, required: true
 
   defp all_projects_section(assigns) do
     ~H"""
+    <% overview_active = @sidebar_tab in [:sessions, :tasks, :prompts, :notes, :skills, :teams, :notifications, :usage] && is_nil(@sidebar_project) %>
     <button
       phx-click="toggle_all_projects"
       phx-target={@myself}
       class={[
         "flex items-center gap-2.5 w-full text-left text-sm transition-colors",
         if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
-        "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5"
+        if(overview_active,
+          do: "text-base-content/80 hover:bg-base-content/5",
+          else: "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5"
+        )
       ]}
-      title="All Projects"
+      title="Overview"
     >
       <%= if !@collapsed do %>
         <.icon
@@ -430,7 +435,10 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
         />
       <% end %>
       <.icon name="hero-rectangle-stack" class="w-4 h-4 flex-shrink-0" />
-      <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>All Projects</span>
+      <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>Overview</span>
+      <%= if overview_active && !@collapsed do %>
+        <span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"></span>
+      <% end %>
     </button>
 
     <%= if @expanded_all_projects || @collapsed do %>
@@ -477,42 +485,6 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           active={@sidebar_tab == :teams}
           collapsed={@collapsed}
         />
-      </div>
-    <% end %>
-    """
-  end
-
-  attr :sidebar_tab, :atom, required: true
-  attr :sidebar_project, :any, default: nil
-  attr :collapsed, :boolean, required: true
-  attr :expanded_system, :boolean, required: true
-  attr :notification_count, :integer, required: true
-  attr :myself, :any, required: true
-
-  defp system_section(assigns) do
-    ~H"""
-    <button
-      phx-click="toggle_system"
-      phx-target={@myself}
-      class={[
-        "flex items-center gap-2.5 w-full text-left text-sm transition-colors",
-        if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
-        "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5"
-      ]}
-      title="System"
-    >
-      <%= if !@collapsed do %>
-        <.icon
-          name={if @expanded_system, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"}
-          class="w-3.5 h-3.5 flex-shrink-0"
-        />
-      <% end %>
-      <.icon name="hero-squares-2x2" class="w-4 h-4 flex-shrink-0" />
-      <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>System</span>
-    </button>
-
-    <%= if @expanded_system || @collapsed do %>
-      <div class={if !@collapsed, do: "ml-5 border-l border-base-content/8"}>
         <.section_sub_item
           href="/usage"
           icon="hero-chart-bar"
@@ -526,6 +498,48 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           collapsed={@collapsed}
           count={@notification_count}
         />
+      </div>
+    <% end %>
+    """
+  end
+
+  attr :sidebar_tab, :atom, required: true
+  attr :sidebar_project, :any, default: nil
+  attr :collapsed, :boolean, required: true
+  attr :expanded_system, :boolean, required: true
+  attr :myself, :any, required: true
+
+  defp system_section(assigns) do
+    ~H"""
+    <% system_active = @sidebar_tab in [:config, :jobs, :settings] && is_nil(@sidebar_project) %>
+    <button
+      phx-click="toggle_system"
+      phx-target={@myself}
+      class={[
+        "flex items-center gap-2.5 w-full text-left text-sm transition-colors",
+        if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
+        if(system_active,
+          do: "text-base-content/80 hover:bg-base-content/5",
+          else: "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5"
+        )
+      ]}
+      title="System"
+    >
+      <%= if !@collapsed do %>
+        <.icon
+          name={if @expanded_system, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"}
+          class="w-3.5 h-3.5 flex-shrink-0"
+        />
+      <% end %>
+      <.icon name="hero-squares-2x2" class="w-4 h-4 flex-shrink-0" />
+      <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>System</span>
+      <%= if system_active && !@collapsed do %>
+        <span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"></span>
+      <% end %>
+    </button>
+
+    <%= if @expanded_system || @collapsed do %>
+      <div class={if !@collapsed, do: "ml-5 border-l border-base-content/8"}>
         <.section_sub_item
           href="/config"
           icon="hero-cog-6-tooth"
@@ -538,13 +552,6 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           icon="hero-calendar-days"
           label="Jobs"
           active={@sidebar_tab == :jobs}
-          collapsed={@collapsed}
-        />
-        <.section_sub_item
-          href="/oban"
-          icon="hero-queue-list"
-          label="Oban"
-          active={false}
           collapsed={@collapsed}
         />
         <.section_sub_item
@@ -569,77 +576,78 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
 
   defp chat_section(assigns) do
     ~H"""
-    <div>
-      <button
-        phx-click="toggle_chat"
-        phx-target={@myself}
-        class={[
-          "flex items-center gap-2.5 w-full text-left text-sm transition-colors",
-          if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
-          if(@sidebar_tab == :chat,
-            do: "text-primary bg-primary/10 border-l-2 border-primary font-medium",
-            else: "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5"
-          )
-        ]}
-        title="Chat"
-      >
-        <%= if !@collapsed do %>
-          <.icon
-            name={if @expanded_chat, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"}
-            class="w-3.5 h-3.5 flex-shrink-0"
-          />
-        <% end %>
-        <.icon name="hero-chat-bubble-left-ellipsis" class="w-4 h-4 flex-shrink-0" />
-        <span class={["truncate", if(@collapsed, do: "hidden")]}>Chat</span>
-      </button>
-
-      <%= if @expanded_chat && !@collapsed do %>
-        <div class="ml-5 border-l border-base-content/8">
-          <%= for channel <- @channels do %>
-            <.link
-              navigate={~p"/chat?channel_id=#{channel.id}"}
-              class={[
-                "block pl-4 pr-3 py-1 text-sm transition-colors",
-                if(@active_channel_id && to_string(@active_channel_id) == to_string(channel.id),
-                  do: "text-primary font-medium bg-primary/5",
-                  else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/5"
-                )
-              ]}
-            >
-              <span class="text-base-content/30 mr-0.5">#</span>{channel.name}
-            </.link>
-          <% end %>
-
-          <%!-- New channel inline form or button --%>
-          <%= if @new_channel_name do %>
-            <form
-              phx-submit="create_channel"
-              phx-target={@myself}
-              class="flex items-center gap-1 pl-4 pr-2 py-1"
-            >
-              <input
-                type="text"
-                name="name"
-                value={@new_channel_name}
-                phx-keyup="update_channel_name"
-                phx-target={@myself}
-                placeholder="channel-name"
-                class="flex-1 bg-transparent border-b border-base-content/15 text-xs text-base-content/70 placeholder:text-base-content/25 outline-none py-0.5 font-mono"
-                autofocus
-              />
-            </form>
-          <% else %>
-            <button
-              phx-click="show_new_channel"
-              phx-target={@myself}
-              class="block pl-4 pr-3 py-1 text-sm text-base-content/30 hover:text-base-content/55 transition-colors w-full text-left"
-            >
-              + New Channel
-            </button>
-          <% end %>
-        </div>
+    <button
+      phx-click="toggle_chat"
+      phx-target={@myself}
+      class={[
+        "flex items-center gap-2.5 w-full text-left text-sm transition-colors",
+        if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
+        if(@sidebar_tab == :chat,
+          do: "text-base-content/80 hover:bg-base-content/5",
+          else: "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5"
+        )
+      ]}
+      title="Chat"
+    >
+      <%= if !@collapsed do %>
+        <.icon
+          name={if @expanded_chat, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"}
+          class="w-3.5 h-3.5 flex-shrink-0"
+        />
       <% end %>
-    </div>
+      <.icon name="hero-chat-bubble-left-ellipsis" class="w-4 h-4 flex-shrink-0" />
+      <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>Chat</span>
+      <%= if @sidebar_tab == :chat && !@collapsed do %>
+        <span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"></span>
+      <% end %>
+    </button>
+
+    <%= if @expanded_chat && !@collapsed do %>
+      <div class="ml-5 border-l border-base-content/8">
+        <%= for channel <- @channels do %>
+          <.link
+            navigate={~p"/chat?channel_id=#{channel.id}"}
+            class={[
+              "block pl-3 pr-3 py-0.5 text-sm transition-colors",
+              if(@active_channel_id && to_string(@active_channel_id) == to_string(channel.id),
+                do: "text-primary font-medium bg-primary/5",
+                else: "text-base-content/50 hover:text-base-content/75 hover:bg-base-content/5"
+              )
+            ]}
+          >
+            <span class="text-base-content/30 mr-0.5">#</span>{channel.name}
+          </.link>
+        <% end %>
+
+        <%!-- New channel inline form or button --%>
+        <%= if @new_channel_name do %>
+          <form
+            phx-submit="create_channel"
+            phx-target={@myself}
+            class="flex items-center gap-1 pl-3 pr-2 py-1"
+          >
+            <input
+              type="text"
+              name="name"
+              value={@new_channel_name}
+              phx-keyup="update_channel_name"
+              phx-target={@myself}
+              placeholder="channel-name"
+              class="flex-1 bg-transparent border-b border-base-content/15 text-xs text-base-content/70 placeholder:text-base-content/25 outline-none py-0.5 font-mono"
+              autofocus
+            />
+          </form>
+        <% else %>
+          <button
+            phx-click="show_new_channel"
+            phx-target={@myself}
+            class="block pl-3 pr-3 py-0.5 text-sm text-base-content/30 hover:text-base-content/55 transition-colors w-full text-left"
+          >
+            + New Channel
+          </button>
+        <% end %>
+      </div>
+    <% end %>
     """
   end
 
@@ -670,6 +678,9 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
         <% end %>
         <.icon name="hero-folder-open" class="w-4 h-4 flex-shrink-0" />
         <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>Projects</span>
+        <%= if !is_nil(@sidebar_project) && !@collapsed do %>
+          <span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"></span>
+        <% end %>
       </button>
       <%= if !@collapsed && @expanded_projects do %>
         <button

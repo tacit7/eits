@@ -67,10 +67,10 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    {:noreply, load_channel_context(params, socket)}
+    {:noreply, setup_channel(params, socket)}
   end
 
-  defp load_channel_context(params, socket) do
+  defp setup_channel(params, socket) do
     project_id = get_project_id(params)
 
     channels =
@@ -139,7 +139,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     session_search = socket.assigns[:session_search] || ""
 
     sessions_by_project =
-      ChatPresenter.build_sessions_by_project(channel_members, all_projects, session_search)
+      build_sessions_by_project(channel_members, all_projects, session_search)
 
     socket
     |> assign(:page_title, "Chat")
@@ -408,7 +408,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   @impl true
   def handle_event("search_sessions", %{"session_search" => query}, socket) do
     sessions_by_project =
-      ChatPresenter.build_sessions_by_project(
+      build_sessions_by_project(
         socket.assigns.channel_members,
         socket.assigns.all_projects,
         query
@@ -926,11 +926,50 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     search = socket.assigns[:session_search] || ""
 
     sessions_by_project =
-      ChatPresenter.build_sessions_by_project(channel_members, socket.assigns.all_projects, search)
+      build_sessions_by_project(channel_members, socket.assigns.all_projects, search)
 
     socket
     |> assign(:channel_members, channel_members)
     |> assign(:sessions_by_project, sessions_by_project)
+  end
+
+  defp build_sessions_by_project(channel_members, all_projects, search) do
+    member_session_ids = channel_members |> Enum.map(& &1.session_id) |> MapSet.new()
+    projects_by_id = Enum.into(all_projects, %{}, fn p -> {p.id, p} end)
+
+    all_sessions =
+      Sessions.list_sessions_filtered(
+        status_filter: "all",
+        search_query: search,
+        limit: 100
+      )
+
+    all_sessions
+    |> Enum.reject(fn s -> MapSet.member?(member_session_ids, s.id) end)
+    |> Enum.group_by(fn s -> s.project_id end)
+    |> Enum.map(fn {pid, sessions} ->
+      project = Map.get(projects_by_id, pid)
+
+      %{
+        project_id: pid,
+        project_name: if(project, do: project.name, else: "Unassigned"),
+        sessions:
+          Enum.map(sessions, fn s ->
+            %{
+              id: s.id,
+              name: s.name,
+              model: s.model,
+              ended_at: s.ended_at,
+              agent_description:
+                if(Ecto.assoc_loaded?(s.agent) && s.agent,
+                  do: s.agent.description,
+                  else: nil
+                )
+            }
+          end)
+      }
+    end)
+    |> Enum.sort_by(fn g -> g.project_name end)
   end
 
   defp parse_budget(nil), do: nil

@@ -1,10 +1,9 @@
 defmodule EyeInTheSkyWebWeb.ChatPresenter do
   @moduledoc """
-  Serialization and presentation helpers for ChatLive.
+  Pure serialization helpers for ChatLive.
   Handles data shaping before assigns hit the template.
+  No DB queries — only transforms already-loaded data.
   """
-
-  alias EyeInTheSkyWeb.Sessions
 
   def serialize_channels(channels) do
     Enum.map(channels, fn channel ->
@@ -44,7 +43,7 @@ defmodule EyeInTheSkyWebWeb.ChatPresenter do
     }
   end
 
-  def serialize_reactions(message) do
+  defp serialize_reactions(message) do
     if Ecto.assoc_loaded?(message.reactions) do
       message.reactions
       |> Enum.group_by(& &1.emoji)
@@ -70,44 +69,5 @@ defmodule EyeInTheSkyWebWeb.ChatPresenter do
         prompt_text: prompt.prompt_text
       }
     end)
-  end
-
-  def build_sessions_by_project(channel_members, all_projects, search) do
-    member_session_ids = channel_members |> Enum.map(& &1.session_id) |> MapSet.new()
-    projects_by_id = Enum.into(all_projects, %{}, fn p -> {p.id, p} end)
-
-    all_sessions =
-      Sessions.list_sessions_filtered(
-        status_filter: "all",
-        search_query: search,
-        limit: 100
-      )
-
-    all_sessions
-    |> Enum.reject(fn s -> MapSet.member?(member_session_ids, s.id) end)
-    |> Enum.group_by(fn s -> s.project_id end)
-    |> Enum.map(fn {pid, sessions} ->
-      project = Map.get(projects_by_id, pid)
-
-      %{
-        project_id: pid,
-        project_name: if(project, do: project.name, else: "Unassigned"),
-        sessions:
-          Enum.map(sessions, fn s ->
-            %{
-              id: s.id,
-              name: s.name,
-              model: s.model,
-              ended_at: s.ended_at,
-              agent_description:
-                if(Ecto.assoc_loaded?(s.agent) && s.agent,
-                  do: s.agent.description,
-                  else: nil
-                )
-            }
-          end)
-      }
-    end)
-    |> Enum.sort_by(fn g -> g.project_name end)
   end
 end

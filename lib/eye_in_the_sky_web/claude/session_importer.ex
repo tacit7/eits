@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Claude.SessionImporter do
   deduplicating against existing DB records, and persisting new ones.
   """
 
-  alias EyeInTheSkyWeb.{Messages}
+  alias EyeInTheSkyWeb.Messages
   alias EyeInTheSkyWeb.Claude.SessionReader
 
   require Logger
@@ -41,16 +41,11 @@ defmodule EyeInTheSkyWeb.Claude.SessionImporter do
     |> Enum.count(&import_message(&1, session_id, now))
   end
 
-  @doc """
-  Imports a single formatted message into the DB.
+  # ---------------------------------------------------------------------------
+  # Private
+  # ---------------------------------------------------------------------------
 
-  If an unlinked message with matching content already exists (created before sync),
-  it back-fills the `source_uuid` instead of creating a duplicate.
-
-  Returns `true` if the message was persisted, `false` if it was skipped.
-  """
-  @spec import_message(map(), integer(), DateTime.t()) :: boolean()
-  def import_message(msg, session_id, now) do
+  defp import_message(msg, session_id, now) do
     {sender_role, recipient_role, direction} = message_roles(msg.role)
     inserted_at = parse_timestamp(msg.timestamp, now)
 
@@ -96,19 +91,15 @@ defmodule EyeInTheSkyWeb.Claude.SessionImporter do
     end
   end
 
-  @doc "Maps a session message role string to {sender_role, recipient_role, direction}."
-  @spec message_roles(String.t()) :: {String.t(), String.t(), String.t()}
-  def message_roles("user"), do: {"user", "agent", "outbound"}
-  def message_roles(_role), do: {"agent", "user", "inbound"}
+  defp message_roles("user"), do: {"user", "agent", "outbound"}
+  defp message_roles(_role), do: {"agent", "user", "inbound"}
 
-  @doc "Parses an ISO8601 timestamp string, returning `fallback` on failure."
-  @spec parse_timestamp(term(), DateTime.t()) :: DateTime.t()
-  def parse_timestamp(timestamp, fallback) when is_binary(timestamp) do
+  defp parse_timestamp(timestamp, fallback) when is_binary(timestamp) do
     case DateTime.from_iso8601(timestamp) do
       {:ok, dt, _offset} -> DateTime.truncate(dt, :second)
       _ -> fallback
     end
   end
 
-  def parse_timestamp(_timestamp, fallback), do: fallback
+  defp parse_timestamp(_timestamp, fallback), do: fallback
 end

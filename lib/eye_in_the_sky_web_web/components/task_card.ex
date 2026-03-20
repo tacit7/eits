@@ -180,43 +180,41 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
           <summary class="flex items-center justify-center w-6 h-6 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/8 cursor-pointer list-none transition-colors">
             <.icon name="hero-ellipsis-horizontal-mini" class="w-3.5 h-3.5" />
           </summary>
-          <ul class="dropdown-content z-50 menu menu-xs p-1 mt-1 shadow-lg bg-base-200 dark:bg-base-300 border border-base-content/10 rounded-lg w-36">
-            <li>
-              <button
-                type="button"
-                phx-click={@on_click}
-                phx-value-task_id={@task.uuid || to_string(@task.id)}
-                class="flex items-center gap-2 text-xs"
-              >
-                <.icon name="hero-arrow-top-right-on-square-mini" class="w-3 h-3" /> Open
-              </button>
-            </li>
-            <li>
-              <button
-                type="button"
-                phx-hook="CopyToClipboard"
-                id={"copy-task-kanban-#{@task.id}"}
-                data-copy={@task.uuid || to_string(@task.id)}
-                onclick="event.preventDefault();"
-                class="flex items-center gap-2 text-xs"
-              >
-                <.icon name="hero-clipboard-document-mini" class="w-3 h-3" /> Copy ID
-              </button>
-            </li>
+          <div class="dropdown-content z-50 mt-1 w-44 rounded-xl bg-base-300 dark:bg-[hsl(220,13%,18%)] shadow-xl p-1.5 flex flex-col gap-0.5">
+            <button
+              type="button"
+              phx-click={@on_click}
+              phx-value-task_id={@task.uuid || to_string(@task.id)}
+              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+            >
+              <.icon name="hero-rectangle-stack-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+              Open card
+            </button>
+            <button
+              type="button"
+              phx-hook="CopyToClipboard"
+              id={"copy-task-kanban-#{@task.id}"}
+              data-copy={@task.uuid || to_string(@task.id)}
+              onclick="event.preventDefault();"
+              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+            >
+              <.icon name="hero-link-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+              Copy link
+            </button>
             <%= if @on_delete do %>
-              <li>
-                <button
-                  type="button"
-                  phx-click={@on_delete}
-                  phx-value-task_id={@task.uuid || to_string(@task.id)}
-                  phx-confirm="Delete this task?"
-                  class="flex items-center gap-2 text-xs text-error hover:bg-error/10"
-                >
-                  <.icon name="hero-trash-mini" class="w-3 h-3" /> Delete
-                </button>
-              </li>
+              <div class="border-t border-base-content/10 my-0.5" />
+              <button
+                type="button"
+                phx-click={@on_delete}
+                phx-value-task_id={@task.uuid || to_string(@task.id)}
+                phx-confirm="Delete this task?"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-error hover:bg-error/10 transition-colors text-left"
+              >
+                <.icon name="hero-archive-box-mini" class="w-4 h-4 flex-shrink-0" />
+                Delete
+              </button>
             <% end %>
-          </ul>
+          </div>
         </details>
       </div>
     </div>

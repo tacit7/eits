@@ -3,6 +3,8 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage.TasksTab do
 
   use EyeInTheSkyWebWeb, :html
 
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1]
+
   alias EyeInTheSkyWeb.Tasks.WorkflowState
 
   attr :tasks, :list, default: []
@@ -97,6 +99,10 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage.TasksTab do
                       <span class="text-base-content/15">&middot;</span>
                       <span class="font-mono text-base-content/30">
                         {String.slice(task.uuid || to_string(task.id), 0..7)}
+                      </span>
+                      <span class="text-base-content/15">&middot;</span>
+                      <span class="tabular-nums text-base-content/30">
+                        {relative_time(task.created_at)}
                       </span>
                       <%= if Map.get(task, :notes_count, 0) > 0 do %>
                         <span class="text-base-content/15">&middot;</span>

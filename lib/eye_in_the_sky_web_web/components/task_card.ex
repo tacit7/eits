@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   import EyeInTheSkyWebWeb.CoreComponents
 
   import EyeInTheSkyWebWeb.Helpers.ViewHelpers,
-    only: [format_due_date: 1, card_aging_indicator: 1]
+    only: [format_due_date: 1, card_aging_indicator: 1, relative_time: 1]
 
   alias EyeInTheSkyWeb.Tasks.WorkflowState
 
@@ -95,6 +95,8 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
           <% end %>
           <span class="text-base-content/15">&middot;</span>
           <span class="font-mono">{String.slice(@task.uuid || "", 0..7)}</span>
+          <span class="text-base-content/15">&middot;</span>
+          <span class="tabular-nums">{relative_time(@task.created_at)}</span>
         </div>
       </div>
       <%= if @dm_session do %>
@@ -306,9 +308,11 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
     <% checklist = Map.get(@task, :checklist_items, []) %>
     <% notes_count = Map.get(@task, :notes_count, 0) %>
     <% has_footer =
-      @task.description || @aging || @task.due_at || checklist != [] || notes_count > 0 || @dm_session %>
+      @task.description || @aging || @task.due_at || checklist != [] || notes_count > 0 ||
+        @dm_session || Map.get(@task, :created_at) %>
     <%= if has_footer do %>
       <div class="flex items-center gap-2 mt-2 text-base-content/35 text-[11px]">
+        <span class="tabular-nums">{relative_time(@task.created_at)}</span>
         <%= if @task.description do %>
           <.icon name="hero-document-text" class="w-3 h-3 flex-shrink-0" />
         <% end %>
@@ -395,6 +399,9 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
     <div class="flex flex-wrap items-center gap-2 mt-auto pt-3 border-t border-base-300">
       <span class="badge badge-ghost badge-sm font-mono text-xs">
         {String.slice(@task.uuid || "", 0..7)}
+      </span>
+      <span class="badge badge-ghost badge-sm text-xs tabular-nums">
+        {relative_time(@task.created_at)}
       </span>
       <button
         type="button"

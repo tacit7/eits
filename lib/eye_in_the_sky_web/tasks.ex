@@ -218,7 +218,7 @@ defmodule EyeInTheSkyWeb.Tasks do
     title = params["title"]
     description = params["description"]
     state_id = parse_form_int(params["state_id"], 0)
-    priority = parse_form_int(params["priority"], 0)
+    priority = parse_form_int(params["priority"], 1)
     tags_string = params["tags"] || ""
 
     tag_names =

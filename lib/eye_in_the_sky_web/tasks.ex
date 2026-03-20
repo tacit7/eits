@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.Tasks do
 
   import Ecto.Query, warn: false
   alias EyeInTheSkyWeb.Repo
-  alias EyeInTheSkyWeb.Tasks.{Task, WorkflowState, Tag, ChecklistItem}
+  alias EyeInTheSkyWeb.Tasks.{Task, WorkflowState}
   alias EyeInTheSkyWeb.QueryHelpers
   alias EyeInTheSkyWeb.QueryBuilder
   alias EyeInTheSkyWeb.Search.PgSearch
@@ -18,6 +18,24 @@ defmodule EyeInTheSkyWeb.Tasks do
   defdelegate state_in_progress, to: WorkflowState, as: :in_progress_id
   defdelegate state_in_review, to: WorkflowState, as: :in_review_id
   defdelegate state_done, to: WorkflowState, as: :done_id
+
+  # Delegates to sub-contexts (backward-compatible)
+  defdelegate list_workflow_states(), to: EyeInTheSkyWeb.WorkflowStates
+  defdelegate reorder_workflow_states(ids), to: EyeInTheSkyWeb.WorkflowStates
+  defdelegate get_workflow_state!(id), to: EyeInTheSkyWeb.WorkflowStates
+  defdelegate get_workflow_state_by_name(name), to: EyeInTheSkyWeb.WorkflowStates
+
+  defdelegate list_tags(), to: EyeInTheSkyWeb.TaskTags
+  defdelegate get_tag!(id), to: EyeInTheSkyWeb.TaskTags
+  defdelegate update_tag(tag, attrs), to: EyeInTheSkyWeb.TaskTags
+  defdelegate get_or_create_tag(name), to: EyeInTheSkyWeb.TaskTags
+  defdelegate replace_task_tags(task_id, tag_names), to: EyeInTheSkyWeb.TaskTags
+  defdelegate link_tag_to_task(task_id, tag_id), to: EyeInTheSkyWeb.TaskTags
+
+  defdelegate list_checklist_items(task_id), to: EyeInTheSkyWeb.ChecklistItems
+  defdelegate create_checklist_item(attrs), to: EyeInTheSkyWeb.ChecklistItems
+  defdelegate toggle_checklist_item(id), to: EyeInTheSkyWeb.ChecklistItems
+  defdelegate delete_checklist_item(id), to: EyeInTheSkyWeb.ChecklistItems
 
   # Task functions
 
@@ -396,87 +414,6 @@ defmodule EyeInTheSkyWeb.Tasks do
     )
   end
 
-  # Workflow State functions
-
-  @doc """
-  Returns the list of workflow states.
-  """
-  def list_workflow_states do
-    WorkflowState
-    |> order_by([ws], asc: ws.position)
-    |> Repo.all()
-  end
-
-  @doc """
-  Reorder workflow states by a list of IDs in desired order.
-  The position unique constraint is DEFERRABLE INITIALLY DEFERRED, so uniqueness
-  is checked at commit rather than per-statement — no temp negative positions needed.
-  """
-  def reorder_workflow_states(ordered_ids) when is_list(ordered_ids) do
-    Repo.transaction(fn ->
-      ordered_ids
-      |> Enum.with_index(1)
-      |> Enum.each(fn {id, idx} ->
-        from(ws in WorkflowState, where: ws.id == ^id)
-        |> Repo.update_all(set: [position: idx])
-      end)
-    end)
-  end
-
-  @doc """
-  Gets a single workflow state.
-  """
-  def get_workflow_state!(id) do
-    Repo.get!(WorkflowState, id)
-  end
-
-  @doc """
-  Gets a workflow state by name.
-  """
-  def get_workflow_state_by_name(name) do
-    Repo.get_by(WorkflowState, name: name)
-  end
-
-  # Tag functions
-
-  @doc """
-  Returns the list of tags.
-  """
-  def list_tags do
-    Repo.all(Tag)
-  end
-
-  @doc """
-  Gets a single tag.
-  """
-  def get_tag!(id) do
-    Repo.get!(Tag, id)
-  end
-
-  @doc """
-  Updates a tag's attributes (e.g., color).
-  """
-  def update_tag(%Tag{} = tag, attrs) do
-    tag
-    |> Tag.changeset(attrs)
-    |> Repo.update()
-  end
-
-  @doc """
-  Gets or creates a tag by name.
-  """
-  def get_or_create_tag(name) do
-    case Repo.get_by(Tag, name: name) do
-      nil ->
-        %Tag{}
-        |> Tag.changeset(%{name: name})
-        |> Repo.insert()
-
-      tag ->
-        {:ok, tag}
-    end
-  end
-
   @doc """
   Links a session to a task via the task_sessions join table.
   Uses on_conflict: :nothing to silently skip duplicates.
@@ -508,37 +445,6 @@ defmodule EyeInTheSkyWeb.Tasks do
   def task_linked_to_session?(_, _), do: false
 
   @doc """
-  Replaces all tags on a task with the given list of tag names.
-  Deletes existing tag associations and inserts new ones.
-  No-op if tag_names is empty (leaves existing tags unchanged).
-  """
-  def replace_task_tags(_task_id, []), do: :ok
-
-  def replace_task_tags(task_id, tag_names) when is_list(tag_names) do
-    tag_rows =
-      Enum.flat_map(tag_names, fn tag_name ->
-        case get_or_create_tag(tag_name) do
-          {:ok, tag} -> [%{task_id: task_id, tag_id: tag.id}]
-          _ -> []
-        end
-      end)
-
-    Repo.delete_all(from(t in "task_tags", where: t.task_id == ^task_id))
-    Repo.insert_all("task_tags", tag_rows, on_conflict: :nothing)
-  end
-
-  @doc """
-  Links a tag to a task via the task_tags join table.
-  """
-  def link_tag_to_task(task_id, tag_id)
-      when is_integer(task_id) and is_integer(tag_id) do
-    {count, _} =
-      Repo.insert_all("task_tags", [%{task_id: task_id, tag_id: tag_id}], on_conflict: :nothing)
-
-    {:ok, count}
-  end
-
-  @doc """
   Unlinks a session from a task by deleting the task_sessions row.
   Returns the number of rows deleted.
   """
@@ -561,45 +467,5 @@ defmodule EyeInTheSkyWeb.Tasks do
 
   defp broadcast_change(_) do
     EyeInTheSkyWeb.Events.tasks_changed()
-  end
-
-  # Checklist Items
-
-  @doc """
-  Lists checklist items for a task, ordered by position.
-  """
-  def list_checklist_items(task_id) do
-    ChecklistItem
-    |> where([c], c.task_id == ^task_id)
-    |> order_by([c], asc: c.position, asc: c.id)
-    |> Repo.all()
-  end
-
-  @doc """
-  Creates a checklist item for a task.
-  """
-  def create_checklist_item(attrs) do
-    %ChecklistItem{}
-    |> ChecklistItem.changeset(attrs)
-    |> Repo.insert()
-  end
-
-  @doc """
-  Toggles a checklist item's completed state.
-  """
-  def toggle_checklist_item(id) do
-    item = Repo.get!(ChecklistItem, id)
-
-    item
-    |> ChecklistItem.changeset(%{completed: !item.completed})
-    |> Repo.update()
-  end
-
-  @doc """
-  Deletes a checklist item.
-  """
-  def delete_checklist_item(id) do
-    Repo.get!(ChecklistItem, id)
-    |> Repo.delete()
   end
 end

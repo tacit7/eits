@@ -377,6 +377,27 @@ defmodule EyeInTheSkyWeb.Messages do
     |> deduplicate_by_source_uuid()
   end
 
+  @doc """
+  Searches messages for a session by body content using case-insensitive substring match.
+  Returns up to 100 results ordered chronologically.
+  """
+  @spec search_messages_for_session(integer(), String.t()) :: [Message.t()]
+  def search_messages_for_session(session_id, query) when is_binary(query) and query != "" do
+    pattern = "%#{query}%"
+
+    Message
+    |> where([m], m.session_id == ^session_id)
+    |> where([m], ilike(m.body, ^pattern))
+    |> order_by([m], asc: m.inserted_at)
+    |> limit(100)
+    |> Repo.all()
+    |> deduplicate_by_source_uuid()
+  end
+
+  def search_messages_for_session(session_id, _query) do
+    list_recent_messages(session_id)
+  end
+
   # Remove duplicate messages by source_uuid, keeping the first occurrence
   defp deduplicate_by_source_uuid(messages) do
     messages

@@ -257,6 +257,13 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Jobs do
       <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 class="text-xl font-semibold">Scheduled Jobs</h1>
         <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <.link
+            navigate="/oban"
+            class="btn btn-ghost btn-sm w-full sm:w-auto text-base-content/50"
+            title="Oban queue dashboard"
+          >
+            <.icon name="hero-queue-list" class="w-3.5 h-3.5" /> Oban
+          </.link>
           <button class="btn btn-outline btn-sm w-full sm:w-auto" phx-click="toggle_claude_drawer">
             <.icon name="hero-sparkles" class="w-3.5 h-3.5" /> Create with Claude
           </button>

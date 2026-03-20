@@ -229,6 +229,14 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
             <% end %>
           </button>
 
+          <.link
+            navigate={~p"/projects/#{@project.id}/kanban"}
+            class="btn btn-sm sm:btn-xs btn-ghost border border-base-content/10 gap-1 min-h-0 h-8 sm:h-7"
+            title="Kanban board"
+          >
+            <.icon name="hero-view-columns-mini" class="w-3.5 h-3.5" />
+            <span class="hidden sm:inline">Kanban</span>
+          </.link>
           <button
             phx-click="toggle_new_task_drawer"
             class="btn btn-sm btn-primary gap-1.5 min-h-0 h-8 sm:h-7 text-xs"

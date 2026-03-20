@@ -74,15 +74,6 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
     end
   end
 
-  defp format_date(nil), do: "—"
-
-  defp format_date(ts) when is_binary(ts) do
-    case String.split(ts, " ") do
-      [date | _] -> date
-      _ -> ts
-    end
-  end
-
   @impl true
   def render(assigns) do
     ~H"""
@@ -397,7 +388,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Usage do
                       <td class="text-base-content/60 whitespace-nowrap">{row.project}</td>
                       <td class="whitespace-nowrap">{ViewHelpers.short_model(row.model)}</td>
                       <td class="text-base-content/60 whitespace-nowrap">
-                        {format_date(row.started_at)}
+                        {ViewHelpers.format_date(row.started_at)}
                       </td>
                       <td class="text-right">{ViewHelpers.format_number(row.input_tokens)}</td>
                       <td class="text-right">{ViewHelpers.format_number(row.output_tokens)}</td>

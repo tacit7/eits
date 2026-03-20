@@ -28,6 +28,32 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
   @terminal_exit_wait_ms 2_000
 
   @doc """
+  Build the EITS init prompt prepended to new Codex sessions.
+
+  Provides the agent with EITS environment context and CLI instructions.
+  Accepts any struct with the fields: eits_session_uuid, session_id, agent_id, project_id.
+  """
+  @spec eits_init_prompt(map()) :: String.t()
+  def eits_init_prompt(state) do
+    """
+    EITS environment variables are pre-set in your shell via shell_environment_policy:
+    - EITS_SESSION_UUID=#{state.eits_session_uuid}
+    - EITS_SESSION_ID=#{state.session_id}
+    - EITS_AGENT_UUID=#{state.agent_id}
+    - EITS_PROJECT_ID=#{state.project_id}
+    - EITS_URL=http://localhost:5000/api/v1
+
+    Use `eits` CLI for task tracking:
+    - `eits tasks create --title "Task name" --description "Details"`
+    - `eits tasks start <task_id>`
+    - `eits tasks update <task_id> --state 4` (when done)
+    - `eits notes create --parent-type session --parent-id $EITS_SESSION_UUID --title "Note" --body "Content"`
+
+    Now proceed with the task:
+    """
+  end
+
+  @doc """
   Start a new Codex session with streaming output.
 
   ## Options

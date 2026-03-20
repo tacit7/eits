@@ -10,12 +10,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   use GenServer, restart: :transient
   require Logger
 
-  alias EyeInTheSkyWeb.Claude.{Job, Message, SDK, StreamAssembler}
+  alias EyeInTheSkyWeb.Claude.{Job, Message, ProviderStrategy, StreamAssembler}
   alias EyeInTheSkyWeb.Claude.StreamAssemblerProtocol
   alias EyeInTheSkyWeb.Codex.StreamAssembler, as: CodexStreamAssembler
   alias EyeInTheSkyWeb.AgentWorkerEvents, as: WorkerEvents
   alias EyeInTheSkyWeb.Agents.CmdDispatcher
-  alias EyeInTheSkyWeb.Codex
 
   @registry EyeInTheSkyWeb.Claude.AgentRegistry
   @retry_start_ms 1_000
@@ -211,7 +210,8 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   def handle_cast(:cancel, %__MODULE__{sdk_ref: ref} = state) when not is_nil(ref) do
     Logger.info("[#{state.session_id}] Cancelling SDK process (provider=#{state.provider})")
-    cancel_sdk(state.provider, ref)
+    strategy = ProviderStrategy.for_provider(state.provider)
+    strategy.cancel(ref)
     {:noreply, state}
   end
 
@@ -430,7 +430,11 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
 
   @impl true
   def terminate(_reason, %__MODULE__{} = state) do
-    if state.sdk_ref, do: cancel_sdk(state.provider || "claude", state.sdk_ref)
+    if state.sdk_ref do
+      strategy = ProviderStrategy.for_provider(state.provider || "claude")
+      strategy.cancel(state.sdk_ref)
+    end
+
     :ok
   end
 
@@ -439,6 +443,12 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   # Provider-polymorphic stream assembler factory
   defp stream_assembler_for("codex"), do: CodexStreamAssembler.new()
   defp stream_assembler_for(_provider), do: StreamAssembler.new()
+
+  # Recover from :failed state before processing submit
+  defp process_submit(message, context, %__MODULE__{status: :failed} = state) do
+    Logger.info("AgentWorker: recovering from :failed state for session_id=#{state.session_id}")
+    process_submit(message, context, %{state | status: :idle, retry_attempt: 0})
+  end
 
   # Handles the full submit_message logic; returns {reply_term, new_state}.
   defp process_submit(message, context, state) do
@@ -459,18 +469,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     })
 
     job = Job.new(message, context)
-
-    # Recover from :failed state — reset so we can attempt to start the SDK again
-    state =
-      if state.status == :failed do
-        Logger.info(
-          "AgentWorker: recovering from :failed state for session_id=#{state.session_id}"
-        )
-
-        %{state | status: :idle, retry_attempt: 0}
-      else
-        state
-      end
 
     if state.status == :idle do
       Logger.info("AgentWorker: starting SDK for session_id=#{state.session_id}")
@@ -578,12 +576,18 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
     end
   end
 
-  defp start_sdk(%__MODULE__{provider: "codex"} = state, job) do
-    monitor_handler(start_codex_sdk(state, job))
-  end
+  defp start_sdk(%__MODULE__{} = state, job) do
+    strategy = ProviderStrategy.for_provider(state.provider)
+    has_messages = job.context[:has_messages] || false
 
-  defp start_sdk(state, job) do
-    monitor_handler(start_claude_sdk(state, job))
+    result =
+      if has_messages do
+        strategy.resume(state, job)
+      else
+        strategy.start(state, job)
+      end
+
+    monitor_handler(result)
   end
 
   # Convert {:ok, sdk_ref, handler_pid} to {:ok, sdk_ref, monitor_ref}
@@ -593,103 +597,6 @@ defmodule EyeInTheSkyWeb.Claude.AgentWorker do
   end
 
   defp monitor_handler({:error, _} = error), do: error
-
-  defp start_claude_sdk(state, job) do
-    context = job.context
-    has_messages = context[:has_messages] || false
-    prompt = job.message
-
-    optional_opts =
-      [
-        effort_level: context[:effort_level],
-        thinking_budget: context[:thinking_budget],
-        max_budget_usd: context[:max_budget_usd]
-      ]
-      |> Keyword.filter(fn {k, v} -> v != nil && (k != :effort_level || v != "") end)
-
-    opts =
-      [
-        to: self(),
-        model: context[:model],
-        session_id: state.provider_conversation_id,
-        project_path: state.project_path,
-        skip_permissions: true,
-        use_script: true,
-        eits_session_id: state.provider_conversation_id,
-        eits_agent_id: state.agent_id,
-        eits_workflow: context[:eits_workflow] || "1",
-        worktree: state.worktree,
-        agent: context[:agent]
-      ] ++ optional_opts
-
-    if has_messages do
-      Logger.info("Resuming Claude session #{state.provider_conversation_id}")
-      SDK.resume(state.provider_conversation_id, prompt, opts)
-    else
-      Logger.info("Starting new Claude session #{state.provider_conversation_id}")
-      SDK.start(prompt, opts)
-    end
-  end
-
-  defp start_codex_sdk(state, job) do
-    context = job.context
-    has_messages = context[:has_messages] || false
-    prompt = job.message
-
-    opts = [
-      to: self(),
-      model: context[:model],
-      # provider_conversation_id = Codex thread_id (synced from thread.started); used for resume
-      session_id: state.provider_conversation_id,
-      project_path: state.project_path,
-      full_auto: true,
-      bypass_sandbox: context[:bypass_sandbox] || false,
-      # eits_session_uuid: stable EITS UUID — distinct from the Codex thread_id
-      eits_session_uuid: state.eits_session_uuid,
-      eits_session_id: state.session_id,
-      eits_agent_uuid: state.agent_id,
-      eits_agent_id: state.agent_id,
-      eits_project_id: state.project_id,
-      eits_model: context[:model],
-      eits_url: System.get_env("EITS_URL", "http://localhost:5000/api/v1")
-    ]
-
-    if has_messages do
-      Logger.info("Resuming Codex session #{state.provider_conversation_id}")
-      Codex.SDK.resume(state.provider_conversation_id, prompt, opts)
-    else
-      Logger.info("Starting new Codex session #{state.provider_conversation_id}")
-
-      full_prompt =
-        codex_eits_init(state) <> "\n\n---\n\n" <> prompt
-
-      Codex.SDK.start(full_prompt, opts)
-    end
-  end
-
-  defp codex_eits_init(state) do
-    # eits_session_uuid is the stable EITS session UUID for tracking.
-    # provider_conversation_id (Codex thread_id) may differ and is used only for resume.
-    """
-    EITS environment variables are pre-set in your shell via shell_environment_policy:
-    - EITS_SESSION_UUID=#{state.eits_session_uuid}
-    - EITS_SESSION_ID=#{state.session_id}
-    - EITS_AGENT_UUID=#{state.agent_id}
-    - EITS_PROJECT_ID=#{state.project_id}
-    - EITS_URL=http://localhost:5000/api/v1
-
-    Use `eits` CLI for task tracking:
-    - `eits tasks create --title "Task name" --description "Details"`
-    - `eits tasks start <task_id>`
-    - `eits tasks update <task_id> --state 4` (when done)
-    - `eits notes create --parent-type session --parent-id $EITS_SESSION_UUID --title "Note" --body "Content"`
-
-    Now proceed with the task:
-    """
-  end
-
-  defp cancel_sdk("codex", ref), do: Codex.SDK.cancel(ref)
-  defp cancel_sdk(_provider, ref), do: SDK.cancel(ref)
 
   defp demonitor_handler(nil), do: :ok
   defp demonitor_handler(ref), do: Process.demonitor(ref, [:flush])

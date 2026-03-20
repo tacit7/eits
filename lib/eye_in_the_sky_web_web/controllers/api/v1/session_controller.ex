@@ -39,8 +39,8 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
         {:ok, existing} ->
           update_attrs =
             %{status: "working", last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()}
-            |> maybe_put(:name, params["name"])
-            |> maybe_put(:description, params["description"])
+            |> Helpers.maybe_put(:name, params["name"])
+            |> Helpers.maybe_put(:description, params["description"])
 
           case Sessions.update_session(existing, update_attrs) do
             {:ok, updated} ->
@@ -129,10 +129,10 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
 
         attrs =
           %{}
-          |> maybe_put(:status, status)
-          |> maybe_put(:intent, params["intent"])
-          |> maybe_put(:entrypoint, params["entrypoint"])
-          |> maybe_put(:last_activity_at, DateTime.utc_now() |> DateTime.to_iso8601())
+          |> Helpers.maybe_put(:status, status)
+          |> Helpers.maybe_put(:intent, params["intent"])
+          |> Helpers.maybe_put(:entrypoint, params["entrypoint"])
+          |> Helpers.maybe_put(:last_activity_at, DateTime.utc_now() |> DateTime.to_iso8601())
 
         # Explicit entrypoint clear — set to nil so LiveView removes the CLI icon
         attrs =

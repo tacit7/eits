@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.NoteController do
   import EyeInTheSkyWebWeb.ControllerHelpers
 
   alias EyeInTheSkyWeb.Notes
+  alias EyeInTheSkyWeb.Utils.ToolHelpers, as: Helpers
 
   @doc """
   GET /api/v1/notes - Search notes.
@@ -110,9 +111,9 @@ defmodule EyeInTheSkyWebWeb.Api.V1.NoteController do
 
       attrs =
         %{}
-        |> maybe_put(:body, params["body"])
-        |> maybe_put(:title, params["title"])
-        |> maybe_put(:starred, parse_starred(params["starred"]))
+        |> Helpers.maybe_put(:body, params["body"])
+        |> Helpers.maybe_put(:title, params["title"])
+        |> Helpers.maybe_put(:starred, parse_starred(params["starred"]))
 
       case EyeInTheSkyWeb.Repo.update(Ecto.Changeset.change(note, attrs)) do
         {:ok, updated} ->

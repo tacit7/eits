@@ -248,10 +248,10 @@ defmodule EyeInTheSkyWebWeb.Api.V1.TaskController do
   defp update_attrs(task, params) do
     attrs =
       %{}
-      |> maybe_put(:state_id, params["state_id"])
-      |> maybe_put(:priority, params["priority"])
-      |> maybe_put(:description, params["description"])
-      |> maybe_put(:due_at, params["due_at"])
+      |> Helpers.maybe_put(:state_id, params["state_id"])
+      |> Helpers.maybe_put(:priority, params["priority"])
+      |> Helpers.maybe_put(:description, params["description"])
+      |> Helpers.maybe_put(:due_at, params["due_at"])
 
     Tasks.update_task(task, attrs)
   end

@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   alias EyeInTheSkyWeb.Agents.AgentManager
   alias EyeInTheSkyWeb.Claude.ChannelProtocol
   alias EyeInTheSkyWebWeb.ChatPresenter
+  alias EyeInTheSkyWebWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
 
   # Deterministic UUIDs for the web UI user
@@ -521,27 +522,17 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   end
 
   @impl true
-  def handle_info({:agent_working, _session_uuid, session_int_id}, socket) do
-    working_agents = Map.put(socket.assigns.working_agents, session_int_id, true)
-    {:noreply, assign(socket, :working_agents, working_agents)}
+  def handle_info({:agent_working, msg}, socket) do
+    AgentStatusHelpers.handle_agent_working(socket, msg, fn socket, session_id ->
+      assign(socket, :working_agents, Map.put(socket.assigns.working_agents, session_id, true))
+    end)
   end
 
   @impl true
-  def handle_info({:agent_working, %{id: session_int_id}}, socket) do
-    working_agents = Map.put(socket.assigns.working_agents, session_int_id, true)
-    {:noreply, assign(socket, :working_agents, working_agents)}
-  end
-
-  @impl true
-  def handle_info({:agent_stopped, _session_uuid, session_int_id}, socket) do
-    working_agents = Map.delete(socket.assigns.working_agents, session_int_id)
-    {:noreply, assign(socket, :working_agents, working_agents)}
-  end
-
-  @impl true
-  def handle_info({:agent_stopped, %{id: session_int_id}}, socket) do
-    working_agents = Map.delete(socket.assigns.working_agents, session_int_id)
-    {:noreply, assign(socket, :working_agents, working_agents)}
+  def handle_info({:agent_stopped, msg}, socket) do
+    AgentStatusHelpers.handle_agent_stopped(socket, msg, fn socket, session_id ->
+      assign(socket, :working_agents, Map.delete(socket.assigns.working_agents, session_id))
+    end)
   end
 
   @impl true

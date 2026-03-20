@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
 
   alias EyeInTheSkyWeb.Agents
   alias EyeInTheSkyWeb.Sessions
+  alias EyeInTheSkyWebWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWebWeb.Components.Icons
   import EyeInTheSkyWebWeb.Components.SessionCard
@@ -364,24 +365,24 @@ defmodule EyeInTheSkyWebWeb.AgentLive.Index do
   end
 
   @impl true
-  def handle_info({:agent_working, %{id: session_id}}, socket) do
-    {:noreply, update_agent_status_in_list(socket, session_id, "working")}
+  def handle_info({:agent_working, msg}, socket) do
+    AgentStatusHelpers.handle_agent_working(socket, msg, fn socket, session_id ->
+      update_agent_status_in_list(socket, session_id, "working")
+    end)
   end
 
   @impl true
-  def handle_info({:agent_working, _session_uuid, session_id}, socket) do
-    {:noreply, update_agent_status_in_list(socket, session_id, "working")}
+  def handle_info({:agent_stopped, msg}, socket) do
+    AgentStatusHelpers.handle_agent_stopped(socket, msg, fn socket, session_id ->
+      # For agent_stopped, we need to handle the status field from the message if present
+      status = extract_stopped_status(msg)
+      update_agent_status_in_list(socket, session_id, status)
+    end)
   end
 
-  @impl true
-  def handle_info({:agent_stopped, %{id: session_id, status: status}}, socket) do
-    {:noreply, update_agent_status_in_list(socket, session_id, status || "completed")}
-  end
-
-  @impl true
-  def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
-    {:noreply, update_agent_status_in_list(socket, session_id, "idle")}
-  end
+  defp extract_stopped_status(%{status: status}) when is_binary(status) and status != "", do: status
+  defp extract_stopped_status(%{status: _}), do: "completed"
+  defp extract_stopped_status(_), do: "idle"
 
   @impl true
   def handle_info(_msg, socket), do: {:noreply, socket}

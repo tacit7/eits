@@ -18,6 +18,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   alias EyeInTheSkyWebWeb.Components.DmPage
   alias EyeInTheSkyWebWeb.DmLive.StreamState
   alias EyeInTheSkyWebWeb.Live.Shared.SessionHelpers
+  alias EyeInTheSkyWebWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
 
@@ -610,67 +611,37 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
-  def handle_info({:agent_working, %{id: session_id, status: "compacting"}}, socket) do
-    if session_id == socket.assigns.session_id do
-      {:noreply, assign(socket, :compacting, true)}
-    else
-      {:noreply, socket}
-    end
+  def handle_info({:agent_working, msg}, socket) do
+    AgentStatusHelpers.handle_agent_working_if_match(
+      socket, msg, :session_id,
+      fn socket, _session_id ->
+        case msg do
+          %{status: "compacting"} ->
+            assign(socket, :compacting, true)
+
+          _other ->
+            socket
+            |> assign(:compacting, false)
+            |> assign(:processing, true)
+            |> start_sync_timer()
+        end
+      end
+    )
   end
 
   @impl true
-  def handle_info({:agent_working, %{id: session_id}}, socket) do
-    if session_id == socket.assigns.session_id do
-      {:noreply,
-       socket
-       |> assign(:compacting, false)
-       |> assign(:processing, true)
-       |> start_sync_timer()}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_info({:agent_working, _session_uuid, session_id}, socket) do
-    if session_id == socket.assigns.session_id do
-      {:noreply,
-       socket
-       |> assign(:processing, true)
-       |> start_sync_timer()}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_info({:agent_stopped, %{id: session_id}}, socket) do
-    if session_id == socket.assigns.session_id do
-      {:noreply,
-       socket
-       |> assign(:compacting, false)
-       |> assign(:processing, false)
-       |> stop_sync_timer()
-       |> sync_and_reload()
-       |> push_event("focus-input", %{})}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
-    if session_id == socket.assigns.session_id do
-      {:noreply,
-       socket
-       |> assign(:compacting, false)
-       |> assign(:processing, false)
-       |> stop_sync_timer()
-       |> sync_and_reload()
-       |> push_event("focus-input", %{})}
-    else
-      {:noreply, socket}
-    end
+  def handle_info({:agent_stopped, msg}, socket) do
+    AgentStatusHelpers.handle_agent_stopped_if_match(
+      socket, msg, :session_id,
+      fn socket, _session_id ->
+        socket
+        |> assign(:compacting, false)
+        |> assign(:processing, false)
+        |> stop_sync_timer()
+        |> sync_and_reload()
+        |> push_event("focus-input", %{})
+      end
+    )
   end
 
   @impl true

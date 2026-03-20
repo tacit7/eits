@@ -487,4 +487,46 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
       text
     end
   end
+
+  @doc """
+  Format a cost value as a dollar string (e.g. "$1.23").
+  """
+  def format_cost(value) when is_float(value),
+    do: "$#{:erlang.float_to_binary(value, decimals: 2)}"
+
+  def format_cost(value) when is_integer(value),
+    do: "$#{:erlang.float_to_binary(value / 1, decimals: 2)}"
+
+  def format_cost(_), do: "$0.00"
+
+  @doc """
+  Format an integer with comma separators (e.g. 1_000_000 -> "1,000,000").
+  """
+  def format_number(value) when is_integer(value) do
+    value
+    |> Integer.to_string()
+    |> String.graphemes()
+    |> Enum.reverse()
+    |> Enum.chunk_every(3)
+    |> Enum.join(",")
+    |> String.reverse()
+  end
+
+  def format_number(value) when is_float(value), do: format_number(trunc(value))
+  def format_number(_), do: "0"
+
+  @doc """
+  Return a short display name for a Claude model ID.
+  """
+  def short_model(nil), do: "—"
+
+  def short_model(name) do
+    case name do
+      "claude-opus-4-6" -> "Opus 4.6"
+      "claude-sonnet-4-6" -> "Sonnet 4.6"
+      "claude-sonnet-4-5-20250929" -> "Sonnet 4.5"
+      "claude-haiku-4-5-20251001" -> "Haiku 4.5"
+      other -> other
+    end
+  end
 end

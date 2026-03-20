@@ -168,9 +168,12 @@ defmodule EyeInTheSkyWeb.Messages do
 
         attrs = Map.put(attrs, :channel_message_number, next_channel_message_number(cid))
 
-        %Message{}
-        |> Message.changeset(attrs)
-        |> Repo.insert!()
+        case %Message{}
+             |> Message.changeset(attrs)
+             |> Repo.insert() do
+          {:ok, message} -> message
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
       end)
     else
       %Message{}
@@ -472,11 +475,23 @@ defmodule EyeInTheSkyWeb.Messages do
 
   # Finds the most recent agent message in the session matching the given body,
   # within the last minute. Used to detect duplicates before creating a new record.
+  # Unlike find_unlinked_message, this does NOT filter on is_nil(source_uuid) because
+  # a concurrent sync may have already stamped the source_uuid on an existing message.
   defp find_recent_agent_message(session_id, body) do
-    case find_unlinked_message(session_id, "agent", body) do
-      {:ok, message} -> message
-      :not_found -> nil
-    end
+    one_minute_ago =
+      DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
+
+    Message
+    |> where(
+      [m],
+      m.session_id == ^session_id and
+        m.sender_role == "agent" and
+        m.body == ^body and
+        m.inserted_at >= ^one_minute_ago
+    )
+    |> order_by([m], desc: m.inserted_at)
+    |> limit(1)
+    |> Repo.one()
   end
 
   @doc """

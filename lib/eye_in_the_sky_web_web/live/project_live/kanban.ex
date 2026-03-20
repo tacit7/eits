@@ -497,6 +497,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     {:noreply, socket |> assign(:filter_tag_mode, new_mode) |> apply_filters()}
   end
 
+  defp update_filter(_params, socket), do: {:noreply, socket}
+
   defp state_dot_color(color) when is_binary(color), do: color
   defp state_dot_color(_), do: "#6B7280"
 

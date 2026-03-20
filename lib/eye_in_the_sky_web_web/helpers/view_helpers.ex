@@ -478,6 +478,20 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
     """
   end
 
+  @doc """
+  Extract uppercase initials from a name (e.g. "John Doe" -> "JD").
+  """
+  def member_initials(nil), do: "?"
+
+  def member_initials(name) when is_binary(name) do
+    name
+    |> String.split()
+    |> Enum.take(2)
+    |> Enum.map(&String.first/1)
+    |> Enum.join()
+    |> String.upcase()
+  end
+
   def truncate_text(nil), do: nil
 
   def truncate_text(text) when is_binary(text) do
@@ -531,7 +545,7 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
   def format_datetime_short_time(str) when is_binary(str) do
     case DateTime.from_iso8601(str) do
       {:ok, dt, _} -> Calendar.strftime(dt, "%b %d, %H:%M")
-      _ -> str
+      _ -> ""
     end
   end
 

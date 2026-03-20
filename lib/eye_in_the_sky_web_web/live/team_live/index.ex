@@ -248,7 +248,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
                   "w-6 h-6 rounded-md shrink-0 flex items-center justify-center text-[10px] font-bold",
                   member_avatar_class(@selected_agent.status)
                 ]}>
-                  {member_initials(@selected_agent.name)}
+                  {ViewHelpers.member_initials(@selected_agent.name)}
                 </div>
                 <span class="font-medium text-sm truncate">{@selected_agent.name}</span>
                 <span class={[
@@ -407,17 +407,6 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   end
 
   defp active_member_count(members), do: Enum.count(members, &(&1.status == "active"))
-
-  defp member_initials(nil), do: "?"
-
-  defp member_initials(name) do
-    name
-    |> String.split()
-    |> Enum.take(2)
-    |> Enum.map(&String.first/1)
-    |> Enum.join()
-    |> String.upcase()
-  end
 
   defp team_status_border("active"), do: "border-success"
   defp team_status_border(_), do: "border-transparent"

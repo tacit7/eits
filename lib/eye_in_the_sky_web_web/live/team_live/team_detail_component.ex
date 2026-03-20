@@ -112,7 +112,7 @@ defmodule EyeInTheSkyWebWeb.TeamDetailComponent do
                     "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
                     member_avatar_class(member.status)
                   ]}>
-                    {member_initials(member.name)}
+                    {ViewHelpers.member_initials(member.name)}
                   </div>
                   <div class="flex-1 min-w-0">
                     <span class="font-medium text-sm text-base-content truncate">{member.name}</span>
@@ -214,7 +214,7 @@ defmodule EyeInTheSkyWebWeb.TeamDetailComponent do
                         {task.state.name}
                       </span>
                     <% end %>
-                    <%!-- Assign to member picker --%>
+                    <%!-- Assign to member picker — no phx-target, event handled by parent LiveView --%>
                     <select
                       class="text-[10px] bg-base-300 border-0 rounded px-1.5 py-0.5 text-base-content/60 cursor-pointer focus:outline-none"
                       phx-change="assign_task"
@@ -252,17 +252,6 @@ defmodule EyeInTheSkyWebWeb.TeamDetailComponent do
   defp status_badge_class("active"), do: "badge-success"
   defp status_badge_class("archived"), do: "badge-ghost"
   defp status_badge_class(_), do: "badge-neutral"
-
-  defp member_initials(nil), do: "?"
-
-  defp member_initials(name) do
-    name
-    |> String.split()
-    |> Enum.take(2)
-    |> Enum.map(&String.first/1)
-    |> Enum.join()
-    |> String.upcase()
-  end
 
   defp member_status_dot("active"), do: "bg-success"
   defp member_status_dot("idle"), do: "bg-warning"

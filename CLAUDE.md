@@ -8,6 +8,10 @@ Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky.
 
 This project uses Phoenix LiveView with Elixir. Primary languages: TypeScript, JavaScript, Elixir/HEEx, Go, Rust. Use Tailwind CSS for styling.
 
+## Project Conventions
+
+- The `tasks` table uses `created_at`, **not** `inserted_at`. Always verify timestamp field names against the schema before using them — using `inserted_at` will cause KeyErrors at runtime.
+
 ## Git Worktrees
 
 **Always start any code change work in a worktree.** Never modify files directly in the main project directory. Create a worktree first, make changes there, then merge/PR back.
@@ -15,6 +19,11 @@ This project uses Phoenix LiveView with Elixir. Primary languages: TypeScript, J
 Worktrees live in `.claude/worktrees/` relative to the project root.
 
 When working in git worktrees, always compile from the main project directory or symlink deps/build directories first. Never attempt to compile directly in a worktree without verifying deps are available.
+
+If deps are missing in the worktree, symlink them before compiling:
+```bash
+ln -s ../../deps deps && ln -s ../../_build _build
+```
 
 When using git worktrees, always verify you are editing files in the worktree directory, NOT the main project directory. Check `pwd` before making edits.
 
@@ -29,15 +38,29 @@ mix compile              # Compile only
 
 Assets: `cd assets && npm install` for JS dependencies. Esbuild and Tailwind run as Phoenix watchers.
 
+## Playwright / Browser Testing
+
+When using Playwright, start a dedicated server instance on a port other than 5000 with auth disabled:
+
+```bash
+PORT=5001 DISABLE_AUTH=true mix phx.server
+```
+
+Navigate Playwright to `http://localhost:5001`. This avoids interfering with the running dev server and bypasses the login wall.
+
 ## Development Workflow
 
 **Before committing:** Always run `mix compile` to ensure the project compiles without errors. Only warnings are acceptable.
 
 After completing code changes, always run `mix compile --warnings-as-errors` to verify clean compilation before committing.
 
+**Before staging/committing:** Run `git status` and `git diff --staged` to check for pre-existing staged changes. Never assume a clean staging area — only commit the files relevant to the current task.
+
 ## Bug Fixes
 
-When fixing bugs, search the entire file for ALL occurrences of the problematic pattern before committing. Don't fix just the first occurrence.
+When fixing bugs, grep the **entire codebase** for ALL occurrences of the problematic pattern before making any edits. List every file and line number, then fix all of them in a single pass. Don't fix just the first occurrence.
+
+When a UI bug is reported, read the exact symptom carefully before investigating. Do not assume the category of bug. Don't investigate duplicate messages when the report is about dark mode CSS. Read the report literally, trace the code, then propose a fix.
 
 ## Session Status Lifecycle
 
@@ -55,6 +78,10 @@ Session status is driven by Claude Code hooks and explicit commands:
 
 ## Entrypoint-Based Command Protocol
 
+> **IMPORTANT: Check your entrypoint before dispatching ANY EITS command.**
+> Run `echo $CLAUDE_CODE_ENTRYPOINT` at the start of every session.
+> Using the wrong method silently fails or breaks session hierarchy.
+
 **How you dispatch EITS commands depends on your `CLAUDE_CODE_ENTRYPOINT`:**
 
 | Entrypoint | Mode | Use |
@@ -70,7 +97,7 @@ EITS-CMD: task annotate 1234 What I did and why
 EITS-CMD: dm --to <session_uuid> --message "done"
 EITS-CMD: commit abc1234
 ```
-These are intercepted by AgentWorker in-process — no HTTP round-trips. Never use the `eits` bash script when running as `sdk-cli`.
+These are intercepted by AgentWorker in-process — no HTTP round-trips. **Never use the `eits` bash script when running as `sdk-cli`.**
 
 **`cli` (interactive sessions) — use `eits` script:**
 ```bash
@@ -79,6 +106,8 @@ eits tasks annotate <id> --body "..."
 eits tasks update <id> --state 4
 eits dm --to <session_uuid> --message "done"
 ```
+
+**When spawning agents:** their `CLAUDE_CODE_ENTRYPOINT` will be `sdk-cli`. Write their instructions using `EITS-CMD:` directives, not `eits` CLI calls.
 
 ## REST API
 

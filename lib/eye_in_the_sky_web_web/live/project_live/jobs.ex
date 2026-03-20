@@ -2,8 +2,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.ScheduledJobs
-  alias EyeInTheSkyWeb.ScheduledJobs.{ScheduledJob, JobHelper}
-  alias EyeInTheSkyWeb.Agents.AgentManager
+  alias EyeInTheSkyWeb.ScheduledJobs.ScheduledJob
   import EyeInTheSkyWebWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWebWeb.Live.Shared.JobsHelpers
   import EyeInTheSkyWebWeb.Components.JobFormDrawer
@@ -123,38 +122,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
     do: handle_change_schedule_type(params, socket)
 
   @impl true
-  def handle_event("save_job", %{"job" => params}, socket) do
-    config = build_config(params)
-
-    project_id =
-      if socket.assigns.form_scope == "global", do: nil, else: socket.assigns.project_id
-
-    attrs =
-      params
-      |> Map.put("config", Jason.encode!(config))
-      |> Map.put("project_id", project_id)
-
-    result =
-      if socket.assigns.editing_job do
-        ScheduledJobs.update_job(socket.assigns.editing_job, attrs, socket.assigns.project_id)
-      else
-        ScheduledJobs.create_job(attrs)
-      end
-
-    case result do
-      {:ok, _job} ->
-        {:noreply,
-         socket
-         |> assign(:show_form, false)
-         |> reload_jobs()
-         |> put_flash(:info, "Job saved")}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign(socket, :form, to_form(changeset, action: :validate))}
-
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Error: #{inspect(reason)}")}
-    end
+  def handle_event("save_job", params, socket) do
+    handle_save_job(params, socket, &reload_jobs/1, scoping_project_id: socket.assigns.project_id)
   end
 
   @impl true
@@ -251,32 +220,9 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Jobs do
 
   @impl true
   def handle_event("create_with_claude", params, socket) do
-    model = params["model"] || "sonnet"
-    effort_level = params["effort_level"]
-    description = params["description"]
-    project = socket.assigns.project
-
-    if is_nil(project) do
-      {:noreply, put_flash(socket, :error, "Project not found")}
-    else
-      case AgentManager.create_agent(
-             model: model,
-             effort_level: effort_level,
-             project_id: project.id,
-             project_path: project.path,
-             description: "Job Helper",
-             instructions: JobHelper.prompt(description, project: project)
-           ) do
-        {:ok, %{session: session}} ->
-          {:noreply,
-           socket
-           |> assign(:show_claude_drawer, false)
-           |> push_navigate(to: ~p"/dm/#{session.id}")}
-
-        {:error, reason} ->
-          {:noreply, put_flash(socket, :error, "Failed to start session: #{inspect(reason)}")}
-      end
-    end
+    handle_create_with_claude(params, socket, socket.assigns.project,
+      prompt_project: socket.assigns.project
+    )
   end
 
   @impl true

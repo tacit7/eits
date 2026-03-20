@@ -17,7 +17,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   alias EyeInTheSkyWeb.FileAttachments
   alias EyeInTheSkyWebWeb.Components.DmPage
   alias EyeInTheSkyWebWeb.DmLive.StreamState
-  import EyeInTheSkyWebWeb.ControllerHelpers
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
 
@@ -196,41 +195,10 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @impl true
   def handle_event("create_new_task", params, socket) do
-    title = params["title"]
-    description = params["description"]
-    state_id = parse_int(params["state_id"], 0)
-    priority = parse_int(params["priority"], 1)
-    tags_string = params["tags"] || ""
     session_id = socket.assigns.session_id
 
-    tag_names =
-      tags_string
-      |> String.split(",")
-      |> Enum.map(&String.trim/1)
-      |> Enum.reject(&(&1 == ""))
-
-    task_id = String.upcase(Ecto.UUID.generate())
-    now = DateTime.utc_now() |> DateTime.to_iso8601()
-
-    case Tasks.create_task(%{
-           id: task_id,
-           title: title,
-           description: description,
-           state_id: state_id,
-           priority: priority,
-           created_at: now,
-           updated_at: now
-         }) do
-      {:ok, task} ->
-        Tasks.link_session_to_task(task.id, session_id)
-
-        Enum.each(tag_names, fn tag_name ->
-          case Tasks.get_or_create_tag(tag_name) do
-            {:ok, tag} -> Tasks.link_tag_to_task(task.id, tag.id)
-            _ -> :ok
-          end
-        end)
-
+    case Tasks.create_task_from_form(params, session_id: session_id) do
+      {:ok, _task} ->
         socket =
           socket
           |> assign(:active_overlay, nil)

@@ -5,7 +5,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
   alias EyeInTheSkyWeb.Tasks
   alias EyeInTheSkyWebWeb.Components.TaskCard
   alias EyeInTheSkyWebWeb.Components.FilterSheet
-  import EyeInTheSkyWebWeb.ControllerHelpers
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWebWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
@@ -113,46 +112,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Tasks do
   end
 
   @impl true
-  def handle_event("create_new_task", params, socket) do
-    title = params["title"]
-    description = params["description"]
-    state_id = parse_int(params["state_id"], 0)
-    priority = parse_int(params["priority"], 1)
-    tags_string = params["tags"] || ""
-
-    tag_names =
-      tags_string
-      |> String.split(",")
-      |> Enum.map(&String.trim/1)
-      |> Enum.reject(&(&1 == ""))
-
-    task_uuid = String.upcase(Ecto.UUID.generate())
-    now = DateTime.utc_now() |> DateTime.to_iso8601()
-
-    case Tasks.create_task(%{
-           uuid: task_uuid,
-           title: title,
-           description: description,
-           state_id: state_id,
-           priority: priority,
-           project_id: socket.assigns.project_id,
-           created_at: now,
-           updated_at: now
-         }) do
-      {:ok, task} ->
-        Tasks.replace_task_tags(task.id, tag_names)
-
-        {:noreply,
-         socket
-         |> assign(:show_new_task_drawer, false)
-         |> load_tasks()
-         |> put_flash(:info, "Task created successfully")}
-
-      {:error, changeset} ->
-        {:noreply,
-         put_flash(socket, :error, "Failed to create task: #{inspect(changeset.errors)}")}
-    end
-  end
+  def handle_event("create_new_task", params, socket),
+    do: handle_create_new_task(params, socket, &load_tasks/1)
 
   @impl true
   def handle_info(:tasks_changed, socket),

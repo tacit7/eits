@@ -2,11 +2,10 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
   use EyeInTheSkyWebWeb, :live_view
 
   alias EyeInTheSkyWeb.Tasks
-  alias EyeInTheSkyWeb.Tasks.WorkflowState
+
   alias EyeInTheSkyWebWeb.Components.FilterSheet
   alias EyeInTheSkyWebWeb.Components.TaskCard
   import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
-  import EyeInTheSkyWebWeb.ControllerHelpers, only: [parse_int: 2]
 
   @per_page 50
 
@@ -103,29 +102,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
   end
 
   @impl true
-  def handle_event("create_new_task", params, socket) do
-    title = params["title"]
-    description = params["description"]
-    state_id = parse_int(params["state_id"], 0)
-
-    case Tasks.create_task(%{
-           title: title,
-           description: description,
-           state_id: if(state_id > 0, do: state_id, else: WorkflowState.todo_id()),
-           created_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-           updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
-         }) do
-      {:ok, _task} ->
-        {:noreply,
-         socket
-         |> assign(:show_create_task_drawer, false)
-         |> load_tasks()
-         |> put_flash(:info, "Task created")}
-
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to create task")}
-    end
-  end
+  def handle_event("create_new_task", params, socket),
+    do: handle_create_new_task(params, socket, &load_tasks/1)
 
   @impl true
   def handle_info(:tasks_changed, socket),

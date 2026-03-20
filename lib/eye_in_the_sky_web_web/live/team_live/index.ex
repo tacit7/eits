@@ -1,15 +1,8 @@
 defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   use EyeInTheSkyWebWeb, :live_view
 
-  import EyeInTheSkyWebWeb.Components.SessionCard, only: [session_row: 1]
-
   alias EyeInTheSkyWeb.{Teams, Tasks, Notes, Messages}
-  alias EyeInTheSkyWeb.Tasks.WorkflowState
-
-  @state_todo WorkflowState.todo_id()
-  @state_in_progress WorkflowState.in_progress_id()
-  @state_in_review WorkflowState.in_review_id()
-  @state_done WorkflowState.done_id()
+  alias EyeInTheSkyWebWeb.Helpers.ViewHelpers
 
   @impl true
   def mount(_params, _session, socket) do
@@ -224,7 +217,12 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
           <% end %>
           <div class="flex-1 overflow-y-auto">
             <%= if @selected_team do %>
-              <.team_detail team={@selected_team} selected_agent_session_id={@agent_session_id} />
+              <.live_component
+                module={EyeInTheSkyWebWeb.TeamDetailComponent}
+                id="team-detail"
+                team={@selected_team}
+                selected_agent_session_id={@agent_session_id}
+              />
             <% else %>
               <div class="flex items-center justify-center h-full">
                 <div class="text-center space-y-3">
@@ -250,7 +248,7 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
                   "w-6 h-6 rounded-md shrink-0 flex items-center justify-center text-[10px] font-bold",
                   member_avatar_class(@selected_agent.status)
                 ]}>
-                  {member_initials(@selected_agent.name)}
+                  {ViewHelpers.member_initials(@selected_agent.name)}
                 </div>
                 <span class="font-medium text-sm truncate">{@selected_agent.name}</span>
                 <span class={[
@@ -316,246 +314,13 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
             {if @is_user, do: "You", else: "Agent"}
           </span>
           <span class="text-[10px] text-base-content/25 font-mono">
-            {format_message_time(@message.inserted_at)}
+            {ViewHelpers.format_time(@message.inserted_at)}
           </span>
         </div>
         <p class="text-xs text-base-content/70 whitespace-pre-wrap leading-relaxed break-words">
-          {truncate_message(@message.body, 500)}
+          {ViewHelpers.truncate_text(@message.body, 500)}
         </p>
       </div>
-    </div>
-    """
-  end
-
-  defp team_detail(assigns) do
-    active_members = Enum.count(assigns.team.members, &(&1.status == "active"))
-    done_tasks = Enum.count(assigns.team.tasks, &(&1.state_id == @state_done))
-    total_tasks = length(assigns.team.tasks)
-
-    assigns =
-      assign(assigns,
-        active_members: active_members,
-        done_tasks: done_tasks,
-        total_tasks: total_tasks
-      )
-
-    ~H"""
-    <div class="p-4 max-w-4xl space-y-6">
-      <%!-- Header --%>
-      <div class="flex items-start justify-between gap-4">
-        <div class="min-w-0">
-          <div class="flex items-center flex-wrap gap-3 mb-1">
-            <h1 class="text-2xl font-bold text-base-content tracking-tight">{@team.name}</h1>
-            <span class={["badge badge-sm font-medium", status_badge_class(@team.status)]}>
-              {@team.status}
-            </span>
-          </div>
-          <%= if @team.description do %>
-            <p class="text-sm text-base-content/50">{@team.description}</p>
-          <% end %>
-        </div>
-      </div>
-
-      <%!-- Stats row --%>
-      <div class="grid grid-cols-2 gap-3">
-        <div class="bg-base-200 rounded-lg px-4 py-3">
-          <div class="text-2xl font-bold font-mono text-base-content">{length(@team.members)}</div>
-          <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Members</div>
-        </div>
-        <div class="bg-base-200 rounded-lg px-4 py-3">
-          <div class="text-2xl font-bold font-mono text-success">{@active_members}</div>
-          <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Active</div>
-        </div>
-        <div class="bg-base-200 rounded-lg px-4 py-3">
-          <div class="text-2xl font-bold font-mono text-base-content">{@total_tasks}</div>
-          <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Tasks</div>
-        </div>
-        <div class="bg-base-200 rounded-lg px-4 py-3">
-          <div class="text-2xl font-bold font-mono text-success">{@done_tasks}</div>
-          <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Completed</div>
-        </div>
-      </div>
-
-      <%!-- Task progress bar --%>
-      <%= if @total_tasks > 0 do %>
-        <div class="space-y-1">
-          <div class="flex items-center justify-between text-[11px] text-base-content/40">
-            <span>Progress</span>
-            <span class="font-mono">{@done_tasks}/{@total_tasks}</span>
-          </div>
-          <div class="h-1.5 bg-base-300 rounded-full overflow-hidden">
-            <div
-              class="h-full bg-success rounded-full transition-all"
-              style={"width: #{Float.round(@done_tasks / @total_tasks * 100, 1)}%"}
-            >
-            </div>
-          </div>
-        </div>
-      <% end %>
-
-      <%!-- Members --%>
-      <section>
-        <div class="flex items-center gap-2 mb-3">
-          <h2 class="text-[11px] font-semibold text-base-content/50 uppercase tracking-widest">
-            Members
-          </h2>
-          <div class="h-px flex-1 bg-base-300"></div>
-          <span class="font-mono text-[11px] text-base-content/30">{length(@team.members)}</span>
-        </div>
-
-        <div class="space-y-2">
-          <%= for member <- @team.members do %>
-            <div class={[
-              "rounded-lg overflow-hidden",
-              member.session_id && @selected_agent_session_id == member.session_id &&
-                "ring-1 ring-primary/40"
-            ]}>
-              <%= if member.session do %>
-                <.session_row
-                  session={member.session}
-                  click_event="select_agent"
-                  project_name={if member.role && member.role != "", do: member.role}
-                />
-              <% else %>
-                <%!-- Member without an associated session --%>
-                <div class="flex items-center gap-3 p-3 bg-base-200">
-                  <div class={[
-                    "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
-                    member_avatar_class(member.status)
-                  ]}>
-                    {member_initials(member.name)}
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <span class="font-medium text-sm text-base-content truncate">{member.name}</span>
-                    <div class="flex items-center gap-2 mt-0.5">
-                      <span class={[
-                        "w-1.5 h-1.5 rounded-full shrink-0",
-                        member_status_dot(member.status)
-                      ]}>
-                      </span>
-                      <span class={["text-[11px] font-medium", member_status_text(member.status)]}>
-                        {member.status}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              <% end %>
-              <%!-- Per-member tasks --%>
-              <%= if Map.get(member, :tasks, []) != [] do %>
-                <div class="border-t border-base-300/50 px-3 py-2 space-y-1 bg-base-200">
-                  <%= for task <- member.tasks do %>
-                    <div class="flex items-center gap-2">
-                      <div class={["w-1.5 h-1.5 rounded-full shrink-0", task_state_dot(task.state_id)]}>
-                      </div>
-                      <%= if task.project_id do %>
-                        <.link
-                          navigate={~p"/projects/#{task.project_id}/tasks"}
-                          class="flex-1 text-xs text-base-content/70 truncate hover:text-base-content/90 hover:underline"
-                        >
-                          {task.title}
-                        </.link>
-                      <% else %>
-                        <span class="flex-1 text-xs text-base-content/70 truncate">{task.title}</span>
-                      <% end %>
-                      <%= if task.state do %>
-                        <span class={[
-                          "text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0",
-                          task_state_chip(task.state_id)
-                        ]}>
-                          {task.state.name}
-                        </span>
-                      <% end %>
-                    </div>
-                  <% end %>
-                </div>
-              <% end %>
-            </div>
-          <% end %>
-        </div>
-      </section>
-
-      <%!-- Unowned Tasks --%>
-      <section>
-        <div class="flex items-center gap-2 mb-3">
-          <h2 class="text-[11px] font-semibold text-base-content/50 uppercase tracking-widest">
-            Unassigned Tasks
-          </h2>
-          <div class="h-px flex-1 bg-base-300"></div>
-          <span class="font-mono text-[11px] text-base-content/30">
-            {length(Map.get(@team, :unowned_tasks, []))}
-          </span>
-        </div>
-
-        <%= if Map.get(@team, :unowned_tasks, []) == [] do %>
-          <div class="flex items-center gap-3 p-4 rounded-lg border border-dashed border-base-300 text-base-content/30">
-            <.icon name="hero-clipboard-document-list" class="w-4 h-4" />
-            <p class="text-sm">No unassigned tasks</p>
-          </div>
-        <% else %>
-          <div class="space-y-1.5">
-            <%= for task <- @team.unowned_tasks do %>
-              <div class="rounded-lg bg-base-200 overflow-hidden">
-                <div class="flex items-center gap-3 px-3 py-2.5 group">
-                  <div class={["w-1.5 h-1.5 rounded-full shrink-0", task_state_dot(task.state_id)]}>
-                  </div>
-                  <%= if task.project_id do %>
-                    <.link
-                      navigate={~p"/projects/#{task.project_id}/tasks"}
-                      class="flex-1 text-sm text-base-content min-w-0 truncate hover:underline"
-                    >
-                      {task.title}
-                    </.link>
-                  <% else %>
-                    <span class="flex-1 text-sm text-base-content min-w-0 truncate">
-                      {task.title}
-                    </span>
-                  <% end %>
-                  <div class="flex items-center gap-1.5 shrink-0">
-                    <%= if Map.get(task, :notes, []) != [] do %>
-                      <span class="flex items-center gap-1 text-[10px] text-base-content/40 font-mono">
-                        <.icon name="hero-chat-bubble-left-ellipsis" class="w-3 h-3" />
-                        {length(task.notes)}
-                      </span>
-                    <% end %>
-                    <%= if task.state do %>
-                      <span class={[
-                        "text-[10px] font-medium px-1.5 py-0.5 rounded",
-                        task_state_chip(task.state_id)
-                      ]}>
-                        {task.state.name}
-                      </span>
-                    <% end %>
-                    <%!-- Assign to member picker --%>
-                    <select
-                      class="text-[10px] bg-base-300 border-0 rounded px-1.5 py-0.5 text-base-content/60 cursor-pointer focus:outline-none"
-                      phx-change="assign_task"
-                      phx-value-task-id={task.id}
-                      name="session-id"
-                    >
-                      <option value="">Assign to...</option>
-                      <%= for member <- Enum.filter(@team.members, & &1.session_id) do %>
-                        <option value={member.session_id}>{member.name}</option>
-                      <% end %>
-                    </select>
-                  </div>
-                </div>
-                <%= if Map.get(task, :notes, []) != [] do %>
-                  <div class="border-t border-base-300/50 px-3 pb-2.5 pt-2 space-y-2">
-                    <%= for note <- task.notes do %>
-                      <div class="text-xs text-base-content/50 pl-3 border-l-2 border-base-content/10">
-                        <p class="whitespace-pre-wrap leading-relaxed">{note.body}</p>
-                        <span class="text-[10px] text-base-content/25 mt-1 block font-mono">
-                          {format_note_time(note.created_at)}
-                        </span>
-                      </div>
-                    <% end %>
-                  </div>
-                <% end %>
-              </div>
-            <% end %>
-          </div>
-        <% end %>
-      </section>
     </div>
     """
   end
@@ -643,64 +408,8 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
 
   defp active_member_count(members), do: Enum.count(members, &(&1.status == "active"))
 
-  defp member_initials(nil), do: "?"
-
-  defp member_initials(name) do
-    name
-    |> String.split()
-    |> Enum.take(2)
-    |> Enum.map(&String.first/1)
-    |> Enum.join()
-    |> String.upcase()
-  end
-
-  defp truncate_message(nil, _), do: ""
-
-  defp truncate_message(body, max) do
-    if String.length(body) > max do
-      String.slice(body, 0, max) <> "…"
-    else
-      body
-    end
-  end
-
-  defp format_message_time(nil), do: ""
-  defp format_message_time(%DateTime{} = dt), do: Calendar.strftime(dt, "%H:%M")
-  defp format_message_time(%NaiveDateTime{} = dt), do: Calendar.strftime(dt, "%H:%M")
-
-  defp format_message_time(str) when is_binary(str) do
-    case DateTime.from_iso8601(str) do
-      {:ok, dt, _} -> Calendar.strftime(dt, "%H:%M")
-      _ -> ""
-    end
-  end
-
-  defp format_message_time(_), do: ""
-
-  defp format_note_time(nil), do: ""
-  defp format_note_time(%DateTime{} = dt), do: Calendar.strftime(dt, "%b %d, %H:%M")
-  defp format_note_time(%NaiveDateTime{} = dt), do: Calendar.strftime(dt, "%b %d, %H:%M")
-
-  defp format_note_time(str) when is_binary(str) do
-    case DateTime.from_iso8601(str) do
-      {:ok, dt, _} -> Calendar.strftime(dt, "%b %d, %H:%M")
-      _ -> str
-    end
-  end
-
-  defp format_note_time(_), do: ""
-
   defp team_status_border("active"), do: "border-success"
   defp team_status_border(_), do: "border-transparent"
-
-  defp status_badge_class("active"), do: "badge-success"
-  defp status_badge_class("archived"), do: "badge-ghost"
-  defp status_badge_class(_), do: "badge-neutral"
-
-  defp member_status_dot("active"), do: "bg-success"
-  defp member_status_dot("idle"), do: "bg-warning"
-  defp member_status_dot("done"), do: "bg-base-content/30"
-  defp member_status_dot(_), do: "bg-base-content/20"
 
   defp member_status_text("active"), do: "text-success"
   defp member_status_text("idle"), do: "text-warning"
@@ -711,16 +420,4 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
   defp member_avatar_class("idle"), do: "bg-warning/15 text-warning"
   defp member_avatar_class("done"), do: "bg-base-300 text-base-content/40"
   defp member_avatar_class(_), do: "bg-base-300 text-base-content/30"
-
-  defp task_state_dot(@state_todo), do: "bg-base-content/30"
-  defp task_state_dot(@state_in_progress), do: "bg-info"
-  defp task_state_dot(@state_done), do: "bg-success"
-  defp task_state_dot(@state_in_review), do: "bg-warning"
-  defp task_state_dot(_), do: "bg-base-content/20"
-
-  defp task_state_chip(@state_todo), do: "bg-base-300 text-base-content/40"
-  defp task_state_chip(@state_in_progress), do: "bg-info/15 text-info"
-  defp task_state_chip(@state_done), do: "bg-success/15 text-success"
-  defp task_state_chip(@state_in_review), do: "bg-warning/15 text-warning"
-  defp task_state_chip(_), do: "bg-base-300 text-base-content/30"
 end

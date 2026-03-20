@@ -38,6 +38,9 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
         <.list_row task={@task} on_click={@on_click} on_delete={@on_delete} />
       <% _ -> %>
         <div class={[card_class(@variant), @aging && elem(@aging, 0)]} {@rest}>
+          <%= if @variant == "kanban" && Map.get(@task, :priority, 0) > 0 do %>
+            <div class="h-0.5 w-full rounded-t" style={"background-color: #{priority_bar_color(Map.get(@task, :priority))}"} />
+          <% end %>
           <div class={card_body_class(@variant)}>
             <%= if @variant == "kanban" do %>
               <.kanban_card_content
@@ -136,14 +139,6 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       |> assign_new(:workflow_states, fn -> [] end)
 
     ~H"""
-    <%!-- Priority top bar --%>
-    <%= if @task.priority && @task.priority > 0 do %>
-      <div
-        class="-mx-2 -mt-2 mb-2 h-0.5"
-        style={"background-color: #{priority_bar_color(@task.priority)}"}
-      />
-    <% end %>
-
     <%!-- Title + drag handle + delete --%>
     <div class="flex items-start gap-1.5">
       <div
@@ -437,7 +432,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   end
 
   defp card_class("kanban") do
-    "group/card card bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] border border-base-content/8 hover:shadow-md transition-all cursor-pointer overflow-hidden"
+    "group/card card bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] border border-base-content/8 hover:shadow-md transition-all cursor-pointer"
   end
 
   defp card_class("grid") do

@@ -62,7 +62,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
   """
   def create(conn, params) do
     with {:ok, params} <- validate_params(params),
-         {:ok, project_id, project_name} <- resolve_project_id(params),
+         {:ok, project_id, project_name} <- Projects.resolve_project(params),
          {:ok, team} <- resolve_team(params) do
       params = Map.merge(params, %{"project_id" => project_id, "project_name" => project_name})
       instructions = apply_team_context(params["instructions"], team, params["member_name"])
@@ -262,52 +262,6 @@ defmodule EyeInTheSkyWebWeb.Api.V1.AgentController do
          "parent_agent_id" => parent_agent_id,
          "parent_session_id" => parent_session_id
        })}
-    end
-  end
-
-  # Fix 1: resolve or create project from project_id / project_path
-  defp resolve_project_id(params) do
-    project_id = parse_int(params["project_id"], nil)
-    project_path = params["project_path"]
-
-    cond do
-      project_id != nil ->
-        case Projects.get_project(project_id) do
-          nil -> {:error, "project_not_found", "project_id #{project_id} does not exist"}
-          project -> {:ok, project.id, project.name}
-        end
-
-      project_path not in [nil, ""] ->
-        case Projects.get_project_by_path(project_path) do
-          nil ->
-            name = Path.basename(project_path)
-
-            case Projects.create_project(%{name: name, path: project_path, active: true}) do
-              {:ok, project} ->
-                Logger.info(
-                  "resolve_project_id: created project id=#{project.id} for path=#{project_path}"
-                )
-
-                {:ok, project.id, project.name}
-
-              {:error, _changeset} ->
-                # Race condition: try lookup again
-                case Projects.get_project_by_path(project_path) do
-                  nil ->
-                    {:error, "project_creation_failed",
-                     "failed to create project for path: #{project_path}"}
-
-                  project ->
-                    {:ok, project.id, project.name}
-                end
-            end
-
-          project ->
-            {:ok, project.id, project.name}
-        end
-
-      true ->
-        {:ok, nil, nil}
     end
   end
 

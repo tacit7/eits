@@ -7,17 +7,7 @@ defmodule EyeInTheSkyWebWeb.Plugs.RequireAuth do
 
   def call(conn, _opts) do
     configured_key = Application.get_env(:eye_in_the_sky_web, :api_key)
-    no_env_key = is_nil(configured_key) or configured_key == ""
 
-    if no_env_key and System.get_env("MIX_ENV") == "prod" do
-      # In production with no env key, only DB keys are valid. Fall through to DB check.
-      check_token(conn, configured_key)
-    else
-      check_token(conn, configured_key)
-    end
-  end
-
-  defp check_token(conn, configured_key) do
     case get_req_header(conn, "authorization") do
       ["Bearer " <> token] ->
         if authenticated?(token, configured_key) do
@@ -27,16 +17,8 @@ defmodule EyeInTheSkyWebWeb.Plugs.RequireAuth do
         end
 
       _ ->
-        if is_nil(configured_key) or configured_key == "" do
-          # No env key and no bearer token — allow in dev/test, reject in prod
-          if System.get_env("MIX_ENV") == "prod" do
-            reject(conn)
-          else
-            conn
-          end
-        else
-          reject(conn)
-        end
+        # No bearer token — always reject, regardless of environment or key config.
+        reject(conn)
     end
   end
 

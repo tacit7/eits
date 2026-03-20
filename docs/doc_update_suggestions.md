@@ -1,5 +1,13 @@
 # Documentation Update Suggestions
 
+## 2026-03-20
+**Commits reviewed**: cdb8acd..6243133
+
+- **CODE_GUIDELINES.md**: Document new module extractions from recent refactoring: ProviderStrategy (`lib/eye_in_the_sky_web/claude/provider_strategy.ex`) with provider implementations (Claude, Codex); ChatPresenter (`lib/eye_in_the_sky_web_web/live/chat_presenter.ex`) for extracted chat logic; WorkflowStates, TaskTags, ChecklistItems contexts extracted from Tasks (`lib/eye_in_the_sky_web/workflow_states.ex`, `lib/eye_in_the_sky_web/task_tags.ex`, `lib/eye_in_the_sky_web/checklist_items.ex`)
+- **CODE_GUIDELINES.md** or **WORKERS.md**: Document JobsHelpers module consolidation: `lib/eye_in_the_sky_web_web/live/shared/jobs_helpers.ex` now contains unified `create_with_claude/2` and `save_job/2` logic (replaces duplicate implementations in OverviewLive.Jobs and ProjectLive.Jobs); explain when to use JobsHelpers vs direct context calls
+- **KANBAN.md** or **CODE_GUIDELINES.md**: Document Trello-style kanban card dropdown menu for task actions (replace task copy/delete buttons with "..." menu); include UI pattern for mobile/desktop action menus
+- No breaking API changes in these commits; refactoring is internal module organization only
+
 ## 2026-03-18
 **Commits reviewed**: 435f772..cdb8acd
 

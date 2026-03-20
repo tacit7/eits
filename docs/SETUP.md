@@ -188,37 +188,46 @@ The EITS MCP server runs at `https://eits.dev/mcp`. Add to `~/.claude/settings.j
 
 ## 8. API Key & Environment
 
-The REST API requires a bearer token. Generate one with:
+### REST API Keys
+
+The REST API is authenticated via Bearer token. Two key sources are checked on every request — whichever matches first wins:
+
+1. **Env var** — `EITS_API_KEY` in `.env` or shell; plain string comparison
+2. **DB key** — any active row in the `api_keys` table; HMAC-SHA256 hash comparison
+
+**In dev with no key set and no Bearer token, the API is open.** No setup needed for local development unless you explicitly want to test auth.
+
+Generate a key (stored only as a hash — raw key shown once):
 
 ```bash
-mix eits.gen.api_key
+mix eits.gen.api_key                                         # label: "default", no expiry
+mix eits.gen.api_key --label "ci" --valid-until "2027-06-01T00:00:00"
 ```
 
-Copy `.env.example` to `.env` and fill in all required variables:
+Multiple keys can coexist. Rotating `secret_key_base` invalidates all existing DB key hashes.
+
+Copy `.env.example` to `.env` and set the key:
 
 ```bash
 cp .env.example .env
-# edit .env and set:
-# - EITS_API_KEY (generated above)
-# - VAPID_PRIVATE_KEY (for web push notifications)
 ```
 
-**Required environment variables for production:**
-
-| Variable | Source | Purpose |
-|----------|--------|---------|
-| `EITS_API_KEY` | `mix eits.gen.api_key` | REST API authentication |
-| `VAPID_PRIVATE_KEY` | Generate via `mix run -e '{pub, priv} = :crypto.generate_key(:ecdh, :prime256v1); IO.puts(Base.url_encode64(priv, padding: false))'` | Web push notifications (raises at startup if missing in prod) |
-| `VAPID_PUBLIC_KEY` | Same command above | Public key for service worker (optional in dev, defaults to committed value) |
-
-Phoenix loads `.env` automatically at startup via `dotenvy`.
-
-Add both to `~/.zshrc` for persistence:
+Add to `~/.zshrc` for persistence:
 
 ```bash
 export EITS_API_KEY="<generated-key>"
 export EITS_URL="http://localhost:5000/api/v1"
 ```
+
+### Environment variables for production
+
+| Variable | Source | Purpose |
+|----------|--------|---------|
+| `EITS_API_KEY` | `mix eits.gen.api_key` | REST API authentication |
+| `VAPID_PRIVATE_KEY` | `mix run -e '{pub, priv} = :crypto.generate_key(:ecdh, :prime256v1); IO.puts(Base.url_encode64(priv, padding: false))'` | Web push notifications (raises at startup if missing in prod) |
+| `VAPID_PUBLIC_KEY` | Same command | Public key for service worker (optional in dev) |
+
+Phoenix loads `.env` automatically at startup via `dotenvy`.
 
 **Webhook configuration (optional for dev):**
 

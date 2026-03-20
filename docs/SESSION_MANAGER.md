@@ -120,6 +120,67 @@ All 11 call sites across `dm_live.ex`, `agent_live/`, `project_live/`, and `chat
 
 `spawn_channel_agent` in CLI runs outside this supervision tree. Channel agents are spawned directly by LiveViews via `Task.Supervisor.start_child` with their own output handler (`handle_channel_output`). They have a different lifecycle and message routing (channel-based, not session-based). Integration into the DynamicSupervisor pattern is a future option.
 
+## Agent State Lifecycle
+
+Agent state is independent from session state and transitions through three states during the agent spawning and execution lifecycle:
+
+| State | Transition | Meaning |
+|---|---|---|
+| `:pending` | On :queued or :retry_queued admission | Agent is queued for spawning, worker process not yet running |
+| `:running` | On SDK :started event | CLI process started, agent actively processing |
+| `:failed` | On dispatch error or spawn failure | Agent spawn failed or Claude SDK error during execution |
+
+**Key mechanics:**
+- `promote_agent_if_pending/1` transitions an agent from pending → running when SDK successfully starts
+- This promotion is **synchronous** (not Task.start) to ensure completion before next event fires — critical for test sandbox safety
+- Failed agents remain in `:failed` state; no auto-recovery without explicit retry
+
+---
+
+## Session Status Lifecycle
+
+Session status is set by lifecycle hooks and reflects the CLI process state:
+
+| Status | Set By | Meaning |
+|---|---|---|
+| `working` | UserPromptSubmit hook | Claude Code is processing a message |
+| `stopped` | Stop hook | Session explicitly stopped; CLI stopped gracefully |
+| `waiting` | SessionEnd hook (sdk-cli) | Headless session ended; can be resumed |
+| `completed` | i-end-session skill | Interactive session finished (manually set) |
+| `failed` | SessionWorker on error | Process crashed or error during execution |
+
+**Status indicator styling:**
+- `stopped` → Yellow left border (warning color) on session card
+- `working` → Blue left border
+- `failed` → Red left border
+- `waiting` → Yellow left border
+
+**Auto-completion behavior:**
+- Stopped status is **not** auto-set on CLI exit
+- Completed status must be set **explicitly** via i-end-session skill
+- This prevents incorrect status when sessions are retried or resumed
+
+---
+
+## Worktree Management
+
+Agent workers use git worktrees to isolate CLI processes and prevent conflicts on concurrent spawns.
+
+**Location:** `lib/eye_in_the_sky_web/git/worktrees.ex` (Git.Worktrees module)
+
+**Key behaviors:**
+- Worktrees reuse existing paths on repeated `prepare_session_worktree/2` calls
+- Dirty state check filters untracked files (`git status --porcelain` with `??` filter)
+  - Untracked files are irrelevant to worktree creation since worktrees branch from HEAD
+  - Allows multiple worktrees on repos without `.gitignore` rules for `.claude/worktrees/`
+- Each agent gets a dedicated worktree at `.claude/worktrees/<session-uuid>`
+
+**Worktree fallback:**
+- If worktree creation fails, agent falls back to main project directory
+- Fallback is silent in non-critical paths; logged in debug contexts
+
+---
+
 ## IEx Debugging
 
 ```elixir

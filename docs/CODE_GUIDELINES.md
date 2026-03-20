@@ -505,6 +505,101 @@ query = Task |> maybe_where(“title”, “bug fix”) |> Repo.all()
 
 ---
 
+## Module Architecture
+
+### Agent Management Modules
+
+**AgentManager** (`lib/eye_in_the_sky_web/agents/agent_manager.ex`): Primary module for agent lifecycle management and spawning.
+
+**Related modules:**
+- **InstructionBuilder** (`lib/eye_in_the_sky_web/agents/instruction_builder.ex`): Constructs Claude SDK initialization instructions (model, effort, context, tools)
+- **RuntimeContext** (`lib/eye_in_the_sky_web/agents/runtime_context.ex`): Captures agent runtime state (project path, session UUID, provider identity)
+- **Git.Worktrees** (`lib/eye_in_the_sky_web/git/worktrees.ex`): Manages git worktree creation, reuse, and dirty state checking
+
+**Agent State Lifecycle:**
+- `:pending` — Initial state on :queued or :retry_queued admission (agent spawning)
+- `:running` — Transitioned on SDK :started event (CLI process running)
+- `:failed` — Set on dispatch error or spawn failure
+
+**Worktree Behavior:**
+- Worktrees reuse existing paths on repeated `prepare_session_worktree/2` calls
+- Dirty state check filters untracked files (`git status --porcelain` with `??` filter) — untracked files are irrelevant since worktrees branch from HEAD
+- Promotes agent from pending to running on successful SDK start via `promote_agent_if_pending/1` (synchronous for test sandbox safety)
+
+---
+
+## Model Configuration
+
+### Supported Models and Effort Levels
+
+**Opus models:**
+- `opus` — Claude 3.5 Opus
+- `opus[1m]` — Claude 4.6 Opus (1M context window)
+
+**Sonnet models:**
+- `sonnet` — Claude 3.5 Sonnet
+- `sonnet[1m]` — Claude 4.5 Sonnet (1M context window)
+
+**Effort levels:**
+- `low` — Quick execution, minimal retries
+- `normal` — Balanced approach (default)
+- `high` — More thorough, multiple attempts
+- `max` — Exhaustive effort, maximum retries
+
+**Model display helper:**
+Use `ViewHelpers.model_display_name/1` to render human-readable model names in UI:
+
+```elixir
+# In components
+<%= ViewHelpers.model_display_name(“opus[1m]”) %>
+# Renders: “Opus 4.6 (1M)”
+```
+
+**Available forms with model + effort selection:**
+- DM page (session selector dropdown)
+- New Agent drawer
+- New Session modal
+- Overview Jobs page
+- Project Jobs page
+
+---
+
+## Note Creation
+
+### Quick Note Modal
+
+**Purpose:** Create a note with inline title/body textarea without page navigation.
+
+**Location:** `lib/eye_in_the_sky_web_web/live/*/notes.ex` (overview_live/notes, project_live/notes)
+
+**Features:**
+- Title input field
+- Body textarea
+- Star toggle (optional)
+- Modal submit creates note and reloads list
+
+**Parent type resolution:**
+- Overview page notes parent to `system/0`
+- Project page notes parent to current project
+
+### New Note CodeMirror Editor
+
+**Purpose:** Dedicated page for writing markdown notes with syntax highlighting and save shortcuts.
+
+**Features:**
+- Title input field
+- CodeMirror 6 markdown editor
+- Cmd+S keyboard shortcut to save
+- Cancel button to discard
+
+**JavaScript hook:** `InlineNoteCreatorHook` (`assets/js/hooks/inline_note_creator.js`)
+
+**Both buttons available on:**
+- `/notes` (overview)
+- `/projects/:id/notes` (project-scoped)
+
+---
+
 ## “Gotchas” Checklist
 
 - If you see missing `current_scope`: fix routing/live_session + pass it to `<Layouts.app>`.

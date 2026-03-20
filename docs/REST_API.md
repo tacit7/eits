@@ -382,29 +382,51 @@ List all registered push subscriptions for the current user.
 
 Send a message to an agent session. Rate-limited to protect against message injection flooding.
 
-**Request body:**
+**Request body (current format):**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `session_id` | integer | yes | Session ID |
-| `content` | string | yes | Message content (markdown) |
-| `sender_id` | string | yes | Sender UUID or identifier |
+| `from_session_id` | integer \| string | yes | Sender session ID (int) or UUID (string) |
+| `to_session_id` | integer \| string | yes | Recipient session ID (int) or UUID (string) |
+| `body` | string | yes | Message content (markdown) |
+
+**Legacy format (backward compatible):**
+
+| Field | Type | Deprecated | Description |
+|-------|------|------------|-------------|
+| `session_id` | integer | yes | Use `to_session_id` instead |
+| `sender_id` | string | yes | Use `from_session_id` instead |
+| `content` | string | yes | Use `body` instead |
+| `target_session_id` | integer | yes | Use `to_session_id` instead |
 
 **Response:** `201 Created`
 
 ```json
 {
   "id": 123,
-  "session_id": 42,
-  "sender_id": "user-uuid",
-  "content": "Looking at the error logs...",
+  "from_session_id": 40,
+  "to_session_id": 42,
+  "body": "Looking at the error logs...",
+  "from_session_uuid": "abc-123",
   "inserted_at": "2026-03-17T10:30:00Z"
 }
 ```
 
+**Message body format sent to agent:**
+
+When a DM is routed to an agent, the body includes sender context:
+
+```
+DM from:<sender_name> (session:<sender_uuid>) <original_message>
+```
+
+Example: `DM from:Developer (session:abc-123) Can you check the test output?`
+
+This allows agents to reply to the correct session via `eits dm` command.
+
 **Rate limiting:**
 
-- 30 requests per minute per `sender_id`
+- 30 requests per minute per `from_session_id`
 - Exceeding limit returns `429 Too Many Requests`:
 
 ```json
@@ -414,7 +436,19 @@ Send a message to an agent session. Rate-limited to protect against message inje
 }
 ```
 
-**Example:**
+**Example (current format):**
+
+```bash
+curl -X POST localhost:5000/api/v1/dm \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "from_session_id": 40,
+    "to_session_id": 42,
+    "body": "Can you check the test output?"
+  }'
+```
+
+**Example (legacy format - still works):**
 
 ```bash
 curl -X POST localhost:5000/api/v1/dm \

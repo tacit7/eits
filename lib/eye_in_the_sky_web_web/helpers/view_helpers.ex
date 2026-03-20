@@ -489,6 +489,55 @@ defmodule EyeInTheSkyWebWeb.Helpers.ViewHelpers do
   end
 
   @doc """
+  Truncate text to a given max length, appending "…" when truncated.
+  """
+  def truncate_text(nil, _max), do: ""
+
+  def truncate_text(text, max) when is_binary(text) do
+    if String.length(text) > max do
+      String.slice(text, 0, max) <> "…"
+    else
+      text
+    end
+  end
+
+  def truncate_text(_, _), do: ""
+
+  @doc """
+  Format a datetime value as "HH:MM" (wall-clock time only).
+  Accepts DateTime, NaiveDateTime, ISO8601 binary, or nil.
+  """
+  def format_time(nil), do: ""
+  def format_time(%DateTime{} = dt), do: Calendar.strftime(dt, "%H:%M")
+  def format_time(%NaiveDateTime{} = dt), do: Calendar.strftime(dt, "%H:%M")
+
+  def format_time(str) when is_binary(str) do
+    case DateTime.from_iso8601(str) do
+      {:ok, dt, _} -> Calendar.strftime(dt, "%H:%M")
+      _ -> ""
+    end
+  end
+
+  def format_time(_), do: ""
+
+  @doc """
+  Format a datetime value as "Mon DD, HH:MM" (e.g. "Jan 15, 09:30").
+  Accepts DateTime, NaiveDateTime, ISO8601 binary, or nil.
+  """
+  def format_datetime_short_time(nil), do: ""
+  def format_datetime_short_time(%DateTime{} = dt), do: Calendar.strftime(dt, "%b %d, %H:%M")
+  def format_datetime_short_time(%NaiveDateTime{} = dt), do: Calendar.strftime(dt, "%b %d, %H:%M")
+
+  def format_datetime_short_time(str) when is_binary(str) do
+    case DateTime.from_iso8601(str) do
+      {:ok, dt, _} -> Calendar.strftime(dt, "%b %d, %H:%M")
+      _ -> str
+    end
+  end
+
+  def format_datetime_short_time(_), do: ""
+
+  @doc """
   Format a cost value as a dollar string (e.g. "$1.23").
   """
   def format_cost(value) when is_float(value),

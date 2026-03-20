@@ -22,6 +22,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
        collapsed: false,
        mobile_open: false,
        expanded_all_projects: true,
+       expanded_projects: true,
        expanded_system: true,
        expanded_chat: false,
        new_channel_name: nil,
@@ -52,6 +53,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
      |> assign(:expanded_chat, expanded_chat)
      |> assign(:mobile_open, false)
      |> assign(:expanded_all_projects, socket.assigns[:expanded_all_projects] != false)
+     |> assign(:expanded_projects, socket.assigns[:expanded_projects] != false)
      |> assign(:expanded_system, socket.assigns[:expanded_system] != false)}
   end
 
@@ -83,6 +85,11 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   @impl true
   def handle_event("toggle_all_projects", _params, socket) do
     {:noreply, assign(socket, :expanded_all_projects, !socket.assigns.expanded_all_projects)}
+  end
+
+  @impl true
+  def handle_event("toggle_projects", _params, socket) do
+    {:noreply, assign(socket, :expanded_projects, !socket.assigns.expanded_projects)}
   end
 
   @impl true
@@ -332,14 +339,6 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
             expanded_all_projects={@expanded_all_projects}
             myself={@myself}
           />
-          <.system_section
-            sidebar_tab={@sidebar_tab}
-            sidebar_project={@sidebar_project}
-            collapsed={@collapsed}
-            expanded_system={@expanded_system}
-            notification_count={@notification_count}
-            myself={@myself}
-          />
           <.chat_section
             sidebar_tab={@sidebar_tab}
             collapsed={@collapsed}
@@ -354,9 +353,18 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
             sidebar_project={@sidebar_project}
             sidebar_tab={@sidebar_tab}
             collapsed={@collapsed}
+            expanded_projects={@expanded_projects}
             new_project_path={@new_project_path}
             renaming_project_id={@renaming_project_id}
             rename_value={@rename_value}
+            myself={@myself}
+          />
+          <.system_section
+            sidebar_tab={@sidebar_tab}
+            sidebar_project={@sidebar_project}
+            collapsed={@collapsed}
+            expanded_system={@expanded_system}
+            notification_count={@notification_count}
             myself={@myself}
           />
         </nav>
@@ -449,6 +457,20 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           collapsed={@collapsed}
         />
         <.section_sub_item
+          href="/notes"
+          icon="hero-document-text"
+          label="Notes"
+          active={@sidebar_tab == :notes && is_nil(@sidebar_project)}
+          collapsed={@collapsed}
+        />
+        <.section_sub_item
+          href="/skills"
+          icon="hero-bolt"
+          label="Skills"
+          active={@sidebar_tab == :skills}
+          collapsed={@collapsed}
+        />
+        <.section_sub_item
           href="/teams"
           icon="hero-users"
           label="Teams"
@@ -492,24 +514,10 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     <%= if @expanded_system || @collapsed do %>
       <div class={if !@collapsed, do: "ml-5 border-l border-base-content/8"}>
         <.section_sub_item
-          href="/notes"
-          icon="hero-document-text"
-          label="Notes"
-          active={@sidebar_tab == :notes && is_nil(@sidebar_project)}
-          collapsed={@collapsed}
-        />
-        <.section_sub_item
           href="/usage"
           icon="hero-chart-bar"
           label="Usage"
           active={@sidebar_tab == :usage}
-          collapsed={@collapsed}
-        />
-        <.section_sub_item
-          href="/skills"
-          icon="hero-bolt"
-          label="Skills"
-          active={@sidebar_tab == :skills}
           collapsed={@collapsed}
         />
         <.section_notification_item
@@ -639,6 +647,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   attr :sidebar_project, :any, default: nil
   attr :sidebar_tab, :atom, required: true
   attr :collapsed, :boolean, required: true
+  attr :expanded_projects, :boolean, required: true
   attr :new_project_path, :any, default: nil
   attr :renaming_project_id, :any, default: nil
   attr :rename_value, :string, default: ""
@@ -646,22 +655,27 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
 
   defp projects_section(assigns) do
     ~H"""
-    <div class={[
-      "mt-3 mb-0.5 flex items-center justify-between",
-      if(@collapsed, do: "px-2", else: "px-3")
-    ]}>
-      <span class={[
-        "text-[10px] uppercase tracking-wider font-medium text-base-content/30",
-        if(@collapsed, do: "hidden")
-      ]}>
-        Projects
-      </span>
-      <div class={["border-t border-base-content/8 mt-1 flex-1", if(!@collapsed, do: "hidden")]} />
-      <%= if !@collapsed do %>
+    <div class={["flex items-center", if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1")]}>
+      <button
+        phx-click="toggle_projects"
+        phx-target={@myself}
+        class="flex items-center gap-2.5 flex-1 text-left text-sm text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5 transition-colors"
+        title="Projects"
+      >
+        <%= if !@collapsed do %>
+          <.icon
+            name={if @expanded_projects, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"}
+            class="w-3.5 h-3.5 flex-shrink-0"
+          />
+        <% end %>
+        <.icon name="hero-folder-open" class="w-4 h-4 flex-shrink-0" />
+        <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>Projects</span>
+      </button>
+      <%= if !@collapsed && @expanded_projects do %>
         <button
           phx-click="show_new_project"
           phx-target={@myself}
-          class="text-base-content/30 hover:text-base-content/60 transition-colors"
+          class="flex-shrink-0 text-base-content/30 hover:text-base-content/60 transition-colors"
           title="New Project"
         >
           <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
@@ -669,35 +683,36 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
       <% end %>
     </div>
 
-    <%!-- Inline new project path form --%>
-    <%= if @new_project_path != nil && !@collapsed do %>
-      <form
-        phx-submit="create_project"
-        phx-target={@myself}
-        class="flex items-center gap-1 px-3 py-1"
-      >
-        <input
-          type="text"
-          name="path"
-          value={@new_project_path}
-          phx-keyup="update_project_path"
+    <%= if @expanded_projects || @collapsed do %>
+      <%!-- Inline new project path form --%>
+      <%= if @new_project_path != nil && !@collapsed do %>
+        <form
+          phx-submit="create_project"
           phx-target={@myself}
-          placeholder="/path/to/project"
-          class="flex-1 bg-transparent border-b border-base-content/15 text-xs text-base-content/70 placeholder:text-base-content/25 outline-none py-0.5 font-mono"
-          autofocus
-        />
-        <button
-          type="button"
-          phx-click="cancel_new_project"
-          phx-target={@myself}
-          class="text-base-content/30 hover:text-base-content/60 transition-colors flex-shrink-0"
+          class="flex items-center gap-1 px-3 py-1"
         >
-          <.icon name="hero-x-mark" class="w-3.5 h-3.5" />
-        </button>
-      </form>
-    <% end %>
+          <input
+            type="text"
+            name="path"
+            value={@new_project_path}
+            phx-keyup="update_project_path"
+            phx-target={@myself}
+            placeholder="/path/to/project"
+            class="flex-1 bg-transparent border-b border-base-content/15 text-xs text-base-content/70 placeholder:text-base-content/25 outline-none py-0.5 font-mono"
+            autofocus
+          />
+          <button
+            type="button"
+            phx-click="cancel_new_project"
+            phx-target={@myself}
+            class="text-base-content/30 hover:text-base-content/60 transition-colors flex-shrink-0"
+          >
+            <.icon name="hero-x-mark" class="w-3.5 h-3.5" />
+          </button>
+        </form>
+      <% end %>
 
-    <%= for project <- @projects do %>
+      <%= for project <- @projects do %>
       <% is_active_project = @sidebar_project && @sidebar_project.id == project.id %>
       <div data-project-id={project.id}>
         <%!-- Project row --%>
@@ -854,6 +869,7 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
           />
         </div>
       </div>
+    <% end %>
     <% end %>
     """
   end

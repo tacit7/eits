@@ -332,3 +332,134 @@ end
 **Limits:**
 - Max 1000 messages per session (paginated on scroll)
 - Max 100 agents visible at once (paginated/searchable)
+
+---
+
+## Note Creation and Editing
+
+**LiveView:** `lib/eye_in_the_sky_web_web/live/note_live/new.ex`
+**Full Editor Hook:** `assets/js/hooks/note_full_editor.js`
+**Notes Contexts:** `lib/eye_in_the_sky_web_web/live/overview_live/notes.ex`, `lib/eye_in_the_sky_web_web/live/project_live/notes.ex`
+
+### Quick Note Modal
+
+**Trigger:** "Quick Note" button in notes list (available on overview and project notes pages).
+
+**Features:**
+- **Title input**: Auto-focused, placeholder "Title...", required
+- **Body textarea**: 4 rows, placeholder "Note content..."
+- **Starred checkbox**: Optional, star this note immediately
+- **Modal controls**: Escape key or cancel button closes modal
+
+**Flow:**
+1. User clicks "Quick Note" button
+2. Modal opens with focus on title input
+3. User enters title and body
+4. Submit button creates note via `create_quick_note` event
+5. Modal closes and notes list reloads
+6. Note appears in list with parent type set
+
+**Parent Type Resolution:**
+- **Overview notes page**: Creates with `parent_type: "system"`, `parent_id: "0"`
+- **Project notes page**: Creates with `parent_type: "project"`, `parent_id: <project.id>`
+
+**Implementation:**
+```elixir
+# handle_event("create_quick_note", params, socket)
+case Notes.create_note(%{
+  parent_type: parent_type,
+  parent_id: parent_id,
+  title: params["title"],
+  body: params["body"],
+  starred: starred
+}) do
+  {:ok, _note} -> socket |> assign(:show_quick_note_modal, false) |> load_notes()
+  {:error, _changeset} -> put_flash(socket, :error, "Failed to create note")
+end
+```
+
+---
+
+### New Note CodeMirror Editor
+
+**Page:** `/notes/new` (full-screen editor)
+
+**Features:**
+- **CodeMirror 6 editor**: Markdown syntax highlighting
+- **Title field**: Editable in header, updates via `update_title` event
+- **Save handler**: Cmd+S (Mod+S) triggers `note_saved` event
+- **Escape handler**: Returns to previous page (`return_to` param)
+- **Status bar**: Shows current line and column (Ln X, Col Y)
+- **Line numbers**: Line number gutter on left
+- **Active line highlight**: Current line highlighted
+- **Line wrapping**: Enabled for better readability
+
+**Query Parameters:**
+- `parent_type`: One of "session", "task", "agent", "project", "system" (defaults to "system")
+- `parent_id`: Parent resource ID (defaults to "0")
+- `return_to`: Safe redirect path after save (validated against whitelist)
+
+**Parent Type Resolution:**
+Valid parent types are validated in mount/handle_params:
+```elixir
+@valid_parent_types ["session", "task", "agent", "project", "system"]
+
+parent_type =
+  if params["parent_type"] in @valid_parent_types, do: params["parent_type"], else: "system"
+```
+
+Invalid parent types default to "system". This ensures notes are always assigned to a valid scope.
+
+**Return-To Validation:**
+Safe redirects are validated against a whitelist to prevent open redirect attacks:
+```elixir
+@valid_return_paths ["/notes", ~r|^/projects/\d+/notes$|]
+
+defp safe_return_to(path) when is_binary(path) do
+  if String.starts_with?(path, "/") and
+       Enum.any?(@valid_return_paths, fn
+         p when is_binary(p) -> p == path
+         r -> Regex.match?(r, path)
+       end),
+     do: path,
+     else: "/notes"
+end
+```
+
+Only `/notes` and `/projects/:id/notes` paths are allowed. All other paths default to `/notes`.
+
+**CodeMirror Hook Integration:**
+
+The `NoteFullEditorHook` initializes a full-screen CodeMirror editor with markdown support:
+
+```javascript
+// assets/js/hooks/note_full_editor.js
+export const NoteFullEditorHook = {
+  mounted() {
+    // Initialize CodeMirror with:
+    // - markdown() syntax highlighting
+    // - Line numbers and active line highlight
+    // - History undo/redo
+    // - Cmd+S to save (pushes "note_saved" event)
+    // - Escape to navigate back
+    // - Status bar updates (Ln/Col)
+  }
+}
+```
+
+**Save Handler:**
+When user presses Cmd+S or clicks the Save button, the hook:
+1. Collects editor content via `view.state.doc.toString()`
+2. Pushes `note_saved` event with body content
+3. LiveView creates note with validated parent_type and parent_id
+4. On success, redirects to safe return path
+5. On error, displays flash message "Failed to create note"
+
+**Keyboard Shortcuts:**
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl + S` | Save note and redirect |
+| `Escape` | Go back without saving |
+| `Tab` (in title) | Focus editor |
+| `Cmd/Ctrl + Z` | Undo |
+| `Cmd/Ctrl + Shift + Z` | Redo |

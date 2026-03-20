@@ -115,6 +115,23 @@ The DM page renders stream events provider-aware:
 - **Thinking display**: Codex reasoning items render as italic text above tool/content output
 - **Message provider**: User messages are tagged with the session's provider, not hardcoded "claude"
 
+#### Stream Thinking Display
+
+Thinking/reasoning content is captured in the `stream_thinking` socket assign during streaming:
+
+```elixir
+# lib/eye_in_the_sky_web_web/live/dm_live/stream_state.ex
+def handle_stream_replace(:thinking, text, socket) do
+  {:noreply, assign(socket, :stream_thinking, text)}
+end
+```
+
+The `stream_thinking` assign:
+- Holds the full thinking block text as it's streamed from Codex
+- Is cleared on each new stream via `handle_stream_clear/1` (sets to `nil`)
+- Allows the UI to display inline reasoning while the agent thinks
+- Works for both complete blocks (Codex) and character-by-character deltas (Claude)
+
 ## JSONL Event Types
 
 Events emitted by `codex exec --json`:

@@ -171,30 +171,54 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       >
         {@task.title}
       </h4>
-      <%!-- Copy task ID --%>
-      <button
-        type="button"
-        phx-hook="CopyToClipboard"
-        id={"copy-task-kanban-#{@task.id}"}
-        data-copy={@task.uuid || to_string(@task.id)}
-        onclick="event.stopPropagation(); event.preventDefault();"
-        aria-label="Copy task ID"
-        class="flex-shrink-0 opacity-0 group-hover/card:opacity-100 flex items-center justify-center w-6 h-6 rounded text-base-content/25 hover:text-base-content/60 transition-all"
+      <%!-- ... menu --%>
+      <div
+        class="flex-shrink-0 opacity-0 group-hover/card:opacity-100 transition-opacity"
+        onclick="event.stopPropagation();"
       >
-        <.icon name="hero-clipboard-document-mini" class="w-3 h-3" />
-      </button>
-      <%= if @on_delete do %>
-        <button
-          type="button"
-          phx-click={@on_delete}
-          phx-value-task_id={@task.uuid || to_string(@task.id)}
-          phx-confirm="Delete this task?"
-          class="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover/card:opacity-100 flex items-center justify-center w-6 h-6 rounded text-base-content/25 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error focus-visible:ring-inset"
-          aria-label={"Delete task #{@task.title}"}
-        >
-          <.icon name="hero-x-mark-mini" class="w-3 h-3" />
-        </button>
-      <% end %>
+        <details class="dropdown dropdown-end">
+          <summary class="flex items-center justify-center w-6 h-6 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/8 cursor-pointer list-none transition-colors">
+            <.icon name="hero-ellipsis-horizontal-mini" class="w-3.5 h-3.5" />
+          </summary>
+          <ul class="dropdown-content z-50 menu menu-xs p-1 mt-1 shadow-lg bg-base-200 dark:bg-base-300 border border-base-content/10 rounded-lg w-36">
+            <li>
+              <button
+                type="button"
+                phx-click={@on_click}
+                phx-value-task_id={@task.uuid || to_string(@task.id)}
+                class="flex items-center gap-2 text-xs"
+              >
+                <.icon name="hero-arrow-top-right-on-square-mini" class="w-3 h-3" /> Open
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                phx-hook="CopyToClipboard"
+                id={"copy-task-kanban-#{@task.id}"}
+                data-copy={@task.uuid || to_string(@task.id)}
+                onclick="event.preventDefault();"
+                class="flex items-center gap-2 text-xs"
+              >
+                <.icon name="hero-clipboard-document-mini" class="w-3 h-3" /> Copy ID
+              </button>
+            </li>
+            <%= if @on_delete do %>
+              <li>
+                <button
+                  type="button"
+                  phx-click={@on_delete}
+                  phx-value-task_id={@task.uuid || to_string(@task.id)}
+                  phx-confirm="Delete this task?"
+                  class="flex items-center gap-2 text-xs text-error hover:bg-error/10"
+                >
+                  <.icon name="hero-trash-mini" class="w-3 h-3" /> Delete
+                </button>
+              </li>
+            <% end %>
+          </ul>
+        </details>
+      </div>
     </div>
 
     <%!-- Tags --%>

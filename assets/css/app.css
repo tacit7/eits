@@ -508,6 +508,62 @@ code.hljs { padding: 3px 5px; }
 .collapse-content .dm-markdown pre { margin: 0; background: transparent; }
 .collapse-content .hljs { background: transparent; }
 
+/* ===== EITS-CMD directive styling ===== */
+.eits-cmd-block {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  margin: 0.25rem 0;
+  border-left: 2px solid;
+  flex-wrap: wrap;
+}
+
+.eits-cmd-prefix {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.eits-cmd-action {
+  font-weight: 600;
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+
+.eits-cmd-payload {
+  opacity: 0.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+[data-theme="dark"] .eits-cmd-block {
+  background: oklch(16% 0.04 210 / 0.6);
+  border-left-color: oklch(65% 0.18 210);
+  color: oklch(80% 0.12 210);
+}
+[data-theme="dark"] .eits-cmd-prefix {
+  color: oklch(70% 0.2 210);
+}
+
+[data-theme="light"] .eits-cmd-block {
+  background: oklch(96% 0.02 210);
+  border-left-color: oklch(55% 0.18 210);
+  color: oklch(35% 0.1 210);
+}
+[data-theme="light"] .eits-cmd-prefix {
+  color: oklch(45% 0.22 210);
+}
+
 /* DM Markdown - Light theme */
 [data-theme="light"] .dm-markdown pre { background: #f6f8fa; }
 [data-theme="light"] .dm-markdown code { background: rgba(175, 184, 193, 0.2); }

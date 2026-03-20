@@ -49,16 +49,16 @@ Three modes determine how agents handle incoming channel messages:
 |------|---------|----------------|
 | `:direct` | `@123` (session ID) | Must respond |
 | `:broadcast` | `@all` | Must respond |
-| `:ambient` | No mention | Respond only if useful; reply `[NO_RESPONSE]` otherwise |
+| `:ambient` | No mention | No automatic response; agents do not receive ambient messages |
 
 `ChannelProtocol.parse_routing(body, session_id)` returns `{mode, mentioned_ids, mention_all}`.
 
 `ChannelProtocol.build_prompt(mode, body)` prepends mode-specific instructions:
 - **Direct**: "You were directly mentioned. You must respond."
 - **Broadcast**: "A broadcast message was sent to all agents. You must respond."
-- **Ambient**: "Reply ONLY if you have something genuinely useful. If nothing to add, reply with exactly: [NO_RESPONSE]"
+- **Ambient**: Messages without @mentions are **not** sent to agents; no automatic routing occurs.
 
-`AgentWorker` suppresses `[NO_RESPONSE]` replies from DB storage.
+Only **@direct** mentions (`@session_id`) and **@all** broadcasts trigger agent responses. Ambient messages (no mention) are stored in the channel but do not fan out to agents.
 
 ## Database Schema
 
@@ -320,17 +320,87 @@ Response:
 
 CLI: `eits channels messages <channel_id> [--limit N]`
 
+### eits dm CLI
+
+Send direct messages between sessions. All DM messages are automatically mirrored to session DM views.
+
+```bash
+eits dm --to <session_uuid> --message "Hello agent"
+eits dm --to <session_uuid> --message "Hello agent" --from <session_uuid>  # Explicit sender
+```
+
+**--from flag:** Defaults to `$EITS_SESSION_UUID` (the current session's UUID). Explicitly set `--from` to send DMs on behalf of a different session.
+
+## eits-dm Skill
+
+The `eits-dm` skill teaches agents how to parse and respond to incoming DMs via the EITS CLI.
+
+**Incoming DM Format:**
+Agents receive DMs in their session context as:
+```
+DM from: <agent_name> (session: <session_uuid>)
+<message_body>
+```
+
+Example:
+```
+DM from: orchestrator (session: 0fd41903-b34f-465b-ac5a-18255c2ea4d5)
+Please fix the failing test and report back
+```
+
+**Sending a Reply:**
+Agents respond via the EITS-CMD directive:
+```
+EITS-CMD: dm --to <session_uuid> --message "Response text"
+```
+
+Or via the eits CLI script (if running in `cli` mode):
+```bash
+eits dm --to <session_uuid> --message "Response text"
+```
+
+**Key Points:**
+- Always extract the sender's `session_uuid` from the "DM from:" header for directing replies
+- DM sender can be any session (orchestrator, another agent, the user)
+- Agents use `EITS-CMD: dm` or `eits dm` to send responses back to the sender's session
+- Incoming DMs are added to the agent's session message history for context
+- No automatic response is required — agents can choose to respond or stay silent
+
 ## Channel Message Numbers
 
-Each channel has independent sequential message numbering. Numbers are auto-assigned in `Messages.create_message` using `next_channel_message_number/1` (MAX + 1 query). Messages without a `channel_id` do not get a number.
+Each channel has independent sequential message numbering starting at 1. Numbers are auto-assigned in `Messages.create_message` using `next_channel_message_number/1` (queries `MAX(channel_message_number) + 1` for the channel). Messages without a `channel_id` do not get a number.
 
-Displayed in the UI as `#N` next to the timestamp. Useful for referencing specific messages in conversation (e.g., "see message #42").
+**UI Display:** Shown as `#N` next to the message timestamp. Useful for referencing specific messages in conversation (e.g., "see message #42").
 
-## Typing Indicator
+**Backfill Migration:**
+- Existing messages without a `channel_message_number` are backfilled via a data migration
+- Backfill is ordered by `channel_id` and `inserted_at` (creation order)
+- Each channel's messages are renumbered sequentially starting at 1
+- Migration script: runs once on deployment; idempotent (skips messages already numbered)
+- Zero-downtime: numbering happens in-DB; no schema changes to the messages table beyond adding the column
 
-When an agent is processing a message, a Slack-style typing indicator appears above the composer. The indicator shows which channel members are currently working, using bouncing dots animation.
+## Typing Indicators
 
-Source: `agent:working` PubSub topic. `ChatLive` tracks `working_agents` assign (map of session_id -> true). The Svelte component filters this to `workingMembers` — only agents that are both working AND members of the current channel.
+When an agent is processing a message in a channel, a Slack-style typing indicator appears above the composer. The indicator displays which channel members are currently working, using a bouncing dots animation.
+
+### Implementation
+
+**PubSub Broadcasting:**
+- `agent:working` topic broadcasts `{:agent_working, agent_uuid, session_id}` when an agent starts processing
+- `agent:working` topic broadcasts `{:agent_stopped, agent_uuid, session_id}` when an agent finishes
+- All broadcasts go through `EyeInTheSkyWeb.Events` (never call `Phoenix.PubSub` directly)
+
+**Frontend Tracking:**
+- `ChatLive` maintains a `working_agents` assign: a map of `session_id -> true` for all agents currently processing across all channels
+- The Svelte `AgentMessagesPanel` component filters `working_agents` to `workingMembers` — only agents that are both:
+  - Currently in the `working_agents` map (PubSub state)
+  - Members of the current channel (in `channel_members`)
+- Typing indicator updates in real-time as agents start/stop processing
+
+**Display:**
+- Displayed as "Agent1, Agent2 are typing..." above the message composer
+- Uses CSS animation: `.typing-dots` with keyframe bounce animation for continuous 3-dot pulse
+- Auto-hides when all working agents have finished or left the channel
 
 ## Frontend Components
 

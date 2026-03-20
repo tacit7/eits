@@ -92,8 +92,7 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
             job.timezone || "Etc/UTC"
           )
 
-        {:ok, _} = update_job_fields(job, %{next_run_at: next})
-        {:ok, Repo.get!(ScheduledJob, job.id)}
+        update_job_fields(job, %{next_run_at: next})
 
       {:error, %Ecto.Changeset{} = cs} ->
         if Keyword.has_key?(cs.errors, :prompt_id),
@@ -118,7 +117,7 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
       case job |> ScheduledJob.changeset(attrs) |> Repo.update() do
         {:ok, updated} ->
           if Map.has_key?(attrs, "next_run_at") do
-            {:ok, Repo.get!(ScheduledJob, updated.id)}
+            {:ok, updated}
           else
             next =
               compute_next_run_at(
@@ -129,7 +128,6 @@ defmodule EyeInTheSkyWeb.ScheduledJobs do
               )
 
             update_job_fields(updated, %{next_run_at: next})
-            {:ok, Repo.get!(ScheduledJob, updated.id)}
           end
 
         error ->

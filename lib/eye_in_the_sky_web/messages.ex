@@ -1,9 +1,6 @@
 defmodule EyeInTheSkyWeb.Messages do
   @moduledoc """
   The Messages context for managing agent-user messaging.
-
-  Supports both database storage and JSONL file storage (opcode-style).
-  JSONL files are stored in ~/.claude/projects/{projectId}/{sessionId}.jsonl
   """
 
   import Ecto.Query, warn: false
@@ -399,52 +396,6 @@ defmodule EyeInTheSkyWeb.Messages do
     |> offset(^offset)
     |> limit(^limit)
     |> Repo.all()
-  end
-
-  # JSONL File-based Storage Functions (opcode-style)
-
-  @doc """
-  Loads recent messages for a session from JSONL file.
-  If project_id provided, loads from JSONL file. Otherwise uses database.
-  """
-  def list_recent_messages(session_id, limit, project_id) when is_binary(project_id) do
-    Logger.debug("Loading recent messages from JSONL for session: #{session_id}, limit: #{limit}")
-
-    messages = list_messages_for_session(session_id, project_id)
-
-    messages
-    |> Enum.sort_by(fn msg -> msg.inserted_at || DateTime.utc_now() end, {:desc, DateTime})
-    |> Enum.take(limit)
-    |> Enum.reverse()
-  end
-
-  @doc """
-  Appends a message to a session's JSONL file.
-  """
-  def append_to_jsonl(project_id, session_id, message_attrs) when is_binary(project_id) do
-    Logger.debug("Appending message to JSONL: session=#{session_id}")
-
-    JsonlStorage.append_message(project_id, session_id, message_attrs)
-  end
-
-  @doc """
-  Writes all messages for a session to JSONL file.
-  Useful for bulk initialization or migration from database to file storage.
-  """
-  def write_session_to_jsonl(project_id, session_id) when is_binary(project_id) do
-    Logger.info(
-      "Writing session messages to JSONL file: project=#{project_id}, session=#{session_id}"
-    )
-
-    messages = list_messages_for_session_db(session_id)
-    JsonlStorage.write_session_messages(project_id, session_id, messages)
-  end
-
-  @doc """
-  Gets the path to a session's JSONL file.
-  """
-  def get_session_jsonl_path(project_id, session_id) when is_binary(project_id) do
-    JsonlStorage.get_session_file_path(project_id, session_id)
   end
 
   @doc """

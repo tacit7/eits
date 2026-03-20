@@ -24,7 +24,9 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
        expanded_chat: false,
        new_channel_name: nil,
        new_project_path: nil,
-       notification_count: Notifications.unread_count()
+       notification_count: Notifications.unread_count(),
+       renaming_project_id: nil,
+       rename_value: ""
      )}
   end
 
@@ -143,6 +145,47 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
     else
       _ -> {:noreply, socket}
     end
+  end
+
+  @impl true
+  def handle_event("start_rename_project", %{"project_id" => id_str}, socket) do
+    {id, ""} = Integer.parse(id_str)
+    project = Projects.get_project!(id)
+    {:noreply, assign(socket, renaming_project_id: id, rename_value: project.name)}
+  end
+
+  @impl true
+  def handle_event("cancel_rename_project", _params, socket) do
+    {:noreply, assign(socket, renaming_project_id: nil, rename_value: "")}
+  end
+
+  @impl true
+  def handle_event("update_rename_value", %{"value" => value}, socket) do
+    {:noreply, assign(socket, :rename_value, value)}
+  end
+
+  @impl true
+  def handle_event("commit_rename_project", _params, socket) do
+    name = String.trim(socket.assigns.rename_value)
+
+    if name != "" && socket.assigns.renaming_project_id do
+      project = Projects.get_project!(socket.assigns.renaming_project_id)
+      Projects.update_project(project, %{name: name})
+    end
+
+    {:noreply,
+     socket
+     |> assign(:projects, Projects.list_projects())
+     |> assign(:renaming_project_id, nil)
+     |> assign(:rename_value, "")}
+  end
+
+  @impl true
+  def handle_event("delete_project", %{"project_id" => id_str}, socket) do
+    {id, ""} = Integer.parse(id_str)
+    project = Projects.get_project!(id)
+    Projects.delete_project(project)
+    {:noreply, assign(socket, :projects, Projects.list_projects())}
   end
 
   @impl true
@@ -288,6 +331,8 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
             sidebar_tab={@sidebar_tab}
             collapsed={@collapsed}
             new_project_path={@new_project_path}
+            renaming_project_id={@renaming_project_id}
+            rename_value={@rename_value}
             myself={@myself}
           />
           <.system_nav
@@ -480,6 +525,8 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   attr :sidebar_tab, :atom, required: true
   attr :collapsed, :boolean, required: true
   attr :new_project_path, :any, default: nil
+  attr :renaming_project_id, :any, default: nil
+  attr :rename_value, :string, default: ""
   attr :myself, :any, required: true
 
   defp projects_section(assigns) do
@@ -557,31 +604,95 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
               </span>
             </button>
           <% end %>
-          <.link
-            navigate={~p"/projects/#{project.id}"}
-            class={[
-              "flex items-center gap-2 flex-1 min-w-0 text-sm py-1 transition-colors",
-              if(@collapsed, do: "px-4 justify-center", else: ""),
-              if(is_active_project,
-                do: "text-primary font-medium",
-                else: "text-base-content/60 hover:text-base-content/80"
-              )
-            ]}
-            title={project.name}
-          >
-            <.icon name="hero-folder" class="w-4 h-4 flex-shrink-0" />
-            <span class={["truncate", if(@collapsed, do: "hidden")]}>{project.name}</span>
-          </.link>
-          <%= if !@collapsed do %>
-            <button
-              phx-click="new_session"
-              phx-value-project_id={project.id}
+          <%= if !@collapsed && @renaming_project_id == project.id do %>
+            <%!-- Inline rename input --%>
+            <form
+              phx-submit="commit_rename_project"
               phx-target={@myself}
-              class="opacity-0 group-hover:opacity-100 flex-shrink-0 px-1.5 py-1 text-base-content/35 hover:text-primary transition-all"
-              title="New session"
+              class="flex-1 flex items-center gap-1 pr-1"
             >
-              <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
-            </button>
+              <input
+                type="text"
+                name="name"
+                value={@rename_value}
+                phx-keyup="update_rename_value"
+                phx-target={@myself}
+                class="flex-1 min-w-0 bg-transparent border-b border-primary/40 text-sm text-base-content/80 outline-none py-0.5"
+                autofocus
+              />
+              <button
+                type="button"
+                phx-click="cancel_rename_project"
+                phx-target={@myself}
+                class="flex-shrink-0 text-base-content/30 hover:text-base-content/60"
+              >
+                <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
+              </button>
+            </form>
+          <% else %>
+            <.link
+              navigate={~p"/projects/#{project.id}"}
+              class={[
+                "flex items-center gap-2 flex-1 min-w-0 text-sm py-1 transition-colors",
+                if(@collapsed, do: "px-4 justify-center", else: ""),
+                if(is_active_project,
+                  do: "text-primary font-medium",
+                  else: "text-base-content/60 hover:text-base-content/80"
+                )
+              ]}
+              title={project.name}
+            >
+              <.icon name="hero-folder" class="w-4 h-4 flex-shrink-0" />
+              <span class={["truncate", if(@collapsed, do: "hidden")]}>{project.name}</span>
+            </.link>
+            <%= if !@collapsed do %>
+              <%!-- ... dropdown menu --%>
+              <div class="opacity-0 group-hover:opacity-100 flex-shrink-0 relative dropdown dropdown-end transition-all">
+                <button
+                  tabindex="0"
+                  class="px-1 py-1 text-base-content/35 hover:text-base-content/70 transition-colors"
+                  title="More options"
+                >
+                  <.icon name="hero-ellipsis-horizontal-mini" class="w-3.5 h-3.5" />
+                </button>
+                <ul
+                  tabindex="0"
+                  class="dropdown-content z-50 menu menu-xs bg-base-200 border border-base-content/10 rounded-lg shadow-lg w-44 p-1"
+                >
+                  <li>
+                    <button
+                      phx-click="start_rename_project"
+                      phx-value-project_id={project.id}
+                      phx-target={@myself}
+                      class="flex items-center gap-2 text-sm"
+                    >
+                      <.icon name="hero-pencil-mini" class="w-3.5 h-3.5" /> Edit name
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      phx-click="delete_project"
+                      phx-value-project_id={project.id}
+                      phx-target={@myself}
+                      data-confirm={"Remove "#{project.name}"?"}
+                      class="flex items-center gap-2 text-sm text-error hover:text-error"
+                    >
+                      <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" /> Remove
+                    </button>
+                  </li>
+                </ul>
+              </div>
+              <%!-- New session (compose) button --%>
+              <button
+                phx-click="new_session"
+                phx-value-project_id={project.id}
+                phx-target={@myself}
+                class="opacity-0 group-hover:opacity-100 flex-shrink-0 px-1 py-1 text-base-content/35 hover:text-primary transition-all"
+                title="New session"
+              >
+                <.icon name="hero-pencil-square" class="w-3.5 h-3.5" />
+              </button>
+            <% end %>
           <% end %>
         </div>
 

@@ -434,6 +434,13 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
       collapsed={@collapsed}
       count={@notification_count}
     />
+    <.nav_item
+      href="/config"
+      icon="hero-cog-6-tooth"
+      label="Claude Config"
+      active={@sidebar_tab == :config && is_nil(@sidebar_project)}
+      collapsed={@collapsed}
+    />
     """
   end
 
@@ -709,14 +716,9 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
             active={is_active_project && @sidebar_tab == :sessions}
           />
           <.project_sub_item
-            href={~p"/projects/#{project.id}/tasks"}
-            label="Tasks"
-            active={is_active_project && @sidebar_tab == :tasks}
-          />
-          <.project_sub_item
             href={~p"/projects/#{project.id}/kanban"}
-            label="Kanban"
-            active={is_active_project && @sidebar_tab == :kanban}
+            label="Tasks"
+            active={is_active_project && (@sidebar_tab == :tasks || @sidebar_tab == :kanban)}
           />
           <.project_sub_item
             href={~p"/projects/#{project.id}/notes"}
@@ -756,13 +758,6 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
   defp system_nav(assigns) do
     ~H"""
     <.section_label collapsed={@collapsed} label="System" />
-    <.nav_item
-      href="/config"
-      icon="hero-cog-6-tooth"
-      label="Claude Config"
-      active={@sidebar_tab == :config && is_nil(@sidebar_project)}
-      collapsed={@collapsed}
-    />
     <.nav_item
       href="/teams"
       icon="hero-users"

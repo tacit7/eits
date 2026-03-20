@@ -649,6 +649,14 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
               <span class="badge badge-xs badge-primary">{active_filter_count}</span>
             <% end %>
           </button>
+          <.link
+            navigate={~p"/projects/#{@project.id}/tasks"}
+            class="btn btn-sm sm:btn-xs btn-ghost border border-base-content/10 gap-1 h-9 sm:h-7 min-h-0"
+            title="List view"
+          >
+            <.icon name="hero-list-bullet-mini" class="w-3.5 h-3.5" />
+            <span class="hidden sm:inline">List</span>
+          </.link>
           <button
             phx-click="toggle_new_task_drawer"
             class="btn btn-sm btn-primary gap-1.5 h-9 sm:h-7 min-h-0 text-xs"

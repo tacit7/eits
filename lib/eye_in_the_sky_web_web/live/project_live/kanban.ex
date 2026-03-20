@@ -5,13 +5,13 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   alias EyeInTheSkyWeb.Tasks
   alias EyeInTheSkyWeb.Tasks.WorkflowState
   alias EyeInTheSkyWeb.Notes
-  alias EyeInTheSkyWeb.Agents.AgentManager
   import EyeInTheSkyWebWeb.ControllerHelpers
 
   import EyeInTheSkyWebWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWebWeb.Components.TaskCard, only: [task_card: 1]
   import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
   import EyeInTheSkyWebWeb.Live.Shared.KanbanFilters, only: [apply_filters: 1, parse_due_date_filter: 1, parse_activity_filter: 1]
+  import EyeInTheSkyWebWeb.Live.Shared.AgentHelpers, only: [handle_start_agent_for_task: 2]
   import EyeInTheSkyWebWeb.Components.KanbanFilterDrawer, only: [kanban_filter_drawer: 1]
 
   @impl true
@@ -115,35 +115,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   # ---------------------------------------------------------------------------
 
   @impl true
-  def handle_event("start_agent_for_task", %{"task_id" => task_id}, socket) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-    project = socket.assigns.project
-
-    task_prompt = "#{task.title}\n\n#{task.description || ""}" |> String.trim()
-
-    opts = [
-      description: task.title,
-      instructions: task_prompt,
-      project_id: project.id,
-      project_path: project.path,
-      model: "sonnet"
-    ]
-
-    case AgentManager.create_agent(opts) do
-      {:ok, %{session: session}} ->
-        Tasks.link_session_to_task(task.id, session.id)
-
-        socket =
-          socket
-          |> assign(:show_task_detail_drawer, false)
-          |> put_flash(:info, "Agent spawned for task: #{String.slice(task.title, 0..40)}")
-
-        {:noreply, socket}
-
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to spawn agent: #{inspect(reason)}")}
-    end
-  end
+  def handle_event("start_agent_for_task", params, socket),
+    do: handle_start_agent_for_task(params, socket)
 
   # ---------------------------------------------------------------------------
   # Events: copy task to another project
@@ -184,60 +157,6 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       end
     else
       {:noreply, socket}
-    end
-  end
-
-  # ---------------------------------------------------------------------------
-  # Events: checklist items
-  # ---------------------------------------------------------------------------
-
-  @impl true
-  def handle_event("add_checklist_item", %{"task_id" => task_id, "title" => title}, socket) do
-    title = String.trim(title)
-
-    if title != "" do
-      task = Tasks.get_task_by_uuid_or_id!(task_id)
-      items = Tasks.list_checklist_items(task.id)
-      next_position = if items == [], do: 0, else: length(items)
-
-      case Tasks.create_checklist_item(%{task_id: task.id, title: title, position: next_position}) do
-        {:ok, _} ->
-          updated_task = Tasks.get_task!(task.id)
-          {:noreply, socket |> assign(:selected_task, updated_task) |> load_tasks()}
-
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to add checklist item")}
-      end
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("toggle_checklist_item", %{"item-id" => item_id_str}, socket) do
-    item_id = parse_int(item_id_str, 0)
-
-    case Tasks.toggle_checklist_item(item_id) do
-      {:ok, item} ->
-        updated_task = Tasks.get_task!(item.task_id)
-        {:noreply, socket |> assign(:selected_task, updated_task) |> load_tasks()}
-
-      {:error, _} ->
-        {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("delete_checklist_item", %{"item-id" => item_id_str}, socket) do
-    item_id = parse_int(item_id_str, 0)
-
-    case Tasks.delete_checklist_item(item_id) do
-      {:ok, item} ->
-        updated_task = Tasks.get_task!(item.task_id)
-        {:noreply, socket |> assign(:selected_task, updated_task) |> load_tasks()}
-
-      {:error, _} ->
-        {:noreply, socket}
     end
   end
 
@@ -359,53 +278,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   end
 
   @impl true
-  def handle_event("set_due_date_filter", %{"value" => value}, socket) do
-    new_val = parse_due_date_filter(value)
-    current = socket.assigns.filter_due_date
-    filter = if current == new_val, do: nil, else: new_val
-    {:noreply, socket |> assign(:filter_due_date, filter) |> apply_filters()}
-  end
-
-  @impl true
-  def handle_event("set_activity_filter", %{"value" => value}, socket) do
-    new_val = parse_activity_filter(value)
-    current = socket.assigns.filter_activity
-    filter = if current == new_val, do: nil, else: new_val
-    {:noreply, socket |> assign(:filter_activity, filter) |> apply_filters()}
-  end
-
-  @impl true
-  def handle_event("set_priority_filter", %{"priority" => priority}, socket) do
-    new_priority = if priority == "", do: nil, else: String.to_integer(priority)
-    current = socket.assigns.filter_priority
-    priority_filter = if current == new_priority, do: nil, else: new_priority
-
-    {:noreply, socket |> assign(:filter_priority, priority_filter) |> apply_filters()}
-  end
-
-  @impl true
-  def handle_event("set_tag_filter", %{"tag" => tag}, socket) do
-    current_tags = socket.assigns.filter_tags
-
-    updated_tags =
-      if MapSet.member?(current_tags, tag),
-        do: MapSet.delete(current_tags, tag),
-        else: MapSet.put(current_tags, tag)
-
-    {:noreply, socket |> assign(:filter_tags, updated_tags) |> apply_filters()}
-  end
-
-  @impl true
-  def handle_event("toggle_tag_filter_mode", %{"mode" => mode}, socket) do
-    new_mode = if mode == "or", do: :or, else: :and
-    {:noreply, socket |> assign(:filter_tag_mode, new_mode) |> apply_filters()}
-  end
-
-  @impl true
-  def handle_event("toggle_tag_filter_mode", _params, socket) do
-    new_mode = if socket.assigns.filter_tag_mode == :and, do: :or, else: :and
-    {:noreply, socket |> assign(:filter_tag_mode, new_mode) |> apply_filters()}
-  end
+  def handle_event("update_filter", params, socket),
+    do: update_filter(params, socket)
 
   @impl true
   def handle_event("toggle_filters", _params, socket) do
@@ -542,6 +416,11 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   @impl true
   def handle_info({:agent_deleted, _}, socket), do: {:noreply, socket}
 
+  @impl true
+  def handle_info({:checklist_updated, task}, socket) do
+    {:noreply, socket |> assign(:selected_task, task) |> load_tasks()}
+  end
+
   # ---------------------------------------------------------------------------
   # Private: task loading
   # ---------------------------------------------------------------------------
@@ -580,6 +459,45 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
     |> assign(:tag_counts, tag_counts)
     |> apply_filters()
   end
+
+  defp update_filter(%{"field" => "due_date", "value" => value}, socket) do
+    new_val = parse_due_date_filter(value)
+    current = socket.assigns.filter_due_date
+    filter = if current == new_val, do: nil, else: new_val
+    {:noreply, socket |> assign(:filter_due_date, filter) |> apply_filters()}
+  end
+
+  defp update_filter(%{"field" => "activity", "value" => value}, socket) do
+    new_val = parse_activity_filter(value)
+    current = socket.assigns.filter_activity
+    filter = if current == new_val, do: nil, else: new_val
+    {:noreply, socket |> assign(:filter_activity, filter) |> apply_filters()}
+  end
+
+  defp update_filter(%{"field" => "priority", "value" => priority}, socket) do
+    new_priority = if priority == "", do: nil, else: String.to_integer(priority)
+    current = socket.assigns.filter_priority
+    priority_filter = if current == new_priority, do: nil, else: new_priority
+    {:noreply, socket |> assign(:filter_priority, priority_filter) |> apply_filters()}
+  end
+
+  defp update_filter(%{"field" => "tag", "value" => tag}, socket) do
+    current_tags = socket.assigns.filter_tags
+
+    updated_tags =
+      if MapSet.member?(current_tags, tag),
+        do: MapSet.delete(current_tags, tag),
+        else: MapSet.put(current_tags, tag)
+
+    {:noreply, socket |> assign(:filter_tags, updated_tags) |> apply_filters()}
+  end
+
+  defp update_filter(%{"field" => "tag_mode", "value" => mode}, socket) do
+    new_mode = if mode == "or", do: :or, else: :and
+    {:noreply, socket |> assign(:filter_tag_mode, new_mode) |> apply_filters()}
+  end
+
+  defp update_filter(_params, socket), do: {:noreply, socket}
 
   defp state_dot_color(color) when is_binary(color), do: color
   defp state_dot_color(_), do: "#6B7280"
@@ -877,7 +795,17 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
       update_event="update_task"
       delete_event="delete_task"
       copy_event="copy_task_to_project"
-    />
+    >
+      <:checklist>
+        <%= if @selected_task do %>
+          <.live_component
+            module={EyeInTheSkyWebWeb.Components.TaskChecklistComponent}
+            id={"task-checklist-#{@selected_task.id}"}
+            task={@selected_task}
+          />
+        <% end %>
+      </:checklist>
+    </EyeInTheSkyWebWeb.Components.TaskDetailDrawer.task_detail_drawer>
 
     <.kanban_filter_drawer
       show={@show_filter_drawer}

@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   alias EyeInTheSkyWeb.{Agents, Channels, Messages, Projects, Prompts, Sessions}
   alias EyeInTheSkyWeb.Agents.AgentManager
   alias EyeInTheSkyWeb.Claude.ChannelProtocol
+  alias EyeInTheSkyWebWeb.ChatPresenter
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
 
   # Deterministic UUIDs for the web UI user
@@ -14,7 +15,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   def mount(_params, _session, socket) do
     session_id = ensure_web_session()
 
-    # Subscribe to agent working events once on mount
     if connected?(socket) do
       subscribe_agent_working()
     end
@@ -37,7 +37,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         session.id
 
       {:error, :not_found} ->
-        # Create the web UI agent first
         agent =
           case Agents.get_agent_by_uuid(@web_agent_uuid) do
             {:ok, a} ->
@@ -68,74 +67,55 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    # Get project_id from params or default to first project
+    {:noreply, setup_channel(params, socket)}
+  end
+
+  defp setup_channel(params, socket) do
     project_id = get_project_id(params)
 
-    # Load channels for this project (with error handling for invalid IDs)
     channels =
       case Channels.list_channels_for_project(project_id) do
         channels when is_list(channels) -> channels
         _ -> []
       end
 
-    # Determine active channel (from URL or first channel)
     channel_id = params["channel_id"] || get_default_channel_id(channels, project_id)
-
-    # Create default channel if none exists
     {channel_id, channels} = ensure_default_channel(channel_id, channels, project_id, socket)
 
-    # Subscribe to channel messages if connected
     if connected?(socket) && channel_id do
       subscribe_channel_messages(channel_id)
     end
 
-    # Load messages for active channel (with JSONL support)
     messages =
       if channel_id do
-        # First try to load from JSONL files (opcode-style), fall back to database
-        channel_messages = Messages.list_messages_for_channel(channel_id)
-
-        # For JSONL storage, get project_id as string (will be set in socket in handle_params)
-        # For now, just use database messages
-        channel_messages
-        |> serialize_messages()
+        Messages.list_messages_for_channel(channel_id)
+        |> ChatPresenter.serialize_messages()
       else
         []
       end
 
-    # Calculate unread counts for all channels
     unread_counts = calculate_unread_counts(channels, get_session_id(socket))
-
-    # Load active thread if specified
     active_thread = load_thread(params["thread_id"])
 
-    # Get agent status counts for the project (with error handling)
     agent_status_counts =
       case Agents.get_agent_status_counts(project_id) do
         counts when is_map(counts) -> counts
         _ -> %{}
       end
 
-    # Load available prompts for agent creation
-    # Convert project_id to string since prompts table uses string project_id
     prompts =
       Prompts.list_prompts(project_id: project_id)
-      |> serialize_prompts()
+      |> ChatPresenter.serialize_prompts()
 
-    # Load recent agents with descriptions for the new agent modal template picker
     agent_templates =
       Agents.list_active_agents()
       |> Enum.filter(fn a -> a.description && a.description != "" end)
       |> Enum.take(50)
       |> Enum.map(fn a -> %{id: a.id, description: a.description} end)
 
-    # Load channel members
     channel_members = load_channel_members(channel_id)
-
-    # Load all projects for the session drawer
     all_projects = Projects.list_projects()
 
-    # Load active sessions for @ autocomplete
     active_sessions =
       Sessions.list_active_sessions()
       |> EyeInTheSkyWeb.Repo.preload(:agent)
@@ -156,32 +136,30 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         }
       end)
 
-    # Build project-grouped sessions for the "Add Agent" picker
     session_search = socket.assigns[:session_search] || ""
-    sessions_by_project = build_sessions_by_project(channel_members, all_projects, session_search)
 
-    socket =
-      socket
-      |> assign(:page_title, "Chat")
-      |> assign(:project_id, project_id)
-      |> assign(:all_projects, all_projects)
-      |> assign(:channels, serialize_channels(channels))
-      |> assign(:active_channel_id, channel_id)
-      |> assign(:messages, messages)
-      |> assign(:unread_counts, unread_counts)
-      |> assign(:active_thread, active_thread)
-      |> assign(:agent_status_counts, agent_status_counts)
-      |> assign(:prompts, prompts)
-      |> assign(:agent_templates, agent_templates)
-      |> assign(:active_agents, active_sessions)
-      |> assign(:channel_members, channel_members)
-      |> assign(:sessions_by_project, sessions_by_project)
-      |> assign(:show_agent_drawer, false)
-      |> assign(:show_members, false)
-      |> assign_new(:session_search, fn -> "" end)
-      |> assign(:slash_items, EyeInTheSkyWebWeb.Helpers.SlashItems.build())
+    sessions_by_project =
+      build_sessions_by_project(channel_members, all_projects, session_search)
 
-    {:noreply, socket}
+    socket
+    |> assign(:page_title, "Chat")
+    |> assign(:project_id, project_id)
+    |> assign(:all_projects, all_projects)
+    |> assign(:channels, ChatPresenter.serialize_channels(channels))
+    |> assign(:active_channel_id, channel_id)
+    |> assign(:messages, messages)
+    |> assign(:unread_counts, unread_counts)
+    |> assign(:active_thread, active_thread)
+    |> assign(:agent_status_counts, agent_status_counts)
+    |> assign(:prompts, prompts)
+    |> assign(:agent_templates, agent_templates)
+    |> assign(:active_agents, active_sessions)
+    |> assign(:channel_members, channel_members)
+    |> assign(:sessions_by_project, sessions_by_project)
+    |> assign(:show_agent_drawer, false)
+    |> assign(:show_members, false)
+    |> assign_new(:session_search, fn -> "" end)
+    |> assign(:slash_items, EyeInTheSkyWebWeb.Helpers.SlashItems.build())
   end
 
   @impl true
@@ -194,7 +172,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     require Logger
     session_id = get_session_id(socket)
 
-    # 1. Save user message to channel
     case Messages.send_channel_message(%{
            channel_id: channel_id,
            session_id: session_id,
@@ -204,13 +181,9 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
            body: body
          }) do
       {:ok, message} ->
-        # 2. Broadcast to channel PubSub
         EyeInTheSkyWeb.Events.channel_message(channel_id, message)
-
-        # Mark channel as read
         Channels.mark_as_read(channel_id, session_id)
 
-        # 3. Parse mentions and auto-add mentioned sessions not yet in channel
         {_mode, mentioned_ids, _mention_all} = ChannelProtocol.parse_routing(body, -1)
 
         Enum.each(mentioned_ids, fn mid ->
@@ -226,19 +199,13 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
           end
         end)
 
-        # 4. Get all agent members (now includes auto-added)
         agent_members = Channels.list_members(channel_id)
 
-        # 5. Route message to each member using ChannelProtocol
-        # Only :direct and :broadcast trigger agent responses.
-        # :ambient messages are mirrored for context but don't ask the agent to respond.
         Enum.each(agent_members, fn member ->
           unless ChannelProtocol.skip?(member.session_id, session_id) do
             {mode, _mentioned_ids, _mention_all} =
               ChannelProtocol.parse_routing(body, member.session_id)
 
-            # Mirror the user message into the agent's session so DM page shows context
-            # Do NOT set channel_id — that would re-broadcast to the channel per member
             Messages.send_message(%{
               session_id: member.session_id,
               sender_role: "user",
@@ -257,7 +224,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
           end
         end)
 
-        # Reload channel members + picker in case auto-added via @mention
         {:noreply, refresh_members_and_picker(socket)}
 
       {:error, _changeset} ->
@@ -315,7 +281,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
       case Channels.add_member(channel_id, agent_id, session_id) do
         {:ok, _member} ->
-          # Broadcast system message to channel
           {:ok, sys_msg} =
             Messages.send_channel_message(%{
               channel_id: channel_id,
@@ -361,7 +326,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         })
 
       EyeInTheSkyWeb.Events.channel_message(channel_id, sys_msg)
-
       Logger.info("Removed agent session=#{session_id} from channel=#{channel_id}")
 
       {:noreply, refresh_members_and_picker(socket)}
@@ -402,12 +366,8 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
            body: body
          }) do
       {:ok, message} ->
-        # Broadcast to channel subscribers
         EyeInTheSkyWeb.Events.channel_message(channel_id, message)
-
-        # Reload thread
         active_thread = load_thread(parent_id)
-
         {:noreply, assign(socket, :active_thread, active_thread)}
 
       {:error, _changeset} ->
@@ -421,10 +381,9 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
     case Messages.toggle_reaction(message_id, session_id, emoji) do
       {:ok, _action} ->
-        # Reload messages to show updated reactions
         messages =
           Messages.list_messages_for_channel(socket.assigns.active_channel_id)
-          |> serialize_messages()
+          |> ChatPresenter.serialize_messages()
 
         {:noreply, assign(socket, :messages, messages)}
 
@@ -441,7 +400,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
     messages =
       Messages.list_messages_for_channel(socket.assigns.active_channel_id)
-      |> serialize_messages()
+      |> ChatPresenter.serialize_messages()
 
     {:noreply, assign(socket, :messages, messages)}
   end
@@ -473,7 +432,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
   @impl true
   def handle_event("create_channel", _params, socket) do
-    # TODO: Open modal or navigate to channel creation page
     {:noreply, put_flash(socket, :info, "Channel creation coming soon")}
   end
 
@@ -487,7 +445,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     selected_project_id = params["project_id"]
     channel_id = socket.assigns.active_channel_id
 
-    # Look up the selected project's path
     selected_project =
       Enum.find(socket.assigns.all_projects, fn p ->
         to_string(p.id) == to_string(selected_project_id)
@@ -502,7 +459,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
         "Channel agent for #{channel_id}"
       end
 
-    # Send system notification to channel
     {:ok, _creating_msg} =
       Messages.send_channel_message(%{
         channel_id: channel_id,
@@ -514,10 +470,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
           "Creating new agent (#{model})#{if agent_name != "", do: " - #{agent_name}", else: ""}..."
       })
 
-    # Use description as initial instructions, fall back to agent name
     instructions = if description != "", do: description, else: agent_description
-
-    # Delegate to AgentManager for full lifecycle
     agent_type = params["agent_type"] || "claude"
 
     opts = [
@@ -534,7 +487,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
     case AgentManager.create_agent(opts) do
       {:ok, %{agent: agent, session: session}} ->
-        # Auto-add the new agent to the current channel
         if channel_id do
           case Channels.add_member(channel_id, agent.id, session.id) do
             {:ok, _member} ->
@@ -574,7 +526,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     {:noreply, assign(socket, :working_agents, working_agents)}
   end
 
-  # Handle struct variant from PubSub
   @impl true
   def handle_info({:agent_working, %{id: session_int_id}}, socket) do
     working_agents = Map.put(socket.assigns.working_agents, session_int_id, true)
@@ -601,14 +552,12 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       "📨 Received new_message broadcast for channel #{socket.assigns.active_channel_id}"
     )
 
-    # Reload messages when new message arrives via PubSub
     messages =
       Messages.list_messages_for_channel(socket.assigns.active_channel_id)
-      |> serialize_messages()
+      |> ChatPresenter.serialize_messages()
 
     Logger.info("📬 Loaded #{length(messages)} messages from DB")
 
-    # Update unread counts (with error handling)
     channels =
       case Channels.list_channels_for_project(socket.assigns.project_id) do
         channels when is_list(channels) -> channels
@@ -617,12 +566,10 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
     unread_counts = calculate_unread_counts(channels, get_session_id(socket))
 
-    socket =
-      socket
-      |> assign(:messages, messages)
-      |> assign(:unread_counts, unread_counts)
-
-    {:noreply, socket}
+    {:noreply,
+     socket
+     |> assign(:messages, messages)
+     |> assign(:unread_counts, unread_counts)}
   end
 
   @impl true
@@ -636,200 +583,242 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
 
     ~H"""
     <div class="flex flex-col h-[calc(100dvh-3rem)] md:h-[calc(100dvh-2rem)] px-4 sm:px-6 lg:px-8 py-4">
-      <%!-- Header card --%>
-      <div
-        class="max-w-6xl mx-auto w-full bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0"
-        id="chat-header-card"
-      >
-        <div class="px-5 py-3">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <div class="w-2 h-2 rounded-full flex-shrink-0 bg-success animate-pulse" />
-              <h1 class="text-lg font-bold text-base-content">
-                <%= if @active_channel do %>
-                  <span class="text-base-content/30 mr-0.5">#</span>{@active_channel.name || "Channel"}
-                <% else %>
-                  Chat
-                <% end %>
-              </h1>
-              <%= if @active_channel && @active_channel[:description] do %>
-                <span class="text-xs text-base-content/30">{@active_channel.description}</span>
+      <.channel_header
+        active_channel={@active_channel}
+        agent_status_counts={@agent_status_counts}
+        show_members={@show_members}
+        channel_members={@channel_members}
+        sessions_by_project={@sessions_by_project}
+        session_search={@session_search}
+      />
+      <.message_feed
+        active_channel_id={@active_channel_id}
+        messages={@messages}
+        active_agents={@active_agents}
+        channel_members={@channel_members}
+        working_agents={@working_agents}
+        slash_items={@slash_items}
+        socket={@socket}
+      />
+      <.agent_drawer
+        show={@show_agent_drawer}
+        all_projects={@all_projects}
+        prompts={@prompts}
+        agent_templates={@agent_templates}
+      />
+    </div>
+    """
+  end
+
+  # Sub-components
+
+  defp channel_header(assigns) do
+    ~H"""
+    <div
+      class="max-w-6xl mx-auto w-full bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0"
+      id="chat-header-card"
+    >
+      <div class="px-5 py-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-2 h-2 rounded-full flex-shrink-0 bg-success animate-pulse" />
+            <h1 class="text-lg font-bold text-base-content">
+              <%= if @active_channel do %>
+                <span class="text-base-content/30 mr-0.5">#</span>{@active_channel.name || "Channel"}
+              <% else %>
+                Chat
               <% end %>
-            </div>
-            <div class="flex items-center gap-2">
-              <%!-- Status pills --%>
-              <%= if @agent_status_counts[:active] do %>
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 text-[11px] font-mono text-success">
-                  <span class="w-1.5 h-1.5 rounded-full bg-success"></span>
-                  {@agent_status_counts.active} active
-                </span>
-              <% end %>
-              <%= if @agent_status_counts[:working] do %>
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-warning/10 text-[11px] font-mono text-warning">
-                  <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse"></span>
-                  {@agent_status_counts.working} running
-                </span>
-              <% end %>
-              <button
-                phx-click="toggle_members"
-                class={[
-                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors",
-                  if(@show_members,
-                    do: "text-primary bg-primary/10 hover:bg-primary/15",
-                    else: "text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5"
-                  )
-                ]}
-              >
-                <.icon name="hero-user-group-mini" class="w-3.5 h-3.5" />
-                {length(@channel_members)} members
-              </button>
-              <button
-                phx-click="toggle_agent_drawer"
-                class="btn btn-xs btn-primary gap-1"
-              >
-                <.icon name="hero-plus-mini" class="w-3 h-3" /> New Agent
-              </button>
-            </div>
+            </h1>
+            <%= if @active_channel && @active_channel[:description] do %>
+              <span class="text-xs text-base-content/30">{@active_channel.description}</span>
+            <% end %>
+          </div>
+          <div class="flex items-center gap-2">
+            <%= if @agent_status_counts[:active] do %>
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 text-[11px] font-mono text-success">
+                <span class="w-1.5 h-1.5 rounded-full bg-success"></span>
+                {@agent_status_counts.active} active
+              </span>
+            <% end %>
+            <%= if @agent_status_counts[:working] do %>
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-warning/10 text-[11px] font-mono text-warning">
+                <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse"></span>
+                {@agent_status_counts.working} running
+              </span>
+            <% end %>
+            <button
+              phx-click="toggle_members"
+              class={[
+                "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors",
+                if(@show_members,
+                  do: "text-primary bg-primary/10 hover:bg-primary/15",
+                  else: "text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5"
+                )
+              ]}
+            >
+              <.icon name="hero-user-group-mini" class="w-3.5 h-3.5" />
+              {length(@channel_members)} members
+            </button>
+            <button
+              phx-click="toggle_agent_drawer"
+              class="btn btn-xs btn-primary gap-1"
+            >
+              <.icon name="hero-plus-mini" class="w-3 h-3" /> New Agent
+            </button>
           </div>
         </div>
+      </div>
 
-        <%!-- Members panel (collapsible, server-rendered) --%>
-        <%= if @show_members do %>
-          <div class="px-5 pb-3 border-t border-base-content/5 pt-3" id="chat-members-panel">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-[10px] uppercase tracking-wider font-medium text-base-content/30">
-                Channel Agents
-              </span>
-            </div>
+      <%= if @show_members do %>
+        <.member_panel
+          channel_members={@channel_members}
+          sessions_by_project={@sessions_by_project}
+          session_search={@session_search}
+        />
+      <% end %>
+    </div>
+    """
+  end
 
-            <%!-- Current channel members --%>
-            <%= if @channel_members != [] do %>
-              <div class="flex flex-wrap gap-1.5 mb-3">
-                <%= for member <- @channel_members do %>
-                  <div class="inline-flex items-center gap-0.5 group">
-                    <a
-                      href={~p"/dm/#{member.session_id}"}
-                      class="inline-flex items-center gap-1 font-mono text-[11px] font-medium px-2 py-0.5 rounded-l bg-base-content/[0.04] text-base-content/50 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
-                      title={"Session ##{member.session_id}"}
-                    >
-                      @{member.session_id}
-                      <%= if member.session_name do %>
-                        <span class="text-base-content/35">
-                          {String.slice(member.session_name, 0, 15)}{if String.length(
-                                                                          member.session_name
-                                                                        ) > 15, do: "…"}
-                        </span>
-                      <% end %>
-                    </a>
-                    <button
-                      phx-click="remove_agent_from_channel"
-                      phx-value-session_id={member.session_id}
-                      class="inline-flex items-center px-1 py-0.5 rounded-r bg-base-content/[0.04] text-base-content/20 hover:text-error hover:bg-error/10 transition-colors border border-transparent opacity-0 group-hover:opacity-100"
-                      title="Remove from channel"
-                    >
-                      <.icon name="hero-x-mark" class="w-2.5 h-2.5" />
-                    </button>
-                  </div>
+  defp member_panel(assigns) do
+    ~H"""
+    <div class="px-5 pb-3 border-t border-base-content/5 pt-3" id="chat-members-panel">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[10px] uppercase tracking-wider font-medium text-base-content/30">
+          Channel Agents
+        </span>
+      </div>
+
+      <%= if @channel_members != [] do %>
+        <div class="flex flex-wrap gap-1.5 mb-3">
+          <%= for member <- @channel_members do %>
+            <div class="inline-flex items-center gap-0.5 group">
+              <a
+                href={~p"/dm/#{member.session_id}"}
+                class="inline-flex items-center gap-1 font-mono text-[11px] font-medium px-2 py-0.5 rounded-l bg-base-content/[0.04] text-base-content/50 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
+                title={"Session ##{member.session_id}"}
+              >
+                @{member.session_id}
+                <%= if member.session_name do %>
+                  <span class="text-base-content/35">
+                    {String.slice(member.session_name, 0, 15)}{if String.length(
+                                                                    member.session_name
+                                                                  ) > 15, do: "…"}
+                  </span>
                 <% end %>
-              </div>
-            <% else %>
-              <p class="text-xs text-base-content/30 mb-3">
-                No agents in this channel yet.
-              </p>
-            <% end %>
+              </a>
+              <button
+                phx-click="remove_agent_from_channel"
+                phx-value-session_id={member.session_id}
+                class="inline-flex items-center px-1 py-0.5 rounded-r bg-base-content/[0.04] text-base-content/20 hover:text-error hover:bg-error/10 transition-colors border border-transparent opacity-0 group-hover:opacity-100"
+                title="Remove from channel"
+              >
+                <.icon name="hero-x-mark" class="w-2.5 h-2.5" />
+              </button>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="text-xs text-base-content/30 mb-3">
+          No agents in this channel yet.
+        </p>
+      <% end %>
 
-            <%!-- Add existing agent: searchable project-grouped picker --%>
-            <div class="border-t border-base-content/5 pt-2 mt-1">
-              <div class="flex items-center justify-between mb-1.5">
-                <span class="text-[10px] uppercase tracking-wider font-medium text-base-content/30">
-                  Add Agent
+      <div class="border-t border-base-content/5 pt-2 mt-1">
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="text-[10px] uppercase tracking-wider font-medium text-base-content/30">
+            Add Agent
+          </span>
+        </div>
+        <form phx-change="search_sessions" class="mb-2">
+          <input
+            type="text"
+            name="session_search"
+            value={@session_search}
+            placeholder="Search sessions..."
+            class="w-full input input-xs bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 text-xs"
+            autocomplete="off"
+            phx-debounce="200"
+          />
+        </form>
+        <%= if @sessions_by_project != [] do %>
+          <div class="max-h-48 overflow-y-auto space-y-2">
+            <%= for group <- @sessions_by_project do %>
+              <div>
+                <span class="text-[10px] font-medium text-base-content/25 uppercase tracking-wider">
+                  {group.project_name}
                 </span>
-              </div>
-              <form phx-change="search_sessions" class="mb-2">
-                <input
-                  type="text"
-                  name="session_search"
-                  value={@session_search}
-                  placeholder="Search sessions..."
-                  class="w-full input input-xs bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 text-xs"
-                  autocomplete="off"
-                  phx-debounce="200"
-                />
-              </form>
-              <%= if @sessions_by_project != [] do %>
-                <div class="max-h-48 overflow-y-auto space-y-2">
-                  <%= for group <- @sessions_by_project do %>
-                    <div>
-                      <span class="text-[10px] font-medium text-base-content/25 uppercase tracking-wider">
-                        {group.project_name}
+                <div class="flex flex-wrap gap-1 mt-0.5">
+                  <%= for session <- group.sessions do %>
+                    <button
+                      phx-click="add_agent_to_channel"
+                      phx-value-session_id={session.id}
+                      class="inline-flex items-center gap-1 font-mono text-[11px] px-2 py-0.5 rounded bg-base-content/[0.03] text-base-content/40 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
+                      title={"Add @#{session.id} to channel"}
+                    >
+                      <.icon name="hero-plus-mini" class="w-2.5 h-2.5 opacity-50" />
+                      @{session.id}
+                      <span class="text-base-content/25">
+                        {String.slice(session.name || session.agent_description || "", 0, 20)}{if String.length(
+                                                                                                    session.name ||
+                                                                                                      session.agent_description ||
+                                                                                                      ""
+                                                                                                  ) >
+                                                                                                    20,
+                                                                                                  do:
+                                                                                                    "…"}
                       </span>
-                      <div class="flex flex-wrap gap-1 mt-0.5">
-                        <%= for session <- group.sessions do %>
-                          <button
-                            phx-click="add_agent_to_channel"
-                            phx-value-session_id={session.id}
-                            class="inline-flex items-center gap-1 font-mono text-[11px] px-2 py-0.5 rounded bg-base-content/[0.03] text-base-content/40 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
-                            title={"Add @#{session.id} to channel"}
-                          >
-                            <.icon name="hero-plus-mini" class="w-2.5 h-2.5 opacity-50" />
-                            @{session.id}
-                            <span class="text-base-content/25">
-                              {String.slice(session.name || session.agent_description || "", 0, 20)}{if String.length(
-                                                                                                          session.name ||
-                                                                                                            session.agent_description ||
-                                                                                                            ""
-                                                                                                        ) >
-                                                                                                          20,
-                                                                                                        do:
-                                                                                                          "…"}
-                            </span>
-                            <span class="text-[9px] text-base-content/15">{session.model}</span>
-                            <%= if session.ended_at do %>
-                              <span class="text-[9px] text-base-content/15">ended</span>
-                            <% end %>
-                          </button>
-                        <% end %>
-                      </div>
-                    </div>
+                      <span class="text-[9px] text-base-content/15">{session.model}</span>
+                      <%= if session.ended_at do %>
+                        <span class="text-[9px] text-base-content/15">ended</span>
+                      <% end %>
+                    </button>
                   <% end %>
                 </div>
-              <% else %>
-                <p class="text-xs text-base-content/25 py-1">
-                  <%= if @session_search != "" do %>
-                    No sessions match "{@session_search}"
-                  <% else %>
-                    No available sessions
-                  <% end %>
-                </p>
-              <% end %>
-            </div>
+              </div>
+            <% end %>
           </div>
+        <% else %>
+          <p class="text-xs text-base-content/25 py-1">
+            <%= if @session_search != "" do %>
+              No sessions match "{@session_search}"
+            <% else %>
+              No available sessions
+            <% end %>
+          </p>
         <% end %>
       </div>
-
-      <%!-- Messages panel (Svelte: messages + @autocomplete input only) --%>
-      <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full overflow-hidden">
-        <.svelte
-          name="AgentMessagesPanel"
-          props={
-            %{
-              activeChannelId: @active_channel_id,
-              messages: @messages,
-              activeAgents: @active_agents,
-              channelMembers: @channel_members,
-              workingAgents: @working_agents,
-              slashItems: @slash_items
-            }
-          }
-          socket={@socket}
-        />
-      </div>
     </div>
+    """
+  end
 
+  defp message_feed(assigns) do
+    ~H"""
+    <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full overflow-hidden">
+      <.svelte
+        name="AgentMessagesPanel"
+        props={
+          %{
+            activeChannelId: @active_channel_id,
+            messages: @messages,
+            activeAgents: @active_agents,
+            channelMembers: @channel_members,
+            workingAgents: @working_agents,
+            slashItems: @slash_items
+          }
+        }
+        socket={@socket}
+      />
+    </div>
+    """
+  end
+
+  defp agent_drawer(assigns) do
+    ~H"""
     <.live_component
       module={EyeInTheSkyWebWeb.Components.NewSessionModal}
       id="new-session-modal"
-      show={@show_agent_drawer}
+      show={@show}
       toggle_event="toggle_agent_drawer"
       submit_event="create_agent"
       projects={@all_projects}
@@ -840,35 +829,24 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     """
   end
 
-  # Private functions
+  # Private helpers
 
   defp get_project_id(params) do
     case params["project_id"] do
       nil ->
-        # Default project ID
         1
 
       project_id when is_binary(project_id) ->
-        # Try to parse as integer, otherwise use default
-        try do
-          case Integer.parse(project_id) do
-            {int, ""} -> int
-            # Partial parse (e.g., "123abc"), use default
-            {_int, _rest} -> 1
-            # Not a number at all, use default
-            :error -> 1
-          end
-        rescue
-          # Any exception, use default
-          _ -> 1
+        case Integer.parse(project_id) do
+          {int, ""} -> int
+          {_int, _rest} -> 1
+          :error -> 1
         end
 
       project_id when is_integer(project_id) ->
-        # Already an integer
         project_id
 
       _project_id ->
-        # Any other type, use default
         1
     end
   end
@@ -881,12 +859,10 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   end
 
   defp ensure_default_channel(nil, [], project_id, socket) do
-    # No channels exist, create default #general
     session_id = get_session_id(socket)
 
     case Channels.create_default_channel(project_id, session_id) do
       {:ok, channel} ->
-        # Reload channels
         channels = Channels.list_channels_for_project(project_id)
         {channel.id, channels}
 
@@ -909,65 +885,9 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
     parent_message = Messages.get_message_with_thread!(message_id)
 
     %{
-      parent_message: serialize_message(parent_message),
-      replies: Enum.map(parent_message.thread_replies, &serialize_message/1)
+      parent_message: ChatPresenter.serialize_message(parent_message),
+      replies: Enum.map(parent_message.thread_replies, &ChatPresenter.serialize_message/1)
     }
-  end
-
-  defp serialize_channels(channels) do
-    Enum.map(channels, fn channel ->
-      %{
-        id: channel.id,
-        name: channel.name,
-        description: channel.description,
-        channel_type: channel.channel_type
-      }
-    end)
-  end
-
-  defp serialize_messages(messages) do
-    Enum.map(messages, &serialize_message/1)
-  end
-
-  defp serialize_message(message) do
-    session_name =
-      if Ecto.assoc_loaded?(message.session) && message.session do
-        message.session.name
-      else
-        nil
-      end
-
-    %{
-      id: message.id,
-      number: message.channel_message_number,
-      session_id: message.session_id,
-      session_name: session_name,
-      sender_role: message.sender_role,
-      direction: message.direction,
-      body: message.body,
-      provider: message.provider,
-      status: message.status,
-      inserted_at: message.inserted_at,
-      thread_reply_count: message.thread_reply_count || 0,
-      reactions: serialize_reactions(message),
-      metadata: message.metadata || %{}
-    }
-  end
-
-  defp serialize_reactions(message) do
-    if Ecto.assoc_loaded?(message.reactions) do
-      message.reactions
-      |> Enum.group_by(& &1.emoji)
-      |> Enum.map(fn {emoji, reactions} ->
-        %{
-          emoji: emoji,
-          count: length(reactions),
-          session_ids: Enum.map(reactions, & &1.session_id)
-        }
-      end)
-    else
-      []
-    end
   end
 
   defp calculate_unread_counts(channels, session_id) do
@@ -1050,18 +970,6 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       }
     end)
     |> Enum.sort_by(fn g -> g.project_name end)
-  end
-
-  defp serialize_prompts(prompts) do
-    Enum.map(prompts, fn prompt ->
-      %{
-        id: prompt.id,
-        name: prompt.name,
-        slug: prompt.slug,
-        description: prompt.description,
-        prompt_text: prompt.prompt_text
-      }
-    end)
   end
 
   defp parse_budget(nil), do: nil

@@ -132,7 +132,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
     <%!-- Priority top bar --%>
     <%= if @task.priority && @task.priority > 0 do %>
       <div
-        class="-mx-3 -mt-3 mb-2.5 h-0.5"
+        class="-mx-2 -mt-2 mb-2 h-0.5"
         style={"background-color: #{priority_bar_color(@task.priority)}"}
       />
     <% end %>
@@ -162,7 +162,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       </button>
       <h4
         class={[
-          "text-sm font-medium flex-1 leading-snug cursor-pointer hover:text-primary transition-colors",
+          "text-xs font-medium flex-1 leading-snug cursor-pointer hover:text-primary transition-colors",
           @task.completed_at && "text-base-content/40 line-through",
           !@task.completed_at && "text-base-content"
         ]}
@@ -234,8 +234,8 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
           </span>
         <% end %>
         <%= if @task.due_at do %>
-          <span class={["flex items-center gap-0.5 px-1.5 py-0.5 rounded font-medium text-[10px]", due_date_pill_class(@task.due_at)]}>
-            <.icon name="hero-clock-mini" class="w-3 h-3 flex-shrink-0" />
+          <span class="flex items-center gap-0.5">
+            <.icon name="hero-calendar" class="w-3 h-3" />
             <span>{format_due_date(@task.due_at)}</span>
           </span>
         <% end %>
@@ -339,7 +339,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   end
 
   defp card_class("kanban") do
-    "group/card rounded-xl bg-base-200 dark:bg-[hsl(225,10%,28%)] hover:bg-base-300 dark:hover:bg-[hsl(225,10%,32%)] transition-colors cursor-pointer overflow-hidden"
+    "group/card card bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] border border-base-content/8 hover:shadow-md transition-all cursor-pointer overflow-hidden"
   end
 
   defp card_class("grid") do
@@ -348,7 +348,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
 
   defp card_class(_), do: ""
 
-  defp card_body_class("kanban"), do: "card-body p-3"
+  defp card_body_class("kanban"), do: "card-body p-2"
   defp card_body_class("grid"), do: "card-body p-5"
   defp card_body_class(_), do: ""
 
@@ -365,22 +365,6 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
       priority == 2 -> "#F59E0B"
       priority == 1 -> "#3B82F6"
       true -> "transparent"
-    end
-  end
-
-  defp due_date_pill_class(due_at) do
-    now = DateTime.utc_now()
-
-    case due_at do
-      %DateTime{} = dt ->
-        cond do
-          DateTime.before?(dt, now) -> "bg-error/20 text-error"
-          DateTime.diff(dt, now, :hour) < 48 -> "bg-warning/20 text-warning"
-          true -> "bg-base-content/10 text-base-content/60"
-        end
-
-      _ ->
-        "bg-base-content/10 text-base-content/60"
     end
   end
 end

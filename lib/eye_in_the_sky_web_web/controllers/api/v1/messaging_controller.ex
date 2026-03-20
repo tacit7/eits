@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
   require Logger
   import EyeInTheSkyWebWeb.ControllerHelpers
 
-  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Sessions, Teams}
+  alias EyeInTheSkyWeb.{Agents, ChannelMessages, Channels, Messages, Sessions, Teams}
   alias EyeInTheSkyWeb.Agents.AgentManager
 
   @doc """
@@ -210,7 +210,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
               status: "sent"
             }
 
-            case Messages.create_channel_message(attrs) do
+            case ChannelMessages.create_channel_message(attrs) do
               {:ok, msg} ->
                 EyeInTheSkyWeb.Events.channel_message(channel_id, msg)
 
@@ -241,7 +241,7 @@ defmodule EyeInTheSkyWebWeb.Api.V1.MessagingController do
         _ -> 20
       end
 
-    messages = Messages.list_messages_for_channel(channel_id, limit: limit)
+    messages = ChannelMessages.list_messages_for_channel(channel_id, limit: limit)
 
     json(conn, %{
       success: true,

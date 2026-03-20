@@ -656,11 +656,13 @@ defmodule EyeInTheSkyWebWeb.TeamLive.Index do
 
   defp truncate_message(nil, _), do: ""
 
-  defp truncate_message(body, max) when String.length(body) > max do
-    String.slice(body, 0, max) <> "…"
+  defp truncate_message(body, max) do
+    if String.length(body) > max do
+      String.slice(body, 0, max) <> "…"
+    else
+      body
+    end
   end
-
-  defp truncate_message(body, _), do: body
 
   defp format_message_time(nil), do: ""
   defp format_message_time(%DateTime{} = dt), do: Calendar.strftime(dt, "%H:%M")

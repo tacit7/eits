@@ -91,23 +91,89 @@ Subsequent users also need a registration token — there is no self-signup.
 
 Sessions are stored as browser cookies. No password involved.
 
-## 6. Claude Code Hooks
+### Skip auth in dev (DISABLE_AUTH)
 
-EITS uses Claude Code hooks for session tracking, task logging, and MCP integration.
+If you want to develop without setting up passkeys, set `DISABLE_AUTH=true` in `.env`:
 
 ```bash
-./priv/scripts/install.sh
-# Manually merge the output into ~/.claude/settings.json
+DISABLE_AUTH=true
 ```
 
-Hooks registered:
+This bypasses all LiveView session auth. **Dev and test only** — the flag is ignored in production at both compile time and runtime. Caddy still needs to be running for the app to start correctly.
 
-| Hook | Purpose |
-|------|---------|
-| `SessionStart` | Registers session, sets `EITS_SESSION_ID`, `EITS_AGENT_ID`, `EITS_PROJECT_ID` |
-| `SessionEnd` | Marks session completed |
-| `Stop` | Marks session waiting |
-| `PreToolUse` / `PostToolUse` | Action logging |
+## 6. Claude Code Hooks
+
+EITS uses Claude Code hooks for session lifecycle tracking, task enforcement, and commit logging.
+
+**Hook scripts live in `priv/scripts/` and are registered by absolute path — nothing is copied to `~/.claude/hooks/`.**
+
+Run the install script to generate the `settings.json` snippet:
+
+```bash
+./scripts/install.sh
+# Prints the full hooks JSON block — manually merge it into ~/.claude/settings.json
+```
+
+Registered hooks:
+
+| Event | Script | Purpose |
+|-------|--------|---------|
+| `SessionStart` (startup/resume/clear) | `eits-session-startup.sh`, `eits-session-resume.sh` | Registers session, writes env vars (`EITS_SESSION_UUID`, `EITS_AGENT_UUID`, `EITS_PROJECT_ID`, `EITS_URL`) to `$CLAUDE_ENV_FILE`, injects context |
+| `SessionStart` (compact) | `eits-session-compact.sh` | Resets session to working after compaction |
+| `SessionEnd` | `eits-session-end.sh` | Moves in-progress tasks to In Review; marks session `completed` |
+| `Stop` | `eits-session-stop.sh` | Sets session status to `idle` after each turn |
+| `PreToolUse` (Edit\|Write) | `eits-pre-tool-use.sh` | Blocks edits if session has no name or no active task |
+| `PostToolUse` (Bash) | `eits-post-tool-commit.sh` | Logs git commits to EITS automatically |
+| `UserPromptSubmit` | `eits-prompt-submit.sh` | Sets session to `working` on each prompt |
+| `PreCompact` | `eits-pre-compact.sh` | Sets session to `compacting` before context compaction |
+
+### Disable hooks
+
+Set `EITS_WORKFLOW=0` in your environment or `.env` to disable all hook behavior for a session. All scripts check this var and exit immediately.
+
+### Verify
+
+```bash
+# Check scripts exist
+ls priv/scripts/eits-*.sh
+
+# Check what's registered
+jq '.hooks' ~/.claude/settings.json
+```
+
+See [docs/EITS_HOOKS.md](EITS_HOOKS.md) for full hook behavior, context injection details, and the workflow guard.
+
+## 6a. Claude Code Skills
+
+EITS ships a set of skills that live in `~/.claude/skills/`. These are loaded automatically by Claude Code and control how agents interact with the tracking system.
+
+| Skill | Trigger | Purpose |
+|-------|---------|---------|
+| `eits-init` | Session start | Registers agent + session; required before any file edits |
+| `eits-workflow` | `eits-workflow` | Task/commit/note lifecycle (`eits tasks`, `eits commits`, `eits notes`) |
+| `eits-dm` | `DM from:` prefix | Receive and reply to inter-agent DMs |
+| `eits-chat` | `eits-chat:` prefix | Handle @mentions from the web UI chat |
+| `eits-teams` | `eits-teams` | Create teams, spawn agents, monitor coordinated work |
+| `eits-superpowers` | `eits-superpowers` | EITS-native dev workflow: task tracking, team spawning, mockup-first UI |
+| `i-end-session` | `i-end-session` | Clean session close: update tracking → commit → mark completed (commits auto-logged by hook) |
+| `task-workable` | `task-workable` | Create tasks for the auto-worker (haiku or sonnet model) |
+
+**Entrypoint rule** — all skills respect `$CLAUDE_CODE_ENTRYPOINT`:
+
+| Value | Mode | Method |
+|-------|------|--------|
+| `sdk-cli` | Spawned/headless agent | `EITS-CMD:` directives in stdout |
+| `cli` | Interactive session | `eits` bash script |
+
+Skills are version-controlled in `priv/skills/`. Install them by copying to `~/.claude/skills/`:
+
+```bash
+cp -r priv/skills/eits-* ~/.claude/skills/
+cp -r priv/skills/i-end-session ~/.claude/skills/
+cp -r priv/skills/task-workable ~/.claude/skills/
+```
+
+Re-run this any time a skill is updated in the repo.
 
 ## 7. MCP Server
 
@@ -368,3 +434,4 @@ Open that URL on the device you want to register (e.g., iPhone). The passkey wil
 - `.env` is loaded automatically at startup via `dotenvy`; copy `.env.example` to get started
 - No `.tool-versions` or `.nvmrc` — use Node 22 LTS
 - Oban background jobs require the DB to be up before server starts
+- `mix precommit` runs compile + deps.unlock + format + test in one shot; run before committing

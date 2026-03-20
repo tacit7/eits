@@ -622,11 +622,6 @@ defmodule EyeInTheSkyWebWeb.Components.Sidebar do
             active={is_active_project && @sidebar_tab == :files}
           />
           <.project_sub_item
-            href={~p"/projects/#{project.id}/config"}
-            label="Config"
-            active={is_active_project && @sidebar_tab == :config}
-          />
-          <.project_sub_item
             href={~p"/projects/#{project.id}/agents"}
             label="Agents"
             active={is_active_project && @sidebar_tab == :agents}

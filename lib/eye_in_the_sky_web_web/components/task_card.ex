@@ -174,10 +174,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
         {@task.title}
       </h4>
       <%!-- ... menu --%>
-      <div
-        class="flex-shrink-0 opacity-0 group-hover/card:opacity-100 transition-opacity"
-        onclick="event.stopPropagation();"
-      >
+      <div class="flex-shrink-0 opacity-0 group-hover/card:opacity-100 transition-opacity">
         <details class="dropdown dropdown-end">
           <summary class="flex items-center justify-center w-6 h-6 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/8 cursor-pointer list-none transition-colors">
             <.icon name="hero-ellipsis-horizontal-mini" class="w-3.5 h-3.5" />
@@ -432,7 +429,7 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
   end
 
   defp card_class("kanban") do
-    "group/card card bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] border border-base-content/8 hover:shadow-md transition-all cursor-pointer"
+    "group/card card bg-base-200 dark:bg-[hsl(225,10%,28%)] hover:bg-base-300 dark:hover:bg-[hsl(225,10%,32%)] border border-base-content/8 transition-all cursor-pointer"
   end
 
   defp card_class("grid") do

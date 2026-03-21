@@ -216,8 +216,10 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_event("export_markdown", _params, socket), do: handle_export_markdown(socket)
 
   @impl true
-  def handle_event("reload_from_session_file", _params, socket),
-    do: handle_reload_from_session_file(socket, &TabHelpers.load_tab_data(&1, "messages", &1.assigns.session_id))
+  def handle_event("reload_from_session_file", _params, socket) do
+    send(self(), :do_reload_from_session_file)
+    {:noreply, assign(socket, :reloading, true)}
+  end
 
   # ---------------------------------------------------------------------------
   # File uploads
@@ -255,6 +257,17 @@ defmodule EyeInTheSkyWeb.DmLive do
   # ---------------------------------------------------------------------------
   # handle_info: message reload (event-driven, debounced)
   # ---------------------------------------------------------------------------
+
+  @impl true
+  def handle_info(:do_reload_from_session_file, socket) do
+    {_reply, new_socket} =
+      handle_reload_from_session_file(
+        socket,
+        &TabHelpers.load_tab_data(&1, "messages", &1.assigns.session_id)
+      )
+
+    {:noreply, assign(new_socket, :reloading, false)}
+  end
 
   @impl true
   def handle_info(:do_message_reload, socket) do

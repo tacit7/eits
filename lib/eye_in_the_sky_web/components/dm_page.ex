@@ -52,6 +52,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :context_window, :integer, default: 0
   attr :message_search_query, :string, default: ""
   attr :session_context, :map, default: nil
+  attr :reloading, :boolean, default: false
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
 
@@ -84,6 +85,17 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           <button data-reload-cancel>close</button>
         </form>
       </dialog>
+
+      <%!-- Reload loading overlay --%>
+      <div
+        :if={@reloading}
+        class="absolute inset-0 z-40 flex items-center justify-center bg-base-100/80 backdrop-blur-sm rounded-xl"
+      >
+        <div class="flex flex-col items-center gap-3">
+          <span class="loading loading-spinner loading-lg text-primary"></span>
+          <p class="text-sm text-base-content/60">Reloading messages...</p>
+        </div>
+      </div>
 
       <%!-- Drag overlay --%>
       <div

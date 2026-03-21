@@ -303,9 +303,19 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_info({:agent_working, msg}, socket),
     do: AgentLifecycle.handle_agent_working(msg, socket)
 
+  # 3-tuple form from AgentWorkerEvents: {:agent_working, provider_conv_id, session_int_id}
+  @impl true
+  def handle_info({:agent_working, _ref, session_id}, socket),
+    do: AgentLifecycle.handle_agent_working(session_id, socket)
+
   @impl true
   def handle_info({:agent_stopped, msg}, socket),
     do: AgentLifecycle.handle_agent_stopped(msg, socket)
+
+  # 3-tuple form from AgentWorkerEvents: {:agent_stopped, provider_conv_id, session_int_id}
+  @impl true
+  def handle_info({:agent_stopped, _ref, session_id}, socket),
+    do: AgentLifecycle.handle_agent_stopped(session_id, socket)
 
   @impl true
   def handle_info({:agent_updated, updated_session}, socket),

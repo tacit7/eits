@@ -12,6 +12,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
   import EyeInTheSkyWebWeb.Live.Shared.KanbanFilters, only: [apply_filters: 1, parse_due_date_filter: 1, parse_activity_filter: 1]
   import EyeInTheSkyWebWeb.Live.Shared.AgentHelpers, only: [handle_start_agent_for_task: 2]
+  import EyeInTheSkyWebWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWebWeb.Components.KanbanFilterDrawer, only: [kanban_filter_drawer: 1]
 
   @impl true
@@ -388,23 +389,17 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Kanban do
   end
 
   @impl true
-  def handle_info({:agent_working, session}, socket) when is_map(session) do
-    {:noreply, update(socket, :working_session_ids, &MapSet.put(&1, session.id))}
+  def handle_info({:agent_working, msg}, socket) do
+    handle_agent_working(socket, msg, fn socket, session_id ->
+      update(socket, :working_session_ids, &MapSet.put(&1, session_id))
+    end)
   end
 
   @impl true
-  def handle_info({:agent_working, _ref, session_int_id}, socket) do
-    {:noreply, update(socket, :working_session_ids, &MapSet.put(&1, session_int_id))}
-  end
-
-  @impl true
-  def handle_info({:agent_stopped, session}, socket) when is_map(session) do
-    {:noreply, update(socket, :working_session_ids, &MapSet.delete(&1, session.id))}
-  end
-
-  @impl true
-  def handle_info({:agent_stopped, _ref, session_int_id}, socket) do
-    {:noreply, update(socket, :working_session_ids, &MapSet.delete(&1, session_int_id))}
+  def handle_info({:agent_stopped, msg}, socket) do
+    handle_agent_stopped(socket, msg, fn socket, session_id ->
+      update(socket, :working_session_ids, &MapSet.delete(&1, session_id))
+    end)
   end
 
   @impl true

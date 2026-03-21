@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   @page_size 25
 
   alias EyeInTheSkyWeb.Sessions
+  alias EyeInTheSkyWebWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWebWeb.Components.Icons
   import EyeInTheSkyWebWeb.Components.SessionCard
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
@@ -379,13 +380,17 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Sessions do
   end
 
   @impl true
-  def handle_info({:agent_working, _session_uuid, session_id}, socket) do
-    {:noreply, update_agent_status_in_list(socket, session_id, "working")}
+  def handle_info({:agent_working, msg}, socket) do
+    AgentStatusHelpers.handle_agent_working(socket, msg, fn socket, session_id ->
+      update_agent_status_in_list(socket, session_id, "working")
+    end)
   end
 
   @impl true
-  def handle_info({:agent_stopped, _session_uuid, session_id}, socket) do
-    {:noreply, update_agent_status_in_list(socket, session_id, "idle")}
+  def handle_info({:agent_stopped, msg}, socket) do
+    AgentStatusHelpers.handle_agent_stopped(socket, msg, fn socket, session_id ->
+      update_agent_status_in_list(socket, session_id, "idle")
+    end)
   end
 
   @impl true

@@ -23,9 +23,6 @@ defmodule EyeInTheSkyWebWeb.ControllerHelpers do
 
   def translate_errors(_), do: %{}
 
-  def maybe_put(map, _key, nil), do: map
-  def maybe_put(map, key, value), do: Map.put(map, key, value)
-
   def normalize_parent_type("sessions"), do: "session"
   def normalize_parent_type("agents"), do: "agent"
   def normalize_parent_type("tasks"), do: "task"

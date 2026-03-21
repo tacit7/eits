@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         |> MountState.assign_sidebar_context(params)
         |> MountState.assign_session_state(session, agent)
         |> MountState.assign_defaults(session)
-        |> TabHelpers.load_tab_data("messages", session.id)
+        |> load_messages_on_mount()
 
       {:ok, socket}
     else
@@ -428,5 +428,24 @@ defmodule EyeInTheSkyWeb.DmLive do
       />
     </div>
     """
+  end
+
+  # ---------------------------------------------------------------------------
+  # Private
+  # ---------------------------------------------------------------------------
+
+  # On connected mount, sync messages from the session file into the DB first
+  # so navigating back after an agent run shows the full conversation (including
+  # tool blocks), not just the final text saved by on_result_received.
+  # Falls back to a plain DB query if no session file / project path found.
+  defp load_messages_on_mount(socket) do
+    if connected?(socket) do
+      case MessageHandlers.sync_messages_from_session_file(socket) do
+        {:ok, socket, _imported} -> socket
+        {:error, _reason} -> TabHelpers.load_tab_data(socket, "messages", socket.assigns.session_id)
+      end
+    else
+      TabHelpers.load_tab_data(socket, "messages", socket.assigns.session_id)
+    end
   end
 end

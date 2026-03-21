@@ -117,6 +117,14 @@ defmodule EyeInTheSky.AgentDefinitions do
     sync_directory(dir, "project", project_id)
   end
 
+  @doc false
+  # Test-only: allows passing an explicit directory path rather than deriving from project_path.
+  if Mix.env() == :test do
+    def sync_directory_for_test(dir, scope, project_id) do
+      sync_directory(dir, scope, project_id)
+    end
+  end
+
   defp sync_directory(dir, scope, project_id) do
     lock_key = sync_lock_key(scope, project_id)
 

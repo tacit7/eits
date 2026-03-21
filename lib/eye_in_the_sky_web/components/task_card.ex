@@ -197,8 +197,9 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
             <%!-- Edit labels --%>
             <button
               type="button"
-              phx-click={@on_click}
+              phx-click="open_task_detail"
               phx-value-task_id={@task.uuid || to_string(@task.id)}
+              phx-value-focus="tags"
               class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
             >
               <.icon name="hero-tag-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
@@ -207,8 +208,9 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
             <%!-- Edit dates --%>
             <button
               type="button"
-              phx-click={@on_click}
+              phx-click="open_task_detail"
               phx-value-task_id={@task.uuid || to_string(@task.id)}
+              phx-value-focus="due_at"
               class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
             >
               <.icon name="hero-clock-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />

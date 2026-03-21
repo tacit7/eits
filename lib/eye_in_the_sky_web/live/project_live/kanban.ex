@@ -292,6 +292,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
       workflow_states={@workflow_states}
       projects={@all_projects}
       current_project_id={@project_id}
+      focus={@task_detail_focus}
       toggle_event="toggle_task_detail_drawer"
       update_event="update_task"
       delete_event="delete_task"
@@ -340,6 +341,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
     |> assign(:tag_counts, %{})
     |> assign(:show_new_task_drawer, false)
     |> assign(:show_task_detail_drawer, false)
+    |> assign(:task_detail_focus, nil)
     |> assign(:selected_task, nil)
     |> assign(:task_notes, [])
     |> assign(:quick_add_column, nil)

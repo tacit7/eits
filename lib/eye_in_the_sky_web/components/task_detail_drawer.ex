@@ -19,6 +19,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
   attr :copy_event, :string, default: nil
   attr :projects, :list, default: []
   attr :current_project_id, :any, default: nil
+  attr :focus, :string, default: nil
 
   slot :checklist
 
@@ -129,8 +130,10 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                     </label>
                     <input
                       type="date"
+                      id="task-detail-due-at"
                       name="due_at"
                       value={format_date_input(@task.due_at)}
+                      phx-mounted={if @focus == "due_at", do: JS.focus()}
                       class="input input-sm w-full bg-base-200 border-base-300 text-sm focus:border-primary/30"
                     />
                   </div>
@@ -138,9 +141,11 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                     <.detail_label text="Tags" />
                     <input
                       type="text"
+                      id="task-detail-tags"
                       name="tags"
                       value={format_tags(@task.tags)}
                       placeholder="tag1, tag2"
+                      phx-mounted={if @focus == "tags", do: JS.focus()}
                       class="input input-sm w-full bg-base-200 border-base-300 text-sm placeholder:text-base-content/20 focus:border-primary/30"
                     />
                   </div>

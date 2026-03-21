@@ -19,14 +19,16 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
     {:noreply, assign(socket, :show_filter_sheet, false)}
   end
 
-  def handle_open_task_detail(%{"task_id" => task_id}, socket) do
+  def handle_open_task_detail(%{"task_id" => task_id} = params, socket) do
     task = Tasks.get_task_by_uuid_or_id!(task_id)
     notes = Notes.list_notes_for_task(task.id)
+    focus = Map.get(params, "focus")
 
     {:noreply,
      socket
      |> assign(:selected_task, task)
      |> assign(:task_notes, notes)
+     |> assign(:task_detail_focus, focus)
      |> assign(:show_task_detail_drawer, true)}
   end
 

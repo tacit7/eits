@@ -121,10 +121,20 @@ defmodule EyeInTheSkyWeb.Telemetry do
       # A module, function and arguments to be invoked periodically.
       # This function must call :telemetry.execute/3 and a metric must be added above.
       # {EyeInTheSkyWeb, :count_users, []}
-      {EyeInTheSkyWeb.Telemetry, :measure_memory, []},
-      {EyeInTheSkyWeb.Telemetry, :measure_processes, []},
-      {EyeInTheSkyWeb.Telemetry, :measure_liveview, []}
+      {EyeInTheSkyWeb.Telemetry, :dispatch_measurements, []}
     ]
+  end
+
+  # Single dispatcher guards against hot-reload :undef errors. The telemetry_poller
+  # calls this one MFA; if the module is mid-reload the poller logs once (for this
+  # function) rather than once per measurement. Individual helpers stay public so
+  # they can be called directly in tests.
+  def dispatch_measurements do
+    mod = __MODULE__
+
+    if function_exported?(mod, :measure_memory, 0), do: measure_memory()
+    if function_exported?(mod, :measure_processes, 0), do: measure_processes()
+    if function_exported?(mod, :measure_liveview, 0), do: measure_liveview()
   end
 
   def measure_memory do

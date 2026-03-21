@@ -1,0 +1,112 @@
+defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
+  @moduledoc false
+
+  import Phoenix.Component, only: [assign: 3]
+  import Phoenix.LiveView, only: [put_flash: 3, push_event: 3]
+
+  alias EyeInTheSky.Messages
+  alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Claude.SessionImporter
+  alias EyeInTheSkyWeb.DmLive.TabHelpers
+  alias EyeInTheSkyWeb.DmLive.UploadHelpers
+  alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
+
+  require Logger
+
+  @reload_debounce_ms 300
+
+  def handle_send_message(body, socket) do
+    model = socket.assigns.selected_model
+    effort_level = socket.assigns.selected_effort
+    thinking_enabled = socket.assigns.thinking_enabled
+    max_budget_usd = socket.assigns.max_budget_usd
+
+    Logger.info(
+      "DM send_message received for session=#{socket.assigns.session_id} model=#{model} effort=#{effort_level} body_length=#{String.length(body)}"
+    )
+
+    uploaded_files = UploadHelpers.consume_uploaded_files(socket)
+    full_body = UploadHelpers.build_message_body(body, uploaded_files)
+    session_id = socket.assigns.session_id
+    provider = socket.assigns.session.provider
+
+    case create_user_message(session_id, full_body, provider) do
+      {:ok, message} ->
+        Logger.info("Message created in DB with id=#{message.id}")
+        UploadHelpers.persist_upload_attachments(uploaded_files, message.id)
+
+        socket = TabHelpers.load_tab_data(socket, "messages", session_id)
+
+        case AgentManager.continue_session(
+               session_id,
+               full_body,
+               SessionHelpers.continue_session_opts(model, effort_level, thinking_enabled, max_budget_usd)
+             ) do
+          {:ok, _admission} ->
+            Logger.info("Message forwarded to AgentManager for session=#{session_id}")
+
+            {:noreply,
+             socket
+             |> assign(:processing, true)
+             |> push_event("clear-input", %{})}
+
+          {:error, reason} ->
+            Logger.error("Failed to send message via AgentManager: #{inspect(reason)}")
+
+            {:noreply,
+             socket
+             |> assign(:processing, false)
+             |> put_flash(:error, "Failed to send message: #{inspect(reason)}")}
+        end
+
+      {:error, reason} ->
+        Logger.error("Failed to create message: #{inspect(reason)}")
+        {:noreply, put_flash(socket, :error, "Failed to create message: #{inspect(reason)}")}
+    end
+  end
+
+  def sync_messages_from_session_file(socket) do
+    session_id = socket.assigns.session_id
+    session_uuid = socket.assigns.session_uuid
+
+    with {:ok, project_path} <-
+           SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent),
+         {:ok, imported} <- SessionImporter.sync(session_uuid, project_path, session_id) do
+      {:ok, TabHelpers.load_tab_data(socket, "messages", session_id), imported}
+    end
+  end
+
+  def sync_and_reload(socket) do
+    case sync_messages_from_session_file(socket) do
+      {:ok, socket, _imported} -> socket
+      {:error, _reason} -> maybe_reload_messages(socket)
+    end
+  end
+
+  def maybe_reload_messages(socket) do
+    if socket.assigns.active_tab == "messages" do
+      TabHelpers.load_tab_data(socket, "messages", socket.assigns.session_id)
+    else
+      socket
+    end
+  end
+
+  def schedule_message_reload(socket) do
+    if socket.assigns.reload_timer do
+      Process.cancel_timer(socket.assigns.reload_timer)
+    end
+
+    timer = Process.send_after(self(), :do_message_reload, @reload_debounce_ms)
+    assign(socket, :reload_timer, timer)
+  end
+
+  defp create_user_message(session_id, body, provider) do
+    Messages.send_message(%{
+      session_id: session_id,
+      sender_role: "user",
+      recipient_role: "agent",
+      provider: provider || "claude",
+      body: body
+    })
+  end
+end

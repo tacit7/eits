@@ -518,7 +518,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
              project_id: project.id,
              project_path: project.path,
              description: "Job Helper",
-             instructions: JobHelper.prompt(description, project: prompt_project)
+             instructions: JobHelper.prompt(description, project: prompt_project),
+             agent: "cron-job-builder"
            ) do
         {:ok, %{session: session}} ->
           {:noreply,

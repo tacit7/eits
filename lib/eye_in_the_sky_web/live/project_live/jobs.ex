@@ -4,7 +4,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Jobs do
   alias EyeInTheSky.ScheduledJobs
   alias EyeInTheSky.ScheduledJobs.ScheduledJob
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
-  import EyeInTheSkyWeb.Helpers.ViewHelpers, except: [format_time: 1]
   import EyeInTheSkyWeb.Live.Shared.JobsHelpers
   import EyeInTheSkyWeb.Components.JobFormDrawer
   import EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers

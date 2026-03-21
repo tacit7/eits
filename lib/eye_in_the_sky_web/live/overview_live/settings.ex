@@ -685,6 +685,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   end
 
   defp render_tab(%{active_tab: _} = assigns) do
-    ~H"<p class=\"text-sm text-base-content/50 px-2 py-4\">Coming soon</p>"
+    ~H[<p class="text-sm text-base-content/50 px-2 py-4">Coming soon</p>]
   end
 end

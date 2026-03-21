@@ -17,6 +17,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
       |> assign(:selected_file_path, nil)
       |> assign(:file_content, nil)
       |> assign(:file_type, nil)
+      |> assign(:creating, nil)
       |> assign(:error, nil)
 
     {:ok, socket}
@@ -25,7 +26,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
   @impl true
   def handle_params(params, _uri, socket) do
     path = Map.get(params, "path")
-    {:noreply, load_list_path(socket, path)}
+    {:noreply, socket |> assign(:creating, nil) |> load_list_path(path)}
   end
 
   @impl true
@@ -58,6 +59,69 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
         else: ~p"/config"
 
     {:noreply, push_patch(socket, to: target)}
+  end
+
+  @impl true
+  def handle_event("start_create", %{"type" => type}, socket) do
+    kind = if type == "dir", do: :dir, else: :file
+    {:noreply, assign(socket, :creating, kind)}
+  end
+
+  @impl true
+  def handle_event("cancel_create", _params, socket) do
+    {:noreply, assign(socket, :creating, nil)}
+  end
+
+  @impl true
+  def handle_event("create_entry", %{"name" => raw_name}, socket) do
+    name = String.trim(raw_name)
+
+    cond do
+      name == "" ->
+        {:noreply, assign(socket, :error, "Name cannot be empty")}
+
+      String.contains?(name, "/") or String.contains?(name, "..") ->
+        {:noreply, assign(socket, :error, "Invalid name")}
+
+      true ->
+        current_rel = socket.assigns.current_path
+        base = if current_rel, do: Path.join(@claude_dir, current_rel), else: @claude_dir
+        full = Path.join(base, name)
+        expanded_base = Path.expand(@claude_dir)
+        expanded_full = Path.expand(full)
+
+        if String.starts_with?(expanded_full, expanded_base) do
+          case socket.assigns.creating do
+            :dir ->
+              case File.mkdir(full) do
+                :ok ->
+                  rel = if current_rel, do: Path.join(current_rel, name), else: name
+                  {:noreply, socket |> assign(:creating, nil) |> load_list_path(rel)}
+
+                {:error, reason} ->
+                  {:noreply, assign(socket, :error, "Failed to create directory: #{reason}")}
+              end
+
+            :file ->
+              case File.write(full, "") do
+                :ok ->
+                  rel = if current_rel, do: Path.join(current_rel, name), else: name
+                  {:noreply,
+                   socket
+                   |> assign(:creating, nil)
+                   |> push_patch(to: ~p"/config?path=#{rel}")}
+
+                {:error, reason} ->
+                  {:noreply, assign(socket, :error, "Failed to create file: #{reason}")}
+              end
+
+            _ ->
+              {:noreply, socket}
+          end
+        else
+          {:noreply, assign(socket, :error, "Access denied")}
+        end
+    end
   end
 
   # ── Private helpers ──────────────────────────────────────────────────────────
@@ -267,25 +331,63 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
             </div>
           <% else %>
             <!-- Directory listing -->
-            <%= if length(@files) > 0 do %>
-              <div class="mb-4">
-                <%= if @current_path do %>
-                  <.link
-                    patch={
-                      if Path.dirname(@current_path) != ".",
-                        do: ~p"/config?path=#{Path.dirname(@current_path)}",
-                        else: ~p"/config"
-                    }
-                    class="btn btn-sm btn-ghost mb-4"
-                  >
-                    <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
-                  </.link>
-                <% end %>
-                <h2 class="text-lg font-semibold text-base-content mb-2">
-                  ~/.claude/{@current_path || ""}
-                </h2>
-              </div>
+            <!-- Directory header with create buttons -->
+            <div class="flex items-center gap-2 mb-4">
+              <%= if @current_path do %>
+                <.link
+                  patch={
+                    if Path.dirname(@current_path) != ".",
+                      do: ~p"/config?path=#{Path.dirname(@current_path)}",
+                      else: ~p"/config"
+                  }
+                  class="btn btn-sm btn-ghost"
+                >
+                  <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
+                </.link>
+              <% end %>
+              <h2 class="text-lg font-semibold text-base-content flex-1">
+                ~/.claude/{@current_path || ""}
+              </h2>
+              <button
+                phx-click="start_create"
+                phx-value-type="file"
+                class="btn btn-sm btn-ghost"
+                title="New file"
+              >
+                <.icon name="hero-document-plus" class="w-4 h-4" /> File
+              </button>
+              <button
+                phx-click="start_create"
+                phx-value-type="dir"
+                class="btn btn-sm btn-ghost"
+                title="New folder"
+              >
+                <.icon name="hero-folder-plus" class="w-4 h-4" /> Folder
+              </button>
+            </div>
 
+            <!-- Inline create form -->
+            <%= if @creating do %>
+              <form phx-submit="create_entry" class="flex items-center gap-2 mb-4">
+                <.icon
+                  name={if @creating == :dir, do: "hero-folder", else: "hero-document"}
+                  class="w-4 h-4 text-base-content/50 shrink-0"
+                />
+                <input
+                  type="text"
+                  name="name"
+                  placeholder={if @creating == :dir, do: "Folder name", else: "File name"}
+                  class="input input-sm input-bordered flex-1"
+                  autofocus
+                />
+                <button type="submit" class="btn btn-sm btn-primary">Create</button>
+                <button type="button" phx-click="cancel_create" class="btn btn-sm btn-ghost">
+                  Cancel
+                </button>
+              </form>
+            <% end %>
+
+            <%= if length(@files) > 0 do %>
               <!-- Mobile list -->
               <div class="md:hidden space-y-2">
                 <%= for file <- @files do %>

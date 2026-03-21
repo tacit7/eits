@@ -52,6 +52,46 @@ defmodule EyeInTheSkyWeb.Live.Shared.KanbanFilters do
   def parse_activity_filter("inactive"), do: :inactive
   def parse_activity_filter(_), do: nil
 
+  def state_dot_color(color) when is_binary(color), do: color
+  def state_dot_color(_), do: "#6B7280"
+
+  # ---------------------------------------------------------------------------
+  # Task loading
+  # ---------------------------------------------------------------------------
+
+  def load_tasks(socket) do
+    project_id = socket.assigns.project_id
+    query = socket.assigns.search_query
+    show_archived = socket.assigns.show_archived
+    show_completed = socket.assigns.show_completed
+
+    all_tasks =
+      if String.length(String.trim(query)) >= 4 do
+        EyeInTheSky.Tasks.search_tasks(query, project_id)
+      else
+        EyeInTheSky.Projects.get_project_tasks(project_id, include_archived: show_archived)
+      end
+      |> then(fn tasks ->
+        if show_completed, do: tasks, else: Enum.reject(tasks, & &1.completed_at)
+      end)
+      |> EyeInTheSky.Notes.with_notes_count()
+
+    all_tag_refs = Enum.flat_map(all_tasks, fn t -> t.tags || [] end)
+
+    available_tags =
+      all_tag_refs
+      |> Enum.uniq_by(& &1.name)
+      |> Enum.sort_by(& &1.name)
+
+    tag_counts = Enum.frequencies_by(all_tag_refs, & &1.name)
+
+    socket
+    |> assign(:tasks, all_tasks)
+    |> assign(:available_tags, available_tags)
+    |> assign(:tag_counts, tag_counts)
+    |> apply_filters()
+  end
+
   # ---------------------------------------------------------------------------
   # Private filter implementations
   # ---------------------------------------------------------------------------

@@ -20,10 +20,11 @@ defmodule EyeInTheSkyWebWeb.Components.JobsTable do
       row_border_class: 1,
       format_schedule: 1,
       format_time: 1,
-      format_relative_time: 1,
       type_label: 1,
       status_badge_class: 1
     ]
+
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [format_relative_time: 1]
 
   attr :jobs, :list, required: true
   attr :expanded_job_id, :any, required: true

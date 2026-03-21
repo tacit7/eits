@@ -221,10 +221,10 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
           </button>
 
           <%= if @selected_team do %>
-            <div class="overflow-hidden rounded-xl bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)]">
+            <div id="team-detail" class="overflow-hidden rounded-xl bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)]">
               <.live_component
                 module={EyeInTheSkyWeb.TeamDetailComponent}
-                id="team-detail"
+                id="team-detail-component"
                 team={@selected_team}
                 selected_agent_session_id={@agent_session_id}
               />

@@ -25,7 +25,7 @@ config :eye_in_the_sky_web, EyeInTheSkyWeb.Repo,
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
-config :eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint,
+config :eye_in_the_sky_web, EyeInTheSkyWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [port: String.to_integer(System.get_env("PORT", "5001"))],
@@ -63,15 +63,20 @@ config :eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint,
 # different ports.
 
 # Watch static and templates for browser reloading.
-config :eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint,
-  live_reload: [
-    web_console_logger: true,
-    patterns: [
-      ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
-      ~r"priv/gettext/.*(po)$",
-      ~r"lib/eye_in_the_sky_web_web/(?:controllers|live|components|router)/?.*\.(ex|heex)$"
-    ]
-  ]
+config :eye_in_the_sky_web, EyeInTheSkyWeb.Endpoint,
+  live_reload:
+    (if System.get_env("LIVE_RELOAD") in ["0", "false"] do
+      []
+    else
+      [
+        web_console_logger: true,
+        patterns: [
+          ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
+          ~r"priv/gettext/.*(po)$",
+          ~r"lib/eye_in_the_sky_web/(?:controllers|live|components|router)/?.*\.(ex|heex)$"
+        ]
+      ]
+    end)
 
 # Enable dev routes for dashboard and mailbox
 config :eye_in_the_sky_web, dev_routes: true

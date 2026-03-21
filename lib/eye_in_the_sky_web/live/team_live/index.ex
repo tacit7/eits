@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
      |> assign(:sidebar_tab, :teams)
      |> assign(:sidebar_project, nil)
      |> assign(:show_archived, false)
+     |> assign(:search, "")
      |> assign(:teams, load_teams(false))
      |> assign(:selected_team_id, nil)
      |> assign(:selected_team, nil)
@@ -41,6 +42,24 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
     else
       {:noreply, socket}
     end
+  end
+
+  @impl true
+  def handle_event("search", %{"search" => query}, socket) do
+    {:noreply, assign(socket, :search, query)}
+  end
+
+  @impl true
+  def handle_event("delete_team", %{"id" => id}, socket) do
+    team = Teams.get_team!(String.to_integer(id))
+    {:ok, _} = Teams.delete_team(team)
+
+    socket =
+      socket
+      |> assign(:teams, load_teams(socket.assigns.show_archived))
+      |> maybe_close_if_deleted(team.id)
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -119,13 +138,15 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
 
   @impl true
   def render(assigns) do
+    assigns = assign(assigns, :filtered_teams, filter_teams(assigns.teams, assigns.search))
+
     ~H"""
     <div class="bg-base-100 min-h-full px-4 sm:px-6 lg:px-8">
       <div class="max-w-4xl mx-auto">
         <%!-- Header --%>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-5">
           <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
-            {length(@teams)} teams
+            {length(@filtered_teams)} teams
           </span>
           <button
             phx-click="toggle_archived"
@@ -141,39 +162,53 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
           </button>
         </div>
 
+        <%!-- Search --%>
+        <div class="relative mb-3">
+          <div class="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+            <.icon name="hero-magnifying-glass" class="w-3.5 h-3.5 text-base-content/30" />
+          </div>
+          <form phx-change="search" phx-submit="search">
+            <input
+              type="text"
+              name="search"
+              value={@search}
+              placeholder="Search teams..."
+              class="w-full bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] border-0 rounded-xl py-2.5 pl-9 pr-4 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:ring-1 focus:ring-primary/30"
+              phx-debounce="150"
+            />
+          </form>
+        </div>
+
         <%!-- Teams list --%>
-        <div class="mt-2 rounded-xl shadow-sm">
-          <%= if @teams == [] do %>
+        <div class="rounded-xl shadow-sm">
+          <%= if @filtered_teams == [] do %>
             <div class="flex flex-col items-center justify-center py-16 px-4 text-center gap-3 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl">
               <div class="w-10 h-10 rounded-full bg-base-200 flex items-center justify-center">
                 <.icon name="hero-user-group" class="w-5 h-5 text-base-content/30" />
               </div>
-              <p class="text-xs text-base-content/30">No active teams</p>
+              <p class="text-xs text-base-content/30">
+                {if @search != "", do: "No teams match your search", else: "No active teams"}
+              </p>
             </div>
           <% else %>
             <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl px-4">
-              <%= for team <- @teams do %>
+              <%= for team <- @filtered_teams do %>
                 <div class={[
-                  "relative overflow-hidden border-l-2 pl-2",
-                  team_status_border(team.status),
+                  "relative overflow-hidden",
                   @selected_team_id == team.id && "ring-inset ring-1 ring-primary/30"
                 ]}>
-                  <div
-                    class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer bg-inherit relative z-[1]"
-                    phx-click="select_team"
-                    phx-value-id={team.id}
-                    role="button"
-                    tabindex="0"
-                  >
-                    <div class="flex-1 min-w-0">
+                  <div class="group flex items-center gap-4 py-3">
+                    <div
+                      class="flex-1 min-w-0 cursor-pointer"
+                      phx-click="select_team"
+                      phx-value-id={team.id}
+                      role="button"
+                      tabindex="0"
+                    >
                       <span class="text-[13px] font-medium text-base-content/85 truncate block">
                         {team.name}
                       </span>
                       <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
-                        <span class={["font-medium shrink-0", team_status_text(team.status)]}>
-                          {String.capitalize(team.status)}
-                        </span>
-                        <span class="text-base-content/15">/</span>
                         <span class="font-mono">{length(team.members)} members</span>
                         <%= if active_member_count(team.members) > 0 do %>
                           <span class="text-base-content/15">/</span>
@@ -187,6 +222,14 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
                         <% end %>
                       </div>
                     </div>
+                    <button
+                      phx-click="delete_team"
+                      phx-value-id={team.id}
+                      class="shrink-0 p-1.5 rounded hover:bg-base-200 text-base-content/20 hover:text-error/60 transition-colors opacity-0 group-hover:opacity-100"
+                      title="Delete team"
+                    >
+                      <.icon name="hero-trash" class="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
               <% end %>
@@ -399,12 +442,20 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
 
   defp active_member_count(members), do: Enum.count(members, &(&1.status == "active"))
 
-  defp team_status_border("active"), do: "border-success"
-  defp team_status_border(_), do: "border-transparent"
+  defp filter_teams(teams, ""), do: teams
 
-  defp team_status_text("active"), do: "text-success"
-  defp team_status_text("archived"), do: "text-base-content/40"
-  defp team_status_text(_), do: "text-base-content/40"
+  defp filter_teams(teams, query) do
+    q = String.downcase(query)
+    Enum.filter(teams, fn t -> String.contains?(String.downcase(t.name), q) end)
+  end
+
+  defp maybe_close_if_deleted(socket, deleted_id) do
+    if socket.assigns.selected_team_id == deleted_id do
+      socket |> clear_agent_selection() |> show_team_list()
+    else
+      socket
+    end
+  end
 
   defp member_status_text("active"), do: "text-success"
   defp member_status_text("idle"), do: "text-warning"

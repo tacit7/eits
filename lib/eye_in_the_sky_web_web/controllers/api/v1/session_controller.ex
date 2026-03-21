@@ -22,7 +22,11 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
       conn |> put_status(:bad_request) |> json(%{error: "session_id is required"})
     else
       # Resolve project_id from project_name if needed
-      project_id = resolve_project_id(params)
+      project_id =
+        case Projects.resolve_project(params) do
+          {:ok, id, _name} -> id
+          {:error, _, _} -> nil
+        end
 
       # Build Agent (agents table) attrs
       agent_attrs = %{
@@ -450,23 +454,6 @@ defmodule EyeInTheSkyWebWeb.Api.V1.SessionController do
         {:ok, existing} -> {:ok, existing}
         _ -> {:error, :constraint_race}
       end
-  end
-
-  # Resolve project_id from project_name or direct project_id param
-  defp resolve_project_id(params) do
-    cond do
-      params["project_id"] ->
-        params["project_id"]
-
-      params["project_name"] ->
-        case Projects.get_project_by_name(params["project_name"]) do
-          %{id: id} -> id
-          nil -> nil
-        end
-
-      true ->
-        nil
-    end
   end
 
   # Parse model string like "claude-sonnet-4-5-20250929" into provider/name

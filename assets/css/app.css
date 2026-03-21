@@ -6,7 +6,7 @@
 /* highlight.js theme-aware styles are defined below under [data-theme] selectors */
 @source "../css";
 @source "../js";
-@source "../../lib/eye_in_the_sky_web_web";
+@source "../../lib/eye_in_the_sky_web";
 
 /* A Tailwind plugin that makes "hero-#{ICON}" classes available.
    The heroicons installation itself is managed by your mix.exs */

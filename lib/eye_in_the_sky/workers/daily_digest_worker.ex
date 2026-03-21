@@ -38,7 +38,7 @@ defmodule EyeInTheSky.Workers.DailyDigestWorker do
   end
 
   defp generate_digest do
-    since = NaiveDateTime.add(NaiveDateTime.utc_now(), -86_400) |> NaiveDateTime.to_iso8601()
+    since = DateTime.add(DateTime.utc_now(), -86_400, :second)
     date_label = Date.utc_today() |> Date.to_string()
 
     sessions = fetch_sessions(since)

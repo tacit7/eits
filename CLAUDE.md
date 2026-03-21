@@ -20,10 +20,13 @@ Worktrees live in `.claude/worktrees/` relative to the project root.
 
 When using git worktrees, always verify you are editing files in the worktree directory, NOT the main project directory. Check `pwd` before making edits.
 
-If deps are missing in the worktree, symlink them before compiling:
+If deps are missing in the worktree, symlink them before compiling. Worktrees live at `.claude/worktrees/<name>/`, which is **3 levels deep** from the project root — use `../../../`:
 ```bash
-ln -s ../../deps deps && ln -s ../../_build _build
+cd .claude/worktrees/<name>
+ln -s ../../../deps deps && ln -s ../../../_build _build
 ```
+
+Do NOT use `../../` — that resolves to `.claude/`, not the project root, and the symlinks will be broken.
 
 **Exception: when adding new Elixir modules or deps**, do NOT symlink `_build`. A symlinked `_build` causes stale module conflicts when the worktree introduces modules that don't exist in the main tree (compiled beams collide). For tasks that add new modules, run `mix deps.get` and `mix compile` directly in the worktree to get an isolated `_build`.
 

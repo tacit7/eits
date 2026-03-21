@@ -68,9 +68,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
         nil
 
       days ->
-        NaiveDateTime.utc_now()
-        |> NaiveDateTime.add(-days * 86400, :second)
-        |> NaiveDateTime.to_string()
+        DateTime.utc_now()
+        |> DateTime.add(-days * 86400, :second)
     end
   end
 

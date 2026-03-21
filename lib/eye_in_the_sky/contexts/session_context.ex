@@ -9,8 +9,8 @@ defmodule EyeInTheSky.Contexts.SessionContext do
     # Note: session_id is not a foreign key in the schema, just a field
     field :session_id, :integer
 
-    field :created_at, :string
-    field :updated_at, :string
+    field :created_at, :utc_datetime_usec
+    field :updated_at, :utc_datetime_usec
   end
 
   @doc false

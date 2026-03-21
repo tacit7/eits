@@ -6,11 +6,11 @@ defmodule EyeInTheSky.ScheduledJobs.JobRun do
 
   schema "job_runs" do
     field :status, :string
-    field :started_at, :string
-    field :completed_at, :string
+    field :started_at, :utc_datetime_usec
+    field :completed_at, :utc_datetime_usec
     field :result, :string
     field :session_id, :integer
-    field :created_at, :string
+    field :created_at, :utc_datetime_usec
 
     belongs_to :job, EyeInTheSky.ScheduledJobs.ScheduledJob,
       foreign_key: :job_id,

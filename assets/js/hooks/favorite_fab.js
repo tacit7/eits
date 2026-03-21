@@ -62,6 +62,11 @@ export const FavoriteFab = {
       this._appendMessage(msg)
     })
 
+    // Allow any LiveView to open the FAB chat modal by pushing this event
+    this.handleEvent('open_fab_chat', (detail) => {
+      this._openChat(detail)
+    })
+
     this.pushEvent('fab_request_statuses', {})
   },
 

@@ -56,6 +56,7 @@ import {DrawerSwipeClose} from "./hooks/drawer_swipe_close"
 import {QuickCreateNote, QuickCreateAgent, QuickCreateChat, QuickCreateTask} from "./hooks/quick_create"
 import {CommandPalette} from "./hooks/command_palette"
 import {FlashTimeout} from "./hooks/flash_timeout"
+import {ReloadConfirmModal} from "./hooks/reload_confirm_modal"
 import {showToast} from "./hooks/utils"
 import {getHooks} from "live_svelte"
 import "./theme"
@@ -122,6 +123,7 @@ Hooks.QuickCreateChat = QuickCreateChat
 Hooks.QuickCreateTask = QuickCreateTask
 Hooks.CommandPalette = CommandPalette
 Hooks.FlashTimeout = FlashTimeout
+Hooks.ReloadConfirmModal = ReloadConfirmModal
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {

@@ -73,6 +73,7 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
   """
   def coerce_datetime(nil), do: ~U[1970-01-01 00:00:00Z]
   def coerce_datetime(%DateTime{} = dt), do: dt
+  def coerce_datetime(%NaiveDateTime{} = ndt), do: DateTime.from_naive!(ndt, "Etc/UTC")
 
   def coerce_datetime(str) when is_binary(str) do
     case parse_datetime(str) do

@@ -1,4 +1,5 @@
 import { TOUCH_DEVICE } from "./touch_gesture"
+import { showToast } from "./utils"
 
 const MAX_BOOKMARKS = 4;
 const STORAGE_KEY = 'eye-in-the-sky-bookmarks';
@@ -36,11 +37,11 @@ export const BookmarkAgent = {
       // Remove bookmark
       bookmarks.splice(index, 1);
       this.saveBookmarks(bookmarks);
-      this.showToast('Bookmark removed', 'info');
+      showToast('Bookmark removed', 'info');
     } else {
       // Add bookmark
       if (bookmarks.length >= MAX_BOOKMARKS) {
-        this.showToast(`Maximum ${MAX_BOOKMARKS} bookmarks allowed`, 'error');
+        showToast(`Maximum ${MAX_BOOKMARKS} bookmarks allowed`, 'error');
         return;
       }
 
@@ -52,7 +53,7 @@ export const BookmarkAgent = {
       });
 
       this.saveBookmarks(bookmarks);
-      this.showToast('Agent bookmarked', 'success');
+      showToast('Agent bookmarked', 'success');
     }
 
     this.updateBookmarkUI();
@@ -126,20 +127,4 @@ export const BookmarkAgent = {
     }
   },
 
-  showToast(message, type = 'info') {
-    // Create toast notification
-    const toast = document.createElement('div');
-    toast.className = `alert alert-${type} fixed bottom-24 right-4 w-auto max-w-sm shadow-lg z-50 transition-opacity`;
-    toast.textContent = message;
-
-    document.body.appendChild(toast);
-
-    // Fade out and remove after 2 seconds
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      setTimeout(() => {
-        document.body.removeChild(toast);
-      }, 300);
-    }, 2000);
-  }
 };

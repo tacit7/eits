@@ -216,8 +216,10 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_event("export_markdown", _params, socket), do: handle_export_markdown(socket)
 
   @impl true
-  def handle_event("reload_from_session_file", _params, socket),
-    do: handle_reload_from_session_file(socket, &TabHelpers.load_tab_data(&1, "messages", &1.assigns.session_id))
+  def handle_event("reload_from_session_file", _params, socket) do
+    Process.send_after(self(), :do_reload_from_session_file, 50)
+    {:noreply, assign(socket, :reloading, true)}
+  end
 
   # ---------------------------------------------------------------------------
   # File uploads
@@ -257,6 +259,17 @@ defmodule EyeInTheSkyWeb.DmLive do
   # ---------------------------------------------------------------------------
 
   @impl true
+  def handle_info(:do_reload_from_session_file, socket) do
+    {_reply, new_socket} =
+      handle_reload_from_session_file(
+        socket,
+        &TabHelpers.load_tab_data(&1, "messages", &1.assigns.session_id)
+      )
+
+    {:noreply, assign(new_socket, :reloading, false)}
+  end
+
+  @impl true
   def handle_info(:do_message_reload, socket) do
     {:noreply,
      socket
@@ -290,9 +303,19 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_info({:agent_working, msg}, socket),
     do: AgentLifecycle.handle_agent_working(msg, socket)
 
+  # 3-tuple form from AgentWorkerEvents: {:agent_working, provider_conv_id, session_int_id}
+  @impl true
+  def handle_info({:agent_working, _ref, session_id}, socket),
+    do: AgentLifecycle.handle_agent_working(session_id, socket)
+
   @impl true
   def handle_info({:agent_stopped, msg}, socket),
     do: AgentLifecycle.handle_agent_stopped(msg, socket)
+
+  # 3-tuple form from AgentWorkerEvents: {:agent_stopped, provider_conv_id, session_int_id}
+  @impl true
+  def handle_info({:agent_stopped, _ref, session_id}, socket),
+    do: AgentLifecycle.handle_agent_stopped(session_id, socket)
 
   @impl true
   def handle_info({:agent_updated, updated_session}, socket),
@@ -381,6 +404,8 @@ defmodule EyeInTheSkyWeb.DmLive do
         context_used={@context_used}
         context_window={@context_window}
         message_search_query={@message_search_query}
+        session_context={@session_context}
+        reloading={@reloading}
       />
 
       <EyeInTheSkyWeb.Components.NewTaskDrawer.new_task_drawer

@@ -124,7 +124,7 @@ defmodule EyeInTheSky.Sessions do
   """
   def end_session(%Session{} = session, opts \\ %{}) do
     attrs =
-      %{ended_at: DateTime.utc_now() |> DateTime.to_iso8601()}
+      %{ended_at: DateTime.utc_now()}
       |> then(fn m ->
         if opts[:summary], do: Map.put(m, :description, opts[:summary]), else: m
       end)
@@ -141,8 +141,7 @@ defmodule EyeInTheSky.Sessions do
   Archives a session (soft delete).
   """
   def archive_session(%Session{} = session) do
-    now = DateTime.utc_now() |> DateTime.to_iso8601()
-    update_session(session, %{archived_at: now})
+    update_session(session, %{archived_at: DateTime.utc_now()})
   end
 
   @doc """

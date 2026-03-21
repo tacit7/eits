@@ -85,6 +85,8 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:max_budget_usd, nil)
     |> assign(:compacting, session.status == "compacting")
     |> assign(:message_search_query, "")
+    |> assign(:session_context, nil)
+    |> assign(:reloading, false)
     |> allow_upload(:files,
       accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
       max_entries: 10,

@@ -223,8 +223,6 @@ defmodule EyeInTheSky.Checkpoints do
     name =
       attrs[:session_name] || "Fork: #{original_session.name || "session #{original_session.id}"}"
 
-    now = DateTime.utc_now() |> DateTime.to_iso8601()
-
     Sessions.create_session(%{
       uuid: Ecto.UUID.generate(),
       agent_id: agent.id,
@@ -236,7 +234,7 @@ defmodule EyeInTheSky.Checkpoints do
       project_id: original_session.project_id,
       git_worktree_path: original_session.git_worktree_path,
       parent_session_id: original_session.id,
-      started_at: now
+      started_at: DateTime.utc_now()
     })
   end
 

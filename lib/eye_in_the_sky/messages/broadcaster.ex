@@ -75,19 +75,31 @@ defmodule EyeInTheSky.Messages.Broadcaster do
   end
 
   defp get_max_id do
-    Message
-    |> select([m], max(m.id))
-    |> Repo.one() || 0
+    case :code.is_loaded(Message) do
+      false ->
+        0
+
+      _ ->
+        Message
+        |> select([m], max(m.id))
+        |> Repo.one() || 0
+    end
   end
 
   defp get_messages_after(last_id) when last_id in [nil, 0], do: []
 
   defp get_messages_after(last_id) do
-    Message
-    |> where([m], m.id > ^last_id)
-    |> order_by([m], asc: m.id)
-    |> limit(50)
-    |> Repo.all()
+    case :code.is_loaded(Message) do
+      false ->
+        []
+
+      _ ->
+        Message
+        |> where([m], m.id > ^last_id)
+        |> order_by([m], asc: m.id)
+        |> limit(50)
+        |> Repo.all()
+    end
   end
 
   defp broadcast_message(%Message{session_id: sid} = msg) when not is_nil(sid) do

@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.Presenters.AgentPresenter do
   end
 
   defp session_status(session) do
-    if session.ended_at && session.ended_at != "", do: "completed", else: "idle"
+    if session.ended_at, do: "completed", else: "idle"
   end
 
   # Serialization helpers

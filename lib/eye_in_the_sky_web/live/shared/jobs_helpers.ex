@@ -255,6 +255,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
   # ---------------------------------------------------------------------------
 
   def format_time(nil), do: "-"
+  def format_time(%DateTime{} = dt), do: Calendar.strftime(dt, "%m/%d %H:%M")
+  def format_time(%NaiveDateTime{} = dt), do: Calendar.strftime(dt, "%m/%d %H:%M")
 
   def format_time(iso) when is_binary(iso) do
     case NaiveDateTime.from_iso8601(String.replace(iso, "Z", "")) do
@@ -516,7 +518,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
              project_id: project.id,
              project_path: project.path,
              description: "Job Helper",
-             instructions: JobHelper.prompt(description, project: prompt_project)
+             instructions: JobHelper.prompt(description, project: prompt_project),
+             agent: "cron-job-builder"
            ) do
         {:ok, %{session: session}} ->
           {:noreply,

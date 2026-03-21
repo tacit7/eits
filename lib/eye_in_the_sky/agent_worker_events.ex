@@ -143,7 +143,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
           attrs =
             if status == "idle" do
-              Map.put(attrs, :last_activity_at, DateTime.utc_now() |> DateTime.to_iso8601())
+              Map.put(attrs, :last_activity_at, DateTime.utc_now())
             else
               attrs
             end

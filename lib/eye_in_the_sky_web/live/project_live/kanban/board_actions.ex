@@ -45,7 +45,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.BoardActions do
 
     case Tasks.update_task(task, %{
            state_id: state_id,
-           updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
+           updated_at: DateTime.utc_now()
          }) do
       {:ok, _} -> {:noreply, KanbanFilters.load_tasks(socket)}
       {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to move task")}

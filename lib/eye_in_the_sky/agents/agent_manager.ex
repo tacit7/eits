@@ -197,7 +197,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
              provider: provider,
              project_id: project_id,
              git_worktree_path: worktree_path,
-             started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+             started_at: DateTime.utc_now(),
              parent_agent_id: opts[:parent_agent_id],
              parent_session_id: opts[:parent_session_id]
            }) do

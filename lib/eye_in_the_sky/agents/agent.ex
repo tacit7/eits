@@ -8,6 +8,7 @@ defmodule EyeInTheSky.Agents.Agent do
   import Ecto.Changeset
 
   @primary_key {:id, :id, autogenerate: true}
+  @timestamps_opts [type: :utc_datetime_usec]
 
   schema "agents" do
     field :uuid, :string
@@ -28,8 +29,8 @@ defmodule EyeInTheSky.Agents.Agent do
 
     field :parent_agent_id, :integer
     field :parent_session_id, :integer
-    field :created_at, :string
-    field :archived_at, :string
+    field :created_at, :utc_datetime_usec
+    field :archived_at, :utc_datetime_usec
     # Denormalized from the projects table. Populated at read time by
     # Agents.populate_project_name/1 (which reads agent.project.name after
     # preloading the association). It is NOT written back to the DB — the
@@ -37,7 +38,7 @@ defmodule EyeInTheSky.Agents.Agent do
     # via changeset. Always call populate_project_name/1 after any query that
     # needs this value.
     field :project_name, :string
-    field :last_activity_at, :string
+    field :last_activity_at, :utc_datetime_usec
   end
 
   @doc false

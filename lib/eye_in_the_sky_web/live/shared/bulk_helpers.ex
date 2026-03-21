@@ -46,7 +46,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.BulkHelpers do
 
   def handle_bulk_move(%{"state_id" => state_id_str}, socket, reload_fn) do
     state_id = parse_int(state_id_str, 0)
-    now = DateTime.utc_now() |> DateTime.to_iso8601()
+    now = DateTime.utc_now()
 
     socket.assigns.selected_tasks
     |> Enum.reject(&is_nil/1)

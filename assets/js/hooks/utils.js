@@ -1,12 +1,20 @@
-export function showToast(message) {
-  const toast = document.createElement("div")
-  toast.className = "fixed bottom-4 right-4 z-[9999] bg-base-content text-base-100 text-xs font-medium px-4 py-2 rounded-lg shadow-lg opacity-0 transition-opacity duration-200"
-  toast.textContent = message
-  document.body.appendChild(toast)
-  requestAnimationFrame(() => { toast.style.opacity = "1" })
+export function showToast(message, type = "info") {
+  const wrapper = document.createElement("div")
+  wrapper.className = "toast toast-bottom toast-end z-[9999]"
+  wrapper.style.opacity = "0"
+  wrapper.style.transition = "opacity 0.2s"
+
+  const alertEl = document.createElement("div")
+  alertEl.className = `alert alert-${type} text-sm`
+  alertEl.innerHTML = `<span>${message}</span>`
+
+  wrapper.appendChild(alertEl)
+  document.body.appendChild(wrapper)
+
+  requestAnimationFrame(() => { wrapper.style.opacity = "1" })
   setTimeout(() => {
-    toast.style.opacity = "0"
-    setTimeout(() => toast.remove(), 200)
+    wrapper.style.opacity = "0"
+    setTimeout(() => wrapper.remove(), 200)
   }, 2000)
 }
 

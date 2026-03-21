@@ -8,7 +8,7 @@ defmodule EyeInTheSky.Logs.SessionLog do
     field :category, :string
     field :message, :string
     field :details, :string
-    field :created_at, :string
+    field :created_at, :utc_datetime_usec
 
     belongs_to :session, EyeInTheSky.Sessions.Session,
       define_field: false,

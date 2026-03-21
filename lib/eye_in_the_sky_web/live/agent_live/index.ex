@@ -380,12 +380,12 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
     end)
   end
 
+  @impl true
+  def handle_info(_msg, socket), do: {:noreply, socket}
+
   defp extract_stopped_status(%{status: status}) when is_binary(status) and status != "", do: status
   defp extract_stopped_status(%{status: _}), do: "completed"
   defp extract_stopped_status(_), do: "idle"
-
-  @impl true
-  def handle_info(_msg, socket), do: {:noreply, socket}
 
   defp apply_action(socket, :index, %{"new" => "1"}) do
     socket
@@ -411,7 +411,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   defp cancel_timer(socket), do: socket
 
   defp update_agent_status_in_list(socket, session_id, new_status) do
-    now = DateTime.utc_now() |> DateTime.to_iso8601()
+    now = DateTime.utc_now()
 
     updated_agents =
       socket.assigns.agents

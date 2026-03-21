@@ -95,7 +95,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
            state_id: state_id,
            priority: priority,
            due_at: due_at,
-           updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
+           updated_at: DateTime.utc_now()
          }) do
       {:ok, updated_task} ->
         Tasks.replace_task_tags(task.id, tag_names)
@@ -222,7 +222,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
     target_project_id = parse_int(project_id_str, 0)
 
     if target_project_id > 0 and task do
-      now = DateTime.utc_now() |> DateTime.to_iso8601()
+      now = DateTime.utc_now()
       tag_names = Enum.map(task.tags || [], & &1.name)
 
       case Tasks.create_task(%{

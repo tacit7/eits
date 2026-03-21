@@ -46,23 +46,12 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
       </div>
 
       <%!-- Stats row --%>
-      <div class="grid grid-cols-2 gap-3">
-        <div class="bg-base-200 rounded-lg px-4 py-3">
-          <div class="text-2xl font-bold font-mono text-base-content">{length(@team.members)}</div>
-          <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Members</div>
-        </div>
-        <div class="bg-base-200 rounded-lg px-4 py-3">
-          <div class="text-2xl font-bold font-mono text-success">{@active_members}</div>
-          <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Active</div>
-        </div>
-        <div class="bg-base-200 rounded-lg px-4 py-3">
-          <div class="text-2xl font-bold font-mono text-base-content">{@total_tasks}</div>
-          <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Tasks</div>
-        </div>
-        <div class="bg-base-200 rounded-lg px-4 py-3">
-          <div class="text-2xl font-bold font-mono text-success">{@done_tasks}</div>
-          <div class="text-[11px] text-base-content/40 uppercase tracking-wide mt-0.5">Completed</div>
-        </div>
+      <div class="flex items-center gap-3 text-[11px] text-base-content/40">
+        <span><span class="font-mono font-semibold text-base-content/70">{length(@team.members)}</span> members</span>
+        <span class="text-base-content/20">·</span>
+        <span><span class="font-mono font-semibold text-success">{@active_members}</span> active</span>
+        <span class="text-base-content/20">·</span>
+        <span><span class="font-mono font-semibold text-base-content/70">{@done_tasks}/{@total_tasks}</span> tasks done</span>
       </div>
 
       <%!-- Task progress bar --%>

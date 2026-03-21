@@ -7,13 +7,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   alias EyeInTheSkyWeb.Components.DmPage.TasksTab
   alias EyeInTheSkyWeb.Components.DmPage.CommitsTab
   alias EyeInTheSkyWeb.Components.DmPage.NotesTab
+  alias EyeInTheSkyWeb.Components.DmPage.ContextTab
   alias EyeInTheSkyWeb.Components.DmPage.Composer
 
   @tabs [
     {"messages", "hero-chat-bubble-left-right", "Messages"},
     {"tasks", "hero-clipboard-document-list", "Tasks"},
     {"commits", "hero-code-bracket", "Commits"},
-    {"notes", "hero-document-text", "Notes"}
+    {"notes", "hero-document-text", "Notes"},
+    {"context", "hero-document-magnifying-glass", "Context"}
   ]
 
   attr :agent, :map, required: true
@@ -49,6 +51,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :context_used, :integer, default: 0
   attr :context_window, :integer, default: 0
   attr :message_search_query, :string, default: ""
+  attr :session_context, :map, default: nil
+  attr :reloading, :boolean, default: false
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
 
@@ -59,6 +63,40 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       phx-drop-target={@uploads.files.ref}
       phx-hook="DragUpload"
     >
+      <%!-- Reload confirm modal --%>
+      <dialog id="dm-reload-confirm-modal" class="modal" phx-hook="ReloadConfirmModal">
+        <div class="modal-box">
+          <h3 class="font-semibold text-base">Reload from file?</h3>
+          <p class="py-3 text-sm text-base-content/70">
+            This will delete all messages and re-import from the JSONL file.
+          </p>
+          <div class="form-control mb-4">
+            <label class="label cursor-pointer gap-2 justify-start">
+              <input type="checkbox" data-reload-skip class="checkbox checkbox-sm" />
+              <span class="label-text text-sm">Don't show this message again</span>
+            </label>
+          </div>
+          <div class="modal-action">
+            <button data-reload-cancel class="btn btn-ghost btn-sm">Cancel</button>
+            <button data-reload-confirm class="btn btn-error btn-sm">Reload</button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button data-reload-cancel>close</button>
+        </form>
+      </dialog>
+
+      <%!-- Reload loading overlay --%>
+      <div
+        :if={@reloading}
+        class="absolute inset-0 z-40 flex items-center justify-center bg-base-100/80 backdrop-blur-sm rounded-xl"
+      >
+        <div class="flex flex-col items-center gap-3">
+          <span class="loading loading-spinner loading-lg text-primary"></span>
+          <p class="text-sm text-base-content/60">Reloading messages...</p>
+        </div>
+      </div>
+
       <%!-- Drag overlay --%>
       <div
         id="drag-overlay"
@@ -131,8 +169,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             <li><hr class="border-base-content/10 my-1" /></li>
             <li>
               <button
-                phx-click="reload_from_session_file"
-                data-confirm="This will delete all messages and re-import from the JSONL file. Continue?"
+                phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
                 class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
               >
                 <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Reload from file
@@ -230,8 +267,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 <span class="hidden sm:inline">Live</span>
               </button>
               <button
-                phx-click="reload_from_session_file"
-                data-confirm="This will delete all messages and re-import from the JSONL file. Continue?"
+                phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
                 class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
                 id="dm-reload-button"
               >
@@ -291,8 +327,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 >
                   <li>
                     <button
-                      phx-click="reload_from_session_file"
-                      data-confirm="This will delete all messages and re-import from the JSONL file. Continue?"
+                      phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
                       class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
                     >
                       <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Reload from file
@@ -355,7 +390,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <% end %>
 
         <%!-- Pill tabs --%>
-        <div class="px-5 pb-3 overflow-x-auto" id="dm-tabs">
+        <div class="px-5 pb-3 flex items-center gap-3" id="dm-tabs">
           <div class="flex items-center gap-1 bg-base-content/[0.03] rounded-lg p-0.5 min-w-max">
             <%= for {tab, icon, label} <- @tabs do %>
               <button
@@ -373,6 +408,35 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               </button>
             <% end %>
           </div>
+          <%= if @active_tab in ["messages", nil] do %>
+            <div class="ml-auto w-48">
+              <form phx-change="search_messages" phx-submit="search_messages" class="relative">
+                <.icon
+                  name="hero-magnifying-glass"
+                  class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-base-content/30 pointer-events-none"
+                />
+                <input
+                  type="text"
+                  name="query"
+                  value={@message_search_query}
+                  placeholder="Search messages..."
+                  autocomplete="off"
+                  phx-debounce="300"
+                  class="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30 placeholder:text-base-content/25 text-base-content/70 transition-colors"
+                />
+                <%= if @message_search_query != "" do %>
+                  <button
+                    type="button"
+                    phx-click="search_messages"
+                    phx-value-query=""
+                    class="absolute right-2 top-1/2 -translate-y-1/2 text-base-content/30 hover:text-base-content/60 transition-colors"
+                  >
+                    <.icon name="hero-x-mark" class="w-3.5 h-3.5" />
+                  </button>
+                <% end %>
+              </form>
+            </div>
+          <% end %>
         </div>
       </div>
 
@@ -397,6 +461,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             <CommitsTab.commits_tab commits={@commits} diff_cache={@diff_cache} />
           <% "notes" -> %>
             <NotesTab.notes_tab notes={@notes} />
+          <% "context" -> %>
+            <ContextTab.context_tab session_context={@session_context} />
           <% _ -> %>
             <MessagesTab.messages_tab
               messages={@messages}

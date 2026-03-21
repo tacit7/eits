@@ -120,55 +120,46 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="flex h-full gap-0 flex-col">
-      <%!-- Team list sidebar --%>
-      <div class={[
-        "border-b border-base-300 flex flex-col flex-1 w-full",
-        @mobile_view == :detail && "hidden"
-      ]}>
-        <div class="px-4 py-3 border-b border-base-300 flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <.icon name="hero-user-group" class="w-4 h-4 text-base-content/50" />
-            <span class="text-xs font-semibold uppercase tracking-widest text-base-content/60">
-              Teams
-            </span>
-          </div>
-          <div class="flex items-center gap-2">
-            <button
-              phx-click="toggle_archived"
-              class={[
-                "text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors",
-                if(@show_archived,
-                  do: "bg-base-content/10 text-base-content/60",
-                  else: "text-base-content/30 hover:text-base-content/50"
-                )
-              ]}
-              title={if @show_archived, do: "Showing archived", else: "Show archived"}
-            >
-              {if @show_archived, do: "archived", else: "archived"}
-            </button>
-            <span class="font-mono text-xs text-base-content/40">{length(@teams)}</span>
-          </div>
+    <div class="bg-base-100 min-h-full px-4 sm:px-6 lg:px-8">
+      <div class="max-w-4xl mx-auto">
+        <%!-- Header --%>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-5">
+          <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
+            {length(@teams)} teams
+          </span>
+          <button
+            phx-click="toggle_archived"
+            class={[
+              "text-xs font-medium px-2 py-1 rounded transition-colors",
+              if(@show_archived,
+                do: "bg-base-content/10 text-base-content/60",
+                else: "text-base-content/30 hover:text-base-content/50"
+              )
+            ]}
+          >
+            {if @show_archived, do: "Hide archived", else: "Show archived"}
+          </button>
         </div>
 
-        <div class="flex-1 overflow-y-auto">
+        <%!-- Teams list --%>
+        <div class="mt-2 rounded-xl shadow-sm">
           <%= if @teams == [] do %>
-            <div class="flex flex-col items-center justify-center py-16 px-4 text-center gap-3">
+            <div class="flex flex-col items-center justify-center py-16 px-4 text-center gap-3 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl">
               <div class="w-10 h-10 rounded-full bg-base-200 flex items-center justify-center">
                 <.icon name="hero-user-group" class="w-5 h-5 text-base-content/30" />
               </div>
               <p class="text-xs text-base-content/30">No active teams</p>
             </div>
           <% else %>
-            <div class="space-y-px">
+            <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl px-4">
               <%= for team <- @teams do %>
                 <div class={[
-                  "relative overflow-hidden bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] border-l-2 pl-2",
+                  "relative overflow-hidden border-l-2 pl-2",
                   team_status_border(team.status),
                   @selected_team_id == team.id && "ring-inset ring-1 ring-primary/30"
                 ]}>
                   <div
-                    class="group flex items-center gap-3 py-3 px-2 cursor-pointer"
+                    class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer bg-inherit relative z-[1]"
                     phx-click="select_team"
                     phx-value-id={team.id}
                     role="button"
@@ -179,12 +170,20 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
                         {team.name}
                       </span>
                       <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
+                        <span class={["font-medium shrink-0", team_status_text(team.status)]}>
+                          {String.capitalize(team.status)}
+                        </span>
+                        <span class="text-base-content/15">/</span>
                         <span class="font-mono">{length(team.members)} members</span>
                         <%= if active_member_count(team.members) > 0 do %>
                           <span class="text-base-content/15">/</span>
                           <span class="text-success/70">
                             {active_member_count(team.members)} active
                           </span>
+                        <% end %>
+                        <%= if team.description do %>
+                          <span class="text-base-content/15">/</span>
+                          <span class="truncate text-base-content/40">{team.description}</span>
                         <% end %>
                       </div>
                     </div>
@@ -194,95 +193,87 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
             </div>
           <% end %>
         </div>
-      </div>
 
-      <%!-- Team detail panel --%>
-      <div class={[
-        "flex-1 min-w-0 w-full flex",
-        @mobile_view == :list && "hidden sm:block"
-      ]}>
-        <%!-- Left: team detail --%>
-        <div class={[
-          "flex flex-col overflow-hidden",
-          @selected_agent && "w-1/2 border-r border-base-300",
-          !@selected_agent && "flex-1"
-        ]}>
-          <%= if @mobile_view == :detail do %>
-            <button
-              class="flex items-center gap-2 px-4 py-3 text-sm text-base-content/60 border-b border-base-300 w-full hover:bg-base-200 shrink-0"
-              phx-click="close_team"
-            >
-              <.icon name="hero-arrow-left" class="w-4 h-4" /> Teams
-            </button>
-          <% end %>
-          <div class="flex-1 overflow-y-auto">
-            <%= if @selected_team do %>
-              <.live_component
-                module={EyeInTheSkyWeb.TeamDetailComponent}
-                id="team-detail"
-                team={@selected_team}
-                selected_agent_session_id={@agent_session_id}
-              />
-            <% else %>
-              <div class="flex items-center justify-center h-full">
-                <div class="text-center space-y-3">
-                  <div class="w-16 h-16 rounded-2xl bg-base-200 flex items-center justify-center mx-auto">
-                    <.icon name="hero-user-group" class="w-8 h-8 text-base-content/20" />
-                  </div>
-                  <div>
-                    <p class="text-sm font-medium text-base-content/30">No team selected</p>
-                    <p class="text-xs text-base-content/20 mt-1">Choose a team from the list</p>
-                  </div>
-                </div>
-              </div>
-            <% end %>
-          </div>
-        </div>
-
-        <%!-- Right: agent messages pane --%>
-        <%= if @selected_agent do %>
-          <div class="w-1/2 flex flex-col overflow-hidden">
-            <div class="px-4 py-3 border-b border-base-300 flex items-center justify-between shrink-0">
-              <div class="flex items-center gap-2 min-w-0">
-                <div class={[
-                  "w-6 h-6 rounded-md shrink-0 flex items-center justify-center text-[10px] font-bold",
-                  member_avatar_class(@selected_agent.status)
-                ]}>
-                  {ViewHelpers.member_initials(@selected_agent.name)}
-                </div>
-                <span class="font-medium text-sm truncate">{@selected_agent.name}</span>
-                <span class={[
-                  "text-[10px] font-medium shrink-0",
-                  member_status_text(@selected_agent.status)
-                ]}>
-                  {@selected_agent.status}
-                </span>
-              </div>
+        <%!-- Team detail panel --%>
+        <%= if @selected_team do %>
+          <div class="mt-4 rounded-xl shadow-sm bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)]">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-base-content/5">
+              <span class="text-[11px] font-semibold uppercase tracking-widest text-base-content/50">
+                {@selected_team.name}
+              </span>
               <button
-                phx-click="close_agent"
-                class="shrink-0 p-1 rounded hover:bg-base-200 text-base-content/40 hover:text-base-content/70 transition-colors"
+                phx-click="close_team"
+                class="p-1 rounded hover:bg-base-200 text-base-content/40 hover:text-base-content/70 transition-colors"
               >
                 <.icon name="hero-x-mark" class="w-4 h-4" />
               </button>
             </div>
 
-            <%= if @agent_messages == [] do %>
-              <div class="flex-1 flex items-center justify-center">
-                <div class="text-center space-y-2">
-                  <.icon
-                    name="hero-chat-bubble-left-right"
-                    class="w-8 h-8 text-base-content/15 mx-auto"
-                  />
-                  <p class="text-sm text-base-content/30">No messages</p>
+            <div class={["flex", @selected_agent && "divide-x divide-base-content/5"]}>
+              <%!-- Left: team detail --%>
+              <div class={[
+                "overflow-hidden",
+                @selected_agent && "w-1/2",
+                !@selected_agent && "w-full"
+              ]}>
+                <.live_component
+                  module={EyeInTheSkyWeb.TeamDetailComponent}
+                  id="team-detail"
+                  team={@selected_team}
+                  selected_agent_session_id={@agent_session_id}
+                />
+              </div>
+
+              <%!-- Right: agent messages pane --%>
+              <%= if @selected_agent do %>
+                <div class="w-1/2 flex flex-col overflow-hidden">
+                  <div class="px-4 py-3 border-b border-base-content/5 flex items-center justify-between shrink-0">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <div class={[
+                        "w-6 h-6 rounded-md shrink-0 flex items-center justify-center text-[10px] font-bold",
+                        member_avatar_class(@selected_agent.status)
+                      ]}>
+                        {ViewHelpers.member_initials(@selected_agent.name)}
+                      </div>
+                      <span class="font-medium text-sm truncate">{@selected_agent.name}</span>
+                      <span class={[
+                        "text-[10px] font-medium shrink-0",
+                        member_status_text(@selected_agent.status)
+                      ]}>
+                        {@selected_agent.status}
+                      </span>
+                    </div>
+                    <button
+                      phx-click="close_agent"
+                      class="shrink-0 p-1 rounded hover:bg-base-200 text-base-content/40 hover:text-base-content/70 transition-colors"
+                    >
+                      <.icon name="hero-x-mark" class="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <%= if @agent_messages == [] do %>
+                    <div class="flex items-center justify-center py-12">
+                      <div class="text-center space-y-2">
+                        <.icon
+                          name="hero-chat-bubble-left-right"
+                          class="w-8 h-8 text-base-content/15 mx-auto"
+                        />
+                        <p class="text-sm text-base-content/30">No messages</p>
+                      </div>
+                    </div>
+                  <% else %>
+                    <div
+                      class="overflow-y-auto px-3 py-3 space-y-3 max-h-96"
+                      id="agent-messages-panel"
+                    >
+                      <%= for message <- @agent_messages do %>
+                        <.agent_message message={message} />
+                      <% end %>
+                    </div>
+                  <% end %>
                 </div>
-              </div>
-            <% else %>
-              <div class="flex-1 overflow-y-auto px-3 py-3 space-y-3" id="agent-messages-panel">
-                <%= for message <- @agent_messages do %>
-                  <.agent_message message={message} />
-                <% end %>
-              </div>
-            <% end %>
+              <% end %>
+            </div>
           </div>
         <% end %>
       </div>
@@ -410,6 +401,10 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
 
   defp team_status_border("active"), do: "border-success"
   defp team_status_border(_), do: "border-transparent"
+
+  defp team_status_text("active"), do: "text-success"
+  defp team_status_text("archived"), do: "text-base-content/40"
+  defp team_status_text(_), do: "text-base-content/40"
 
   defp member_status_text("active"), do: "text-success"
   defp member_status_text("idle"), do: "text-warning"

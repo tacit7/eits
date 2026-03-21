@@ -390,7 +390,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <% end %>
 
         <%!-- Pill tabs --%>
-        <div class="px-5 pb-3 overflow-x-auto" id="dm-tabs">
+        <div class="px-5 pb-3 flex items-center gap-3" id="dm-tabs">
           <div class="flex items-center gap-1 bg-base-content/[0.03] rounded-lg p-0.5 min-w-max">
             <%= for {tab, icon, label} <- @tabs do %>
               <button
@@ -408,6 +408,35 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               </button>
             <% end %>
           </div>
+          <%= if @active_tab in ["messages", nil] do %>
+            <div class="ml-auto w-48">
+              <form phx-change="search_messages" phx-submit="search_messages" class="relative">
+                <.icon
+                  name="hero-magnifying-glass"
+                  class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-base-content/30 pointer-events-none"
+                />
+                <input
+                  type="text"
+                  name="query"
+                  value={@message_search_query}
+                  placeholder="Search messages..."
+                  autocomplete="off"
+                  phx-debounce="300"
+                  class="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30 placeholder:text-base-content/25 text-base-content/70 transition-colors"
+                />
+                <%= if @message_search_query != "" do %>
+                  <button
+                    type="button"
+                    phx-click="search_messages"
+                    phx-value-query=""
+                    class="absolute right-2 top-1/2 -translate-y-1/2 text-base-content/30 hover:text-base-content/60 transition-colors"
+                  >
+                    <.icon name="hero-x-mark" class="w-3.5 h-3.5" />
+                  </button>
+                <% end %>
+              </form>
+            </div>
+          <% end %>
         </div>
       </div>
 

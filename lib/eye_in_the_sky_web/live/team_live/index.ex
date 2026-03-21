@@ -168,7 +168,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
             <% else %>
               <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl px-4">
                 <%= for team <- @filtered_teams do %>
-                  <div class="relative overflow-hidden">
+                  <div class={"relative overflow-hidden border-l-2 #{team_status_border(team.members)}"}>
                     <div class="group flex items-center gap-4 py-3">
                       <div
                         class="flex-1 min-w-0 cursor-pointer"
@@ -320,6 +320,18 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
   end
 
   defp active_member_count(members), do: Enum.count(members, &(&1.status == "active"))
+
+  defp team_status_border([]), do: "border-transparent"
+
+  defp team_status_border(members) do
+    active = Enum.count(members, &(&1.status == "active"))
+
+    cond do
+      active > 0 and active == length(members) -> "border-success"
+      active > 0 -> "border-success/40"
+      true -> "border-transparent"
+    end
+  end
 
   defp filter_teams(teams, ""), do: teams
 

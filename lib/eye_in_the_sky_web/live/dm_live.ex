@@ -394,6 +394,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         context_used={@context_used}
         context_window={@context_window}
         message_search_query={@message_search_query}
+        session_context={@session_context}
       />
 
       <EyeInTheSkyWeb.Components.NewTaskDrawer.new_task_drawer

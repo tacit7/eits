@@ -29,7 +29,7 @@ defmodule EyeInTheSky.AgentDefinitions do
     AgentDefinition
     |> where([d], is_nil(d.missing_at))
     |> maybe_filter_project(project_id)
-    |> order_by([d], [asc: d.scope, asc: d.slug])
+    |> order_by([d], [desc: d.scope, asc: d.slug])
     |> Repo.all()
   end
 
@@ -41,7 +41,7 @@ defmodule EyeInTheSky.AgentDefinitions do
     AgentDefinition
     |> where([d], is_nil(d.missing_at))
     |> where([d], d.project_id == ^project_id or d.scope == "global")
-    |> order_by([d], [asc: d.scope, asc: d.slug])
+    |> order_by([d], [desc: d.scope, asc: d.slug])
     |> Repo.all()
   end
 
@@ -143,6 +143,8 @@ defmodule EyeInTheSky.AgentDefinitions do
 
       {:ok, synced_slugs}
     else
+      # Directory absent — mark all existing definitions for this scope as missing
+      mark_missing(scope, project_id, [], now)
       {:ok, []}
     end
   end
@@ -254,11 +256,33 @@ defmodule EyeInTheSky.AgentDefinitions do
       [_, yaml_block] ->
         lines = String.split(yaml_block, "\n")
 
-        attrs =
-          Enum.reduce(lines, %{}, fn line, acc ->
-            case Regex.run(~r/^(\w+):\s*(.+)$/, String.trim(line)) do
-              [_, key, value] -> Map.put(acc, key, clean_value(value))
-              _ -> acc
+        {attrs, _current_key} =
+          Enum.reduce(lines, {%{}, nil}, fn line, {acc, current_key} ->
+            trimmed = String.trim(line)
+
+            case {Regex.run(~r/^(\w+):\s+(.+)$/, trimmed),
+                  Regex.run(~r/^(\w+):\s*$/, trimmed),
+                  Regex.run(~r/^-\s+(.+)$/, trimmed)} do
+              {[_, key, value], _, _} ->
+                # key: value (inline)
+                {Map.put(acc, key, clean_value(value)), key}
+
+              {nil, [_, key], _} ->
+                # key: (empty — YAML list follows)
+                {Map.put(acc, key, []), key}
+
+              {nil, nil, [_, value]} ->
+                # - value (YAML list item)
+                if current_key do
+                  existing = Map.get(acc, current_key, [])
+                  items = if is_list(existing), do: existing, else: []
+                  {Map.put(acc, current_key, items ++ [clean_value(value)]), current_key}
+                else
+                  {acc, current_key}
+                end
+
+              _ ->
+                {acc, current_key}
             end
           end)
 
@@ -285,8 +309,9 @@ defmodule EyeInTheSky.AgentDefinitions do
   end
 
   defp parse_tools(nil), do: []
+  defp parse_tools(tools) when is_list(tools), do: Enum.map(tools, &String.trim/1)
 
-  defp parse_tools(tools_str) do
+  defp parse_tools(tools_str) when is_binary(tools_str) do
     tools_str |> String.split(~r/[,\s]+/) |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
   end
 

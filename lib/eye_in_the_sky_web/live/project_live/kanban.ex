@@ -1,19 +1,17 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Projects
-  alias EyeInTheSky.Tasks
-  alias EyeInTheSky.Tasks.WorkflowState
-  alias EyeInTheSky.Notes
-  import EyeInTheSkyWeb.ControllerHelpers
+  alias EyeInTheSky.{Tasks, Notes}
+  alias EyeInTheSkyWeb.Live.Shared.{KanbanFilters, TasksHelpers, BulkHelpers}
+  alias EyeInTheSkyWeb.ProjectLive.Kanban.{BoardActions, FilterHandlers}
 
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
-  import EyeInTheSkyWeb.Components.TaskCard, only: [task_card: 1]
-  import EyeInTheSkyWeb.Live.Shared.TasksHelpers
-  import EyeInTheSkyWeb.Live.Shared.KanbanFilters, only: [apply_filters: 1, parse_due_date_filter: 1, parse_activity_filter: 1]
   import EyeInTheSkyWeb.Live.Shared.AgentHelpers, only: [handle_start_agent_for_task: 2]
   import EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWeb.Components.KanbanFilterDrawer, only: [kanban_filter_drawer: 1]
+  import EyeInTheSkyWeb.Components.KanbanToolbar, only: [kanban_toolbar: 1]
+  import EyeInTheSkyWeb.Components.KanbanBulkBar, only: [kanban_bulk_bar: 1]
+  import EyeInTheSkyWeb.Components.KanbanBoard, only: [kanban_board: 1]
 
   @impl true
   def mount(%{"id" => _} = params, _session, socket) do
@@ -32,45 +30,22 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
         page_title_prefix: "Kanban",
         preload: [:agents]
       )
-      |> assign(:search_query, "")
-      |> assign(:filter_priority, nil)
-      |> assign(:filter_tags, MapSet.new())
-      |> assign(:filter_tag_mode, :and)
-      |> assign(:workflow_states, Tasks.list_workflow_states())
-      |> assign(:tasks, [])
-      |> assign(:tasks_by_state, %{})
-      |> assign(:available_tags, [])
-      |> assign(:tag_counts, %{})
-      |> assign(:show_new_task_drawer, false)
-      |> assign(:show_task_detail_drawer, false)
-      |> assign(:selected_task, nil)
-      |> assign(:task_notes, [])
-      |> assign(:quick_add_column, nil)
-      |> assign(:show_completed, false)
-      |> assign(:show_archived, false)
-      |> assign(:selected_tasks, MapSet.new())
-      |> assign(:bulk_mode, false)
-      |> assign(:all_projects, Projects.list_projects())
-      |> assign(:show_filters, false)
-      |> assign(:show_filter_drawer, false)
-      |> assign(:filter_due_date, nil)
-      |> assign(:filter_activity, nil)
-      |> assign(:working_session_ids, MapSet.new())
+      |> init_assigns()
 
     if socket.assigns.project do
-      {:ok, load_tasks(socket)}
+      {:ok, KanbanFilters.load_tasks(socket)}
     else
       {:ok, socket}
     end
   end
 
   # ---------------------------------------------------------------------------
-  # Events: search, drawers, task CRUD (delegated to TasksHelpers)
+  # Events: search and drawers
   # ---------------------------------------------------------------------------
 
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
-    {:noreply, socket |> assign(:search_query, query) |> load_tasks()}
+    {:noreply, socket |> assign(:search_query, query) |> KanbanFilters.load_tasks()}
   end
 
   @impl true
@@ -83,33 +58,41 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
     {:noreply, assign(socket, :show_task_detail_drawer, !socket.assigns.show_task_detail_drawer)}
   end
 
+  # ---------------------------------------------------------------------------
+  # Events: task CRUD (delegated to TasksHelpers)
+  # ---------------------------------------------------------------------------
+
   @impl true
   def handle_event("open_task_detail", params, socket),
-    do: handle_open_task_detail(params, socket)
+    do: TasksHelpers.handle_open_task_detail(params, socket)
 
   @impl true
   def handle_event("update_task", params, socket),
-    do: handle_update_task(params, socket, &load_tasks/1)
+    do: TasksHelpers.handle_update_task(params, socket, &KanbanFilters.load_tasks/1)
 
   @impl true
   def handle_event("delete_task", params, socket),
-    do: handle_delete_task(params, socket, &load_tasks/1)
+    do: TasksHelpers.handle_delete_task(params, socket, &KanbanFilters.load_tasks/1)
 
   @impl true
   def handle_event("create_new_task", params, socket),
-    do: handle_create_new_task(params, socket, &load_tasks/1)
+    do: TasksHelpers.handle_create_new_task(params, socket, &KanbanFilters.load_tasks/1)
 
   @impl true
   def handle_event("quick_add_task", params, socket),
-    do: handle_quick_add_task(params, socket, &load_tasks/1)
+    do: TasksHelpers.handle_quick_add_task(params, socket, &KanbanFilters.load_tasks/1)
 
   @impl true
   def handle_event("archive_task", params, socket),
-    do: handle_archive_task(params, socket, &load_tasks/1)
+    do: TasksHelpers.handle_archive_task(params, socket, &KanbanFilters.load_tasks/1)
 
   @impl true
   def handle_event("add_task_annotation", params, socket),
-    do: handle_add_task_annotation(params, socket)
+    do: TasksHelpers.handle_add_task_annotation(params, socket)
+
+  @impl true
+  def handle_event("copy_task_to_project", params, socket),
+    do: TasksHelpers.handle_copy_task_to_project(params, socket)
 
   # ---------------------------------------------------------------------------
   # Events: agent spawning
@@ -120,253 +103,92 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
     do: handle_start_agent_for_task(params, socket)
 
   # ---------------------------------------------------------------------------
-  # Events: copy task to another project
+  # Events: bulk operations (delegated to BulkHelpers)
   # ---------------------------------------------------------------------------
 
   @impl true
-  def handle_event("copy_task_to_project", %{"project_id" => project_id_str}, socket) do
-    task = socket.assigns.selected_task
-    target_project_id = parse_int(project_id_str, 0)
+  def handle_event("toggle_bulk_mode", _params, socket),
+    do: BulkHelpers.handle_toggle_bulk_mode(socket)
 
-    if target_project_id > 0 and task do
-      now = DateTime.utc_now() |> DateTime.to_iso8601()
-      tag_names = Enum.map(task.tags || [], & &1.name)
+  @impl true
+  def handle_event("toggle_select_task", params, socket),
+    do: BulkHelpers.handle_toggle_select_task(params, socket)
 
-      case Tasks.create_task(%{
-             uuid: Ecto.UUID.generate(),
-             title: task.title,
-             description: task.description,
-             state_id: WorkflowState.todo_id(),
-             priority: task.priority || 0,
-             project_id: target_project_id,
-             created_at: now,
-             updated_at: now
-           }) do
-        {:ok, new_task} ->
-          if tag_names != [], do: Tasks.replace_task_tags(new_task.id, tag_names)
-          target = Projects.get_project!(target_project_id)
+  @impl true
+  def handle_event("select_all_column", params, socket),
+    do: BulkHelpers.handle_select_all_column(params, socket)
 
-          socket =
-            socket
-            |> assign(:show_task_detail_drawer, false)
-            |> put_flash(:info, "Task copied to #{target.name}")
+  @impl true
+  def handle_event("bulk_move", params, socket),
+    do: BulkHelpers.handle_bulk_move(params, socket, &KanbanFilters.load_tasks/1)
 
-          {:noreply, socket}
+  @impl true
+  def handle_event("bulk_archive", _params, socket),
+    do: BulkHelpers.handle_bulk_archive(socket, &KanbanFilters.load_tasks/1)
 
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to copy task")}
-      end
-    else
-      {:noreply, socket}
-    end
-  end
+  @impl true
+  def handle_event("bulk_delete", _params, socket),
+    do: BulkHelpers.handle_bulk_delete(socket, &KanbanFilters.load_tasks/1)
 
   # ---------------------------------------------------------------------------
-  # Events: bulk operations
+  # Events: filters (delegated to FilterHandlers)
   # ---------------------------------------------------------------------------
 
   @impl true
-  def handle_event("toggle_bulk_mode", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:bulk_mode, !socket.assigns.bulk_mode)
-     |> assign(:selected_tasks, MapSet.new())}
-  end
+  def handle_event("clear_filters", _params, socket),
+    do: FilterHandlers.handle_clear_filters(socket)
 
   @impl true
-  def handle_event("toggle_select_task", %{"task-uuid" => uuid}, socket) do
-    selected = socket.assigns.selected_tasks
-
-    updated =
-      if MapSet.member?(selected, uuid),
-        do: MapSet.delete(selected, uuid),
-        else: MapSet.put(selected, uuid)
-
-    {:noreply, assign(socket, :selected_tasks, updated)}
-  end
-
-  @impl true
-  def handle_event("toggle_select_task", _params, socket) do
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("select_all_column", %{"state-id" => state_id_str}, socket) do
-    state_id = parse_int(state_id_str, 0)
-
-    column_uuids =
-      Map.get(socket.assigns.tasks_by_state, state_id, [])
-      |> Enum.map(& &1.uuid)
-      |> Enum.reject(&is_nil/1)
-
-    current = socket.assigns.selected_tasks
-    all_selected = Enum.all?(column_uuids, &MapSet.member?(current, &1))
-
-    updated =
-      if all_selected,
-        do: Enum.reduce(column_uuids, current, &MapSet.delete(&2, &1)),
-        else: Enum.reduce(column_uuids, current, &MapSet.put(&2, &1))
-
-    {:noreply, assign(socket, :selected_tasks, updated)}
-  end
-
-  @impl true
-  def handle_event("bulk_move", %{"state_id" => state_id_str}, socket) do
-    state_id = parse_int(state_id_str, 0)
-    now = DateTime.utc_now() |> DateTime.to_iso8601()
-
-    socket.assigns.selected_tasks
-    |> Enum.reject(&is_nil/1)
-    |> Enum.each(fn uuid ->
-      task = Tasks.get_task_by_uuid!(uuid)
-      Tasks.update_task(task, %{state_id: state_id, updated_at: now})
-    end)
-
-    {:noreply, socket |> assign(:selected_tasks, MapSet.new()) |> load_tasks()}
-  end
-
-  @impl true
-  def handle_event("bulk_archive", _params, socket) do
-    socket.assigns.selected_tasks
-    |> Enum.reject(&is_nil/1)
-    |> Enum.each(fn uuid ->
-      task = Tasks.get_task_by_uuid!(uuid)
-      Tasks.archive_task(task)
-    end)
-
-    {:noreply,
-     socket
-     |> assign(:selected_tasks, MapSet.new())
-     |> load_tasks()
-     |> put_flash(:info, "Tasks archived")}
-  end
-
-  @impl true
-  def handle_event("bulk_delete", _params, socket) do
-    socket.assigns.selected_tasks
-    |> Enum.reject(&is_nil/1)
-    |> Enum.each(fn uuid ->
-      task = Tasks.get_task_by_uuid!(uuid)
-      Tasks.delete_task_with_associations(task)
-    end)
-
-    {:noreply,
-     socket
-     |> assign(:selected_tasks, MapSet.new())
-     |> load_tasks()
-     |> put_flash(:info, "Tasks deleted")}
-  end
-
-  # ---------------------------------------------------------------------------
-  # Events: filters (delegates to KanbanFilters for logic)
-  # ---------------------------------------------------------------------------
-
-  @impl true
-  def handle_event("clear_filters", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:filter_priority, nil)
-     |> assign(:filter_tags, MapSet.new())
-     |> assign(:filter_tag_mode, :and)
-     |> assign(:filter_due_date, nil)
-     |> assign(:filter_activity, nil)
-     |> apply_filters()}
-  end
-
-  @impl true
-  def handle_event("toggle_filter_drawer", _, socket) do
-    {:noreply, assign(socket, :show_filter_drawer, !socket.assigns.show_filter_drawer)}
-  end
+  def handle_event("toggle_filter_drawer", _, socket),
+    do: FilterHandlers.handle_toggle_filter_drawer(socket)
 
   @impl true
   def handle_event("update_filter", params, socket),
-    do: update_filter(params, socket)
+    do: FilterHandlers.handle_update_filter(params, socket)
 
   @impl true
-  def handle_event("toggle_filters", _params, socket) do
-    {:noreply, assign(socket, :show_filters, !socket.assigns.show_filters)}
-  end
+  def handle_event("toggle_filters", _params, socket),
+    do: FilterHandlers.handle_toggle_filters(socket)
 
   @impl true
-  def handle_event("toggle_show_completed", _params, socket) do
-    {:noreply, socket |> assign(:show_completed, !socket.assigns.show_completed) |> load_tasks()}
-  end
+  def handle_event("toggle_show_completed", _params, socket),
+    do: FilterHandlers.handle_toggle_show_completed(socket)
 
   @impl true
-  def handle_event("toggle_show_archived", _params, socket) do
-    {:noreply, socket |> assign(:show_archived, !socket.assigns.show_archived) |> load_tasks()}
-  end
+  def handle_event("toggle_show_archived", _params, socket),
+    do: FilterHandlers.handle_toggle_show_archived(socket)
 
   # ---------------------------------------------------------------------------
-  # Events: column / task ordering, quick-add, tag colors
+  # Events: board actions (delegated to BoardActions)
   # ---------------------------------------------------------------------------
 
-  @tag_colors ~w(#6B7280 #EF4444 #F59E0B #10B981 #3B82F6 #8B5CF6 #EC4899 #06B6D4)
+  @impl true
+  def handle_event("cycle_tag_color", params, socket),
+    do: BoardActions.handle_cycle_tag_color(params, socket)
 
   @impl true
-  def handle_event("cycle_tag_color", %{"tag-id" => tag_id_str}, socket) do
-    tag_id = parse_int(tag_id_str, 0)
-    tag = Tasks.get_tag!(tag_id)
-    current_color = tag.color || List.first(@tag_colors)
-    current_idx = Enum.find_index(@tag_colors, &(&1 == current_color)) || -1
-    next_color = Enum.at(@tag_colors, rem(current_idx + 1, length(@tag_colors)))
-
-    case Tasks.update_tag(tag, %{color: next_color}) do
-      {:ok, _} -> {:noreply, load_tasks(socket)}
-      {:error, _} -> {:noreply, socket}
-    end
-  end
+  def handle_event("reorder_columns", params, socket),
+    do: BoardActions.handle_reorder_columns(params, socket)
 
   @impl true
-  def handle_event("reorder_columns", %{"column_ids" => column_ids}, socket)
-      when is_list(column_ids) do
-    ids = Enum.map(column_ids, &parse_int(&1, 0))
-    Tasks.reorder_workflow_states(ids)
-    {:noreply, assign(socket, :workflow_states, Tasks.list_workflow_states())}
-  end
+  def handle_event("reorder_tasks", params, socket),
+    do: BoardActions.handle_reorder_tasks(params, socket)
 
   @impl true
-  def handle_event("reorder_tasks", %{"task_ids" => task_ids}, socket) when is_list(task_ids) do
-    Tasks.reorder_tasks(task_ids)
-    {:noreply, socket}
-  end
+  def handle_event("move_task", params, socket),
+    do: BoardActions.handle_move_task(params, socket)
 
   @impl true
-  def handle_event("move_task", %{"task_id" => task_uuid, "state_id" => state_id_str}, socket) do
-    state_id = parse_int(state_id_str, 0)
-    task = Tasks.get_task_by_uuid!(task_uuid)
-
-    case Tasks.update_task(task, %{
-           state_id: state_id,
-           updated_at: DateTime.utc_now() |> DateTime.to_iso8601()
-         }) do
-      {:ok, _} ->
-        {:noreply, load_tasks(socket)}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to move task")}
-    end
-  end
+  def handle_event("show_quick_add", params, socket),
+    do: BoardActions.handle_show_quick_add(params, socket)
 
   @impl true
-  def handle_event("show_quick_add", %{"state_id" => state_id}, socket) do
-    {:noreply, assign(socket, :quick_add_column, parse_int(state_id, 0))}
-  end
+  def handle_event("hide_quick_add", _params, socket),
+    do: BoardActions.handle_hide_quick_add(socket)
 
   @impl true
-  def handle_event("hide_quick_add", _params, socket) do
-    {:noreply, assign(socket, :quick_add_column, nil)}
-  end
-
-  @impl true
-  def handle_event("archive_column", %{"state-id" => state_id_str}, socket) do
-    state_id = parse_int(state_id_str, 0)
-    column_tasks = Map.get(socket.assigns.tasks_by_state, state_id, [])
-    Enum.each(column_tasks, fn task -> Tasks.archive_task(task) end)
-
-    {:noreply,
-     socket |> load_tasks() |> put_flash(:info, "#{length(column_tasks)} tasks archived")}
-  end
+  def handle_event("archive_column", params, socket),
+    do: BoardActions.handle_archive_column(params, socket)
 
   # ---------------------------------------------------------------------------
   # PubSub handlers
@@ -374,7 +196,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_info(:tasks_changed, socket) do
-    socket = load_tasks(socket)
+    socket = KanbanFilters.load_tasks(socket)
 
     socket =
       if socket.assigns.selected_task && socket.assigns.show_task_detail_drawer do
@@ -403,99 +225,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   end
 
   @impl true
-  def handle_info({:agent_updated, _}, socket), do: {:noreply, load_tasks(socket)}
+  def handle_info({:agent_updated, _}, socket), do: {:noreply, KanbanFilters.load_tasks(socket)}
 
   @impl true
-  def handle_info({:agent_created, _}, socket), do: {:noreply, load_tasks(socket)}
+  def handle_info({:agent_created, _}, socket), do: {:noreply, KanbanFilters.load_tasks(socket)}
 
   @impl true
   def handle_info({:agent_deleted, _}, socket), do: {:noreply, socket}
 
   @impl true
   def handle_info({:checklist_updated, task}, socket) do
-    {:noreply, socket |> assign(:selected_task, task) |> load_tasks()}
+    {:noreply, socket |> assign(:selected_task, task) |> KanbanFilters.load_tasks()}
   end
-
-  # ---------------------------------------------------------------------------
-  # Private: task loading
-  # ---------------------------------------------------------------------------
-
-  defp load_tasks(socket) do
-    project_id = socket.assigns.project_id
-    query = socket.assigns.search_query
-    show_archived = socket.assigns.show_archived
-    show_completed = socket.assigns.show_completed
-
-    all_tasks =
-      if String.length(String.trim(query)) >= 4 do
-        Tasks.search_tasks(query, project_id)
-      else
-        Projects.get_project_tasks(project_id, include_archived: show_archived)
-      end
-      |> then(fn tasks ->
-        if show_completed, do: tasks, else: Enum.reject(tasks, & &1.completed_at)
-      end)
-      |> Notes.with_notes_count()
-
-    all_tag_refs = Enum.flat_map(all_tasks, fn t -> t.tags || [] end)
-
-    available_tags =
-      all_tag_refs
-      |> Enum.uniq_by(& &1.name)
-      |> Enum.sort_by(& &1.name)
-
-    tag_counts =
-      all_tag_refs
-      |> Enum.frequencies_by(& &1.name)
-
-    socket
-    |> assign(:tasks, all_tasks)
-    |> assign(:available_tags, available_tags)
-    |> assign(:tag_counts, tag_counts)
-    |> apply_filters()
-  end
-
-  defp update_filter(%{"field" => "due_date", "value" => value}, socket) do
-    new_val = parse_due_date_filter(value)
-    current = socket.assigns.filter_due_date
-    filter = if current == new_val, do: nil, else: new_val
-    {:noreply, socket |> assign(:filter_due_date, filter) |> apply_filters()}
-  end
-
-  defp update_filter(%{"field" => "activity", "value" => value}, socket) do
-    new_val = parse_activity_filter(value)
-    current = socket.assigns.filter_activity
-    filter = if current == new_val, do: nil, else: new_val
-    {:noreply, socket |> assign(:filter_activity, filter) |> apply_filters()}
-  end
-
-  defp update_filter(%{"field" => "priority", "value" => priority}, socket) do
-    new_priority = if priority == "", do: nil, else: String.to_integer(priority)
-    current = socket.assigns.filter_priority
-    priority_filter = if current == new_priority, do: nil, else: new_priority
-    {:noreply, socket |> assign(:filter_priority, priority_filter) |> apply_filters()}
-  end
-
-  defp update_filter(%{"field" => "tag", "value" => tag}, socket) do
-    current_tags = socket.assigns.filter_tags
-
-    updated_tags =
-      if MapSet.member?(current_tags, tag),
-        do: MapSet.delete(current_tags, tag),
-        else: MapSet.put(current_tags, tag)
-
-    {:noreply, socket |> assign(:filter_tags, updated_tags) |> apply_filters()}
-  end
-
-  defp update_filter(%{"field" => "tag_mode", "value" => mode}, socket) do
-    new_mode = if mode == "or", do: :or, else: :and
-    {:noreply, socket |> assign(:filter_tag_mode, new_mode) |> apply_filters()}
-  end
-
-  defp update_filter(_params, socket), do: {:noreply, socket}
-
-  defp state_dot_color(color) when is_binary(color), do: color
-  defp state_dot_color(_), do: "#6B7280"
 
   # ---------------------------------------------------------------------------
   # Render
@@ -509,265 +250,30 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
       phx-hook="KanbanKeyboard"
       class="px-4 sm:px-6 py-6 h-[calc(100dvh-7rem)] md:h-[calc(100dvh-4rem)] flex flex-col"
     >
-      <%!-- Search + New Task --%>
-      <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 sticky top-0 z-10 bg-base-100 -mx-4 px-4 sm:-mx-6 sm:px-6 pt-1 pb-2 md:static md:mx-0 md:px-0 md:pt-0 md:pb-0 md:bg-transparent">
-        <form phx-change="search" class="w-full sm:flex-1 sm:max-w-sm">
-          <div class="relative">
-            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
-            </div>
-            <input
-              type="text"
-              name="query"
-              value={@search_query}
-              placeholder="Search tasks..."
-              phx-debounce="300"
-              class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
-              autocomplete="off"
-            />
-          </div>
-          <%= if String.length(String.trim(@search_query)) == 1 do %>
-            <p class="text-xs text-base-content/30 mt-1 pl-9">Type at least 2 characters to search</p>
-          <% end %>
-        </form>
+      <% active_filter_count =
+        if(@filter_priority, do: 1, else: 0) + MapSet.size(@filter_tags) +
+          if(@filter_due_date, do: 1, else: 0) + if @filter_activity, do: 1, else: 0 %>
+      <.kanban_toolbar
+        search_query={@search_query}
+        show_completed={@show_completed}
+        bulk_mode={@bulk_mode}
+        active_filter_count={active_filter_count}
+      />
 
-        <% active_filter_count =
-          if(@filter_priority, do: 1, else: 0) + MapSet.size(@filter_tags) +
-            if(@filter_due_date, do: 1, else: 0) + if @filter_activity, do: 1, else: 0 %>
-        <div class="flex items-center gap-1.5">
-          <button
-            phx-click="toggle_show_completed"
-            class={"btn btn-sm sm:btn-xs gap-1 h-9 sm:h-7 min-h-0 " <> if(@show_completed, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
-            title="Show completed tasks"
-          >
-            <.icon name="hero-check-circle-mini" class="w-3.5 h-3.5" />
-            <span class="hidden sm:inline">Done</span>
-          </button>
-          <button
-            phx-click="toggle_bulk_mode"
-            class={"btn btn-sm sm:btn-xs gap-1 h-9 sm:h-7 min-h-0 " <> if(@bulk_mode, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
-            title="Bulk select mode"
-          >
-            <.icon name="hero-check-mini" class="w-3.5 h-3.5" />
-            <span class="hidden sm:inline">Select</span>
-          </button>
-          <button
-            phx-click="toggle_filter_drawer"
-            class={"btn btn-sm sm:btn-xs gap-1 h-9 sm:h-7 min-h-0 " <> if(active_filter_count > 0, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
-            title="Filter tasks"
-          >
-            <.icon name="hero-funnel-mini" class="w-3.5 h-3.5" />
-            <span class="hidden sm:inline">Filter</span>
-            <%= if active_filter_count > 0 do %>
-              <span class="badge badge-xs badge-primary">{active_filter_count}</span>
-            <% end %>
-          </button>
-          <.link
-            navigate={~p"/projects/#{@project.id}/tasks"}
-            class="btn btn-sm sm:btn-xs btn-ghost border border-base-content/10 gap-1 h-9 sm:h-7 min-h-0"
-            title="List view"
-          >
-            <.icon name="hero-list-bullet-mini" class="w-3.5 h-3.5" />
-            <span class="hidden sm:inline">List</span>
-          </.link>
-          <button
-            phx-click="toggle_new_task_drawer"
-            class="btn btn-sm btn-primary gap-1.5 h-9 sm:h-7 min-h-0 text-xs"
-          >
-            <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Task
-          </button>
-        </div>
-      </div>
+      <.kanban_bulk_bar
+        bulk_mode={@bulk_mode}
+        selected_tasks={@selected_tasks}
+        workflow_states={@workflow_states}
+      />
 
-      <%!-- Bulk action bar --%>
-      <%= if @bulk_mode and MapSet.size(@selected_tasks) > 0 do %>
-        <div class="mb-2 flex flex-wrap items-center gap-1.5 sm:gap-2 px-2 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
-          <span class="text-xs font-medium text-primary">
-            {MapSet.size(@selected_tasks)} selected
-          </span>
-          <span class="text-base-content/15 hidden sm:inline">|</span>
-          <span class="text-[11px] text-base-content/40 hidden sm:inline">Move to:</span>
-          <%= for state <- @workflow_states do %>
-            <button
-              phx-click="bulk_move"
-              phx-value-state_id={state.id}
-              class="btn btn-sm sm:btn-xs btn-ghost gap-1 min-h-[36px] sm:min-h-0"
-            >
-              <span
-                class="w-1.5 h-1.5 rounded-full"
-                style={"background-color: #{state_dot_color(state.color)}"}
-              >
-              </span>
-              {state.name}
-            </button>
-          <% end %>
-          <span class="text-base-content/15 hidden sm:inline">|</span>
-          <button
-            phx-click="bulk_archive"
-            class="btn btn-sm sm:btn-xs btn-ghost text-warning gap-1 min-h-[36px] sm:min-h-0"
-          >
-            <.icon name="hero-archive-box-mini" class="w-3 h-3" /> Archive
-          </button>
-          <button
-            phx-click="bulk_delete"
-            phx-confirm={"Delete #{MapSet.size(@selected_tasks)} tasks?"}
-            class="btn btn-sm sm:btn-xs btn-ghost text-error gap-1 min-h-[36px] sm:min-h-0"
-          >
-            <.icon name="hero-trash-mini" class="w-3 h-3" /> Delete
-          </button>
-        </div>
-      <% end %>
-
-      <%!-- Kanban columns --%>
-      <div
-        class="flex-1 min-h-0 overflow-x-auto"
-        id="kanban-scroll"
-        phx-hook="KanbanScrollDots"
-        data-column-count={length(@workflow_states)}
-      >
-        <div
-          id="kanban-columns"
-          phx-hook="SortableColumns"
-          class="inline-flex gap-3 h-full min-w-full pb-2 snap-x snap-mandatory"
-        >
-          <%= for state <- @workflow_states do %>
-            <% column_tasks = Map.get(@tasks_by_state, state.id, []) %>
-            <% task_count = length(column_tasks) %>
-            <div
-              class="flex-shrink-0 w-[84vw] max-w-80 md:w-72 flex flex-col h-full snap-start"
-              data-column-id={state.id}
-            >
-              <%!-- Column header with colored accent --%>
-              <div class="mb-2">
-                <div
-                  class="h-0.5 rounded-full mx-1 mb-2"
-                  style={"background-color: #{state_dot_color(state.color)}"}
-                />
-                <div class="flex items-center gap-2 px-3 py-1" data-column-handle>
-                  <%= if @bulk_mode do %>
-                    <input
-                      type="checkbox"
-                      class="checkbox checkbox-sm sm:checkbox-xs checkbox-primary"
-                      checked={
-                        column_tasks != [] and
-                          Enum.all?(column_tasks, &MapSet.member?(@selected_tasks, &1.uuid))
-                      }
-                      phx-click="select_all_column"
-                      phx-value-state-id={state.id}
-                    />
-                  <% end %>
-                  <div class="flex items-center gap-1.5 cursor-grab active:cursor-grabbing">
-                    <.icon
-                      name="hero-bars-2"
-                      class="w-3 h-3 text-base-content/20 hover:text-base-content/40"
-                    />
-                    <div
-                      class="w-2 h-2 rounded-full flex-shrink-0"
-                      style={"background-color: #{state_dot_color(state.color)}"}
-                    />
-                  </div>
-                  <span class="text-xs font-semibold text-base-content/70 uppercase tracking-wider">
-                    {state.name}
-                  </span>
-                  <span class="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-medium tabular-nums bg-base-content/[0.06] text-base-content/40">
-                    {task_count}
-                  </span>
-                  <%= if state.name == "Done" and task_count > 0 do %>
-                    <button
-                      type="button"
-                      phx-click="archive_column"
-                      phx-value-state-id={state.id}
-                      phx-confirm={"Archive all #{task_count} done tasks?"}
-                      class="p-1 rounded text-base-content/20 hover:text-warning hover:bg-warning/10 transition-colors"
-                      title="Archive all done tasks"
-                    >
-                      <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
-                    </button>
-                  <% end %>
-                </div>
-              </div>
-
-              <%!-- Column body --%>
-              <div
-                class="flex-1 min-h-0 overflow-y-auto rounded-xl bg-base-content/[0.04] p-2 space-y-1.5"
-                id={"kanban-col-#{state.id}"}
-                phx-hook="SortableKanban"
-                data-state-id={state.id}
-              >
-                <%= if column_tasks == [] do %>
-                  <div
-                    data-empty-placeholder
-                    class="flex flex-col items-center justify-center h-24 border border-dashed border-base-content/8 rounded-lg pointer-events-none"
-                  >
-                    <.icon name="hero-inbox" class="w-5 h-5 text-base-content/15 mb-1" />
-                    <span class="text-[11px] text-base-content/20">No tasks</span>
-                  </div>
-                <% end %>
-                <%= for task <- column_tasks do %>
-                  <div class="flex items-start gap-1.5" data-task-id={task.uuid}>
-                    <%= if @bulk_mode do %>
-                      <input
-                        type="checkbox"
-                        class="checkbox checkbox-sm sm:checkbox-xs checkbox-primary mt-3 flex-shrink-0"
-                        checked={MapSet.member?(@selected_tasks, task.uuid)}
-                        phx-click="toggle_select_task"
-                        phx-value-task-uuid={task.uuid}
-                      />
-                    <% end %>
-                    <div class="flex-1 min-w-0">
-                      <.task_card
-                        variant="kanban"
-                        task={task}
-                        on_click="open_task_detail"
-                        on_delete="delete_task"
-                        id={"kanban-task-#{task.id}"}
-                        working_session_ids={@working_session_ids}
-                        workflow_states={@workflow_states}
-                      />
-                    </div>
-                  </div>
-                <% end %>
-
-                <%!-- Quick-add --%>
-                <%= if @quick_add_column == state.id do %>
-                  <form phx-submit="quick_add_task" class="mt-1">
-                    <input type="hidden" name="state_id" value={state.id} />
-                    <input
-                      type="text"
-                      name="title"
-                      placeholder="Task title... (Esc to cancel)"
-                      autofocus
-                      phx-keydown="hide_quick_add"
-                      phx-key="Escape"
-                      class="input input-md sm:input-sm w-full bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] border-base-content/10 text-sm placeholder:text-base-content/25 focus:border-primary/30"
-                    />
-                  </form>
-                <% else %>
-                  <button
-                    phx-click="show_quick_add"
-                    phx-value-state_id={state.id}
-                    class="mt-1 w-full flex items-center gap-1.5 px-2 py-2.5 sm:py-1.5 rounded-lg text-xs sm:text-[11px] text-base-content/25 hover:text-base-content/50 hover:bg-base-content/[0.04] transition-colors"
-                  >
-                    <.icon name="hero-plus-mini" class="w-4 h-4 sm:w-3.5 sm:h-3.5" />
-                    <span>Add task</span>
-                  </button>
-                <% end %>
-              </div>
-            </div>
-          <% end %>
-        </div>
-        <%!-- Column indicator dots (mobile only) --%>
-        <div id="kanban-dots" class="flex justify-center gap-1.5 py-2 md:hidden">
-          <%= for {state, idx} <- Enum.with_index(@workflow_states) do %>
-            <span
-              class="w-2 h-2 rounded-full transition-colors duration-200"
-              style={"background-color: #{state_dot_color(state.color)}"}
-              data-dot-index={idx}
-              id={"kanban-dot-#{idx}"}
-            />
-          <% end %>
-        </div>
-      </div>
+      <.kanban_board
+        workflow_states={@workflow_states}
+        tasks_by_state={@tasks_by_state}
+        bulk_mode={@bulk_mode}
+        selected_tasks={@selected_tasks}
+        quick_add_column={@quick_add_column}
+        working_session_ids={@working_session_ids}
+      />
     </div>
 
     <EyeInTheSkyWeb.Components.NewTaskDrawer.new_task_drawer
@@ -815,5 +321,37 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
       available_tags={@available_tags}
     />
     """
+  end
+
+  # ---------------------------------------------------------------------------
+  # Private
+  # ---------------------------------------------------------------------------
+
+  defp init_assigns(socket) do
+    socket
+    |> assign(:search_query, "")
+    |> assign(:filter_priority, nil)
+    |> assign(:filter_tags, MapSet.new())
+    |> assign(:filter_tag_mode, :and)
+    |> assign(:workflow_states, Tasks.list_workflow_states())
+    |> assign(:tasks, [])
+    |> assign(:tasks_by_state, %{})
+    |> assign(:available_tags, [])
+    |> assign(:tag_counts, %{})
+    |> assign(:show_new_task_drawer, false)
+    |> assign(:show_task_detail_drawer, false)
+    |> assign(:selected_task, nil)
+    |> assign(:task_notes, [])
+    |> assign(:quick_add_column, nil)
+    |> assign(:show_completed, false)
+    |> assign(:show_archived, false)
+    |> assign(:selected_tasks, MapSet.new())
+    |> assign(:bulk_mode, false)
+    |> assign(:all_projects, EyeInTheSky.Projects.list_projects())
+    |> assign(:show_filters, false)
+    |> assign(:show_filter_drawer, false)
+    |> assign(:filter_due_date, nil)
+    |> assign(:filter_activity, nil)
+    |> assign(:working_session_ids, MapSet.new())
   end
 end

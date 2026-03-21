@@ -216,4 +216,39 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
   def handle_tasks_changed(socket, reload_fn) do
     {:noreply, reload_fn.(socket)}
   end
+
+  def handle_copy_task_to_project(%{"project_id" => project_id_str}, socket) do
+    task = socket.assigns.selected_task
+    target_project_id = parse_int(project_id_str, 0)
+
+    if target_project_id > 0 and task do
+      now = DateTime.utc_now() |> DateTime.to_iso8601()
+      tag_names = Enum.map(task.tags || [], & &1.name)
+
+      case Tasks.create_task(%{
+             uuid: Ecto.UUID.generate(),
+             title: task.title,
+             description: task.description,
+             state_id: EyeInTheSky.Tasks.WorkflowState.todo_id(),
+             priority: task.priority || 0,
+             project_id: target_project_id,
+             created_at: now,
+             updated_at: now
+           }) do
+        {:ok, new_task} ->
+          if tag_names != [], do: Tasks.replace_task_tags(new_task.id, tag_names)
+          target = EyeInTheSky.Projects.get_project!(target_project_id)
+
+          {:noreply,
+           socket
+           |> assign(:show_task_detail_drawer, false)
+           |> put_flash(:info, "Task copied to #{target.name}")}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Failed to copy task")}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
 end

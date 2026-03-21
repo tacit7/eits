@@ -30,7 +30,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
       EITS-CMD: spawn --instructions <text> [--description <text>] [--model <model>]
                       [--worktree <branch>] [--effort-level <level>]
                       [--team-name <name>] [--member-name <alias>]
-                      [--agent <name>] [--yolo]
+                      [--agent <name>] [--provider <claude|codex>] [--yolo]
 
       EITS-CMD: teams join <team_id> --name <name> [--role <role>]
       EITS-CMD: teams leave <team_id> <member_id>
@@ -442,6 +442,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
       opts = put_optional_flag(opts, args, "--team-name",    :team_name)
       opts = put_optional_flag(opts, args, "--member-name",  :member_name)
       opts = put_optional_flag(opts, args, "--agent",        :agent)
+      opts = put_optional_flag(opts, args, "--provider",     :agent_type)
 
       opts = if String.contains?(args, "--yolo"),
         do: Keyword.put(opts, :bypass_sandbox, true),

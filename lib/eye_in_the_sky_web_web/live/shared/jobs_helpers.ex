@@ -1,5 +1,5 @@
 defmodule EyeInTheSkyWebWeb.Live.Shared.JobsHelpers do
-  import Phoenix.Component, only: [assign: 2, assign: 3, to_form: 2]
+  import Phoenix.Component, only: [assign: 2, assign: 3, to_form: 1, to_form: 2]
   import Phoenix.LiveView, only: [put_flash: 3, push_navigate: 2]
   import EyeInTheSkyWebWeb.ControllerHelpers, only: [parse_int: 2]
 
@@ -431,6 +431,114 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.JobsHelpers do
 
   defp filter_jobs_by_origin(jobs, "all"), do: jobs
   defp filter_jobs_by_origin(jobs, origin), do: Enum.filter(jobs, &(&1.origin == origin))
+
+  # ---------------------------------------------------------------------------
+  # handle_edit_job — scoping_project_id is nil for overview, project_id for project view.
+  # When scoped, checks job belongs to the project and sets form_scope.
+  # ---------------------------------------------------------------------------
+
+  def handle_edit_job(%{"id" => id}, socket, scoping_project_id \\ nil) do
+    with {:ok, int_id} <- parse_job_id(id),
+         {:ok, job} <- ScheduledJobs.get_job(int_id) do
+      if scoping_project_id && job.project_id != scoping_project_id do
+        {:noreply, put_flash(socket, :error, "Access denied")}
+      else
+        config = ScheduledJobs.decode_config(job)
+
+        socket =
+          socket
+          |> assign(:show_form, true)
+          |> assign(:editing_job, job)
+          |> assign(:form, to_form(ScheduledJobs.change_job(job)))
+          |> assign(:form_job_type, job.job_type)
+          |> assign(:form_schedule_type, job.schedule_type)
+          |> assign(:form_config, config)
+
+        socket =
+          if scoping_project_id do
+            scope = if is_nil(job.project_id), do: "global", else: "project"
+            assign(socket, :form_scope, scope)
+          else
+            socket
+          end
+
+        {:noreply, socket}
+      end
+    else
+      :error -> {:noreply, put_flash(socket, :error, "Invalid job ID")}
+      {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Job not found")}
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # handle_toggle_job — reload_fun is fn socket -> socket.
+  # scoping_project_id is nil for overview, project_id for project view.
+  # ---------------------------------------------------------------------------
+
+  def handle_toggle_job(%{"id" => id}, socket, reload_fun, scoping_project_id \\ nil) do
+    with {:ok, int_id} <- parse_job_id(id),
+         {:ok, job} <- ScheduledJobs.get_job(int_id) do
+      if scoping_project_id && job.project_id != scoping_project_id do
+        {:noreply, put_flash(socket, :error, "Access denied")}
+      else
+        ScheduledJobs.toggle_job(job, scoping_project_id)
+        {:noreply, reload_fun.(socket)}
+      end
+    else
+      :error -> {:noreply, put_flash(socket, :error, "Invalid job ID")}
+      {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Job not found")}
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # handle_delete_job — reload_fun is fn socket -> socket.
+  # scoping_project_id is nil for overview, project_id for project view.
+  # ---------------------------------------------------------------------------
+
+  def handle_delete_job(%{"id" => id}, socket, reload_fun, scoping_project_id \\ nil) do
+    with {:ok, int_id} <- parse_job_id(id),
+         {:ok, job} <- ScheduledJobs.get_job(int_id) do
+      if scoping_project_id && job.project_id != scoping_project_id do
+        {:noreply, put_flash(socket, :error, "Access denied")}
+      else
+        case ScheduledJobs.delete_job(job, scoping_project_id) do
+          {:ok, _} ->
+            {:noreply, socket |> reload_fun.() |> put_flash(:info, "Job deleted")}
+
+          {:error, :system_job} ->
+            {:noreply, put_flash(socket, :error, "Cannot delete system jobs")}
+
+          {:error, :unauthorized} ->
+            {:noreply, put_flash(socket, :error, "Access denied")}
+        end
+      end
+    else
+      :error -> {:noreply, put_flash(socket, :error, "Invalid job ID")}
+      {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Job not found")}
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # handle_filter_jobs — job_sets is a list of {all_key, filtered_key} tuples.
+  # e.g. [{:all_jobs, :jobs}] for overview, or
+  #      [{:all_project_jobs, :project_jobs}, {:all_global_jobs, :global_jobs}] for project.
+  # ---------------------------------------------------------------------------
+
+  def handle_filter_jobs(params, socket, job_sets) do
+    socket =
+      socket
+      |> assign(:search_query, params["search"] || "")
+      |> assign(:filter_type, params["type"] || "all")
+      |> assign(:filter_status, params["status"] || "all")
+      |> assign(:filter_origin, params["origin"] || "all")
+
+    socket =
+      Enum.reduce(job_sets, socket, fn {all_key, filtered_key}, acc ->
+        assign(acc, filtered_key, apply_job_filters(acc.assigns[all_key], acc.assigns))
+      end)
+
+    {:noreply, socket}
+  end
 
   # ---------------------------------------------------------------------------
   # create_with_claude — shared across overview and project jobs pages

@@ -17,15 +17,24 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
   - Reuses Claude.SDK.Registry for ref->port tracking
   """
 
+  use EyeInTheSkyWeb.SDK.MessageHandler
+
   alias EyeInTheSkyWeb.Claude.{Message, Utils}
   alias EyeInTheSkyWeb.Claude.SDK.Registry
   alias EyeInTheSkyWeb.Codex.Parser
+  alias EyeInTheSkyWeb.SDK.MessageHandler
 
   require Logger
 
   @type ref :: reference()
   @type opts :: keyword()
-  @terminal_exit_wait_ms 2_000
+
+  @loop_opts [
+    parser: Parser,
+    telemetry_prefix: [:eits, :codex, :sdk],
+    log_raw_key: "log_codex_raw",
+    log_raw_prefix: "codex.raw"
+  ]
 
   @doc """
   Build the EITS init prompt prepended to new Codex sessions.
@@ -189,17 +198,18 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
             %{}
           )
 
-          # accumulated_text collects agent_message content during a turn
-          handle_messages(
-            sdk_ref,
-            caller_pid,
-            _session_id = nil,
-            _accumulated_text = "",
-            fallback_session_id
-          )
+          state = %{
+            sdk_ref: sdk_ref,
+            caller_pid: caller_pid,
+            session_id: nil,
+            accumulated_text: "",
+            fallback_session_id: fallback_session_id
+          }
+
+          MessageHandler.run_loop(__MODULE__, state, @loop_opts)
 
         {:DOWN, _ref, :process, ^caller_pid, _reason} ->
-          stop_and_unregister(sdk_ref)
+          MessageHandler.stop_and_unregister(sdk_ref)
       after
         5_000 ->
           send(caller_pid, {:claude_error, sdk_ref, :handler_timeout})
@@ -207,195 +217,80 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
     end)
   end
 
-  # Message handler loop - receives {:claude_output, ref, line} from CLI
-  defp handle_messages(
-         sdk_ref,
-         caller_pid,
-         session_id,
-         accumulated_text,
-         fallback_session_id
-       ) do
-    receive do
-      {:claude_output, _cli_ref, line} ->
-        maybe_log_raw_line(session_id, line)
+  # ---------------------------------------------------------------------------
+  # MessageHandler behaviour implementation
+  # ---------------------------------------------------------------------------
 
-        :telemetry.execute([:eits, :codex, :sdk, :output], %{byte_size: byte_size(line)}, %{
-          session_id: session_id
-        })
-
-        case Parser.parse_stream_line(line) do
-          {:ok, %Message{type: :text} = message} ->
-            # Accumulate agent_message text for the result
-            new_text = accumulated_text <> (message.content || "")
-            send(caller_pid, {:claude_message, sdk_ref, message})
-            handle_messages(sdk_ref, caller_pid, session_id, new_text, fallback_session_id)
-
-          {:ok, message} ->
-            send(caller_pid, {:claude_message, sdk_ref, message})
-
-            handle_messages(
-              sdk_ref,
-              caller_pid,
-              session_id,
-              accumulated_text,
-              fallback_session_id
-            )
-
-          {:session_id, sid} ->
-            # Notify the worker immediately so it can sync the provider_conversation_id
-            send(caller_pid, {:codex_session_id, sdk_ref, sid})
-            handle_messages(sdk_ref, caller_pid, sid, accumulated_text, fallback_session_id)
-
-          {:result, data} ->
-            # Turn completed - build synthetic result message with accumulated text
-            final_session_id = data[:session_id] || session_id
-            result_text = if accumulated_text != "", do: accumulated_text, else: nil
-
-            metadata = %{
-              session_id: final_session_id,
-              usage: data[:usage],
-              input_tokens: data[:input_tokens],
-              output_tokens: data[:output_tokens]
-            }
-
-            :telemetry.execute(
-              [:eits, :codex, :sdk, :result],
-              %{
-                text_length: if(result_text, do: String.length(result_text), else: 0),
-                input_tokens: data[:input_tokens] || 0,
-                output_tokens: data[:output_tokens] || 0
-              },
-              %{session_id: final_session_id}
-            )
-
-            Logger.info(
-              "[telemetry] codex.sdk.result session_id=#{final_session_id} " <>
-                "text_length=#{if result_text, do: String.length(result_text), else: 0}"
-            )
-
-            if result_text do
-              msg = Message.result(result_text, metadata)
-              send(caller_pid, {:claude_message, sdk_ref, msg})
-            end
-
-            send(caller_pid, {:claude_complete, sdk_ref, final_session_id})
-
-            :telemetry.execute(
-              [:eits, :codex, :sdk, :complete],
-              %{system_time: System.system_time()},
-              %{session_id: final_session_id}
-            )
-
-            Logger.info("[telemetry] codex.sdk.complete session_id=#{final_session_id}")
-
-            finalize_after_terminal_event(sdk_ref, final_session_id)
-            :ok
-
-          {:error, reason} ->
-            send(caller_pid, {:claude_error, sdk_ref, reason})
-
-            :telemetry.execute(
-              [:eits, :codex, :sdk, :error],
-              %{system_time: System.system_time()},
-              %{session_id: session_id, reason: reason}
-            )
-
-            Logger.error(
-              "[telemetry] codex.sdk.error session_id=#{session_id} reason=#{inspect(reason)}"
-            )
-
-            stop_and_unregister(sdk_ref)
-            :ok
-
-          :skip ->
-            handle_messages(
-              sdk_ref,
-              caller_pid,
-              session_id,
-              accumulated_text,
-              fallback_session_id
-            )
-        end
-
-      {:claude_exit, _cli_ref, 0} ->
-        # Normal exit without turn.completed - send complete
-        # Use fallback (execution agent uuid) if thread.started wasn't observed
-        final_session_id = session_id || fallback_session_id || ""
-        send(caller_pid, {:claude_complete, sdk_ref, final_session_id})
-        log_sdk_exit(final_session_id, 0)
-        stop_and_unregister(sdk_ref)
-        :ok
-
-      {:claude_exit, _cli_ref, status} ->
-        log_sdk_exit(session_id, status)
-
-        reason =
-          case status do
-            :timeout -> :timeout
-            code when is_integer(code) -> {:exit_code, code}
-            other -> other
-          end
-
-        send(caller_pid, {:claude_error, sdk_ref, reason})
-        stop_and_unregister(sdk_ref)
-        :ok
-
-      {:DOWN, _ref, :process, ^caller_pid, _reason} ->
-        stop_and_unregister(sdk_ref)
-        :ok
-    end
+  @impl MessageHandler
+  def handle_message(%Message{type: :text} = message, state) do
+    %{sdk_ref: sdk_ref, caller_pid: caller_pid, accumulated_text: acc} = state
+    new_acc = acc <> (message.content || "")
+    send(caller_pid, {:claude_message, sdk_ref, message})
+    {:continue, %{state | accumulated_text: new_acc}}
   end
 
-  defp maybe_log_raw_line(session_id, line) do
-    if EyeInTheSkyWeb.Settings.get_boolean("log_codex_raw") do
-      label = session_id || "unknown"
-      Logger.info("[codex.raw] session_id=#{label} line=#{inspect(line, limit: 1_000)}")
-    end
+  def handle_message(message, state) do
+    send(state.caller_pid, {:claude_message, state.sdk_ref, message})
+    {:continue, state}
   end
 
-  defp finalize_after_terminal_event(sdk_ref, session_id) do
-    receive do
-      {:claude_output, _cli_ref, line} ->
-        maybe_log_raw_line(session_id, line)
-        finalize_after_terminal_event(sdk_ref, session_id)
+  @impl MessageHandler
+  def handle_result(data, state) do
+    %{sdk_ref: sdk_ref, caller_pid: caller_pid, accumulated_text: acc} = state
 
-      {:claude_exit, _cli_ref, status} ->
-        log_sdk_exit(session_id, status)
-        stop_and_unregister(sdk_ref)
-    after
-      @terminal_exit_wait_ms ->
-        Logger.warning(
-          "[telemetry] codex.sdk.force_close session_id=#{session_id} reason=no_exit_after_terminal_event"
-        )
+    final_session_id = data[:session_id] || state[:session_id]
+    result_text = if acc != "", do: acc, else: nil
 
-        stop_and_unregister(sdk_ref)
-    end
-  end
+    metadata = %{
+      session_id: final_session_id,
+      usage: data[:usage],
+      input_tokens: data[:input_tokens],
+      output_tokens: data[:output_tokens]
+    }
 
-  defp log_sdk_exit(session_id, status) do
-    exit_code = if is_integer(status), do: status, else: -1
+    :telemetry.execute(
+      [:eits, :codex, :sdk, :result],
+      %{
+        text_length: if(result_text, do: String.length(result_text), else: 0),
+        input_tokens: data[:input_tokens] || 0,
+        output_tokens: data[:output_tokens] || 0
+      },
+      %{session_id: final_session_id}
+    )
 
-    :telemetry.execute([:eits, :codex, :sdk, :exit], %{exit_code: exit_code}, %{
-      session_id: session_id,
-      status: status
-    })
+    Logger.info(
+      "[telemetry] codex.sdk.result session_id=#{final_session_id} " <>
+        "text_length=#{if result_text, do: String.length(result_text), else: 0}"
+    )
 
-    if status == 0 do
-      Logger.info("[telemetry] codex.sdk.exit session_id=#{session_id} exit_code=0")
-    else
-      Logger.error(
-        "[telemetry] codex.sdk.exit session_id=#{session_id} exit_code=#{exit_code} status=#{inspect(status)}"
-      )
-    end
-  end
-
-  defp stop_and_unregister(sdk_ref) do
-    case Registry.lookup(sdk_ref) do
-      nil -> :ok
-      port_or_pid -> Utils.close_port_safely(port_or_pid)
+    if result_text do
+      msg = Message.result(result_text, metadata)
+      send(caller_pid, {:claude_message, sdk_ref, msg})
     end
 
-    Registry.unregister(sdk_ref)
+    send(caller_pid, {:claude_complete, sdk_ref, final_session_id})
+
+    :telemetry.execute(
+      [:eits, :codex, :sdk, :complete],
+      %{system_time: System.system_time()},
+      %{session_id: final_session_id}
+    )
+
+    Logger.info("[telemetry] codex.sdk.complete session_id=#{final_session_id}")
+
+    MessageHandler.finalize_after_terminal_event(sdk_ref, final_session_id, @loop_opts)
     :ok
+  end
+
+  @impl MessageHandler
+  def on_session_id(sid, state) do
+    # Notify the worker immediately so it can sync the provider_conversation_id
+    send(state.caller_pid, {:codex_session_id, state.sdk_ref, sid})
+    %{state | session_id: sid}
+  end
+
+  @impl MessageHandler
+  def resolve_exit_session_id(state) do
+    state[:session_id] || state[:fallback_session_id] || ""
   end
 end

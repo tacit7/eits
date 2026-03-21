@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWebWeb.Components.NotesList do
   use Phoenix.Component
   import EyeInTheSkyWebWeb.CoreComponents
+  import EyeInTheSkyWebWeb.Helpers.ViewHelpers, only: [relative_time: 1]
 
   attr :notes, :list, required: true
   attr :starred_filter, :boolean, default: false
@@ -78,7 +79,7 @@ defmodule EyeInTheSkyWebWeb.Components.NotesList do
                     {parent_type_label(note.parent_type)}
                   </span>
                   <span class="text-base-content/20">&middot;</span>
-                  <span class="font-mono tabular-nums">{format_date(note.created_at)}</span>
+                  <span class="tabular-nums">{relative_time(note.created_at)}</span>
                 </div>
               </div>
               <div class="collapse-content px-0 pb-2">

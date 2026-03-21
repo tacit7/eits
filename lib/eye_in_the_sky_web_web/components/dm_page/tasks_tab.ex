@@ -100,10 +100,12 @@ defmodule EyeInTheSkyWebWeb.Components.DmPage.TasksTab do
                       <span class="font-mono text-base-content/30">
                         {String.slice(task.uuid || to_string(task.id), 0..7)}
                       </span>
-                      <span class="text-base-content/15">&middot;</span>
-                      <span class="tabular-nums text-base-content/30">
-                        {relative_time(task.created_at)}
-                      </span>
+                      <%= if task.created_at do %>
+                        <span class="text-base-content/15">&middot;</span>
+                        <span class="tabular-nums text-base-content/30">
+                          {relative_time(task.created_at)}
+                        </span>
+                      <% end %>
                       <%= if Map.get(task, :notes_count, 0) > 0 do %>
                         <span class="text-base-content/15">&middot;</span>
                         <span class="flex items-center gap-0.5 text-base-content/35">

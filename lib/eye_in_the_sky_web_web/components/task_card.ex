@@ -96,10 +96,14 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
             <span class="text-base-content/15">&middot;</span>
             <span>{Enum.map_join(Enum.take(@task.tags, 2), ", ", & &1.name)}</span>
           <% end %>
-          <span class="text-base-content/15">&middot;</span>
-          <span class="font-mono">{String.slice(@task.uuid || "", 0..7)}</span>
-          <span class="text-base-content/15">&middot;</span>
-          <span class="tabular-nums">{relative_time(@task.created_at)}</span>
+          <%= if @task.uuid do %>
+            <span class="text-base-content/15">&middot;</span>
+            <span class="font-mono">{String.slice(@task.uuid, 0..7)}</span>
+          <% end %>
+          <%= if @task.created_at do %>
+            <span class="text-base-content/15">&middot;</span>
+            <span class="tabular-nums">{relative_time(@task.created_at)}</span>
+          <% end %>
         </div>
       </div>
       <%= if @dm_session do %>
@@ -301,7 +305,9 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
         @dm_session || Map.get(@task, :created_at) %>
     <%= if has_footer do %>
       <div class="flex items-center gap-2 mt-2 text-base-content/35 text-[11px]">
-        <span class="tabular-nums">{relative_time(@task.created_at)}</span>
+        <%= if @task.created_at do %>
+          <span class="tabular-nums">{relative_time(@task.created_at)}</span>
+        <% end %>
         <%= if @task.description do %>
           <.icon name="hero-document-text" class="w-3 h-3 flex-shrink-0" />
         <% end %>
@@ -386,12 +392,16 @@ defmodule EyeInTheSkyWebWeb.Components.TaskCard do
 
     <!-- Task Metadata -->
     <div class="flex flex-wrap items-center gap-2 mt-auto pt-3 border-t border-base-300">
-      <span class="badge badge-ghost badge-sm font-mono text-xs">
-        {String.slice(@task.uuid || "", 0..7)}
-      </span>
-      <span class="badge badge-ghost badge-sm text-xs tabular-nums">
-        {relative_time(@task.created_at)}
-      </span>
+      <%= if @task.uuid do %>
+        <span class="badge badge-ghost badge-sm font-mono text-xs">
+          {String.slice(@task.uuid, 0..7)}
+        </span>
+      <% end %>
+      <%= if @task.created_at do %>
+        <span class="badge badge-ghost badge-sm text-xs tabular-nums">
+          {relative_time(@task.created_at)}
+        </span>
+      <% end %>
       <button
         type="button"
         class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] cursor-pointer hover:text-primary transition-colors z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"

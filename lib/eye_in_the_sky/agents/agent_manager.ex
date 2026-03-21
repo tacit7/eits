@@ -98,7 +98,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
       "📝 create_agent: agent_uuid=#{agent_uuid}, session_uuid=#{inspect(session_uuid)}, model=#{opts[:model]}, project_id=#{project_id}"
     )
 
-    definition_info = resolve_agent_definition(opts[:agent], project_id)
+    definition_info = resolve_agent_definition(opts[:agent], project_id, opts[:project_path])
 
     with {:ok, worktree_path} <- resolve_worktree_path(opts) do
       insert_agent_and_session(%{
@@ -410,24 +410,45 @@ defmodule EyeInTheSky.Agents.AgentManager do
 
   # Resolves an agent slug to a definition record. Returns a map with
   # :agent_definition_id and :definition_checksum_at_spawn, or nil.
-  defp resolve_agent_definition(nil, _project_id), do: nil
-  defp resolve_agent_definition("", _project_id), do: nil
+  # If the slug is not found in the DB, syncs the relevant directory first and retries.
+  defp resolve_agent_definition(nil, _project_id, _project_path), do: nil
+  defp resolve_agent_definition("", _project_id, _project_path), do: nil
 
-  defp resolve_agent_definition(slug, project_id) do
-    result =
-      if project_id do
-        AgentDefinitions.resolve(slug, project_id)
-      else
-        AgentDefinitions.resolve_global(slug)
-      end
-
-    case result do
+  defp resolve_agent_definition(slug, project_id, project_path) do
+    case lookup_definition(slug, project_id) do
       {:ok, defn} ->
         %{agent_definition_id: defn.id, definition_checksum_at_spawn: defn.checksum}
 
       {:error, :not_found} ->
-        Logger.debug("resolve_agent_definition: no definition found for slug=#{slug}")
-        nil
+        Logger.debug("resolve_agent_definition: slug=#{slug} not in DB, syncing and retrying")
+        sync_for_spawn(project_id, project_path)
+
+        case lookup_definition(slug, project_id) do
+          {:ok, defn} ->
+            %{agent_definition_id: defn.id, definition_checksum_at_spawn: defn.checksum}
+
+          {:error, :not_found} ->
+            Logger.debug("resolve_agent_definition: slug=#{slug} not found after sync")
+            nil
+        end
+    end
+  end
+
+  defp lookup_definition(slug, project_id) do
+    if project_id do
+      AgentDefinitions.resolve(slug, project_id)
+    else
+      AgentDefinitions.resolve_global(slug)
+    end
+  end
+
+  defp sync_for_spawn(nil, _project_path), do: AgentDefinitions.sync_global()
+
+  defp sync_for_spawn(project_id, project_path) do
+    AgentDefinitions.sync_global()
+
+    if project_path do
+      AgentDefinitions.sync_project(project_id, project_path)
     end
   end
 

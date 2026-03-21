@@ -193,6 +193,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
             </div>
           </form>
 
+          <button
+            phx-click="toggle_create_task_drawer"
+            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-8 text-xs"
+          >
+            <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Task
+          </button>
+
           <%!-- Mobile filter button --%>
           <button
             phx-click="open_filter_sheet"

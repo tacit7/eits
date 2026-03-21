@@ -48,13 +48,19 @@ defmodule EyeInTheSkyWeb.Tasks do
   - `:state_id` - filter by workflow state ID (default: nil = all)
   """
   def list_tasks(opts \\ []) do
+    sort_by = Keyword.get(opts, :sort_by, "created_desc")
+
     base_tasks_query(opts)
     |> preload([:state, :tags, :sessions, :checklist_items])
-    |> order_by([t], desc: t.created_at)
+    |> task_order(sort_by)
     |> QueryBuilder.maybe_limit(opts)
     |> QueryBuilder.maybe_offset(opts)
     |> Repo.all()
   end
+
+  defp task_order(query, "created_asc"), do: order_by(query, [t], asc: t.created_at)
+  defp task_order(query, "priority"), do: order_by(query, [t], desc: t.priority, desc: t.created_at)
+  defp task_order(query, _), do: order_by(query, [t], desc: t.created_at)
 
   @doc """
   Returns the count of tasks matching the given filters.

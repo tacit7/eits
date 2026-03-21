@@ -15,6 +15,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
       |> assign(:page_title, "All Notes")
       |> assign(:search_query, "")
       |> assign(:starred_filter, false)
+      |> assign(:notes_sort_by, "newest")
       |> assign(:notes, [])
       |> assign(:editing_note_id, nil)
       |> assign(:sidebar_tab, :notes)
@@ -28,6 +29,10 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
   @impl true
   def handle_event("search", params, socket),
     do: handle_search(params, socket, &load_notes/1)
+
+  @impl true
+  def handle_event("sort_notes", params, socket),
+    do: handle_sort_notes(params, socket, &load_notes/1)
 
   @impl true
   def handle_event("toggle_starred_filter", params, socket),
@@ -101,6 +106,8 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
   defp load_notes(socket) do
     query = socket.assigns.search_query
     starred_only = socket.assigns.starred_filter
+    sort_by = socket.assigns.notes_sort_by
+    order = if sort_by == "oldest", do: [asc: :created_at], else: [desc: :created_at]
 
     notes =
       if query != "" and String.trim(query) != "" do
@@ -108,7 +115,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
       else
         base =
           from(n in Note,
-            order_by: [desc: n.created_at],
+            order_by: ^order,
             limit: 200
           )
 
@@ -152,6 +159,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Notes do
           notes={@notes}
           starred_filter={@starred_filter}
           search_query={@search_query}
+          sort_by={@notes_sort_by}
           empty_id="overview-notes-empty"
           editing_note_id={@editing_note_id}
           current_path="/notes"

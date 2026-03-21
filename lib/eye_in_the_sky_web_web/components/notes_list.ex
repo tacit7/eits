@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWebWeb.Components.NotesList do
   attr :notes, :list, required: true
   attr :starred_filter, :boolean, default: false
   attr :search_query, :string, default: ""
+  attr :sort_by, :string, default: "newest"
   attr :empty_id, :string, default: "notes-empty"
   attr :editing_note_id, :integer, default: nil
   attr :current_path, :string, default: "/notes"
@@ -45,6 +46,17 @@ defmodule EyeInTheSkyWebWeb.Components.NotesList do
           class="w-3.5 h-3.5"
         /> Starred
       </button>
+      <form phx-change="sort_notes">
+        <label for={"#{@empty_id}-sort"} class="sr-only">Sort notes</label>
+        <select
+          name="value"
+          id={"#{@empty_id}-sort"}
+          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-0 h-8 text-xs"
+        >
+          <option value="newest" selected={@sort_by == "newest"}>Newest</option>
+          <option value="oldest" selected={@sort_by == "oldest"}>Oldest</option>
+        </select>
+      </form>
     </div>
 
     <%!-- Notes count --%>

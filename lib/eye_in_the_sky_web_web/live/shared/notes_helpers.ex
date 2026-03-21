@@ -18,6 +18,10 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.NotesHelpers do
      |> reload_fn.()}
   end
 
+  def handle_sort_notes(%{"value" => sort_by}, socket, reload_fn) do
+    {:noreply, socket |> assign(:notes_sort_by, sort_by) |> reload_fn.()}
+  end
+
   def handle_toggle_starred_filter(_params, socket, reload_fn) do
     {:noreply,
      socket

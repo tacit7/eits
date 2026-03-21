@@ -23,6 +23,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
       |> assign(:search_query, "")
       |> assign(:workflow_states, workflow_states)
       |> assign(:filter_state_id, nil)
+      |> assign(:sort_by, "created_desc")
       |> assign(:task_count, 0)
       |> assign(:page, 1)
       |> assign(:has_more, false)
@@ -61,6 +62,11 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
      socket
      |> assign(:filter_state_id, state_id)
      |> load_tasks()}
+  end
+
+  @impl true
+  def handle_event("sort_by", %{"value" => value}, socket) do
+    {:noreply, socket |> assign(:sort_by, value) |> load_tasks()}
   end
 
   @impl true
@@ -113,6 +119,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
   defp load_tasks(socket) do
     query = socket.assigns.search_query
     state_id = socket.assigns.filter_state_id
+    sort_by = socket.assigns.sort_by
 
     if query != "" and String.trim(query) != "" do
       tasks = Tasks.search_tasks(query)
@@ -130,7 +137,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
       |> stream(:tasks, tasks, reset: true)
     else
       total = Tasks.count_tasks(state_id: state_id)
-      tasks = Tasks.list_tasks(limit: @per_page, offset: 0, state_id: state_id)
+      tasks = Tasks.list_tasks(limit: @per_page, offset: 0, state_id: state_id, sort_by: sort_by)
 
       socket
       |> assign(:task_count, length(tasks))
@@ -193,7 +200,7 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
             class="sm:hidden relative btn btn-ghost btn-sm btn-square"
           >
             <.icon name="hero-funnel-mini" class="w-4 h-4" />
-            <%= if !is_nil(@filter_state_id) do %>
+            <%= if !is_nil(@filter_state_id) || @sort_by != "created_desc" do %>
               <span
                 class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full"
                 aria-hidden="true"
@@ -230,15 +237,31 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
               {state.name}
             </button>
           </div>
+
+          <%!-- Desktop sort dropdown --%>
+          <form phx-change="sort_by" class="hidden sm:block">
+            <label for="overview-tasks-sort" class="sr-only">Sort tasks</label>
+            <select
+              name="value"
+              id="overview-tasks-sort"
+              class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-0 h-8 text-xs"
+            >
+              <option value="created_desc" selected={@sort_by == "created_desc"}>Newest first</option>
+              <option value="created_asc" selected={@sort_by == "created_asc"}>Oldest first</option>
+              <option value="priority" selected={@sort_by == "priority"}>Priority</option>
+            </select>
+          </form>
         </div>
 
         <%!-- Mobile filter bottom sheet --%>
         <FilterSheet.filter_sheet
           id="overview-tasks-filter-sheet"
           show={@show_filter_sheet}
-          title="Filter by Status"
+          title="Filter & Sort"
           workflow_states={@workflow_states}
           filter_state_id={@filter_state_id}
+          show_sort={true}
+          sort_by={@sort_by}
         />
 
         <%!-- Task count --%>

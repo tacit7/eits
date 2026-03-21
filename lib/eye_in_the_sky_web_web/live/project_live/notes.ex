@@ -26,6 +26,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
         |> assign(:sidebar_project, project)
         |> assign(:search_query, "")
         |> assign(:starred_filter, false)
+        |> assign(:notes_sort_by, "newest")
         |> assign(:notes, [])
         |> assign(:editing_note_id, nil)
         |> assign(:show_quick_note_modal, false)
@@ -46,6 +47,10 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
   @impl true
   def handle_event("search", params, socket),
     do: handle_search(params, socket, &load_notes/1)
+
+  @impl true
+  def handle_event("sort_notes", params, socket),
+    do: handle_sort_notes(params, socket, &load_notes/1)
 
   @impl true
   def handle_event("toggle_starred_filter", params, socket),
@@ -130,6 +135,8 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
 
     query = socket.assigns.search_query
     starred_only = socket.assigns.starred_filter
+    sort_by = socket.assigns.notes_sort_by
+    order = if sort_by == "oldest", do: [asc: :created_at], else: [desc: :created_at]
 
     notes =
       if query != "" and String.trim(query) != "" do
@@ -150,7 +157,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
                 (n.parent_type in ["agent", "agents"] and n.parent_id in ^agent_id_strs) or
                 (n.parent_type in ["session", "sessions"] and
                    n.parent_id in ^session_id_strs),
-            order_by: [desc: n.created_at]
+            order_by: ^order
           )
 
         base = if starred_only, do: from(n in base, where: n.starred == 1), else: base
@@ -195,6 +202,7 @@ defmodule EyeInTheSkyWebWeb.ProjectLive.Notes do
           notes={@notes}
           starred_filter={@starred_filter}
           search_query={@search_query}
+          sort_by={@notes_sort_by}
           empty_id="project-notes-empty"
           editing_note_id={@editing_note_id}
           current_path={~p"/projects/#{@project.id}/notes"}

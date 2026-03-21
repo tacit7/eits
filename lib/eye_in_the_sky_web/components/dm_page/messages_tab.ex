@@ -140,7 +140,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     ~H"""
     <div
       class={[
-        "py-3 px-2 -mx-2 rounded-lg opacity-0",
+        "py-3 px-2 -mx-2 rounded-lg",
         @is_dm && "border-l-2 border-primary/30 pl-3 bg-primary/[0.03]"
       ]}
       id={"dm-message-#{@message.id}"}

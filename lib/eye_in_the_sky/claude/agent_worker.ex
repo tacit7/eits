@@ -292,6 +292,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   @impl true
   def handle_info({:codex_session_id, ref, thread_id}, %__MODULE__{sdk_ref: ref} = state) do
     state = maybe_sync_provider_conversation_id(state, thread_id)
+    WorkerEvents.on_codex_thread_started(state.session_id)
     {:noreply, state}
   end
 
@@ -314,7 +315,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
     Logger.info("[telemetry] agent.sdk.complete session_id=#{state.session_id}")
 
-    WorkerEvents.on_sdk_completed(state.session_id, state.provider_conversation_id)
+    WorkerEvents.on_sdk_completed(state.session_id, state.provider_conversation_id, state.provider)
 
     demonitor_handler(state.handler_monitor)
 

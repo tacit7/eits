@@ -21,6 +21,10 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   alias EyeInTheSkyWebWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
+  import EyeInTheSkyWebWeb.Live.Shared.DmExportHelpers
+  import EyeInTheSkyWebWeb.Live.Shared.DmModelHelpers
+  import EyeInTheSkyWebWeb.Live.Shared.DmSessionHelpers
+  import EyeInTheSkyWebWeb.Live.Shared.DmStreamHelpers
 
   require Logger
 
@@ -74,16 +78,10 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
-  def handle_event("toggle_model_menu", _params, socket) do
-    overlay = if socket.assigns.active_overlay == :model_menu, do: nil, else: :model_menu
-    {:noreply, assign(socket, :active_overlay, overlay)}
-  end
+  def handle_event("toggle_model_menu", _params, socket), do: handle_toggle_model_menu(socket)
 
   @impl true
-  def handle_event("toggle_effort_menu", _params, socket) do
-    overlay = if socket.assigns.active_overlay == :effort_menu, do: nil, else: :effort_menu
-    {:noreply, assign(socket, :active_overlay, overlay)}
-  end
+  def handle_event("toggle_effort_menu", _params, socket), do: handle_toggle_effort_menu(socket)
 
   @impl true
   def handle_event("toggle_new_task_drawer", _params, socket) do
@@ -98,21 +96,10 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
-  def handle_event("toggle_thinking", _params, socket) do
-    {:noreply, assign(socket, :thinking_enabled, !socket.assigns.thinking_enabled)}
-  end
+  def handle_event("toggle_thinking", _params, socket), do: handle_toggle_thinking(socket)
 
   @impl true
-  def handle_event("toggle_live_stream", params, socket) do
-    enabled =
-      case params do
-        %{"enabled" => true} -> true
-        %{"enabled" => "true"} -> true
-        _ -> !socket.assigns.show_live_stream
-      end
-
-    {:noreply, assign(socket, :show_live_stream, enabled)}
-  end
+  def handle_event("toggle_live_stream", params, socket), do: handle_toggle_live_stream(params, socket)
 
   @impl true
   def handle_event("keydown", %{"key" => "k", "ctrlKey" => true}, socket) do
@@ -173,75 +160,21 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   # ---------------------------------------------------------------------------
 
   @impl true
-  def handle_event("select_model", %{"model" => model, "effort" => effort}, socket) do
-    session = socket.assigns.session
-
-    socket =
-      case Sessions.update_session(session, %{model: model}) do
-        {:ok, _updated} ->
-          socket
-
-        {:error, changeset} ->
-          Logger.error("Failed to persist model selection: #{inspect(changeset.errors)}")
-          put_flash(socket, :error, "Failed to save model selection")
-      end
-
-    effort = if effort == "" and model == "opus", do: "medium", else: effort
-
-    socket =
-      socket
-      |> assign(:selected_model, model)
-      |> assign(:selected_effort, effort)
-      |> assign(:active_overlay, nil)
-
-    {:noreply, socket}
-  end
+  def handle_event("select_model", params, socket), do: handle_select_model(params, socket)
 
   @impl true
-  def handle_event("select_effort", %{"effort" => effort}, socket) do
-    {:noreply, socket |> assign(:selected_effort, effort) |> assign(:active_overlay, nil)}
-  end
+  def handle_event("select_effort", params, socket), do: handle_select_effort(params, socket)
 
   @impl true
-  def handle_event("set_max_budget", %{"value" => value}, socket) do
-    budget =
-      case Float.parse(value) do
-        {f, _} when f > 0 -> f
-        _ -> nil
-      end
-
-    {:noreply, assign(socket, :max_budget_usd, budget)}
-  end
+  def handle_event("set_max_budget", params, socket), do: handle_set_max_budget(params, socket)
 
   @impl true
-  def handle_event("update_session_name", %{"value" => value}, socket) do
-    session = socket.assigns.session
-    value = String.trim(value)
-
-    case Sessions.update_session(session, %{name: if(value == "", do: nil, else: value)}) do
-      {:ok, updated} ->
-        {:noreply, assign(socket, :session, updated)}
-
-      {:error, changeset} ->
-        Logger.error("Failed to update session name: #{inspect(changeset.errors)}")
-        {:noreply, put_flash(socket, :error, "Failed to update session name")}
-    end
-  end
+  def handle_event("update_session_name", params, socket),
+    do: handle_update_session_name(params, socket)
 
   @impl true
-  def handle_event("update_session_description", %{"value" => value}, socket) do
-    session = socket.assigns.session
-    value = String.trim(value)
-
-    case Sessions.update_session(session, %{description: if(value == "", do: nil, else: value)}) do
-      {:ok, updated} ->
-        {:noreply, assign(socket, :session, updated)}
-
-      {:error, changeset} ->
-        Logger.error("Failed to update session description: #{inspect(changeset.errors)}")
-        {:noreply, put_flash(socket, :error, "Failed to update session description")}
-    end
-  end
+  def handle_event("update_session_description", params, socket),
+    do: handle_update_session_description(params, socket)
 
   # ---------------------------------------------------------------------------
   # Messaging
@@ -292,62 +225,14 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   @impl true
-  def handle_event("export_jsonl", _params, socket) do
-    messages = socket.assigns[:messages] || []
-
-    text =
-      messages
-      |> Enum.map(fn msg ->
-        Jason.encode!(%{
-          role: msg.sender_role,
-          body: msg.body,
-          timestamp: msg.inserted_at
-        })
-      end)
-      |> Enum.join("\n")
-
-    {:noreply, push_event(socket, "copy_to_clipboard", %{text: text, format: "JSONL"})}
-  end
+  def handle_event("export_jsonl", _params, socket), do: handle_export_jsonl(socket)
 
   @impl true
-  def handle_event("export_markdown", _params, socket) do
-    messages = socket.assigns[:messages] || []
-
-    text =
-      messages
-      |> Enum.map(fn msg ->
-        role = String.capitalize(to_string(msg.sender_role))
-        "**#{role}**: #{msg.body}"
-      end)
-      |> Enum.join("\n\n")
-
-    {:noreply, push_event(socket, "copy_to_clipboard", %{text: text, format: "Markdown"})}
-  end
+  def handle_event("export_markdown", _params, socket), do: handle_export_markdown(socket)
 
   @impl true
-  def handle_event("reload_from_session_file", _params, socket) do
-    session_id = socket.assigns.session_id
-    session_uuid = socket.assigns.session_uuid
-
-    with {:ok, project_path} <-
-           SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent),
-         {:ok, raw_messages} <-
-           SessionReader.read_messages_after_uuid(session_uuid, project_path, nil) do
-      Messages.delete_session_messages(session_id)
-      imported = SessionImporter.import_messages(raw_messages, session_id)
-      socket = load_tab_data(socket, "messages", session_id)
-      {:noreply, put_flash(socket, :info, "Reloaded #{imported} messages from session file")}
-    else
-      {:error, :not_found} ->
-        {:noreply, put_flash(socket, :error, "No session file found for this session")}
-
-      {:error, :no_project_path} ->
-        {:noreply, put_flash(socket, :error, "No project path configured")}
-
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to reload: #{inspect(reason)}")}
-    end
-  end
+  def handle_event("reload_from_session_file", _params, socket),
+    do: handle_reload_from_session_file(socket, &load_tab_data(&1, "messages", &1.assigns.session_id))
 
   # ---------------------------------------------------------------------------
   # File uploads
@@ -426,62 +311,12 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # Notes
-  # ---------------------------------------------------------------------------
+  @impl true
+  def handle_event("toggle_star", params, socket),
+    do: handle_toggle_star(params, socket, &load_tab_data(&1, "notes", &1.assigns.session_id))
 
   @impl true
-  def handle_event("toggle_star", params, socket) do
-    note_id = params["note_id"] || params["note-id"] || params["value"]
-
-    case Notes.toggle_starred(note_id) do
-      {:ok, _note} ->
-        {:noreply, load_tab_data(socket, "notes", socket.assigns.session_id)}
-
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to toggle star")}
-    end
-  end
-
-  # ---------------------------------------------------------------------------
-  # Session control
-  # ---------------------------------------------------------------------------
-
-  @impl true
-  def handle_event("kill_session", _params, socket) do
-    session_id = socket.assigns.session_id
-
-    # Properly stop the worker — GenServer.stop calls terminate/2 which cancels the SDK subprocess.
-    # Process.exit does NOT call terminate/2 for non-trapping GenServers, so the CLI keeps running.
-    case Registry.lookup(EyeInTheSkyWeb.Claude.AgentRegistry, {:session, session_id}) do
-      [{pid, _}] ->
-        Logger.warning(
-          "kill_session: stopping worker pid=#{inspect(pid)} for session=#{session_id}"
-        )
-
-        try do
-          GenServer.stop(pid, :shutdown, 3000)
-        catch
-          :exit, _ -> :ok
-        end
-
-      [] ->
-        # Worker not running — just cancel via AgentManager in case SDK ref exists elsewhere
-        AgentManager.cancel_session(session_id)
-    end
-
-    # Update session status so stale agent_working PubSub events don't revive the UI
-    case Sessions.get_session(session_id) do
-      {:ok, session} ->
-        Sessions.update_session(session, %{status: "stopped"})
-        EyeInTheSkyWeb.Events.agent_stopped(session)
-
-      _ ->
-        :ok
-    end
-
-    {:noreply, socket |> assign(:processing, false) |> stop_sync_timer()}
-  end
+  def handle_event("kill_session", _params, socket), do: handle_kill_session(socket)
 
   # ---------------------------------------------------------------------------
   # handle_info: sync & reload
@@ -612,37 +447,35 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   # ---------------------------------------------------------------------------
-  # handle_info: streaming — delegated to DmLive.StreamState
+  # handle_info: streaming — delegated to DmStreamHelpers
   # ---------------------------------------------------------------------------
 
   @impl true
   def handle_info({:stream_delta, type, content}, socket),
-    do: StreamState.handle_stream_delta(type, content, socket)
+    do: handle_stream_delta(type, content, socket)
 
   @impl true
   def handle_info({:stream_replace, type, content}, socket),
-    do: StreamState.handle_stream_replace(type, content, socket)
+    do: handle_stream_replace(type, content, socket)
 
   @impl true
-  def handle_info(:stream_clear, socket),
-    do: StreamState.handle_stream_clear(socket)
+  def handle_info(:stream_clear, socket), do: handle_stream_clear(socket)
 
   @impl true
   def handle_info({:stream_tool_input, name, input}, socket),
-    do: StreamState.handle_stream_tool_input(name, input, socket)
+    do: handle_stream_tool_input(name, input, socket)
 
   @impl true
   def handle_info({:tool_use, tool_name, _params}, socket),
-    do: StreamState.handle_tool_use(tool_name, socket)
+    do: handle_tool_use(tool_name, socket)
 
   @impl true
-  def handle_info({:tool_result, _tool_name, _is_error}, socket) do
-    {:noreply, socket |> assign(:stream_tool, nil) |> schedule_message_reload()}
-  end
+  def handle_info({:tool_result, _tool_name, _is_error}, socket),
+    do: handle_tool_result(socket)
 
   @impl true
   def handle_info({:queue_updated, prompts}, socket),
-    do: StreamState.handle_queue_updated(prompts, socket)
+    do: handle_queue_updated(prompts, socket)
 
   @impl true
   def handle_info(msg, socket) do

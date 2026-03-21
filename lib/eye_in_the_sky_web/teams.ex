@@ -109,10 +109,10 @@ defmodule EyeInTheSkyWeb.Teams do
   """
   def mark_member_done_by_session(session_id, status \\ "done")
       when status in ["done", "failed", "idle"] do
-    case Repo.get_by(TeamMember, session_id: session_id) do
-      nil -> :ok
-      member -> update_member_status(member, status)
-    end
+    TeamMember
+    |> where([m], m.session_id == ^session_id)
+    |> Repo.all()
+    |> Enum.each(&update_member_status(&1, status))
   end
 
   def leave_team(%TeamMember{} = member) do

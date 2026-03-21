@@ -7,21 +7,21 @@
 # General application configuration
 import Config
 
-config :eye_in_the_sky_web,
-  ecto_repos: [EyeInTheSkyWeb.Repo],
+config :eye_in_the_sky,
+  ecto_repos: [EyeInTheSky.Repo],
   generators: [timestamp_type: :utc_datetime]
 
 config :elixir, :time_zone_database, Tz.TimeZoneDatabase
 
 # Configures the endpoint
-config :eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint,
+config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [html: EyeInTheSkyWebWeb.ErrorHTML, json: EyeInTheSkyWebWeb.ErrorJSON],
+    formats: [html: EyeInTheSkyWeb.ErrorHTML, json: EyeInTheSkyWeb.ErrorJSON],
     layout: false
   ],
-  pubsub_server: EyeInTheSkyWeb.PubSub,
+  pubsub_server: EyeInTheSky.PubSub,
   live_view: [signing_salt: "VYcRHPZn"]
 
 # Configures the mailer
@@ -31,7 +31,7 @@ config :eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint,
 #
 # For production it's recommended to configure a different adapter
 # at the `config/runtime.exs`.
-config :eye_in_the_sky_web, EyeInTheSkyWeb.Mailer, adapter: Swoosh.Adapters.Local
+config :eye_in_the_sky, EyeInTheSky.Mailer, adapter: Swoosh.Adapters.Local
 
 # esbuild is handled by custom build.js script (for Svelte support)
 # See assets/build.js and the node watcher in config/dev.exs
@@ -40,7 +40,7 @@ config :esbuild, :version, "0.25.4"
 # Configure tailwind (the version is required)
 config :tailwind,
   version: "4.1.7",
-  eye_in_the_sky_web: [
+  eye_in_the_sky: [
     args: ~w(
       --input=assets/css/app.css
       --output=priv/static/assets/css/app.css
@@ -57,15 +57,15 @@ config :logger, :default_formatter,
 config :phoenix, :json_library, Jason
 
 # Oban job processing
-config :eye_in_the_sky_web, Oban,
+config :eye_in_the_sky, Oban,
   engine: Oban.Engines.Basic,
   notifier: Oban.Notifiers.PG,
   queues: [jobs: 5, default: 5],
-  repo: EyeInTheSkyWeb.Repo,
+  repo: EyeInTheSky.Repo,
   plugins: [
     {Oban.Plugins.Cron,
      crontab: [
-       {"* * * * *", EyeInTheSkyWeb.Workers.JobDispatcherWorker}
+       {"* * * * *", EyeInTheSky.Workers.JobDispatcherWorker}
      ]}
   ]
 
@@ -79,7 +79,7 @@ config :wax_,
 
 # Additional allowed WebAuthn origins (e.g. ngrok tunnels). Primary origin
 # above is always included; add extras via WEBAUTHN_EXTRA_ORIGINS env var.
-config :eye_in_the_sky_web, :webauthn_extra_origins, []
+config :eye_in_the_sky, :webauthn_extra_origins, []
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

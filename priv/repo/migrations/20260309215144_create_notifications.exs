@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Repo.Migrations.CreateNotifications do
+defmodule EyeInTheSky.Repo.Migrations.CreateNotifications do
   use Ecto.Migration
 
   def change do

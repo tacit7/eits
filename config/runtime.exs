@@ -16,16 +16,16 @@ source!([".env", System.get_env()])
 # If you use `mix release`, you need to explicitly enable the server
 # by passing the PHX_SERVER=true when you start it:
 #
-#     PHX_SERVER=true bin/eye_in_the_sky_web start
+#     PHX_SERVER=true bin/eye_in_the_sky start
 #
 # Alternatively, you can use `mix phx.gen.release` to generate a `bin/server`
 # script that automatically sets the env var above.
 if System.get_env("PHX_SERVER") do
-  config :eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint, server: true
+  config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint, server: true
 end
 
 # Gitea webhook HMAC secret — required for signature verification in all envs
-config :eye_in_the_sky_web, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SECRET", "")
+config :eye_in_the_sky, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SECRET", "")
 
 # VAPID keys — loaded from env vars. Required in prod, optional in dev.
 if vapid_private = System.get_env("VAPID_PRIVATE_KEY") do
@@ -43,12 +43,12 @@ end
 # Leave unset to disable auth (dev default).
 # Generate with: mix eits.gen.api_key
 if config_env() != :test do
-  config :eye_in_the_sky_web, :api_key, System.get_env("EITS_API_KEY")
+  config :eye_in_the_sky, :api_key, System.get_env("EITS_API_KEY")
 end
 
 # Disable passkey auth — set DISABLE_AUTH=true to skip LiveView session auth (dev only)
 if config_env() != :prod do
-  config :eye_in_the_sky_web, :disable_auth, System.get_env("DISABLE_AUTH") in ~w(true 1)
+  config :eye_in_the_sky, :disable_auth, System.get_env("DISABLE_AUTH") in ~w(true 1)
 end
 
 # WebAuthn — extra allowed origins (comma-separated). Read directly from
@@ -68,7 +68,7 @@ if webauthn_extra_raw do
     |> Enum.reject(&(&1 == ""))
 
   if origins != [] do
-    config :eye_in_the_sky_web, :webauthn_extra_origins, origins
+    config :eye_in_the_sky, :webauthn_extra_origins, origins
   end
 end
 
@@ -108,7 +108,7 @@ if config_env() == :prod do
 
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
-  config :eye_in_the_sky_web, EyeInTheSkyWeb.Repo,
+  config :eye_in_the_sky, EyeInTheSky.Repo,
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
     socket_options: maybe_ipv6
@@ -128,9 +128,9 @@ if config_env() == :prod do
   host = System.get_env("PHX_HOST") || "example.com"
   port = String.to_integer(System.get_env("PORT") || "4000")
 
-  config :eye_in_the_sky_web, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+  config :eye_in_the_sky, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
-  config :eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint,
+  config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
       # Enable IPv6 and bind on all interfaces.
@@ -148,7 +148,7 @@ if config_env() == :prod do
   # To get SSL working, you will need to add the `https` key
   # to your endpoint configuration:
   #
-  #     config :eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint,
+  #     config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
   #       https: [
   #         ...,
   #         port: 443,
@@ -170,7 +170,7 @@ if config_env() == :prod do
   # We also recommend setting `force_ssl` in your config/prod.exs,
   # ensuring no data is ever sent via http, always redirecting to https:
   #
-  #     config :eye_in_the_sky_web, EyeInTheSkyWebWeb.Endpoint,
+  #     config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
   #       force_ssl: [hsts: true]
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.
@@ -180,7 +180,7 @@ if config_env() == :prod do
   # In production you need to configure the mailer to use a different adapter.
   # Here is an example configuration for Mailgun:
   #
-  #     config :eye_in_the_sky_web, EyeInTheSkyWeb.Mailer,
+  #     config :eye_in_the_sky, EyeInTheSky.Mailer,
   #       adapter: Swoosh.Adapters.Mailgun,
   #       api_key: System.get_env("MAILGUN_API_KEY"),
   #       domain: System.get_env("MAILGUN_DOMAIN")

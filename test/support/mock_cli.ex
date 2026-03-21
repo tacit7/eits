@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Claude.MockCLI do
+defmodule EyeInTheSky.Claude.MockCLI do
   @moduledoc """
   Test double for CLI module. Sends controllable messages instead of spawning ports.
   """

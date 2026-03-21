@@ -1,0 +1,285 @@
+defmodule EyeInTheSkyWeb.SessionLive.Index do
+  use EyeInTheSkyWeb, :live_view
+
+  alias EyeInTheSky.Sessions
+  import EyeInTheSkyWeb.Components.SessionCard, only: [session_row: 1]
+  import EyeInTheSkyWeb.Helpers.PubSubHelpers
+
+  @per_page 20
+
+  @impl true
+  def mount(_params, _session, socket) do
+    if connected?(socket) do
+      subscribe_agents()
+    end
+
+    sessions = Sessions.list_session_overview_rows(limit: @per_page, offset: 0)
+    total = Sessions.count_session_overview_rows()
+    projects = EyeInTheSky.Projects.list_projects()
+
+    socket =
+      socket
+      |> assign(:page_title, "Session Overview")
+      |> assign(:projects, projects)
+      |> assign(:page, 1)
+      |> assign(:has_more, length(sessions) < total)
+      |> assign(:total_sessions, total)
+      |> assign(:show_new_session_modal, false)
+      |> assign(:editing_session_id, nil)
+      |> stream(:sessions, sessions, dom_id: fn s -> "si-#{s.uuid}" end)
+
+    {:ok, socket}
+  end
+
+  @impl true
+  def handle_event("load_more", _params, socket) do
+    if socket.assigns.has_more do
+      next_page = socket.assigns.page + 1
+      offset = (next_page - 1) * @per_page
+      total = socket.assigns.total_sessions
+
+      new_sessions = Sessions.list_session_overview_rows(limit: @per_page, offset: offset)
+
+      socket =
+        socket
+        |> assign(:page, next_page)
+        |> assign(:has_more, offset + length(new_sessions) < total)
+
+      socket =
+        Enum.reduce(new_sessions, socket, fn session, acc ->
+          stream_insert(acc, :sessions, session)
+        end)
+
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("navigate_dm", %{"id" => id}, socket) do
+    {:noreply, push_navigate(socket, to: ~p"/dm/#{id}")}
+  end
+
+  @impl true
+  def handle_event("noop", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_event("rename_session", %{"session_id" => session_id}, socket) do
+    {:noreply, assign(socket, :editing_session_id, String.to_integer(session_id))}
+  end
+
+  @impl true
+  def handle_event("save_session_name", %{"session_id" => session_id, "name" => name}, socket) do
+    name = String.trim(name)
+
+    socket =
+      if name != "" do
+        case Sessions.get_session(session_id) do
+          {:ok, session} ->
+            Sessions.update_session(session, %{name: name})
+            socket
+
+          _ ->
+            socket
+        end
+      else
+        socket
+      end
+
+    {:noreply, assign(socket, :editing_session_id, nil)}
+  end
+
+  @impl true
+  def handle_event("cancel_rename", _params, socket) do
+    {:noreply, assign(socket, :editing_session_id, nil)}
+  end
+
+  @impl true
+  def handle_event("archive_session", %{"session_id" => session_id}, socket) do
+    with {:ok, session} <- Sessions.get_session(session_id),
+         {:ok, _} <- Sessions.archive_session(session) do
+      sessions =
+        Sessions.list_session_overview_rows(limit: socket.assigns.page * @per_page, offset: 0)
+
+      total = Sessions.count_session_overview_rows()
+
+      socket =
+        socket
+        |> assign(:has_more, length(sessions) < total)
+        |> assign(:total_sessions, total)
+        |> stream(:sessions, sessions, reset: true)
+        |> put_flash(:info, "Session archived")
+
+      {:noreply, socket}
+    else
+      {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to archive session")}
+    end
+  end
+
+  @impl true
+  def handle_event("delete_session", %{"session_id" => session_id}, socket) do
+    with {:ok, session} <- Sessions.get_session(session_id),
+         {:ok, _} <- Sessions.delete_session(session) do
+      sessions =
+        Sessions.list_session_overview_rows(limit: socket.assigns.page * @per_page, offset: 0)
+
+      total = Sessions.count_session_overview_rows()
+
+      socket =
+        socket
+        |> assign(:has_more, length(sessions) < total)
+        |> assign(:total_sessions, total)
+        |> stream(:sessions, sessions, reset: true)
+        |> put_flash(:info, "Session deleted")
+
+      {:noreply, socket}
+    else
+      {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to delete session")}
+    end
+  end
+
+  @impl true
+  def handle_event("toggle_new_session_modal", _params, socket) do
+    {:noreply, assign(socket, :show_new_session_modal, !socket.assigns.show_new_session_modal)}
+  end
+
+  @impl true
+  def handle_event("create_new_session", params, socket) do
+    model = params["model"]
+    effort_level = params["effort_level"]
+    project_id = String.to_integer(params["project_id"])
+    description = params["description"]
+    agent_name = params["agent_name"] || String.slice(description || "", 0, 60)
+
+    project = EyeInTheSky.Projects.get_project!(project_id)
+
+    worktree =
+      case params["worktree"] do
+        nil -> nil
+        "" -> nil
+        w -> w
+      end
+
+    opts = [
+      model: model,
+      effort_level: effort_level,
+      project_id: project_id,
+      project_path: project.path,
+      description: agent_name,
+      instructions: description,
+      agent: params["agent"],
+      worktree: worktree
+    ]
+
+    case EyeInTheSky.Agents.AgentManager.create_agent(opts) do
+      {:ok, _result} ->
+        sessions = Sessions.list_session_overview_rows(limit: @per_page, offset: 0)
+        total = Sessions.count_session_overview_rows()
+
+        socket =
+          socket
+          |> assign(:show_new_session_modal, false)
+          |> assign(:page, 1)
+          |> assign(:has_more, length(sessions) < total)
+          |> assign(:total_sessions, total)
+          |> stream(:sessions, sessions, reset: true)
+          |> put_flash(:info, "Session launched")
+
+        {:noreply, socket}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to create session: #{inspect(reason)}")}
+    end
+  end
+
+  # Real-time: reload sessions list when agents change
+  @impl true
+  def handle_info({event, _agent}, socket)
+      when event in [:agent_created, :agent_updated, :agent_deleted] do
+    current_page = socket.assigns.page
+    sessions = Sessions.list_session_overview_rows(limit: current_page * @per_page, offset: 0)
+    total = Sessions.count_session_overview_rows()
+
+    socket =
+      socket
+      |> assign(:has_more, length(sessions) < total)
+      |> assign(:total_sessions, total)
+      |> stream(:sessions, sessions, reset: true)
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <div class="bg-base-100 min-h-full px-4 sm:px-6 lg:px-8">
+      <div class="max-w-4xl mx-auto">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-5">
+          <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
+            {@total_sessions} sessions
+          </span>
+          <div class="flex w-full sm:w-auto items-center gap-2">
+            <button
+              phx-click="toggle_new_session_modal"
+              class="btn btn-sm btn-primary gap-1.5 min-h-0 h-8 sm:h-7 text-xs w-full sm:w-auto"
+            >
+              <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Agent
+            </button>
+          </div>
+        </div>
+
+        <div class="mt-2 rounded-xl shadow-sm">
+          <div
+            id="sessions-list"
+            phx-update="stream"
+            class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl px-4"
+          >
+            <div :for={{dom_id, session} <- @streams.sessions} id={dom_id}>
+              <.session_row
+                session={session}
+                project_name={session.project_name}
+                click_event="navigate_dm"
+                editing_session_id={@editing_session_id}
+              >
+                <:actions>
+                  <.icon_button
+                    icon="hero-archive-box-mini"
+                    on_click="archive_session"
+                    aria_label="Archive"
+                    color="warning"
+                    class="hidden sm:flex"
+                    values={%{"session_id" => session.id}}
+                  />
+                </:actions>
+              </.session_row>
+            </div>
+          </div>
+        </div>
+
+        <div
+          id="sessions-infinite-scroll-sentinel"
+          phx-hook="InfiniteScroll"
+          data-has-more={to_string(@has_more)}
+          data-page={@page}
+          class="py-6 flex justify-center"
+        >
+          <%= if @has_more do %>
+            <span class="loading loading-spinner loading-sm text-base-content/30"></span>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <.live_component
+      module={EyeInTheSkyWeb.Components.NewSessionModal}
+      id="new-session-modal"
+      show={@show_new_session_modal}
+      projects={@projects}
+      current_project={nil}
+      toggle_event="toggle_new_session_modal"
+      submit_event="create_new_session"
+    />
+    """
+  end
+end

@@ -14,9 +14,9 @@ defmodule Mix.Tasks.Eits.Register do
 
   @impl Mix.Task
   def run([username]) do
-    Application.ensure_all_started(:eye_in_the_sky_web)
+    Application.ensure_all_started(:eye_in_the_sky)
 
-    case EyeInTheSkyWeb.Accounts.create_registration_token(username) do
+    case EyeInTheSky.Accounts.create_registration_token(username) do
       {:ok, raw_token, _rt} ->
         origin = Application.get_env(:wax_, :origin, "https://localhost:5001")
         url = "#{origin}/auth/register?token=#{raw_token}"

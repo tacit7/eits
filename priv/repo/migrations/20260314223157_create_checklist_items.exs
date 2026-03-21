@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Repo.Migrations.CreateChecklistItems do
+defmodule EyeInTheSky.Repo.Migrations.CreateChecklistItems do
   use Ecto.Migration
 
   def change do

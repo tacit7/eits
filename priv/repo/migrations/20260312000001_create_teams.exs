@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Repo.Migrations.CreateTeams do
+defmodule EyeInTheSky.Repo.Migrations.CreateTeams do
   use Ecto.Migration
 
   def change do

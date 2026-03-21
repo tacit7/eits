@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWebWeb.ConnCase do
+defmodule EyeInTheSkyWeb.ConnCase do
   @moduledoc """
   This module defines the test case to be used by
   tests that require setting up a connection.
@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWebWeb.ConnCase do
   we enable the SQL sandbox, so changes done to the database
   are reverted at the end of every test. If you are using
   PostgreSQL, you can even run database tests asynchronously
-  by setting `use EyeInTheSkyWebWeb.ConnCase, async: true`, although
+  by setting `use EyeInTheSkyWeb.ConnCase, async: true`, although
   this option is not recommended for other databases.
   """
 
@@ -20,20 +20,20 @@ defmodule EyeInTheSkyWebWeb.ConnCase do
   using do
     quote do
       # The default endpoint for testing
-      @endpoint EyeInTheSkyWebWeb.Endpoint
+      @endpoint EyeInTheSkyWeb.Endpoint
 
-      use EyeInTheSkyWebWeb, :verified_routes
+      use EyeInTheSkyWeb, :verified_routes
 
       # Import conveniences for testing with connections
       import Plug.Conn
       import Phoenix.ConnTest
-      import EyeInTheSkyWebWeb.ConnCase
+      import EyeInTheSkyWeb.ConnCase
     end
   end
 
   setup tags do
-    EyeInTheSkyWeb.DataCase.setup_sandbox(tags)
-    user = EyeInTheSkyWeb.Factory.user_fixture()
+    EyeInTheSky.DataCase.setup_sandbox(tags)
+    user = EyeInTheSky.Factory.user_fixture()
     conn = Phoenix.ConnTest.build_conn() |> log_in_user(user)
     {:ok, conn: conn, user: user}
   end
@@ -44,7 +44,7 @@ defmodule EyeInTheSkyWebWeb.ConnCase do
   the ValidateSession plug and auth controller write.
   """
   def log_in_user(conn, user) do
-    {:ok, token} = EyeInTheSkyWeb.Accounts.create_user_session(user.id)
+    {:ok, token} = EyeInTheSky.Accounts.create_user_session(user.id)
 
     conn
     |> Plug.Test.init_test_session(%{})
@@ -57,13 +57,13 @@ defmodule EyeInTheSkyWebWeb.ConnCase do
 
   Usage:
 
-      use EyeInTheSkyWebWeb.ConnCase
-      import EyeInTheSkyWebWeb.ConnCase, only: [setup_with_auth: 0]
+      use EyeInTheSkyWeb.ConnCase
+      import EyeInTheSkyWeb.ConnCase, only: [setup_with_auth: 0]
 
       setup :setup_with_auth
   """
   def setup_with_auth(_tags \\ %{}) do
-    user = EyeInTheSkyWeb.Factory.user_fixture()
+    user = EyeInTheSky.Factory.user_fixture()
     conn = Phoenix.ConnTest.build_conn() |> log_in_user(user)
     {:ok, conn: conn, user: user}
   end

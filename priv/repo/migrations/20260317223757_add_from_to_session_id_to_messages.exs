@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Repo.Migrations.AddFromToSessionIdToMessages do
+defmodule EyeInTheSky.Repo.Migrations.AddFromToSessionIdToMessages do
   use Ecto.Migration
 
   def change do

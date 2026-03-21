@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.SDKE2ETest do
+defmodule EyeInTheSky.SDKE2ETest do
   @moduledoc """
   Real end-to-end integration test for the Claude SDK.
 
@@ -14,7 +14,7 @@ defmodule EyeInTheSkyWeb.SDKE2ETest do
 
   use ExUnit.Case, async: false
 
-  alias EyeInTheSkyWeb.Claude.{SDK, Message}
+  alias EyeInTheSky.Claude.{SDK, Message}
 
   @moduletag :integration
   @moduletag :sdk_e2e

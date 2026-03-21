@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Repo.Migrations.ChangeSessionsIntentToText do
+defmodule EyeInTheSky.Repo.Migrations.ChangeSessionsIntentToText do
   use Ecto.Migration
 
   def up do

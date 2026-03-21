@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Repo.Migrations.CreateAuthTables do
+defmodule EyeInTheSky.Repo.Migrations.CreateAuthTables do
   use Ecto.Migration
 
   def change do

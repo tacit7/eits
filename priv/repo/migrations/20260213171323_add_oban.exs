@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Repo.Migrations.AddOban do
+defmodule EyeInTheSky.Repo.Migrations.AddOban do
   use Ecto.Migration
 
   def up, do: Oban.Migration.up(version: 12)

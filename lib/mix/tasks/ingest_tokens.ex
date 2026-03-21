@@ -35,7 +35,7 @@ defmodule Mix.Tasks.IngestTokens do
   defp ingest_single(uuid) do
     Mix.shell().info("Ingesting session #{uuid}...")
 
-    case EyeInTheSkyWeb.Metrics.TokenIngestion.ingest_session(uuid) do
+    case EyeInTheSky.Metrics.TokenIngestion.ingest_session(uuid) do
       :ok ->
         Mix.shell().info("Done.")
 
@@ -50,7 +50,7 @@ defmodule Mix.Tasks.IngestTokens do
     Mix.shell().info("Ingesting token usage (#{mode})...")
 
     {ingested, skipped, errors} =
-      EyeInTheSkyWeb.Metrics.TokenIngestion.ingest_all(force: force)
+      EyeInTheSky.Metrics.TokenIngestion.ingest_all(force: force)
 
     Mix.shell().info("""
     Done.

@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Repo.Migrations.AddParentFieldsToAgentsAndSessions do
+defmodule EyeInTheSky.Repo.Migrations.AddParentFieldsToAgentsAndSessions do
   use Ecto.Migration
 
   def change do

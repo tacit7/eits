@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Repo.Migrations.AddEntrypointToSessions do
+defmodule EyeInTheSky.Repo.Migrations.AddEntrypointToSessions do
   use Ecto.Migration
 
   def change do

@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Repo.Migrations.CreateApiKeys do
+defmodule EyeInTheSky.Repo.Migrations.CreateApiKeys do
   use Ecto.Migration
 
   def change do

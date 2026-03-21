@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.SchemaLoader do
+defmodule EyeInTheSky.SchemaLoader do
   @moduledoc """
   Schema setup for tests. With PostgreSQL, schema is managed via Ecto migrations.
   This module is kept for backwards compatibility with test_helper.exs.
@@ -14,7 +14,7 @@ defmodule EyeInTheSkyWeb.SchemaLoader do
 
   def schema_loaded? do
     case Ecto.Adapters.SQL.query(
-           EyeInTheSkyWeb.Repo,
+           EyeInTheSky.Repo,
            "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'sessions'",
            []
          ) do

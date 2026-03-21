@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Repo.Migrations.AddChannelMessageNumber do
+defmodule EyeInTheSky.Repo.Migrations.AddChannelMessageNumber do
   use Ecto.Migration
 
   def change do

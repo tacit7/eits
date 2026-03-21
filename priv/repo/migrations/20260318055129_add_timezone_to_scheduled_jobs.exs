@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Repo.Migrations.AddTimezoneToScheduledJobs do
+defmodule EyeInTheSky.Repo.Migrations.AddTimezoneToScheduledJobs do
   use Ecto.Migration
 
   def change do

@@ -53,7 +53,7 @@ defmodule Mix.Tasks.Eits.Gen.ApiKey do
 
     key = :crypto.strong_rand_bytes(32) |> Base.encode64(padding: false)
 
-    case EyeInTheSkyWeb.Accounts.ApiKey.create(key, label, valid_until) do
+    case EyeInTheSky.Accounts.ApiKey.create(key, label, valid_until) do
       {:ok, api_key} ->
         expiry_note =
           if api_key.valid_until,

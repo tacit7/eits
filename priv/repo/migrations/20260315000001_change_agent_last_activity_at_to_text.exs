@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Repo.Migrations.ChangeAgentLastActivityAtToText do
+defmodule EyeInTheSky.Repo.Migrations.ChangeAgentLastActivityAtToText do
   use Ecto.Migration
 
   def up do

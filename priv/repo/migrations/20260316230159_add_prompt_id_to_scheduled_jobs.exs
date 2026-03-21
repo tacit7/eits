@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Repo.Migrations.AddPromptIdToScheduledJobs do
+defmodule EyeInTheSky.Repo.Migrations.AddPromptIdToScheduledJobs do
   use Ecto.Migration
 
   def up do

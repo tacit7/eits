@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Repo.Migrations.DeferWorkflowStatePositionUnique do
+defmodule EyeInTheSky.Repo.Migrations.DeferWorkflowStatePositionUnique do
   use Ecto.Migration
 
   def up do

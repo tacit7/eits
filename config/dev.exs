@@ -1,14 +1,14 @@
 import Config
 
 # Gitea webhook HMAC secret — set this in Gitea webhook settings and here
-config :eye_in_the_sky_web, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SECRET", "")
-config :eye_in_the_sky_web, :env, :dev
-config :eye_in_the_sky_web, :bypass_auth, true
+config :eye_in_the_sky, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SECRET", "")
+config :eye_in_the_sky, :env, :dev
+config :eye_in_the_sky, :bypass_auth, true
 # Allow unsigned webhooks in dev when no secret is set (never enable in prod)
-config :eye_in_the_sky_web, :allow_unsigned_webhooks, true
+config :eye_in_the_sky, :allow_unsigned_webhooks, true
 
 # Configure your database
-config :eye_in_the_sky_web, EyeInTheSkyWeb.Repo,
+config :eye_in_the_sky, EyeInTheSky.Repo,
   username: "postgres",
   password: "postgres",
   hostname: "localhost",
@@ -25,7 +25,7 @@ config :eye_in_the_sky_web, EyeInTheSkyWeb.Repo,
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
-config :eye_in_the_sky_web, EyeInTheSkyWeb.Endpoint,
+config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [port: String.to_integer(System.get_env("PORT", "5001"))],
@@ -35,8 +35,8 @@ config :eye_in_the_sky_web, EyeInTheSkyWeb.Endpoint,
   secret_key_base: "N/iElaaIGg/5yCN4JOKd13aAXziMbsBDWfTjQFgjjLY32KpeZ7hBDnQEx1AcpSLO",
   watchers: [
     node: ["build.js", "--watch", cd: Path.expand("../assets", __DIR__)],
-    # esbuild: {Esbuild, :install_and_run, [:eye_in_the_sky_web, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:eye_in_the_sky_web, ~w(--watch)]}
+    # esbuild: {Esbuild, :install_and_run, [:eye_in_the_sky, ~w(--sourcemap=inline --watch)]},
+    tailwind: {Tailwind, :install_and_run, [:eye_in_the_sky, ~w(--watch)]}
   ]
 
 # ## SSL Support
@@ -63,7 +63,7 @@ config :eye_in_the_sky_web, EyeInTheSkyWeb.Endpoint,
 # different ports.
 
 # Watch static and templates for browser reloading.
-config :eye_in_the_sky_web, EyeInTheSkyWeb.Endpoint,
+config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
   live_reload:
     (if System.get_env("LIVE_RELOAD") in ["0", "false"] do
       []
@@ -73,13 +73,13 @@ config :eye_in_the_sky_web, EyeInTheSkyWeb.Endpoint,
         patterns: [
           ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
           ~r"priv/gettext/.*(po)$",
-          ~r"lib/eye_in_the_sky_web/(?:controllers|live|components|router)/?.*\.(ex|heex)$"
+          ~r"lib/eye_in_the_sky/(?:controllers|live|components|router)/?.*\.(ex|heex)$"
         ]
       ]
     end)
 
 # Enable dev routes for dashboard and mailbox
-config :eye_in_the_sky_web, dev_routes: true
+config :eye_in_the_sky, dev_routes: true
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"

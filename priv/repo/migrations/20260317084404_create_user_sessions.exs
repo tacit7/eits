@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Repo.Migrations.CreateUserSessions do
+defmodule EyeInTheSky.Repo.Migrations.CreateUserSessions do
   use Ecto.Migration
 
   def change do

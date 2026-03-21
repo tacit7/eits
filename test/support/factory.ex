@@ -1,9 +1,9 @@
-defmodule EyeInTheSkyWeb.Factory do
+defmodule EyeInTheSky.Factory do
   @moduledoc """
   Shared test factory helpers for controller and MCP tool tests.
   """
 
-  alias EyeInTheSkyWeb.{Accounts, Agents, Sessions}
+  alias EyeInTheSky.{Accounts, Agents, Sessions}
 
   def user_fixture(attrs \\ %{}) do
     username = Map.get(attrs, :username, "user_#{System.unique_integer([:positive])}")

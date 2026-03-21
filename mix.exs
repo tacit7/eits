@@ -1,9 +1,9 @@
-defmodule EyeInTheSkyWeb.MixProject do
+defmodule EyeInTheSky.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :eye_in_the_sky_web,
+      app: :eye_in_the_sky,
       version: "0.1.0",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -20,7 +20,7 @@ defmodule EyeInTheSkyWeb.MixProject do
   # Type `mix help compile.app` for more information.
   def application do
     [
-      mod: {EyeInTheSkyWeb.Application, []},
+      mod: {EyeInTheSky.Application, []},
       extra_applications: [:logger, :runtime_tools]
     ]
   end
@@ -91,9 +91,9 @@ defmodule EyeInTheSkyWeb.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "cmd --cd assets npm install"],
-      "assets.build": ["compile", "tailwind eye_in_the_sky_web", "cmd --cd assets node build.js"],
+      "assets.build": ["compile", "tailwind eye_in_the_sky", "cmd --cd assets node build.js"],
       "assets.deploy": [
-        "tailwind eye_in_the_sky_web --minify",
+        "tailwind eye_in_the_sky --minify",
         "cmd --cd assets node build.js --deploy",
         "phx.digest"
       ],

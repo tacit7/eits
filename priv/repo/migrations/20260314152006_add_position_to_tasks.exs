@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Repo.Migrations.AddPositionToTasks do
+defmodule EyeInTheSky.Repo.Migrations.AddPositionToTasks do
   use Ecto.Migration
 
   def up do

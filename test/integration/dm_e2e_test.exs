@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.DME2ETest do
+defmodule EyeInTheSky.DME2ETest do
   @moduledoc """
   End-to-end test for Direct Message functionality.
 
@@ -8,21 +8,21 @@ defmodule EyeInTheSkyWeb.DME2ETest do
   3. Recipient can view the message
   """
 
-  use EyeInTheSkyWebWeb.ConnCase, async: false
+  use EyeInTheSkyWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSkyWeb.{Agents, Channels, Messages, Projects, Sessions}
+  alias EyeInTheSky.{Agents, Channels, Messages, Projects, Sessions}
 
   @moduletag :integration
 
   setup %{conn: conn} do
     # Use real CLI (not mock) for this test
-    Application.put_env(:eye_in_the_sky_web, :cli_module, EyeInTheSkyWeb.Claude.CLI)
+    Application.put_env(:eye_in_the_sky, :cli_module, EyeInTheSky.Claude.CLI)
 
     on_exit(fn ->
-      Application.put_env(:eye_in_the_sky_web, :cli_module, EyeInTheSkyWeb.Claude.MockCLI)
+      Application.put_env(:eye_in_the_sky, :cli_module, EyeInTheSky.Claude.MockCLI)
 
-      supervisor = EyeInTheSkyWeb.Claude.AgentSupervisor
+      supervisor = EyeInTheSky.Claude.AgentSupervisor
 
       supervisor
       |> DynamicSupervisor.which_children()
@@ -107,8 +107,8 @@ defmodule EyeInTheSkyWeb.DME2ETest do
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
       # Subscribe to channel and session events
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "channel:#{channel.id}:messages")
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{recipient.uuid}:status")
+      Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "channel:#{channel.id}:messages")
+      Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "session:#{recipient.uuid}:status")
 
       # STEP 2: Send DM from sender to recipient
       test_message = "Hello from E2E DM test at #{System.system_time(:second)}"
@@ -151,7 +151,7 @@ defmodule EyeInTheSkyWeb.DME2ETest do
          %{conn: conn, recipient_session: recipient, channel: channel} do
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "channel:#{channel.id}:messages")
+      Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "channel:#{channel.id}:messages")
 
       # Send 3 DMs in sequence
       messages = ["First DM", "Second DM", "Third DM"]
@@ -277,7 +277,7 @@ defmodule EyeInTheSkyWeb.DME2ETest do
          %{conn: conn, recipient_session: recipient, channel: channel} do
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
-      Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "channel:#{channel.id}:messages")
+      Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "channel:#{channel.id}:messages")
 
       # Send 5 DMs sequentially (render_hook must be called from the test process)
       for i <- 1..5 do

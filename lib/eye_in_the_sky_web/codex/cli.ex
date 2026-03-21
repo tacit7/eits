@@ -166,7 +166,7 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
           {"EITS_PROJECT_ID", opts[:eits_project_id]},
           {"EITS_MODEL", opts[:eits_model]},
           {"EITS_URL",
-           opts[:eits_url] || System.get_env("EITS_URL", "http://localhost:5000/api/v1")}
+           opts[:eits_url] || System.get_env("EITS_URL", "http://localhost:5001/api/v1")}
         ],
         args,
         fn {key, val}, acc ->
@@ -305,7 +305,7 @@ defmodule EyeInTheSkyWeb.Codex.CLI do
     |> EyeInTheSkyWeb.CLI.Port.maybe_add_env("EITS_MODEL", opts[:eits_model])
     |> EyeInTheSkyWeb.CLI.Port.maybe_add_env(
       "EITS_URL",
-      opts[:eits_url] || System.get_env("EITS_URL", "http://localhost:5000/api/v1")
+      opts[:eits_url] || System.get_env("EITS_URL", "http://localhost:5001/api/v1")
     )
   end
 

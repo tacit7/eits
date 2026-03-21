@@ -6,7 +6,7 @@ set -uo pipefail
 # --- EITS Workflow Guard ---
 EITS_WORKFLOW="${EITS_WORKFLOW:-}"
 if [ -z "$EITS_WORKFLOW" ]; then
-  EITS_URL="${EITS_API_URL:-http://localhost:5000/api/v1}"
+  EITS_URL="${EITS_API_URL:-http://localhost:5001/api/v1}"
   ENABLED=$(curl -sf "${EITS_URL}/settings/eits_workflow_enabled" 2>/dev/null | jq -r '.enabled' 2>/dev/null || echo "true")
   [ "$ENABLED" = "false" ] && exit 0
 elif [ "$EITS_WORKFLOW" = "0" ]; then
@@ -30,7 +30,7 @@ AGENT_ID="${AGENT_ID:-$SESSION_ID}"
 HASH=$(git rev-parse HEAD 2>/dev/null) || exit 0
 MSG=$(git log -1 --pretty=%s HEAD 2>/dev/null) || MSG=""
 
-EITS_URL="${EITS_API_URL:-http://localhost:5000/api/v1}" \
+EITS_URL="${EITS_API_URL:-http://localhost:5001/api/v1}" \
   EITS_AGENT_UUID="$AGENT_ID" \
   eits commits create --hash "$HASH" --message "$MSG" >/dev/null 2>&1 || true
 

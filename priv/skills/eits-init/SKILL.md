@@ -9,7 +9,7 @@ The startup/resume hooks inject these env vars automatically:
 - `$EITS_SESSION_UUID` — session UUID
 - `$EITS_PROJECT_ID` — project integer ID
 - `$EITS_AGENT_UUID` — agent UUID (resume only; not set on new sessions)
-- `$EITS_URL` — `http://localhost:5000/api/v1`
+- `$EITS_URL` — `http://localhost:5001/api/v1`
 
 ## Steps
 

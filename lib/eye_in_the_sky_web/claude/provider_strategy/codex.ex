@@ -52,7 +52,7 @@ defmodule EyeInTheSkyWeb.Claude.ProviderStrategy.Codex do
       eits_agent_id: state.agent_id,
       eits_project_id: state.project_id,
       eits_model: context[:model],
-      eits_url: System.get_env("EITS_URL", "http://localhost:5000/api/v1")
+      eits_url: System.get_env("EITS_URL", "http://localhost:5001/api/v1")
     ]
   end
 end

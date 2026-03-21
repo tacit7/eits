@@ -103,4 +103,4 @@ eits tasks update <id> --state 4
 | `EITS_SESSION_UUID` | Your session UUID |
 | `EITS_AGENT_UUID` | Your agent UUID |
 | `EITS_PROJECT_ID` | Your project ID |
-| `EITS_URL` | `http://localhost:5000/api/v1` |
+| `EITS_URL` | `http://localhost:5001/api/v1` |

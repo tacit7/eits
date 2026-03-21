@@ -50,7 +50,7 @@ defmodule EyeInTheSkyWeb.Codex.SDK do
     - EITS_SESSION_ID=#{state.session_id}
     - EITS_AGENT_UUID=#{state.agent_id}
     - EITS_PROJECT_ID=#{state.project_id}
-    - EITS_URL=http://localhost:5000/api/v1
+    - EITS_URL=http://localhost:5001/api/v1
 
     Use `eits` CLI for task tracking:
     - `eits tasks create --title "Task name" --description "Details"`

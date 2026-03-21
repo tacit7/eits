@@ -6,7 +6,7 @@ Bash script at `scripts/eits`. Talks to the Eye in the Sky REST API.
 
 ```bash
 # Default URL
-export EITS_URL=http://localhost:5000/api/v1
+export EITS_URL=http://localhost:5001/api/v1
 
 # Optional auth
 export EITS_API_KEY=<your-key>

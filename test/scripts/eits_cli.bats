@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
 # Tests for scripts/eits CLI
-# Runs against the real server at http://localhost:5000/api/v1
+# Runs against the real server at http://localhost:5001/api/v1
 
 EITS="$BATS_TEST_DIRNAME/../../scripts/eits"
-export EITS_URL="http://localhost:5000/api/v1"
+export EITS_URL="http://localhost:5001/api/v1"
 export EITS_PROJECT_ID="1"
 
 # Use a fixed test session that's already in the DB
@@ -342,7 +342,7 @@ teardown_teams() {
 
 # ── default URL ───────────────────────────────────────────────────────────────
 
-@test "BASE_URL: defaults to http://localhost:5000/api/v1 when EITS_URL unset" {
+@test "BASE_URL: defaults to http://localhost:5001/api/v1 when EITS_URL unset" {
   run env -u EITS_URL "$EITS" sessions get "$TEST_SESSION"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.session_id' >/dev/null

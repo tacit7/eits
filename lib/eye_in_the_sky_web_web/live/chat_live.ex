@@ -25,6 +25,12 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       |> assign(:working_agents, %{})
       |> assign(:sidebar_tab, :chat)
       |> assign(:sidebar_project, nil)
+      |> allow_upload(:agent_images,
+        accept: ~w(.jpg .jpeg .png .gif .webp),
+        max_entries: 5,
+        max_file_size: 20_000_000,
+        auto_upload: true
+      )
 
     {:ok, socket}
   end
@@ -431,6 +437,16 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
   end
 
   @impl true
+  def handle_event("validate_agent_upload", _params, socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("cancel_agent_upload", %{"ref" => ref}, socket) do
+    {:noreply, cancel_upload(socket, :agent_images, ref)}
+  end
+
+  @impl true
   def handle_event("create_channel", _params, socket) do
     {:noreply, put_flash(socket, :info, "Channel creation coming soon")}
   end
@@ -470,7 +486,9 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
           "Creating new agent (#{model})#{if agent_name != "", do: " - #{agent_name}", else: ""}..."
       })
 
-    instructions = if description != "", do: description, else: agent_description
+    base_instructions = if description != "", do: description, else: agent_description
+    uploaded_images = consume_agent_images(socket)
+    instructions = append_image_paths(base_instructions, uploaded_images)
     agent_type = params["agent_type"] || "claude"
 
     opts = [
@@ -825,6 +843,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       current_project={nil}
       prompts={@prompts}
       agent_templates={@agent_templates}
+      uploads={@uploads}
     />
     """
   end
@@ -980,5 +999,28 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       {f, _} when f > 0 -> f
       _ -> nil
     end
+  end
+
+  defp consume_agent_images(socket) do
+    consume_uploaded_entries(socket, :agent_images, fn %{path: temp_path}, entry ->
+      destination = agent_image_destination(entry.client_name)
+      File.mkdir_p!(Path.dirname(destination))
+      File.cp!(temp_path, destination)
+      {:ok, destination}
+    end)
+  end
+
+  defp agent_image_destination(client_name) do
+    base = Path.join([:code.priv_dir(:eye_in_the_sky_web), "static", "uploads", "agent"])
+    date_dir = Date.utc_today() |> Date.to_string()
+    filename = "#{Ecto.UUID.generate()}#{Path.extname(client_name)}"
+    Path.join([base, date_dir, filename])
+  end
+
+  defp append_image_paths(instructions, []), do: instructions
+
+  defp append_image_paths(instructions, image_paths) do
+    paths = Enum.map_join(image_paths, "\n", fn p -> "- #{p}" end)
+    "#{instructions}\n\nAttached images:\n#{paths}"
   end
 end

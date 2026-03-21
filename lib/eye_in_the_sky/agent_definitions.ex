@@ -118,35 +118,47 @@ defmodule EyeInTheSky.AgentDefinitions do
   end
 
   defp sync_directory(dir, scope, project_id) do
-    now = DateTime.utc_now()
+    lock_key = sync_lock_key(scope, project_id)
 
-    if File.dir?(dir) do
-      md_files =
-        dir
-        |> File.ls!()
-        |> Enum.filter(&String.ends_with?(&1, ".md"))
-        |> Enum.reject(&(&1 == "README.md"))
+    Repo.transaction(fn ->
+      # Advisory lock prevents concurrent syncs for the same scope/project from racing
+      Repo.query!("SELECT pg_advisory_xact_lock($1)", [lock_key])
 
-      synced_slugs =
-        Enum.map(md_files, fn filename ->
-          slug = Path.rootname(filename)
-          file_path = Path.join(dir, filename)
+      now = DateTime.utc_now()
 
-          case sync_one(file_path, slug, scope, project_id, now) do
-            {:ok, _defn} -> slug
-            {:error, _reason} -> nil
-          end
-        end)
-        |> Enum.reject(&is_nil/1)
+      if File.dir?(dir) do
+        md_files =
+          dir
+          |> File.ls!()
+          |> Enum.filter(&String.ends_with?(&1, ".md"))
+          |> Enum.reject(&(&1 == "README.md"))
 
-      mark_missing(scope, project_id, synced_slugs, now)
+        synced_slugs =
+          Enum.map(md_files, fn filename ->
+            slug = Path.rootname(filename)
+            file_path = Path.join(dir, filename)
 
-      {:ok, synced_slugs}
-    else
-      # Directory absent — mark all existing definitions for this scope as missing
-      mark_missing(scope, project_id, [], now)
-      {:ok, []}
-    end
+            case sync_one(file_path, slug, scope, project_id, now) do
+              {:ok, _defn} -> slug
+              {:error, _reason} -> nil
+            end
+          end)
+          |> Enum.reject(&is_nil/1)
+
+        mark_missing(scope, project_id, synced_slugs, now)
+        synced_slugs
+      else
+        # Directory absent — mark all existing definitions for this scope as missing
+        mark_missing(scope, project_id, [], now)
+        []
+      end
+    end)
+  end
+
+  # Deterministic advisory lock key from scope + project_id.
+  # Uses Erlang's phash2 which returns a 32-bit integer — fits pg_advisory_xact_lock's bigint param.
+  defp sync_lock_key(scope, project_id) do
+    :erlang.phash2({:agent_def_sync, scope, project_id})
   end
 
   defp sync_one(file_path, slug, scope, project_id, now) do

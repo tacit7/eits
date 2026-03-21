@@ -7,13 +7,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   alias EyeInTheSkyWeb.Components.DmPage.TasksTab
   alias EyeInTheSkyWeb.Components.DmPage.CommitsTab
   alias EyeInTheSkyWeb.Components.DmPage.NotesTab
+  alias EyeInTheSkyWeb.Components.DmPage.ContextTab
   alias EyeInTheSkyWeb.Components.DmPage.Composer
 
   @tabs [
     {"messages", "hero-chat-bubble-left-right", "Messages"},
     {"tasks", "hero-clipboard-document-list", "Tasks"},
     {"commits", "hero-code-bracket", "Commits"},
-    {"notes", "hero-document-text", "Notes"}
+    {"notes", "hero-document-text", "Notes"},
+    {"context", "hero-document-magnifying-glass", "Context"}
   ]
 
   attr :agent, :map, required: true
@@ -49,6 +51,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :context_used, :integer, default: 0
   attr :context_window, :integer, default: 0
   attr :message_search_query, :string, default: ""
+  attr :session_context, :map, default: nil
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
 
@@ -397,6 +400,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             <CommitsTab.commits_tab commits={@commits} diff_cache={@diff_cache} />
           <% "notes" -> %>
             <NotesTab.notes_tab notes={@notes} />
+          <% "context" -> %>
+            <ContextTab.context_tab session_context={@session_context} />
           <% _ -> %>
             <MessagesTab.messages_tab
               messages={@messages}

@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
 
   import Phoenix.Component, only: [assign: 3]
 
-  alias EyeInTheSky.{Commits, Messages, Notes, Repo, Tasks}
+  alias EyeInTheSky.{Commits, Contexts, Messages, Notes, Repo, Tasks}
 
   require Logger
 
@@ -58,6 +58,12 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
       :notes,
       maybe_load_tab_data(tab, "notes", socket.assigns[:notes], fn ->
         Notes.list_notes_for_session(session_id)
+      end)
+    )
+    |> assign(
+      :session_context,
+      maybe_load_tab_data(tab, "context", socket.assigns[:session_context], fn ->
+        Contexts.get_session_context(session_id)
       end)
     )
   end

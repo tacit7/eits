@@ -73,11 +73,35 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycle do
 
   def handle_agent_updated(%{id: session_id} = updated_session, socket) do
     if session_id == socket.assigns.session_id do
-      {:noreply, assign(socket, :session, updated_session)}
+      socket =
+        socket
+        |> assign(:session, updated_session)
+        |> sync_processing_from_status(updated_session.status)
+
+      {:noreply, socket}
     else
       {:noreply, socket}
     end
   end
+
+  # Sync processing/compacting assigns from session status as a fallback.
+  # The agent_stopped PubSub event is the primary mechanism, but it can be
+  # missed (e.g. 3-tuple from AgentWorker, or hook delivery issues). The
+  # session_updated broadcast always fires and carries the authoritative status.
+  defp sync_processing_from_status(socket, "working") do
+    socket |> assign(:compacting, false) |> assign(:processing, true)
+  end
+
+  defp sync_processing_from_status(socket, "compacting") do
+    assign(socket, :compacting, true)
+  end
+
+  defp sync_processing_from_status(socket, status)
+       when status in ["stopped", "idle", "waiting", "completed", "failed", "error"] do
+    socket |> assign(:compacting, false) |> assign(:processing, false)
+  end
+
+  defp sync_processing_from_status(socket, _status), do: socket
 
   def handle_tasks_changed(socket) do
     {:noreply,

@@ -217,7 +217,7 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("reload_from_session_file", _params, socket) do
-    send(self(), :do_reload_from_session_file)
+    Process.send_after(self(), :do_reload_from_session_file, 50)
     {:noreply, assign(socket, :reloading, true)}
   end
 
@@ -405,6 +405,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         context_window={@context_window}
         message_search_query={@message_search_query}
         session_context={@session_context}
+        reloading={@reloading}
       />
 
       <EyeInTheSkyWeb.Components.NewTaskDrawer.new_task_drawer

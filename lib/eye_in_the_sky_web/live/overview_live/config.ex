@@ -354,7 +354,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
                 class="btn btn-sm btn-ghost"
                 title="New file"
               >
-                <.icon name="hero-document-plus" class="w-4 h-4" /> File
+                <.icon name="hero-plus" class="w-4 h-4" /> File
               </button>
               <button
                 phx-click="start_create"
@@ -362,7 +362,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
                 class="btn btn-sm btn-ghost"
                 title="New folder"
               >
-                <.icon name="hero-folder-plus" class="w-4 h-4" /> Folder
+                <.icon name="hero-plus" class="w-4 h-4" /> Folder
               </button>
             </div>
 

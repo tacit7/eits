@@ -66,7 +66,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
             uuid: @web_session_uuid,
             agent_id: agent.id,
             name: "Web UI",
-            started_at: DateTime.utc_now() |> DateTime.to_iso8601()
+            started_at: DateTime.utc_now()
           })
 
         session.id
@@ -615,6 +615,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
         all_projects={@all_projects}
         prompts={@prompts}
         agent_templates={@agent_templates}
+        uploads={@uploads}
       />
     </div>
     """

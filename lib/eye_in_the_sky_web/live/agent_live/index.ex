@@ -411,7 +411,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   defp cancel_timer(socket), do: socket
 
   defp update_agent_status_in_list(socket, session_id, new_status) do
-    now = DateTime.utc_now() |> DateTime.to_iso8601()
+    now = DateTime.utc_now()
 
     updated_agents =
       socket.assigns.agents

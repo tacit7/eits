@@ -42,7 +42,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       case Sessions.get_session_by_uuid(session_uuid) do
         {:ok, existing} ->
           update_attrs =
-            %{status: "working", last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()}
+            %{status: "working", last_activity_at: DateTime.utc_now()}
             |> Helpers.maybe_put(:name, params["name"])
             |> Helpers.maybe_put(:description, params["description"])
 
@@ -76,7 +76,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
               name: params["name"],
               description: params["description"],
               status: "working",
-              started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+              started_at: DateTime.utc_now(),
               provider: params["provider"] || "claude",
               model: params["model"],
               model_provider: model_provider,
@@ -136,7 +136,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
           |> Helpers.maybe_put(:status, status)
           |> Helpers.maybe_put(:intent, params["intent"])
           |> Helpers.maybe_put(:entrypoint, params["entrypoint"])
-          |> Helpers.maybe_put(:last_activity_at, DateTime.utc_now() |> DateTime.to_iso8601())
+          |> Helpers.maybe_put(:last_activity_at, DateTime.utc_now())
 
         # Explicit entrypoint clear — set to nil so LiveView removes the CLI icon
         attrs =
@@ -152,7 +152,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
             Map.put(
               attrs,
               :ended_at,
-              params["ended_at"] || DateTime.utc_now() |> DateTime.to_iso8601()
+              params["ended_at"] || DateTime.utc_now()
             )
           else
             attrs
@@ -210,7 +210,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       case Sessions.get_session_by_uuid(uuid) do
         {:ok, session} ->
           Sessions.update_session(session, %{
-            last_activity_at: DateTime.utc_now() |> DateTime.to_iso8601()
+            last_activity_at: DateTime.utc_now()
           })
 
           tool_input = params["tool_input"] || %{}
@@ -348,7 +348,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
           if status in ["completed", "failed"] do
             %{
               status: status,
-              ended_at: DateTime.utc_now() |> DateTime.to_iso8601()
+              ended_at: DateTime.utc_now()
             }
           else
             %{status: status}

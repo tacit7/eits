@@ -251,7 +251,7 @@ defmodule EyeInTheSky.Tasks do
       |> Enum.map(&String.trim/1)
       |> Enum.reject(&(&1 == ""))
 
-    now = DateTime.utc_now() |> DateTime.to_iso8601()
+    now = DateTime.utc_now()
 
     attrs = %{
       uuid: Ecto.UUID.generate(),
@@ -281,7 +281,7 @@ defmodule EyeInTheSky.Tasks do
   Used by kanban quick-add and similar minimal-input flows.
   """
   def quick_create_task(title, state_id, project_id) do
-    now = DateTime.utc_now() |> DateTime.to_iso8601()
+    now = DateTime.utc_now()
 
     create_task(%{
       uuid: Ecto.UUID.generate(),
@@ -335,7 +335,7 @@ defmodule EyeInTheSky.Tasks do
   """
   def archive_task(%Task{} = task) do
     result =
-      update_task(task, %{archived: true, updated_at: DateTime.utc_now() |> DateTime.to_iso8601()})
+      update_task(task, %{archived: true, updated_at: DateTime.utc_now()})
 
     case result do
       {:ok, updated} -> broadcast_change({:updated, updated})
@@ -349,7 +349,7 @@ defmodule EyeInTheSky.Tasks do
   Unarchives a task (sets archived = false).
   """
   def unarchive_task(%Task{} = task) do
-    update_task(task, %{archived: false, updated_at: DateTime.utc_now() |> DateTime.to_iso8601()})
+    update_task(task, %{archived: false, updated_at: DateTime.utc_now()})
   end
 
   @doc """
@@ -357,7 +357,7 @@ defmodule EyeInTheSky.Tasks do
   `ordered_uuids` is a list of task UUIDs in the desired order (index = position).
   """
   def reorder_tasks(ordered_uuids) when is_list(ordered_uuids) do
-    now = DateTime.utc_now() |> DateTime.to_iso8601()
+    now = DateTime.utc_now()
 
     ordered_uuids
     |> Enum.with_index(1)

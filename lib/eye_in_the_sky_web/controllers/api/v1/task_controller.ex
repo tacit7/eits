@@ -75,7 +75,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       team_id: parse_int(params["team_id"], nil),
       agent_id: resolve_agent_int_id(params["agent_id"]),
       due_at: params["due_at"],
-      created_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      created_at: DateTime.utc_now()
     }
 
     case Tasks.create_task(attrs) do

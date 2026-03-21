@@ -10,7 +10,7 @@ defmodule EyeInTheSky.Notes.Note do
     field :title, :string
     field :body, :string
     field :starred, :integer, default: 0
-    field :created_at, :string
+    field :created_at, :utc_datetime_usec
   end
 
   @doc false
@@ -35,7 +35,7 @@ defmodule EyeInTheSky.Notes.Note do
     if get_field(changeset, :created_at) do
       changeset
     else
-      put_change(changeset, :created_at, DateTime.utc_now() |> DateTime.to_iso8601())
+      put_change(changeset, :created_at, DateTime.utc_now())
     end
   end
 end

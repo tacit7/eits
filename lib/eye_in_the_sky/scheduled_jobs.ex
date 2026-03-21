@@ -61,7 +61,7 @@ defmodule EyeInTheSky.ScheduledJobs do
   end
 
   def create_job(attrs) do
-    now = iso_now()
+    now = DateTime.utc_now()
 
     attrs =
       attrs
@@ -105,7 +105,7 @@ defmodule EyeInTheSky.ScheduledJobs do
     if not authorized?(job, caller_project_id) do
       {:error, :unauthorized}
     else
-      now = iso_now()
+      now = DateTime.utc_now()
 
       attrs =
         attrs
@@ -175,7 +175,7 @@ defmodule EyeInTheSky.ScheduledJobs do
       {:error, :unauthorized}
     else
       new_enabled = if job.enabled == 1, do: 0, else: 1
-      update_job_fields(job, %{enabled: new_enabled, updated_at: iso_now()})
+      update_job_fields(job, %{enabled: new_enabled, updated_at: DateTime.utc_now()})
     end
   end
 
@@ -227,7 +227,7 @@ defmodule EyeInTheSky.ScheduledJobs do
     |> JobRun.changeset(%{
       job_id: job.id,
       status: "running",
-      started_at: iso_now()
+      started_at: DateTime.utc_now()
     })
     |> Repo.insert()
   end
@@ -239,7 +239,7 @@ defmodule EyeInTheSky.ScheduledJobs do
     run
     |> JobRun.changeset(%{
       status: status,
-      completed_at: iso_now(),
+      completed_at: DateTime.utc_now(),
       result: result,
       session_id: session_id
     })
@@ -252,7 +252,7 @@ defmodule EyeInTheSky.ScheduledJobs do
     case schedule_type do
       "interval" ->
         seconds = String.to_integer(schedule_value)
-        NaiveDateTime.add(utc_now, seconds) |> NaiveDateTime.to_iso8601() |> Kernel.<>("Z")
+        NaiveDateTime.add(utc_now, seconds) |> DateTime.from_naive!("Etc/UTC")
 
       "cron" ->
         case Crontab.CronExpression.Parser.parse(schedule_value) do
@@ -261,9 +261,7 @@ defmodule EyeInTheSky.ScheduledJobs do
 
             case Crontab.Scheduler.get_next_run_date(parsed, local_now) do
               {:ok, next_local} ->
-                local_to_utc(next_local, timezone)
-                |> NaiveDateTime.to_iso8601()
-                |> Kernel.<>("Z")
+                local_to_utc(next_local, timezone) |> DateTime.from_naive!("Etc/UTC")
 
               _ ->
                 nil
@@ -310,7 +308,7 @@ defmodule EyeInTheSky.ScheduledJobs do
   end
 
   def due_jobs do
-    now = iso_now()
+    now = DateTime.utc_now()
 
     from(j in ScheduledJob,
       where: j.enabled == 1 and not is_nil(j.next_run_at) and j.next_run_at <= ^now
@@ -325,10 +323,10 @@ defmodule EyeInTheSky.ScheduledJobs do
       compute_next_run_at(job.schedule_type, job.schedule_value, now, job.timezone || "Etc/UTC")
 
     update_job_fields(job, %{
-      last_run_at: iso_now(),
+      last_run_at: DateTime.utc_now(),
       next_run_at: next,
       run_count: (job.run_count || 0) + 1,
-      updated_at: iso_now()
+      updated_at: DateTime.utc_now()
     })
   end
 
@@ -408,10 +406,4 @@ defmodule EyeInTheSky.ScheduledJobs do
     end
   end
 
-  defp iso_now do
-    NaiveDateTime.utc_now()
-    |> NaiveDateTime.truncate(:second)
-    |> NaiveDateTime.to_iso8601()
-    |> Kernel.<>("Z")
-  end
 end

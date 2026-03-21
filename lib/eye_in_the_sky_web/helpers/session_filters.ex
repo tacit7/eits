@@ -189,13 +189,8 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
   def is_session_stale?(%{ended_at: ended_at}, _hours) when not is_nil(ended_at), do: false
 
   def is_session_stale?(%{started_at: started_at}, hours) do
-    case VH.parse_datetime(started_at) do
-      {:ok, dt} ->
-        now = DateTime.utc_now()
-        DateTime.diff(now, dt, :hour) > hours
-
-      :error ->
-        false
-    end
+    dt = VH.coerce_datetime(started_at)
+    now = DateTime.utc_now()
+    DateTime.diff(now, dt, :hour) > hours
   end
 end

@@ -10,8 +10,8 @@ defmodule EyeInTheSky.Tasks.Task do
     field :description, :string
     field :priority, :integer, default: 0
     field :position, :integer, default: 0
-    field :due_at, :string
-    field :completed_at, :string
+    field :due_at, :utc_datetime_usec
+    field :completed_at, :utc_datetime_usec
     field :archived, :boolean, default: false
     field :agent_id, :integer
 
@@ -44,8 +44,8 @@ defmodule EyeInTheSky.Tasks.Task do
     has_many :checklist_items, EyeInTheSky.Tasks.ChecklistItem,
       preload_order: [asc: :position, asc: :id]
 
-    field :created_at, :string
-    field :updated_at, :string
+    field :created_at, :utc_datetime_usec
+    field :updated_at, :utc_datetime_usec
 
     # Populated by EyeInTheSky.Notes.with_notes_count/1, which batch-loads
     # annotations for a list of tasks. Called from EyeInTheSky.Tasks (tasks.ex)

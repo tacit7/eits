@@ -8,6 +8,7 @@ defmodule EyeInTheSky.Sessions.Session do
   import Ecto.Changeset
 
   @primary_key {:id, :id, autogenerate: true}
+  @timestamps_opts [type: :utc_datetime_usec]
 
   schema "sessions" do
     field :uuid, :string
@@ -16,9 +17,9 @@ defmodule EyeInTheSky.Sessions.Session do
     field :description, :string
     field :status, :string, default: "idle"
     field :intent, :string
-    field :started_at, :string
-    field :last_activity_at, :string
-    field :ended_at, :string
+    field :started_at, :utc_datetime_usec
+    field :last_activity_at, :utc_datetime_usec
+    field :ended_at, :utc_datetime_usec
     field :provider, :string, default: "claude"
 
     # DEPRECATED: :model stores the raw model string received from the API at session
@@ -47,7 +48,7 @@ defmodule EyeInTheSky.Sessions.Session do
     field :model_provider, :string
     field :model_name, :string
     field :model_version, :string
-    field :archived_at, :string
+    field :archived_at, :utc_datetime_usec
     field :project_id, :integer
     field :git_worktree_path, :string
     field :parent_agent_id, :integer
@@ -79,6 +80,8 @@ defmodule EyeInTheSky.Sessions.Session do
     many_to_many :tasks, EyeInTheSky.Tasks.Task,
       join_through: "task_sessions",
       join_keys: [session_id: :id, task_id: :id]
+
+    timestamps()
   end
 
   @doc false
@@ -117,18 +120,6 @@ defmodule EyeInTheSky.Sessions.Session do
       "failed",
       "archived"
     ])
-    |> validate_iso8601(:started_at)
-    |> validate_iso8601(:ended_at)
-    |> validate_iso8601(:last_activity_at)
-  end
-
-  defp validate_iso8601(changeset, field) do
-    validate_change(changeset, field, fn ^field, value ->
-      case DateTime.from_iso8601(value) do
-        {:ok, _, _} -> []
-        {:error, _} -> [{field, "must be a valid ISO8601 timestamp"}]
-      end
-    end)
   end
 
   @doc """

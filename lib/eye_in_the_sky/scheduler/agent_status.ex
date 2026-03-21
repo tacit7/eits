@@ -44,18 +44,9 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
     {:noreply, state}
   end
 
-  defp parse_iso8601(str) when is_binary(str) do
-    case DateTime.from_iso8601(str) do
-      {:ok, dt, _} -> DateTime.to_naive(dt)
-      _ -> nil
-    end
-  end
-
-  defp parse_iso8601(_), do: nil
-
   defp mark_stale_agents do
     try do
-      now = NaiveDateTime.utc_now()
+      now = DateTime.utc_now()
 
       # Get all agents except completed/failed
       agents =
@@ -93,35 +84,29 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
     end
   end
 
-  defp is_too_old(last_activity_at, now) do
-    case parse_iso8601(last_activity_at) do
-      nil -> false
-      dt -> NaiveDateTime.diff(now, dt) > @one_day_ago
-    end
+  defp is_too_old(nil, _now), do: false
+
+  defp is_too_old(%DateTime{} = last_activity_at, now) do
+    DateTime.diff(now, last_activity_at) > @one_day_ago
   end
 
-  defp is_stale(last_activity_at, now) do
-    case parse_iso8601(last_activity_at) do
-      nil -> false
-      dt -> NaiveDateTime.diff(now, dt) > @one_hour_ago
-    end
+  defp is_stale(nil, _now), do: false
+
+  defp is_stale(%DateTime{} = last_activity_at, now) do
+    DateTime.diff(now, last_activity_at) > @one_hour_ago
   end
 
-  defp is_waiting(created_at, _now) when is_nil(created_at) do
-    false
-  end
+  defp is_waiting(nil, _now), do: false
 
-  defp is_waiting(created_at, now) do
-    seconds_since = NaiveDateTime.diff(now, created_at)
-    seconds_since < @one_hour_ago
+  defp is_waiting(%DateTime{} = created_at, now) do
+    DateTime.diff(now, created_at) < @one_hour_ago
   end
 
   # Archive sessions that are idle, older than 30 min, and have no active tasks.
   defp archive_dead_idle_sessions do
     try do
       now = DateTime.utc_now()
-      cutoff = DateTime.add(now, -@thirty_minutes, :second) |> DateTime.to_iso8601()
-      now_iso = DateTime.to_iso8601(now)
+      cutoff = DateTime.add(now, -@thirty_minutes, :second)
 
       # Sessions that are idle, not archived, and inactive for >30 min.
       # Use last_activity_at when available, fall back to started_at.
@@ -144,7 +129,7 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
         idle_sessions
         |> Enum.filter(&no_active_tasks?/1)
         |> Enum.reduce(0, fn session, count ->
-          archive_session_and_agent(session, now_iso)
+          archive_session_and_agent(session, now)
           count + 1
         end)
 
@@ -173,9 +158,9 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
     active_task_count == 0
   end
 
-  defp archive_session_and_agent(session, now_iso) do
+  defp archive_session_and_agent(session, now) do
     # Archive the session
-    Sessions.update_session(session, %{archived_at: now_iso, status: "archived"})
+    Sessions.update_session(session, %{archived_at: now, status: "archived"})
 
     # Archive the associated agent if present
     if session.agent_id do
@@ -185,7 +170,7 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
 
         agent ->
           agent
-          |> Ecto.Changeset.change(%{archived_at: now_iso})
+          |> Ecto.Changeset.change(%{archived_at: now})
           |> Repo.update()
       end
     end

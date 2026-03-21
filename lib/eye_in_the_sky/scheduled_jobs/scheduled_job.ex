@@ -13,11 +13,11 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
     field :schedule_value, :string
     field :config, :string, default: "{}"
     field :enabled, :integer, default: 1
-    field :last_run_at, :string
-    field :next_run_at, :string
+    field :last_run_at, :utc_datetime_usec
+    field :next_run_at, :utc_datetime_usec
     field :run_count, :integer, default: 0
-    field :created_at, :string
-    field :updated_at, :string
+    field :created_at, :utc_datetime_usec
+    field :updated_at, :utc_datetime_usec
     field :project_id, :integer
     # :id = bigint, matches subagent_prompts PK
     field :prompt_id, :id

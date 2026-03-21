@@ -3,8 +3,8 @@ defmodule EyeInTheSky.Repo.Migrations.AgentsUtcTimestamps do
 
   def up do
     # Convert existing timestamp columns to timestamptz
-    execute "ALTER TABLE agents ALTER COLUMN created_at TYPE timestamptz USING created_at AT TIME ZONE 'UTC'"
-    execute "ALTER TABLE agents ALTER COLUMN archived_at TYPE timestamptz USING archived_at AT TIME ZONE 'UTC'"
+    execute "ALTER TABLE agents ALTER COLUMN created_at TYPE timestamptz USING created_at::timestamp AT TIME ZONE 'UTC'"
+    execute "ALTER TABLE agents ALTER COLUMN archived_at TYPE timestamptz USING archived_at::timestamp AT TIME ZONE 'UTC'"
 
     # Convert last_activity_at from text to timestamptz
     # Existing values are ISO8601 strings; cast via timestamptz handles this

@@ -3,10 +3,10 @@ defmodule EyeInTheSky.Repo.Migrations.SessionsUtcTimestamps do
 
   def up do
     # Convert existing timestamp columns to timestamptz (UTC-aware)
-    execute "ALTER TABLE sessions ALTER COLUMN started_at TYPE timestamptz USING started_at AT TIME ZONE 'UTC'"
-    execute "ALTER TABLE sessions ALTER COLUMN last_activity_at TYPE timestamptz USING last_activity_at AT TIME ZONE 'UTC'"
-    execute "ALTER TABLE sessions ALTER COLUMN ended_at TYPE timestamptz USING ended_at AT TIME ZONE 'UTC'"
-    execute "ALTER TABLE sessions ALTER COLUMN archived_at TYPE timestamptz USING archived_at AT TIME ZONE 'UTC'"
+    execute "ALTER TABLE sessions ALTER COLUMN started_at TYPE timestamptz USING started_at::timestamp AT TIME ZONE 'UTC'"
+    execute "ALTER TABLE sessions ALTER COLUMN last_activity_at TYPE timestamptz USING last_activity_at::timestamp AT TIME ZONE 'UTC'"
+    execute "ALTER TABLE sessions ALTER COLUMN ended_at TYPE timestamptz USING ended_at::timestamp AT TIME ZONE 'UTC'"
+    execute "ALTER TABLE sessions ALTER COLUMN archived_at TYPE timestamptz USING archived_at::timestamp AT TIME ZONE 'UTC'"
 
     # Add Ecto-managed timestamps (as timestamptz to match the schema)
     execute "ALTER TABLE sessions ADD COLUMN inserted_at timestamptz NOT NULL DEFAULT NOW()"

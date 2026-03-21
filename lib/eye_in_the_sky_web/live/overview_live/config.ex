@@ -103,7 +103,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
 
                       %{name: item, path: rel, is_dir: File.dir?(item_path), size: size}
                     end)
-                    |> Enum.sort_by(&{!&1.is_dir, &1.name})
+                    |> Enum.sort_by(&sort_key/1)
 
                   socket
                   |> assign(:files, file_list)
@@ -154,6 +154,14 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
           end
       end
     end
+  end
+
+  @pinned_order ~w(CLAUDE.md settings.json commands agents skills)
+
+  defp sort_key(%{name: name} = entry) do
+    idx = Enum.find_index(@pinned_order, &(String.downcase(&1) == String.downcase(name)))
+    pinned = if idx, do: {0, idx}, else: {1, 0}
+    {pinned, !entry.is_dir, String.downcase(name)}
   end
 
   defp relative_path(path) do

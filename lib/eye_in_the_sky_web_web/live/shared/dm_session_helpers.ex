@@ -78,11 +78,6 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.DmSessionHelpers do
         :ok
     end
 
-    # Inline stop_sync_timer: cancel any running sync and clear the assign
-    if socket.assigns.sync_timer do
-      Process.cancel_timer(socket.assigns.sync_timer)
-    end
-
-    {:noreply, socket |> assign(:processing, false) |> assign(:sync_timer, nil)}
+    {:noreply, assign(socket, :processing, false)}
   end
 end

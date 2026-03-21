@@ -30,7 +30,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
 
   @default_message_limit 20
   @message_page_size 20
-  @sync_interval 3_000
 
   @impl true
   def mount(%{"session_id" => session_id_param} = params, _session, socket) do
@@ -319,33 +318,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   def handle_event("kill_session", _params, socket), do: handle_kill_session(socket)
 
   # ---------------------------------------------------------------------------
-  # handle_info: sync & reload
+  # handle_info: message reload (event-driven, debounced)
   # ---------------------------------------------------------------------------
-
-  @impl true
-  def handle_info(:sync_from_session_file, socket) do
-    case sync_messages_from_session_file(socket) do
-      {:ok, socket, _imported} -> {:noreply, socket}
-      {:error, _reason} -> {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_info(:periodic_sync, socket) do
-    actually_processing = AgentWorker.is_processing?(socket.assigns.session_id)
-
-    if socket.assigns.processing && actually_processing do
-      case sync_messages_from_session_file(socket) do
-        {:ok, socket, _imported} ->
-          {:noreply, start_sync_timer(socket)}
-
-        {:error, _reason} ->
-          {:noreply, start_sync_timer(socket)}
-      end
-    else
-      {:noreply, socket |> assign(:processing, false) |> assign(:sync_timer, nil)}
-    end
-  end
 
   @impl true
   def handle_info(:do_message_reload, socket) do
@@ -375,7 +349,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     socket =
       socket
       |> assign(:processing, false)
-      |> stop_sync_timer()
       |> sync_and_reload()
       |> push_event("focus-input", %{})
 
@@ -390,7 +363,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       socket
       |> assign(:processing, false)
       |> assign(:session_ref, nil)
-      |> stop_sync_timer()
       |> sync_and_reload()
       |> push_event("focus-input", %{})
 
@@ -410,7 +382,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
             socket
             |> assign(:compacting, false)
             |> assign(:processing, true)
-            |> start_sync_timer()
         end
       end
     )
@@ -424,7 +395,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         socket
         |> assign(:compacting, false)
         |> assign(:processing, false)
-        |> stop_sync_timer()
         |> sync_and_reload()
         |> push_event("focus-input", %{})
       end
@@ -560,7 +530,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     subscribe_dm_stream(session_id)
     subscribe_dm_queue(session_id)
     subscribe_tasks()
-    send(self(), :sync_from_session_file)
   end
 
   defp assign_sidebar_context(socket, %{"from" => "project", "project_id" => project_id_str}) do
@@ -614,7 +583,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     |> assign(:task_notes, [])
     |> assign(:workflow_states, Tasks.list_workflow_states())
     |> assign(:current_task, Tasks.get_current_task_for_session(session.id))
-    |> assign(:sync_timer, nil)
     |> assign(:reload_timer, nil)
     |> assign(:total_tokens, 0)
     |> assign(:total_cost, 0.0)
@@ -670,7 +638,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
             {:noreply,
              socket
              |> assign(:processing, true)
-             |> start_sync_timer()
              |> push_event("clear-input", %{})}
 
           {:error, reason} ->
@@ -956,29 +923,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   # ---------------------------------------------------------------------------
-  # Timer helpers
+  # Reload helpers (event-driven, debounced)
   # ---------------------------------------------------------------------------
 
-  defp start_sync_timer(socket) do
-    if socket.assigns.sync_timer do
-      Process.cancel_timer(socket.assigns.sync_timer)
-    end
-
-    timer = Process.send_after(self(), :periodic_sync, @sync_interval)
-    assign(socket, :sync_timer, timer)
-  end
-
-  defp stop_sync_timer(socket) do
-    if socket.assigns.sync_timer do
-      Process.cancel_timer(socket.assigns.sync_timer)
-    end
-
-    assign(socket, :sync_timer, nil)
-  end
-
-  # Debounce rapid bursts of reload triggers (new_message, new_dm, tool_result).
-  # Messages context broadcasts immediately; Broadcaster re-broadcasts 2s later for the same
-  # messages. Without debounce, each message causes at least 2 DB queries.
   @reload_debounce_ms 300
 
   defp schedule_message_reload(socket) do

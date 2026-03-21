@@ -59,6 +59,29 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       phx-drop-target={@uploads.files.ref}
       phx-hook="DragUpload"
     >
+      <%!-- Reload confirm modal --%>
+      <dialog id="dm-reload-confirm-modal" class="modal" phx-hook="ReloadConfirmModal">
+        <div class="modal-box">
+          <h3 class="font-semibold text-base">Reload from file?</h3>
+          <p class="py-3 text-sm text-base-content/70">
+            This will delete all messages and re-import from the JSONL file.
+          </p>
+          <div class="form-control mb-4">
+            <label class="label cursor-pointer gap-2 justify-start">
+              <input type="checkbox" data-reload-skip class="checkbox checkbox-sm" />
+              <span class="label-text text-sm">Don't show this message again</span>
+            </label>
+          </div>
+          <div class="modal-action">
+            <button data-reload-cancel class="btn btn-ghost btn-sm">Cancel</button>
+            <button data-reload-confirm class="btn btn-error btn-sm">Reload</button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button data-reload-cancel>close</button>
+        </form>
+      </dialog>
+
       <%!-- Drag overlay --%>
       <div
         id="drag-overlay"
@@ -131,8 +154,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             <li><hr class="border-base-content/10 my-1" /></li>
             <li>
               <button
-                phx-click="reload_from_session_file"
-                data-confirm="This will delete all messages and re-import from the JSONL file. Continue?"
+                phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
                 class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
               >
                 <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Reload from file
@@ -230,8 +252,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 <span class="hidden sm:inline">Live</span>
               </button>
               <button
-                phx-click="reload_from_session_file"
-                data-confirm="This will delete all messages and re-import from the JSONL file. Continue?"
+                phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
                 class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
                 id="dm-reload-button"
               >
@@ -291,8 +312,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 >
                   <li>
                     <button
-                      phx-click="reload_from_session_file"
-                      data-confirm="This will delete all messages and re-import from the JSONL file. Continue?"
+                      phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
                       class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
                     >
                       <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Reload from file

@@ -843,7 +843,7 @@ defmodule EyeInTheSkyWebWeb.ChatLive do
       current_project={nil}
       prompts={@prompts}
       agent_templates={@agent_templates}
-      uploads={@uploads}
+      file_uploads={@uploads}
     />
     """
   end

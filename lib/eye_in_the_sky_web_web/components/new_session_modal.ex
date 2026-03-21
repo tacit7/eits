@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
        selected_prompt_id: nil,
        prefill_text: "",
        available_agents: [],
-       uploads: nil
+       file_uploads: nil
      )}
   end
 
@@ -28,7 +28,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
     # When the form is open, skip parent re-renders to avoid DOM patches disrupting the modal,
     # but always update uploads so image previews reflect the current state.
     if socket.assigns[:show] == true && assigns[:show] == true do
-      {:ok, assign(socket, :uploads, assigns[:uploads])}
+      {:ok, assign(socket, :file_uploads, assigns[:file_uploads])}
     else
       project_path = assigns[:current_project] && assigns[:current_project].path
       available_agents = list_agents(project_path)
@@ -161,11 +161,11 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
             </div>
 
             <%!-- Image attachments --%>
-            <%= if @uploads && Map.has_key?(@uploads, :agent_images) do %>
+            <%= if @file_uploads && Map.has_key?(@file_uploads, :agent_images) do %>
               <div>
-                <%= if @uploads.agent_images.entries != [] do %>
+                <%= if @file_uploads.agent_images.entries != [] do %>
                   <div class="flex flex-wrap gap-2 mb-2">
-                    <%= for entry <- @uploads.agent_images.entries do %>
+                    <%= for entry <- @file_uploads.agent_images.entries do %>
                       <div class="flex items-center gap-1.5 rounded-lg bg-base-content/[0.04] px-2 py-1 text-xs">
                         <.icon name="hero-photo" class="w-3.5 h-3.5 text-base-content/40" />
                         <span class="text-base-content/70">{entry.client_name}</span>
@@ -182,8 +182,8 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
                   </div>
                 <% end %>
                 <label
-                  for={@uploads.agent_images.ref}
-                  phx-drop-target={@uploads.agent_images.ref}
+                  for={@file_uploads.agent_images.ref}
+                  phx-drop-target={@file_uploads.agent_images.ref}
                   class="flex items-center gap-1.5 cursor-pointer w-fit"
                 >
                   <.icon name="hero-photo-mini" class="w-3.5 h-3.5 text-base-content/40" />
@@ -191,7 +191,7 @@ defmodule EyeInTheSkyWebWeb.Components.NewSessionModal do
                     Attach image
                   </span>
                 </label>
-                <.live_file_input upload={@uploads.agent_images} class="hidden" />
+                <.live_file_input upload={@file_uploads.agent_images} class="hidden" />
               </div>
             <% end %>
 

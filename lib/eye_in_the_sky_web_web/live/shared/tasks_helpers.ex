@@ -32,6 +32,21 @@ defmodule EyeInTheSkyWebWeb.Live.Shared.TasksHelpers do
 
   def handle_open_task_detail(_params, socket), do: {:noreply, socket}
 
+  # Variant for LiveViews that use an `active_overlay` atom rather than a boolean drawer assign.
+  def handle_open_task_detail_with_overlay(%{"task_id" => task_id}, socket, overlay_value) do
+    task = Tasks.get_task_by_uuid_or_id!(task_id)
+    notes = Notes.list_notes_for_task(task.id)
+
+    {:noreply,
+     socket
+     |> assign(:selected_task, task)
+     |> assign(:task_notes, notes)
+     |> assign(:active_overlay, overlay_value)}
+  end
+
+  def handle_open_task_detail_with_overlay(_params, socket, _overlay_value),
+    do: {:noreply, socket}
+
   def handle_toggle_task_detail_drawer(_params, socket) do
     {:noreply, assign(socket, :show_task_detail_drawer, !socket.assigns.show_task_detail_drawer)}
   end

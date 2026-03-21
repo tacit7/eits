@@ -16,7 +16,7 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   alias EyeInTheSkyWeb.Claude.{AgentWorker, SessionImporter, SessionReader}
   alias EyeInTheSkyWeb.FileAttachments
   alias EyeInTheSkyWebWeb.Components.DmPage
-  alias EyeInTheSkyWebWeb.DmLive.StreamState
+  alias EyeInTheSkyWebWeb.DmLive.{StreamState, TaskHandlers}
   alias EyeInTheSkyWebWeb.Live.Shared.SessionHelpers
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
@@ -126,18 +126,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   # ---------------------------------------------------------------------------
 
   @impl true
-  def handle_event("open_task_detail", %{"task_id" => task_id}, socket) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-    notes = Notes.list_notes_for_task(task.id)
-
-    {:noreply,
-     socket
-     |> assign(:selected_task, task)
-     |> assign(:task_notes, notes)
-     |> assign(:active_overlay, :task_detail)}
-  end
-
-  def handle_event("open_task_detail", _params, socket), do: {:noreply, socket}
+  def handle_event("open_task_detail", params, socket),
+    do: handle_open_task_detail_with_overlay(params, socket, :task_detail)
 
   @impl true
   def handle_event("update_task", params, socket),
@@ -160,59 +150,21 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     do: handle_add_task_annotation(params, socket)
 
   @impl true
-  def handle_event("start_agent_for_task", %{"task_id" => task_id}, socket) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-    session = socket.assigns.session
-    agent = socket.assigns.agent
-
-    project_id = agent.project_id
-
-    project_path =
-      case SessionHelpers.resolve_project_path(session, agent) do
-        {:ok, path} -> path
-        _ -> nil
-      end
-
-    task_prompt = "#{task.title}\n\n#{task.description || ""}" |> String.trim()
-
-    opts =
-      [description: task.title, instructions: task_prompt, model: "sonnet"]
-      |> then(fn o -> if project_id, do: o ++ [project_id: project_id], else: o end)
-      |> then(fn o -> if project_path, do: o ++ [project_path: project_path], else: o end)
-
-    case AgentManager.create_agent(opts) do
-      {:ok, %{session: new_session}} ->
-        Tasks.link_session_to_task(task.id, new_session.id)
-
-        {:noreply,
-         socket
-         |> assign(:active_overlay, nil)
-         |> put_flash(:info, "Agent spawned for: #{String.slice(task.title, 0..40)}")}
-
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to spawn agent: #{inspect(reason)}")}
-    end
-  end
+  def handle_event("start_agent_for_task", params, socket),
+    do: TaskHandlers.handle_start_agent_for_task(params, socket)
 
   @impl true
   def handle_event("create_new_task", params, socket) do
     session_id = socket.assigns.session_id
 
-    case Tasks.create_task_from_form(params, session_id: session_id) do
-      {:ok, _task} ->
-        socket =
-          socket
-          |> assign(:active_overlay, nil)
-          |> assign(:active_tab, "tasks")
-          |> load_tab_data("tasks", session_id)
-          |> put_flash(:info, "Task created")
-
-        {:noreply, socket}
-
-      {:error, changeset} ->
-        {:noreply,
-         put_flash(socket, :error, "Failed to create task: #{inspect(changeset.errors)}")}
+    reload_fn = fn s ->
+      s
+      |> assign(:active_overlay, nil)
+      |> assign(:active_tab, "tasks")
+      |> load_tab_data("tasks", session_id)
     end
+
+    handle_create_new_task(params, socket, reload_fn)
   end
 
   # ---------------------------------------------------------------------------

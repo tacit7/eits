@@ -151,10 +151,11 @@ defmodule EyeInTheSkyWebWeb.OverviewLive.Tasks do
   # Appends the next page to the existing task list
   defp load_tasks_page(socket, page) do
     state_id = socket.assigns.filter_state_id
+    sort_by = socket.assigns.sort_by
     offset = (page - 1) * @per_page
     total = socket.assigns.total_tasks
 
-    new_tasks = Tasks.list_tasks(limit: @per_page, offset: offset, state_id: state_id)
+    new_tasks = Tasks.list_tasks(limit: @per_page, offset: offset, state_id: state_id, sort_by: sort_by)
 
     socket =
       socket

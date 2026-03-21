@@ -7,6 +7,8 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   alias EyeInTheSky.Messages
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Claude.SessionImporter
+  alias EyeInTheSky.Codex.SessionImporter, as: CodexImporter
+  alias EyeInTheSky.Codex.SessionReader, as: CodexReader
   alias EyeInTheSkyWeb.DmLive.TabHelpers
   alias EyeInTheSkyWeb.DmLive.UploadHelpers
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
@@ -66,13 +68,12 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   end
 
   def sync_messages_from_session_file(socket) do
-    session_id = socket.assigns.session_id
-    session_uuid = socket.assigns.session_uuid
+    provider = socket.assigns.session.provider
 
-    with {:ok, project_path} <-
-           SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent),
-         {:ok, imported} <- SessionImporter.sync(session_uuid, project_path, session_id) do
-      {:ok, TabHelpers.load_tab_data(socket, "messages", session_id), imported}
+    if provider == "codex" do
+      sync_codex_session_file(socket)
+    else
+      sync_claude_session_file(socket)
     end
   end
 
@@ -98,6 +99,27 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
     timer = Process.send_after(self(), :do_message_reload, @reload_debounce_ms)
     assign(socket, :reload_timer, timer)
+  end
+
+  defp sync_claude_session_file(socket) do
+    session_id = socket.assigns.session_id
+    session_uuid = socket.assigns.session_uuid
+
+    with {:ok, project_path} <-
+           SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent),
+         {:ok, imported} <- SessionImporter.sync(session_uuid, project_path, session_id) do
+      {:ok, TabHelpers.load_tab_data(socket, "messages", session_id), imported}
+    end
+  end
+
+  defp sync_codex_session_file(socket) do
+    session_id = socket.assigns.session_id
+    thread_id = socket.assigns.session_uuid
+
+    with {:ok, messages} <- CodexReader.read_messages(thread_id) do
+      imported = CodexImporter.import_messages(messages, session_id)
+      {:ok, TabHelpers.load_tab_data(socket, "messages", session_id), imported}
+    end
   end
 
   defp create_user_message(session_id, body, provider) do

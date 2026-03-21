@@ -143,119 +143,115 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
     ~H"""
     <div class="bg-base-100 min-h-full px-4 sm:px-6 lg:px-8">
       <div class="max-w-4xl mx-auto">
-        <%!-- Header --%>
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-5">
-          <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
-            {length(@filtered_teams)} teams
-          </span>
-          <button
-            phx-click="toggle_archived"
-            class={[
-              "text-xs font-medium px-2 py-1 rounded transition-colors",
-              if(@show_archived,
-                do: "bg-base-content/10 text-base-content/60",
-                else: "text-base-content/30 hover:text-base-content/50"
-              )
-            ]}
-          >
-            {if @show_archived, do: "Hide archived", else: "Show archived"}
-          </button>
-        </div>
-
-        <%!-- Search --%>
-        <div class="relative mb-3">
-          <div class="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-            <.icon name="hero-magnifying-glass" class="w-3.5 h-3.5 text-base-content/30" />
+        <%!-- LIST VIEW --%>
+        <div class={@mobile_view == :detail && "hidden"}>
+          <%!-- Header --%>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-5">
+            <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
+              {length(@filtered_teams)} teams
+            </span>
+            <button
+              phx-click="toggle_archived"
+              class={[
+                "text-xs font-medium px-2 py-1 rounded transition-colors",
+                if(@show_archived,
+                  do: "bg-base-content/10 text-base-content/60",
+                  else: "text-base-content/30 hover:text-base-content/50"
+                )
+              ]}
+            >
+              {if @show_archived, do: "Hide archived", else: "Show archived"}
+            </button>
           </div>
-          <form phx-change="search" phx-submit="search">
-            <input
-              type="text"
-              name="search"
-              value={@search}
-              placeholder="Search teams..."
-              class="w-full bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] border-0 rounded-xl py-2.5 pl-9 pr-4 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:ring-1 focus:ring-primary/30"
-              phx-debounce="150"
-            />
-          </form>
-        </div>
 
-        <%!-- Teams list --%>
-        <div class="rounded-xl shadow-sm">
-          <%= if @filtered_teams == [] do %>
-            <div class="flex flex-col items-center justify-center py-16 px-4 text-center gap-3 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl">
-              <div class="w-10 h-10 rounded-full bg-base-200 flex items-center justify-center">
-                <.icon name="hero-user-group" class="w-5 h-5 text-base-content/30" />
-              </div>
-              <p class="text-xs text-base-content/30">
-                {if @search != "", do: "No teams match your search", else: "No active teams"}
-              </p>
+          <%!-- Search --%>
+          <div class="relative mb-3">
+            <div class="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+              <.icon name="hero-magnifying-glass" class="w-3.5 h-3.5 text-base-content/30" />
             </div>
-          <% else %>
-            <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl px-4">
-              <%= for team <- @filtered_teams do %>
-                <div class={[
-                  "relative overflow-hidden",
-                  @selected_team_id == team.id && "ring-inset ring-1 ring-primary/30"
-                ]}>
-                  <div class="group flex items-center gap-4 py-3">
-                    <div
-                      class="flex-1 min-w-0 cursor-pointer"
-                      phx-click="select_team"
-                      phx-value-id={team.id}
-                      role="button"
-                      tabindex="0"
-                    >
-                      <span class="text-[13px] font-medium text-base-content/85 truncate block">
-                        {team.name}
-                      </span>
-                      <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
-                        <span class="font-mono">{length(team.members)} members</span>
-                        <%= if active_member_count(team.members) > 0 do %>
-                          <span class="text-base-content/15">/</span>
-                          <span class="text-success/70">
-                            {active_member_count(team.members)} active
-                          </span>
-                        <% end %>
-                        <%= if team.description do %>
-                          <span class="text-base-content/15">/</span>
-                          <span class="truncate text-base-content/40">{team.description}</span>
-                        <% end %>
-                      </div>
-                    </div>
-                    <button
-                      phx-click="delete_team"
-                      phx-value-id={team.id}
-                      class="shrink-0 p-1.5 rounded hover:bg-base-200 text-base-content/20 hover:text-error/60 transition-colors opacity-0 group-hover:opacity-100"
-                      title="Delete team"
-                    >
-                      <.icon name="hero-trash" class="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+            <form phx-change="search" phx-submit="search">
+              <input
+                type="text"
+                name="search"
+                value={@search}
+                placeholder="Search teams..."
+                class="w-full bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] border-0 rounded-xl py-2.5 pl-9 pr-4 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                phx-debounce="150"
+              />
+            </form>
+          </div>
+
+          <%!-- Teams list --%>
+          <div class="rounded-xl shadow-sm">
+            <%= if @filtered_teams == [] do %>
+              <div class="flex flex-col items-center justify-center py-16 px-4 text-center gap-3 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl">
+                <div class="w-10 h-10 rounded-full bg-base-200 flex items-center justify-center">
+                  <.icon name="hero-user-group" class="w-5 h-5 text-base-content/30" />
                 </div>
-              <% end %>
-            </div>
-          <% end %>
+                <p class="text-xs text-base-content/30">
+                  {if @search != "", do: "No teams match your search", else: "No active teams"}
+                </p>
+              </div>
+            <% else %>
+              <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl px-4">
+                <%= for team <- @filtered_teams do %>
+                  <div class="relative overflow-hidden">
+                    <div class="group flex items-center gap-4 py-3">
+                      <div
+                        class="flex-1 min-w-0 cursor-pointer"
+                        phx-click="select_team"
+                        phx-value-id={team.id}
+                        role="button"
+                        tabindex="0"
+                      >
+                        <span class="text-[13px] font-medium text-base-content/85 truncate block">
+                          {team.name}
+                        </span>
+                        <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
+                          <span class="font-mono">{length(team.members)} members</span>
+                          <%= if active_member_count(team.members) > 0 do %>
+                            <span class="text-base-content/15">/</span>
+                            <span class="text-success/70">
+                              {active_member_count(team.members)} active
+                            </span>
+                          <% end %>
+                          <%= if team.description do %>
+                            <span class="text-base-content/15">/</span>
+                            <span class="truncate text-base-content/40">{team.description}</span>
+                          <% end %>
+                        </div>
+                      </div>
+                      <button
+                        phx-click="delete_team"
+                        phx-value-id={team.id}
+                        class="shrink-0 p-1.5 rounded hover:bg-base-200 text-base-content/20 hover:text-error/60 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Delete team"
+                      >
+                        <.icon name="hero-trash" class="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
         </div>
 
-        <%!-- Team detail panel --%>
-        <%= if @selected_team do %>
-          <div class="mt-4 rounded-xl shadow-sm bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)]">
-            <div class="flex items-center justify-between px-4 py-3 border-b border-base-content/5">
-              <span class="text-[11px] font-semibold uppercase tracking-widest text-base-content/50">
-                {@selected_team.name}
-              </span>
-              <button
-                phx-click="close_team"
-                class="p-1 rounded hover:bg-base-200 text-base-content/40 hover:text-base-content/70 transition-colors"
-              >
-                <.icon name="hero-x-mark" class="w-4 h-4" />
-              </button>
-            </div>
+        <%!-- DETAIL VIEW --%>
+        <div class={@mobile_view == :list && "hidden"}>
+          <%!-- Back button --%>
+          <button
+            phx-click="close_team"
+            class="flex items-center gap-2 py-4 text-sm text-base-content/50 hover:text-base-content/80 transition-colors"
+          >
+            <.icon name="hero-arrow-left" class="w-4 h-4" /> Teams
+          </button>
 
-            <div class={["flex", @selected_agent && "divide-x divide-base-content/5"]}>
+          <%= if @selected_team do %>
+            <div class={["flex", @selected_agent && "gap-4"]}>
               <%!-- Left: team detail --%>
               <div class={[
-                "overflow-hidden",
+                "overflow-hidden rounded-xl bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)]",
                 @selected_agent && "w-1/2",
                 !@selected_agent && "w-full"
               ]}>
@@ -269,7 +265,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
 
               <%!-- Right: agent messages pane --%>
               <%= if @selected_agent do %>
-                <div class="w-1/2 flex flex-col overflow-hidden">
+                <div class="w-1/2 flex flex-col overflow-hidden rounded-xl bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)]">
                   <div class="px-4 py-3 border-b border-base-content/5 flex items-center justify-between shrink-0">
                     <div class="flex items-center gap-2 min-w-0">
                       <div class={[
@@ -317,8 +313,8 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
                 </div>
               <% end %>
             </div>
-          </div>
-        <% end %>
+          <% end %>
+        </div>
       </div>
     </div>
     """

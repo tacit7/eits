@@ -10,7 +10,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
   alias EyeInTheSky.Agents.{InstructionBuilder, RuntimeContext}
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSky.Git.Worktrees
-  alias EyeInTheSky.{Agents, Sessions}
+  alias EyeInTheSky.{AgentDefinitions, Agents, Sessions}
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 
   @registry EyeInTheSky.Claude.AgentRegistry
@@ -98,6 +98,8 @@ defmodule EyeInTheSky.Agents.AgentManager do
       "📝 create_agent: agent_uuid=#{agent_uuid}, session_uuid=#{inspect(session_uuid)}, model=#{opts[:model]}, project_id=#{project_id}"
     )
 
+    definition_info = resolve_agent_definition(opts[:agent], project_id, opts[:project_path])
+
     with {:ok, worktree_path} <- resolve_worktree_path(opts) do
       insert_agent_and_session(%{
         agent_uuid: agent_uuid,
@@ -106,6 +108,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
         description: description,
         project_id: project_id,
         worktree_path: worktree_path,
+        definition_info: definition_info,
         opts: opts
       })
     end
@@ -173,20 +176,24 @@ defmodule EyeInTheSky.Agents.AgentManager do
          description: description,
          project_id: project_id,
          worktree_path: worktree_path,
+         definition_info: definition_info,
          opts: opts
        }) do
     with {:ok, agent} <-
-           Agents.create_agent(%{
-             uuid: agent_uuid,
-             agent_type: opts[:agent_type] || "claude",
-             project_id: project_id,
-             project_name: opts[:project_name],
-             status: "pending",
-             description: description,
-             git_worktree_path: worktree_path,
-             parent_agent_id: opts[:parent_agent_id],
-             parent_session_id: opts[:parent_session_id]
-           }),
+           Agents.create_agent(
+             %{
+               uuid: agent_uuid,
+               agent_type: opts[:agent_type] || "claude",
+               project_id: project_id,
+               project_name: opts[:project_name],
+               status: "pending",
+               description: description,
+               git_worktree_path: worktree_path,
+               parent_agent_id: opts[:parent_agent_id],
+               parent_session_id: opts[:parent_session_id]
+             }
+             |> maybe_put_definition(definition_info)
+           ),
          {:ok, session} <-
            Sessions.create_session(%{
              uuid: session_uuid,
@@ -398,4 +405,56 @@ defmodule EyeInTheSky.Agents.AgentManager do
 
   defp normalize_provider(provider) when provider in @supported_providers, do: provider
   defp normalize_provider(_provider), do: nil
+
+  # ── Agent definition resolution ────────────────────────────────────────
+
+  # Resolves an agent slug to a definition record. Returns a map with
+  # :agent_definition_id and :definition_checksum_at_spawn, or nil.
+  # If the slug is not found in the DB, syncs the relevant directory first and retries.
+  defp resolve_agent_definition(nil, _project_id, _project_path), do: nil
+  defp resolve_agent_definition("", _project_id, _project_path), do: nil
+
+  defp resolve_agent_definition(slug, project_id, project_path) do
+    case lookup_definition(slug, project_id) do
+      {:ok, defn} ->
+        %{agent_definition_id: defn.id, definition_checksum_at_spawn: defn.checksum}
+
+      {:error, :not_found} ->
+        Logger.debug("resolve_agent_definition: slug=#{slug} not in DB, syncing and retrying")
+        sync_for_spawn(project_id, project_path)
+
+        case lookup_definition(slug, project_id) do
+          {:ok, defn} ->
+            %{agent_definition_id: defn.id, definition_checksum_at_spawn: defn.checksum}
+
+          {:error, :not_found} ->
+            Logger.debug("resolve_agent_definition: slug=#{slug} not found after sync")
+            nil
+        end
+    end
+  end
+
+  defp lookup_definition(slug, project_id) do
+    if project_id do
+      AgentDefinitions.resolve(slug, project_id)
+    else
+      AgentDefinitions.resolve_global(slug)
+    end
+  end
+
+  defp sync_for_spawn(nil, _project_path), do: AgentDefinitions.sync_global()
+
+  defp sync_for_spawn(project_id, project_path) do
+    AgentDefinitions.sync_global()
+
+    if project_path do
+      AgentDefinitions.sync_project(project_id, project_path)
+    end
+  end
+
+  defp maybe_put_definition(attrs, nil), do: attrs
+
+  defp maybe_put_definition(attrs, definition_info) do
+    Map.merge(attrs, definition_info)
+  end
 end

@@ -27,6 +27,9 @@ defmodule EyeInTheSky.Agents.Agent do
 
     has_many :tasks, EyeInTheSky.Tasks.Task, foreign_key: :agent_id
 
+    belongs_to :agent_definition, EyeInTheSky.AgentDefinitions.AgentDefinition
+    field :definition_checksum_at_spawn, :string
+
     field :parent_agent_id, :integer
     field :parent_session_id, :integer
     field :created_at, :utc_datetime_usec
@@ -56,7 +59,9 @@ defmodule EyeInTheSky.Agents.Agent do
       :git_worktree_path,
       :parent_agent_id,
       :parent_session_id,
-      :last_activity_at
+      :last_activity_at,
+      :agent_definition_id,
+      :definition_checksum_at_spawn
     ])
     |> maybe_generate_uuid()
     |> validate_required([])

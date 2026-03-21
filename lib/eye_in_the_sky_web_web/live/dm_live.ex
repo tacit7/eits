@@ -1,36 +1,25 @@
 defmodule EyeInTheSkyWebWeb.DmLive do
   use EyeInTheSkyWebWeb, :live_view
 
-  alias EyeInTheSkyWeb.{
-    Sessions,
-    Agents,
-    Commits,
-    Messages,
-    Notes,
-    Repo,
-    Tasks,
-    Projects
-  }
-
+  alias EyeInTheSkyWeb.{Sessions, Agents, Messages, Tasks, Projects}
   alias EyeInTheSkyWeb.Agents.AgentManager
-  alias EyeInTheSkyWeb.Claude.{AgentWorker, SessionImporter, SessionReader}
-  alias EyeInTheSkyWeb.FileAttachments
+  alias EyeInTheSkyWeb.Claude.{AgentWorker, SessionImporter}
   alias EyeInTheSkyWebWeb.Components.DmPage
   alias EyeInTheSkyWebWeb.DmLive.{StreamState, TaskHandlers}
-  alias EyeInTheSkyWebWeb.Live.Shared.SessionHelpers
-  alias EyeInTheSkyWebWeb.Live.Shared.AgentStatusHelpers
+  alias EyeInTheSkyWebWeb.Live.Shared.{SessionHelpers, AgentStatusHelpers}
   import EyeInTheSkyWebWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWebWeb.Live.Shared.TasksHelpers
   import EyeInTheSkyWebWeb.Live.Shared.DmExportHelpers
   import EyeInTheSkyWebWeb.Live.Shared.DmModelHelpers
   import EyeInTheSkyWebWeb.Live.Shared.DmSessionHelpers
   import EyeInTheSkyWebWeb.Live.Shared.DmStreamHelpers
+  import EyeInTheSkyWebWeb.DmLive.TabHelpers
+  import EyeInTheSkyWebWeb.DmLive.UploadHelpers
 
   require Logger
 
   @default_message_limit 20
   @message_page_size 20
-  @sync_interval 3_000
 
   @impl true
   def mount(%{"session_id" => session_id_param} = params, _session, socket) do
@@ -319,33 +308,8 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   def handle_event("kill_session", _params, socket), do: handle_kill_session(socket)
 
   # ---------------------------------------------------------------------------
-  # handle_info: sync & reload
+  # handle_info: message reload (event-driven, debounced)
   # ---------------------------------------------------------------------------
-
-  @impl true
-  def handle_info(:sync_from_session_file, socket) do
-    case sync_messages_from_session_file(socket) do
-      {:ok, socket, _imported} -> {:noreply, socket}
-      {:error, _reason} -> {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_info(:periodic_sync, socket) do
-    actually_processing = AgentWorker.is_processing?(socket.assigns.session_id)
-
-    if socket.assigns.processing && actually_processing do
-      case sync_messages_from_session_file(socket) do
-        {:ok, socket, _imported} ->
-          {:noreply, start_sync_timer(socket)}
-
-        {:error, _reason} ->
-          {:noreply, start_sync_timer(socket)}
-      end
-    else
-      {:noreply, socket |> assign(:processing, false) |> assign(:sync_timer, nil)}
-    end
-  end
 
   @impl true
   def handle_info(:do_message_reload, socket) do
@@ -375,7 +339,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     socket =
       socket
       |> assign(:processing, false)
-      |> stop_sync_timer()
       |> sync_and_reload()
       |> push_event("focus-input", %{})
 
@@ -390,7 +353,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
       socket
       |> assign(:processing, false)
       |> assign(:session_ref, nil)
-      |> stop_sync_timer()
       |> sync_and_reload()
       |> push_event("focus-input", %{})
 
@@ -410,7 +372,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
             socket
             |> assign(:compacting, false)
             |> assign(:processing, true)
-            |> start_sync_timer()
         end
       end
     )
@@ -424,7 +385,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
         socket
         |> assign(:compacting, false)
         |> assign(:processing, false)
-        |> stop_sync_timer()
         |> sync_and_reload()
         |> push_event("focus-input", %{})
       end
@@ -560,7 +520,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     subscribe_dm_stream(session_id)
     subscribe_dm_queue(session_id)
     subscribe_tasks()
-    send(self(), :sync_from_session_file)
   end
 
   defp assign_sidebar_context(socket, %{"from" => "project", "project_id" => project_id_str}) do
@@ -614,7 +573,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
     |> assign(:task_notes, [])
     |> assign(:workflow_states, Tasks.list_workflow_states())
     |> assign(:current_task, Tasks.get_current_task_for_session(session.id))
-    |> assign(:sync_timer, nil)
     |> assign(:reload_timer, nil)
     |> assign(:total_tokens, 0)
     |> assign(:total_cost, 0.0)
@@ -670,7 +628,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
             {:noreply,
              socket
              |> assign(:processing, true)
-             |> start_sync_timer()
              |> push_event("clear-input", %{})}
 
           {:error, reason} ->
@@ -701,123 +658,6 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   # ---------------------------------------------------------------------------
-  # Tab data loading
-  # ---------------------------------------------------------------------------
-
-  defp load_tab_data(socket, tab, session_id) do
-    Logger.info("Loading DM tab data tab=#{tab} session_id=#{session_id}")
-    {messages, has_more} = load_message_data(socket, tab, session_id)
-
-    {total_tokens, total_cost} =
-      maybe_load_value(
-        tab,
-        "messages",
-        {socket.assigns[:total_tokens], socket.assigns[:total_cost]},
-        fn ->
-          read_session_usage_stats(socket, session_id)
-        end
-      )
-
-    current_task =
-      maybe_load_value(tab, ["messages", "tasks"], socket.assigns[:current_task], fn ->
-        Tasks.get_current_task_for_session(session_id)
-      end)
-
-    {context_used, context_window} =
-      maybe_load_value(
-        tab,
-        "messages",
-        {socket.assigns[:context_used], socket.assigns[:context_window]},
-        fn ->
-          extract_context_window(messages)
-        end
-      )
-
-    socket
-    |> assign(:messages, messages)
-    |> assign(:has_more_messages, has_more)
-    |> assign(:total_tokens, total_tokens)
-    |> assign(:total_cost, total_cost)
-    |> assign(:context_used, context_used || 0)
-    |> assign(:context_window, context_window || 0)
-    |> assign(:current_task, current_task)
-    |> assign(
-      :tasks,
-      maybe_load_tab_data(tab, "tasks", socket.assigns[:tasks], fn ->
-        Tasks.list_tasks_for_session(session_id)
-      end)
-    )
-    |> assign(
-      :commits,
-      maybe_load_tab_data(tab, "commits", socket.assigns[:commits], fn ->
-        Commits.list_commits_for_session(session_id)
-      end)
-    )
-    |> assign(
-      :notes,
-      maybe_load_tab_data(tab, "notes", socket.assigns[:notes], fn ->
-        Notes.list_notes_for_session(session_id)
-      end)
-    )
-  end
-
-  defp reload_tasks(socket) do
-    assign(socket, :tasks, Tasks.list_tasks_for_session(socket.assigns.session_id))
-  end
-
-  defp load_message_data(socket, "messages", session_id) do
-    query = socket.assigns[:message_search_query] || ""
-
-    if query != "" do
-      messages =
-        Messages.search_messages_for_session(session_id, query)
-        |> Repo.preload(:attachments)
-
-      Logger.info(
-        "Searched #{length(messages)} messages for session=#{session_id} query=#{inspect(query)}"
-      )
-
-      {messages, false}
-    else
-      limit = socket.assigns[:message_limit] || @default_message_limit
-
-      fetched_messages =
-        Messages.list_recent_messages(session_id, limit + 1)
-        |> Repo.preload(:attachments)
-
-      Logger.info("Loaded #{length(fetched_messages)} messages for session=#{session_id}")
-
-      if length(fetched_messages) > limit do
-        {Enum.drop(fetched_messages, 1), true}
-      else
-        {fetched_messages, false}
-      end
-    end
-  end
-
-  defp load_message_data(socket, _tab, _session_id) do
-    {socket.assigns[:messages] || [], socket.assigns[:has_more_messages] || false}
-  end
-
-  defp maybe_load_tab_data(active_tab, target_tab, existing_data, loader) do
-    if active_tab == target_tab do
-      loader.()
-    else
-      existing_data || []
-    end
-  end
-
-  defp maybe_load_value(active_tab, target_tabs, existing_value, loader) do
-    targets = List.wrap(target_tabs)
-
-    if active_tab in targets do
-      loader.()
-    else
-      existing_value
-    end
-  end
-
-  # ---------------------------------------------------------------------------
   # Session file sync
   # ---------------------------------------------------------------------------
 
@@ -833,152 +673,9 @@ defmodule EyeInTheSkyWebWeb.DmLive do
   end
 
   # ---------------------------------------------------------------------------
-  # Context window extraction
+  # Reload helpers (event-driven, debounced)
   # ---------------------------------------------------------------------------
 
-  defp extract_context_window(messages) do
-    messages
-    |> Enum.reverse()
-    |> Enum.find_value(fn msg ->
-      case msg.metadata do
-        # Claude CLI result messages: model_usage map with camelCase keys
-        %{"model_usage" => model_usage} when is_map(model_usage) and map_size(model_usage) > 0 ->
-          model_usage
-          |> Map.values()
-          |> Enum.find_value(fn entry when is_map(entry) ->
-            input = entry["inputTokens"] || 0
-            cache_read = entry["cacheReadInputTokens"] || 0
-            cache_creation = entry["cacheCreationInputTokens"] || 0
-            ctx_window = entry["contextWindow"] || 200_000
-            used = input + cache_read + cache_creation
-
-            if used > 0, do: {used, ctx_window}
-          end)
-
-        # Anubis/streaming messages: usage map with snake_case keys
-        %{"usage" => %{"input_tokens" => _} = usage} ->
-          input = usage["input_tokens"] || 0
-          cache_read = usage["cache_read_input_tokens"] || 0
-          cache_creation = usage["cache_creation_input_tokens"] || 0
-          used = input + cache_read + cache_creation
-
-          if used > 0, do: {used, 200_000}
-
-        _ ->
-          nil
-      end
-    end) || {0, 0}
-  end
-
-  defp read_session_usage_stats(socket, session_id) do
-    case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
-      {:ok, project_path} ->
-        case SessionReader.read_usage(socket.assigns.session_uuid, project_path) do
-          {:ok, tokens, cost} ->
-            {tokens, cost}
-
-          _ ->
-            {Messages.total_tokens_for_session(session_id),
-             Messages.total_cost_for_session(session_id)}
-        end
-
-      _ ->
-        {Messages.total_tokens_for_session(session_id),
-         Messages.total_cost_for_session(session_id)}
-    end
-  end
-
-  # ---------------------------------------------------------------------------
-  # File uploads
-  # ---------------------------------------------------------------------------
-
-  defp consume_uploaded_files(socket) do
-    consume_uploaded_entries(socket, :files, fn %{path: temp_path}, entry ->
-      destination = upload_destination(entry.client_name)
-
-      File.mkdir_p!(Path.dirname(destination))
-      File.cp!(temp_path, destination)
-
-      {:ok,
-       %{
-         storage_path: destination,
-         filename: Path.basename(destination),
-         original_filename: entry.client_name,
-         content_type: entry.client_type,
-         size_bytes: entry.client_size
-       }}
-    end)
-  end
-
-  defp upload_destination(client_name) do
-    base_upload_dir = Path.join([:code.priv_dir(:eye_in_the_sky_web), "static", "uploads", "dm"])
-    date_dir = Date.utc_today() |> Date.to_string()
-    filename = "#{Ecto.UUID.generate()}#{Path.extname(client_name)}"
-
-    Path.join([base_upload_dir, date_dir, filename])
-  end
-
-  defp build_message_body(body, []), do: body
-
-  defp build_message_body(body, uploaded_files) do
-    file_list =
-      uploaded_files
-      |> Enum.map(fn file_data ->
-        relative = relative_upload_path(file_data.storage_path)
-        "- #{relative} (#{file_data.original_filename})"
-      end)
-      |> Enum.join("\n")
-
-    "#{body}\n\nAttached files:\n#{file_list}"
-  end
-
-  defp relative_upload_path(abs_path) do
-    priv_static = Path.join(:code.priv_dir(:eye_in_the_sky_web), "static")
-
-    case String.split(abs_path, priv_static, parts: 2) do
-      [_, relative] -> relative
-      _ -> Path.basename(abs_path)
-    end
-  end
-
-  defp persist_upload_attachments(uploaded_files, message_id) do
-    Enum.each(uploaded_files, fn file_data ->
-      case FileAttachments.create_attachment(Map.put(file_data, :message_id, message_id)) do
-        {:ok, _attachment} ->
-          :ok
-
-        {:error, reason} ->
-          Logger.warning(
-            "Failed to persist attachment for message_id=#{message_id}: #{inspect(reason)}"
-          )
-      end
-    end)
-  end
-
-  # ---------------------------------------------------------------------------
-  # Timer helpers
-  # ---------------------------------------------------------------------------
-
-  defp start_sync_timer(socket) do
-    if socket.assigns.sync_timer do
-      Process.cancel_timer(socket.assigns.sync_timer)
-    end
-
-    timer = Process.send_after(self(), :periodic_sync, @sync_interval)
-    assign(socket, :sync_timer, timer)
-  end
-
-  defp stop_sync_timer(socket) do
-    if socket.assigns.sync_timer do
-      Process.cancel_timer(socket.assigns.sync_timer)
-    end
-
-    assign(socket, :sync_timer, nil)
-  end
-
-  # Debounce rapid bursts of reload triggers (new_message, new_dm, tool_result).
-  # Messages context broadcasts immediately; Broadcaster re-broadcasts 2s later for the same
-  # messages. Without debounce, each message causes at least 2 DB queries.
   @reload_debounce_ms 300
 
   defp schedule_message_reload(socket) do

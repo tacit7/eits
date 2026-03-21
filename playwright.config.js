@@ -4,6 +4,6 @@ export default defineConfig({
   testDir: './test/playwright',
   testMatch: ['**/*.spec.js', '**/*_test.js'],
   use: {
-    baseURL: 'http://localhost:5000',
+    baseURL: 'http://localhost:5001',
   },
 })

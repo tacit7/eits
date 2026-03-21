@@ -58,7 +58,7 @@ caddy trust
 caddy run --config Caddyfile
 ```
 
-Caddy listens on 443, terminates TLS with `tls internal`, and proxies to Phoenix on port 5000 (plain HTTP). Both `https://eits.dev` and `https://localhost` are served. Phoenix does not handle TLS directly.
+Caddy listens on 443, terminates TLS with `tls internal`, and proxies to Phoenix on port 5001 (plain HTTP). Both `https://eits.dev` and `https://localhost` are served. Phoenix does not handle TLS directly.
 
 ## 4. Start Phoenix
 
@@ -216,7 +216,7 @@ Add to `~/.zshrc` for persistence:
 
 ```bash
 export EITS_API_KEY="<generated-key>"
-export EITS_URL="http://localhost:5000/api/v1"
+export EITS_URL="http://localhost:5001/api/v1"
 ```
 
 ### Environment variables for production
@@ -282,7 +282,7 @@ The `scripts/eits` script provides shell access to the REST API.
 ```bash
 export PATH="$HOME/projects/eits/web/scripts:$PATH"
 export EITS_API_KEY="<generated-key>"
-export EITS_URL="http://localhost:5000/api/v1"
+export EITS_URL="http://localhost:5001/api/v1"
 ```
 
 **Usage:**
@@ -319,14 +319,14 @@ mix phx.server
 
 Caddy (`Caddyfile`) proxies `eits.dev` → `localhost:5002` when using this worktree.
 
-To switch back to local DB, update `Caddyfile` to proxy to `localhost:5000` and run `caddy reload --config Caddyfile`.
+To switch back to local DB, update `Caddyfile` to proxy to `localhost:5001` and run `caddy reload --config Caddyfile`.
 
 ### Key config differences from local dev
 
 | | Local | Supabase worktree |
 |--|--|--|
 | DB | `eits_dev` on localhost | Supabase PostgreSQL (IPv6) |
-| Port | 5000 (HTTP) | 5002 |
+| Port | 5001 (HTTP) | 5002 |
 | TLS | Caddy handles (port 443) | Caddy handles (port 443) |
 | Oban notifier | `Oban.Notifiers.PG` | `Oban.Notifiers.Postgres` (poll-based; Supabase `postgres` user can't use `LISTEN/NOTIFY`) |
 | `socket_options` | default | `[:inet6]` (Supabase direct connection is IPv6-only) |
@@ -378,19 +378,19 @@ Get your token from the ngrok dashboard under "Your Authtoken". Without this ste
 
 ```bash
 # Tunnel to Phoenix — must specify http:// explicitly
-ngrok http http://localhost:5000
+ngrok http http://localhost:5001
 ```
 
 ngrok will display a public URL like `https://abc123.ngrok-free.app`. Use that to access your local app externally.
 
-**Important:** Always use `http://localhost:5000`, not just `5000`. Without the scheme, ngrok may try HTTPS to your upstream and fail with `err_ngrok_3004` ("invalid or incomplete HTTP response").
+**Important:** Always use `http://localhost:5001`, not just `5001`. Without the scheme, ngrok may try HTTPS to your upstream and fail with `err_ngrok_3004` ("invalid or incomplete HTTP response").
 
 **Common errors:**
 
 | Error | Fix |
 |-------|-----|
 | `err_ngrok_3004` (auth) | Run `ngrok config add-authtoken <token>` |
-| `err_ngrok_3004` (gateway) | Use `ngrok http http://localhost:5000` — ngrok is sending HTTPS to a plain HTTP server |
+| `err_ngrok_3004` (gateway) | Use `ngrok http http://localhost:5001` — ngrok is sending HTTPS to a plain HTTP server |
 | `err_ngrok_108` | ngrok agent already running; kill it with `pkill ngrok` |
 | `err_ngrok_334` | Endpoint already online; kill existing ngrok first |
 
@@ -439,7 +439,7 @@ Open that URL on the device you want to register (e.g., iPhone). The passkey wil
 
 - Migrations auto-run on startup via `Ecto.Migrator` — no manual step needed beyond `ecto.setup`
 - Caddy `tls internal` auto-generates and manages the local cert; run `caddy trust` once to install the CA
-- Phoenix serves plain HTTP on port 5000; Caddy handles all TLS on port 443
+- Phoenix serves plain HTTP on port 5001; Caddy handles all TLS on port 443
 - `.env` is loaded automatically at startup via `dotenvy`; copy `.env.example` to get started
 - No `.tool-versions` or `.nvmrc` — use Node 22 LTS
 - Oban background jobs require the DB to be up before server starts

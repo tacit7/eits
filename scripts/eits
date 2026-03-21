@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # eits - CLI for the Eye in the Sky REST API
-# Base URL defaults to http://localhost:5000/api/v1
+# Base URL defaults to http://localhost:5001/api/v1
 # Override with EITS_URL env var
 #
 # Session env vars (injected by EITS hooks):
@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-BASE_URL="${EITS_URL:-http://localhost:5000/api/v1}"
+BASE_URL="${EITS_URL:-http://localhost:5001/api/v1}"
 AUTH_HEADER="${EITS_API_KEY:+Authorization: Bearer ${EITS_API_KEY}}"
 
 # Check deps

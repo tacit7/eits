@@ -37,7 +37,7 @@ Open with: `open priv/static/mockups/<feature-name>.html`
     <div class="dot dot-r"></div>
     <div class="dot dot-y"></div>
     <div class="dot dot-g"></div>
-    <div class="mockup-url">localhost:5000/<route></div>
+    <div class="mockup-url">localhost:5001/<route></div>
   </div>
   <div class="app-body">
     <!-- sidebar + content -->

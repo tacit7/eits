@@ -1,6 +1,6 @@
 # REST API v1
 
-Base URL: `http://localhost:5000/api/v1`
+Base URL: `http://localhost:5001/api/v1`
 
 All endpoints accept and return JSON. Set `Content-Type: application/json` on requests.
 
@@ -40,7 +40,7 @@ Register a new session. Creates a ChatAgent (chat identity) and Agent (execution
 **Example:**
 
 ```bash
-curl -X POST localhost:5000/api/v1/sessions \
+curl -X POST localhost:5001/api/v1/sessions \
   -H 'Content-Type: application/json' \
   -d '{"session_id":"abc-123","description":"implementing feature X","project_name":"web","model":"claude-sonnet-4-5-20250929"}'
 ```
@@ -80,7 +80,7 @@ For terminal states (`completed`, `failed`), `ended_at` is auto-set to now if no
 **Example:**
 
 ```bash
-curl -X PATCH localhost:5000/api/v1/sessions/abc-123 \
+curl -X PATCH localhost:5001/api/v1/sessions/abc-123 \
   -H 'Content-Type: application/json' \
   -d '{"status":"completed"}'
 ```
@@ -138,7 +138,7 @@ With `team_name`:
 **Example:**
 
 ```bash
-curl -X POST localhost:5000/api/v1/agents \
+curl -X POST localhost:5001/api/v1/agents \
   -H 'Content-Type: application/json' \
   -d '{
     "instructions": "Fix the auth bug in session_controller.ex and run the tests",
@@ -177,7 +177,7 @@ Track one or more git commits. Looks up the Agent by UUID to get the integer `se
 **Example:**
 
 ```bash
-curl -X POST localhost:5000/api/v1/commits \
+curl -X POST localhost:5001/api/v1/commits \
   -H 'Content-Type: application/json' \
   -d '{"agent_id":"abc-123","commit_hashes":["a1b2c3"],"commit_messages":["fix auth bug"]}'
 ```
@@ -216,7 +216,7 @@ Parent type plurals are normalized automatically: `"sessions"` -> `"session"`, `
 **Example:**
 
 ```bash
-curl -X POST localhost:5000/api/v1/notes \
+curl -X POST localhost:5001/api/v1/notes \
   -H 'Content-Type: application/json' \
   -d '{"parent_type":"sessions","parent_id":"42","body":"found the root cause"}'
 ```
@@ -248,7 +248,7 @@ Save or update session context (markdown). Upserts based on session_id. Looks up
 **Example:**
 
 ```bash
-curl -X POST localhost:5000/api/v1/session-context \
+curl -X POST localhost:5001/api/v1/session-context \
   -H 'Content-Type: application/json' \
   -d '{"agent_id":"abc-123","context":"# Context\n\nKey findings..."}'
 ```
@@ -353,7 +353,7 @@ Register a browser for web push notifications.
 
 ```bash
 # After service worker registers
-curl -X POST localhost:5000/api/v1/push/subscriptions \
+curl -X POST localhost:5001/api/v1/push/subscriptions \
   -H 'Content-Type: application/json' \
   -d @subscription.json  # from navigator.serviceWorker.ready.then(reg => reg.pushManager.getSubscription())
 ```
@@ -439,7 +439,7 @@ This allows agents to reply to the correct session via `eits dm` command.
 **Example (current format):**
 
 ```bash
-curl -X POST localhost:5000/api/v1/dm \
+curl -X POST localhost:5001/api/v1/dm \
   -H 'Content-Type: application/json' \
   -d '{
     "from_session_id": 40,
@@ -451,7 +451,7 @@ curl -X POST localhost:5000/api/v1/dm \
 **Example (legacy format - still works):**
 
 ```bash
-curl -X POST localhost:5000/api/v1/dm \
+curl -X POST localhost:5001/api/v1/dm \
   -H 'Content-Type: application/json' \
   -d '{
     "session_id": 42,

@@ -184,7 +184,7 @@ Variables passed:
 | `EITS_AGENT_ID` | `state.agent_id` | Agent ID (same as UUID) |
 | `EITS_PROJECT_ID` | `state.project_id` | EITS project integer ID |
 | `EITS_MODEL` | `context[:model]` | Model name (e.g., "o4-mini") |
-| `EITS_URL` | hardcoded | `http://localhost:5000/api/v1` |
+| `EITS_URL` | hardcoded | `http://localhost:5001/api/v1` |
 
 ## Init Prompt
 

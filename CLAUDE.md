@@ -36,8 +36,8 @@ unlink _build && unlink deps
 
 ```bash
 mix deps.get
-mix phx.server          # Start dev server on http://localhost:5000
-PORT=5002 mix phx.server # Override port via PORT env var (range 5000-5020)
+mix phx.server          # Start dev server on http://localhost:5001
+PORT=5002 mix phx.server # Override port via PORT env var (range 5001-5020)
 mix compile              # Compile only
 ```
 
@@ -45,13 +45,13 @@ Assets: `cd assets && npm install` for JS dependencies. Esbuild and Tailwind run
 
 ## Playwright / Browser Testing
 
-When using Playwright, start a dedicated server instance on a port other than 5000 with auth disabled:
+When using Playwright, start a dedicated server instance on a different port than the dev server with auth disabled:
 
 ```bash
-PORT=5001 DISABLE_AUTH=true mix phx.server
+PORT=5002 DISABLE_AUTH=true mix phx.server
 ```
 
-Navigate Playwright to `http://localhost:5001`. This avoids interfering with the running dev server and bypasses the login wall.
+Navigate Playwright to `http://localhost:5002`. This avoids interfering with the running dev server and bypasses the login wall.
 
 ## Development Workflow
 

@@ -1,7 +1,7 @@
 // test/playwright/note_editor_test.js
 const { test, expect, chromium } = require('@playwright/test')
 
-const BASE_URL = 'http://localhost:5000'
+const BASE_URL = 'http://localhost:5001'
 
 test.describe('Note inline editor', () => {
   let browser, page

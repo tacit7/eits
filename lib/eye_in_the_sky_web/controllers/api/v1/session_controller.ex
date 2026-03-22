@@ -322,6 +322,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
           project_id: session.project_id,
           status: session.status,
           name: session.name,
+          description: session.description,
           is_spawned: is_spawned,
           initialized: true
         })

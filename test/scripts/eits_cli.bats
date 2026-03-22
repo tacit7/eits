@@ -38,6 +38,26 @@ _agent_uuid() { cat "$BATS_FILE_TMPDIR/agent_uuid"; }
   [[ "$agent_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]
 }
 
+@test "sessions update --name: updates session name" {
+  run "$EITS" sessions update "$TEST_SESSION" --name "bats-updated-name"
+  [ "$status" -eq 0 ]
+  name=$("$EITS" sessions get "$TEST_SESSION" | jq -r '.name')
+  [ "$name" = "bats-updated-name" ]
+}
+
+@test "sessions update --description: updates session description" {
+  run "$EITS" sessions update "$TEST_SESSION" --description "bats test description"
+  [ "$status" -eq 0 ]
+  desc=$("$EITS" sessions get "$TEST_SESSION" | jq -r '.description')
+  [ "$desc" = "bats test description" ]
+}
+
+@test "sessions update: rejects unknown flags" {
+  run "$EITS" sessions update "$TEST_SESSION" --bogus "foo" 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "unknown flag" ]]
+}
+
 @test "sessions context: returns valid JSON (200 with data or 404 no context)" {
   # Endpoint returns 404 when no context has been saved yet — that's fine
   run bash -c "'$EITS' sessions context '$TEST_SESSION' 2>/dev/null; true"

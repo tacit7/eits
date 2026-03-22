@@ -40,13 +40,19 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
 
   @impl true
   def handle_event("open_file", _params, socket) do
-    if path = socket.assigns.selected_file_path do
-      if String.starts_with?(path, @claude_dir) do
-        EyeInTheSkyWeb.Helpers.ViewHelpers.open_in_system(path)
-      end
-    end
+    path = socket.assigns.selected_file_path
 
-    {:noreply, socket}
+    cond do
+      is_nil(path) ->
+        {:noreply, put_flash(socket, :error, "No file selected")}
+
+      not String.starts_with?(path, @claude_dir) ->
+        {:noreply, put_flash(socket, :error, "Access denied")}
+
+      true ->
+        System.cmd("open", ["-t", path], stderr_to_stdout: true)
+        {:noreply, socket}
+    end
   end
 
   @impl true
@@ -287,7 +293,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
             </div>
           <% end %>
 
-          <%= if @file_content do %>
+          <%= if not is_nil(@file_content) do %>
             <!-- File content -->
             <div class="mb-4">
               <div class="flex items-center gap-2 mb-4">

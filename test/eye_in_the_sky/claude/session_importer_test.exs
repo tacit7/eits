@@ -28,7 +28,7 @@ defmodule EyeInTheSky.Claude.SessionImporterTest do
     test "imports user and assistant messages from raw JSONL format", %{session: session} do
       raw_messages = [
         %{
-          "uuid" => "msg-user-001",
+          "uuid" => "a0000000-0000-4000-8000-000000000001",
           "type" => "user",
           "timestamp" => "2026-03-20T12:00:00Z",
           "message" => %{
@@ -37,7 +37,7 @@ defmodule EyeInTheSky.Claude.SessionImporterTest do
           }
         },
         %{
-          "uuid" => "msg-asst-001",
+          "uuid" => "a0000000-0000-4000-8000-000000000002",
           "type" => "assistant",
           "timestamp" => "2026-03-20T12:00:05Z",
           "message" => %{
@@ -56,12 +56,12 @@ defmodule EyeInTheSky.Claude.SessionImporterTest do
 
       user_msg = Enum.find(messages, &(&1.sender_role == "user"))
       assert user_msg.body == "Hello agent"
-      assert user_msg.source_uuid == "msg-user-001"
+      assert user_msg.source_uuid == "a0000000-0000-4000-8000-000000000001"
       assert user_msg.recipient_role == "agent"
 
       agent_msg = Enum.find(messages, &(&1.sender_role == "agent"))
       assert agent_msg.body == "Hello human"
-      assert agent_msg.source_uuid == "msg-asst-001"
+      assert agent_msg.source_uuid == "a0000000-0000-4000-8000-000000000002"
       assert agent_msg.recipient_role == "user"
     end
 
@@ -85,7 +85,7 @@ defmodule EyeInTheSky.Claude.SessionImporterTest do
     test "parses ISO8601 timestamps correctly", %{session: session} do
       raw_messages = [
         %{
-          "uuid" => "msg-ts-001",
+          "uuid" => "a0000000-0000-4000-8000-000000000003",
           "type" => "assistant",
           "timestamp" => "2026-03-15T08:30:00Z",
           "message" => %{
@@ -117,7 +117,7 @@ defmodule EyeInTheSky.Claude.SessionImporterTest do
 
       raw_messages = [
         %{
-          "uuid" => "msg-dedup-001",
+          "uuid" => "a0000000-0000-4000-8000-000000000004",
           "type" => "user",
           "timestamp" => "2026-03-20T12:00:00Z",
           "message" => %{
@@ -136,13 +136,13 @@ defmodule EyeInTheSky.Claude.SessionImporterTest do
 
       # The existing message should now have a source_uuid
       [msg] = messages
-      assert msg.source_uuid == "msg-dedup-001"
+      assert msg.source_uuid == "a0000000-0000-4000-8000-000000000004"
     end
 
     test "maps user role to outbound direction, assistant to inbound", %{session: session} do
       raw_messages = [
         %{
-          "uuid" => "msg-dir-user",
+          "uuid" => "a0000000-0000-4000-8000-000000000005",
           "type" => "user",
           "timestamp" => "2026-03-20T12:00:00Z",
           "message" => %{
@@ -151,7 +151,7 @@ defmodule EyeInTheSky.Claude.SessionImporterTest do
           }
         },
         %{
-          "uuid" => "msg-dir-asst",
+          "uuid" => "a0000000-0000-4000-8000-000000000006",
           "type" => "assistant",
           "timestamp" => "2026-03-20T12:00:01Z",
           "message" => %{

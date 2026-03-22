@@ -5,7 +5,7 @@ defmodule EyeInTheSky.Messages.Message do
   @primary_key {:id, :id, autogenerate: true}
 
   schema "messages" do
-    field :uuid, :string
+    field :uuid, Ecto.UUID
     field :sender_role, :string
     field :recipient_role, :string
     field :provider, :string
@@ -39,7 +39,7 @@ defmodule EyeInTheSky.Messages.Message do
     has_many :reactions, EyeInTheSky.Messages.MessageReaction
     has_many :attachments, EyeInTheSky.Messages.FileAttachment
 
-    field :source_uuid, :string
+    field :source_uuid, Ecto.UUID
     field :session_id, :integer
     field :channel_id, :integer
     field :parent_message_id, :integer

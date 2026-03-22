@@ -4,7 +4,7 @@ defmodule EyeInTheSky.Notes.Note do
 
   @primary_key {:id, :id, autogenerate: true}
   schema "notes" do
-    field :uuid, :string
+    field :uuid, Ecto.UUID
     field :parent_type, :string
     field :parent_id, :string
     field :title, :string

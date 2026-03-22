@@ -17,10 +17,12 @@ _log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [startup] $*" >> "$LOG_FILE" 2>/de
 INPUT=$(cat)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || echo "")
 MODEL=$(echo "$INPUT" | jq -r '.model // empty' 2>/dev/null || echo "")
+AGENT_ID=$(echo "$INPUT" | jq -r '.agent_id // empty' 2>/dev/null || echo "")
+AGENT_TYPE=$(echo "$INPUT" | jq -r '.agent_type // empty' 2>/dev/null || echo "")
 ENTRYPOINT="${CLAUDE_CODE_ENTRYPOINT:-}"
 
-_log "--- session=$SESSION_ID model=${MODEL:-none} entrypoint=${ENTRYPOINT:-none}"
-echo "[EITS] startup: session=$SESSION_ID entrypoint=${ENTRYPOINT:-none}" >&2
+_log "--- session=$SESSION_ID model=${MODEL:-none} entrypoint=${ENTRYPOINT:-none} agent_id=${AGENT_ID:-none} agent_type=${AGENT_TYPE:-none}"
+echo "[EITS] startup: session=$SESSION_ID entrypoint=${ENTRYPOINT:-none} agent_id=${AGENT_ID:-none} agent_type=${AGENT_TYPE:-none}" >&2
 
 [ -z "$SESSION_ID" ] && exit 0
 

@@ -255,9 +255,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               </div>
             </div>
             <div class="flex items-center gap-1 flex-shrink-0">
-              <%= if @agent_record && is_map(@agent_record.agent_definition) && not match?(%Ecto.Association.NotLoaded{}, @agent_record.agent_definition) && @agent_record.agent_definition.display_name do %>
-                <span class="hidden sm:inline text-[11px] text-base-content/40 bg-base-content/5 px-2 py-0.5 rounded mr-1">{@agent_record.agent_definition.display_name}</span>
-              <% end %>
               <button
                 phx-click="toggle_live_stream"
                 phx-hook="LiveStreamToggle"
@@ -445,6 +442,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 <% end %>
               </form>
             </div>
+          <% end %>
+          <%= if @agent_record && is_map(@agent_record.agent_definition) && not match?(%Ecto.Association.NotLoaded{}, @agent_record.agent_definition) && @agent_record.agent_definition.display_name do %>
+            <span class={["hidden sm:inline text-[11px] text-base-content/40 bg-base-content/5 px-2 py-0.5 rounded flex-shrink-0", @active_tab in ["messages", nil] || "ml-auto"]}>{@agent_record.agent_definition.display_name}</span>
           <% end %>
         </div>
       </div>

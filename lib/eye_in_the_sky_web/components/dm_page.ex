@@ -224,9 +224,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                     phx-key="Enter"
                     class="text-base sm:text-lg font-bold text-base-content bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 flex-1 placeholder:text-base-content/20 transition-colors"
                   />
-                  <%= if @agent_record && is_map(@agent_record.agent_definition) && not match?(%Ecto.Association.NotLoaded{}, @agent_record.agent_definition) && @agent_record.agent_definition.display_name do %>
-                    <span class="text-[11px] text-base-content/35 bg-base-content/5 px-2 py-0.5 rounded flex-shrink-0">{@agent_record.agent_definition.display_name}</span>
-                  <% end %>
                   <button
                     type="button"
                     class="hidden sm:flex items-center gap-1 text-[11px] font-mono text-base-content/30 bg-base-content/5 px-2 py-0.5 rounded hover:text-base-content/50 hover:bg-base-content/8 transition-colors cursor-pointer flex-shrink-0"
@@ -258,6 +255,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               </div>
             </div>
             <div class="flex items-center gap-1 flex-shrink-0">
+              <%= if @agent_record && is_map(@agent_record.agent_definition) && not match?(%Ecto.Association.NotLoaded{}, @agent_record.agent_definition) && @agent_record.agent_definition.display_name do %>
+                <span class="hidden sm:inline text-[11px] text-base-content/40 bg-base-content/5 px-2 py-0.5 rounded mr-1">{@agent_record.agent_definition.display_name}</span>
+              <% end %>
               <button
                 phx-click="toggle_live_stream"
                 phx-hook="LiveStreamToggle"

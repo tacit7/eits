@@ -13,7 +13,7 @@ defmodule EyeInTheSky.Messages.BroadcasterTest do
 
     {:ok, session} =
       Sessions.create_session(%{
-        uuid: "bc-#{uniq()}",
+        uuid: Ecto.UUID.generate(),
         agent_id: agent.id,
         started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
         status: "idle"

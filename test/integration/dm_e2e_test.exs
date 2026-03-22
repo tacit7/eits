@@ -51,7 +51,7 @@ defmodule EyeInTheSky.DME2ETest do
     # Create sender (web UI user)
     {:ok, sender_agent} =
       Agents.create_agent(%{
-        uuid: "dm-sender-#{System.system_time(:second)}",
+        uuid: Ecto.UUID.generate(),
         description: "DM Test Sender",
         source: "web",
         project_id: project.id
@@ -59,7 +59,7 @@ defmodule EyeInTheSky.DME2ETest do
 
     {:ok, sender_session} =
       Sessions.create_session(%{
-        uuid: "dm-sender-session-#{System.system_time(:second)}",
+        uuid: Ecto.UUID.generate(),
         agent_id: sender_agent.id,
         name: "Sender Session",
         started_at: DateTime.utc_now() |> DateTime.to_iso8601()
@@ -68,7 +68,7 @@ defmodule EyeInTheSky.DME2ETest do
     # Create recipient agent
     {:ok, recipient_agent} =
       Agents.create_agent(%{
-        uuid: "dm-recipient-#{System.system_time(:second)}",
+        uuid: Ecto.UUID.generate(),
         description: "DM Test Recipient",
         source: "claude",
         project_id: project.id
@@ -76,7 +76,7 @@ defmodule EyeInTheSky.DME2ETest do
 
     {:ok, recipient_session} =
       Sessions.create_session(%{
-        uuid: "dm-recipient-session-#{System.system_time(:second)}",
+        uuid: Ecto.UUID.generate(),
         agent_id: recipient_agent.id,
         name: "Recipient Session",
         started_at: DateTime.utc_now() |> DateTime.to_iso8601()
@@ -85,7 +85,7 @@ defmodule EyeInTheSky.DME2ETest do
     # Create a channel for DMs
     {:ok, channel} =
       Channels.create_channel(%{
-        uuid: "dm-channel-#{System.system_time(:second)}",
+        uuid: Ecto.UUID.generate(),
         name: "DM Test Channel",
         project_id: project.id,
         session_id: sender_session.id

@@ -50,12 +50,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
         {:noreply, put_flash(socket, :error, "Access denied")}
 
       true ->
-        case :os.type() do
-          {:unix, :darwin} -> System.cmd("open", ["-t", path], stderr_to_stdout: true)
-          {:unix, _} -> System.cmd("xdg-open", [path], stderr_to_stdout: true)
-          {:win32, _} -> System.cmd("cmd", ["/c", "start", "", path], stderr_to_stdout: true)
-        end
-
+        EyeInTheSkyWeb.Helpers.ViewHelpers.open_in_system(path)
         {:noreply, socket}
     end
   end

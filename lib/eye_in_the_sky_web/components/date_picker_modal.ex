@@ -27,6 +27,7 @@ defmodule EyeInTheSkyWeb.Components.DatePickerModal do
       |> assign(:month, month)
       |> assign(:month_name, month_name)
       |> assign(:weeks, weeks)
+      |> assign(:day_names, @day_names)
 
     ~H"""
     <%= if @show && @task do %>

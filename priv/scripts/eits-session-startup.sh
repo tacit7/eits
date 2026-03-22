@@ -34,7 +34,8 @@ EXISTING_AGENT_UUID=""
 SESSION_INFO=$(eits sessions get "$SESSION_ID" 2>/dev/null || true)
 if [ -n "$SESSION_INFO" ]; then
   EXISTING_AGENT_UUID=$(echo "$SESSION_INFO" | jq -r '.agent_id // empty')
-  _log "session found: agent_uuid=${EXISTING_AGENT_UUID:-none}"
+  _log "session found: agent_id=${EXISTING_AGENT_UUID:-none}"
+  echo "[EITS] startup: pre-registered agent_id=${EXISTING_AGENT_UUID:-none}" >&2
 fi
 
 # Resolve or create project
@@ -53,7 +54,8 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   [ -n "$ENTRYPOINT" ]        && echo "export EITS_ENTRYPOINT=$ENTRYPOINT"             >> "$CLAUDE_ENV_FILE"
   [ -n "$EXISTING_AGENT_UUID" ] && echo "export EITS_AGENT_UUID=$EXISTING_AGENT_UUID"  >> "$CLAUDE_ENV_FILE"
   [ -n "$PROJECT_ID" ]        && echo "export EITS_PROJECT_ID=$PROJECT_ID"             >> "$CLAUDE_ENV_FILE"
-  _log "env vars written"
+  _log "env vars written — agent_id=${EXISTING_AGENT_UUID:-none} project_id=${PROJECT_ID:-none}"
+  echo "[EITS] startup: env written — agent_id=${EXISTING_AGENT_UUID:-none} project_id=${PROJECT_ID:-none}" >&2
 
   # Patch entrypoint on pre-registered sessions
   if [ -n "$EXISTING_AGENT_UUID" ] && [ -n "$ENTRYPOINT" ]; then

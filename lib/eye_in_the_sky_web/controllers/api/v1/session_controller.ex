@@ -136,6 +136,8 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
           |> Helpers.maybe_put(:status, status)
           |> Helpers.maybe_put(:intent, params["intent"])
           |> Helpers.maybe_put(:entrypoint, params["entrypoint"])
+          |> Helpers.maybe_put(:name, params["name"])
+          |> Helpers.maybe_put(:description, params["description"])
           |> Helpers.maybe_put(:last_activity_at, DateTime.utc_now())
 
         # Explicit entrypoint clear — set to nil so LiveView removes the CLI icon

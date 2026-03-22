@@ -75,18 +75,20 @@ cmd_sessions() {
       _post "/sessions" "$(json session_id "$session_id" name "$name" description "$description" project_name "$project_name" model "$model" entrypoint "$entrypoint")"
       ;;
     update)
-      # eits sessions update <uuid> [--status <status>] [--intent <text>] [--entrypoint <e>]
+      # eits sessions update <uuid> [--status <status>] [--intent <text>] [--entrypoint <e>] [--name <name>] [--description <desc>]
       local uuid="${1:-}"; need uuid; shift
-      local status="" intent="" entrypoint=""
+      local status="" intent="" entrypoint="" name="" description=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --status)     status="$2";     shift 2 ;;
-          --intent)     intent="$2";     shift 2 ;;
-          --entrypoint) entrypoint="$2"; shift 2 ;;
+          --status)      status="$2";      shift 2 ;;
+          --intent)      intent="$2";      shift 2 ;;
+          --entrypoint)  entrypoint="$2";  shift 2 ;;
+          --name)        name="$2";        shift 2 ;;
+          --description) description="$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      _patch "/sessions/$uuid" "$(json status "$status" intent "$intent" entrypoint "$entrypoint")"
+      _patch "/sessions/$uuid" "$(json status "$status" intent "$intent" entrypoint "$entrypoint" name "$name" description "$description")"
       ;;
     end)
       local uuid="${1:-}"; need uuid

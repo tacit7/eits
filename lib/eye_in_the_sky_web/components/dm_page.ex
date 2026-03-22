@@ -53,6 +53,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :message_search_query, :string, default: ""
   attr :session_context, :map, default: nil
   attr :reloading, :boolean, default: false
+  attr :agent_record, :map, default: nil
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
 
@@ -126,21 +127,21 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             "compacting" -> "bg-orange-500 animate-pulse"
             _ -> "bg-base-content/20"
           end} />
-          <%= if @session.entrypoint == "cli" do %>
+          <%= if @agent.entrypoint == "cli" do %>
             <.icon name="hero-command-line" class="w-3.5 h-3.5 text-base-content/40 flex-shrink-0" />
           <% end %>
           <div class="flex flex-col items-center min-w-0 flex-1">
             <input
               type="text"
-              value={@session.name || ""}
+              value={@agent.name || ""}
               placeholder="Session name"
               phx-blur="update_session_name"
               phx-keydown={JS.push("update_session_name") |> JS.focus(to: "#message-input")}
               phx-key="Enter"
               class="text-sm font-semibold text-base-content/85 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 w-full text-center placeholder:text-base-content/20 transition-colors"
             />
-            <%= if is_map(@agent.agent_definition) && not match?(%Ecto.Association.NotLoaded{}, @agent.agent_definition) && @agent.agent_definition.display_name do %>
-              <span class="text-[10px] text-base-content/35 truncate">{@agent.agent_definition.display_name}</span>
+            <%= if @agent_record && is_map(@agent_record.agent_definition) && not match?(%Ecto.Association.NotLoaded{}, @agent_record.agent_definition) && @agent_record.agent_definition.display_name do %>
+              <span class="text-[10px] text-base-content/35 truncate">{@agent_record.agent_definition.display_name}</span>
             <% end %>
           </div>
         </div>
@@ -208,7 +209,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               end} />
               <div class="flex flex-col min-w-0 flex-1">
                 <div class="flex items-center gap-2 min-w-0">
-                  <%= if @session.entrypoint == "cli" do %>
+                  <%= if @agent.entrypoint == "cli" do %>
                     <.icon
                       name="hero-command-line"
                       class="w-4 h-4 text-base-content/40 flex-shrink-0"
@@ -216,15 +217,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                   <% end %>
                   <input
                     type="text"
-                    value={@session.name || ""}
+                    value={@agent.name || ""}
                     placeholder="Session name"
                     phx-blur="update_session_name"
                     phx-keydown={JS.push("update_session_name") |> JS.focus(to: "#message-input")}
                     phx-key="Enter"
                     class="text-base sm:text-lg font-bold text-base-content bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 flex-1 placeholder:text-base-content/20 transition-colors"
                   />
-                  <%= if is_map(@agent.agent_definition) && not match?(%Ecto.Association.NotLoaded{}, @agent.agent_definition) && @agent.agent_definition.display_name do %>
-                    <span class="text-[11px] text-base-content/35 bg-base-content/5 px-2 py-0.5 rounded flex-shrink-0">{@agent.agent_definition.display_name}</span>
+                  <%= if @agent_record && is_map(@agent_record.agent_definition) && not match?(%Ecto.Association.NotLoaded{}, @agent_record.agent_definition) && @agent_record.agent_definition.display_name do %>
+                    <span class="text-[11px] text-base-content/35 bg-base-content/5 px-2 py-0.5 rounded flex-shrink-0">{@agent_record.agent_definition.display_name}</span>
                   <% end %>
                   <button
                     type="button"

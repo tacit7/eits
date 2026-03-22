@@ -372,6 +372,7 @@ defmodule EyeInTheSkyWeb.DmLive do
     <div id="dm-live-root" phx-hook="GlobalKeydown">
       <DmPage.dm_page
         agent={@session}
+        agent_record={@agent}
         session_uuid={@session_uuid}
         active_tab={@active_tab}
         messages={@messages}

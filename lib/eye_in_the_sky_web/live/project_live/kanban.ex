@@ -86,6 +86,97 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   def handle_event("archive_task", params, socket),
     do: TasksHelpers.handle_archive_task(params, socket, &KanbanFilters.load_tasks/1)
 
+  # ---------------------------------------------------------------------------
+  # Events: date picker
+  # ---------------------------------------------------------------------------
+
+  @impl true
+  def handle_event("open_date_picker", %{"task_id" => task_id}, socket) do
+    task = EyeInTheSky.Tasks.get_task_by_uuid_or_id!(task_id)
+    today = Date.utc_today()
+
+    selected =
+      case task.due_at do
+        nil -> nil
+        dt -> dt |> DateTime.to_date() |> Date.to_iso8601()
+      end
+
+    {year, month} =
+      case task.due_at do
+        nil -> {today.year, today.month}
+        dt -> dt = DateTime.to_date(dt); {dt.year, dt.month}
+      end
+
+    {:noreply,
+     socket
+     |> assign(:show_date_picker, true)
+     |> assign(:date_picker_task, task)
+     |> assign(:date_picker_year, year)
+     |> assign(:date_picker_month, month)
+     |> assign(:date_picker_selected, selected)}
+  end
+
+  @impl true
+  def handle_event("close_date_picker", _params, socket) do
+    {:noreply, assign(socket, :show_date_picker, false)}
+  end
+
+  @impl true
+  def handle_event("date_picker_prev_month", _params, socket) do
+    {year, month} = prev_month(socket.assigns.date_picker_year, socket.assigns.date_picker_month)
+    {:noreply, socket |> assign(:date_picker_year, year) |> assign(:date_picker_month, month)}
+  end
+
+  @impl true
+  def handle_event("date_picker_next_month", _params, socket) do
+    {year, month} = next_month(socket.assigns.date_picker_year, socket.assigns.date_picker_month)
+    {:noreply, socket |> assign(:date_picker_year, year) |> assign(:date_picker_month, month)}
+  end
+
+  @impl true
+  def handle_event("select_due_date", %{"date" => date_str}, socket) do
+    {:noreply, assign(socket, :date_picker_selected, date_str)}
+  end
+
+  @impl true
+  def handle_event("save_due_date", %{"task_id" => task_id, "due_at" => due_at_str}, socket) do
+    task = EyeInTheSky.Tasks.get_task_by_uuid_or_id!(task_id)
+    due_at = if due_at_str == "", do: nil, else: due_at_str
+
+    case EyeInTheSky.Tasks.update_task(task, %{due_at: due_at, updated_at: DateTime.utc_now()}) do
+      {:ok, _updated} ->
+        {:noreply,
+         socket
+         |> assign(:show_date_picker, false)
+         |> KanbanFilters.load_tasks()}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not update due date")}
+    end
+  end
+
+  @impl true
+  def handle_event("remove_due_date", %{"task_id" => task_id}, socket) do
+    task = EyeInTheSky.Tasks.get_task_by_uuid_or_id!(task_id)
+
+    case EyeInTheSky.Tasks.update_task(task, %{due_at: nil, updated_at: DateTime.utc_now()}) do
+      {:ok, _updated} ->
+        {:noreply,
+         socket
+         |> assign(:show_date_picker, false)
+         |> KanbanFilters.load_tasks()}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not remove due date")}
+    end
+  end
+
+  defp prev_month(year, 1), do: {year - 1, 12}
+  defp prev_month(year, month), do: {year, month - 1}
+
+  defp next_month(year, 12), do: {year + 1, 1}
+  defp next_month(year, month), do: {year, month + 1}
+
   @impl true
   def handle_event("add_task_annotation", params, socket),
     do: TasksHelpers.handle_add_task_annotation(params, socket)
@@ -321,6 +412,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
       filter_activity={@filter_activity}
       available_tags={@available_tags}
     />
+
+    <EyeInTheSkyWeb.Components.DatePickerModal.date_picker_modal
+      show={@show_date_picker}
+      task={@date_picker_task}
+      year={@date_picker_year}
+      month={@date_picker_month}
+      selected_date={@date_picker_selected}
+    />
     """
   end
 
@@ -355,5 +454,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
     |> assign(:filter_due_date, nil)
     |> assign(:filter_activity, nil)
     |> assign(:working_session_ids, MapSet.new())
+    |> assign(:show_date_picker, false)
+    |> assign(:date_picker_task, nil)
+    |> assign(:date_picker_year, nil)
+    |> assign(:date_picker_month, nil)
+    |> assign(:date_picker_selected, nil)
   end
 end

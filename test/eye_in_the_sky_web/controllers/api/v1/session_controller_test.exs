@@ -234,6 +234,50 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
       {:ok, updated} = Sessions.get_session_by_uuid(session.uuid)
       assert updated.entrypoint == "cli"
     end
+
+    test "updates session name", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+
+      patch(conn, ~p"/api/v1/sessions/#{session.uuid}", %{"name" => "My Session"})
+
+      {:ok, updated} = Sessions.get_session_by_uuid(session.uuid)
+      assert updated.name == "My Session"
+    end
+
+    test "updates session description", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+
+      patch(conn, ~p"/api/v1/sessions/#{session.uuid}", %{"description" => "Doing important work"})
+
+      {:ok, updated} = Sessions.get_session_by_uuid(session.uuid)
+      assert updated.description == "Doing important work"
+    end
+
+    test "updates name and description together", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+
+      patch(conn, ~p"/api/v1/sessions/#{session.uuid}", %{
+        "name" => "Combined Update",
+        "description" => "Both fields at once"
+      })
+
+      {:ok, updated} = Sessions.get_session_by_uuid(session.uuid)
+      assert updated.name == "Combined Update"
+      assert updated.description == "Both fields at once"
+    end
+
+    test "omitting name does not clear existing name", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent, %{name: "Original Name"})
+
+      patch(conn, ~p"/api/v1/sessions/#{session.uuid}", %{"status" => "working"})
+
+      {:ok, updated} = Sessions.get_session_by_uuid(session.uuid)
+      assert updated.name == "Original Name"
+    end
   end
 
   # ---- entrypoint on session create ----

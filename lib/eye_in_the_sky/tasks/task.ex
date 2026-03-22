@@ -5,7 +5,7 @@ defmodule EyeInTheSky.Tasks.Task do
   @primary_key {:id, :id, autogenerate: true}
 
   schema "tasks" do
-    field :uuid, :string
+    field :uuid, Ecto.UUID
     field :title, :string
     field :description, :string
     field :priority, :integer, default: 0

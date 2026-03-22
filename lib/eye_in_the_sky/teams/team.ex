@@ -5,7 +5,7 @@ defmodule EyeInTheSky.Teams.Team do
   @primary_key {:id, :id, autogenerate: true}
 
   schema "teams" do
-    field :uuid, :string
+    field :uuid, Ecto.UUID
     field :name, :string
     field :description, :string
     field :status, :string, default: "active"

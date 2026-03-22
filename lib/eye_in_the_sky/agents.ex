@@ -64,7 +64,7 @@ defmodule EyeInTheSky.Agents do
   @spec get_agent!(integer()) :: Agent.t()
   def get_agent!(id) do
     Agent
-    |> preload([:project])
+    |> preload([:project, :agent_definition])
     |> Repo.get!(id)
     |> populate_project_name()
   end
@@ -77,7 +77,7 @@ defmodule EyeInTheSky.Agents do
   @spec get_agent(integer()) :: {:ok, Agent.t()} | {:error, :not_found}
   def get_agent(id) do
     case Agent
-         |> preload([:project])
+         |> preload([:project, :agent_definition])
          |> Repo.get(id) do
       nil -> {:error, :not_found}
       agent -> {:ok, populate_project_name(agent)}

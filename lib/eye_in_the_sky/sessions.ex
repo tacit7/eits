@@ -185,7 +185,7 @@ defmodule EyeInTheSky.Sessions do
   """
   def list_sessions_with_agent(opts \\ []) do
     Session
-    |> preload(:agent)
+    |> preload(agent: :agent_definition)
     |> order_by([s], desc: s.started_at)
     |> Archivable.include_archived(opts)
     |> Repo.all()
@@ -200,7 +200,7 @@ defmodule EyeInTheSky.Sessions do
     sessions =
       Session
       |> where([s], s.project_id == ^project_id)
-      |> preload(:agent)
+      |> preload(agent: :agent_definition)
       |> order_by([s], desc: s.started_at)
       |> Archivable.include_archived(opts)
       |> Repo.all()
@@ -250,7 +250,8 @@ defmodule EyeInTheSky.Sessions do
     base_query =
       from s in Session,
         join: a in assoc(s, :agent),
-        preload: [agent: a],
+        left_join: ad in assoc(a, :agent_definition),
+        preload: [agent: {a, agent_definition: ad}],
         order_by: [desc_nulls_last: s.last_activity_at, desc: s.started_at],
         limit: ^limit,
         offset: ^offset

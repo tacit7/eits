@@ -84,9 +84,6 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_event("toggle_thinking", _params, socket), do: handle_toggle_thinking(socket)
 
   @impl true
-  def handle_event("toggle_live_stream", params, socket), do: handle_toggle_live_stream(params, socket)
-
-  @impl true
   def handle_event("keydown", %{"key" => "k", "ctrlKey" => true}, socket) do
     overlay = if socket.assigns.active_overlay == :task_drawer, do: nil, else: :task_drawer
     {:noreply, assign(socket, :active_overlay, overlay)}

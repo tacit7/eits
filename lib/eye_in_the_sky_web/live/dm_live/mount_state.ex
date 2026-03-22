@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:selected_model, session.model || "opus")
     |> assign(:selected_effort, "medium")
     |> assign(:active_overlay, nil)
-    |> assign(:show_live_stream, false)
+    |> assign(:show_live_stream, true)
     |> assign(:stream_content, AgentWorker.get_stream_state(session.id))
     |> assign(:stream_tool, nil)
     |> assign(:stream_thinking, nil)

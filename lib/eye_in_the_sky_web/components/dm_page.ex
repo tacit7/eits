@@ -33,7 +33,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :commits, :list, default: []
   attr :diff_cache, :map, default: %{}
   attr :notes, :list, default: []
-  attr :show_live_stream, :boolean, default: false
+  attr :show_live_stream, :boolean, default: true
   attr :stream_content, :string, default: ""
   attr :stream_tool, :string, default: nil
   attr :stream_thinking, :string, default: nil
@@ -255,23 +255,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               </div>
             </div>
             <div class="flex items-center gap-1 flex-shrink-0">
-              <button
-                phx-click="toggle_live_stream"
-                phx-hook="LiveStreamToggle"
-                id="dm-live-stream-toggle"
-                class={[
-                  "flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs transition-colors",
-                  @show_live_stream && "text-primary bg-primary/10 hover:bg-primary/15",
-                  !@show_live_stream &&
-                    "text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5"
-                ]}
-              >
-                <.icon
-                  name={if @show_live_stream, do: "hero-signal-solid", else: "hero-signal"}
-                  class="w-3.5 h-3.5"
-                />
-                <span class="hidden sm:inline">Live</span>
-              </button>
               <button
                 phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
                 class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"

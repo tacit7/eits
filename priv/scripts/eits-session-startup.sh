@@ -6,7 +6,7 @@ set -uo pipefail
 
 # --- EITS Workflow Guard ---
 if [ "${EITS_WORKFLOW:-}" = "0" ]; then
-  echo "EITS_WORKFLOW=0 — EITS integration disabled. Skip /eits-init and all EITS workflows."
+  echo "EITS_WORKFLOW=0 — EITS integration disabled." >&2
   exit 0
 fi
 # --- End Workflow Guard ---

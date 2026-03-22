@@ -93,6 +93,7 @@ defmodule EyeInTheSky.Claude.AgentFileScanner do
           {:ok, meta, body} ->
             %{
               id: "fs:#{path}",
+              slug: Path.basename(path, ".md"),
               name: meta["name"] || Path.basename(path, ".md"),
               description: meta["description"] || "",
               prompt_text: String.trim(body),

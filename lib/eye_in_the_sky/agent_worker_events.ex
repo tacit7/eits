@@ -162,7 +162,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
               Logger.warning("[#{session_id}] update_session_status failed: #{inspect(reason)}")
           end
 
-          if status == "idle" do
+          if status in ["idle", "waiting"] do
             Events.session_idle(session_id)
           end
 

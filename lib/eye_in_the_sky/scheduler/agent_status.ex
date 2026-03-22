@@ -112,7 +112,7 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
       # Use last_activity_at when available, fall back to started_at.
       idle_sessions =
         from(s in Session,
-          where: s.status == "idle",
+          where: s.status in ["idle", "waiting"],
           where: is_nil(s.archived_at),
           where: not is_nil(s.started_at),
           where:

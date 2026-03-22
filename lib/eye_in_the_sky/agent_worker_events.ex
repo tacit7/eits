@@ -24,10 +24,16 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   end
 
   @doc "SDK completed successfully."
-  def on_sdk_completed(session_id, provider_conversation_id) do
-    update_session_status(session_id, "idle")
+  def on_sdk_completed(session_id, provider_conversation_id, provider \\ "claude") do
+    status = if provider == "codex", do: "waiting", else: "idle"
+    update_session_status(session_id, status)
     Events.agent_stopped(provider_conversation_id, session_id)
     notify_agent_complete(session_id, provider_conversation_id)
+  end
+
+  @doc "Codex thread.started received — confirm session is working."
+  def on_codex_thread_started(session_id) do
+    update_session_status(session_id, "working")
   end
 
   @doc "SDK errored (transient or systemic)."
@@ -142,7 +148,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
           attrs = %{status: status}
 
           attrs =
-            if status == "idle" do
+            if status in ["idle", "waiting"] do
               Map.put(attrs, :last_activity_at, DateTime.utc_now())
             else
               attrs
@@ -156,7 +162,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
               Logger.warning("[#{session_id}] update_session_status failed: #{inspect(reason)}")
           end
 
-          if status == "idle" do
+          if status in ["idle", "waiting"] do
             Events.session_idle(session_id)
           end
 

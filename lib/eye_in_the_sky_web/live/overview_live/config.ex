@@ -93,39 +93,44 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
         current_rel = socket.assigns.current_path
         base = if current_rel, do: Path.join(@claude_dir, current_rel), else: @claude_dir
         full = Path.join(base, name)
-        expanded_base = Path.expand(@claude_dir)
-        expanded_full = Path.expand(full)
+        real_base = @claude_dir |> Path.expand() |> resolve_real_path()
+        real_full = full |> Path.expand() |> resolve_real_path()
 
-        if String.starts_with?(expanded_full, expanded_base) do
-          case socket.assigns.creating do
-            :dir ->
-              case File.mkdir(full) do
-                :ok ->
-                  rel = if current_rel, do: Path.join(current_rel, name), else: name
-                  {:noreply, socket |> assign(:creating, nil) |> load_list_path(rel)}
+        cond do
+          not String.starts_with?(real_full, real_base <> "/") ->
+            {:noreply, put_flash(socket, :error, "Access denied")}
 
-                {:error, reason} ->
-                  {:noreply, assign(socket, :error, "Failed to create directory: #{reason}")}
-              end
+          File.exists?(full) ->
+            {:noreply, put_flash(socket, :error, "Already exists: #{name}")}
 
-            :file ->
-              case File.write(full, "") do
-                :ok ->
-                  rel = if current_rel, do: Path.join(current_rel, name), else: name
-                  {:noreply,
-                   socket
-                   |> assign(:creating, nil)
-                   |> push_patch(to: ~p"/config?path=#{rel}")}
+          true ->
+            rel = if current_rel, do: Path.join(current_rel, name), else: name
 
-                {:error, reason} ->
-                  {:noreply, assign(socket, :error, "Failed to create file: #{reason}")}
-              end
+            case socket.assigns.creating do
+              :dir ->
+                case File.mkdir(full) do
+                  :ok ->
+                    {:noreply, socket |> assign(:creating, nil) |> load_list_path(rel)}
 
-            _ ->
-              {:noreply, socket}
-          end
-        else
-          {:noreply, assign(socket, :error, "Access denied")}
+                  {:error, reason} ->
+                    {:noreply, put_flash(socket, :error, "Failed to create directory: #{reason}")}
+                end
+
+              :file ->
+                case File.write(full, "") do
+                  :ok ->
+                    {:noreply,
+                     socket
+                     |> assign(:creating, nil)
+                     |> push_patch(to: ~p"/config?path=#{rel}")}
+
+                  {:error, reason} ->
+                    {:noreply, put_flash(socket, :error, "Failed to create file: #{reason}")}
+                end
+
+              _ ->
+                {:noreply, socket}
+            end
         end
     end
   end
@@ -232,6 +237,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
     idx = Enum.find_index(@pinned_order, &(String.downcase(&1) == String.downcase(name)))
     pinned = if idx, do: {0, idx}, else: {1, 0}
     {pinned, !entry.is_dir, String.downcase(name)}
+  end
+
+  defp resolve_real_path(path) do
+    case System.cmd("realpath", [path], stderr_to_stdout: true) do
+      {real, 0} -> String.trim(real)
+      _ -> path
+    end
   end
 
   defp relative_path(path) do

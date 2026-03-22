@@ -94,7 +94,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
         base = if current_rel, do: Path.join(@claude_dir, current_rel), else: @claude_dir
         full = Path.join(base, name)
         real_base = @claude_dir |> Path.expand() |> resolve_real_path()
-        real_full = full |> Path.expand() |> resolve_real_path()
+        # Resolve the *parent* directory (which must exist) to catch symlink traversal.
+        # Appending the validated name is safe because name contains no "/" or "..".
+        real_parent = base |> Path.expand() |> resolve_real_path()
+        real_full = Path.join(real_parent, name)
 
         cond do
           not String.starts_with?(real_full, real_base <> "/") ->

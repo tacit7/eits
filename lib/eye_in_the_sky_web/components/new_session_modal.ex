@@ -88,8 +88,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
                 <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Agent</label>
                 <select name="agent" class="select select-bordered w-full">
                   <option value="">-- None --</option>
-                  <%= for {name, scope} <- @available_agents do %>
-                    <option value={name}>{name}{if scope == :project, do: " (project)"}</option>
+                  <%= for {slug, name, scope} <- @available_agents do %>
+                    <option value={slug}>{name}{if scope == :project, do: " (project)"}</option>
                   <% end %>
                 </select>
               </div>
@@ -291,6 +291,6 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   defp list_agents(project_path) do
     AgentFileScanner.scan(project_path)
-    |> Enum.map(fn agent -> {agent.name, agent.source} end)
+    |> Enum.map(fn agent -> {agent.slug, agent.name, agent.source} end)
   end
 end

@@ -11,7 +11,7 @@ defmodule EyeInTheSky.Sessions.Session do
   @timestamps_opts [type: :utc_datetime_usec]
 
   schema "sessions" do
-    field :uuid, :string
+    field :uuid, Ecto.UUID
     field :agent_id, :integer
     field :name, :string
     field :description, :string

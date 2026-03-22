@@ -5,7 +5,7 @@ defmodule EyeInTheSky.Messages.MessageReaction do
   @primary_key {:id, :id, autogenerate: true}
 
   schema "message_reactions" do
-    field :uuid, :string
+    field :uuid, Ecto.UUID
     field :session_id, :integer
     field :emoji, :string
 

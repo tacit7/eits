@@ -5,7 +5,7 @@ defmodule EyeInTheSky.Messages.FileAttachment do
   @primary_key {:id, :id, autogenerate: true}
 
   schema "file_attachments" do
-    field :uuid, :string
+    field :uuid, Ecto.UUID
     field :filename, :string
     field :original_filename, :string
     field :content_type, :string

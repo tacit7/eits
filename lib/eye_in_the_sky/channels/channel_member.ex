@@ -5,7 +5,7 @@ defmodule EyeInTheSky.Channels.ChannelMember do
   @primary_key {:id, :id, autogenerate: true}
 
   schema "channel_members" do
-    field :uuid, :string
+    field :uuid, Ecto.UUID
     field :agent_id, :integer
     field :session_id, :integer
     field :role, :string, default: "member"

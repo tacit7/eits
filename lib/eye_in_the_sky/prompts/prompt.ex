@@ -5,7 +5,7 @@ defmodule EyeInTheSky.Prompts.Prompt do
   @primary_key {:id, :id, autogenerate: true}
 
   schema "subagent_prompts" do
-    field :uuid, :string
+    field :uuid, Ecto.UUID
     field :name, :string
     field :slug, :string
     field :description, :string

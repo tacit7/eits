@@ -5,7 +5,7 @@ defmodule EyeInTheSky.Channels.Channel do
   @primary_key {:id, :id, autogenerate: true}
 
   schema "channels" do
-    field :uuid, :string
+    field :uuid, Ecto.UUID
     field :name, :string
     field :description, :string
     field :channel_type, :string, default: "public"

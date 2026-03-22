@@ -11,7 +11,7 @@ defmodule EyeInTheSky.Agents.Agent do
   @timestamps_opts [type: :utc_datetime_usec]
 
   schema "agents" do
-    field :uuid, :string
+    field :uuid, Ecto.UUID
     field :persona_id, :string
     field :source, :string
     field :description, :string

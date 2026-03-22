@@ -3,7 +3,7 @@ defmodule EyeInTheSky.Notifications.Notification do
   import Ecto.Changeset
 
   schema "notifications" do
-    field :uuid, :string
+    field :uuid, Ecto.UUID
     field :title, :string
     field :body, :string
     field :category, :string, default: "system"

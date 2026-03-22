@@ -4,7 +4,7 @@ defmodule EyeInTheSky.Bookmarks.Bookmark do
 
   @primary_key {:id, :id, autogenerate: true}
   schema "bookmarks" do
-    field :uuid, :string
+    field :uuid, Ecto.UUID
     field :bookmark_type, :string
     field :bookmark_id, :string
     field :file_path, :string

@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
   alias EyeInTheSky.Agents
   alias EyeInTheSky.Sessions
+  alias EyeInTheSkyWeb.Canvases
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Components.Icons
@@ -37,6 +38,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
       |> assign(:selected_ids, MapSet.new())
       |> assign(:show_delete_confirm, false)
       |> assign(:editing_session_id, nil)
+      |> assign(:canvases, Canvases.list_canvases())
       |> load_agents()
       |> schedule_refresh()
 
@@ -556,6 +558,35 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
                 editing_session_id={@editing_session_id}
               >
                 <:actions>
+                  <div class="dropdown dropdown-top" id={"canvas-dropdown-#{agent.id}"}>
+                    <button tabindex="0" class="btn btn-secondary btn-xs gap-1 md:opacity-0 md:group-hover:opacity-100">
+                      <.icon name="hero-squares-2x2" class="w-3 h-3" /> Canvas
+                    </button>
+                    <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-10 w-48 p-1 shadow-xl border border-base-300 text-xs">
+                      <li class="menu-title text-[10px]">Select canvas</li>
+                      <%= for canvas <- @canvases do %>
+                        <li>
+                          <a phx-click="add_to_canvas" phx-value-canvas-id={canvas.id} phx-value-session-id={agent.id}>
+                            <%= canvas.name %>
+                          </a>
+                        </li>
+                      <% end %>
+                      <li><hr class="border-base-content/10 my-1" /></li>
+                      <li id={"new-canvas-label-#{agent.id}"}>
+                        <a
+                          class="text-secondary"
+                          onclick={"document.getElementById('new-canvas-label-#{agent.id}').style.display='none'; document.getElementById('new-canvas-form-#{agent.id}').style.display='block';"}
+                        >+ New canvas</a>
+                      </li>
+                      <li id={"new-canvas-form-#{agent.id}"} style="display:none">
+                        <form phx-submit="add_to_new_canvas" class="flex flex-col gap-1 p-1">
+                          <input type="hidden" name="session_id" value={agent.id} />
+                          <input type="text" name="canvas_name" class="input input-xs w-full" placeholder="Canvas name..." autocomplete="off" />
+                          <button type="submit" class="btn btn-primary btn-xs w-full">Create &amp; Add</button>
+                        </form>
+                      </li>
+                    </ul>
+                  </div>
                   <%= if agent.id do %>
                     <a
                       href={~p"/dm/#{agent.id}"}
@@ -649,6 +680,28 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
       submit_event="create_new_session"
     />
     """
+  end
+
+  def handle_event("noop", _params, socket), do: {:noreply, socket}
+
+  def handle_event("add_to_canvas", %{"canvas-id" => cid, "session-id" => sid}, socket) do
+    canvas_id = String.to_integer(cid)
+    session_id = String.to_integer(sid)
+    canvas = Canvases.get_canvas!(canvas_id)
+    Canvases.add_session(canvas_id, session_id)
+    send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,
+      id: "canvas-overlay", action: :open_canvas, canvas_id: canvas_id)
+    {:noreply, put_flash(socket, :info, "Added to #{canvas.name}")}
+  end
+
+  def handle_event("add_to_new_canvas", %{"session_id" => sid, "canvas_name" => name}, socket) do
+    session_id = String.to_integer(sid)
+    canvas_name = if name && String.trim(name) != "", do: String.trim(name), else: "Canvas #{:os.system_time(:second)}"
+    {:ok, canvas} = Canvases.create_canvas(%{name: canvas_name})
+    Canvases.add_session(canvas.id, session_id)
+    send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,
+      id: "canvas-overlay", action: :open_canvas, canvas_id: canvas.id)
+    {:noreply, put_flash(socket, :info, "Added to #{canvas.name}")}
   end
 
   defp parse_budget(nil), do: nil

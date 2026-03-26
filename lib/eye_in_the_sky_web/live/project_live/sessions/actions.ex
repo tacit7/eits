@@ -12,7 +12,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
     statics: EyeInTheSkyWeb.static_paths()
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [push_navigate: 2, put_flash: 3]
+  import Phoenix.LiveView, only: [push_navigate: 2, put_flash: 3, stream_insert: 3]
 
   alias EyeInTheSky.Sessions
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Loader
@@ -139,7 +139,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   end
 
   def rename_session(%{"session_id" => session_id}, socket) do
-    {:noreply, assign(socket, :editing_session_id, String.to_integer(session_id))}
+    session_id_int = String.to_integer(session_id)
+    socket = assign(socket, :editing_session_id, session_id_int)
+
+    socket =
+      case Enum.find(socket.assigns.agents, &(&1.id == session_id_int)) do
+        nil -> socket
+        session -> stream_insert(socket, :session_list, session)
+      end
+
+    {:noreply, socket}
   end
 
   def save_session_name(%{"session_id" => session_id, "name" => name}, socket) do
@@ -152,11 +161,21 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
       end
     end
 
-    {:noreply, assign(socket, :editing_session_id, nil)}
+    {:noreply, assign(socket, :editing_session_id, nil) |> Loader.load_agents()}
   end
 
   def cancel_rename(_params, socket) do
-    {:noreply, assign(socket, :editing_session_id, nil)}
+    editing_id = socket.assigns.editing_session_id
+    socket = assign(socket, :editing_session_id, nil)
+
+    socket =
+      case editing_id && Enum.find(socket.assigns.agents, &(&1.id == editing_id)) do
+        nil -> socket
+        false -> socket
+        session -> stream_insert(socket, :session_list, session)
+      end
+
+    {:noreply, socket}
   end
 
   def noop(_params, socket), do: {:noreply, socket}

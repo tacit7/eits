@@ -59,7 +59,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     socket
     |> assign(:active_tab, "messages")
     |> assign(:session_ref, nil)
-    |> assign(:processing, AgentWorker.is_processing?(session.id))
+    |> assign(:processing, initial_processing?(session))
     |> assign(:message_limit, @default_message_limit)
     |> assign(:has_more_messages, false)
     |> assign(:selected_model, session.model || "opus")
@@ -93,5 +93,19 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
       max_file_size: 50_000_000,
       auto_upload: true
     )
+  end
+
+  # Session status is authoritative: terminal states never show the stop button,
+  # even if an AgentWorker happens to still be in :running state (race condition
+  # between SessionEnd hook and SDK completion message). For non-terminal states,
+  # fall through to the worker check as a real-time signal.
+  @terminal_statuses ~w(waiting stopped completed failed error archived)
+
+  defp initial_processing?(%{status: status, id: session_id}) do
+    if status in @terminal_statuses do
+      false
+    else
+      AgentWorker.is_processing?(session_id)
+    end
   end
 end

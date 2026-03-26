@@ -22,6 +22,8 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
 
   alias EyeInTheSky.Messages
 
+  @known_keys ~w(model effort_level channel_id thinking_budget max_budget_usd agent eits_workflow bypass_sandbox content_blocks)a
+
   @type t :: %{
           model: String.t() | nil,
           effort_level: String.t() | nil,
@@ -31,7 +33,9 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
           max_budget_usd: float() | nil,
           agent: String.t() | nil,
           eits_workflow: String.t(),
-          bypass_sandbox: boolean()
+          bypass_sandbox: boolean(),
+          content_blocks: [EyeInTheSky.Claude.ContentBlock.t()],
+          extra_cli_opts: keyword()
         }
 
   @doc """
@@ -39,9 +43,14 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
 
   Queries `Messages.has_inbound_reply?/2` to determine whether the session
   has prior conversation history, which controls SDK resume vs. fresh start.
+
+  Any opts not in the known set are forwarded as `:extra_cli_opts` so they
+  reach `CLI.build_args` for flags like `--add-dir`, `--mcp-config`, etc.
   """
   @spec build(session_id :: integer(), provider :: String.t(), opts :: keyword()) :: t()
   def build(session_id, provider, opts) do
+    extra = Keyword.drop(opts, @known_keys)
+
     %{
       model: opts[:model],
       effort_level: opts[:effort_level],
@@ -51,7 +60,9 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
       max_budget_usd: opts[:max_budget_usd],
       agent: opts[:agent],
       eits_workflow: opts[:eits_workflow],
-      bypass_sandbox: opts[:bypass_sandbox] || false
+      bypass_sandbox: opts[:bypass_sandbox] || false,
+      content_blocks: opts[:content_blocks] || [],
+      extra_cli_opts: extra
     }
   end
 end

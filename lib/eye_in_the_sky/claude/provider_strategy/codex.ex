@@ -5,9 +5,25 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
 
   @behaviour EyeInTheSky.Claude.ProviderStrategy
 
+  alias EyeInTheSky.Claude.ContentBlock
   alias EyeInTheSky.Codex
 
   require Logger
+
+  @impl true
+  def format_content(%ContentBlock.Text{text: text}) do
+    %{"type" => "text", "text" => text}
+  end
+
+  @impl true
+  def format_content(%ContentBlock.Image{data: data, mime_type: mime_type}) do
+    %{"type" => "image_url", "image_url" => %{"url" => "data:#{mime_type};base64,#{data}"}}
+  end
+
+  @impl true
+  def format_content(%ContentBlock.Document{}) do
+    %{"type" => "text", "text" => "[PDF content not supported by this provider]"}
+  end
 
   @impl true
   def start(state, job) do
@@ -16,7 +32,12 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
 
     opts = build_opts(state, context)
 
-    full_prompt = Codex.SDK.eits_init_prompt(state) <> "\n\n---\n\n" <> prompt
+    full_prompt =
+      if (context[:eits_workflow] || "1") != "0" do
+        Codex.SDK.eits_init_prompt(state) <> "\n\n---\n\n" <> prompt
+      else
+        prompt
+      end
 
     Logger.info("Starting new Codex session #{state.provider_conversation_id}")
     Codex.SDK.start(full_prompt, opts)

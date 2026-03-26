@@ -10,6 +10,7 @@ defmodule EyeInTheSky.Claude.Job do
           id: integer() | nil,
           message: String.t(),
           context: map(),
+          content_blocks: [EyeInTheSky.Claude.ContentBlock.t()],
           submitted_at: DateTime.t()
         }
 
@@ -18,6 +19,7 @@ defmodule EyeInTheSky.Claude.Job do
     :id,
     :message,
     :context,
+    content_blocks: [],
     submitted_at: nil
   ]
 
@@ -28,6 +30,20 @@ defmodule EyeInTheSky.Claude.Job do
     %__MODULE__{
       message: message,
       context: context,
+      content_blocks: [],
+      submitted_at: DateTime.utc_now()
+    }
+  end
+
+  @doc """
+  Create a new Job from a message, context, and content blocks.
+  """
+  def new(message, context, content_blocks)
+      when is_binary(message) and is_map(context) and is_list(content_blocks) do
+    %__MODULE__{
+      message: message,
+      context: context,
+      content_blocks: content_blocks,
       submitted_at: DateTime.utc_now()
     }
   end

@@ -89,6 +89,10 @@ defmodule EyeInTheSky.Claude.SessionImporter do
             false
         end
     end
+  rescue
+    e in Postgrex.Error ->
+      Logger.warning("SessionImporter: Postgrex error importing source_uuid=#{msg.uuid}: #{inspect(e)}")
+      false
   end
 
   defp message_roles("user"), do: {"user", "agent", "outbound"}

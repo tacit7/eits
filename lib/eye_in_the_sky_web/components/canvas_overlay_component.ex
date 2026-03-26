@@ -72,12 +72,19 @@ defmodule EyeInTheSkyWeb.Components.CanvasOverlayComponent do
   def handle_event("toggle", _params, socket), do: {:noreply, toggle_open(socket)}
 
   def handle_event("open", %{"canvas-id" => id_str}, socket) do
-    canvas_id = String.to_integer(id_str)
-    {:noreply, socket |> assign(:open, true) |> load_canvases() |> activate_canvas(canvas_id)}
+    case Integer.parse(id_str) do
+      {canvas_id, _} ->
+        {:noreply, socket |> assign(:open, true) |> load_canvases() |> activate_canvas(canvas_id)}
+      :error ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event("switch_tab", %{"canvas-id" => id_str}, socket) do
-    {:noreply, activate_canvas(socket, String.to_integer(id_str))}
+    case Integer.parse(id_str) do
+      {canvas_id, _} -> {:noreply, activate_canvas(socket, canvas_id)}
+      :error -> {:noreply, socket}
+    end
   end
 
   def handle_event("start_new_canvas", _params, socket) do
@@ -104,12 +111,16 @@ defmodule EyeInTheSkyWeb.Components.CanvasOverlayComponent do
 
   # cs_id arrives from JS as a string — must convert to integer
   def handle_event("window_moved", %{"id" => cs_id, "x" => x, "y" => y}, socket) do
-    Canvases.update_window_layout(String.to_integer(cs_id), %{pos_x: x, pos_y: y})
+    with {id, _} <- Integer.parse(to_string(cs_id)) do
+      Canvases.update_window_layout(id, %{pos_x: x, pos_y: y})
+    end
     {:noreply, socket}
   end
 
   def handle_event("window_resized", %{"id" => cs_id, "w" => w, "h" => h}, socket) do
-    Canvases.update_window_layout(String.to_integer(cs_id), %{width: w, height: h})
+    with {id, _} <- Integer.parse(to_string(cs_id)) do
+      Canvases.update_window_layout(id, %{width: w, height: h})
+    end
     {:noreply, socket}
   end
 

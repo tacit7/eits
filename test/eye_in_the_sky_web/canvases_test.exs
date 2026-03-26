@@ -1,16 +1,16 @@
 defmodule EyeInTheSkyWeb.CanvasesTest do
-  use EyeInTheSkyWeb.DataCase, async: true
+  use EyeInTheSky.DataCase, async: true
 
   alias EyeInTheSkyWeb.Canvases
 
   defp uniq, do: System.unique_integer([:positive])
 
   defp create_session do
-    {:ok, agent} = EyeInTheSkyWeb.Agents.create_agent(%{
+    {:ok, agent} = EyeInTheSky.Agents.create_agent(%{
       name: "canvas-test-#{uniq()}",
       status: "active"
     })
-    {:ok, session} = EyeInTheSkyWeb.Sessions.create_session(%{
+    {:ok, session} = EyeInTheSky.Sessions.create_session(%{
       name: "canvas-session-#{uniq()}",
       agent_id: agent.id,
       started_at: DateTime.utc_now() |> DateTime.to_iso8601(),

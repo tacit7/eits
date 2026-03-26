@@ -97,21 +97,27 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
   end
 
   def handle_event("remove_window", %{"cs-id" => cs_id}, socket) do
-    send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,
-      id: "canvas-overlay",
-      action: :remove_window,
-      canvas_session_id: String.to_integer(cs_id)
-    )
+    with {id, _} <- Integer.parse(to_string(cs_id)) do
+      send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,
+        id: "canvas-overlay",
+        action: :remove_window,
+        canvas_session_id: id
+      )
+    end
     {:noreply, socket}
   end
 
   def handle_event("window_moved", %{"id" => cs_id, "x" => x, "y" => y}, socket) do
-    EyeInTheSkyWeb.Canvases.update_window_layout(String.to_integer(cs_id), %{pos_x: x, pos_y: y})
+    with {id, _} <- Integer.parse(to_string(cs_id)) do
+      EyeInTheSkyWeb.Canvases.update_window_layout(id, %{pos_x: x, pos_y: y})
+    end
     {:noreply, socket}
   end
 
   def handle_event("window_resized", %{"id" => cs_id, "w" => w, "h" => h}, socket) do
-    EyeInTheSkyWeb.Canvases.update_window_layout(String.to_integer(cs_id), %{width: w, height: h})
+    with {id, _} <- Integer.parse(to_string(cs_id)) do
+      EyeInTheSkyWeb.Canvases.update_window_layout(id, %{width: w, height: h})
+    end
     {:noreply, socket}
   end
 

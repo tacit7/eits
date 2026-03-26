@@ -83,6 +83,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:queued_prompts, AgentWorker.get_queue(session.id))
     |> assign(:thinking_enabled, false)
     |> assign(:max_budget_usd, nil)
+    |> assign(:session_cli_opts, [])
     |> assign(:compacting, session.status == "compacting")
     |> assign(:message_search_query, "")
     |> assign(:session_context, nil)

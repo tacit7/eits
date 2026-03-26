@@ -17,7 +17,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
   @reload_debounce_ms 300
 
-  def handle_send_message(body, socket) do
+  def handle_send_message(body, socket, extra_cli_opts \\ []) do
     model = socket.assigns.selected_model
     effort_level = socket.assigns.selected_effort
     thinking_enabled = socket.assigns.thinking_enabled
@@ -39,11 +39,10 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
         socket = TabHelpers.load_tab_data(socket, "messages", session_id)
 
-        case AgentManager.continue_session(
-               session_id,
-               full_body,
-               SessionHelpers.continue_session_opts(model, effort_level, thinking_enabled, max_budget_usd)
-             ) do
+        base_opts = SessionHelpers.continue_session_opts(model, effort_level, thinking_enabled, max_budget_usd)
+        cli_opts = Keyword.merge(base_opts, extra_cli_opts)
+
+        case AgentManager.continue_session(session_id, full_body, cli_opts) do
           {:ok, _admission} ->
             Logger.info("Message forwarded to AgentManager for session=#{session_id}")
 

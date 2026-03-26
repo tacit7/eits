@@ -239,6 +239,11 @@ defmodule EyeInTheSky.Claude.CLI do
     * `:allowedTools` - `--allowedTools <csv>`
     * `:permission_mode` - `--permission-mode <mode>`
     * `:mcp_config` - `--mcp-config <path>`
+    * `:add_dir` - `--add-dir <path>`
+    * `:plugin_dir` - `--plugin-dir <path>`
+    * `:settings_file` - `--settings <file>`
+    * `:sandbox` - `true` → `--sandbox`, `false` → `--no-sandbox`
+    * `:chrome` - `true` → `--chrome`, `false` → `--no-chrome`
 
   Unknown keys are silently ignored (they may be used by env/caller logic).
   """
@@ -283,12 +288,19 @@ defmodule EyeInTheSky.Claude.CLI do
     args = maybe_flag(args, "--thinking-budget-tokens", opts[:thinking_budget])
     args = maybe_flag(args, "--max-budget-usd", opts[:max_budget_usd])
     args = maybe_flag(args, "--agent", opts[:agent])
+    args = maybe_flag(args, "--add-dir", opts[:add_dir])
+    args = maybe_flag(args, "--plugin-dir", opts[:plugin_dir])
+    args = maybe_flag(args, "--settings", opts[:settings_file])
 
     # Boolean flags
     # stream-json requires --verbose for proper output parsing
     verbose = opts[:verbose] || opts[:output_format] == "stream-json"
     args = if verbose, do: args ++ ["--verbose"], else: args
     args = if opts[:skip_permissions], do: args ++ ["--dangerously-skip-permissions"], else: args
+    args = if opts[:sandbox] == true, do: args ++ ["--sandbox"], else: args
+    args = if opts[:sandbox] == false, do: args ++ ["--no-sandbox"], else: args
+    args = if opts[:chrome] == true, do: args ++ ["--chrome"], else: args
+    args = if opts[:chrome] == false, do: args ++ ["--no-chrome"], else: args
 
     args =
       if opts[:include_partial_messages], do: args ++ ["--include-partial-messages"], else: args

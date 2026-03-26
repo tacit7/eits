@@ -164,7 +164,16 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("send_message", %{"body" => body}, socket) when body != "" do
-    MessageHandlers.handle_send_message(body, socket)
+    {server_cmds, cli_opts, clean_body} = parse_slash_commands(body)
+    socket = apply_server_commands(server_cmds, socket)
+
+    trimmed = String.trim(clean_body)
+
+    if trimmed != "" do
+      MessageHandlers.handle_send_message(trimmed, socket, cli_opts)
+    else
+      {:noreply, push_event(socket, "clear-input", %{})}
+    end
   end
 
   @impl true
@@ -446,4 +455,114 @@ defmodule EyeInTheSkyWeb.DmLive do
       TabHelpers.load_tab_data(socket, "messages", socket.assigns.session_id)
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Slash command parsing
+  #
+  # Slash commands are stripped from the message body before sending to Claude.
+  # Server commands (/rename, /model, /effort) update LiveView state directly.
+  # CLI flag commands are passed as extra opts to AgentManager.continue_session.
+  #
+  # Format: /command [args]  — must appear at start of a line or be the whole body.
+  # Multiple slash commands may be combined with regular message text.
+  # ---------------------------------------------------------------------------
+
+  @slash_pattern ~r/^\/(\S+)(?:\s+(.+?))?$/m
+
+  defp parse_slash_commands(body) do
+    lines = String.split(body, "\n")
+
+    {server_cmds, cli_opts, text_lines} =
+      Enum.reduce(lines, {[], [], []}, fn line, {scmds, copts, texts} ->
+        trimmed = String.trim(line)
+
+        case Regex.run(@slash_pattern, trimmed, capture: :all_but_first) do
+          [cmd | rest] ->
+            arg = List.first(rest) |> then(&if(&1 == "", do: nil, else: &1))
+
+            case route_slash_command(cmd, arg) do
+              {:server, cmd_tuple} -> {scmds ++ [cmd_tuple], copts, texts}
+              {:cli, cli_opt} -> {scmds, copts ++ [cli_opt], texts}
+              :unknown -> {scmds, copts, texts ++ [line]}
+            end
+
+          nil ->
+            {scmds, copts, texts ++ [line]}
+        end
+      end)
+
+    {server_cmds, cli_opts, Enum.join(text_lines, "\n")}
+  end
+
+  # Server-side commands: handled directly in LiveView, not forwarded to Claude
+  defp route_slash_command("rename", name) when is_binary(name),
+    do: {:server, {:rename, name}}
+
+  defp route_slash_command("model", model) when is_binary(model),
+    do: {:server, {:model, model}}
+
+  defp route_slash_command("effort", level) when is_binary(level),
+    do: {:server, {:effort, level}}
+
+  # CLI flag commands: translated to keyword list opts for continue_session
+  defp route_slash_command("plan", _), do: {:cli, {:permission_mode, "plan"}}
+  defp route_slash_command("sandbox", _), do: {:cli, {:sandbox, true}}
+  defp route_slash_command("no-sandbox", _), do: {:cli, {:sandbox, false}}
+  defp route_slash_command("chrome", _), do: {:cli, {:chrome, true}}
+  defp route_slash_command("no-chrome", _), do: {:cli, {:chrome, false}}
+
+  defp route_slash_command("permissions", mode) when is_binary(mode),
+    do: {:cli, {:permission_mode, mode}}
+
+  defp route_slash_command("mcp", file) when is_binary(file),
+    do: {:cli, {:mcp_config, file}}
+
+  defp route_slash_command("add-dir", path) when is_binary(path),
+    do: {:cli, {:add_dir, path}}
+
+  defp route_slash_command("plugin", path) when is_binary(path),
+    do: {:cli, {:plugin_dir, path}}
+
+  defp route_slash_command("config", file) when is_binary(file),
+    do: {:cli, {:settings_file, file}}
+
+  defp route_slash_command("agents", name) when is_binary(name),
+    do: {:cli, {:agent, name}}
+
+  defp route_slash_command("max-turns", n) when is_binary(n) do
+    case Integer.parse(n) do
+      {int, ""} -> {:cli, {:max_turns, int}}
+      _ -> :unknown
+    end
+  end
+
+  defp route_slash_command(_, _), do: :unknown
+
+  # Apply server-side commands to socket state
+  defp apply_server_commands([], socket), do: socket
+
+  defp apply_server_commands([{:rename, name} | rest], socket) do
+    socket =
+      case Sessions.update_session(socket.assigns.session, %{name: name}) do
+        {:ok, updated_session} ->
+          socket
+          |> assign(:session, updated_session)
+          |> assign(:page_title, name)
+
+        {:error, _} ->
+          socket
+      end
+
+    apply_server_commands(rest, socket)
+  end
+
+  defp apply_server_commands([{:model, model} | rest], socket) do
+    apply_server_commands(rest, assign(socket, :selected_model, model))
+  end
+
+  defp apply_server_commands([{:effort, level} | rest], socket) do
+    apply_server_commands(rest, assign(socket, :selected_effort, level))
+  end
+
+  defp apply_server_commands([_ | rest], socket), do: apply_server_commands(rest, socket)
 end

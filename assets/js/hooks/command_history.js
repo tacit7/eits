@@ -272,8 +272,8 @@ export const CommandHistory = {
       groups[t].push(item)
     }
 
-    const typeOrder = ['skill', 'command', 'agent', 'prompt']
-    const typeLabels = { skill: 'Skills', command: 'Commands', agent: 'Agents', prompt: 'Prompts' }
+    const typeOrder = ['skill', 'command', 'flag', 'agent', 'prompt']
+    const typeLabels = { skill: 'Skills', command: 'Commands', flag: 'Flags', agent: 'Agents', prompt: 'Prompts' }
     const allTypes = [...typeOrder, ...Object.keys(groups).filter(t => !typeOrder.includes(t))]
 
     // slashOrdered tracks items in exact DOM render order — used by slashSelect
@@ -348,6 +348,7 @@ export const CommandHistory = {
     const badge = {
       skill: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary">skill</span>',
       command: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary/10 text-secondary">cmd</span>',
+      flag: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-info/10 text-info">flag</span>',
       agent: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent">agent</span>',
       prompt: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-warning/10 text-warning">prompt</span>',
     }[item.type] || ''

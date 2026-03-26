@@ -25,9 +25,39 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
     project_skills = load_project_skills(project_path)
     agents = load_agents()
     prompts = load_prompts()
+    flags = cli_flags()
 
-    (skills ++ plugin_skills ++ project_skills ++ agents ++ prompts)
+    (skills ++ plugin_skills ++ project_skills ++ agents ++ prompts ++ flags)
     |> Enum.uniq_by(& &1.slug)
+  end
+
+  @doc """
+  Returns hardcoded CLI flag slash items. These map to Claude CLI flags that can
+  be injected inline into DM messages to control how the next invocation runs.
+  """
+  def cli_flags do
+    [
+      # Session & Context
+      %{slug: "add-dir", type: "flag", description: "Add extra working directory --add-dir <path>"},
+      %{slug: "rename", type: "flag", description: "Rename this session --name <name>"},
+      # Model & Performance
+      %{slug: "model", type: "flag", description: "Set model for this message --model <model>"},
+      %{slug: "effort", type: "flag", description: "Set effort level: low|medium|high|max"},
+      %{slug: "plan", type: "flag", description: "Force plan-only mode, no file changes"},
+      %{slug: "max-turns", type: "flag", description: "Limit agentic steps --max-turns <n>"},
+      # Permissions
+      %{slug: "permissions", type: "flag", description: "Set permission mode --permission-mode <mode>"},
+      %{slug: "sandbox", type: "flag", description: "Enable OS-level sandbox isolation"},
+      %{slug: "no-sandbox", type: "flag", description: "Disable OS-level sandbox isolation"},
+      # Tools & Integrations
+      %{slug: "agents", type: "flag", description: "Run as named subagent --agent <name>"},
+      %{slug: "chrome", type: "flag", description: "Enable browser automation"},
+      %{slug: "no-chrome", type: "flag", description: "Disable browser automation"},
+      %{slug: "mcp", type: "flag", description: "Load MCP config file --mcp-config <file>"},
+      %{slug: "plugin", type: "flag", description: "Load plugins from directory --plugin-dir <path>"},
+      # Configuration
+      %{slug: "config", type: "flag", description: "Load settings from file --settings <file>"},
+    ]
   end
 
   @doc false

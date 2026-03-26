@@ -496,6 +496,19 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
           active={@sidebar_tab == :usage}
           collapsed={@collapsed}
         />
+        <button
+          phx-click="toggle"
+          phx-target="#canvas-overlay"
+          class={[
+            "flex items-center gap-2 text-sm transition-colors w-full",
+            if(@collapsed, do: "px-4 py-1 justify-center", else: "pl-3 pr-3 py-0.5"),
+            "text-base-content/50 hover:text-base-content/75 hover:bg-base-content/5"
+          ]}
+          title="Canvas"
+        >
+          <.icon name="hero-squares-2x2" class="w-3.5 h-3.5 flex-shrink-0" />
+          <span class={["truncate", if(@collapsed, do: "hidden")]}>Canvas</span>
+        </button>
         <.section_notification_item
           href="/notifications"
           active={@sidebar_tab == :notifications}

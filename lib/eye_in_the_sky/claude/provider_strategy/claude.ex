@@ -37,6 +37,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
   @impl true
   def start(state, job) do
     opts = build_opts(state, job.context)
+    opts = maybe_add_content_blocks(opts, job.content_blocks)
     Logger.info("Starting new Claude session #{state.provider_conversation_id}")
     SDK.start(job.message, opts)
   end
@@ -44,6 +45,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
   @impl true
   def resume(state, job) do
     opts = build_opts(state, job.context)
+    opts = maybe_add_content_blocks(opts, job.content_blocks)
     Logger.info("Resuming Claude session #{state.provider_conversation_id}")
     SDK.resume(state.provider_conversation_id, job.message, opts)
   end
@@ -117,5 +119,12 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
 
     extra = context[:extra_cli_opts] || []
     base_opts ++ optional_opts ++ extra
+  end
+
+  defp maybe_add_content_blocks(opts, []), do: opts
+
+  defp maybe_add_content_blocks(opts, content_blocks) when is_list(content_blocks) do
+    formatted = Enum.map(content_blocks, &format_content/1)
+    Keyword.put(opts, :content_blocks, formatted)
   end
 end

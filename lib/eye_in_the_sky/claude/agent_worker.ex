@@ -469,7 +469,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       has_messages: context.has_messages
     })
 
-    job = Job.new(message, context)
+    job = Job.new(message, context, context[:content_blocks] || [])
 
     if state.status == :idle do
       Logger.info("AgentWorker: starting SDK for session_id=#{state.session_id}")

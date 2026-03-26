@@ -242,7 +242,7 @@ defmodule EyeInTheSky.Claude.CLI do
     * `:add_dir` - `--add-dir <path>`
     * `:plugin_dir` - `--plugin-dir <path>`
     * `:settings_file` - `--settings <file>`
-    * `:sandbox` - `true` → `--sandbox`, `false` → `--no-sandbox`
+    * `:sandbox` - `true` → `--sandbox` (OS-level isolation; off by default, --no-sandbox is remote-control only)
     * `:chrome` - `true` → `--chrome`, `false` → `--no-chrome`
 
   Unknown keys are silently ignored (they may be used by env/caller logic).
@@ -297,8 +297,8 @@ defmodule EyeInTheSky.Claude.CLI do
     verbose = opts[:verbose] || opts[:output_format] == "stream-json"
     args = if verbose, do: args ++ ["--verbose"], else: args
     args = if opts[:skip_permissions], do: args ++ ["--dangerously-skip-permissions"], else: args
+    # --sandbox enables OS-level isolation; --no-sandbox is remote-control only (sandbox off by default)
     args = if opts[:sandbox] == true, do: args ++ ["--sandbox"], else: args
-    args = if opts[:sandbox] == false, do: args ++ ["--no-sandbox"], else: args
     args = if opts[:chrome] == true, do: args ++ ["--chrome"], else: args
     args = if opts[:chrome] == false, do: args ++ ["--no-chrome"], else: args
 

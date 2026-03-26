@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
       # Permissions
       %{slug: "permissions", type: "flag", description: "Set permission mode --permission-mode <mode>"},
       %{slug: "sandbox", type: "flag", description: "Enable OS-level sandbox isolation"},
-      %{slug: "no-sandbox", type: "flag", description: "Disable OS-level sandbox isolation"},
+      %{slug: "no-sandbox", type: "flag", description: "Disable sandbox (no-op in -p mode; off by default)"},
       # Tools & Integrations
       %{slug: "agents", type: "flag", description: "Run as named subagent --agent <name>"},
       %{slug: "chrome", type: "flag", description: "Enable browser automation"},

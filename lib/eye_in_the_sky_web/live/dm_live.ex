@@ -507,7 +507,7 @@ defmodule EyeInTheSkyWeb.DmLive do
   # CLI flag commands: translated to keyword list opts for continue_session
   defp route_slash_command("plan", _), do: {:cli, {:permission_mode, "plan"}}
   defp route_slash_command("sandbox", _), do: {:cli, {:sandbox, true}}
-  defp route_slash_command("no-sandbox", _), do: {:cli, {:sandbox, false}}
+  # /no-sandbox is a no-op: --no-sandbox only applies to remote-control mode; sandbox is off by default
   defp route_slash_command("chrome", _), do: {:cli, {:chrome, true}}
   defp route_slash_command("no-chrome", _), do: {:cli, {:chrome, false}}
 

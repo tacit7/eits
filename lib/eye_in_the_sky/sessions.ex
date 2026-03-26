@@ -335,6 +335,43 @@ defmodule EyeInTheSky.Sessions do
     |> Repo.all()
   end
 
+  @doc "Fetch a single session in the overview row format (same shape as list_session_overview_rows)."
+  def get_session_overview_row(session_id) do
+    from(s in Session,
+      join: a in assoc(s, :agent),
+      left_join: p in EyeInTheSky.Projects.Project,
+      on: p.id == a.project_id,
+      where: s.id == ^session_id,
+      select: %{
+        id: s.id,
+        uuid: s.uuid,
+        name: s.name,
+        agent_id: a.id,
+        agent_uuid: a.uuid,
+        description: s.description,
+        project_name: p.name,
+        started_at: s.started_at,
+        ended_at: s.ended_at,
+        status: s.status,
+        intent: s.intent,
+        model_provider: s.model_provider,
+        model_name: s.model_name,
+        model_version: s.model_version,
+        last_activity_at: a.last_activity_at,
+        current_task_title:
+          fragment(
+            "(SELECT t.title FROM tasks t JOIN task_sessions ts ON ts.task_id = t.id WHERE ts.session_id = ? AND t.state_id = 2 AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)",
+            s.id
+          )
+      }
+    )
+    |> Repo.one()
+    |> case do
+      nil -> {:error, :not_found}
+      row -> {:ok, row}
+    end
+  end
+
   @doc """
   Counts sessions for overview (same filters as list_session_overview_rows, without limit/offset).
   """

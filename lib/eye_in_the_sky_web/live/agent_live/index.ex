@@ -250,21 +250,14 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   def handle_event("save_session_name", %{"session_id" => session_id, "name" => name}, socket) do
     name = String.trim(name)
 
-    socket =
-      if name != "" do
-        case Sessions.get_session(session_id) do
-          {:ok, session} ->
-            Sessions.update_session(session, %{name: name})
-            socket
-
-          _ ->
-            socket
-        end
-      else
-        socket
+    if name != "" do
+      case Sessions.get_session(session_id) do
+        {:ok, session} -> Sessions.update_session(session, %{name: name})
+        _ -> :noop
       end
+    end
 
-    {:noreply, assign(socket, :editing_session_id, nil)}
+    {:noreply, socket |> assign(:editing_session_id, nil) |> load_agents()}
   end
 
   @impl true
@@ -587,60 +580,97 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
                       </li>
                     </ul>
                   </div>
-                  <%= if agent.id do %>
-                    <a
-                      href={~p"/dm/#{agent.id}"}
-                      target="_blank"
-                      class="hidden sm:inline-flex md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-base-content/30 hover:text-primary hover:bg-primary/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                      aria-label="Open in new tab"
-                    >
-                      <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
-                    </a>
-                  <% end %>
-                  <%= if agent.agent && agent.agent.uuid && agent.uuid do %>
+                  <div class="md:opacity-0 md:group-hover:opacity-100 relative dropdown dropdown-end transition-all">
                     <button
-                      id={"bookmark-btn-#{agent.uuid}"}
+                      tabindex="0"
                       type="button"
-                      phx-hook="BookmarkAgent"
-                      data-agent-id={agent.agent.uuid}
-                      data-session-id={agent.uuid}
-                      data-agent-name={agent.name || agent.agent.description || "Agent"}
-                      data-agent-status={agent.status}
-                      class="bookmark-button md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
-                      aria-label="Bookmark agent"
+                      class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/35 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+                      aria-label="More options"
+                      phx-click="noop"
                     >
-                      <.heart class="bookmark-icon w-3.5 h-3.5" />
+                      <.icon name="hero-ellipsis-horizontal-mini" class="w-4 h-4" />
                     </button>
-                  <% end %>
-                  <%= if agent.uuid do %>
-                    <%= if agent.archived_at do %>
-                      <.icon_button
-                        icon="hero-arrow-up-tray-mini"
-                        on_click="unarchive_session"
-                        aria_label="Unarchive"
-                        color="info"
-                        show_on_hover={false}
-                        values={%{"session_id" => agent.id}}
-                      />
-                      <.icon_button
-                        icon="hero-trash-mini"
-                        on_click="delete_session"
-                        aria_label="Delete"
-                        color="error"
-                        show_on_hover={false}
-                        values={%{"session_id" => agent.id}}
-                      />
-                    <% else %>
-                      <.icon_button
-                        icon="hero-archive-box-mini"
-                        on_click="archive_session"
-                        aria_label="Archive"
-                        color="warning"
-                        class="hidden sm:flex"
-                        values={%{"session_id" => agent.id}}
-                      />
-                    <% end %>
-                  <% end %>
+                    <ul
+                      tabindex="0"
+                      class="dropdown-content z-50 menu menu-xs bg-base-200 border border-base-content/10 rounded-lg shadow-lg w-44 p-1"
+                    >
+                      <%= if agent.id do %>
+                        <li>
+                          <a href={~p"/dm/#{agent.id}"} target="_blank" class="flex items-center gap-2">
+                            <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
+                            Open in new tab
+                          </a>
+                        </li>
+                      <% end %>
+                      <li>
+                        <button
+                          type="button"
+                          phx-click="rename_session"
+                          phx-value-session_id={agent.id}
+                          class="flex items-center gap-2"
+                        >
+                          <.icon name="hero-pencil-square-mini" class="w-3.5 h-3.5" />
+                          Rename
+                        </button>
+                      </li>
+                      <%= if agent.agent && agent.agent.uuid && agent.uuid do %>
+                        <li>
+                          <button
+                            id={"bookmark-btn-#{agent.uuid}"}
+                            type="button"
+                            phx-hook="BookmarkAgent"
+                            data-agent-id={agent.agent.uuid}
+                            data-session-id={agent.uuid}
+                            data-agent-name={agent.name || agent.agent.description || "Agent"}
+                            data-agent-status={agent.status}
+                            class="bookmark-button flex items-center gap-2"
+                            aria-label="Bookmark agent"
+                          >
+                            <.heart class="bookmark-icon w-3.5 h-3.5" />
+                            <span class="bookmark-label">Favorite</span>
+                          </button>
+                        </li>
+                      <% end %>
+                      <%= if agent.uuid do %>
+                        <%= if agent.archived_at do %>
+                          <li>
+                            <button
+                              type="button"
+                              phx-click="unarchive_session"
+                              phx-value-session_id={agent.id}
+                              class="flex items-center gap-2 text-info"
+                            >
+                              <.icon name="hero-arrow-up-tray-mini" class="w-3.5 h-3.5" />
+                              Unarchive
+                            </button>
+                          </li>
+                          <li>
+                            <button
+                              type="button"
+                              phx-click="delete_session"
+                              phx-value-session_id={agent.id}
+                              class="flex items-center gap-2 text-error"
+                            >
+                              <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
+                              Delete
+                            </button>
+                          </li>
+                        <% else %>
+                          <li>
+                            <button
+                              type="button"
+                              phx-click="archive_session"
+                              phx-value-session_id={agent.id}
+                              class="flex items-center gap-2 text-warning"
+                            >
+                              <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
+                              Archive
+                            </button>
+                          </li>
+                        <% end %>
+                      <% end %>
+                    </ul>
+                  </div>
                 </:actions>
               </.session_row>
             </div>

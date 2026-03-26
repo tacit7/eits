@@ -183,7 +183,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
           <summary class="flex items-center justify-center w-6 h-6 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/8 cursor-pointer list-none transition-colors">
             <.icon name="hero-ellipsis-horizontal-mini" class="w-3.5 h-3.5" />
           </summary>
-          <div class="dropdown-content z-50 mt-1 w-48 rounded-xl bg-base-300 dark:bg-[hsl(220,13%,18%)] shadow-xl p-1.5 flex flex-col gap-0.5">
+          <div class="dropdown-content z-50 mt-1 w-48 rounded-xl bg-base-300 shadow-xl p-1.5 flex flex-col gap-0.5">
             <%!-- Open card --%>
             <button
               type="button"
@@ -247,7 +247,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
                     >
                       <span
                         class="w-2 h-2 rounded-full flex-shrink-0"
-                        style={"background-color: #{state.color || "#6B7280"}"}
+                        style={"background-color: #{state.color || "hsl(var(--bc) / 0.3)"}"}
                       />
                       {state.name}
                     </button>
@@ -290,7 +290,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
         <%= for tag <- Enum.take(@task.tags, 3) do %>
           <span
             class="text-[10px] px-1.5 py-0.5 rounded font-medium leading-none"
-            style={"background-color: #{tag.color || "#6B7280"}26; color: #{tag.color || "#6B7280"}"}
+            style={"background-color: #{tag.color || "hsl(var(--bc) / 0.3)"}26; color: #{tag.color || "hsl(var(--bc) / 0.3)"}"}
           >
             {tag.name}
           </span>
@@ -437,7 +437,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
   end
 
   defp card_class("kanban") do
-    "group/card card bg-base-200 dark:bg-[hsl(225,10%,28%)] hover:bg-base-300 dark:hover:bg-[hsl(225,10%,32%)] border border-base-content/8 transition-all cursor-pointer"
+    "group/card card bg-base-200 hover:bg-base-300 border border-base-content/8 transition-all cursor-pointer"
   end
 
   defp card_class("grid") do
@@ -459,9 +459,9 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
 
   defp priority_bar_color(priority) do
     cond do
-      priority >= 3 -> "#EF4444"
-      priority == 2 -> "#F59E0B"
-      priority == 1 -> "#3B82F6"
+      priority >= 3 -> "hsl(var(--er))"
+      priority == 2 -> "hsl(var(--wa))"
+      priority == 1 -> "hsl(var(--in))"
       true -> "transparent"
     end
   end

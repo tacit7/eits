@@ -104,7 +104,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
       <div class="sm:flex sm:items-center sm:justify-between mb-6">
         <div class="sm:flex-auto">
           <div class="flex items-center gap-3">
-            <h1 class="text-2xl font-semibold leading-6 text-gray-900 dark:text-gray-100">
+            <h1 class="text-2xl font-semibold leading-6 text-base-content">
               {@prompt.name}
             </h1>
             <%= if is_nil(@prompt.project_id) do %>
@@ -116,7 +116,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
           </div>
 
           <%= if @prompt.description do %>
-            <p class="mt-2 text-sm text-gray-700 dark:text-gray-400">
+            <p class="mt-2 text-sm text-base-content/70">
               {@prompt.description}
             </p>
           <% end %>
@@ -188,14 +188,14 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         <div class="card bg-base-200">
           <div class="card-body p-4">
-            <div class="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Slug</div>
+            <div class="text-xs text-base-content/50 uppercase font-semibold">Slug</div>
             <code class="text-sm font-mono mt-1">{@prompt.slug}</code>
           </div>
         </div>
 
         <div class="card bg-base-200">
           <div class="card-body p-4">
-            <div class="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">
+            <div class="text-xs text-base-content/50 uppercase font-semibold">
               Version
             </div>
             <div class="text-lg font-semibold mt-1">v{@prompt.version}</div>
@@ -204,7 +204,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
 
         <div class="card bg-base-200">
           <div class="card-body p-4">
-            <div class="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">
+            <div class="text-xs text-base-content/50 uppercase font-semibold">
               Created
             </div>
             <div class="text-sm mt-1" title={format_datetime_full(@prompt.created_at)}>
@@ -215,7 +215,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
 
         <div class="card bg-base-200">
           <div class="card-body p-4">
-            <div class="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">
+            <div class="text-xs text-base-content/50 uppercase font-semibold">
               Updated
             </div>
             <div class="text-sm mt-1" title={format_datetime_full(@prompt.updated_at)}>
@@ -299,7 +299,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 mt-4">
               <%= if @prompt.tags do %>
                 <div>
-                  <div class="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold mb-2">
+                  <div class="text-xs text-base-content/50 uppercase font-semibold mb-2">
                     Tags
                   </div>
                   <div class="text-sm">{@prompt.tags}</div>
@@ -308,7 +308,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
 
               <%= if @prompt.created_by do %>
                 <div>
-                  <div class="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold mb-2">
+                  <div class="text-xs text-base-content/50 uppercase font-semibold mb-2">
                     Created By
                   </div>
                   <div class="text-sm">{@prompt.created_by}</div>
@@ -317,7 +317,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
 
               <%= if @prompt.project_id do %>
                 <div>
-                  <div class="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold mb-2">
+                  <div class="text-xs text-base-content/50 uppercase font-semibold mb-2">
                     Project ID
                   </div>
                   <div class="text-sm font-mono">{@prompt.project_id}</div>

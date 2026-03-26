@@ -67,7 +67,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
     </div>
 
     <%= if length(@notes) > 0 do %>
-      <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-5">
+      <div class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5">
         <%= for note <- @notes do %>
           <div class="py-1 flex items-start gap-1">
             <%!-- Collapse: title + body --%>

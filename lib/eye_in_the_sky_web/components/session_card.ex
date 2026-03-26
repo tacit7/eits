@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
       <%!-- Row content (slides left on swipe) --%>
       <div
         data-swipe-row
-        class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer bg-inherit relative z-[1] will-change-transform"
+        class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer bg-inherit relative z-[1] will-change-transform md:will-change-auto md:z-auto"
         phx-click={if !@select_mode, do: @click_event}
         phx-value-id={@session.id}
         role="button"

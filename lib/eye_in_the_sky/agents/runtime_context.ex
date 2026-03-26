@@ -20,6 +20,7 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
   - `:bypass_sandbox` — skip all confirmations and sandboxing (Codex only; maps to --dangerously-bypass-approvals-and-sandbox)
   """
 
+  alias EyeInTheSky.Claude.ModelCapabilities
   alias EyeInTheSky.Messages
 
   @known_keys ~w(model effort_level channel_id thinking_budget max_budget_usd agent eits_workflow bypass_sandbox content_blocks)a
@@ -61,7 +62,7 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
       agent: opts[:agent],
       eits_workflow: opts[:eits_workflow],
       bypass_sandbox: opts[:bypass_sandbox] || false,
-      content_blocks: opts[:content_blocks] || [],
+      content_blocks: ModelCapabilities.filter_blocks(opts[:content_blocks] || [], opts[:model]),
       extra_cli_opts: extra
     }
   end

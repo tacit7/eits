@@ -137,7 +137,6 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                     <option value="bypassPermissions">bypassPermissions — skip all prompts</option>
                     <option value="dontAsk">dontAsk — never ask for confirmation</option>
                     <option value="plan">plan — read-only, no file changes</option>
-                    <option value="auto">auto — fully autonomous</option>
                   </select>
                 </div>
 

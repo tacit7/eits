@@ -292,7 +292,6 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
               <option value="bypassPermissions" selected={@permission_mode == "bypassPermissions"}>bypassPermissions — skip all prompts</option>
               <option value="dontAsk" selected={@permission_mode == "dontAsk"}>dontAsk — never ask</option>
               <option value="plan" selected={@permission_mode == "plan"}>plan — read-only</option>
-              <option value="auto" selected={@permission_mode == "auto"}>auto — fully autonomous</option>
             </select>
           </div>
 

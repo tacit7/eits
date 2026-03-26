@@ -500,17 +500,29 @@ defmodule EyeInTheSkyWeb.ChatLive do
     instructions = append_image_paths(base_instructions, uploaded_images)
     agent_type = params["agent_type"] || "claude"
 
-    opts = [
-      agent_type: agent_type,
-      model: model,
-      effort_level: effort_level,
-      max_budget_usd: max_budget_usd,
-      project_id: selected_project_id,
-      project_path: project_path,
-      description: agent_description,
-      instructions: instructions,
-      agent: params["agent"]
-    ]
+    advanced_opts =
+      []
+      |> maybe_opt(:permission_mode, params["permission_mode"])
+      |> maybe_opt(:max_turns, params["max_turns"])
+      |> maybe_opt(:add_dir, params["add_dir"])
+      |> maybe_opt(:mcp_config, params["mcp_config"])
+      |> maybe_opt(:plugin_dir, params["plugin_dir"])
+      |> maybe_opt(:settings_file, params["settings_file"])
+      |> maybe_bool_opt(:chrome, params["chrome"])
+      |> maybe_bool_opt(:sandbox, params["sandbox"])
+
+    opts =
+      [
+        agent_type: agent_type,
+        model: model,
+        effort_level: effort_level,
+        max_budget_usd: max_budget_usd,
+        project_id: selected_project_id,
+        project_path: project_path,
+        description: agent_description,
+        instructions: instructions,
+        agent: params["agent"]
+      ] ++ advanced_opts
 
     case AgentManager.create_agent(opts) do
       {:ok, %{agent: agent, session: session}} ->
@@ -810,6 +822,14 @@ defmodule EyeInTheSkyWeb.ChatLive do
     end)
     |> Enum.sort_by(fn g -> g.project_name end)
   end
+
+  defp maybe_opt(opts, _key, nil), do: opts
+  defp maybe_opt(opts, _key, ""), do: opts
+  defp maybe_opt(opts, key, val), do: opts ++ [{key, val}]
+
+  defp maybe_bool_opt(opts, _key, nil), do: opts
+  defp maybe_bool_opt(opts, key, "true"), do: opts ++ [{key, true}]
+  defp maybe_bool_opt(opts, _key, _), do: opts
 
   defp parse_budget(nil), do: nil
   defp parse_budget(""), do: nil

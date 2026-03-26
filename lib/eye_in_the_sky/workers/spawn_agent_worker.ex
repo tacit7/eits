@@ -55,6 +55,13 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
       |> maybe_put(:allowed_tools, config["allowed_tools"])
       |> maybe_put(:output_format, config["output_format"])
       |> maybe_put(:skip_permissions, config["skip_permissions"])
+      |> maybe_put(:permission_mode, config["permission_mode"])
+      |> maybe_put(:add_dir, config["add_dir"])
+      |> maybe_put(:mcp_config, config["mcp_config"])
+      |> maybe_put(:plugin_dir, config["plugin_dir"])
+      |> maybe_put(:settings_file, config["settings_file"])
+      |> maybe_put(:chrome, config["chrome"])
+      |> maybe_put(:sandbox, config["sandbox"])
 
     log_opts = Keyword.drop(opts, [:instructions])
 

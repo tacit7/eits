@@ -142,9 +142,38 @@ PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. **T
 
 ## Architecture
 
-- `lib/eye_in_the_sky_web/` - Contexts (Sessions, Tasks, Agents, Projects, Notes, Prompts, Commits)
+- `lib/eye_in_the_sky/` - OTP application core (Repo, migrations, application.ex after rename from `eye_in_the_sky_web`)
+- `lib/eye_in_the_sky_web/` - Contexts (Sessions, Tasks, Agents, Projects, Notes, Prompts, Commits, Canvases)
 - `lib/eye_in_the_sky_web_web/` - Web layer (LiveViews, components, router)
 - `lib/eye_in_the_sky_web/search/pg_search.ex` - Full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback (`EyeInTheSkyWeb.Search.PgSearch`)
+
+## OTP App Rename
+
+The OTP application name was renamed from `eye_in_the_sky_web` to `eye_in_the_sky` (commit 554da58). Key impacts:
+
+- `EyeInTheSky.Repo` — Repo module is now under the `EyeInTheSky` namespace (was `EyeInTheSkyWeb.Repo`)
+- Supervision tree references use `EyeInTheSky.Application`
+- The `lib/eye_in_the_sky/` directory houses core OTP app files
+- Context modules under `lib/eye_in_the_sky_web/` continue to use the `EyeInTheSkyWeb.*` namespace
+- Web layer under `lib/eye_in_the_sky_web_web/` uses `EyeInTheSkyWebWeb.*` namespace
+
+## Schema Conventions
+
+### Timestamp Types
+
+All tables use `:utc_datetime_usec` (microsecond precision UTC datetime). Migrations 20260321080000–20260321080200 converted all timestamp columns.
+
+- Use `DateTime.utc_now()` when setting timestamps programmatically
+- When comparing DB values against Elixir datetimes, use `DateTime.from_iso8601/1` to parse ISO8601 strings
+- The `tasks` table uses `created_at`, **not** `inserted_at`
+
+### UUID Columns
+
+All UUID columns were converted from `varchar` to native PostgreSQL `uuid` type (migration 20260322011755). A `source_uuid` field was also added.
+
+- Ecto uses `Ecto.UUID` codec directly for native `uuid` columns — no manual encoding/decoding needed
+- Queries using UUID values pass them as plain strings; Ecto handles the codec
+- The `source_uuid` field tracks the originating session/agent UUID for cross-referencing
 
 ## PubSub
 

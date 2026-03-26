@@ -507,6 +507,55 @@ query = Task |> maybe_where(“title”, “bug fix”) |> Repo.all()
 
 ## Module Architecture
 
+### Provider Strategy
+
+**ProviderStrategy** (`lib/eye_in_the_sky/claude/provider_strategy.ex`): Handles provider-polymorphic dispatch for Claude vs Codex. Extracted to allow clean separation of provider logic.
+
+Provider implementations:
+- `ProviderStrategy.Claude` — Claude SDK stream dispatch and avatar/label rendering
+- `ProviderStrategy.Codex` — Codex streaming pipeline via `CodexStreamAssembler`
+
+Use `ProviderStrategy` when branching on `provider` field. Do not inline `if provider == "claude"` checks in LiveViews.
+
+---
+
+### Context Extractions (Tasks)
+
+Contexts extracted from the monolithic `Tasks` context:
+
+| Module | Path | Responsibility |
+|--------|------|----------------|
+| `WorkflowStates` | `lib/eye_in_the_sky_web/workflow_states.ex` | Kanban state definitions and transitions |
+| `TaskTags` | `lib/eye_in_the_sky_web/task_tags.ex` | Tag CRUD and task-tag join table operations |
+| `ChecklistItems` | `lib/eye_in_the_sky_web/checklist_items.ex` | Checklist item CRUD scoped to tasks |
+
+These replace direct `Tasks.*` calls for tag/checklist/state operations in new code.
+
+---
+
+### Chat Presenter
+
+**ChatPresenter** (`lib/eye_in_the_sky_web_web/live/chat_presenter.ex`): Extracted chat presentation logic from `ChatLive`. Handles message formatting, typing indicator state, and ambient message filtering.
+
+- Ambient channel messages no longer trigger agent responses — only `@direct` and `@all` mentions do
+- Message numbering is per-channel and sequential (with backfill migration)
+
+---
+
+### JobsHelpers
+
+**JobsHelpers** (`lib/eye_in_the_sky_web_web/live/shared/jobs_helpers.ex`): Unified job creation logic, replacing duplicate implementations in `OverviewLive.Jobs` and `ProjectLive.Jobs`.
+
+Key functions:
+- `create_with_claude/2` — spawns an agent to work on a job using selected model + effort level
+- `save_job/2` — persists a job with validated attributes
+
+**When to use:**
+- Call `JobsHelpers.create_with_claude/2` from any LiveView that needs to spawn an agent for a job
+- Do not duplicate the spawn logic inline in individual LiveViews
+
+---
+
 ### Agent Management Modules
 
 **AgentManager** (`lib/eye_in_the_sky_web/agents/agent_manager.ex`): Primary module for agent lifecycle management and spawning.
@@ -597,6 +646,53 @@ Use `ViewHelpers.model_display_name/1` to render human-readable model names in U
 **Both buttons available on:**
 - `/notes` (overview)
 - `/projects/:id/notes` (project-scoped)
+
+---
+
+## UI Component Patterns
+
+### Action Dropdown Menu (Session Row / Kanban Card)
+
+Session rows and kanban cards use a `...` dropdown menu for destructive/secondary actions (rename, delete, archive) instead of inline icon buttons.
+
+**Pattern:**
+- The row/card itself is a clickable navigation target
+- Secondary actions live in a `...` button that opens a dropdown
+- The dropdown must call `phx-capture-click` or `JS.stop_propagation()` so clicking a menu item does **not** also trigger row navigation
+
+**Click propagation guard (rename form):**
+
+When an inline rename form is open inside a clickable row, stop click propagation on the form to prevent the row's navigation handler from firing:
+
+```heex
+<form
+  phx-submit=”rename_session”
+  phx-capture-click=”noop”
+>
+  <input phx-change=”update_rename_input” ... />
+</form>
+```
+
+Using `phx-capture-click=”noop”` (or `JS.stop_propagation()`) ensures clicks inside the rename form don't bubble up to the row's `phx-click` handler.
+
+### stream_insert Re-render Behavior
+
+When using `stream_insert` to update a session row (e.g., after rename or status change), LiveView re-renders the entire stream item. This means:
+
+- Any open state (dropdowns, inline forms) in that stream item will close on re-render
+- Design flows to complete (submit or cancel) before a stream update arrives
+- Use `stream_insert(socket, :sessions, updated_session)` to push updates; do NOT reset the full stream on single-item updates
+
+---
+
+## Kanban Card Actions (Trello-style Dropdown)
+
+Kanban task cards use a `...` overflow menu for actions (copy, delete, move) instead of always-visible icon buttons.
+
+**UX pattern:**
+- Menu button appears on card hover (desktop) or is always visible on mobile
+- Opening the menu stops click propagation so the card click (navigate to task) doesn't fire
+- Consistent with the session row dropdown pattern above
 
 ---
 

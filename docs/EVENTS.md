@@ -35,6 +35,7 @@ Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session_id}")
 | `"scheduled_jobs"` | `subscribe_scheduled_jobs/0` | Workers, `JobHelper` | JobsLive |
 | `"session_lifecycle"` | `subscribe_session_lifecycle/0` | `WorkerEvents` | Teams.Subscriber |
 | `"tool_approvals"` | `subscribe_tool_approvals/0` | _(not yet implemented)_ | _(not yet implemented)_ |
+| `"canvas:<id>"` | `subscribe_canvas/1` | `Canvases`, `CanvasOverlayComponent` | CanvasOverlayComponent, ChatWindowComponent |
 
 ---
 
@@ -149,6 +150,19 @@ Two payload shapes exist for historical reasons — see [Known inconsistency](#k
 | Payload | Meaning |
 |---|---|
 | `{:session_idle, session_id}` | Session transitioned to idle (completed or errored) |
+
+### `"canvas:<id>"` _(id = integer canvas PK)_
+
+Canvas events sync floating session window state across connected clients.
+
+| Payload | Broadcaster | Meaning |
+|---|---|---|
+| `{:agent_updated, agent}` | `Canvases`, `Agents` | Agent status changed; floating windows re-render live status badges |
+| `{:session_updated, session}` | `Canvases`, `Sessions` | Session record changed (name, status); floating window title/state refreshed |
+| `{:canvas_session_updated, canvas_session}` | `Canvases` | Window position/size/z-index persisted; other clients sync layout |
+| `{:canvas_session_removed, canvas_session}` | `Canvases` | Floating window closed; other clients remove the window from canvas |
+
+These events drive the `CanvasOverlayComponent` drag/resize/z-index sync. Client-side state for position and size is also managed by `chat_window_hook.js`; the PubSub events are for server-side persistence and cross-client sync only.
 
 ---
 

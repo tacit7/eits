@@ -50,6 +50,22 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     {:noreply, assign(socket, selected_prompt_id: nil, prefill_text: "")}
   end
 
+  def handle_event("project_changed", %{"project_id" => project_id_str}, socket) do
+    projects = socket.assigns[:projects] || []
+
+    project_path =
+      case Integer.parse(project_id_str) do
+        {id, ""} ->
+          project = Enum.find(projects, fn p -> p.id == id end)
+          project && project.path
+
+        _ ->
+          nil
+      end
+
+    {:noreply, assign(socket, :available_agents, list_agents(project_path))}
+  end
+
   def handle_event("prompt_selected", %{"prompt_id" => prompt_id}, socket) do
     prompts = socket.assigns[:prompts] || []
     prompt = Enum.find(prompts, fn p -> to_string(p.id) == prompt_id end)
@@ -208,7 +224,13 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
             <% else %>
               <div>
                 <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Project</label>
-                <select name="project_id" class="select select-bordered w-full" required>
+                <select
+                  name="project_id"
+                  class="select select-bordered w-full"
+                  required
+                  phx-change="project_changed"
+                  phx-target={@myself}
+                >
                   <option value="">Select project...</option>
                   <%= for project <- @projects || [] do %>
                     <option value={project.id}>{project.name}</option>

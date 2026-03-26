@@ -100,7 +100,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   @impl true
   def handle_event("save_setting", %{"key" => key, "value" => value}, socket) do
-    # Convert seconds to milliseconds for timeout storage
+    # Convert seconds to milliseconds for timeout storage; 0 means no timeout
     value =
       if key == "cli_idle_timeout_ms" do
         case Integer.parse(value) do
@@ -355,7 +355,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
             <div>
               <p class="text-sm font-medium text-base-content">CLI Idle Timeout</p>
               <p class="text-xs text-base-content/50 mt-0.5">
-                How long before an idle Claude process is killed (seconds)
+                How long before an idle Claude process is killed (seconds). 0 = no timeout.
               </p>
             </div>
             <div class="flex items-center gap-2">
@@ -368,14 +368,14 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
                     div(
                       String.to_integer(
                         case @settings["cli_idle_timeout_ms"] do
-                          v when v in [nil, ""] -> "300000"
+                          v when v in [nil, ""] -> "0"
                           v -> v
                         end
                       ),
                       1000
                     )
                   }
-                  min="30"
+                  min="0"
                   max="3600"
                   step="30"
                   class="input input-bordered input-sm w-24 text-right"

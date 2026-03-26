@@ -23,7 +23,7 @@ defmodule EyeInTheSky.Codex.CLI do
   @type cli_opts :: keyword()
   @type spawn_result :: {:ok, port(), reference()} | {:error, term()}
 
-  @default_idle_timeout_ms 300_000
+  @default_idle_timeout_ms :infinity
   @standard_paths [
     "/usr/local/bin/codex",
     "/opt/homebrew/bin/codex",
@@ -215,10 +215,21 @@ defmodule EyeInTheSky.Codex.CLI do
     caller = Keyword.get(opts, :caller, self())
     session_ref = Keyword.get(opts, :session_ref, make_ref())
 
+    raw_timeout = EyeInTheSky.Settings.get_integer("cli_idle_timeout_ms")
+
+    default_timeout =
+      cond do
+        raw_timeout == 0 -> :infinity
+        is_integer(raw_timeout) and raw_timeout > 0 -> raw_timeout
+        true -> @default_idle_timeout_ms
+      end
+
     idle_timeout_ms =
-      case Keyword.get(opts, :idle_timeout_ms, @default_idle_timeout_ms) do
+      case Keyword.get(opts, :idle_timeout_ms, default_timeout) do
+        0 -> :infinity
         n when is_integer(n) and n > 0 -> n
-        _ -> @default_idle_timeout_ms
+        :infinity -> :infinity
+        _ -> default_timeout
       end
 
     case find_codex_binary() do

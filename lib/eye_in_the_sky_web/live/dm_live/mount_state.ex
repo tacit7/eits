@@ -99,7 +99,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
   # even if an AgentWorker happens to still be in :running state (race condition
   # between SessionEnd hook and SDK completion message). For non-terminal states,
   # fall through to the worker check as a real-time signal.
-  @terminal_statuses ~w(waiting stopped completed failed error archived)
+  @terminal_statuses ~w(idle waiting stopped completed failed error archived)
 
   defp initial_processing?(%{status: status, id: session_id}) do
     if status in @terminal_statuses do

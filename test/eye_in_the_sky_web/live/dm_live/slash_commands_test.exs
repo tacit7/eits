@@ -41,10 +41,10 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommandsTest do
       assert session == [{:sandbox, true}]
     end
 
-    test "/no-sandbox is consumed (does not leak into body)" do
+    test "/no-sandbox clears sandbox toggle" do
       {_server, session, body} = SlashCommands.parse("/no-sandbox")
       assert body == ""
-      assert session == [{:_noop, true}]
+      assert session == [{:_clear, :sandbox}]
     end
 
     test "session flag /chrome and /no-chrome" do
@@ -131,7 +131,7 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommandsTest do
     test "/no-sandbox is consumed, not leaked" do
       {_server, session, body} = SlashCommands.parse("/no-sandbox\nhello")
       assert body == "hello"
-      assert session == [{:_noop, true}]
+      assert session == [{:_clear, :sandbox}]
     end
   end
 

@@ -493,6 +493,11 @@ defmodule EyeInTheSkyWeb.DmLive do
   defp apply_session_opts([{:_noop, _} | rest], socket),
     do: apply_session_opts(rest, socket)
 
+  defp apply_session_opts([{:_clear, key} | rest], socket) do
+    updated = Keyword.delete(socket.assigns.session_cli_opts, key)
+    apply_session_opts(rest, assign(socket, :session_cli_opts, updated))
+  end
+
   defp apply_session_opts([{k, v} | rest], socket) do
     updated = Keyword.put(socket.assigns.session_cli_opts, k, v)
     apply_session_opts(rest, assign(socket, :session_cli_opts, updated))

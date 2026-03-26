@@ -59,9 +59,9 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
   # Session-level CLI flags: stored in session_cli_opts and applied to every message
   def route("plan", _), do: {:session, {:permission_mode, "plan"}}
   def route("sandbox", _), do: {:session, {:sandbox, true}}
-  # no-op: --no-sandbox only applies to remote-control mode; sandbox is off by default.
-  # Still consumed so it doesn't leak into the message text.
-  def route("no-sandbox", _), do: {:session, {:_noop, true}}
+  # --no-sandbox doesn't apply to -p mode, but we still need to clear
+  # a prior /sandbox toggle. :_clear tells apply_session_opts to remove the key.
+  def route("no-sandbox", _), do: {:session, {:_clear, :sandbox}}
   def route("chrome", _), do: {:session, {:chrome, true}}
   def route("no-chrome", _), do: {:session, {:chrome, false}}
 

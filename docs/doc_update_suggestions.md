@@ -1,5 +1,18 @@
 # Documentation Update Suggestions
 
+## 2026-03-26
+**Commits reviewed**: 624313367941bf1280bd1f090c450e2b3d67594a..9a92b45
+
+- **NEW: docs/CANVAS_OVERLAY.md** — Document floating session windows feature: Canvas/CanvasSession schemas (`lib/eye_in_the_sky_web/canvases.ex`), CanvasOverlayComponent with drag/resize/z-index handling, ChatWindowComponent, WebSocket state sync via agent_updated/session_updated PubSub events, chat_window_hook.js for client-side state management, position/size persistence in CanvasSession records. Include UI pattern for floating windows and z-index stacking.
+- **CLAUDE.md or ARCHITECTURE.md** — Document OTP app rename: `eye_in_the_sky_web` → `eye_in_the_sky` (commit 554da58). Update import statements and supervision tree references if documented separately.
+- **SETUP.md** — Update default port documentation: application now defaults to port 5001 (was 5000); document PORT env var override (5001-5020 range) and MCP server endpoint moved to `http://localhost:5001/mcp` (Anubis server).
+- **CLAUDE.md** — Document timestamp field migration: all tables now use `:utc_datetime_usec` type (migrations 20260321080000-080200). Previously mixed datetime/timestamp types; clarify that queries should use `DateTime.utc_now()` and comparisons with ISO8601 strings via `DateTime.from_iso8601/1`.
+- **CLAUDE.md or ARCHITECTURE.md** — Document UUID column migration: varchar UUID columns converted to native Postgres `uuid` type (migration 20260322011755). Include source_uuid field addition and impact on Ecto.UUID codec usage; update example queries.
+- **NEW: docs/AGENT_DEFINITIONS.md** — Document agent definition tracking system: AgentDefinitions context for scanning `.claude/agents/` files, AgentDefinition schema (project_id, scope, filepath, frontmatter parsing), auto-sync on agent spawn when slug not found in DB, YAML list parser for agent lists, scope/project_id constraints, and advisory locks for sync race conditions.
+- **CODE_GUIDELINES.md** — Document UI component improvements: session_card component refactoring with action dropdown menu (replace icon buttons), click propagation guards on edit forms (stop rename form clicks from triggering row navigation), stream_insert re-render behavior in session lists.
+- **SETUP.md** — Document VAPID_PRIVATE_KEY requirement for web push; note migration of key from config/config.exs to runtime.exs environment variables.
+- **EVENTS.md** — Add documentation for canvas-related PubSub events: agent_updated/session_updated broadcasts that sync floating window state across clients.
+
 ## 2026-03-20
 **Commits reviewed**: cdb8acd..6243133
 
@@ -91,7 +104,7 @@
 
 - Add notifications system documentation: new Notifications context (notify, mark_read, mark_all_read, purge_old) and `/api/v1/notifications` endpoints in REST_API.md
 - Document i-notify MCP tool (categories: agent/job/system, resource linking, PubSub broadcasting) in MCP_TOOLS.md
-- Update MCP_TOOLS.md to reflect removed tools: i-nats-send, i-nats-listen, i-nats-send-remote, i-nats-listen-remote, i-spawn-claude
+- Update MCP_TOOLS.md to reflect removed tools: i-nats-send, i-nats-listen, i-nats-send-remote, i-nats-listen-remote, i-nats-spawn-claude
 - Document MCP.Tools.Helpers module for shared session ID resolution across MCP tools
 - Add SessionStore 24h TTL cleanup implementation to ARCHITECTURE.md or MCP_TOOLS.md
 - Document i-todo fixes: project_id auto-resolution, tag linking via task_tags join table, remove-session and add-session-to-tasks commands
@@ -124,3 +137,4 @@
 - Update Session card component documentation: shared session_card component usage across different pages (agent_live/index, project sessions), status indicator styling (colored left border accent), and mobile responsiveness fixes
 - Document Kanban search improvements: lowered threshold to 2 characters, search hint text, and removal of WIP limit display
 - Add mobile UI improvements documentation: FAB (floating action button) navigation to DM page, dark mode code block rendering fixes, and string timestamp handling in session filters
+

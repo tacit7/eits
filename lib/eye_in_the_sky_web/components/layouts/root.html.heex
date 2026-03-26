@@ -1,5 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" data-theme={EyeInTheSky.Settings.get("theme") || "dark"}>
+<html lang="en" data-theme={case EyeInTheSky.Settings.get("theme") do
+  nil -> "dark"
+  "" -> "dark"
+  theme -> theme
+end}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

@@ -32,6 +32,11 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     end
 
     settings = Settings.all()
+    # Normalize empty theme to default
+    if settings["theme"] == "" do
+      Settings.put("theme", "dark")
+    end
+    settings = if settings["theme"] == "", do: Map.put(settings, "theme", "dark"), else: settings
     db_info = load_db_info()
 
     socket =
@@ -118,6 +123,19 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       else
         socket
       end
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("set_theme", %{"theme" => theme}, socket) do
+    Settings.put("theme", theme)
+    settings = Settings.all()
+    socket =
+      socket
+      |> assign(:settings, settings)
+      |> flash_saved("theme")
+      |> push_event("apply_theme", %{theme: theme})
 
     {:noreply, socket}
   end
@@ -277,9 +295,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
             <div class="flex flex-wrap gap-2">
               <button
                 :for={{val, label} <- @themes}
-                phx-click="save_setting"
-                phx-value-key="theme"
-                phx-value-value={val}
+                phx-click="set_theme"
+                phx-value-theme={val}
                 class={"btn btn-sm #{if @settings["theme"] == val, do: "btn-primary", else: "btn-outline"}"}
               >
                 {label}

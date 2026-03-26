@@ -358,4 +358,62 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
       assert "--verbose" in args
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Multimodal content blocks
+  # ---------------------------------------------------------------------------
+
+  describe "build_args with content_blocks" do
+    test "adds --input-format stream-json when content_blocks present" do
+      blocks = [%{"type" => "image", "source" => %{"type" => "base64", "media_type" => "image/png", "data" => "abc"}}]
+      args = CLI.build_args(prompt: "describe this", content_blocks: blocks)
+
+      assert "--input-format" in args
+      assert "stream-json" in args
+    end
+
+    test "does not add --input-format when content_blocks is empty" do
+      args = CLI.build_args(prompt: "hello", content_blocks: [])
+
+      # Should only have the output-format stream-json, not input-format
+      {_flag_indices, input_format_count} =
+        args
+        |> Enum.chunk_every(2, 1, :discard)
+        |> Enum.reduce({[], 0}, fn
+          ["--input-format", _], {acc, count} -> {acc, count + 1}
+          _, {acc, count} -> {acc, count}
+        end)
+
+      assert input_format_count == 0
+    end
+
+    test "does not add --input-format when no content_blocks key" do
+      args = CLI.build_args(prompt: "hello")
+
+      refute "--input-format" in args
+    end
+  end
+
+  describe "content_blocks_json/1" do
+    test "returns nil when no content_blocks" do
+      assert CLI.content_blocks_json(prompt: "hello") == nil
+    end
+
+    test "returns nil for empty content_blocks" do
+      assert CLI.content_blocks_json(prompt: "hello", content_blocks: []) == nil
+    end
+
+    test "returns JSON user message with text and image blocks" do
+      blocks = [%{"type" => "image", "source" => %{"type" => "base64", "media_type" => "image/png", "data" => "iVBOR"}}]
+      json = CLI.content_blocks_json(prompt: "describe this", content_blocks: blocks)
+
+      assert json != nil
+      decoded = Jason.decode!(json)
+      assert decoded["type"] == "user"
+      assert length(decoded["content"]) == 2
+      assert hd(decoded["content"])["type"] == "text"
+      assert hd(decoded["content"])["text"] == "describe this"
+      assert List.last(decoded["content"])["type"] == "image"
+    end
+  end
 end

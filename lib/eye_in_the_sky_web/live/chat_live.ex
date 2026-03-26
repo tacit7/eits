@@ -179,6 +179,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
   def handle_event("send_channel_message", %{"channel_id" => channel_id, "body" => body}, socket) do
     require Logger
     session_id = get_session_id(socket)
+    content_blocks = consume_agent_images_as_content_blocks(socket)
 
     case ChannelMessages.send_channel_message(%{
            channel_id: channel_id,
@@ -227,7 +228,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
             AgentManager.send_message(member.session_id, prompt,
               model: "sonnet",
-              channel_id: channel_id
+              channel_id: channel_id,
+              content_blocks: content_blocks
             )
           end
         end)
@@ -248,6 +250,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
     require Logger
     session_id = get_session_id(socket)
     channel_id = params["channel_id"] || socket.assigns.active_channel_id
+    content_blocks = consume_agent_images_as_content_blocks(socket)
 
     target_session_id =
       case Integer.parse(to_string(target_session_id_str)) do
@@ -268,7 +271,11 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
         if target_session_id do
           prompt = ChannelProtocol.build_prompt(:direct, body)
-          AgentManager.send_message(target_session_id, prompt, channel_id: channel_id)
+
+          AgentManager.send_message(target_session_id, prompt,
+            channel_id: channel_id,
+            content_blocks: content_blocks
+          )
         end
 
         {:noreply, socket}
@@ -835,5 +842,27 @@ defmodule EyeInTheSkyWeb.ChatLive do
   defp append_image_paths(instructions, image_paths) do
     paths = Enum.map_join(image_paths, "\n", fn p -> "- #{p}" end)
     "#{instructions}\n\nAttached images:\n#{paths}"
+  end
+
+  defp consume_agent_images_as_content_blocks(socket) do
+    alias EyeInTheSky.Claude.ContentBlock
+
+    consume_uploaded_entries(socket, :agent_images, fn %{path: temp_path}, entry ->
+      data = File.read!(temp_path)
+      base64 = Base.encode64(data)
+      mime_type = entry.client_type || mime_from_ext(entry.client_name)
+      {:ok, ContentBlock.new_image(base64, mime_type)}
+    end)
+  end
+
+  defp mime_from_ext(filename) do
+    case Path.extname(filename) |> String.downcase() do
+      ".jpg" -> "image/jpeg"
+      ".jpeg" -> "image/jpeg"
+      ".png" -> "image/png"
+      ".gif" -> "image/gif"
+      ".webp" -> "image/webp"
+      _ -> "application/octet-stream"
+    end
   end
 end

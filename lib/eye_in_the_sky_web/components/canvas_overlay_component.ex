@@ -116,7 +116,7 @@ defmodule EyeInTheSkyWeb.Components.CanvasOverlayComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div>
+    <div id="canvas-overlay">
     <%= if @open do %>
       <div style="position: fixed; inset: 0; z-index: 60;" class="bg-base-100/80 backdrop-blur-md flex flex-col">
         <div class="flex items-center justify-between px-4 py-2 border-b border-base-300 bg-base-200/70 shrink-0">

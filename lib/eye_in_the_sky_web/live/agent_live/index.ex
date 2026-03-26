@@ -562,7 +562,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
                     <button tabindex="0" class="btn btn-secondary btn-xs gap-1 md:opacity-0 md:group-hover:opacity-100">
                       <.icon name="hero-squares-2x2" class="w-3 h-3" /> Canvas
                     </button>
-                    <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-10 w-48 p-1 shadow-xl border border-base-300 text-xs">
+                    <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[200] w-48 p-1 shadow-xl border border-base-300 text-xs">
                       <li class="menu-title text-[10px]">Select canvas</li>
                       <%= for canvas <- @canvases do %>
                         <li>

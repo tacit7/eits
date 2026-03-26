@@ -76,6 +76,51 @@ defmodule EyeInTheSkyWeb.OverviewLive.SettingsTest do
     end
   end
 
+  describe "theme settings" do
+    test "renders theme buttons on general tab", %{conn: conn} do
+      {:ok, _lv, html} = live(auth_conn(conn), ~p"/settings")
+      assert html =~ "Appearance"
+      assert html =~ "Theme"
+      for label <- ~w(Dark Light Latte Mocha Macchiato) do
+        assert html =~ label
+      end
+      assert html =~ "Frappé"
+    end
+
+    test "set_theme persists theme to Settings", %{conn: conn} do
+      {:ok, lv, _html} = live(auth_conn(conn), ~p"/settings")
+      lv |> element(~s(button[phx-value-theme="mocha"]), "Mocha") |> render_click()
+      assert EyeInTheSky.Settings.get("theme") == "mocha"
+    end
+
+    test "set_theme updates button active state", %{conn: conn} do
+      {:ok, lv, _html} = live(auth_conn(conn), ~p"/settings")
+      html = lv |> element(~s(button[phx-value-theme="latte"]), "Latte") |> render_click()
+      assert html =~ ~s(btn-primary)
+    end
+
+    test "normalizes empty theme to dark on mount", %{conn: conn} do
+      EyeInTheSky.Settings.put("theme", "")
+      {:ok, _lv, html} = live(auth_conn(conn), ~p"/settings")
+      assert EyeInTheSky.Settings.get("theme") == "dark"
+      assert html =~ "Appearance"
+    end
+  end
+
+  describe "root layout data-theme" do
+    test "renders data-theme from Settings", %{conn: conn} do
+      EyeInTheSky.Settings.put("theme", "macchiato")
+      conn = auth_conn(conn) |> get(~p"/settings")
+      assert html_response(conn, 200) =~ ~s(data-theme="macchiato")
+    end
+
+    test "defaults to dark when theme is nil", %{conn: conn} do
+      EyeInTheSky.Settings.reset("theme")
+      conn = auth_conn(conn) |> get(~p"/settings")
+      assert html_response(conn, 200) =~ ~s(data-theme="dark")
+    end
+  end
+
   describe "editor tab" do
     test "renders preferred editor selector with VS Code option", %{conn: conn} do
       {:ok, _lv, html} = live(auth_conn(conn), ~p"/settings?tab=editor")

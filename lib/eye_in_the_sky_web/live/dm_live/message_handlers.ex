@@ -17,11 +17,12 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
   @reload_debounce_ms 300
 
-  def handle_send_message(body, socket, extra_cli_opts \\ []) do
+  def handle_send_message(body, socket) do
     model = socket.assigns.selected_model
     effort_level = socket.assigns.selected_effort
     thinking_enabled = socket.assigns.thinking_enabled
     max_budget_usd = socket.assigns.max_budget_usd
+    extra_cli_opts = socket.assigns[:session_cli_opts] || []
 
     Logger.info(
       "DM send_message received for session=#{socket.assigns.session_id} model=#{model} effort=#{effort_level} body_length=#{String.length(body)}"

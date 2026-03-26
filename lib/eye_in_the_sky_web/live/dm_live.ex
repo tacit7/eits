@@ -164,13 +164,14 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("send_message", %{"body" => body}, socket) when body != "" do
-    {server_cmds, cli_opts, clean_body} = SlashCommands.parse(body)
+    {server_cmds, session_opts, clean_body} = SlashCommands.parse(body)
     socket = apply_server_commands(server_cmds, socket)
+    socket = apply_session_opts(session_opts, socket)
 
     trimmed = String.trim(clean_body)
 
     if trimmed != "" do
-      MessageHandlers.handle_send_message(trimmed, socket, cli_opts)
+      MessageHandlers.handle_send_message(trimmed, socket)
     else
       {:noreply, push_event(socket, "clear-input", %{})}
     end
@@ -483,4 +484,22 @@ defmodule EyeInTheSkyWeb.DmLive do
   end
 
   defp apply_server_commands([_ | rest], socket), do: apply_server_commands(rest, socket)
+
+  # Merge session-level CLI opts into socket assigns.
+  # _noop entries are dropped. For keyed flags (chrome: false), the value is stored
+  # so --no-chrome fires on every message. Omitting a key entirely means no flag sent.
+  defp apply_session_opts([], socket), do: socket
+
+  defp apply_session_opts([{:_noop, _} | rest], socket),
+    do: apply_session_opts(rest, socket)
+
+  defp apply_session_opts([{:_clear, key} | rest], socket) do
+    updated = Keyword.delete(socket.assigns.session_cli_opts, key)
+    apply_session_opts(rest, assign(socket, :session_cli_opts, updated))
+  end
+
+  defp apply_session_opts([{k, v} | rest], socket) do
+    updated = Keyword.put(socket.assigns.session_cli_opts, k, v)
+    apply_session_opts(rest, assign(socket, :session_cli_opts, updated))
+  end
 end

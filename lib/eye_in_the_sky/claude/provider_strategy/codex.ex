@@ -82,7 +82,13 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
   defp maybe_add_content_blocks(opts, []), do: opts
 
   defp maybe_add_content_blocks(opts, content_blocks) when is_list(content_blocks) do
-    formatted = Enum.map(content_blocks, &format_content/1)
-    Keyword.put(opts, :content_blocks, formatted)
+    # Codex CLI does not support multimodal input — content blocks are stripped
+    # with a warning rather than silently dropped. format_content/1 exists for
+    # future use when Codex adds multimodal support.
+    Logger.warning(
+      "[Codex] Stripping #{length(content_blocks)} content block(s): Codex CLI does not support multimodal input"
+    )
+
+    opts
   end
 end

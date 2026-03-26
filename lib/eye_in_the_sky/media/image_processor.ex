@@ -49,28 +49,35 @@ defmodule EyeInTheSky.Media.ImageProcessor do
 
   @doc """
   Processes a single image block. Returns the block unchanged if already
-  within limits or if ImageMagick is not available.
+  within limits or if ImageMagick is not available. Gracefully handles
+  invalid base64 data by returning the block as-is.
   """
   @spec process_image(ContentBlock.Image.t(), pos_integer()) :: ContentBlock.Image.t()
   def process_image(%ContentBlock.Image{data: data, mime_type: mime_type} = block, max_dim \\ @max_dimension) do
-    raw = Base.decode64!(data)
-    raw_size = byte_size(raw)
+    case Base.decode64(data) do
+      {:ok, raw} ->
+        raw_size = byte_size(raw)
 
-    cond do
-      raw_size > @hard_limit_bytes ->
-        Logger.warning("[ImageProcessor] Image exceeds hard limit (#{raw_size} bytes), attempting resize")
-        resize_and_compress(raw, mime_type, max_dim)
+        cond do
+          raw_size > @hard_limit_bytes ->
+            Logger.warning("[ImageProcessor] Image exceeds hard limit (#{raw_size} bytes), attempting resize")
+            resize_and_compress(raw, mime_type, max_dim)
 
-      raw_size > @target_bytes ->
-        Logger.info("[ImageProcessor] Image above target (#{raw_size} bytes), compressing")
-        resize_and_compress(raw, mime_type, max_dim)
+          raw_size > @target_bytes ->
+            Logger.info("[ImageProcessor] Image above target (#{raw_size} bytes), compressing")
+            resize_and_compress(raw, mime_type, max_dim)
 
-      true ->
-        # Within limits, just normalize EXIF orientation
-        case auto_orient(raw, mime_type) do
-          {:ok, oriented} -> %ContentBlock.Image{data: Base.encode64(oriented), mime_type: mime_type}
-          :error -> block
+          true ->
+            # Within limits, just normalize EXIF orientation
+            case auto_orient(raw, mime_type) do
+              {:ok, oriented} -> %ContentBlock.Image{data: Base.encode64(oriented), mime_type: mime_type}
+              :error -> block
+            end
         end
+
+      :error ->
+        Logger.warning("[ImageProcessor] Invalid base64 data, passing through unchanged")
+        block
     end
   end
 
@@ -85,8 +92,7 @@ defmodule EyeInTheSky.Media.ImageProcessor do
     end
   end
 
-  defp do_resize_and_compress(raw, _mime_type, max_dim) do
-    # Write source to temp file
+  defp do_resize_and_compress(raw, original_mime_type, max_dim) do
     src = temp_path("src")
     File.write!(src, raw)
 
@@ -116,11 +122,13 @@ defmodule EyeInTheSky.Media.ImageProcessor do
                 end
 
               {:error, _} ->
+                File.rm(dst)
                 {:cont, nil}
             end
 
           {err, _} ->
             Logger.warning("[ImageProcessor] convert failed: #{err}")
+            File.rm(dst)
             {:halt, :error}
         end
       end)
@@ -133,9 +141,9 @@ defmodule EyeInTheSky.Media.ImageProcessor do
         %ContentBlock.Image{data: Base.encode64(processed), mime_type: "image/jpeg"}
 
       _ ->
-        # Fallback: return original
+        # Fallback: return original data with original mime type (not forced jpeg)
         Logger.warning("[ImageProcessor] All quality steps exceeded target, using original")
-        %ContentBlock.Image{data: Base.encode64(raw), mime_type: "image/jpeg"}
+        %ContentBlock.Image{data: Base.encode64(raw), mime_type: original_mime_type}
     end
   end
 

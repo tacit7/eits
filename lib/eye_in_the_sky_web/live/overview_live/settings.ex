@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     {"dark", "Dark"},
     {"light", "Light"},
     {"dracula", "Dracula"},
+    {"tokyonight", "Tokyo Night"},
     {"latte", "Latte"},
     {"frappe", "Frappé"},
     {"macchiato", "Macchiato"},

@@ -33,7 +33,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :commits, :list, default: []
   attr :diff_cache, :map, default: %{}
   attr :notes, :list, default: []
-  attr :show_live_stream, :boolean, default: false
+  attr :show_live_stream, :boolean, default: true
   attr :stream_content, :string, default: ""
   attr :stream_tool, :string, default: nil
   attr :stream_thinking, :string, default: nil
@@ -53,6 +53,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :message_search_query, :string, default: ""
   attr :session_context, :map, default: nil
   attr :reloading, :boolean, default: false
+  attr :agent_record, :map, default: nil
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
 
@@ -129,15 +130,20 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           <%= if @agent.entrypoint == "cli" do %>
             <.icon name="hero-command-line" class="w-3.5 h-3.5 text-base-content/40 flex-shrink-0" />
           <% end %>
-          <input
-            type="text"
-            value={@agent.name || ""}
-            placeholder="Session name"
-            phx-blur="update_session_name"
-            phx-keydown={JS.push("update_session_name") |> JS.focus(to: "#message-input")}
-            phx-key="Enter"
-            class="text-sm font-semibold text-base-content/85 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 flex-1 text-center placeholder:text-base-content/20 transition-colors"
-          />
+          <div class="flex flex-col items-center min-w-0 flex-1">
+            <input
+              type="text"
+              value={@agent.name || ""}
+              placeholder="Session name"
+              phx-blur="update_session_name"
+              phx-keydown={JS.push("update_session_name") |> JS.focus(to: "#message-input")}
+              phx-key="Enter"
+              class="text-sm font-semibold text-base-content/85 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 w-full text-center placeholder:text-base-content/20 transition-colors"
+            />
+            <%= if @agent_record && is_map(@agent_record.agent_definition) && not match?(%Ecto.Association.NotLoaded{}, @agent_record.agent_definition) && @agent_record.agent_definition.display_name do %>
+              <span class="text-[10px] text-base-content/35 truncate">{@agent_record.agent_definition.display_name}</span>
+            <% end %>
+          </div>
         </div>
         <div class="dropdown dropdown-end">
           <button
@@ -249,23 +255,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               </div>
             </div>
             <div class="flex items-center gap-1 flex-shrink-0">
-              <button
-                phx-click="toggle_live_stream"
-                phx-hook="LiveStreamToggle"
-                id="dm-live-stream-toggle"
-                class={[
-                  "flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs transition-colors",
-                  @show_live_stream && "text-primary bg-primary/10 hover:bg-primary/15",
-                  !@show_live_stream &&
-                    "text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5"
-                ]}
-              >
-                <.icon
-                  name={if @show_live_stream, do: "hero-signal-solid", else: "hero-signal"}
-                  class="w-3.5 h-3.5"
-                />
-                <span class="hidden sm:inline">Live</span>
-              </button>
               <button
                 phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
                 class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
@@ -502,6 +491,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             total_cost={@total_cost}
             context_used={@context_used}
             context_window={@context_window}
+            display_name={if @agent_record && is_map(@agent_record.agent_definition) && not match?(%Ecto.Association.NotLoaded{}, @agent_record.agent_definition), do: @agent_record.agent_definition.display_name}
           />
         </div>
       <% end %>

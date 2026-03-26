@@ -17,6 +17,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
   attr :total_cost, :float, default: 0.0
   attr :context_used, :integer, default: 0
   attr :context_window, :integer, default: 0
+  attr :display_name, :string, default: nil
 
   def message_form(assigns) do
     ~H"""
@@ -28,6 +29,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
       data-slash-items={Jason.encode!(@slash_items)}
       phx-hook="DmComposer"
     >
+      <%= if @display_name do %>
+        <div class="flex justify-end px-4 pt-2">
+          <span class="text-[11px] text-base-content/35 bg-base-content/5 px-2 py-0.5 rounded">{@display_name}</span>
+        </div>
+      <% end %>
       <%!-- Upload previews --%>
       <%= if @uploads.files.entries != [] do %>
         <div class="px-4 pt-3 flex flex-wrap gap-2" id="upload-preview-list">

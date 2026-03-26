@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
     ~H"""
     <div
       id={"swipe-row-#{@session.id}"}
-      class={"relative overflow-hidden bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] border-l-2 pl-2 " <> @status_border}
+      class={"relative overflow-hidden md:overflow-visible bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] border-l-2 pl-2 " <> @status_border}
       phx-hook="SwipeRow"
     >
       <%!-- Action panel (mobile only, sits behind the row, revealed by swipe) --%>
@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
       <%!-- Row content (slides left on swipe) --%>
       <div
         data-swipe-row
-        class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer bg-inherit relative z-[1] will-change-transform"
+        class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer bg-inherit relative z-[1] will-change-transform md:will-change-auto md:z-auto"
         phx-click={if !@select_mode, do: @click_event}
         phx-value-id={@session.id}
         role="button"
@@ -169,6 +169,10 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
             <span class="text-base-content/15">/</span>
             <%= if Map.get(@session, :entrypoint) == "cli" do %>
               <.icon name="hero-command-line" class="w-3 h-3 text-base-content/40 flex-shrink-0" />
+            <% end %>
+            <%= if (agent = Map.get(@session, :agent)) && is_map(Map.get(agent, :agent_definition)) && not match?(%Ecto.Association.NotLoaded{}, Map.get(agent, :agent_definition)) && Map.get(agent.agent_definition, :display_name) do %>
+              <span class="text-base-content/50 truncate">{agent.agent_definition.display_name}</span>
+              <span class="text-base-content/15">/</span>
             <% end %>
             <span class="font-mono">{Sessions.format_model_info(@session)}</span>
             <span class="text-base-content/15">/</span>

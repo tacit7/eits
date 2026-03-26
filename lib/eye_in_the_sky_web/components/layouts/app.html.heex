@@ -14,6 +14,11 @@
     active_channel_id={assigns[:active_channel_id]}
   />
 
+  <.live_component
+    module={EyeInTheSkyWeb.Components.CanvasOverlayComponent}
+    id="canvas-overlay"
+  />
+
   <%!-- Grab handle for swipe-to-open sidebar on mobile.
        touch-action:none prevents Safari from stealing the gesture for back navigation. --%>
   <div

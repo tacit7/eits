@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.DmLive do
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSkyWeb.Components.DmPage
   alias EyeInTheSkyWeb.DmLive.TaskHandlers
-  alias EyeInTheSkyWeb.DmLive.{MountState, MessageHandlers, AgentLifecycle, ExternalActions}
+  alias EyeInTheSkyWeb.DmLive.{MountState, MessageHandlers, AgentLifecycle, ExternalActions, SlashCommands}
   alias EyeInTheSkyWeb.DmLive.TabHelpers
   import EyeInTheSkyWeb.Live.Shared.TasksHelpers
   import EyeInTheSkyWeb.Live.Shared.DmExportHelpers
@@ -164,7 +164,16 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("send_message", %{"body" => body}, socket) when body != "" do
-    MessageHandlers.handle_send_message(body, socket)
+    {server_cmds, cli_opts, clean_body} = SlashCommands.parse(body)
+    socket = apply_server_commands(server_cmds, socket)
+
+    trimmed = String.trim(clean_body)
+
+    if trimmed != "" do
+      MessageHandlers.handle_send_message(trimmed, socket, cli_opts)
+    else
+      {:noreply, push_event(socket, "clear-input", %{})}
+    end
   end
 
   @impl true
@@ -446,4 +455,32 @@ defmodule EyeInTheSkyWeb.DmLive do
       TabHelpers.load_tab_data(socket, "messages", socket.assigns.session_id)
     end
   end
+
+  # Apply server-side commands to socket state
+  defp apply_server_commands([], socket), do: socket
+
+  defp apply_server_commands([{:rename, name} | rest], socket) do
+    socket =
+      case Sessions.update_session(socket.assigns.session, %{name: name}) do
+        {:ok, updated_session} ->
+          socket
+          |> assign(:session, updated_session)
+          |> assign(:page_title, name)
+
+        {:error, _} ->
+          socket
+      end
+
+    apply_server_commands(rest, socket)
+  end
+
+  defp apply_server_commands([{:model, model} | rest], socket) do
+    apply_server_commands(rest, assign(socket, :selected_model, model))
+  end
+
+  defp apply_server_commands([{:effort, level} | rest], socket) do
+    apply_server_commands(rest, assign(socket, :selected_effort, level))
+  end
+
+  defp apply_server_commands([_ | rest], socket), do: apply_server_commands(rest, socket)
 end

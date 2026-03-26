@@ -11,16 +11,18 @@ defmodule EyeInTheSky.Notes.Note do
     field :body, :string
     field :starred, :integer, default: 0
     field :created_at, :utc_datetime_usec
+    field :embedding, Pgvector.Ecto.Vector
+    field :embedding_model, :string
   end
 
   @doc false
   def changeset(note, attrs) do
     note
-    |> cast(attrs, [:uuid, :parent_type, :parent_id, :title, :body, :starred, :created_at])
+    |> cast(attrs, [:uuid, :parent_type, :parent_id, :title, :body, :starred, :created_at, :embedding, :embedding_model])
     |> maybe_generate_uuid()
     |> maybe_set_created_at()
     |> validate_required([:parent_type, :parent_id, :body])
-    |> validate_inclusion(:parent_type, ["session", "task", "agent", "project", "system"])
+    |> validate_inclusion(:parent_type, ["session", "task", "agent", "project", "system", "assistant"])
   end
 
   defp maybe_generate_uuid(changeset) do

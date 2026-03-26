@@ -42,6 +42,8 @@ defmodule EyeInTheSky.Application do
       EyeInTheSky.Messages.Broadcaster,
       # Rate limiter ETS backend for auth endpoint throttling
       EyeInTheSky.RateLimiter,
+      # HTTP client pool (used by EmbedNoteWorker for OpenAI calls)
+      {Finch, name: EyeInTheSky.Finch},
       # Start to serve requests, typically the last entry
       EyeInTheSkyWeb.Endpoint
     ]

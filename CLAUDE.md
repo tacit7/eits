@@ -142,9 +142,10 @@ PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. **T
 
 ## Architecture
 
-- `lib/eye_in_the_sky_web/` - Contexts (Sessions, Tasks, Agents, Projects, Notes, Prompts, Commits)
+- `lib/eye_in_the_sky_web/` - Contexts (Sessions, Tasks, Agents, Projects, Notes, Prompts, Commits, Assistants)
 - `lib/eye_in_the_sky_web_web/` - Web layer (LiveViews, components, router)
 - `lib/eye_in_the_sky_web/search/pg_search.ex` - Full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback (`EyeInTheSkyWeb.Search.PgSearch`)
+- `lib/eye_in_the_sky_web/assistants/` - Assistant layer: tool catalog, policy engine, approval records, memory
 
 ## PubSub
 
@@ -270,3 +271,33 @@ In LiveViews and components:
 - Sessions can be sorted by `last_activity_at`, `created_at`, or `last_message_at`
 - Use `Sessions.list_sessions/2` with `:last_activity_at`, `:created_at`, or `:last_message_at` sort options
 - Filtering works with ISO8601 string values; comparisons use standard string ordering
+
+## Documentation
+
+Project docs live in `docs/`. Key references:
+
+- [docs/SECURITY.md](docs/SECURITY.md) — Security architecture: auth, session handling, rate limiting, secrets, transport security
+- [docs/REST_API.md](docs/REST_API.md) — Full API endpoint reference
+- [docs/SETUP.md](docs/SETUP.md) — Project setup guide
+- [docs/CODE_GUIDELINES.md](docs/CODE_GUIDELINES.md) — Coding standards
+- [docs/EITS_CLI.md](docs/EITS_CLI.md) — CLI reference
+- [docs/EITS_HOOKS.md](docs/EITS_HOOKS.md) — Hook system
+- [docs/DM_FEATURES.md](docs/DM_FEATURES.md) — DM/messaging features
+- [docs/SESSION_MANAGER.md](docs/SESSION_MANAGER.md) — Session lifecycle
+- [docs/WORKERS.md](docs/WORKERS.md) — Background workers
+- [docs/KANBAN.md](docs/KANBAN.md) — Kanban board
+- [docs/COMMAND_PALETTE.md](docs/COMMAND_PALETTE.md) — Command palette
+- [docs/ASSISTANTS.md](docs/ASSISTANTS.md) — Assistant layer: definitions, tool registry, approval inbox, memory
+
+## Assistant Layer
+
+Assistants are reusable agent configurations (prompt + model + tool policy + scope). See [docs/ASSISTANTS.md](docs/ASSISTANTS.md) for full reference.
+
+Key rules when working with the assistant layer:
+
+- **All tool invocations from assistant sessions go through `ToolPolicy.authorize/5`** — never bypass it
+- **`fetch_assistant/1` returns `{:error, :assistant_not_found}` for missing IDs** — callers must handle this; it does not silently fall back to open policy
+- **Tool policy precedence**: denied > requires_approval > allowed > open policy (empty allowed list) > tool catalog default (`requires_approval_default`)
+- **Memory uses notes** with `parent_type: "assistant"` — no new table; filter by `parent_id` and title prefix `[kind]`
+- **Sessions without `assistant_id` skip policy entirely** — ad hoc sessions are unconstrained
+- **PubSub for approvals**: use `Events.tool_approval_requested/1`, `Events.tool_approval_updated/1`, `Events.subscribe_tool_approvals/0` — never call `Phoenix.PubSub` directly

@@ -148,7 +148,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
                 name="search"
                 value={@search}
                 placeholder="Search teams..."
-                class="w-full bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] border-0 rounded-xl py-2.5 pl-9 pr-4 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                class="w-full bg-base-100 border-0 rounded-xl py-2.5 pl-9 pr-4 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:ring-1 focus:ring-primary/30"
                 phx-debounce="150"
               />
             </form>
@@ -157,7 +157,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
           <%!-- Teams list --%>
           <div class="rounded-xl shadow-sm">
             <%= if @filtered_teams == [] do %>
-              <div class="flex flex-col items-center justify-center py-16 px-4 text-center gap-3 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl">
+              <div class="flex flex-col items-center justify-center py-16 px-4 text-center gap-3 bg-base-100 rounded-xl">
                 <div class="w-10 h-10 rounded-full bg-base-200 flex items-center justify-center">
                   <.icon name="hero-user-group" class="w-5 h-5 text-base-content/30" />
                 </div>
@@ -166,7 +166,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
                 </p>
               </div>
             <% else %>
-              <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl px-4">
+              <div class="divide-y divide-base-content/5 bg-base-100 rounded-xl px-4">
                 <%= for team <- @filtered_teams do %>
                   <div class={"relative overflow-hidden border-l-2 #{team_status_border(team.members)}"}>
                     <div class="group flex items-center gap-4 py-3">
@@ -221,7 +221,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
           </button>
 
           <%= if @selected_team do %>
-            <div id="team-detail" class="overflow-hidden rounded-xl bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)]">
+            <div id="team-detail" class="overflow-hidden rounded-xl bg-base-100">
               <.live_component
                 module={EyeInTheSkyWeb.TeamDetailComponent}
                 id="team-detail-component"

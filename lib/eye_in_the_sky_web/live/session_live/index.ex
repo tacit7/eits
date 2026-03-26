@@ -66,33 +66,56 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
 
   @impl true
   def handle_event("rename_session", %{"session_id" => session_id}, socket) do
-    {:noreply, assign(socket, :editing_session_id, String.to_integer(session_id))}
+    session_id_int = String.to_integer(session_id)
+    socket = assign(socket, :editing_session_id, session_id_int)
+
+    socket =
+      case Sessions.get_session_overview_row(session_id_int) do
+        {:ok, row} -> stream_insert(socket, :sessions, row)
+        _ -> socket
+      end
+
+    {:noreply, socket}
   end
 
   @impl true
   def handle_event("save_session_name", %{"session_id" => session_id, "name" => name}, socket) do
     name = String.trim(name)
 
-    socket =
-      if name != "" do
-        case Sessions.get_session(session_id) do
-          {:ok, session} ->
-            Sessions.update_session(session, %{name: name})
-            socket
-
-          _ ->
-            socket
-        end
-      else
-        socket
+    if name != "" do
+      case Sessions.get_session(session_id) do
+        {:ok, session} -> Sessions.update_session(session, %{name: name})
+        _ -> :noop
       end
+    end
 
-    {:noreply, assign(socket, :editing_session_id, nil)}
+    sessions =
+      Sessions.list_session_overview_rows(limit: socket.assigns.page * @per_page, offset: 0)
+
+    total = Sessions.count_session_overview_rows()
+
+    socket =
+      socket
+      |> assign(:editing_session_id, nil)
+      |> assign(:has_more, length(sessions) < total)
+      |> assign(:total_sessions, total)
+      |> stream(:sessions, sessions, reset: true)
+
+    {:noreply, socket}
   end
 
   @impl true
   def handle_event("cancel_rename", _params, socket) do
-    {:noreply, assign(socket, :editing_session_id, nil)}
+    editing_id = socket.assigns.editing_session_id
+    socket = assign(socket, :editing_session_id, nil)
+
+    socket =
+      case editing_id && Sessions.get_session_overview_row(editing_id) do
+        {:ok, row} -> stream_insert(socket, :sessions, row)
+        _ -> socket
+      end
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -233,7 +256,7 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
           <div
             id="sessions-list"
             phx-update="stream"
-            class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl px-4"
+            class="divide-y divide-base-content/5 bg-base-100 rounded-xl px-4"
           >
             <div :for={{dom_id, session} <- @streams.sessions} id={dom_id}>
               <.session_row
@@ -243,14 +266,52 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
                 editing_session_id={@editing_session_id}
               >
                 <:actions>
-                  <.icon_button
-                    icon="hero-archive-box-mini"
-                    on_click="archive_session"
-                    aria_label="Archive"
-                    color="warning"
-                    class="hidden sm:flex"
-                    values={%{"session_id" => session.id}}
-                  />
+                  <div class="md:opacity-0 md:group-hover:opacity-100 relative dropdown dropdown-end transition-all">
+                    <button
+                      tabindex="0"
+                      type="button"
+                      class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/35 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+                      aria-label="More options"
+                      phx-click="noop"
+                    >
+                      <.icon name="hero-ellipsis-horizontal-mini" class="w-4 h-4" />
+                    </button>
+                    <ul
+                      tabindex="0"
+                      class="dropdown-content z-50 menu menu-xs bg-base-200 border border-base-content/10 rounded-lg shadow-lg w-44 p-1"
+                    >
+                      <%= if session.id do %>
+                        <li>
+                          <a href={~p"/dm/#{session.id}"} target="_blank" class="flex items-center gap-2">
+                            <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
+                            Open in new tab
+                          </a>
+                        </li>
+                      <% end %>
+                      <li>
+                        <button
+                          type="button"
+                          phx-click="rename_session"
+                          phx-value-session_id={session.id}
+                          class="flex items-center gap-2"
+                        >
+                          <.icon name="hero-pencil-square-mini" class="w-3.5 h-3.5" />
+                          Rename
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          type="button"
+                          phx-click="archive_session"
+                          phx-value-session_id={session.id}
+                          class="flex items-center gap-2 text-warning"
+                        >
+                          <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
+                          Archive
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
                 </:actions>
               </.session_row>
             </div>

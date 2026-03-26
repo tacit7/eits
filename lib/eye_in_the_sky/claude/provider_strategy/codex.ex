@@ -16,7 +16,12 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
 
     opts = build_opts(state, context)
 
-    full_prompt = Codex.SDK.eits_init_prompt(state) <> "\n\n---\n\n" <> prompt
+    full_prompt =
+      if (context[:eits_workflow] || "1") != "0" do
+        Codex.SDK.eits_init_prompt(state) <> "\n\n---\n\n" <> prompt
+      else
+        prompt
+      end
 
     Logger.info("Starting new Codex session #{state.provider_conversation_id}")
     Codex.SDK.start(full_prompt, opts)

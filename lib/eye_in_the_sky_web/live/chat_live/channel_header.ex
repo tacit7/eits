@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
   def channel_header(assigns) do
     ~H"""
     <div
-      class="max-w-6xl mx-auto w-full bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0"
+      class="max-w-6xl mx-auto w-full bg-base-100 rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0"
       id="chat-header-card"
     >
       <div class="px-5 py-3">

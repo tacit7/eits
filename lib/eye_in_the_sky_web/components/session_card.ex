@@ -138,6 +138,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
             <%= if @editing_session_id == @session.id do %>
               <form
                 phx-submit="save_session_name"
+                phx-click="noop"
                 class="flex-1 min-w-0"
               >
                 <%!-- No phx-click-away: it's mouse-only and won't fire on mobile touch.

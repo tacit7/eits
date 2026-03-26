@@ -341,7 +341,7 @@ defmodule EyeInTheSky.Sessions do
       join: a in assoc(s, :agent),
       left_join: p in EyeInTheSky.Projects.Project,
       on: p.id == a.project_id,
-      where: s.id == ^session_id,
+      where: s.id == ^session_id and is_nil(s.archived_at),
       select: %{
         id: s.id,
         uuid: s.uuid,

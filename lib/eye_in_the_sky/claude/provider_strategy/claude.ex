@@ -90,6 +90,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
         base_opts
       end
 
-    base_opts ++ optional_opts
+    extra = context[:extra_cli_opts] || []
+    base_opts ++ optional_opts ++ extra
   end
 end

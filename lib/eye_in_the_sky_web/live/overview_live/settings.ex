@@ -275,17 +275,15 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
           <div class="card-body px-5 py-4">
             <p class="text-sm font-medium text-base-content mb-3">Theme</p>
             <div class="flex flex-wrap gap-2">
-              <form :for={{val, label} <- @themes} phx-change="save_setting">
-                <input type="hidden" name="key" value="theme" />
-                <button
-                  type="submit"
-                  name="value"
-                  value={val}
-                  class={"btn btn-sm #{if @settings["theme"] == val, do: "btn-primary", else: "btn-outline"}"}
-                >
-                  {label}
-                </button>
-              </form>
+              <button
+                :for={{val, label} <- @themes}
+                phx-click="save_setting"
+                phx-value-key="theme"
+                phx-value-value={val}
+                class={"btn btn-sm #{if @settings["theme"] == val, do: "btn-primary", else: "btn-outline"}"}
+              >
+                {label}
+              </button>
             </div>
           </div>
         </div>

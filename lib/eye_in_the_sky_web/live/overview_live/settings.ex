@@ -15,6 +15,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   @themes [
     {"dark", "Dark"},
     {"light", "Light"},
+    {"dracula", "Dracula"},
     {"latte", "Latte"},
     {"frappe", "Frappé"},
     {"macchiato", "Macchiato"},

@@ -335,6 +335,15 @@ defmodule EyeInTheSky.Claude.CLI do
     end
   end
 
+  defp maybe_pipe_content_blocks(port, opts) do
+    case content_blocks_json(opts) do
+      nil -> :ok
+      json ->
+        Port.command(port, json <> "\n")
+        Logger.info("[CLI] Piped multimodal content blocks to stdin (#{byte_size(json)} bytes)")
+    end
+  end
+
   defp maybe_flag(args, _flag, nil), do: args
   defp maybe_flag(args, _flag, ""), do: args
   defp maybe_flag(args, flag, value), do: args ++ [flag, to_string(value)]
@@ -488,6 +497,11 @@ defmodule EyeInTheSky.Claude.CLI do
               ]
             )
           end
+
+        # When multimodal content blocks are present, pipe the JSON user message
+        # to stdin before handing the port to the handler. This feeds Claude CLI
+        # the structured content via --input-format stream-json.
+        maybe_pipe_content_blocks(port, opts)
 
         Port.connect(port, handler_pid)
         send(handler_pid, {:port, port})

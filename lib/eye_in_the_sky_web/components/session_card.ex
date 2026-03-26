@@ -166,6 +166,8 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
             <% end %>
           </div>
           <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
+            <span class="font-mono tabular-nums text-base-content/30 shrink-0">#{@session.id}</span>
+            <span class="text-base-content/15">/</span>
             <span class={["font-medium shrink-0", @status_class]}>{@status_label}</span>
             <span class="text-base-content/15">/</span>
             <%= if Map.get(@session, :entrypoint) == "cli" do %>

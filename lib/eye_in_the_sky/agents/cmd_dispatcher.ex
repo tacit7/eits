@@ -115,10 +115,10 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   # ---------------------------------------------------------------------------
 
   defp dispatch_dm(args, from_session_id) do
-    with {:ok, to_uuid} <- extract_flag(args, "--to"),
+    with {:ok, to_ref} <- extract_flag(args, "--to"),
          {:ok, message} <- extract_flag(args, "--message"),
          {:ok, from_session} <- Sessions.get_session(from_session_id),
-         {:ok, to_session} <- Sessions.get_session_by_uuid(to_uuid) do
+         {:ok, to_session} <- resolve_session(to_ref) do
       sender_name = from_session.name || "session:#{from_session.uuid}"
       dm_body = "DM from:#{sender_name} (session:#{from_session.uuid}) #{message}"
 
@@ -136,7 +136,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
         metadata: %{
           sender_name: sender_name,
           from_session_uuid: from_session.uuid,
-          to_session_uuid: to_uuid
+          to_session_uuid: to_session.uuid
         }
       }
 
@@ -145,7 +145,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
           case Messages.create_message(attrs) do
             {:ok, msg} ->
               EyeInTheSky.Events.session_new_dm(to_session.id, msg)
-              Logger.info("[CmdDispatcher] dm #{from_session_id} -> #{to_uuid}")
+              Logger.info("[CmdDispatcher] dm #{from_session_id} -> #{to_session.id}")
 
             {:error, reason} ->
               Logger.warning("[CmdDispatcher] dm persist failed: #{inspect(reason)}")
@@ -156,6 +156,14 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
       end
     else
       err -> Logger.warning("[CmdDispatcher] dm failed: #{inspect(err)}")
+    end
+  end
+
+  # Resolve a session by integer ID or UUID string.
+  defp resolve_session(ref) do
+    case Integer.parse(ref) do
+      {id, ""} -> Sessions.get_session(id)
+      _ -> Sessions.get_session_by_uuid(ref)
     end
   end
 

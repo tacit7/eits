@@ -846,13 +846,17 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   defp consume_agent_images_as_content_blocks(socket) do
     alias EyeInTheSky.Claude.ContentBlock
+    alias EyeInTheSky.Media.ImageProcessor
 
-    consume_uploaded_entries(socket, :agent_images, fn %{path: temp_path}, entry ->
-      data = File.read!(temp_path)
-      base64 = Base.encode64(data)
-      mime_type = entry.client_type || mime_from_ext(entry.client_name)
-      {:ok, ContentBlock.new_image(base64, mime_type)}
-    end)
+    blocks =
+      consume_uploaded_entries(socket, :agent_images, fn %{path: temp_path}, entry ->
+        data = File.read!(temp_path)
+        base64 = Base.encode64(data)
+        mime_type = entry.client_type || mime_from_ext(entry.client_name)
+        {:ok, ContentBlock.new_image(base64, mime_type)}
+      end)
+
+    ImageProcessor.process_blocks(blocks)
   end
 
   defp mime_from_ext(filename) do

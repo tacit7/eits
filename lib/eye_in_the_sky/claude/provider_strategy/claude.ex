@@ -67,7 +67,9 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
       ]
       |> Keyword.filter(fn {k, v} -> v != nil && (k != :effort_level || v != "") end)
 
-    [
+    eits_workflow = context[:eits_workflow] || "1"
+
+    base_opts = [
       to: self(),
       model: context[:model],
       session_id: state.provider_conversation_id,
@@ -76,10 +78,18 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
       use_script: true,
       eits_session_id: state.provider_conversation_id,
       eits_agent_id: state.agent_id,
-      eits_workflow: context[:eits_workflow] || "1",
+      eits_workflow: eits_workflow,
       worktree: state.worktree,
-      agent: context[:agent],
-      append_system_prompt: eits_init_prompt(state)
-    ] ++ optional_opts
+      agent: context[:agent]
+    ]
+
+    base_opts =
+      if eits_workflow != "0" do
+        Keyword.put(base_opts, :append_system_prompt, eits_init_prompt(state))
+      else
+        base_opts
+      end
+
+    base_opts ++ optional_opts
   end
 end

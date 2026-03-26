@@ -551,128 +551,120 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
                 editing_session_id={@editing_session_id}
               >
                 <:actions>
-                  <div class="md:opacity-0 md:group-hover:opacity-100 relative dropdown dropdown-end transition-all">
-                    <button
-                      tabindex="0"
-                      type="button"
-                      class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/35 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+                  <details class="md:opacity-0 md:group-hover:opacity-100 relative dropdown dropdown-end transition-all">
+                    <summary
+                      class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/35 hover:text-base-content/70 hover:bg-base-content/5 transition-colors cursor-pointer list-none"
                       aria-label="More options"
-                      phx-click="noop"
                     >
                       <.icon name="hero-ellipsis-horizontal-mini" class="w-4 h-4" />
-                    </button>
-                    <ul
-                      tabindex="0"
-                      class="dropdown-content z-50 menu menu-xs bg-base-200 border border-base-content/10 rounded-lg shadow-lg w-44 p-1"
-                    >
+                    </summary>
+                    <div class="dropdown-content z-50 mt-1 w-48 rounded-xl bg-base-300 dark:bg-[hsl(220,13%,18%)] shadow-xl p-1.5 flex flex-col gap-0.5">
                       <%= if agent.id do %>
-                        <li>
-                          <a href={~p"/dm/#{agent.id}"} target="_blank" class="flex items-center gap-2">
-                            <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
-                            Open in new tab
-                          </a>
-                        </li>
-                      <% end %>
-                      <li>
-                        <button
-                          type="button"
-                          phx-click="rename_session"
-                          phx-value-session_id={agent.id}
-                          class="flex items-center gap-2"
+                        <a
+                          href={~p"/dm/#{agent.id}"}
+                          target="_blank"
+                          class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors"
                         >
-                          <.icon name="hero-pencil-square-mini" class="w-3.5 h-3.5" />
-                          Rename
-                        </button>
-                      </li>
-                      <li>
-                        <details>
-                          <summary class="flex items-center gap-2">
-                            <.icon name="hero-squares-2x2-mini" class="w-3.5 h-3.5" />
-                            Canvas
-                          </summary>
-                          <ul class="w-40">
-                            <%= for canvas <- @canvases do %>
-                              <li>
-                                <a phx-click="add_to_canvas" phx-value-canvas-id={canvas.id} phx-value-session-id={agent.id}>
-                                  {canvas.name}
-                                </a>
-                              </li>
-                            <% end %>
-                            <li><hr class="border-base-content/10 my-1" /></li>
-                            <li id={"new-canvas-label-#{agent.id}"}>
-                              <a
-                                class="text-secondary"
-                                onclick={"document.getElementById('new-canvas-label-#{agent.id}').style.display='none'; document.getElementById('new-canvas-form-#{agent.id}').style.display='block';"}
-                              >+ New canvas</a>
-                            </li>
-                            <li id={"new-canvas-form-#{agent.id}"} style="display:none">
-                              <form phx-submit="add_to_new_canvas" phx-click="noop" class="flex flex-col gap-1 p-1">
-                                <input type="hidden" name="session_id" value={agent.id} />
-                                <input type="text" name="canvas_name" class="input input-xs w-full" placeholder="Canvas name..." autocomplete="off" />
-                                <button type="submit" class="btn btn-primary btn-xs w-full">Create &amp; Add</button>
-                              </form>
-                            </li>
-                          </ul>
-                        </details>
-                      </li>
+                          <.icon name="hero-arrow-top-right-on-square-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+                          Open in new tab
+                        </a>
+                      <% end %>
+                      <button
+                        type="button"
+                        phx-click="rename_session"
+                        phx-value-session_id={agent.id}
+                        class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+                      >
+                        <.icon name="hero-pencil-square-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+                        Rename
+                      </button>
+                      <%!-- Canvas submenu --%>
+                      <details class="group/canvas">
+                        <summary class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors cursor-pointer list-none">
+                          <.icon name="hero-squares-2x2-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+                          <span class="flex-1">Canvas</span>
+                          <.icon name="hero-chevron-right-mini" class="w-3 h-3 text-base-content/40" />
+                        </summary>
+                        <div class="mt-0.5 ml-3 flex flex-col gap-0.5">
+                          <%= for canvas <- @canvases do %>
+                            <button
+                              type="button"
+                              phx-click="add_to_canvas"
+                              phx-value-canvas-id={canvas.id}
+                              phx-value-session-id={agent.id}
+                              class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-base-content/80 hover:bg-base-content/10 transition-colors text-left"
+                            >
+                              {canvas.name}
+                            </button>
+                          <% end %>
+                          <div class="border-t border-base-content/10 my-0.5" />
+                          <div id={"new-canvas-label-#{agent.id}"}>
+                            <button
+                              type="button"
+                              class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-secondary hover:bg-base-content/10 transition-colors text-left"
+                              onclick={"document.getElementById('new-canvas-label-#{agent.id}').style.display='none'; document.getElementById('new-canvas-form-#{agent.id}').style.display='block';"}
+                            >+ New canvas</button>
+                          </div>
+                          <div id={"new-canvas-form-#{agent.id}"} style="display:none">
+                            <form phx-submit="add_to_new_canvas" phx-click="noop" class="flex flex-col gap-1 p-1">
+                              <input type="hidden" name="session_id" value={agent.id} />
+                              <input type="text" name="canvas_name" class="input input-xs w-full" placeholder="Canvas name..." autocomplete="off" />
+                              <button type="submit" class="btn btn-primary btn-xs w-full">Create &amp; Add</button>
+                            </form>
+                          </div>
+                        </div>
+                      </details>
                       <%= if agent.agent && agent.agent.uuid && agent.uuid do %>
-                        <li>
-                          <button
-                            id={"bookmark-btn-#{agent.uuid}"}
-                            type="button"
-                            phx-hook="BookmarkAgent"
-                            data-agent-id={agent.agent.uuid}
-                            data-session-id={agent.uuid}
-                            data-agent-name={agent.name || agent.agent.description || "Agent"}
-                            data-agent-status={agent.status}
-                            class="bookmark-button flex items-center gap-2"
-                            aria-label="Bookmark agent"
-                          >
-                            <.heart class="bookmark-icon w-3.5 h-3.5" />
-                            <span class="bookmark-label">Favorite</span>
-                          </button>
-                        </li>
+                        <button
+                          id={"bookmark-btn-#{agent.uuid}"}
+                          type="button"
+                          phx-hook="BookmarkAgent"
+                          data-agent-id={agent.agent.uuid}
+                          data-session-id={agent.uuid}
+                          data-agent-name={agent.name || agent.agent.description || "Agent"}
+                          data-agent-status={agent.status}
+                          class="bookmark-button w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+                          aria-label="Bookmark agent"
+                        >
+                          <.heart class="bookmark-icon w-4 h-4 text-base-content/60 flex-shrink-0" />
+                          <span class="bookmark-label">Favorite</span>
+                        </button>
                       <% end %>
                       <%= if agent.uuid do %>
+                        <div class="border-t border-base-content/10 my-0.5" />
                         <%= if agent.archived_at do %>
-                          <li>
-                            <button
-                              type="button"
-                              phx-click="unarchive_session"
-                              phx-value-session_id={agent.id}
-                              class="flex items-center gap-2 text-info"
-                            >
-                              <.icon name="hero-arrow-up-tray-mini" class="w-3.5 h-3.5" />
-                              Unarchive
-                            </button>
-                          </li>
-                          <li>
-                            <button
-                              type="button"
-                              phx-click="delete_session"
-                              phx-value-session_id={agent.id}
-                              class="flex items-center gap-2 text-error"
-                            >
-                              <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
-                              Delete
-                            </button>
-                          </li>
+                          <button
+                            type="button"
+                            phx-click="unarchive_session"
+                            phx-value-session_id={agent.id}
+                            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-info hover:bg-base-content/10 transition-colors text-left"
+                          >
+                            <.icon name="hero-arrow-up-tray-mini" class="w-4 h-4 flex-shrink-0" />
+                            Unarchive
+                          </button>
+                          <button
+                            type="button"
+                            phx-click="delete_session"
+                            phx-value-session_id={agent.id}
+                            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-error hover:bg-base-content/10 transition-colors text-left"
+                          >
+                            <.icon name="hero-trash-mini" class="w-4 h-4 flex-shrink-0" />
+                            Delete
+                          </button>
                         <% else %>
-                          <li>
-                            <button
-                              type="button"
-                              phx-click="archive_session"
-                              phx-value-session_id={agent.id}
-                              class="flex items-center gap-2 text-warning"
-                            >
-                              <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
-                              Archive
-                            </button>
-                          </li>
+                          <button
+                            type="button"
+                            phx-click="archive_session"
+                            phx-value-session_id={agent.id}
+                            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-warning hover:bg-base-content/10 transition-colors text-left"
+                          >
+                            <.icon name="hero-archive-box-mini" class="w-4 h-4 flex-shrink-0" />
+                            Archive
+                          </button>
                         <% end %>
                       <% end %>
-                    </ul>
-                  </div>
+                    </div>
+                  </details>
                 </:actions>
               </.session_row>
             </div>

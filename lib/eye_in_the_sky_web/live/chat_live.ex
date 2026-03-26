@@ -503,7 +503,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
     advanced_opts =
       []
       |> maybe_opt(:permission_mode, params["permission_mode"])
-      |> maybe_opt(:max_turns, params["max_turns"])
+      |> maybe_int_opt(:max_turns, params["max_turns"])
       |> maybe_opt(:add_dir, params["add_dir"])
       |> maybe_opt(:mcp_config, params["mcp_config"])
       |> maybe_opt(:plugin_dir, params["plugin_dir"])
@@ -826,6 +826,16 @@ defmodule EyeInTheSkyWeb.ChatLive do
   defp maybe_opt(opts, _key, nil), do: opts
   defp maybe_opt(opts, _key, ""), do: opts
   defp maybe_opt(opts, key, val), do: opts ++ [{key, val}]
+
+  defp maybe_int_opt(opts, _key, nil), do: opts
+  defp maybe_int_opt(opts, _key, ""), do: opts
+
+  defp maybe_int_opt(opts, key, val) when is_binary(val) do
+    case Integer.parse(val) do
+      {n, _} when n > 0 -> opts ++ [{key, n}]
+      _ -> opts
+    end
+  end
 
   defp maybe_bool_opt(opts, _key, nil), do: opts
   defp maybe_bool_opt(opts, key, "true"), do: opts ++ [{key, true}]

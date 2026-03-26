@@ -12,6 +12,15 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   @voices ["Ava", "Isha", "Lee", "Jamie", "Serena"]
 
+  @themes [
+    {"dark", "Dark"},
+    {"light", "Light"},
+    {"latte", "Latte"},
+    {"frappe", "Frappé"},
+    {"macchiato", "Macchiato"},
+    {"mocha", "Mocha"}
+  ]
+
   @valid_tabs ~w(general editor auth workflow pricing system)
 
   @known_editors ~w(code cursor vim nano zed)
@@ -34,6 +43,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       |> assign(:db_info, db_info)
       |> assign(:models, @models)
       |> assign(:voices, @voices)
+      |> assign(:themes, @themes)
       |> assign(:flash_key, nil)
       |> assign(:active_tab, :general)
       |> assign(:generated_api_key, nil)
@@ -96,7 +106,20 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
     Settings.put(key, value)
     settings = Settings.all()
-    {:noreply, socket |> assign(:settings, settings) |> flash_saved(key)}
+
+    socket =
+      socket
+      |> assign(:settings, settings)
+      |> flash_saved(key)
+
+    socket =
+      if key == "theme" do
+        push_event(socket, "apply_theme", %{theme: value})
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -243,10 +266,35 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   defp render_tab(%{active_tab: :general} = assigns) do
     ~H"""
-    <section>
-      <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
-        Agent Defaults
-      </h2>
+    <div class="space-y-6">
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+          Appearance
+        </h2>
+        <div class="card bg-base-100 border border-base-300 shadow-sm">
+          <div class="card-body px-5 py-4">
+            <p class="text-sm font-medium text-base-content mb-3">Theme</p>
+            <div class="flex flex-wrap gap-2">
+              <form :for={{val, label} <- @themes} phx-change="save_setting">
+                <input type="hidden" name="key" value="theme" />
+                <button
+                  type="submit"
+                  name="value"
+                  value={val}
+                  class={"btn btn-sm #{if @settings["theme"] == val, do: "btn-primary", else: "btn-outline"}"}
+                >
+                  {label}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+          Agent Defaults
+        </h2>
       <div class="card bg-base-100 border border-base-300 shadow-sm">
         <div class="card-body p-0 divide-y divide-base-300">
           <%!-- Default Model --%>
@@ -399,6 +447,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
         </div>
       </div>
     </section>
+    </div>
     """
   end
 

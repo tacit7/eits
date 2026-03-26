@@ -96,17 +96,12 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     )
   end
 
-  # Session status is authoritative: terminal states never show the stop button,
-  # even if an AgentWorker happens to still be in :running state (race condition
-  # between SessionEnd hook and SDK completion message). For non-terminal states,
-  # fall through to the worker check as a real-time signal.
-  @terminal_statuses ~w(idle waiting stopped completed failed error archived)
-
-  defp initial_processing?(%{status: status, id: session_id}) do
-    if status in @terminal_statuses do
-      false
-    else
-      AgentWorker.is_processing?(session_id)
-    end
+  # Always check the AgentWorker state — do not skip based on session status.
+  # A "stopped" session can have an active worker when the user sends a new
+  # message while the Stop hook fires concurrently. Skipping the worker check
+  # causes `processing` to mount as false while the worker is running, so new
+  # messages silently queue instead of being rejected or properly shown as busy.
+  defp initial_processing?(%{id: session_id}) do
+    AgentWorker.is_processing?(session_id)
   end
 end

@@ -9,11 +9,22 @@ export const SidebarState = {
       this.pushEventTo(this.el, "toggle_collapsed", {})
     }
 
+    // Restore section expanded states (overview, projects, system) from localStorage
+    this._restoreSectionStates()
+
     // Apply project expansion state immediately from localStorage (no server round-trip)
     this._applyExpandedProjects()
 
-    // Handle project toggle buttons (delegated click on sidebar)
+    // Handle project toggle buttons and section toggle buttons (delegated click on sidebar)
     this.el.addEventListener("click", (e) => {
+      // Section toggles (overview, projects, system)
+      const sectionBtn = e.target.closest("[data-section-toggle]")
+      if (sectionBtn) {
+        const section = sectionBtn.dataset.sectionToggle
+        this._persistSectionToggle(section)
+        return
+      }
+
       const btn = e.target.closest("[data-project-toggle]")
       if (!btn) return
       const id = btn.dataset.projectToggle
@@ -166,6 +177,30 @@ export const SidebarState = {
   _navigateToFirstVisibleProject() {
     const link = this._firstVisibleProjectLink()
     if (link) window.location.assign(link.getAttribute("href"))
+  },
+
+  // Section state persistence (overview, projects, system)
+  _restoreSectionStates() {
+    const sectionMap = {
+      overview: "toggle_all_projects",
+      projects: "toggle_projects",
+      system: "toggle_system",
+    }
+    for (const [section, event] of Object.entries(sectionMap)) {
+      const saved = localStorage.getItem(`sidebar_section_${section}`)
+      // Server defaults all sections to expanded; if stored as collapsed, toggle once
+      if (saved === "false") {
+        this.pushEventTo(this.el, event, {})
+      }
+    }
+  },
+
+  _persistSectionToggle(section) {
+    const key = `sidebar_section_${section}`
+    const current = localStorage.getItem(key)
+    // Default is expanded (true); toggling flips it
+    const newVal = current === "false" ? "true" : "false"
+    localStorage.setItem(key, newVal)
   },
 
   destroyed() {

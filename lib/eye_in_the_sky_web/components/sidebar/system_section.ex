@@ -13,6 +13,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.SystemSection do
     <button
       phx-click="toggle_system"
       phx-target={@myself}
+      data-section-toggle="system"
       class={[
         "flex items-center gap-2.5 w-full text-left text-sm transition-colors",
         if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),

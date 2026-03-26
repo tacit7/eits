@@ -422,6 +422,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
     <button
       phx-click="toggle_all_projects"
       phx-target={@myself}
+      data-section-toggle="overview"
       class={[
         "flex items-center gap-2.5 w-full text-left text-sm transition-colors",
         if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),

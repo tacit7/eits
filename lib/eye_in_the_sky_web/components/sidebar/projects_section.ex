@@ -17,6 +17,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
       <button
         phx-click="toggle_projects"
         phx-target={@myself}
+        data-section-toggle="projects"
         class="flex items-center gap-2.5 flex-1 text-left text-sm text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5 transition-colors"
         title="Projects"
       >

@@ -53,4 +53,18 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
   });
+
+  // Handle theme changes pushed from LiveView Settings page
+  window.addEventListener('phx:apply_theme', ({ detail }) => {
+    const theme = detail.theme;
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+
+    // Keep checkbox theme-controllers in sync (dark = any non-light theme)
+    themeControllers.forEach(controller => {
+      if (controller.type === 'checkbox') {
+        controller.checked = theme !== 'light' && theme !== 'latte';
+      }
+    });
+  });
 });

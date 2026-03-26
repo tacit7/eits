@@ -686,8 +686,8 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
   def handle_event("add_to_canvas", %{"canvas-id" => cid, "session-id" => sid}, socket) do
     with {canvas_id, _} <- Integer.parse(cid),
-         {session_id, _} <- Integer.parse(sid) do
-      canvas = Canvases.get_canvas!(canvas_id)
+         {session_id, _} <- Integer.parse(sid),
+         %{} = canvas <- Canvases.get_canvas(canvas_id) do
       Canvases.add_session(canvas_id, session_id)
       send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,
         id: "canvas-overlay", action: :open_canvas, canvas_id: canvas_id)
@@ -700,11 +700,15 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   def handle_event("add_to_new_canvas", %{"session_id" => sid, "canvas_name" => name}, socket) do
     with {session_id, _} <- Integer.parse(sid) do
       canvas_name = if name && String.trim(name) != "", do: String.trim(name), else: "Canvas #{:os.system_time(:second)}"
-      {:ok, canvas} = Canvases.create_canvas(%{name: canvas_name})
-      Canvases.add_session(canvas.id, session_id)
-      send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,
-        id: "canvas-overlay", action: :open_canvas, canvas_id: canvas.id)
-      {:noreply, put_flash(socket, :info, "Added to #{canvas.name}")}
+      case Canvases.create_canvas(%{name: canvas_name}) do
+        {:ok, canvas} ->
+          Canvases.add_session(canvas.id, session_id)
+          send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,
+            id: "canvas-overlay", action: :open_canvas, canvas_id: canvas.id)
+          {:noreply, put_flash(socket, :info, "Added to #{canvas.name}")}
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Failed to create canvas")}
+      end
     else
       _ -> {:noreply, socket}
     end

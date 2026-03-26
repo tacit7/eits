@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.Canvases do
     Repo.all(from c in Canvas, order_by: [asc: c.inserted_at])
   end
 
+  def get_canvas(id), do: Repo.get(Canvas, id)
   def get_canvas!(id), do: Repo.get!(Canvas, id)
 
   def create_canvas(attrs) do

@@ -551,35 +551,6 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
                 editing_session_id={@editing_session_id}
               >
                 <:actions>
-                  <div class="dropdown dropdown-top" id={"canvas-dropdown-#{agent.id}"}>
-                    <button tabindex="0" class="btn btn-secondary btn-xs gap-1 md:opacity-0 md:group-hover:opacity-100">
-                      <.icon name="hero-squares-2x2" class="w-3 h-3" /> Canvas
-                    </button>
-                    <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[200] w-48 p-1 shadow-xl border border-base-300 text-xs">
-                      <li class="menu-title text-[10px]">Select canvas</li>
-                      <%= for canvas <- @canvases do %>
-                        <li>
-                          <a phx-click="add_to_canvas" phx-value-canvas-id={canvas.id} phx-value-session-id={agent.id}>
-                            <%= canvas.name %>
-                          </a>
-                        </li>
-                      <% end %>
-                      <li><hr class="border-base-content/10 my-1" /></li>
-                      <li id={"new-canvas-label-#{agent.id}"}>
-                        <a
-                          class="text-secondary"
-                          onclick={"document.getElementById('new-canvas-label-#{agent.id}').style.display='none'; document.getElementById('new-canvas-form-#{agent.id}').style.display='block';"}
-                        >+ New canvas</a>
-                      </li>
-                      <li id={"new-canvas-form-#{agent.id}"} style="display:none">
-                        <form phx-submit="add_to_new_canvas" class="flex flex-col gap-1 p-1">
-                          <input type="hidden" name="session_id" value={agent.id} />
-                          <input type="text" name="canvas_name" class="input input-xs w-full" placeholder="Canvas name..." autocomplete="off" />
-                          <button type="submit" class="btn btn-primary btn-xs w-full">Create &amp; Add</button>
-                        </form>
-                      </li>
-                    </ul>
-                  </div>
                   <div class="md:opacity-0 md:group-hover:opacity-100 relative dropdown dropdown-end transition-all">
                     <button
                       tabindex="0"
@@ -612,6 +583,37 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
                           <.icon name="hero-pencil-square-mini" class="w-3.5 h-3.5" />
                           Rename
                         </button>
+                      </li>
+                      <li>
+                        <details>
+                          <summary class="flex items-center gap-2">
+                            <.icon name="hero-squares-2x2-mini" class="w-3.5 h-3.5" />
+                            Canvas
+                          </summary>
+                          <ul class="w-40">
+                            <%= for canvas <- @canvases do %>
+                              <li>
+                                <a phx-click="add_to_canvas" phx-value-canvas-id={canvas.id} phx-value-session-id={agent.id}>
+                                  {canvas.name}
+                                </a>
+                              </li>
+                            <% end %>
+                            <li><hr class="border-base-content/10 my-1" /></li>
+                            <li id={"new-canvas-label-#{agent.id}"}>
+                              <a
+                                class="text-secondary"
+                                onclick={"document.getElementById('new-canvas-label-#{agent.id}').style.display='none'; document.getElementById('new-canvas-form-#{agent.id}').style.display='block';"}
+                              >+ New canvas</a>
+                            </li>
+                            <li id={"new-canvas-form-#{agent.id}"} style="display:none">
+                              <form phx-submit="add_to_new_canvas" phx-click="noop" class="flex flex-col gap-1 p-1">
+                                <input type="hidden" name="session_id" value={agent.id} />
+                                <input type="text" name="canvas_name" class="input input-xs w-full" placeholder="Canvas name..." autocomplete="off" />
+                                <button type="submit" class="btn btn-primary btn-xs w-full">Create &amp; Add</button>
+                              </form>
+                            </li>
+                          </ul>
+                        </details>
                       </li>
                       <%= if agent.agent && agent.agent.uuid && agent.uuid do %>
                         <li>

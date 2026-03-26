@@ -305,7 +305,55 @@ defmodule EyeInTheSky.Claude.CLI do
     args =
       if opts[:include_partial_messages], do: args ++ ["--include-partial-messages"], else: args
 
+    # When multimodal content blocks are present, switch to stdin input mode.
+    # do_spawn reads :content_blocks_json from opts and pipes it via stdin.
+    args =
+      if has_content_blocks?(opts) do
+        args ++ ["--input-format", "stream-json"]
+      else
+        args
+      end
+
     args
+  end
+
+  @doc """
+  Serializes content blocks to a JSON message suitable for Claude CLI stdin input.
+
+  Returns `nil` when no content blocks are present (text-only message).
+  When content blocks exist, returns a JSON string containing a user message
+  with the text prompt and all formatted content blocks as the content array.
+  """
+  @spec content_blocks_json(keyword()) :: String.t() | nil
+  def content_blocks_json(opts) do
+    case Keyword.get(opts, :content_blocks, []) do
+      [] ->
+        nil
+
+      blocks when is_list(blocks) ->
+        prompt = Keyword.get(opts, :prompt, "")
+
+        content = [%{"type" => "text", "text" => prompt} | blocks]
+        message = %{"type" => "user", "content" => content}
+        Jason.encode!(message)
+    end
+  end
+
+  defp has_content_blocks?(opts) do
+    case Keyword.get(opts, :content_blocks, []) do
+      [] -> false
+      blocks when is_list(blocks) -> true
+      _ -> false
+    end
+  end
+
+  defp maybe_pipe_content_blocks(port, opts) do
+    case content_blocks_json(opts) do
+      nil -> :ok
+      json ->
+        Port.command(port, json <> "\n")
+        Logger.info("[CLI] Piped multimodal content blocks to stdin (#{byte_size(json)} bytes)")
+    end
   end
 
   defp maybe_flag(args, _flag, nil), do: args
@@ -461,6 +509,11 @@ defmodule EyeInTheSky.Claude.CLI do
               ]
             )
           end
+
+        # When multimodal content blocks are present, pipe the JSON user message
+        # to stdin before handing the port to the handler. This feeds Claude CLI
+        # the structured content via --input-format stream-json.
+        maybe_pipe_content_blocks(port, opts)
 
         Port.connect(port, handler_pid)
         send(handler_pid, {:port, port})

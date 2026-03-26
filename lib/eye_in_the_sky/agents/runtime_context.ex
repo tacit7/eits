@@ -18,14 +18,11 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
   - `:agent` — agent identifier forwarded to CLI flags
   - `:eits_workflow` — EITS workflow identifier string (default: "1")
   - `:bypass_sandbox` — skip all confirmations and sandboxing (Codex only; maps to --dangerously-bypass-approvals-and-sandbox)
-  - `:extra_cli_opts` — passthrough keyword list for additional CLI flags
-    (e.g. add_dir, mcp_config, permission_mode, sandbox, chrome, plugin_dir,
-    settings_file, max_turns) injected by DM slash commands
   """
 
   alias EyeInTheSky.Messages
 
-  @known_keys ~w(model effort_level channel_id thinking_budget max_budget_usd agent eits_workflow bypass_sandbox)a
+  @known_keys ~w(model effort_level channel_id thinking_budget max_budget_usd agent eits_workflow bypass_sandbox content_blocks)a
 
   @type t :: %{
           model: String.t() | nil,
@@ -37,6 +34,7 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
           agent: String.t() | nil,
           eits_workflow: String.t(),
           bypass_sandbox: boolean(),
+          content_blocks: [EyeInTheSky.Claude.ContentBlock.t()],
           extra_cli_opts: keyword()
         }
 
@@ -63,6 +61,7 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
       agent: opts[:agent],
       eits_workflow: opts[:eits_workflow],
       bypass_sandbox: opts[:bypass_sandbox] || false,
+      content_blocks: opts[:content_blocks] || [],
       extra_cli_opts: extra
     }
   end

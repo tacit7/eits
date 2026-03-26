@@ -5,9 +5,25 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
 
   @behaviour EyeInTheSky.Claude.ProviderStrategy
 
+  alias EyeInTheSky.Claude.ContentBlock
   alias EyeInTheSky.Codex
 
   require Logger
+
+  @impl true
+  def format_content(%ContentBlock.Text{text: text}) do
+    %{"type" => "text", "text" => text}
+  end
+
+  @impl true
+  def format_content(%ContentBlock.Image{data: data, mime_type: mime_type}) do
+    %{"type" => "image_url", "image_url" => %{"url" => "data:#{mime_type};base64,#{data}"}}
+  end
+
+  @impl true
+  def format_content(%ContentBlock.Document{}) do
+    %{"type" => "text", "text" => "[PDF content not supported by this provider]"}
+  end
 
   @impl true
   def start(state, job) do
@@ -15,6 +31,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
     prompt = job.message
 
     opts = build_opts(state, context)
+    opts = maybe_add_content_blocks(opts, job.content_blocks)
 
     full_prompt =
       if (context[:eits_workflow] || "1") != "0" do
@@ -33,6 +50,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
     prompt = job.message
 
     opts = build_opts(state, context)
+    opts = maybe_add_content_blocks(opts, job.content_blocks)
 
     Logger.info("Resuming Codex session #{state.provider_conversation_id}")
     Codex.SDK.resume(state.provider_conversation_id, prompt, opts)
@@ -59,5 +77,12 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
       eits_model: context[:model],
       eits_url: System.get_env("EITS_URL", "http://localhost:5001/api/v1")
     ]
+  end
+
+  defp maybe_add_content_blocks(opts, []), do: opts
+
+  defp maybe_add_content_blocks(opts, content_blocks) when is_list(content_blocks) do
+    formatted = Enum.map(content_blocks, &format_content/1)
+    Keyword.put(opts, :content_blocks, formatted)
   end
 end

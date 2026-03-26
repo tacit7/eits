@@ -5,13 +5,39 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
 
   @behaviour EyeInTheSky.Claude.ProviderStrategy
 
-  alias EyeInTheSky.Claude.SDK
+  alias EyeInTheSky.Claude.{ContentBlock, SDK}
 
   require Logger
 
   @impl true
+  def format_content(%ContentBlock.Text{text: text}) do
+    %{"type" => "text", "text" => text}
+  end
+
+  @impl true
+  def format_content(%ContentBlock.Image{data: data, mime_type: mime_type}) do
+    %{"type" => "image", "source" => %{"type" => "base64", "media_type" => mime_type, "data" => data}}
+  end
+
+  @impl true
+  def format_content(%ContentBlock.Document{source: source}) do
+    %{"type" => "document", "source" => %{"type" => "base64", "media_type" => source.media_type, "data" => source.data}}
+  end
+
+  @doc """
+  Builds a full content array from a text string and a list of ContentBlock structs.
+  """
+  @spec format_message(String.t(), [ContentBlock.t()]) :: [map()]
+  def format_message(text, content_blocks) do
+    text_block = %{"type" => "text", "text" => text}
+    image_blocks = Enum.map(content_blocks, &format_content/1)
+    [text_block | image_blocks]
+  end
+
+  @impl true
   def start(state, job) do
     opts = build_opts(state, job.context)
+    opts = maybe_add_content_blocks(opts, job.content_blocks)
     Logger.info("Starting new Claude session #{state.provider_conversation_id}")
     SDK.start(job.message, opts)
   end
@@ -19,6 +45,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
   @impl true
   def resume(state, job) do
     opts = build_opts(state, job.context)
+    opts = maybe_add_content_blocks(opts, job.content_blocks)
     Logger.info("Resuming Claude session #{state.provider_conversation_id}")
     SDK.resume(state.provider_conversation_id, job.message, opts)
   end
@@ -92,5 +119,12 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
 
     extra = context[:extra_cli_opts] || []
     base_opts ++ optional_opts ++ extra
+  end
+
+  defp maybe_add_content_blocks(opts, []), do: opts
+
+  defp maybe_add_content_blocks(opts, content_blocks) when is_list(content_blocks) do
+    formatted = Enum.map(content_blocks, &format_content/1)
+    Keyword.put(opts, :content_blocks, formatted)
   end
 end

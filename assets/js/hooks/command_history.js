@@ -454,7 +454,7 @@ export const CommandHistory = {
       const cursor = this.el.selectionStart
       const prefix = val.slice(0, this.enumTriggerWordStart)
       const suffix  = val.slice(cursor)
-      const newVal  = prefix + item.slug + ' '
+      const newVal  = prefix + item.slug + ' ' + suffix
       this.el.value = newVal
       const pos = prefix.length + item.slug.length + 1
       this.el.setSelectionRange(pos, pos)

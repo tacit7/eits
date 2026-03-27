@@ -394,6 +394,101 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # build_args/1 advanced CLI flags (form-submitted)
+  # ---------------------------------------------------------------------------
+
+  describe "build_args/1 advanced CLI flags" do
+    test "chrome: true produces --chrome" do
+      args = CLI.build_args(prompt: "x", chrome: true)
+      assert "--chrome" in args
+      refute "--no-chrome" in args
+    end
+
+    test "chrome: false produces --no-chrome" do
+      args = CLI.build_args(prompt: "x", chrome: false)
+      assert "--no-chrome" in args
+      refute "--chrome" in args
+    end
+
+    test "chrome not set omits both --chrome and --no-chrome" do
+      args = CLI.build_args(prompt: "x")
+      refute "--chrome" in args
+      refute "--no-chrome" in args
+    end
+
+    test "sandbox: true produces --sandbox" do
+      args = CLI.build_args(prompt: "x", sandbox: true)
+      assert "--sandbox" in args
+    end
+
+    test "sandbox not set omits --sandbox" do
+      args = CLI.build_args(prompt: "x")
+      refute "--sandbox" in args
+    end
+
+    test "permission_mode produces --permission-mode <value>" do
+      args = CLI.build_args(prompt: "x", permission_mode: "plan")
+      idx = Enum.find_index(args, &(&1 == "--permission-mode"))
+      assert idx != nil
+      assert Enum.at(args, idx + 1) == "plan"
+    end
+
+    test "add_dir produces --add-dir <path>" do
+      args = CLI.build_args(prompt: "x", add_dir: "/some/path")
+      idx = Enum.find_index(args, &(&1 == "--add-dir"))
+      assert idx != nil
+      assert Enum.at(args, idx + 1) == "/some/path"
+    end
+
+    test "mcp_config produces --mcp-config <path>" do
+      args = CLI.build_args(prompt: "x", mcp_config: "./mcp.json")
+      idx = Enum.find_index(args, &(&1 == "--mcp-config"))
+      assert idx != nil
+      assert Enum.at(args, idx + 1) == "./mcp.json"
+    end
+
+    test "plugin_dir produces --plugin-dir <path>" do
+      args = CLI.build_args(prompt: "x", plugin_dir: "./plugins")
+      idx = Enum.find_index(args, &(&1 == "--plugin-dir"))
+      assert idx != nil
+      assert Enum.at(args, idx + 1) == "./plugins"
+    end
+
+    test "settings_file produces --settings <path>" do
+      args = CLI.build_args(prompt: "x", settings_file: "./settings.json")
+      idx = Enum.find_index(args, &(&1 == "--settings"))
+      assert idx != nil
+      assert Enum.at(args, idx + 1) == "./settings.json"
+    end
+
+    test "all advanced flags together" do
+      args =
+        CLI.build_args(
+          prompt: "x",
+          chrome: true,
+          sandbox: true,
+          permission_mode: "acceptEdits",
+          add_dir: "/lib",
+          mcp_config: "./mcp.json",
+          plugin_dir: "./plugins",
+          settings_file: "./settings.json",
+          max_turns: 10
+        )
+
+      assert "--chrome" in args
+      assert "--sandbox" in args
+      assert "--permission-mode" in args
+      assert "acceptEdits" in args
+      assert "--add-dir" in args
+      assert "/lib" in args
+      assert "--mcp-config" in args
+      assert "--plugin-dir" in args
+      assert "--settings" in args
+      assert "--max-turns" in args
+    end
+  end
+
   describe "content_blocks_json/1" do
     test "returns nil when no content_blocks" do
       assert CLI.content_blocks_json(prompt: "hello") == nil

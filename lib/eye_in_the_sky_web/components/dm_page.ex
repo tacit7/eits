@@ -492,6 +492,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             context_used={@context_used}
             context_window={@context_window}
             display_name={if @agent_record && is_map(@agent_record.agent_definition) && not match?(%Ecto.Association.NotLoaded{}, @agent_record.agent_definition), do: @agent_record.agent_definition.display_name}
+            session_cli_opts={@session_cli_opts}
           />
         </div>
       <% end %>

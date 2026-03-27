@@ -70,6 +70,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:stream_tool, nil)
     |> assign(:stream_thinking, nil)
     |> assign(:slash_items, SlashItems.build())
+    |> assign(:session_cli_opts, [])
     |> assign(:diff_cache, %{})
     |> assign(:selected_task, nil)
     |> assign(:task_notes, [])

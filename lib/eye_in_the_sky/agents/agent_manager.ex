@@ -36,15 +36,14 @@ defmodule EyeInTheSky.Agents.AgentManager do
 
       Logger.info("📤 create_agent: sending initial message to session.id=#{session.id}")
 
-      case send_message(session.id, instructions,
-             model: opts[:model],
-             effort_level: opts[:effort_level],
-             max_budget_usd: opts[:max_budget_usd],
-             worktree: opts[:worktree],
-             agent: opts[:agent],
-             eits_workflow: opts[:eits_workflow],
-             bypass_sandbox: opts[:bypass_sandbox]
-           ) do
+      # Forward all opts to send_message so RuntimeContext.build can pick up
+      # known keys (model, effort_level, etc.) and pass the rest as extra_cli_opts
+      # to CLI.build_args (permission_mode, add_dir, chrome, sandbox, etc.)
+      send_opts =
+        opts
+        |> Keyword.drop([:agent_type, :project_id, :project_path, :description, :instructions])
+
+      case send_message(session.id, instructions, send_opts) do
         {:ok, admission} ->
           # Only mark "running" when the SDK actually started. :retry_queued means
           # the spawn failed and was queued for retry — agent stays "pending".

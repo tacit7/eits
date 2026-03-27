@@ -27,7 +27,7 @@ defmodule EyeInTheSky.Claude.CLI do
   @type spawn_result :: {:ok, port(), reference()} | {:error, term()}
 
   @known_permission_modes ~w(acceptEdits bypassPermissions default delegate dontAsk plan)
-  @fallback_idle_timeout_ms 300_000
+  @fallback_idle_timeout_ms :infinity
   @max_buffer_bytes 4 * 1024 * 1024
   @standard_paths [
     "/usr/local/bin/claude",
@@ -436,13 +436,17 @@ defmodule EyeInTheSky.Claude.CLI do
     raw_timeout = EyeInTheSky.Settings.get_integer("cli_idle_timeout_ms")
 
     default_timeout =
-      if is_integer(raw_timeout) and raw_timeout > 0,
-        do: raw_timeout,
-        else: @fallback_idle_timeout_ms
+      cond do
+        raw_timeout == 0 -> :infinity
+        is_integer(raw_timeout) and raw_timeout > 0 -> raw_timeout
+        true -> @fallback_idle_timeout_ms
+      end
 
     idle_timeout_ms =
       case Keyword.get(opts, :idle_timeout_ms, default_timeout) do
+        0 -> :infinity
         n when is_integer(n) and n > 0 -> n
+        :infinity -> :infinity
         _ -> default_timeout
       end
 

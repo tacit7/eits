@@ -108,6 +108,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
             |> put_if_present("allowed_tools", params["allowed_tools"])
             |> put_if_present("output_format", params["output_format"])
             |> Map.put("skip_permissions", params["skip_permissions"] == "true")
+            |> put_if_present("permission_mode", params["permission_mode"])
+            |> put_if_present("add_dir", params["add_dir"])
+            |> put_if_present("mcp_config", params["mcp_config"])
+            |> put_if_present("plugin_dir", params["plugin_dir"])
+            |> put_if_present("settings_file", params["settings_file"])
+            |> put_bool_if_true("chrome", params["chrome"])
+            |> put_bool_if_true("sandbox", params["sandbox"])
             |> Jason.encode!()
 
           job_attrs =
@@ -284,6 +291,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
   defp put_if_present(map, _key, nil), do: map
   defp put_if_present(map, _key, ""), do: map
   defp put_if_present(map, key, val), do: Map.put(map, key, val)
+
+  defp put_bool_if_true(map, key, "true"), do: Map.put(map, key, true)
+  defp put_bool_if_true(map, _key, _), do: map
 
   # 4-step resolution: form override -> prompt default -> page context -> error
   defp resolve_project_path(params, prompt, socket) do

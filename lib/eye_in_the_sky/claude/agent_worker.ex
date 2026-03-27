@@ -657,7 +657,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       max_budget_usd: Map.get(context, :max_budget_usd),
       agent: Map.get(context, :agent),
       eits_workflow: Map.get(context, :eits_workflow, "1"),
-      bypass_sandbox: Map.get(context, :bypass_sandbox, false)
+      bypass_sandbox: Map.get(context, :bypass_sandbox, false),
+      content_blocks: Map.get(context, :content_blocks, []),
+      extra_cli_opts: Map.get(context, :extra_cli_opts, [])
     }
   end
 
@@ -671,7 +673,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       max_budget_usd: context[:max_budget_usd],
       agent: context[:agent],
       eits_workflow: context[:eits_workflow] || "1",
-      bypass_sandbox: context[:bypass_sandbox] || false
+      bypass_sandbox: context[:bypass_sandbox] || false,
+      content_blocks: context[:content_blocks] || [],
+      extra_cli_opts: context[:extra_cli_opts] || []
     }
   end
 
@@ -684,7 +688,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       thinking_budget: nil,
       max_budget_usd: nil,
       agent: nil,
-      eits_workflow: "1"
+      eits_workflow: "1",
+      content_blocks: [],
+      extra_cli_opts: []
     }
   end
 

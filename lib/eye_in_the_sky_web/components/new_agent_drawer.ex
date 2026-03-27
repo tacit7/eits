@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
   """
 
   use Phoenix.LiveComponent
-  import EyeInTheSkyWeb.CoreComponents, only: [form_actions: 1, form_field: 1, modal_header: 1]
+  import EyeInTheSkyWeb.CoreComponents, only: [form_actions: 1, form_field: 1, icon: 1, modal_header: 1]
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [claude_models: 0, codex_models: 0]
 
   @impl true
@@ -121,8 +121,121 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                 <span class="label-text-alt text-base-content/40">Branch: worktree-&lt;name&gt;</span>
               </label>
             </.form_field>
-            
-    <!-- Actions -->
+
+            <!-- Advanced CLI Flags -->
+            <div class="collapse collapse-arrow bg-base-200 rounded-lg">
+              <input type="checkbox" class="min-h-0" />
+              <div class="collapse-title min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-xs font-medium text-base-content/60">
+                <.icon name="hero-adjustments-horizontal" class="w-3.5 h-3.5" /> Advanced
+              </div>
+              <div class="collapse-content px-3 pb-3 space-y-3">
+                <div class="form-control">
+                  <label class="label"><span class="label-text text-xs">Permission Mode</span></label>
+                  <select name="permission_mode" class="select select-bordered select-sm w-full">
+                    <option value="">Default</option>
+                    <option value="acceptEdits">acceptEdits — auto-accept file edits</option>
+                    <option value="bypassPermissions">bypassPermissions — skip all prompts</option>
+                    <option value="dontAsk">dontAsk — never ask for confirmation</option>
+                    <option value="plan">plan — read-only, no file changes</option>
+                  </select>
+                </div>
+
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text text-xs">Max Turns</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-[10px]">--max-turns</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="max_turns"
+                    min="1"
+                    placeholder="unlimited"
+                    class="input input-bordered input-sm w-full font-mono"
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text text-xs">Add Directory</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-[10px]">--add-dir</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="add_dir"
+                    placeholder="/path/to/shared-lib"
+                    class="input input-bordered input-sm w-full font-mono"
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text text-xs">MCP Config File</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-[10px]">--mcp-config</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="mcp_config"
+                    placeholder="./mcp-servers.json"
+                    class="input input-bordered input-sm w-full font-mono"
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text text-xs">Plugin Directory</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-[10px]">--plugin-dir</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="plugin_dir"
+                    placeholder="./my-plugins"
+                    class="input input-bordered input-sm w-full font-mono"
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text text-xs">Settings File</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-[10px]">--settings</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="settings_file"
+                    placeholder="./settings.json"
+                    class="input input-bordered input-sm w-full font-mono"
+                  />
+                </div>
+
+                <div class="flex flex-col gap-1 pt-1">
+                  <label class="label cursor-pointer justify-start gap-2 py-1">
+                    <input
+                      type="checkbox"
+                      name="chrome"
+                      value="true"
+                      class="checkbox checkbox-sm checkbox-primary"
+                    />
+                    <span class="label-text text-xs">
+                      Chrome integration
+                      <span class="font-mono text-base-content/40 text-[10px] ml-1">--chrome</span>
+                    </span>
+                  </label>
+                  <label class="label cursor-pointer justify-start gap-2 py-1">
+                    <input
+                      type="checkbox"
+                      name="sandbox"
+                      value="true"
+                      class="checkbox checkbox-sm checkbox-primary"
+                    />
+                    <span class="label-text text-xs">
+                      OS sandbox isolation
+                      <span class="font-mono text-base-content/40 text-[10px] ml-1">--sandbox</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Actions -->
             <.form_actions submit_text="Create Agent" cancel_event={@toggle_event} class="mt-4" />
           </form>
         </div>

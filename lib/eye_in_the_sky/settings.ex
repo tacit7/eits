@@ -14,7 +14,7 @@ defmodule EyeInTheSky.Settings do
 
   @defaults %{
     "default_model" => "sonnet",
-    "cli_idle_timeout_ms" => "300000",
+    "cli_idle_timeout_ms" => "0",
     "log_claude_raw" => "false",
     "log_codex_raw" => "false",
     "tts_voice" => "Ava",

@@ -836,6 +836,85 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
     if new_mock, do: send(new_mock, {:exit, 0})
   end
 
+  # --- SDK cancel on error tests ---
+  # Verify do_handle_sdk_error cancels the running SDK process to prevent orphans
+
+  test "handler crash cancels SDK process before clearing state", %{track: track} do
+    {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+
+    Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "agent:working")
+    session_id = session.id
+
+    assert {:ok, _} = EyeInTheSky.Agents.AgentManager.send_message(session.id, "msg-1")
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    mock_port = wait_for_mock_port(session.id)
+    assert mock_port != nil
+
+    # Monitor the mock port to detect when it gets killed by cancel
+    port_ref = Process.monitor(mock_port)
+
+    [{worker_pid, _}] =
+      Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session.id})
+
+    # Get the handler monitor ref from worker state so we can simulate a handler crash
+    worker_state = :sys.get_state(worker_pid)
+    handler_monitor = worker_state.handler_monitor
+    assert handler_monitor != nil
+
+    # Simulate handler crash by sending a :DOWN message with the handler's monitor ref.
+    # The mock port is still alive at this point — without the cancel fix, it would
+    # become an orphan.
+    send(worker_pid, {:DOWN, handler_monitor, :process, self(), :test_crash})
+
+    # The mock port should be cancelled (receives :cancel → exits with 130)
+    assert_receive {:DOWN, ^port_ref, :process, ^mock_port, _reason}, 5_000
+
+    # Verify mock port is dead — no orphan
+    refute Process.alive?(mock_port)
+
+    # Worker state should be cleaned up
+    Process.sleep(100)
+    new_state = :sys.get_state(worker_pid)
+    assert new_state.sdk_ref == nil
+    assert new_state.current_job == nil
+  end
+
+  test "handler crash cancels SDK process for codex provider", %{track: track} do
+    {_agent, session} =
+      create_test_agent_and_session(%{provider: "codex"}, %{track: track})
+
+    Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "agent:working")
+    session_id = session.id
+
+    assert {:ok, _} = EyeInTheSky.Agents.AgentManager.send_message(session.id, "msg-1")
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    mock_port = wait_for_mock_port(session.id)
+    assert mock_port != nil
+
+    port_ref = Process.monitor(mock_port)
+
+    [{worker_pid, _}] =
+      Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session.id})
+
+    worker_state = :sys.get_state(worker_pid)
+    handler_monitor = worker_state.handler_monitor
+    assert handler_monitor != nil
+
+    # Simulate handler crash — Codex provider path
+    send(worker_pid, {:DOWN, handler_monitor, :process, self(), :test_crash})
+
+    # Mock port should be cancelled regardless of provider
+    assert_receive {:DOWN, ^port_ref, :process, ^mock_port, _reason}, 5_000
+    refute Process.alive?(mock_port)
+
+    Process.sleep(100)
+    new_state = :sys.get_state(worker_pid)
+    assert new_state.sdk_ref == nil
+    assert new_state.current_job == nil
+  end
+
   # --- Registry Invariant Tests ---
   # Invariant: exactly one AgentWorker per session, keyed by {:session, session_id}
 

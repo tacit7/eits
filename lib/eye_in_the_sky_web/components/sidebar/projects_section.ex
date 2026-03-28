@@ -111,10 +111,12 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                 </button>
               </form>
             <% else %>
-              <.link
-                navigate={~p"/projects/#{project.id}"}
+              <button
+                phx-click="select_project"
+                phx-value-project_id={project.id}
+                phx-target={@myself}
                 class={[
-                  "flex items-center gap-2 flex-1 min-w-0 text-sm py-1 transition-colors",
+                  "flex items-center gap-2 flex-1 min-w-0 text-sm py-1 transition-colors text-left",
                   if(@collapsed, do: "px-4 justify-center", else: "pl-3"),
                   if(is_selected,
                     do: "text-primary font-semibold",
@@ -128,7 +130,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                   class={if is_selected, do: "w-4 h-4 flex-shrink-0 text-primary", else: "w-4 h-4 flex-shrink-0"}
                 />
                 <span class={["truncate", if(@collapsed, do: "hidden")]}>{project.name}</span>
-              </.link>
+              </button>
               <%= if !@collapsed do %>
                 <%!-- Hover action menu --%>
                 <div class="opacity-0 group-hover:opacity-100 flex-shrink-0 relative dropdown dropdown-end transition-all">
@@ -188,6 +190,12 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                   {@sidebar_project.name}
                 </span>
               </div>
+              <.panel_nav_item
+                href={~p"/projects/#{@sidebar_project.id}"}
+                icon="hero-home"
+                label="Overview"
+                active={@sidebar_tab == :overview}
+              />
               <.panel_nav_item
                 href={~p"/projects/#{@sidebar_project.id}/sessions"}
                 icon="hero-cpu-chip"

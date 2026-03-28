@@ -189,12 +189,6 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                 </span>
               </div>
               <.panel_nav_item
-                href={~p"/projects/#{@sidebar_project.id}"}
-                icon="hero-home"
-                label="Overview"
-                active={@sidebar_tab == :overview}
-              />
-              <.panel_nav_item
                 href={~p"/projects/#{@sidebar_project.id}/sessions"}
                 icon="hero-cpu-chip"
                 label="Sessions"

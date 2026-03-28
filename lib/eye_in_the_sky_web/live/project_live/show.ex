@@ -306,19 +306,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
             rel = ".claude/#{name}"
 
             if File.dir?(full) do
-              # Skip recursing into git repos (worktrees, submodules, etc.)
               count =
-                if File.exists?(Path.join(full, ".git")),
-                  do: nil,
-                  else: count_files_recursive(full)
-
-              detail =
-                case count do
-                  nil -> "git repo"
-                  n -> "#{n} #{if n == 1, do: "item", else: "items"}"
+                case File.ls(full) do
+                  {:ok, entries} -> length(entries)
+                  _ -> 0
                 end
 
-              %{rel_path: rel, type: :dir, detail: detail}
+              %{rel_path: rel, type: :dir, detail: "#{count} #{if count == 1, do: "item", else: "items"}"}
             else
               size = file_size_label(full)
               %{rel_path: rel, type: :file, detail: size}
@@ -341,23 +335,4 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
     end
   end
 
-  defp count_files_recursive(dir) do
-    case File.ls(dir) do
-      {:ok, entries} ->
-        entries
-        |> Enum.reject(&String.starts_with?(&1, "."))
-        |> Enum.reduce(0, fn name, acc ->
-          full = Path.join(dir, name)
-
-          if File.dir?(full) do
-            acc + count_files_recursive(full)
-          else
-            acc + 1
-          end
-        end)
-
-      _ ->
-        0
-    end
-  end
 end

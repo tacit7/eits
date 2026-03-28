@@ -77,6 +77,32 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
     end
   end
 
+  @doc """
+  Resolves a path to its canonical form, following symlinks.
+  Returns `{:ok, realpath}` or `{:error, reason}`.
+  """
+  @spec safe_realpath(String.t()) :: {:ok, String.t()} | {:error, atom}
+  def safe_realpath(path) do
+    case System.cmd("realpath", [path], stderr_to_stdout: true) do
+      {resolved, 0} -> {:ok, String.trim(resolved)}
+      _ -> {:error, :not_found}
+    end
+  end
+
+  @doc """
+  Returns true if `child_path` is safely contained within `root_path`,
+  resolving symlinks to prevent escape.
+  """
+  @spec path_within?(String.t(), String.t()) :: boolean
+  def path_within?(child_path, root_path) do
+    with {:ok, real_root} <- safe_realpath(root_path),
+         {:ok, real_child} <- safe_realpath(child_path) do
+      String.starts_with?(real_child, real_root <> "/")
+    else
+      _ -> false
+    end
+  end
+
   @spec cm_language(atom) :: String.t()
   def cm_language(file_type) do
     case file_type do

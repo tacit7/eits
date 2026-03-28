@@ -53,6 +53,25 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
       assert File.read!(secret) == "do not touch"
     end
 
+    test "handle_params rejects symlink escape", %{conn: conn} do
+      {project, dir} = create_project_with_dir()
+
+      # Create a file outside project root and a symlink inside pointing to it
+      parent = Path.dirname(dir)
+      secret = Path.join(parent, "secret_symlink.txt")
+      File.write!(secret, "do not touch")
+
+      link_path = Path.join(dir, "escape_link.txt")
+      File.ln_s!(secret, link_path)
+
+      # Navigate to the symlink — path_within? resolves it and should reject
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/files?path=escape_link.txt")
+
+      # File should not be loaded since realpath resolves outside project
+      assert render(view) =~ "Access denied"
+      assert File.read!(secret) == "do not touch"
+    end
+
     test "returns error flash on write failure", %{conn: conn} do
       {project, dir} = create_project_with_dir()
       file_path = Path.join(dir, "readonly.ex")

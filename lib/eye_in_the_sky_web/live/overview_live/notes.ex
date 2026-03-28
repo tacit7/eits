@@ -21,6 +21,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
       |> assign(:sidebar_tab, :notes)
       |> assign(:sidebar_project, nil)
       |> assign(:show_quick_note_modal, false)
+      |> assign(:type_filter, "all")
       |> load_notes()
 
     {:ok, socket}
@@ -33,6 +34,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
   @impl true
   def handle_event("sort_notes", params, socket),
     do: handle_sort_notes(params, socket, &load_notes/1)
+
+  @impl true
+  def handle_event("filter_type", params, socket),
+    do: handle_filter_type(params, socket, &load_notes/1)
 
   @impl true
   def handle_event("toggle_starred_filter", params, socket),
@@ -107,6 +112,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
     query = socket.assigns.search_query
     starred_only = socket.assigns.starred_filter
     sort_by = socket.assigns.notes_sort_by
+    type_filter = socket.assigns.type_filter
     order = if sort_by == "oldest", do: [asc: :created_at], else: [desc: :created_at]
 
     notes =
@@ -120,6 +126,14 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
           )
 
         base = if starred_only, do: from(n in base, where: n.starred == 1), else: base
+
+        base =
+          if type_filter != "all" do
+            from(n in base, where: n.parent_type == ^type_filter)
+          else
+            base
+          end
+
         Repo.all(base)
       end
 
@@ -160,6 +174,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
           starred_filter={@starred_filter}
           search_query={@search_query}
           sort_by={@notes_sort_by}
+          type_filter={@type_filter}
           empty_id="overview-notes-empty"
           editing_note_id={@editing_note_id}
           current_path="/notes"

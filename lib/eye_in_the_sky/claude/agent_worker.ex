@@ -719,6 +719,15 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       reason: reason
     })
 
+    # Cancel the underlying SDK process before clearing sdk_ref so the OS process
+    # is killed. Without this, the Claude process keeps running as an orphan because
+    # do_handle_sdk_error is called during error recovery while the worker stays alive
+    # (unlike terminate/2 which only fires when the worker itself stops).
+    if state.sdk_ref do
+      strategy = ProviderStrategy.for_provider(state.provider || "claude")
+      strategy.cancel(state.sdk_ref)
+    end
+
     WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
     demonitor_handler(state.handler_monitor)
 

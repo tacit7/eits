@@ -309,10 +309,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   end
 
   @impl true
+  def handle_info({:agent_working, _session_ref, session_int_id}, socket) do
+    {:noreply, update(socket, :working_session_ids, &MapSet.put(&1, session_int_id))}
+  end
+
+  @impl true
   def handle_info({:agent_stopped, msg}, socket) do
     handle_agent_stopped(socket, msg, fn socket, session_id ->
       update(socket, :working_session_ids, &MapSet.delete(&1, session_id))
     end)
+  end
+
+  @impl true
+  def handle_info({:agent_stopped, _session_ref, session_int_id}, socket) do
+    {:noreply, update(socket, :working_session_ids, &MapSet.delete(&1, session_int_id))}
   end
 
   @impl true

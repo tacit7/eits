@@ -36,11 +36,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           |> Enum.take(5)
 
         # Load recent notes for this project (max 5)
-        recent_notes =
-          Notes.list_notes()
-          |> Enum.filter(&(&1.parent_type == "project" and &1.parent_id == to_string(project_id)))
-          |> Enum.sort_by(& &1.created_at, :desc)
-          |> Enum.take(5)
+        recent_notes = Notes.list_notes_for_project(project_id, limit: 5)
 
         # Load agents for this project
         project_agents = Agents.list_agents_by_project(project_id)

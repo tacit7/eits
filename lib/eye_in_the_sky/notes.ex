@@ -148,6 +148,21 @@ defmodule EyeInTheSky.Notes do
   end
 
   @doc """
+  Returns recent notes for a specific project, ordered by created_at desc.
+  Options: `:limit` (default 5)
+  """
+  def list_notes_for_project(project_id, opts \\ []) do
+    limit_val = Keyword.get(opts, :limit, 5)
+    project_id_str = to_string(project_id)
+
+    Note
+    |> where([n], n.parent_type in ["project", "projects"] and n.parent_id == ^project_id_str)
+    |> order_by([n], desc: n.created_at)
+    |> limit(^limit_val)
+    |> Repo.all()
+  end
+
+  @doc """
   Gets a single note. Returns nil if not found.
   """
   def get_note(id) do

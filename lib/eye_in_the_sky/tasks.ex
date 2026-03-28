@@ -192,15 +192,15 @@ defmodule EyeInTheSky.Tasks do
   """
   def get_task_by_uuid_or_id!(id_str) do
     task =
-      case Repo.get_by(Task, uuid: id_str) do
-        nil ->
-          case Integer.parse(id_str) do
-            {int_id, ""} -> Repo.get!(Task, int_id)
-            _ -> raise Ecto.NoResultsError, queryable: Task
-          end
+      case Integer.parse(id_str) do
+        {int_id, ""} ->
+          Repo.get!(Task, int_id)
 
-        task ->
-          task
+        _ ->
+          case Repo.get_by(Task, uuid: id_str) do
+            nil -> raise Ecto.NoResultsError, queryable: Task
+            task -> task
+          end
       end
 
     Repo.preload(task, [:state, :tags, :sessions, :checklist_items])

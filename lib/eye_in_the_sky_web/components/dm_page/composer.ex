@@ -18,6 +18,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
   attr :context_used, :integer, default: 0
   attr :context_window, :integer, default: 0
   attr :display_name, :string, default: nil
+  attr :session_cli_opts, :list, default: []
 
   def message_form(assigns) do
     ~H"""
@@ -27,6 +28,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
       class="rounded-2xl border border-base-content/10 bg-base-200 shadow-sm outline-none"
       id="message-form"
       data-slash-items={Jason.encode!(@slash_items)}
+      data-session-flags={Jason.encode!(serialize_cli_opts(@session_cli_opts))}
       phx-hook="DmComposer"
     >
       <%= if @display_name do %>
@@ -354,4 +356,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
   end
 
   defp format_number(_), do: "0"
+
+  defp serialize_cli_opts(opts) do
+    key_map = EyeInTheSkyWeb.DmLive.SlashCommands.opt_key_to_slug()
+
+    opts
+    |> Enum.reject(fn {k, _v} -> k in [:_clear, :_noop] end)
+    |> Enum.flat_map(fn {k, v} ->
+      slug = Map.get(key_map, Atom.to_string(k))
+      if slug, do: [%{slug: slug, value: v}], else: []
+    end)
+  end
 end

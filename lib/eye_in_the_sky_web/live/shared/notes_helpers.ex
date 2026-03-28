@@ -22,6 +22,10 @@ defmodule EyeInTheSkyWeb.Live.Shared.NotesHelpers do
     {:noreply, socket |> assign(:notes_sort_by, sort_by) |> reload_fn.()}
   end
 
+  def handle_filter_type(%{"value" => type}, socket, reload_fn) do
+    {:noreply, socket |> assign(:type_filter, type) |> reload_fn.()}
+  end
+
   def handle_toggle_starred_filter(_params, socket, reload_fn) do
     {:noreply,
      socket

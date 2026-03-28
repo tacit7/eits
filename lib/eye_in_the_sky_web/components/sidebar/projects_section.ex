@@ -185,11 +185,6 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
           <%!-- Docked project panel — server-side, renders only for selected project --%>
           <%= if is_selected && !@collapsed do %>
             <div class="mb-1 ml-3.5 border-t-2 border-primary border-r border-b border-primary/15 rounded-br-md bg-primary/[0.03]">
-              <div class="px-2.5 py-1 border-b border-primary/10">
-                <span class="text-[11px] font-medium text-primary truncate block">
-                  {@sidebar_project.name}
-                </span>
-              </div>
               <.panel_nav_item
                 href={~p"/projects/#{@sidebar_project.id}"}
                 icon="hero-home"

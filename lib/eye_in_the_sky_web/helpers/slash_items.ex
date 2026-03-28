@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
   """
 
   alias EyeInTheSky.{Agents, Prompts}
+  alias EyeInTheSkyWeb.DmLive.SlashCommands
 
   @doc """
   Returns a flat list of slash-completable items from all sources:
@@ -32,33 +33,22 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
   end
 
   @doc """
-  Returns hardcoded CLI flag slash items. These map to Claude CLI flags that can
-  be injected inline into DM messages to control how the next invocation runs.
+  Returns a list of CLI flag items derived from SlashCommands.command_metadata/0.
+  Each item has slug, type: "flag", description, and arg_type.
   """
   def cli_flags do
-    [
-      # Session & Context
-      %{slug: "add-dir", type: "flag", description: "Add extra working directory --add-dir <path>"},
-      %{slug: "rename", type: "flag", description: "Rename this session --name <name>"},
-      # Model & Performance
-      %{slug: "model", type: "flag", description: "Set model for this message --model <model>"},
-      %{slug: "effort", type: "flag", description: "Set effort level: low|medium|high|max"},
-      %{slug: "plan", type: "flag", description: "Force plan-only mode, no file changes"},
-      %{slug: "max-turns", type: "flag", description: "Limit agentic steps --max-turns <n>"},
-      # Permissions
-      %{slug: "permissions", type: "flag", description: "Set permission mode --permission-mode <mode>"},
-      %{slug: "sandbox", type: "flag", description: "Enable OS-level sandbox isolation"},
-      %{slug: "no-sandbox", type: "flag", description: "Disable sandbox (no-op in -p mode; off by default)"},
-      # Tools & Integrations
-      %{slug: "agents", type: "flag", description: "Run as named subagent --agent <name>"},
-      %{slug: "chrome", type: "flag", description: "Enable browser automation"},
-      %{slug: "no-chrome", type: "flag", description: "Disable browser automation"},
-      %{slug: "mcp", type: "flag", description: "Load MCP config file --mcp-config <file>"},
-      %{slug: "plugin", type: "flag", description: "Load plugins from directory --plugin-dir <path>"},
-      # Configuration
-      %{slug: "config", type: "flag", description: "Load settings from file --settings <file>"},
-    ]
+    SlashCommands.command_metadata()
+    |> Enum.map(fn {slug, arg_type, description} ->
+      %{slug: slug, type: "flag", description: description, arg_type: encode_arg_type(arg_type)}
+    end)
   end
+
+  defp encode_arg_type(:none),           do: "none"
+  defp encode_arg_type(:free_text),      do: "free_text"
+  defp encode_arg_type(:integer),        do: "integer"
+  defp encode_arg_type(:path),           do: "path"
+  defp encode_arg_type({:enum, values}), do: %{type: "enum", values: values}
+
 
   @doc false
   def load_skills(commands_dir, skills_dir) do

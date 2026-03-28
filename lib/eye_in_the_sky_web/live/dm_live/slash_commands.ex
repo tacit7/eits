@@ -1,6 +1,9 @@
 defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
   @moduledoc """
-  Parses inline slash commands from DM message bodies.
+  Single source of truth for CLI slash-command metadata and parsing.
+
+  `command_metadata/0` returns the canonical list used by both the router
+  (route/2 dispatch) and the slash-autocomplete UI (via SlashItems.cli_flags/0).
 
   Slash commands are lines matching `/command [args]`. They are extracted from
   the message body before it reaches Claude. Each command is routed as either:
@@ -9,6 +12,45 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
   - `{:session, {atom, value}}` — stored in session_cli_opts and applied to every subsequent message
   - `:unknown` — left in the message text as-is
   """
+
+  @commands [
+    # {slug, arg_type, description}
+    {"plan",        :none,                                                          "Force plan-only mode, no file changes"},
+    {"sandbox",     :none,                                                          "Enable OS-level sandbox isolation"},
+    {"no-sandbox",  :none,                                                          "Disable sandbox"},
+    {"chrome",      :none,                                                          "Enable browser automation"},
+    {"no-chrome",   :none,                                                          "Disable browser automation"},
+    {"permissions", {:enum, ["default", "acceptEdits", "bypassPermissions", "dontAsk", "plan", "auto"]}, "Set permission mode"},
+    {"effort",      {:enum, ["low", "medium", "high", "max"]},                      "Set effort level"},
+    {"model",       {:enum, ["opus", "opus[1m]", "sonnet", "sonnet[1m]", "haiku",
+                             "gpt-5.4", "gpt-5.3-codex", "gpt-5.2-codex",
+                             "gpt-5.2", "gpt-5.1-codex-max", "gpt-5.1-codex-mini"]}, "Set model"},
+    {"max-turns",   :integer,                                                       "Limit agentic steps"},
+    {"add-dir",     :path,                                                          "Add extra working directory"},
+    {"mcp",         :path,                                                          "Load MCP config file"},
+    {"plugin",      :path,                                                          "Load plugins from directory"},
+    {"config",      :path,                                                          "Load settings from file"},
+    {"agents",      :free_text,                                                     "Run as named subagent"},
+    {"rename",      :free_text,                                                     "Rename this session"},
+  ]
+
+  @doc "Returns the canonical command metadata list."
+  def command_metadata, do: @commands
+
+  @doc "Maps CLI option keys (string) to slash slugs."
+  def opt_key_to_slug do
+    %{
+      "chrome"          => "chrome",
+      "permission_mode" => "permissions",
+      "sandbox"         => "sandbox",
+      "mcp_config"      => "mcp",
+      "add_dir"         => "add-dir",
+      "plugin_dir"      => "plugin",
+      "settings_file"   => "config",
+      "agent"           => "agents",
+      "max_turns"       => "max-turns",
+    }
+  end
 
   @slash_pattern ~r/^\/(\S+)(?:\s+(.+?))?$/m
 
@@ -57,10 +99,8 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
   def route("effort", level) when is_binary(level), do: {:server, {:effort, level}}
 
   # Session-level CLI flags: stored in session_cli_opts and applied to every message
-  def route("plan", _), do: {:session, {:permission_mode, "plan"}}
+  def route("plan", _), do: {:session, {:plan, true}}
   def route("sandbox", _), do: {:session, {:sandbox, true}}
-  # --no-sandbox doesn't apply to -p mode, but we still need to clear
-  # a prior /sandbox toggle. :_clear tells apply_session_opts to remove the key.
   def route("no-sandbox", _), do: {:session, {:_clear, :sandbox}}
   def route("chrome", _), do: {:session, {:chrome, true}}
   def route("no-chrome", _), do: {:session, {:chrome, false}}

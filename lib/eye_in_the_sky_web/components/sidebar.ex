@@ -293,7 +293,6 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
         id="app-sidebar"
         phx-hook="SidebarState"
         phx-target={@myself}
-        data-active-project-id={@sidebar_project && @sidebar_project.id}
         class={[
           "flex flex-col h-full border-r border-base-content/10 bg-base-100 lg:bg-gradient-to-t lg:from-base-300/5 lg:to-base-300/30 shadow-lg lg:shadow-none transition-[background-color,border-color,box-shadow] duration-[35ms] flex-shrink-0 overflow-hidden safe-inset-y",
           "fixed inset-y-0 left-0 z-50 md:relative md:inset-auto md:z-auto",
@@ -440,7 +439,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
         />
       <% end %>
       <.icon name="hero-rectangle-stack" class="w-4 h-4 flex-shrink-0" />
-      <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>Overview</span>
+      <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>Workspace</span>
       <%= if overview_active && !@collapsed do %>
         <span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"></span>
       <% end %>

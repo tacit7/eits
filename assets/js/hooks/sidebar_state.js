@@ -12,23 +12,13 @@ export const SidebarState = {
     // Restore section expanded states (overview, projects, system) from localStorage
     this._restoreSectionStates()
 
-    // Apply project expansion state immediately from localStorage (no server round-trip)
-    this._applyExpandedProjects()
-
-    // Handle project toggle buttons and section toggle buttons (delegated click on sidebar)
+    // Handle section toggle buttons (delegated click on sidebar)
     this.el.addEventListener("click", (e) => {
-      // Section toggles (overview, projects, system)
       const sectionBtn = e.target.closest("[data-section-toggle]")
       if (sectionBtn) {
         const section = sectionBtn.dataset.sectionToggle
         this._persistSectionToggle(section)
-        return
       }
-
-      const btn = e.target.closest("[data-project-toggle]")
-      if (!btn) return
-      const id = btn.dataset.projectToggle
-      this._toggleProject(id)
     })
 
     this._projectFilterInput = this.el.querySelector("[data-project-filter]")
@@ -72,8 +62,6 @@ export const SidebarState = {
       this.el.addEventListener("touchend", this._sidebarGesture.onTouchEnd, { passive: true })
 
       // Edge swipe right via dedicated grab handle → open sidebar.
-      // #sidebar-grab-handle has touch-action:none so Safari's native back
-      // gesture won't intercept touches that start on it.
       this._edgeGesture = createSwipeDetector({
         onSwipeRight: () => this.pushEventTo(this.el, "open_mobile", {}),
       })
@@ -87,72 +75,8 @@ export const SidebarState = {
   },
 
   updated() {
-    // After LiveView re-renders (e.g. active project changed), reapply expansion state
-    // and ensure the active project is expanded
-    const activeId = this.el.dataset.activeProjectId
-    if (activeId) {
-      const expanded = this._getExpanded()
-      if (!expanded.has(activeId)) {
-        expanded.add(activeId)
-        this._saveExpanded(expanded)
-      }
-    }
-    this._applyExpandedProjects()
     const filterValue = this._projectFilterInput?.value || ""
     this._applyProjectFilter(filterValue)
-  },
-
-  _getExpanded() {
-    try {
-      const saved = localStorage.getItem("sidebar_expanded_projects")
-      return new Set(saved ? JSON.parse(saved) : [])
-    } catch (_) {
-      return new Set()
-    }
-  },
-
-  _saveExpanded(set) {
-    localStorage.setItem("sidebar_expanded_projects", JSON.stringify([...set]))
-  },
-
-  _toggleProject(id) {
-    const expanded = this._getExpanded()
-    if (expanded.has(id)) {
-      expanded.delete(id)
-    } else {
-      expanded.add(id)
-    }
-    this._saveExpanded(expanded)
-    this._applyProject(id, expanded.has(id))
-  },
-
-  _applyExpandedProjects() {
-    const expanded = this._getExpanded()
-
-    // Also auto-expand the active project
-    const activeId = this.el.dataset.activeProjectId
-    if (activeId) {
-      expanded.add(activeId)
-      this._saveExpanded(expanded)
-    }
-
-    this.el.querySelectorAll("[data-project-id]").forEach(el => {
-      const id = el.dataset.projectId
-      this._applyProject(id, expanded.has(id))
-    })
-  },
-
-  _applyProject(id, isExpanded) {
-    const sub = document.getElementById(`project-sub-${id}`)
-    const chevron = this.el.querySelector(`[data-project-chevron="${id}"]`)
-    const toggle = this.el.querySelector(`[data-project-toggle="${id}"]`)
-    if (sub) sub.style.display = isExpanded ? "" : "none"
-    if (toggle) toggle.setAttribute("aria-expanded", isExpanded ? "true" : "false")
-    if (chevron) {
-      chevron.innerHTML = isExpanded
-        ? `<svg class="w-3.5 h-3.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>`
-        : `<svg class="w-3.5 h-3.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>`
-    }
   },
 
   _applyProjectFilter(rawValue) {
@@ -184,11 +108,9 @@ export const SidebarState = {
     const sectionMap = {
       overview: "toggle_all_projects",
       projects: "toggle_projects",
-      system: "toggle_system",
     }
     for (const [section, event] of Object.entries(sectionMap)) {
       const saved = localStorage.getItem(`sidebar_section_${section}`)
-      // Server defaults all sections to expanded; if stored as collapsed, toggle once
       if (saved === "false") {
         this.pushEventTo(this.el, event, {})
       }
@@ -198,7 +120,6 @@ export const SidebarState = {
   _persistSectionToggle(section) {
     const key = `sidebar_section_${section}`
     const current = localStorage.getItem(key)
-    // Default is expanded (true); toggling flips it
     const newVal = current === "false" ? "true" : "false"
     localStorage.setItem(key, newVal)
   },

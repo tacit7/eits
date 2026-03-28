@@ -11,6 +11,13 @@ defmodule EyeInTheSkyWeb.TelemetryDispatch do
   def dispatch do
     EyeInTheSkyWeb.Telemetry.dispatch_measurements()
   rescue
-    _ -> :ok
+    UndefinedFunctionError ->
+      # Expected during hot-reload; module is temporarily unavailable.
+      :ok
+
+    e ->
+      require Logger
+      Logger.warning("[TelemetryDispatch] unexpected error in dispatch_measurements: #{Exception.message(e)}")
+      :ok
   end
 end

@@ -194,18 +194,41 @@ defmodule EyeInTheSky.Sessions do
   @doc """
   Lists sessions for a single project with agents preloaded.
   Returns sessions ordered by most recent first, excluding archived by default.
-  Pass `include_archived: true` to include archived sessions.
+  Options:
+  - `include_archived: true` — include archived sessions
+  - `active_only: true` — only sessions where ended_at IS NULL
+  - `limit: n` — cap result count at the DB level
   """
   def list_project_sessions_with_agent(project_id, opts \\ []) do
-    sessions =
+    limit_val = Keyword.get(opts, :limit)
+    active_only = Keyword.get(opts, :active_only, false)
+
+    query =
       Session
       |> where([s], s.project_id == ^project_id)
       |> preload(agent: :agent_definition)
       |> order_by([s], desc: s.started_at)
       |> Archivable.include_archived(opts)
+
+    query = if active_only, do: where(query, [s], is_nil(s.ended_at)), else: query
+    query = if limit_val, do: limit(query, ^limit_val), else: query
+
+    sessions = Repo.all(query)
+    attach_current_task_titles(sessions)
+  end
+
+  @doc """
+  Returns `{count, [id]}` for all sessions belonging to a project (including archived).
+  Lightweight — no preloads, no task title joins.
+  """
+  def count_and_ids_for_project(project_id) do
+    rows =
+      Session
+      |> where([s], s.project_id == ^project_id)
+      |> select([s], s.id)
       |> Repo.all()
 
-    attach_current_task_titles(sessions)
+    {length(rows), rows}
   end
 
   defp attach_current_task_titles([]), do: []

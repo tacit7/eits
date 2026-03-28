@@ -29,11 +29,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
         # Load tasks manually due to type mismatch (projects.id is INT, tasks.project_id is TEXT)
         tasks = Projects.get_project_tasks(project_id)
 
-        # Load active sessions for this project (max 5)
+        # Load active sessions for this project (max 5) — filtered in SQL
         active_sessions =
-          Sessions.list_project_sessions_with_agent(project_id)
-          |> Enum.filter(&is_nil(&1.ended_at))
-          |> Enum.take(5)
+          Sessions.list_project_sessions_with_agent(project_id, active_only: true, limit: 5)
 
         # Load recent notes for this project (max 5)
         recent_notes = Notes.list_notes_for_project(project_id, limit: 5)
@@ -41,12 +39,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
         # Load agents for this project
         project_agents = Agents.list_agents_by_project(project_id)
 
-        # Load all sessions for count (include archived for accurate total)
-        all_sessions =
-          Sessions.list_project_sessions_with_agent(project_id, include_archived: true)
+        # Lightweight count + IDs for display and commits query (no preloads)
+        {session_count, session_ids} = Sessions.count_and_ids_for_project(project_id)
 
         # Load recent commits via single batch query
-        session_ids = Enum.map(all_sessions, & &1.id)
         recent_commits = Commits.list_commits_for_sessions(session_ids, limit: 10)
 
         # Task stats
@@ -64,7 +60,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
         |> assign(:active_sessions, active_sessions)
         |> assign(:recent_notes, recent_notes)
         |> assign(:project_agents, project_agents)
-        |> assign(:all_sessions, all_sessions)
+        |> assign(:session_count, session_count)
         |> assign(:recent_commits, recent_commits)
         |> assign(:open_tasks, open_tasks)
         |> assign(:done_tasks, done_tasks)
@@ -91,7 +87,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           <div class="card bg-base-100 shadow-sm">
             <div class="card-body p-3">
               <p class="text-xs text-base-content/50 uppercase tracking-wider">Sessions</p>
-              <p class="text-2xl font-semibold text-base-content">{length(@all_sessions)}</p>
+              <p class="text-2xl font-semibold text-base-content">{@session_count}</p>
               <p class="text-xs text-base-content/40">{length(@active_sessions)} active</p>
             </div>
           </div>
@@ -310,13 +306,19 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
             rel = ".claude/#{name}"
 
             if File.dir?(full) do
-              count = count_files_recursive(full)
+              # Skip recursing into git repos (worktrees, submodules, etc.)
+              count =
+                if File.exists?(Path.join(full, ".git")),
+                  do: nil,
+                  else: count_files_recursive(full)
 
-              %{
-                rel_path: rel,
-                type: :dir,
-                detail: "#{count} #{if count == 1, do: "item", else: "items"}"
-              }
+              detail =
+                case count do
+                  nil -> "git repo"
+                  n -> "#{n} #{if n == 1, do: "item", else: "items"}"
+                end
+
+              %{rel_path: rel, type: :dir, detail: detail}
             else
               size = file_size_label(full)
               %{rel_path: rel, type: :file, detail: size}

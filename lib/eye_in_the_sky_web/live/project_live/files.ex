@@ -240,6 +240,29 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   end
 
   @impl true
+  def handle_event("file_changed", %{"content" => content}, socket) do
+    project = socket.assigns.project
+    file_path = socket.assigns.file_path
+
+    if project && project.path && file_path do
+      full_path = Path.join(project.path, file_path)
+      expanded_root = Path.expand(project.path)
+      expanded_full = Path.expand(full_path)
+
+      if String.starts_with?(expanded_full, expanded_root) do
+        case File.write(full_path, content) do
+          :ok -> {:noreply, put_flash(socket, :info, "Saved")}
+          {:error, reason} -> {:noreply, put_flash(socket, :error, "Save failed: #{reason}")}
+        end
+      else
+        {:noreply, put_flash(socket, :error, "Access denied")}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_info(_msg, socket), do: {:noreply, socket}
 
   attr :item, :map, required: true
@@ -338,10 +361,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
                 <h2 class="text-lg font-semibold text-base-content">{Path.basename(@file_path)}</h2>
                 <p class="text-sm text-base-content/60">{@file_path}</p>
               </div>
-              <!-- Syntax Highlighted Code -->
-              <div class="bg-base-200 rounded-lg overflow-x-auto">
-                <pre class="text-sm"><code id="code-viewer" class={"language-#{language_class(@file_type)}"} phx-hook="Highlight"><%= @file_content %></code></pre>
-              </div>
+              <!-- CodeMirror Editor -->
+              <div
+                id={"codemirror-#{Base.encode16(:crypto.hash(:md5, @file_path), case: :lower)}"}
+                phx-hook="CodeMirror"
+                data-content={Base.encode64(@file_content)}
+                data-lang={cm_language(@file_type)}
+                class="min-h-[400px] rounded-lg overflow-hidden"
+              />
             </div>
           <% else %>
             <!-- Empty State -->
@@ -386,10 +413,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
                   <p class="text-sm text-base-content/60">{@file_path}</p>
                 </div>
               </div>
-              <!-- Syntax Highlighted Code -->
-              <div class="bg-base-200 rounded-lg overflow-x-auto">
-                <pre class="text-sm"><code id="code-viewer" class={"language-#{language_class(@file_type)}"} phx-hook="Highlight"><%= @file_content %></code></pre>
-              </div>
+              <!-- CodeMirror Editor -->
+              <div
+                id={"codemirror-#{Base.encode16(:crypto.hash(:md5, @file_path), case: :lower)}"}
+                phx-hook="CodeMirror"
+                data-content={Base.encode64(@file_content)}
+                data-lang={cm_language(@file_type)}
+                class="min-h-[400px] rounded-lg overflow-hidden"
+              />
             </div>
           <% else %>
             <!-- Directory Listing -->

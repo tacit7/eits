@@ -77,6 +77,22 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
     end
   end
 
+  @spec cm_language(atom) :: String.t()
+  def cm_language(file_type) do
+    case file_type do
+      :elixir -> "elixir"
+      :markdown -> "markdown"
+      :javascript -> "javascript"
+      :typescript -> "javascript"
+      :json -> "json"
+      :yaml -> "yaml"
+      :html -> "html"
+      :css -> "css"
+      :bash -> "shell"
+      _ -> "text"
+    end
+  end
+
   @doc """
   Recursively builds a file tree up to `max_depth`.
   Returns a list of %{name, path, type, children?/size} maps.

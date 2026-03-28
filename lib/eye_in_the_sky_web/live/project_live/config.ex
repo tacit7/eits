@@ -130,6 +130,21 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   end
 
   @impl true
+  def handle_event("file_changed", %{"content" => content}, socket) do
+    path = socket.assigns.selected_file_path
+    claude_dir = socket.assigns.claude_dir
+
+    if path && claude_dir && String.starts_with?(Path.expand(path), Path.expand(claude_dir)) do
+      case File.write(path, content) do
+        :ok -> {:noreply, put_flash(socket, :info, "Saved")}
+        {:error, reason} -> {:noreply, put_flash(socket, :error, "Save failed: #{reason}")}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "Access denied")}
+    end
+  end
+
+  @impl true
   def handle_event("toggle_view_mode", %{"mode" => mode}, socket) do
     project = socket.assigns.project
 
@@ -300,13 +315,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   defp format_size(bytes) when is_integer(bytes), do: "#{Float.round(bytes / 1024, 1)} KB"
   defp format_size(_), do: ""
 
-  defp language_class(:markdown), do: "markdown"
-  defp language_class(:json), do: "json"
-  defp language_class(:elixir), do: "elixir"
-  defp language_class(:bash), do: "bash"
-  defp language_class(:yaml), do: "yaml"
-  defp language_class(:toml), do: "toml"
-  defp language_class(_), do: "plaintext"
+  defp cm_language(:elixir), do: "elixir"
+  defp cm_language(:markdown), do: "markdown"
+  defp cm_language(:json), do: "json"
+  defp cm_language(:bash), do: "shell"
+  defp cm_language(:yaml), do: "yaml"
+  defp cm_language(_), do: "text"
 
   # ── Tree-mode sidebar components ─────────────────────────────────────────────
 
@@ -422,7 +436,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
                         >
                         </div>
                       <% else %>
-                        <pre class="p-4 text-xs font-mono text-base-content whitespace-pre-wrap break-all"><code class={"language-#{language_class(@file_type)}"}>{@file_content}</code></pre>
+                        <div
+                          id={"codemirror-#{Base.encode16(:crypto.hash(:md5, @selected_file), case: :lower)}"}
+                          phx-hook="CodeMirror"
+                          data-content={Base.encode64(@file_content)}
+                          data-lang={cm_language(@file_type)}
+                          class="min-h-[300px]"
+                        />
                       <% end %>
                     </div>
                   </div>
@@ -484,7 +504,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
                     <.icon name="hero-pencil-square" class="w-4 h-4" /> Edit
                   </button>
                 </div>
-                <div class="bg-base-200 rounded-lg overflow-x-auto">
+                <div class="rounded-lg overflow-hidden">
                   <%= if @file_type == :markdown do %>
                     <div
                       id="config-viewer-list"
@@ -494,7 +514,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
                     >
                     </div>
                   <% else %>
-                    <pre class="text-sm p-4"><code id="code-viewer" class={"language-#{language_class(@file_type)}"} phx-hook="Highlight"><%= @file_content %></code></pre>
+                    <div
+                      id={"codemirror-list-#{Base.encode16(:crypto.hash(:md5, @current_path), case: :lower)}"}
+                      phx-hook="CodeMirror"
+                      data-content={Base.encode64(@file_content)}
+                      data-lang={cm_language(@file_type)}
+                      class="min-h-[300px]"
+                    />
                   <% end %>
                 </div>
               </div>

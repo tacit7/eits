@@ -440,7 +440,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
         />
       <% end %>
       <.icon name="hero-rectangle-stack" class="w-4 h-4 flex-shrink-0" />
-      <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>Overview</span>
+      <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>Workspace</span>
       <%= if overview_active && !@collapsed do %>
         <span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"></span>
       <% end %>

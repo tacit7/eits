@@ -75,184 +75,194 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
       <% end %>
 
       <%= for project <- @projects do %>
-      <% is_active_project = @sidebar_project && @sidebar_project.id == project.id %>
-      <div data-project-id={project.id}>
-        <%!-- Project row --%>
-        <div class={[
-          "group flex items-center transition-colors",
-          if(is_active_project,
-            do: "bg-primary/10 border-l-2 border-primary",
-            else: "hover:bg-base-content/5"
-          )
-        ]}>
-          <%= if !@collapsed do %>
-            <button
-              data-project-toggle={project.id}
-              class="pl-3 pr-1 py-1 text-base-content/40 hover:text-base-content/70 flex-shrink-0"
-              title="Expand"
-            >
-              <span data-project-chevron={project.id}>
-                <.icon name="hero-chevron-right-mini" class="w-3.5 h-3.5" />
-              </span>
-            </button>
-          <% end %>
-          <%= if !@collapsed && @renaming_project_id == project.id do %>
-            <%!-- Inline rename input --%>
-            <form
-              phx-submit="commit_rename_project"
-              phx-target={@myself}
-              class="flex-1 flex items-center gap-1 pr-1"
-            >
-              <input
-                type="text"
-                name="name"
-                value={@rename_value}
-                phx-keyup="update_rename_value"
+        <% is_selected = @sidebar_project && @sidebar_project.id == project.id %>
+        <div data-project-id={project.id}>
+          <%!-- Project row --%>
+          <div class={[
+            "group flex items-center transition-colors",
+            if(is_selected,
+              do: "bg-primary/15 border-l-2 border-primary",
+              else: "hover:bg-base-content/5"
+            )
+          ]}>
+            <%= if !@collapsed && @renaming_project_id == project.id do %>
+              <%!-- Inline rename input --%>
+              <form
+                phx-submit="commit_rename_project"
                 phx-target={@myself}
-                class="flex-1 min-w-0 bg-transparent border-b border-primary/40 text-sm text-base-content/80 outline-none py-0.5"
-                autofocus
-              />
-              <button
-                type="button"
-                phx-click="cancel_rename_project"
-                phx-target={@myself}
-                class="flex-shrink-0 text-base-content/30 hover:text-base-content/60"
+                class="flex-1 flex items-center gap-1 pl-3 pr-1"
               >
-                <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
-              </button>
-            </form>
-          <% else %>
-            <.link
-              navigate={~p"/projects/#{project.id}"}
-              class={[
-                "flex items-center gap-2 flex-1 min-w-0 text-sm py-1 transition-colors",
-                if(@collapsed, do: "px-4 justify-center", else: ""),
-                if(is_active_project,
-                  do: "text-primary font-medium",
-                  else: "text-base-content/60 hover:text-base-content/80"
-                )
-              ]}
-              title={project.name}
-            >
-              <.icon name="hero-folder" class="w-4 h-4 flex-shrink-0" />
-              <span class={["truncate", if(@collapsed, do: "hidden")]}>{project.name}</span>
-            </.link>
-            <%= if !@collapsed do %>
-              <%!-- ... dropdown menu --%>
-              <div class="opacity-0 group-hover:opacity-100 flex-shrink-0 relative dropdown dropdown-end transition-all">
+                <input
+                  type="text"
+                  name="name"
+                  value={@rename_value}
+                  phx-keyup="update_rename_value"
+                  phx-target={@myself}
+                  class="flex-1 min-w-0 bg-transparent border-b border-primary/40 text-sm text-base-content/80 outline-none py-0.5"
+                  autofocus
+                />
                 <button
-                  tabindex="0"
-                  class="px-1 py-1 text-base-content/35 hover:text-base-content/70 transition-colors"
-                  title="More options"
+                  type="button"
+                  phx-click="cancel_rename_project"
+                  phx-target={@myself}
+                  class="flex-shrink-0 text-base-content/30 hover:text-base-content/60"
                 >
-                  <.icon name="hero-ellipsis-horizontal-mini" class="w-3.5 h-3.5" />
+                  <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
                 </button>
-                <ul
-                  tabindex="0"
-                  class="dropdown-content z-50 menu menu-xs bg-base-200 border border-base-content/10 rounded-lg shadow-lg w-44 p-1"
-                >
-                  <li>
-                    <button
-                      phx-click="start_rename_project"
-                      phx-value-project_id={project.id}
-                      phx-target={@myself}
-                      class="flex items-center gap-2 text-sm"
-                    >
-                      <.icon name="hero-pencil-mini" class="w-3.5 h-3.5" /> Edit name
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      phx-click="delete_project"
-                      phx-value-project_id={project.id}
-                      phx-target={@myself}
-                      data-confirm={"Remove \"#{project.name}\"?"}
-                      class="flex items-center gap-2 text-sm text-error hover:text-error"
-                    >
-                      <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" /> Remove
-                    </button>
-                  </li>
-                </ul>
-              </div>
-              <%!-- New session (compose) button --%>
-              <button
-                phx-click="new_session"
-                phx-value-project_id={project.id}
-                phx-target={@myself}
-                class="opacity-0 group-hover:opacity-100 flex-shrink-0 px-1 py-1 text-base-content/35 hover:text-primary transition-all"
-                title="New session"
+              </form>
+            <% else %>
+              <.link
+                navigate={~p"/projects/#{project.id}"}
+                class={[
+                  "flex items-center gap-2 flex-1 min-w-0 text-sm py-1 transition-colors",
+                  if(@collapsed, do: "px-4 justify-center", else: "pl-3"),
+                  if(is_selected,
+                    do: "text-primary font-semibold",
+                    else: "text-base-content/60 hover:text-base-content/80"
+                  )
+                ]}
+                title={project.name}
               >
-                <.icon name="hero-pencil-square" class="w-3.5 h-3.5" />
-              </button>
+                <.icon
+                  name={if is_selected, do: "hero-folder-open", else: "hero-folder"}
+                  class={if is_selected, do: "w-4 h-4 flex-shrink-0 text-primary", else: "w-4 h-4 flex-shrink-0"}
+                />
+                <span class={["truncate", if(@collapsed, do: "hidden")]}>{project.name}</span>
+              </.link>
+              <%= if !@collapsed do %>
+                <%!-- Hover action menu --%>
+                <div class="opacity-0 group-hover:opacity-100 flex-shrink-0 relative dropdown dropdown-end transition-all">
+                  <button
+                    tabindex="0"
+                    class="px-1 py-1 text-base-content/35 hover:text-base-content/70 transition-colors"
+                    title="More options"
+                  >
+                    <.icon name="hero-ellipsis-horizontal-mini" class="w-3.5 h-3.5" />
+                  </button>
+                  <ul
+                    tabindex="0"
+                    class="dropdown-content z-50 menu menu-xs bg-base-200 border border-base-content/10 rounded-lg shadow-lg w-44 p-1"
+                  >
+                    <li>
+                      <button
+                        phx-click="start_rename_project"
+                        phx-value-project_id={project.id}
+                        phx-target={@myself}
+                        class="flex items-center gap-2 text-sm"
+                      >
+                        <.icon name="hero-pencil-mini" class="w-3.5 h-3.5" /> Edit name
+                      </button>
+                    </li>
+                    <li>
+                      <button
+                        phx-click="delete_project"
+                        phx-value-project_id={project.id}
+                        phx-target={@myself}
+                        data-confirm={"Remove \"#{project.name}\"?"}
+                        class="flex items-center gap-2 text-sm text-error hover:text-error"
+                      >
+                        <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" /> Remove
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+                <%!-- New session button --%>
+                <button
+                  phx-click="new_session"
+                  phx-value-project_id={project.id}
+                  phx-target={@myself}
+                  class="opacity-0 group-hover:opacity-100 flex-shrink-0 px-1 py-1 text-base-content/35 hover:text-primary transition-all"
+                  title="New session"
+                >
+                  <.icon name="hero-pencil-square" class="w-3.5 h-3.5" />
+                </button>
+              <% end %>
             <% end %>
+          </div>
+
+          <%!-- Docked project panel — server-side, renders only for selected project --%>
+          <%= if is_selected && !@collapsed do %>
+            <div class="mb-1 ml-3.5 border-t-2 border-primary border-r border-b border-primary/15 rounded-br-md bg-primary/[0.03]">
+              <div class="px-2.5 py-1 border-b border-primary/10">
+                <span class="text-[11px] font-medium text-primary truncate block">
+                  {@sidebar_project.name}
+                </span>
+              </div>
+              <.panel_nav_item
+                href={~p"/projects/#{@sidebar_project.id}"}
+                icon="hero-home"
+                label="Overview"
+                active={@sidebar_tab == :overview}
+              />
+              <.panel_nav_item
+                href={~p"/projects/#{@sidebar_project.id}/sessions"}
+                icon="hero-cpu-chip"
+                label="Sessions"
+                active={@sidebar_tab == :sessions}
+              />
+              <.panel_nav_item
+                href={~p"/projects/#{@sidebar_project.id}/tasks"}
+                icon="hero-clipboard-document-list"
+                label="Tasks"
+                active={@sidebar_tab in [:tasks, :kanban]}
+              />
+              <.panel_nav_item
+                href={~p"/projects/#{@sidebar_project.id}/prompts"}
+                icon="hero-chat-bubble-left-right"
+                label="Prompts"
+                active={@sidebar_tab == :prompts}
+              />
+              <.panel_nav_item
+                href={~p"/projects/#{@sidebar_project.id}/notes"}
+                icon="hero-document-text"
+                label="Notes"
+                active={@sidebar_tab == :notes}
+              />
+              <.panel_nav_item
+                href={~p"/projects/#{@sidebar_project.id}/files"}
+                icon="hero-folder-open"
+                label="Files"
+                active={@sidebar_tab == :files}
+              />
+              <.panel_nav_item
+                href={~p"/projects/#{@sidebar_project.id}/agents"}
+                icon="hero-users"
+                label="Agents"
+                active={@sidebar_tab == :agents}
+              />
+              <.panel_nav_item
+                href={~p"/projects/#{@sidebar_project.id}/jobs"}
+                icon="hero-clock"
+                label="Jobs"
+                active={@sidebar_tab == :jobs}
+              />
+            </div>
           <% end %>
         </div>
-
-        <%!-- Sub-items — always rendered, shown/hidden by JS --%>
-        <div
-          id={"project-sub-#{project.id}"}
-          class={["ml-5 border-l border-base-content/8", if(@collapsed, do: "hidden")]}
-          style="display: none;"
-        >
-          <.project_sub_item
-            href={~p"/projects/#{project.id}/sessions"}
-            label="Sessions"
-            active={is_active_project && @sidebar_tab == :sessions}
-          />
-          <.project_sub_item
-            href={~p"/projects/#{project.id}/kanban"}
-            label="Tasks"
-            active={is_active_project && (@sidebar_tab == :tasks || @sidebar_tab == :kanban)}
-          />
-          <.project_sub_item
-            href={~p"/projects/#{project.id}/notes"}
-            label="Notes"
-            active={is_active_project && @sidebar_tab == :notes}
-          />
-          <.project_sub_item
-            href={~p"/projects/#{project.id}/prompts"}
-            label="Prompts"
-            active={is_active_project && @sidebar_tab == :prompts}
-          />
-          <.project_sub_item
-            href={~p"/projects/#{project.id}/files"}
-            label="Files"
-            active={is_active_project && @sidebar_tab == :files}
-          />
-          <.project_sub_item
-            href={~p"/projects/#{project.id}/agents"}
-            label="Agents"
-            active={is_active_project && @sidebar_tab == :agents}
-          />
-          <.project_sub_item
-            href={~p"/projects/#{project.id}/jobs"}
-            label="Jobs"
-            active={is_active_project && @sidebar_tab == :jobs}
-          />
-        </div>
-      </div>
-    <% end %>
+      <% end %>
     <% end %>
     """
   end
 
   attr :href, :string, required: true
+  attr :icon, :string, required: true
   attr :label, :string, required: true
   attr :active, :boolean, default: false
 
-  defp project_sub_item(assigns) do
+  defp panel_nav_item(assigns) do
     ~H"""
     <.link
       navigate={@href}
       class={[
-        "block pl-4 pr-3 py-0.5 text-sm transition-colors",
+        "flex items-center gap-1.5 pl-2.5 pr-2 py-1 text-xs border-l-2 transition-colors",
         if(@active,
-          do: "text-primary font-medium bg-primary/5",
-          else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/5"
+          do: "text-primary bg-primary/10 border-primary font-medium",
+          else: "text-base-content/50 hover:text-base-content/75 hover:bg-primary/5 border-transparent"
         )
       ]}
     >
-      {@label}
+      <.icon name={@icon} class="w-3 h-3 flex-shrink-0" />
+      <span class="truncate">{@label}</span>
     </.link>
     """
   end

@@ -76,7 +76,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       expanded_project_path = Path.expand(project.path)
       expanded_full_path = Path.expand(full_path)
 
-      if not String.starts_with?(expanded_full_path, expanded_project_path) do
+      if not String.starts_with?(expanded_full_path, expanded_project_path <> "/") do
         {:noreply,
          socket
          |> assign(:error, "Access denied: path outside project directory")

@@ -86,7 +86,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   def handle_event("view_file", %{"path" => path}, socket) do
     claude_dir = socket.assigns.claude_dir
 
-    if claude_dir && String.starts_with?(path, claude_dir) do
+    if claude_dir && String.starts_with?(path, claude_dir <> "/") do
       content =
         case File.read(path) do
           {:ok, data} -> data
@@ -122,7 +122,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
     path = socket.assigns.selected_file_path
     claude_dir = socket.assigns.claude_dir
 
-    if path && claude_dir && String.starts_with?(path, claude_dir) && File.exists?(path) do
+    if path && claude_dir && String.starts_with?(path, claude_dir <> "/") && File.exists?(path) do
       EyeInTheSkyWeb.Helpers.ViewHelpers.open_in_system(path)
     end
 
@@ -174,7 +174,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
           expanded_base = Path.expand(claude_dir)
           expanded_full = Path.expand(full)
 
-          if String.starts_with?(expanded_full, expanded_base),
+          if String.starts_with?(expanded_full, expanded_base <> "/"),
             do: {:ok, full, path},
             else: {:error, "Access denied"}
         else

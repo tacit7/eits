@@ -20,13 +20,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.ConfigTest do
     {project, tmp_dir, claude_dir}
   end
 
-  defp write_config_file(claude_dir, relative_path, content \\ "original") do
-    full_path = Path.join(claude_dir, relative_path)
-    File.mkdir_p!(Path.dirname(full_path))
-    File.write!(full_path, content)
-    full_path
-  end
-
   # ---------------------------------------------------------------------------
   # Tests
   # ---------------------------------------------------------------------------
@@ -34,7 +27,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.ConfigTest do
   describe "file_changed event" do
     test "saves config file content to disk", %{conn: conn} do
       {project, _dir, claude_dir} = create_project_with_claude_dir()
-      write_config_file(claude_dir, "settings.json", "{}")
+      File.write!(Path.join(claude_dir, "settings.json"), "{}")
 
       {:ok, view, _html} =
         live(conn, ~p"/projects/#{project.id}/config?mode=list&path=settings.json")
@@ -44,20 +37,19 @@ defmodule EyeInTheSkyWeb.ProjectLive.ConfigTest do
       assert File.read!(Path.join(claude_dir, "settings.json")) == ~s({"key": "value"})
     end
 
-    test "rejects path traversal via sibling prefix", %{conn: conn} do
-      {project, _dir, claude_dir} = create_project_with_claude_dir()
-      sibling = claude_dir <> "-evil"
-      File.mkdir_p!(sibling)
-      evil_file = Path.join(sibling, "pwned.txt")
-      File.write!(evil_file, "safe")
+    test "handle_params rejects path traversal via ../", %{conn: conn} do
+      {project, dir, _claude_dir} = create_project_with_claude_dir()
 
-      write_config_file(claude_dir, "test.json", "{}")
-      {:ok, _view, _html} =
-        live(conn, ~p"/projects/#{project.id}/config?mode=list&path=test.json")
+      # Create a file outside .claude/
+      secret = Path.join(dir, "secret.txt")
+      File.write!(secret, "do not touch")
 
-      # The file_changed handler uses selected_file_path from socket assigns,
-      # which is set during handle_params. Sibling directories can't be reached.
-      assert File.read!(evil_file) == "safe"
+      # Navigate to ../secret.txt — handle_params should reject
+      {:ok, view, _html} =
+        live(conn, ~p"/projects/#{project.id}/config?mode=list&path=../secret.txt")
+
+      assert render(view) =~ "Access denied"
+      assert File.read!(secret) == "do not touch"
     end
   end
 end

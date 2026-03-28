@@ -96,7 +96,13 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     )
   end
 
-  # Always check the AgentWorker state — do not skip based on session status.
+  # For definitively-ended sessions, never show the stop button regardless of
+  # AgentWorker state. The worker can lag behind the SessionEnd hook that set
+  # "waiting"/"completed"/"failed", causing a false :running state at mount.
+  @ended_statuses ~w(waiting completed failed)
+  defp initial_processing?(%{status: status}) when status in @ended_statuses, do: false
+
+  # For other statuses (working, stopped, idle), always check the AgentWorker.
   # A "stopped" session can have an active worker when the user sends a new
   # message while the Stop hook fires concurrently. Skipping the worker check
   # causes `processing` to mount as false while the worker is running, so new

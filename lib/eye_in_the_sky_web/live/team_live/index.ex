@@ -33,6 +33,9 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
   end
 
   @impl true
+  def handle_info({:new_message, _message}, socket), do: {:noreply, socket}
+
+  @impl true
   def handle_event("search", %{"search" => query}, socket) do
     {:noreply, assign(socket, :search, query)}
   end

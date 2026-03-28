@@ -43,7 +43,11 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
   end
 
   def update(assigns, socket) do
-    sidebar_project = assigns[:sidebar_project]
+    # Parent sets sidebar_project when on a project route; otherwise nil.
+    # Prefer the parent value when present; keep the locally-pinned project
+    # (set via select_project click) when the parent has none.
+    sidebar_project =
+      assigns[:sidebar_project] || socket.assigns[:sidebar_project]
 
     # Auto-expand chat when on chat page
     sidebar_tab = assigns[:sidebar_tab] || :sessions
@@ -94,6 +98,20 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
   @impl true
   def handle_event("toggle_projects", _params, socket) do
     {:noreply, assign(socket, :expanded_projects, !socket.assigns.expanded_projects)}
+  end
+
+  @impl true
+  def handle_event("select_project", %{"project_id" => id_str}, socket) do
+    {id, ""} = Integer.parse(id_str)
+    current_id = get_in(socket.assigns, [:sidebar_project, Access.key(:id)])
+
+    if current_id == id do
+      # Toggle off — clicking the already-selected project collapses the panel
+      {:noreply, assign(socket, :sidebar_project, nil)}
+    else
+      project = Projects.get_project!(id)
+      {:noreply, assign(socket, :sidebar_project, project)}
+    end
   end
 
   @impl true

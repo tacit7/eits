@@ -134,7 +134,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
     path = socket.assigns.selected_file_path
     claude_dir = socket.assigns.claude_dir
 
-    if path && claude_dir && String.starts_with?(Path.expand(path), Path.expand(claude_dir)) do
+    if path && claude_dir && String.starts_with?(Path.expand(path), Path.expand(claude_dir) <> "/") do
       case File.write(path, content) do
         :ok -> {:noreply, put_flash(socket, :info, "Saved")}
         {:error, reason} -> {:noreply, put_flash(socket, :error, "Save failed: #{reason}")}

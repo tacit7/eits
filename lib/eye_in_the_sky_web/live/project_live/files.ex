@@ -249,7 +249,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       expanded_root = Path.expand(project.path)
       expanded_full = Path.expand(full_path)
 
-      if String.starts_with?(expanded_full, expanded_root) do
+      if String.starts_with?(expanded_full, expanded_root <> "/") do
         case File.write(full_path, content) do
           :ok -> {:noreply, put_flash(socket, :info, "Saved")}
           {:error, reason} -> {:noreply, put_flash(socket, :error, "Save failed: #{reason}")}

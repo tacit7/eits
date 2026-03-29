@@ -1,33 +1,58 @@
 // assets/js/hooks/codemirror.js
-import { EditorView, keymap, lineNumbers, highlightActiveLine } from "@codemirror/view"
-import { EditorState } from "@codemirror/state"
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands"
-import { oneDark } from "@codemirror/theme-one-dark"
-import { javascript } from "@codemirror/lang-javascript"
-import { css } from "@codemirror/lang-css"
-import { html } from "@codemirror/lang-html"
-import { markdown } from "@codemirror/lang-markdown"
-import { StreamLanguage } from "@codemirror/language"
-import { shell } from "@codemirror/legacy-modes/mode/shell"
-import { elixir } from "codemirror-lang-elixir"
+// CodeMirror is loaded lazily on first mount to keep the initial JS bundle small.
 
-function getLanguageExtension(lang) {
+async function loadLanguage(lang) {
   switch (lang) {
-    case "elixir": return elixir()
-    case "javascript": case "js": case "ts": return javascript()
-    case "css": return css()
-    case "html": case "heex": return html()
-    case "markdown": case "md": return markdown()
-    case "shell": case "sh": case "bash": return StreamLanguage.define(shell)
+    case "elixir": {
+      const { elixir } = await import("codemirror-lang-elixir")
+      return elixir()
+    }
+    case "javascript": case "js": case "ts": {
+      const { javascript } = await import("@codemirror/lang-javascript")
+      return javascript()
+    }
+    case "css": {
+      const { css } = await import("@codemirror/lang-css")
+      return css()
+    }
+    case "html": case "heex": {
+      const { html } = await import("@codemirror/lang-html")
+      return html()
+    }
+    case "markdown": case "md": {
+      const { markdown } = await import("@codemirror/lang-markdown")
+      return markdown()
+    }
+    case "shell": case "sh": case "bash": {
+      const [{ StreamLanguage }, { shell }] = await Promise.all([
+        import("@codemirror/language"),
+        import("@codemirror/legacy-modes/mode/shell"),
+      ])
+      return StreamLanguage.define(shell)
+    }
     default: return []
   }
 }
 
 export const CodeMirrorHook = {
-  mounted() {
+  async mounted() {
     const content = atob(this.el.dataset.content || "")
     const lang = this.el.dataset.lang || "text"
     const self = this
+
+    const [
+      { EditorView, keymap, lineNumbers, highlightActiveLine },
+      { EditorState },
+      { defaultKeymap, history, historyKeymap },
+      { oneDark },
+      langExtension,
+    ] = await Promise.all([
+      import("@codemirror/view"),
+      import("@codemirror/state"),
+      import("@codemirror/commands"),
+      import("@codemirror/theme-one-dark"),
+      loadLanguage(lang),
+    ])
 
     const saveKeymap = keymap.of([{
       key: "Mod-s",
@@ -46,7 +71,7 @@ export const CodeMirrorHook = {
         keymap.of([...defaultKeymap, ...historyKeymap]),
         saveKeymap,
         oneDark,
-        getLanguageExtension(lang),
+        langExtension,
       ]
     })
 

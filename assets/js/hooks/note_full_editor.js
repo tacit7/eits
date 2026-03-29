@@ -1,24 +1,28 @@
 // assets/js/hooks/note_full_editor.js
-import {
-  EditorView,
-  keymap,
-  highlightActiveLine,
-  lineNumbers
-} from "@codemirror/view"
-import { EditorState } from "@codemirror/state"
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands"
-import { oneDark } from "@codemirror/theme-one-dark"
-import { markdown } from "@codemirror/lang-markdown"
+// CodeMirror is loaded lazily on first mount to keep the initial JS bundle small.
 
 export const NoteFullEditorHook = {
-  mounted() {
+  async mounted() {
     const body = this.el.dataset.body || ""
     const returnTo = this.el.dataset.returnTo || "/notes"
     const self = this
 
     const isDark = document.documentElement.dataset.theme === "dark"
-
     const statusEl = document.getElementById("note-editor-status")
+
+    const [
+      { EditorView, keymap, highlightActiveLine, lineNumbers },
+      { EditorState },
+      { defaultKeymap, history, historyKeymap },
+      { oneDark },
+      { markdown },
+    ] = await Promise.all([
+      import("@codemirror/view"),
+      import("@codemirror/state"),
+      import("@codemirror/commands"),
+      import("@codemirror/theme-one-dark"),
+      import("@codemirror/lang-markdown"),
+    ])
 
     const saveKeymap = keymap.of([
       {

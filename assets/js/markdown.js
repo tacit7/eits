@@ -1,27 +1,32 @@
 import { marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
-import hljs from 'highlight.js';
 
-marked.use(
-  markedHighlight({
-    langPrefix: 'hljs language-',
-    highlight(code, lang) {
-      if (lang && hljs.getLanguage(lang)) {
-        try {
-          return hljs.highlight(code, { language: lang }).value;
-        } catch (err) {
-          console.error('Highlight error:', err);
-        }
-      }
-      return hljs.highlightAuto(code).value;
-    }
-  })
-);
+// hljs is large (~9 MB). Load it once on first use, then cache.
+let _ready = null;
 
-marked.setOptions({
-  breaks: true,
-  gfm: true
-});
+function ensureReady() {
+  if (!_ready) {
+    _ready = import('highlight.js').then(({ default: hljs }) => {
+      marked.use(
+        markedHighlight({
+          langPrefix: 'hljs language-',
+          highlight(code, lang) {
+            if (lang && hljs.getLanguage(lang)) {
+              try {
+                return hljs.highlight(code, { language: lang }).value;
+              } catch (err) {
+                console.error('Highlight error:', err);
+              }
+            }
+            return hljs.highlightAuto(code).value;
+          }
+        })
+      );
+      marked.setOptions({ breaks: true, gfm: true });
+    });
+  }
+  return _ready;
+}
 
 function stripFrontmatter(markdown) {
   if (!markdown.startsWith('---')) return markdown;
@@ -59,12 +64,12 @@ function escapeHtml(str) {
 }
 
 /**
- * Render markdown with syntax highlighting
- * @param {string} markdown - The markdown text to render
- * @returns {string} HTML string with syntax highlighting
+ * Render markdown with syntax highlighting.
+ * Returns a Promise<string>. hljs is loaded lazily on first call.
  */
-export function renderMarkdown(markdown) {
+export async function renderMarkdown(markdown) {
   if (!markdown) return '';
+  await ensureReady();
   return marked.parse(preprocessEitsCmds(stripFrontmatter(markdown)));
 }
 

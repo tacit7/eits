@@ -34,7 +34,6 @@ config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
   code_reloader: true,
   debug_errors: true,
   secret_key_base: "N/iElaaIGg/5yCN4JOKd13aAXziMbsBDWfTjQFgjjLY32KpeZ7hBDnQEx1AcpSLO",
-  static_url: [host: "localhost", port: 5173],
   watchers: [
     vite: {PhoenixVite.Npm, :run, [:vite, ~w(dev)]},
     tailwind: {Tailwind, :install_and_run, [:eye_in_the_sky, ~w(--watch)]}

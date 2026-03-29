@@ -5,7 +5,7 @@
 | Dependency | Version | Notes |
 |-----------|---------|-------|
 | Elixir | 1.15+ | OTP 26+ included |
-| Node.js | 22 LTS | Svelte 5 + esbuild require 18+ |
+| Node.js | 22 LTS | Svelte 5 + Vite require 18+ |
 | PostgreSQL | 12+ | `eits_dev` database |
 | Caddy | any | HTTPS proxy for WebAuthn |
 | NATS | optional | Port 4222, currently disabled in code |

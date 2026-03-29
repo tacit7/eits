@@ -11,7 +11,8 @@ defmodule EyeInTheSky.MixProject do
       aliases: aliases(),
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
-      listeners: [Phoenix.CodeReloader]
+      listeners: [Phoenix.CodeReloader],
+      releases: [eye_in_the_sky: [validate_compile_env: false]]
     ]
   end
 

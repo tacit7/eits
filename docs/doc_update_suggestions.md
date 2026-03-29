@@ -1,5 +1,13 @@
 # Documentation Update Suggestions
 
+## 2026-03-28
+**Commits reviewed**: 624313367941bf1280bd1f090c450e2b3d67594a..f967b6d
+
+- **CODE_GUIDELINES.md** — Document CodeMirror 6 integration on project config and files pages: replace Highlight syntax highlighting with CodeMirror editor (ProjectLive.Files, ProjectLive.Config); Cmd+S save handler with path traversal guard; cm_language/1 helper for language detection; editor remount keyed on file path hash
+- **SECURITY.md or CODE_GUIDELINES.md** — Document path traversal hardening: FileHelpers.safe_realpath/1 resolves symlinks via system realpath; FileHelpers.path_within?/2 replaces all starts_with? guards across files.ex/config.ex/overview config.ex; trailing "/" appended to root before comparison; symlink escape prevention via realpath resolution before path check
+- **WORKERS.md or SESSION_MANAGER.md** — Document SDK process cleanup: do_handle_sdk_error now calls strategy.cancel(sdk_ref) before clearing the ref to kill orphaned Claude CLI processes on handler crash; prevents indefinite background process accumulation
+- **CODE_GUIDELINES.md** — Document sidebar UI improvements: docked project panel expanded on folder click; redundant project name header removed from docked panel; persistent section state across navigation (SidebarState JS hook)
+
 ## 2026-03-26
 **Commits reviewed**: 624313367941bf1280bd1f090c450e2b3d67594a..9a92b45
 

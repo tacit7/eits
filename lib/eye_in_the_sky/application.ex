@@ -9,9 +9,14 @@ defmodule EyeInTheSky.Application do
   def start(_type, _args) do
     Oban.Telemetry.attach_default_logger(:info)
 
-    children = [
-      # Disabled SSR - server module not built
-      # {NodeJS.Supervisor, [path: LiveSvelte.SSR.NodeJS.server_path(), pool_size: 4]},
+    children =
+      if Application.get_env(:live_svelte, :ssr_module) != LiveSvelte.SSR.ViteJS do
+        [{NodeJS.Supervisor, [path: LiveSvelte.SSR.NodeJS.server_path(), pool_size: 4]}]
+      else
+        []
+      end
+
+    children = children ++ [
       EyeInTheSkyWeb.Telemetry,
       EyeInTheSky.Repo,
       {Ecto.Migrator,

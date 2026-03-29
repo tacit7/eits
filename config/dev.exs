@@ -34,9 +34,9 @@ config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
   code_reloader: true,
   debug_errors: true,
   secret_key_base: "N/iElaaIGg/5yCN4JOKd13aAXziMbsBDWfTjQFgjjLY32KpeZ7hBDnQEx1AcpSLO",
+  static_url: [host: "localhost", port: 5173],
   watchers: [
-    node: ["build.js", "--watch", cd: Path.expand("../assets", __DIR__)],
-    # esbuild: {Esbuild, :install_and_run, [:eye_in_the_sky, ~w(--sourcemap=inline --watch)]},
+    vite: {PhoenixVite.Npm, :run, [:vite, ~w(dev)]},
     tailwind: {Tailwind, :install_and_run, [:eye_in_the_sky, ~w(--watch)]}
   ]
 
@@ -78,6 +78,11 @@ config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
         ]
       ]
     end)
+
+# LiveSvelte SSR via Vite dev server in development
+config :live_svelte,
+  ssr_module: LiveSvelte.SSR.ViteJS,
+  vite_host: "http://localhost:5173"
 
 # Enable dev routes for dashboard and mailbox
 config :eye_in_the_sky, dev_routes: true

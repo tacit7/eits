@@ -133,6 +133,8 @@
       return topbar;
     });
   } else {
-    this.topbar = topbar;
+    window.topbar = topbar;
   }
-}.call(this, window, document));
+}.call(window, window, document));
+
+export default window.topbar;

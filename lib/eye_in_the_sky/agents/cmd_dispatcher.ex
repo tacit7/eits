@@ -58,7 +58,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
 
   require Logger
 
-  alias EyeInTheSky.{ChannelMessages, Commits, Messages, Notes, Sessions, Tasks, Teams}
+  alias EyeInTheSky.{ChannelMessages, Commits, Messages, Notes, Notifications, Sessions, Tasks, Teams}
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Teams.TeamMember
 
@@ -148,14 +148,14 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
               Logger.info("[CmdDispatcher] dm #{from_session_id} -> #{to_session.id}")
 
             {:error, reason} ->
-              Logger.warning("[CmdDispatcher] dm persist failed: #{inspect(reason)}")
+              notify_error(from_session_id, "dm persist", reason)
           end
 
         {:error, reason} ->
-          Logger.warning("[CmdDispatcher] dm send failed (not persisted): #{inspect(reason)}")
+          notify_error(from_session_id, "dm send", reason)
       end
     else
-      err -> Logger.warning("[CmdDispatcher] dm failed: #{inspect(err)}")
+      err -> notify_error(from_session_id, "dm", err)
     end
   end
 
@@ -186,7 +186,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
         Logger.info("[CmdDispatcher] task created id=#{task.id} title=#{title}")
 
       {:error, reason} ->
-        Logger.warning("[CmdDispatcher] task create failed: #{inspect(reason)}")
+        notify_error(from_session_id, "task create", reason)
     end
   end
 
@@ -205,7 +205,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
         Logger.info("[CmdDispatcher] task begun id=#{task.id} title=#{title}")
 
       {:error, reason} ->
-        Logger.warning("[CmdDispatcher] task begin failed: #{inspect(reason)}")
+        notify_error(from_session_id, "task begin", reason)
     end
   end
 
@@ -461,10 +461,10 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
           Logger.info("[CmdDispatcher] spawned agent=#{agent.id} session=#{new_session.id} from=#{from_session_id}")
 
         {:error, reason} ->
-          Logger.warning("[CmdDispatcher] spawn failed: #{inspect(reason)}")
+          notify_error(from_session_id, "spawn", reason)
       end
     else
-      err -> Logger.warning("[CmdDispatcher] spawn: missing --instructions flag: #{inspect(err)}")
+      err -> notify_error(from_session_id, "spawn (missing --instructions)", err)
     end
   end
 
@@ -630,6 +630,29 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
       {:ok, value} -> Keyword.put(opts, key, value)
       _ -> opts
     end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Error surfacing
+  # ---------------------------------------------------------------------------
+
+  # Logs the error, creates a persistent notification visible in the UI,
+  # and DMs the error back to the originating agent session so it can react.
+  defp notify_error(from_session_id, cmd, reason) do
+    msg = "[EITS-CMD error] #{cmd}: #{inspect(reason)}"
+    Logger.warning("[CmdDispatcher] #{msg}")
+
+    Notifications.notify("EITS-CMD #{cmd} failed",
+      body: inspect(reason),
+      category: :agent,
+      resource: {"session", to_string(from_session_id)}
+    )
+
+    if from_session_id do
+      Task.start(fn -> AgentManager.send_message(from_session_id, msg) end)
+    end
+
+    :ok
   end
 
   # Handles: --flag "quoted value"  or  --flag multi word value (to next flag or EOL)

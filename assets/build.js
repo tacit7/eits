@@ -18,6 +18,8 @@ if (!deploy) {
 let optsClient = {
     entryPoints: ["js/app.js"],
     bundle: true,
+    splitting: true,
+    format: "esm",
     minify: deploy,
     conditions: clientConditions,
     alias: {svelte: "svelte"},

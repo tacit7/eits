@@ -95,10 +95,16 @@ defmodule EyeInTheSky.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "phoenix_vite.npm assets install"],
-      "assets.build": ["compile", "tailwind eye_in_the_sky", "phoenix_vite.npm vite build"],
+      "assets.build": [
+        "compile",
+        "tailwind eye_in_the_sky",
+        "phoenix_vite.npm vite build",
+        "cmd --cd assets npx vite build --ssr js/server.js --outDir ../priv/svelte"
+      ],
       "assets.deploy": [
         "tailwind eye_in_the_sky --minify",
         "phoenix_vite.npm vite build",
+        "cmd --cd assets npx vite build --ssr js/server.js --outDir ../priv/svelte",
         "phx.digest"
       ],
       precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"]

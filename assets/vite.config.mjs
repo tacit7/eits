@@ -3,6 +3,8 @@ import { svelte } from "@sveltejs/vite-plugin-svelte"
 import liveSveltePlugin from "live_svelte/vitePlugin"
 import { phoenixVitePlugin } from "phoenix_vite"
 
+const isSSR = process.argv.includes("--ssr")
+
 export default defineConfig({
   server: {
     port: 5173,
@@ -12,14 +14,21 @@ export default defineConfig({
   optimizeDeps: {
     include: ["phoenix", "phoenix_html", "phoenix_live_view"],
   },
-  build: {
-    manifest: true,
-    rollupOptions: {
-      input: ["js/app.js"],
-    },
-    outDir: "../priv/static",
-    emptyOutDir: false,
-  },
+  build: isSSR
+    ? {
+        // SSR build: CJS format so NodeJS.call! (which uses require()) can load it
+        rollupOptions: {
+          output: { format: "cjs", entryFileNames: "[name].js" },
+        },
+      }
+    : {
+        manifest: true,
+        rollupOptions: {
+          input: ["js/app.js"],
+        },
+        outDir: "../priv/static",
+        emptyOutDir: false,
+      },
   resolve: {
     alias: {
       "@": ".",

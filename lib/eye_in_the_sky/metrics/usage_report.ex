@@ -142,7 +142,7 @@ defmodule EyeInTheSky.Metrics.UsageReport do
         """
         SELECT
           s.name,
-          s.uuid,
+          s.uuid::text,
           COALESCE(p.name, 'No Project') as project_name,
           sm.model_name,
           COALESCE(sm.input_tokens, 0),

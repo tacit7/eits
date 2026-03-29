@@ -62,30 +62,17 @@ import {showToast} from "./hooks/utils"
 import {getHooks} from "live_svelte"
 import "./theme"
 
-// Import Svelte components manually (esbuild doesn't support import.meta.glob)
-import SessionsSidebar from "../svelte/components/SessionsSidebar.svelte"
-import MainWorkArea from "../svelte/components/MainWorkArea.svelte"
-import ContextPanel from "../svelte/components/ContextPanel.svelte"
-import TasksTab from "../svelte/components/tabs/TasksTab.svelte"
-import CommitsTab from "../svelte/components/tabs/CommitsTab.svelte"
-import LogsTab from "../svelte/components/tabs/LogsTab.svelte"
-import NotesTab from "../svelte/components/tabs/NotesTab.svelte"
-import AgentDetail from "../svelte/components/AgentDetail.svelte"
-import AgentMessagesPanel from "../svelte/components/tabs/AgentMessagesPanel.svelte"
-import FABFlower from "../svelte/components/FABFlower.svelte"
+// Auto-discover Svelte components via live_svelte's Vite plugin.
+// The virtual module keys include the path (e.g. "components/tabs/TasksTab"),
+// but Elixir templates reference bare names (e.g. name="TasksTab"), so we
+// strip the directory prefix to produce a flat name -> Component map.
+import _components from "virtual:live-svelte-components"
 
-let Hooks = getHooks({
-  SessionsSidebar,
-  MainWorkArea,
-  ContextPanel,
-  TasksTab,
-  CommitsTab,
-  LogsTab,
-  NotesTab,
-  AgentDetail,
-  AgentMessagesPanel,
-  FABFlower
-})
+const components = Object.fromEntries(
+  Object.entries(_components).map(([key, comp]) => [key.split("/").pop(), comp])
+)
+
+let Hooks = getHooks(components)
 Hooks.CopyToClipboard = CopyToClipboard
 Hooks.CopySessionId = CopySessionId
 Hooks.BookmarkAgent = BookmarkAgent
@@ -184,7 +171,7 @@ window.liveSocket = liveSocket
 //     1. stream server logs to the browser console
 //     2. click on elements to jump to their definitions in your code editor
 //
-if (process.env.NODE_ENV === "development") {
+if (import.meta.env.DEV) {
   window.addEventListener("phx:live_reload:attached", ({detail: reloader}) => {
     // Enable server log streaming to client.
     // Disable with reloader.disableServerLogs()

@@ -32,9 +32,12 @@ end}>
       />
     </noscript>
     <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
-    <link phx-track-static rel="stylesheet" href={~p"/assets/app.css"} />
-    <script type="module" phx-track-static src={~p"/assets/app.js"}>
-    </script>
+    <PhoenixVite.Components.assets
+      names={["js/app.js"]}
+      manifest={{:eye_in_the_sky, "priv/static/.vite/manifest.json"}}
+      dev_server={PhoenixVite.Components.has_vite_watcher?(EyeInTheSkyWeb.Endpoint)}
+      to_url={fn p -> static_url(assigns[:conn] || assigns[:socket], p) end}
+    />
     <script>
       // Override server-rendered data-theme if localStorage has a saved value
       const saved = localStorage.getItem("theme");

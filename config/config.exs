@@ -33,9 +33,14 @@ config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
 # at the `config/runtime.exs`.
 config :eye_in_the_sky, EyeInTheSky.Mailer, adapter: Swoosh.Adapters.Local
 
-# esbuild is handled by custom build.js script (for Svelte support)
-# See assets/build.js and the node watcher in config/dev.exs
-config :esbuild, :version, "0.25.4"
+# phoenix_vite — npm profiles for local node/npm integration
+config :phoenix_vite, PhoenixVite.Npm,
+  assets: [args: [], cd: Path.expand("../assets", __DIR__)],
+  vite: [
+    args: ~w(exec -- vite),
+    cd: Path.expand("../assets", __DIR__),
+    env: %{"MIX_BUILD_PATH" => Mix.Project.build_path()}
+  ]
 
 # Configure tailwind (the version is required)
 config :tailwind,

@@ -32,7 +32,7 @@ let optsClient = {
         importGlobPlugin(),
         sveltePlugin({
             preprocess: sveltePreprocess(),
-            compilerOptions: {dev: !deploy, css: "injected", generate: "client"},
+            compilerOptions: {dev: !deploy, css: "external", generate: "client"},
         }),
     ],
 }

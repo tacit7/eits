@@ -23,8 +23,8 @@ Same as dev setup (see [SETUP.md](SETUP.md)). You need:
 
 ```bash
 # 1. Build everything
-mix assets.deploy        # tailwind + vite client + vite SSR + phx.digest
-mix release --overwrite  # compile BEAM release
+MIX_ENV=prod mix assets.deploy        # tailwind + vite client + vite SSR + phx.digest
+MIX_ENV=prod mix release --overwrite  # compile BEAM release
 
 # 2. Run it
 source .env
@@ -125,12 +125,6 @@ ngrok http http://localhost:5001
 **`cookie store expects conn.secret_key_base to be at least 64 bytes`**
 Your `SECRET_KEY_BASE` is too short. Use `openssl rand -hex 64` (produces 128 hex chars).
 
-**`validate_compile_env` error about `force_ssl`**
-The release was compiled without prod env vars. Clean and rebuild:
-```bash
-MIX_ENV=prod mix deps.clean eye_in_the_sky --build
-MIX_ENV=prod mix release --overwrite
-```
 
 **WebSocket 403 on ngrok**
 Add the ngrok URL to `WEBAUTHN_EXTRA_ORIGINS` in `.env` and rebuild the release.

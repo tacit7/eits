@@ -269,7 +269,7 @@ The app includes Web Push and PWA install capability.
 - Handles incoming push events and displays notifications
 
 **Configuration (production):**
-Set `WEB_PUSH_ENCRYPTION_KEY` env var (base64-encoded 16-byte key) for push encryption. Missing key disables push (app still works).
+Push encryption uses VAPID keys (`VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in `.env`). Missing keys disable push in dev; raises at startup in prod.
 
 ---
 

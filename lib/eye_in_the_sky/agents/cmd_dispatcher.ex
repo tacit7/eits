@@ -10,6 +10,9 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   ## Supported commands
 
       EITS-CMD: dm --to <session_uuid> --message <text>
+      EITS-CMD: dm list [--limit <n>]
+
+      EITS-CMD: team broadcast --message <text>
 
       EITS-CMD: task create <title>
       EITS-CMD: task begin <title>
@@ -42,6 +45,9 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   ## Usage from a spawned agent (CLAUDE_CODE_ENTRYPOINT=sdk-cli)
 
       EITS-CMD: dm --to 0c77344b-52bc-4c3d-97a1-cf3c421cb325 --message "done"
+      EITS-CMD: dm list
+      EITS-CMD: dm list --limit 5
+      EITS-CMD: team broadcast --message "Build complete, reviewing output"
       EITS-CMD: commit abc1234
       EITS-CMD: task begin Fix broken import in dm_page
       EITS-CMD: task start 1234
@@ -103,6 +109,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
       ["commit", hash]  -> dispatch_commit(String.trim(hash), from_session_id)
       ["spawn", args]   -> dispatch_spawn(args, from_session_id)
       ["teams", args]   -> dispatch_teams(args, from_session_id)
+      ["team", args]    -> dispatch_team(args, from_session_id)
       ["channel", args] -> dispatch_channel(args, from_session_id)
       _                 -> Logger.warning("[CmdDispatcher] Unknown command: #{rest}")
     end
@@ -113,6 +120,47 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   # ---------------------------------------------------------------------------
   # dm
   # ---------------------------------------------------------------------------
+
+  # dm list [--limit <n>] — inject recent inbound DMs back into the agent's context
+  defp dispatch_dm("list" <> rest, from_session_id) do
+    limit =
+      case extract_flag(rest, "--limit") do
+        {:ok, n} ->
+          case Integer.parse(String.trim(n)) do
+            {v, ""} -> min(v, 50)
+            _ -> 20
+          end
+
+        _ ->
+          20
+      end
+
+    import Ecto.Query
+
+    dms =
+      EyeInTheSky.Messages.Message
+      |> where([m], m.to_session_id == ^from_session_id)
+      |> where([m], not is_nil(m.from_session_id))
+      |> order_by([m], desc: m.inserted_at)
+      |> limit(^limit)
+      |> EyeInTheSky.Repo.all()
+      |> Enum.reverse()
+
+    if dms == [] do
+      AgentManager.send_message(from_session_id, "[EITS] dm list: no DMs found")
+    else
+      lines =
+        Enum.map(dms, fn m ->
+          ts = Calendar.strftime(m.inserted_at, "%Y-%m-%d %H:%M:%S")
+          "[#{ts}] from_session:#{m.from_session_id} — #{m.body}"
+        end)
+
+      payload = "[EITS] dm list (#{length(dms)}):\n" <> Enum.join(lines, "\n")
+      AgentManager.send_message(from_session_id, payload)
+    end
+
+    Logger.info("[CmdDispatcher] dm list for session #{from_session_id}, #{length(dms)} results")
+  end
 
   defp dispatch_dm(args, from_session_id) do
     with {:ok, to_ref} <- extract_flag(args, "--to"),
@@ -572,6 +620,49 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
 
   defp dispatch_teams(unknown, _),
     do: Logger.warning("[CmdDispatcher] Unknown teams sub-command: #{unknown}")
+
+  # ---------------------------------------------------------------------------
+  # team (singular) — agent-scoped team commands
+  # ---------------------------------------------------------------------------
+
+  # team broadcast --message <text>
+  # Sends a DM to every other active member in all teams the calling session belongs to.
+  defp dispatch_team("broadcast" <> rest, from_session_id) do
+    case extract_flag(rest, "--message") do
+      {:ok, message} ->
+        import Ecto.Query
+
+        members =
+          EyeInTheSky.Teams.TeamMember
+          |> join(:inner, [m], other in EyeInTheSky.Teams.TeamMember,
+            on: other.team_id == m.team_id and other.session_id != ^from_session_id
+          )
+          |> where([m, _other], m.session_id == ^from_session_id)
+          |> where([_m, other], not is_nil(other.session_id))
+          |> select([_m, other], other)
+          |> distinct(true)
+          |> EyeInTheSky.Repo.all()
+
+        {:ok, from_session} = Sessions.get_session(from_session_id)
+        sender_name = from_session.name || "session:#{from_session.uuid}"
+        dm_body = "[team broadcast] from #{sender_name}: #{message}"
+
+        Enum.each(members, fn member ->
+          Task.start(fn ->
+            AgentManager.send_message(member.session_id, dm_body)
+            Logger.info("[CmdDispatcher] team broadcast -> session #{member.session_id}")
+          end)
+        end)
+
+        Logger.info("[CmdDispatcher] team broadcast from #{from_session_id} to #{length(members)} members")
+
+      _ ->
+        notify_error(from_session_id, "team broadcast", :missing_message_flag)
+    end
+  end
+
+  defp dispatch_team(unknown, _),
+    do: Logger.warning("[CmdDispatcher] Unknown team sub-command: #{unknown}")
 
   # ---------------------------------------------------------------------------
   # channel

@@ -40,6 +40,7 @@ async function loadLanguage(lang) {
 
 export const CodeMirrorHook = {
   async mounted() {
+    this._destroyed = false
     const content = atob(this.el.dataset.content || "")
     const lang = this.el.dataset.lang || "text"
     const self = this
@@ -49,7 +50,7 @@ export const CodeMirrorHook = {
       { EditorState },
       { defaultKeymap, history, historyKeymap },
       { makeThemeCompartment },
-      { makeTabSizeExtension },
+      { makeTabSizeExtension, makeFontSizeExtension, makeVimExtension },
       langExtension,
     ] = await Promise.all([
       import("@codemirror/view"),
@@ -62,6 +63,8 @@ export const CodeMirrorHook = {
 
     const { extension: themeExtension, watch } = await makeThemeCompartment()
     const { extension: tabExtension, watch: tabWatch } = await makeTabSizeExtension()
+    const { extension: fontExtension, watch: watchFont } = await makeFontSizeExtension()
+    const { extension: vimExtension, watch: watchVim } = await makeVimExtension()
 
     const saveKeymap = keymap.of([{
       key: "Mod-s",
@@ -81,18 +84,26 @@ export const CodeMirrorHook = {
         saveKeymap,
         themeExtension,
         tabExtension,
+        fontExtension,
+        vimExtension,
         langExtension,
       ]
     })
 
+    if (this._destroyed) return
     this._view = new EditorView({ state, parent: this.el })
     this._cleanupTheme = watch(this._view)
     this._cleanupTabSize = tabWatch(this._view)
+    this._cleanupFontSize = watchFont(this._view)
+    this._cleanupVim = watchVim(this._view)
   },
 
   destroyed() {
+    this._destroyed = true
     if (this._cleanupTheme) this._cleanupTheme()
     if (this._cleanupTabSize) this._cleanupTabSize()
+    if (this._cleanupFontSize) this._cleanupFontSize()
+    if (this._cleanupVim) this._cleanupVim()
     if (this._view) {
       this._view.destroy()
       this._view = null

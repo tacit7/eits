@@ -68,17 +68,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Restore cm_tab_size from localStorage on page load
-  const savedTabSize = localStorage.getItem('cm_tab_size');
-  if (savedTabSize) {
-    document.documentElement.setAttribute('data-cm-tab-size', savedTabSize);
-  }
-
   // Handle CodeMirror settings changes pushed from LiveView Settings page
   window.addEventListener('phx:apply_cm_settings', ({ detail }) => {
     if (detail.cm_tab_size) {
       document.documentElement.setAttribute('data-cm-tab-size', detail.cm_tab_size);
       localStorage.setItem('cm_tab_size', detail.cm_tab_size);
+    }
+    if (detail.cm_font_size) {
+      document.documentElement.setAttribute('data-cm-font-size', detail.cm_font_size);
+      localStorage.setItem('cm_font_size', detail.cm_font_size);
+    }
+    if (detail.cm_vim !== undefined) {
+      document.documentElement.setAttribute('data-cm-vim', detail.cm_vim);
+      localStorage.setItem('cm_vim', detail.cm_vim);
     }
   });
 });

@@ -116,10 +116,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       |> flash_saved(key)
 
     socket =
-      if key == "theme" do
-        push_event(socket, "apply_theme", %{theme: value})
-      else
-        socket
+      cond do
+        key == "theme" ->
+          push_event(socket, "apply_theme", %{theme: value})
+        key == "cm_font_size" ->
+          push_event(socket, "apply_cm_settings", %{cm_font_size: value})
+        true ->
+          socket
       end
 
     socket =
@@ -181,6 +184,16 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
     {:noreply,
      socket |> assign(:settings, settings) |> put_flash(:info, "Pricing reset to defaults")}
+  end
+
+  @impl true
+  def handle_event("toggle_setting", %{"key" => "cm_vim"}, socket) do
+    current = Settings.get("cm_vim") || "false"
+    new_val = if current == "true", do: "false", else: "true"
+    Settings.put("cm_vim", new_val)
+    settings = Settings.all()
+    socket = socket |> assign(:settings, settings) |> flash_saved("cm_vim")
+    {:noreply, push_event(socket, "apply_cm_settings", %{cm_vim: new_val})}
   end
 
   @impl true
@@ -627,11 +640,40 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
                 </select>
               </form>
             </div>
+            <div class="flex items-center justify-between px-5 py-4">
+              <div>
+                <p class="text-sm font-medium text-base-content">Font Size</p>
+                <p class="text-xs text-base-content/50 mt-0.5">Editor font size in pixels</p>
+              </div>
+              <form phx-change="save_setting" class="flex items-center gap-2">
+                <input type="hidden" name="key" value="cm_font_size" />
+                <select class="select select-bordered select-sm w-24" name="value">
+                  <%= for size <- ["12", "13", "14", "16", "18"] do %>
+                    <option value={size} selected={(@settings["cm_font_size"] || "14") == size}>
+                      {size}px
+                    </option>
+                  <% end %>
+                </select>
+              </form>
+            </div>
             <div class="px-5 py-4">
               <p class="text-sm font-medium text-base-content">In-Browser Editor</p>
               <p class="text-xs text-base-content/50 mt-0.5">
                 CodeMirror 6 is available on config and file browser pages for in-browser editing.
               </p>
+            </div>
+            <div class="flex items-center justify-between px-5 py-4">
+              <div>
+                <p class="text-sm font-medium text-base-content">Vim Keybindings</p>
+                <p class="text-xs text-base-content/50 mt-0.5">Enable vim modal editing</p>
+              </div>
+              <input
+                type="checkbox"
+                class="toggle toggle-sm toggle-primary"
+                checked={@settings["cm_vim"] == "true"}
+                phx-click="toggle_setting"
+                phx-value-key="cm_vim"
+              />
             </div>
           </div>
         </div>

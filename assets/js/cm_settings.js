@@ -1,8 +1,6 @@
-// Lazy-loaded CodeMirror tab size management. Loaded on first editor mount,
-// not at app startup, to keep the initial bundle small.
-//
-// Reads from document.documentElement.dataset.cmTabSize (set in root.html.heex)
-// and listens for phx:apply_cm_settings to update live editors.
+// assets/js/cm_settings.js
+// Shared CodeMirror settings extensions (tab size, font size, vim mode).
+// Loaded lazily — only imported by editor hooks, not at app startup.
 
 export async function makeTabSizeExtension() {
   const [{ EditorState, Compartment }, { indentUnit }] = await Promise.all([
@@ -27,5 +25,60 @@ export async function makeTabSizeExtension() {
       window.addEventListener("phx:apply_cm_settings", handler)
       return () => window.removeEventListener("phx:apply_cm_settings", handler)
     }
+  }
+}
+
+export async function makeFontSizeExtension() {
+  const { EditorView } = await import("@codemirror/view")
+  const { Compartment } = await import("@codemirror/state")
+  const compartment = new Compartment()
+  const size = document.documentElement.dataset.cmFontSize || "14"
+  const makeTheme = (sz) =>
+    EditorView.theme({
+      "&": { fontSize: sz + "px" },
+      ".cm-scroller": { fontFamily: "monospace" },
+    })
+
+  return {
+    extension: compartment.of(makeTheme(size)),
+    watch(view) {
+      const handler = ({ detail }) => {
+        if (detail.cm_font_size) {
+          view.dispatch({ effects: compartment.reconfigure(makeTheme(detail.cm_font_size)) })
+        }
+      }
+      window.addEventListener("phx:apply_cm_settings", handler)
+      return () => window.removeEventListener("phx:apply_cm_settings", handler)
+    },
+  }
+}
+
+const isVim = () => document.documentElement.dataset.cmVim === "true"
+
+export async function makeVimExtension() {
+  const { Compartment } = await import("@codemirror/state")
+  const compartment = new Compartment()
+
+  const loadVim = async () => {
+    if (!isVim()) return []
+    const { vim } = await import("@replit/codemirror-vim")
+    return vim()
+  }
+
+  return {
+    extension: compartment.of(await loadVim()),
+    watch(view) {
+      const handler = async ({ detail }) => {
+        if (detail.cm_vim === undefined) return
+        let ext = []
+        if (detail.cm_vim === "true") {
+          const { vim } = await import("@replit/codemirror-vim")
+          ext = vim()
+        }
+        view.dispatch({ effects: compartment.reconfigure(ext) })
+      }
+      window.addEventListener("phx:apply_cm_settings", handler)
+      return () => window.removeEventListener("phx:apply_cm_settings", handler)
+    },
   }
 }

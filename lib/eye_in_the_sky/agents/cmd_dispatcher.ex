@@ -164,43 +164,59 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
 
   defp dispatch_dm(args, from_session_id) do
     with {:ok, to_ref} <- extract_flag(args, "--to"),
-         {:ok, message} <- extract_flag(args, "--message"),
-         {:ok, from_session} <- Sessions.get_session(from_session_id),
-         {:ok, to_session} <- resolve_session(to_ref) do
-      sender_name = from_session.name || "session:#{from_session.uuid}"
-      dm_body = "DM from:#{sender_name} (session:#{from_session.uuid}) #{message}"
+         {:ok, message} <- extract_flag(args, "--message") do
+      case Sessions.get_session(from_session_id) do
+        {:ok, from_session} ->
+          case resolve_session(to_ref) do
+            {:ok, to_session} ->
+              sender_name = from_session.name || "session:#{from_session.uuid}"
+              dm_body = "DM from:#{sender_name} (session:#{from_session.uuid}) #{message}"
 
-      attrs = %{
-        uuid: Ecto.UUID.generate(),
-        session_id: to_session.id,
-        from_session_id: from_session.id,
-        to_session_id: to_session.id,
-        body: dm_body,
-        sender_role: "agent",
-        recipient_role: "agent",
-        direction: "inbound",
-        status: "sent",
-        provider: "claude",
-        metadata: %{
-          sender_name: sender_name,
-          from_session_uuid: from_session.uuid,
-          to_session_uuid: to_session.uuid
-        }
-      }
+              attrs = %{
+                uuid: Ecto.UUID.generate(),
+                session_id: to_session.id,
+                from_session_id: from_session.id,
+                to_session_id: to_session.id,
+                body: dm_body,
+                sender_role: "agent",
+                recipient_role: "agent",
+                direction: "inbound",
+                status: "sent",
+                provider: "claude",
+                metadata: %{
+                  sender_name: sender_name,
+                  from_session_uuid: from_session.uuid,
+                  to_session_uuid: to_session.uuid
+                }
+              }
 
-      case AgentManager.send_message(to_session.id, dm_body) do
-        {:ok, _} ->
-          case Messages.create_message(attrs) do
-            {:ok, msg} ->
-              EyeInTheSky.Events.session_new_dm(to_session.id, msg)
-              Logger.info("[CmdDispatcher] dm #{from_session_id} -> #{to_session.id}")
+              case AgentManager.send_message(to_session.id, dm_body) do
+                {:ok, _} ->
+                  case Messages.create_message(attrs) do
+                    {:ok, msg} ->
+                      EyeInTheSky.Events.session_new_dm(to_session.id, msg)
+                      Logger.info("[CmdDispatcher] dm #{from_session_id} -> #{to_session.id}")
 
-            {:error, reason} ->
-              notify_error(from_session_id, "dm persist", reason)
+                    {:error, reason} ->
+                      notify_error(from_session_id, "dm persist", reason)
+                  end
+
+                {:error, reason} ->
+                  notify_error(from_session_id, "dm send", reason)
+              end
+
+            {:error, :not_found} ->
+              notify_error(from_session_id, "dm", {:target_session_not_found, to_ref})
+
+            err ->
+              notify_error(from_session_id, "dm", err)
           end
 
-        {:error, reason} ->
-          notify_error(from_session_id, "dm send", reason)
+        {:error, :not_found} ->
+          notify_error(from_session_id, "dm", {:sender_session_not_found, from_session_id})
+
+        err ->
+          notify_error(from_session_id, "dm", err)
       end
     else
       err -> notify_error(from_session_id, "dm", err)

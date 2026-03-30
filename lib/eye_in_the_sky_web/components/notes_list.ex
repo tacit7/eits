@@ -85,20 +85,25 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
     <%= if length(@notes) > 0 do %>
       <div class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5">
         <%= for note <- @notes do %>
-          <div class="py-1 flex items-start gap-1">
-            <%!-- Collapse: title + body --%>
-            <div class="collapse collapse-arrow flex-1 overflow-visible">
+          <div class="py-1 flex items-start gap-1 group">
+            <%!-- Collapse: chevron expands inline body --%>
+            <div class="collapse flex-1 overflow-visible">
               <input type="checkbox" class="min-h-0 p-0" checked={note.id == @editing_note_id} />
-              <div class="collapse-title py-2.5 px-0 min-h-0 flex flex-col gap-1">
-                <div class="flex items-center gap-2">
+              <div class="collapse-title py-3 px-0 min-h-0 flex flex-col gap-1">
+                <%!-- Title — clicking navigates to full editor --%>
+                <div class="flex items-center gap-2 pr-6">
                   <%= if note.starred == 1 do %>
-                    <.icon name="hero-star-solid" class="w-3.5 h-3.5 text-warning flex-shrink-0" />
+                    <.icon name="hero-star-solid" class="w-3 h-3 text-warning flex-shrink-0" />
                   <% end %>
-                  <span class="text-sm font-medium text-base-content/85 truncate">
+                  <.link
+                    navigate={"/notes/#{note.id}/edit?return_to=#{URI.encode_www_form(@current_path)}"}
+                    class="text-sm font-medium text-base-content/85 hover:text-base-content truncate"
+                  >
                     {note.title || extract_title(note.body)}
-                  </span>
+                  </.link>
                 </div>
-                <div class="flex items-center gap-1.5 text-xs text-base-content/40">
+                <%!-- Metadata: type badge • source ref • age --%>
+                <div class="flex items-center gap-1.5 text-[11px] text-base-content/40">
                   <span class={[
                     "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium",
                     parent_type_class(note.parent_type)
@@ -106,9 +111,19 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                     <.icon name={parent_type_icon(note.parent_type)} class="w-2.5 h-2.5" />
                     {parent_type_label(note.parent_type)}
                   </span>
+                  <%= if ref = format_parent_ref(note.parent_id) do %>
+                    <span class="text-base-content/20">&middot;</span>
+                    <span class="font-mono text-base-content/30">{ref}</span>
+                  <% end %>
                   <span class="text-base-content/20">&middot;</span>
                   <span class="tabular-nums">{relative_time(note.created_at)}</span>
                 </div>
+                <%!-- Snippet preview --%>
+                <%= if snippet = extract_snippet(note.body) do %>
+                  <p class="text-xs text-base-content/35 truncate leading-snug mt-0.5 pr-6">
+                    {snippet}
+                  </p>
+                <% end %>
               </div>
               <div class="collapse-content px-0 pb-2">
                 <%= if note.id == @editing_note_id do %>
@@ -142,47 +157,69 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                 <% end %>
               </div>
             </div>
-            <%!-- Action buttons outside collapse so they don't trigger open/close --%>
-            <div class="flex items-center gap-0.5 flex-shrink-0 pt-2.5">
+
+            <%!-- Right: star always visible, kebab on hover --%>
+            <div class="flex items-center gap-0.5 flex-shrink-0 pt-3">
               <button
                 type="button"
                 phx-click="toggle_star"
                 phx-value-note_id={note.id}
-                class="flex items-center gap-1 text-xs text-base-content/30 hover:text-warning transition-colors px-1 py-0.5"
+                class={"flex items-center px-1 py-1 rounded transition-colors " <>
+                  if(note.starred == 1,
+                    do: "text-warning",
+                    else: "text-base-content/20 hover:text-warning"
+                  )}
                 aria-label={if note.starred == 1, do: "Unstar note", else: "Star note"}
-                aria-pressed={note.starred == 1}
               >
                 <.icon
                   name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}
-                  class={"w-3.5 h-3.5 #{if note.starred == 1, do: "text-warning", else: ""}"}
+                  class="w-3.5 h-3.5"
                 />
               </button>
-              <button
-                type="button"
-                phx-click="edit_note"
-                phx-value-note_id={note.id}
-                class="flex items-center gap-1 text-xs text-base-content/30 hover:text-primary transition-colors px-1 py-0.5"
-                aria-label="Edit note"
-              >
-                <.icon name="hero-pencil-square" class="w-3.5 h-3.5" />
-              </button>
-              <.link
-                navigate={"/notes/#{note.id}/edit?return_to=#{URI.encode_www_form(@current_path)}"}
-                class="flex items-center gap-1 text-xs text-base-content/30 hover:text-secondary transition-colors px-1 py-0.5"
-                aria-label="Open full editor"
-              >
-                <.icon name="hero-arrows-pointing-out" class="w-3.5 h-3.5" />
-              </.link>
-              <button
-                type="button"
-                phx-click="delete_note"
-                phx-value-note_id={note.id}
-                data-confirm="Delete this note?"
-                class="flex items-center gap-1 text-xs text-base-content/30 hover:text-error transition-colors px-1 py-0.5"
-                aria-label="Delete note"
-              >
-                <.icon name="hero-trash" class="w-3.5 h-3.5" />
-              </button>
+              <div class="dropdown dropdown-end">
+                <button
+                  tabindex="0"
+                  role="button"
+                  class="flex items-center px-1 py-1 rounded text-base-content/20 hover:text-base-content/60 hover:bg-base-200/50 transition-colors sm:opacity-0 sm:group-hover:opacity-100"
+                  aria-label="More actions"
+                >
+                  <.icon name="hero-ellipsis-vertical" class="w-4 h-4" />
+                </button>
+                <ul
+                  tabindex="0"
+                  class="dropdown-content z-50 menu menu-xs p-1 shadow-lg bg-base-200 rounded-lg w-44 border border-base-content/8"
+                >
+                  <li>
+                    <button
+                      type="button"
+                      phx-click="edit_note"
+                      phx-value-note_id={note.id}
+                      class="flex items-center gap-2 text-xs"
+                    >
+                      <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit inline
+                    </button>
+                  </li>
+                  <li>
+                    <.link
+                      navigate={"/notes/#{note.id}/edit?return_to=#{URI.encode_www_form(@current_path)}"}
+                      class="flex items-center gap-2 text-xs"
+                    >
+                      <.icon name="hero-arrows-pointing-out" class="w-3.5 h-3.5" /> Open full editor
+                    </.link>
+                  </li>
+                  <li class="mt-1 border-t border-base-content/8 pt-1">
+                    <button
+                      type="button"
+                      phx-click="delete_note"
+                      phx-value-note_id={note.id}
+                      data-confirm="Delete this note?"
+                      class="flex items-center gap-2 text-xs text-error/70 hover:!text-error hover:!bg-error/10"
+                    >
+                      <.icon name="hero-trash" class="w-3.5 h-3.5" /> Delete
+                    </button>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         <% end %>
@@ -225,6 +262,18 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
 
   defp parent_type_class(_), do: "bg-base-content/[0.06] text-base-content/50"
 
+  # UUID (36 chars) -> first 8 chars; integer string -> "#N"; nil/empty -> nil
+  defp format_parent_ref(nil), do: nil
+  defp format_parent_ref(""), do: nil
+
+  defp format_parent_ref(id) when is_binary(id) do
+    if String.length(id) == 36 and String.contains?(id, "-") do
+      String.slice(id, 0, 8)
+    else
+      "#" <> id
+    end
+  end
+
   def extract_title(nil), do: "Untitled"
 
   def extract_title(body) when is_binary(body) do
@@ -237,6 +286,36 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
     |> then(fn text ->
       if String.length(text) >= 50, do: text <> "...", else: text
     end)
+  end
+
+  defp extract_snippet(nil), do: nil
+
+  defp extract_snippet(body) when is_binary(body) do
+    body
+    |> String.trim()
+    |> String.split("\n")
+    |> Enum.drop(1)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(fn line ->
+      line == "" or String.starts_with?(line, "#") or String.starts_with?(line, "---")
+    end)
+    |> List.first()
+    |> case do
+      nil ->
+        nil
+
+      line ->
+        stripped =
+          line
+          |> String.replace(~r/^[-*+]\s+/, "")
+          |> String.replace(~r/^\d+\.\s+/, "")
+          |> String.replace(~r/\*\*(.+?)\*\*/, "\\1")
+          |> String.replace(~r/\*(.+?)\*/, "\\1")
+          |> String.replace(~r/`(.+?)`/, "\\1")
+          |> String.replace(~r/\[(.+?)\]\(.+?\)/, "\\1")
+
+        if String.length(stripped) > 0, do: String.slice(stripped, 0, 120), else: nil
+    end
   end
 
   def format_date(nil), do: ""

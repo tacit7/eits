@@ -1,9 +1,12 @@
 <!DOCTYPE html>
-<html lang="en" data-theme={case EyeInTheSky.Settings.get("theme") do
-  nil -> "dark"
-  "" -> "dark"
-  theme -> theme
-end}>
+<html lang="en"
+  data-theme={case EyeInTheSky.Settings.get("theme") do
+    nil -> "dark"
+    "" -> "dark"
+    theme -> theme
+  end}
+  data-cm-font-size={EyeInTheSky.Settings.get("cm_font_size") || "14"}
+>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

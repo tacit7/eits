@@ -1,6 +1,12 @@
 // Daisy UI Theme Controller Integration
 // Handles theme persistence and synchronization across tabs
 
+// Restore cm_font_size from localStorage before first paint
+;(function () {
+  const saved = localStorage.getItem('cm_font_size')
+  if (saved) document.documentElement.setAttribute('data-cm-font-size', saved)
+})()
+
 document.addEventListener('DOMContentLoaded', () => {
   const themeControllers = document.querySelectorAll('.theme-controller');
 
@@ -66,5 +72,13 @@ document.addEventListener('DOMContentLoaded', () => {
         controller.checked = theme !== 'light' && theme !== 'latte';
       }
     });
+  });
+
+  // Handle CM editor settings pushed from LiveView Settings page
+  window.addEventListener('phx:apply_cm_settings', ({ detail }) => {
+    if (detail.cm_font_size) {
+      document.documentElement.setAttribute('data-cm-font-size', detail.cm_font_size)
+      localStorage.setItem('cm_font_size', detail.cm_font_size)
+    }
   });
 });

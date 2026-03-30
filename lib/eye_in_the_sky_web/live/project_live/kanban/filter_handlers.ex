@@ -41,7 +41,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.FilterHandlers do
 
   def handle_update_filter(%{"field" => "priority", "value" => priority}, socket) do
     new_priority = case Integer.parse(priority) do
-      {int, _} -> int
+      {int, ""} -> int
       :error -> nil
     end
     current = socket.assigns.filter_priority

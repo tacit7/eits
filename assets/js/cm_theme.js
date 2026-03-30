@@ -33,10 +33,10 @@ async function ensureModules() {
     import("@uiw/codemirror-theme-tokyo-night"),
     import("@codemirror/language"),
   ])
-  // Fallback highlighter fills in any tags the active theme doesn't cover
-  // (e.g. markdown headings, bold, italic, inline code).
-  const highlightFallback = syntaxHighlighting(defaultHighlightStyle, { fallback: true })
-  _modules = { Compartment, bespin, eclipse, dracula, tokyoNight, highlightFallback }
+  // Base highlighter applied first (lower priority). Theme's own syntaxHighlighting
+  // overrides tokens it explicitly defines; defaultHighlightStyle covers the rest.
+  const highlightBase = syntaxHighlighting(defaultHighlightStyle)
+  _modules = { Compartment, bespin, eclipse, dracula, tokyoNight, highlightBase }
   return _modules
 }
 
@@ -58,7 +58,7 @@ export async function makeThemeCompartment() {
   const appTheme = document.documentElement.dataset.theme || "dark"
 
   return {
-    extension: [compartment.of(resolveTheme(modules, appTheme)), modules.highlightFallback],
+    extension: [modules.highlightBase, compartment.of(resolveTheme(modules, appTheme))],
     watch(view) {
       const handler = ({ detail }) => {
         view.dispatch({

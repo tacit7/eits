@@ -87,7 +87,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
         <%= for note <- @notes do %>
           <div class="py-1 flex items-start gap-1 group">
             <%!-- Collapse: chevron expands inline body --%>
-            <div class="collapse collapse-arrow flex-1 overflow-visible">
+            <div class="collapse flex-1 overflow-visible">
               <input type="checkbox" class="min-h-0 p-0" checked={note.id == @editing_note_id} />
               <div class="collapse-title py-3 px-0 min-h-0 flex flex-col gap-1">
                 <%!-- Title — clicking navigates to full editor --%>

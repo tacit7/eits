@@ -40,6 +40,7 @@ async function loadLanguage(lang) {
 
 export const CodeMirrorHook = {
   async mounted() {
+    this._destroyed = false
     const content = atob(this.el.dataset.content || "")
     const lang = this.el.dataset.lang || "text"
     const self = this
@@ -89,6 +90,7 @@ export const CodeMirrorHook = {
       ]
     })
 
+    if (this._destroyed) return
     this._view = new EditorView({ state, parent: this.el })
     this._cleanupTheme = watch(this._view)
     this._cleanupTabSize = tabWatch(this._view)
@@ -97,6 +99,7 @@ export const CodeMirrorHook = {
   },
 
   destroyed() {
+    this._destroyed = true
     if (this._cleanupTheme) this._cleanupTheme()
     if (this._cleanupTabSize) this._cleanupTabSize()
     if (this._cleanupFontSize) this._cleanupFontSize()

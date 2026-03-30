@@ -3,6 +3,7 @@
 
 export const NoteFullEditorHook = {
   async mounted() {
+    this._destroyed = false
     const body = this.el.dataset.body || ""
     const returnTo = this.el.dataset.returnTo || "/notes"
     const self = this
@@ -77,6 +78,7 @@ export const NoteFullEditorHook = {
       vimExtension,
     ]
 
+    if (this._destroyed) return
     const state = EditorState.create({ doc: body, extensions })
     this._view = new EditorView({ state, parent: this.el })
     this._cleanupTheme = watch(this._view)
@@ -109,6 +111,7 @@ export const NoteFullEditorHook = {
   },
 
   destroyed() {
+    this._destroyed = true
     const titleInput = document.getElementById("note-title-input")
     if (titleInput && this._titleTabHandler) {
       titleInput.removeEventListener("keydown", this._titleTabHandler)

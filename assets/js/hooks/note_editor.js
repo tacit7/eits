@@ -3,6 +3,7 @@
 
 export const NoteEditorHook = {
   async mounted() {
+    this._destroyed = false
     const body = atob(this.el.dataset.body || "")
     const noteId = this.el.dataset.noteId
     this._saved = false
@@ -60,6 +61,7 @@ export const NoteEditorHook = {
       vimExtension,
     ]
 
+    if (this._destroyed) return
     const state = EditorState.create({ doc: body, extensions })
     this._view = new EditorView({ state, parent: this.el })
     this._cleanupTheme = watch(this._view)
@@ -76,6 +78,7 @@ export const NoteEditorHook = {
   },
 
   destroyed() {
+    this._destroyed = true
     // pushEvent from destroyed() is best-effort — it may not reach the server
     // if the socket is already torn down. The LiveView recovers on the next
     // user interaction (clicking Edit again or page reload).

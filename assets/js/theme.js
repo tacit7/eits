@@ -1,12 +1,6 @@
 // Daisy UI Theme Controller Integration
 // Handles theme persistence and synchronization across tabs
 
-// Restore cm_font_size from localStorage before first paint
-;(function () {
-  const saved = localStorage.getItem('cm_font_size')
-  if (saved) document.documentElement.setAttribute('data-cm-font-size', saved)
-})()
-
 document.addEventListener('DOMContentLoaded', () => {
   const themeControllers = document.querySelectorAll('.theme-controller');
 
@@ -73,16 +67,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
-
-  // Restore cm_tab_size from localStorage on page load
-  const savedTabSize = localStorage.getItem('cm_tab_size');
-  if (savedTabSize) {
-    document.documentElement.setAttribute('data-cm-tab-size', savedTabSize);
-  }
-
-  // Restore vim mode from localStorage
-  const savedVim = localStorage.getItem('cm_vim');
-  if (savedVim !== null) document.documentElement.setAttribute('data-cm-vim', savedVim);
 
   // Handle CodeMirror settings changes pushed from LiveView Settings page
   window.addEventListener('phx:apply_cm_settings', ({ detail }) => {

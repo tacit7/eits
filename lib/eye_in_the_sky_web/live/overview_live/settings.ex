@@ -582,10 +582,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   defp render_tab(%{active_tab: :editor} = assigns) do
     ~H"""
-    <div class="space-y-4">
+    <div class="space-y-6">
       <section>
         <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
-          Editor
+          External Editor
         </h2>
         <div class="card bg-base-100 border border-base-300 shadow-sm">
           <div class="card-body p-0 divide-y divide-base-300">
@@ -627,6 +627,15 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
                 />
               </form>
             </div>
+          </div>
+        </div>
+      </section>
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+          CodeMirror
+        </h2>
+        <div class="card bg-base-100 border border-base-300 shadow-sm">
+          <div class="card-body p-0 divide-y divide-base-300">
             <div class="flex items-center justify-between px-5 py-4">
               <div>
                 <p class="text-sm font-medium text-base-content">Tab Size</p>
@@ -655,12 +664,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
                   <% end %>
                 </select>
               </form>
-            </div>
-            <div class="px-5 py-4">
-              <p class="text-sm font-medium text-base-content">In-Browser Editor</p>
-              <p class="text-xs text-base-content/50 mt-0.5">
-                CodeMirror 6 is available on config and file browser pages for in-browser editing.
-              </p>
             </div>
             <div class="flex items-center justify-between px-5 py-4">
               <div>

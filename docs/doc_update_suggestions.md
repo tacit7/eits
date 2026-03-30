@@ -1,5 +1,10 @@
 # Documentation Update Suggestions
 
+## 2026-03-29
+**Commits reviewed**: 624313367941bf1280bd1f090c450e2b3d67594a..87ae294
+
+- **DM_FEATURES.md or CODE_GUIDELINES.md** — Document CmdDispatcher error surfacing: notify_error/3 now creates persistent notifications (toast UI, sidebar badge) and DMs errors back to originating agent session instead of bare logging; applies to dm, task create/begin, and spawn directives; enables agents to react to dispatch failures in real-time
+
 ## 2026-03-28
 **Commits reviewed**: 624313367941bf1280bd1f090c450e2b3d67594a..f967b6d
 

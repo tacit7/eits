@@ -29,7 +29,6 @@ MIX_ENV=prod mix release --overwrite  # compile BEAM release
 # 2. Run it
 source .env
 DATABASE_URL="ecto://postgres:postgres@localhost/eits_dev" \
-SECRET_KEY_BASE="$(openssl rand -hex 64)" \
 WEBAUTHN_ORIGIN="https://eits.dev" \
 WEBAUTHN_RP_ID="eits.dev" \
 PHX_HOST="eits.dev" \
@@ -40,7 +39,7 @@ _build/prod/rel/eye_in_the_sky/bin/eye_in_the_sky start
 
 The release runs in the background. Access at `https://eits.dev` (through Caddy).
 
-**All env vars from `.env` are loaded automatically** via Dotenvy. You only need to provide the ones that `.env` doesn't have: `DATABASE_URL`, `SECRET_KEY_BASE`, `WEBAUTHN_ORIGIN`, `WEBAUTHN_RP_ID`, `PHX_HOST`.
+**All env vars from `.env` are loaded automatically** via Dotenvy. You only need to provide the ones that `.env` doesn't have: `DATABASE_URL`, `WEBAUTHN_ORIGIN`, `WEBAUTHN_RP_ID`, `PHX_HOST`.
 
 ## Managing the release
 
@@ -83,7 +82,7 @@ The `MIX_ENV=prod` prefix is needed for `mix` commands. The release binary doesn
 | Variable | Required | Source | Purpose |
 |----------|----------|--------|---------|
 | `DATABASE_URL` | yes | you set it | Postgres connection string |
-| `SECRET_KEY_BASE` | yes | `openssl rand -hex 64` | Cookie signing (64+ bytes) |
+| `SECRET_KEY_BASE` | yes | `.env` (generate once: `openssl rand -hex 64`) | Cookie signing (64+ bytes) |
 | `PHX_HOST` | yes | you set it | Domain for URL generation |
 | `PHX_SERVER` | yes | set to `true` | Starts the HTTP server |
 | `PORT` | no | default 4000 | HTTP listen port |

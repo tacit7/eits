@@ -129,7 +129,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
 
         base =
           if type_filter != "all" do
-            from(n in base, where: n.parent_type == ^type_filter)
+            variants = type_filter_variants(type_filter)
+            from(n in base, where: n.parent_type in ^variants)
           else
             base
           end

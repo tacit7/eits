@@ -24,14 +24,19 @@ async function ensureModules() {
     { eclipse },
     { dracula },
     { tokyoNight },
+    { syntaxHighlighting, defaultHighlightStyle },
   ] = await Promise.all([
     import("@codemirror/state"),
     import("@uiw/codemirror-theme-bespin"),
     import("@uiw/codemirror-theme-eclipse"),
     import("@uiw/codemirror-theme-dracula"),
     import("@uiw/codemirror-theme-tokyo-night"),
+    import("@codemirror/language"),
   ])
-  _modules = { Compartment, bespin, eclipse, dracula, tokyoNight }
+  // Fallback highlighter fills in any tags the active theme doesn't cover
+  // (e.g. markdown headings, bold, italic, inline code).
+  const highlightFallback = syntaxHighlighting(defaultHighlightStyle, { fallback: true })
+  _modules = { Compartment, bespin, eclipse, dracula, tokyoNight, highlightFallback }
   return _modules
 }
 
@@ -53,7 +58,7 @@ export async function makeThemeCompartment() {
   const appTheme = document.documentElement.dataset.theme || "dark"
 
   return {
-    extension: compartment.of(resolveTheme(modules, appTheme)),
+    extension: [compartment.of(resolveTheme(modules, appTheme)), modules.highlightFallback],
     watch(view) {
       const handler = ({ detail }) => {
         view.dispatch({

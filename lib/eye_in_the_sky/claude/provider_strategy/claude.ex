@@ -77,7 +77,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
       EITS-CMD: task done <id>
       EITS-CMD: note <body>
       EITS-CMD: commit <hash>
-      EITS-CMD: dm --to #{state.eits_session_uuid} --message <text>
+      EITS-CMD: dm --to #{state.session_id} --message <text>
 
     Write EITS-CMD lines anywhere in your output. They are stripped before display.
     You MUST claim a task before editing files:

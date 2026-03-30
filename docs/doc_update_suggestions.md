@@ -1,5 +1,12 @@
 # Documentation Update Suggestions
 
+## 2026-03-29 (Updated)
+**Commits reviewed**: f233620..c4c2112
+
+- No new feature suggestions. Recent commits are documentation-only:
+  - c4c2112: Added DEBUG_VITE_LIVEVIEW.md with diagnostic steps for "Cannot bind multiple views" prod build errors
+  - dce9e53: Updated PRODUCTION.md with SECRET_KEY_BASE persistence notes
+
 ## 2026-03-29
 **Commits reviewed**: 624313367941bf1280bd1f090c450e2b3d67594a..87ae294
 

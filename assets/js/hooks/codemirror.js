@@ -23,6 +23,10 @@ async function loadLanguage(lang) {
       const { markdown } = await import("@codemirror/lang-markdown")
       return markdown()
     }
+    case "json": {
+      const { json } = await import("@codemirror/lang-json")
+      return json()
+    }
     case "shell": case "sh": case "bash": {
       const [{ StreamLanguage }, { shell }] = await Promise.all([
         import("@codemirror/language"),
@@ -44,15 +48,17 @@ export const CodeMirrorHook = {
       { EditorView, keymap, lineNumbers, highlightActiveLine },
       { EditorState },
       { defaultKeymap, history, historyKeymap },
-      { oneDark },
+      { makeThemeCompartment },
       langExtension,
     ] = await Promise.all([
       import("@codemirror/view"),
       import("@codemirror/state"),
       import("@codemirror/commands"),
-      import("@codemirror/theme-one-dark"),
+      import("../cm_theme"),
       loadLanguage(lang),
     ])
+
+    const { extension: themeExtension, watch } = await makeThemeCompartment()
 
     const saveKeymap = keymap.of([{
       key: "Mod-s",
@@ -70,15 +76,17 @@ export const CodeMirrorHook = {
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         saveKeymap,
-        oneDark,
+        themeExtension,
         langExtension,
       ]
     })
 
     this._view = new EditorView({ state, parent: this.el })
+    this._cleanupTheme = watch(this._view)
   },
 
   destroyed() {
+    if (this._cleanupTheme) this._cleanupTheme()
     if (this._view) {
       this._view.destroy()
       this._view = null

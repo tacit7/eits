@@ -49,6 +49,7 @@ defmodule EyeInTheSkyWeb.Components.FileEditorComponent do
       ".html" -> "html"
       ".heex" -> "html"
       ".md" -> "markdown"
+      ".json" -> "json"
       ".sh" -> "shell"
       ".bash" -> "shell"
       _ -> "text"

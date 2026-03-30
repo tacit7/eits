@@ -7,22 +7,23 @@ export const NoteFullEditorHook = {
     const returnTo = this.el.dataset.returnTo || "/notes"
     const self = this
 
-    const isDark = document.documentElement.dataset.theme === "dark"
     const statusEl = document.getElementById("note-editor-status")
 
     const [
       { EditorView, keymap, highlightActiveLine, lineNumbers },
       { EditorState },
       { defaultKeymap, history, historyKeymap },
-      { oneDark },
+      { makeThemeCompartment },
       { markdown },
     ] = await Promise.all([
       import("@codemirror/view"),
       import("@codemirror/state"),
       import("@codemirror/commands"),
-      import("@codemirror/theme-one-dark"),
+      import("../cm_theme"),
       import("@codemirror/lang-markdown"),
     ])
+
+    const { extension: themeExtension, watch } = await makeThemeCompartment()
 
     const saveKeymap = keymap.of([
       {
@@ -65,12 +66,12 @@ export const NoteFullEditorHook = {
       EditorView.lineWrapping,
       statusUpdate,
       fillHeight,
+      themeExtension,
     ]
-
-    if (isDark) extensions.push(oneDark)
 
     const state = EditorState.create({ doc: body, extensions })
     this._view = new EditorView({ state, parent: this.el })
+    this._cleanupTheme = watch(this._view)
 
     // Wire Tab on title input to focus the editor
     const titleInput = document.getElementById("note-title-input")
@@ -105,6 +106,7 @@ export const NoteFullEditorHook = {
     if (saveBtn && this._saveBtnHandler) {
       saveBtn.removeEventListener("click", this._saveBtnHandler)
     }
+    if (this._cleanupTheme) this._cleanupTheme()
     if (this._view) {
       this._view.destroy()
       this._view = null

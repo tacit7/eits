@@ -1,9 +1,12 @@
 <!DOCTYPE html>
-<html lang="en" data-theme={case EyeInTheSky.Settings.get("theme") do
-  nil -> "dark"
-  "" -> "dark"
-  theme -> theme
-end}>
+<html lang="en"
+  data-theme={case EyeInTheSky.Settings.get("theme") do
+    nil -> "dark"
+    "" -> "dark"
+    theme -> theme
+  end}
+  data-cm-tab-size={EyeInTheSky.Settings.get("cm_tab_size") || "2"}
+>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -44,6 +47,9 @@ end}>
       // Override server-rendered data-theme if localStorage has a saved value
       const saved = localStorage.getItem("theme");
       if (saved) document.documentElement.setAttribute("data-theme", saved);
+      // Override server-rendered data-cm-tab-size if localStorage has a saved value
+      const savedTabSize = localStorage.getItem("cm_tab_size");
+      if (savedTabSize) document.documentElement.setAttribute("data-cm-tab-size", savedTabSize);
     </script>
   </head>
   <body class="bg-base-100 min-h-[100dvh] overflow-hidden">

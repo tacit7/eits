@@ -67,4 +67,18 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
+
+  // Restore cm_tab_size from localStorage on page load
+  const savedTabSize = localStorage.getItem('cm_tab_size');
+  if (savedTabSize) {
+    document.documentElement.setAttribute('data-cm-tab-size', savedTabSize);
+  }
+
+  // Handle CodeMirror settings changes pushed from LiveView Settings page
+  window.addEventListener('phx:apply_cm_settings', ({ detail }) => {
+    if (detail.cm_tab_size) {
+      document.documentElement.setAttribute('data-cm-tab-size', detail.cm_tab_size);
+      localStorage.setItem('cm_tab_size', detail.cm_tab_size);
+    }
+  });
 });

@@ -122,6 +122,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
         socket
       end
 
+    socket =
+      if key == "cm_tab_size" do
+        push_event(socket, "apply_cm_settings", %{cm_tab_size: value})
+      else
+        socket
+      end
+
     {:noreply, socket}
   end
 
@@ -605,6 +612,19 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
                   class="input input-bordered input-sm w-36"
                   phx-debounce="500"
                 />
+              </form>
+            </div>
+            <div class="flex items-center justify-between px-5 py-4">
+              <div>
+                <p class="text-sm font-medium text-base-content">Tab Size</p>
+                <p class="text-xs text-base-content/50 mt-0.5">Spaces per indent level</p>
+              </div>
+              <form phx-change="save_setting" class="flex items-center gap-2">
+                <input type="hidden" name="key" value="cm_tab_size" />
+                <select class="select select-bordered select-sm w-24" name="value">
+                  <option value="2" selected={(@settings["cm_tab_size"] || "2") == "2"}>2</option>
+                  <option value="4" selected={@settings["cm_tab_size"] == "4"}>4</option>
+                </select>
               </form>
             </div>
             <div class="px-5 py-4">

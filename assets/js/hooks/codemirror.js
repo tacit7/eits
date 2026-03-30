@@ -49,16 +49,19 @@ export const CodeMirrorHook = {
       { EditorState },
       { defaultKeymap, history, historyKeymap },
       { makeThemeCompartment },
+      { makeTabSizeExtension },
       langExtension,
     ] = await Promise.all([
       import("@codemirror/view"),
       import("@codemirror/state"),
       import("@codemirror/commands"),
       import("../cm_theme"),
+      import("../cm_settings"),
       loadLanguage(lang),
     ])
 
     const { extension: themeExtension, watch } = await makeThemeCompartment()
+    const { extension: tabExtension, watch: tabWatch } = await makeTabSizeExtension()
 
     const saveKeymap = keymap.of([{
       key: "Mod-s",
@@ -77,16 +80,19 @@ export const CodeMirrorHook = {
         keymap.of([...defaultKeymap, ...historyKeymap]),
         saveKeymap,
         themeExtension,
+        tabExtension,
         langExtension,
       ]
     })
 
     this._view = new EditorView({ state, parent: this.el })
     this._cleanupTheme = watch(this._view)
+    this._cleanupTabSize = tabWatch(this._view)
   },
 
   destroyed() {
     if (this._cleanupTheme) this._cleanupTheme()
+    if (this._cleanupTabSize) this._cleanupTabSize()
     if (this._view) {
       this._view.destroy()
       this._view = null

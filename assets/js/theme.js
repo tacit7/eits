@@ -80,6 +80,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.documentElement.setAttribute('data-cm-tab-size', savedTabSize);
   }
 
+  // Restore vim mode from localStorage
+  const savedVim = localStorage.getItem('cm_vim');
+  if (savedVim !== null) document.documentElement.setAttribute('data-cm-vim', savedVim);
+
   // Handle CodeMirror settings changes pushed from LiveView Settings page
   window.addEventListener('phx:apply_cm_settings', ({ detail }) => {
     if (detail.cm_tab_size) {
@@ -89,6 +93,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (detail.cm_font_size) {
       document.documentElement.setAttribute('data-cm-font-size', detail.cm_font_size);
       localStorage.setItem('cm_font_size', detail.cm_font_size);
+    }
+    if (detail.cm_vim !== undefined) {
+      document.documentElement.setAttribute('data-cm-vim', detail.cm_vim);
+      localStorage.setItem('cm_vim', detail.cm_vim);
     }
   });
 });

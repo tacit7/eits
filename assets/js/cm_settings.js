@@ -1,5 +1,5 @@
 // assets/js/cm_settings.js
-// Shared CodeMirror settings extensions (tab size, font size).
+// Shared CodeMirror settings extensions (tab size, font size, vim mode).
 // Loaded lazily — only imported by editor hooks, not at app startup.
 
 export async function makeTabSizeExtension() {
@@ -28,8 +28,6 @@ export async function makeTabSizeExtension() {
   }
 }
 
-// Returns an extension seeded with the current font size, plus a watch()
-// function to wire live switching once the EditorView is created.
 export async function makeFontSizeExtension() {
   const { EditorView } = await import("@codemirror/view")
   const { Compartment } = await import("@codemirror/state")
@@ -48,6 +46,36 @@ export async function makeFontSizeExtension() {
         if (detail.cm_font_size) {
           view.dispatch({ effects: compartment.reconfigure(makeTheme(detail.cm_font_size)) })
         }
+      }
+      window.addEventListener("phx:apply_cm_settings", handler)
+      return () => window.removeEventListener("phx:apply_cm_settings", handler)
+    },
+  }
+}
+
+const isVim = () => document.documentElement.dataset.cmVim === "true"
+
+export async function makeVimExtension() {
+  const { Compartment } = await import("@codemirror/state")
+  const compartment = new Compartment()
+
+  const loadVim = async () => {
+    if (!isVim()) return []
+    const { vim } = await import("@replit/codemirror-vim")
+    return vim()
+  }
+
+  return {
+    extension: compartment.of(await loadVim()),
+    watch(view) {
+      const handler = async ({ detail }) => {
+        if (detail.cm_vim === undefined) return
+        let ext = []
+        if (detail.cm_vim === "true") {
+          const { vim } = await import("@replit/codemirror-vim")
+          ext = vim()
+        }
+        view.dispatch({ effects: compartment.reconfigure(ext) })
       }
       window.addEventListener("phx:apply_cm_settings", handler)
       return () => window.removeEventListener("phx:apply_cm_settings", handler)

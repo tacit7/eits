@@ -14,7 +14,7 @@ export const NoteFullEditorHook = {
       { EditorState },
       { defaultKeymap, history, historyKeymap },
       { makeThemeCompartment },
-      { makeTabSizeExtension, makeFontSizeExtension },
+      { makeTabSizeExtension, makeFontSizeExtension, makeVimExtension },
       { markdown },
     ] = await Promise.all([
       import("@codemirror/view"),
@@ -28,6 +28,7 @@ export const NoteFullEditorHook = {
     const { extension: themeExtension, watch } = await makeThemeCompartment()
     const { extension: tabExtension, watch: tabWatch } = await makeTabSizeExtension()
     const { extension: fontExtension, watch: watchFont } = await makeFontSizeExtension()
+    const { extension: vimExtension, watch: watchVim } = await makeVimExtension()
 
     const saveKeymap = keymap.of([
       {
@@ -73,6 +74,7 @@ export const NoteFullEditorHook = {
       themeExtension,
       tabExtension,
       fontExtension,
+      vimExtension,
     ]
 
     const state = EditorState.create({ doc: body, extensions })
@@ -80,6 +82,7 @@ export const NoteFullEditorHook = {
     this._cleanupTheme = watch(this._view)
     this._cleanupTabSize = tabWatch(this._view)
     this._cleanupFontSize = watchFont(this._view)
+    this._cleanupVim = watchVim(this._view)
 
     // Wire Tab on title input to focus the editor
     const titleInput = document.getElementById("note-title-input")
@@ -117,6 +120,7 @@ export const NoteFullEditorHook = {
     if (this._cleanupTheme) this._cleanupTheme()
     if (this._cleanupTabSize) this._cleanupTabSize()
     if (this._cleanupFontSize) this._cleanupFontSize()
+    if (this._cleanupVim) this._cleanupVim()
     if (this._view) {
       this._view.destroy()
       this._view = null

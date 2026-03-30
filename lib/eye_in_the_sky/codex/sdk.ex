@@ -60,7 +60,7 @@ defmodule EyeInTheSky.Codex.SDK do
       EITS-CMD: task done <id>
       EITS-CMD: note <body>
       EITS-CMD: commit <hash>
-      EITS-CMD: dm --to #{state.eits_session_uuid} --message <text>
+      EITS-CMD: dm --to #{state.session_id} --message <text>
 
     You MUST claim a task before editing files:
       EITS-CMD: task begin <title of your work>

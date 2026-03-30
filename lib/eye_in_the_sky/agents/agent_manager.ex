@@ -307,7 +307,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
     with {:ok, session} <- Sessions.get_session(session_id),
          {:ok, agent} <- Agents.get_agent(session.agent_id),
          provider when not is_nil(provider) <- normalize_provider(session.provider),
-         {:ok, session} <- ensure_session_uuid(session) do
+         {:ok, session} <- ensure_session_uuid(session, provider) do
       project_path = resolve_project_path_with_fallback(session, agent)
 
       Logger.info(
@@ -347,7 +347,12 @@ defmodule EyeInTheSky.Agents.AgentManager do
     end
   end
 
-  defp ensure_session_uuid(session) do
+  # Codex sessions intentionally start with uuid=nil — the real UUID (provider thread_id)
+  # arrives via the thread.started event and is synced by on_provider_conversation_id_changed.
+  # Generating a temp UUID here would become stale and break dm resolve_session lookups.
+  defp ensure_session_uuid(session, "codex"), do: {:ok, session}
+
+  defp ensure_session_uuid(session, _provider) do
     if is_nil(session.uuid) or session.uuid == "" do
       uuid = Ecto.UUID.generate()
       Logger.info("ensure_session_uuid: generating UUID=#{uuid} for session.id=#{session.id}")

@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
   attr :starred_filter, :boolean, default: false
   attr :search_query, :string, default: ""
   attr :sort_by, :string, default: "newest"
+  attr :type_filter, :string, default: "all"
   attr :empty_id, :string, default: "notes-empty"
   attr :editing_note_id, :integer, default: nil
   attr :current_path, :string, default: "/notes"
@@ -46,6 +47,21 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
           class="w-3.5 h-3.5"
         /> Starred
       </button>
+      <form phx-change="filter_type">
+        <label for={"#{@empty_id}-type"} class="sr-only">Filter by type</label>
+        <select
+          name="value"
+          id={"#{@empty_id}-type"}
+          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-0 h-8 text-xs"
+        >
+          <option value="all" selected={@type_filter == "all"}>All Types</option>
+          <option value="session" selected={@type_filter == "session"}>Session</option>
+          <option value="agent" selected={@type_filter == "agent"}>Agent</option>
+          <option value="project" selected={@type_filter == "project"}>Project</option>
+          <option value="task" selected={@type_filter == "task"}>Task</option>
+          <option value="system" selected={@type_filter == "system"}>System</option>
+        </select>
+      </form>
       <form phx-change="sort_notes">
         <label for={"#{@empty_id}-sort"} class="sr-only">Sort notes</label>
         <select

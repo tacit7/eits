@@ -1,8 +1,6 @@
-// Lazy-loaded CodeMirror tab size management. Loaded on first editor mount,
-// not at app startup, to keep the initial bundle small.
-//
-// Reads from document.documentElement.dataset.cmTabSize (set in root.html.heex)
-// and listens for phx:apply_cm_settings to update live editors.
+// assets/js/cm_settings.js
+// Shared CodeMirror settings extensions (tab size, font size).
+// Loaded lazily — only imported by editor hooks, not at app startup.
 
 export async function makeTabSizeExtension() {
   const [{ EditorState, Compartment }, { indentUnit }] = await Promise.all([
@@ -27,5 +25,32 @@ export async function makeTabSizeExtension() {
       window.addEventListener("phx:apply_cm_settings", handler)
       return () => window.removeEventListener("phx:apply_cm_settings", handler)
     }
+  }
+}
+
+// Returns an extension seeded with the current font size, plus a watch()
+// function to wire live switching once the EditorView is created.
+export async function makeFontSizeExtension() {
+  const { EditorView } = await import("@codemirror/view")
+  const { Compartment } = await import("@codemirror/state")
+  const compartment = new Compartment()
+  const size = document.documentElement.dataset.cmFontSize || "14"
+  const makeTheme = (sz) =>
+    EditorView.theme({
+      "&": { fontSize: sz + "px" },
+      ".cm-scroller": { fontFamily: "monospace" },
+    })
+
+  return {
+    extension: compartment.of(makeTheme(size)),
+    watch(view) {
+      const handler = ({ detail }) => {
+        if (detail.cm_font_size) {
+          view.dispatch({ effects: compartment.reconfigure(makeTheme(detail.cm_font_size)) })
+        }
+      }
+      window.addEventListener("phx:apply_cm_settings", handler)
+      return () => window.removeEventListener("phx:apply_cm_settings", handler)
+    },
   }
 }

@@ -116,10 +116,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       |> flash_saved(key)
 
     socket =
-      if key == "theme" do
-        push_event(socket, "apply_theme", %{theme: value})
-      else
-        socket
+      cond do
+        key == "theme" ->
+          push_event(socket, "apply_theme", %{theme: value})
+        key == "cm_font_size" ->
+          push_event(socket, "apply_cm_settings", %{cm_font_size: value})
+        true ->
+          socket
       end
 
     socket =
@@ -624,6 +627,22 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
                 <select class="select select-bordered select-sm w-24" name="value">
                   <option value="2" selected={(@settings["cm_tab_size"] || "2") == "2"}>2</option>
                   <option value="4" selected={@settings["cm_tab_size"] == "4"}>4</option>
+                </select>
+              </form>
+            </div>
+            <div class="flex items-center justify-between px-5 py-4">
+              <div>
+                <p class="text-sm font-medium text-base-content">Font Size</p>
+                <p class="text-xs text-base-content/50 mt-0.5">Editor font size in pixels</p>
+              </div>
+              <form phx-change="save_setting" class="flex items-center gap-2">
+                <input type="hidden" name="key" value="cm_font_size" />
+                <select class="select select-bordered select-sm w-24" name="value">
+                  <%= for size <- ["12", "13", "14", "16", "18"] do %>
+                    <option value={size} selected={(@settings["cm_font_size"] || "14") == size}>
+                      {size}px
+                    </option>
+                  <% end %>
                 </select>
               </form>
             </div>

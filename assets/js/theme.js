@@ -1,6 +1,12 @@
 // Daisy UI Theme Controller Integration
 // Handles theme persistence and synchronization across tabs
 
+// Restore cm_font_size from localStorage before first paint
+;(function () {
+  const saved = localStorage.getItem('cm_font_size')
+  if (saved) document.documentElement.setAttribute('data-cm-font-size', saved)
+})()
+
 document.addEventListener('DOMContentLoaded', () => {
   const themeControllers = document.querySelectorAll('.theme-controller');
 
@@ -79,6 +85,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (detail.cm_tab_size) {
       document.documentElement.setAttribute('data-cm-tab-size', detail.cm_tab_size);
       localStorage.setItem('cm_tab_size', detail.cm_tab_size);
+    }
+    if (detail.cm_font_size) {
+      document.documentElement.setAttribute('data-cm-font-size', detail.cm_font_size);
+      localStorage.setItem('cm_font_size', detail.cm_font_size);
     }
   });
 });

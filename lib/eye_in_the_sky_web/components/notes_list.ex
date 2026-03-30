@@ -180,7 +180,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                 <button
                   tabindex="0"
                   role="button"
-                  class="flex items-center px-1 py-1 rounded text-base-content/20 hover:text-base-content/60 hover:bg-base-200/50 transition-colors opacity-0 group-hover:opacity-100"
+                  class="flex items-center px-1 py-1 rounded text-base-content/20 hover:text-base-content/60 hover:bg-base-200/50 transition-colors sm:opacity-0 sm:group-hover:opacity-100"
                   aria-label="More actions"
                 >
                   <.icon name="hero-ellipsis-vertical" class="w-4 h-4" />

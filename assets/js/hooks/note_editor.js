@@ -15,6 +15,7 @@ export const NoteEditorHook = {
       { defaultKeymap, history, historyKeymap },
       { makeThemeCompartment },
       { makeTabSizeExtension, makeFontSizeExtension, makeVimExtension },
+      { syntaxHighlighting, defaultHighlightStyle },
       { markdown },
     ] = await Promise.all([
       import("@codemirror/view"),
@@ -22,6 +23,7 @@ export const NoteEditorHook = {
       import("@codemirror/commands"),
       import("../cm_theme"),
       import("../cm_settings"),
+      import("@codemirror/language"),
       import("@codemirror/lang-markdown"),
     ])
 
@@ -55,6 +57,7 @@ export const NoteEditorHook = {
       saveKeymap,
       markdown(),
       EditorView.lineWrapping,
+      syntaxHighlighting(defaultHighlightStyle),
       themeExtension,
       tabExtension,
       fontExtension,

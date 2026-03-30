@@ -51,6 +51,7 @@ export const CodeMirrorHook = {
       { defaultKeymap, history, historyKeymap },
       { makeThemeCompartment },
       { makeTabSizeExtension, makeFontSizeExtension, makeVimExtension },
+      { syntaxHighlighting, defaultHighlightStyle },
       langExtension,
     ] = await Promise.all([
       import("@codemirror/view"),
@@ -58,6 +59,7 @@ export const CodeMirrorHook = {
       import("@codemirror/commands"),
       import("../cm_theme"),
       import("../cm_settings"),
+      import("@codemirror/language"),
       loadLanguage(lang),
     ])
 
@@ -82,6 +84,7 @@ export const CodeMirrorHook = {
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         saveKeymap,
+        syntaxHighlighting(defaultHighlightStyle),
         themeExtension,
         tabExtension,
         fontExtension,

@@ -14,16 +14,19 @@ export const NoteFullEditorHook = {
       { EditorState },
       { defaultKeymap, history, historyKeymap },
       { makeThemeCompartment },
+      { makeVimExtension },
       { markdown },
     ] = await Promise.all([
       import("@codemirror/view"),
       import("@codemirror/state"),
       import("@codemirror/commands"),
       import("../cm_theme"),
+      import("../cm_settings"),
       import("@codemirror/lang-markdown"),
     ])
 
-    const { extension: themeExtension, watch } = await makeThemeCompartment()
+    const { extension: themeExtension, watch: watchTheme } = await makeThemeCompartment()
+    const { extension: vimExtension, watch: watchVim } = await makeVimExtension()
 
     const saveKeymap = keymap.of([
       {
@@ -67,11 +70,13 @@ export const NoteFullEditorHook = {
       statusUpdate,
       fillHeight,
       themeExtension,
+      vimExtension,
     ]
 
     const state = EditorState.create({ doc: body, extensions })
     this._view = new EditorView({ state, parent: this.el })
-    this._cleanupTheme = watch(this._view)
+    this._cleanupTheme = watchTheme(this._view)
+    this._cleanupVim = watchVim(this._view)
 
     // Wire Tab on title input to focus the editor
     const titleInput = document.getElementById("note-title-input")
@@ -107,6 +112,7 @@ export const NoteFullEditorHook = {
       saveBtn.removeEventListener("click", this._saveBtnHandler)
     }
     if (this._cleanupTheme) this._cleanupTheme()
+    if (this._cleanupVim) this._cleanupVim()
     if (this._view) {
       this._view.destroy()
       this._view = null

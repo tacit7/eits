@@ -13,16 +13,19 @@ export const NoteEditorHook = {
       { EditorState },
       { defaultKeymap, history, historyKeymap },
       { makeThemeCompartment },
+      { makeVimExtension },
       { markdown },
     ] = await Promise.all([
       import("@codemirror/view"),
       import("@codemirror/state"),
       import("@codemirror/commands"),
       import("../cm_theme"),
+      import("../cm_settings"),
       import("@codemirror/lang-markdown"),
     ])
 
-    const { extension: themeExtension, watch } = await makeThemeCompartment()
+    const { extension: themeExtension, watch: watchTheme } = await makeThemeCompartment()
+    const { extension: vimExtension, watch: watchVim } = await makeVimExtension()
 
     const saveKeymap = keymap.of([{
       key: "Mod-s",
@@ -50,11 +53,13 @@ export const NoteEditorHook = {
       markdown(),
       EditorView.lineWrapping,
       themeExtension,
+      vimExtension,
     ]
 
     const state = EditorState.create({ doc: body, extensions })
     this._view = new EditorView({ state, parent: this.el })
-    this._cleanupTheme = watch(this._view)
+    this._cleanupTheme = watchTheme(this._view)
+    this._cleanupVim = watchVim(this._view)
 
     // Force the DaisyUI accordion open. LiveView does not re-set checked on
     // existing inputs after initial render, so we must do it imperatively.
@@ -72,6 +77,7 @@ export const NoteEditorHook = {
       try { this.pushEvent("note_edit_cancelled", { note_id: this.el.dataset.noteId }) } catch (_) {}
     }
     if (this._cleanupTheme) this._cleanupTheme()
+    if (this._cleanupVim) this._cleanupVim()
     if (this._view) {
       this._view.destroy()
       this._view = null

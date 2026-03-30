@@ -67,4 +67,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
+
+  // Handle CodeMirror settings pushed from LiveView Settings page
+  window.addEventListener('phx:apply_cm_settings', ({ detail }) => {
+    if (detail.cm_vim !== undefined) {
+      document.documentElement.setAttribute('data-cm-vim', detail.cm_vim);
+      localStorage.setItem('cm_vim', detail.cm_vim);
+    }
+  });
 });

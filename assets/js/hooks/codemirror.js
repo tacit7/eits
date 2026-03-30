@@ -49,16 +49,19 @@ export const CodeMirrorHook = {
       { EditorState },
       { defaultKeymap, history, historyKeymap },
       { makeThemeCompartment },
+      { makeVimExtension },
       langExtension,
     ] = await Promise.all([
       import("@codemirror/view"),
       import("@codemirror/state"),
       import("@codemirror/commands"),
       import("../cm_theme"),
+      import("../cm_settings"),
       loadLanguage(lang),
     ])
 
-    const { extension: themeExtension, watch } = await makeThemeCompartment()
+    const { extension: themeExtension, watch: watchTheme } = await makeThemeCompartment()
+    const { extension: vimExtension, watch: watchVim } = await makeVimExtension()
 
     const saveKeymap = keymap.of([{
       key: "Mod-s",
@@ -77,16 +80,19 @@ export const CodeMirrorHook = {
         keymap.of([...defaultKeymap, ...historyKeymap]),
         saveKeymap,
         themeExtension,
+        vimExtension,
         langExtension,
       ]
     })
 
     this._view = new EditorView({ state, parent: this.el })
-    this._cleanupTheme = watch(this._view)
+    this._cleanupTheme = watchTheme(this._view)
+    this._cleanupVim = watchVim(this._view)
   },
 
   destroyed() {
     if (this._cleanupTheme) this._cleanupTheme()
+    if (this._cleanupVim) this._cleanupVim()
     if (this._view) {
       this._view.destroy()
       this._view = null

@@ -177,6 +177,16 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   end
 
   @impl true
+  def handle_event("toggle_setting", %{"key" => "cm_vim"}, socket) do
+    current = Settings.get("cm_vim") || "false"
+    new_val = if current == "true", do: "false", else: "true"
+    Settings.put("cm_vim", new_val)
+    settings = Settings.all()
+    socket = socket |> assign(:settings, settings) |> flash_saved("cm_vim")
+    {:noreply, push_event(socket, "apply_cm_settings", %{cm_vim: new_val})}
+  end
+
+  @impl true
   def handle_event("toggle_setting", %{"key" => key}, socket) do
     current = Settings.get_boolean(key)
     Settings.put(key, to_string(!current))
@@ -612,6 +622,19 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
               <p class="text-xs text-base-content/50 mt-0.5">
                 CodeMirror 6 is available on config and file browser pages for in-browser editing.
               </p>
+            </div>
+            <div class="flex items-center justify-between px-5 py-4">
+              <div>
+                <p class="text-sm font-medium text-base-content">Vim Keybindings</p>
+                <p class="text-xs text-base-content/50 mt-0.5">Enable vim modal editing</p>
+              </div>
+              <input
+                type="checkbox"
+                class="toggle toggle-sm toggle-primary"
+                checked={@settings["cm_vim"] == "true"}
+                phx-click="toggle_setting"
+                phx-value-key="cm_vim"
+              />
             </div>
           </div>
         </div>

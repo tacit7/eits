@@ -172,6 +172,16 @@ export const QuickCreateTask = {
     }
     window.addEventListener("palette:create-task", this._openHandler)
 
+    this.handleEvent("palette:create-task-result", ({ ok, error }) => {
+      if (ok) {
+        this.el.close()
+        this._reset()
+        showToast("Task created")
+      } else {
+        showToast(error || "Failed to create task")
+      }
+    })
+
     this.el.querySelector("[data-qct-form]")?.addEventListener("submit", (e) => {
       e.preventDefault()
       this._submit()
@@ -186,34 +196,16 @@ export const QuickCreateTask = {
     window.removeEventListener("palette:create-task", this._openHandler)
   },
 
-  async _submit() {
+  _submit() {
     const title = (this.el.querySelector("[data-qct-title]")?.value || "").trim()
     if (!title) return
 
     const description = (this.el.querySelector("[data-qct-description]")?.value || "").trim()
     const tagsRaw = (this.el.querySelector("[data-qct-tags]")?.value || "").trim()
     const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : []
-    const projectId = this.el.dataset.projectId ? Number(this.el.dataset.projectId) : null
+    const projectId = this.el.dataset.projectId || null
 
-    const body = { title, description, tags, state_id: 1 }
-    if (projectId) body.project_id = projectId
-
-    try {
-      const res = await fetch("/api/v1/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      })
-      if (res.ok) {
-        this.el.close()
-        this._reset()
-        showToast("Task created")
-      } else {
-        showToast("Failed to create task")
-      }
-    } catch (_) {
-      showToast("Failed to create task")
-    }
+    this.pushEvent("palette:create-task", { title, description, tags, project_id: projectId })
   },
 
   _reset() {

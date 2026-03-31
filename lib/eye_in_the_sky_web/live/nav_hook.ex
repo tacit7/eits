@@ -18,6 +18,7 @@ defmodule EyeInTheSkyWeb.NavHook do
 
   alias EyeInTheSky.Sessions
   alias EyeInTheSky.Projects
+  alias EyeInTheSky.Tasks
   alias EyeInTheSkyWeb.Helpers.MobileNav
 
   def on_mount(:default, _params, _session, socket) do
@@ -32,6 +33,7 @@ defmodule EyeInTheSkyWeb.NavHook do
       |> assign(:palette_projects, projects)
       |> attach_hook(:capture_nav_path, :handle_params, &capture_nav_path/3)
       |> attach_hook(:palette_sessions, :handle_event, &handle_palette_event/3)
+      |> attach_hook(:palette_create_task, :handle_event, &handle_create_task_event/3)
 
     {:cont, socket}
   end
@@ -63,6 +65,30 @@ defmodule EyeInTheSkyWeb.NavHook do
   end
 
   defp handle_palette_event(_event, _params, socket), do: {:cont, socket}
+
+  defp handle_create_task_event("palette:create-task", params, socket) do
+    project_id = parse_project_id(params["project_id"])
+    tags = params["tags"]
+
+    form_params = %{
+      "title" => params["title"] || "",
+      "description" => params["description"] || "",
+      "state_id" => "1",
+      "tags" => if(is_list(tags), do: Enum.join(tags, ","), else: tags || "")
+    }
+
+    opts = if project_id, do: [project_id: project_id], else: []
+
+    result =
+      case Tasks.create_task_from_form(form_params, opts) do
+        {:ok, _task} -> %{ok: true}
+        {:error, _changeset} -> %{ok: false, error: "Failed to create task"}
+      end
+
+    {:halt, push_event(socket, "palette:create-task-result", result)}
+  end
+
+  defp handle_create_task_event(_event, _params, socket), do: {:cont, socket}
 
   defp parse_project_id(nil), do: nil
   defp parse_project_id(id) when is_integer(id), do: id

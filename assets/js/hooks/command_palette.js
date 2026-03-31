@@ -119,9 +119,9 @@ function getCommands() {
         try {
           const projectId = document.getElementById("quick-create-task")?.dataset?.projectId
           const url = projectId
-            ? `/api/v1/sessions?limit=30&status=all&project_id=${projectId}`
-            : "/api/v1/sessions?limit=30&status=all"
-          const res = await fetch(url)
+            ? `/api/browser/sessions?limit=30&status=all&project_id=${projectId}`
+            : "/api/browser/sessions?limit=30&status=all"
+          const res = await fetch(url, { credentials: "include" })
           if (!res.ok) return []
           const data = await res.json()
           return (data.results || []).map(s => ({

@@ -554,6 +554,11 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   defp process_next_job(%__MODULE__{queue: [next_job | rest]} = state) do
+    # Re-evaluate has_messages at dequeue time — the prior job may have produced a reply
+    # since this job was submitted, making the stale value wrong (false → start instead of resume).
+    fresh_has_messages = EyeInTheSky.Messages.has_inbound_reply?(state.session_id, state.provider)
+    next_job = put_in(next_job.context[:has_messages], fresh_has_messages)
+
     case start_sdk(state, next_job) do
       {:ok, sdk_ref, handler_monitor} ->
         WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)

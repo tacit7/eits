@@ -250,18 +250,28 @@ defmodule EyeInTheSky.Agents.AgentManager do
 
         context = RuntimeContext.build(session_id, provider, opts)
 
-        case GenServer.call(pid, {:submit_message, message, context}) do
-          {:ok, admission} ->
-            Logger.debug("send_message: #{admission} for session_id=#{session_id}")
+        try do
+          case GenServer.call(pid, {:submit_message, message, context}) do
+            {:ok, admission} ->
+              Logger.debug("send_message: #{admission} for session_id=#{session_id}")
 
-            {:ok, admission}
+              {:ok, admission}
 
-          {:error, reason} = error ->
-            Logger.warning(
-              "send_message: rejected for session_id=#{session_id} - #{inspect(reason)}"
-            )
+            {:error, reason} = error ->
+              Logger.warning(
+                "send_message: rejected for session_id=#{session_id} - #{inspect(reason)}"
+              )
 
-            error
+              error
+          end
+        catch
+          :exit, {:noproc, _} ->
+            Logger.warning("send_message: worker died before call for session_id=#{session_id}")
+            {:error, :worker_not_found}
+
+          :exit, reason ->
+            Logger.error("send_message: worker exit for session_id=#{session_id} - #{inspect(reason)}")
+            {:error, {:worker_exit, reason}}
         end
 
       {:error, reason} ->

@@ -30,13 +30,6 @@ defmodule EyeInTheSkyWeb.Router do
     plug :accepts, ["json"]
   end
 
-  # Browser-session-authenticated JSON pipeline for UI-facing API calls (e.g. command palette)
-  pipeline :browser_json do
-    plug :accepts, ["json"]
-    plug :fetch_session
-    plug EyeInTheSkyWeb.Plugs.SessionAuth
-  end
-
   # Session-aware JSON pipeline without CSRF — safe for WebAuthn endpoints
   # (registration is token-gated; login uses WebAuthn challenge binding)
   pipeline :webauthn do
@@ -205,13 +198,6 @@ defmodule EyeInTheSkyWeb.Router do
     pipe_through [:accepts_json]
 
     get "/settings/eits_workflow_enabled", SettingsController, :eits_workflow_enabled
-  end
-
-  # Browser-session-authenticated endpoints for UI-internal reads (command palette, etc.)
-  scope "/api/browser", EyeInTheSkyWeb.Api.V1 do
-    pipe_through :browser_json
-
-    get "/sessions", SessionController, :index
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

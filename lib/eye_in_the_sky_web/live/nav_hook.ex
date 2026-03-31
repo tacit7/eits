@@ -16,9 +16,8 @@ defmodule EyeInTheSkyWeb.NavHook do
   import Phoenix.LiveView
   import Phoenix.Component, only: [assign: 3]
 
-  alias EyeInTheSky.Sessions
-  alias EyeInTheSky.Projects
-  alias EyeInTheSky.Tasks
+  alias EyeInTheSky.{Agents, Notes, Sessions, Projects, Tasks}
+  alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSkyWeb.Helpers.MobileNav
 
   def on_mount(:default, _params, _session, socket) do
@@ -34,6 +33,9 @@ defmodule EyeInTheSkyWeb.NavHook do
       |> attach_hook(:capture_nav_path, :handle_params, &capture_nav_path/3)
       |> attach_hook(:palette_sessions, :handle_event, &handle_palette_event/3)
       |> attach_hook(:palette_create_task, :handle_event, &handle_create_task_event/3)
+      |> attach_hook(:palette_create_note, :handle_event, &handle_create_note_event/3)
+      |> attach_hook(:palette_create_chat, :handle_event, &handle_create_chat_event/3)
+      |> attach_hook(:palette_create_agent, :handle_event, &handle_create_agent_event/3)
 
     {:cont, socket}
   end
@@ -89,6 +91,88 @@ defmodule EyeInTheSkyWeb.NavHook do
   end
 
   defp handle_create_task_event(_event, _params, socket), do: {:cont, socket}
+
+  defp handle_create_note_event("palette:create-note", params, socket) do
+    attrs = %{
+      title: params["title"] || "",
+      body: params["body"] || ""
+    }
+
+    result =
+      case Notes.create_note(attrs) do
+        {:ok, _note} -> %{ok: true}
+        {:error, _} -> %{ok: false, error: "Failed to create note"}
+      end
+
+    {:halt, push_event(socket, "palette:create-note-result", result)}
+  end
+
+  defp handle_create_note_event(_event, _params, socket), do: {:cont, socket}
+
+  defp handle_create_chat_event("palette:create-chat", params, socket) do
+    session_uuid = params["session_uuid"]
+    project_id = parse_project_id(params["project_id"])
+
+    agent_attrs = %{
+      uuid: session_uuid,
+      source: "manual",
+      project_id: project_id
+    }
+
+    result =
+      with {:ok, agent} <- find_or_create_agent(agent_attrs),
+           session_attrs = %{
+             uuid: session_uuid,
+             agent_id: agent.id,
+             name: params["name"],
+             project_id: project_id
+           },
+           {:ok, session} <- Sessions.create_session_with_model(session_attrs) do
+        %{ok: true, session_uuid: session.uuid}
+      else
+        _ -> %{ok: false, error: "Failed to create chat"}
+      end
+
+    {:halt, push_event(socket, "palette:create-chat-result", result)}
+  end
+
+  defp handle_create_chat_event(_event, _params, socket), do: {:cont, socket}
+
+  defp handle_create_agent_event("palette:create-agent", params, socket) do
+    project_id = parse_project_id(params["project_id"])
+
+    project_path =
+      if project_id do
+        case Projects.get_project(project_id) do
+          %{path: path} -> path
+          _ -> nil
+        end
+      end
+
+    opts = [
+      instructions: params["instructions"] || "",
+      model: params["model"] || "haiku",
+      project_id: project_id,
+      project_path: project_path
+    ]
+
+    result =
+      case AgentManager.create_agent(opts) do
+        {:ok, %{session: session}} -> %{ok: true, session_uuid: session.uuid}
+        {:error, _} -> %{ok: false, error: "Failed to spawn agent"}
+      end
+
+    {:halt, push_event(socket, "palette:create-agent-result", result)}
+  end
+
+  defp handle_create_agent_event(_event, _params, socket), do: {:cont, socket}
+
+  defp find_or_create_agent(%{uuid: uuid} = attrs) do
+    case Agents.get_agent_by_uuid(uuid) do
+      {:ok, existing} -> {:ok, existing}
+      {:error, :not_found} -> Agents.create_agent(attrs)
+    end
+  end
 
   defp parse_project_id(nil), do: nil
   defp parse_project_id(id) when is_integer(id), do: id

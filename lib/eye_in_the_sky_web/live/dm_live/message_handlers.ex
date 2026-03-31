@@ -52,8 +52,18 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
              |> assign(:processing, true)
              |> push_event("clear-input", %{})}
 
+          {:error, :queue_full} ->
+            Logger.warning("Queue full for session=#{session_id}, deleting orphaned message id=#{message.id}")
+            Messages.delete_message(message)
+
+            {:noreply,
+             socket
+             |> assign(:processing, false)
+             |> put_flash(:error, "Queue is full — max 5 messages pending")}
+
           {:error, reason} ->
             Logger.error("Failed to send message via AgentManager: #{inspect(reason)}")
+            Messages.delete_message(message)
 
             {:noreply,
              socket

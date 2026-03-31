@@ -113,6 +113,28 @@ defmodule EyeInTheSkyWeb.NavHook do
 
   defp handle_create_chat_event("palette:create-chat", params, socket) do
     session_uuid = params["session_uuid"]
+
+    case Ecto.UUID.cast(session_uuid) do
+      {:ok, _} -> do_create_chat(session_uuid, params, socket)
+      :error -> {:halt, push_event(socket, "palette:create-chat-result", %{ok: false, error: "Invalid session UUID"})}
+    end
+  end
+
+  defp handle_create_chat_event(_event, _params, socket), do: {:cont, socket}
+
+  defp handle_create_agent_event("palette:create-agent", params, socket) do
+    instructions = String.trim(params["instructions"] || "")
+
+    if instructions == "" do
+      {:halt, push_event(socket, "palette:create-agent-result", %{ok: false, error: "Instructions are required"})}
+    else
+      do_create_agent(instructions, params, socket)
+    end
+  end
+
+  defp handle_create_agent_event(_event, _params, socket), do: {:cont, socket}
+
+  defp do_create_chat(session_uuid, params, socket) do
     project_id = parse_project_id(params["project_id"])
 
     agent_attrs = %{
@@ -142,9 +164,7 @@ defmodule EyeInTheSkyWeb.NavHook do
     {:halt, push_event(socket, "palette:create-chat-result", result)}
   end
 
-  defp handle_create_chat_event(_event, _params, socket), do: {:cont, socket}
-
-  defp handle_create_agent_event("palette:create-agent", params, socket) do
+  defp do_create_agent(instructions, params, socket) do
     project_id = parse_project_id(params["project_id"])
 
     project_path =
@@ -156,7 +176,7 @@ defmodule EyeInTheSkyWeb.NavHook do
       end
 
     opts = [
-      instructions: params["instructions"] || "",
+      instructions: instructions,
       model: params["model"] || "haiku",
       project_id: project_id,
       project_path: project_path
@@ -170,8 +190,6 @@ defmodule EyeInTheSkyWeb.NavHook do
 
     {:halt, push_event(socket, "palette:create-agent-result", result)}
   end
-
-  defp handle_create_agent_event(_event, _params, socket), do: {:cont, socket}
 
   defp find_or_create_agent(%{uuid: uuid} = attrs) do
     case Agents.get_agent_by_uuid(uuid) do

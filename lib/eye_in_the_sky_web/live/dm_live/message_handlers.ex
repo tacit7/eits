@@ -58,6 +58,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
             {:noreply,
              socket
+             |> TabHelpers.load_tab_data("messages", session_id)
              |> assign(:processing, false)
              |> put_flash(:error, "Queue is full — max 5 messages pending")}
 
@@ -67,6 +68,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
             {:noreply,
              socket
+             |> TabHelpers.load_tab_data("messages", session_id)
              |> assign(:processing, false)
              |> put_flash(:error, "Failed to send message: #{inspect(reason)}")}
         end

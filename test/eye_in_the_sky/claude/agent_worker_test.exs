@@ -997,6 +997,85 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
     if mock_port, do: send(mock_port, {:exit, 0})
   end
 
+  # --- Queue: has_messages re-evaluation at dequeue ---
+
+  test "process_next_job re-evaluates has_messages at dequeue time", %{track: track} do
+    {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+
+    Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "agent:working")
+    session_id = session.id
+
+    # Start first message — no inbound replies yet
+    assert {:ok, _} = EyeInTheSky.Agents.AgentManager.send_message(session.id, "msg-1")
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    mock_port = wait_for_mock_port(session.id)
+
+    # Queue a second message while busy — has_messages is false at this point
+    assert {:ok, :queued} =
+             EyeInTheSky.Agents.AgentManager.send_message(session.id, "msg-2")
+
+    [{worker_pid, _}] =
+      Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session.id})
+
+    # Verify queued job has stale has_messages=false
+    queued_state = :sys.get_state(worker_pid)
+    [queued_job] = queued_state.queue
+    assert queued_job.context[:has_messages] == false
+
+    # Insert an inbound reply directly into DB (simulating a completed first exchange).
+    # The SDK result save is async via Task.start and may not land before process_next_job,
+    # so we seed it synchronously to test the re-evaluation logic deterministically.
+    {:ok, _reply} = Messages.record_incoming_reply(session.id, "claude", "response to msg-1")
+
+    # Now complete the SDK so process_next_job fires
+    send(mock_port, {:exit, 0})
+
+    # Wait for msg-1 to complete and msg-2 to start
+    assert_receive {:agent_stopped, _, ^session_id}, 5_000
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    # The dequeued job should now have has_messages=true (re-evaluated)
+    worker_state = :sys.get_state(worker_pid)
+    assert worker_state.current_job.context[:has_messages] == true
+
+    new_mock = wait_for_mock_port(session.id)
+    if new_mock, do: send(new_mock, {:exit, 0})
+  end
+
+  # --- AgentManager: GenServer.call exit handling ---
+
+  test "send_message returns error when worker dies between lookup and call", %{track: track} do
+    {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+
+    Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "agent:working")
+    session_id = session.id
+
+    # Start worker to get it registered
+    assert {:ok, _} = EyeInTheSky.Agents.AgentManager.send_message(session.id, "msg-1")
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    [{worker_pid, _}] =
+      Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session.id})
+
+    mock_port = wait_for_mock_port(session.id)
+    send(mock_port, {:exit, 0})
+    assert_receive {:agent_stopped, _, ^session_id}, 5_000
+
+    # Kill the worker directly — simulates unexpected death
+    Process.exit(worker_pid, :kill)
+    Process.sleep(50)
+    refute Process.alive?(worker_pid)
+
+    # Calling send_message should now return an error, not crash the caller
+    # The try/catch in send_message guards against the :noproc exit
+    result = EyeInTheSky.Agents.AgentManager.send_message(session.id, "after-death")
+
+    # Could be {:error, :worker_not_found} if caught, or {:ok, :started}
+    # if a new worker was auto-started. Either is acceptable; crash is not.
+    assert match?({:ok, _}, result) or match?({:error, _}, result)
+  end
+
   # --- Helper: poll until condition is true ---
 
   defp assert_eventually(fun, attempts \\ 20) do

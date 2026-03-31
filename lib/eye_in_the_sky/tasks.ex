@@ -210,6 +210,14 @@ defmodule EyeInTheSky.Tasks do
   Creates a task.
   """
   def create_task(attrs \\ %{}) do
+    now = DateTime.utc_now()
+
+    attrs =
+      attrs
+      |> Map.put_new(:uuid, Ecto.UUID.generate())
+      |> Map.put_new(:created_at, now)
+      |> Map.put_new(:updated_at, now)
+
     result =
       %Task{}
       |> Task.changeset(attrs)
@@ -310,6 +318,8 @@ defmodule EyeInTheSky.Tasks do
   Updates a task.
   """
   def update_task(%Task{} = task, attrs) do
+    attrs = Map.put_new(attrs, :updated_at, DateTime.utc_now())
+
     result =
       task
       |> Task.changeset(attrs)

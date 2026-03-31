@@ -146,22 +146,19 @@ function getCommands(hook) {
       shortcut: null,
       type: "submenu",
       commands: () => {
-        const registryHrefs = new Set(getCommands().map(c => c.href).filter(Boolean))
-        return [...document.querySelectorAll("#app-sidebar a[href^='/projects/']")]
-          .map(a => ({ label: (a.textContent || "").trim().replace(/\s+/g, " "), href: a.getAttribute("href") }))
-          .filter(({ label, href }) => label && href && href !== "#" && !registryHrefs.has(href))
-          .map(({ label, href }) => ({
-            id: "go-project-" + href.replace(/[^a-z0-9]+/gi, "-").toLowerCase(),
-            label,
-            icon: "hero-folder",
-            group: "Projects",
-            hint: "Projects",
-            keywords: [],
-            shortcut: null,
-            type: "navigate",
-            href,
-            when: null
-          }))
+        const projects = JSON.parse(hook?.el?.dataset?.projects || "[]")
+        return projects.map(p => ({
+          id: "go-project-" + p.id,
+          label: p.name,
+          icon: "hero-folder",
+          group: "Projects",
+          hint: null,
+          keywords: [],
+          shortcut: null,
+          type: "navigate",
+          href: "/projects/" + p.id,
+          when: null
+        }))
       },
       when: null
     }

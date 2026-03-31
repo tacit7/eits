@@ -16,6 +16,7 @@ export const NoteFullEditorHook = {
       { defaultKeymap, history, historyKeymap },
       { makeThemeCompartment },
       { makeTabSizeExtension, makeFontSizeExtension, makeVimExtension },
+      { syntaxHighlighting, defaultHighlightStyle },
       { markdown },
     ] = await Promise.all([
       import("@codemirror/view"),
@@ -23,6 +24,7 @@ export const NoteFullEditorHook = {
       import("@codemirror/commands"),
       import("../cm_theme"),
       import("../cm_settings"),
+      import("@codemirror/language"),
       import("@codemirror/lang-markdown"),
     ])
 
@@ -72,6 +74,7 @@ export const NoteFullEditorHook = {
       EditorView.lineWrapping,
       statusUpdate,
       fillHeight,
+      syntaxHighlighting(defaultHighlightStyle),
       themeExtension,
       tabExtension,
       fontExtension,

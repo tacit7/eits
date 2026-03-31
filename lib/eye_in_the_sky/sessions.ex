@@ -269,6 +269,7 @@ defmodule EyeInTheSky.Sessions do
     status_filter = Keyword.get(opts, :status_filter, "active")
     limit = Keyword.get(opts, :limit, 100)
     offset = Keyword.get(opts, :offset, 0)
+    project_id = Keyword.get(opts, :project_id, nil)
 
     base_query =
       from s in Session,
@@ -280,6 +281,14 @@ defmodule EyeInTheSky.Sessions do
         offset: ^offset
 
     base_query = Archivable.include_archived(base_query, opts)
+
+    # Apply project filter
+    base_query =
+      if project_id do
+        where(base_query, [s, a], s.project_id == ^project_id or a.project_id == ^project_id)
+      else
+        base_query
+      end
 
     # Apply full-text search filter
     base_query =

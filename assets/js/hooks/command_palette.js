@@ -1,4 +1,4 @@
-function getCommands() {
+function getCommands(hook) {
   return [
     // --- Workspace navigation ---
     { id: "go-sessions",      label: "Sessions",      icon: "hero-cpu-chip",                  group: "Workspace", hint: "Workspace", keywords: [],                        shortcut: null, type: "navigate", href: "/",              when: null },
@@ -115,28 +115,24 @@ function getCommands() {
       keywords: ["dm", "chat", "open", "history", "recent"],
       shortcut: null,
       type: "submenu",
-      commands: async () => {
-        try {
-          const projectId = document.getElementById("quick-create-task")?.dataset?.projectId
-          const url = projectId
-            ? `/api/v1/sessions?limit=30&status=all&project_id=${projectId}`
-            : "/api/v1/sessions?limit=30&status=all"
-          const res = await fetch(url)
-          if (!res.ok) return []
-          const data = await res.json()
-          return (data.results || []).map(s => ({
-            id: "session-" + s.uuid,
-            label: s.name || s.description || s.uuid.slice(0, 8),
-            icon: "hero-chat-bubble-left-right",
-            group: projectId ? "Project Sessions" : "Recent",
-            hint: s.status,
-            keywords: [],
-            shortcut: null,
-            type: "navigate",
-            href: "/dm/" + s.uuid,
-            when: null
-          }))
-        } catch (_) { return [] }
+      commands: () => {
+        if (!hook) return Promise.resolve([])
+        const projectId = document.getElementById("quick-create-task")?.dataset?.projectId
+        return new Promise((resolve) => {
+          hook._paletteSessionsResolve = resolve
+          hook.pushEvent("palette:sessions", { project_id: projectId || null })
+        }).then(sessions => sessions.map(s => ({
+          id: "session-" + s.uuid,
+          label: s.name || s.description || (s.uuid || "").slice(0, 8),
+          icon: "hero-chat-bubble-left-right",
+          group: projectId ? "Project Sessions" : "Recent",
+          hint: s.status,
+          keywords: [],
+          shortcut: null,
+          type: "navigate",
+          href: "/dm/" + s.uuid,
+          when: null
+        })))
       },
       when: null
     },
@@ -184,6 +180,13 @@ export const CommandPalette = {
     this._isMac = navigator.userAgentData
       ? navigator.userAgentData.platform === "macOS"
       : navigator.platform.toUpperCase().includes("MAC")
+
+    this.handleEvent("palette:sessions-result", ({ sessions }) => {
+      if (this._paletteSessionsResolve) {
+        this._paletteSessionsResolve(sessions)
+        this._paletteSessionsResolve = null
+      }
+    })
 
     this._globalKeyHandler = (e) => {
       if ((this._isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -233,7 +236,7 @@ export const CommandPalette = {
   },
 
   activeCommands() {
-    if (this.stack.length === 0) return getCommands()
+    if (this.stack.length === 0) return getCommands(this)
     return this.stack[this.stack.length - 1].commands
   },
 

@@ -36,7 +36,6 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
     case create_user_message(session_id, full_body, provider) do
       {:ok, message} ->
         Logger.info("Message created in DB with id=#{message.id}")
-        UploadHelpers.persist_upload_attachments(uploaded_files, message.id)
 
         socket = TabHelpers.load_tab_data(socket, "messages", session_id)
 
@@ -46,6 +45,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
         case AgentManager.continue_session(session_id, full_body, cli_opts) do
           {:ok, _admission} ->
             Logger.info("Message forwarded to AgentManager for session=#{session_id}")
+            UploadHelpers.persist_upload_attachments(uploaded_files, message.id)
 
             {:noreply,
              socket
@@ -54,7 +54,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
           {:error, :queue_full} ->
             Logger.warning("Queue full for session=#{session_id}, deleting orphaned message id=#{message.id}")
-            Messages.delete_message(message)
+            cleanup_rejected_message(message, uploaded_files)
 
             {:noreply,
              socket
@@ -63,7 +63,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
           {:error, reason} ->
             Logger.error("Failed to send message via AgentManager: #{inspect(reason)}")
-            Messages.delete_message(message)
+            cleanup_rejected_message(message, uploaded_files)
 
             {:noreply,
              socket
@@ -73,6 +73,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
       {:error, reason} ->
         Logger.error("Failed to create message: #{inspect(reason)}")
+        cleanup_uploaded_files(uploaded_files)
         {:noreply, put_flash(socket, :error, "Failed to create message: #{inspect(reason)}")}
     end
   end
@@ -130,6 +131,22 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
       imported = CodexImporter.import_messages(messages, session_id)
       {:ok, TabHelpers.load_tab_data(socket, "messages", session_id), imported}
     end
+  end
+
+  defp cleanup_rejected_message(message, uploaded_files) do
+    Messages.delete_message(message)
+    cleanup_uploaded_files(uploaded_files)
+  end
+
+  defp cleanup_uploaded_files([]), do: :ok
+
+  defp cleanup_uploaded_files(uploaded_files) do
+    Enum.each(uploaded_files, fn %{storage_path: path} ->
+      case File.rm(path) do
+        :ok -> Logger.info("Cleaned up rejected upload: #{path}")
+        {:error, reason} -> Logger.warning("Failed to clean up upload #{path}: #{reason}")
+      end
+    end)
   end
 
   defp create_user_message(session_id, body, provider) do

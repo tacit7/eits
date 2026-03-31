@@ -46,6 +46,16 @@ mix compile              # Compile only
 
 Assets: `cd assets && npm install` for JS dependencies. Esbuild and Tailwind run as Phoenix watchers.
 
+### Running a worktree server alongside main
+
+Vite defaults to port 5173 with `strictPort: true` — a second instance will crash if the main server is already running. Use `VITE_PORT` to avoid the conflict:
+
+```bash
+VITE_PORT=5174 PORT=5002 mix phx.server
+```
+
+Pick any free port for `VITE_PORT`. The Vite dev server, LiveSvelte SSR host, and asset URL generation all read from it automatically.
+
 ## Playwright / Browser Testing
 
 When using Playwright, start a dedicated server instance on a different port than the dev server with auth disabled:

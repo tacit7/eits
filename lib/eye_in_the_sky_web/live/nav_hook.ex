@@ -95,7 +95,9 @@ defmodule EyeInTheSkyWeb.NavHook do
   defp handle_create_note_event("palette:create-note", params, socket) do
     attrs = %{
       title: params["title"] || "",
-      body: params["body"] || ""
+      body: params["body"] || "(empty)",
+      parent_type: "system",
+      parent_id: "0"
     }
 
     result =
@@ -125,7 +127,11 @@ defmodule EyeInTheSkyWeb.NavHook do
              uuid: session_uuid,
              agent_id: agent.id,
              name: params["name"],
-             project_id: project_id
+             project_id: project_id,
+             model_provider: "manual",
+             model_name: "chat",
+             status: "stopped",
+             started_at: DateTime.utc_now()
            },
            {:ok, session} <- Sessions.create_session_with_model(session_attrs) do
         %{ok: true, session_uuid: session.uuid}

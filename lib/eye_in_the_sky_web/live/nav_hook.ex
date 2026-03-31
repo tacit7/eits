@@ -4,8 +4,9 @@ defmodule EyeInTheSkyWeb.NavHook do
   and sets deterministic mobile nav active-state assigns.
 
   Sets:
-  - `nav_path`       — the current request path (e.g. "/projects/3/kanban")
-  - `mobile_nav_tab` — one of :sessions | :tasks | :notes | :project | :none
+  - `nav_path`         — the current request path (e.g. "/projects/3/kanban")
+  - `mobile_nav_tab`   — one of :sessions | :tasks | :notes | :project | :none
+  - `palette_projects` — list of %{id, name} maps for the command palette
 
   Also handles the `palette:sessions` event for the command palette's
   "Go to Session..." submenu, so every LiveView in the :app live_session
@@ -16,13 +17,19 @@ defmodule EyeInTheSkyWeb.NavHook do
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSky.Sessions
+  alias EyeInTheSky.Projects
   alias EyeInTheSkyWeb.Helpers.MobileNav
 
   def on_mount(:default, _params, _session, socket) do
+    projects =
+      Projects.list_projects()
+      |> Enum.map(&%{id: &1.id, name: &1.name})
+
     socket =
       socket
       |> assign(:nav_path, nil)
       |> assign(:mobile_nav_tab, :sessions)
+      |> assign(:palette_projects, projects)
       |> attach_hook(:capture_nav_path, :handle_params, &capture_nav_path/3)
       |> attach_hook(:palette_sessions, :handle_event, &handle_palette_event/3)
 

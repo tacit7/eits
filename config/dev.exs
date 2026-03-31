@@ -81,7 +81,9 @@ config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
 # LiveSvelte SSR via Vite dev server in development
 config :live_svelte,
   ssr_module: LiveSvelte.SSR.ViteJS,
-  vite_host: "http://localhost:5173"
+  vite_host: "http://localhost:#{System.get_env("VITE_PORT", "5173")}"
+
+config :eye_in_the_sky, :vite_host, "http://localhost:#{System.get_env("VITE_PORT", "5173")}"
 
 # Enable dev routes for dashboard and mailbox
 config :eye_in_the_sky, dev_routes: true

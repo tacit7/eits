@@ -7,7 +7,7 @@ const isSSR = process.argv.includes("--ssr")
 
 export default defineConfig({
   server: {
-    port: 5173,
+    port: parseInt(process.env.VITE_PORT || "5173"),
     strictPort: true,
     cors: true,
   },

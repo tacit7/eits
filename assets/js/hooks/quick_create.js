@@ -8,6 +8,16 @@ export const QuickCreateNote = {
     }
     window.addEventListener("palette:create-note", this._openHandler)
 
+    this.handleEvent("palette:create-note-result", ({ ok, error }) => {
+      if (ok) {
+        this.el.close()
+        this._reset()
+        showToast("Note created")
+      } else {
+        showToast(error || "Failed to create note")
+      }
+    })
+
     this.el.querySelector("[data-qcn-form]")?.addEventListener("submit", (e) => {
       e.preventDefault()
       this._submit()
@@ -22,29 +32,12 @@ export const QuickCreateNote = {
     window.removeEventListener("palette:create-note", this._openHandler)
   },
 
-  async _submit() {
+  _submit() {
     const title = (this.el.querySelector("[data-qcn-title]")?.value || "").trim()
     const body = (this.el.querySelector("[data-qcn-body]")?.value || "").trim()
     if (!title) return
 
-    const payload = { title, body }
-
-    try {
-      const res = await fetch("/api/v1/notes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      })
-      if (res.ok) {
-        this.el.close()
-        this._reset()
-        showToast("Note created")
-      } else {
-        showToast("Failed to create note")
-      }
-    } catch (_) {
-      showToast("Failed to create note")
-    }
+    this.pushEvent("palette:create-note", { title, body })
   },
 
   _reset() {
@@ -63,6 +56,16 @@ export const QuickCreateAgent = {
     }
     window.addEventListener("palette:create-agent", this._openHandler)
 
+    this.handleEvent("palette:create-agent-result", ({ ok, session_uuid, error }) => {
+      if (ok) {
+        this.el.close()
+        this._reset()
+        window.location.assign("/dm/" + session_uuid)
+      } else {
+        showToast(error || "Failed to spawn agent")
+      }
+    })
+
     this.el.querySelector("[data-qca-form]")?.addEventListener("submit", (e) => {
       e.preventDefault()
       this._submit()
@@ -77,33 +80,14 @@ export const QuickCreateAgent = {
     window.removeEventListener("palette:create-agent", this._openHandler)
   },
 
-  async _submit() {
+  _submit() {
     const instructions = (this.el.querySelector("[data-qca-instructions]")?.value || "").trim()
     if (!instructions) return
 
     const model = this.el.querySelector("[data-qca-model]")?.value || "haiku"
-    const projectId = this.el.dataset.projectId ? Number(this.el.dataset.projectId) : null
+    const projectId = this.el.dataset.projectId || null
 
-    const body = { instructions, model }
-    if (projectId) body.project_id = projectId
-
-    try {
-      const res = await fetch("/api/v1/agents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      })
-      if (res.ok) {
-        const data = await res.json()
-        this.el.close()
-        this._reset()
-        window.location.assign("/dm/" + data.session_uuid)
-      } else {
-        showToast("Failed to spawn agent")
-      }
-    } catch (_) {
-      showToast("Failed to spawn agent")
-    }
+    this.pushEvent("palette:create-agent", { instructions, model, project_id: projectId })
   },
 
   _reset() {
@@ -122,6 +106,15 @@ export const QuickCreateChat = {
     }
     window.addEventListener("palette:create-chat", this._openHandler)
 
+    this.handleEvent("palette:create-chat-result", ({ ok, session_uuid, error }) => {
+      if (ok) {
+        this.el.close()
+        window.location.assign("/dm/" + session_uuid)
+      } else {
+        showToast(error || "Failed to create chat")
+      }
+    })
+
     this.el.querySelector("[data-qcc-form]")?.addEventListener("submit", (e) => {
       e.preventDefault()
       this._submit()
@@ -136,31 +129,12 @@ export const QuickCreateChat = {
     window.removeEventListener("palette:create-chat", this._openHandler)
   },
 
-  async _submit() {
+  _submit() {
     const name = (this.el.querySelector("[data-qcc-name]")?.value || "").trim()
-    const projectId = this.el.dataset.projectId ? Number(this.el.dataset.projectId) : null
+    const sessionUuid = crypto.randomUUID()
+    const projectId = this.el.dataset.projectId || null
 
-    const sessionId = crypto.randomUUID()
-    const body = { session_id: sessionId }
-    if (name) body.name = name
-    if (projectId) body.project_id = projectId
-
-    try {
-      const res = await fetch("/api/v1/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      })
-      if (res.ok) {
-        const data = await res.json()
-        this.el.close()
-        window.location.assign("/dm/" + data.uuid)
-      } else {
-        showToast("Failed to create chat")
-      }
-    } catch (_) {
-      showToast("Failed to create chat")
-    }
+    this.pushEvent("palette:create-chat", { name, session_uuid: sessionUuid, project_id: projectId })
   }
 }
 

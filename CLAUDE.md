@@ -57,7 +57,7 @@ npm run dev                  # Vite dev server (auto via phx.server)
 npm run build               # Production build
 ```
 
-Vite configuration lives in `assets/vite.config.ts`. The dev server runs on port 5173 by default (configurable via `VITE_PORT` env var). LiveSvelte SSR support and TypeScript compilation are integrated.
+Vite configuration lives in `assets/vite.config.mjs`. The dev server runs on port 5173 by default (configurable via `VITE_PORT` env var). LiveSvelte SSR support and TypeScript compilation are integrated.
 
 ### Running a worktree server alongside main
 
@@ -194,21 +194,11 @@ PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. **T
 
 ## Architecture
 
-- `lib/eye_in_the_sky/` - OTP application core (Repo, migrations, application.ex after rename from `eye_in_the_sky_web`)
-- `lib/eye_in_the_sky_web/` - Contexts (Sessions, Tasks, Agents, Projects, Notes, Prompts, Commits, Canvases, AgentDefinitions)
-- `lib/eye_in_the_sky_web_web/` - Web layer (LiveViews, components, router)
-- `lib/eye_in_the_sky_web/search/pg_search.ex` - Full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback (`EyeInTheSkyWeb.Search.PgSearch`)
-- `lib/eye_in_the_sky_web/sessions/queries.ex` - SessionQueries module for Ecto-based session operations
-
-## OTP App Rename
-
-The OTP application name was renamed from `eye_in_the_sky_web` to `eye_in_the_sky` (commit 554da58). Key impacts:
-
-- `EyeInTheSky.Repo` — Repo module is now under the `EyeInTheSky` namespace (was `EyeInTheSkyWeb.Repo`)
-- Supervision tree references use `EyeInTheSky.Application`
-- The `lib/eye_in_the_sky/` directory houses core OTP app files
-- Context modules under `lib/eye_in_the_sky_web/` continue to use the `EyeInTheSkyWeb.*` namespace
-- Web layer under `lib/eye_in_the_sky_web_web/` uses `EyeInTheSkyWebWeb.*` namespace
+- `lib/eye_in_the_sky/` - OTP core: Repo, contexts (Sessions, Tasks, Agents, Projects, Notes, Prompts, Commits, Canvases, AgentDefinitions), search, scheduler
+- `lib/eye_in_the_sky_web/` - Web layer entry point (endpoint, router, plugs)
+- `lib/eye_in_the_sky_web_web/` - LiveViews, components, controllers
+- `lib/eye_in_the_sky/search/pg_search.ex` - Full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback (`EyeInTheSkyWeb.Search.PgSearch`)
+- `lib/eye_in_the_sky/sessions/queries.ex` - SessionQueries module for Ecto-based session operations
 
 ## Schema Conventions
 
@@ -230,19 +220,19 @@ All UUID columns were converted from `varchar` to native PostgreSQL `uuid` type 
 
 ## PubSub
 
-All PubSub broadcasting and subscribing goes through `EyeInTheSkyWeb.Events` (`lib/eye_in_the_sky_web/events.ex`). **Never call `Phoenix.PubSub.broadcast` or `Phoenix.PubSub.subscribe` directly** — use the named functions in Events.
+All PubSub broadcasting and subscribing goes through `EyeInTheSky.Events` (`lib/eye_in_the_sky/events.ex`). **Never call `Phoenix.PubSub.broadcast` or `Phoenix.PubSub.subscribe` directly** — use the named functions in Events.
 
 ```elixir
 # GOOD
-EyeInTheSkyWeb.Events.agent_updated(agent)
-EyeInTheSkyWeb.Events.subscribe_session(session_id)
+EyeInTheSky.Events.agent_updated(agent)
+EyeInTheSky.Events.subscribe_session(session_id)
 
 # BAD
-Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, agent})
-Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session_id}")
+Phoenix.PubSub.broadcast(EyeInTheSky.PubSub, "agents", {:agent_updated, agent})
+Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "session:#{session_id}")
 ```
 
-Events owns all topic strings. If you need a new broadcast, add a named function to Events — don't hardcode a topic anywhere else. `EyeInTheSkyWebWeb.Helpers.PubSubHelpers` is a thin compatibility wrapper that delegates to Events; prefer calling Events directly in new code.
+Events owns all topic strings. If you need a new broadcast, add a named function to Events — don't hardcode a topic anywhere else.
 
 ## Documentation
 
@@ -294,16 +284,7 @@ Common icons:
 
 ### Full-Text Search
 
-`lib/eye_in_the_sky_web/search/pg_search.ex` (`EyeInTheSkyWeb.Search.PgSearch`) wraps PostgreSQL `tsvector/tsquery` full-text search with an ILIKE fallback. Use `PgSearch.search_for/2` for all full-text queries across sessions, tasks, and notes.
-
-**Helper Function: `PgSearch.fts_name_description_match/1`**
-
-Extracts reusable tsvector query fragments for common search patterns across sessions, tasks, and notes. This helper:
-- Builds PostgreSQL `@@` operator queries on indexed columns
-- Returns parameterized tsvector expressions for use in composed queries
-- Falls back to ILIKE for partial matching when tsquery doesn't match
-- Used in Sessions, Tasks, and Notes contexts for consistent search behavior
-- Performance: tsvector queries are O(log N) on indexed columns vs O(N) for ILIKE
+`lib/eye_in_the_sky/search/pg_search.ex` (`EyeInTheSky.Search.PgSearch`) wraps PostgreSQL `tsvector/tsquery` full-text search with an ILIKE fallback. Use `PgSearch.search_for/2` for all full-text queries across sessions, tasks, and notes.
 
 ### User Settings & Themes
 
@@ -343,8 +324,8 @@ The `workflow_states` table defines kanban columns. Current states:
 
 Two schemas map to different DB tables:
 
-- **`Agent` schema** (`lib/eye_in_the_sky_web/agents/agent.ex`) → **`agents` DB table** (agent identity/participant)
-- **`Session` schema** (`lib/eye_in_the_sky_web/sessions/session.ex`) → **`sessions` DB table** (execution session)
+- **`Agent` schema** (`lib/eye_in_the_sky/agents/agent.ex`) → **`agents` DB table** (agent identity/participant)
+- **`Session` schema** (`lib/eye_in_the_sky/sessions/session.ex`) → **`sessions` DB table** (execution session)
 
 The old `ChatAgent` schema and `ChatAgents` context have been removed. All agent identity operations go through `EyeInTheSkyWeb.Agents`.
 
@@ -361,7 +342,7 @@ In LiveViews and components:
 - Migration: `20260309000001_change_agent_last_activity_at_to_text.exs`
 
 **Impact:**
-- Agent status scheduling in `lib/eye_in_the_sky_web/scheduler/agent_status.ex` now uses ISO8601 strings
+- Agent status scheduling in `lib/eye_in_the_sky/scheduler/agent_status.ex` now uses ISO8601 strings
 - Queries comparing timestamps must use string comparison or convert to datetime
 - Use `DateTime.from_iso8601/1` when comparing with Elixir datetime values
 - Always pass ISO8601 strings when updating `last_activity_at` on agents

@@ -75,60 +75,58 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
         %{"session_id" => target_session_id, "body" => body},
         socket
       ) do
-    # Fetch session once, reuse below
-    with {:ok, session} <- Sessions.get_session(target_session_id) do
-      channels =
-        if session.project_id,
-          do: EyeInTheSky.Channels.list_channels_for_project(session.project_id),
-          else: EyeInTheSky.Channels.list_channels()
+    with {:session, {:ok, session}} <- {:session, Sessions.get_session(target_session_id)},
+         {:channel, {:ok, global_channel}} <- {:channel, find_global_channel(session)},
+         {:send, {:ok, _message}} <-
+           {:send,
+            EyeInTheSky.ChannelMessages.send_channel_message(%{
+              channel_id: global_channel.id,
+              session_id: "web-user",
+              sender_role: "user",
+              recipient_role: "agent",
+              provider: "claude",
+              body: body
+            })} do
+      case Agents.get_agent(session.agent_id) do
+        {:ok, chat_agent} ->
+          project_path =
+            chat_agent.git_worktree_path ||
+              (chat_agent.project && chat_agent.project.path)
 
-      global_channel = Enum.find(channels, fn c -> c.name == "#global" end)
+          if project_path do
+            prompt_with_reminder = """
+            REMINDER: Use i-chat-send MCP tool to send your response to the channel.
 
-      if global_channel do
-        case EyeInTheSky.ChannelMessages.send_channel_message(%{
-               channel_id: global_channel.id,
-               session_id: "web-user",
-               sender_role: "user",
-               recipient_role: "agent",
-               provider: "claude",
-               body: body
-             }) do
-          {:ok, _message} ->
-            case Agents.get_agent(session.agent_id) do
-              {:ok, chat_agent} ->
-                project_path = chat_agent.git_worktree_path || File.cwd!()
+            User message: #{body}
+            """
 
-                prompt_with_reminder = """
-                REMINDER: Use i-chat-send MCP tool to send your response to the channel.
+            EyeInTheSky.Agents.AgentManager.continue_session(
+              session.id,
+              prompt_with_reminder,
+              model: "sonnet",
+              project_path: project_path
+            )
 
-                User message: #{body}
-                """
+            {:noreply, socket}
+          else
+            Logger.warning(
+              "send_direct_message: agent #{chat_agent.id} has no path (git_worktree_path and project.path both nil), session not continued"
+            )
 
-                EyeInTheSky.Agents.AgentManager.continue_session(
-                  session.id,
-                  prompt_with_reminder,
-                  model: "sonnet",
-                  project_path: project_path
-                )
+            {:noreply, socket}
+          end
 
-                {:noreply, socket}
+        _ ->
+          Logger.warning(
+            "send_direct_message: agent #{session.agent_id} not found, message sent but session not continued"
+          )
 
-              _ ->
-                Logger.warning(
-                  "send_direct_message: agent #{session.agent_id} not found, message sent but session not continued"
-                )
-
-                {:noreply, socket}
-            end
-
-          {:error, _} ->
-            {:noreply, put_flash(socket, :error, "Failed to send message")}
-        end
-      else
-        {:noreply, put_flash(socket, :error, "Global channel not found")}
+          {:noreply, socket}
       end
     else
-      _ -> {:noreply, put_flash(socket, :error, "Session not found")}
+      {:session, _} -> {:noreply, put_flash(socket, :error, "Session not found")}
+      {:channel, _} -> {:noreply, put_flash(socket, :error, "Global channel not found")}
+      {:send, _} -> {:noreply, put_flash(socket, :error, "Failed to send message")}
     end
   end
 
@@ -243,7 +241,10 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
   @impl true
   def handle_event("rename_session", %{"session_id" => session_id}, socket) do
-    {:noreply, assign(socket, :editing_session_id, String.to_integer(session_id))}
+    case Integer.parse(session_id) do
+      {id, ""} -> {:noreply, assign(socket, :editing_session_id, id)}
+      _ -> {:noreply, socket}
+    end
   end
 
   @impl true
@@ -252,8 +253,17 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
     if name != "" do
       case Sessions.get_session(session_id) do
-        {:ok, session} -> Sessions.update_session(session, %{name: name})
-        _ -> :noop
+        {:ok, session} ->
+          case Sessions.update_session(session, %{name: name}) do
+            {:ok, _} ->
+              :ok
+
+            {:error, reason} ->
+              Logger.warning("save_session_name: failed to rename session #{session_id}: #{inspect(reason)}")
+          end
+
+        _ ->
+          :ok
       end
     end
 
@@ -282,6 +292,58 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
       {:noreply, put_flash(socket, :error, "Invalid project")}
     else
       create_new_session_with_project(params, project_id, socket)
+    end
+  end
+
+  @impl true
+  def handle_event("noop", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_event("add_to_canvas", %{"canvas-id" => cid, "session-id" => sid}, socket) do
+    with {canvas_id, _} <- Integer.parse(cid),
+         {session_id, _} <- Integer.parse(sid),
+         %{} = canvas <- Canvases.get_canvas(canvas_id) do
+      Canvases.add_session(canvas_id, session_id)
+
+      send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,
+        id: "canvas-overlay",
+        action: :open_canvas,
+        canvas_id: canvas_id
+      )
+
+      {:noreply, put_flash(socket, :info, "Added to #{canvas.name}")}
+    else
+      _ -> {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("add_to_new_canvas", %{"session_id" => sid, "canvas_name" => name}, socket) do
+    case Integer.parse(sid) do
+      {session_id, _} ->
+        canvas_name =
+          if name && String.trim(name) != "",
+            do: String.trim(name),
+            else: "Canvas #{:os.system_time(:second)}"
+
+        case Canvases.create_canvas(%{name: canvas_name}) do
+          {:ok, canvas} ->
+            Canvases.add_session(canvas.id, session_id)
+
+            send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,
+              id: "canvas-overlay",
+              action: :open_canvas,
+              canvas_id: canvas.id
+            )
+
+            {:noreply, put_flash(socket, :info, "Added to #{canvas.name}")}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Failed to create canvas")}
+        end
+
+      _ ->
+        {:noreply, socket}
     end
   end
 
@@ -706,35 +768,15 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
     """
   end
 
-  def handle_event("noop", _params, socket), do: {:noreply, socket}
+  defp find_global_channel(session) do
+    channels =
+      if session.project_id,
+        do: EyeInTheSky.Channels.list_channels_for_project(session.project_id),
+        else: EyeInTheSky.Channels.list_channels()
 
-  def handle_event("add_to_canvas", %{"canvas-id" => cid, "session-id" => sid}, socket) do
-    with {canvas_id, _} <- Integer.parse(cid),
-         {session_id, _} <- Integer.parse(sid),
-         %{} = canvas <- Canvases.get_canvas(canvas_id) do
-      Canvases.add_session(canvas_id, session_id)
-      send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,
-        id: "canvas-overlay", action: :open_canvas, canvas_id: canvas_id)
-      {:noreply, put_flash(socket, :info, "Added to #{canvas.name}")}
-    else
-      _ -> {:noreply, socket}
-    end
-  end
-
-  def handle_event("add_to_new_canvas", %{"session_id" => sid, "canvas_name" => name}, socket) do
-    with {session_id, _} <- Integer.parse(sid) do
-      canvas_name = if name && String.trim(name) != "", do: String.trim(name), else: "Canvas #{:os.system_time(:second)}"
-      case Canvases.create_canvas(%{name: canvas_name}) do
-        {:ok, canvas} ->
-          Canvases.add_session(canvas.id, session_id)
-          send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,
-            id: "canvas-overlay", action: :open_canvas, canvas_id: canvas.id)
-          {:noreply, put_flash(socket, :info, "Added to #{canvas.name}")}
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to create canvas")}
-      end
-    else
-      _ -> {:noreply, socket}
+    case Enum.find(channels, fn c -> c.name == "#global" end) do
+      nil -> {:error, :channel_not_found}
+      channel -> {:ok, channel}
     end
   end
 

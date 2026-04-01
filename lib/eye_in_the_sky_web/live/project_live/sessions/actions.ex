@@ -171,7 +171,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
     socket =
       case editing_id && Enum.find(socket.assigns.agents, &(&1.id == editing_id)) do
         nil -> socket
-        false -> socket
         session -> stream_insert(socket, :session_list, session)
       end
 

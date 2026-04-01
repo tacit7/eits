@@ -211,8 +211,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageToolWidget do
             |> Map.to_list()
             |> Enum.take(2)
             |> Enum.filter(fn {_k, v} -> is_binary(v) or is_number(v) or is_atom(v) end)
-            |> Enum.map(fn {k, v} -> "#{k}: #{String.slice(to_string(v), 0..40)}" end)
-            |> Enum.join(", ")
+            |> Enum.map_join(", ", fn {k, v} -> "#{k}: #{String.slice(to_string(v), 0..40)}" end)
 
           {"hero-puzzle-piece", if(summary == "", do: rest, else: summary)}
 

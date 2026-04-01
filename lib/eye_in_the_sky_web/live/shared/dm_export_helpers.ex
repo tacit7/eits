@@ -10,15 +10,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
     messages = socket.assigns[:messages] || []
 
     text =
-      messages
-      |> Enum.map(fn msg ->
+      Enum.map_join(messages, "\n", fn msg ->
         Jason.encode!(%{
           role: msg.sender_role,
           body: msg.body,
           timestamp: msg.inserted_at
         })
       end)
-      |> Enum.join("\n")
 
     {:noreply, push_event(socket, "copy_to_clipboard", %{text: text, format: "JSONL"})}
   end
@@ -27,12 +25,10 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
     messages = socket.assigns[:messages] || []
 
     text =
-      messages
-      |> Enum.map(fn msg ->
+      Enum.map_join(messages, "\n\n", fn msg ->
         role = String.capitalize(to_string(msg.sender_role))
         "**#{role}**: #{msg.body}"
       end)
-      |> Enum.join("\n\n")
 
     {:noreply, push_event(socket, "copy_to_clipboard", %{text: text, format: "Markdown"})}
   end

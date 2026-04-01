@@ -71,8 +71,21 @@ EITS-CMD: task annotate <id> <body>
 EITS-CMD: note <body>
 EITS-CMD: note task <id> <body>
 EITS-CMD: commit <hash>
+EITS-CMD: teams join <team_id> --name <name> [--role <role>]
+EITS-CMD: teams leave <team_id> <member_id>
+EITS-CMD: teams done
+EITS-CMD: teams update-member <team_id> <member_id> --status <status>
+EITS-CMD: team broadcast --message "text"
+EITS-CMD: channel send <channel_id> --body "text"
+EITS-CMD: spawn --instructions "text" [--model <m>] [--worktree <b>]
 ```
 The AgentWorker strips these from the visible stream and dispatches them in-process.
+
+**Feedback:** Every directive sends a message back to your session on completion:
+- Success: `[EITS-CMD ok] task begun id=42 title=...`
+- Error: `[EITS-CMD error] task done: {:not_linked, 99}`
+
+**Wait for the feedback before using returned IDs.** After `task begin`, wait for the `[EITS-CMD ok]` response to get the task ID before annotating or completing it. Do not guess IDs.
 
 **When `sdk-cli` (interactive session) — use the eits script:**
 ```bash

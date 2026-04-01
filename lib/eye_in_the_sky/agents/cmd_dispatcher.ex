@@ -111,11 +111,12 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
       ["teams", args]   -> dispatch_teams(args, from_session_id)
       ["team", args]    -> dispatch_team(args, from_session_id)
       ["channel", args] -> dispatch_channel(args, from_session_id)
-      _                 -> Logger.warning("[CmdDispatcher] Unknown command: #{rest}")
+      [unknown]         -> notify_error(from_session_id, unknown, :unknown_command)
+      _                 -> notify_error(from_session_id, rest, :unknown_command)
     end
   end
 
-  defp dispatch(line, _), do: Logger.warning("[CmdDispatcher] Malformed line: #{line}")
+  defp dispatch(line, from_session_id), do: notify_error(from_session_id, "parse", {:malformed_line, line})
 
   # ---------------------------------------------------------------------------
   # dm
@@ -195,7 +196,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
                   case Messages.create_message(attrs) do
                     {:ok, msg} ->
                       EyeInTheSky.Events.session_new_dm(to_session.id, msg)
-                      Logger.info("[CmdDispatcher] dm #{from_session_id} -> #{to_session.id}")
+                      notify_success(from_session_id, "dm sent to session #{to_session.id}")
 
                     {:error, reason} ->
                       notify_error(from_session_id, "dm persist", reason)
@@ -247,7 +248,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
          }) do
       {:ok, task} ->
         Tasks.link_session_to_task(task.id, from_session_id)
-        Logger.info("[CmdDispatcher] task created id=#{task.id} title=#{title}")
+        notify_success(from_session_id, "task created id=#{task.id} title=#{title}")
 
       {:error, reason} ->
         notify_error(from_session_id, "task create", reason)
@@ -266,7 +267,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
          }) do
       {:ok, task} ->
         Tasks.link_session_to_task(task.id, from_session_id)
-        Logger.info("[CmdDispatcher] task begun id=#{task.id} title=#{title}")
+        notify_success(from_session_id, "task begun id=#{task.id} title=#{title}")
 
       {:error, reason} ->
         notify_error(from_session_id, "task begin", reason)
@@ -282,13 +283,13 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
         task = Tasks.get_task!(id)
         Tasks.update_task_state(task, 2)
         Tasks.link_session_to_task(id, from_session_id)
-        Logger.info("[CmdDispatcher] task #{id} -> in_progress")
+        notify_success(from_session_id, "task #{id} started (in_progress)")
 
       _ ->
-        Logger.warning("[CmdDispatcher] task start: invalid id '#{id_str}'")
+        notify_error(from_session_id, "task start", {:invalid_id, id_str})
     end
   rescue
-    _ -> Logger.warning("[CmdDispatcher] task start: task not found")
+    _ -> notify_error(from_session_id, "task start", :not_found)
   end
 
   # task update <id> <state_id>
@@ -300,17 +301,17 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
              true <- Tasks.task_linked_to_session?(id, from_session_id),
              task <- Tasks.get_task!(id) do
           Tasks.update_task_state(task, state_id)
-          Logger.info("[CmdDispatcher] task #{id} state -> #{state_id}")
+          notify_success(from_session_id, "task #{id} state -> #{state_id}")
         else
-          false -> Logger.warning("[CmdDispatcher] task update: task #{rest} not linked to session #{from_session_id}")
-          err -> Logger.warning("[CmdDispatcher] task update failed: #{inspect(err)}")
+          false -> notify_error(from_session_id, "task update", {:not_linked, rest})
+          err -> notify_error(from_session_id, "task update", err)
         end
 
       _ ->
-        Logger.warning("[CmdDispatcher] task update: expected <id> <state_id>")
+        notify_error(from_session_id, "task update", :expected_id_and_state_id)
     end
   rescue
-    _ -> Logger.warning("[CmdDispatcher] task update: task not found")
+    _ -> notify_error(from_session_id, "task update", :not_found)
   end
 
   # task done <id> — shortcut for state 3 (Done)
@@ -322,16 +323,16 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
         if Tasks.task_linked_to_session?(id, from_session_id) do
           task = Tasks.get_task!(id)
           Tasks.update_task_state(task, 3)
-          Logger.info("[CmdDispatcher] task #{id} -> done")
+          notify_success(from_session_id, "task #{id} -> done")
         else
-          Logger.warning("[CmdDispatcher] task done: task #{id} not linked to session #{from_session_id}")
+          notify_error(from_session_id, "task done", {:not_linked, id})
         end
 
       _ ->
-        Logger.warning("[CmdDispatcher] task done: invalid id '#{id_str}'")
+        notify_error(from_session_id, "task done", {:invalid_id, id_str})
     end
   rescue
-    _ -> Logger.warning("[CmdDispatcher] task done: task not found")
+    _ -> notify_error(from_session_id, "task done", :not_found)
   end
 
   # task delete <id>
@@ -343,16 +344,16 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
         if Tasks.task_linked_to_session?(id, from_session_id) do
           task = Tasks.get_task!(id)
           Tasks.delete_task(task)
-          Logger.info("[CmdDispatcher] task #{id} deleted")
+          notify_success(from_session_id, "task #{id} deleted")
         else
-          Logger.warning("[CmdDispatcher] task delete: task #{id} not linked to session #{from_session_id}")
+          notify_error(from_session_id, "task delete", {:not_linked, id})
         end
 
       _ ->
-        Logger.warning("[CmdDispatcher] task delete: invalid id '#{id_str}'")
+        notify_error(from_session_id, "task delete", {:invalid_id, id_str})
     end
   rescue
-    _ -> Logger.warning("[CmdDispatcher] task delete: task not found")
+    _ -> notify_error(from_session_id, "task delete", :not_found)
   end
 
   # task annotate <id> <body>
@@ -369,17 +370,17 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
                 parent_type: "task"
               })
 
-              Logger.info("[CmdDispatcher] task #{id} annotated")
+              notify_success(from_session_id, "task #{id} annotated")
             else
-              Logger.warning("[CmdDispatcher] task annotate: task #{id} not linked to session #{from_session_id}")
+              notify_error(from_session_id, "task annotate", {:not_linked, id})
             end
 
           _ ->
-            Logger.warning("[CmdDispatcher] task annotate: invalid id '#{id_str}'")
+            notify_error(from_session_id, "task annotate", {:invalid_id, id_str})
         end
 
       _ ->
-        Logger.warning("[CmdDispatcher] task annotate: missing body")
+        notify_error(from_session_id, "task annotate", :missing_body)
     end
   end
 
@@ -390,13 +391,13 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
     case Integer.parse(id_str) do
       {id, ""} ->
         Tasks.link_session_to_task(id, from_session_id)
-        Logger.info("[CmdDispatcher] task #{id} linked to session #{from_session_id}")
+        notify_success(from_session_id, "task #{id} linked to session #{from_session_id}")
 
       _ ->
-        Logger.warning("[CmdDispatcher] task link-session: invalid id '#{id_str}'")
+        notify_error(from_session_id, "task link-session", {:invalid_id, id_str})
     end
   rescue
-    _ -> Logger.warning("[CmdDispatcher] task link-session: task not found")
+    _ -> notify_error(from_session_id, "task link-session", :not_found)
   end
 
   # task unlink-session <id> — unlink current session from a task
@@ -406,13 +407,13 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
     case Integer.parse(id_str) do
       {id, ""} ->
         Tasks.unlink_session_from_task(id, from_session_id)
-        Logger.info("[CmdDispatcher] task #{id} unlinked from session #{from_session_id}")
+        notify_success(from_session_id, "task #{id} unlinked from session #{from_session_id}")
 
       _ ->
-        Logger.warning("[CmdDispatcher] task unlink-session: invalid id '#{id_str}'")
+        notify_error(from_session_id, "task unlink-session", {:invalid_id, id_str})
     end
   rescue
-    _ -> Logger.warning("[CmdDispatcher] task unlink-session: task not found")
+    _ -> notify_error(from_session_id, "task unlink-session", :not_found)
   end
 
   # task tag <id> <tag_id>
@@ -423,21 +424,21 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
              {tag_id, ""} <- Integer.parse(String.trim(tag_id_str)),
              true <- Tasks.task_linked_to_session?(id, from_session_id) do
           Tasks.link_tag_to_task(id, tag_id)
-          Logger.info("[CmdDispatcher] task #{id} tagged with #{tag_id}")
+          notify_success(from_session_id, "task #{id} tagged with #{tag_id}")
         else
-          false -> Logger.warning("[CmdDispatcher] task tag: task #{id_str} not linked to session #{from_session_id}")
-          _ -> Logger.warning("[CmdDispatcher] task tag: invalid id or tag_id in '#{rest}'")
+          false -> notify_error(from_session_id, "task tag", {:not_linked, id_str})
+          _ -> notify_error(from_session_id, "task tag", {:invalid_id_or_tag_id, rest})
         end
 
       _ ->
-        Logger.warning("[CmdDispatcher] task tag: expected <id> <tag_id>")
+        notify_error(from_session_id, "task tag", :expected_id_and_tag_id)
     end
   rescue
-    _ -> Logger.warning("[CmdDispatcher] task tag: task not found")
+    _ -> notify_error(from_session_id, "task tag", :not_found)
   end
 
-  defp dispatch_task(unknown, _),
-    do: Logger.warning("[CmdDispatcher] Unknown task sub-command: #{unknown}")
+  defp dispatch_task(unknown, from_session_id),
+    do: notify_error(from_session_id, "task", {:unknown_subcommand, unknown})
 
   # ---------------------------------------------------------------------------
   # note
@@ -451,27 +452,27 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
           {id, ""} ->
             if Tasks.task_linked_to_session?(id, from_session_id) do
               Notes.create_note(%{body: body, parent_id: id, parent_type: "task"})
-              Logger.info("[CmdDispatcher] note on task #{id}")
+              notify_success(from_session_id, "note added to task #{id}")
             else
-              Logger.warning("[CmdDispatcher] note task: task #{id} not linked to session #{from_session_id}")
+              notify_error(from_session_id, "note task", {:not_linked, id})
             end
 
           _ ->
-            Logger.warning("[CmdDispatcher] note task: invalid id '#{id_str}'")
+            notify_error(from_session_id, "note task", {:invalid_id, id_str})
         end
 
       _ ->
-        Logger.warning("[CmdDispatcher] note task: missing body")
+        notify_error(from_session_id, "note task", :missing_body)
     end
   end
 
   # note <body> — note on the current session
   defp dispatch_note(body, from_session_id) when body != "" do
     Notes.create_note(%{body: body, parent_id: from_session_id, parent_type: "session"})
-    Logger.info("[CmdDispatcher] note on session #{from_session_id}")
+    notify_success(from_session_id, "note added to session #{from_session_id}")
   end
 
-  defp dispatch_note(_, _), do: Logger.warning("[CmdDispatcher] note: empty body")
+  defp dispatch_note(_, from_session_id), do: notify_error(from_session_id, "note", :empty_body)
 
   # ---------------------------------------------------------------------------
   # commit
@@ -480,14 +481,14 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   defp dispatch_commit(hash, from_session_id) when hash != "" do
     case Commits.create_commit(%{commit_hash: hash, session_id: from_session_id}) do
       {:ok, _} ->
-        Logger.info("[CmdDispatcher] commit #{hash} logged for session #{from_session_id}")
+        notify_success(from_session_id, "commit #{hash} logged")
 
       {:error, reason} ->
-        Logger.warning("[CmdDispatcher] commit failed: #{inspect(reason)}")
+        notify_error(from_session_id, "commit", reason)
     end
   end
 
-  defp dispatch_commit(_, _), do: Logger.warning("[CmdDispatcher] commit: empty hash")
+  defp dispatch_commit(_, from_session_id), do: notify_error(from_session_id, "commit", :empty_hash)
 
   # ---------------------------------------------------------------------------
   # spawn
@@ -522,7 +523,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
 
       case AgentManager.create_agent(opts) do
         {:ok, %{agent: agent, session: new_session}} ->
-          Logger.info("[CmdDispatcher] spawned agent=#{agent.id} session=#{new_session.id} from=#{from_session_id}")
+          notify_success(from_session_id, "spawned agent=#{agent.id} session=#{new_session.id} uuid=#{new_session.uuid}")
 
         {:error, reason} ->
           notify_error(from_session_id, "spawn", reason)
@@ -560,57 +561,57 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
 
           case Teams.join_team(attrs) do
             {:ok, member} ->
-              Logger.info("[CmdDispatcher] session #{from_session_id} joined team #{team_id} as #{member.name}")
+              notify_success(from_session_id, "joined team #{team_id} as #{member.name} (member_id=#{member.id})")
 
             {:error, reason} ->
-              Logger.warning("[CmdDispatcher] teams join failed: #{inspect(reason)}")
+              notify_error(from_session_id, "teams join", reason)
           end
         else
-          _ -> Logger.warning("[CmdDispatcher] teams join: invalid team_id or missing --name")
+          _ -> notify_error(from_session_id, "teams join", :invalid_team_id_or_missing_name)
         end
 
       _ ->
-        Logger.warning("[CmdDispatcher] teams join: expected <team_id> --name <name>")
+        notify_error(from_session_id, "teams join", :expected_team_id_and_name)
     end
   end
 
   # teams leave <team_id> <member_id>
-  defp dispatch_teams("leave " <> rest, _from_session_id) do
+  defp dispatch_teams("leave " <> rest, from_session_id) do
     case String.split(rest, " ", parts: 2) do
       [_team_id_str, member_id_str] ->
         case Integer.parse(String.trim(member_id_str)) do
           {member_id, ""} ->
             case EyeInTheSky.Repo.get(TeamMember, member_id) do
               nil ->
-                Logger.warning("[CmdDispatcher] teams leave: member #{member_id} not found")
+                notify_error(from_session_id, "teams leave", {:member_not_found, member_id})
 
               member ->
                 Teams.leave_team(member)
-                Logger.info("[CmdDispatcher] member #{member_id} left team")
+                notify_success(from_session_id, "member #{member_id} left team")
             end
 
           _ ->
-            Logger.warning("[CmdDispatcher] teams leave: invalid member_id '#{member_id_str}'")
+            notify_error(from_session_id, "teams leave", {:invalid_member_id, member_id_str})
         end
 
       _ ->
-        Logger.warning("[CmdDispatcher] teams leave: expected <team_id> <member_id>")
+        notify_error(from_session_id, "teams leave", :expected_team_id_and_member_id)
     end
   end
 
   # teams done — mark current session's team memberships as done
   defp dispatch_teams("done", from_session_id) do
     Teams.mark_member_done_by_session(from_session_id)
-    Logger.info("[CmdDispatcher] teams done for session #{from_session_id}")
+    notify_success(from_session_id, "teams done for session #{from_session_id}")
   end
 
   defp dispatch_teams("done" <> _, from_session_id) do
     Teams.mark_member_done_by_session(from_session_id)
-    Logger.info("[CmdDispatcher] teams done for session #{from_session_id}")
+    notify_success(from_session_id, "teams done for session #{from_session_id}")
   end
 
   # teams update-member <team_id> <member_id> --status <status>
-  defp dispatch_teams("update-member " <> rest, _from_session_id) do
+  defp dispatch_teams("update-member " <> rest, from_session_id) do
     case String.split(rest, " ", parts: 3) do
       [_team_id_str, member_id_str | tail] ->
         args = List.first(tail, "")
@@ -619,23 +620,23 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
              {:ok, status} <- extract_flag(args, "--status") do
           case EyeInTheSky.Repo.get(TeamMember, member_id) do
             nil ->
-              Logger.warning("[CmdDispatcher] teams update-member: member #{member_id} not found")
+              notify_error(from_session_id, "teams update-member", {:member_not_found, member_id})
 
             member ->
               Teams.update_member_status(member, status)
-              Logger.info("[CmdDispatcher] team member #{member_id} status -> #{status}")
+              notify_success(from_session_id, "team member #{member_id} status -> #{status}")
           end
         else
-          _ -> Logger.warning("[CmdDispatcher] teams update-member: invalid member_id or missing --status")
+          _ -> notify_error(from_session_id, "teams update-member", :invalid_member_id_or_missing_status)
         end
 
       _ ->
-        Logger.warning("[CmdDispatcher] teams update-member: expected <team_id> <member_id> --status <status>")
+        notify_error(from_session_id, "teams update-member", :expected_team_id_member_id_and_status)
     end
   end
 
-  defp dispatch_teams(unknown, _),
-    do: Logger.warning("[CmdDispatcher] Unknown teams sub-command: #{unknown}")
+  defp dispatch_teams(unknown, from_session_id),
+    do: notify_error(from_session_id, "teams", {:unknown_subcommand, unknown})
 
   # ---------------------------------------------------------------------------
   # team (singular) — agent-scoped team commands
@@ -666,19 +667,18 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
         Enum.each(members, fn member ->
           Task.start(fn ->
             AgentManager.send_message(member.session_id, dm_body)
-            Logger.info("[CmdDispatcher] team broadcast -> session #{member.session_id}")
           end)
         end)
 
-        Logger.info("[CmdDispatcher] team broadcast from #{from_session_id} to #{length(members)} members")
+        notify_success(from_session_id, "team broadcast sent to #{length(members)} members")
 
       _ ->
         notify_error(from_session_id, "team broadcast", :missing_message_flag)
     end
   end
 
-  defp dispatch_team(unknown, _),
-    do: Logger.warning("[CmdDispatcher] Unknown team sub-command: #{unknown}")
+  defp dispatch_team(unknown, from_session_id),
+    do: notify_error(from_session_id, "team", {:unknown_subcommand, unknown})
 
   # ---------------------------------------------------------------------------
   # channel
@@ -704,22 +704,22 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
 
           case ChannelMessages.send_channel_message(attrs) do
             {:ok, msg} ->
-              Logger.info("[CmdDispatcher] channel #{channel_id} message id=#{msg.id} from session #{from_session_id}")
+              notify_success(from_session_id, "channel #{channel_id} message sent (id=#{msg.id})")
 
             {:error, reason} ->
-              Logger.warning("[CmdDispatcher] channel send failed: #{inspect(reason)}")
+              notify_error(from_session_id, "channel send", reason)
           end
         else
-          _ -> Logger.warning("[CmdDispatcher] channel send: invalid channel_id or missing --body")
+          _ -> notify_error(from_session_id, "channel send", :invalid_channel_id_or_missing_body)
         end
 
       _ ->
-        Logger.warning("[CmdDispatcher] channel send: expected <channel_id> --body <text>")
+        notify_error(from_session_id, "channel send", :expected_channel_id_and_body)
     end
   end
 
-  defp dispatch_channel(unknown, _),
-    do: Logger.warning("[CmdDispatcher] Unknown channel sub-command: #{unknown}")
+  defp dispatch_channel(unknown, from_session_id),
+    do: notify_error(from_session_id, "channel", {:unknown_subcommand, unknown})
 
   # ---------------------------------------------------------------------------
   # Helpers
@@ -742,6 +742,18 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   # ---------------------------------------------------------------------------
   # Error surfacing
   # ---------------------------------------------------------------------------
+
+  # Sends a success acknowledgement back to the originating agent session
+  # so it can use returned IDs (e.g. task ID) in follow-up commands.
+  defp notify_success(from_session_id, msg) do
+    Logger.info("[CmdDispatcher] #{msg}")
+
+    if from_session_id do
+      Task.start(fn -> AgentManager.send_message(from_session_id, "[EITS-CMD ok] #{msg}") end)
+    end
+
+    :ok
+  end
 
   # Logs the error, creates a persistent notification visible in the UI,
   # and DMs the error back to the originating agent session so it can react.

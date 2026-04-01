@@ -32,7 +32,17 @@ EITS-CMD: task annotate <id> <body>
 EITS-CMD: note <body>
 EITS-CMD: note task <id> <body>
 EITS-CMD: dm --to <session_uuid> --message "text"
+EITS-CMD: commit <hash>
 ```
+
+### Feedback Messages
+
+Every EITS-CMD directive sends a feedback message back to your session:
+
+- **Success**: `[EITS-CMD ok] task begun id=42 title=Fix bug` — contains IDs you need for follow-up commands
+- **Error**: `[EITS-CMD error] task done: {:not_linked, 99}` — tells you exactly what went wrong
+
+**You MUST wait for the feedback message before using returned IDs.** For example, after `EITS-CMD: task begin Fix something`, wait for the `[EITS-CMD ok] task begun id=<N>` response before emitting `EITS-CMD: task annotate <N> ...` or `EITS-CMD: task done <N>`. Do not guess task IDs.
 
 ---
 

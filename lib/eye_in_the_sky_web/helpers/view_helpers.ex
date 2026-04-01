@@ -68,6 +68,20 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
   def parse_id(_), do: nil
 
   @doc """
+  Parse a USD budget string from form params. Returns a positive float or nil.
+  Accepts nil, empty string, or a numeric string. Rejects zero/negative.
+  """
+  def parse_budget(nil), do: nil
+  def parse_budget(""), do: nil
+
+  def parse_budget(v) when is_binary(v) do
+    case Float.parse(v) do
+      {f, _} when f > 0 -> f
+      _ -> nil
+    end
+  end
+
+  @doc """
   Coerce a raw datetime value (nil | DateTime | binary string) to a DateTime.
   Returns a fallback epoch datetime when the value is nil or unparseable.
   """

@@ -136,16 +136,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
           20
       end
 
-    import Ecto.Query
-
-    dms =
-      EyeInTheSky.Messages.Message
-      |> where([m], m.to_session_id == ^from_session_id)
-      |> where([m], not is_nil(m.from_session_id))
-      |> order_by([m], desc: m.inserted_at)
-      |> limit(^limit)
-      |> EyeInTheSky.Repo.all()
-      |> Enum.reverse()
+    dms = Messages.list_inbound_dms(from_session_id, limit)
 
     if dms == [] do
       AgentManager.send_message(from_session_id, "[EITS] dm list: no DMs found")
@@ -647,18 +638,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   defp dispatch_team("broadcast" <> rest, from_session_id) do
     case extract_flag(rest, "--message") do
       {:ok, message} ->
-        import Ecto.Query
-
-        members =
-          EyeInTheSky.Teams.TeamMember
-          |> join(:inner, [m], other in EyeInTheSky.Teams.TeamMember,
-            on: other.team_id == m.team_id and other.session_id != ^from_session_id
-          )
-          |> where([m, _other], m.session_id == ^from_session_id)
-          |> where([_m, other], not is_nil(other.session_id))
-          |> select([_m, other], other)
-          |> distinct(true)
-          |> EyeInTheSky.Repo.all()
+        members = Teams.list_broadcast_targets(from_session_id)
 
         {:ok, from_session} = Sessions.get_session(from_session_id)
         sender_name = from_session.name || "session:#{from_session.uuid}"

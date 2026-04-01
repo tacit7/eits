@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
   alias EyeInTheSkyWeb.ChatLive.ChannelHeader
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
+  import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_budget: 1]
 
   # Deterministic UUIDs for the web UI user
   @web_agent_uuid "00000000-0000-0000-0000-000000000001"
@@ -840,16 +841,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
   defp maybe_bool_opt(opts, _key, nil), do: opts
   defp maybe_bool_opt(opts, key, "true"), do: opts ++ [{key, true}]
   defp maybe_bool_opt(opts, _key, _), do: opts
-
-  defp parse_budget(nil), do: nil
-  defp parse_budget(""), do: nil
-
-  defp parse_budget(v) when is_binary(v) do
-    case Float.parse(v) do
-      {f, _} when f > 0 -> f
-      _ -> nil
-    end
-  end
 
   defp consume_agent_images(socket) do
     consume_uploaded_entries(socket, :agent_images, fn %{path: temp_path}, entry ->

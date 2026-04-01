@@ -120,6 +120,25 @@ defmodule EyeInTheSky.Teams do
     |> tap_broadcast(:member_left)
   end
 
+  @doc """
+  Returns all team members in teams that `session_id` belongs to,
+  excluding the calling session itself.
+
+  Used by EITS-CMD `team broadcast` to fan-out a message to co-team members.
+  """
+  @spec list_broadcast_targets(integer()) :: [TeamMember.t()]
+  def list_broadcast_targets(session_id) when is_integer(session_id) do
+    TeamMember
+    |> join(:inner, [m], other in TeamMember,
+      on: other.team_id == m.team_id and other.session_id != ^session_id
+    )
+    |> where([m, _other], m.session_id == ^session_id)
+    |> where([_m, other], not is_nil(other.session_id))
+    |> select([_m, other], other)
+    |> distinct(true)
+    |> Repo.all()
+  end
+
   # ── Helpers ────────────────────────────────────────────────
 
   defp tap_broadcast({:ok, record}, event) do

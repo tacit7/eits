@@ -9,9 +9,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
   import EyeInTheSkyWeb.Helpers.SessionFilters
 
   alias EyeInTheSky.Sessions
+  alias EyeInTheSkyWeb.ProjectLive.Sessions.State
 
   @telemetry_prefix [:eye_in_the_sky, :project_sessions]
-  @page_size 25
 
   @doc "Reload sessions from the database and rebuild the view."
   def load_agents(socket) do
@@ -36,7 +36,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
 
   @doc "Reapply filter/sort/pagination on the already-loaded agent list."
   def apply_agent_view(socket, reset_page \\ false) do
-    visible_count = if reset_page, do: @page_size, else: socket.assigns.visible_count
+    visible_count = if reset_page, do: State.page_size(), else: socket.assigns.visible_count
 
     {duration_us, {ordered_agents, depths}} =
       :timer.tc(fn ->

@@ -19,6 +19,11 @@ defmodule EyeInTheSky.Sessions do
   alias EyeInTheSky.QueryBuilder
   alias EyeInTheSky.Search.PgSearch
 
+  # SQL fragment for getting current task title for a session
+  @current_task_title_fragment """
+  (SELECT t.title FROM tasks t JOIN task_sessions ts ON ts.task_id = t.id WHERE ts.session_id = ? AND t.state_id = ? AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)
+  """
+
   @doc """
   Returns the list of sessions, excluding archived by default.
   Pass `include_archived: true` to include archived sessions.
@@ -359,9 +364,9 @@ defmodule EyeInTheSky.Sessions do
       last_activity_at: a.last_activity_at,
       current_task_title:
         fragment(
-          # 2 = WorkflowState.in_progress_id()
-          "(SELECT t.title FROM tasks t JOIN task_sessions ts ON ts.task_id = t.id WHERE ts.session_id = ? AND t.state_id = 2 AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)",
-          s.id
+          @current_task_title_fragment,
+          s.id,
+          ^WorkflowState.in_progress_id()
         )
     })
     |> Repo.all()
@@ -392,8 +397,9 @@ defmodule EyeInTheSky.Sessions do
         last_activity_at: a.last_activity_at,
         current_task_title:
           fragment(
-            "(SELECT t.title FROM tasks t JOIN task_sessions ts ON ts.task_id = t.id WHERE ts.session_id = ? AND t.state_id = 2 AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)",
-            s.id
+            @current_task_title_fragment,
+            s.id,
+            ^WorkflowState.in_progress_id()
           )
       }
     )

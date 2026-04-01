@@ -10,6 +10,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.State do
 
   @page_size 25
 
+  @doc "Returns the pagination page size for session lists."
+  def page_size, do: @page_size
+
   @doc """
   Assigns all defaults and performs the initial data load.
   Call this inside mount/3 after the project is confirmed present.
@@ -25,7 +28,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.State do
     |> assign(:all_agents, [])
     |> assign(:agents, [])
     |> assign(:depths, %{})
-    |> assign(:visible_count, @page_size)
+    |> assign(:visible_count, page_size())
     |> assign(:has_more, false)
     |> assign(:editing_session_id, nil)
     |> Loader.load_agents()

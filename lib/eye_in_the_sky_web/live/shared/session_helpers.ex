@@ -25,8 +25,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.SessionHelpers do
       if thinking_enabled do
         budget =
           case model do
-            "opus" -> 16000
-            _ -> 10000
+            "opus" -> 16_000
+            _ -> 10_000
           end
 
         opts ++ [thinking_budget: budget]

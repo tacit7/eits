@@ -65,7 +65,7 @@ defmodule EyeInTheSky.NotificationsTest do
 
     # Manually backdate the notification
     import Ecto.Query
-    cutoff = NaiveDateTime.utc_now() |> NaiveDateTime.add(-8 * 86400, :second)
+    cutoff = NaiveDateTime.utc_now() |> NaiveDateTime.add(-8 * 86_400, :second)
 
     EyeInTheSky.Repo.update_all(
       from(n in "notifications", where: n.id == ^n.id),

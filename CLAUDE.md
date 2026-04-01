@@ -44,7 +44,20 @@ PORT=5002 mix phx.server # Override port via PORT env var (range 5001-5020)
 mix compile              # Compile only
 ```
 
-Assets: `cd assets && npm install` for JS dependencies. Esbuild and Tailwind run as Phoenix watchers.
+Assets: `cd assets && npm install` for JS dependencies. Vite, Tailwind, and TypeScript compilation run as Phoenix watchers.
+
+### Asset Pipeline: Vite Migration
+
+The asset pipeline was migrated from esbuild to **Vite** for faster development and production builds:
+
+```bash
+# In assets/ directory
+npm install                  # Install dependencies
+npm run dev                  # Vite dev server (auto via phx.server)
+npm run build               # Production build
+```
+
+Vite configuration lives in `assets/vite.config.ts`. The dev server runs on port 5173 by default (configurable via `VITE_PORT` env var). LiveSvelte SSR support and TypeScript compilation are integrated.
 
 ### Running a worktree server alongside main
 
@@ -113,9 +126,12 @@ EITS-CMD: task begin Fix broken import
 EITS-CMD: task done 1234
 EITS-CMD: task annotate 1234 What I did and why
 EITS-CMD: dm --to <session_uuid> --message "done"
+EITS-CMD: dm --to 1740 --message "done"
 EITS-CMD: commit abc1234
 ```
 These are intercepted by AgentWorker in-process — no HTTP round-trips. **Never use the `eits` bash script when running as `sdk-cli`.**
+
+**DM targets support both UUID and numeric session ID** (as of commit ee6cacc). Pass either format to `dm --to`.
 
 **`cli` (interactive sessions) — use `eits` script:**
 ```bash
@@ -150,12 +166,39 @@ Exit status will be 1 (error) instead of 0 (success).
 
 PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. **This app owns the schema** — Go is no longer involved. Schema changes are made via Ecto migrations (`mix ecto.gen.migration` / `mix ecto.migrate`).
 
+## Recent Features
+
+### EITS-CMD Enhancements
+
+- **Numeric Session ID Support**: DM targets now accept numeric session IDs in addition to UUIDs
+- **Feedback Messages**: All EITS-CMD directives return feedback to the calling agent
+- **Session Hierarchy**: Parent/child session tracking via `source_uuid` field
+
+### Agent Definitions & Canvas System
+
+- **Agent Definitions**: Database-backed tracking of global and project-level agent configurations (`.claude/agents`)
+- **Canvas Overlay**: Floating session windows on a shared canvas with PubSub sync for real-time updates
+- **Agent Display Names**: Custom display names from agent definitions shown in DM headers and session cards
+
+### CodeMirror & Editor Improvements
+
+- **CodeMirror Themes**: Integrated theme support (defaultHighlightStyle, syntax highlighting for markdown/JSON)
+- **User Settings**: Tab size, font size, vim keybindings (persisted in Settings)
+- **Code Editor**: CodeMirror replacing Highlight on project files and config pages
+
+### Performance Optimizations
+
+- **SessionQueries Extraction**: Refactored session queries from raw SQL to Ecto-based operations
+- **Query Consolidation**: Eliminated redundant queries, optimized file scans (skip git dirs)
+- **Search Performance**: PgSearch tsvector queries are O(log N) on indexed columns
+
 ## Architecture
 
 - `lib/eye_in_the_sky/` - OTP application core (Repo, migrations, application.ex after rename from `eye_in_the_sky_web`)
-- `lib/eye_in_the_sky_web/` - Contexts (Sessions, Tasks, Agents, Projects, Notes, Prompts, Commits, Canvases)
+- `lib/eye_in_the_sky_web/` - Contexts (Sessions, Tasks, Agents, Projects, Notes, Prompts, Commits, Canvases, AgentDefinitions)
 - `lib/eye_in_the_sky_web_web/` - Web layer (LiveViews, components, router)
 - `lib/eye_in_the_sky_web/search/pg_search.ex` - Full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback (`EyeInTheSkyWeb.Search.PgSearch`)
+- `lib/eye_in_the_sky_web/sessions/queries.ex` - SessionQueries module for Ecto-based session operations
 
 ## OTP App Rename
 
@@ -261,6 +304,24 @@ Extracts reusable tsvector query fragments for common search patterns across ses
 - Falls back to ILIKE for partial matching when tsquery doesn't match
 - Used in Sessions, Tasks, and Notes contexts for consistent search behavior
 - Performance: tsvector queries are O(log N) on indexed columns vs O(N) for ILIKE
+
+### User Settings & Themes
+
+User preferences (theme, CodeMirror settings) are stored in the database and persisted via Settings LiveView. Available themes:
+
+- `system` - Default, respects OS dark/light preference
+- `light` - Explicit light mode
+- `dark` - Explicit dark mode
+- `dracula` - Dracula theme
+- `tokyo-night` - Tokyo Night theme
+- Catppuccin themes (via `@catppuccin/daisyui` plugin)
+
+CodeMirror user settings:
+- **Tab Size**: 2, 4, or 8 spaces
+- **Font Size**: Configurable in pixels (default 12px)
+- **Vim Keybindings**: Toggle on/off
+
+Settings are applied via `phx:apply_theme` hook and persisted in the `settings` table.
 
 ### Workflow States
 

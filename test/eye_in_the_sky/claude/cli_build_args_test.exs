@@ -146,7 +146,7 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
       assert "-p" in args
       assert "hello" in args
       assert "--model" in args
-      assert "sonnet" in args
+      assert "claude-sonnet-4-6" in args
     end
 
     test "DB model appears when caller doesn't specify model" do
@@ -155,16 +155,16 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
       args = CLI.build_args(prompt: "test")
 
       assert "--model" in args
-      assert "opus" in args
+      assert "claude-opus-4-6" in args
     end
 
-    test "caller model overrides DB model" do
+    test "caller model overrides DB model and gets normalized" do
       Settings.set_cli_defaults(%{"model" => "opus"})
 
       args = CLI.build_args(prompt: "test", model: "haiku")
 
       assert "--model" in args
-      assert "haiku" in args
+      assert "claude-haiku-4-5" in args
       refute "opus" in args
     end
 
@@ -174,7 +174,29 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
       args = CLI.build_args(prompt: "test", model: nil)
 
       assert "--model" in args
-      assert "opus" in args
+      assert "claude-opus-4-6" in args
+    end
+
+    test "model names are normalized to full Claude identifiers" do
+      test_cases = [
+        {"haiku", "claude-haiku-4-5"},
+        {"sonnet", "claude-sonnet-4-6"},
+        {"opus", "claude-opus-4-6"},
+        {"HAIKU", "claude-haiku-4-5"},  # case insensitive
+        {"custom-model", "custom-model"},  # passthrough for unknown models
+        {nil, nil}  # nil passthrough
+      ]
+
+      for {input, expected} <- test_cases do
+        args = CLI.build_args(prompt: "test", model: input)
+
+        if expected do
+          assert "--model" in args
+          assert expected in args
+        else
+          refute "--model" in args
+        end
+      end
     end
 
     test "prompt always present as -p <text>" do

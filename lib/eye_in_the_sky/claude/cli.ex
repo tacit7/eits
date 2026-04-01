@@ -247,6 +247,25 @@ defmodule EyeInTheSky.Claude.CLI do
 
   Unknown keys are silently ignored (they may be used by env/caller logic).
   """
+
+  # Normalize model names from simple identifiers to full Claude model identifiers.
+  # Maps EITS's simple model names to current Claude API model identifiers:
+  # - "haiku" -> "claude-haiku-4-5"
+  # - "sonnet" -> "claude-sonnet-4-6"
+  # - "opus" -> "claude-opus-4-6"
+  # Other model names are passed through unchanged.
+  @spec normalize_model_name(String.t() | nil) :: String.t() | nil
+  defp normalize_model_name(nil), do: nil
+
+  defp normalize_model_name(model) when is_binary(model) do
+    case String.downcase(model) do
+      "haiku" -> "claude-haiku-4-5"
+      "sonnet" -> "claude-sonnet-4-6"
+      "opus" -> "claude-opus-4-6"
+      _ -> model
+    end
+  end
+
   @spec build_args(cli_opts()) :: [String.t()]
   def build_args(caller_opts) do
     # Filter nils from caller opts (nil = "not specified", allows DB/fallback to win)
@@ -278,7 +297,7 @@ defmodule EyeInTheSky.Claude.CLI do
 
     # Value flags
     args = maybe_flag(args, "--output-format", opts[:output_format])
-    args = maybe_flag(args, "--model", opts[:model])
+    args = maybe_flag(args, "--model", normalize_model_name(opts[:model]))
     args = maybe_flag(args, "--max-turns", opts[:max_turns])
     args = maybe_flag(args, "--system-prompt", opts[:system_prompt])
     args = maybe_flag(args, "--append-system-prompt", opts[:append_system_prompt])

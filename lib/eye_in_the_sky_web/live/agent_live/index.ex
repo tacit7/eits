@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   import EyeInTheSkyWeb.Components.Icons
   import EyeInTheSkyWeb.Components.SessionCard
   import EyeInTheSkyWeb.Helpers.SessionFilters
+  import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_budget: 1]
 
   require Logger
 
@@ -780,13 +781,4 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
     end
   end
 
-  defp parse_budget(nil), do: nil
-  defp parse_budget(""), do: nil
-
-  defp parse_budget(v) when is_binary(v) do
-    case Float.parse(v) do
-      {f, _} when f > 0 -> f
-      _ -> nil
-    end
-  end
 end

@@ -102,7 +102,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
     <!-- Instructions -->
             <.form_field label="Instructions">
               <textarea
-                name="instructions"
+                name="description"
                 class="textarea textarea-bordered h-24"
                 placeholder="What should this agent do?"
                 required

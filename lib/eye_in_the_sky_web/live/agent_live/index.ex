@@ -300,7 +300,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
     model = params["model"]
     effort_level = params["effort_level"]
     max_budget_usd = parse_budget(params["max_budget_usd"])
-    description = params["instructions"] || params["description"]
+    description = params["description"]
     agent_name = params["agent_name"] || String.slice(description || "", 0, 60)
 
     worktree =

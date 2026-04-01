@@ -50,7 +50,7 @@ defmodule EyeInTheSky.SDKE2ETest do
 
       # Should receive at least one text message
       text_messages = Enum.filter(messages, &(&1.type == :text))
-      assert length(text_messages) > 0
+      assert text_messages != []
 
       # Text should contain "hello"
       full_text = text_messages |> Enum.map(& &1.content) |> Enum.join()
@@ -91,7 +91,7 @@ defmodule EyeInTheSky.SDKE2ETest do
       # Should have usage message
       usage_messages = Enum.filter(messages, &(&1.type == :usage))
 
-      if length(usage_messages) > 0 do
+      if usage_messages != [] do
         usage = hd(usage_messages)
         assert is_map(usage.content)
         assert Map.has_key?(usage.content, :output_tokens)

@@ -8,10 +8,6 @@ Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky.
 
 This project uses Phoenix LiveView with Elixir. Primary languages: TypeScript, JavaScript, Elixir/HEEx, Go, Rust. Use Tailwind CSS for styling.
 
-## Project Conventions
-
-- The `tasks` table uses `created_at`, **not** `inserted_at`. Always verify timestamp field names against the schema before using them — using `inserted_at` will cause KeyErrors at runtime.
-
 ## Git Worktrees
 
 **Always start any code change work in a worktree.** Never modify files directly in the main project directory. Create a worktree first, make changes there, then merge/PR back.
@@ -46,28 +42,11 @@ mix compile              # Compile only
 
 Assets: `cd assets && npm install` for JS dependencies. Vite, Tailwind, and TypeScript compilation run as Phoenix watchers.
 
-### Asset Pipeline: Vite Migration
-
-The asset pipeline was migrated from esbuild to **Vite** for faster development and production builds:
-
-```bash
-# In assets/ directory
-npm install                  # Install dependencies
-npm run dev                  # Vite dev server (auto via phx.server)
-npm run build               # Production build
-```
-
-Vite configuration lives in `assets/vite.config.mjs`. The dev server runs on port 5173 by default (configurable via `VITE_PORT` env var). LiveSvelte SSR support and TypeScript compilation are integrated.
-
-### Running a worktree server alongside main
-
-Vite defaults to port 5173 with `strictPort: true` — a second instance will crash if the main server is already running. Use `VITE_PORT` to avoid the conflict:
+Asset pipeline uses **Vite** (`assets/vite.config.mjs`). Dev server runs on port 5173 (override with `VITE_PORT`). When running a worktree server alongside main, use a different port to avoid conflicts:
 
 ```bash
 VITE_PORT=5174 PORT=5002 mix phx.server
 ```
-
-Pick any free port for `VITE_PORT`. The Vite dev server, LiveSvelte SSR host, and asset URL generation all read from it automatically.
 
 ## Playwright / Browser Testing
 
@@ -81,9 +60,7 @@ Navigate Playwright to `http://localhost:5002`. This avoids interfering with the
 
 ## Development Workflow
 
-**Before committing:** Always run `mix compile` to ensure the project compiles without errors. Only warnings are acceptable.
-
-After completing code changes, always run `mix compile --warnings-as-errors` to verify clean compilation before committing.
+**Before committing:** Run `mix compile --warnings-as-errors`. Only warnings are acceptable, no errors.
 
 **Before staging/committing:** Run `git status` and `git diff --staged` to check for pre-existing staged changes. Never assume a clean staging area — only commit the files relevant to the current task.
 
@@ -91,7 +68,7 @@ After completing code changes, always run `mix compile --warnings-as-errors` to 
 
 When fixing bugs, grep the **entire codebase** for ALL occurrences of the problematic pattern before making any edits. List every file and line number, then fix all of them in a single pass. Don't fix just the first occurrence.
 
-When a UI bug is reported, read the exact symptom carefully before investigating. Do not assume the category of bug. Don't investigate duplicate messages when the report is about dark mode CSS. Read the report literally, trace the code, then propose a fix.
+When a UI bug is reported, read the exact symptom carefully before investigating. Do not assume the category of bug. Read the report literally, trace the code, then propose a fix.
 
 ## Session Status Lifecycle
 
@@ -166,38 +143,12 @@ Exit status will be 1 (error) instead of 0 (success).
 
 PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. **This app owns the schema** — Go is no longer involved. Schema changes are made via Ecto migrations (`mix ecto.gen.migration` / `mix ecto.migrate`).
 
-## Recent Features
-
-### EITS-CMD Enhancements
-
-- **Numeric Session ID Support**: DM targets now accept numeric session IDs in addition to UUIDs
-- **Feedback Messages**: All EITS-CMD directives return feedback to the calling agent
-- **Session Hierarchy**: Parent/child session tracking via `source_uuid` field
-
-### Agent Definitions & Canvas System
-
-- **Agent Definitions**: Database-backed tracking of global and project-level agent configurations (`.claude/agents`)
-- **Canvas Overlay**: Floating session windows on a shared canvas with PubSub sync for real-time updates
-- **Agent Display Names**: Custom display names from agent definitions shown in DM headers and session cards
-
-### CodeMirror & Editor Improvements
-
-- **CodeMirror Themes**: Integrated theme support (defaultHighlightStyle, syntax highlighting for markdown/JSON)
-- **User Settings**: Tab size, font size, vim keybindings (persisted in Settings)
-- **Code Editor**: CodeMirror replacing Highlight on project files and config pages
-
-### Performance Optimizations
-
-- **SessionQueries Extraction**: Refactored session queries from raw SQL to Ecto-based operations
-- **Query Consolidation**: Eliminated redundant queries, optimized file scans (skip git dirs)
-- **Search Performance**: PgSearch tsvector queries are O(log N) on indexed columns
-
 ## Architecture
 
 - `lib/eye_in_the_sky/` - OTP core: Repo, contexts (Sessions, Tasks, Agents, Projects, Notes, Prompts, Commits, Canvases, AgentDefinitions), search, scheduler
 - `lib/eye_in_the_sky_web/` - Web layer entry point (endpoint, router, plugs)
 - `lib/eye_in_the_sky_web_web/` - LiveViews, components, controllers
-- `lib/eye_in_the_sky/search/pg_search.ex` - Full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback (`EyeInTheSkyWeb.Search.PgSearch`)
+- `lib/eye_in_the_sky/search/pg_search.ex` - Full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback (`EyeInTheSky.Search.PgSearch`)
 - `lib/eye_in_the_sky/sessions/queries.ex` - SessionQueries module for Ecto-based session operations
 
 ## Schema Conventions
@@ -327,7 +278,7 @@ Two schemas map to different DB tables:
 - **`Agent` schema** (`lib/eye_in_the_sky/agents/agent.ex`) → **`agents` DB table** (agent identity/participant)
 - **`Session` schema** (`lib/eye_in_the_sky/sessions/session.ex`) → **`sessions` DB table** (execution session)
 
-The old `ChatAgent` schema and `ChatAgents` context have been removed. All agent identity operations go through `EyeInTheSkyWeb.Agents`.
+All agent identity operations go through `EyeInTheSky.Agents`.
 
 In LiveViews and components:
 - `@session` typically refers to a `Session` struct (from sessions table)
@@ -336,16 +287,10 @@ In LiveViews and components:
 
 ### Agent `last_activity_at` Schema
 
-**Migration History:**
-- Previous: DateTime field (Elixir datetime)
-- Current: ISO8601 text field (standardized string format)
-- Migration: `20260309000001_change_agent_last_activity_at_to_text.exs`
-
-**Impact:**
-- Agent status scheduling in `lib/eye_in_the_sky/scheduler/agent_status.ex` now uses ISO8601 strings
-- Queries comparing timestamps must use string comparison or convert to datetime
+`last_activity_at` is an ISO8601 text field, not a DateTime.
+- Always pass ISO8601 strings when updating it
 - Use `DateTime.from_iso8601/1` when comparing with Elixir datetime values
-- Always pass ISO8601 strings when updating `last_activity_at` on agents
+- Agent status scheduling in `lib/eye_in_the_sky/scheduler/agent_status.ex` uses ISO8601 strings
 
 **Sessions `last_activity_at` Ordering:**
 - Sessions can be sorted by `last_activity_at`, `created_at`, or `last_message_at`

@@ -9,7 +9,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
 
   ## Supported commands
 
-      EITS-CMD: dm --to <session_uuid> --message <text>
+      EITS-CMD: dm --to <session_ref> --message <text>
       EITS-CMD: dm list [--limit <n>]
 
       EITS-CMD: team broadcast --message <text>
@@ -44,7 +44,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
 
   ## Usage from a spawned agent (CLAUDE_CODE_ENTRYPOINT=sdk-cli)
 
-      EITS-CMD: dm --to 0c77344b-52bc-4c3d-97a1-cf3c421cb325 --message "done"
+      EITS-CMD: dm --to 1733 --message "done"
       EITS-CMD: dm list
       EITS-CMD: dm list --limit 5
       EITS-CMD: team broadcast --message "Build complete, reviewing output"

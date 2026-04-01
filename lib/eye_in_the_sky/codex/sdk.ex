@@ -62,6 +62,9 @@ defmodule EyeInTheSky.Codex.SDK do
       EITS-CMD: commit <hash>
       EITS-CMD: dm --to #{state.session_id} --message <text>
 
+    DM targets accept either a numeric session ID or a session UUID. Prefer the
+    numeric session ID from EITS context when it is available.
+
     You MUST claim a task before editing files:
       EITS-CMD: task begin <title of your work>
 

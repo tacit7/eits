@@ -212,6 +212,32 @@ defmodule EyeInTheSky.Agents.CmdDispatcherTest do
     end
   end
 
+  describe "EITS-CMD: dm --to" do
+    test "accepts a numeric session id target" do
+      sender = new_session()
+      receiver = new_session()
+
+      dispatch(~s(EITS-CMD: dm --to #{receiver.id} --message "hello by id"), sender.id)
+
+      assert_receive {:session_new_dm, ^receiver.id, msg}, 500
+      assert msg.to_session_id == receiver.id
+      assert msg.from_session_id == sender.id
+      assert String.contains?(msg.body, "hello by id")
+    end
+
+    test "accepts a session uuid target" do
+      sender = new_session()
+      receiver = new_session()
+
+      dispatch(~s(EITS-CMD: dm --to #{receiver.uuid} --message "hello by uuid"), sender.id)
+
+      assert_receive {:session_new_dm, ^receiver.id, msg}, 500
+      assert msg.to_session_id == receiver.id
+      assert msg.from_session_id == sender.id
+      assert String.contains?(msg.body, "hello by uuid")
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # team broadcast
   # ---------------------------------------------------------------------------

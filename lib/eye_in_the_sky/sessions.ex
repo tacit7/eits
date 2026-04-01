@@ -513,42 +513,6 @@ defmodule EyeInTheSky.Sessions do
     end
   end
 
-  @doc """
-  Lazy load: tasks only
-  """
-  def load_session_tasks(session_id) do
-    EyeInTheSky.Tasks.list_tasks_for_session(session_id)
-  end
-
-  @doc """
-  Lazy load: commits only
-  """
-  def load_session_commits(session_id, opts \\ []) do
-    limit = Keyword.get(opts, :limit, 50)
-    EyeInTheSky.Commits.list_commits_for_session(session_id, limit: limit)
-  end
-
-  @doc """
-  Lazy load: logs only
-  """
-  def load_session_logs(session_id, opts \\ []) do
-    limit = Keyword.get(opts, :limit, 100)
-    EyeInTheSky.Logs.list_logs_for_session(session_id, limit: limit)
-  end
-
-  @doc """
-  Lazy load: context only
-  """
-  def load_session_context(session_id) do
-    EyeInTheSky.Contexts.get_session_context(session_id)
-  end
-
-  @doc """
-  Lazy load: notes only
-  """
-  def load_session_notes(session_id) do
-    EyeInTheSky.Notes.list_notes_for_session(session_id)
-  end
 
   @doc """
   Extracts and validates model information from a nested model object.

@@ -53,7 +53,7 @@ import {LocalTime} from "./hooks/local_time"
 import {DragUpload} from "./hooks/drag_upload"
 import {SidebarState} from "./hooks/sidebar_state"
 import {DrawerSwipeClose} from "./hooks/drawer_swipe_close"
-import {QuickCreateNote, QuickCreateAgent, QuickCreateChat, QuickCreateTask} from "./hooks/quick_create"
+import {QuickCreateNote, QuickCreateAgent, QuickUpdateAgent, QuickGetAgent, QuickDeleteAgent, QuickResumeAgent, QuickCreateChat, QuickCreateTask} from "./hooks/quick_create"
 import {CommandPalette} from "./hooks/command_palette"
 import {FlashTimeout} from "./hooks/flash_timeout"
 import {ReloadConfirmModal} from "./hooks/reload_confirm_modal"
@@ -107,6 +107,9 @@ Hooks.SidebarState = SidebarState
 Hooks.DrawerSwipeClose = DrawerSwipeClose
 Hooks.QuickCreateNote = QuickCreateNote
 Hooks.QuickCreateAgent = QuickCreateAgent
+Hooks.QuickUpdateAgent = QuickUpdateAgent
+Hooks.QuickGetAgent = QuickGetAgent
+Hooks.QuickDeleteAgent = QuickDeleteAgent
 Hooks.QuickCreateChat = QuickCreateChat
 Hooks.QuickCreateTask = QuickCreateTask
 Hooks.CommandPalette = CommandPalette

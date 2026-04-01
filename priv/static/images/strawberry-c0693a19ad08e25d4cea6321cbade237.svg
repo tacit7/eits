@@ -1,0 +1,24 @@
+<svg width="200" height="240" viewBox="0 0 200 240" xmlns="http://www.w3.org/2000/svg">
+  <!-- Strawberry body -->
+  <path d="M 100,60 C 160,60 180,120 100,200 C 20,120 40,60 100,60 Z" fill="#E74C3C"/>
+
+  <!-- Calyx (leaves on top) -->
+  <path d="M 100,60 L 80,40 L 90,60 L 60,30 L 75,60 L 50,50 L 70,65" fill="#2ECC71" stroke="#27AE60" stroke-width="1"/>
+  <path d="M 100,60 L 120,40 L 110,60 L 140,30 L 125,60 L 150,50 L 130,65" fill="#2ECC71" stroke="#27AE60" stroke-width="1"/>
+
+  <!-- Seeds -->
+  <circle cx="80" cy="110" r="2" fill="#F1C40F"/>
+  <circle cx="120" cy="110" r="2" fill="#F1C40F"/>
+  <circle cx="100" cy="140" r="2" fill="#F1C40F"/>
+  <circle cx="70" cy="150" r="2" fill="#F1C40F"/>
+  <circle cx="130" cy="150" r="2" fill="#F1C40F"/>
+  <circle cx="90" cy="170" r="2" fill="#F1C40F"/>
+  <circle cx="110" cy="170" r="2" fill="#F1C40F"/>
+  <circle cx="100" cy="90" r="2" fill="#F1C40F"/>
+
+  <!-- Speech bubble -->
+  <path d="M 140,20 C 135,20 130,25 130,30 L 130,50 C 130,55 135,60 140,60 L 180,60 C 185,60 190,55 190,50 L 190,30 C 190,25 185,20 180,20 Z M 145,60 L 135,75 L 155,60 Z" fill="white" stroke="black" stroke-width="2"/>
+
+  <!-- Text -->
+  <text x="145" y="45" font-family="Arial, sans-serif" font-size="20" fill="black" font-weight="bold">Hi!</text>
+</svg>

@@ -64,6 +64,7 @@ export const SortableColumns = {
       animation: 150,
       ghostClass: "opacity-30",
       handle: "[data-column-handle]",
+      filter: "input, button, a, select, textarea",
       draggable: "[data-column-id]",
       onEnd: () => {
         const order = [...this.el.querySelectorAll("[data-column-id]")].map(el => el.dataset.columnId)

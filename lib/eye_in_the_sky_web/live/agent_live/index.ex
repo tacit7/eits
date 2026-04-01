@@ -89,29 +89,31 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
             })} do
       case Agents.get_agent(session.agent_id) do
         {:ok, chat_agent} ->
-          case chat_agent.git_worktree_path do
-            nil ->
-              Logger.warning(
-                "send_direct_message: agent #{chat_agent.id} has no git_worktree_path, session not continued"
-              )
+          project_path =
+            chat_agent.git_worktree_path ||
+              (chat_agent.project && chat_agent.project.path)
 
-              {:noreply, socket}
+          if project_path do
+            prompt_with_reminder = """
+            REMINDER: Use i-chat-send MCP tool to send your response to the channel.
 
-            project_path ->
-              prompt_with_reminder = """
-              REMINDER: Use i-chat-send MCP tool to send your response to the channel.
+            User message: #{body}
+            """
 
-              User message: #{body}
-              """
+            EyeInTheSky.Agents.AgentManager.continue_session(
+              session.id,
+              prompt_with_reminder,
+              model: "sonnet",
+              project_path: project_path
+            )
 
-              EyeInTheSky.Agents.AgentManager.continue_session(
-                session.id,
-                prompt_with_reminder,
-                model: "sonnet",
-                project_path: project_path
-              )
+            {:noreply, socket}
+          else
+            Logger.warning(
+              "send_direct_message: agent #{chat_agent.id} has no path (git_worktree_path and project.path both nil), session not continued"
+            )
 
-              {:noreply, socket}
+            {:noreply, socket}
           end
 
         _ ->

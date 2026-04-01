@@ -2,7 +2,6 @@ import Config
 
 # Gitea webhook HMAC secret — set this in Gitea webhook settings and here
 config :eye_in_the_sky, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SECRET", "")
-config :eye_in_the_sky, Oban, testing: :inline
 config :eye_in_the_sky, :env, :dev
 config :eye_in_the_sky, :bypass_auth, true
 # Allow unsigned webhooks in dev when no secret is set (never enable in prod)

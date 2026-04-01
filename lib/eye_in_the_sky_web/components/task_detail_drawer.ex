@@ -318,8 +318,6 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
   defp format_tags([]), do: ""
 
   defp format_tags(tags) when is_list(tags) do
-    tags
-    |> Enum.map(& &1.name)
-    |> Enum.join(", ")
+    Enum.map_join(tags, ", ", & &1.name)
   end
 end

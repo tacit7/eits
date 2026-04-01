@@ -434,11 +434,10 @@ defmodule EyeInTheSky.Claude.SessionReader do
       |> Map.to_list()
       |> Enum.take(2)
       |> Enum.filter(fn {_k, v} -> is_binary(v) or is_number(v) or is_atom(v) end)
-      |> Enum.map(fn {k, v} ->
+      |> Enum.map_join(", ", fn {k, v} ->
         val = v |> to_string() |> String.slice(0..500)
         "#{k}: #{val}"
       end)
-      |> Enum.join(", ")
 
     "> `#{name}` #{summary}"
   end

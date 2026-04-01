@@ -27,12 +27,10 @@ defmodule EyeInTheSkyWeb.DmLive.UploadHelpers do
 
   def build_message_body(body, uploaded_files) do
     file_list =
-      uploaded_files
-      |> Enum.map(fn file_data ->
+      Enum.map_join(uploaded_files, "\n", fn file_data ->
         relative = relative_upload_path(file_data.storage_path)
         "- #{relative} (#{file_data.original_filename})"
       end)
-      |> Enum.join("\n")
 
     "#{body}\n\nAttached files:\n#{file_list}"
   end

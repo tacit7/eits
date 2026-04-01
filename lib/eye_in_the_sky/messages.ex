@@ -550,7 +550,7 @@ defmodule EyeInTheSky.Messages do
     Message
     |> where([m], m.to_session_id == ^session_id)
     |> where([m], not is_nil(m.from_session_id))
-    |> order_by([m], desc: m.inserted_at)
+    |> order_by([m], [desc: m.inserted_at, desc: m.id])
     |> limit(^limit)
     |> Repo.all()
     |> Enum.reverse()

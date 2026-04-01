@@ -135,8 +135,8 @@ defmodule EyeInTheSky.Teams do
     |> where([m, _other], m.session_id == ^session_id)
     |> where([_m, other], not is_nil(other.session_id))
     |> select([_m, other], other)
-    |> distinct(true)
     |> Repo.all()
+    |> Enum.uniq_by(& &1.session_id)
   end
 
   # ── Helpers ────────────────────────────────────────────────

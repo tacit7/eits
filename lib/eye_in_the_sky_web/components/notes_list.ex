@@ -318,39 +318,4 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
     end
   end
 
-  def format_date(nil), do: ""
-
-  def format_date(timestamp) when is_binary(timestamp) do
-    case NaiveDateTime.from_iso8601(timestamp) do
-      {:ok, ndt} ->
-        format_naive_date(ndt)
-
-      _ ->
-        case String.split(timestamp, [" ", "T"], parts: 2) do
-          [date | _] -> date
-          _ -> timestamp
-        end
-    end
-  end
-
-  def format_date(_), do: ""
-
-  defp format_naive_date(ndt) do
-    today = Date.utc_today()
-    date = NaiveDateTime.to_date(ndt)
-
-    cond do
-      Date.compare(date, today) == :eq ->
-        Calendar.strftime(ndt, "Today at %H:%M")
-
-      Date.compare(date, Date.add(today, -1)) == :eq ->
-        "Yesterday"
-
-      Date.diff(today, date) < 7 ->
-        Calendar.strftime(ndt, "%a %b %d")
-
-      true ->
-        Calendar.strftime(ndt, "%b %d, %Y")
-    end
-  end
 end

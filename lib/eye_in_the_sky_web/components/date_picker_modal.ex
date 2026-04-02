@@ -38,7 +38,7 @@ defmodule EyeInTheSkyWeb.Components.DatePickerModal do
       />
       <%!-- Modal panel --%>
       <div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-        <div class="pointer-events-auto w-72 rounded-2xl bg-base-200 dark:bg-[hsl(225,10%,22%)] shadow-2xl flex flex-col overflow-hidden">
+        <div class="pointer-events-auto w-72 rounded-2xl bg-base-200 shadow-2xl flex flex-col overflow-hidden">
           <%!-- Month navigation --%>
           <div class="flex items-center justify-between px-4 py-3 border-b border-base-content/10">
             <button

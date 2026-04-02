@@ -8,8 +8,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.FilterHandlers do
   import Phoenix.LiveView, only: [stream_insert: 3]
 
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Loader
+  alias EyeInTheSkyWeb.ProjectLive.Sessions.State
 
-  @page_size 25
 
   def search(%{"query" => query}, socket) do
     effective_query = if String.length(String.trim(query)) >= 3, do: query, else: ""
@@ -44,10 +44,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.FilterHandlers do
   def load_more(_params, socket) do
     if socket.assigns.has_more do
       old_count = socket.assigns.visible_count
-      new_count = old_count + @page_size
+      new_count = old_count + State.page_size()
       agents = socket.assigns.agents
 
-      new_items = Enum.slice(agents, old_count, @page_size)
+      new_items = Enum.slice(agents, old_count, State.page_size())
 
       socket =
         socket

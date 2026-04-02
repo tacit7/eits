@@ -287,7 +287,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
           <div
             id="overview-tasks-list"
             phx-update="stream"
-            class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-5"
+            class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5"
           >
             <div :for={{dom_id, task} <- @streams.tasks} id={dom_id}>
               <TaskCard.task_card

@@ -35,7 +35,7 @@ defmodule EyeInTheSky.Messages do
     Logger.debug("Loading messages from JSONL for session: #{session_id}, project: #{project_id}")
 
     case JsonlStorage.read_session_messages(project_id, session_id) do
-      messages when is_list(messages) and length(messages) > 0 ->
+      messages when is_list(messages) and messages != [] ->
         Logger.debug("Loaded #{length(messages)} messages from JSONL file")
         messages
 
@@ -539,6 +539,21 @@ defmodule EyeInTheSky.Messages do
   """
   def has_inbound_claude_reply?(session_id) do
     has_inbound_reply?(session_id, "claude")
+  end
+
+  @doc """
+  Returns the most recent inbound DMs received by a session, oldest-first.
+  Used by EITS-CMD `dm list` to inject recent context back into an agent.
+  """
+  @spec list_inbound_dms(integer(), pos_integer()) :: [Message.t()]
+  def list_inbound_dms(session_id, limit \\ 20) when is_integer(session_id) do
+    Message
+    |> where([m], m.to_session_id == ^session_id)
+    |> where([m], not is_nil(m.from_session_id))
+    |> order_by([m], [desc: m.inserted_at, desc: m.id])
+    |> limit(^limit)
+    |> Repo.all()
+    |> Enum.reverse()
   end
 
   @doc """

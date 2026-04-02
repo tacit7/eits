@@ -1,5 +1,32 @@
 # Documentation Update Suggestions
 
+## 2026-04-01
+**Commits reviewed**: ca015ef..d70a166
+
+- **CODE_GUIDELINES.md** — Document context function pattern for SQL queries: Messages.list_inbound_dms/2 and Teams.list_broadcast_targets/1 extract inline Ecto.Query from CmdDispatcher; explain when to move query logic to context modules (reusability, testability, separation of concerns); note secondary sort stability in list_inbound_dms (desc: m.id) for deterministic ordering
+- **CODE_GUIDELINES.md** — Document ViewHelpers.parse_budget/1 as canonical budget parsing implementation; previously duplicated in ChatLive and AgentLive.Index; explain import pattern to avoid code duplication across LiveView modules
+- **SETUP.md** — Document Oban configuration change: removed inline testing mode from dev.exs; scheduled jobs now run normally in development (cron plugin enabled); previously disabled with `testing: :inline` flag
+
+## 2026-03-29 (Updated)
+**Commits reviewed**: f233620..c4c2112
+
+- No new feature suggestions. Recent commits are documentation-only:
+  - c4c2112: Added DEBUG_VITE_LIVEVIEW.md with diagnostic steps for "Cannot bind multiple views" prod build errors
+  - dce9e53: Updated PRODUCTION.md with SECRET_KEY_BASE persistence notes
+
+## 2026-03-29
+**Commits reviewed**: 624313367941bf1280bd1f090c450e2b3d67594a..87ae294
+
+- **DM_FEATURES.md or CODE_GUIDELINES.md** — Document CmdDispatcher error surfacing: notify_error/3 now creates persistent notifications (toast UI, sidebar badge) and DMs errors back to originating agent session instead of bare logging; applies to dm, task create/begin, and spawn directives; enables agents to react to dispatch failures in real-time
+
+## 2026-03-28
+**Commits reviewed**: 624313367941bf1280bd1f090c450e2b3d67594a..f967b6d
+
+- **CODE_GUIDELINES.md** — Document CodeMirror 6 integration on project config and files pages: replace Highlight syntax highlighting with CodeMirror editor (ProjectLive.Files, ProjectLive.Config); Cmd+S save handler with path traversal guard; cm_language/1 helper for language detection; editor remount keyed on file path hash
+- **SECURITY.md or CODE_GUIDELINES.md** — Document path traversal hardening: FileHelpers.safe_realpath/1 resolves symlinks via system realpath; FileHelpers.path_within?/2 replaces all starts_with? guards across files.ex/config.ex/overview config.ex; trailing "/" appended to root before comparison; symlink escape prevention via realpath resolution before path check
+- **WORKERS.md or SESSION_MANAGER.md** — Document SDK process cleanup: do_handle_sdk_error now calls strategy.cancel(sdk_ref) before clearing the ref to kill orphaned Claude CLI processes on handler crash; prevents indefinite background process accumulation
+- **CODE_GUIDELINES.md** — Document sidebar UI improvements: docked project panel expanded on folder click; redundant project name header removed from docked panel; persistent section state across navigation (SidebarState JS hook)
+
 ## 2026-03-26
 **Commits reviewed**: 624313367941bf1280bd1f090c450e2b3d67594a..9a92b45
 

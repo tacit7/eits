@@ -70,6 +70,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:stream_tool, nil)
     |> assign(:stream_thinking, nil)
     |> assign(:slash_items, SlashItems.build())
+    |> assign(:session_cli_opts, [])
     |> assign(:diff_cache, %{})
     |> assign(:selected_task, nil)
     |> assign(:task_notes, [])
@@ -83,6 +84,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:queued_prompts, AgentWorker.get_queue(session.id))
     |> assign(:thinking_enabled, false)
     |> assign(:max_budget_usd, nil)
+    |> assign(:session_cli_opts, [])
     |> assign(:compacting, session.status == "compacting")
     |> assign(:message_search_query, "")
     |> assign(:session_context, nil)
@@ -95,17 +97,17 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     )
   end
 
-  # Session status is authoritative: terminal states never show the stop button,
-  # even if an AgentWorker happens to still be in :running state (race condition
-  # between SessionEnd hook and SDK completion message). For non-terminal states,
-  # fall through to the worker check as a real-time signal.
-  @terminal_statuses ~w(idle waiting stopped completed failed error archived)
+  # For definitively-ended sessions (interactive close, crash), never show the
+  # stop button. completed/failed sessions should not be resumed and any lagging
+  # AgentWorker state from the SessionEnd hook would be a false positive.
+  @ended_statuses ~w(completed failed)
+  defp initial_processing?(%{status: status}) when status in @ended_statuses, do: false
 
-  defp initial_processing?(%{status: status, id: session_id}) do
-    if status in @terminal_statuses do
-      false
-    else
-      AgentWorker.is_processing?(session_id)
-    end
+  # For all other statuses (working, stopped, idle, waiting, archived, etc.),
+  # delegate to the AgentWorker. "waiting" means a headless sdk-cli session
+  # ended and can be resumed — if the user sends a new message, a new worker
+  # runs and its state must be reflected here.
+  defp initial_processing?(%{id: session_id}) do
+    AgentWorker.is_processing?(session_id)
   end
 end

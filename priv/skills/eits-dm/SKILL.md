@@ -62,9 +62,16 @@ When running as `sdk-cli`, output this directive in text instead of calling the 
 
 ```
 EITS-CMD: dm --to <session_uuid> --message "text"
+EITS-CMD: dm list [--limit <n>]
 ```
 
 AgentWorker intercepts it in-process — no HTTP round-trip needed.
+
+**Feedback:** You will receive a confirmation message after each directive:
+- Success: `[EITS-CMD ok] dm sent to session 7`
+- Error: `[EITS-CMD error] dm: {:target_session_not_found, "bad-uuid"}`
+
+Wait for the feedback before assuming the DM was delivered.
 
 ---
 

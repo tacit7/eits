@@ -533,6 +533,64 @@ These replace direct `Tasks.*` calls for tag/checklist/state operations in new c
 
 ---
 
+### SQL Extraction to Context Functions
+
+**Pattern:** When query logic appears inline in a module (e.g., `CmdDispatcher`), extract it to a context function for reusability and testability.
+
+**Examples:**
+- `Messages.list_inbound_dms/2` — Extracts DM query logic with proper sorting and pagination
+- `Teams.list_broadcast_targets/1` — Encapsulates team broadcast join logic
+
+**When to extract:**
+- Query is used in multiple places (DRY principle)
+- Query is complex enough to warrant unit testing
+- Query needs to be reused from different contexts (e.g., CmdDispatcher, LiveView, REST API)
+
+**Benefits:**
+- **Reusability:** One canonical implementation, not scattered duplicates
+- **Testability:** Query behavior isolated and independently testable
+- **Separation of concerns:** Query logic lives in context, not in dispatcher/controller code
+
+**Example pattern:**
+```elixir
+# ❌ Avoid: Inline Ecto.Query in module
+defmodule CmdDispatcher do
+  def dispatch(cmd, session_id) do
+    # Query embedded here
+    dms = Repo.all(
+      from m in Message,
+      where: m.recipient_id == ^session_id,
+      order_by: [desc: m.inserted_at, desc: m.id]
+    )
+    # ... use dms
+  end
+end
+
+# ✅ Prefer: Extract to context
+defmodule Messages do
+  def list_inbound_dms(session_id, opts \\ []) do
+    Repo.all(
+      from m in Message,
+      where: m.recipient_id == ^session_id,
+      order_by: [desc: m.inserted_at, desc: m.id],  # secondary sort for stability
+      limit: Keyword.get(opts, :limit, 50)
+    )
+  end
+end
+
+# Then in CmdDispatcher:
+defmodule CmdDispatcher do
+  def dispatch(cmd, session_id) do
+    dms = Messages.list_inbound_dms(session_id)
+    # ...
+  end
+end
+```
+
+**Secondary sort stability:** Always include a secondary sort column (e.g., `m.id`) when primary sort has potential collisions (e.g., timestamps). This ensures deterministic query results for testing.
+
+---
+
 ### Chat Presenter
 
 **ChatPresenter** (`lib/eye_in_the_sky_web_web/live/chat_presenter.ex`): Extracted chat presentation logic from `ChatLive`. Handles message formatting, typing indicator state, and ambient message filtering.
@@ -603,6 +661,17 @@ Use `ViewHelpers.model_display_name/1` to render human-readable model names in U
 <%= ViewHelpers.model_display_name(“opus[1m]”) %>
 # Renders: “Opus 4.6 (1M)”
 ```
+
+**Budget parsing (canonical implementation):**
+Use `ViewHelpers.parse_budget/1` as the single source of truth for parsing budget strings. This replaces duplicate implementations previously scattered across `ChatLive` and `AgentLive.Index`.
+
+```elixir
+# In any module
+budget_value = ViewHelpers.parse_budget(“p95”)
+# Returns: {:ok, 0.95} or {:error, reason}
+```
+
+**Why canonical:** Budget parsing logic is shared across multiple LiveViews and contexts. Maintaining a single implementation in `ViewHelpers` prevents inconsistencies and reduces code duplication. Always import and use this function rather than reimplementing budget logic locally.
 
 **Available forms with model + effort selection:**
 - DM page (session selector dropdown)

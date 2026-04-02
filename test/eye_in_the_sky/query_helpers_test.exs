@@ -100,7 +100,7 @@ defmodule EyeInTheSky.QueryHelpersTest do
           @task_order ++ [preload: [:state]]
         )
 
-      assert length(result) >= 1
+      assert result != []
     end
   end
 

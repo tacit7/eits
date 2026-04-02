@@ -36,15 +36,14 @@ defmodule EyeInTheSky.Agents.AgentManager do
 
       Logger.info("📤 create_agent: sending initial message to session.id=#{session.id}")
 
-      case send_message(session.id, instructions,
-             model: opts[:model],
-             effort_level: opts[:effort_level],
-             max_budget_usd: opts[:max_budget_usd],
-             worktree: opts[:worktree],
-             agent: opts[:agent],
-             eits_workflow: opts[:eits_workflow],
-             bypass_sandbox: opts[:bypass_sandbox]
-           ) do
+      # Forward all opts to send_message so RuntimeContext.build can pick up
+      # known keys (model, effort_level, etc.) and pass the rest as extra_cli_opts
+      # to CLI.build_args (permission_mode, add_dir, chrome, sandbox, etc.)
+      send_opts =
+        opts
+        |> Keyword.drop([:agent_type, :project_id, :project_path, :description, :instructions])
+
+      case send_message(session.id, instructions, send_opts) do
         {:ok, admission} ->
           # Only mark "running" when the SDK actually started. :retry_queued means
           # the spawn failed and was queued for retry — agent stays "pending".
@@ -251,18 +250,28 @@ defmodule EyeInTheSky.Agents.AgentManager do
 
         context = RuntimeContext.build(session_id, provider, opts)
 
-        case GenServer.call(pid, {:submit_message, message, context}) do
-          {:ok, admission} ->
-            Logger.debug("send_message: #{admission} for session_id=#{session_id}")
+        try do
+          case GenServer.call(pid, {:submit_message, message, context}) do
+            {:ok, admission} ->
+              Logger.debug("send_message: #{admission} for session_id=#{session_id}")
 
-            {:ok, admission}
+              {:ok, admission}
 
-          {:error, reason} = error ->
-            Logger.warning(
-              "send_message: rejected for session_id=#{session_id} - #{inspect(reason)}"
-            )
+            {:error, reason} = error ->
+              Logger.warning(
+                "send_message: rejected for session_id=#{session_id} - #{inspect(reason)}"
+              )
 
-            error
+              error
+          end
+        catch
+          :exit, {:noproc, _} ->
+            Logger.warning("send_message: worker died before call for session_id=#{session_id}")
+            {:error, :worker_not_found}
+
+          :exit, reason ->
+            Logger.error("send_message: worker exit for session_id=#{session_id} - #{inspect(reason)}")
+            {:error, {:worker_exit, reason}}
         end
 
       {:error, reason} ->
@@ -308,7 +317,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
     with {:ok, session} <- Sessions.get_session(session_id),
          {:ok, agent} <- Agents.get_agent(session.agent_id),
          provider when not is_nil(provider) <- normalize_provider(session.provider),
-         {:ok, session} <- ensure_session_uuid(session) do
+         {:ok, session} <- ensure_session_uuid(session, provider) do
       project_path = resolve_project_path_with_fallback(session, agent)
 
       Logger.info(
@@ -348,7 +357,12 @@ defmodule EyeInTheSky.Agents.AgentManager do
     end
   end
 
-  defp ensure_session_uuid(session) do
+  # Codex sessions intentionally start with uuid=nil — the real UUID (provider thread_id)
+  # arrives via the thread.started event and is synced by on_provider_conversation_id_changed.
+  # Generating a temp UUID here would become stale and break dm resolve_session lookups.
+  defp ensure_session_uuid(session, "codex"), do: {:ok, session}
+
+  defp ensure_session_uuid(session, _provider) do
     if is_nil(session.uuid) or session.uuid == "" do
       uuid = Ecto.UUID.generate()
       Logger.info("ensure_session_uuid: generating UUID=#{uuid} for session.id=#{session.id}")

@@ -8,6 +8,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
   alias EyeInTheSkyWeb.ChatLive.ChannelHeader
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
+  import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_budget: 1]
+  import EyeInTheSkyWeb.Helpers.UploadHelpers
 
   # Deterministic UUIDs for the web UI user
   @web_agent_uuid "00000000-0000-0000-0000-000000000001"
@@ -179,6 +181,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
   def handle_event("send_channel_message", %{"channel_id" => channel_id, "body" => body}, socket) do
     require Logger
     session_id = get_session_id(socket)
+    content_blocks = consume_agent_images_as_content_blocks(socket)
 
     case ChannelMessages.send_channel_message(%{
            channel_id: channel_id,
@@ -227,7 +230,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
             AgentManager.send_message(member.session_id, prompt,
               model: "sonnet",
-              channel_id: channel_id
+              channel_id: channel_id,
+              content_blocks: content_blocks
             )
           end
         end)
@@ -248,6 +252,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
     require Logger
     session_id = get_session_id(socket)
     channel_id = params["channel_id"] || socket.assigns.active_channel_id
+    content_blocks = consume_agent_images_as_content_blocks(socket)
 
     target_session_id =
       case Integer.parse(to_string(target_session_id_str)) do
@@ -268,7 +273,11 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
         if target_session_id do
           prompt = ChannelProtocol.build_prompt(:direct, body)
-          AgentManager.send_message(target_session_id, prompt, channel_id: channel_id)
+
+          AgentManager.send_message(target_session_id, prompt,
+            channel_id: channel_id,
+            content_blocks: content_blocks
+          )
         end
 
         {:noreply, socket}
@@ -493,17 +502,29 @@ defmodule EyeInTheSkyWeb.ChatLive do
     instructions = append_image_paths(base_instructions, uploaded_images)
     agent_type = params["agent_type"] || "claude"
 
-    opts = [
-      agent_type: agent_type,
-      model: model,
-      effort_level: effort_level,
-      max_budget_usd: max_budget_usd,
-      project_id: selected_project_id,
-      project_path: project_path,
-      description: agent_description,
-      instructions: instructions,
-      agent: params["agent"]
-    ]
+    advanced_opts =
+      []
+      |> maybe_opt(:permission_mode, params["permission_mode"])
+      |> maybe_int_opt(:max_turns, params["max_turns"])
+      |> maybe_opt(:add_dir, params["add_dir"])
+      |> maybe_opt(:mcp_config, params["mcp_config"])
+      |> maybe_opt(:plugin_dir, params["plugin_dir"])
+      |> maybe_opt(:settings_file, params["settings_file"])
+      |> maybe_bool_opt(:chrome, params["chrome"])
+      |> maybe_bool_opt(:sandbox, params["sandbox"])
+
+    opts =
+      [
+        agent_type: agent_type,
+        model: model,
+        effort_level: effort_level,
+        max_budget_usd: max_budget_usd,
+        project_id: selected_project_id,
+        project_path: project_path,
+        description: agent_description,
+        instructions: instructions,
+        agent: params["agent"]
+      ] ++ advanced_opts
 
     case AgentManager.create_agent(opts) do
       {:ok, %{agent: agent, session: session}} ->
@@ -804,36 +825,22 @@ defmodule EyeInTheSkyWeb.ChatLive do
     |> Enum.sort_by(fn g -> g.project_name end)
   end
 
-  defp parse_budget(nil), do: nil
-  defp parse_budget(""), do: nil
+  defp maybe_opt(opts, _key, nil), do: opts
+  defp maybe_opt(opts, _key, ""), do: opts
+  defp maybe_opt(opts, key, val), do: opts ++ [{key, val}]
 
-  defp parse_budget(v) when is_binary(v) do
-    case Float.parse(v) do
-      {f, _} when f > 0 -> f
-      _ -> nil
+  defp maybe_int_opt(opts, _key, nil), do: opts
+  defp maybe_int_opt(opts, _key, ""), do: opts
+
+  defp maybe_int_opt(opts, key, val) when is_binary(val) do
+    case Integer.parse(val) do
+      {n, _} when n > 0 -> opts ++ [{key, n}]
+      _ -> opts
     end
   end
 
-  defp consume_agent_images(socket) do
-    consume_uploaded_entries(socket, :agent_images, fn %{path: temp_path}, entry ->
-      destination = agent_image_destination(entry.client_name)
-      File.mkdir_p!(Path.dirname(destination))
-      File.cp!(temp_path, destination)
-      {:ok, destination}
-    end)
-  end
+  defp maybe_bool_opt(opts, _key, nil), do: opts
+  defp maybe_bool_opt(opts, key, "true"), do: opts ++ [{key, true}]
+  defp maybe_bool_opt(opts, _key, _), do: opts
 
-  defp agent_image_destination(client_name) do
-    base = Path.join([:code.priv_dir(:eye_in_the_sky), "static", "uploads", "agent"])
-    date_dir = Date.utc_today() |> Date.to_string()
-    filename = "#{Ecto.UUID.generate()}#{Path.extname(client_name)}"
-    Path.join([base, date_dir, filename])
-  end
-
-  defp append_image_paths(instructions, []), do: instructions
-
-  defp append_image_paths(instructions, image_paths) do
-    paths = Enum.map_join(image_paths, "\n", fn p -> "- #{p}" end)
-    "#{instructions}\n\nAttached images:\n#{paths}"
-  end
 end

@@ -27,7 +27,7 @@ defmodule EyeInTheSky.Claude.CLI do
   @type spawn_result :: {:ok, port(), reference()} | {:error, term()}
 
   @known_permission_modes ~w(acceptEdits bypassPermissions default delegate dontAsk plan)
-  @fallback_idle_timeout_ms 300_000
+  @fallback_idle_timeout_ms :infinity
   @max_buffer_bytes 4 * 1024 * 1024
   @standard_paths [
     "/usr/local/bin/claude",
@@ -221,6 +221,24 @@ defmodule EyeInTheSky.Claude.CLI do
   # Arg builder
   # ---------------------------------------------------------------------------
 
+  # Normalize model names from simple identifiers to full Claude model identifiers.
+  # Maps EITS's simple model names to current Claude API model identifiers:
+  # - "haiku" -> "claude-haiku-4-5"
+  # - "sonnet" -> "claude-sonnet-4-6"
+  # - "opus" -> "claude-opus-4-6"
+  # Other model names are passed through unchanged.
+  @spec normalize_model_name(String.t() | nil) :: String.t() | nil
+  defp normalize_model_name(nil), do: nil
+
+  defp normalize_model_name(model) when is_binary(model) do
+    case String.downcase(model) do
+      "haiku" -> "claude-haiku-4-5"
+      "sonnet" -> "claude-sonnet-4-6"
+      "opus" -> "claude-opus-4-6"
+      _ -> model
+    end
+  end
+
   @doc """
   Builds a flat list of CLI args from a keyword list.
 
@@ -239,6 +257,11 @@ defmodule EyeInTheSky.Claude.CLI do
     * `:allowedTools` - `--allowedTools <csv>`
     * `:permission_mode` - `--permission-mode <mode>`
     * `:mcp_config` - `--mcp-config <path>`
+    * `:add_dir` - `--add-dir <path>`
+    * `:plugin_dir` - `--plugin-dir <path>`
+    * `:settings_file` - `--settings <file>`
+    * `:sandbox` - `true` → `--sandbox` (OS-level isolation; off by default, --no-sandbox is remote-control only)
+    * `:chrome` - `true` → `--chrome`, `false` → `--no-chrome`
 
   Unknown keys are silently ignored (they may be used by env/caller logic).
   """
@@ -273,7 +296,7 @@ defmodule EyeInTheSky.Claude.CLI do
 
     # Value flags
     args = maybe_flag(args, "--output-format", opts[:output_format])
-    args = maybe_flag(args, "--model", opts[:model])
+    args = maybe_flag(args, "--model", normalize_model_name(opts[:model]))
     args = maybe_flag(args, "--max-turns", opts[:max_turns])
     args = maybe_flag(args, "--system-prompt", opts[:system_prompt])
     args = maybe_flag(args, "--append-system-prompt", opts[:append_system_prompt])
@@ -283,17 +306,72 @@ defmodule EyeInTheSky.Claude.CLI do
     args = maybe_flag(args, "--thinking-budget-tokens", opts[:thinking_budget])
     args = maybe_flag(args, "--max-budget-usd", opts[:max_budget_usd])
     args = maybe_flag(args, "--agent", opts[:agent])
+    args = maybe_flag(args, "--add-dir", opts[:add_dir])
+    args = maybe_flag(args, "--plugin-dir", opts[:plugin_dir])
+    args = maybe_flag(args, "--settings", opts[:settings_file])
 
     # Boolean flags
     # stream-json requires --verbose for proper output parsing
     verbose = opts[:verbose] || opts[:output_format] == "stream-json"
     args = if verbose, do: args ++ ["--verbose"], else: args
     args = if opts[:skip_permissions], do: args ++ ["--dangerously-skip-permissions"], else: args
+    # --sandbox enables OS-level isolation; --no-sandbox is remote-control only (sandbox off by default)
+    args = if opts[:sandbox] == true, do: args ++ ["--sandbox"], else: args
+    args = if opts[:chrome] == true, do: args ++ ["--chrome"], else: args
+    args = if opts[:chrome] == false, do: args ++ ["--no-chrome"], else: args
 
     args =
       if opts[:include_partial_messages], do: args ++ ["--include-partial-messages"], else: args
 
+    # When multimodal content blocks are present, switch to stdin input mode.
+    # do_spawn reads :content_blocks_json from opts and pipes it via stdin.
+    args =
+      if has_content_blocks?(opts) do
+        args ++ ["--input-format", "stream-json"]
+      else
+        args
+      end
+
     args
+  end
+
+  @doc """
+  Serializes content blocks to a JSON message suitable for Claude CLI stdin input.
+
+  Returns `nil` when no content blocks are present (text-only message).
+  When content blocks exist, returns a JSON string containing a user message
+  with the text prompt and all formatted content blocks as the content array.
+  """
+  @spec content_blocks_json(keyword()) :: String.t() | nil
+  def content_blocks_json(opts) do
+    case Keyword.get(opts, :content_blocks, []) do
+      [] ->
+        nil
+
+      blocks when is_list(blocks) ->
+        prompt = Keyword.get(opts, :prompt, "")
+
+        content = [%{"type" => "text", "text" => prompt} | blocks]
+        message = %{"type" => "user", "content" => content}
+        Jason.encode!(message)
+    end
+  end
+
+  defp has_content_blocks?(opts) do
+    case Keyword.get(opts, :content_blocks, []) do
+      [] -> false
+      blocks when is_list(blocks) -> true
+      _ -> false
+    end
+  end
+
+  defp maybe_pipe_content_blocks(port, opts) do
+    case content_blocks_json(opts) do
+      nil -> :ok
+      json ->
+        Port.command(port, json <> "\n")
+        Logger.info("[CLI] Piped multimodal content blocks to stdin (#{byte_size(json)} bytes)")
+    end
   end
 
   defp maybe_flag(args, _flag, nil), do: args
@@ -376,13 +454,17 @@ defmodule EyeInTheSky.Claude.CLI do
     raw_timeout = EyeInTheSky.Settings.get_integer("cli_idle_timeout_ms")
 
     default_timeout =
-      if is_integer(raw_timeout) and raw_timeout > 0,
-        do: raw_timeout,
-        else: @fallback_idle_timeout_ms
+      cond do
+        raw_timeout == 0 -> :infinity
+        is_integer(raw_timeout) and raw_timeout > 0 -> raw_timeout
+        true -> @fallback_idle_timeout_ms
+      end
 
     idle_timeout_ms =
       case Keyword.get(opts, :idle_timeout_ms, default_timeout) do
+        0 -> :infinity
         n when is_integer(n) and n > 0 -> n
+        :infinity -> :infinity
         _ -> default_timeout
       end
 
@@ -449,6 +531,11 @@ defmodule EyeInTheSky.Claude.CLI do
               ]
             )
           end
+
+        # When multimodal content blocks are present, pipe the JSON user message
+        # to stdin before handing the port to the handler. This feeds Claude CLI
+        # the structured content via --input-format stream-json.
+        maybe_pipe_content_blocks(port, opts)
 
         Port.connect(port, handler_pid)
         send(handler_pid, {:port, port})

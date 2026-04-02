@@ -72,6 +72,13 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
       |> assign(:skip_permissions, Map.get(config, "skip_permissions", true))
       |> assign(:output_format, Map.get(config, "output_format", ""))
       |> assign(:timezone, (assigns.job && assigns.job.timezone) || system_timezone())
+      |> assign(:permission_mode, Map.get(config, "permission_mode", ""))
+      |> assign(:add_dir, Map.get(config, "add_dir", ""))
+      |> assign(:mcp_config, Map.get(config, "mcp_config", ""))
+      |> assign(:plugin_dir, Map.get(config, "plugin_dir", ""))
+      |> assign(:settings_file, Map.get(config, "settings_file", ""))
+      |> assign(:chrome, Map.get(config, "chrome", false))
+      |> assign(:sandbox, Map.get(config, "sandbox", false))
 
     ~H"""
     <div class="flex items-start justify-between mb-4">
@@ -216,85 +223,192 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
         </select>
       </div>
 
-      <%!-- CLI Flags --%>
-      <div class="divider text-xs text-base-content/40 my-2">CLI Flags</div>
-
-      <div class="grid grid-cols-2 gap-3">
-        <div class="form-control">
-          <label class="label"><span class="label-text text-xs">Max Budget (USD)</span></label>
-          <input
-            type="number"
-            name="schedule[max_budget_usd]"
-            value={@max_budget_usd}
-            placeholder="e.g. 5.00"
-            step="0.01"
-            min="0"
-            class="input input-bordered input-sm w-full font-mono"
-          />
+      <%!-- Advanced CLI Flags accordion --%>
+      <div class="collapse collapse-arrow bg-base-200 rounded-lg">
+        <input type="checkbox" class="min-h-0" />
+        <div class="collapse-title min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-xs font-medium text-base-content/60">
+          <.icon name="hero-adjustments-horizontal" class="w-3.5 h-3.5" /> Advanced CLI Flags
         </div>
-        <div class="form-control">
-          <label class="label"><span class="label-text text-xs">Max Turns</span></label>
-          <input
-            type="number"
-            name="schedule[max_turns]"
-            value={@max_turns}
-            placeholder="e.g. 25"
-            min="1"
-            class="input input-bordered input-sm w-full font-mono"
-          />
-        </div>
-      </div>
+        <div class="collapse-content px-3 pb-3 space-y-3">
 
-      <div class="grid grid-cols-2 gap-3">
-        <div class="form-control">
-          <label class="label"><span class="label-text text-xs">Fallback Model</span></label>
-          <select name="schedule[fallback_model]" class="select select-bordered select-sm w-full">
-            <option value="" selected={@fallback_model == ""}>None</option>
-            <%= for {value, label} <- claude_models() do %>
-              <option value={value} selected={@fallback_model == value}>{label}</option>
-            <% end %>
-          </select>
-        </div>
-        <div class="form-control">
-          <label class="label"><span class="label-text text-xs">Output Format</span></label>
-          <select name="schedule[output_format]" class="select select-bordered select-sm w-full">
-            <option value="" selected={@output_format == ""}>Default</option>
-            <option value="text" selected={@output_format == "text"}>Text</option>
-            <option value="json" selected={@output_format == "json"}>JSON</option>
-            <option value="stream-json" selected={@output_format == "stream-json"}>
-              Stream JSON
-            </option>
-          </select>
-        </div>
-      </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="form-control">
+              <label class="label"><span class="label-text text-xs">Max Budget (USD)</span></label>
+              <input
+                type="number"
+                name="schedule[max_budget_usd]"
+                value={@max_budget_usd}
+                placeholder="e.g. 5.00"
+                step="0.01"
+                min="0"
+                class="input input-bordered input-sm w-full font-mono"
+              />
+            </div>
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text text-xs">Max Turns</span>
+                <span class="label-text-alt text-base-content/40 font-mono text-[10px]">--max-turns</span>
+              </label>
+              <input
+                type="number"
+                name="schedule[max_turns]"
+                value={@max_turns}
+                placeholder="e.g. 25"
+                min="1"
+                class="input input-bordered input-sm w-full font-mono"
+              />
+            </div>
+          </div>
 
-      <div class="form-control">
-        <label class="label"><span class="label-text text-xs">Allowed Tools</span></label>
-        <input
-          type="text"
-          name="schedule[allowed_tools]"
-          value={@allowed_tools}
-          placeholder="e.g. Bash,Read,Edit,Write,Grep,Glob"
-          class="input input-bordered input-sm w-full font-mono"
-        />
-        <label class="label">
-          <span class="label-text-alt text-base-content/40">
-            Comma-separated. Supports wildcards: Bash(git *)
-          </span>
-        </label>
-      </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="form-control">
+              <label class="label"><span class="label-text text-xs">Fallback Model</span></label>
+              <select name="schedule[fallback_model]" class="select select-bordered select-sm w-full">
+                <option value="" selected={@fallback_model == ""}>None</option>
+                <%= for {value, label} <- claude_models() do %>
+                  <option value={value} selected={@fallback_model == value}>{label}</option>
+                <% end %>
+              </select>
+            </div>
+            <div class="form-control">
+              <label class="label"><span class="label-text text-xs">Output Format</span></label>
+              <select name="schedule[output_format]" class="select select-bordered select-sm w-full">
+                <option value="" selected={@output_format == ""}>Default</option>
+                <option value="text" selected={@output_format == "text"}>Text</option>
+                <option value="json" selected={@output_format == "json"}>JSON</option>
+                <option value="stream-json" selected={@output_format == "stream-json"}>Stream JSON</option>
+              </select>
+            </div>
+          </div>
 
-      <div class="form-control">
-        <label class="label cursor-pointer justify-start gap-2">
-          <input
-            type="checkbox"
-            name="schedule[skip_permissions]"
-            value="true"
-            checked={@skip_permissions}
-            class="checkbox checkbox-sm checkbox-primary"
-          />
-          <span class="label-text text-xs">Skip permissions (--dangerously-skip-permissions)</span>
-        </label>
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text text-xs">Permission Mode</span>
+              <span class="label-text-alt text-base-content/40 font-mono text-[10px]">--permission-mode</span>
+            </label>
+            <select name="schedule[permission_mode]" class="select select-bordered select-sm w-full">
+              <option value="" selected={@permission_mode == ""}>Default</option>
+              <option value="acceptEdits" selected={@permission_mode == "acceptEdits"}>acceptEdits — auto-accept file edits</option>
+              <option value="bypassPermissions" selected={@permission_mode == "bypassPermissions"}>bypassPermissions — skip all prompts</option>
+              <option value="dontAsk" selected={@permission_mode == "dontAsk"}>dontAsk — never ask</option>
+              <option value="plan" selected={@permission_mode == "plan"}>plan — read-only</option>
+            </select>
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text text-xs">Allowed Tools</span></label>
+            <input
+              type="text"
+              name="schedule[allowed_tools]"
+              value={@allowed_tools}
+              placeholder="e.g. Bash,Read,Edit,Write,Grep,Glob"
+              class="input input-bordered input-sm w-full font-mono"
+            />
+            <label class="label">
+              <span class="label-text-alt text-base-content/40">Comma-separated. Supports wildcards: Bash(git *)</span>
+            </label>
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text text-xs">Add Directory</span>
+              <span class="label-text-alt text-base-content/40 font-mono text-[10px]">--add-dir</span>
+            </label>
+            <input
+              type="text"
+              name="schedule[add_dir]"
+              value={@add_dir}
+              placeholder="/path/to/shared-lib"
+              class="input input-bordered input-sm w-full font-mono"
+            />
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text text-xs">MCP Config File</span>
+              <span class="label-text-alt text-base-content/40 font-mono text-[10px]">--mcp-config</span>
+            </label>
+            <input
+              type="text"
+              name="schedule[mcp_config]"
+              value={@mcp_config}
+              placeholder="./mcp-servers.json"
+              class="input input-bordered input-sm w-full font-mono"
+            />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text text-xs">Plugin Directory</span>
+                <span class="label-text-alt text-base-content/40 font-mono text-[10px]">--plugin-dir</span>
+              </label>
+              <input
+                type="text"
+                name="schedule[plugin_dir]"
+                value={@plugin_dir}
+                placeholder="./my-plugins"
+                class="input input-bordered input-sm w-full font-mono"
+              />
+            </div>
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text text-xs">Settings File</span>
+                <span class="label-text-alt text-base-content/40 font-mono text-[10px]">--settings</span>
+              </label>
+              <input
+                type="text"
+                name="schedule[settings_file]"
+                value={@settings_file}
+                placeholder="./settings.json"
+                class="input input-bordered input-sm w-full font-mono"
+              />
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-1 pt-1">
+            <label class="label cursor-pointer justify-start gap-2 py-1">
+              <input
+                type="checkbox"
+                name="schedule[skip_permissions]"
+                value="true"
+                checked={@skip_permissions}
+                class="checkbox checkbox-sm checkbox-primary"
+              />
+              <span class="label-text text-xs">
+                Skip permissions
+                <span class="font-mono text-base-content/40 text-[10px] ml-1">--dangerously-skip-permissions</span>
+              </span>
+            </label>
+            <label class="label cursor-pointer justify-start gap-2 py-1">
+              <input
+                type="checkbox"
+                name="schedule[chrome]"
+                value="true"
+                checked={@chrome}
+                class="checkbox checkbox-sm checkbox-primary"
+              />
+              <span class="label-text text-xs">
+                Chrome integration
+                <span class="font-mono text-base-content/40 text-[10px] ml-1">--chrome</span>
+              </span>
+            </label>
+            <label class="label cursor-pointer justify-start gap-2 py-1">
+              <input
+                type="checkbox"
+                name="schedule[sandbox]"
+                value="true"
+                checked={@sandbox}
+                class="checkbox checkbox-sm checkbox-primary"
+              />
+              <span class="label-text text-xs">
+                OS sandbox isolation
+                <span class="font-mono text-base-content/40 text-[10px] ml-1">--sandbox</span>
+              </span>
+            </label>
+          </div>
+
+        </div>
       </div>
 
       <div class="flex justify-end gap-2 pt-2">

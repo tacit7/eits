@@ -104,7 +104,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
     {year, month} =
       case task.due_at do
         nil -> {today.year, today.month}
-        dt -> dt = DateTime.to_date(dt); {dt.year, dt.month}
+        dt ->
+          dt = DateTime.to_date(dt)
+          {dt.year, dt.month}
       end
 
     {:noreply,
@@ -170,12 +172,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
         {:noreply, put_flash(socket, :error, "Could not remove due date")}
     end
   end
-
-  defp prev_month(year, 1), do: {year - 1, 12}
-  defp prev_month(year, month), do: {year, month - 1}
-
-  defp next_month(year, 12), do: {year + 1, 1}
-  defp next_month(year, month), do: {year, month + 1}
 
   @impl true
   def handle_event("add_task_annotation", params, socket),
@@ -309,10 +305,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   end
 
   @impl true
+  def handle_info({:agent_working, _session_ref, session_int_id}, socket) do
+    {:noreply, update(socket, :working_session_ids, &MapSet.put(&1, session_int_id))}
+  end
+
+  @impl true
   def handle_info({:agent_stopped, msg}, socket) do
     handle_agent_stopped(socket, msg, fn socket, session_id ->
       update(socket, :working_session_ids, &MapSet.delete(&1, session_id))
     end)
+  end
+
+  @impl true
+  def handle_info({:agent_stopped, _session_ref, session_int_id}, socket) do
+    {:noreply, update(socket, :working_session_ids, &MapSet.delete(&1, session_int_id))}
   end
 
   @impl true
@@ -426,6 +432,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   # ---------------------------------------------------------------------------
   # Private
   # ---------------------------------------------------------------------------
+
+  defp prev_month(year, 1), do: {year - 1, 12}
+  defp prev_month(year, month), do: {year, month - 1}
+
+  defp next_month(year, 12), do: {year + 1, 1}
+  defp next_month(year, month), do: {year, month + 1}
 
   defp init_assigns(socket) do
     socket

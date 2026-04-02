@@ -5,7 +5,7 @@
 | Dependency | Version | Notes |
 |-----------|---------|-------|
 | Elixir | 1.15+ | OTP 26+ included |
-| Node.js | 22 LTS | Svelte 5 + esbuild require 18+ |
+| Node.js | 22 LTS | Svelte 5 + Vite require 18+ |
 | PostgreSQL | 12+ | `eits_dev` database |
 | Caddy | any | HTTPS proxy for WebAuthn |
 | NATS | optional | Port 4222, currently disabled in code |
@@ -269,11 +269,51 @@ The app includes Web Push and PWA install capability.
 - Handles incoming push events and displays notifications
 
 **Configuration (production):**
-Set `WEB_PUSH_ENCRYPTION_KEY` env var (base64-encoded 16-byte key) for push encryption. Missing key disables push (app still works).
+Push encryption uses VAPID keys (`VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in `.env`). Missing keys disable push in dev; raises at startup in prod.
 
 ---
 
-## 10. CLI Tools
+## 10. Background Jobs (Oban)
+
+The app uses Oban for background job processing and scheduled tasks.
+
+**Development configuration:**
+In `config/dev.exs`, Oban is configured with normal settings (no inline testing mode). Scheduled jobs via the `:cron` plugin run normally in development.
+
+```elixir
+# config/dev.exs
+config :eye_in_the_sky_web, Oban,
+  notifier: Oban.Notifiers.PG,
+  plugins: [Oban.Plugins.Cron],
+  # ... other opts
+```
+
+**Previous behavior (deprecated):**
+Earlier versions had `testing: :inline` in dev config, which disabled the cron plugin and prevented scheduled jobs from running. This was removed to enable scheduled job testing in development.
+
+**Scheduled jobs:**
+Jobs that run on a cron schedule are defined in the same Oban config. To add a new scheduled job, add a job definition to `:cron` in the config:
+
+```elixir
+config :eye_in_the_sky_web, Oban,
+  plugins: [
+    {Oban.Plugins.Cron, crontab: [
+      {"*/5 * * * *", MyJob, args: %{}},  # Every 5 minutes
+      {"0 0 * * *", DailyDigestWorker, args: %{}}  # Daily at midnight
+    ]}
+  ]
+```
+
+**Production configuration:**
+Oban in production uses `Oban.Notifiers.PG` for real-time job notification via `LISTEN/NOTIFY` (requires superuser or special permission). For environments like Supabase where the app user is not a superuser, use `Oban.Notifiers.Postgres` (poll-based, less efficient but always works).
+
+**Verify jobs are running:**
+- Check `oban_jobs` table for recent entries
+- Monitor job status in the `/oban` dashboard (via SessionAuth, requires session cookie)
+
+---
+
+## 11. CLI Tools
 
 The `scripts/eits` script provides shell access to the REST API.
 

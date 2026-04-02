@@ -836,6 +836,85 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
     if new_mock, do: send(new_mock, {:exit, 0})
   end
 
+  # --- SDK cancel on error tests ---
+  # Verify do_handle_sdk_error cancels the running SDK process to prevent orphans
+
+  test "handler crash cancels SDK process before clearing state", %{track: track} do
+    {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+
+    Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "agent:working")
+    session_id = session.id
+
+    assert {:ok, _} = EyeInTheSky.Agents.AgentManager.send_message(session.id, "msg-1")
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    mock_port = wait_for_mock_port(session.id)
+    assert mock_port != nil
+
+    # Monitor the mock port to detect when it gets killed by cancel
+    port_ref = Process.monitor(mock_port)
+
+    [{worker_pid, _}] =
+      Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session.id})
+
+    # Get the handler monitor ref from worker state so we can simulate a handler crash
+    worker_state = :sys.get_state(worker_pid)
+    handler_monitor = worker_state.handler_monitor
+    assert handler_monitor != nil
+
+    # Simulate handler crash by sending a :DOWN message with the handler's monitor ref.
+    # The mock port is still alive at this point — without the cancel fix, it would
+    # become an orphan.
+    send(worker_pid, {:DOWN, handler_monitor, :process, self(), :test_crash})
+
+    # The mock port should be cancelled (receives :cancel → exits with 130)
+    assert_receive {:DOWN, ^port_ref, :process, ^mock_port, _reason}, 5_000
+
+    # Verify mock port is dead — no orphan
+    refute Process.alive?(mock_port)
+
+    # Worker state should be cleaned up
+    Process.sleep(100)
+    new_state = :sys.get_state(worker_pid)
+    assert new_state.sdk_ref == nil
+    assert new_state.current_job == nil
+  end
+
+  test "handler crash cancels SDK process for codex provider", %{track: track} do
+    {_agent, session} =
+      create_test_agent_and_session(%{provider: "codex"}, %{track: track})
+
+    Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "agent:working")
+    session_id = session.id
+
+    assert {:ok, _} = EyeInTheSky.Agents.AgentManager.send_message(session.id, "msg-1")
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    mock_port = wait_for_mock_port(session.id)
+    assert mock_port != nil
+
+    port_ref = Process.monitor(mock_port)
+
+    [{worker_pid, _}] =
+      Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session.id})
+
+    worker_state = :sys.get_state(worker_pid)
+    handler_monitor = worker_state.handler_monitor
+    assert handler_monitor != nil
+
+    # Simulate handler crash — Codex provider path
+    send(worker_pid, {:DOWN, handler_monitor, :process, self(), :test_crash})
+
+    # Mock port should be cancelled regardless of provider
+    assert_receive {:DOWN, ^port_ref, :process, ^mock_port, _reason}, 5_000
+    refute Process.alive?(mock_port)
+
+    Process.sleep(100)
+    new_state = :sys.get_state(worker_pid)
+    assert new_state.sdk_ref == nil
+    assert new_state.current_job == nil
+  end
+
   # --- Registry Invariant Tests ---
   # Invariant: exactly one AgentWorker per session, keyed by {:session, session_id}
 
@@ -918,6 +997,85 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
     if mock_port, do: send(mock_port, {:exit, 0})
   end
 
+  # --- Queue: has_messages re-evaluation at dequeue ---
+
+  test "process_next_job re-evaluates has_messages at dequeue time", %{track: track} do
+    {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+
+    Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "agent:working")
+    session_id = session.id
+
+    # Start first message — no inbound replies yet
+    assert {:ok, _} = EyeInTheSky.Agents.AgentManager.send_message(session.id, "msg-1")
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    mock_port = wait_for_mock_port(session.id)
+
+    # Queue a second message while busy — has_messages is false at this point
+    assert {:ok, :queued} =
+             EyeInTheSky.Agents.AgentManager.send_message(session.id, "msg-2")
+
+    [{worker_pid, _}] =
+      Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session.id})
+
+    # Verify queued job has stale has_messages=false
+    queued_state = :sys.get_state(worker_pid)
+    [queued_job] = queued_state.queue
+    assert queued_job.context[:has_messages] == false
+
+    # Insert an inbound reply directly into DB (simulating a completed first exchange).
+    # The SDK result save is async via Task.start and may not land before process_next_job,
+    # so we seed it synchronously to test the re-evaluation logic deterministically.
+    {:ok, _reply} = Messages.record_incoming_reply(session.id, "claude", "response to msg-1")
+
+    # Now complete the SDK so process_next_job fires
+    send(mock_port, {:exit, 0})
+
+    # Wait for msg-1 to complete and msg-2 to start
+    assert_receive {:agent_stopped, _, ^session_id}, 5_000
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    # The dequeued job should now have has_messages=true (re-evaluated)
+    worker_state = :sys.get_state(worker_pid)
+    assert worker_state.current_job.context[:has_messages] == true
+
+    new_mock = wait_for_mock_port(session.id)
+    if new_mock, do: send(new_mock, {:exit, 0})
+  end
+
+  # --- AgentManager: GenServer.call exit handling ---
+
+  test "send_message returns error when worker dies between lookup and call", %{track: track} do
+    {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+
+    Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "agent:working")
+    session_id = session.id
+
+    # Start worker to get it registered
+    assert {:ok, _} = EyeInTheSky.Agents.AgentManager.send_message(session.id, "msg-1")
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    [{worker_pid, _}] =
+      Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session.id})
+
+    mock_port = wait_for_mock_port(session.id)
+    send(mock_port, {:exit, 0})
+    assert_receive {:agent_stopped, _, ^session_id}, 5_000
+
+    # Kill the worker directly — simulates unexpected death
+    Process.exit(worker_pid, :kill)
+    Process.sleep(50)
+    refute Process.alive?(worker_pid)
+
+    # Calling send_message should now return an error, not crash the caller
+    # The try/catch in send_message guards against the :noproc exit
+    result = EyeInTheSky.Agents.AgentManager.send_message(session.id, "after-death")
+
+    # Could be {:error, :worker_not_found} if caught, or {:ok, :started}
+    # if a new worker was auto-started. Either is acceptable; crash is not.
+    assert match?({:ok, _}, result) or match?({:error, _}, result)
+  end
+
   # --- Helper: poll until condition is true ---
 
   defp assert_eventually(fun, attempts \\ 20) do
@@ -964,6 +1122,144 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
       [] ->
         Process.sleep(50)
         wait_for_mock_port(session_id, attempts - 1)
+    end
+  end
+
+  # Helper: start a worker with one active job and one queued job, return
+  # {worker_pid, sdk_ref} so tests can inject {:claude_error, sdk_ref, reason}.
+  defp start_worker_with_active_sdk(session, _track) do
+    Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "agent:working")
+    session_id = session.id
+
+    assert {:ok, _} = EyeInTheSky.Agents.AgentManager.send_message(session.id, "msg-1")
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    [{worker_pid, _}] =
+      Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session.id})
+
+    # Queue a second job while running — should be drained on systemic error
+    assert {:ok, :queued} =
+             GenServer.call(worker_pid, {:submit_message, "msg-2", %{has_messages: false}})
+
+    worker_state = :sys.get_state(worker_pid)
+    {worker_pid, worker_state.sdk_ref}
+  end
+
+  # --- systemic_error? pattern-matching tests ---
+
+  describe "systemic errors drain the queue" do
+    test "billing_error atom drains queue", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      send(worker_pid, {:claude_error, sdk_ref, {:billing_error, "Credit balance is too low"}})
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      assert state.status == :failed
+      assert state.queue == []
+      assert state.sdk_ref == nil
+    end
+
+    test "authentication_error atom drains queue (was broken: matched 'auth_error' string, never hit)",
+         %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      send(worker_pid, {:claude_error, sdk_ref, {:authentication_error, "Invalid API key"}})
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      assert state.status == :failed
+      assert state.queue == []
+    end
+
+    test "unknown_error with credit balance message drains queue", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      send(
+        worker_pid,
+        {:claude_error, sdk_ref, {:unknown_error, "Credit balance is too low to run"}}
+      )
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      assert state.status == :failed
+      assert state.queue == []
+    end
+
+    test "unknown_error with missing binary message drains queue", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      send(worker_pid, {:claude_error, sdk_ref, {:unknown_error, "missing binary: claude"}})
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      assert state.status == :failed
+      assert state.queue == []
+    end
+
+    test "claude_result_error with errors as map (billing) drains queue", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      reason = {:claude_result_error, %{errors: %{"type" => "billing_error", "message" => "No credits"}, result: nil, session_id: session.uuid}}
+      send(worker_pid, {:claude_error, sdk_ref, reason})
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      assert state.status == :failed
+      assert state.queue == []
+    end
+
+    test "claude_result_error with errors as map (authentication) drains queue", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      reason = {:claude_result_error, %{errors: %{"type" => "authentication_error", "message" => "Bad key"}, result: nil, session_id: session.uuid}}
+      send(worker_pid, {:claude_error, sdk_ref, reason})
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      assert state.status == :failed
+      assert state.queue == []
+    end
+
+    test "claude_result_error with errors as binary drains queue", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      reason = {:claude_result_error, %{errors: "billing_error: no credits", result: nil, session_id: session.uuid}}
+      send(worker_pid, {:claude_error, sdk_ref, reason})
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      assert state.status == :failed
+      assert state.queue == []
+    end
+
+    test "non-systemic error (exit_code) does not enter :failed state", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      send(worker_pid, {:claude_error, sdk_ref, {:exit_code, 1}})
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      # Non-systemic: worker does not enter :failed.
+      # process_next_job fires immediately, starting the queued job,
+      # so status is :running (or :retry_wait if SDK start failed).
+      assert state.status != :failed
     end
   end
 end

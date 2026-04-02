@@ -52,7 +52,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteControllerTest do
       resp = json_response(conn, 200)
 
       assert resp["success"] == true
-      assert length(resp["results"]) >= 1
+      assert resp["results"] != []
     end
 
     test "respects limit param", %{conn: conn} do

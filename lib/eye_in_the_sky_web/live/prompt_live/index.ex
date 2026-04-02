@@ -85,10 +85,10 @@ defmodule EyeInTheSkyWeb.PromptLive.Index do
     <div class="px-4 sm:px-6 lg:px-8">
       <div class="sm:flex sm:items-center sm:justify-between">
         <div class="sm:flex-auto">
-          <h1 class="text-base font-semibold leading-6 text-gray-900 dark:text-gray-100">
+          <h1 class="text-base font-semibold leading-6 text-base-content">
             Subagent Prompts
           </h1>
-          <p class="mt-2 text-sm text-gray-700 dark:text-gray-400">
+          <p class="mt-2 text-sm text-base-content/70">
             Reusable prompt templates for spawning specialized subagents
           </p>
         </div>
@@ -127,7 +127,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Index do
           <label for="search" class="sr-only">Search prompts</label>
           <div class="relative">
             <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+              <svg class="h-5 w-5 text-base-content/30" viewBox="0 0 20 20" fill="currentColor">
                 <path
                   fill-rule="evenodd"
                   d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
@@ -193,7 +193,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Index do
                 <td colspan="7" class="text-center py-8">
                   <div class="flex flex-col items-center gap-2">
                     <svg
-                      class="h-12 w-12 text-gray-400"
+                      class="h-12 w-12 text-base-content/30"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -205,7 +205,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Index do
                         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                       />
                     </svg>
-                    <p class="text-sm text-gray-500">No prompts found matching your criteria.</p>
+                    <p class="text-sm text-base-content/60">No prompts found matching your criteria.</p>
                   </div>
                 </td>
               </tr>

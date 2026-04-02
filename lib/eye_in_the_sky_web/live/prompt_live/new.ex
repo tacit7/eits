@@ -68,10 +68,10 @@ defmodule EyeInTheSkyWeb.PromptLive.New do
 
       <div class="sm:flex sm:items-center mb-6">
         <div class="sm:flex-auto">
-          <h1 class="text-2xl font-semibold leading-6 text-gray-900 dark:text-gray-100">
+          <h1 class="text-2xl font-semibold leading-6 text-base-content">
             New Prompt
           </h1>
-          <p class="mt-2 text-sm text-gray-700 dark:text-gray-400">
+          <p class="mt-2 text-sm text-base-content/70">
             Create a reusable prompt template for subagents
           </p>
         </div>
@@ -94,7 +94,7 @@ defmodule EyeInTheSkyWeb.PromptLive.New do
           <div class="form-control">
             <label class="label">
               <span class="label-text font-semibold">Slug <span class="text-error">*</span></span>
-              <span class="label-text-alt text-gray-400">Auto-generated from name</span>
+              <span class="label-text-alt text-base-content/30">Auto-generated from name</span>
             </label>
             <.input
               field={@form[:slug]}

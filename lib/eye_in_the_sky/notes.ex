@@ -7,6 +7,7 @@ defmodule EyeInTheSky.Notes do
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Notes.Note
   alias EyeInTheSky.Search.PgSearch
+  alias EyeInTheSky.Sessions
 
   @doc """
   Returns the list of notes.
@@ -52,9 +53,9 @@ defmodule EyeInTheSky.Notes do
   def list_notes_for_session(session_id, opts \\ []) do
     # session_id can be a UUID string or an integer string
     session =
-      case Integer.parse(to_string(session_id)) do
-        {int_id, ""} -> Repo.get(EyeInTheSky.Sessions.Session, int_id)
-        _ -> Repo.get_by(EyeInTheSky.Sessions.Session, uuid: session_id)
+      case Sessions.resolve(to_string(session_id)) do
+        {:ok, s} -> s
+        _ -> nil
       end
 
     if session do
@@ -145,6 +146,21 @@ defmodule EyeInTheSky.Notes do
     else
       []
     end
+  end
+
+  @doc """
+  Returns recent notes for a specific project, ordered by created_at desc.
+  Options: `:limit` (default 5)
+  """
+  def list_notes_for_project(project_id, opts \\ []) do
+    limit_val = Keyword.get(opts, :limit, 5)
+    project_id_str = to_string(project_id)
+
+    Note
+    |> where([n], n.parent_type in ["project", "projects"] and n.parent_id == ^project_id_str)
+    |> order_by([n], desc: n.created_at)
+    |> limit(^limit_val)
+    |> Repo.all()
   end
 
   @doc """
@@ -292,8 +308,7 @@ defmodule EyeInTheSky.Notes do
           placeholders =
             agent_ids_str
             |> Enum.with_index(idx)
-            |> Enum.map(fn {_, i} -> "$#{i}" end)
-            |> Enum.join(",")
+            |> Enum.map_join(",", fn {_, i} -> "$#{i}" end)
 
           clause = "(n.parent_type IN ('agent', 'agents') AND n.parent_id IN (#{placeholders}))"
           {[clause | clauses], params ++ agent_ids_str, idx + length(agent_ids_str)}
@@ -305,8 +320,7 @@ defmodule EyeInTheSky.Notes do
           placeholders =
             session_ids_str
             |> Enum.with_index(idx)
-            |> Enum.map(fn {_, i} -> "$#{i}" end)
-            |> Enum.join(",")
+            |> Enum.map_join(",", fn {_, i} -> "$#{i}" end)
 
           clause =
             "(n.parent_type IN ('session', 'sessions') AND n.parent_id IN (#{placeholders}))"

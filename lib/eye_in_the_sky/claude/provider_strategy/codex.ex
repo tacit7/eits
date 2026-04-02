@@ -5,9 +5,25 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
 
   @behaviour EyeInTheSky.Claude.ProviderStrategy
 
+  alias EyeInTheSky.Claude.ContentBlock
   alias EyeInTheSky.Codex
 
   require Logger
+
+  @impl true
+  def format_content(%ContentBlock.Text{text: text}) do
+    %{"type" => "text", "text" => text}
+  end
+
+  @impl true
+  def format_content(%ContentBlock.Image{data: data, mime_type: mime_type}) do
+    %{"type" => "image_url", "image_url" => %{"url" => "data:#{mime_type};base64,#{data}"}}
+  end
+
+  @impl true
+  def format_content(%ContentBlock.Document{}) do
+    %{"type" => "text", "text" => "[PDF content not supported by this provider]"}
+  end
 
   @impl true
   def start(state, job) do
@@ -15,6 +31,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
     prompt = job.message
 
     opts = build_opts(state, context)
+    opts = maybe_add_content_blocks(opts, job.content_blocks)
 
     full_prompt =
       if (context[:eits_workflow] || "1") != "0" do
@@ -33,6 +50,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
     prompt = job.message
 
     opts = build_opts(state, context)
+    opts = maybe_add_content_blocks(opts, job.content_blocks)
 
     Logger.info("Resuming Codex session #{state.provider_conversation_id}")
     Codex.SDK.resume(state.provider_conversation_id, prompt, opts)
@@ -44,7 +62,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
   end
 
   defp build_opts(state, context) do
-    [
+    base = [
       to: self(),
       model: context[:model],
       session_id: state.provider_conversation_id,
@@ -59,5 +77,23 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
       eits_model: context[:model],
       eits_url: System.get_env("EITS_URL", "http://localhost:5001/api/v1")
     ]
+
+    # Forward extra_cli_opts — Codex.CLI.build_args ignores unknown keys,
+    # so Claude-only flags (--chrome, --sandbox, etc.) are harmlessly dropped.
+    extra = context[:extra_cli_opts] || []
+    base ++ extra
+  end
+
+  defp maybe_add_content_blocks(opts, []), do: opts
+
+  defp maybe_add_content_blocks(opts, content_blocks) when is_list(content_blocks) do
+    # Codex CLI does not support multimodal input — content blocks are stripped
+    # with a warning rather than silently dropped. format_content/1 exists for
+    # future use when Codex adds multimodal support.
+    Logger.warning(
+      "[Codex] Stripping #{length(content_blocks)} content block(s): Codex CLI does not support multimodal input"
+    )
+
+    opts
   end
 end

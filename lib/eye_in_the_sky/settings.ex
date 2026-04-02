@@ -14,7 +14,7 @@ defmodule EyeInTheSky.Settings do
 
   @defaults %{
     "default_model" => "sonnet",
-    "cli_idle_timeout_ms" => "300000",
+    "cli_idle_timeout_ms" => "0",
     "log_claude_raw" => "false",
     "log_codex_raw" => "false",
     "tts_voice" => "Ava",
@@ -32,7 +32,8 @@ defmodule EyeInTheSky.Settings do
     "pricing_haiku_cache_read" => "0.08",
     "pricing_haiku_cache_creation" => "1.00",
     "preferred_editor" => "code",
-    "eits_workflow_enabled" => "true"
+    "eits_workflow_enabled" => "true",
+    "theme" => "dark"
   }
 
   @doc "Get a single setting value, falling back to default."

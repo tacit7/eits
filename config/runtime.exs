@@ -130,8 +130,18 @@ if config_env() == :prod do
 
   config :eye_in_the_sky, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
+  # Build check_origin list from PHX_HOST + any WEBAUTHN_EXTRA_ORIGINS
+  extra_origins =
+    case webauthn_extra_raw do
+      nil -> []
+      raw -> raw |> String.split(",") |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
+    end
+
+  allowed_origins = ["https://#{host}" | extra_origins]
+
   config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
+    check_origin: allowed_origins,
     http: [
       # Enable IPv6 and bind on all interfaces.
       # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.

@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectControllerTest do
 
       assert resp["success"] == true
       assert is_list(resp["projects"])
-      assert length(resp["projects"]) >= 1
+      assert resp["projects"] != []
     end
 
     test "each project has expected fields", %{conn: conn} do

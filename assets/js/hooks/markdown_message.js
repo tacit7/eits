@@ -7,10 +7,10 @@ export const MarkdownMessage = {
   updated() {
     this.renderContent()
   },
-  renderContent() {
+  async renderContent() {
     const raw = this.el.dataset.rawBody
     if (raw) {
-      this.el.innerHTML = renderMarkdown(raw)
+      this.el.innerHTML = await renderMarkdown(raw)
     }
   }
 }

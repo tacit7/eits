@@ -32,7 +32,7 @@ defmodule EyeInTheSky.Claude.SDKTest do
 
         # Should receive text messages
         text_messages = Enum.filter(messages, &(&1.type == :text))
-        assert length(text_messages) > 0
+        assert text_messages != []
 
         # Should get completion
         assert_receive {:claude_complete, ^ref, session_id}, 30_000

@@ -33,9 +33,14 @@ config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
 # at the `config/runtime.exs`.
 config :eye_in_the_sky, EyeInTheSky.Mailer, adapter: Swoosh.Adapters.Local
 
-# esbuild is handled by custom build.js script (for Svelte support)
-# See assets/build.js and the node watcher in config/dev.exs
-config :esbuild, :version, "0.25.4"
+# phoenix_vite — npm profiles for local node/npm integration
+config :phoenix_vite, PhoenixVite.Npm,
+  assets: [args: [], cd: Path.expand("../assets", __DIR__)],
+  vite: [
+    args: ~w(exec -- vite),
+    cd: Path.expand("../assets", __DIR__),
+    env: %{"MIX_BUILD_PATH" => Mix.Project.build_path()}
+  ]
 
 # Configure tailwind (the version is required)
 config :tailwind,
@@ -63,6 +68,12 @@ config :eye_in_the_sky, Oban,
   queues: [jobs: 5, default: 5],
   repo: EyeInTheSky.Repo,
   plugins: [
+    # Keep completed/cancelled/discarded jobs for 7 days, then prune
+    {Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 7},
+    # Stage scheduled/retryable jobs so they actually execute
+    Oban.Plugins.Stager,
+    # Rescue jobs stuck in executing after a crash (after 30 min)
+    {Oban.Plugins.Lifeline, rescue_after: :timer.minutes(30)},
     {Oban.Plugins.Cron,
      crontab: [
        {"* * * * *", EyeInTheSky.Workers.JobDispatcherWorker}

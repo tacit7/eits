@@ -104,8 +104,7 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
             s.agent && s.agent.description,
             s.agent && s.agent.project_name
           ]
-          |> Enum.map(&to_string_or_empty/1)
-          |> Enum.join(" ")
+          |> Enum.map_join(" ", &to_string_or_empty/1)
           |> String.downcase()
 
         String.contains?(haystack, q)

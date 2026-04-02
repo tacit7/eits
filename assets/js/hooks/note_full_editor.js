@@ -1,24 +1,37 @@
 // assets/js/hooks/note_full_editor.js
-import {
-  EditorView,
-  keymap,
-  highlightActiveLine,
-  lineNumbers
-} from "@codemirror/view"
-import { EditorState } from "@codemirror/state"
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands"
-import { oneDark } from "@codemirror/theme-one-dark"
-import { markdown } from "@codemirror/lang-markdown"
+// CodeMirror is loaded lazily on first mount to keep the initial JS bundle small.
 
 export const NoteFullEditorHook = {
-  mounted() {
+  async mounted() {
+    this._destroyed = false
     const body = this.el.dataset.body || ""
     const returnTo = this.el.dataset.returnTo || "/notes"
     const self = this
 
-    const isDark = document.documentElement.dataset.theme === "dark"
-
     const statusEl = document.getElementById("note-editor-status")
+
+    const [
+      { EditorView, keymap, highlightActiveLine, lineNumbers },
+      { EditorState },
+      { defaultKeymap, history, historyKeymap },
+      { makeThemeCompartment },
+      { makeTabSizeExtension, makeFontSizeExtension, makeVimExtension },
+      { syntaxHighlighting, defaultHighlightStyle },
+      { markdown },
+    ] = await Promise.all([
+      import("@codemirror/view"),
+      import("@codemirror/state"),
+      import("@codemirror/commands"),
+      import("../cm_theme"),
+      import("../cm_settings"),
+      import("@codemirror/language"),
+      import("@codemirror/lang-markdown"),
+    ])
+
+    const { extension: themeExtension, watch } = await makeThemeCompartment()
+    const { extension: tabExtension, watch: tabWatch } = await makeTabSizeExtension()
+    const { extension: fontExtension, watch: watchFont } = await makeFontSizeExtension()
+    const { extension: vimExtension, watch: watchVim } = await makeVimExtension()
 
     const saveKeymap = keymap.of([
       {
@@ -61,12 +74,20 @@ export const NoteFullEditorHook = {
       EditorView.lineWrapping,
       statusUpdate,
       fillHeight,
+      syntaxHighlighting(defaultHighlightStyle),
+      themeExtension,
+      tabExtension,
+      fontExtension,
+      vimExtension,
     ]
 
-    if (isDark) extensions.push(oneDark)
-
+    if (this._destroyed) return
     const state = EditorState.create({ doc: body, extensions })
     this._view = new EditorView({ state, parent: this.el })
+    this._cleanupTheme = watch(this._view)
+    this._cleanupTabSize = tabWatch(this._view)
+    this._cleanupFontSize = watchFont(this._view)
+    this._cleanupVim = watchVim(this._view)
 
     // Wire Tab on title input to focus the editor
     const titleInput = document.getElementById("note-title-input")
@@ -93,6 +114,7 @@ export const NoteFullEditorHook = {
   },
 
   destroyed() {
+    this._destroyed = true
     const titleInput = document.getElementById("note-title-input")
     if (titleInput && this._titleTabHandler) {
       titleInput.removeEventListener("keydown", this._titleTabHandler)
@@ -101,6 +123,10 @@ export const NoteFullEditorHook = {
     if (saveBtn && this._saveBtnHandler) {
       saveBtn.removeEventListener("click", this._saveBtnHandler)
     }
+    if (this._cleanupTheme) this._cleanupTheme()
+    if (this._cleanupTabSize) this._cleanupTabSize()
+    if (this._cleanupFontSize) this._cleanupFontSize()
+    if (this._cleanupVim) this._cleanupVim()
     if (this._view) {
       this._view.destroy()
       this._view = null

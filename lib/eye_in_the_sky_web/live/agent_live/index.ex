@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   import EyeInTheSkyWeb.Components.Icons
   import EyeInTheSkyWeb.Components.SessionCard
   import EyeInTheSkyWeb.Helpers.SessionFilters
+  import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_budget: 1]
 
   require Logger
 
@@ -75,60 +76,58 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
         %{"session_id" => target_session_id, "body" => body},
         socket
       ) do
-    # Fetch session once, reuse below
-    with {:ok, session} <- Sessions.get_session(target_session_id) do
-      channels =
-        if session.project_id,
-          do: EyeInTheSky.Channels.list_channels_for_project(session.project_id),
-          else: EyeInTheSky.Channels.list_channels()
+    with {:session, {:ok, session}} <- {:session, Sessions.get_session(target_session_id)},
+         {:channel, {:ok, global_channel}} <- {:channel, find_global_channel(session)},
+         {:send, {:ok, _message}} <-
+           {:send,
+            EyeInTheSky.ChannelMessages.send_channel_message(%{
+              channel_id: global_channel.id,
+              session_id: "web-user",
+              sender_role: "user",
+              recipient_role: "agent",
+              provider: "claude",
+              body: body
+            })} do
+      case Agents.get_agent(session.agent_id) do
+        {:ok, chat_agent} ->
+          project_path =
+            chat_agent.git_worktree_path ||
+              (chat_agent.project && chat_agent.project.path)
 
-      global_channel = Enum.find(channels, fn c -> c.name == "#global" end)
+          if project_path do
+            prompt_with_reminder = """
+            REMINDER: Use i-chat-send MCP tool to send your response to the channel.
 
-      if global_channel do
-        case EyeInTheSky.ChannelMessages.send_channel_message(%{
-               channel_id: global_channel.id,
-               session_id: "web-user",
-               sender_role: "user",
-               recipient_role: "agent",
-               provider: "claude",
-               body: body
-             }) do
-          {:ok, _message} ->
-            case Agents.get_agent(session.agent_id) do
-              {:ok, chat_agent} ->
-                project_path = chat_agent.git_worktree_path || File.cwd!()
+            User message: #{body}
+            """
 
-                prompt_with_reminder = """
-                REMINDER: Use i-chat-send MCP tool to send your response to the channel.
+            EyeInTheSky.Agents.AgentManager.continue_session(
+              session.id,
+              prompt_with_reminder,
+              model: "sonnet",
+              project_path: project_path
+            )
 
-                User message: #{body}
-                """
+            {:noreply, socket}
+          else
+            Logger.warning(
+              "send_direct_message: agent #{chat_agent.id} has no path (git_worktree_path and project.path both nil), session not continued"
+            )
 
-                EyeInTheSky.Agents.AgentManager.continue_session(
-                  session.id,
-                  prompt_with_reminder,
-                  model: "sonnet",
-                  project_path: project_path
-                )
+            {:noreply, socket}
+          end
 
-                {:noreply, socket}
+        _ ->
+          Logger.warning(
+            "send_direct_message: agent #{session.agent_id} not found, message sent but session not continued"
+          )
 
-              _ ->
-                Logger.warning(
-                  "send_direct_message: agent #{session.agent_id} not found, message sent but session not continued"
-                )
-
-                {:noreply, socket}
-            end
-
-          {:error, _} ->
-            {:noreply, put_flash(socket, :error, "Failed to send message")}
-        end
-      else
-        {:noreply, put_flash(socket, :error, "Global channel not found")}
+          {:noreply, socket}
       end
     else
-      _ -> {:noreply, put_flash(socket, :error, "Session not found")}
+      {:session, _} -> {:noreply, put_flash(socket, :error, "Session not found")}
+      {:channel, _} -> {:noreply, put_flash(socket, :error, "Global channel not found")}
+      {:send, _} -> {:noreply, put_flash(socket, :error, "Failed to send message")}
     end
   end
 
@@ -243,7 +242,10 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
   @impl true
   def handle_event("rename_session", %{"session_id" => session_id}, socket) do
-    {:noreply, assign(socket, :editing_session_id, String.to_integer(session_id))}
+    case Integer.parse(session_id) do
+      {id, ""} -> {:noreply, assign(socket, :editing_session_id, id)}
+      _ -> {:noreply, socket}
+    end
   end
 
   @impl true
@@ -252,8 +254,17 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
     if name != "" do
       case Sessions.get_session(session_id) do
-        {:ok, session} -> Sessions.update_session(session, %{name: name})
-        _ -> :noop
+        {:ok, session} ->
+          case Sessions.update_session(session, %{name: name}) do
+            {:ok, _} ->
+              :ok
+
+            {:error, reason} ->
+              Logger.warning("save_session_name: failed to rename session #{session_id}: #{inspect(reason)}")
+          end
+
+        _ ->
+          :ok
       end
     end
 
@@ -282,6 +293,58 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
       {:noreply, put_flash(socket, :error, "Invalid project")}
     else
       create_new_session_with_project(params, project_id, socket)
+    end
+  end
+
+  @impl true
+  def handle_event("noop", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_event("add_to_canvas", %{"canvas-id" => cid, "session-id" => sid}, socket) do
+    with {canvas_id, _} <- Integer.parse(cid),
+         {session_id, _} <- Integer.parse(sid),
+         %{} = canvas <- Canvases.get_canvas(canvas_id) do
+      Canvases.add_session(canvas_id, session_id)
+
+      send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,
+        id: "canvas-overlay",
+        action: :open_canvas,
+        canvas_id: canvas_id
+      )
+
+      {:noreply, put_flash(socket, :info, "Added to #{canvas.name}")}
+    else
+      _ -> {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("add_to_new_canvas", %{"session_id" => sid, "canvas_name" => name}, socket) do
+    case Integer.parse(sid) do
+      {session_id, _} ->
+        canvas_name =
+          if name && String.trim(name) != "",
+            do: String.trim(name),
+            else: "Canvas #{:os.system_time(:second)}"
+
+        case Canvases.create_canvas(%{name: canvas_name}) do
+          {:ok, canvas} ->
+            Canvases.add_session(canvas.id, session_id)
+
+            send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,
+              id: "canvas-overlay",
+              action: :open_canvas,
+              canvas_id: canvas.id
+            )
+
+            {:noreply, put_flash(socket, :info, "Added to #{canvas.name}")}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Failed to create canvas")}
+        end
+
+      _ ->
+        {:noreply, socket}
     end
   end
 
@@ -461,7 +524,212 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
     """
   end
 
+  # Sticky search input + filter tabs bar
+  defp search_bar(assigns) do
+    ~H"""
+    <div class="sticky safe-top-sticky md:top-16 z-10 bg-base-100/85 backdrop-blur-md -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 border-b border-base-content/5">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
+        <form phx-change="search" class="flex-1 max-w-sm">
+          <label for="search" class="sr-only">Search agents</label>
+          <div class="relative">
+            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
+            </div>
+            <input
+              type="text"
+              name="query"
+              id="search"
+              value={@search_query}
+              phx-debounce="300"
+              class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
+              placeholder="Search..."
+            />
+          </div>
+        </form>
+        <.filter_tabs current={@session_filter} />
+      </div>
+    </div>
+    """
+  end
+
+  # Select-all + bulk delete bar shown only in archived mode
+  defp bulk_action_bar(assigns) do
+    ~H"""
+    <div :if={@session_filter == "archived" && @agents != []} class="mt-2 flex items-center gap-3 px-2 py-1.5">
+      <input
+        type="checkbox"
+        checked={MapSet.size(@selected_ids) == length(@agents)}
+        phx-click="toggle_select_all"
+        class="checkbox checkbox-xs checkbox-primary"
+      />
+      <%= if MapSet.size(@selected_ids) > 0 do %>
+        <span class="text-[11px] text-base-content/50 font-medium">
+          {MapSet.size(@selected_ids)} selected
+        </span>
+        <button
+          phx-click="confirm_delete_selected"
+          class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1"
+        >
+          <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
+        </button>
+      <% else %>
+        <span class="text-[11px] text-base-content/30">{length(@agents)} archived</span>
+      <% end %>
+    </div>
+    """
+  end
+
+  # Per-row context menu (ellipsis dropdown) with canvas, rename, archive/delete
+  defp agent_row_menu(assigns) do
+    ~H"""
+    <details class="md:opacity-0 md:group-hover:opacity-100 relative dropdown dropdown-end transition-all">
+      <summary
+        class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/35 hover:text-base-content/70 hover:bg-base-content/5 transition-colors cursor-pointer list-none"
+        aria-label="More options"
+      >
+        <.icon name="hero-ellipsis-horizontal-mini" class="w-4 h-4" />
+      </summary>
+      <div class="dropdown-content z-50 mt-1 w-48 rounded-xl bg-base-300 dark:bg-[hsl(220,13%,18%)] shadow-xl p-1.5 flex flex-col gap-0.5">
+        <%= if @agent.id do %>
+          <a
+            href={~p"/dm/#{@agent.id}"}
+            target="_blank"
+            class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors"
+          >
+            <.icon name="hero-arrow-top-right-on-square-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+            Open in new tab
+          </a>
+        <% end %>
+        <button
+          type="button"
+          phx-click="rename_session"
+          phx-value-session_id={@agent.id}
+          class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+        >
+          <.icon name="hero-pencil-square-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+          Rename
+        </button>
+        <%!-- Canvas submenu --%>
+        <details class="group/canvas">
+          <summary class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors cursor-pointer list-none">
+            <.icon name="hero-squares-2x2-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+            <span class="flex-1">Canvas</span>
+            <.icon name="hero-chevron-right-mini" class="w-3 h-3 text-base-content/40" />
+          </summary>
+          <div class="mt-0.5 ml-3 flex flex-col gap-0.5">
+            <%= for canvas <- @canvases do %>
+              <button
+                type="button"
+                phx-click="add_to_canvas"
+                phx-value-canvas-id={canvas.id}
+                phx-value-session-id={@agent.id}
+                class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-base-content/80 hover:bg-base-content/10 transition-colors text-left"
+              >
+                {canvas.name}
+              </button>
+            <% end %>
+            <div class="border-t border-base-content/10 my-0.5" />
+            <div id={"new-canvas-label-#{@agent.id}"}>
+              <button
+                type="button"
+                class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-secondary hover:bg-base-content/10 transition-colors text-left"
+                onclick={"document.getElementById('new-canvas-label-#{@agent.id}').style.display='none'; document.getElementById('new-canvas-form-#{@agent.id}').style.display='block';"}
+              >+ New canvas</button>
+            </div>
+            <div id={"new-canvas-form-#{@agent.id}"} style="display:none">
+              <form phx-submit="add_to_new_canvas" phx-click="noop" class="flex flex-col gap-1 p-1">
+                <input type="hidden" name="session_id" value={@agent.id} />
+                <input type="text" name="canvas_name" class="input input-xs w-full" placeholder="Canvas name..." autocomplete="off" />
+                <button type="submit" class="btn btn-primary btn-xs w-full">Create &amp; Add</button>
+              </form>
+            </div>
+          </div>
+        </details>
+        <%= if @agent.agent && @agent.agent.uuid && @agent.uuid do %>
+          <button
+            id={"bookmark-btn-#{@agent.uuid}"}
+            type="button"
+            phx-hook="BookmarkAgent"
+            data-agent-id={@agent.agent.uuid}
+            data-session-id={@agent.uuid}
+            data-agent-name={@agent.name || @agent.agent.description || "Agent"}
+            data-agent-status={@agent.status}
+            class="bookmark-button w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+            aria-label="Bookmark agent"
+          >
+            <.heart class="bookmark-icon w-4 h-4 text-base-content/60 flex-shrink-0" />
+            <span class="bookmark-label">Favorite</span>
+          </button>
+        <% end %>
+        <%= if @agent.uuid do %>
+          <div class="border-t border-base-content/10 my-0.5" />
+          <%= if @agent.archived_at do %>
+            <button
+              type="button"
+              phx-click="unarchive_session"
+              phx-value-session_id={@agent.id}
+              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-info hover:bg-base-content/10 transition-colors text-left"
+            >
+              <.icon name="hero-arrow-up-tray-mini" class="w-4 h-4 flex-shrink-0" />
+              Unarchive
+            </button>
+            <button
+              type="button"
+              phx-click="delete_session"
+              phx-value-session_id={@agent.id}
+              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-error hover:bg-base-content/10 transition-colors text-left"
+            >
+              <.icon name="hero-trash-mini" class="w-4 h-4 flex-shrink-0" />
+              Delete
+            </button>
+          <% else %>
+            <button
+              type="button"
+              phx-click="archive_session"
+              phx-value-session_id={@agent.id}
+              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-warning hover:bg-base-content/10 transition-colors text-left"
+            >
+              <.icon name="hero-archive-box-mini" class="w-4 h-4 flex-shrink-0" />
+              Archive
+            </button>
+          <% end %>
+        <% end %>
+      </div>
+    </details>
+    """
+  end
+
+  # Confirmation dialog for bulk-delete of selected archived sessions
+  defp delete_confirm_modal(assigns) do
+    ~H"""
+    <dialog
+      id="delete-confirm-modal"
+      class={"modal " <> if(@show_delete_confirm, do: "modal-open", else: "")}
+    >
+      <div class="modal-box max-w-sm">
+        <h3 class="text-lg font-bold">Delete sessions</h3>
+        <p class="py-4 text-sm text-base-content/70">
+          Permanently delete {MapSet.size(@selected_ids)} selected session{if MapSet.size(@selected_ids) != 1, do: "s"}? This cannot be undone.
+        </p>
+        <div class="modal-action">
+          <button phx-click="cancel_delete_selected" class="btn btn-sm btn-ghost">Cancel</button>
+          <button phx-click="delete_selected" class="btn btn-sm btn-error">Delete</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button phx-click="cancel_delete_selected">close</button>
+      </form>
+    </dialog>
+    """
+  end
+
   # -- Render ---------------------------------------------------------------
+
+  # This LiveView is large by necessity: it owns the full agents list page with
+  # filtering, search, bulk selection, per-row context menus, canvas management,
+  # inline rename, and a new-agent drawer. The render function is broken into
+  # defp components (search_bar, bulk_action_bar, agent_row_menu,
+  # delete_confirm_modal) to keep each section navigable.
 
   @impl true
   def render(assigns) do
@@ -487,54 +755,10 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
           </div>
         </div>
 
-        <div class="sticky safe-top-sticky md:top-16 z-10 bg-base-100/85 backdrop-blur-md -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 border-b border-base-content/5">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
-            <form phx-change="search" class="flex-1 max-w-sm">
-              <label for="search" class="sr-only">Search agents</label>
-              <div class="relative">
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                  <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
-                </div>
-                <input
-                  type="text"
-                  name="query"
-                  id="search"
-                  value={@search_query}
-                  phx-debounce="300"
-                  class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
-                  placeholder="Search..."
-                />
-              </div>
-            </form>
-            <.filter_tabs current={@session_filter} />
-          </div>
-        </div>
+        <.search_bar search_query={@search_query} session_filter={@session_filter} />
+        <.bulk_action_bar session_filter={@session_filter} agents={@agents} selected_ids={@selected_ids} />
 
-        <%= if @session_filter == "archived" && @agents != [] do %>
-          <div class="mt-2 flex items-center gap-3 px-2 py-1.5">
-            <input
-              type="checkbox"
-              checked={MapSet.size(@selected_ids) == length(@agents)}
-              phx-click="toggle_select_all"
-              class="checkbox checkbox-xs checkbox-primary"
-            />
-            <%= if MapSet.size(@selected_ids) > 0 do %>
-              <span class="text-[11px] text-base-content/50 font-medium">
-                {MapSet.size(@selected_ids)} selected
-              </span>
-              <button
-                phx-click="confirm_delete_selected"
-                class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1"
-              >
-                <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
-              </button>
-            <% else %>
-              <span class="text-[11px] text-base-content/30">{length(@agents)} archived</span>
-            <% end %>
-          </div>
-        <% end %>
-
-        <div class="mt-2 divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-4">
+        <div class="mt-2 divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-4">
           <%= if @agents == [] do %>
             <.empty_state
               id="agents-empty"
@@ -551,120 +775,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
                 editing_session_id={@editing_session_id}
               >
                 <:actions>
-                  <details class="md:opacity-0 md:group-hover:opacity-100 relative dropdown dropdown-end transition-all">
-                    <summary
-                      class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/35 hover:text-base-content/70 hover:bg-base-content/5 transition-colors cursor-pointer list-none"
-                      aria-label="More options"
-                    >
-                      <.icon name="hero-ellipsis-horizontal-mini" class="w-4 h-4" />
-                    </summary>
-                    <div class="dropdown-content z-50 mt-1 w-48 rounded-xl bg-base-300 dark:bg-[hsl(220,13%,18%)] shadow-xl p-1.5 flex flex-col gap-0.5">
-                      <%= if agent.id do %>
-                        <a
-                          href={~p"/dm/#{agent.id}"}
-                          target="_blank"
-                          class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors"
-                        >
-                          <.icon name="hero-arrow-top-right-on-square-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
-                          Open in new tab
-                        </a>
-                      <% end %>
-                      <button
-                        type="button"
-                        phx-click="rename_session"
-                        phx-value-session_id={agent.id}
-                        class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
-                      >
-                        <.icon name="hero-pencil-square-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
-                        Rename
-                      </button>
-                      <%!-- Canvas submenu --%>
-                      <details class="group/canvas">
-                        <summary class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors cursor-pointer list-none">
-                          <.icon name="hero-squares-2x2-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
-                          <span class="flex-1">Canvas</span>
-                          <.icon name="hero-chevron-right-mini" class="w-3 h-3 text-base-content/40" />
-                        </summary>
-                        <div class="mt-0.5 ml-3 flex flex-col gap-0.5">
-                          <%= for canvas <- @canvases do %>
-                            <button
-                              type="button"
-                              phx-click="add_to_canvas"
-                              phx-value-canvas-id={canvas.id}
-                              phx-value-session-id={agent.id}
-                              class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-base-content/80 hover:bg-base-content/10 transition-colors text-left"
-                            >
-                              {canvas.name}
-                            </button>
-                          <% end %>
-                          <div class="border-t border-base-content/10 my-0.5" />
-                          <div id={"new-canvas-label-#{agent.id}"}>
-                            <button
-                              type="button"
-                              class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-secondary hover:bg-base-content/10 transition-colors text-left"
-                              onclick={"document.getElementById('new-canvas-label-#{agent.id}').style.display='none'; document.getElementById('new-canvas-form-#{agent.id}').style.display='block';"}
-                            >+ New canvas</button>
-                          </div>
-                          <div id={"new-canvas-form-#{agent.id}"} style="display:none">
-                            <form phx-submit="add_to_new_canvas" phx-click="noop" class="flex flex-col gap-1 p-1">
-                              <input type="hidden" name="session_id" value={agent.id} />
-                              <input type="text" name="canvas_name" class="input input-xs w-full" placeholder="Canvas name..." autocomplete="off" />
-                              <button type="submit" class="btn btn-primary btn-xs w-full">Create &amp; Add</button>
-                            </form>
-                          </div>
-                        </div>
-                      </details>
-                      <%= if agent.agent && agent.agent.uuid && agent.uuid do %>
-                        <button
-                          id={"bookmark-btn-#{agent.uuid}"}
-                          type="button"
-                          phx-hook="BookmarkAgent"
-                          data-agent-id={agent.agent.uuid}
-                          data-session-id={agent.uuid}
-                          data-agent-name={agent.name || agent.agent.description || "Agent"}
-                          data-agent-status={agent.status}
-                          class="bookmark-button w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
-                          aria-label="Bookmark agent"
-                        >
-                          <.heart class="bookmark-icon w-4 h-4 text-base-content/60 flex-shrink-0" />
-                          <span class="bookmark-label">Favorite</span>
-                        </button>
-                      <% end %>
-                      <%= if agent.uuid do %>
-                        <div class="border-t border-base-content/10 my-0.5" />
-                        <%= if agent.archived_at do %>
-                          <button
-                            type="button"
-                            phx-click="unarchive_session"
-                            phx-value-session_id={agent.id}
-                            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-info hover:bg-base-content/10 transition-colors text-left"
-                          >
-                            <.icon name="hero-arrow-up-tray-mini" class="w-4 h-4 flex-shrink-0" />
-                            Unarchive
-                          </button>
-                          <button
-                            type="button"
-                            phx-click="delete_session"
-                            phx-value-session_id={agent.id}
-                            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-error hover:bg-base-content/10 transition-colors text-left"
-                          >
-                            <.icon name="hero-trash-mini" class="w-4 h-4 flex-shrink-0" />
-                            Delete
-                          </button>
-                        <% else %>
-                          <button
-                            type="button"
-                            phx-click="archive_session"
-                            phx-value-session_id={agent.id}
-                            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-warning hover:bg-base-content/10 transition-colors text-left"
-                          >
-                            <.icon name="hero-archive-box-mini" class="w-4 h-4 flex-shrink-0" />
-                            Archive
-                          </button>
-                        <% end %>
-                      <% end %>
-                    </div>
-                  </details>
+                  <.agent_row_menu agent={agent} canvases={@canvases} />
                 </:actions>
               </.session_row>
             </div>
@@ -673,26 +784,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
       </div>
     </div>
 
-    <dialog
-      id="delete-confirm-modal"
-      class={"modal " <> if(@show_delete_confirm, do: "modal-open", else: "")}
-    >
-      <div class="modal-box max-w-sm">
-        <h3 class="text-lg font-bold">Delete sessions</h3>
-        <p class="py-4 text-sm text-base-content/70">
-          Permanently delete {MapSet.size(@selected_ids)} selected session{if MapSet.size(
-                                                                                @selected_ids
-                                                                              ) != 1, do: "s"}? This cannot be undone.
-        </p>
-        <div class="modal-action">
-          <button phx-click="cancel_delete_selected" class="btn btn-sm btn-ghost">Cancel</button>
-          <button phx-click="delete_selected" class="btn btn-sm btn-error">Delete</button>
-        </div>
-      </div>
-      <form method="dialog" class="modal-backdrop">
-        <button phx-click="cancel_delete_selected">close</button>
-      </form>
-    </dialog>
+    <.delete_confirm_modal show_delete_confirm={@show_delete_confirm} selected_ids={@selected_ids} />
 
     <.live_component
       module={EyeInTheSkyWeb.Components.NewSessionModal}
@@ -706,45 +798,15 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
     """
   end
 
-  def handle_event("noop", _params, socket), do: {:noreply, socket}
+  defp find_global_channel(session) do
+    channels =
+      if session.project_id,
+        do: EyeInTheSky.Channels.list_channels_for_project(session.project_id),
+        else: EyeInTheSky.Channels.list_channels()
 
-  def handle_event("add_to_canvas", %{"canvas-id" => cid, "session-id" => sid}, socket) do
-    with {canvas_id, _} <- Integer.parse(cid),
-         {session_id, _} <- Integer.parse(sid),
-         %{} = canvas <- Canvases.get_canvas(canvas_id) do
-      Canvases.add_session(canvas_id, session_id)
-      send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,
-        id: "canvas-overlay", action: :open_canvas, canvas_id: canvas_id)
-      {:noreply, put_flash(socket, :info, "Added to #{canvas.name}")}
-    else
-      _ -> {:noreply, socket}
-    end
-  end
-
-  def handle_event("add_to_new_canvas", %{"session_id" => sid, "canvas_name" => name}, socket) do
-    with {session_id, _} <- Integer.parse(sid) do
-      canvas_name = if name && String.trim(name) != "", do: String.trim(name), else: "Canvas #{:os.system_time(:second)}"
-      case Canvases.create_canvas(%{name: canvas_name}) do
-        {:ok, canvas} ->
-          Canvases.add_session(canvas.id, session_id)
-          send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,
-            id: "canvas-overlay", action: :open_canvas, canvas_id: canvas.id)
-          {:noreply, put_flash(socket, :info, "Added to #{canvas.name}")}
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to create canvas")}
-      end
-    else
-      _ -> {:noreply, socket}
-    end
-  end
-
-  defp parse_budget(nil), do: nil
-  defp parse_budget(""), do: nil
-
-  defp parse_budget(v) when is_binary(v) do
-    case Float.parse(v) do
-      {f, _} when f > 0 -> f
-      _ -> nil
+    case Enum.find(channels, fn c -> c.name == "#global" end) do
+      nil -> {:error, :channel_not_found}
+      channel -> {:ok, channel}
     end
   end
 end

@@ -325,11 +325,13 @@ CLI: `eits channels messages <channel_id> [--limit N]`
 Send direct messages between sessions. All DM messages are automatically mirrored to session DM views.
 
 ```bash
-eits dm --to <session_uuid> --message "Hello agent"
-eits dm --to <session_uuid> --message "Hello agent" --from <session_uuid>  # Explicit sender
+eits dm --to <session_ref> --message "Hello agent"
+eits dm --to <session_ref> --message "Hello agent" --from <session_ref>  # Explicit sender
 ```
 
-**--from flag:** Defaults to `$EITS_SESSION_UUID` (the current session's UUID). Explicitly set `--from` to send DMs on behalf of a different session.
+`<session_ref>` may be either a numeric session ID or a session UUID.
+
+**--from flag:** Defaults to `$EITS_SESSION_UUID` and falls back to `$EITS_SESSION_ID`. Explicitly set `--from` to send DMs on behalf of a different session.
 
 ## eits-dm Skill
 
@@ -350,17 +352,19 @@ Please fix the failing test and report back
 
 **Sending a Reply:**
 Agents respond via the EITS-CMD directive:
-```
-EITS-CMD: dm --to <session_uuid> --message "Response text"
+``` 
+EITS-CMD: dm --to <session_ref> --message "Response text"
 ```
 
 Or via the eits CLI script (if running in `cli` mode):
 ```bash
-eits dm --to <session_uuid> --message "Response text"
+eits dm --to <session_ref> --message "Response text"
 ```
 
 **Key Points:**
-- Always extract the sender's `session_uuid` from the "DM from:" header for directing replies
+- DM targets accept either a numeric session ID or a session UUID
+- When EITS context provides `EITS_SESSION_ID`, prefer that numeric session ID for replies
+- Always extract the sender's `session_uuid` from the "DM from:" header when you need a UUID-based reply target
 - DM sender can be any session (orchestrator, another agent, the user)
 - Agents use `EITS-CMD: dm` or `eits dm` to send responses back to the sender's session
 - Incoming DMs are added to the agent's session message history for context

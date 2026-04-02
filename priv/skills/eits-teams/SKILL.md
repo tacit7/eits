@@ -59,11 +59,23 @@ Only `--instructions` is required. `--project-id` is inherited from parent sessi
 
 ## EITS-CMD (sdk-cli only)
 
+Team directives are available for spawned agents:
+
 ```
 EITS-CMD: dm --to <session_uuid> --message "text"
+EITS-CMD: teams join <team_id> --name <alias> [--role <role>]
+EITS-CMD: teams leave <team_id> <member_id>
+EITS-CMD: teams done
+EITS-CMD: teams update-member <team_id> <member_id> --status <active|idle|done|failed>
+EITS-CMD: team broadcast --message "text"
+EITS-CMD: spawn --instructions "text" [--model <m>] [--team-name <name>] [--member-name <alias>]
 ```
 
-No team-specific EITS-CMD directives exist — use the `eits` CLI for all team operations even in spawned agents via a Bash tool call.
+**Feedback:** Every directive sends a confirmation back to your session:
+- Success: `[EITS-CMD ok] joined team 3 as worker-1 (member_id=9)`
+- Error: `[EITS-CMD error] teams join: :invalid_team_id_or_missing_name`
+
+Wait for the feedback before using returned IDs (member_id, session uuid, etc.).
 
 ---
 

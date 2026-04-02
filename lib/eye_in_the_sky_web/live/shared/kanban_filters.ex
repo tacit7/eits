@@ -156,7 +156,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.KanbanFilters do
 
           str ->
             case DateTime.from_iso8601(str) do
-              {:ok, dt, _} -> DateTime.diff(now, dt, :second) |> div(86400)
+              {:ok, dt, _} -> DateTime.diff(now, dt, :second) |> div(86_400)
               _ -> 999
             end
         end

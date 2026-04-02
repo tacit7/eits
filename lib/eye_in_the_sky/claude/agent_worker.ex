@@ -469,7 +469,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       has_messages: context.has_messages
     })
 
-    job = Job.new(message, context)
+    job = Job.new(message, context, context[:content_blocks] || [])
 
     if state.status == :idle do
       Logger.info("AgentWorker: starting SDK for session_id=#{state.session_id}")
@@ -554,6 +554,11 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   defp process_next_job(%__MODULE__{queue: [next_job | rest]} = state) do
+    # Re-evaluate has_messages at dequeue time — the prior job may have produced a reply
+    # since this job was submitted, making the stale value wrong (false → start instead of resume).
+    fresh_has_messages = EyeInTheSky.Messages.has_inbound_reply?(state.session_id, state.provider)
+    next_job = put_in(next_job.context[:has_messages], fresh_has_messages)
+
     case start_sdk(state, next_job) do
       {:ok, sdk_ref, handler_monitor} ->
         WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
@@ -647,7 +652,14 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     %{state | retry_timer_ref: nil, retry_attempt: 0}
   end
 
-  defp normalize_context(context) when is_map(context) do
+  defp normalize_context(context) do
+    context =
+      cond do
+        is_list(context) -> Map.new(context)
+        is_map(context) -> context
+        true -> %{}
+      end
+
     %{
       model: Map.get(context, :model),
       effort_level: Map.get(context, :effort_level),
@@ -657,34 +669,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       max_budget_usd: Map.get(context, :max_budget_usd),
       agent: Map.get(context, :agent),
       eits_workflow: Map.get(context, :eits_workflow, "1"),
-      bypass_sandbox: Map.get(context, :bypass_sandbox, false)
-    }
-  end
-
-  defp normalize_context(context) when is_list(context) do
-    %{
-      model: context[:model],
-      effort_level: context[:effort_level],
-      has_messages: context[:has_messages] || false,
-      channel_id: context[:channel_id],
-      thinking_budget: context[:thinking_budget],
-      max_budget_usd: context[:max_budget_usd],
-      agent: context[:agent],
-      eits_workflow: context[:eits_workflow] || "1",
-      bypass_sandbox: context[:bypass_sandbox] || false
-    }
-  end
-
-  defp normalize_context(_context) do
-    %{
-      model: nil,
-      effort_level: nil,
-      has_messages: false,
-      channel_id: nil,
-      thinking_budget: nil,
-      max_budget_usd: nil,
-      agent: nil,
-      eits_workflow: "1"
+      bypass_sandbox: Map.get(context, :bypass_sandbox, false),
+      content_blocks: Map.get(context, :content_blocks, []),
+      extra_cli_opts: Map.get(context, :extra_cli_opts, [])
     }
   end
 
@@ -713,6 +700,15 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       reason: reason
     })
 
+    # Cancel the underlying SDK process before clearing sdk_ref so the OS process
+    # is killed. Without this, the Claude process keeps running as an orphan because
+    # do_handle_sdk_error is called during error recovery while the worker stays alive
+    # (unlike terminate/2 which only fires when the worker itself stops).
+    if state.sdk_ref do
+      strategy = ProviderStrategy.for_provider(state.provider || "claude")
+      strategy.cancel(state.sdk_ref)
+    end
+
     WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
     demonitor_handler(state.handler_monitor)
 
@@ -739,12 +735,36 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     end
   end
 
-  defp systemic_error?(reason) do
-    reason_str = inspect(reason)
+  # Pattern-match on actual error term shapes rather than inspect() strings.
+  # Parser emits {:billing_error, msg} / {:authentication_error, msg} as atoms.
+  # Unknown errors and result errors carry free-form strings that still need
+  # substring matching, but only within the message field — not on inspect output.
+  defp systemic_error?({:billing_error, _}), do: true
+  defp systemic_error?({:authentication_error, _}), do: true
 
-    Enum.any?(
-      ["billing_error", "auth_error", "missing binary", "Credit balance is too low"],
-      &String.contains?(reason_str, &1)
-    )
+  # errors is a list of strings — scan each entry
+  defp systemic_error?({:claude_result_error, %{errors: errors}}) when is_list(errors) do
+    Enum.any?(errors, &String.contains?(&1, ["billing_error", "authentication_error"]))
   end
+
+  # errors is a map — parser sets this from event["error"] object e.g. %{"type" => "billing_error"}
+  defp systemic_error?({:claude_result_error, %{errors: %{"type" => type}}})
+       when type in ["billing_error", "authentication_error"],
+       do: true
+
+  # errors is a raw string — check for known systemic markers
+  defp systemic_error?({:claude_result_error, %{errors: errors}}) when is_binary(errors) do
+    String.contains?(errors, ["billing_error", "authentication_error"])
+  end
+
+  # fallback: check the result text for billing messages when errors field is absent/nil
+  defp systemic_error?({:claude_result_error, %{result: result}}) when is_binary(result) do
+    String.contains?(result, ["Credit balance is too low", "missing binary"])
+  end
+
+  defp systemic_error?({:unknown_error, msg}) when is_binary(msg) do
+    String.contains?(msg, ["Credit balance is too low", "missing binary"])
+  end
+
+  defp systemic_error?(_), do: false
 end

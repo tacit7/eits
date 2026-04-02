@@ -71,7 +71,10 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
 
     ~H"""
     <div
-      class="group flex items-center gap-2 py-3.5 cursor-pointer"
+      class={[
+        "group flex items-center gap-3 py-3.5 cursor-pointer",
+        @task.completed_at && "opacity-60"
+      ]}
       phx-click={@on_click}
       phx-keyup={@on_click}
       phx-key="Enter"
@@ -80,52 +83,85 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
       tabindex="0"
       aria-label={"Open task #{@task.title}"}
     >
-      <div class="flex flex-col gap-1 flex-1 min-w-0">
+      <%!-- Completion indicator --%>
+      <div class="flex-shrink-0">
+        <.icon
+          name={if @task.completed_at, do: "hero-check-circle-mini", else: "hero-circle-mini"}
+          class={if @task.completed_at, do: "w-3.5 h-3.5 text-success/60", else: "w-3.5 h-3.5 text-base-content/20"}
+        />
+      </div>
+
+      <%!-- Title + metadata --%>
+      <div class="flex flex-col gap-0.5 flex-1 min-w-0">
         <span class={[
           "text-sm font-medium truncate",
-          @task.completed_at && "text-base-content/40 line-through",
+          @task.completed_at && "text-base-content/50 line-through",
           !@task.completed_at && "text-base-content/85 group-hover:text-base-content"
         ]}>
           {@task.title}
         </span>
-        <div class="flex items-center gap-1.5 text-xs text-base-content/60">
+        <div class="flex items-center gap-1.5 text-xs">
+          <%!-- State with color --%>
           <%= if @task.state do %>
             <span class={state_text_color(@task.state_id)}>{@task.state.name}</span>
+            <span class="text-base-content/15">&middot;</span>
           <% end %>
+          <%!-- Session link (scan anchor) or task UUID fallback --%>
+          <%= if @dm_session do %>
+            <.link
+              navigate={"/dm/#{@dm_session.uuid}"}
+              class="font-mono text-base-content/45 hover:text-primary transition-colors"
+              onclick="event.stopPropagation();"
+              title="Open session"
+            >
+              {String.slice(@dm_session.uuid, 0..7)}
+            </.link>
+          <% else %>
+            <span class="font-mono text-base-content/25">
+              {String.slice(@task.uuid || "", 0..7)}
+            </span>
+          <% end %>
+          <%!-- Updated time --%>
+          <span class="text-base-content/15">&middot;</span>
+          <span class="tabular-nums text-base-content/45">
+            {relative_time(@task.updated_at || @task.created_at)}
+          </span>
+          <%!-- Tags (compact, lower priority) --%>
           <%= if @task.tags && length(@task.tags) > 0 do %>
             <span class="text-base-content/15">&middot;</span>
-            <span>{Enum.map_join(Enum.take(@task.tags, 2), ", ", & &1.name)}</span>
-          <% end %>
-          <%= if @task.uuid do %>
-            <span class="text-base-content/15">&middot;</span>
-            <span class="font-mono">{String.slice(@task.uuid, 0..7)}</span>
-          <% end %>
-          <%= if @task.created_at do %>
-            <span class="text-base-content/15">&middot;</span>
-            <span class="tabular-nums">{relative_time(@task.created_at)}</span>
+            <span class="text-base-content/35">
+              {Enum.map_join(Enum.take(@task.tags, 2), ", ", & &1.name)}
+            </span>
           <% end %>
         </div>
       </div>
-      <%= if @dm_session do %>
-        <.link
-          navigate={"/dm/#{@dm_session.uuid}"}
-          class="flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/40 hover:text-primary hover:bg-primary/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          title="Open agent DM"
-          aria-label="Open agent direct message"
-          onclick="event.stopPropagation();"
-        >
-          <.icon name="hero-chat-bubble-left-ellipsis" class="w-3.5 h-3.5" />
-        </.link>
-      <% end %>
-      <%= if @on_delete do %>
-        <.icon_button
-          icon="hero-trash-mini"
-          on_click={@on_delete}
-          aria_label="Delete task"
-          color="error"
-          values={%{"task_id" => @task.uuid || to_string(@task.id)}}
-        />
-      <% end %>
+
+      <%!-- Hover actions — always same position, hidden until hover --%>
+      <div class="flex items-center flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+        <%= if @dm_session do %>
+          <.link
+            navigate={"/dm/#{@dm_session.uuid}"}
+            class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/40 hover:text-primary hover:bg-primary/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            title="Open agent DM"
+            aria-label="Open agent direct message"
+            onclick="event.stopPropagation();"
+          >
+            <.icon name="hero-chat-bubble-left-ellipsis" class="w-3.5 h-3.5" />
+          </.link>
+        <% end %>
+        <%= if @on_delete do %>
+          <button
+            type="button"
+            phx-click={@on_delete}
+            phx-value-task_id={@task.uuid || to_string(@task.id)}
+            aria-label="Delete task"
+            class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/40 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
+            onclick="event.stopPropagation();"
+          >
+            <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
+          </button>
+        <% end %>
+      </div>
     </div>
     """
   end
@@ -183,7 +219,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
           <summary class="flex items-center justify-center w-6 h-6 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/8 cursor-pointer list-none transition-colors">
             <.icon name="hero-ellipsis-horizontal-mini" class="w-3.5 h-3.5" />
           </summary>
-          <div class="dropdown-content z-50 mt-1 w-48 rounded-xl bg-base-300 dark:bg-[hsl(220,13%,18%)] shadow-xl p-1.5 flex flex-col gap-0.5">
+          <div class="dropdown-content z-50 mt-1 w-48 rounded-xl bg-base-300 shadow-xl p-1.5 flex flex-col gap-0.5">
             <%!-- Open card --%>
             <button
               type="button"
@@ -247,7 +283,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
                     >
                       <span
                         class="w-2 h-2 rounded-full flex-shrink-0"
-                        style={"background-color: #{state.color || "#6B7280"}"}
+                        style={"background-color: #{state.color || "hsl(var(--bc) / 0.3)"}"}
                       />
                       {state.name}
                     </button>
@@ -290,7 +326,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
         <%= for tag <- Enum.take(@task.tags, 3) do %>
           <span
             class="text-[10px] px-1.5 py-0.5 rounded font-medium leading-none"
-            style={"background-color: #{tag.color || "#6B7280"}26; color: #{tag.color || "#6B7280"}"}
+            style={"background-color: #{tag.color || "hsl(var(--bc) / 0.3)"}26; color: #{tag.color || "hsl(var(--bc) / 0.3)"}"}
           >
             {tag.name}
           </span>
@@ -437,7 +473,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
   end
 
   defp card_class("kanban") do
-    "group/card card bg-base-200 dark:bg-[hsl(225,10%,28%)] hover:bg-base-300 dark:hover:bg-[hsl(225,10%,32%)] border border-base-content/8 transition-all cursor-pointer"
+    "group/card card bg-base-200 hover:bg-base-300 border border-base-content/8 transition-all cursor-pointer"
   end
 
   defp card_class("grid") do
@@ -459,9 +495,9 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
 
   defp priority_bar_color(priority) do
     cond do
-      priority >= 3 -> "#EF4444"
-      priority == 2 -> "#F59E0B"
-      priority == 1 -> "#3B82F6"
+      priority >= 3 -> "hsl(var(--er))"
+      priority == 2 -> "hsl(var(--wa))"
+      priority == 1 -> "hsl(var(--in))"
       true -> "transparent"
     end
   end

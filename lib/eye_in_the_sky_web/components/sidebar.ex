@@ -43,7 +43,11 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
   end
 
   def update(assigns, socket) do
-    sidebar_project = assigns[:sidebar_project]
+    # Parent sets sidebar_project when on a project route; otherwise nil.
+    # Prefer the parent value when present; keep the locally-pinned project
+    # (set via select_project click) when the parent has none.
+    sidebar_project =
+      assigns[:sidebar_project] || socket.assigns[:sidebar_project]
 
     # Auto-expand chat when on chat page
     sidebar_tab = assigns[:sidebar_tab] || :sessions
@@ -94,6 +98,20 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
   @impl true
   def handle_event("toggle_projects", _params, socket) do
     {:noreply, assign(socket, :expanded_projects, !socket.assigns.expanded_projects)}
+  end
+
+  @impl true
+  def handle_event("select_project", %{"project_id" => id_str}, socket) do
+    {id, ""} = Integer.parse(id_str)
+    current_id = get_in(socket.assigns, [:sidebar_project, Access.key(:id)])
+
+    if current_id == id do
+      # Toggle off — clicking the already-selected project collapses the panel
+      {:noreply, assign(socket, :sidebar_project, nil)}
+    else
+      project = Projects.get_project!(id)
+      {:noreply, assign(socket, :sidebar_project, project)}
+    end
   end
 
   @impl true
@@ -293,7 +311,6 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
         id="app-sidebar"
         phx-hook="SidebarState"
         phx-target={@myself}
-        data-active-project-id={@sidebar_project && @sidebar_project.id}
         class={[
           "flex flex-col h-full border-r border-base-content/10 bg-base-100 lg:bg-gradient-to-t lg:from-base-300/5 lg:to-base-300/30 shadow-lg lg:shadow-none transition-[background-color,border-color,box-shadow] duration-[35ms] flex-shrink-0 overflow-hidden safe-inset-y",
           "fixed inset-y-0 left-0 z-50 md:relative md:inset-auto md:z-auto",
@@ -422,6 +439,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
     <button
       phx-click="toggle_all_projects"
       phx-target={@myself}
+      data-section-toggle="overview"
       class={[
         "flex items-center gap-2.5 w-full text-left text-sm transition-colors",
         if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
@@ -439,7 +457,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
         />
       <% end %>
       <.icon name="hero-rectangle-stack" class="w-4 h-4 flex-shrink-0" />
-      <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>Overview</span>
+      <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>Workspace</span>
       <%= if overview_active && !@collapsed do %>
         <span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"></span>
       <% end %>

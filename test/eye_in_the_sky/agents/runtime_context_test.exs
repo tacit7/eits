@@ -76,5 +76,49 @@ defmodule EyeInTheSky.Agents.RuntimeContextTest do
       assert ctx.agent == nil
       assert ctx.eits_workflow == nil
     end
+
+    test "unknown opts go into extra_cli_opts", %{session: session} do
+      ctx =
+        RuntimeContext.build(session.id, "claude",
+          model: "sonnet",
+          chrome: true,
+          sandbox: true,
+          permission_mode: "plan",
+          add_dir: "/some/path",
+          mcp_config: "./mcp.json",
+          plugin_dir: "./plugins",
+          settings_file: "./settings.json",
+          max_turns: 5
+        )
+
+      assert Keyword.get(ctx.extra_cli_opts, :chrome) == true
+      assert Keyword.get(ctx.extra_cli_opts, :sandbox) == true
+      assert Keyword.get(ctx.extra_cli_opts, :permission_mode) == "plan"
+      assert Keyword.get(ctx.extra_cli_opts, :add_dir) == "/some/path"
+      assert Keyword.get(ctx.extra_cli_opts, :mcp_config) == "./mcp.json"
+      assert Keyword.get(ctx.extra_cli_opts, :plugin_dir) == "./plugins"
+      assert Keyword.get(ctx.extra_cli_opts, :settings_file) == "./settings.json"
+      assert Keyword.get(ctx.extra_cli_opts, :max_turns) == 5
+    end
+
+    test "known keys are NOT in extra_cli_opts", %{session: session} do
+      ctx =
+        RuntimeContext.build(session.id, "claude",
+          model: "sonnet",
+          effort_level: "high",
+          max_budget_usd: 2.0,
+          chrome: true
+        )
+
+      refute Keyword.has_key?(ctx.extra_cli_opts, :model)
+      refute Keyword.has_key?(ctx.extra_cli_opts, :effort_level)
+      refute Keyword.has_key?(ctx.extra_cli_opts, :max_budget_usd)
+      assert Keyword.get(ctx.extra_cli_opts, :chrome) == true
+    end
+
+    test "extra_cli_opts is empty list when no unknown keys", %{session: session} do
+      ctx = RuntimeContext.build(session.id, "claude", model: "sonnet", effort_level: "high")
+      assert ctx.extra_cli_opts == []
+    end
   end
 end

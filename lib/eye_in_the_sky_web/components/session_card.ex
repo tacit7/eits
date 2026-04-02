@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
     ~H"""
     <div
       id={"swipe-row-#{@session.id}"}
-      class={"relative overflow-hidden md:overflow-visible bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] border-l-2 pl-2 " <> @status_border}
+      class={"relative overflow-hidden md:overflow-visible bg-base-100 border-l-2 pl-2 " <> @status_border}
       phx-hook="SwipeRow"
     >
       <%!-- Action panel (mobile only, sits behind the row, revealed by swipe) --%>
@@ -79,7 +79,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
           }
           data-agent-status={@session.status}
           data-swipe-fav="true"
-          class="bookmark-button w-[53px] flex flex-col items-center justify-center gap-1 bg-[#f43f5e] text-white text-[9px] font-bold uppercase tracking-wide border-none"
+          class="bookmark-button w-[53px] flex flex-col items-center justify-center gap-1 bg-error text-white text-[9px] font-bold uppercase tracking-wide border-none"
           aria-label="Bookmark session"
         >
           <.icon name="hero-heart" class="bookmark-icon w-5 h-5" /> Fav
@@ -89,7 +89,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
           type="button"
           phx-click="rename_session"
           phx-value-session_id={@session.id}
-          class="w-[53px] flex flex-col items-center justify-center gap-1 bg-[#6366f1] text-white text-[9px] font-bold uppercase tracking-wide border-none"
+          class="w-[53px] flex flex-col items-center justify-center gap-1 bg-primary text-white text-[9px] font-bold uppercase tracking-wide border-none"
           aria-label="Rename session"
         >
           <.icon name="hero-pencil-square" class="w-5 h-5" /> Rename
@@ -99,7 +99,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
           type="button"
           phx-click="archive_session"
           phx-value-session_id={@session.id}
-          class="w-[53px] flex flex-col items-center justify-center gap-1 bg-[#f59e0b] text-white text-[9px] font-bold uppercase tracking-wide border-none"
+          class="w-[53px] flex flex-col items-center justify-center gap-1 bg-warning text-white text-[9px] font-bold uppercase tracking-wide border-none"
           aria-label="Archive session"
         >
           <.icon name="hero-archive-box" class="w-5 h-5" /> Archive
@@ -166,6 +166,8 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
             <% end %>
           </div>
           <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
+            <span class="font-mono tabular-nums text-base-content/30 shrink-0">#{@session.id}</span>
+            <span class="text-base-content/15">/</span>
             <span class={["font-medium shrink-0", @status_class]}>{@status_label}</span>
             <span class="text-base-content/15">/</span>
             <%= if Map.get(@session, :entrypoint) == "cli" do %>

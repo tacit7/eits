@@ -273,11 +273,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     <div class="mt-1 space-y-1.5">
       <details
         :if={@thinking && @thinking != ""}
-        class="group rounded border-l-2 border-purple-500/50 bg-zinc-950/50 overflow-hidden"
+        class="group rounded border-l-2 border-primary/50 bg-zinc-950/50 overflow-hidden"
       >
         <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
-          <.icon name="hero-sparkles" class="w-3.5 h-3.5 flex-shrink-0 text-purple-400/60" />
-          <span class="text-[11px] font-mono font-semibold text-purple-400/60 uppercase tracking-wide">
+          <.icon name="hero-sparkles" class="w-3.5 h-3.5 flex-shrink-0 text-primary/60" />
+          <span class="text-[11px] font-mono font-semibold text-primary/60 uppercase tracking-wide">
             Thinking
           </span>
           <.icon
@@ -285,7 +285,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             class="w-3 h-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
           />
         </summary>
-        <div class="px-2.5 pb-2 pt-1 border-t border-purple-500/10">
+        <div class="px-2.5 pb-2 pt-1 border-t border-primary/10">
           <pre class="font-mono text-xs text-base-content/40 whitespace-pre-wrap break-words leading-relaxed">{@thinking}</pre>
         </div>
       </details>

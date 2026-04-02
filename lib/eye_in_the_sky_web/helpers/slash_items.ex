@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
   """
 
   alias EyeInTheSky.{Agents, Prompts}
+  alias EyeInTheSkyWeb.DmLive.SlashCommands
 
   @doc """
   Returns a flat list of slash-completable items from all sources:
@@ -25,10 +26,29 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
     project_skills = load_project_skills(project_path)
     agents = load_agents()
     prompts = load_prompts()
+    flags = cli_flags()
 
-    (skills ++ plugin_skills ++ project_skills ++ agents ++ prompts)
+    (skills ++ plugin_skills ++ project_skills ++ agents ++ prompts ++ flags)
     |> Enum.uniq_by(& &1.slug)
   end
+
+  @doc """
+  Returns a list of CLI flag items derived from SlashCommands.command_metadata/0.
+  Each item has slug, type: "flag", description, and arg_type.
+  """
+  def cli_flags do
+    SlashCommands.command_metadata()
+    |> Enum.map(fn {slug, arg_type, description} ->
+      %{slug: slug, type: "flag", description: description, arg_type: encode_arg_type(arg_type)}
+    end)
+  end
+
+  defp encode_arg_type(:none),           do: "none"
+  defp encode_arg_type(:free_text),      do: "free_text"
+  defp encode_arg_type(:integer),        do: "integer"
+  defp encode_arg_type(:path),           do: "path"
+  defp encode_arg_type({:enum, values}), do: %{type: "enum", values: values}
+
 
   @doc false
   def load_skills(commands_dir, skills_dir) do

@@ -1,4 +1,4 @@
-function getCommands() {
+function getCommands(hook) {
   return [
     // --- Workspace navigation ---
     { id: "go-sessions",      label: "Sessions",      icon: "hero-cpu-chip",                  group: "Workspace", hint: "Workspace", keywords: [],                        shortcut: null, type: "navigate", href: "/",              when: null },
@@ -46,6 +46,93 @@ function getCommands() {
       shortcut: null,
       type: "callback",
       fn: () => { window.dispatchEvent(new CustomEvent("palette:create-agent")) },
+      when: null
+    },
+    {
+      id: "update-agent",
+      label: "Update Agent Instructions",
+      icon: "hero-pencil-square",
+      group: "Agents",
+      hint: null,
+      keywords: ["edit", "modify", "instructions", "agent"],
+      shortcut: null,
+      type: "callback",
+      fn: () => { window.dispatchEvent(new CustomEvent("palette:update-agent")) },
+      when: null
+    },
+    {
+      id: "get-agent",
+      label: "Get Agent Details",
+      icon: "hero-magnifying-glass",
+      group: "Agents",
+      hint: null,
+      keywords: ["find", "search", "lookup", "agent", "uuid", "details"],
+      shortcut: null,
+      type: "callback",
+      fn: () => { window.dispatchEvent(new CustomEvent("palette:get-agent")) },
+      when: null
+    },
+    {
+      id: "delete-agent",
+      label: "Delete Agent",
+      icon: "hero-trash",
+      group: "Agents",
+      hint: null,
+      keywords: ["remove", "delete", "destroy", "agent", "uuid"],
+      shortcut: null,
+      type: "callback",
+      fn: () => { window.dispatchEvent(new CustomEvent("palette:delete-agent")) },
+      when: null
+    },
+    {
+      id: "resume-agent",
+      label: "Resume Agent",
+      icon: "hero-play",
+      group: "Agents",
+      hint: null,
+      keywords: ["resume", "restart", "continue", "spawn", "agent", "uuid"],
+      shortcut: null,
+      type: "callback",
+      fn: () => { window.dispatchEvent(new CustomEvent("palette:resume-agent")) },
+      when: null
+    },
+    {
+      id: "list-agents",
+      label: "List Agents...",
+      icon: "hero-queue-list",
+      group: "Agents",
+      hint: null,
+      keywords: ["view", "show", "all", "agents", "list"],
+      shortcut: null,
+      type: "submenu",
+      commands: () => {
+        if (!hook) return Promise.resolve([])
+        const projectId = document.getElementById("quick-create-task")?.dataset?.projectId
+        return new Promise((resolve) => {
+          hook._paletteAgentsResolve = resolve
+          hook.pushEvent("palette:list-agents", { project_id: projectId })
+          setTimeout(() => resolve([]), 2000)
+        }).then(agents => agents.map(a => ({
+          id: "agent-" + a.uuid,
+          label: a.name,
+          icon: "hero-cpu-chip",
+          group: null,
+          hint: `UUID: ${a.uuid} | Status: ${a.status} | Sessions: ${a.session_count}`,
+          keywords: [],
+          shortcut: null,
+          type: "callback",
+          fn: () => {
+            // Copy agent UUID to clipboard
+            navigator.clipboard.writeText(a.uuid)
+              .then(() => {
+                window.dispatchEvent(new CustomEvent("phx:copy_to_clipboard", {
+                  detail: { text: a.uuid, format: "text/plain" }
+                }))
+              })
+          },
+          when: null
+        })))
+      },
       when: null
     },
     {
@@ -115,28 +202,24 @@ function getCommands() {
       keywords: ["dm", "chat", "open", "history", "recent"],
       shortcut: null,
       type: "submenu",
-      commands: async () => {
-        try {
-          const projectId = document.getElementById("quick-create-task")?.dataset?.projectId
-          const url = projectId
-            ? `/api/v1/sessions?limit=30&status=all&project_id=${projectId}`
-            : "/api/v1/sessions?limit=30&status=all"
-          const res = await fetch(url)
-          if (!res.ok) return []
-          const data = await res.json()
-          return (data.results || []).map(s => ({
-            id: "session-" + s.uuid,
-            label: s.name || s.description || s.uuid.slice(0, 8),
-            icon: "hero-chat-bubble-left-right",
-            group: projectId ? "Project Sessions" : "Recent",
-            hint: s.status,
-            keywords: [],
-            shortcut: null,
-            type: "navigate",
-            href: "/dm/" + s.uuid,
-            when: null
-          }))
-        } catch (_) { return [] }
+      commands: () => {
+        if (!hook) return Promise.resolve([])
+        const projectId = document.getElementById("quick-create-task")?.dataset?.projectId
+        return new Promise((resolve) => {
+          hook._paletteSessionsResolve = resolve
+          hook.pushEvent("palette:sessions", { project_id: projectId || null })
+        }).then(sessions => sessions.map(s => ({
+          id: "session-" + s.uuid,
+          label: s.name || s.description || (s.uuid || "").slice(0, 8),
+          icon: "hero-chat-bubble-left-right",
+          group: projectId ? "Project Sessions" : "Recent",
+          hint: s.status,
+          keywords: [],
+          shortcut: null,
+          type: "navigate",
+          href: "/dm/" + s.uuid,
+          when: null
+        })))
       },
       when: null
     },
@@ -150,22 +233,19 @@ function getCommands() {
       shortcut: null,
       type: "submenu",
       commands: () => {
-        const registryHrefs = new Set(getCommands().map(c => c.href).filter(Boolean))
-        return [...document.querySelectorAll("#app-sidebar a[href^='/projects/']")]
-          .map(a => ({ label: (a.textContent || "").trim().replace(/\s+/g, " "), href: a.getAttribute("href") }))
-          .filter(({ label, href }) => label && href && href !== "#" && !registryHrefs.has(href))
-          .map(({ label, href }) => ({
-            id: "go-project-" + href.replace(/[^a-z0-9]+/gi, "-").toLowerCase(),
-            label,
-            icon: "hero-folder",
-            group: "Projects",
-            hint: "Projects",
-            keywords: [],
-            shortcut: null,
-            type: "navigate",
-            href,
-            when: null
-          }))
+        const projects = JSON.parse(hook?.el?.dataset?.projects || "[]")
+        return projects.map(p => ({
+          id: "go-project-" + p.id,
+          label: p.name,
+          icon: "hero-folder",
+          group: "Projects",
+          hint: null,
+          keywords: [],
+          shortcut: null,
+          type: "navigate",
+          href: "/projects/" + p.id,
+          when: null
+        }))
       },
       when: null
     }
@@ -184,6 +264,20 @@ export const CommandPalette = {
     this._isMac = navigator.userAgentData
       ? navigator.userAgentData.platform === "macOS"
       : navigator.platform.toUpperCase().includes("MAC")
+
+    this.handleEvent("palette:sessions-result", ({ sessions }) => {
+      if (this._paletteSessionsResolve) {
+        this._paletteSessionsResolve(sessions)
+        this._paletteSessionsResolve = null
+      }
+    })
+
+    this.handleEvent("palette:list-agents-result", ({ agents }) => {
+      if (this._paletteAgentsResolve) {
+        this._paletteAgentsResolve(agents)
+        this._paletteAgentsResolve = null
+      }
+    })
 
     this._globalKeyHandler = (e) => {
       if ((this._isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -233,7 +327,7 @@ export const CommandPalette = {
   },
 
   activeCommands() {
-    if (this.stack.length === 0) return getCommands()
+    if (this.stack.length === 0) return getCommands(this)
     return this.stack[this.stack.length - 1].commands
   },
 

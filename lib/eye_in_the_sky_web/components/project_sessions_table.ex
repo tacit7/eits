@@ -70,7 +70,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
         <div
           id="ps-list"
           phx-update="stream"
-          class="divide-y divide-base-content/5 bg-base-200 rounded-xl px-4"
+          class="divide-y divide-base-content/5"
         >
           <div
             :for={{dom_id, agent} <- @streams.session_list}

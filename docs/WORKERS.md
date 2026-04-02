@@ -2,6 +2,31 @@
 
 This document describes the OTP workers (GenServers) that process async jobs and background tasks.
 
+## Agent Process Idle Timeout
+
+Claude and Codex agent processes have a configurable idle timeout — if the subprocess produces no output for the configured duration, it is killed and the agent worker receives an error.
+
+**Configuration:** `cli_idle_timeout_ms` setting (Settings UI → "CLI Idle Timeout", in seconds). Stored as milliseconds.
+
+| Value | Meaning |
+|-------|---------|
+| `0` | No timeout (default) — process runs indefinitely |
+| `N > 0` | Kill process after N milliseconds of silence |
+
+**Default:** `0` (no timeout). Processes run until they exit naturally.
+
+**Timeout cascade:**
+1. `EyeInTheSky.CLI.Port.handle_port_output/6` — `after idle_timeout_ms` (`:infinity` when disabled). Closes the OS port and sends `{:claude_exit, ref, :timeout}` to the caller.
+2. `EyeInTheSky.SDK.MessageHandler` — maps `:timeout` → `{:claude_error, sdk_ref, :timeout}` and unregisters.
+3. `EyeInTheSky.Claude.AgentWorker.do_handle_sdk_error/2` — since `:timeout` is not a systemic error (billing/auth), the worker **survives**: drops the current job and processes the next queue item.
+
+**Code locations:**
+- `lib/eye_in_the_sky/cli/port.ex` — port receive loop
+- `lib/eye_in_the_sky/claude/cli.ex` — reads setting, resolves `:infinity` when value is 0
+- `lib/eye_in_the_sky/codex/cli.ex` — same for Codex processes
+- `lib/eye_in_the_sky/claude/agent_worker.ex` — `do_handle_sdk_error/2` recovery logic
+- `lib/eye_in_the_sky_web/live/overview_live/settings.ex` — UI
+
 ## JobDispatcherWorker
 
 Periodically scans for workable tasks and spawns appropriate agents.

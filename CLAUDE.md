@@ -8,10 +8,6 @@ Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky.
 
 This project uses Phoenix LiveView with Elixir. Primary languages: TypeScript, JavaScript, Elixir/HEEx, Go, Rust. Use Tailwind CSS for styling.
 
-## Project Conventions
-
-- The `tasks` table uses `created_at`, **not** `inserted_at`. Always verify timestamp field names against the schema before using them — using `inserted_at` will cause KeyErrors at runtime.
-
 ## Git Worktrees
 
 **Always start any code change work in a worktree.** Never modify files directly in the main project directory. Create a worktree first, make changes there, then merge/PR back.
@@ -44,7 +40,13 @@ PORT=5002 mix phx.server # Override port via PORT env var (range 5001-5020)
 mix compile              # Compile only
 ```
 
-Assets: `cd assets && npm install` for JS dependencies. Esbuild and Tailwind run as Phoenix watchers.
+Assets: `cd assets && npm install` for JS dependencies. Vite, Tailwind, and TypeScript compilation run as Phoenix watchers.
+
+Asset pipeline uses **Vite** (`assets/vite.config.mjs`). Dev server runs on port 5173 (override with `VITE_PORT`). When running a worktree server alongside main, use a different port to avoid conflicts:
+
+```bash
+VITE_PORT=5174 PORT=5002 mix phx.server
+```
 
 ## Playwright / Browser Testing
 
@@ -58,9 +60,7 @@ Navigate Playwright to `http://localhost:5002`. This avoids interfering with the
 
 ## Development Workflow
 
-**Before committing:** Always run `mix compile` to ensure the project compiles without errors. Only warnings are acceptable.
-
-After completing code changes, always run `mix compile --warnings-as-errors` to verify clean compilation before committing.
+**Before committing:** Run `mix compile --warnings-as-errors`. Only warnings are acceptable, no errors.
 
 **Before staging/committing:** Run `git status` and `git diff --staged` to check for pre-existing staged changes. Never assume a clean staging area — only commit the files relevant to the current task.
 
@@ -68,7 +68,7 @@ After completing code changes, always run `mix compile --warnings-as-errors` to 
 
 When fixing bugs, grep the **entire codebase** for ALL occurrences of the problematic pattern before making any edits. List every file and line number, then fix all of them in a single pass. Don't fix just the first occurrence.
 
-When a UI bug is reported, read the exact symptom carefully before investigating. Do not assume the category of bug. Don't investigate duplicate messages when the report is about dark mode CSS. Read the report literally, trace the code, then propose a fix.
+When a UI bug is reported, read the exact symptom carefully before investigating. Do not assume the category of bug. Read the report literally, trace the code, then propose a fix.
 
 ## Session Status Lifecycle
 
@@ -103,9 +103,12 @@ EITS-CMD: task begin Fix broken import
 EITS-CMD: task done 1234
 EITS-CMD: task annotate 1234 What I did and why
 EITS-CMD: dm --to <session_uuid> --message "done"
+EITS-CMD: dm --to 1740 --message "done"
 EITS-CMD: commit abc1234
 ```
 These are intercepted by AgentWorker in-process — no HTTP round-trips. **Never use the `eits` bash script when running as `sdk-cli`.**
+
+**DM targets support both UUID and numeric session ID** (as of commit ee6cacc). Pass either format to `dm --to`.
 
 **`cli` (interactive sessions) — use `eits` script:**
 ```bash
@@ -142,160 +145,8 @@ PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. **T
 
 ## Architecture
 
-- `lib/eye_in_the_sky/` - OTP application core (Repo, migrations, application.ex after rename from `eye_in_the_sky_web`)
-- `lib/eye_in_the_sky_web/` - Contexts (Sessions, Tasks, Agents, Projects, Notes, Prompts, Commits, Canvases)
-- `lib/eye_in_the_sky_web_web/` - Web layer (LiveViews, components, router)
-- `lib/eye_in_the_sky_web/search/pg_search.ex` - Full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback (`EyeInTheSkyWeb.Search.PgSearch`)
-
-## OTP App Rename
-
-The OTP application name was renamed from `eye_in_the_sky_web` to `eye_in_the_sky` (commit 554da58). Key impacts:
-
-- `EyeInTheSky.Repo` — Repo module is now under the `EyeInTheSky` namespace (was `EyeInTheSkyWeb.Repo`)
-- Supervision tree references use `EyeInTheSky.Application`
-- The `lib/eye_in_the_sky/` directory houses core OTP app files
-- Context modules under `lib/eye_in_the_sky_web/` continue to use the `EyeInTheSkyWeb.*` namespace
-- Web layer under `lib/eye_in_the_sky_web_web/` uses `EyeInTheSkyWebWeb.*` namespace
-
-## Schema Conventions
-
-### Timestamp Types
-
-All tables use `:utc_datetime_usec` (microsecond precision UTC datetime). Migrations 20260321080000–20260321080200 converted all timestamp columns.
-
-- Use `DateTime.utc_now()` when setting timestamps programmatically
-- When comparing DB values against Elixir datetimes, use `DateTime.from_iso8601/1` to parse ISO8601 strings
-- The `tasks` table uses `created_at`, **not** `inserted_at`
-
-### UUID Columns
-
-All UUID columns were converted from `varchar` to native PostgreSQL `uuid` type (migration 20260322011755). A `source_uuid` field was also added.
-
-- Ecto uses `Ecto.UUID` codec directly for native `uuid` columns — no manual encoding/decoding needed
-- Queries using UUID values pass them as plain strings; Ecto handles the codec
-- The `source_uuid` field tracks the originating session/agent UUID for cross-referencing
-
-## PubSub
-
-All PubSub broadcasting and subscribing goes through `EyeInTheSkyWeb.Events` (`lib/eye_in_the_sky_web/events.ex`). **Never call `Phoenix.PubSub.broadcast` or `Phoenix.PubSub.subscribe` directly** — use the named functions in Events.
-
-```elixir
-# GOOD
-EyeInTheSkyWeb.Events.agent_updated(agent)
-EyeInTheSkyWeb.Events.subscribe_session(session_id)
-
-# BAD
-Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, agent})
-Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session_id}")
-```
-
-Events owns all topic strings. If you need a new broadcast, add a named function to Events — don't hardcode a topic anywhere else. `EyeInTheSkyWebWeb.Helpers.PubSubHelpers` is a thin compatibility wrapper that delegates to Events; prefer calling Events directly in new code.
+See `lib/CLAUDE.md` for full architecture, schema conventions, PubSub rules, and UI standards.
 
 ## Documentation
 
-Project docs live in `docs/`. Key references:
-
-- [docs/SECURITY.md](docs/SECURITY.md) — Security architecture: auth, session handling, rate limiting, secrets, transport security
-- [docs/REST_API.md](docs/REST_API.md) — Full API endpoint reference
-- [docs/SETUP.md](docs/SETUP.md) — Project setup guide
-- [docs/CODE_GUIDELINES.md](docs/CODE_GUIDELINES.md) — Coding standards
-- [docs/EITS_CLI.md](docs/EITS_CLI.md) — CLI reference
-- [docs/EITS_HOOKS.md](docs/EITS_HOOKS.md) — Hook system
-- [docs/DM_FEATURES.md](docs/DM_FEATURES.md) — DM/messaging features
-- [docs/SESSION_MANAGER.md](docs/SESSION_MANAGER.md) — Session lifecycle
-- [docs/WORKERS.md](docs/WORKERS.md) — Background workers
-- [docs/KANBAN.md](docs/KANBAN.md) — Kanban board
-- [docs/COMMAND_PALETTE.md](docs/COMMAND_PALETTE.md) — Command palette
-- [docs/chat-mention-workflow.md](docs/chat-mention-workflow.md) — Chat @mention system
-- [docs/claude-cli-flags.md](docs/claude-cli-flags.md) — Claude CLI flag reference
-- [docs/CONTEXT_WINDOW.md](docs/CONTEXT_WINDOW.md) — Context window handling
-- [docs/SEARCH.md](docs/SEARCH.md) — Full-text search: PgSearch implementation, prefix-aware tsquery, callers
-- [docs/CODEX_SDK.md](docs/CODEX_SDK.md) — Codex SDK: session lifecycle, JSONL events, resume flow, env vars
-- [docs/CHAT.md](docs/CHAT.md) — Chat system: channels, routing protocol, @mentions, cross-project membership
-- [docs/EVENTS.md](docs/EVENTS.md) — PubSub Events module: all topics, payload shapes, subscribe helpers, how to add new events
-
-## UI Standards
-
-### Icons
-
-**Always use Heroicons** via the Phoenix `<.icon>` component. Never use inline SVG paths.
-
-```heex
-<!-- GOOD -->
-<.icon name="hero-folder" class="w-4 h-4" />
-<.icon name="hero-document-text" class="w-4 h-4" />
-<.icon name="hero-chevron-right" class="w-4 h-4" />
-
-<!-- BAD -->
-<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="..." />
-</svg>
-```
-
-Common icons:
-- `hero-folder` - Directories
-- `hero-document-text` - Files
-- `hero-chevron-right` - Expand/collapse indicators
-- `hero-x-mark` - Close buttons
-- `hero-pencil-square` - Edit buttons
-
-### Full-Text Search
-
-`lib/eye_in_the_sky_web/search/pg_search.ex` (`EyeInTheSkyWeb.Search.PgSearch`) wraps PostgreSQL `tsvector/tsquery` full-text search with an ILIKE fallback. Use `PgSearch.search_for/2` for all full-text queries across sessions, tasks, and notes.
-
-**Helper Function: `PgSearch.fts_name_description_match/1`**
-
-Extracts reusable tsvector query fragments for common search patterns across sessions, tasks, and notes. This helper:
-- Builds PostgreSQL `@@` operator queries on indexed columns
-- Returns parameterized tsvector expressions for use in composed queries
-- Falls back to ILIKE for partial matching when tsquery doesn't match
-- Used in Sessions, Tasks, and Notes contexts for consistent search behavior
-- Performance: tsvector queries are O(log N) on indexed columns vs O(N) for ILIKE
-
-### Workflow States
-
-The `workflow_states` table defines kanban columns. Current states:
-
-| ID | Name        | Position | Color   |
-|----|-------------|----------|---------|
-| 1  | To Do       | 1        | #6B7280 |
-| 2  | In Progress | 2        | #3B82F6 |
-| 4  | In Review   | 3        | #F59E0B |
-| 3  | Done        | 4        | #10B981 |
-
-### Type Quirks
-
-- Project PK is integer (`@primary_key {:id, :id, autogenerate: false}`). Task `project_id` uses `type: :string` in the Ecto association for legacy compatibility.
-- Agent `project_name` is a real DB column (not virtual).
-
-### Schema Naming
-
-Two schemas map to different DB tables:
-
-- **`Agent` schema** (`lib/eye_in_the_sky_web/agents/agent.ex`) → **`agents` DB table** (agent identity/participant)
-- **`Session` schema** (`lib/eye_in_the_sky_web/sessions/session.ex`) → **`sessions` DB table** (execution session)
-
-The old `ChatAgent` schema and `ChatAgents` context have been removed. All agent identity operations go through `EyeInTheSkyWeb.Agents`.
-
-In LiveViews and components:
-- `@session` typically refers to a `Session` struct (from sessions table)
-- Sessions have an `agent_id` foreign key pointing to the agents table
-- The `Agents` context handles agent CRUD; the `Sessions` context handles session-specific logic like `format_model_info/1`
-
-### Agent `last_activity_at` Schema
-
-**Migration History:**
-- Previous: DateTime field (Elixir datetime)
-- Current: ISO8601 text field (standardized string format)
-- Migration: `20260309000001_change_agent_last_activity_at_to_text.exs`
-
-**Impact:**
-- Agent status scheduling in `lib/eye_in_the_sky_web/scheduler/agent_status.ex` now uses ISO8601 strings
-- Queries comparing timestamps must use string comparison or convert to datetime
-- Use `DateTime.from_iso8601/1` when comparing with Elixir datetime values
-- Always pass ISO8601 strings when updating `last_activity_at` on agents
-
-**Sessions `last_activity_at` Ordering:**
-- Sessions can be sorted by `last_activity_at`, `created_at`, or `last_message_at`
-- Use `Sessions.list_sessions/2` with `:last_activity_at`, `:created_at`, or `:last_message_at` sort options
-- Filtering works with ISO8601 string values; comparisons use standard string ordering
+See `docs/CLAUDE.md` for the full documentation index.

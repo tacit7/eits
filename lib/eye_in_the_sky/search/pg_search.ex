@@ -186,9 +186,9 @@ defmodule EyeInTheSky.Search.PgSearch do
 
     # Build tsvector expression from search columns: to_tsvector('english', coalesce(col1,'') || ' ' || coalesce(col2,''))
     tsvector_expr =
-      search_columns
-      |> Enum.map(fn col -> "coalesce(#{alias_letter}.#{col}, '')" end)
-      |> Enum.join(" || ' ' || ")
+      Enum.map_join(search_columns, " || ' ' || ", fn col ->
+        "coalesce(#{alias_letter}.#{col}, '')"
+      end)
 
     effective_limit = limit || 50
 

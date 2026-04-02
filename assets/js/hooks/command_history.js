@@ -13,6 +13,11 @@ export const CommandHistory = {
     this.slashTriggerPos = -1
     this.slashTriggerChar = '/'  // '/' or '@'
 
+    // Enum sub-popup state
+    this.enumMode = false
+    this.enumTriggerWordStart = -1
+    this.enumValues = []
+
     this.loadSlashItems()
     this.buildPopup()
 
@@ -80,6 +85,7 @@ export const CommandHistory = {
       this.autoResize()
       this.loadSlashItems()
       this.checkSlashTrigger()
+      if (!this.slashOpen) this.checkEnumContext()
     })
 
     // Close popup on click outside
@@ -125,6 +131,12 @@ export const CommandHistory = {
       this.slashItems = JSON.parse(raw)
     } catch (e) {
       this.slashItems = []
+    }
+
+    const activeRaw = target.dataset.sessionFlags
+    this.activeFlags = {}
+    if (activeRaw) {
+      try { JSON.parse(activeRaw).forEach(f => { this.activeFlags[f.slug] = f.value }) } catch (_) {}
     }
 
     // If the popup was detached by a LiveView DOM patch while open,
@@ -212,15 +224,26 @@ export const CommandHistory = {
   // 1: slug contains query
   // 0: description/type contains query
   scoreItem(item, q) {
-    if (!q) return 1
+    if (!q) {
+      let score = 1
+      if (item.type === 'flag' && this.activeFlags && this.activeFlags[item.slug] !== undefined) {
+        score += 10
+      }
+      return score
+    }
     const slug = item.slug.toLowerCase()
     const desc = (item.description || '').toLowerCase()
     const type = (item.type || '').toLowerCase()
-    if (slug === q) return 3
-    if (slug.startsWith(q)) return 2
-    if (slug.includes(q)) return 1
-    if (desc.includes(q) || type.includes(q)) return 0
-    return -1
+    let score = -1
+    if (slug === q) score = 3
+    else if (slug.startsWith(q)) score = 2
+    else if (slug.includes(q)) score = 1
+    else if (desc.includes(q) || type.includes(q)) score = 0
+
+    if (score >= 0 && item.type === 'flag' && this.activeFlags && this.activeFlags[item.slug] !== undefined) {
+      score += 10
+    }
+    return score
   },
 
   slashFilter(query, typeFilter) {
@@ -272,8 +295,8 @@ export const CommandHistory = {
       groups[t].push(item)
     }
 
-    const typeOrder = ['skill', 'command', 'agent', 'prompt']
-    const typeLabels = { skill: 'Skills', command: 'Commands', agent: 'Agents', prompt: 'Prompts' }
+    const typeOrder = ['skill', 'command', 'flag', 'agent', 'prompt']
+    const typeLabels = { skill: 'Skills', command: 'Commands', flag: 'Flags', agent: 'Agents', prompt: 'Prompts' }
     const allTypes = [...typeOrder, ...Object.keys(groups).filter(t => !typeOrder.includes(t))]
 
     // slashOrdered tracks items in exact DOM render order — used by slashSelect
@@ -348,6 +371,7 @@ export const CommandHistory = {
     const badge = {
       skill: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary">skill</span>',
       command: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary/10 text-secondary">cmd</span>',
+      flag: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-info/10 text-info">flag</span>',
       agent: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent">agent</span>',
       prompt: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-warning/10 text-warning">prompt</span>',
     }[item.type] || ''
@@ -355,6 +379,12 @@ export const CommandHistory = {
     const prefix = item.type === 'agent' ? '@' : '/'
     const nameHtml = this.highlightMatch(item.slug, query)
     const name = `<span class="font-medium text-base-content">${prefix}${nameHtml}</span>`
+
+    const isActive = item.type === 'flag' && this.activeFlags && this.activeFlags[item.slug] !== undefined
+    const activeVal = isActive ? this.activeFlags[item.slug] : null
+    const activeBadge = isActive
+      ? `<span class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-success/10 text-success ml-1">${activeVal === true ? 'on' : activeVal === false ? 'off' : this.escapeHtml ? this.escapeHtml(String(activeVal)) : String(activeVal)}</span>`
+      : ''
 
     const desc = item.description
       ? `<span class="text-xs text-base-content/50 truncate">${this.escapeHtml(item.description)}</span>`
@@ -364,7 +394,7 @@ export const CommandHistory = {
       ${badge}
       <span class="min-w-0 flex-1">
         <span class="flex items-center gap-2">
-          ${name}
+          ${name}${activeBadge}
         </span>
         ${desc}
       </span>
@@ -391,25 +421,147 @@ export const CommandHistory = {
     this.highlightRow()
   },
 
+  slashBuildInsertion(item) {
+    if (item.type === 'agent') return { text: `@${item.slug} `, selectRange: null }
+
+    const argType = item.arg_type
+    if (!argType || argType === 'none') return { text: `/${item.slug} `, selectRange: null }
+
+    let placeholder
+    if (typeof argType === 'object' && argType.type === 'enum') {
+      placeholder = `<${argType.values[0]}>`
+    } else if (argType === 'path') {
+      placeholder = '<path>'
+    } else if (argType === 'integer') {
+      placeholder = '<n>'
+    } else {
+      placeholder = '<value>'
+    }
+
+    const text = `/${item.slug} ${placeholder}`
+    const selectStart = item.slug.length + 2  // '/' + slug + ' '
+    const selectEnd   = selectStart + placeholder.length
+    return { text, selectRange: [selectStart, selectEnd] }
+  },
+
   slashSelect() {
     const item = (this.slashOrdered || this.slashFiltered)[this.slashIndex]
     if (!item) return
+
+    // Enum mode: insert selected enum value
+    if (this.enumMode) {
+      const val = this.el.value
+      const cursor = this.el.selectionStart
+      const prefix = val.slice(0, this.enumTriggerWordStart)
+      const suffix  = val.slice(cursor)
+      const newVal  = prefix + item.slug + ' ' + suffix
+      this.el.value = newVal
+      const pos = prefix.length + item.slug.length + 1
+      this.el.setSelectionRange(pos, pos)
+      this.slashClose()
+      this.enumMode = false
+      this.autoResize && this.autoResize()
+      return
+    }
 
     const val = this.el.value
     const cursor = this.el.selectionStart
     const prefix = val.slice(0, this.slashTriggerPos)
     const suffix = val.slice(cursor)
 
-    const insertion = item.type === 'agent' ? `@${item.slug} ` : `/${item.slug} `
+    const { text: insertion, selectRange } = this.slashBuildInsertion(item)
     const newVal = prefix + insertion + suffix
     this.el.value = newVal
 
-    const newCursor = prefix.length + insertion.length
-    this.el.setSelectionRange(newCursor, newCursor)
+    if (selectRange) {
+      const base = prefix.length
+      this.el.setSelectionRange(base + selectRange[0], base + selectRange[1])
+    } else {
+      const pos = prefix.length + insertion.length
+      this.el.setSelectionRange(pos, pos)
+    }
     this.el.focus()
 
     this.slashClose()
     this.autoResize()
+  },
+
+  checkEnumContext() {
+    const val = this.el.value
+    const cursor = this.el.selectionStart
+
+    let wordStart = cursor
+    while (wordStart > 0 && val[wordStart-1] !== ' ' && val[wordStart-1] !== '\n') wordStart--
+    if (wordStart === 0 || val[wordStart-1] !== ' ') return
+
+    const partial = val.slice(wordStart, cursor)
+    let cmdEnd = wordStart - 1
+    let cmdStart = cmdEnd - 1
+    while (cmdStart > 0 && val[cmdStart-1] !== ' ' && val[cmdStart-1] !== '\n') cmdStart--
+
+    const cmdToken = val.slice(cmdStart, cmdEnd)
+    if (!cmdToken.startsWith('/')) return
+
+    const slug = cmdToken.slice(1)
+    const flagItem = this.slashItems && this.slashItems.find(i => i.slug === slug && i.type === 'flag')
+    if (!flagItem) return
+
+    const argType = flagItem.arg_type
+    if (!argType || typeof argType !== 'object' || argType.type !== 'enum') return
+
+    this.enumTriggerWordStart = wordStart
+    this.enumValues = argType.values
+    this.filterAndShowEnum(partial)
+  },
+
+  filterAndShowEnum(partial) {
+    const q = partial.toLowerCase()
+    const matches = this.enumValues.filter(v => v.toLowerCase().startsWith(q))
+    if (matches.length === 0) { this.slashClose(); return }
+
+    this.slashOrdered = matches.map(v => ({ slug: v, type: '_enum', description: '' }))
+    this.slashIndex = 0
+    this.slashOpen = true
+    this.enumMode = true
+    this.renderEnumPopup(matches, partial)
+  },
+
+  renderEnumPopup(matches, partial) {
+    if (!document.contains(this.popup)) {
+      const form = this.el.closest('form')
+      if (form) {
+        form.style.position = 'relative'
+        form.appendChild(this.popup)
+      }
+    }
+    this.popup.innerHTML = ''
+
+    for (let idx = 0; idx < matches.length; idx++) {
+      const v = matches[idx]
+      const row = document.createElement('button')
+      row.type = 'button'
+      row.dataset.slashIdx = idx
+      row.className = this.rowClass(idx)
+      row.innerHTML = `<span class="min-w-0 flex-1"><span class="font-medium text-base-content">${this.highlightMatch(v, partial)}</span></span>`
+      row.addEventListener('mouseenter', () => {
+        this.slashIndex = idx
+        this.highlightRow()
+      })
+      row.addEventListener('mousedown', (e) => {
+        e.preventDefault()
+        this.slashIndex = idx
+        this.slashSelect()
+      })
+      this.popup.appendChild(row)
+    }
+
+    const hint = document.createElement('div')
+    hint.className = 'px-3 py-1.5 text-[10px] text-base-content/30 border-t border-base-content/5 flex items-center gap-3 sticky bottom-0 bg-base-100'
+    hint.innerHTML = '<kbd class="font-mono">↑↓</kbd> navigate &nbsp;<kbd class="font-mono">↵</kbd> or <kbd class="font-mono">Tab</kbd> select &nbsp;<kbd class="font-mono">Esc</kbd> dismiss'
+    this.popup.appendChild(hint)
+
+    this.popup.classList.remove('hidden')
+    this.highlightRow()
   },
 
   slashClose() {
@@ -417,6 +569,7 @@ export const CommandHistory = {
     this.slashTriggerPos = -1
     this.slashTriggerChar = '/'
     this.slashOrdered = []
+    this.enumMode = false
     this.popup.classList.add('hidden')
     this.popup.innerHTML = ''
   },

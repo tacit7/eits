@@ -1262,4 +1262,80 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
       assert state.status != :failed
     end
   end
+
+  # --- Already-in-use retry tests ---
+
+  describe "already-in-use CLI error" do
+    test "retries as resume when has_messages is false", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+
+      Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "agent:working")
+      session_id = session.id
+
+      # No inbound replies → has_messages will be false
+      assert {:ok, _} = EyeInTheSky.Agents.AgentManager.send_message(session.id, "msg-1")
+      assert_receive {:agent_working, _, ^session_id}, 5_000
+
+      [{worker_pid, _}] =
+        Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session.id})
+
+      worker_state = :sys.get_state(worker_pid)
+      sdk_ref = worker_state.sdk_ref
+      assert worker_state.current_job.context.has_messages == false
+
+      # Inject the "already in use" error from Claude CLI
+      send(
+        worker_pid,
+        {:claude_error, sdk_ref,
+         {:cli_error, "Error: Session ID #{session.uuid} is already in use."}}
+      )
+
+      # Handler should retry as resume → new SDK starts → new agent_working broadcast
+      assert_receive {:agent_working, _, ^session_id}, 5_000
+
+      new_state = :sys.get_state(worker_pid)
+      # Retried job must have has_messages: true (forced resume)
+      assert new_state.current_job.context.has_messages == true
+
+      new_mock = wait_for_mock_port(session.id)
+      if new_mock, do: send(new_mock, {:exit, 0})
+    end
+
+    test "falls through to error handler when has_messages is true (no retry loop)", %{
+      track: track
+    } do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+
+      Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "agent:working")
+      session_id = session.id
+
+      # Seed an inbound reply so has_messages evaluates to true
+      {:ok, _} = Messages.record_incoming_reply(session.id, "claude", "prior reply")
+
+      assert {:ok, _} = EyeInTheSky.Agents.AgentManager.send_message(session.id, "msg-1")
+      assert_receive {:agent_working, _, ^session_id}, 5_000
+
+      [{worker_pid, _}] =
+        Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session.id})
+
+      worker_state = :sys.get_state(worker_pid)
+      sdk_ref = worker_state.sdk_ref
+      assert worker_state.current_job.context.has_messages == true
+
+      # Inject the same error — but now has_messages is true, guard must prevent retry
+      send(
+        worker_pid,
+        {:claude_error, sdk_ref,
+         {:cli_error, "Error: Session ID #{session.uuid} is already in use."}}
+      )
+
+      # Should fall through to do_handle_sdk_error → agent_stopped, no second agent_working
+      assert_receive {:agent_stopped, _, ^session_id}, 5_000
+
+      Process.sleep(100)
+      final_state = :sys.get_state(worker_pid)
+      assert final_state.current_job == nil
+      assert final_state.sdk_ref == nil
+    end
+  end
 end

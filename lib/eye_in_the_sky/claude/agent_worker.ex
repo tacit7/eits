@@ -391,6 +391,8 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
       case start_sdk(state, resume_job) do
         {:ok, sdk_ref, handler_monitor} ->
+          WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
+
           {:noreply,
            %{state | sdk_ref: sdk_ref, handler_monitor: handler_monitor, current_job: resume_job}}
 

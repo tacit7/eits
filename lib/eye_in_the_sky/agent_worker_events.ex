@@ -53,7 +53,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   @doc "Max retries exceeded — worker giving up."
   def on_max_retries_exceeded(session_id, provider_conversation_id) do
     Events.stream_error(session_id, provider_conversation_id, "Max retries exceeded")
-    update_session_status(session_id, "error")
+    update_session_status(session_id, "failed")
     Events.agent_stopped(provider_conversation_id, session_id)
   end
 

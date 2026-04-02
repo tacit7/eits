@@ -742,10 +742,22 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   defp systemic_error?({:billing_error, _}), do: true
   defp systemic_error?({:authentication_error, _}), do: true
 
+  # errors is a list of strings — scan each entry
   defp systemic_error?({:claude_result_error, %{errors: errors}}) when is_list(errors) do
     Enum.any?(errors, &String.contains?(&1, ["billing_error", "authentication_error"]))
   end
 
+  # errors is a map — parser sets this from event["error"] object e.g. %{"type" => "billing_error"}
+  defp systemic_error?({:claude_result_error, %{errors: %{"type" => type}}})
+       when type in ["billing_error", "authentication_error"],
+       do: true
+
+  # errors is a raw string — check for known systemic markers
+  defp systemic_error?({:claude_result_error, %{errors: errors}}) when is_binary(errors) do
+    String.contains?(errors, ["billing_error", "authentication_error"])
+  end
+
+  # fallback: check the result text for billing messages when errors field is absent/nil
   defp systemic_error?({:claude_result_error, %{result: result}}) when is_binary(result) do
     String.contains?(result, ["Credit balance is too low", "missing binary"])
   end

@@ -1205,6 +1205,48 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
       assert state.queue == []
     end
 
+    test "claude_result_error with errors as map (billing) drains queue", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      reason = {:claude_result_error, %{errors: %{"type" => "billing_error", "message" => "No credits"}, result: nil, session_id: session.uuid}}
+      send(worker_pid, {:claude_error, sdk_ref, reason})
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      assert state.status == :failed
+      assert state.queue == []
+    end
+
+    test "claude_result_error with errors as map (authentication) drains queue", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      reason = {:claude_result_error, %{errors: %{"type" => "authentication_error", "message" => "Bad key"}, result: nil, session_id: session.uuid}}
+      send(worker_pid, {:claude_error, sdk_ref, reason})
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      assert state.status == :failed
+      assert state.queue == []
+    end
+
+    test "claude_result_error with errors as binary drains queue", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      reason = {:claude_result_error, %{errors: "billing_error: no credits", result: nil, session_id: session.uuid}}
+      send(worker_pid, {:claude_error, sdk_ref, reason})
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      assert state.status == :failed
+      assert state.queue == []
+    end
+
     test "non-systemic error (exit_code) does not enter :failed state", %{track: track} do
       {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
       {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)

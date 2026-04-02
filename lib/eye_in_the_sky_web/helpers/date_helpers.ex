@@ -167,6 +167,18 @@ defmodule EyeInTheSkyWeb.Helpers.DateHelpers do
   """
   def format_relative_time(nil), do: "-"
 
+  def format_relative_time(%DateTime{} = dt) do
+    now = DateTime.utc_now()
+    diff = DateTime.diff(dt, now, :second)
+    format_relative_diff(diff)
+  end
+
+  def format_relative_time(%NaiveDateTime{} = ndt) do
+    now = NaiveDateTime.utc_now()
+    diff = NaiveDateTime.diff(ndt, now, :second)
+    format_relative_diff(diff)
+  end
+
   def format_relative_time(iso) when is_binary(iso) do
     with cleaned <- String.replace(iso, "Z", ""),
          {:ok, ndt} <- NaiveDateTime.from_iso8601(cleaned) do

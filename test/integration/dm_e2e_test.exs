@@ -332,7 +332,7 @@ defmodule EyeInTheSky.DME2ETest do
 
       jsonl_files = Path.wildcard(jsonl_path)
 
-      if length(jsonl_files) > 0 do
+      if jsonl_files != [] do
         # JSONL is enabled, verify message is in file
         # This is optional - JSONL might not be enabled in test environment
         IO.puts("JSONL files found, DM persistence verified")
@@ -364,7 +364,7 @@ defmodule EyeInTheSky.DME2ETest do
       # Retrieve via Messages context
       messages = Messages.list_messages_for_channel(channel.id)
 
-      assert length(messages) > 0, "Should retrieve messages for channel"
+      assert messages != [], "Should retrieve messages for channel"
 
       test_msg = Enum.find(messages, fn m -> m.body == "Test retrieval" end)
       assert test_msg, "Sent DM should be retrievable"

@@ -148,8 +148,7 @@ defmodule EyeInTheSky.Messages.JsonlStorage do
     jsonl_content =
       messages
       |> Enum.map(&message_to_json_data/1)
-      |> Enum.map(&Jason.encode!/1)
-      |> Enum.join("\n")
+      |> Enum.map_join("\n", &Jason.encode!/1)
 
     case File.write(file_path, jsonl_content <> "\n") do
       :ok ->

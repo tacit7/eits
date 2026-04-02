@@ -50,10 +50,10 @@ defmodule EyeInTheSky.SDKE2ETest do
 
       # Should receive at least one text message
       text_messages = Enum.filter(messages, &(&1.type == :text))
-      assert length(text_messages) > 0
+      assert text_messages != []
 
       # Text should contain "hello"
-      full_text = text_messages |> Enum.map(& &1.content) |> Enum.join()
+      full_text = Enum.map_join(text_messages, "", & &1.content)
       assert full_text =~ ~r/hello/i
 
       # Should get session ID
@@ -91,7 +91,7 @@ defmodule EyeInTheSky.SDKE2ETest do
       # Should have usage message
       usage_messages = Enum.filter(messages, &(&1.type == :usage))
 
-      if length(usage_messages) > 0 do
+      if usage_messages != [] do
         usage = hd(usage_messages)
         assert is_map(usage.content)
         assert Map.has_key?(usage.content, :output_tokens)
@@ -118,8 +118,7 @@ defmodule EyeInTheSky.SDKE2ETest do
       text =
         messages
         |> Enum.filter(&(&1.type == :text))
-        |> Enum.map(& &1.content)
-        |> Enum.join()
+        |> Enum.map_join("", & &1.content)
 
       assert text =~ ~r/Hello from E2E test/i
     end
@@ -151,8 +150,7 @@ defmodule EyeInTheSky.SDKE2ETest do
       text =
         messages2
         |> Enum.filter(&(&1.type == :text))
-        |> Enum.map(& &1.content)
-        |> Enum.join()
+        |> Enum.map_join("", & &1.content)
 
       assert text =~ ~r/7/
     end

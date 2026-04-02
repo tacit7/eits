@@ -307,8 +307,7 @@ defmodule EyeInTheSky.Notes do
           placeholders =
             agent_ids_str
             |> Enum.with_index(idx)
-            |> Enum.map(fn {_, i} -> "$#{i}" end)
-            |> Enum.join(",")
+            |> Enum.map_join(",", fn {_, i} -> "$#{i}" end)
 
           clause = "(n.parent_type IN ('agent', 'agents') AND n.parent_id IN (#{placeholders}))"
           {[clause | clauses], params ++ agent_ids_str, idx + length(agent_ids_str)}
@@ -320,8 +319,7 @@ defmodule EyeInTheSky.Notes do
           placeholders =
             session_ids_str
             |> Enum.with_index(idx)
-            |> Enum.map(fn {_, i} -> "$#{i}" end)
-            |> Enum.join(",")
+            |> Enum.map_join(",", fn {_, i} -> "$#{i}" end)
 
           clause =
             "(n.parent_type IN ('session', 'sessions') AND n.parent_id IN (#{placeholders}))"

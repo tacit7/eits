@@ -283,7 +283,7 @@ defmodule EyeInTheSkyWeb.NavHook do
               session.status in ["working", "idle"]
             end)
 
-          if length(active_sessions) > 0 do
+          if active_sessions != [] do
             {:halt, push_event(socket, "palette:delete-agent-result",
               %{ok: false, error: "Cannot delete agent with active sessions (#{length(active_sessions)} active)"})}
           else

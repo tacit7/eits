@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
 
       days ->
         DateTime.utc_now()
-        |> DateTime.add(-days * 86400, :second)
+        |> DateTime.add(-days * 86_400, :second)
     end
   end
 

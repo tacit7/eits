@@ -131,7 +131,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
       conn = get(conn, ~p"/api/v1/channels")
       resp = json_response(conn, 200)
 
-      assert length(resp["channels"]) >= 1
+      assert resp["channels"] != []
 
       ch = hd(resp["channels"])
       assert Map.has_key?(ch, "id")

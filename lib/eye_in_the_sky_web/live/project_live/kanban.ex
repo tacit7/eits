@@ -104,7 +104,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
     {year, month} =
       case task.due_at do
         nil -> {today.year, today.month}
-        dt -> dt = DateTime.to_date(dt); {dt.year, dt.month}
+        dt ->
+          dt = DateTime.to_date(dt)
+          {dt.year, dt.month}
       end
 
     {:noreply,

@@ -89,7 +89,7 @@ defmodule EyeInTheSky.Notifications do
   end
 
   def purge_old(days \\ 7) do
-    cutoff = NaiveDateTime.utc_now() |> NaiveDateTime.add(-days * 86400, :second)
+    cutoff = NaiveDateTime.utc_now() |> NaiveDateTime.add(-days * 86_400, :second)
 
     {count, _} =
       Notification

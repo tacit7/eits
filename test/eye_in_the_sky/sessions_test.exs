@@ -357,7 +357,7 @@ defmodule EyeInTheSky.SessionsTest do
       rows = Queries.list_session_overview_rows(limit: 10)
 
       assert is_list(rows)
-      assert length(rows) > 0
+      assert rows != []
 
       row = hd(rows)
       assert Map.has_key?(row, :id)

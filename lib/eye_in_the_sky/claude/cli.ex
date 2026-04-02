@@ -560,8 +560,10 @@ defmodule EyeInTheSky.Claude.CLI do
   # ---------------------------------------------------------------------------
 
   defp build_env(opts) do
-    # Strip vars that prevent nested Claude sessions from starting
-    blocked_vars = ~w[CLAUDECODE CLAUDE_CODE_ENTRYPOINT]
+    # Strip vars that prevent nested Claude sessions from starting, and
+    # ANTHROPIC_API_KEY so spawned processes use Max plan OAuth instead of
+    # a (potentially empty) API key that may be in the server's environment.
+    blocked_vars = ~w[CLAUDECODE CLAUDE_CODE_ENTRYPOINT ANTHROPIC_API_KEY]
 
     # Pass through system environment
     base_env =

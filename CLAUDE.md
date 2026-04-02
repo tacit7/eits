@@ -128,9 +128,9 @@ JSON API at `/api/v1` for Claude Code hooks and external integrations. See [docs
 
 This app spawns Claude CLI processes to run agents. API key configuration:
 
-- **Environment-based**: Claude CLI uses `ANTHROPIC_API_KEY` from the system environment or `~/.config/claude/config.toml`
-- **No DB storage**: API keys are NOT stored in the database
-- **Pass-through**: The CLI module passes through all system environment variables to spawned Claude processes
+- **Max plan OAuth**: Spawned Claude processes authenticate via Max plan OAuth credentials stored in the macOS keychain — no API key needed.
+- **ANTHROPIC_API_KEY is blocked**: `build_env` in `claude/cli.ex` explicitly strips `ANTHROPIC_API_KEY` from the spawned process environment. This prevents a leaked API key in the server env from overriding Max plan OAuth and causing "Credit balance is too low" billing errors.
+- **No DB storage**: API keys are NOT stored in the database.
 
 Common error when API key has insufficient credits:
 ```json

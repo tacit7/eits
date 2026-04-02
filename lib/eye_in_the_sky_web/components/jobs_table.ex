@@ -19,12 +19,12 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
       job_row_state: 3,
       row_border_class: 1,
       format_schedule: 1,
-      format_time: 1,
       type_label: 1,
       status_badge_class: 1
     ]
 
-  import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [format_relative_time: 1]
+  import EyeInTheSkyWeb.Helpers.ViewHelpers,
+    only: [format_relative_time: 1, format_datetime_short_time: 1]
 
   attr :jobs, :list, required: true
   attr :expanded_job_id, :any, required: true
@@ -96,11 +96,11 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
 
             <div class="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
               <span class="text-base-content/50">Last Run</span>
-              <span class="text-right" title={format_time(job.last_run_at)}>
+              <span class="text-right" title={format_datetime_short_time(job.last_run_at)}>
                 {format_relative_time(job.last_run_at)}
               </span>
               <span class="text-base-content/50">Next Run</span>
-              <span class="text-right" title={format_time(job.next_run_at)}>
+              <span class="text-right" title={format_datetime_short_time(job.next_run_at)}>
                 {format_relative_time(job.next_run_at)}
               </span>
               <span class="text-base-content/50">Runs</span>
@@ -154,7 +154,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                             {run.status}
                           </span>
                           <span class="text-base-content/60 truncate">
-                            {format_time(run.started_at)}
+                            {format_datetime_short_time(run.started_at)}
                           </span>
                         </div>
                         <p class="mt-1 text-base-content/60 truncate">{run.result || "-"}</p>
@@ -255,10 +255,10 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                     phx-value-id={job.id}
                   />
                 </td>
-                <td class="text-xs" title={format_time(job.last_run_at)}>
+                <td class="text-xs" title={format_datetime_short_time(job.last_run_at)}>
                   {format_relative_time(job.last_run_at)}
                 </td>
-                <td class="text-xs" title={format_time(job.next_run_at)}>
+                <td class="text-xs" title={format_datetime_short_time(job.next_run_at)}>
                   {format_relative_time(job.next_run_at)}
                 </td>
                 <td class="text-xs">{job.run_count || 0}</td>
@@ -319,8 +319,8 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                                   {run.status}
                                 </span>
                               </td>
-                              <td class="text-xs">{format_time(run.started_at)}</td>
-                              <td class="text-xs">{format_time(run.completed_at)}</td>
+                              <td class="text-xs">{format_datetime_short_time(run.started_at)}</td>
+                              <td class="text-xs">{format_datetime_short_time(run.completed_at)}</td>
                               <td class="text-xs max-w-xs truncate" title={run.result || ""}>
                                 {String.slice(run.result || "-", 0, 120)}
                               </td>

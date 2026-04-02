@@ -20,11 +20,7 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def mount(%{"session_id" => session_id_param} = params, _session, socket) do
-    session_result =
-      case Integer.parse(session_id_param) do
-        {id, ""} -> Sessions.get_session(id)
-        _ -> Sessions.get_session_by_uuid(session_id_param)
-      end
+    session_result = Sessions.resolve(session_id_param)
 
     with {:session, {:ok, session}} <- {:session, session_result},
          {:agent, {:ok, agent}} <- {:agent, Agents.get_agent(session.agent_id)} do

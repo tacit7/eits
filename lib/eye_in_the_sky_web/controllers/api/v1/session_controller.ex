@@ -332,12 +332,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     end
   end
 
-  defp resolve_session(id_or_uuid) do
-    case Integer.parse(id_or_uuid) do
-      {int_id, ""} -> Sessions.get_session(int_id)
-      _ -> Sessions.get_session_by_uuid(id_or_uuid)
-    end
-  end
+  defp resolve_session(id_or_uuid), do: Sessions.resolve(id_or_uuid)
 
   @doc """
   POST /api/v1/sessions/:uuid/end - End a session with optional summary and final status.

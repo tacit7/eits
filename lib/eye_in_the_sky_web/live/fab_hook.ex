@@ -251,10 +251,5 @@ defmodule EyeInTheSkyWeb.FabHook do
     end
   end
 
-  defp resolve_session(session_id) do
-    case Integer.parse(session_id) do
-      {id, ""} -> Sessions.get_session(id)
-      _ -> Sessions.get_session_by_uuid(session_id)
-    end
-  end
+  defp resolve_session(session_id), do: Sessions.resolve(session_id)
 end

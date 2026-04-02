@@ -7,6 +7,7 @@ defmodule EyeInTheSky.Notes do
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Notes.Note
   alias EyeInTheSky.Search.PgSearch
+  alias EyeInTheSky.Sessions
 
   @doc """
   Returns the list of notes.
@@ -52,9 +53,9 @@ defmodule EyeInTheSky.Notes do
   def list_notes_for_session(session_id, opts \\ []) do
     # session_id can be a UUID string or an integer string
     session =
-      case Integer.parse(to_string(session_id)) do
-        {int_id, ""} -> Repo.get(EyeInTheSky.Sessions.Session, int_id)
-        _ -> Repo.get_by(EyeInTheSky.Sessions.Session, uuid: session_id)
+      case Sessions.resolve(to_string(session_id)) do
+        {:ok, s} -> s
+        _ -> nil
       end
 
     if session do

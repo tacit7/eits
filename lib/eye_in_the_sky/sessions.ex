@@ -70,6 +70,20 @@ defmodule EyeInTheSky.Sessions do
   def get_session(id), do: get(id)
 
   @doc """
+  Resolves a session from an integer ID or UUID string.
+  Returns {:ok, session} or {:error, :not_found}.
+  """
+  @spec resolve(integer() | String.t()) :: {:ok, Session.t()} | {:error, :not_found}
+  def resolve(id) when is_integer(id), do: get_session(id)
+
+  def resolve(ref) when is_binary(ref) do
+    case Integer.parse(ref) do
+      {id, ""} -> get_session(id)
+      _ -> get_session_by_uuid(ref)
+    end
+  end
+
+  @doc """
   Gets a single session with logs preloaded.
   """
   def get_session_with_logs!(id) do

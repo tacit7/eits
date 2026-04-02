@@ -4,8 +4,16 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
   The worker decides WHAT happened (SDK started, completed, errored).
   This module decides HOW to react: DB writes, PubSub broadcasts,
-  notifications, team member updates. All DB operations are fire-and-forget
-  via Task.start to avoid blocking the worker GenServer.
+  notifications, team member updates.
+
+  ## Concurrency strategy
+
+  - Status updates and UUID syncs are **synchronous** — they are fast DB writes
+    where ordering matters. Running them in a Task risks race conditions (two
+    concurrent read-then-write pairs) and stale PubSub broadcasts on DB failure.
+  - Result saves and notifications are **supervised async** via
+    `Task.Supervisor.start_child/2`. Crashes are visible in logs/telemetry;
+    the worker is not blocked waiting for non-critical side effects.
   """
 
   require Logger
@@ -77,7 +85,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
   @doc "Result received from SDK — save to DB."
   def on_result_received(session_id, provider, text, metadata, channel_id) when is_binary(text) do
-    Task.start(fn ->
+    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
       if String.trim(text) in ["", "[NO_RESPONSE]"] do
         Logger.info("[#{session_id}] Skipping DB save — empty or suppressed response")
       else
@@ -102,31 +110,31 @@ defmodule EyeInTheSky.AgentWorkerEvents do
         end
       end
     end)
+
+    :ok
   end
 
   def on_result_received(session_id, _provider, _text, _metadata, _channel_id) do
     Logger.warning("[#{session_id}] Result has no text content")
   end
 
-  @doc "Provider conversation ID changed — sync to DB."
+  @doc "Provider conversation ID changed — sync to DB (synchronous: ordering is critical)."
   def on_provider_conversation_id_changed(session_id, old_id, new_id) do
-    Task.start(fn ->
-      case Sessions.get_session(session_id) do
-        {:ok, session} ->
-          case Sessions.update_session(session, %{uuid: new_id}) do
-            {:ok, _updated} ->
-              Logger.info("[#{session_id}] Updated session uuid #{old_id} -> #{new_id}")
+    case Sessions.get_session(session_id) do
+      {:ok, session} ->
+        case Sessions.update_session(session, %{uuid: new_id}) do
+          {:ok, _updated} ->
+            Logger.info("[#{session_id}] Updated session uuid #{old_id} -> #{new_id}")
 
-            {:error, reason} ->
-              Logger.warning("[#{session_id}] Failed to update session uuid: #{inspect(reason)}")
-          end
+          {:error, reason} ->
+            Logger.warning("[#{session_id}] Failed to update session uuid: #{inspect(reason)}")
+        end
 
-        {:error, reason} ->
-          Logger.warning(
-            "[#{session_id}] Failed to load session for uuid sync: #{inspect(reason)}"
-          )
-      end
-    end)
+      {:error, reason} ->
+        Logger.warning(
+          "[#{session_id}] Failed to load session for uuid sync: #{inspect(reason)}"
+        )
+    end
   end
 
   # --- Broadcast Helpers ---
@@ -141,35 +149,34 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     Events.queue_updated(session_id, queue)
   end
 
+  # Synchronous — fast DB write where ordering matters. Running in a Task risks
+  # two concurrent read-then-write pairs racing each other, and the session_idle
+  # broadcast must only fire after a successful update.
   defp update_session_status(session_id, status) do
-    Task.start(fn ->
-      case Sessions.get_session(session_id) do
-        {:ok, session} ->
-          attrs = %{status: status}
+    case Sessions.get_session(session_id) do
+      {:ok, session} ->
+        attrs = %{status: status}
 
-          attrs =
+        attrs =
+          if status in ["idle", "waiting"] do
+            Map.put(attrs, :last_activity_at, DateTime.utc_now())
+          else
+            attrs
+          end
+
+        case Sessions.update_session(session, attrs) do
+          {:ok, _} ->
             if status in ["idle", "waiting"] do
-              Map.put(attrs, :last_activity_at, DateTime.utc_now())
-            else
-              attrs
+              Events.session_idle(session_id)
             end
 
-          case Sessions.update_session(session, attrs) do
-            {:ok, _} ->
-              :ok
+          {:error, reason} ->
+            Logger.warning("[#{session_id}] update_session_status failed: #{inspect(reason)}")
+        end
 
-            {:error, reason} ->
-              Logger.warning("[#{session_id}] update_session_status failed: #{inspect(reason)}")
-          end
-
-          if status in ["idle", "waiting"] do
-            Events.session_idle(session_id)
-          end
-
-        {:error, _} ->
-          :ok
-      end
-    end)
+      {:error, _} ->
+        :ok
+    end
   end
 
   # Synchronous — no Task.start. The promotion must complete before the next
@@ -199,7 +206,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   end
 
   defp notify_agent_complete(session_id, provider_conversation_id) do
-    Task.start(fn ->
+    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
       title =
         case Sessions.get_session(session_id) do
           {:ok, session} when is_binary(session.name) and session.name != "" ->
@@ -214,5 +221,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
         resource: {"session", provider_conversation_id}
       )
     end)
+
+    :ok
   end
 end

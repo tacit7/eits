@@ -191,7 +191,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   @impl true
   def handle_call({:submit_message, message, context}, _from, state) when is_binary(message) do
-    {reply, new_state} = process_submit(message, context, state)
+    {reply, new_state} = process_submit(message, normalize_context(context), state)
     {:reply, reply, new_state}
   end
 
@@ -452,9 +452,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   # Handles the full submit_message logic; returns {reply_term, new_state}.
+  # context is guaranteed to be a normalized map — normalize_context/1 is called
+  # in handle_call before dispatching here.
   defp process_submit(message, context, state) do
-    context = normalize_context(context)
-
     Logger.info(
       "AgentWorker.submit_message: session_id=#{state.session_id}, " <>
         "message_length=#{String.length(message)}, has_messages=#{context.has_messages}, " <>

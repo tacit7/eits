@@ -35,7 +35,7 @@ eye_in_the_sky_web-*.tar
 /priv/static/.vite/
 /priv/static/**/*.gz
 /priv/static/manifest-*.json
-/priv/static/sw*.js
+/priv/static/sw-*.js
 /priv/static/mockups*.html
 /priv/static/mockups/
 /priv/static/robots-*.txt

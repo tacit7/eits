@@ -652,7 +652,14 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     %{state | retry_timer_ref: nil, retry_attempt: 0}
   end
 
-  defp normalize_context(context) when is_map(context) do
+  defp normalize_context(context) do
+    context =
+      cond do
+        is_list(context) -> Map.new(context)
+        is_map(context) -> context
+        true -> %{}
+      end
+
     %{
       model: Map.get(context, :model),
       effort_level: Map.get(context, :effort_level),
@@ -665,37 +672,6 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       bypass_sandbox: Map.get(context, :bypass_sandbox, false),
       content_blocks: Map.get(context, :content_blocks, []),
       extra_cli_opts: Map.get(context, :extra_cli_opts, [])
-    }
-  end
-
-  defp normalize_context(context) when is_list(context) do
-    %{
-      model: context[:model],
-      effort_level: context[:effort_level],
-      has_messages: context[:has_messages] || false,
-      channel_id: context[:channel_id],
-      thinking_budget: context[:thinking_budget],
-      max_budget_usd: context[:max_budget_usd],
-      agent: context[:agent],
-      eits_workflow: context[:eits_workflow] || "1",
-      bypass_sandbox: context[:bypass_sandbox] || false,
-      content_blocks: context[:content_blocks] || [],
-      extra_cli_opts: context[:extra_cli_opts] || []
-    }
-  end
-
-  defp normalize_context(_context) do
-    %{
-      model: nil,
-      effort_level: nil,
-      has_messages: false,
-      channel_id: nil,
-      thinking_budget: nil,
-      max_budget_usd: nil,
-      agent: nil,
-      eits_workflow: "1",
-      content_blocks: [],
-      extra_cli_opts: []
     }
   end
 

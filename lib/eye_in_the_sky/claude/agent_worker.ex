@@ -381,7 +381,8 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     WorkerEvents.broadcast_stream_clear(state.session_id)
     state = %{state | stream: StreamAssemblerProtocol.reset(state.stream)}
 
-    if String.contains?(msg, "already in use") && not is_nil(job) do
+    if String.contains?(msg, "already in use") && not is_nil(job) &&
+         job.context[:has_messages] == false do
       Logger.warning(
         "[#{state.session_id}] Session UUID=#{state.provider_conversation_id} already in use, retrying as resume"
       )

@@ -15,6 +15,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
       end
 
     socket =
+      socket
+      |> assign(:selected_file, nil)
+      |> assign(:selected_file_path, nil)
+      |> assign(:file_content, nil)
+      |> assign(:file_type, nil)
+      |> assign(:entries, [])
+      |> assign(:files, [])
+      |> assign(:current_path, nil)
+      |> assign(:view_mode, :tree)
+      |> assign(:error, nil)
+
+    socket =
       if project_id do
         project =
           Projects.get_project!(project_id)
@@ -28,29 +40,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
         |> assign(:sidebar_tab, :config)
         |> assign(:sidebar_project, project)
         |> assign(:claude_dir, claude_dir)
-        |> assign(:selected_file, nil)
-        |> assign(:selected_file_path, nil)
-        |> assign(:file_content, nil)
-        |> assign(:file_type, nil)
-        |> assign(:entries, [])
-        |> assign(:files, [])
-        |> assign(:current_path, nil)
-        |> assign(:view_mode, :tree)
-        |> assign(:error, nil)
       else
         socket
         |> assign(:page_title, "Project Not Found")
         |> assign(:project, nil)
         |> assign(:claude_dir, nil)
-        |> assign(:selected_file, nil)
-        |> assign(:selected_file_path, nil)
-        |> assign(:file_content, nil)
-        |> assign(:file_type, nil)
-        |> assign(:entries, [])
-        |> assign(:files, [])
-        |> assign(:current_path, nil)
-        |> assign(:view_mode, :tree)
-        |> assign(:error, nil)
         |> put_flash(:error, "Invalid project ID")
       end
 

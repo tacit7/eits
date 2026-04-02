@@ -735,12 +735,36 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     end
   end
 
-  defp systemic_error?(reason) do
-    reason_str = inspect(reason)
+  # Pattern-match on actual error term shapes rather than inspect() strings.
+  # Parser emits {:billing_error, msg} / {:authentication_error, msg} as atoms.
+  # Unknown errors and result errors carry free-form strings that still need
+  # substring matching, but only within the message field — not on inspect output.
+  defp systemic_error?({:billing_error, _}), do: true
+  defp systemic_error?({:authentication_error, _}), do: true
 
-    Enum.any?(
-      ["billing_error", "auth_error", "missing binary", "Credit balance is too low"],
-      &String.contains?(reason_str, &1)
-    )
+  # errors is a list of strings — scan each entry
+  defp systemic_error?({:claude_result_error, %{errors: errors}}) when is_list(errors) do
+    Enum.any?(errors, &String.contains?(&1, ["billing_error", "authentication_error"]))
   end
+
+  # errors is a map — parser sets this from event["error"] object e.g. %{"type" => "billing_error"}
+  defp systemic_error?({:claude_result_error, %{errors: %{"type" => type}}})
+       when type in ["billing_error", "authentication_error"],
+       do: true
+
+  # errors is a raw string — check for known systemic markers
+  defp systemic_error?({:claude_result_error, %{errors: errors}}) when is_binary(errors) do
+    String.contains?(errors, ["billing_error", "authentication_error"])
+  end
+
+  # fallback: check the result text for billing messages when errors field is absent/nil
+  defp systemic_error?({:claude_result_error, %{result: result}}) when is_binary(result) do
+    String.contains?(result, ["Credit balance is too low", "missing binary"])
+  end
+
+  defp systemic_error?({:unknown_error, msg}) when is_binary(msg) do
+    String.contains?(msg, ["Credit balance is too low", "missing binary"])
+  end
+
+  defp systemic_error?(_), do: false
 end

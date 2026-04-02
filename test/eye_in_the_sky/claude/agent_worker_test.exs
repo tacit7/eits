@@ -1124,4 +1124,142 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
         wait_for_mock_port(session_id, attempts - 1)
     end
   end
+
+  # Helper: start a worker with one active job and one queued job, return
+  # {worker_pid, sdk_ref} so tests can inject {:claude_error, sdk_ref, reason}.
+  defp start_worker_with_active_sdk(session, _track) do
+    Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "agent:working")
+    session_id = session.id
+
+    assert {:ok, _} = EyeInTheSky.Agents.AgentManager.send_message(session.id, "msg-1")
+    assert_receive {:agent_working, _, ^session_id}, 5_000
+
+    [{worker_pid, _}] =
+      Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session.id})
+
+    # Queue a second job while running — should be drained on systemic error
+    assert {:ok, :queued} =
+             GenServer.call(worker_pid, {:submit_message, "msg-2", %{has_messages: false}})
+
+    worker_state = :sys.get_state(worker_pid)
+    {worker_pid, worker_state.sdk_ref}
+  end
+
+  # --- systemic_error? pattern-matching tests ---
+
+  describe "systemic errors drain the queue" do
+    test "billing_error atom drains queue", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      send(worker_pid, {:claude_error, sdk_ref, {:billing_error, "Credit balance is too low"}})
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      assert state.status == :failed
+      assert state.queue == []
+      assert state.sdk_ref == nil
+    end
+
+    test "authentication_error atom drains queue (was broken: matched 'auth_error' string, never hit)",
+         %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      send(worker_pid, {:claude_error, sdk_ref, {:authentication_error, "Invalid API key"}})
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      assert state.status == :failed
+      assert state.queue == []
+    end
+
+    test "unknown_error with credit balance message drains queue", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      send(
+        worker_pid,
+        {:claude_error, sdk_ref, {:unknown_error, "Credit balance is too low to run"}}
+      )
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      assert state.status == :failed
+      assert state.queue == []
+    end
+
+    test "unknown_error with missing binary message drains queue", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      send(worker_pid, {:claude_error, sdk_ref, {:unknown_error, "missing binary: claude"}})
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      assert state.status == :failed
+      assert state.queue == []
+    end
+
+    test "claude_result_error with errors as map (billing) drains queue", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      reason = {:claude_result_error, %{errors: %{"type" => "billing_error", "message" => "No credits"}, result: nil, session_id: session.uuid}}
+      send(worker_pid, {:claude_error, sdk_ref, reason})
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      assert state.status == :failed
+      assert state.queue == []
+    end
+
+    test "claude_result_error with errors as map (authentication) drains queue", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      reason = {:claude_result_error, %{errors: %{"type" => "authentication_error", "message" => "Bad key"}, result: nil, session_id: session.uuid}}
+      send(worker_pid, {:claude_error, sdk_ref, reason})
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      assert state.status == :failed
+      assert state.queue == []
+    end
+
+    test "claude_result_error with errors as binary drains queue", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      reason = {:claude_result_error, %{errors: "billing_error: no credits", result: nil, session_id: session.uuid}}
+      send(worker_pid, {:claude_error, sdk_ref, reason})
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      assert state.status == :failed
+      assert state.queue == []
+    end
+
+    test "non-systemic error (exit_code) does not enter :failed state", %{track: track} do
+      {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+      {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
+
+      send(worker_pid, {:claude_error, sdk_ref, {:exit_code, 1}})
+
+      Process.sleep(200)
+
+      state = :sys.get_state(worker_pid)
+      # Non-systemic: worker does not enter :failed.
+      # process_next_job fires immediately, starting the queued job,
+      # so status is :running (or :retry_wait if SDK start failed).
+      assert state.status != :failed
+    end
+  end
 end

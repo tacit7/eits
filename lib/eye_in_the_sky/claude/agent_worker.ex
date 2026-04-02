@@ -371,6 +371,49 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     end
   end
 
+  # Session ID already in use — start was called but JSONL exists on disk; retry as resume
+  @impl true
+  def handle_info(
+        {:claude_error, ref, {:cli_error, msg} = reason},
+        %__MODULE__{sdk_ref: ref, current_job: job} = state
+      )
+      when is_binary(msg) do
+    WorkerEvents.broadcast_stream_clear(state.session_id)
+    state = %{state | stream: StreamAssemblerProtocol.reset(state.stream)}
+
+    if String.contains?(msg, "already in use") && not is_nil(job) do
+      Logger.warning(
+        "[#{state.session_id}] Session UUID=#{state.provider_conversation_id} already in use, retrying as resume"
+      )
+
+      resume_job = Job.as_resume(job)
+
+      case start_sdk(state, resume_job) do
+        {:ok, sdk_ref, handler_monitor} ->
+          {:noreply,
+           %{state | sdk_ref: sdk_ref, handler_monitor: handler_monitor, current_job: resume_job}}
+
+        {:error, start_reason} ->
+          Logger.error(
+            "[#{state.session_id}] Failed to resume after already-in-use: #{inspect(start_reason)}"
+          )
+
+          WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
+          demonitor_handler(state.handler_monitor)
+
+          process_next_job(%{
+            state
+            | status: :idle,
+              sdk_ref: nil,
+              handler_monitor: nil,
+              current_job: nil
+          })
+      end
+    else
+      do_handle_sdk_error(reason, state)
+    end
+  end
+
   # SDK error
   @impl true
   def handle_info({:claude_error, ref, reason}, %__MODULE__{sdk_ref: ref} = state) do

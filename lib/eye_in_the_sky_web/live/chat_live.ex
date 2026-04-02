@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_budget: 1]
+  import EyeInTheSkyWeb.Helpers.UploadHelpers
 
   # Deterministic UUIDs for the web UI user
   @web_agent_uuid "00000000-0000-0000-0000-000000000001"
@@ -842,52 +843,4 @@ defmodule EyeInTheSkyWeb.ChatLive do
   defp maybe_bool_opt(opts, key, "true"), do: opts ++ [{key, true}]
   defp maybe_bool_opt(opts, _key, _), do: opts
 
-  defp consume_agent_images(socket) do
-    consume_uploaded_entries(socket, :agent_images, fn %{path: temp_path}, entry ->
-      destination = agent_image_destination(entry.client_name)
-      File.mkdir_p!(Path.dirname(destination))
-      File.cp!(temp_path, destination)
-      {:ok, destination}
-    end)
-  end
-
-  defp agent_image_destination(client_name) do
-    base = Path.join([:code.priv_dir(:eye_in_the_sky), "static", "uploads", "agent"])
-    date_dir = Date.utc_today() |> Date.to_string()
-    filename = "#{Ecto.UUID.generate()}#{Path.extname(client_name)}"
-    Path.join([base, date_dir, filename])
-  end
-
-  defp append_image_paths(instructions, []), do: instructions
-
-  defp append_image_paths(instructions, image_paths) do
-    paths = Enum.map_join(image_paths, "\n", fn p -> "- #{p}" end)
-    "#{instructions}\n\nAttached images:\n#{paths}"
-  end
-
-  defp consume_agent_images_as_content_blocks(socket) do
-    alias EyeInTheSky.Claude.ContentBlock
-    alias EyeInTheSky.Media.ImageProcessor
-
-    blocks =
-      consume_uploaded_entries(socket, :agent_images, fn %{path: temp_path}, entry ->
-        data = File.read!(temp_path)
-        base64 = Base.encode64(data)
-        mime_type = entry.client_type || mime_from_ext(entry.client_name)
-        {:ok, ContentBlock.new_image(base64, mime_type)}
-      end)
-
-    ImageProcessor.process_blocks(blocks)
-  end
-
-  defp mime_from_ext(filename) do
-    case Path.extname(filename) |> String.downcase() do
-      ".jpg" -> "image/jpeg"
-      ".jpeg" -> "image/jpeg"
-      ".png" -> "image/png"
-      ".gif" -> "image/gif"
-      ".webp" -> "image/webp"
-      _ -> "application/octet-stream"
-    end
-  end
 end

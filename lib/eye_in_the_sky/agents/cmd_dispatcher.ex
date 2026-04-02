@@ -159,7 +159,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
          {:ok, message} <- extract_flag(args, "--message") do
       case Sessions.get_session(from_session_id) do
         {:ok, from_session} ->
-          case resolve_session(to_ref) do
+          case Sessions.resolve(to_ref) do
             {:ok, to_session} ->
               sender_name = from_session.name || "session:#{from_session.uuid}"
               dm_body = "DM from:#{sender_name} (session:#{from_session.uuid}) #{message}"
@@ -212,14 +212,6 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
       end
     else
       err -> notify_error(from_session_id, "dm", err)
-    end
-  end
-
-  # Resolve a session by integer ID or UUID string.
-  defp resolve_session(ref) do
-    case Integer.parse(ref) do
-      {id, ""} -> Sessions.get_session(id)
-      _ -> Sessions.get_session_by_uuid(ref)
     end
   end
 
@@ -280,7 +272,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
         notify_error(from_session_id, "task start", {:invalid_id, id_str})
     end
   rescue
-    _ -> notify_error(from_session_id, "task start", :not_found)
+    Ecto.NoResultsError -> notify_error(from_session_id, "task start", :not_found)
   end
 
   # task update <id> <state_id>
@@ -302,7 +294,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
         notify_error(from_session_id, "task update", :expected_id_and_state_id)
     end
   rescue
-    _ -> notify_error(from_session_id, "task update", :not_found)
+    Ecto.NoResultsError -> notify_error(from_session_id, "task update", :not_found)
   end
 
   # task done <id> — shortcut for state 3 (Done)
@@ -323,7 +315,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
         notify_error(from_session_id, "task done", {:invalid_id, id_str})
     end
   rescue
-    _ -> notify_error(from_session_id, "task done", :not_found)
+    Ecto.NoResultsError -> notify_error(from_session_id, "task done", :not_found)
   end
 
   # task delete <id>
@@ -344,7 +336,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
         notify_error(from_session_id, "task delete", {:invalid_id, id_str})
     end
   rescue
-    _ -> notify_error(from_session_id, "task delete", :not_found)
+    Ecto.NoResultsError -> notify_error(from_session_id, "task delete", :not_found)
   end
 
   # task annotate <id> <body>
@@ -388,7 +380,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
         notify_error(from_session_id, "task link-session", {:invalid_id, id_str})
     end
   rescue
-    _ -> notify_error(from_session_id, "task link-session", :not_found)
+    Ecto.NoResultsError -> notify_error(from_session_id, "task link-session", :not_found)
   end
 
   # task unlink-session <id> — unlink current session from a task
@@ -404,7 +396,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
         notify_error(from_session_id, "task unlink-session", {:invalid_id, id_str})
     end
   rescue
-    _ -> notify_error(from_session_id, "task unlink-session", :not_found)
+    Ecto.NoResultsError -> notify_error(from_session_id, "task unlink-session", :not_found)
   end
 
   # task tag <id> <tag_id>
@@ -425,7 +417,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
         notify_error(from_session_id, "task tag", :expected_id_and_tag_id)
     end
   rescue
-    _ -> notify_error(from_session_id, "task tag", :not_found)
+    Ecto.NoResultsError -> notify_error(from_session_id, "task tag", :not_found)
   end
 
   defp dispatch_task(unknown, from_session_id),

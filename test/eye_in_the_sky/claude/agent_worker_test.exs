@@ -1301,16 +1301,12 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
       if new_mock, do: send(new_mock, {:exit, 0})
     end
 
-    test "falls through to error handler when has_messages is true (no retry loop)", %{
-      track: track
-    } do
+    test "falls through to error handler on second already-in-use (kill_retry guard prevents loop)",
+         %{track: track} do
       {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
 
       Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "agent:working")
       session_id = session.id
-
-      # Seed an inbound reply so has_messages evaluates to true
-      {:ok, _} = Messages.record_incoming_reply(session.id, "claude", "prior reply")
 
       assert {:ok, _} = EyeInTheSky.Agents.AgentManager.send_message(session.id, "msg-1")
       assert_receive {:agent_working, _, ^session_id}, 5_000
@@ -1320,16 +1316,21 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
 
       worker_state = :sys.get_state(worker_pid)
       sdk_ref = worker_state.sdk_ref
-      assert worker_state.current_job.context.has_messages == true
 
-      # Inject the same error — but now has_messages is true, guard must prevent retry
+      # Simulate that kill-and-retry already happened by setting kill_retry: true in job context
+      :sys.replace_state(worker_pid, fn state ->
+        updated_job = %{state.current_job | context: Map.put(state.current_job.context, :kill_retry, true)}
+        %{state | current_job: updated_job}
+      end)
+
+      # Second already-in-use: kill_retry is true, guard must prevent another retry
       send(
         worker_pid,
         {:claude_error, sdk_ref,
          {:cli_error, "Error: Session ID #{session.uuid} is already in use."}}
       )
 
-      # Should fall through to do_handle_sdk_error → agent_stopped, no second agent_working
+      # Should fall through to do_handle_sdk_error → agent_stopped
       assert_receive {:agent_stopped, _, ^session_id}, 5_000
 
       Process.sleep(100)

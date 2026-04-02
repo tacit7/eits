@@ -371,7 +371,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     end
   end
 
-  # Session ID already in use — start was called but JSONL exists on disk; retry as resume
+  # Session ID already in use — either JSONL exists (no live process) or an orphaned Claude
+  # process is holding the session lock. Kill any orphan, then retry as resume exactly once.
+  # The :kill_retry flag prevents a second retry if the orphan kill didn't help.
   @impl true
   def handle_info(
         {:claude_error, ref, {:cli_error, msg} = reason},
@@ -381,13 +383,19 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     WorkerEvents.broadcast_stream_clear(state.session_id)
     state = %{state | stream: StreamAssemblerProtocol.reset(state.stream)}
 
-    if String.contains?(msg, "already in use") && not is_nil(job) &&
-         job.context[:has_messages] == false do
+    already_retried = Map.get(job.context, :kill_retry, false)
+
+    if String.contains?(msg, "already in use") && not is_nil(job) && not already_retried do
+      uuid = state.provider_conversation_id
+
       Logger.warning(
-        "[#{state.session_id}] Session UUID=#{state.provider_conversation_id} already in use, retrying as resume"
+        "[#{state.session_id}] Session UUID=#{uuid} already in use — killing orphan and retrying as resume"
       )
 
+      kill_orphaned_claude(uuid)
+
       resume_job = Job.as_resume(job)
+      resume_job = %{resume_job | context: Map.put(resume_job.context, :kill_retry, true)}
 
       case start_sdk(state, resume_job) do
         {:ok, sdk_ref, handler_monitor} ->
@@ -813,4 +821,23 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   defp systemic_error?(_), do: false
+
+  # Kill any orphaned Claude process holding the session lock for the given UUID.
+  # Uses pkill -f to match the UUID in the process command line.
+  # Safe: session UUIDs are unique enough that false matches are extremely unlikely.
+  defp kill_orphaned_claude(uuid) when is_binary(uuid) do
+    case System.cmd("pkill", ["-f", uuid], stderr_to_stdout: true) do
+      {_, 0} ->
+        Logger.info("Killed orphaned Claude process for session UUID=#{uuid}")
+        # Give the process a moment to actually exit before retrying
+        Process.sleep(200)
+
+      {_, 1} ->
+        # pkill exits 1 when no matching process found — not an error
+        Logger.debug("No orphaned process found for session UUID=#{uuid}")
+
+      {output, code} ->
+        Logger.warning("pkill for UUID=#{uuid} exited #{code}: #{output}")
+    end
+  end
 end

@@ -1,0 +1,17 @@
+{
+  "name": "Eye in the Sky",
+  "short_name": "EITS",
+  "description": "Eye in the Sky monitoring dashboard",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e1c1a",
+  "theme_color": "#1e1c1a",
+  "icons": [
+    {
+      "src": "/images/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

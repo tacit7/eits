@@ -5,10 +5,6 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
 
   use Phoenix.Component
 
-  import EyeInTheSkyWeb.Helpers.DateHelpers
-  import EyeInTheSkyWeb.Helpers.StatusHelpers
-  import EyeInTheSkyWeb.Helpers.TaskHelpers
-
   # Re-export so callers that `import ViewHelpers` get everything.
   defdelegate coerce_datetime(v), to: EyeInTheSkyWeb.Helpers.DateHelpers
   defdelegate parse_updated_at(v), to: EyeInTheSkyWeb.Helpers.DateHelpers

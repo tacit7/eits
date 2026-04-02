@@ -173,12 +173,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
     end
   end
 
-  defp prev_month(year, 1), do: {year - 1, 12}
-  defp prev_month(year, month), do: {year, month - 1}
-
-  defp next_month(year, 12), do: {year + 1, 1}
-  defp next_month(year, month), do: {year, month + 1}
-
   @impl true
   def handle_event("add_task_annotation", params, socket),
     do: TasksHelpers.handle_add_task_annotation(params, socket)
@@ -438,6 +432,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   # ---------------------------------------------------------------------------
   # Private
   # ---------------------------------------------------------------------------
+
+  defp prev_month(year, 1), do: {year - 1, 12}
+  defp prev_month(year, month), do: {year, month - 1}
+
+  defp next_month(year, 12), do: {year + 1, 1}
+  defp next_month(year, month), do: {year, month + 1}
 
   defp init_assigns(socket) do
     socket

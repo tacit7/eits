@@ -70,8 +70,6 @@ config :eye_in_the_sky, Oban,
   plugins: [
     # Keep completed/cancelled/discarded jobs for 7 days, then prune
     {Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 7},
-    # Stage scheduled/retryable jobs so they actually execute
-    Oban.Plugins.Stager,
     # Rescue jobs stuck in executing after a crash (after 30 min)
     {Oban.Plugins.Lifeline, rescue_after: :timer.minutes(30)},
     {Oban.Plugins.Cron,

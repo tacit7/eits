@@ -61,4 +61,12 @@ defmodule EyeInTheSky.Claude.Job do
   def as_fresh_session(%__MODULE__{} = job) do
     %{job | context: %{job.context | has_messages: false}}
   end
+
+  @doc """
+  Return a copy of this job with has_messages set to true (force resume).
+  Used when Claude rejects a start because the session ID already exists on disk.
+  """
+  def as_resume(%__MODULE__{} = job) do
+    %{job | context: %{job.context | has_messages: true}}
+  end
 end

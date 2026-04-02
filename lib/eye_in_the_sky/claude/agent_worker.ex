@@ -191,7 +191,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   @impl true
   def handle_call({:submit_message, message, context}, _from, state) when is_binary(message) do
-    {reply, new_state} = process_submit(message, context, state)
+    {reply, new_state} = process_submit(message, normalize_context(context), state)
     {:reply, reply, new_state}
   end
 
@@ -371,6 +371,60 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     end
   end
 
+  # Session ID already in use — either JSONL exists (no live process) or an orphaned Claude
+  # process is holding the session lock. Kill any orphan, then retry as resume exactly once.
+  # The :kill_retry flag prevents a second retry if the orphan kill didn't help.
+  @impl true
+  def handle_info(
+        {:claude_error, ref, {:cli_error, msg} = reason},
+        %__MODULE__{sdk_ref: ref, current_job: job} = state
+      )
+      when is_binary(msg) do
+    WorkerEvents.broadcast_stream_clear(state.session_id)
+    state = %{state | stream: StreamAssemblerProtocol.reset(state.stream)}
+
+    already_retried = Map.get(job.context, :kill_retry, false)
+
+    if String.contains?(msg, "already in use") && not is_nil(job) && not already_retried do
+      uuid = state.provider_conversation_id
+
+      Logger.warning(
+        "[#{state.session_id}] Session UUID=#{uuid} already in use — killing orphan and retrying as resume"
+      )
+
+      kill_orphaned_claude(uuid)
+
+      resume_job = Job.as_resume(job)
+      resume_job = %{resume_job | context: Map.put(resume_job.context, :kill_retry, true)}
+
+      case start_sdk(state, resume_job) do
+        {:ok, sdk_ref, handler_monitor} ->
+          WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
+
+          {:noreply,
+           %{state | sdk_ref: sdk_ref, handler_monitor: handler_monitor, current_job: resume_job}}
+
+        {:error, start_reason} ->
+          Logger.error(
+            "[#{state.session_id}] Failed to resume after already-in-use: #{inspect(start_reason)}"
+          )
+
+          WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
+          demonitor_handler(state.handler_monitor)
+
+          process_next_job(%{
+            state
+            | status: :idle,
+              sdk_ref: nil,
+              handler_monitor: nil,
+              current_job: nil
+          })
+      end
+    else
+      do_handle_sdk_error(reason, state)
+    end
+  end
+
   # SDK error
   @impl true
   def handle_info({:claude_error, ref, reason}, %__MODULE__{sdk_ref: ref} = state) do
@@ -452,9 +506,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   # Handles the full submit_message logic; returns {reply_term, new_state}.
+  # context is guaranteed to be a normalized map — normalize_context/1 is called
+  # in handle_call before dispatching here.
   defp process_submit(message, context, state) do
-    context = normalize_context(context)
-
     Logger.info(
       "AgentWorker.submit_message: session_id=#{state.session_id}, " <>
         "message_length=#{String.length(message)}, has_messages=#{context.has_messages}, " <>
@@ -767,4 +821,23 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   defp systemic_error?(_), do: false
+
+  # Kill any orphaned Claude process holding the session lock for the given UUID.
+  # Uses pkill -f to match the UUID in the process command line.
+  # Safe: session UUIDs are unique enough that false matches are extremely unlikely.
+  defp kill_orphaned_claude(uuid) when is_binary(uuid) do
+    case System.cmd("pkill", ["-f", uuid], stderr_to_stdout: true) do
+      {_, 0} ->
+        Logger.info("Killed orphaned Claude process for session UUID=#{uuid}")
+        # Give the process a moment to actually exit before retrying
+        Process.sleep(200)
+
+      {_, 1} ->
+        # pkill exits 1 when no matching process found — not an error
+        Logger.debug("No orphaned process found for session UUID=#{uuid}")
+
+      {output, code} ->
+        Logger.warning("pkill for UUID=#{uuid} exited #{code}: #{output}")
+    end
+  end
 end

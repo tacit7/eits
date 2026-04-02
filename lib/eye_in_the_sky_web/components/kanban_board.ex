@@ -37,7 +37,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                 class="h-0.5 rounded-full mx-1 mb-2"
                 style={"background-color: #{state_dot_color(state.color)}"}
               />
-              <div class="flex items-center gap-2 px-3 py-1" data-column-handle>
+              <div class="flex items-center gap-2 px-3 py-1">
                 <%= if @bulk_mode do %>
                   <input
                     type="checkbox"
@@ -50,7 +50,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                     phx-value-state-id={state.id}
                   />
                 <% end %>
-                <div class="flex items-center gap-1.5 cursor-grab active:cursor-grabbing">
+                <div class="flex items-center gap-1.5 cursor-grab active:cursor-grabbing" data-column-handle>
                   <.icon
                     name="hero-bars-2"
                     class="w-3 h-3 text-base-content/20 hover:text-base-content/40"

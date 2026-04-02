@@ -34,10 +34,8 @@ eye_in_the_sky_web-*.tar
 # Vite prod build output (fingerprinted files and compressed artifacts)
 /priv/static/.vite/
 /priv/static/**/*.gz
-/priv/static/manifest*.json
-/priv/static/sw*.js
-/priv/static/mockups*.html
-/priv/static/mockups/
+/priv/static/manifest-*.json
+/priv/static/sw-*.js
 /priv/static/robots-*.txt
 /priv/static/favicon-*.ico
 

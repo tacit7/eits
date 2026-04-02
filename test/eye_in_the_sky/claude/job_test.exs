@@ -43,4 +43,27 @@ defmodule EyeInTheSky.Claude.JobTest do
       assert fresh.context.has_messages == false
     end
   end
+
+  describe "as_resume/1" do
+    test "sets has_messages to true" do
+      job = Job.new("test", %{has_messages: false})
+      resumed = Job.as_resume(job)
+      assert resumed.context.has_messages == true
+    end
+
+    test "preserves all other context fields" do
+      job = Job.new("test", %{has_messages: false, model: "haiku", channel_id: 42})
+      resumed = Job.as_resume(job)
+      assert resumed.context.model == "haiku"
+      assert resumed.context.channel_id == 42
+    end
+
+    test "preserves message and content_blocks" do
+      blocks = [ContentBlock.new_image("abc", "image/png")]
+      job = Job.new("original message", %{has_messages: false}, blocks)
+      resumed = Job.as_resume(job)
+      assert resumed.message == "original message"
+      assert resumed.content_blocks == blocks
+    end
+  end
 end

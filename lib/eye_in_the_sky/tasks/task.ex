@@ -73,6 +73,9 @@ defmodule EyeInTheSky.Tasks.Task do
       :created_at,
       :updated_at
     ])
+    |> then(fn cs ->
+      if get_field(cs, :uuid), do: cs, else: put_change(cs, :uuid, Ecto.UUID.generate())
+    end)
     |> validate_required([:title])
     |> validate_inclusion(:state_id, [1, 2, 3, 4], message: "must be a valid workflow state")
     |> validate_number(:project_id, greater_than: 0)

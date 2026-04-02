@@ -1,5 +1,12 @@
 # Documentation Update Suggestions
 
+## 2026-04-01
+**Commits reviewed**: ca015ef..d70a166
+
+- **CODE_GUIDELINES.md** — Document context function pattern for SQL queries: Messages.list_inbound_dms/2 and Teams.list_broadcast_targets/1 extract inline Ecto.Query from CmdDispatcher; explain when to move query logic to context modules (reusability, testability, separation of concerns); note secondary sort stability in list_inbound_dms (desc: m.id) for deterministic ordering
+- **CODE_GUIDELINES.md** — Document ViewHelpers.parse_budget/1 as canonical budget parsing implementation; previously duplicated in ChatLive and AgentLive.Index; explain import pattern to avoid code duplication across LiveView modules
+- **SETUP.md** — Document Oban configuration change: removed inline testing mode from dev.exs; scheduled jobs now run normally in development (cron plugin enabled); previously disabled with `testing: :inline` flag
+
 ## 2026-03-29 (Updated)
 **Commits reviewed**: f233620..c4c2112
 

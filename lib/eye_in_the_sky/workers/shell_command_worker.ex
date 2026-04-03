@@ -47,6 +47,9 @@ defmodule EyeInTheSky.Workers.ShellCommandWorker do
     :exit, {:timeout, _} ->
       Task.shutdown(task, :brutal_kill)
       {:error, "Command timed out after #{timeout}ms"}
+
+    :exit, reason ->
+      {:error, "Task exited: #{inspect(reason)}"}
   end
 
   defp blank_to_nil(nil), do: nil

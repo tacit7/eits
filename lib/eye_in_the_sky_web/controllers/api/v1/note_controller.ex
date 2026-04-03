@@ -46,20 +46,20 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
   GET /api/v1/notes/:id - Retrieve a note by ID.
   """
   def show(conn, %{"id" => note_id}) do
-    try do
-      note = Notes.get_note!(note_id)
+    case Notes.get_note(note_id) do
+      nil ->
+        conn |> put_status(:not_found) |> json(%{error: "Note not found"})
 
-      json(conn, %{
-        note_id: to_string(note.id),
-        parent_id: note.parent_id,
-        parent_type: note.parent_type,
-        title: note.title,
-        body: note.body,
-        starred: note.starred || 0,
-        created_at: to_string(note.created_at)
-      })
-    rescue
-      Ecto.NoResultsError -> {:error, :not_found}
+      note ->
+        json(conn, %{
+          note_id: to_string(note.id),
+          parent_id: note.parent_id,
+          parent_type: note.parent_type,
+          title: note.title,
+          body: note.body,
+          starred: note.starred || 0,
+          created_at: to_string(note.created_at)
+        })
     end
   end
 
@@ -106,30 +106,32 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
   PATCH /api/v1/notes/:id - Update a note (body, title, starred).
   """
   def update(conn, %{"id" => note_id} = params) do
-    try do
-      note = Notes.get_note!(note_id)
+    case Notes.get_note(note_id) do
+      nil ->
+        conn |> put_status(:not_found) |> json(%{error: "Note not found"})
 
-      attrs =
-        %{}
-        |> Helpers.maybe_put(:body, params["body"])
-        |> Helpers.maybe_put(:title, params["title"])
-        |> Helpers.maybe_put(:starred, parse_starred(params["starred"]))
+      note ->
+        attrs =
+          %{}
+          |> Helpers.maybe_put(:body, params["body"])
+          |> Helpers.maybe_put(:title, params["title"])
+          |> Helpers.maybe_put(:starred, parse_starred(params["starred"]))
 
-      case EyeInTheSky.Repo.update(Ecto.Changeset.change(note, attrs)) do
-        {:ok, updated} ->
-          json(conn, %{
-            success: true,
-            id: updated.id,
-            body: updated.body,
-            title: updated.title,
-            starred: updated.starred || 0
-          })
+        case EyeInTheSky.Repo.update(Ecto.Changeset.change(note, attrs)) do
+          {:ok, updated} ->
+            json(conn, %{
+              success: true,
+              id: updated.id,
+              body: updated.body,
+              title: updated.title,
+              starred: updated.starred || 0
+            })
 
-        {:error, _} = err ->
-          err
-      end
-    rescue
-      Ecto.NoResultsError -> {:error, :not_found}
+          {:error, changeset} ->
+            conn
+            |> put_status(:unprocessable_entity)
+            |> json(%{error: "Failed to update note", details: translate_errors(changeset)})
+        end
     end
   end
 

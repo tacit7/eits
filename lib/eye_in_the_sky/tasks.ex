@@ -164,6 +164,15 @@ defmodule EyeInTheSky.Tasks do
   end
 
   @doc """
+  Gets a single task. Returns `nil` if not found.
+  """
+  def get_task(id) do
+    Task
+    |> preload([:state, :tags, :sessions, :checklist_items])
+    |> Repo.get(id)
+  end
+
+  @doc """
   Gets a single task.
 
   Raises `Ecto.NoResultsError` if the Task does not exist.

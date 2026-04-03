@@ -76,6 +76,37 @@ defmodule EyeInTheSky.Prompts do
   end
 
   @doc """
+  Resolves a prompt by integer ID, UUID, or slug (in that order).
+  Returns `{:ok, prompt}` or `{:error, :not_found}`.
+  The `project_id` param narrows slug lookups to a specific project.
+  """
+  def get_prompt_by_ref(ref, project_id \\ nil) do
+    cond do
+      Regex.match?(~r/^\d+$/, ref) ->
+        case get_prompt(String.to_integer(ref)) do
+          nil -> {:error, :not_found}
+          prompt -> {:ok, prompt}
+        end
+
+      Regex.match?(~r/^[0-9a-f-]{36}$/, ref) ->
+        case get_prompt(ref) do
+          nil -> {:error, :not_found}
+          prompt -> {:ok, prompt}
+        end
+
+      true ->
+        prompt =
+          if project_id do
+            get_prompt_by_slug(ref, project_id) || get_prompt_by_slug(ref, nil)
+          else
+            get_prompt_by_slug(ref, nil)
+          end
+
+        if prompt, do: {:ok, prompt}, else: {:error, :not_found}
+    end
+  end
+
+  @doc """
   Creates a prompt. Auto-generates UUID and timestamps if not provided.
   """
   def create_prompt(attrs \\ %{}) do

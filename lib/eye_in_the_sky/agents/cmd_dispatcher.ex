@@ -709,20 +709,11 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   # Error surfacing
   # ---------------------------------------------------------------------------
 
-  # Sends a success acknowledgement back to the originating agent session
-  # so it can use returned IDs (e.g. task ID) in follow-up commands.
-  defp notify_success(from_session_id, msg) do
+  defp notify_success(_from_session_id, msg) do
     Logger.info("[CmdDispatcher] #{msg}")
-
-    if from_session_id do
-      Task.start(fn -> AgentManager.send_message(from_session_id, "[EITS-CMD ok] #{msg}") end)
-    end
-
     :ok
   end
 
-  # Logs the error, creates a persistent notification visible in the UI,
-  # and DMs the error back to the originating agent session so it can react.
   defp notify_error(from_session_id, cmd, reason) do
     msg = "[EITS-CMD error] #{cmd}: #{inspect(reason)}"
     Logger.warning("[CmdDispatcher] #{msg}")
@@ -732,10 +723,6 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
       category: :agent,
       resource: {"session", to_string(from_session_id)}
     )
-
-    if from_session_id do
-      Task.start(fn -> AgentManager.send_message(from_session_id, msg) end)
-    end
 
     :ok
   end

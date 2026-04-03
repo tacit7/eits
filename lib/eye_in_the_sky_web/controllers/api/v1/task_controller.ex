@@ -99,24 +99,25 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   GET /api/v1/tasks/:id - Show a task.
   """
   def show(conn, %{"id" => id}) do
-    try do
-      task = Tasks.get_task!(id)
-      annotations = Notes.list_notes_for_task(id)
-      presented = ApiPresenter.present_task(task)
+    case Tasks.get_task(id) do
+      nil ->
+        conn |> put_status(:not_found) |> json(%{error: "Task not found"})
 
-      json(conn, %{
-        success: true,
-        task: presented,
-        # Top-level convenience fields so scripts can read .project_id / .title
-        # without reaching into .task (backwards-compat with callers that assumed flat response)
-        id: presented.id,
-        title: presented.title,
-        project_id: task.project_id,
-        state_id: presented.state_id,
-        annotations: Enum.map(annotations, &ApiPresenter.present_note/1)
-      })
-    rescue
-      Ecto.NoResultsError -> {:error, :not_found}
+      task ->
+        annotations = Notes.list_notes_for_task(id)
+        presented = ApiPresenter.present_task(task)
+
+        json(conn, %{
+          success: true,
+          task: presented,
+          # Top-level convenience fields so scripts can read .project_id / .title
+          # without reaching into .task (backwards-compat with callers that assumed flat response)
+          id: presented.id,
+          title: presented.title,
+          project_id: task.project_id,
+          state_id: presented.state_id,
+          annotations: Enum.map(annotations, &ApiPresenter.present_note/1)
+        })
     end
   end
 
@@ -125,33 +126,35 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   Body: state_id, priority, state (shorthand: "done", "start")
   """
   def update(conn, %{"id" => id} = params) do
-    try do
-      task = Tasks.get_task!(id)
+    case Tasks.get_task(id) do
+      nil ->
+        conn |> put_status(:not_found) |> json(%{error: "Task not found"})
 
-      result =
-        case params["state"] do
-          "done" -> move_to_state(task, "Done")
-          "start" -> move_to_state(task, "In Progress")
-          _ -> update_attrs(task, params)
-        end
-
-      case result do
-        {:ok, updated} ->
-          if params["state"] == "start" do
-            maybe_link_session(updated.id, params["session_id"])
+      task ->
+        result =
+          case params["state"] do
+            "done" -> move_to_state(task, "Done")
+            "start" -> move_to_state(task, "In Progress")
+            _ -> update_attrs(task, params)
           end
 
-          json(conn, %{
-            success: true,
-            message: "Task updated",
-            task: ApiPresenter.present_task(updated)
-          })
+        case result do
+          {:ok, updated} ->
+            if params["state"] == "start" do
+              maybe_link_session(updated.id, params["session_id"])
+            end
 
-        {:error, _} = err ->
-          err
-      end
-    rescue
-      Ecto.NoResultsError -> {:error, :not_found}
+            json(conn, %{
+              success: true,
+              message: "Task updated",
+              task: ApiPresenter.present_task(updated)
+            })
+
+          {:error, changeset} ->
+            conn
+            |> put_status(:unprocessable_entity)
+            |> json(%{error: "Failed to update task", details: translate_errors(changeset)})
+        end
     end
   end
 
@@ -159,18 +162,20 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   DELETE /api/v1/tasks/:id - Delete a task.
   """
   def delete(conn, %{"id" => id}) do
-    try do
-      task = Tasks.get_task!(id)
+    case Tasks.get_task(id) do
+      nil ->
+        conn |> put_status(:not_found) |> json(%{error: "Task not found"})
 
-      case Tasks.delete_task(task) do
-        {:ok, _} ->
-          json(conn, %{success: true, message: "Task deleted"})
+      task ->
+        case Tasks.delete_task(task) do
+          {:ok, _} ->
+            json(conn, %{success: true, message: "Task deleted"})
 
-        {:error, _} = err ->
-          err
-      end
-    rescue
-      Ecto.NoResultsError -> {:error, :not_found}
+          {:error, changeset} ->
+            conn
+            |> put_status(:unprocessable_entity)
+            |> json(%{error: "Failed to delete task", details: translate_errors(changeset)})
+        end
     end
   end
 

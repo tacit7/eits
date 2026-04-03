@@ -23,15 +23,10 @@ defmodule EyeInTheSky.Claude.Utils do
   def close_port_safely(nil), do: :ok
 
   def close_port_safely(port) when is_port(port) do
-    if Port.info(port) != nil do
-      try do
-        Port.close(port)
-      rescue
-        _ -> :ok
-      end
-    end
-
+    Port.close(port)
     :ok
+  rescue
+    ArgumentError -> :ok
   end
 
   # Mock ports are pids in tests

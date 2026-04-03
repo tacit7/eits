@@ -45,23 +45,19 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
   end
 
   defp mark_stale_agents do
-    try do
-      now = DateTime.utc_now()
+    now = DateTime.utc_now()
 
-      # Get all agents except completed/failed
-      agents =
-        from(a in Agent,
-          where: a.status not in ["completed", "failed"]
-        )
-        |> Repo.all()
+    agents =
+      from(a in Agent,
+        where: a.status not in ["completed", "failed"]
+      )
+      |> Repo.all()
 
-      Enum.each(agents, fn agent -> update_agent_status(agent, now) end)
+    Enum.each(agents, fn agent -> update_agent_status(agent, now) end)
 
-      Logger.debug("Agent status update completed: #{length(agents)} agents checked")
-    rescue
-      e ->
-        Logger.error("Error marking stale agents: #{inspect(e)}")
-    end
+    Logger.debug("Agent status update completed: #{length(agents)} agents checked")
+  rescue
+    DBConnection.ConnectionError -> Logger.warning("mark_stale_agents: DB unavailable, skipping")
   end
 
   defp update_agent_status(agent, now) do
@@ -104,42 +100,39 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
 
   # Archive sessions that are idle, older than 30 min, and have no active tasks.
   defp archive_dead_idle_sessions do
-    try do
-      now = DateTime.utc_now()
-      cutoff = DateTime.add(now, -@thirty_minutes, :second)
+    now = DateTime.utc_now()
+    cutoff = DateTime.add(now, -@thirty_minutes, :second)
 
-      # Sessions that are idle, not archived, and inactive for >30 min.
-      # Use last_activity_at when available, fall back to started_at.
-      idle_sessions =
-        from(s in Session,
-          where: s.status in ["idle", "waiting"],
-          where: is_nil(s.archived_at),
-          where: not is_nil(s.started_at),
-          where:
-            fragment(
-              "coalesce(?, ?) < ?",
-              s.last_activity_at,
-              s.started_at,
-              ^cutoff
-            )
-        )
-        |> Repo.all()
+    # Sessions that are idle, not archived, and inactive for >30 min.
+    # Use last_activity_at when available, fall back to started_at.
+    idle_sessions =
+      from(s in Session,
+        where: s.status in ["idle", "waiting"],
+        where: is_nil(s.archived_at),
+        where: not is_nil(s.started_at),
+        where:
+          fragment(
+            "coalesce(?, ?) < ?",
+            s.last_activity_at,
+            s.started_at,
+            ^cutoff
+          )
+      )
+      |> Repo.all()
 
-      archived_count =
-        idle_sessions
-        |> Enum.filter(&no_active_tasks?/1)
-        |> Enum.reduce(0, fn session, count ->
-          archive_session_and_agent(session, now)
-          count + 1
-        end)
+    archived_count =
+      idle_sessions
+      |> Enum.filter(&no_active_tasks?/1)
+      |> Enum.reduce(0, fn session, count ->
+        archive_session_and_agent(session, now)
+        count + 1
+      end)
 
-      if archived_count > 0 do
-        Logger.info("Auto-archived #{archived_count} dead idle session(s)")
-      end
-    rescue
-      e ->
-        Logger.error("Error archiving dead idle sessions: #{inspect(e)}")
+    if archived_count > 0 do
+      Logger.info("Auto-archived #{archived_count} dead idle session(s)")
     end
+  rescue
+    DBConnection.ConnectionError -> Logger.warning("archive_dead_idle_sessions: DB unavailable, skipping")
   end
 
   # Returns true when a session has no linked tasks, or all linked tasks are done/archived.

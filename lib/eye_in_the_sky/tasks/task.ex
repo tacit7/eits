@@ -52,6 +52,8 @@ defmodule EyeInTheSky.Tasks.Task do
     # and EyeInTheSky.ProjectLive.Kanban (kanban.ex) after querying tasks.
     field :notes_count, :integer, virtual: true, default: 0
     field :notes, :any, virtual: true, default: []
+    # Populated by Tasks.list_tasks_for_team_with_sessions/1
+    field :session_ids, {:array, :integer}, virtual: true, default: []
   end
 
   @doc false

@@ -136,17 +136,9 @@ defmodule EyeInTheSky.Sessions do
   Ends a session by setting ended_at timestamp.
   """
   def end_session(%Session{} = session, opts \\ %{}) do
-    attrs =
-      %{ended_at: DateTime.utc_now()}
-      |> then(fn m ->
-        if opts[:summary], do: Map.put(m, :description, opts[:summary]), else: m
-      end)
-      |> then(fn m ->
-        if opts[:final_status],
-          do: Map.put(m, :status, opts[:final_status]),
-          else: m
-      end)
-
+    attrs = %{ended_at: DateTime.utc_now()}
+    attrs = if s = opts[:summary], do: Map.put(attrs, :description, s), else: attrs
+    attrs = if s = opts[:final_status], do: Map.put(attrs, :status, s), else: attrs
     update_session(session, attrs)
   end
 

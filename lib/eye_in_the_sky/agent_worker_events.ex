@@ -153,22 +153,14 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   # two concurrent read-then-write pairs racing each other, and the session_idle
   # broadcast must only fire after a successful update.
   defp update_session_status(session_id, status) do
+    idle_like? = status in ["idle", "waiting"]
+    attrs = if idle_like?, do: %{status: status, last_activity_at: DateTime.utc_now()}, else: %{status: status}
+
     case Sessions.get_session(session_id) do
       {:ok, session} ->
-        attrs = %{status: status}
-
-        attrs =
-          if status in ["idle", "waiting"] do
-            Map.put(attrs, :last_activity_at, DateTime.utc_now())
-          else
-            attrs
-          end
-
         case Sessions.update_session(session, attrs) do
           {:ok, _} ->
-            if status in ["idle", "waiting"] do
-              Events.session_idle(session_id)
-            end
+            if idle_like?, do: Events.session_idle(session_id)
 
           {:error, reason} ->
             Logger.warning("[#{session_id}] update_session_status failed: #{inspect(reason)}")
@@ -182,23 +174,13 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   # Synchronous — no Task.start. The promotion must complete before the next
   # event fires, and Task.start spawns a process outside the SQL sandbox in tests.
   defp promote_agent_if_pending(session_id) do
-    case Sessions.get_session(session_id) do
-      {:ok, session} when not is_nil(session.agent_id) ->
-        case Agents.get_agent(session.agent_id) do
-          {:ok, agent} when agent.status == "pending" ->
-            case Agents.update_agent(agent, %{status: "running"}) do
-              {:ok, _} ->
-                Logger.info("[#{session_id}] Promoted agent #{agent.id} from pending to running")
-
-              {:error, reason} ->
-                Logger.warning(
-                  "[#{session_id}] Failed to promote agent #{agent.id}: #{inspect(reason)}"
-                )
-            end
-
-          _ ->
-            :ok
-        end
+    with {:ok, session} when not is_nil(session.agent_id) <- Sessions.get_session(session_id),
+         {:ok, %{status: "pending"} = agent} <- Agents.get_agent(session.agent_id),
+         {:ok, _} <- Agents.update_agent(agent, %{status: "running"}) do
+      Logger.info("[#{session_id}] Promoted agent #{agent.id} from pending to running")
+    else
+      {:error, reason} ->
+        Logger.warning("[#{session_id}] Failed to promote agent: #{inspect(reason)}")
 
       _ ->
         :ok

@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
 
   @impl true
   def mount(socket) do
-    projects = Projects.list_projects()
+    projects = Projects.list_projects_for_sidebar()
 
     channels =
       case Channels.list_channels() do
@@ -40,6 +40,10 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
   @impl true
   def update(%{notification_count: :refresh}, socket) do
     {:ok, assign(socket, :notification_count, Notifications.unread_count())}
+  end
+
+  def update(%{refresh_projects: true}, socket) do
+    {:ok, assign(socket, :projects, Projects.list_projects_for_sidebar())}
   end
 
   def update(assigns, socket) do
@@ -219,7 +223,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
 
     {:noreply,
      socket
-     |> assign(:projects, Projects.list_projects())
+     |> assign(:projects, Projects.list_projects_for_sidebar())
      |> assign(:renaming_project_id, nil)
      |> assign(:rename_value, "")}
   end
@@ -229,7 +233,15 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
     {id, ""} = Integer.parse(id_str)
     project = Projects.get_project!(id)
     Projects.delete_project(project)
-    {:noreply, assign(socket, :projects, Projects.list_projects())}
+    {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+  end
+
+  @impl true
+  def handle_event("set_bookmark", %{"id" => id, "value" => value}, socket) do
+    bookmarked = value == "true"
+    {:ok, project} = Projects.set_bookmarked(String.to_integer(id), bookmarked)
+    EyeInTheSky.Events.project_updated(project)
+    {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
   end
 
   @impl true
@@ -265,7 +277,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
         {:ok, _project} ->
           {:noreply,
            socket
-           |> assign(:projects, Projects.list_projects())
+           |> assign(:projects, Projects.list_projects_for_sidebar())
            |> assign(:new_project_path, nil)}
 
         {:error, _} ->
@@ -283,7 +295,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
 
     case Projects.create_project(%{name: name, path: path}) do
       {:ok, _project} ->
-        {:noreply, assign(socket, :projects, Projects.list_projects())}
+        {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
 
       {:error, _} ->
         {:noreply, socket}

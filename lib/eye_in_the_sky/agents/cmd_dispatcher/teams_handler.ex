@@ -17,7 +17,6 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
   alias EyeInTheSky.{Sessions, Teams}
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Agents.CmdDispatcher.Helpers
-  alias EyeInTheSky.Teams.TeamMember
 
   import Helpers, only: [notify_success: 2, notify_error: 3, extract_flag: 2, get_session!: 1]
 
@@ -72,7 +71,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
       [_team_id_str, member_id_str] ->
         case Integer.parse(String.trim(member_id_str)) do
           {member_id, ""} ->
-            case EyeInTheSky.Repo.get(TeamMember, member_id) do
+            case Teams.get_member(member_id) do
               nil ->
                 notify_error(from_session_id, "teams leave", {:member_not_found, member_id})
 
@@ -102,7 +101,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
 
         with {member_id, ""} <- Integer.parse(String.trim(member_id_str)),
              {:ok, status} <- extract_flag(args, "--status") do
-          case EyeInTheSky.Repo.get(TeamMember, member_id) do
+          case Teams.get_member(member_id) do
             nil ->
               notify_error(from_session_id, "teams update-member", {:member_not_found, member_id})
 

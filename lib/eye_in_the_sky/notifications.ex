@@ -110,7 +110,7 @@ defmodule EyeInTheSky.Notifications do
   defp maybe_push(%{category: "agent"} = notification) do
     url = build_url(notification.resource_type, notification.resource_id)
 
-    Task.start(fn ->
+    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
       PushSubscriptions.broadcast(notification.title, notification.body, url)
     end)
   end

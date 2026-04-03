@@ -143,7 +143,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
         dm_body = "[team broadcast] from #{sender_name}: #{message}"
 
         Enum.each(members, fn member ->
-          Task.start(fn ->
+          Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
             AgentManager.send_message(member.session_id, dm_body)
           end)
         end)

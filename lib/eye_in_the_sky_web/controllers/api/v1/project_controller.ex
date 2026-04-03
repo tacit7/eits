@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectController do
       git_remote: params["git_remote"],
       repo_url: params["repo_url"],
       branch: params["branch"],
-      active: if(params["active"] == false, do: false, else: true)
+      active: Map.get(params, "active", true)
     }
 
     case Projects.create_project(attrs) do

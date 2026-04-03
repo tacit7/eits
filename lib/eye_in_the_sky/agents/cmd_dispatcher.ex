@@ -92,7 +92,9 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   @spec dispatch_all([String.t()], integer()) :: :ok
   def dispatch_all(cmd_lines, from_session_id) do
     Enum.each(cmd_lines, fn line ->
-      Task.start(fn -> dispatch(String.trim(line), from_session_id) end)
+      Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+        dispatch(String.trim(line), from_session_id)
+      end)
     end)
   end
 

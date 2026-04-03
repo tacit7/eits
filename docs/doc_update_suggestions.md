@@ -1,5 +1,29 @@
 # Documentation Update Suggestions
 
+## 2026-04-02
+**Commits reviewed**: 624313367941bf1280bd1f090c450e2b3d67594a..42ae046
+
+- **CLAUDE.md** — Update API key blocking behavior (commit c3a47c8): ANTHROPIC_API_KEY now blocked in build_env for spawned Claude processes to prevent credit-balance-too-low errors when shell env contains a key with insufficient credits; spawned processes fall through to Max plan OAuth via macOS keychain
+- **WORKERS.md or SESSION_MANAGER.md** — Document orphaned Claude process cleanup (commits 29f9684, 5846ebf, 6bf2b26, 428b0c8): AgentWorker now retries failed session starts with `--resume` when "Session ID already in use" error is received; first retry pkill's orphaned processes, second retry fails if orphan kill didn't help (:kill_retry flag prevents infinite retries); covers crash-and-restart scenarios
+- **CODE_GUIDELINES.md** — Document chat upload helpers extraction (commit f155e80): ChatLive.UploadHelpers module extracted with functions for file cleanup, accept/reject processing, and attachment presigning; enables test coverage and reuse across upload flows
+- **REST_API.md** — Document `/api/browser/sessions` endpoint (commit 76ab752): new browser-authenticated endpoint (session cookie instead of Bearer token) for command palette session list fetches; standard /api/v1/sessions requires Bearer auth which browser fetch cannot provide
+- **SETUP.md or PRODUCTION.md** — Document static asset restoration (commits b194105, f25d0de, f7704bd): mockups.html, manifest.json, and sw.js files restored to `.gitignore` after fix; service worker and mockup assets no longer excluded from production builds
+- **CODE_GUIDELINES.md** — Document kanban accessibility fix (commit 9738b41): select-all checkbox column now uses data-column-index instead of data-column-handle to prevent drag-handle binding on checkbox element; fixes sorting activation when selecting multiple kanban tasks
+- **SETUP.md** — Document Oban Pruner/Stager/Lifeline plugins (commit 804fb9e): Oban config in dev now includes Pruner (clean completed jobs), Stager (enqueue scheduled jobs), and Lifeline (recover crashed job processes) plugins; moved from inline testing mode to normal job processing
+- **CODE_GUIDELINES.md** — Document datetime helpers consolidation (commit fa85633): format_relative_time/1 helper now handles both DateTime and NaiveDateTime types via pattern matching; enables consistent relative time rendering across context that returns mixed datetime types
+- **CODE_GUIDELINES.md** — Document agent task status fix (commit 523b025): Task.Status enum no longer includes invalid `:error` status; corrected to `:failed` in AgentWorkerEvents; fixes agent status lifecycle tracking
+- **CODE_GUIDELINES.md** — Document task timestamp injection (commits d2e90bf, a631a29): create_task and update_task directives now inject timestamps (inserted_at, updated_at) and task UUID directly from EITS-CMD (no DB query); enables proper task lifecycle tracking in agents without waiting for session sync
+- **EITS_CLI.md or CODE_GUIDELINES.md** — Document EITS-CMD feedback protocol (commit 73f64bd): all directives now return [EITS-CMD ok] or [EITS-CMD error] messages back to originating session; task_begin returns task_id, team_add returns member_id, spawn returns agent_id; agents must wait for feedback before follow-up commands
+- **CODE_GUIDELINES.md** — Document UploadHelpers and message validation (commits 85a4a7f, 5c47d80): palette commands (Create Note, Create Agent, Create Chat) now use LiveView socket instead of HTTP fetch; adds input validation for chat UUID and agent instructions before creation
+- **DM_FEATURES.md** — Document message queue bug fixes (commits 1a09115, 91e8d312, 9e8d312): three queue bugs fixed: orphaned file cleanup on message rejection, message reload after rejection, and deterministic deduplication; includes regression tests for message admission flow
+- **CODE_GUIDELINES.md** — Document color system unification (commits 233f620-f1f6c0a): all hardcoded oklch/hsl colors replaced with semantic Tailwind classes (text-primary, bg-surface, etc.) and @catppuccin/daisyui theme plugin; enables dark mode and theme switching across auth, chat, date picker, and prompt pages
+- **SETUP.md** — Document Vite dev server port configuration (commit 2907189, 8686abb): VITE_PORT env var now configurable (default 5173); when running multiple worktrees, use different ports (e.g., VITE_PORT=5174 PORT=5002) to avoid asset conflicts; documented worktree workflow in CLAUDE.md
+- **CODE_GUIDELINES.md** — Document markdown syntax highlighting fix (commit 426cd7c): CodeMirror 6 markdown editor now includes defaultHighlightStyle fallback for proper syntax highlighting; prevents syntax loss in note editors across all CM hooks
+- **CODE_GUIDELINES.md** — Document vim keybindings and CM settings (commits 56d604c, 783bd91, 228f0f2, 52c5fde, a02b82f, dd01560): CodeMirror now supports user-configurable tab size, font size, and vim mode toggles via Settings; persisted in localStorage via CM user settings section
+- **REST_API.md** — Document numeric session ID resolution (commit ee6cacc): dm --to now accepts both UUID and integer session ID; enables agents to use simpler EITS_SESSION_ID env var instead of full UUID for DM targeting
+- **CODE_GUIDELINES.md or DM_FEATURES.md** — Document command palette improvements (commits 672f73e, d4c298a, 80f294d): command palette now includes comprehensive agent management, server-side session flags (from CLI flags), and deduplicated SQL fragments for task title queries
+- **DM_FEATURES.md** — Document multimodal content blocks (commits baa1bf9, 9391dd8, b90e4c4, 85edb0e, 214e6c0): new ContentBlock foundation with provider-aware pipeline; content_blocks JSON piped to Claude CLI stdin; handles image preprocessing (resize, compress, EXIF normalization) with model capability enforcement
+
 ## 2026-04-01
 **Commits reviewed**: ca015ef..d70a166
 

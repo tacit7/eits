@@ -40,6 +40,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
       |> assign(:show_delete_confirm, false)
       |> assign(:editing_session_id, nil)
       |> assign(:canvases, Canvases.list_canvases())
+      |> assign(:show_new_canvas_for, nil)
       |> load_agents()
       |> schedule_refresh()
 
@@ -298,6 +299,11 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
   @impl true
   def handle_event("noop", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_event("show_new_canvas_form", %{"agent-id" => id}, socket) do
+    {:noreply, assign(socket, :show_new_canvas_for, id)}
+  end
 
   @impl true
   def handle_event("add_to_canvas", %{"canvas-id" => cid, "session-id" => sid}, socket) do
@@ -629,20 +635,20 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
               </button>
             <% end %>
             <div class="border-t border-base-content/10 my-0.5" />
-            <div id={"new-canvas-label-#{@agent.id}"}>
+            <%= if @show_new_canvas_for != to_string(@agent.id) do %>
               <button
                 type="button"
+                phx-click="show_new_canvas_form"
+                phx-value-agent-id={@agent.id}
                 class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-secondary hover:bg-base-content/10 transition-colors text-left"
-                onclick={"document.getElementById('new-canvas-label-#{@agent.id}').style.display='none'; document.getElementById('new-canvas-form-#{@agent.id}').style.display='block';"}
               >+ New canvas</button>
-            </div>
-            <div id={"new-canvas-form-#{@agent.id}"} style="display:none">
-              <form phx-submit="add_to_new_canvas" phx-click="noop" class="flex flex-col gap-1 p-1">
+            <% else %>
+              <form phx-submit="add_to_new_canvas" class="flex flex-col gap-1 p-1">
                 <input type="hidden" name="session_id" value={@agent.id} />
                 <input type="text" name="canvas_name" class="input input-xs w-full" placeholder="Canvas name..." autocomplete="off" />
                 <button type="submit" class="btn btn-primary btn-xs w-full">Create &amp; Add</button>
               </form>
-            </div>
+            <% end %>
           </div>
         </details>
         <%= if @agent.agent && @agent.agent.uuid && @agent.uuid do %>
@@ -775,7 +781,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
                 editing_session_id={@editing_session_id}
               >
                 <:actions>
-                  <.agent_row_menu agent={agent} canvases={@canvases} />
+                  <.agent_row_menu agent={agent} canvases={@canvases} show_new_canvas_for={@show_new_canvas_for} />
                 </:actions>
               </.session_row>
             </div>

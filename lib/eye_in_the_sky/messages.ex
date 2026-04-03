@@ -35,16 +35,13 @@ defmodule EyeInTheSky.Messages do
     Logger.debug("Loading messages from JSONL for session: #{session_id}, project: #{project_id}")
 
     case JsonlStorage.read_session_messages(project_id, session_id) do
-      messages when is_list(messages) and messages != [] ->
-        Logger.debug("Loaded #{length(messages)} messages from JSONL file")
-        messages
-
       [] ->
         Logger.debug("No messages found in JSONL file, falling back to database")
         list_messages_for_session_db(session_id)
 
-      nil ->
-        list_messages_for_session_db(session_id)
+      messages ->
+        Logger.debug("Loaded #{length(messages)} messages from JSONL file")
+        messages
     end
   end
 

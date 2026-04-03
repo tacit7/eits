@@ -136,7 +136,7 @@ defmodule EyeInTheSky.Tasks do
       Enum.group_by(session_rows, fn {task_id, _} -> task_id end, fn {_, sid} -> sid end)
 
     Enum.map(tasks, fn t ->
-      Map.put(t, :session_ids, Map.get(sessions_by_task, t.id, []))
+      %{t | session_ids: Map.get(sessions_by_task, t.id, [])}
     end)
   end
 

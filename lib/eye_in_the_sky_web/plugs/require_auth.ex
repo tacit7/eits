@@ -34,11 +34,9 @@ defmodule EyeInTheSkyWeb.Plugs.RequireAuth do
   end
 
   defp db_key_match?(token) do
-    try do
-      ApiKey.valid_db_token?(token)
-    rescue
-      _ -> false
-    end
+    ApiKey.valid_db_token?(token)
+  rescue
+    DBConnection.ConnectionError -> false
   end
 
   defp reject(conn) do

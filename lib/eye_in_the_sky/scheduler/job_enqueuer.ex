@@ -42,18 +42,19 @@ defmodule EyeInTheSky.Scheduler.JobEnqueuer do
 
   @impl GenServer
   def handle_info(:check_jobs, state) do
-    try do
-      for job <- ScheduledJobs.due_jobs() do
-        case ScheduledJobs.enqueue_job(job) do
-          {:ok, _} -> ScheduledJobs.mark_job_executed(job)
-          {:error, reason} -> Logger.error("Failed to enqueue job #{job.id}: #{inspect(reason)}")
-        end
+    for job <- ScheduledJobs.due_jobs() do
+      case ScheduledJobs.enqueue_job(job) do
+        {:ok, _} -> ScheduledJobs.mark_job_executed(job)
+        {:error, reason} -> Logger.error("Failed to enqueue job #{job.id}: #{inspect(reason)}")
       end
-    rescue
-      e -> Logger.error("JobEnqueuer check failed: #{inspect(e)}")
     end
 
     Process.send_after(self(), :check_jobs, @check_interval)
     {:noreply, state}
+  rescue
+    DBConnection.ConnectionError ->
+      Logger.error("JobEnqueuer check failed: DB connection unavailable")
+      Process.send_after(self(), :check_jobs, @check_interval)
+      {:noreply, state}
   end
 end

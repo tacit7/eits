@@ -45,7 +45,7 @@ defmodule EyeInTheSky.Settings do
       _ -> Map.get(@defaults, key)
     end
   rescue
-    _ -> Map.get(@defaults, key)
+    DBConnection.ConnectionError -> Map.get(@defaults, key)
   end
 
   @doc "Get a setting as a float."

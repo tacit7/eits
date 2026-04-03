@@ -4,7 +4,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Notes
   alias EyeInTheSky.Repo
-  import Ecto.Query
   import EyeInTheSkyWeb.Components.NotesList
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_id: 1]
   import EyeInTheSkyWeb.Live.Shared.NotesHelpers
@@ -130,53 +129,22 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   defp load_notes(socket) do
     project = socket.assigns.project
     agent_ids = Enum.map(project.agents, & &1.id)
-
-    session_ids =
-      from(s in EyeInTheSky.Sessions.Session,
-        where: s.agent_id in ^agent_ids,
-        select: s.id
-      )
-      |> Repo.all()
-
     query = socket.assigns.search_query
-    starred_only = socket.assigns.starred_filter
-    sort_by = socket.assigns.notes_sort_by
-    type_filter = socket.assigns.type_filter
-    order = if sort_by == "oldest", do: [asc: :created_at], else: [desc: :created_at]
 
     notes =
       if query != "" and String.trim(query) != "" do
         Notes.search_notes(query, agent_ids,
           project_id: project.id,
-          session_ids: session_ids,
-          starred: starred_only
+          starred: socket.assigns.starred_filter
         )
       else
-        project_id_str = to_string(project.id)
-        agent_id_strs = Enum.map(agent_ids, &to_string/1)
-        session_id_strs = Enum.map(session_ids, &to_string/1)
-
-        base =
-          from(n in EyeInTheSky.Notes.Note,
-            where:
-              (n.parent_type in ["project", "projects"] and n.parent_id == ^project_id_str) or
-                (n.parent_type in ["agent", "agents"] and n.parent_id in ^agent_id_strs) or
-                (n.parent_type in ["session", "sessions"] and
-                   n.parent_id in ^session_id_strs),
-            order_by: ^order
-          )
-
-        base = if starred_only, do: from(n in base, where: n.starred == 1), else: base
-
-        base =
-          if type_filter != "all" do
-            variants = type_filter_variants(type_filter)
-            from(n in base, where: n.parent_type in ^variants)
-          else
-            base
-          end
-
-        Repo.all(base)
+        Notes.list_notes_filtered(
+          project_id: project.id,
+          agent_ids: agent_ids,
+          starred: socket.assigns.starred_filter,
+          sort: socket.assigns.notes_sort_by,
+          type_filter: socket.assigns.type_filter
+        )
       end
 
     assign(socket, :notes, notes)

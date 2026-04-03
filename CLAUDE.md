@@ -84,41 +84,20 @@ Session status is driven by Claude Code hooks and explicit commands:
 
 `CLAUDE_CODE_ENTRYPOINT` distinguishes `cli` (interactive) from `sdk-cli` (headless/spawned).
 
-## Entrypoint-Based Command Protocol
+## EITS Command Protocol
 
-> **IMPORTANT: Check your entrypoint before dispatching ANY EITS command.**
-> Run `echo $CLAUDE_CODE_ENTRYPOINT` at the start of every session.
-> Using the wrong method silently fails or breaks session hierarchy.
+All agents — interactive (`cli`) and spawned (`sdk-cli`) — use the `eits` CLI script:
 
-**How you dispatch EITS commands depends on your `CLAUDE_CODE_ENTRYPOINT`:**
-
-| Entrypoint | Mode | Use |
-|------------|------|-----|
-| `cli` | Interactive | `eits` CLI script |
-| `sdk-cli` | Headless/spawned agent | `EITS-CMD:` directives in output |
-
-**`sdk-cli` (headless/spawned agents) — use `EITS-CMD:` lines:**
-```
-EITS-CMD: task begin Fix broken import
-EITS-CMD: task done 1234
-EITS-CMD: task annotate 1234 What I did and why
-EITS-CMD: dm --to <session_uuid> --message "done"
-EITS-CMD: dm --to 1740 --message "done"
-EITS-CMD: commit abc1234
-```
-These are intercepted by AgentWorker in-process — no HTTP round-trips. **Never use the `eits` bash script when running as `sdk-cli`.**
-
-**DM targets support both UUID and numeric session ID** (as of commit ee6cacc). Pass either format to `dm --to`.
-
-**`cli` (interactive sessions) — use `eits` script:**
 ```bash
-eits tasks begin --title "Task name"   # replaces: create + start
+eits tasks begin --title "Task name"   # create + start in one shot
 eits tasks annotate <id> --body "..."
 eits tasks update <id> --state 4
+eits tasks complete <id> --message "Summary"
 eits dm --to <session_uuid> --message "done"
+eits commits create --hash <hash>
 ```
 
-**When spawning agents:** their `CLAUDE_CODE_ENTRYPOINT` will be `sdk-cli`. Write their instructions using `EITS-CMD:` directives, not `eits` CLI calls.
+**DM targets support both UUID and numeric session ID.** Pass either format to `dm --to`.
 
 ## REST API
 

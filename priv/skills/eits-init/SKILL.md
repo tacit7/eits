@@ -49,45 +49,8 @@ The startup/resume hooks inject these env vars automatically:
 
 ## Messaging Protocol
 
-Check `$CLAUDE_CODE_ENTRYPOINT` to determine how to send DMs and commands:
+All agents — interactive (`cli`) and spawned (`sdk-cli`) — use the `eits` CLI script:
 
-```bash
-echo "$CLAUDE_CODE_ENTRYPOINT"
-```
-
-| Entrypoint | Method | Reason |
-|------------|--------|--------|
-| `sdk-cli` | **EITS-CMD** | Spawned/headless agent — AgentWorker intercepts stdout, no HTTP needed |
-| `cli` | **eits script** | Interactive session — no worker intercepting, use REST API |
-
-**When `sdk-cli` (spawned agent) — output EITS-CMD lines in your text:**
-```
-EITS-CMD: dm --to <session_uuid> --message "your message"
-EITS-CMD: task create <title>
-EITS-CMD: task begin <title>
-EITS-CMD: task update <id> <state_id>
-EITS-CMD: task done <id>
-EITS-CMD: task annotate <id> <body>
-EITS-CMD: note <body>
-EITS-CMD: note task <id> <body>
-EITS-CMD: commit <hash>
-EITS-CMD: teams join <team_id> --name <name> [--role <role>]
-EITS-CMD: teams leave <team_id> <member_id>
-EITS-CMD: teams done
-EITS-CMD: teams update-member <team_id> <member_id> --status <status>
-EITS-CMD: team broadcast --message "text"
-EITS-CMD: channel send <channel_id> --body "text"
-EITS-CMD: spawn --instructions "text" [--model <m>] [--worktree <b>]
-```
-The AgentWorker strips these from the visible stream and dispatches them in-process.
-
-**Feedback:** Every directive sends a message back to your session on completion:
-- Success: `[EITS-CMD ok] task begun id=42 title=...`
-- Error: `[EITS-CMD error] task done: {:not_linked, 99}`
-
-**Wait for the feedback before using returned IDs.** After `task begin`, wait for the `[EITS-CMD ok]` response to get the task ID before annotating or completing it. Do not guess IDs.
-
-**When `sdk-cli` (interactive session) — use the eits script:**
 ```bash
 eits dm --to <session_uuid> --message "your message"
 eits tasks update <id> --state 4

@@ -17,7 +17,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     {"dark", "Dark"},
     {"light", "Light"},
     {"dracula", "Dracula"},
-    {"tokyonight", "Tokyo Night"}
+    {"tokyonight", "Tokyo Night"},
+    {"autumn", "Autumn"}
   ]
 
   @valid_tabs ~w(general editor auth workflow pricing system)

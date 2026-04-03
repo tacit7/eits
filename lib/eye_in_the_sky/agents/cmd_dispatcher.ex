@@ -66,7 +66,6 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
 
   alias EyeInTheSky.{ChannelMessages, Commits, Messages, Notes, Notifications, Sessions, Tasks, Teams}
   alias EyeInTheSky.Agents.AgentManager
-  alias EyeInTheSky.Teams.TeamMember
 
   @cmd_prefix "EITS-CMD:"
 
@@ -564,7 +563,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
       [_team_id_str, member_id_str] ->
         case Integer.parse(String.trim(member_id_str)) do
           {member_id, ""} ->
-            case EyeInTheSky.Repo.get(TeamMember, member_id) do
+            case Teams.get_member(member_id) do
               nil ->
                 notify_error(from_session_id, "teams leave", {:member_not_found, member_id})
 
@@ -583,11 +582,6 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   end
 
   # teams done — mark current session's team memberships as done
-  defp dispatch_teams("done", from_session_id) do
-    Teams.mark_member_done_by_session(from_session_id)
-    notify_success(from_session_id, "teams done for session #{from_session_id}")
-  end
-
   defp dispatch_teams("done" <> _, from_session_id) do
     Teams.mark_member_done_by_session(from_session_id)
     notify_success(from_session_id, "teams done for session #{from_session_id}")
@@ -601,7 +595,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
 
         with {member_id, ""} <- Integer.parse(String.trim(member_id_str)),
              {:ok, status} <- extract_flag(args, "--status") do
-          case EyeInTheSky.Repo.get(TeamMember, member_id) do
+          case Teams.get_member(member_id) do
             nil ->
               notify_error(from_session_id, "teams update-member", {:member_not_found, member_id})
 

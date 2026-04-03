@@ -72,6 +72,10 @@ defmodule EyeInTheSky.Teams do
     |> Repo.all()
   end
 
+  def get_member(id) when is_integer(id) do
+    Repo.get(TeamMember, id)
+  end
+
   def get_member(team_id, name) do
     Repo.get_by(TeamMember, team_id: team_id, name: name)
   end

@@ -1,5 +1,9 @@
 defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
-  alias EyeInTheSky.{Channels, Sessions}
+  require Logger
+
+  alias EyeInTheSky.{Channels, Messages, Sessions}
+  alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Claude.ChannelProtocol
 
   def calculate_unread_counts(channels, session_id) do
     Enum.reduce(channels, %{}, fn channel, acc ->
@@ -28,6 +32,56 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
         session_name: session_data && session_data.name,
         session_uuid: session_data && session_data.uuid
       }
+    end)
+  end
+
+  @doc """
+  Auto-joins mentioned sessions to the channel, then routes the message
+  to every existing agent member (excluding the sender).
+
+  Extracted from ChatLive.handle_event("send_channel_message") to keep
+  the LiveView handler thin.
+  """
+  def route_to_members(channel_id, body, sender_session_id, content_blocks) do
+    {_mode, mentioned_ids, _mention_all} = ChannelProtocol.parse_routing(body, -1)
+
+    Enum.each(mentioned_ids, fn mid ->
+      unless Channels.is_member?(channel_id, mid) do
+        case Sessions.get_session(mid) do
+          {:ok, s} ->
+            Channels.add_member(channel_id, s.agent_id, mid)
+            Logger.info("Auto-added session=#{mid} to channel=#{channel_id}")
+
+          _ ->
+            :ok
+        end
+      end
+    end)
+
+    agent_members = Channels.list_members(channel_id)
+
+    Enum.each(agent_members, fn member ->
+      unless ChannelProtocol.skip?(member.session_id, sender_session_id) do
+        {mode, _mentioned_ids, _mention_all} =
+          ChannelProtocol.parse_routing(body, member.session_id)
+
+        Messages.send_message(%{
+          session_id: member.session_id,
+          sender_role: "user",
+          recipient_role: "agent",
+          provider: "claude",
+          body: body
+        })
+
+        prompt = ChannelProtocol.build_prompt(mode, body)
+        Logger.info("Routing to session=#{member.session_id} mode=#{mode}")
+
+        AgentManager.send_message(member.session_id, prompt,
+          model: "sonnet",
+          channel_id: channel_id,
+          content_blocks: content_blocks
+        )
+      end
     end)
   end
 

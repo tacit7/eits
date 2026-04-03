@@ -12,13 +12,9 @@ defmodule EyeInTheSkyWeb.ChatLive do
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_budget: 1]
   import EyeInTheSkyWeb.Helpers.UploadHelpers
 
-  # Deterministic UUIDs for the web UI user
-  @web_agent_uuid "00000000-0000-0000-0000-000000000001"
-  @web_session_uuid "00000000-0000-0000-0000-000000000002"
-
   @impl true
   def mount(_params, _session, socket) do
-    session_id = ensure_web_session()
+    session_id = Sessions.ensure_web_ui_session()
 
     if connected?(socket) do
       subscribe_agent_working()
@@ -38,42 +34,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
       )
 
     {:ok, socket}
-  end
-
-  defp ensure_web_session do
-    alias EyeInTheSky.{Agents, Sessions}
-
-    case Sessions.get_session_by_uuid(@web_session_uuid) do
-      {:ok, session} ->
-        session.id
-
-      {:error, :not_found} ->
-        agent =
-          case Agents.get_agent_by_uuid(@web_agent_uuid) do
-            {:ok, a} ->
-              a
-
-            {:error, :not_found} ->
-              {:ok, a} =
-                Agents.create_agent(%{
-                  uuid: @web_agent_uuid,
-                  description: "Web UI User",
-                  source: "web"
-                })
-
-              a
-          end
-
-        {:ok, session} =
-          Sessions.create_session(%{
-            uuid: @web_session_uuid,
-            agent_id: agent.id,
-            name: "Web UI",
-            started_at: DateTime.utc_now()
-          })
-
-        session.id
-    end
   end
 
   @impl true
@@ -195,48 +155,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
       {:ok, message} ->
         EyeInTheSky.Events.channel_message(channel_id, message)
         Channels.mark_as_read(channel_id, session_id)
-
-        {_mode, mentioned_ids, _mention_all} = ChannelProtocol.parse_routing(body, -1)
-
-        Enum.each(mentioned_ids, fn mid ->
-          unless Channels.is_member?(channel_id, mid) do
-            case Sessions.get_session(mid) do
-              {:ok, s} ->
-                Channels.add_member(channel_id, s.agent_id, mid)
-                Logger.info("Auto-added session=#{mid} to channel=#{channel_id}")
-
-              _ ->
-                :ok
-            end
-          end
-        end)
-
-        agent_members = Channels.list_members(channel_id)
-
-        Enum.each(agent_members, fn member ->
-          unless ChannelProtocol.skip?(member.session_id, session_id) do
-            {mode, _mentioned_ids, _mention_all} =
-              ChannelProtocol.parse_routing(body, member.session_id)
-
-            Messages.send_message(%{
-              session_id: member.session_id,
-              sender_role: "user",
-              recipient_role: "agent",
-              provider: "claude",
-              body: body
-            })
-
-            prompt = ChannelProtocol.build_prompt(mode, body)
-            Logger.info("Routing to session=#{member.session_id} mode=#{mode}")
-
-            AgentManager.send_message(member.session_id, prompt,
-              model: "sonnet",
-              channel_id: channel_id,
-              content_blocks: content_blocks
-            )
-          end
-        end)
-
+        ChannelHelpers.route_to_members(channel_id, body, session_id, content_blocks)
         {:noreply, refresh_members_and_picker(socket)}
 
       {:error, _changeset} ->

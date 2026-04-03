@@ -31,23 +31,25 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
     job = ScheduledJobs.get_job!(job_id)
     {:ok, run} = ScheduledJobs.record_run_start(job)
 
-    case execute(job) do
-      {:ok, :no_work} ->
-        ScheduledJobs.record_run_complete(run, "completed", result: "No workable tasks")
-        broadcast()
-        :ok
+    try do
+      case execute(job) do
+        {:ok, :no_work} ->
+          ScheduledJobs.record_run_complete(run, "completed", result: "No workable tasks")
+          broadcast()
+          :ok
 
-      {:ok, output} ->
-        ScheduledJobs.record_run_complete(run, "completed", result: output)
+        {:ok, output} ->
+          ScheduledJobs.record_run_complete(run, "completed", result: output)
+          broadcast()
+          notify(output)
+          :ok
+      end
+    rescue
+      e ->
+        ScheduledJobs.record_run_complete(run, "failed", result: Exception.message(e))
         broadcast()
-        notify(output)
-        :ok
-
-      {:error, reason} ->
-        ScheduledJobs.record_run_complete(run, "failed", result: reason)
-        broadcast()
-        notify_error(reason)
-        {:error, reason}
+        notify_error(Exception.message(e))
+        reraise e, __STACKTRACE__
     end
   end
 
@@ -91,8 +93,6 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
         {:ok, "Spawned #{spawned} agents for tag=#{tag_name} (#{failed} failed)"}
       end
     end
-  rescue
-    e -> {:error, Exception.message(e)}
   end
 
   defp count_active_agents do

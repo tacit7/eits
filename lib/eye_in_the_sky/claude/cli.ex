@@ -390,8 +390,8 @@ defmodule EyeInTheSky.Claude.CLI do
     ]
     |> Keyword.filter(fn {_k, v} -> v != nil end)
   rescue
-    e ->
-      Logger.error("[cli_db_defaults] failed to load settings: #{inspect(e)}")
+    DBConnection.ConnectionError ->
+      Logger.warning("[cli_db_defaults] DB unavailable, using empty defaults")
       []
   end
 

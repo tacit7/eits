@@ -255,4 +255,5 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
 
   defp dispatch_channel(unknown, from_session_id),
     do: notify_error(from_session_id, "channel", {:unknown_subcommand, unknown})
+
 end

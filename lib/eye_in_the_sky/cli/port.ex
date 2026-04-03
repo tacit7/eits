@@ -162,6 +162,55 @@ defmodule EyeInTheSky.CLI.Port do
   # Environment helpers
   # ---------------------------------------------------------------------------
 
+  # ---------------------------------------------------------------------------
+  # Process cancellation
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Kills the OS process (group and direct) behind `port`, then closes the port.
+
+  Sends SIGTERM first. If the process is still alive after 500 ms, escalates to
+  SIGKILL. Both the process group (`-pid`) and the direct PID are targeted to
+  handle cases where the spawned binary is not the session leader.
+
+  `log_prefix` is used in informational log messages (e.g. `"CLI"`, `"Codex.CLI"`).
+  """
+  @spec cancel_port(port(), String.t()) :: :ok
+  def cancel_port(port, log_prefix \\ "CLI") when is_port(port) do
+    case Elixir.Port.info(port, :os_pid) do
+      {:os_pid, os_pid} ->
+        System.cmd("kill", ["-TERM", "-#{os_pid}"], stderr_to_stdout: true)
+        System.cmd("kill", ["-TERM", "#{os_pid}"], stderr_to_stdout: true)
+
+        Process.sleep(500)
+
+        case System.cmd("kill", ["-0", "#{os_pid}"], stderr_to_stdout: true) do
+          {_, 0} ->
+            Logger.info("[#{log_prefix}] Process #{os_pid} still alive, sending SIGKILL")
+            System.cmd("kill", ["-9", "-#{os_pid}"], stderr_to_stdout: true)
+            System.cmd("kill", ["-9", "#{os_pid}"], stderr_to_stdout: true)
+
+          _ ->
+            :ok
+        end
+
+      nil ->
+        :ok
+    end
+
+    try do
+      Elixir.Port.close(port)
+    rescue
+      ArgumentError -> :ok
+    end
+
+    :ok
+  end
+
+  # ---------------------------------------------------------------------------
+  # Environment helpers
+  # ---------------------------------------------------------------------------
+
   @doc """
   Appends `{key, value}` to the charlist env list, skipping nil and empty values.
   """

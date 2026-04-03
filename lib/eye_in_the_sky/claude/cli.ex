@@ -69,39 +69,12 @@ defmodule EyeInTheSky.Claude.CLI do
   Cancels a running Claude process by killing the OS process group, then closing the port.
 
   Port.close/1 alone only closes file descriptors; the subprocess may keep running.
-  We extract the OS PID via Port.info and send SIGTERM to the process group (-pid),
-  which kills Claude and any child processes it spawned.
+  Delegates to `EyeInTheSky.CLI.Port.cancel_port/2` which sends SIGTERM to both
+  the process group and direct PID, then escalates to SIGKILL if needed.
   """
   @spec cancel(port()) :: :ok
   def cancel(port) when is_port(port) do
-    case Port.info(port, :os_pid) do
-      {:os_pid, os_pid} ->
-        # Kill the entire process group (negative PID)
-        System.cmd("kill", ["-TERM", "-#{os_pid}"], stderr_to_stdout: true)
-
-        # Give it a moment, then force kill if still alive
-        Process.sleep(500)
-
-        case System.cmd("kill", ["-0", "#{os_pid}"], stderr_to_stdout: true) do
-          {_, 0} ->
-            Logger.info("[CLI] Process #{os_pid} still alive, sending SIGKILL")
-            System.cmd("kill", ["-9", "-#{os_pid}"], stderr_to_stdout: true)
-
-          _ ->
-            :ok
-        end
-
-      nil ->
-        :ok
-    end
-
-    try do
-      Port.close(port)
-    rescue
-      ArgumentError -> :ok
-    end
-
-    :ok
+    EyeInTheSky.CLI.Port.cancel_port(port, "CLI")
   end
 
   # ---------------------------------------------------------------------------

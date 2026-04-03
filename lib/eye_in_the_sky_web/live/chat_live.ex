@@ -43,13 +43,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   defp setup_channel(params, socket) do
     project_id = get_project_id(params)
-
-    channels =
-      case Channels.list_channels_for_project(project_id) do
-        channels when is_list(channels) -> channels
-        _ -> []
-      end
-
+    channels = load_channels(project_id)
     channel_id = params["channel_id"] || get_default_channel_id(channels, project_id)
     {channel_id, channels} = ensure_default_channel(channel_id, channels, project_id, socket)
 
@@ -57,6 +51,39 @@ defmodule EyeInTheSkyWeb.ChatLive do
       subscribe_channel_messages(channel_id)
     end
 
+    data = load_channel_data(project_id, channel_id, params, socket)
+
+    socket
+    |> assign(:page_title, "Chat")
+    |> assign(:project_id, project_id)
+    |> assign(:all_projects, data.all_projects)
+    |> assign(:channels, ChatPresenter.serialize_channels(channels))
+    |> assign(:active_channel_id, channel_id)
+    |> assign(:messages, data.messages)
+    |> assign(:unread_counts, data.unread_counts)
+    |> assign(:active_thread, data.active_thread)
+    |> assign(:agent_status_counts, data.agent_status_counts)
+    |> assign(:prompts, data.prompts)
+    |> assign(:agent_templates, data.agent_templates)
+    |> assign(:active_agents, data.active_sessions)
+    |> assign(:channel_members, data.channel_members)
+    |> assign(:sessions_by_project, data.sessions_by_project)
+    |> assign(:show_agent_drawer, false)
+    |> assign(:show_members, false)
+    |> assign_new(:session_search, fn -> "" end)
+    |> assign(:slash_items, EyeInTheSkyWeb.Helpers.SlashItems.build())
+  end
+
+  defp load_channels(project_id) do
+    case Channels.list_channels_for_project(project_id) do
+      channels when is_list(channels) -> channels
+      _ -> []
+    end
+  end
+
+  # Loads all DB data needed for the channel view. Extracted from setup_channel
+  # to isolate side-effectful queries from socket assignment.
+  defp load_channel_data(project_id, channel_id, params, socket) do
     messages =
       if channel_id do
         ChannelMessages.list_messages_for_channel(channel_id)
@@ -65,6 +92,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
         []
       end
 
+    channels = load_channels(project_id)
     unread_counts = ChannelHelpers.calculate_unread_counts(channels, get_session_id(socket))
     active_thread = load_thread(params["thread_id"])
 
@@ -112,25 +140,18 @@ defmodule EyeInTheSkyWeb.ChatLive do
     sessions_by_project =
       ChannelHelpers.build_sessions_by_project(channel_members, all_projects, session_search)
 
-    socket
-    |> assign(:page_title, "Chat")
-    |> assign(:project_id, project_id)
-    |> assign(:all_projects, all_projects)
-    |> assign(:channels, ChatPresenter.serialize_channels(channels))
-    |> assign(:active_channel_id, channel_id)
-    |> assign(:messages, messages)
-    |> assign(:unread_counts, unread_counts)
-    |> assign(:active_thread, active_thread)
-    |> assign(:agent_status_counts, agent_status_counts)
-    |> assign(:prompts, prompts)
-    |> assign(:agent_templates, agent_templates)
-    |> assign(:active_agents, active_sessions)
-    |> assign(:channel_members, channel_members)
-    |> assign(:sessions_by_project, sessions_by_project)
-    |> assign(:show_agent_drawer, false)
-    |> assign(:show_members, false)
-    |> assign_new(:session_search, fn -> "" end)
-    |> assign(:slash_items, EyeInTheSkyWeb.Helpers.SlashItems.build())
+    %{
+      messages: messages,
+      unread_counts: unread_counts,
+      active_thread: active_thread,
+      agent_status_counts: agent_status_counts,
+      prompts: prompts,
+      agent_templates: agent_templates,
+      channel_members: channel_members,
+      all_projects: all_projects,
+      active_sessions: active_sessions,
+      sessions_by_project: sessions_by_project
+    }
   end
 
   @impl true

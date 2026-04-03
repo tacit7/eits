@@ -378,36 +378,28 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
   # ---------------------------------------------------------------------------
 
   def handle_edit_job(%{"id" => id}, socket, scoping_project_id \\ nil) do
-    with {:ok, int_id} <- parse_job_id(id),
-         {:ok, job} <- ScheduledJobs.get_job(int_id) do
-      if scoping_project_id && job.project_id != scoping_project_id do
-        {:noreply, put_flash(socket, :error, "Access denied")}
-      else
-        config = ScheduledJobs.decode_config(job)
+    with_scoped_job(id, socket, scoping_project_id, fn job ->
+      config = ScheduledJobs.decode_config(job)
 
-        socket =
+      socket =
+        socket
+        |> assign(:show_form, true)
+        |> assign(:editing_job, job)
+        |> assign(:form, to_form(ScheduledJobs.change_job(job)))
+        |> assign(:form_job_type, job.job_type)
+        |> assign(:form_schedule_type, job.schedule_type)
+        |> assign(:form_config, config)
+
+      socket =
+        if scoping_project_id do
+          scope = if is_nil(job.project_id), do: "global", else: "project"
+          assign(socket, :form_scope, scope)
+        else
           socket
-          |> assign(:show_form, true)
-          |> assign(:editing_job, job)
-          |> assign(:form, to_form(ScheduledJobs.change_job(job)))
-          |> assign(:form_job_type, job.job_type)
-          |> assign(:form_schedule_type, job.schedule_type)
-          |> assign(:form_config, config)
+        end
 
-        socket =
-          if scoping_project_id do
-            scope = if is_nil(job.project_id), do: "global", else: "project"
-            assign(socket, :form_scope, scope)
-          else
-            socket
-          end
-
-        {:noreply, socket}
-      end
-    else
-      :error -> {:noreply, put_flash(socket, :error, "Invalid job ID")}
-      {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Job not found")}
-    end
+      {:noreply, socket}
+    end)
   end
 
   # ---------------------------------------------------------------------------
@@ -416,18 +408,10 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
   # ---------------------------------------------------------------------------
 
   def handle_toggle_job(%{"id" => id}, socket, reload_fun, scoping_project_id \\ nil) do
-    with {:ok, int_id} <- parse_job_id(id),
-         {:ok, job} <- ScheduledJobs.get_job(int_id) do
-      if scoping_project_id && job.project_id != scoping_project_id do
-        {:noreply, put_flash(socket, :error, "Access denied")}
-      else
-        ScheduledJobs.toggle_job(job, scoping_project_id)
-        {:noreply, reload_fun.(socket)}
-      end
-    else
-      :error -> {:noreply, put_flash(socket, :error, "Invalid job ID")}
-      {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Job not found")}
-    end
+    with_scoped_job(id, socket, scoping_project_id, fn job ->
+      ScheduledJobs.toggle_job(job, scoping_project_id)
+      {:noreply, reload_fun.(socket)}
+    end)
   end
 
   # ---------------------------------------------------------------------------
@@ -436,21 +420,30 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
   # ---------------------------------------------------------------------------
 
   def handle_delete_job(%{"id" => id}, socket, reload_fun, scoping_project_id \\ nil) do
+    with_scoped_job(id, socket, scoping_project_id, fn job ->
+      case ScheduledJobs.delete_job(job, scoping_project_id) do
+        {:ok, _} ->
+          {:noreply, socket |> reload_fun.() |> put_flash(:info, "Job deleted")}
+
+        {:error, :system_job} ->
+          {:noreply, put_flash(socket, :error, "Cannot delete system jobs")}
+
+        {:error, :unauthorized} ->
+          {:noreply, put_flash(socket, :error, "Access denied")}
+      end
+    end)
+  end
+
+  # Resolves a job by ID, enforces project scoping, then calls fun.(job).
+  # Returns {:noreply, socket} with an error flash if the ID is invalid,
+  # the job is not found, or the job belongs to a different project.
+  defp with_scoped_job(id, socket, scoping_project_id, fun) do
     with {:ok, int_id} <- parse_job_id(id),
          {:ok, job} <- ScheduledJobs.get_job(int_id) do
       if scoping_project_id && job.project_id != scoping_project_id do
         {:noreply, put_flash(socket, :error, "Access denied")}
       else
-        case ScheduledJobs.delete_job(job, scoping_project_id) do
-          {:ok, _} ->
-            {:noreply, socket |> reload_fun.() |> put_flash(:info, "Job deleted")}
-
-          {:error, :system_job} ->
-            {:noreply, put_flash(socket, :error, "Cannot delete system jobs")}
-
-          {:error, :unauthorized} ->
-            {:noreply, put_flash(socket, :error, "Access denied")}
-        end
+        fun.(job)
       end
     else
       :error -> {:noreply, put_flash(socket, :error, "Invalid job ID")}

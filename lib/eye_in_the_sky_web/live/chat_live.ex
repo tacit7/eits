@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
   alias EyeInTheSkyWeb.ChatPresenter
   alias EyeInTheSkyWeb.ChatLive.ChannelHeader
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
+  alias EyeInTheSkyWeb.ChatLive.ChannelHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_budget: 1]
   import EyeInTheSkyWeb.Helpers.UploadHelpers
@@ -104,7 +105,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
         []
       end
 
-    unread_counts = calculate_unread_counts(channels, get_session_id(socket))
+    unread_counts = ChannelHelpers.calculate_unread_counts(channels, get_session_id(socket))
     active_thread = load_thread(params["thread_id"])
 
     agent_status_counts =
@@ -123,7 +124,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
       |> Enum.take(50)
       |> Enum.map(fn a -> %{id: a.id, description: a.description} end)
 
-    channel_members = load_channel_members(channel_id)
+    channel_members = ChannelHelpers.load_channel_members(channel_id)
     all_projects = Projects.list_projects()
 
     active_sessions =
@@ -149,7 +150,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
     session_search = socket.assigns[:session_search] || ""
 
     sessions_by_project =
-      build_sessions_by_project(channel_members, all_projects, session_search)
+      ChannelHelpers.build_sessions_by_project(channel_members, all_projects, session_search)
 
     socket
     |> assign(:page_title, "Chat")
@@ -425,7 +426,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
   @impl true
   def handle_event("search_sessions", %{"session_search" => query}, socket) do
     sessions_by_project =
-      build_sessions_by_project(
+      ChannelHelpers.build_sessions_by_project(
         socket.assigns.channel_members,
         socket.assigns.all_projects,
         query
@@ -595,7 +596,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
         _ -> []
       end
 
-    unread_counts = calculate_unread_counts(channels, get_session_id(socket))
+    unread_counts = ChannelHelpers.calculate_unread_counts(channels, get_session_id(socket))
 
     {:noreply,
      socket
@@ -743,86 +744,17 @@ defmodule EyeInTheSkyWeb.ChatLive do
     }
   end
 
-  defp calculate_unread_counts(channels, session_id) do
-    Enum.reduce(channels, %{}, fn channel, acc ->
-      count = Channels.count_unread_messages(channel.id, session_id)
-      Map.put(acc, channel.id, count)
-    end)
-  end
-
-  defp load_channel_members(nil), do: []
-
-  defp load_channel_members(channel_id) do
-    Channels.list_members(channel_id)
-    |> Enum.map(fn member ->
-      session_data =
-        case Sessions.get_session(member.session_id) do
-          {:ok, s} -> s
-          _ -> nil
-        end
-
-      %{
-        id: member.id,
-        session_id: member.session_id,
-        agent_id: member.agent_id,
-        role: member.role,
-        joined_at: member.joined_at,
-        session_name: session_data && session_data.name,
-        session_uuid: session_data && session_data.uuid
-      }
-    end)
-  end
-
   defp refresh_members_and_picker(socket) do
     channel_id = socket.assigns.active_channel_id
-    channel_members = load_channel_members(channel_id)
+    channel_members = ChannelHelpers.load_channel_members(channel_id)
     search = socket.assigns[:session_search] || ""
 
     sessions_by_project =
-      build_sessions_by_project(channel_members, socket.assigns.all_projects, search)
+      ChannelHelpers.build_sessions_by_project(channel_members, socket.assigns.all_projects, search)
 
     socket
     |> assign(:channel_members, channel_members)
     |> assign(:sessions_by_project, sessions_by_project)
-  end
-
-  defp build_sessions_by_project(channel_members, all_projects, search) do
-    member_session_ids = channel_members |> Enum.map(& &1.session_id) |> MapSet.new()
-    projects_by_id = Enum.into(all_projects, %{}, fn p -> {p.id, p} end)
-
-    all_sessions =
-      Sessions.list_sessions_filtered(
-        status_filter: "all",
-        search_query: search,
-        limit: 100
-      )
-
-    all_sessions
-    |> Enum.reject(fn s -> MapSet.member?(member_session_ids, s.id) end)
-    |> Enum.group_by(fn s -> s.project_id end)
-    |> Enum.map(fn {pid, sessions} ->
-      project = Map.get(projects_by_id, pid)
-
-      %{
-        project_id: pid,
-        project_name: if(project, do: project.name, else: "Unassigned"),
-        sessions:
-          Enum.map(sessions, fn s ->
-            %{
-              id: s.id,
-              name: s.name,
-              model: s.model,
-              ended_at: s.ended_at,
-              agent_description:
-                if(Ecto.assoc_loaded?(s.agent) && s.agent,
-                  do: s.agent.description,
-                  else: nil
-                )
-            }
-          end)
-      }
-    end)
-    |> Enum.sort_by(fn g -> g.project_name end)
   end
 
   defp maybe_opt(opts, _key, nil), do: opts

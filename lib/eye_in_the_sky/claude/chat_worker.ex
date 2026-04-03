@@ -118,7 +118,7 @@ defmodule EyeInTheSky.Claude.ChatWorker do
   defp process_job(state, job) do
     worker = self()
 
-    Task.start(fn ->
+    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
       results = fanout(state.channel_id, job.message, job.sender_session_id, job.opts)
       send(worker, {:fanout_complete, results})
     end)

@@ -19,7 +19,9 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.Helpers do
     Logger.info("[CmdDispatcher] #{msg}")
 
     if from_session_id do
-      Task.start(fn -> AgentManager.send_message(from_session_id, "[EITS-CMD ok] #{msg}") end)
+      Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+        AgentManager.send_message(from_session_id, "[EITS-CMD ok] #{msg}")
+      end)
     end
 
     :ok
@@ -40,7 +42,9 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.Helpers do
     )
 
     if from_session_id do
-      Task.start(fn -> AgentManager.send_message(from_session_id, msg) end)
+      Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+        AgentManager.send_message(from_session_id, msg)
+      end)
     end
 
     :ok

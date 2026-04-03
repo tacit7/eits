@@ -87,7 +87,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       Logger.warning("open_in_editor: unrecognized editor command #{inspect(editor)}")
     end
 
-    Task.start(fn -> System.cmd(editor, [path], stderr_to_stdout: true) end)
+    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+      System.cmd(editor, [path], stderr_to_stdout: true)
+    end)
     {:noreply, put_flash(socket, :info, "Opening in #{editor}...")}
   end
 

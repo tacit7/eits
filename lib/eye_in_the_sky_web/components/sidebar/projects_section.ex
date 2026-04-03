@@ -157,6 +157,22 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                     </li>
                     <li>
                       <button
+                        phx-click="set_bookmark"
+                        phx-value-id={project.id}
+                        phx-value-value={"#{!project.bookmarked}"}
+                        phx-target={@myself}
+                        phx-disable-with=""
+                        class="flex items-center gap-2 text-sm"
+                      >
+                        <.icon
+                          name={if project.bookmarked, do: "hero-bookmark-solid", else: "hero-bookmark"}
+                          class="w-3.5 h-3.5"
+                        />
+                        {if project.bookmarked, do: "Unbookmark", else: "Bookmark"}
+                      </button>
+                    </li>
+                    <li>
+                      <button
                         phx-click="delete_project"
                         phx-value-project_id={project.id}
                         phx-target={@myself}

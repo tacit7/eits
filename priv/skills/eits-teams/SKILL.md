@@ -11,19 +11,6 @@ EITS teams coordinate multiple Claude agents in parallel. Membership is server-s
 
 ---
 
-## Entrypoint
-
-```bash
-echo "$CLAUDE_CODE_ENTRYPOINT"
-```
-
-| Value | Method |
-|-------|--------|
-| `sdk-cli` | `EITS-CMD:` directives in output |
-| `cli` | `eits` CLI script |
-
----
-
 ## CLI Reference
 
 ```bash
@@ -54,28 +41,6 @@ eits agents spawn \
 ```
 
 Only `--instructions` is required. `--project-id` is inherited from parent session automatically — do not pass it.
-
----
-
-## EITS-CMD (sdk-cli only)
-
-Team directives are available for spawned agents:
-
-```
-EITS-CMD: dm --to <session_uuid> --message "text"
-EITS-CMD: teams join <team_id> --name <alias> [--role <role>]
-EITS-CMD: teams leave <team_id> <member_id>
-EITS-CMD: teams done
-EITS-CMD: teams update-member <team_id> <member_id> --status <active|idle|done|failed>
-EITS-CMD: team broadcast --message "text"
-EITS-CMD: spawn --instructions "text" [--model <m>] [--team-name <name>] [--member-name <alias>]
-```
-
-**Feedback:** Every directive sends a confirmation back to your session:
-- Success: `[EITS-CMD ok] joined team 3 as worker-1 (member_id=9)`
-- Error: `[EITS-CMD error] teams join: :invalid_team_id_or_missing_name`
-
-Wait for the feedback before using returned IDs (member_id, session uuid, etc.).
 
 ---
 

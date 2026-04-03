@@ -1,6 +1,6 @@
 ---
 name: eits-workflow
-description: EITS task, commit, and note workflow for agents. Use when an agent needs to log work, create/claim/complete tasks, log commits, or add notes during a session. Covers both sdk-cli (EITS-CMD directives) and cli (eits script) entrypoints. Triggers on: "begin a task", "log this commit", "mark task done", "add a note", task lifecycle questions, or any EITS-CMD usage.
+description: EITS task, commit, and note workflow for agents. Use when an agent needs to log work, create/claim/complete tasks, log commits, or add notes during a session. Triggers on: "begin a task", "log this commit", "mark task done", "add a note", task lifecycle questions.
 user-invocable: true
 allowed-tools: Bash
 argument-hint: "[task|commit|note|dm]"
@@ -8,45 +8,7 @@ argument-hint: "[task|commit|note|dm]"
 
 # EITS Workflow
 
-## Entrypoint Check First
-
-```bash
-echo "$CLAUDE_CODE_ENTRYPOINT"
-```
-
-| Value | Mode | Use |
-|-------|------|-----|
-| `sdk-cli` | Spawned/headless agent | **EITS-CMD directives** in text output |
-| `cli` | Interactive session | **eits CLI script** |
-
----
-
-## sdk-cli — EITS-CMD Directives
-
-AgentWorker intercepts these lines from stdout. Never use the `eits` bash script when running as `sdk-cli`.
-
-```
-EITS-CMD: task begin <title>
-EITS-CMD: task done <id>
-EITS-CMD: task annotate <id> <body>
-EITS-CMD: note <body>
-EITS-CMD: note task <id> <body>
-EITS-CMD: dm --to <session_uuid> --message "text"
-EITS-CMD: commit <hash>
-```
-
-### Feedback Messages
-
-Every EITS-CMD directive sends a feedback message back to your session:
-
-- **Success**: `[EITS-CMD ok] task begun id=42 title=Fix bug` — contains IDs you need for follow-up commands
-- **Error**: `[EITS-CMD error] task done: {:not_linked, 99}` — tells you exactly what went wrong
-
-**You MUST wait for the feedback message before using returned IDs.** For example, after `EITS-CMD: task begin Fix something`, wait for the `[EITS-CMD ok] task begun id=<N>` response before emitting `EITS-CMD: task annotate <N> ...` or `EITS-CMD: task done <N>`. Do not guess task IDs.
-
----
-
-## cli — eits Script
+All agents — interactive (`cli`) and spawned (`sdk-cli`) — use the `eits` CLI script.
 
 ```bash
 # Task lifecycle

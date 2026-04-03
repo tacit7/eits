@@ -364,4 +364,50 @@ defmodule EyeInTheSky.Sessions do
   Returns "provider/name (version)" or "provider/name" if version not set.
   """
   defdelegate format_model_info(session), to: ModelInfo
+
+  # Deterministic UUIDs for the web UI identity — stable across restarts.
+  @web_agent_uuid "00000000-0000-0000-0000-000000000001"
+  @web_session_uuid "00000000-0000-0000-0000-000000000002"
+
+  @doc """
+  Finds or creates the deterministic web UI session used by ChatLive.
+  Returns the integer session ID.
+
+  Safe to call on every mount — returns the existing session immediately
+  if it was already bootstrapped.
+  """
+  @spec ensure_web_ui_session() :: integer()
+  def ensure_web_ui_session do
+    case get_session_by_uuid(@web_session_uuid) do
+      {:ok, session} ->
+        session.id
+
+      {:error, :not_found} ->
+        agent =
+          case EyeInTheSky.Agents.get_agent_by_uuid(@web_agent_uuid) do
+            {:ok, a} ->
+              a
+
+            {:error, :not_found} ->
+              {:ok, a} =
+                EyeInTheSky.Agents.create_agent(%{
+                  uuid: @web_agent_uuid,
+                  description: "Web UI User",
+                  source: "web"
+                })
+
+              a
+          end
+
+        {:ok, session} =
+          create_session(%{
+            uuid: @web_session_uuid,
+            agent_id: agent.id,
+            name: "Web UI",
+            started_at: DateTime.utc_now()
+          })
+
+        session.id
+    end
+  end
 end

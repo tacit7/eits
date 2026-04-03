@@ -281,8 +281,23 @@ defmodule EyeInTheSky.Notes do
     agent_ids_str = Enum.map(agent_ids, &to_string/1)
     project_id = Keyword.get(opts, :project_id)
     project_id_str = if project_id, do: to_string(project_id), else: nil
-    session_ids_str = opts |> Keyword.get(:session_ids, []) |> Enum.map(&to_string/1)
     starred_only = Keyword.get(opts, :starred, false)
+
+    # When session_ids not provided but agent_ids are, resolve them automatically
+    # so session-parented notes appear in project search scope.
+    session_ids_str =
+      case {Keyword.get(opts, :session_ids), agent_ids} do
+        {nil, []} ->
+          []
+
+        {nil, _} ->
+          from(s in EyeInTheSky.Sessions.Session, where: s.agent_id in ^agent_ids, select: s.id)
+          |> Repo.all()
+          |> Enum.map(&to_string/1)
+
+        {ids, _} ->
+          Enum.map(ids, &to_string/1)
+      end
 
     has_scope = agent_ids_str != [] or project_id_str != nil or session_ids_str != []
 

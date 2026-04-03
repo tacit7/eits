@@ -65,38 +65,13 @@ defmodule EyeInTheSky.Codex.CLI do
 
   @doc """
   Cancels a running Codex process by killing the OS process (group and direct), then closing the port.
+
+  Delegates to `EyeInTheSky.CLI.Port.cancel_port/2` which sends SIGTERM to both
+  the process group and direct PID, then escalates to SIGKILL if needed.
   """
   @spec cancel(port()) :: :ok
   def cancel(port) when is_port(port) do
-    case Port.info(port, :os_pid) do
-      {:os_pid, os_pid} ->
-        # Send TERM to both process group and PID directly
-        # (process group for child processes, direct PID in case it's not a group leader)
-        System.cmd("kill", ["-TERM", "-#{os_pid}"], stderr_to_stdout: true)
-        System.cmd("kill", ["-TERM", "#{os_pid}"], stderr_to_stdout: true)
-        Process.sleep(500)
-
-        case System.cmd("kill", ["-0", "#{os_pid}"], stderr_to_stdout: true) do
-          {_, 0} ->
-            Logger.info("[Codex.CLI] Process #{os_pid} still alive, sending SIGKILL")
-            System.cmd("kill", ["-9", "-#{os_pid}"], stderr_to_stdout: true)
-            System.cmd("kill", ["-9", "#{os_pid}"], stderr_to_stdout: true)
-
-          _ ->
-            :ok
-        end
-
-      nil ->
-        :ok
-    end
-
-    try do
-      Port.close(port)
-    rescue
-      ArgumentError -> :ok
-    end
-
-    :ok
+    EyeInTheSky.CLI.Port.cancel_port(port, "Codex.CLI")
   end
 
   # ---------------------------------------------------------------------------

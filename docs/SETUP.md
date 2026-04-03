@@ -68,6 +68,15 @@ mix phx.server
 
 App is available at `https://eits.dev`.
 
+**Vite dev server port (commits 2907189, 8686abb):**
+The Vite asset server defaults to port 5173. Override with `VITE_PORT` when running multiple worktrees in parallel to avoid asset conflicts:
+
+```bash
+VITE_PORT=5174 PORT=5002 mix phx.server
+```
+
+Each running instance needs its own `PORT` (Phoenix) and `VITE_PORT` (Vite) pair.
+
 ## 5. Register the first user
 
 WebAuthn registration requires a one-time token. Generate one with:
@@ -268,6 +277,9 @@ The app includes Web Push and PWA install capability.
 - Runs at `priv/static/sw.js`
 - Handles incoming push events and displays notifications
 
+**Static asset note (commits b194105, f25d0de, f7704bd):**
+`sw.js`, `manifest.json`, and mockup HTML files are committed and tracked in git. They were previously excluded via `.gitignore`; that exclusion was removed. These files are present in the repo and included in production builds — do not re-add them to `.gitignore`.
+
 **Configuration (production):**
 Push encryption uses VAPID keys (`VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in `.env`). Missing keys disable push in dev; raises at startup in prod.
 
@@ -277,15 +289,19 @@ Push encryption uses VAPID keys (`VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in `
 
 The app uses Oban for background job processing and scheduled tasks.
 
-**Development configuration:**
-In `config/dev.exs`, Oban is configured with normal settings (no inline testing mode). Scheduled jobs via the `:cron` plugin run normally in development.
+**Development configuration (commit 804fb9e):**
+In `config/dev.exs`, Oban runs with a full plugin set — no inline testing mode. All job lifecycle management is active in development:
 
 ```elixir
 # config/dev.exs
 config :eye_in_the_sky_web, Oban,
   notifier: Oban.Notifiers.PG,
-  plugins: [Oban.Plugins.Cron],
-  # ... other opts
+  plugins: [
+    Oban.Plugins.Pruner,    # deletes completed/discarded jobs after retention window
+    Oban.Plugins.Stager,    # moves scheduled jobs into the executing queue on time
+    Oban.Plugins.Lifeline,  # rescues jobs stuck in executing state (crashed processes)
+    Oban.Plugins.Cron       # runs jobs on a cron schedule
+  ]
 ```
 
 **Previous behavior (deprecated):**

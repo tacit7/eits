@@ -2,6 +2,36 @@
 
 This document describes the OTP workers (GenServers) that process async jobs and background tasks.
 
+## AgentWorker: Orphaned Claude Process Cleanup
+
+When the server restarts while a Claude subprocess is still running, that orphaned process holds the Claude session lock. The next attempt to start the same session gets a `"Session ID already in use"` error from the CLI.
+
+**Retry flow (in `agent_worker.ex`):**
+
+1. `handle_info({:claude_error, ref, {:cli_error, msg}}, ...)` receives the error.
+2. If `msg` contains `"already in use"` and `:kill_retry` is not set in the job context, the worker:
+   - Calls `kill_orphaned_claude(uuid)` — runs `pkill -f <session_uuid>` to kill any process with the UUID in its argv, then sleeps 200ms.
+   - Converts the job to a resume via `Job.as_resume/1`.
+   - Sets `:kill_retry true` in the job context to prevent a second retry loop.
+   - Retries `start_sdk/2` with the resume job.
+   - On success: fires `WorkerEvents.on_sdk_started/2` and continues normally.
+   - On failure: falls through to the normal error handler.
+3. If `:kill_retry` is already set (second attempt), the error falls through — no infinite retry.
+
+**Why `pkill -f <uuid>`:** Session UUIDs are unique enough that false matches are not a concern. The UUID appears in the Claude subprocess argv (`--resume <uuid>`), making it a reliable match target.
+
+**`Job.as_resume/1`:** Sets `has_messages: true` on the job context, preserving all other context fields and message/block data. This tells the CLI layer to use `--resume` instead of a fresh start.
+
+**Code locations:**
+- `lib/eye_in_the_sky/claude/agent_worker.ex` — `handle_info` clause for `already in use`, `kill_orphaned_claude/1`
+- `lib/eye_in_the_sky/claude/job.ex` — `Job.as_resume/1`
+- `test/eye_in_the_sky/claude/agent_worker_test.exs` — retry and fall-through tests
+- `test/eye_in_the_sky/claude/job_test.exs` — `as_resume/1` tests
+
+**Commits:** `29f9684` (orphan kill + retry), `428b0c8` (tests + `on_sdk_started` fix)
+
+---
+
 ## Agent Process Idle Timeout
 
 Claude and Codex agent processes have a configurable idle timeout — if the subprocess produces no output for the configured duration, it is killed and the agent worker receives an error.

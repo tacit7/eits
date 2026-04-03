@@ -573,6 +573,78 @@ eits channels send 1 --session 1179 --body "hello from CLI"
 
 ---
 
+---
+
+### GET /api/browser/sessions
+
+List sessions for UI-internal reads (e.g. command palette "Go to Session..." submenu). Authenticates via **session cookie** instead of Bearer token, so browser `fetch()` calls work without needing an API key.
+
+**Why this exists:** `GET /api/v1/sessions` requires `Authorization: Bearer <token>`. Browser-side JavaScript (LiveView hooks) cannot attach a Bearer token — it only has the session cookie. This endpoint sits under a separate `browser_json` pipeline that validates the cookie via `SessionAuth` plug instead.
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `q` | string | no | Full-text search query |
+| `project_id` | integer | no | Filter to sessions belonging to this project |
+| `status` | string | no | Filter by status (e.g. `active`, `working`, `completed`) |
+| `limit` | integer | no | Max results to return (default 20) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Found 3 session(s)",
+  "results": [
+    {
+      "id": 42,
+      "uuid": "abc-123",
+      "name": "fix auth bug",
+      "description": "fixing the oauth flow",
+      "status": "working"
+    }
+  ]
+}
+```
+
+**Authentication:** Session cookie (set by Phoenix on browser login). No `Authorization` header needed.
+
+**Example (from browser JS):**
+
+```js
+const res = await fetch('/api/browser/sessions?project_id=1&limit=50');
+const { results } = await res.json();
+```
+
+**Note:** This endpoint is intentionally read-only and scoped to UI-internal use. For programmatic/agent access, use `GET /api/v1/sessions` with a Bearer token.
+
+---
+
+## EITS-CMD dm: numeric session ID support
+
+The `dm --to` directive (commit ee6cacc) accepts both a UUID and a numeric session ID as the target. Agents no longer need the full UUID — the simpler `EITS_SESSION_ID` integer env var works directly.
+
+**Both formats are equivalent:**
+
+```
+EITS-CMD: dm --to 16e6d223-14b8-4e21-8461-8b5c2303fa8c --message "done"
+EITS-CMD: dm --to 1804 --message "done"
+```
+
+The dispatcher resolves an integer string to a session UUID internally before routing the DM.
+
+**Typical agent usage:**
+
+```
+# Use EITS_SESSION_ID (integer) from the spawn context — simpler than EITS_SESSION_UUID
+EITS-CMD: dm --to $EITS_SESSION_ID --message "task complete"
+```
+
+This also applies to the REST API `POST /api/v1/dm` endpoint — `to_session_id` has accepted both formats since the same commit.
+
+---
+
 ## Hook Integration
 
 These endpoints map to Claude Code hooks:

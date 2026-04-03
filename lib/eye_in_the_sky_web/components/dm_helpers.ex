@@ -142,8 +142,6 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
 
   def format_checkpoint_time(%DateTime{} = dt) do
     Calendar.strftime(dt, "%b %-d, %H:%M")
-  rescue
-    _ -> "—"
   end
 
   def format_checkpoint_time(_), do: "—"

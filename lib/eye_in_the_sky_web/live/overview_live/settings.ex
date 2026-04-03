@@ -58,7 +58,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   @impl true
   def handle_params(%{"tab" => tab}, _uri, socket) do
-    active = if tab in @valid_tabs, do: String.to_atom(tab), else: :general
+    active = if tab in @valid_tabs, do: String.to_existing_atom(tab), else: :general
     {:noreply, assign(socket, :active_tab, active)}
   end
 
@@ -260,7 +260,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
             {"Workflow", "workflow"}, {"Pricing", "pricing"}, {"System", "system"}
           ] do %>
             <button
-              class={"tab #{if @active_tab == String.to_atom(key), do: "tab-active", else: ""}"}
+              class={"tab #{if @active_tab == String.to_existing_atom(key), do: "tab-active", else: ""}"}
               phx-click="set_tab"
               phx-value-tab={key}
             >

@@ -4,7 +4,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Agents
   alias EyeInTheSky.Notes
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Sessions
   alias EyeInTheSky.Commits
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1, truncate_text: 1]
@@ -23,8 +22,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
     socket =
       if project_id do
         project =
-          Projects.get_project!(project_id)
-          |> Repo.preload([:agents])
+          Projects.get_project_with_agents!(project_id)
 
         # Load tasks manually due to type mismatch (projects.id is INT, tasks.project_id is TEXT)
         tasks = Projects.get_project_tasks(project_id)

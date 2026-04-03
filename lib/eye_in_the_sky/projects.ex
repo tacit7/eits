@@ -34,6 +34,13 @@ defmodule EyeInTheSky.Projects do
   def get_project(id), do: Repo.get(Project, id)
 
   @doc """
+  Gets a project with agents preloaded. Raises if not found.
+  """
+  def get_project_with_agents!(id) do
+    get_project!(id) |> Repo.preload([:agents])
+  end
+
+  @doc """
   Gets a single project by name.
   """
   def get_project_by_name(name) do

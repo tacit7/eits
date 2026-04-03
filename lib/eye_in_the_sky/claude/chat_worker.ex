@@ -140,13 +140,13 @@ defmodule EyeInTheSky.Claude.ChatWorker do
       result =
         try do
           AgentManager.send_message(member.session_id, prompt, opts)
-        rescue
-          e ->
+        catch
+          :exit, reason ->
             Logger.error(
-              "ChatWorker: exception routing to session=#{member.session_id} - #{inspect(e)}"
+              "ChatWorker: routing failed session=#{member.session_id} - #{inspect(reason)}"
             )
 
-            {:error, {:exception, e}}
+            {:error, {:exit, reason}}
         end
 
       case result do

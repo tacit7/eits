@@ -81,17 +81,15 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
     case TokenParser.parse_session(file_path) do
       {:ok, usage} ->
         primary_model = primary_model_name(usage.models)
-        cost = calculate_cost(usage, primary_model)
-        notes_json = Jason.encode!(%{models: usage.models})
 
-        upsert_metrics(
-          session_id,
-          agent_id,
-          usage,
-          cost,
-          primary_model,
-          notes_json
-        )
+        upsert_metrics(%{
+          session_id: session_id,
+          agent_id: agent_id,
+          usage: usage,
+          cost: calculate_cost(usage, primary_model),
+          model_name: primary_model,
+          notes_json: Jason.encode!(%{models: usage.models})
+        })
 
         :ok
 
@@ -100,7 +98,14 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
     end
   end
 
-  defp upsert_metrics(session_id, agent_id, usage, cost, model_name, notes_json) do
+  defp upsert_metrics(%{
+         session_id: session_id,
+         agent_id: agent_id,
+         usage: usage,
+         cost: cost,
+         model_name: model_name,
+         notes_json: notes_json
+       }) do
     sql = """
     INSERT INTO session_metrics (
       session_id, agent_id, tokens_used, tokens_budget, tokens_remaining,

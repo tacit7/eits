@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
 
   import Phoenix.Component, only: [assign: 3]
 
-  alias EyeInTheSky.{Commits, Contexts, Messages, Notes, Repo, Tasks}
+  alias EyeInTheSky.{Commits, Contexts, Messages, Notes, Tasks}
 
   require Logger
 
@@ -78,7 +78,6 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     if query != "" do
       messages =
         Messages.search_messages_for_session(session_id, query)
-        |> Repo.preload(:attachments)
 
       Logger.info(
         "Searched #{length(messages)} messages for session=#{session_id} query=#{inspect(query)}"
@@ -90,7 +89,6 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
 
       fetched_messages =
         Messages.list_recent_messages(session_id, limit + 1)
-        |> Repo.preload(:attachments)
 
       Logger.info("Loaded #{length(fetched_messages)} messages for session=#{session_id}")
 

@@ -4,7 +4,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   import EyeInTheSkyWeb.Helpers.FileHelpers
 
   alias EyeInTheSky.Projects
-  alias EyeInTheSky.Repo
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -18,8 +17,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     socket =
       if project_id do
         project =
-          Projects.get_project!(project_id)
-          |> Repo.preload([:agents])
+          Projects.get_project_with_agents!(project_id)
 
         # Build file tree
         file_tree =

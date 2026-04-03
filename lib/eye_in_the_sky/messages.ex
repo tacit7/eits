@@ -369,6 +369,7 @@ defmodule EyeInTheSky.Messages do
     |> order_by([m], desc: m.inserted_at)
     |> limit(^limit)
     |> Repo.all()
+    |> Repo.preload(:attachments)
     |> Enum.reverse()
     |> deduplicate_by_source_uuid()
   end
@@ -387,6 +388,7 @@ defmodule EyeInTheSky.Messages do
     |> order_by([m], asc: m.inserted_at)
     |> limit(100)
     |> Repo.all()
+    |> Repo.preload(:attachments)
     |> deduplicate_by_source_uuid()
   end
 

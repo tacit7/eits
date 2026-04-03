@@ -3,7 +3,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
 
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Prompts
-  alias EyeInTheSky.Repo
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -17,8 +16,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
     socket =
       if project_id do
         project =
-          Projects.get_project!(project_id)
-          |> Repo.preload([:agents])
+          Projects.get_project_with_agents!(project_id)
 
         socket
         |> assign(:page_title, "Prompts - #{project.name}")

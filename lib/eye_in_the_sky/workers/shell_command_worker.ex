@@ -8,16 +8,23 @@ defmodule EyeInTheSky.Workers.ShellCommandWorker do
     job = ScheduledJobs.get_job!(job_id)
     {:ok, run} = ScheduledJobs.record_run_start(job)
 
-    case execute(job) do
-      {:ok, output} ->
-        ScheduledJobs.record_run_complete(run, "completed", result: output)
-        broadcast()
-        :ok
+    try do
+      case execute(job) do
+        {:ok, output} ->
+          ScheduledJobs.record_run_complete(run, "completed", result: output)
+          broadcast()
+          :ok
 
-      {:error, reason} ->
-        ScheduledJobs.record_run_complete(run, "failed", result: reason)
+        {:error, reason} ->
+          ScheduledJobs.record_run_complete(run, "failed", result: reason)
+          broadcast()
+          {:error, reason}
+      end
+    rescue
+      e ->
+        ScheduledJobs.record_run_complete(run, "failed", result: Exception.message(e))
         broadcast()
-        {:error, reason}
+        reraise e, __STACKTRACE__
     end
   end
 
@@ -32,18 +39,14 @@ defmodule EyeInTheSky.Workers.ShellCommandWorker do
         System.cmd("sh", ["-c", command], cd: working_dir, stderr_to_stdout: true)
       end)
 
-    try do
-      case Task.await(task, timeout) do
-        {output, 0} -> {:ok, String.trim(output)}
-        {output, exit_code} -> {:error, "Exit code #{exit_code}: #{String.trim(output)}"}
-      end
-    rescue
-      e -> {:error, "Command failed: #{inspect(e)}"}
-    catch
-      :exit, {:timeout, _} ->
-        Task.shutdown(task, :brutal_kill)
-        {:error, "Command timed out after #{timeout}ms"}
+    case Task.await(task, timeout) do
+      {output, 0} -> {:ok, String.trim(output)}
+      {output, exit_code} -> {:error, "Exit code #{exit_code}: #{String.trim(output)}"}
     end
+  catch
+    :exit, {:timeout, _} ->
+      Task.shutdown(task, :brutal_kill)
+      {:error, "Command timed out after #{timeout}ms"}
   end
 
   defp blank_to_nil(nil), do: nil

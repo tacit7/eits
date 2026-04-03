@@ -39,17 +39,19 @@ defmodule EyeInTheSky.Workers.ShellCommandWorker do
         System.cmd("sh", ["-c", command], cd: working_dir, stderr_to_stdout: true)
       end)
 
-    case Task.await(task, timeout) do
-      {output, 0} -> {:ok, String.trim(output)}
-      {output, exit_code} -> {:error, "Exit code #{exit_code}: #{String.trim(output)}"}
-    end
-  catch
-    :exit, {:timeout, _} ->
-      Task.shutdown(task, :brutal_kill)
-      {:error, "Command timed out after #{timeout}ms"}
+    try do
+      case Task.await(task, timeout) do
+        {output, 0} -> {:ok, String.trim(output)}
+        {output, exit_code} -> {:error, "Exit code #{exit_code}: #{String.trim(output)}"}
+      end
+    catch
+      :exit, {:timeout, _} ->
+        Task.shutdown(task, :brutal_kill)
+        {:error, "Command timed out after #{timeout}ms"}
 
-    :exit, reason ->
-      {:error, "Task exited: #{inspect(reason)}"}
+      :exit, reason ->
+        {:error, "Task exited: #{inspect(reason)}"}
+    end
   end
 
   defp blank_to_nil(nil), do: nil

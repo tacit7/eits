@@ -164,6 +164,59 @@ defmodule EyeInTheSky.Notes do
   end
 
   @doc """
+  List notes with filtering options. Moves query logic out of LiveViews.
+
+  Options:
+  - `:project_id` - filter by project (and its agents/sessions)
+  - `:agent_ids` - list of agent IDs; session IDs are resolved internally
+  - `:starred` - boolean, default false
+  - `:type_filter` - "all" | "project" | "agent" | "session" | "task"
+  - `:sort` - "newest" (default) | "oldest"
+  - `:limit` - integer, default 200
+  """
+  def list_notes_filtered(opts \\ []) do
+    starred_only = Keyword.get(opts, :starred, false)
+    type_filter = Keyword.get(opts, :type_filter, "all")
+    sort = Keyword.get(opts, :sort, "newest")
+    limit_val = Keyword.get(opts, :limit, 200)
+    project_id = Keyword.get(opts, :project_id)
+    agent_ids = Keyword.get(opts, :agent_ids, [])
+
+    order = if sort == "oldest", do: [asc: :created_at], else: [desc: :created_at]
+
+    project_id_str = project_id && to_string(project_id)
+    agent_id_strs = Enum.map(agent_ids, &to_string/1)
+
+    session_id_strs =
+      if agent_ids != [] do
+        from(s in EyeInTheSky.Sessions.Session, where: s.agent_id in ^agent_ids, select: s.id)
+        |> Repo.all()
+        |> Enum.map(&to_string/1)
+      else
+        []
+      end
+
+    base =
+      if project_id_str || agent_id_strs != [] || session_id_strs != [] do
+        scope = build_scope_dynamic(project_id_str, agent_id_strs, session_id_strs)
+        from(n in Note, where: ^scope, order_by: ^order, limit: ^limit_val)
+      else
+        from(n in Note, order_by: ^order, limit: ^limit_val)
+      end
+
+    base = if starred_only, do: from(n in base, where: n.starred == 1), else: base
+
+    base =
+      if type_filter != "all" do
+        from(n in base, where: n.parent_type in ^note_type_variants(type_filter))
+      else
+        base
+      end
+
+    Repo.all(base)
+  end
+
+  @doc """
   Gets a single note. Returns nil if not found.
   """
   def get_note(id) do
@@ -228,8 +281,23 @@ defmodule EyeInTheSky.Notes do
     agent_ids_str = Enum.map(agent_ids, &to_string/1)
     project_id = Keyword.get(opts, :project_id)
     project_id_str = if project_id, do: to_string(project_id), else: nil
-    session_ids_str = opts |> Keyword.get(:session_ids, []) |> Enum.map(&to_string/1)
     starred_only = Keyword.get(opts, :starred, false)
+
+    # When session_ids not provided but agent_ids are, resolve them automatically
+    # so session-parented notes appear in project search scope.
+    session_ids_str =
+      case {Keyword.get(opts, :session_ids), agent_ids} do
+        {nil, []} ->
+          []
+
+        {nil, _} ->
+          from(s in EyeInTheSky.Sessions.Session, where: s.agent_id in ^agent_ids, select: s.id)
+          |> Repo.all()
+          |> Enum.map(&to_string/1)
+
+        {ids, _} ->
+          Enum.map(ids, &to_string/1)
+      end
 
     has_scope = agent_ids_str != [] or project_id_str != nil or session_ids_str != []
 
@@ -269,6 +337,12 @@ defmodule EyeInTheSky.Notes do
       limit: Keyword.get(opts, :limit)
     )
   end
+
+  defp note_type_variants("session"), do: ["session", "sessions"]
+  defp note_type_variants("agent"), do: ["agent", "agents"]
+  defp note_type_variants("project"), do: ["project", "projects"]
+  defp note_type_variants("task"), do: ["task", "tasks"]
+  defp note_type_variants(type), do: [type]
 
   # Builds an Ecto dynamic OR filter across all parent types in scope.
   defp build_scope_dynamic(project_id_str, agent_ids_str, session_ids_str) do

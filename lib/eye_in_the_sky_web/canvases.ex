@@ -45,10 +45,11 @@ defmodule EyeInTheSkyWeb.Canvases do
   end
 
   def remove_session(canvas_id, session_id) do
-    from(cs in CanvasSession,
-      where: cs.canvas_id == ^canvas_id and cs.session_id == ^session_id
-    )
-    |> Repo.delete_all()
+    {_n, _} =
+      from(cs in CanvasSession,
+        where: cs.canvas_id == ^canvas_id and cs.session_id == ^session_id
+      )
+      |> Repo.delete_all()
 
     :ok
   end

@@ -2,9 +2,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Notes
-  alias EyeInTheSky.Notes.Note
-  alias EyeInTheSky.Repo
-  import Ecto.Query
   import EyeInTheSkyWeb.Components.NotesList
   import EyeInTheSkyWeb.Live.Shared.NotesHelpers
 
@@ -110,32 +107,17 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
 
   defp load_notes(socket) do
     query = socket.assigns.search_query
-    starred_only = socket.assigns.starred_filter
-    sort_by = socket.assigns.notes_sort_by
-    type_filter = socket.assigns.type_filter
-    order = if sort_by == "oldest", do: [asc: :created_at], else: [desc: :created_at]
 
     notes =
       if query != "" and String.trim(query) != "" do
-        Notes.search_notes(query, [], starred: starred_only)
+        Notes.search_notes(query, [], starred: socket.assigns.starred_filter)
       else
-        base =
-          from(n in Note,
-            order_by: ^order,
-            limit: 200
-          )
-
-        base = if starred_only, do: from(n in base, where: n.starred == 1), else: base
-
-        base =
-          if type_filter != "all" do
-            variants = type_filter_variants(type_filter)
-            from(n in base, where: n.parent_type in ^variants)
-          else
-            base
-          end
-
-        Repo.all(base)
+        Notes.list_notes_filtered(
+          starred: socket.assigns.starred_filter,
+          sort: socket.assigns.notes_sort_by,
+          type_filter: socket.assigns.type_filter,
+          limit: 200
+        )
       end
 
     assign(socket, :notes, notes)

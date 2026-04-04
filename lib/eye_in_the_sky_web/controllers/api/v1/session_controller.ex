@@ -21,105 +21,97 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     if is_nil(session_uuid) or session_uuid == "" do
       conn |> put_status(:bad_request) |> json(%{error: "session_id is required"})
     else
-      # Resolve project_id from project_name if needed
       project_id =
         case Projects.resolve_project(params) do
           {:ok, id, _name} -> id
           {:error, _, _} -> nil
         end
 
-      # Build Agent (agents table) attrs
-      agent_attrs = %{
-        uuid: params["agent_id"] || session_uuid,
-        description: params["agent_description"] || params["description"],
+      case Sessions.get_session_by_uuid(session_uuid) do
+        {:ok, existing} -> handle_session_resume(conn, existing, params)
+        {:error, :not_found} -> handle_new_session(conn, params, project_id)
+      end
+    end
+  end
+
+  defp handle_session_resume(conn, session, params) do
+    update_attrs =
+      %{status: "working", last_activity_at: DateTime.utc_now()}
+      |> Helpers.maybe_put(:name, params["name"])
+      |> Helpers.maybe_put(:description, params["description"])
+
+    case Sessions.update_session(session, update_attrs) do
+      {:ok, updated} ->
+        EyeInTheSky.Events.session_updated(updated)
+        json(conn, %{id: updated.id, uuid: updated.uuid, agent_id: nil, agent_uuid: nil, status: updated.status})
+
+      {:error, changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "Failed to update session", details: translate_errors(changeset)})
+    end
+  end
+
+  defp handle_new_session(conn, params, project_id) do
+    session_uuid = params["session_id"]
+
+    agent_attrs = %{
+      uuid: params["agent_id"] || session_uuid,
+      description: params["agent_description"] || params["description"],
+      project_id: project_id,
+      project_name: params["project_name"],
+      git_worktree_path: params["worktree_path"],
+      source: "hook"
+    }
+
+    with {:ok, agent} <- Agents.find_or_create_agent(agent_attrs) do
+      {model_provider, model_name} = parse_model(params["model"])
+
+      session_attrs = %{
+        uuid: session_uuid,
+        agent_id: agent.id,
+        name: params["name"],
+        description: params["description"],
+        status: "working",
+        started_at: DateTime.utc_now(),
+        provider: params["provider"] || "claude",
+        model: params["model"],
+        model_provider: model_provider,
+        model_name: model_name,
         project_id: project_id,
-        project_name: params["project_name"],
         git_worktree_path: params["worktree_path"],
-        source: "hook"
+        entrypoint: params["entrypoint"]
       }
 
-      # Check if session already exists (resumed session)
-      case Sessions.get_session_by_uuid(session_uuid) do
-        {:ok, existing} ->
-          update_attrs =
-            %{status: "working", last_activity_at: DateTime.utc_now()}
-            |> Helpers.maybe_put(:name, params["name"])
-            |> Helpers.maybe_put(:description, params["description"])
+      create_fn =
+        if model_name,
+          do: &Sessions.create_session_with_model/1,
+          else: &Sessions.create_session/1
 
-          case Sessions.update_session(existing, update_attrs) do
-            {:ok, updated} ->
-              EyeInTheSky.Events.session_updated(updated)
+      case create_fn.(session_attrs) do
+        {:ok, session} ->
+          EyeInTheSky.Events.session_started(session)
 
-              json(conn, %{
-                id: updated.id,
-                uuid: updated.uuid,
-                agent_id: nil,
-                agent_uuid: nil,
-                status: updated.status
-              })
+          conn
+          |> put_status(:created)
+          |> json(%{
+            id: session.id,
+            uuid: session.uuid,
+            agent_id: agent.id,
+            agent_uuid: agent.uuid,
+            status: session.status
+          })
 
-            {:error, changeset} ->
-              conn
-              |> put_status(:unprocessable_entity)
-              |> json(%{error: "Failed to update session", details: translate_errors(changeset)})
-          end
-
-        {:error, :not_found} ->
-          with {:ok, agent} <- Agents.find_or_create_agent(agent_attrs) do
-            # Parse model info
-            {model_provider, model_name} = parse_model(params["model"])
-
-            # Build Session (sessions table) attrs
-            session_attrs = %{
-              uuid: session_uuid,
-              agent_id: agent.id,
-              name: params["name"],
-              description: params["description"],
-              status: "working",
-              started_at: DateTime.utc_now(),
-              provider: params["provider"] || "claude",
-              model: params["model"],
-              model_provider: model_provider,
-              model_name: model_name,
-              project_id: project_id,
-              git_worktree_path: params["worktree_path"],
-              entrypoint: params["entrypoint"]
-            }
-
-            create_fn =
-              if model_name,
-                do: &Sessions.create_session_with_model/1,
-                else: &Sessions.create_session/1
-
-            case create_fn.(session_attrs) do
-              {:ok, session} ->
-                EyeInTheSky.Events.session_started(session)
-
-                conn
-                |> put_status(:created)
-                |> json(%{
-                  id: session.id,
-                  uuid: session.uuid,
-                  agent_id: agent.id,
-                  agent_uuid: agent.uuid,
-                  status: session.status
-                })
-
-              {:error, changeset} ->
-                conn
-                |> put_status(:unprocessable_entity)
-                |> json(%{
-                  error: "Failed to create session",
-                  details: translate_errors(changeset)
-                })
-            end
-          else
-            {:error, changeset} ->
-              conn
-              |> put_status(:unprocessable_entity)
-              |> json(%{error: "Failed to create agent", details: translate_errors(changeset)})
-          end
+        {:error, changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: "Failed to create session", details: translate_errors(changeset)})
       end
+    else
+      {:error, changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "Failed to create agent", details: translate_errors(changeset)})
     end
   end
 
@@ -332,8 +324,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
             EyeInTheSky.Events.session_updated(updated)
 
             # Sync team member status on session end
-            member_status = if status == "failed", do: "failed", else: "done"
-            EyeInTheSky.Teams.mark_member_done_by_session(updated.id, member_status)
+            handle_terminal_status(updated, status)
 
             json(conn, %{success: true, message: "Session ended", status: updated.status})
 
@@ -412,9 +403,13 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     EyeInTheSky.Events.session_updated(updated)
 
     if status in ["completed", "failed"] do
-      member_status = if status == "failed", do: "failed", else: "done"
-      EyeInTheSky.Teams.mark_member_done_by_session(updated.id, member_status)
+      handle_terminal_status(updated, status)
     end
+  end
+
+  defp handle_terminal_status(session, status) do
+    member_status = if status == "failed", do: "failed", else: "done"
+    EyeInTheSky.Teams.mark_member_done_by_session(session.id, member_status)
   end
 
   # Parse model string like "claude-sonnet-4-5-20250929" into provider/name

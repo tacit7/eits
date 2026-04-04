@@ -448,7 +448,10 @@ defmodule EyeInTheSkyWeb.ChatLive do
     advanced_opts =
       []
       |> maybe_opt(:permission_mode, params["permission_mode"])
-      |> maybe_opt(:max_turns, parse_int(params["max_turns"]))
+      |> maybe_opt(:max_turns, (case parse_int(params["max_turns"]) do
+           n when is_integer(n) and n > 0 -> n
+           _ -> nil
+         end))
       |> maybe_opt(:add_dir, params["add_dir"])
       |> maybe_opt(:mcp_config, params["mcp_config"])
       |> maybe_opt(:plugin_dir, params["plugin_dir"])

@@ -117,7 +117,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
           |> Helpers.maybe_put(:title, params["title"])
           |> Helpers.maybe_put(:starred, parse_starred(params["starred"]))
 
-        case EyeInTheSky.Repo.update(Ecto.Changeset.change(note, attrs)) do
+        case Notes.update_note(note, attrs) do
           {:ok, updated} ->
             json(conn, %{
               success: true,

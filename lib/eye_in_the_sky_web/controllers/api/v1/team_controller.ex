@@ -5,8 +5,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Repo, Teams}
-  alias EyeInTheSky.Teams.TeamMember
+  alias EyeInTheSky.Teams
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   # GET /api/v1/teams
@@ -152,7 +151,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         conn |> put_status(:not_found) |> json(%{error: "Team not found"})
 
       _team ->
-        case Repo.get(TeamMember, member_id) do
+        case Teams.get_member(member_id) do
           nil ->
             conn |> put_status(:not_found) |> json(%{error: "Member not found"})
 
@@ -177,7 +176,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         conn |> put_status(:not_found) |> json(%{error: "Team not found"})
 
       _team ->
-        case Repo.get(TeamMember, member_id) do
+        case Teams.get_member(member_id) do
           nil ->
             conn |> put_status(:not_found) |> json(%{error: "Member not found"})
 

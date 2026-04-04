@@ -418,23 +418,7 @@ defmodule EyeInTheSky.Claude.CLI do
   defp do_spawn(opts, project_path) do
     caller = Keyword.get(opts, :caller, self())
     session_ref = Keyword.get(opts, :session_ref, make_ref())
-
-    raw_timeout = EyeInTheSky.Settings.get_integer("cli_idle_timeout_ms")
-
-    default_timeout =
-      cond do
-        raw_timeout == 0 -> :infinity
-        is_integer(raw_timeout) and raw_timeout > 0 -> raw_timeout
-        true -> @fallback_idle_timeout_ms
-      end
-
-    idle_timeout_ms =
-      case Keyword.get(opts, :idle_timeout_ms, default_timeout) do
-        0 -> :infinity
-        n when is_integer(n) and n > 0 -> n
-        :infinity -> :infinity
-        _ -> default_timeout
-      end
+    idle_timeout_ms = resolve_idle_timeout(opts)
 
     case find_claude_binary() do
       {:ok, claude_path} ->
@@ -468,37 +452,9 @@ defmodule EyeInTheSky.Claude.CLI do
         use_script = Keyword.get(opts, :use_script, true)
 
         port =
-          if use_script do
-            # Use script wrapper for interactive sessions
-            script_args = ["-q", "/dev/null", claude_path] ++ args
-
-            Port.open(
-              {:spawn_executable, "/usr/bin/script"},
-              [
-                :binary,
-                :exit_status,
-                :use_stdio,
-                :stderr_to_stdout,
-                {:args, script_args},
-                {:cd, project_path},
-                {:env, env}
-              ]
-            )
-          else
-            # Spawn Claude directly for background agents (AgentWorker)
-            Port.open(
-              {:spawn_executable, claude_path},
-              [
-                :binary,
-                :exit_status,
-                :use_stdio,
-                :stderr_to_stdout,
-                {:args, args},
-                {:cd, project_path},
-                {:env, env}
-              ]
-            )
-          end
+          if use_script,
+            do: open_script_port(claude_path, args, project_path, env),
+            else: open_direct_port(claude_path, args, project_path, env)
 
         # When multimodal content blocks are present, pipe the JSON user message
         # to stdin before handing the port to the handler. This feeds Claude CLI
@@ -521,6 +477,60 @@ defmodule EyeInTheSky.Claude.CLI do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  # Resolves the idle timeout from settings and caller opts.
+  # A raw_timeout of 0 or an invalid value falls back to @fallback_idle_timeout_ms.
+  defp resolve_idle_timeout(opts) do
+    raw_timeout = EyeInTheSky.Settings.get_integer("cli_idle_timeout_ms")
+
+    default_timeout =
+      cond do
+        raw_timeout == 0 -> :infinity
+        is_integer(raw_timeout) and raw_timeout > 0 -> raw_timeout
+        true -> @fallback_idle_timeout_ms
+      end
+
+    case Keyword.get(opts, :idle_timeout_ms, default_timeout) do
+      0 -> :infinity
+      n when is_integer(n) and n > 0 -> n
+      :infinity -> :infinity
+      _ -> default_timeout
+    end
+  end
+
+  # Opens a port using the `script` wrapper for interactive sessions.
+  defp open_script_port(claude_path, args, project_path, env) do
+    script_args = ["-q", "/dev/null", claude_path] ++ args
+
+    Port.open(
+      {:spawn_executable, "/usr/bin/script"},
+      [
+        :binary,
+        :exit_status,
+        :use_stdio,
+        :stderr_to_stdout,
+        {:args, script_args},
+        {:cd, project_path},
+        {:env, env}
+      ]
+    )
+  end
+
+  # Spawns Claude directly without the script wrapper (used by AgentWorker).
+  defp open_direct_port(claude_path, args, project_path, env) do
+    Port.open(
+      {:spawn_executable, claude_path},
+      [
+        :binary,
+        :exit_status,
+        :use_stdio,
+        :stderr_to_stdout,
+        {:args, args},
+        {:cd, project_path},
+        {:env, env}
+      ]
+    )
   end
 
   # ---------------------------------------------------------------------------

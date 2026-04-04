@@ -96,15 +96,9 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
               (chat_agent.project && chat_agent.project.path)
 
           if project_path do
-            prompt_with_reminder = """
-            REMINDER: Use i-chat-send MCP tool to send your response to the channel.
-
-            User message: #{body}
-            """
-
             EyeInTheSky.Agents.AgentManager.continue_session(
               session.id,
-              prompt_with_reminder,
+              direct_message_prompt(body),
               model: "sonnet",
               project_path: project_path
             )
@@ -616,41 +610,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
           Rename
         </button>
         <%!-- Canvas submenu --%>
-        <details class="group/canvas">
-          <summary class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors cursor-pointer list-none">
-            <.icon name="hero-squares-2x2-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
-            <span class="flex-1">Canvas</span>
-            <.icon name="hero-chevron-right-mini" class="w-3 h-3 text-base-content/40" />
-          </summary>
-          <div class="mt-0.5 ml-3 flex flex-col gap-0.5">
-            <%= for canvas <- @canvases do %>
-              <button
-                type="button"
-                phx-click="add_to_canvas"
-                phx-value-canvas-id={canvas.id}
-                phx-value-session-id={@agent.id}
-                class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-base-content/80 hover:bg-base-content/10 transition-colors text-left"
-              >
-                {canvas.name}
-              </button>
-            <% end %>
-            <div class="border-t border-base-content/10 my-0.5" />
-            <%= if @show_new_canvas_for != to_string(@agent.id) do %>
-              <button
-                type="button"
-                phx-click="show_new_canvas_form"
-                phx-value-agent-id={@agent.id}
-                class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-secondary hover:bg-base-content/10 transition-colors text-left"
-              >+ New canvas</button>
-            <% else %>
-              <form phx-submit="add_to_new_canvas" class="flex flex-col gap-1 p-1">
-                <input type="hidden" name="session_id" value={@agent.id} />
-                <input type="text" name="canvas_name" class="input input-xs w-full" placeholder="Canvas name..." autocomplete="off" />
-                <button type="submit" class="btn btn-primary btn-xs w-full">Create &amp; Add</button>
-              </form>
-            <% end %>
-          </div>
-        </details>
+        <.canvas_submenu agent={@agent} canvases={@canvases} show_new_canvas_for={@show_new_canvas_for} />
         <%= if @agent.agent && @agent.agent.uuid && @agent.uuid do %>
           <button
             id={"bookmark-btn-#{@agent.uuid}"}
@@ -726,6 +686,54 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
         <button phx-click="cancel_delete_selected">close</button>
       </form>
     </dialog>
+    """
+  end
+
+  defp canvas_submenu(assigns) do
+    ~H"""
+    <details class="group/canvas">
+      <summary class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors cursor-pointer list-none">
+        <.icon name="hero-squares-2x2-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+        <span class="flex-1">Canvas</span>
+        <.icon name="hero-chevron-right-mini" class="w-3 h-3 text-base-content/40" />
+      </summary>
+      <div class="mt-0.5 ml-3 flex flex-col gap-0.5">
+        <%= for canvas <- @canvases do %>
+          <button
+            type="button"
+            phx-click="add_to_canvas"
+            phx-value-canvas-id={canvas.id}
+            phx-value-session-id={@agent.id}
+            class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-base-content/80 hover:bg-base-content/10 transition-colors text-left"
+          >
+            {canvas.name}
+          </button>
+        <% end %>
+        <div class="border-t border-base-content/10 my-0.5" />
+        <%= if @show_new_canvas_for != to_string(@agent.id) do %>
+          <button
+            type="button"
+            phx-click="show_new_canvas_form"
+            phx-value-agent-id={@agent.id}
+            class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-secondary hover:bg-base-content/10 transition-colors text-left"
+          >+ New canvas</button>
+        <% else %>
+          <form phx-submit="add_to_new_canvas" class="flex flex-col gap-1 p-1">
+            <input type="hidden" name="session_id" value={@agent.id} />
+            <input type="text" name="canvas_name" class="input input-xs w-full" placeholder="Canvas name..." autocomplete="off" />
+            <button type="submit" class="btn btn-primary btn-xs w-full">Create &amp; Add</button>
+          </form>
+        <% end %>
+      </div>
+    </details>
+    """
+  end
+
+  defp direct_message_prompt(body) do
+    """
+    REMINDER: Use i-chat-send MCP tool to send your response to the channel.
+
+    User message: #{body}
     """
   end
 

@@ -343,29 +343,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
         "[#{state.session_id}] Stale Claude session UUID=#{state.provider_conversation_id}, retrying as new session"
       )
 
-      fresh_job = Job.as_fresh_session(job)
-
-      case start_sdk(state, fresh_job) do
-        {:ok, sdk_ref, handler_monitor} ->
-          {:noreply,
-           %{state | sdk_ref: sdk_ref, handler_monitor: handler_monitor, current_job: fresh_job}}
-
-        {:error, start_reason} ->
-          Logger.error(
-            "[#{state.session_id}] Failed to restart fresh SDK: #{inspect(start_reason)}"
-          )
-
-          WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
-          demonitor_handler(state.handler_monitor)
-
-          process_next_job(%{
-            state
-            | status: :idle,
-              sdk_ref: nil,
-              handler_monitor: nil,
-              current_job: nil
-          })
-      end
+      attempt_sdk_retry(state, Job.as_fresh_session(job), "Failed to restart fresh SDK")
     else
       do_handle_sdk_error(reason, state)
     end
@@ -397,29 +375,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       resume_job = Job.as_resume(job)
       resume_job = %{resume_job | context: Map.put(resume_job.context, :kill_retry, true)}
 
-      case start_sdk(state, resume_job) do
-        {:ok, sdk_ref, handler_monitor} ->
-          WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
-
-          {:noreply,
-           %{state | sdk_ref: sdk_ref, handler_monitor: handler_monitor, current_job: resume_job}}
-
-        {:error, start_reason} ->
-          Logger.error(
-            "[#{state.session_id}] Failed to resume after already-in-use: #{inspect(start_reason)}"
-          )
-
-          WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
-          demonitor_handler(state.handler_monitor)
-
-          process_next_job(%{
-            state
-            | status: :idle,
-              sdk_ref: nil,
-              handler_monitor: nil,
-              current_job: nil
-          })
-      end
+      attempt_sdk_retry(state, resume_job, "Failed to resume after already-in-use",
+        broadcast_started: true
+      )
     else
       do_handle_sdk_error(reason, state)
     end
@@ -745,6 +703,32 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   defp maybe_sync_provider_conversation_id(state, _), do: state
+
+  defp attempt_sdk_retry(state, new_job, log_label, opts \\ []) do
+    broadcast_started = Keyword.get(opts, :broadcast_started, false)
+
+    case start_sdk(state, new_job) do
+      {:ok, sdk_ref, handler_monitor} ->
+        if broadcast_started,
+          do: WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
+
+        {:noreply,
+         %{state | sdk_ref: sdk_ref, handler_monitor: handler_monitor, current_job: new_job}}
+
+      {:error, start_reason} ->
+        Logger.error("[#{state.session_id}] #{log_label}: #{inspect(start_reason)}")
+        WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
+        demonitor_handler(state.handler_monitor)
+
+        process_next_job(%{
+          state
+          | status: :idle,
+            sdk_ref: nil,
+            handler_monitor: nil,
+            current_job: nil
+        })
+    end
+  end
 
   defp do_handle_sdk_error(reason, state) do
     Logger.error("[#{state.session_id}] SDK error: #{inspect(reason)}")

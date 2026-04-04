@@ -234,6 +234,23 @@ defmodule EyeInTheSky.Channels do
   end
 
   @doc """
+  Finds the global (#global) channel for a session, scoped to the session's project if set.
+
+  Returns `{:ok, channel}` or `{:error, :channel_not_found}`.
+  """
+  def find_global_channel(session) do
+    channels =
+      if session.project_id,
+        do: list_channels_for_project(session.project_id),
+        else: list_channels()
+
+    case Enum.find(channels, fn c -> c.name == "#global" end) do
+      nil -> {:error, :channel_not_found}
+      channel -> {:ok, channel}
+    end
+  end
+
+  @doc """
   Counts unread messages for a session in a channel.
   """
   def count_unread_messages(channel_id, session_id) do

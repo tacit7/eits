@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Skills do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSkyWeb.Helpers.FileHelpers
+
   @impl true
   def mount(_params, _session, socket) do
     skills = load_skills()
@@ -190,7 +192,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                         <span class={"badge badge-xs " <> if(skill.source == :skills, do: "badge-primary", else: "badge-ghost")}>
                           {if skill.source == :skills, do: "skill", else: "command"}
                         </span>
-                        <span>{format_size(skill.size)}</span>
+                        <span>{FileHelpers.format_size(skill.size)}</span>
                       </div>
                     </div>
                   </button>
@@ -238,6 +240,4 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
     """
   end
 
-  defp format_size(bytes) when bytes < 1024, do: "#{bytes} B"
-  defp format_size(bytes), do: "#{Float.round(bytes / 1024, 1)} KB"
 end

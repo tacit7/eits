@@ -3,6 +3,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
 
   use EyeInTheSkyWeb, :html
 
+  alias EyeInTheSkyWeb.Helpers.FileHelpers
+
   attr :uploads, :map, required: true
   attr :selected_model, :string, default: "opus"
   attr :selected_effort, :string, default: "medium"
@@ -43,7 +45,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
             <div class="flex items-center gap-2 rounded-lg bg-base-content/[0.04] px-3 py-1.5 text-xs">
               <.icon name="hero-paper-clip" class="w-3.5 h-3.5 text-base-content/40" />
               <span class="text-base-content/70">{entry.client_name}</span>
-              <span class="text-base-content/30">{format_size(entry.client_size)}</span>
+              <span class="text-base-content/30">{FileHelpers.format_size(entry.client_size)}</span>
               <button
                 type="button"
                 phx-click="cancel_upload"
@@ -340,10 +342,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
   defp effort_display_name("high"), do: "High"
   defp effort_display_name("max"), do: "Max"
   defp effort_display_name(_), do: "Medium"
-
-  defp format_size(bytes) when bytes < 1024, do: "#{bytes} B"
-  defp format_size(bytes) when bytes < 1_048_576, do: "#{Float.round(bytes / 1024, 1)} KB"
-  defp format_size(bytes), do: "#{Float.round(bytes / 1_048_576, 1)} MB"
 
   defp format_number(n) when is_integer(n) do
     n

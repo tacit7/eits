@@ -162,7 +162,9 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
 
   defp build_file_path(session_info) do
     home = System.get_env("HOME")
-    escaped_path = SessionReader.escape_project_path(session_info.project_path)
+    # Use escaped_path directly (the real directory name on disk) rather than
+    # re-escaping the lossy project_path, which breaks for hyphenated paths.
+    escaped_path = session_info.escaped_path
     Path.join([home, ".claude", "projects", escaped_path, "#{session_info.session_id}.jsonl"])
   end
 

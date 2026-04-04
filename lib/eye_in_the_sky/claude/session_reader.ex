@@ -36,6 +36,12 @@ defmodule EyeInTheSky.Claude.SessionReader do
 
           %{
             session_id: session_id,
+            # escaped_path is the exact directory name on disk — use this when
+            # constructing file paths to avoid ambiguity.
+            escaped_path: escaped_project_name,
+            # project_path is a best-effort unescaping and is LOSSY: paths that
+            # contain hyphens (e.g. /Users/foo/my-app) cannot be distinguished
+            # from path separators once escaped. Use escaped_path for file I/O.
             project_path: unescape_project_path(escaped_project_name),
             last_modified: file_stat.mtime,
             file_size: file_stat.size,
@@ -48,9 +54,10 @@ defmodule EyeInTheSky.Claude.SessionReader do
     end
   end
 
-  # NOTE: This is lossy for paths containing hyphens (e.g., /Users/foo/my-app
-  # escapes to -Users-foo-my-app, but my-app's hyphen is indistinguishable
-  # from a path separator). Fundamentally ambiguous without a lookup table.
+  # LOSSY: /Users/foo/my-app and /Users/foo/my/app both escape to -Users-foo-my-app.
+  # Unescaping is fundamentally ambiguous — hyphens in directory names are
+  # indistinguishable from path separators. Use escaped_path from discover_all_sessions
+  # for any file I/O; treat project_path as a human-readable hint only.
   defp unescape_project_path(escaped_path) do
     escaped_path
     |> String.replace(~r/^-/, "/")

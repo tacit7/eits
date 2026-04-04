@@ -194,26 +194,12 @@ defmodule EyeInTheSky.Messages do
   """
   @spec send_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def send_message(attrs) do
-    result =
-      attrs
-      |> Map.put(:uuid, Ecto.UUID.generate())
-      |> Map.put(:direction, "outbound")
-      |> Map.put(:status, "pending")
-      |> create_message()
-
-    case result do
-      {:ok, message} ->
-        EyeInTheSky.Events.session_new_message(message.session_id, message)
-
-        if message.channel_id do
-          EyeInTheSky.Events.channel_message(message.channel_id, message)
-        end
-
-        {:ok, message}
-
-      error ->
-        error
-    end
+    attrs
+    |> Map.put(:uuid, Ecto.UUID.generate())
+    |> Map.put(:direction, "outbound")
+    |> Map.put(:status, "pending")
+    |> create_message()
+    |> broadcast_and_return()
   end
 
   @doc """
@@ -261,19 +247,7 @@ defmodule EyeInTheSky.Messages do
           create_message(attrs)
       end
 
-    case result do
-      {:ok, message} ->
-        EyeInTheSky.Events.session_new_message(message.session_id, message)
-
-        if message.channel_id do
-          EyeInTheSky.Events.channel_message(message.channel_id, message)
-        end
-
-        {:ok, message}
-
-      error ->
-        error
-    end
+    result |> broadcast_and_return()
   end
 
   @doc """
@@ -478,6 +452,18 @@ defmodule EyeInTheSky.Messages do
       message -> {:ok, message}
     end
   end
+
+  defp broadcast_and_return({:ok, message}) do
+    EyeInTheSky.Events.session_new_message(message.session_id, message)
+
+    if message.channel_id do
+      EyeInTheSky.Events.channel_message(message.channel_id, message)
+    end
+
+    {:ok, message}
+  end
+
+  defp broadcast_and_return(error), do: error
 
   # Finds the most recent agent message in the session matching the given body,
   defp maybe_enrich_metadata(message, metadata) do

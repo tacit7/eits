@@ -130,15 +130,17 @@ defmodule EyeInTheSky.Projects do
     end
   end
 
-  defp parse_project_id(nil), do: nil
-  defp parse_project_id(id) when is_integer(id), do: id
+  def parse_project_id(nil), do: nil
+  def parse_project_id(id) when is_integer(id), do: id
 
-  defp parse_project_id(id) when is_binary(id) do
+  def parse_project_id(id) when is_binary(id) do
     case Integer.parse(id) do
       {n, ""} -> n
       _ -> nil
     end
   end
+
+  def parse_project_id(_), do: nil
 
   @doc """
   Gets tasks for a project.

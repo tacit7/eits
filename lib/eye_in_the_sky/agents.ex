@@ -128,6 +128,38 @@ defmodule EyeInTheSky.Agents do
   end
 
   @doc """
+  Finds an agent by UUID or creates one with the given attrs.
+  Handles Ecto.ConstraintError races (concurrent inserts) by re-fetching.
+  """
+  def find_or_create_agent(%{uuid: uuid} = attrs) do
+    case get_agent_by_uuid(uuid) do
+      {:ok, existing} ->
+        {:ok, existing}
+
+      {:error, :not_found} ->
+        case create_agent(attrs) do
+          {:ok, agent} ->
+            {:ok, agent}
+
+          {:error, %Ecto.Changeset{}} = err ->
+            err
+
+          _ ->
+            case get_agent_by_uuid(uuid) do
+              {:ok, existing} -> {:ok, existing}
+              err -> err
+            end
+        end
+    end
+  rescue
+    Ecto.ConstraintError ->
+      case get_agent_by_uuid(uuid) do
+        {:ok, existing} -> {:ok, existing}
+        _ -> {:error, :constraint_race}
+      end
+  end
+
+  @doc """
   Updates an agent.
   """
   @spec update_agent(Agent.t(), map()) :: {:ok, Agent.t()} | {:error, Ecto.Changeset.t()}

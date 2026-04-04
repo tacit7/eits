@@ -429,33 +429,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     end
   end
 
-  defp find_or_create_agent(%{uuid: uuid} = attrs) do
-    case Agents.get_agent_by_uuid(uuid) do
-      {:ok, existing} ->
-        {:ok, existing}
-
-      {:error, :not_found} ->
-        case Agents.create_agent(attrs) do
-          {:ok, agent} ->
-            {:ok, agent}
-
-          {:error, %Ecto.Changeset{}} = err ->
-            err
-
-          _ ->
-            case Agents.get_agent_by_uuid(uuid) do
-              {:ok, existing} -> {:ok, existing}
-              err -> err
-            end
-        end
-    end
-  rescue
-    Ecto.ConstraintError ->
-      case Agents.get_agent_by_uuid(uuid) do
-        {:ok, existing} -> {:ok, existing}
-        _ -> {:error, :constraint_race}
-      end
-  end
+  defp find_or_create_agent(attrs), do: Agents.find_or_create_agent(attrs)
 
   # Parse model string like "claude-sonnet-4-5-20250929" into provider/name
   defp parse_model(nil), do: {"claude", nil}

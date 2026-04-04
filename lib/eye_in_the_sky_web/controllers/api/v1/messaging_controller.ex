@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   import EyeInTheSkyWeb.ControllerHelpers
 
   alias EyeInTheSky.{Agents, ChannelMessages, Channels, Messages, Sessions, Teams}
+  alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSky.Agents.AgentManager
 
   @doc """
@@ -269,18 +270,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     })
   end
 
-  defp resolve_session_id(raw) when is_binary(raw) do
-    case Integer.parse(raw) do
-      {int_id, ""} ->
-        {:ok, int_id}
-
-      _ ->
-        case Sessions.get_session_by_uuid(raw) do
-          {:ok, session} -> {:ok, session.id}
-          {:error, :not_found} -> {:error, "Session not found: #{raw}"}
-        end
-    end
-  end
+  defp resolve_session_id(raw) when is_binary(raw), do: ToolHelpers.resolve_session_int_id(raw)
 
   defp agent_manager_mod do
     Application.get_env(:eye_in_the_sky, :agent_manager_module, AgentManager)

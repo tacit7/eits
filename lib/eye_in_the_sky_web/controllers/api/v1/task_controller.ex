@@ -221,7 +221,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   """
   def unlink_session(conn, %{"id" => task_id, "uuid" => session_uuid}) do
     int_id = resolve_session_int_id(session_uuid)
-    task_int_id = if is_binary(task_id), do: String.to_integer(task_id), else: task_id
+    task_int_id = parse_task_id(task_id)
 
     if int_id do
       Tasks.unlink_session_from_task(task_int_id, int_id)
@@ -258,7 +258,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   defp maybe_link_session(task_id, session_id) when is_binary(session_id) do
     int_id = resolve_session_int_id(session_id)
-    task_int_id = if is_binary(task_id), do: String.to_integer(task_id), else: task_id
+    task_int_id = parse_task_id(task_id)
 
     if int_id do
       Tasks.link_session_to_task(task_int_id, int_id)
@@ -299,4 +299,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   defp resolve_session_int_id(raw) do
     resolve_id(raw, &Sessions.get_session_by_uuid/1)
   end
+
+  defp parse_task_id(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {n, ""} -> n
+      _ -> id
+    end
+  end
+
+  defp parse_task_id(id), do: id
 end

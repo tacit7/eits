@@ -55,7 +55,7 @@ defmodule EyeInTheSkyWeb.NavHook do
   end
 
   defp handle_palette_event("palette:sessions", params, socket) do
-    project_id = parse_project_id(params["project_id"])
+    project_id = Projects.parse_project_id(params["project_id"])
 
     opts = [status_filter: "all", limit: 30]
     opts = if project_id, do: Keyword.put(opts, :project_id, project_id), else: opts
@@ -73,7 +73,7 @@ defmodule EyeInTheSkyWeb.NavHook do
   defp handle_palette_event(_event, _params, socket), do: {:cont, socket}
 
   defp handle_create_task_event("palette:create-task", params, socket) do
-    project_id = parse_project_id(params["project_id"])
+    project_id = Projects.parse_project_id(params["project_id"])
     tags = params["tags"]
 
     form_params = %{
@@ -174,7 +174,7 @@ defmodule EyeInTheSkyWeb.NavHook do
   defp handle_update_agent_event(_event, _params, socket), do: {:cont, socket}
 
   defp handle_list_agents_event("palette:list-agents", params, socket) do
-    project_id = parse_project_id(params["project_id"])
+    project_id = Projects.parse_project_id(params["project_id"])
 
     agents =
       if project_id do
@@ -307,7 +307,7 @@ defmodule EyeInTheSkyWeb.NavHook do
   defp handle_delete_agent_event(_event, _params, socket), do: {:cont, socket}
 
   defp do_create_chat(session_uuid, params, socket) do
-    project_id = parse_project_id(params["project_id"])
+    project_id = Projects.parse_project_id(params["project_id"])
 
     agent_attrs = %{
       uuid: session_uuid,
@@ -337,7 +337,7 @@ defmodule EyeInTheSkyWeb.NavHook do
   end
 
   defp do_create_agent(instructions, params, socket) do
-    project_id = parse_project_id(params["project_id"])
+    project_id = Projects.parse_project_id(params["project_id"])
     parent_session_uuid = params["parent_session_uuid"]
 
     project_path =
@@ -374,22 +374,5 @@ defmodule EyeInTheSkyWeb.NavHook do
     {:halt, push_event(socket, "palette:create-agent-result", result)}
   end
 
-  defp find_or_create_agent(%{uuid: uuid} = attrs) do
-    case Agents.get_agent_by_uuid(uuid) do
-      {:ok, existing} -> {:ok, existing}
-      {:error, :not_found} -> Agents.create_agent(attrs)
-    end
-  end
-
-  defp parse_project_id(nil), do: nil
-  defp parse_project_id(id) when is_integer(id), do: id
-
-  defp parse_project_id(id) when is_binary(id) do
-    case Integer.parse(id) do
-      {n, ""} -> n
-      _ -> nil
-    end
-  end
-
-  defp parse_project_id(_), do: nil
+  defp find_or_create_agent(attrs), do: Agents.find_or_create_agent(attrs)
 end

@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.Api.V1.NotificationController do
   use EyeInTheSkyWeb, :controller
 
+  import EyeInTheSkyWeb.ControllerHelpers, only: [maybe_opt: 3]
+
   alias EyeInTheSky.Notifications
 
   @doc """
@@ -15,17 +17,16 @@ defmodule EyeInTheSkyWeb.Api.V1.NotificationController do
       |> put_status(:bad_request)
       |> json(%{success: false, message: "title is required"})
     else
+      resource =
+        params["resource_type"] &&
+          params["resource_id"] &&
+          {params["resource_type"], params["resource_id"]}
+
       opts =
         []
-        |> then(fn o -> if params["body"], do: Keyword.put(o, :body, params["body"]), else: o end)
-        |> then(fn o -> Keyword.put(o, :category, params["category"] || "system") end)
-        |> then(fn o ->
-          if params["resource_type"] && params["resource_id"] do
-            Keyword.put(o, :resource, {params["resource_type"], params["resource_id"]})
-          else
-            o
-          end
-        end)
+        |> maybe_opt(:body, params["body"])
+        |> Keyword.put(:category, params["category"] || "system")
+        |> maybe_opt(:resource, resource)
 
       case Notifications.notify(title, opts) do
         {:ok, notification} ->

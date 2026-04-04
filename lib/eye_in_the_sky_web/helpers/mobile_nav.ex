@@ -6,6 +6,8 @@ defmodule EyeInTheSkyWeb.Helpers.MobileNav do
   set the correct assigns for the mobile nav to highlight correctly.
   """
 
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+
   @type nav_tab :: :sessions | :tasks | :notes | :project | :none
 
   @doc """
@@ -52,14 +54,8 @@ defmodule EyeInTheSkyWeb.Helpers.MobileNav do
 
   def project_id_from_path(path) when is_binary(path) do
     case Regex.run(~r{^/projects/(\d+)(/.*)?$}, path) do
-      [_, id_str | _] ->
-        case Integer.parse(id_str) do
-          {id, ""} -> id
-          _ -> nil
-        end
-
-      _ ->
-        nil
+      [_, id_str | _] -> parse_int(id_str)
+      _ -> nil
     end
   end
 end

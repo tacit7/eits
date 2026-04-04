@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   use Phoenix.LiveComponent
   import EyeInTheSkyWeb.CoreComponents, only: [icon: 1, modal_header: 1]
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [models_for_provider: 1]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Claude.AgentFileScanner
 
@@ -54,13 +55,11 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     projects = socket.assigns[:projects] || []
 
     project_path =
-      case Integer.parse(project_id_str) do
-        {id, ""} ->
+      case parse_int(project_id_str) do
+        nil -> nil
+        id ->
           project = Enum.find(projects, fn p -> p.id == id end)
           project && project.path
-
-        _ ->
-          nil
       end
 
     {:noreply, assign(socket, :available_agents, list_agents(project_path))}

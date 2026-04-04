@@ -1,4 +1,6 @@
 defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+
   @moduledoc """
   Single source of truth for CLI slash-command metadata and parsing.
 
@@ -115,9 +117,9 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
   def route("agents", name) when is_binary(name), do: {:session, {:agent, name}}
 
   def route("max-turns", n) when is_binary(n) do
-    case Integer.parse(n) do
-      {int, ""} -> {:session, {:max_turns, int}}
-      _ -> :unknown
+    case parse_int(n) do
+      nil -> :unknown
+      int -> {:session, {:max_turns, int}}
     end
   end
 

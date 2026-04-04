@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.FilterHandlers do
   """
 
   import Phoenix.Component, only: [assign: 3]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSkyWeb.Live.Shared.KanbanFilters
 
@@ -40,10 +41,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.FilterHandlers do
   end
 
   def handle_update_filter(%{"field" => "priority", "value" => priority}, socket) do
-    new_priority = case Integer.parse(priority) do
-      {int, ""} -> int
-      :error -> nil
-    end
+    new_priority = parse_int(priority)
     current = socket.assigns.filter_priority
     priority_filter = if current == new_priority, do: nil, else: new_priority
     {:noreply, socket |> assign(:filter_priority, priority_filter) |> KanbanFilters.apply_filters()}

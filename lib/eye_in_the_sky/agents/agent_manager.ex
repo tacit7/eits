@@ -11,6 +11,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSky.Git.Worktrees
   alias EyeInTheSky.{AgentDefinitions, Agents, Sessions}
+  alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 
   @registry EyeInTheSky.Claude.AgentRegistry
@@ -429,7 +430,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
   defp resolve_agent_definition("", _project_id, _project_path), do: nil
 
   defp resolve_agent_definition(slug, project_id, project_path) do
-    project_id = coerce_project_id(project_id)
+    project_id = ToolHelpers.parse_int(project_id)
     case lookup_definition(slug, project_id) do
       {:ok, defn} ->
         %{agent_definition_id: defn.id, definition_checksum_at_spawn: defn.checksum}
@@ -454,15 +455,6 @@ defmodule EyeInTheSky.Agents.AgentManager do
       AgentDefinitions.resolve(slug, project_id)
     else
       AgentDefinitions.resolve_global(slug)
-    end
-  end
-
-  defp coerce_project_id(nil), do: nil
-  defp coerce_project_id(id) when is_integer(id), do: id
-  defp coerce_project_id(id) when is_binary(id) do
-    case Integer.parse(id) do
-      {int, ""} -> int
-      _ -> nil
     end
   end
 

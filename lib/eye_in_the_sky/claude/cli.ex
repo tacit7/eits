@@ -278,18 +278,18 @@ defmodule EyeInTheSky.Claude.CLI do
     args = maybe_flag(args, "--plugin-dir", opts[:plugin_dir])
     args = maybe_flag(args, "--settings", opts[:settings_file])
 
-    # Boolean flags
+    # Boolean flags — use maybe_bool_flag/3 for consistency with maybe_flag/3
     # stream-json requires --verbose for proper output parsing
     verbose = opts[:verbose] || opts[:output_format] == "stream-json"
-    args = if verbose, do: args ++ ["--verbose"], else: args
-    args = if opts[:skip_permissions], do: args ++ ["--dangerously-skip-permissions"], else: args
     # --sandbox enables OS-level isolation; --no-sandbox is remote-control only (sandbox off by default)
-    args = if opts[:sandbox] == true, do: args ++ ["--sandbox"], else: args
-    args = if opts[:chrome] == true, do: args ++ ["--chrome"], else: args
-    args = if opts[:chrome] == false, do: args ++ ["--no-chrome"], else: args
-
     args =
-      if opts[:include_partial_messages], do: args ++ ["--include-partial-messages"], else: args
+      args
+      |> maybe_bool_flag("--verbose", verbose)
+      |> maybe_bool_flag("--dangerously-skip-permissions", opts[:skip_permissions])
+      |> maybe_bool_flag("--sandbox", opts[:sandbox] == true)
+      |> maybe_bool_flag("--chrome", opts[:chrome] == true)
+      |> maybe_bool_flag("--no-chrome", opts[:chrome] == false)
+      |> maybe_bool_flag("--include-partial-messages", opts[:include_partial_messages])
 
     # When multimodal content blocks are present, switch to stdin input mode.
     # do_spawn reads :content_blocks_json from opts and pipes it via stdin.
@@ -345,6 +345,9 @@ defmodule EyeInTheSky.Claude.CLI do
   defp maybe_flag(args, _flag, nil), do: args
   defp maybe_flag(args, _flag, ""), do: args
   defp maybe_flag(args, flag, value), do: args ++ [flag, to_string(value)]
+
+  defp maybe_bool_flag(args, _flag, falsy) when falsy in [nil, false], do: args
+  defp maybe_bool_flag(args, flag, _truthy), do: args ++ [flag]
 
   defp cli_db_defaults do
     alias EyeInTheSky.Settings

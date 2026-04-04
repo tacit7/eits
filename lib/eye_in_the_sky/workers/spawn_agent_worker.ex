@@ -5,6 +5,7 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
 
   alias EyeInTheSky.ScheduledJobs
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Utils.ToolHelpers
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"job_id" => job_id}}) do
@@ -50,7 +51,7 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
         session_uuid: session_uuid
       ]
       |> maybe_put(:max_budget_usd, parse_float(config["max_budget_usd"]))
-      |> maybe_put(:max_turns, parse_int(config["max_turns"]))
+      |> maybe_put(:max_turns, ToolHelpers.parse_int(config["max_turns"]))
       |> maybe_put(:fallback_model, config["fallback_model"])
       |> maybe_put(:allowed_tools, config["allowed_tools"])
       |> maybe_put(:output_format, config["output_format"])
@@ -93,18 +94,6 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
   end
 
   defp parse_float(val) when is_number(val), do: val
-
-  defp parse_int(nil), do: nil
-  defp parse_int(""), do: nil
-
-  defp parse_int(val) when is_binary(val) do
-    case Integer.parse(val) do
-      {n, _} -> n
-      _ -> nil
-    end
-  end
-
-  defp parse_int(val) when is_integer(val), do: val
 
   defp broadcast do
     EyeInTheSky.Events.jobs_updated()

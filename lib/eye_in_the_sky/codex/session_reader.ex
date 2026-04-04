@@ -15,6 +15,8 @@ defmodule EyeInTheSky.Codex.SessionReader do
   Codex stores sessions in: ~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<thread_id>.jsonl
   """
   @spec find_session_file(String.t()) :: {:ok, String.t()} | {:error, :not_found}
+  def find_session_file(nil), do: {:error, :not_found}
+
   def find_session_file(thread_id) when is_binary(thread_id) do
     home = System.get_env("HOME")
     sessions_dir = Path.join([home, ".codex", "sessions"])

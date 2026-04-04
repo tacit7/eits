@@ -190,7 +190,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
         conn |> put_status(:bad_request) |> json(%{error: "body is required"})
 
       true ->
-        case resolve_session_id(params["session_id"]) do
+        case ToolHelpers.resolve_session_int_id(params["session_id"]) do
           {:ok, int_id} ->
             attrs = %{
               channel_id: channel_id,
@@ -243,8 +243,6 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       messages: Enum.map(messages, &ApiPresenter.present_channel_message/1)
     })
   end
-
-  defp resolve_session_id(raw) when is_binary(raw), do: ToolHelpers.resolve_session_int_id(raw)
 
   defp agent_manager_mod do
     Application.get_env(:eye_in_the_sky, :agent_manager_module, AgentManager)

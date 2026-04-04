@@ -4,11 +4,9 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
   import EyeInTheSkyWeb.Components.Sidebar.SystemSection
   import EyeInTheSkyWeb.Components.Sidebar.ChatSection
   import EyeInTheSkyWeb.Components.Sidebar.ProjectsSection
-  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
+  alias EyeInTheSkyWeb.Components.Sidebar.{ProjectActions, ChannelActions}
   alias EyeInTheSky.{Projects, Channels, Notifications}
-  alias EyeInTheSky.Channels.Channel
-  alias EyeInTheSky.Agents.AgentManager
 
   @impl true
   def mount(socket) do
@@ -70,258 +68,118 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
      |> assign(:expanded_system, socket.assigns[:expanded_system] != false)}
   end
 
-  @impl true
-  def handle_event("new_chat", _params, socket) do
-    {:noreply, push_navigate(socket, to: "/?new=1")}
-  end
+  # --- UI toggles ---
 
   @impl true
-  def handle_event("toggle_collapsed", _params, socket) do
-    {:noreply, assign(socket, :collapsed, !socket.assigns.collapsed)}
-  end
+  def handle_event("new_chat", _params, socket),
+    do: {:noreply, push_navigate(socket, to: "/?new=1")}
 
   @impl true
-  def handle_event("toggle_mobile", _params, socket) do
-    {:noreply, assign(socket, :mobile_open, !socket.assigns.mobile_open)}
-  end
+  def handle_event("toggle_collapsed", _params, socket),
+    do: {:noreply, assign(socket, :collapsed, !socket.assigns.collapsed)}
 
   @impl true
-  def handle_event("open_mobile", _params, socket) do
-    {:noreply, assign(socket, :mobile_open, true)}
-  end
+  def handle_event("toggle_mobile", _params, socket),
+    do: {:noreply, assign(socket, :mobile_open, !socket.assigns.mobile_open)}
 
   @impl true
-  def handle_event("close_mobile", _params, socket) do
-    {:noreply, assign(socket, :mobile_open, false)}
-  end
+  def handle_event("open_mobile", _params, socket),
+    do: {:noreply, assign(socket, :mobile_open, true)}
 
   @impl true
-  def handle_event("toggle_all_projects", _params, socket) do
-    {:noreply, assign(socket, :expanded_all_projects, !socket.assigns.expanded_all_projects)}
-  end
+  def handle_event("close_mobile", _params, socket),
+    do: {:noreply, assign(socket, :mobile_open, false)}
 
   @impl true
-  def handle_event("toggle_projects", _params, socket) do
-    {:noreply, assign(socket, :expanded_projects, !socket.assigns.expanded_projects)}
-  end
+  def handle_event("toggle_all_projects", _params, socket),
+    do: {:noreply, assign(socket, :expanded_all_projects, !socket.assigns.expanded_all_projects)}
 
   @impl true
-  def handle_event("select_project", %{"project_id" => id_str}, socket) do
-    case parse_int(id_str) do
-      nil ->
-        {:noreply, socket}
-
-      id ->
-        current_id = get_in(socket.assigns, [:sidebar_project, Access.key(:id)])
-
-        if current_id == id do
-          {:noreply, assign(socket, :sidebar_project, nil)}
-        else
-          project = Projects.get_project!(id)
-          {:noreply, assign(socket, :sidebar_project, project)}
-        end
-    end
-  end
+  def handle_event("toggle_projects", _params, socket),
+    do: {:noreply, assign(socket, :expanded_projects, !socket.assigns.expanded_projects)}
 
   @impl true
-  def handle_event("toggle_system", _params, socket) do
-    {:noreply, assign(socket, :expanded_system, !socket.assigns.expanded_system)}
-  end
+  def handle_event("toggle_system", _params, socket),
+    do: {:noreply, assign(socket, :expanded_system, !socket.assigns.expanded_system)}
 
   @impl true
-  def handle_event("toggle_chat", _params, socket) do
-    {:noreply, assign(socket, :expanded_chat, !socket.assigns.expanded_chat)}
-  end
+  def handle_event("toggle_chat", _params, socket),
+    do: {:noreply, assign(socket, :expanded_chat, !socket.assigns.expanded_chat)}
+
+  # --- Project actions ---
 
   @impl true
-  def handle_event("show_new_channel", _params, socket) do
-    {:noreply, assign(socket, :new_channel_name, "")}
-  end
+  def handle_event("select_project", params, socket),
+    do: ProjectActions.handle_select_project(params, socket)
 
   @impl true
-  def handle_event("cancel_new_channel", _params, socket) do
-    {:noreply, assign(socket, :new_channel_name, nil)}
-  end
+  def handle_event("new_session", params, socket),
+    do: ProjectActions.handle_new_session(params, socket)
 
   @impl true
-  def handle_event("update_channel_name", %{"value" => value}, socket) do
-    {:noreply, assign(socket, :new_channel_name, value)}
-  end
+  def handle_event("start_rename_project", params, socket),
+    do: ProjectActions.handle_start_rename(params, socket)
 
   @impl true
-  def handle_event("create_channel", _params, socket) do
-    name = (socket.assigns.new_channel_name || "") |> String.trim()
-
-    if name != "" do
-      project_id = get_in(socket.assigns, [:sidebar_project, Access.key(:id)]) || 1
-      channel_id = Channel.generate_id(project_id, name)
-
-      case Channels.create_channel(%{
-             id: channel_id,
-             uuid: Ecto.UUID.generate(),
-             name: name,
-             channel_type: "public",
-             project_id: project_id
-           }) do
-        {:ok, _channel} ->
-          channels =
-            case Channels.list_channels() do
-              channels when is_list(channels) -> channels
-              _ -> []
-            end
-
-          {:noreply,
-           socket
-           |> assign(:channels, channels)
-           |> assign(:new_channel_name, nil)}
-
-        {:error, _} ->
-          {:noreply, assign(socket, :new_channel_name, nil)}
-      end
-    else
-      {:noreply, assign(socket, :new_channel_name, nil)}
-    end
-  end
+  def handle_event("cancel_rename_project", _params, socket),
+    do: ProjectActions.handle_cancel_rename(socket)
 
   @impl true
-  def handle_event("new_session", %{"project_id" => project_id_str}, socket) do
-    with project_id when not is_nil(project_id) <- parse_int(project_id_str),
-         project <- Projects.get_project!(project_id),
-         {:ok, %{session: session}} <-
-           AgentManager.create_agent(
-             project_id: project.id,
-             project_path: project.path,
-             model: "sonnet",
-             eits_workflow: "0"
-           ) do
-      {:noreply, push_navigate(socket, to: "/dm/#{session.id}")}
-    else
-      _ -> {:noreply, socket}
-    end
-  end
+  def handle_event("update_rename_value", params, socket),
+    do: ProjectActions.handle_update_rename_value(params, socket)
 
   @impl true
-  def handle_event("start_rename_project", %{"project_id" => id_str}, socket) do
-    case parse_int(id_str) do
-      nil -> {:noreply, socket}
-      id ->
-        project = Projects.get_project!(id)
-        {:noreply, assign(socket, renaming_project_id: id, rename_value: project.name)}
-    end
-  end
+  def handle_event("commit_rename_project", _params, socket),
+    do: ProjectActions.handle_commit_rename(socket)
 
   @impl true
-  def handle_event("cancel_rename_project", _params, socket) do
-    {:noreply, assign(socket, renaming_project_id: nil, rename_value: "")}
-  end
+  def handle_event("delete_project", params, socket),
+    do: ProjectActions.handle_delete_project(params, socket)
 
   @impl true
-  def handle_event("update_rename_value", %{"value" => value}, socket) do
-    {:noreply, assign(socket, :rename_value, value)}
-  end
+  def handle_event("set_bookmark", params, socket),
+    do: ProjectActions.handle_set_bookmark(params, socket)
 
   @impl true
-  def handle_event("commit_rename_project", _params, socket) do
-    name = String.trim(socket.assigns.rename_value)
-
-    if name != "" && socket.assigns.renaming_project_id do
-      project = Projects.get_project!(socket.assigns.renaming_project_id)
-      Projects.update_project(project, %{name: name})
-    end
-
-    {:noreply,
-     socket
-     |> assign(:projects, Projects.list_projects_for_sidebar())
-     |> assign(:renaming_project_id, nil)
-     |> assign(:rename_value, "")}
-  end
+  def handle_event("show_new_project", _params, socket),
+    do: ProjectActions.handle_show_new_project(socket)
 
   @impl true
-  def handle_event("delete_project", %{"project_id" => id_str}, socket) do
-    case parse_int(id_str) do
-      nil -> {:noreply, socket}
-      id ->
-        project = Projects.get_project!(id)
-        Projects.delete_project(project)
-        {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
-    end
-  end
+  def handle_event("cancel_new_project", _params, socket),
+    do: ProjectActions.handle_cancel_new_project(socket)
 
   @impl true
-  def handle_event("set_bookmark", params, socket) do
-    with id when is_binary(id) <- Map.get(params, "id"),
-         value when value in ["true", "false"] <- Map.get(params, "bookmarked"),
-         project_id when not is_nil(project_id) <- parse_int(id),
-         {:ok, project} <- Projects.set_bookmarked(project_id, value == "true") do
-      EyeInTheSky.Events.project_updated(project)
-      {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
-    else
-      _ -> {:noreply, socket}
-    end
-  end
+  def handle_event("update_project_path", params, socket),
+    do: ProjectActions.handle_update_project_path(params, socket)
 
   @impl true
-  def handle_event("show_new_project", _params, socket) do
-    {:noreply,
-     start_async(socket, :pick_folder, fn ->
-       System.cmd(
-         "osascript",
-         ["-e", ~s[POSIX path of (choose folder with prompt "Select project folder:")]],
-         stderr_to_stdout: true
-       )
-     end)}
-  end
+  def handle_event("create_project", _params, socket),
+    do: ProjectActions.handle_create_project(socket)
+
+  # --- Channel actions ---
 
   @impl true
-  def handle_event("cancel_new_project", _params, socket) do
-    {:noreply, assign(socket, :new_project_path, nil)}
-  end
+  def handle_event("show_new_channel", _params, socket),
+    do: ChannelActions.handle_show_new_channel(socket)
 
   @impl true
-  def handle_event("update_project_path", %{"value" => value}, socket) do
-    {:noreply, assign(socket, :new_project_path, value)}
-  end
+  def handle_event("cancel_new_channel", _params, socket),
+    do: ChannelActions.handle_cancel_new_channel(socket)
 
   @impl true
-  def handle_event("create_project", _params, socket) do
-    path = (socket.assigns.new_project_path || "") |> String.trim()
-
-    if path != "" do
-      name = path |> String.split("/") |> Enum.reject(&(&1 == "")) |> List.last() || path
-
-      case Projects.create_project(%{name: name, path: path}) do
-        {:ok, _project} ->
-          {:noreply,
-           socket
-           |> assign(:projects, Projects.list_projects_for_sidebar())
-           |> assign(:new_project_path, nil)}
-
-        {:error, _} ->
-          {:noreply, assign(socket, :new_project_path, nil)}
-      end
-    else
-      {:noreply, assign(socket, :new_project_path, nil)}
-    end
-  end
+  def handle_event("update_channel_name", params, socket),
+    do: ChannelActions.handle_update_channel_name(params, socket)
 
   @impl true
-  def handle_async(:pick_folder, {:ok, {path, 0}}, socket) do
-    path = String.trim(path)
-    name = path |> String.split("/") |> Enum.reject(&(&1 == "")) |> List.last() || path
+  def handle_event("create_channel", _params, socket),
+    do: ChannelActions.handle_create_channel(socket)
 
-    case Projects.create_project(%{name: name, path: path}) do
-      {:ok, _project} ->
-        {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+  @impl true
+  def handle_async(:pick_folder, {:ok, result}, socket),
+    do: ProjectActions.handle_pick_folder(result, socket)
 
-      {:error, _} ->
-        {:noreply, socket}
-    end
-  end
-
-  def handle_async(:pick_folder, _result, socket) do
-    # User cancelled or osascript failed — fall back to text input
-    {:noreply, assign(socket, :new_project_path, "")}
-  end
+  def handle_async(:pick_folder, _result, socket),
+    do: ProjectActions.handle_pick_folder(:cancelled, socket)
 
   @impl true
   def render(assigns) do

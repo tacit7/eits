@@ -77,11 +77,18 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
       EITS-CMD: task done <id>
       EITS-CMD: note <body>
       EITS-CMD: commit <hash>
-      EITS-CMD: dm --to #{state.session_id} --message <text>
+      EITS-CMD: dm --to <target_session_uuid_or_id> --message <text>
 
     Write EITS-CMD lines anywhere in your output. They are stripped before display.
     You MUST claim a task before editing files:
       EITS-CMD: task begin <title of your work>
+
+    ## Incoming DM Protocol
+
+    If your prompt starts with "DM from:<name> (session:<uuid>) <body>":
+    - Parse the sender UUID from (session:<uuid>)
+    - Reply immediately: EITS-CMD: dm --to <uuid> --message <your reply>
+    - Always respond — unanswered DMs block the sender.
     """
   end
 

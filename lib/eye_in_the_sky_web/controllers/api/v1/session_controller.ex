@@ -299,19 +299,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
             _ -> false
           end
 
-        json(conn, %{
-          id: session.id,
-          uuid: session.uuid,
-          agent_id: agent_uuid,
-          agent_int_id: session.agent_id,
-          session_id: session.uuid,
-          project_id: session.project_id,
-          status: session.status,
-          name: session.name,
-          description: session.description,
-          is_spawned: is_spawned,
-          initialized: true
-        })
+        json(conn, ApiPresenter.present_session_detail(session, agent_uuid: agent_uuid, is_spawned: is_spawned))
 
       {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "Session not found"})

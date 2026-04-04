@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   require Logger
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Agents, ChannelMessages, Channels, Messages, Sessions, Teams}
+  alias EyeInTheSky.{Agents, ChannelMessages, Channels, Messages, Sessions}
   alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
@@ -93,7 +93,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     with {:from, {:ok, from_session}} <- {:from, resolve_from_session(from_raw)},
          {:to, {:ok, to_session}} <- {:to, resolve_to_session(to_raw)} do
       response_required = params["response_required"] in [true, "true", "1", 1]
-      sender_name = resolve_sender_name_from_session(from_session)
+      sender_name = ApiPresenter.resolve_session_sender_name(from_session)
 
       dm_body =
         "DM from:#{sender_name} (session:#{from_session.uuid}) #{params["message"]}"
@@ -252,16 +252,4 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
   # Resolve a readable name from the sender session.
   # Priority: team member name > session name > agent description > "agent"
-  defp resolve_sender_name_from_session(session) do
-    case session.agent_id && Agents.get_agent(session.agent_id) do
-      {:ok, agent} ->
-        case Teams.get_member_by_agent_id(agent.id) do
-          %{name: name} when is_binary(name) and name != "" -> name
-          _ -> session.name || agent.description || "agent"
-        end
-
-      _ ->
-        session.name || "agent"
-    end
-  end
 end

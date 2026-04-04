@@ -113,6 +113,46 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
     }
   end
 
+  @doc """
+  Full session detail shape for the show endpoint.
+  `opts` accepts: agent_uuid (string), is_spawned (boolean).
+  """
+  def present_session_detail(session, opts \\ []) do
+    %{
+      id: session.id,
+      uuid: session.uuid,
+      session_id: session.uuid,
+      agent_id: Keyword.get(opts, :agent_uuid),
+      agent_int_id: session.agent_id,
+      project_id: session.project_id,
+      status: session.status,
+      name: session.name,
+      description: session.description,
+      is_spawned: Keyword.get(opts, :is_spawned, false),
+      initialized: true
+    }
+  end
+
+  @doc """
+  Resolves a human-readable sender name from a session struct.
+  Checks for a team member name, falls back to the agent description, then session name.
+  Performs DB queries via Agents + Teams — call from controller layer only.
+  """
+  def resolve_session_sender_name(session) do
+    alias EyeInTheSky.{Agents, Teams}
+
+    case session.agent_id && Agents.get_agent(session.agent_id) do
+      {:ok, agent} ->
+        case Teams.get_member_by_agent_id(agent.id) do
+          %{name: name} when is_binary(name) and name != "" -> name
+          _ -> session.name || agent.description || "agent"
+        end
+
+      _ ->
+        session.name || "agent"
+    end
+  end
+
   def present_bookmark(bookmark) do
     %{
       id: bookmark.id,

@@ -23,11 +23,7 @@ defmodule EyeInTheSkyWeb.ControllerHelpers do
 
   def translate_errors(_), do: %{}
 
-  def normalize_parent_type("sessions"), do: "session"
-  def normalize_parent_type("agents"), do: "agent"
-  def normalize_parent_type("tasks"), do: "task"
-  def normalize_parent_type("projects"), do: "project"
-  def normalize_parent_type(type), do: type
+  defdelegate normalize_parent_type(type), to: EyeInTheSky.Utils.ToolHelpers
 
   @doc """
   Resolves a raw string to an integer ID.

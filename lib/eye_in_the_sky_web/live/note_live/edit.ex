@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.NoteLive.Edit do
   use EyeInTheSkyWeb, :live_view
 
+  import EyeInTheSkyWeb.ControllerHelpers, only: [normalize_parent_type: 1]
+
   alias EyeInTheSky.Notes
 
   @valid_return_paths ["/notes", ~r|^/projects/\d+/notes$|]
@@ -211,30 +213,33 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
     end
   end
 
-  defp parent_type_label(type) when type in ["session", "sessions"], do: "Session"
-  defp parent_type_label(type) when type in ["agent", "agents"], do: "Agent"
-  defp parent_type_label(type) when type in ["project", "projects"], do: "Project"
-  defp parent_type_label(type) when type in ["task", "tasks"], do: "Task"
-  defp parent_type_label(type) when is_binary(type), do: String.capitalize(type)
-  defp parent_type_label(_), do: "Note"
+  defp parent_type_label(type) do
+    case normalize_parent_type(type) do
+      "session" -> "Session"
+      "agent" -> "Agent"
+      "project" -> "Project"
+      "task" -> "Task"
+      t when is_binary(t) -> String.capitalize(t)
+      _ -> "Note"
+    end
+  end
 
-  defp parent_type_icon(type) when type in ["session", "sessions"], do: "hero-clock-mini"
-  defp parent_type_icon(type) when type in ["agent", "agents"], do: "hero-cpu-chip-mini"
-  defp parent_type_icon(type) when type in ["project", "projects"], do: "hero-folder-mini"
+  defp parent_type_icon(type) do
+    case normalize_parent_type(type) do
+      "session" -> "hero-clock-mini"
+      "agent" -> "hero-cpu-chip-mini"
+      "project" -> "hero-folder-mini"
+      "task" -> "hero-clipboard-document-list-mini"
+      _ -> "hero-document-text-mini"
+    end
+  end
 
-  defp parent_type_icon(type) when type in ["task", "tasks"],
-    do: "hero-clipboard-document-list-mini"
-
-  defp parent_type_icon(_), do: "hero-document-text-mini"
-
-  defp parent_type_class(type) when type in ["session", "sessions"],
-    do: "bg-info/[0.08] text-info/70"
-
-  defp parent_type_class(type) when type in ["agent", "agents"],
-    do: "bg-secondary/[0.08] text-secondary/70"
-
-  defp parent_type_class(type) when type in ["project", "projects"],
-    do: "bg-primary/[0.08] text-primary/70"
-
-  defp parent_type_class(_), do: "bg-base-content/[0.06] text-base-content/50"
+  defp parent_type_class(type) do
+    case normalize_parent_type(type) do
+      "session" -> "bg-info/[0.08] text-info/70"
+      "agent" -> "bg-secondary/[0.08] text-secondary/70"
+      "project" -> "bg-primary/[0.08] text-primary/70"
+      _ -> "bg-base-content/[0.06] text-base-content/50"
+    end
+  end
 end

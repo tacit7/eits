@@ -61,10 +61,12 @@ defmodule EyeInTheSky.Claude.BinaryFinder do
     end
   end
 
-  defp semver_dir?("v" <> rest), do: match?({:ok, _}, Version.parse(rest))
-  defp semver_dir?(_), do: false
+  @doc false
+  def semver_dir?("v" <> rest), do: match?({:ok, _}, Version.parse(rest))
+  def semver_dir?(_), do: false
 
-  defp parse_version("v" <> rest) do
+  @doc false
+  def parse_version("v" <> rest) do
     case Version.parse(rest) do
       {:ok, v} -> v
       :error -> Version.parse!("0.0.0")

@@ -17,7 +17,44 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
   end
 
   def present_note(note) do
-    %{id: note.id, title: note.title, body: note.body, starred: note.starred || 0}
+    %{
+      id: note.id,
+      parent_id: note.parent_id,
+      parent_type: note.parent_type,
+      title: note.title,
+      body: note.body,
+      starred: note.starred || 0
+    }
+  end
+
+  def present_channel(ch) do
+    %{
+      id: to_string(ch.id),
+      name: ch.name,
+      description: ch.description,
+      channel_type: ch.channel_type,
+      project_id: ch.project_id
+    }
+  end
+
+  def present_channel_message(msg) do
+    %{
+      id: msg.id,
+      number: msg.channel_message_number,
+      uuid: msg.uuid,
+      session_id: msg.session_id,
+      session_name:
+        if(Ecto.assoc_loaded?(msg.session) && msg.session, do: msg.session.name, else: nil),
+      sender_role: msg.sender_role,
+      provider: msg.provider,
+      body: msg.body,
+      status: msg.status,
+      inserted_at: msg.inserted_at
+    }
+  end
+
+  def present_commit(c) do
+    %{id: c.id, commit_hash: c.commit_hash, commit_message: c.commit_message}
   end
 
   def present_agent(agent) do

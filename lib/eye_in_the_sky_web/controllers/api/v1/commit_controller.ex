@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
   import EyeInTheSkyWeb.ControllerHelpers
 
   alias EyeInTheSky.{Agents, Commits, Sessions}
+  alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @doc """
   GET /api/v1/commits - List commits for a session or agent.
@@ -32,10 +33,7 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
 
     json(conn, %{
       success: true,
-      commits:
-        Enum.map(commits, fn c ->
-          %{id: c.id, commit_hash: c.commit_hash, commit_message: c.commit_message}
-        end)
+      commits: Enum.map(commits, &ApiPresenter.present_commit/1)
     })
   end
 
@@ -74,13 +72,7 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
           created =
             results
             |> Enum.filter(&match?({:ok, _}, &1))
-            |> Enum.map(fn {:ok, commit} ->
-              %{
-                id: commit.id,
-                commit_hash: commit.commit_hash,
-                commit_message: commit.commit_message
-              }
-            end)
+            |> Enum.map(fn {:ok, commit} -> ApiPresenter.present_commit(commit) end)
 
           errors =
             results

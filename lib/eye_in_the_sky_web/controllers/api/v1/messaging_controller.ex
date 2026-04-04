@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   alias EyeInTheSky.{Agents, ChannelMessages, Channels, Messages, Sessions, Teams}
   alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @doc """
   POST /api/v1/dm - Send a direct message to an agent session.
@@ -172,16 +173,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     json(conn, %{
       success: true,
       message: "#{length(channels)} channel(s) found",
-      channels:
-        Enum.map(channels, fn ch ->
-          %{
-            id: to_string(ch.id),
-            name: ch.name,
-            description: ch.description,
-            channel_type: ch.channel_type,
-            project_id: ch.project_id
-          }
-        end)
+      channels: Enum.map(channels, &ApiPresenter.present_channel/1)
     })
   end
 
@@ -248,25 +240,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       success: true,
       channel_id: channel_id,
       count: length(messages),
-      messages:
-        Enum.map(messages, fn msg ->
-          %{
-            id: msg.id,
-            number: msg.channel_message_number,
-            uuid: msg.uuid,
-            session_id: msg.session_id,
-            session_name:
-              if(Ecto.assoc_loaded?(msg.session) && msg.session,
-                do: msg.session.name,
-                else: nil
-              ),
-            sender_role: msg.sender_role,
-            provider: msg.provider,
-            body: msg.body,
-            status: msg.status,
-            inserted_at: msg.inserted_at
-          }
-        end)
+      messages: Enum.map(messages, &ApiPresenter.present_channel_message/1)
     })
   end
 

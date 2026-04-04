@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
 
   alias EyeInTheSky.Notes
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
+  alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @doc """
   GET /api/v1/notes - Search notes.
@@ -28,17 +29,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
     json(conn, %{
       success: true,
       message: "Found #{length(notes)} note(s)",
-      results:
-        Enum.map(notes, fn n ->
-          %{
-            id: n.id,
-            parent_id: n.parent_id,
-            parent_type: n.parent_type,
-            title: n.title,
-            body: n.body,
-            starred: n.starred || 0
-          }
-        end)
+      results: Enum.map(notes, &ApiPresenter.present_note/1)
     })
   end
 
@@ -135,15 +126,4 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
     end
   end
 
-  defp parse_starred(nil), do: nil
-  defp parse_starred(val) when is_integer(val), do: val
-  defp parse_starred(true), do: 1
-  defp parse_starred(false), do: 0
-
-  defp parse_starred(val) when is_binary(val) do
-    case Integer.parse(val) do
-      {n, ""} -> n
-      _ -> nil
-    end
-  end
 end

@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Projects
+  alias EyeInTheSky.ProjectFiles
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -67,7 +68,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
 
         entries =
           if claude_dir && File.dir?(claude_dir),
-            do: scan_directory(claude_dir, claude_dir, 0),
+            do: ProjectFiles.scan_directory(claude_dir, claude_dir, 0),
             else: []
 
         {:noreply, assign(socket, :entries, entries)}
@@ -187,27 +188,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   end
 
   defp list_directory(socket, full_path, rel_path) do
-    case File.ls(full_path) do
-      {:ok, items} ->
-        file_list =
-          items
-          |> Enum.sort()
-          |> Enum.map(fn item ->
-            item_path = Path.join(full_path, item)
-            rel = if rel_path, do: Path.join(rel_path, item), else: item
-
-            size =
-              case File.stat(item_path) do
-                {:ok, %{size: s}} -> s
-                _ -> 0
-              end
-
-            %{name: item, path: rel, is_dir: File.dir?(item_path), size: size}
-          end)
-          |> Enum.sort_by(&{!&1.is_dir, &1.name})
-
+    case ProjectFiles.list_directory_entries(full_path, rel_path) do
+      {:ok, entries} ->
         socket
-        |> assign(:files, file_list)
+        |> assign(:files, entries)
         |> assign(:current_path, rel_path)
         |> assign(:file_content, nil)
         |> assign(:selected_file, nil)
@@ -221,71 +205,28 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   end
 
   defp read_file_for_display(socket, full_path, rel_path) do
-    case File.stat(full_path) do
-      {:ok, %{size: size}} when size > 1_048_576 ->
+    case ProjectFiles.read_file(full_path) do
+      {:ok, content} ->
+        file_type = detect_file_type(full_path)
+
+        socket
+        |> assign(:current_path, rel_path)
+        |> assign(:file_content, content)
+        |> assign(:selected_file, rel_path)
+        |> assign(:selected_file_path, full_path)
+        |> assign(:file_type, file_type)
+        |> assign(:files, [])
+        |> assign(:error, nil)
+
+      {:too_large, _size} ->
         socket
         |> assign(:current_path, rel_path)
         |> assign(:file_content, nil)
         |> assign(:files, [])
         |> assign(:error, "File too large to display (over 1 MB)")
 
-      {:ok, _} ->
-        case File.read(full_path) do
-          {:ok, content} ->
-            file_type = detect_file_type(full_path)
-
-            socket
-            |> assign(:current_path, rel_path)
-            |> assign(:file_content, content)
-            |> assign(:selected_file, rel_path)
-            |> assign(:selected_file_path, full_path)
-            |> assign(:file_type, file_type)
-            |> assign(:files, [])
-            |> assign(:error, nil)
-
-          {:error, reason} ->
-            assign(socket, :error, "Failed to read file: #{reason}")
-        end
-
       {:error, reason} ->
-        assign(socket, :error, "Failed to stat file: #{reason}")
-    end
-  end
-
-  @max_tree_depth 2
-
-  defp scan_directory(base_dir, current_dir, depth) do
-    case File.ls(current_dir) do
-      {:ok, items} ->
-        items
-        |> Enum.reject(&String.starts_with?(&1, "."))
-        |> Enum.sort()
-        |> Enum.map(fn item ->
-          full = Path.join(current_dir, item)
-          relative = Path.relative_to(full, base_dir)
-          is_dir = File.dir?(full)
-
-          if is_dir do
-            children =
-              if depth < @max_tree_depth,
-                do: scan_directory(base_dir, full, depth + 1),
-                else: []
-
-            %{name: item, path: full, relative: relative, is_dir: true, children: children}
-          else
-            size =
-              case File.stat(full) do
-                {:ok, %{size: s}} -> s
-                _ -> 0
-              end
-
-            %{name: item, path: full, relative: relative, is_dir: false, size: size}
-          end
-        end)
-        |> Enum.sort_by(&{!&1.is_dir, &1.name})
-
-      _ ->
-        []
+        assign(socket, :error, "Failed to read file: #{reason}")
     end
   end
 

@@ -14,13 +14,14 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
   attr :on_delete, :string, default: nil
   attr :working_session_ids, :any, default: nil
   attr :workflow_states, :list, default: []
+  attr :rest, :global
 
   def kanban_card(assigns) do
     aging = card_aging_indicator(Map.get(assigns.task, :updated_at))
     assigns = assign(assigns, :aging, aging)
 
     ~H"""
-    <div class={["group/card card bg-base-200 hover:bg-base-300 border border-base-content/8 transition-all cursor-pointer", @aging && elem(@aging, 0)]}>
+    <div class={["group/card card bg-base-200 hover:bg-base-300 border border-base-content/8 transition-all cursor-pointer", @aging && elem(@aging, 0)]} {@rest}>
       <%= if Map.get(@task, :priority, 0) > 0 do %>
         <div class="h-0.5 w-full rounded-t" style={"background-color: #{priority_bar_color(Map.get(@task, :priority))}"} />
       <% end %>

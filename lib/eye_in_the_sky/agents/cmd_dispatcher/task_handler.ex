@@ -62,15 +62,15 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
   def dispatch("update " <> rest, from_session_id) do
     case String.split(rest, " ", parts: 2) do
       [id_str, state_str] ->
-        with {id, ""} <- Integer.parse(String.trim(id_str)),
-             {state_id, ""} <- Integer.parse(String.trim(state_str)),
+        with id when not is_nil(id) <- id_str |> String.trim() |> ToolHelpers.parse_int(),
+             state_id when not is_nil(state_id) <- state_str |> String.trim() |> ToolHelpers.parse_int(),
              true <- Tasks.task_linked_to_session?(id, from_session_id),
              task <- Tasks.get_task!(id) do
           Tasks.update_task_state(task, state_id)
           notify_success(from_session_id, "task #{id} state -> #{state_id}")
         else
           false -> notify_error(from_session_id, "task update", {:not_linked, rest})
-          err -> notify_error(from_session_id, "task update", err)
+          _ -> notify_error(from_session_id, "task update", :invalid_id_or_state_id)
         end
 
       _ ->
@@ -162,8 +162,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
   def dispatch("tag " <> rest, from_session_id) do
     case String.split(rest, " ", parts: 2) do
       [id_str, tag_id_str] ->
-        with {id, ""} <- Integer.parse(String.trim(id_str)),
-             {tag_id, ""} <- Integer.parse(String.trim(tag_id_str)),
+        with id when not is_nil(id) <- id_str |> String.trim() |> ToolHelpers.parse_int(),
+             tag_id when not is_nil(tag_id) <- tag_id_str |> String.trim() |> ToolHelpers.parse_int(),
              true <- Tasks.task_linked_to_session?(id, from_session_id) do
           Tasks.link_tag_to_task(id, tag_id)
           notify_success(from_session_id, "task #{id} tagged with #{tag_id}")

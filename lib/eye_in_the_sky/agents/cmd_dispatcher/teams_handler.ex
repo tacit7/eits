@@ -17,6 +17,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
   alias EyeInTheSky.{Sessions, Teams}
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Agents.CmdDispatcher.Helpers
+  alias EyeInTheSky.Utils.ToolHelpers
 
   import Helpers, only: [notify_success: 2, notify_error: 3, extract_flag: 2, get_session!: 1]
 
@@ -29,7 +30,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
       [team_id_str | tail] ->
         args = List.first(tail, "")
 
-        with {team_id, ""} <- Integer.parse(String.trim(team_id_str)),
+        with team_id when not is_nil(team_id) <- team_id_str |> String.trim() |> ToolHelpers.parse_int(),
              {:ok, name} <- extract_flag(args, "--name") do
           session = get_session!(from_session_id)
 
@@ -69,8 +70,11 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
   def dispatch_teams("leave " <> rest, from_session_id) do
     case String.split(rest, " ", parts: 2) do
       [_team_id_str, member_id_str] ->
-        case Integer.parse(String.trim(member_id_str)) do
-          {member_id, ""} ->
+        case member_id_str |> String.trim() |> ToolHelpers.parse_int() do
+          nil ->
+            notify_error(from_session_id, "teams leave", {:invalid_member_id, member_id_str})
+
+          member_id ->
             case Teams.get_member(member_id) do
               nil ->
                 notify_error(from_session_id, "teams leave", {:member_not_found, member_id})
@@ -79,9 +83,6 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
                 Teams.leave_team(member)
                 notify_success(from_session_id, "member #{member_id} left team")
             end
-
-          _ ->
-            notify_error(from_session_id, "teams leave", {:invalid_member_id, member_id_str})
         end
 
       _ ->
@@ -99,7 +100,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
       [_team_id_str, member_id_str | tail] ->
         args = List.first(tail, "")
 
-        with {member_id, ""} <- Integer.parse(String.trim(member_id_str)),
+        with member_id when not is_nil(member_id) <- member_id_str |> String.trim() |> ToolHelpers.parse_int(),
              {:ok, status} <- extract_flag(args, "--status") do
           case Teams.get_member(member_id) do
             nil ->

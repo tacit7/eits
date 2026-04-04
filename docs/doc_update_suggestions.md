@@ -1,5 +1,17 @@
 # Documentation Update Suggestions
 
+## 2026-04-03
+**Commits reviewed**: 42ae046..7c77b83
+
+- **CODE_GUIDELINES.md** — Document GenServer error handling pattern (commit 5da2e85): explicit try/catch after task/timeout binding prevents variable scope issues in catch clauses; function-level catch creates implicit try that makes inner bindings inaccessible; show example with ShellCommandWorker
+- **CODE_GUIDELINES.md** — Document catch :exit pattern for GenServer exits (commit 97c201c): replace `rescue e ->` with `catch :exit, reason` for non-error exceptions in GenServer callbacks; `rescue` in GenServer only catches Exception types, not exit/throw signals
+- **CODE_GUIDELINES.md** — Document repository preload extraction (commit 97c201c): move `Repo.preload` calls from web layer LiveViews into context modules (Projects.get_project_with_agents!/1); removes Repo alias from web layer and centralizes query logic
+- **CODE_GUIDELINES.md** — Document CLI refactoring: CLI.Port module extraction (commit e9ba9f0): new CLI.Port.cancel_port/2 consolidates SIGTERM/SIGKILL logic (process group + direct PID); both Claude.CLI and Codex.CLI delegate to it, eliminating duplicate kill implementations
+- **CODE_GUIDELINES.md** — Document jobs_helpers with_scoped_job/4 pattern (commit e9ba9f0): extract repeated parse_job_id + get_job + scoping_check sequence into private helper; show usage in handle_edit_job, handle_toggle_job, handle_delete_job callbacks
+- **CODE_GUIDELINES.md** — Document chat_live channel loading refactoring (commit e9ba9f0): split setup_channel/2 into load_channels/1 (list fetch) + load_channel_data/4 (single channel detail) + setup_channel/2 (socket assign); isolates DB queries from UI state, improves testability
+- **NEW: docs/PROJECT_BOOKMARKS.md** — Document project bookmarks feature (commits 46afbb6): schema design (bookmarks table, name/description/url/icon fields), UI component for bookmark management in project config, bulk operations (import/export), and integration with project overview. Reference implementation plans at `.claude/plans/2026-04-03-project-bookmarks.md`
+- **CODE_GUIDELINES.md or SETTINGS.md** — Document Autumn DaisyUI theme addition (commit 16ef7d2): new theme option in settings theme selector alongside existing themes; note DaisyUI theme plugin loading in Vite config
+
 ## 2026-04-02
 **Commits reviewed**: 624313367941bf1280bd1f090c450e2b3d67594a..42ae046
 

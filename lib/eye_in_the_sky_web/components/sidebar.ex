@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
   import EyeInTheSkyWeb.Components.Sidebar.SystemSection
   import EyeInTheSkyWeb.Components.Sidebar.ChatSection
   import EyeInTheSkyWeb.Components.Sidebar.ProjectsSection
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.{Projects, Channels, Notifications}
   alias EyeInTheSky.Channels.Channel
@@ -106,15 +107,19 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
 
   @impl true
   def handle_event("select_project", %{"project_id" => id_str}, socket) do
-    {id, ""} = Integer.parse(id_str)
-    current_id = get_in(socket.assigns, [:sidebar_project, Access.key(:id)])
+    case parse_int(id_str) do
+      nil ->
+        {:noreply, socket}
 
-    if current_id == id do
-      # Toggle off — clicking the already-selected project collapses the panel
-      {:noreply, assign(socket, :sidebar_project, nil)}
-    else
-      project = Projects.get_project!(id)
-      {:noreply, assign(socket, :sidebar_project, project)}
+      id ->
+        current_id = get_in(socket.assigns, [:sidebar_project, Access.key(:id)])
+
+        if current_id == id do
+          {:noreply, assign(socket, :sidebar_project, nil)}
+        else
+          project = Projects.get_project!(id)
+          {:noreply, assign(socket, :sidebar_project, project)}
+        end
     end
   end
 
@@ -197,9 +202,12 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
 
   @impl true
   def handle_event("start_rename_project", %{"project_id" => id_str}, socket) do
-    {id, ""} = Integer.parse(id_str)
-    project = Projects.get_project!(id)
-    {:noreply, assign(socket, renaming_project_id: id, rename_value: project.name)}
+    case parse_int(id_str) do
+      nil -> {:noreply, socket}
+      id ->
+        project = Projects.get_project!(id)
+        {:noreply, assign(socket, renaming_project_id: id, rename_value: project.name)}
+    end
   end
 
   @impl true
@@ -230,10 +238,13 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
 
   @impl true
   def handle_event("delete_project", %{"project_id" => id_str}, socket) do
-    {id, ""} = Integer.parse(id_str)
-    project = Projects.get_project!(id)
-    Projects.delete_project(project)
-    {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+    case parse_int(id_str) do
+      nil -> {:noreply, socket}
+      id ->
+        project = Projects.get_project!(id)
+        Projects.delete_project(project)
+        {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+    end
   end
 
   @impl true

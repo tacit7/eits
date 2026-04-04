@@ -267,14 +267,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     :ok
   end
 
-  defp resolve_agent_int_id(nil), do: nil
-
-  defp resolve_agent_int_id(uuid) do
-    case Agents.get_agent_by_uuid(uuid) do
-      {:ok, agent} -> agent.id
-      _ -> nil
-    end
-  end
+  defp resolve_agent_int_id(uuid), do: resolve_id(uuid, &Agents.get_agent_by_uuid/1)
 
   defp maybe_add_tags(_task, nil), do: :ok
   defp maybe_add_tags(_task, []), do: :ok
@@ -288,10 +281,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   defp maybe_add_tag_ids(task, tag_ids) when is_list(tag_ids) do
     Enum.each(tag_ids, fn tag_id ->
-      case tag_id do
-        id when is_integer(id) -> Tasks.link_tag_to_task(task.id, id)
-        id when is_binary(id) -> Tasks.link_tag_to_task(task.id, String.to_integer(id))
-        _ -> :ok
+      case parse_int(tag_id) do
+        nil -> :ok
+        id -> Tasks.link_tag_to_task(task.id, id)
       end
     end)
   end

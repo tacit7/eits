@@ -201,15 +201,10 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
   defp safe_return_to(_), do: "/notes"
 
   defp context_suffix(note) do
-    case note.parent_type do
-      t when t in ["session", "sessions"] ->
-        " · #{String.slice(note.parent_id || "", 0, 8)}"
-
-      t when t in ["task", "tasks"] ->
-        " · ##{note.parent_id}"
-
-      _ ->
-        ""
+    case normalize_parent_type(note.parent_type) do
+      "session" -> " · #{String.slice(note.parent_id || "", 0, 8)}"
+      "task" -> " · ##{note.parent_id}"
+      _ -> ""
     end
   end
 

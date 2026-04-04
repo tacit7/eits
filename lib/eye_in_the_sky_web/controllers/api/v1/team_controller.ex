@@ -121,7 +121,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
           name: params["name"],
           role: params["role"] || "member",
           agent_id: params["agent_id"],
-          session_id: resolve_session_id(params["session_id"])
+          session_id: resolve_id(params["session_id"], &EyeInTheSky.Sessions.get_session_by_uuid/1)
         }
 
         case Teams.join_team(attrs) do
@@ -200,22 +200,6 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     case Integer.parse(id) do
       {int_id, ""} -> Teams.get_team(int_id)
       _ -> Teams.get_team_by_name(id)
-    end
-  end
-
-  # Accept either a UUID string (resolves to integer PK) or an integer string
-  defp resolve_session_id(nil), do: nil
-
-  defp resolve_session_id(id) do
-    case Integer.parse(id) do
-      {int_id, ""} ->
-        int_id
-
-      _ ->
-        case EyeInTheSky.Sessions.get_session_by_uuid(id) do
-          {:ok, session} -> session.id
-          _ -> nil
-        end
     end
   end
 

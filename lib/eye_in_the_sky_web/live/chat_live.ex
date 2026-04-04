@@ -448,13 +448,13 @@ defmodule EyeInTheSkyWeb.ChatLive do
     advanced_opts =
       []
       |> maybe_opt(:permission_mode, params["permission_mode"])
-      |> maybe_int_opt(:max_turns, params["max_turns"])
+      |> maybe_opt(:max_turns, parse_int(params["max_turns"]))
       |> maybe_opt(:add_dir, params["add_dir"])
       |> maybe_opt(:mcp_config, params["mcp_config"])
       |> maybe_opt(:plugin_dir, params["plugin_dir"])
       |> maybe_opt(:settings_file, params["settings_file"])
-      |> maybe_bool_opt(:chrome, params["chrome"])
-      |> maybe_bool_opt(:sandbox, params["sandbox"])
+      |> maybe_opt(:chrome, if(params["chrome"] == "true", do: true))
+      |> maybe_opt(:sandbox, if(params["sandbox"] == "true", do: true))
 
     opts =
       [
@@ -471,25 +471,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
     case AgentManager.create_agent(opts) do
       {:ok, %{agent: agent, session: session}} ->
-        if channel_id do
-          case Channels.add_member(channel_id, agent.id, session.id) do
-            {:ok, _member} ->
-              {:ok, sys_msg} =
-                ChannelMessages.send_channel_message(%{
-                  channel_id: channel_id,
-                  session_id: nil,
-                  sender_role: "system",
-                  recipient_role: "agent",
-                  provider: "system",
-                  body: "Agent @#{session.id} (#{agent_description}) joined the channel"
-                })
-
-              EyeInTheSky.Events.channel_message(channel_id, sys_msg)
-
-            {:error, _} ->
-              :ok
-          end
-        end
+        join_agent_to_channel(channel_id, agent, session, agent_description)
 
         {:noreply,
          socket
@@ -685,19 +667,27 @@ defmodule EyeInTheSkyWeb.ChatLive do
     |> assign(:sessions_by_project, sessions_by_project)
   end
 
-  defp maybe_int_opt(opts, _key, nil), do: opts
-  defp maybe_int_opt(opts, _key, ""), do: opts
+  defp join_agent_to_channel(nil, _agent, _session, _description), do: :ok
 
-  defp maybe_int_opt(opts, key, val) when is_binary(val) do
-    case parse_int(val) do
-      n when is_integer(n) and n > 0 -> Keyword.put(opts, key, n)
-      _ -> opts
+  defp join_agent_to_channel(channel_id, agent, session, description) do
+    case Channels.add_member(channel_id, agent.id, session.id) do
+      {:ok, _} ->
+        {:ok, sys_msg} =
+          ChannelMessages.send_channel_message(%{
+            channel_id: channel_id,
+            session_id: nil,
+            sender_role: "system",
+            recipient_role: "agent",
+            provider: "system",
+            body: "Agent @#{session.id} (#{description}) joined the channel"
+          })
+
+        EyeInTheSky.Events.channel_message(channel_id, sys_msg)
+
+      {:error, _} ->
+        :ok
     end
   end
-
-  defp maybe_bool_opt(opts, _key, nil), do: opts
-  defp maybe_bool_opt(opts, key, "true"), do: Keyword.put(opts, key, true)
-  defp maybe_bool_opt(opts, _key, _), do: opts
 
   defp agent_template_option(agent), do: %{id: agent.id, description: agent.description}
 

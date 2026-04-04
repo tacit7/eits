@@ -218,11 +218,16 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
 
   # Real-time: update a single row when a session changes — avoids a full stream
   # reset (which causes heavy DOM churn and can disrupt the new-session modal).
+  # Payload can be a Session struct (id = session_id) or Agent struct (id = agent_id),
+  # so fall back to full reload when the targeted lookup misses.
   @impl true
-  def handle_info({:agent_updated, session}, socket) do
-    case Sessions.get_session_overview_row(session.id) do
-      {:ok, row} -> {:noreply, stream_insert(socket, :sessions, row)}
-      {:error, :not_found} -> {:noreply, socket}
+  def handle_info({:agent_updated, payload}, socket) do
+    case Sessions.get_session_overview_row(payload.id) do
+      {:ok, row} ->
+        {:noreply, stream_insert(socket, :sessions, row)}
+
+      {:error, :not_found} ->
+        {:noreply, reload_sessions(socket)}
     end
   end
 
@@ -230,17 +235,18 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
   @impl true
   def handle_info({event, _agent}, socket)
       when event in [:agent_created, :agent_deleted] do
+    {:noreply, reload_sessions(socket)}
+  end
+
+  defp reload_sessions(socket) do
     current_page = socket.assigns.page
     sessions = Sessions.list_session_overview_rows(limit: current_page * @per_page, offset: 0)
     total = Sessions.count_session_overview_rows()
 
-    socket =
-      socket
-      |> assign(:has_more, length(sessions) < total)
-      |> assign(:total_sessions, total)
-      |> stream(:sessions, sessions, reset: true)
-
-    {:noreply, socket}
+    socket
+    |> assign(:has_more, length(sessions) < total)
+    |> assign(:total_sessions, total)
+    |> stream(:sessions, sessions, reset: true)
   end
 
   @impl true

@@ -130,3 +130,6 @@ See `lib/CLAUDE.md` for full architecture, schema conventions, PubSub rules, and
 ## Documentation
 
 See `docs/CLAUDE.md` for the full documentation index.
+
+Key references:
+- `docs/AGENT_WORKER_QUEUE.md` — AgentWorker queue design, message lifecycle (pending→processing→delivered/failed), error paths, `normalize_context` gotcha

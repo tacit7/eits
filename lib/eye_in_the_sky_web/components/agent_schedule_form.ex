@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [claude_models: 0]
-  import EyeInTheSkyWeb.Live.Shared.JobsHelpers, only: [system_timezone: 0]
+  import EyeInTheSkyWeb.Live.Shared.JobsFormatters, only: [system_timezone: 0]
 
   attr :show, :boolean, required: true
   attr :prompt, :any, required: true

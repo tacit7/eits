@@ -14,7 +14,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
 
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
-  import EyeInTheSkyWeb.Live.Shared.JobsHelpers,
+  import EyeInTheSkyWeb.Live.Shared.JobsFormatters,
     only: [
       job_row_state: 3,
       row_border_class: 1,

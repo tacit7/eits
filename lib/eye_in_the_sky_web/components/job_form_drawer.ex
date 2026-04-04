@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
 
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
-  import EyeInTheSkyWeb.Live.Shared.JobsHelpers, only: [cfg: 2]
+  import EyeInTheSkyWeb.Live.Shared.JobsFormatters, only: [cfg: 2]
 
   @common_timezones [
     "Etc/UTC",

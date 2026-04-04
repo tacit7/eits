@@ -56,37 +56,34 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
   # Resolve a session from an integer ID, UUID, or agent UUID (legacy sender_id).
   defp resolve_from_session(raw) do
-    case Integer.parse(raw) do
-      {int_id, ""} ->
-        Sessions.get_session(int_id)
+    if int_id = ToolHelpers.parse_int(raw) do
+      Sessions.get_session(int_id)
+    else
+      # Try as session UUID first
+      case Sessions.get_session_by_uuid(raw) do
+        {:ok, session} ->
+          {:ok, session}
 
-      _ ->
-        # Try as session UUID first
-        case Sessions.get_session_by_uuid(raw) do
-          {:ok, session} ->
-            {:ok, session}
+        {:error, :not_found} ->
+          # Fallback: treat as agent UUID (legacy sender_id)
+          case Agents.get_agent_by_uuid(raw) do
+            {:ok, agent} ->
+              case Sessions.list_sessions_for_agent(agent.id, limit: 1) do
+                [session | _] -> {:ok, session}
+                _ -> {:error, :not_found}
+              end
 
-          {:error, :not_found} ->
-            # Fallback: treat as agent UUID (legacy sender_id)
-            case Agents.get_agent_by_uuid(raw) do
-              {:ok, agent} ->
-                case Sessions.list_sessions_for_agent(agent.id, limit: 1) do
-                  [session | _] -> {:ok, session}
-                  _ -> {:error, :not_found}
-                end
-
-              _ ->
-                {:error, :not_found}
-            end
-        end
+            _ ->
+              {:error, :not_found}
+          end
+      end
     end
   end
 
   defp resolve_to_session(raw) do
-    case Integer.parse(raw) do
-      {int_id, ""} -> Sessions.get_session(int_id)
-      _ -> Sessions.get_session_by_uuid(raw)
-    end
+    if int_id = ToolHelpers.parse_int(raw),
+      do: Sessions.get_session(int_id),
+      else: Sessions.get_session_by_uuid(raw)
   end
 
   defp do_dm(conn, params, from_raw, to_raw) do

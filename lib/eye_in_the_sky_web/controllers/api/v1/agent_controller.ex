@@ -45,10 +45,7 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
   """
   def show(conn, %{"id" => id}) do
     result =
-      case Integer.parse(id) do
-        {int_id, ""} -> Agents.get_agent(int_id)
-        _ -> Agents.get_agent_by_uuid(id)
-      end
+      if int_id = parse_int(id), do: Agents.get_agent(int_id), else: Agents.get_agent_by_uuid(id)
 
     with {:ok, agent} <- result do
       json(conn, %{success: true, agent: ApiPresenter.present_agent(agent)})

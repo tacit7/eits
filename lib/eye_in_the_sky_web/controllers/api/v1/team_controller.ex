@@ -197,10 +197,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   # ── helpers ──────────────────────────────────────────────────────────────────
 
   defp resolve_team(id) do
-    case Integer.parse(id) do
-      {int_id, ""} -> Teams.get_team(int_id)
-      _ -> Teams.get_team_by_name(id)
-    end
+    if int_id = parse_int(id), do: Teams.get_team(int_id), else: Teams.get_team_by_name(id)
   end
 
 end

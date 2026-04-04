@@ -12,6 +12,7 @@ defmodule EyeInTheSky.Sessions do
   require Logger
 
   alias EyeInTheSky.Repo
+  alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSky.Sessions.Session
   alias EyeInTheSky.Sessions.ModelInfo
   alias EyeInTheSky.Tasks.WorkflowState
@@ -77,10 +78,7 @@ defmodule EyeInTheSky.Sessions do
   def resolve(id) when is_integer(id), do: get_session(id)
 
   def resolve(ref) when is_binary(ref) do
-    case Integer.parse(ref) do
-      {id, ""} -> get_session(id)
-      _ -> get_session_by_uuid(ref)
-    end
+    if id = ToolHelpers.parse_int(ref), do: get_session(id), else: get_session_by_uuid(ref)
   end
 
   @doc """

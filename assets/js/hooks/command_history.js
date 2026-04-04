@@ -85,7 +85,10 @@ export const CommandHistory = {
       this.el.focus()
     })
 
-    // Compose SlashCommandPopup onto this hook context
+    // Copy all SlashCommandPopup methods onto this hook context so that
+    // mounted() can reference them via `this`. Phoenix only supports one
+    // phx-hook per element, so composition is done manually here.
+    Object.assign(this, SlashCommandPopup)
     SlashCommandPopup.mounted.call(this)
   },
 

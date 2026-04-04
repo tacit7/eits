@@ -213,111 +213,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
       >
         {@task.title}
       </h4>
-      <%!-- ... menu --%>
-      <div class="flex-shrink-0 opacity-0 group-hover/card:opacity-100 transition-opacity">
-        <details class="dropdown dropdown-end">
-          <summary class="flex items-center justify-center w-6 h-6 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/8 cursor-pointer list-none transition-colors">
-            <.icon name="hero-ellipsis-horizontal-mini" class="w-3.5 h-3.5" />
-          </summary>
-          <div class="dropdown-content z-50 mt-1 w-48 rounded-xl bg-base-300 shadow-xl p-1.5 flex flex-col gap-0.5">
-            <%!-- Open card --%>
-            <button
-              type="button"
-              phx-click={@on_click}
-              phx-value-task_id={@task.uuid || to_string(@task.id)}
-              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
-            >
-              <.icon name="hero-rectangle-stack-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
-              Open card
-            </button>
-            <%!-- Edit labels --%>
-            <button
-              type="button"
-              phx-click="open_task_detail"
-              phx-value-task_id={@task.uuid || to_string(@task.id)}
-              phx-value-focus="tags"
-              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
-            >
-              <.icon name="hero-tag-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
-              Edit labels
-            </button>
-            <%!-- Edit dates --%>
-            <button
-              type="button"
-              phx-click="open_date_picker"
-              phx-value-task_id={@task.uuid || to_string(@task.id)}
-              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
-            >
-              <.icon name="hero-clock-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
-              Edit dates
-            </button>
-            <%!-- Copy link --%>
-            <button
-              type="button"
-              phx-hook="CopyToClipboard"
-              id={"copy-task-kanban-#{@task.id}"}
-              data-copy={@task.uuid || to_string(@task.id)}
-              onclick="event.preventDefault();"
-              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
-            >
-              <.icon name="hero-link-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
-              Copy link
-            </button>
-            <%!-- Move submenu --%>
-            <%= if @workflow_states != [] do %>
-              <div class="border-t border-base-content/10 my-0.5" />
-              <details class="group/move">
-                <summary class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors cursor-pointer list-none">
-                  <.icon name="hero-arrow-right-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
-                  <span class="flex-1">Move</span>
-                  <.icon name="hero-chevron-right-mini" class="w-3 h-3 text-base-content/40" />
-                </summary>
-                <div class="mt-0.5 ml-3 flex flex-col gap-0.5">
-                  <%= for state <- @workflow_states do %>
-                    <button
-                      type="button"
-                      phx-click="move_task"
-                      phx-value-task_id={@task.uuid || to_string(@task.id)}
-                      phx-value-state_id={state.id}
-                      class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-base-content/80 hover:bg-base-content/10 transition-colors text-left"
-                    >
-                      <span
-                        class="w-2 h-2 rounded-full flex-shrink-0"
-                        style={"background-color: #{state.color || "hsl(var(--bc) / 0.3)"}"}
-                      />
-                      {state.name}
-                    </button>
-                  <% end %>
-                </div>
-              </details>
-            <% end %>
-            <%!-- Archive / Delete --%>
-            <%= if @on_delete do %>
-              <div class="border-t border-base-content/10 my-0.5" />
-              <button
-                type="button"
-                phx-click="archive_task"
-                phx-value-task_id={@task.uuid || to_string(@task.id)}
-                phx-confirm="Archive this task?"
-                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
-              >
-                <.icon name="hero-archive-box-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
-                Archive
-              </button>
-              <button
-                type="button"
-                phx-click={@on_delete}
-                phx-value-task_id={@task.uuid || to_string(@task.id)}
-                phx-confirm="Delete this task?"
-                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-error hover:bg-error/10 transition-colors text-left"
-              >
-                <.icon name="hero-trash-mini" class="w-4 h-4 flex-shrink-0" />
-                Delete
-              </button>
-            <% end %>
-          </div>
-        </details>
-      </div>
+      <.kanban_context_menu task={@task} on_click={@on_click} on_delete={@on_delete} workflow_states={@workflow_states} />
     </div>
 
     <%!-- Tags --%>
@@ -334,13 +230,135 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
       </div>
     <% end %>
 
-    <%!-- Footer icon row --%>
-    <% checklist = Map.get(@task, :checklist_items, []) %>
-    <% notes_count = Map.get(@task, :notes_count, 0) %>
-    <% has_footer =
-      @task.description || @aging || @task.due_at || checklist != [] || notes_count > 0 ||
-        @dm_session || Map.get(@task, :created_at) %>
-    <%= if has_footer do %>
+    <.kanban_card_footer task={@task} aging={@aging} dm_session={@dm_session} working_session_ids={@working_session_ids} />
+    """
+  end
+
+  defp kanban_context_menu(assigns) do
+    ~H"""
+    <div class="flex-shrink-0 opacity-0 group-hover/card:opacity-100 transition-opacity">
+      <details class="dropdown dropdown-end">
+        <summary class="flex items-center justify-center w-6 h-6 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/8 cursor-pointer list-none transition-colors">
+          <.icon name="hero-ellipsis-horizontal-mini" class="w-3.5 h-3.5" />
+        </summary>
+        <div class="dropdown-content z-50 mt-1 w-48 rounded-xl bg-base-300 shadow-xl p-1.5 flex flex-col gap-0.5">
+          <%!-- Open card --%>
+          <button
+            type="button"
+            phx-click={@on_click}
+            phx-value-task_id={@task.uuid || to_string(@task.id)}
+            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+          >
+            <.icon name="hero-rectangle-stack-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+            Open card
+          </button>
+          <%!-- Edit labels --%>
+          <button
+            type="button"
+            phx-click="open_task_detail"
+            phx-value-task_id={@task.uuid || to_string(@task.id)}
+            phx-value-focus="tags"
+            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+          >
+            <.icon name="hero-tag-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+            Edit labels
+          </button>
+          <%!-- Edit dates --%>
+          <button
+            type="button"
+            phx-click="open_date_picker"
+            phx-value-task_id={@task.uuid || to_string(@task.id)}
+            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+          >
+            <.icon name="hero-clock-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+            Edit dates
+          </button>
+          <%!-- Copy link --%>
+          <button
+            type="button"
+            phx-hook="CopyToClipboard"
+            id={"copy-task-kanban-#{@task.id}"}
+            data-copy={@task.uuid || to_string(@task.id)}
+            onclick="event.preventDefault();"
+            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+          >
+            <.icon name="hero-link-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+            Copy link
+          </button>
+          <%!-- Move submenu --%>
+          <%= if @workflow_states != [] do %>
+            <div class="border-t border-base-content/10 my-0.5" />
+            <details class="group/move">
+              <summary class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors cursor-pointer list-none">
+                <.icon name="hero-arrow-right-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+                <span class="flex-1">Move</span>
+                <.icon name="hero-chevron-right-mini" class="w-3 h-3 text-base-content/40" />
+              </summary>
+              <div class="mt-0.5 ml-3 flex flex-col gap-0.5">
+                <%= for state <- @workflow_states do %>
+                  <button
+                    type="button"
+                    phx-click="move_task"
+                    phx-value-task_id={@task.uuid || to_string(@task.id)}
+                    phx-value-state_id={state.id}
+                    class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-base-content/80 hover:bg-base-content/10 transition-colors text-left"
+                  >
+                    <span
+                      class="w-2 h-2 rounded-full flex-shrink-0"
+                      style={"background-color: #{state.color || "hsl(var(--bc) / 0.3)"}"}
+                    />
+                    {state.name}
+                  </button>
+                <% end %>
+              </div>
+            </details>
+          <% end %>
+          <%!-- Archive / Delete --%>
+          <%= if @on_delete do %>
+            <div class="border-t border-base-content/10 my-0.5" />
+            <button
+              type="button"
+              phx-click="archive_task"
+              phx-value-task_id={@task.uuid || to_string(@task.id)}
+              phx-confirm="Archive this task?"
+              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+            >
+              <.icon name="hero-archive-box-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+              Archive
+            </button>
+            <button
+              type="button"
+              phx-click={@on_delete}
+              phx-value-task_id={@task.uuid || to_string(@task.id)}
+              phx-confirm="Delete this task?"
+              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-error hover:bg-error/10 transition-colors text-left"
+            >
+              <.icon name="hero-trash-mini" class="w-4 h-4 flex-shrink-0" />
+              Delete
+            </button>
+          <% end %>
+        </div>
+      </details>
+    </div>
+    """
+  end
+
+  defp kanban_card_footer(assigns) do
+    checklist = Map.get(assigns.task, :checklist_items, [])
+    notes_count = Map.get(assigns.task, :notes_count, 0)
+
+    has_footer =
+      assigns.task.description || assigns.aging || assigns.task.due_at || checklist != [] ||
+        notes_count > 0 || assigns.dm_session || Map.get(assigns.task, :created_at)
+
+    assigns =
+      assigns
+      |> assign(:checklist, checklist)
+      |> assign(:notes_count, notes_count)
+      |> assign(:has_footer, has_footer)
+
+    ~H"""
+    <%= if @has_footer do %>
       <div class="flex items-center gap-2 mt-2 text-base-content/35 text-[11px]">
         <%= if @task.created_at do %>
           <span class="tabular-nums">{relative_time(@task.created_at)}</span>
@@ -366,17 +384,17 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
             <span>{format_due_date(@task.due_at)}</span>
           </span>
         <% end %>
-        <%= if checklist != [] do %>
-          <% cl_done = Enum.count(checklist, & &1.completed) %>
+        <%= if @checklist != [] do %>
+          <% cl_done = Enum.count(@checklist, & &1.completed) %>
           <span class="flex items-center gap-0.5">
             <.icon name="hero-check-circle" class="w-3 h-3" />
-            <span>{cl_done}/{length(checklist)}</span>
+            <span>{cl_done}/{length(@checklist)}</span>
           </span>
         <% end %>
-        <%= if notes_count > 0 do %>
+        <%= if @notes_count > 0 do %>
           <span class="flex items-center gap-0.5">
             <.icon name="hero-chat-bubble-bottom-center-text" class="w-3 h-3" />
-            <span>{notes_count}</span>
+            <span>{@notes_count}</span>
           </span>
         <% end %>
         <%= if @dm_session do %>

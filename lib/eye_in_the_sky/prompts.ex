@@ -7,6 +7,7 @@ defmodule EyeInTheSky.Prompts do
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Prompts.Prompt
   alias EyeInTheSky.Search.PgSearch
+  alias EyeInTheSky.Utils.ToolHelpers
 
   @doc """
   Returns the list of prompts with optional project filter.
@@ -82,8 +83,8 @@ defmodule EyeInTheSky.Prompts do
   """
   def get_prompt_by_ref(ref, project_id \\ nil) do
     cond do
-      Regex.match?(~r/^\d+$/, ref) ->
-        case get_prompt(String.to_integer(ref)) do
+      id = ToolHelpers.parse_int(ref) ->
+        case get_prompt(id) do
           nil -> {:error, :not_found}
           prompt -> {:ok, prompt}
         end

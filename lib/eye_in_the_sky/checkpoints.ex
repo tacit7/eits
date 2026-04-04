@@ -73,11 +73,7 @@ defmodule EyeInTheSky.Checkpoints do
     if checkpoint.git_stash_ref do
       session = Repo.get(EyeInTheSky.Sessions.Session, checkpoint.session_id)
 
-      project_path =
-        cond do
-          session && session.git_worktree_path -> session.git_worktree_path
-          true -> nil
-        end
+      project_path = session && session.git_worktree_path
 
       if project_path && File.dir?(project_path) do
         pop_stash(project_path, checkpoint.git_stash_ref)

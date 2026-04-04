@@ -193,10 +193,10 @@ defmodule EyeInTheSky.Codex.CLI do
     raw_timeout = EyeInTheSky.Settings.get_integer("cli_idle_timeout_ms")
 
     default_timeout =
-      cond do
-        raw_timeout == 0 -> :infinity
-        is_integer(raw_timeout) and raw_timeout > 0 -> raw_timeout
-        true -> @default_idle_timeout_ms
+      case raw_timeout do
+        0 -> :infinity
+        n when is_integer(n) and n > 0 -> n
+        _ -> @default_idle_timeout_ms
       end
 
     idle_timeout_ms =

@@ -190,13 +190,10 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
     Float.round(input_cost + output_cost + cache_read_cost + cache_creation_cost, 6)
   end
 
+  @pricing_tiers ["opus", "haiku", "sonnet"]
+
   defp detect_pricing_tier(model_name) when is_binary(model_name) do
-    cond do
-      String.contains?(model_name, "opus") -> "opus"
-      String.contains?(model_name, "haiku") -> "haiku"
-      String.contains?(model_name, "sonnet") -> "sonnet"
-      true -> "sonnet"
-    end
+    Enum.find(@pricing_tiers, "sonnet", &String.contains?(model_name, &1))
   end
 
   defp detect_pricing_tier(_), do: "sonnet"

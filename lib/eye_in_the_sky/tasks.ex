@@ -12,6 +12,7 @@ defmodule EyeInTheSky.Tasks do
   alias EyeInTheSky.QueryBuilder
   alias EyeInTheSky.Search.PgSearch
   alias EyeInTheSky.Notes
+  alias EyeInTheSky.Utils.ToolHelpers
 
   # Workflow state ID accessors — source of truth is WorkflowState
   defdelegate state_todo, to: WorkflowState, as: :todo_id
@@ -201,15 +202,13 @@ defmodule EyeInTheSky.Tasks do
   """
   def get_task_by_uuid_or_id!(id_str) do
     task =
-      case Integer.parse(id_str) do
-        {int_id, ""} ->
-          Repo.get!(Task, int_id)
-
-        _ ->
-          case Repo.get_by(Task, uuid: id_str) do
-            nil -> raise Ecto.NoResultsError, queryable: Task
-            task -> task
-          end
+      if int_id = ToolHelpers.parse_int(id_str) do
+        Repo.get!(Task, int_id)
+      else
+        case Repo.get_by(Task, uuid: id_str) do
+          nil -> raise Ecto.NoResultsError, queryable: Task
+          task -> task
+        end
       end
 
     Repo.preload(task, [:state, :tags, :sessions, :checklist_items])

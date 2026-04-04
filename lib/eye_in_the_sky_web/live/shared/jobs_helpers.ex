@@ -38,10 +38,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
   end
 
   def parse_job_id(id) when is_binary(id) do
-    case Integer.parse(id) do
-      {int_id, ""} -> {:ok, int_id}
-      _ -> :error
-    end
+    if n = parse_int(id, nil), do: {:ok, n}, else: :error
   end
 
   def parse_job_id(id) when is_integer(id), do: {:ok, id}

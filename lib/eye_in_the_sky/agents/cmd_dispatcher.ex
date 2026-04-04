@@ -57,6 +57,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   alias EyeInTheSky.{ChannelMessages, Commits, Notes, Tasks}
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Agents.CmdDispatcher.{DmHandler, Helpers, TaskHandler, TeamsHandler}
+  alias EyeInTheSky.Utils.ToolHelpers
 
   import Helpers,
     only: [
@@ -127,17 +128,17 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   defp dispatch_note("task " <> rest, from_session_id) do
     case String.split(rest, " ", parts: 2) do
       [id_str, body] ->
-        case Integer.parse(String.trim(id_str)) do
-          {id, ""} ->
+        case ToolHelpers.parse_int(String.trim(id_str)) do
+          nil ->
+            notify_error(from_session_id, "note task", {:invalid_id, id_str})
+
+          id ->
             if Tasks.task_linked_to_session?(id, from_session_id) do
               Notes.create_note(%{body: body, parent_id: id, parent_type: "task"})
               notify_success(from_session_id, "note added to task #{id}")
             else
               notify_error(from_session_id, "note task", {:not_linked, id})
             end
-
-          _ ->
-            notify_error(from_session_id, "note task", {:invalid_id, id_str})
         end
 
       _ ->
@@ -225,7 +226,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
       [channel_id_str | tail] ->
         args = List.first(tail, "")
 
-        with {channel_id, ""} <- Integer.parse(String.trim(channel_id_str)),
+        with channel_id when not is_nil(channel_id) <- ToolHelpers.parse_int(String.trim(channel_id_str)),
              {:ok, body} <- extract_flag(args, "--body") do
           session = get_session!(from_session_id)
 

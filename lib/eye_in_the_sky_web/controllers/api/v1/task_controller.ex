@@ -292,12 +292,6 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     resolve_id(raw, &Sessions.get_session_by_uuid/1)
   end
 
-  defp parse_task_id(id) when is_binary(id) do
-    case Integer.parse(id) do
-      {n, ""} -> n
-      _ -> id
-    end
-  end
-
+  defp parse_task_id(id) when is_binary(id), do: Helpers.parse_int(id) || id
   defp parse_task_id(id), do: id
 end

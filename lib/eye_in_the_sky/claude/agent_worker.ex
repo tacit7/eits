@@ -625,6 +625,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       eits_workflow: Map.get(context, :eits_workflow, "1"),
       bypass_sandbox: Map.get(context, :bypass_sandbox, false),
       content_blocks: Map.get(context, :content_blocks, []),
+      message_id: Map.get(context, :message_id),
       extra_cli_opts: Map.get(context, :extra_cli_opts, [])
     }
   end
@@ -715,6 +716,11 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   defp handle_transient_error(state) do
+    # Mark the current job's message as failed so it doesn't stay stuck in "processing".
+    if state.current_job do
+      Messages.mark_failed(state.current_job.context[:message_id], "transient_error")
+    end
+
     process_next_job(%{
       state
       | status: :idle,

@@ -68,11 +68,13 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     )
   end
 
-  @doc "Systemic error draining queued jobs."
+  @doc "Systemic error draining queued jobs. Marks each as failed in DB before clearing."
   def on_queue_drained(session_id, provider_conversation_id, queue, reason) do
-    reason_str = inspect(reason)
+    reason_str = classify_failure_reason(reason)
 
-    Enum.each(queue, fn _job ->
+    Enum.each(queue, fn job ->
+      Messages.mark_failed(job.context[:message_id], reason_str)
+
       Events.stream_error(
         session_id,
         provider_conversation_id,
@@ -80,6 +82,19 @@ defmodule EyeInTheSky.AgentWorkerEvents do
       )
     end)
   end
+
+  @doc "Marks the current (active) job failed when a systemic error occurs."
+  def on_current_job_failed(nil, _reason), do: :ok
+
+  def on_current_job_failed(job, reason) do
+    Messages.mark_failed(job.context[:message_id], classify_failure_reason(reason))
+  end
+
+  defp classify_failure_reason({:billing_error, _}), do: "billing_error"
+  defp classify_failure_reason({:authentication_error, _}), do: "authentication_error"
+  defp classify_failure_reason({:unknown_error, msg}) when is_binary(msg), do: "unknown_error: #{String.slice(msg, 0, 120)}"
+  defp classify_failure_reason(:retry_exhausted), do: "retry_exhausted"
+  defp classify_failure_reason(reason), do: inspect(reason) |> String.slice(0, 120)
 
   # --- Data Events ---
 

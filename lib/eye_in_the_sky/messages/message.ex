@@ -39,6 +39,7 @@ defmodule EyeInTheSky.Messages.Message do
     has_many :reactions, EyeInTheSky.Messages.MessageReaction
     has_many :attachments, EyeInTheSky.Messages.FileAttachment
 
+    field :failure_reason, :string
     field :source_uuid, Ecto.UUID
     field :session_id, :integer
     field :channel_id, :integer
@@ -65,6 +66,7 @@ defmodule EyeInTheSky.Messages.Message do
       :direction,
       :body,
       :status,
+      :failure_reason,
       :metadata,
       :source_uuid,
       :from_session_id,
@@ -77,7 +79,7 @@ defmodule EyeInTheSky.Messages.Message do
     ])
     |> validate_required([:sender_role, :direction, :body])
     |> validate_inclusion(:direction, ["inbound", "outbound"])
-    |> validate_inclusion(:status, ["sent", "delivered", "failed", "pending"])
+    |> validate_inclusion(:status, ["sent", "delivered", "failed", "pending", "processing"])
     |> unique_constraint(:source_uuid, name: "messages_source_uuid_index")
   end
 end

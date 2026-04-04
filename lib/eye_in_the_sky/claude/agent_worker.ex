@@ -16,6 +16,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   alias EyeInTheSky.AgentWorkerEvents, as: WorkerEvents
   alias EyeInTheSky.Agents.CmdDispatcher
   alias EyeInTheSky.Claude.AgentWorker.{ErrorClassifier, ProcessCleanup, RetryPolicy}
+  alias EyeInTheSky.Messages
 
   @registry EyeInTheSky.Claude.AgentRegistry
   @max_queue_depth 5
@@ -298,6 +299,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     :telemetry.execute([:eits, :agent, :sdk, :complete], %{system_time: System.system_time()}, %{session_id: state.session_id})
 
     WorkerEvents.on_sdk_completed(state.session_id, state.provider_conversation_id, state.provider)
+    Messages.mark_delivered(state.current_job && state.current_job.context[:message_id])
 
     demonitor_handler(state.handler_monitor)
 
@@ -477,6 +479,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
         :telemetry.execute([:eits, :agent, :job, :started], %{system_time: System.system_time()}, %{session_id: state.session_id})
         WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
+        Messages.mark_processing(job.context[:message_id])
 
         {{:ok, :started},
          RetryPolicy.clear_retry_timer(%{
@@ -553,6 +556,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     case start_sdk(state, next_job) do
       {:ok, sdk_ref, handler_monitor} ->
         WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
+        Messages.mark_processing(next_job.context[:message_id])
 
         new_state =
           RetryPolicy.clear_retry_timer(%{
@@ -694,6 +698,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   defp handle_systemic_error(state, reason) do
+    # Mark current job and all queued jobs as failed in DB before clearing.
+    WorkerEvents.on_current_job_failed(state.current_job, reason)
+
     WorkerEvents.on_queue_drained(
       state.session_id,
       state.provider_conversation_id,

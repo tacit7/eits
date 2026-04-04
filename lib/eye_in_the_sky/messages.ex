@@ -138,7 +138,8 @@ defmodule EyeInTheSky.Messages do
   end
 
   @doc """
-  Creates a message.
+  Creates a message (plain insert without advisory lock).
+  For channel messages with sequential numbering, use create_channel_message/1.
   """
   @spec create_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def create_message(attrs \\ %{}) do
@@ -148,8 +149,24 @@ defmodule EyeInTheSky.Messages do
       %{inserted_at: now, updated_at: now}
       |> Map.merge(attrs)
 
-    # Auto-assign channel_message_number for channel messages
-    # Handles both atom and string key maps
+    %Message{}
+    |> Message.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Creates a channel message with auto-assigned sequential numbering.
+  Uses an advisory lock to prevent duplicate channel_message_numbers under concurrent inserts.
+  """
+  @spec create_channel_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
+  def create_channel_message(attrs \\ %{}) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    attrs =
+      %{inserted_at: now, updated_at: now}
+      |> Map.merge(attrs)
+
+    # Extract channel_id; handles both atom and string key maps
     cid = Map.get(attrs, :channel_id) || Map.get(attrs, "channel_id")
 
     has_number =
@@ -233,14 +250,14 @@ defmodule EyeInTheSky.Messages do
           # (session file sync imports messages without usage data; later calls
           # may enrich with usage metadata using the same source_uuid)
           existing = Repo.get_by!(Message, source_uuid: source_uuid)
-          maybe_enrich_metadata(existing, metadata)
+          enrich_metadata_if_present(existing, metadata)
 
         is_nil(source_uuid) ->
           # No source_uuid — check for a recent message with same content to avoid
           # duplicating a message already imported from the session file via periodic sync.
-          case find_recent_agent_message(session_id, body) do
+          case find_recent_matching_message(session_id, body) do
             nil -> create_message(attrs)
-            existing -> maybe_enrich_metadata(existing, metadata)
+            existing -> enrich_metadata_if_present(existing, metadata)
           end
 
         true ->
@@ -465,8 +482,8 @@ defmodule EyeInTheSky.Messages do
 
   defp broadcast_and_return(error), do: error
 
-  # Finds the most recent agent message in the session matching the given body,
-  defp maybe_enrich_metadata(message, metadata) do
+  # Enrich an existing message with metadata if metadata is provided and non-empty.
+  defp enrich_metadata_if_present(message, metadata) do
     if metadata && metadata != %{} do
       update_message(message, %{metadata: metadata})
     else
@@ -474,10 +491,11 @@ defmodule EyeInTheSky.Messages do
     end
   end
 
+  # Finds the most recent agent message in the session matching the given body,
   # within the last minute. Used to detect duplicates before creating a new record.
   # Unlike find_unlinked_message, this does NOT filter on is_nil(source_uuid) because
   # a concurrent sync may have already stamped the source_uuid on an existing message.
-  defp find_recent_agent_message(session_id, body) do
+  defp find_recent_matching_message(session_id, body) do
     one_minute_ago =
       DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
 

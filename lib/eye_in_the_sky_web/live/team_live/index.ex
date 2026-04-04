@@ -266,7 +266,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
             acc
 
           sids ->
-            Enum.reduce(sids, acc, fn sid, a -> Map.update(a, sid, [task], &(&1 ++ [task])) end)
+            Enum.reduce(sids, acc, fn sid, a -> Map.update(a, sid, [task], &[task | &1]) end)
         end
       end)
 
@@ -277,7 +277,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
 
     members_with_tasks =
       Enum.map(team.members, fn m ->
-        Map.put(m, :tasks, Map.get(tasks_by_session, m.session_id, []))
+        Map.put(m, :tasks, tasks_by_session |> Map.get(m.session_id, []) |> Enum.reverse())
       end)
 
     team

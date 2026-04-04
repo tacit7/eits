@@ -112,12 +112,16 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsFormatters do
     end
   end
 
-  def day_name(n) do
-    case Integer.parse(to_string(n)) do
+  def day_name(n) when is_integer(n), do: Map.get(@days_of_week, n, "?")
+
+  def day_name(n) when is_binary(n) do
+    case Integer.parse(n) do
       {num, _} -> Map.get(@days_of_week, num, "?")
       _ -> "?"
     end
   end
+
+  def day_name(_), do: "?"
 
   def parse_cron_num("*"), do: {:ok, :any}
 

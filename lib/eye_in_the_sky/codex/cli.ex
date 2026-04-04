@@ -131,23 +131,23 @@ defmodule EyeInTheSky.Codex.CLI do
 
     # Inject EITS env vars via shell_environment_policy.set so they're
     # available to shell commands the agent runs (bypasses default filters)
-    args =
-      Enum.reduce(
-        [
-          {"EITS_SESSION_UUID", opts[:eits_session_uuid]},
-          {"EITS_SESSION_ID", opts[:eits_session_id]},
-          {"EITS_AGENT_UUID", opts[:eits_agent_uuid]},
-          {"EITS_AGENT_ID", opts[:eits_agent_id]},
-          {"EITS_PROJECT_ID", opts[:eits_project_id]},
-          {"EITS_MODEL", opts[:eits_model]},
-          {"EITS_URL",
-           opts[:eits_url] || System.get_env("EITS_URL", "http://localhost:5001/api/v1")}
-        ],
-        args,
-        fn {key, val}, acc ->
-          if val, do: acc ++ ["-c", "shell_environment_policy.set.#{key}=\"#{val}\""], else: acc
-        end
-      )
+    env_args =
+      [
+        {"EITS_SESSION_UUID", opts[:eits_session_uuid]},
+        {"EITS_SESSION_ID", opts[:eits_session_id]},
+        {"EITS_AGENT_UUID", opts[:eits_agent_uuid]},
+        {"EITS_AGENT_ID", opts[:eits_agent_id]},
+        {"EITS_PROJECT_ID", opts[:eits_project_id]},
+        {"EITS_MODEL", opts[:eits_model]},
+        {"EITS_URL",
+         opts[:eits_url] || System.get_env("EITS_URL", "http://localhost:5001/api/v1")}
+      ]
+      |> Enum.filter(fn {_key, val} -> val end)
+      |> Enum.flat_map(fn {key, val} ->
+        ["-c", "shell_environment_policy.set.#{key}=\"#{val}\""]
+      end)
+
+    args = args ++ env_args
 
     # Prompt goes last as positional argument
     if prompt = opts[:prompt] do

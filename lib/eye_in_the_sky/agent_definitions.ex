@@ -276,7 +276,7 @@ defmodule EyeInTheSky.AgentDefinitions do
       [_, yaml_block] ->
         lines = String.split(yaml_block, "\n")
 
-        {attrs, _current_key} =
+        {raw_attrs, _current_key} =
           Enum.reduce(lines, {%{}, nil}, fn line, {acc, current_key} ->
             trimmed = String.trim(line)
 
@@ -292,11 +292,11 @@ defmodule EyeInTheSky.AgentDefinitions do
                 {Map.put(acc, key, []), key}
 
               {nil, nil, [_, value]} ->
-                # - value (YAML list item)
+                # - value (YAML list item; prepend for O(1), reversed after reduce)
                 if current_key do
                   existing = Map.get(acc, current_key, [])
                   items = if is_list(existing), do: existing, else: []
-                  {Map.put(acc, current_key, items ++ [clean_value(value)]), current_key}
+                  {Map.put(acc, current_key, [clean_value(value) | items]), current_key}
                 else
                   {acc, current_key}
                 end
@@ -305,6 +305,8 @@ defmodule EyeInTheSky.AgentDefinitions do
                 {acc, current_key}
             end
           end)
+
+        attrs = Map.new(raw_attrs, fn {k, v} -> {k, if(is_list(v), do: Enum.reverse(v), else: v)} end)
 
         %{
           display_name: attrs["name"],

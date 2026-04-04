@@ -86,17 +86,7 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
 
   # ── Parse helpers ──────────────────────────────────────────────────────────
 
-  @doc """
-  Parse an integer ID from a string route param. Returns nil for invalid input.
-  """
-  def parse_id(str) when is_binary(str) do
-    case Integer.parse(str) do
-      {int, ""} -> int
-      _ -> nil
-    end
-  end
-
-  def parse_id(_), do: nil
+  defdelegate parse_id(val), to: EyeInTheSkyWeb.ControllerHelpers, as: :parse_int
 
   @doc """
   Parse a USD budget string from form params. Returns a positive float or nil.

@@ -17,6 +17,7 @@ defmodule EyeInTheSkyWeb.FabHook do
   def on_mount(:default, _params, _session, socket) do
     if connected?(socket) do
       EyeInTheSky.Events.subscribe_notifications()
+      EyeInTheSky.Events.subscribe_projects()
     end
 
     socket =
@@ -174,6 +175,15 @@ defmodule EyeInTheSkyWeb.FabHook do
     send_update(EyeInTheSkyWeb.Components.Sidebar,
       id: "app-sidebar",
       notification_count: :refresh
+    )
+
+    {:halt, socket}
+  end
+
+  defp handle_fab_info({:project_updated, _project}, socket) do
+    send_update(EyeInTheSkyWeb.Components.Sidebar,
+      id: "app-sidebar",
+      refresh_projects: true
     )
 
     {:halt, socket}

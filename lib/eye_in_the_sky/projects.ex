@@ -22,6 +22,21 @@ defmodule EyeInTheSky.Projects do
   end
 
   @doc """
+  Returns active projects ordered for sidebar display:
+  bookmarked first, then case-insensitive name, then id for stability.
+  """
+  def list_projects_for_sidebar do
+    Project
+    |> where([p], p.active == true)
+    |> order_by([p], [
+      asc: not p.bookmarked,
+      asc: fragment("lower(?)", p.name),
+      asc: p.id
+    ])
+    |> Repo.all()
+  end
+
+  @doc """
   Gets a single project.
 
   Raises `Ecto.NoResultsError` if the Project does not exist.
@@ -68,6 +83,21 @@ defmodule EyeInTheSky.Projects do
   Deletes a project.
   """
   def delete_project(%Project{} = project), do: delete(project)
+
+  @doc """
+  Sets the bookmarked state of a project. Returns {:ok, project} or {:error, :not_found}.
+  """
+  def set_bookmarked(project_id, bookmarked) when is_boolean(bookmarked) do
+    case get_project(project_id) do
+      nil ->
+        {:error, :not_found}
+
+      project ->
+        project
+        |> Project.changeset(%{bookmarked: bookmarked})
+        |> Repo.update()
+    end
+  end
 
   @doc """
   Resolves a project from request params.

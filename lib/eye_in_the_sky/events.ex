@@ -23,6 +23,7 @@ defmodule EyeInTheSky.Events do
   | `"settings"`                   | OverviewSettings                  |
   | `"scheduled_jobs"`             | JobsLive                          |
   | `"session_lifecycle"`          | Teams.Subscriber                  |
+  | `"projects"`                   | Sidebar                           |
 
   ## Note on payload shape inconsistency
 
@@ -73,6 +74,12 @@ defmodule EyeInTheSky.Events do
 
   @doc "Subscribe to team/member events."
   def subscribe_teams, do: sub("teams")
+
+  @doc "Subscribe to project metadata changes (bookmark toggled, etc.)."
+  def subscribe_projects, do: sub("projects")
+
+  @doc "A project record was updated. Broadcasts to projects topic."
+  def project_updated(project), do: broadcast("projects", {:project_updated, project})
 
   @doc "Subscribe to settings changes."
   def subscribe_settings, do: sub("settings")

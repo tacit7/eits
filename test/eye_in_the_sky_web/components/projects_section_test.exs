@@ -148,4 +148,36 @@ defmodule EyeInTheSkyWeb.Components.ProjectsSectionTest do
       refute html =~ "border-t-2"
     end
   end
+
+  describe "bookmark button" do
+    test "bookmark button is present in hover actions for each project" do
+      p = build_project()
+      html = render_section(%{projects: [p]})
+
+      assert html =~ "set_bookmark"
+    end
+
+    test "outline bookmark icon when project is not bookmarked" do
+      p = build_project()
+      html = render_section(%{projects: [p]})
+
+      assert html =~ "hero-bookmark "
+      refute html =~ "hero-bookmark-solid"
+    end
+
+    test "solid bookmark icon when project is bookmarked" do
+      p = build_project()
+      {:ok, p} = Projects.update_project(p, %{bookmarked: true})
+      html = render_section(%{projects: [p]})
+
+      assert html =~ "hero-bookmark-solid"
+    end
+
+    test "phx-disable-with present on bookmark button" do
+      p = build_project()
+      html = render_section(%{projects: [p]})
+
+      assert html =~ "phx-disable-with"
+    end
+  end
 end

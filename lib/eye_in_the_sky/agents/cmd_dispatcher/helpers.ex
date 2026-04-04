@@ -10,6 +10,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.Helpers do
   require Logger
 
   alias EyeInTheSky.{Notifications, Sessions}
+  alias EyeInTheSky.Utils.ToolHelpers
 
   def notify_success(_from_session_id, msg) do
     Logger.info("[CmdDispatcher] #{msg}")
@@ -60,13 +61,13 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.Helpers do
       end)
   """
   def with_task(id_str, from_session_id, cmd, fun) when is_binary(id_str) do
-    case Integer.parse(String.trim(id_str)) do
-      {id, ""} ->
+    case id_str |> String.trim() |> ToolHelpers.parse_int() do
+      nil ->
+        notify_error(from_session_id, cmd, {:invalid_id, id_str})
+
+      id ->
         task = EyeInTheSky.Tasks.get_task!(id)
         fun.(id, task)
-
-      _ ->
-        notify_error(from_session_id, cmd, {:invalid_id, id_str})
     end
   rescue
     Ecto.NoResultsError -> notify_error(from_session_id, cmd, :not_found)

@@ -19,6 +19,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
 
   alias EyeInTheSky.{Notes, Tasks}
   alias EyeInTheSky.Agents.CmdDispatcher.Helpers
+  alias EyeInTheSky.Utils.ToolHelpers
 
   import Helpers, only: [notify_success: 2, notify_error: 3, get_session!: 1, with_task: 4]
 
@@ -82,8 +83,11 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
   def dispatch("done " <> id_str, from_session_id) do
     id_str = String.trim(id_str)
 
-    case Integer.parse(id_str) do
-      {id, ""} ->
+    case ToolHelpers.parse_int(id_str) do
+      nil ->
+        notify_error(from_session_id, "task done", {:invalid_id, id_str})
+
+      id ->
         if Tasks.task_linked_to_session?(id, from_session_id) do
           with_task(id_str, from_session_id, "task done", fn id, task ->
             Tasks.update_task_state(task, 3)
@@ -92,17 +96,17 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
         else
           notify_error(from_session_id, "task done", {:not_linked, id})
         end
-
-      _ ->
-        notify_error(from_session_id, "task done", {:invalid_id, id_str})
     end
   end
 
   def dispatch("delete " <> id_str, from_session_id) do
     id_str = String.trim(id_str)
 
-    case Integer.parse(id_str) do
-      {id, ""} ->
+    case ToolHelpers.parse_int(id_str) do
+      nil ->
+        notify_error(from_session_id, "task delete", {:invalid_id, id_str})
+
+      id ->
         if Tasks.task_linked_to_session?(id, from_session_id) do
           with_task(id_str, from_session_id, "task delete", fn _id, task ->
             Tasks.delete_task(task)
@@ -111,17 +115,17 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
         else
           notify_error(from_session_id, "task delete", {:not_linked, id})
         end
-
-      _ ->
-        notify_error(from_session_id, "task delete", {:invalid_id, id_str})
     end
   end
 
   def dispatch("annotate " <> rest, from_session_id) do
     case String.split(rest, " ", parts: 2) do
       [id_str, body] ->
-        case Integer.parse(String.trim(id_str)) do
-          {id, ""} ->
+        case id_str |> String.trim() |> ToolHelpers.parse_int() do
+          nil ->
+            notify_error(from_session_id, "task annotate", {:invalid_id, id_str})
+
+          id ->
             if Tasks.task_linked_to_session?(id, from_session_id) do
               Notes.create_note(%{
                 title: "Agent annotation",
@@ -134,9 +138,6 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
             else
               notify_error(from_session_id, "task annotate", {:not_linked, id})
             end
-
-          _ ->
-            notify_error(from_session_id, "task annotate", {:invalid_id, id_str})
         end
 
       _ ->

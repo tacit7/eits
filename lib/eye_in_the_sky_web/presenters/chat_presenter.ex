@@ -3,8 +3,6 @@ defmodule EyeInTheSkyWeb.Presenters.ChatPresenter do
   Presenter utilities for Chat views: serializers and counters.
   """
 
-  alias EyeInTheSky.Channels
-
   @spec serialize_channels(list(map())) :: list(map())
   def serialize_channels(channels) do
     Enum.map(channels, fn channel ->
@@ -63,11 +61,4 @@ defmodule EyeInTheSkyWeb.Presenters.ChatPresenter do
     end
   end
 
-  @spec calculate_unread_counts(list(map()), String.t()) :: map()
-  def calculate_unread_counts(channels, session_id) do
-    Enum.reduce(channels, %{}, fn channel, acc ->
-      count = Channels.count_unread_messages(channel.id, session_id)
-      Map.put(acc, channel.id, count)
-    end)
-  end
 end

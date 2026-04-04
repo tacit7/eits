@@ -12,6 +12,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.DmHandler do
   alias EyeInTheSky.{Messages, Sessions}
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Agents.CmdDispatcher.Helpers
+  alias EyeInTheSky.Utils.ToolHelpers
 
   import Helpers, only: [notify_success: 2, notify_error: 3, extract_flag: 2]
 
@@ -19,9 +20,9 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.DmHandler do
     limit =
       case extract_flag(rest, "--limit") do
         {:ok, n} ->
-          case Integer.parse(String.trim(n)) do
-            {v, ""} -> min(v, 50)
-            _ -> 20
+          case n |> String.trim() |> ToolHelpers.parse_int() do
+            nil -> 20
+            v -> min(v, 50)
           end
 
         _ ->

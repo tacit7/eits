@@ -2,6 +2,7 @@ defmodule EyeInTheSky.Teams do
   import Ecto.Query, warn: false
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Teams.{Team, TeamMember}
+  alias EyeInTheSky.Utils.ToolHelpers
 
   defp broadcast(event, payload) do
     EyeInTheSky.Events.team_event(event, payload)
@@ -77,10 +78,7 @@ defmodule EyeInTheSky.Teams do
   end
 
   def get_member(id) when is_binary(id) do
-    case Integer.parse(id) do
-      {int_id, ""} -> get_member(int_id)
-      _ -> nil
-    end
+    if int_id = ToolHelpers.parse_int(id), do: get_member(int_id)
   end
 
   def get_member(team_id, name) do

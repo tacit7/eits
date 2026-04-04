@@ -2,17 +2,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   use EyeInTheSkyWeb, :live_view
 
   import EyeInTheSkyWeb.Helpers.FileHelpers
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Projects
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    # Parse project ID safely
-    project_id =
-      case Integer.parse(id) do
-        {int, ""} -> int
-        _ -> nil
-      end
+    project_id = parse_int(id)
 
     socket =
       if project_id do

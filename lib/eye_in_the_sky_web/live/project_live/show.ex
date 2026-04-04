@@ -7,16 +7,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
   alias EyeInTheSky.Sessions
   alias EyeInTheSky.Commits
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1, truncate_text: 1]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    # Parse project ID safely, handling both integer and UUID inputs
-    project_id =
-      case Integer.parse(id) do
-        {int, ""} -> int
-        # Not a valid integer
-        _ -> nil
-      end
+    project_id = parse_int(id)
 
     # Load project only if ID is valid
     socket =

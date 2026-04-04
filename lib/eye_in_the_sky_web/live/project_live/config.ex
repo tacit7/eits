@@ -3,16 +3,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
 
   import EyeInTheSkyWeb.Helpers.FileHelpers,
     only: [path_within?: 2, detect_file_type: 1, format_size: 1, cm_language: 1]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Projects
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    project_id =
-      case Integer.parse(id) do
-        {int, ""} -> int
-        _ -> nil
-      end
+    project_id = parse_int(id)
 
     socket =
       socket

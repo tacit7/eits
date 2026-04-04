@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
 
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [allow_upload: 3, connected?: 1]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.{Tasks, Projects}
   alias EyeInTheSky.Claude.AgentWorker
@@ -25,16 +26,16 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
   end
 
   def assign_sidebar_context(socket, %{"from" => "project", "project_id" => project_id_str}) do
-    case Integer.parse(project_id_str) do
-      {pid, ""} ->
-        socket
-        |> assign(:sidebar_tab, :sessions)
-        |> assign(:sidebar_project, Projects.get_project!(pid))
-
-      _ ->
+    case parse_int(project_id_str) do
+      nil ->
         socket
         |> assign(:sidebar_tab, :chat)
         |> assign(:sidebar_project, nil)
+
+      pid ->
+        socket
+        |> assign(:sidebar_tab, :sessions)
+        |> assign(:sidebar_project, Projects.get_project!(pid))
     end
   end
 

@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.DmLive do
   alias EyeInTheSkyWeb.DmLive.TaskHandlers
   alias EyeInTheSkyWeb.DmLive.{MountState, MessageHandlers, AgentLifecycle, ExternalActions, SlashCommands}
   alias EyeInTheSkyWeb.DmLive.TabHelpers
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
   import EyeInTheSkyWeb.Live.Shared.TasksHelpers
   import EyeInTheSkyWeb.Live.Shared.DmExportHelpers
   import EyeInTheSkyWeb.Live.Shared.DmModelHelpers
@@ -180,10 +181,7 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("remove_queued_prompt", %{"id" => id_str}, socket) do
-    case Integer.parse(id_str) do
-      {id, ""} -> AgentWorker.remove_queued_prompt(socket.assigns.session_id, id)
-      _ -> :ok
-    end
+    if id = parse_int(id_str), do: AgentWorker.remove_queued_prompt(socket.assigns.session_id, id)
 
     {:noreply, socket}
   end

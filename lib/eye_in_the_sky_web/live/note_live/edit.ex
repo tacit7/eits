@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.NoteLive.Edit do
   use EyeInTheSkyWeb, :live_view
 
-  import EyeInTheSkyWeb.ControllerHelpers, only: [normalize_parent_type: 1]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [normalize_parent_type: 1, parse_int: 1]
 
   alias EyeInTheSky.Notes
 
@@ -27,16 +27,14 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
       Process.cancel_timer(socket.assigns.saved_timer)
     end
 
-    case Integer.parse(id) do
-      {int_id, ""} ->
+    case parse_int(id) do
+      nil ->
+        {:noreply, socket |> put_flash(:error, "Invalid note ID.") |> push_navigate(to: "/notes")}
+
+      int_id ->
         case Notes.get_note(int_id) do
           nil ->
-            socket =
-              socket
-              |> put_flash(:error, "Note not found.")
-              |> push_navigate(to: "/notes")
-
-            {:noreply, socket}
+            {:noreply, socket |> put_flash(:error, "Note not found.") |> push_navigate(to: "/notes")}
 
           note ->
             return_to = safe_return_to(params["return_to"])
@@ -51,14 +49,6 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
 
             {:noreply, socket}
         end
-
-      _ ->
-        socket =
-          socket
-          |> put_flash(:error, "Invalid note ID.")
-          |> push_navigate(to: "/notes")
-
-        {:noreply, socket}
     end
   end
 

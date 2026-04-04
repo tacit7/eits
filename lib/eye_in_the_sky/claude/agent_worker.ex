@@ -15,12 +15,10 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   alias EyeInTheSky.Codex.StreamAssembler, as: CodexStreamAssembler
   alias EyeInTheSky.AgentWorkerEvents, as: WorkerEvents
   alias EyeInTheSky.Agents.CmdDispatcher
+  alias EyeInTheSky.Claude.AgentWorker.{ErrorClassifier, ProcessCleanup, RetryPolicy}
 
   @registry EyeInTheSky.Claude.AgentRegistry
-  @retry_start_ms 1_000
-  @retry_max_ms 30_000
   @max_queue_depth 5
-  @max_retries 5
 
   @type status :: :idle | :running | :retry_wait | :failed
 
@@ -219,7 +217,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   def handle_cast(:cancel, %__MODULE__{status: status} = state)
       when status in [:retry_wait, :failed] do
     Logger.info("[#{state.session_id}] Cancelling worker in #{status} state (no active SDK)")
-    state = clear_retry_timer(state)
+    state = RetryPolicy.clear_retry_timer(state)
     {:noreply, %{state | status: :idle}}
   end
 
@@ -370,7 +368,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
         "[#{state.session_id}] Session UUID=#{uuid} already in use — killing orphan and retrying as resume"
       )
 
-      kill_orphaned_claude(uuid)
+      ProcessCleanup.kill_orphaned(uuid)
 
       resume_job = Job.as_resume(job)
       resume_job = %{resume_job | context: Map.put(resume_job.context, :kill_retry, true)}
@@ -499,7 +497,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
           WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
 
           {{:ok, :started},
-           clear_retry_timer(%{
+           RetryPolicy.clear_retry_timer(%{
              state
              | status: :running,
                sdk_ref: sdk_ref,
@@ -516,7 +514,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
           WorkerEvents.on_spawn_error(state.session_id, reason)
 
-          {{:ok, :retry_queued}, state |> enqueue_job(job) |> schedule_retry_start()}
+          {{:ok, :retry_queued}, state |> enqueue_job(job) |> RetryPolicy.schedule_retry_start()}
       end
     else
       if length(state.queue) >= @max_queue_depth do
@@ -576,7 +574,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
         WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
 
         new_state =
-          clear_retry_timer(%{
+          RetryPolicy.clear_retry_timer(%{
             state
             | status: :running,
               sdk_ref: sdk_ref,
@@ -590,7 +588,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
       {:error, reason} ->
         Logger.error("Failed to start SDK for next job: #{inspect(reason)}")
-        {:noreply, %{state | queue: [next_job | rest]} |> schedule_retry_start()}
+        {:noreply, %{state | queue: [next_job | rest]} |> RetryPolicy.schedule_retry_start()}
     end
   end
 
@@ -625,43 +623,6 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     new_state = %{state | queue: new_queue}
     WorkerEvents.broadcast_queue_update(state.session_id, new_queue)
     new_state
-  end
-
-  defp schedule_retry_start(%__MODULE__{retry_timer_ref: nil, retry_attempt: attempt} = state)
-       when attempt >= @max_retries do
-    Logger.error("[#{state.session_id}] Max retries (#{@max_retries}) exceeded, giving up")
-
-    WorkerEvents.on_max_retries_exceeded(state.session_id, state.provider_conversation_id)
-    WorkerEvents.broadcast_queue_update(state.session_id, [])
-
-    %{state | status: :failed, queue: [], retry_attempt: 0}
-  end
-
-  defp schedule_retry_start(%__MODULE__{retry_timer_ref: nil} = state) do
-    delay = min(round(@retry_start_ms * :math.pow(2, state.retry_attempt)), @retry_max_ms)
-
-    Logger.info(
-      "[#{state.session_id}] Scheduling retry in #{delay}ms (attempt=#{state.retry_attempt})"
-    )
-
-    timer_ref = Process.send_after(self(), :retry_start, delay)
-
-    %{
-      state
-      | status: :retry_wait,
-        retry_timer_ref: timer_ref,
-        retry_attempt: state.retry_attempt + 1
-    }
-  end
-
-  defp schedule_retry_start(state), do: state
-
-  defp clear_retry_timer(%__MODULE__{retry_timer_ref: nil} = state),
-    do: %{state | retry_attempt: 0}
-
-  defp clear_retry_timer(state) do
-    Process.cancel_timer(state.retry_timer_ref)
-    %{state | retry_timer_ref: nil, retry_attempt: 0}
   end
 
   defp normalize_context(context) do
@@ -750,7 +711,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
     demonitor_handler(state.handler_monitor)
 
-    if systemic_error?(reason) do
+    if ErrorClassifier.systemic?(reason) do
       WorkerEvents.on_queue_drained(
         state.session_id,
         state.provider_conversation_id,
@@ -773,55 +734,4 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     end
   end
 
-  # Pattern-match on actual error term shapes rather than inspect() strings.
-  # Parser emits {:billing_error, msg} / {:authentication_error, msg} as atoms.
-  # Unknown errors and result errors carry free-form strings that still need
-  # substring matching, but only within the message field — not on inspect output.
-  defp systemic_error?({:billing_error, _}), do: true
-  defp systemic_error?({:authentication_error, _}), do: true
-
-  # errors is a list of strings — scan each entry
-  defp systemic_error?({:claude_result_error, %{errors: errors}}) when is_list(errors) do
-    Enum.any?(errors, &String.contains?(&1, ["billing_error", "authentication_error"]))
-  end
-
-  # errors is a map — parser sets this from event["error"] object e.g. %{"type" => "billing_error"}
-  defp systemic_error?({:claude_result_error, %{errors: %{"type" => type}}})
-       when type in ["billing_error", "authentication_error"],
-       do: true
-
-  # errors is a raw string — check for known systemic markers
-  defp systemic_error?({:claude_result_error, %{errors: errors}}) when is_binary(errors) do
-    String.contains?(errors, ["billing_error", "authentication_error"])
-  end
-
-  # fallback: check the result text for billing messages when errors field is absent/nil
-  defp systemic_error?({:claude_result_error, %{result: result}}) when is_binary(result) do
-    String.contains?(result, ["Credit balance is too low", "missing binary"])
-  end
-
-  defp systemic_error?({:unknown_error, msg}) when is_binary(msg) do
-    String.contains?(msg, ["Credit balance is too low", "missing binary"])
-  end
-
-  defp systemic_error?(_), do: false
-
-  # Kill any orphaned Claude process holding the session lock for the given UUID.
-  # Uses pkill -f to match the UUID in the process command line.
-  # Safe: session UUIDs are unique enough that false matches are extremely unlikely.
-  defp kill_orphaned_claude(uuid) when is_binary(uuid) do
-    case System.cmd("pkill", ["-f", uuid], stderr_to_stdout: true) do
-      {_, 0} ->
-        Logger.info("Killed orphaned Claude process for session UUID=#{uuid}")
-        # Give the process a moment to actually exit before retrying
-        Process.sleep(200)
-
-      {_, 1} ->
-        # pkill exits 1 when no matching process found — not an error
-        Logger.debug("No orphaned process found for session UUID=#{uuid}")
-
-      {output, code} ->
-        Logger.warning("pkill for UUID=#{uuid} exited #{code}: #{output}")
-    end
-  end
 end

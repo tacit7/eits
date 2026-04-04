@@ -252,6 +252,8 @@ function getCommands(hook) {
   ]
 }
 
+import { fuzzyPositions, scoreCmd, escapeHtml, highlightLabel } from "./palette_utils.js"
+
 export const CommandPalette = {
   mounted() {
     this.input = this.el.querySelector("[data-palette-input]")
@@ -352,48 +354,13 @@ export const CommandPalette = {
 
     return cmds
       .map(cmd => {
-        const positions = this.fuzzyPositions(cmd.label, q)
-        return { cmd, score: this.scoreCmd(cmd, q, positions), positions }
+        const positions = fuzzyPositions(cmd.label, q)
+        return { cmd, score: scoreCmd(cmd, q, positions), positions }
       })
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score || a.cmd.label.localeCompare(b.cmd.label))
       .slice(0, 40)
       .map(({ cmd, positions }) => ({ ...cmd, _matchPositions: positions }))
-  },
-
-  scoreCmd(cmd, q, positions) {
-    const label = cmd.label.toLowerCase()
-    let score = 0
-
-    if (label === q) score += 200
-    if (label.startsWith(q)) score += 100
-    if (label.includes(q)) score += 50
-
-    if (positions !== null) {
-      score += 60
-      let consecutive = 0
-      for (let i = 1; i < positions.length; i++) {
-        if (positions[i] === positions[i - 1] + 1) consecutive++
-      }
-      score += consecutive * 2
-    }
-
-    const kws = (cmd.keywords || []).join(" ").toLowerCase()
-    if (kws && kws.includes(q)) score += 30
-    if (cmd.hint && cmd.hint.toLowerCase().includes(q)) score += 15
-    if (cmd.group && cmd.group.toLowerCase().includes(q)) score += 10
-
-    return score
-  },
-
-  fuzzyPositions(label, q) {
-    const lc = label.toLowerCase()
-    const positions = []
-    let qi = 0
-    for (let i = 0; i < lc.length && qi < q.length; i++) {
-      if (lc[i] === q[qi]) { positions.push(i); qi++ }
-    }
-    return qi === q.length ? positions : null
   },
 
   render() {
@@ -434,7 +401,7 @@ export const CommandPalette = {
       })
       .map(([group, groupItems]) => {
         const buttons = groupItems.map(item => this.renderRow(item, idx++, null)).join("")
-        return `<section class="px-1 py-1"><h3 class="px-2 py-1 text-[10px] uppercase tracking-wider text-base-content/40">${this.escapeHtml(group)}</h3><div>${buttons}</div></section>`
+        return `<section class="px-1 py-1"><h3 class="px-2 py-1 text-[10px] uppercase tracking-wider text-base-content/40">${escapeHtml(group)}</h3><div>${buttons}</div></section>`
       }).join("")
   },
 
@@ -445,15 +412,15 @@ export const CommandPalette = {
   renderRow(item, idx, matchPositions) {
     const isActive = idx === this.activeIndex
     const labelHtml = matchPositions
-      ? this.highlightLabel(item.label, new Set(matchPositions))
-      : this.escapeHtml(item.label)
+      ? highlightLabel(item.label, new Set(matchPositions))
+      : escapeHtml(item.label)
 
     const hintHtml = item.hint
-      ? `<div class="text-xs text-base-content/45 truncate">${this.escapeHtml(item.hint)}</div>`
+      ? `<div class="text-xs text-base-content/45 truncate">${escapeHtml(item.hint)}</div>`
       : ""
 
     const shortcutHtml = item.shortcut
-      ? item.shortcut.split(" ").map(k => `<kbd class="text-[10px] px-1 py-0.5 rounded border border-base-content/20 text-base-content/50">${this.escapeHtml(k)}</kbd>`).join(" ")
+      ? item.shortcut.split(" ").map(k => `<kbd class="text-[10px] px-1 py-0.5 rounded border border-base-content/20 text-base-content/50">${escapeHtml(k)}</kbd>`).join(" ")
       : ""
 
     const chevronHtml = item.type === "submenu"
@@ -464,15 +431,7 @@ export const CommandPalette = {
       ? `<div class="flex items-center gap-1 ml-2 shrink-0">${shortcutHtml}${chevronHtml}</div>`
       : ""
 
-    return `<button type="button" data-index="${idx}" role="option" aria-selected="${isActive}" class="w-full text-left rounded-lg px-3 py-2 text-sm flex items-center gap-2 transition-colors ${isActive ? "bg-base-content/8 text-base-content" : "hover:bg-base-content/5 text-base-content/80"}"><span class="${this.escapeHtml(item.icon)} w-4 h-4 shrink-0 text-base-content/50"></span><div class="flex-1 min-w-0"><div class="font-medium truncate">${labelHtml}</div>${hintHtml}</div>${rightHtml}</button>`
-  },
-
-  highlightLabel(label, matchedPositions) {
-    return [...label].map((char, i) =>
-      matchedPositions.has(i)
-        ? `<mark class="bg-transparent text-primary font-semibold">${this.escapeHtml(char)}</mark>`
-        : this.escapeHtml(char)
-    ).join("")
+    return `<button type="button" data-index="${idx}" role="option" aria-selected="${isActive}" class="w-full text-left rounded-lg px-3 py-2 text-sm flex items-center gap-2 transition-colors ${isActive ? "bg-base-content/8 text-base-content" : "hover:bg-base-content/5 text-base-content/80"}"><span class="${escapeHtml(item.icon)} w-4 h-4 shrink-0 text-base-content/50"></span><div class="flex-1 min-w-0"><div class="font-medium truncate">${labelHtml}</div>${hintHtml}</div>${rightHtml}</button>`
   },
 
   updateBreadcrumb() {
@@ -569,12 +528,4 @@ export const CommandPalette = {
     localStorage.setItem("command_palette_recent", JSON.stringify(next))
   },
 
-  escapeHtml(value) {
-    return String(value || "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;")
-  }
 }

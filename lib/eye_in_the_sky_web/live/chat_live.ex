@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_budget: 1]
   import EyeInTheSkyWeb.Helpers.UploadHelpers
-  import EyeInTheSkyWeb.ControllerHelpers, only: [maybe_opt: 3, parse_int: 1]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [maybe_opt: 3, parse_int: 1, parse_int: 2]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -111,7 +111,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
       Agents.list_active_agents()
       |> Enum.filter(fn a -> a.description && a.description != "" end)
       |> Enum.take(50)
-      |> Enum.map(fn a -> %{id: a.id, description: a.description} end)
+      |> Enum.map(&agent_template_option/1)
 
     channel_members = ChannelHelpers.load_channel_members(channel_id)
     all_projects = Projects.list_projects()
@@ -631,24 +631,10 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   # Private helpers
 
+  @default_project_id 1
+
   defp get_project_id(params) do
-    case params["project_id"] do
-      nil ->
-        1
-
-      project_id when is_binary(project_id) ->
-        case Integer.parse(project_id) do
-          {int, ""} -> int
-          {_int, _rest} -> 1
-          :error -> 1
-        end
-
-      project_id when is_integer(project_id) ->
-        project_id
-
-      _project_id ->
-        1
-    end
+    parse_int(params["project_id"], @default_project_id)
   end
 
   defp get_default_channel_id(channels, _project_id) do
@@ -708,13 +694,15 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   defp maybe_int_opt(opts, key, val) when is_binary(val) do
     case Integer.parse(val) do
-      {n, _} when n > 0 -> opts ++ [{key, n}]
+      {n, _} when n > 0 -> Keyword.put(opts, key, n)
       _ -> opts
     end
   end
 
   defp maybe_bool_opt(opts, _key, nil), do: opts
-  defp maybe_bool_opt(opts, key, "true"), do: opts ++ [{key, true}]
+  defp maybe_bool_opt(opts, key, "true"), do: Keyword.put(opts, key, true)
   defp maybe_bool_opt(opts, _key, _), do: opts
+
+  defp agent_template_option(agent), do: %{id: agent.id, description: agent.description}
 
 end

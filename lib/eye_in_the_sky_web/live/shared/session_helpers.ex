@@ -12,33 +12,27 @@ defmodule EyeInTheSkyWeb.Live.Shared.SessionHelpers do
   @spec continue_session_opts(String.t(), String.t() | nil, boolean(), float() | nil) ::
           keyword()
   def continue_session_opts(model, effort_level, thinking_enabled, max_budget_usd) do
-    opts = [model: model]
-
-    opts =
-      if is_binary(effort_level) and effort_level != "" do
-        opts ++ [effort_level: effort_level]
-      else
-        opts
-      end
-
-    opts =
+    thinking_budget =
       if thinking_enabled do
-        budget =
-          case model do
-            "opus" -> 16_000
-            _ -> 10_000
-          end
-
-        opts ++ [thinking_budget: budget]
-      else
-        opts
+        if model == "opus", do: 16_000, else: 10_000
       end
 
-    if max_budget_usd do
-      opts ++ [max_budget_usd: max_budget_usd]
-    else
-      opts
-    end
+    [model: model]
+    |> then(fn opts ->
+      if is_binary(effort_level) and effort_level != "",
+        do: Keyword.put(opts, :effort_level, effort_level),
+        else: opts
+    end)
+    |> then(fn opts ->
+      if thinking_budget,
+        do: Keyword.put(opts, :thinking_budget, thinking_budget),
+        else: opts
+    end)
+    |> then(fn opts ->
+      if max_budget_usd,
+        do: Keyword.put(opts, :max_budget_usd, max_budget_usd),
+        else: opts
+    end)
   end
 
   @doc """

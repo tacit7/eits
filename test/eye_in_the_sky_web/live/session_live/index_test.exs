@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.SessionLive.IndexTest do
 
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSky.Factory
+  alias EyeInTheSky.{Agents, Factory}
 
   defp setup_session(_) do
     agent = Factory.create_agent()
@@ -14,8 +14,9 @@ defmodule EyeInTheSkyWeb.SessionLive.IndexTest do
   describe "handle_info :agent_updated — payload shape handling" do
     setup [:setup_session]
 
-    # Session struct payload: id == session_id (emitted by session_updated/session_started)
-    test "Session payload refreshes the row", %{conn: conn, session: session} do
+    # Session struct payload (emitted by session_updated/session_started):
+    # id == session_id — targeted row update should fire.
+    test "Session struct payload refreshes the row", %{conn: conn, session: session} do
       {:ok, lv, _html} = live(conn, ~p"/sessions")
 
       send(lv.pid, {:agent_updated, session})
@@ -24,45 +25,33 @@ defmodule EyeInTheSkyWeb.SessionLive.IndexTest do
       assert html =~ session.name
     end
 
-    # Agent struct payload: id == agent_id, session_id is the linked session
-    # This is the shape emitted by Events.agent_updated/1 (events.ex:153)
-    test "Agent payload uses session_id field, not agent id", %{
-      conn: conn,
-      agent: agent,
-      session: session
-    } do
+    # Agent struct payload — real shape emitted by Agents.update_agent/2 via
+    # Events.agent_updated/1. The Agent changeset never casts session_id, so
+    # agent.session_id is always nil. Handler must fall back to full reload
+    # instead of trying to use agent.id as a session_id.
+    test "Agent struct payload (real Agents.update_agent shape) triggers reload without crash",
+         %{conn: conn, agent: agent, session: session} do
       {:ok, lv, _html} = live(conn, ~p"/sessions")
 
-      # Simulate the Agent struct shape: id is agent.id, session_id is session.id
-      # These must differ to prove the handler uses session_id not id
-      assert agent.id != session.id
+      # Trigger via real update_agent path — broadcasts Agent struct with session_id: nil
+      {:ok, _updated} = Agents.update_agent(agent, %{description: "updated description"})
 
-      agent_payload = %{id: agent.id, session_id: session.id}
-      send(lv.pid, {:agent_updated, agent_payload})
       html = render(lv)
 
+      # View must stay alive and show the session after the reload
       assert html =~ session.name
     end
 
-    # Guard: agent.id must not accidentally equal session.id in the test above.
-    # If they're equal the test proves nothing. This test documents the contract
-    # by verifying the view still functions when agent.id would have been wrong.
-    test "Agent payload with nil session_id falls back to reload", %{conn: conn, agent: agent} do
-      {:ok, lv, _html} = live(conn, ~p"/sessions")
-
-      # Agent with no linked session — session_id is nil, id is agent.id
-      agent_no_session = %{id: agent.id, session_id: nil}
-      send(lv.pid, {:agent_updated, agent_no_session})
-      html = render(lv)
-
-      # View should stay alive (full reload ran without crash)
-      assert html =~ "sessions"
+    # Guard: agent.id must not accidentally equal session.id — if they matched
+    # using payload.id would give a false positive. Verify they differ so the
+    # test above proves the correct code path.
+    test "agent.id and session.id differ in fixture", %{agent: agent, session: session} do
+      assert agent.id != session.id
     end
 
-    test "modal stays open when Agent payload arrives mid-form", %{
+    test "modal stays open when Agent struct payload arrives mid-form", %{
       conn: conn,
-      agent: agent,
-      session: session
+      agent: agent
     } do
       {:ok, lv, _html} = live(conn, ~p"/sessions")
 
@@ -70,12 +59,23 @@ defmodule EyeInTheSkyWeb.SessionLive.IndexTest do
       lv |> element("button", "New Agent") |> render_click()
       assert has_element?(lv, "textarea[name='description']")
 
-      # Simulate an agent_updated Agent payload arriving while form is open
-      agent_payload = %{id: agent.id, session_id: session.id}
-      send(lv.pid, {:agent_updated, agent_payload})
+      # Simulate agent_updated via real update path
+      {:ok, _} = Agents.update_agent(agent, %{description: "mid-form update"})
       render(lv)
 
       # Modal must still be open
+      assert has_element?(lv, "textarea[name='description']")
+    end
+
+    test "Session struct payload keeps modal open", %{conn: conn, session: session} do
+      {:ok, lv, _html} = live(conn, ~p"/sessions")
+
+      lv |> element("button", "New Agent") |> render_click()
+      assert has_element?(lv, "textarea[name='description']")
+
+      send(lv.pid, {:agent_updated, session})
+      render(lv)
+
       assert has_element?(lv, "textarea[name='description']")
     end
   end

@@ -219,14 +219,12 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
   # Real-time: update a single row when a session changes — avoids a full stream
   # reset (which causes heavy DOM churn and can disrupt the new-session modal).
   # Two payload shapes arrive on this event:
-  #   - Session struct: id == session_id (from session_updated/session_started)
-  #   - Agent struct:   id == agent_id, session_id is a separate explicit field
-  # Resolve to the correct session_id before lookup so an agent.id that happens
-  # to equal some other session.id never updates the wrong row.
+  #   - Session struct (from session_updated/session_started): id == session_id
+  #   - Agent struct (from agent_updated): id == agent_id, session_id is never
+  #     populated in practice because the changeset does not cast it
+  # Only Session payloads can be targeted; Agent payloads fall back to full reload.
   @impl true
-  def handle_info({:agent_updated, payload}, socket) do
-    session_id = Map.get(payload, :session_id) || payload.id
-
+  def handle_info({:agent_updated, %EyeInTheSky.Sessions.Session{id: session_id}}, socket) do
     case Sessions.get_session_overview_row(session_id) do
       {:ok, row} ->
         {:noreply, stream_insert(socket, :sessions, row)}
@@ -234,6 +232,10 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
       {:error, :not_found} ->
         {:noreply, reload_sessions(socket)}
     end
+  end
+
+  def handle_info({:agent_updated, _agent}, socket) do
+    {:noreply, reload_sessions(socket)}
   end
 
   # Full reload for creates/deletes since counts and ordering can shift.

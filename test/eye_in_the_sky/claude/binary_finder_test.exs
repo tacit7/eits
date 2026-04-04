@@ -8,12 +8,14 @@ defmodule EyeInTheSky.Claude.BinaryFinderTest do
   # ---------------------------------------------------------------------------
 
   describe "find/0" do
+    @tag :host_dependent
     test "returns {:ok, path} when claude is installed" do
       assert {:ok, path} = BinaryFinder.find()
       assert is_binary(path)
       assert String.ends_with?(path, "claude")
     end
 
+    @tag :host_dependent
     test "returned path is an actual file" do
       {:ok, path} = BinaryFinder.find()
       assert File.exists?(path)

@@ -30,6 +30,10 @@ import {FavoriteFab} from "./hooks/favorite_fab"
 import {ScrollToBottom} from "./hooks/scroll_to_bottom"
 import {AutoScroll} from "./hooks/auto_scroll"
 import {MarkdownMessage} from "./hooks/markdown_message"
+// CommandHistory composes SlashCommandPopup internally (see hooks/command_history.js).
+// Phoenix allows only one phx-hook per element, so SlashCommandPopup is NOT registered
+// here — it is imported and called via SlashCommandPopup.mounted.call(this) inside
+// CommandHistory.mounted() to share the same hook context.
 import {CommandHistory} from "./hooks/command_history"
 import {DiffViewer} from "./hooks/diff_viewer"
 import {PasskeyAuth} from "./hooks/passkey_auth"

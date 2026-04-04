@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   use EyeInTheSkyWeb, :html
 
   alias EyeInTheSkyWeb.Components.DmPage.MessageToolWidget
+  alias EyeInTheSkyWeb.Components.DmHelpers
 
   attr :messages, :list, default: []
   attr :has_more_messages, :boolean, default: false
@@ -365,43 +366,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   defp stream_provider_label(%{provider: "openai"}), do: "Codex"
   defp stream_provider_label(_session), do: "Claude"
 
-  defp dm_message?(%{from_session_id: id}) when is_integer(id), do: true
-
-  defp dm_message?(%{metadata: %{"from_session_uuid" => uuid}})
-       when is_binary(uuid) and uuid != "",
-       do: true
-
-  defp dm_message?(_), do: false
-
-  defp message_sender_name(%{sender_role: "user"}), do: "You"
-
-  defp message_sender_name(%{metadata: %{"sender_name" => name}} = _msg)
-       when is_binary(name) and name != "" do
-    name
-  end
-
-  defp message_sender_name(%{from_session_id: id}) when is_integer(id) do
-    "session:#{id}"
-  end
-
-  defp message_sender_name(message), do: message.provider || "Agent"
-
-  defp strip_dm_prefix(body) when is_binary(body) do
-    case Regex.run(~r/^DM from:[^\(]+\(session:[^\)]+\) (.+)$/s, body) do
-      [_, content] -> content
-      _ -> body
-    end
-  end
-
-  defp strip_dm_prefix(body), do: body
-
-  defp provider_icon("openai"), do: "/images/openai.svg"
-  defp provider_icon("codex"), do: "/images/openai.svg"
-  defp provider_icon(_), do: "/images/claude.svg"
-
-  defp provider_icon_class("openai"), do: "dark:invert"
-  defp provider_icon_class("codex"), do: "dark:invert"
-  defp provider_icon_class(_), do: ""
+  defdelegate dm_message?(msg), to: DmHelpers
+  defdelegate message_sender_name(msg), to: DmHelpers
+  defdelegate strip_dm_prefix(body), to: DmHelpers
+  defdelegate provider_icon(provider), to: DmHelpers
+  defdelegate provider_icon_class(provider), to: DmHelpers
 
   defp message_model(%{metadata: %{"model_usage" => model_usage}}) when is_map(model_usage) do
     case Map.keys(model_usage) do

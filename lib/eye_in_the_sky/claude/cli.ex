@@ -29,11 +29,6 @@ defmodule EyeInTheSky.Claude.CLI do
   @known_permission_modes ~w(acceptEdits bypassPermissions default delegate dontAsk plan)
   @fallback_idle_timeout_ms :infinity
   @max_buffer_bytes 4 * 1024 * 1024
-  @standard_paths [
-    "/usr/local/bin/claude",
-    "/opt/homebrew/bin/claude",
-    Path.expand("~/.local/bin/claude")
-  ]
   @redacted_flags ~w(-p --system-prompt --append-system-prompt)
   @persistent_term_key {__MODULE__, :claude_binary_path}
 
@@ -567,56 +562,6 @@ defmodule EyeInTheSky.Claude.CLI do
   # ---------------------------------------------------------------------------
 
   defp find_claude_binary do
-    EyeInTheSky.CLI.Port.find_binary(@persistent_term_key, &do_find_claude_binary/0)
-  end
-
-  defp do_find_claude_binary do
-    nvm_dir = System.get_env("NVM_DIR") || Path.expand("~/.nvm")
-
-    cond do
-      path = System.find_executable("claude") ->
-        {:ok, path}
-
-      path = find_in_standard_paths() ->
-        {:ok, path}
-
-      path = find_in_nvm() ->
-        {:ok, path}
-
-      true ->
-        {:error, {:binary_not_found, checked_paths: @standard_paths, nvm_dir: nvm_dir}}
-    end
-  end
-
-  defp find_in_standard_paths do
-    EyeInTheSky.CLI.Port.find_in_standard_paths(@standard_paths)
-  end
-
-  defp find_in_nvm do
-    nvm_dir = System.get_env("NVM_DIR") || Path.expand("~/.nvm")
-    versions_dir = Path.join(nvm_dir, "versions/node")
-
-    if File.dir?(versions_dir) do
-      versions_dir
-      |> File.ls!()
-      |> Enum.filter(&semver_dir?/1)
-      |> Enum.sort_by(&parse_version/1, {:desc, Version})
-      |> Enum.find_value(fn dir ->
-        path = Path.join([versions_dir, dir, "bin", "claude"])
-        if File.exists?(path), do: path
-      end)
-    else
-      nil
-    end
-  end
-
-  defp semver_dir?("v" <> rest), do: match?({:ok, _}, Version.parse(rest))
-  defp semver_dir?(_), do: false
-
-  defp parse_version("v" <> rest) do
-    case Version.parse(rest) do
-      {:ok, v} -> v
-      :error -> Version.parse!("0.0.0")
-    end
+    EyeInTheSky.CLI.Port.find_binary(@persistent_term_key, &EyeInTheSky.Claude.BinaryFinder.find/0)
   end
 end

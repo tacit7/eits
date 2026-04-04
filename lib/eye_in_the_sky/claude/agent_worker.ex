@@ -238,18 +238,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     WorkerEvents.on_result_received(state.session_id, state.provider, text, metadata, channel_id)
 
     result_len = if(is_binary(text), do: String.length(text), else: 0)
-
-    :telemetry.execute(
-      [:eits, :agent, :result, :saved],
-      %{
-        text_length: result_len
-      },
-      %{session_id: state.session_id}
-    )
-
-    Logger.info(
-      "[telemetry] agent.result.saved session_id=#{state.session_id} text_length=#{result_len}"
-    )
+    telemetry_result_saved(state.session_id, result_len)
 
     {:noreply, state}
   end
@@ -306,12 +295,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     state = %{state | stream: StreamAssemblerProtocol.reset(state.stream)}
 
     Logger.info("[#{state.session_id}] SDK complete")
-
-    :telemetry.execute([:eits, :agent, :sdk, :complete], %{system_time: System.system_time()}, %{
-      session_id: state.session_id
-    })
-
-    Logger.info("[telemetry] agent.sdk.complete session_id=#{state.session_id}")
+    telemetry_sdk_complete(state.session_id)
 
     WorkerEvents.on_sdk_completed(state.session_id, state.provider_conversation_id, state.provider)
 
@@ -472,12 +456,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     )
 
     queue_len = length(state.queue)
-
-    :telemetry.execute([:eits, :agent, :job, :received], %{system_time: System.system_time()}, %{
-      session_id: state.session_id,
-      queue_length: queue_len,
-      has_messages: context.has_messages
-    })
+    telemetry_job_received(state.session_id, queue_len, context.has_messages)
 
     job = Job.new(message, context, context[:content_blocks] || [])
 
@@ -488,12 +467,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
         {:ok, sdk_ref, handler_monitor} ->
           Logger.info("AgentWorker: SDK started for session_id=#{state.session_id}")
 
-          :telemetry.execute(
-            [:eits, :agent, :job, :started],
-            %{system_time: System.system_time()},
-            %{session_id: state.session_id}
-          )
-
+          telemetry_job_started(state.session_id)
           WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
 
           {{:ok, :started},
@@ -531,10 +505,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
             "queue_length=#{new_queue_length}"
         )
 
-        :telemetry.execute([:eits, :agent, :job, :queued], %{queue_length: new_queue_length}, %{
-          session_id: state.session_id
-        })
-
+        telemetry_job_queued(state.session_id, new_queue_length)
         {{:ok, :queued}, enqueue_job(state, job)}
       end
     end
@@ -693,45 +664,100 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   defp do_handle_sdk_error(reason, state) do
     Logger.error("[#{state.session_id}] SDK error: #{inspect(reason)}")
-
-    :telemetry.execute([:eits, :agent, :sdk, :error], %{system_time: System.system_time()}, %{
-      session_id: state.session_id,
-      reason: reason
-    })
-
-    # Cancel the underlying SDK process before clearing sdk_ref so the OS process
-    # is killed. Without this, the Claude process keeps running as an orphan because
-    # do_handle_sdk_error is called during error recovery while the worker stays alive
-    # (unlike terminate/2 which only fires when the worker itself stops).
-    if state.sdk_ref do
-      strategy = ProviderStrategy.for_provider(state.provider || "claude")
-      strategy.cancel(state.sdk_ref)
-    end
-
+    telemetry_sdk_error(state.session_id, reason)
+    cancel_active_sdk(state)
     WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
     demonitor_handler(state.handler_monitor)
 
     if ErrorClassifier.systemic?(reason) do
-      WorkerEvents.on_queue_drained(
-        state.session_id,
-        state.provider_conversation_id,
-        state.queue,
-        reason
-      )
-
-      WorkerEvents.broadcast_queue_update(state.session_id, [])
-
-      {:noreply,
-       %{state | status: :failed, sdk_ref: nil, handler_monitor: nil, current_job: nil, queue: []}}
+      handle_systemic_error(state, reason)
     else
-      process_next_job(%{
-        state
-        | status: :idle,
-          sdk_ref: nil,
-          handler_monitor: nil,
-          current_job: nil
-      })
+      handle_transient_error(state)
     end
+  end
+
+  # Cancel the underlying SDK process before clearing sdk_ref so the OS process
+  # is killed. Without this, the Claude process keeps running as an orphan because
+  # do_handle_sdk_error is called during error recovery while the worker stays alive
+  # (unlike terminate/2 which only fires when the worker itself stops).
+  defp cancel_active_sdk(%__MODULE__{sdk_ref: nil}), do: :ok
+
+  defp cancel_active_sdk(%__MODULE__{sdk_ref: ref, provider: provider}) do
+    strategy = ProviderStrategy.for_provider(provider || "claude")
+    strategy.cancel(ref)
+  end
+
+  defp handle_systemic_error(state, reason) do
+    WorkerEvents.on_queue_drained(
+      state.session_id,
+      state.provider_conversation_id,
+      state.queue,
+      reason
+    )
+
+    WorkerEvents.broadcast_queue_update(state.session_id, [])
+
+    {:noreply,
+     %{state | status: :failed, sdk_ref: nil, handler_monitor: nil, current_job: nil, queue: []}}
+  end
+
+  defp handle_transient_error(state) do
+    process_next_job(%{
+      state
+      | status: :idle,
+        sdk_ref: nil,
+        handler_monitor: nil,
+        current_job: nil
+    })
+  end
+
+  # --- Telemetry Helpers ---
+
+  defp telemetry_result_saved(session_id, text_length) do
+    :telemetry.execute(
+      [:eits, :agent, :result, :saved],
+      %{text_length: text_length},
+      %{session_id: session_id}
+    )
+
+    Logger.info("[telemetry] agent.result.saved session_id=#{session_id} text_length=#{text_length}")
+  end
+
+  defp telemetry_sdk_complete(session_id) do
+    :telemetry.execute([:eits, :agent, :sdk, :complete], %{system_time: System.system_time()}, %{
+      session_id: session_id
+    })
+
+    Logger.info("[telemetry] agent.sdk.complete session_id=#{session_id}")
+  end
+
+  defp telemetry_job_received(session_id, queue_length, has_messages) do
+    :telemetry.execute([:eits, :agent, :job, :received], %{system_time: System.system_time()}, %{
+      session_id: session_id,
+      queue_length: queue_length,
+      has_messages: has_messages
+    })
+  end
+
+  defp telemetry_job_started(session_id) do
+    :telemetry.execute(
+      [:eits, :agent, :job, :started],
+      %{system_time: System.system_time()},
+      %{session_id: session_id}
+    )
+  end
+
+  defp telemetry_job_queued(session_id, queue_length) do
+    :telemetry.execute([:eits, :agent, :job, :queued], %{queue_length: queue_length}, %{
+      session_id: session_id
+    })
+  end
+
+  defp telemetry_sdk_error(session_id, reason) do
+    :telemetry.execute([:eits, :agent, :sdk, :error], %{system_time: System.system_time()}, %{
+      session_id: session_id,
+      reason: reason
+    })
   end
 
 end

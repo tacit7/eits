@@ -48,6 +48,7 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
       ".sh" -> :bash
       ".sql" -> :sql
       ".xml" -> :xml
+      ".toml" -> :toml
       _ -> :text
     end
   end
@@ -73,6 +74,7 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
       :bash -> "bash"
       :sql -> "sql"
       :xml -> "xml"
+      :toml -> "toml"
       _ -> "plaintext"
     end
   end

@@ -41,7 +41,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
           project_id: team.project_id,
           created_at: to_string(team.created_at),
           archived_at: team.archived_at && to_string(team.archived_at),
-          members: Enum.map(members, &serialize_member/1)
+          members: Enum.map(members, &ApiPresenter.present_member/1)
         })
     end
   end
@@ -104,7 +104,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         json(conn, %{
           success: true,
           team_id: team.id,
-          members: Enum.map(members, &serialize_member/1)
+          members: Enum.map(members, &ApiPresenter.present_member/1)
         })
     end
   end
@@ -217,22 +217,6 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
           _ -> nil
         end
     end
-  end
-
-  defp serialize_member(m) do
-    %{
-      id: m.id,
-      name: m.name,
-      role: m.role,
-      status: m.status,
-      agent_id: m.agent_id,
-      agent_uuid: if(Ecto.assoc_loaded?(m.agent) && m.agent, do: m.agent.uuid),
-      session_id: m.session_id,
-      session_uuid: if(Ecto.assoc_loaded?(m.session) && m.session, do: m.session.uuid),
-      session_status: m.session && m.session.status,
-      joined_at: m.joined_at && to_string(m.joined_at),
-      last_activity_at: m.last_activity_at && to_string(m.last_activity_at)
-    }
   end
 
   defp maybe_opt(opts, _key, nil), do: opts

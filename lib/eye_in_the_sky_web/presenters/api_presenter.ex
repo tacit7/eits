@@ -75,4 +75,20 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       status: session.status
     }
   end
+
+  def present_member(m) do
+    %{
+      id: m.id,
+      name: m.name,
+      role: m.role,
+      status: m.status,
+      agent_id: m.agent_id,
+      agent_uuid: if(Ecto.assoc_loaded?(m.agent) && m.agent, do: m.agent.uuid),
+      session_id: m.session_id,
+      session_uuid: if(Ecto.assoc_loaded?(m.session) && m.session, do: m.session.uuid),
+      session_status: m.session && m.session.status,
+      joined_at: m.joined_at && to_string(m.joined_at),
+      last_activity_at: m.last_activity_at && to_string(m.last_activity_at)
+    }
+  end
 end

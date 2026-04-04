@@ -3,6 +3,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
 
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
 
+  alias EyeInTheSkyWeb.Helpers.FileHelpers
+
   @user_agents_dir Path.expand("~/.claude/agents")
 
   @impl true
@@ -145,10 +147,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
     end
   end
 
-  defp format_size(bytes) when is_integer(bytes) and bytes < 1024, do: "#{bytes} B"
-  defp format_size(bytes) when is_integer(bytes), do: "#{Float.round(bytes / 1024, 1)} KB"
-  defp format_size(_), do: ""
-
   defp has_any_agents?(project_agents, user_agents) do
     project_agents != [] || user_agents != []
   end
@@ -173,7 +171,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                 <.icon name="hero-document-text" class="w-4 h-4 text-base-content/50 shrink-0" />
                 <code class="text-sm font-semibold text-base-content">{agent.name}</code>
                 <span class="text-xs text-base-content/40 ml-auto">
-                  {format_size(agent.size)}
+                  {FileHelpers.format_size(agent.size)}
                 </span>
               </div>
             </div>

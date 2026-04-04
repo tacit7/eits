@@ -79,7 +79,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
         socket
       ) do
     with {:session, {:ok, session}} <- {:session, Sessions.get_session(target_session_id)},
-         {:channel, {:ok, global_channel}} <- {:channel, find_global_channel(session)},
+         {:channel, {:ok, global_channel}} <- {:channel, EyeInTheSky.Channels.find_global_channel(session)},
          {:send, {:ok, _message}} <-
            {:send,
             EyeInTheSky.ChannelMessages.send_channel_message(%{
@@ -572,17 +572,5 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
       submit_event="create_new_session"
     />
     """
-  end
-
-  defp find_global_channel(session) do
-    channels =
-      if session.project_id,
-        do: EyeInTheSky.Channels.list_channels_for_project(session.project_id),
-        else: EyeInTheSky.Channels.list_channels()
-
-    case Enum.find(channels, fn c -> c.name == "#global" end) do
-      nil -> {:error, :channel_not_found}
-      channel -> {:ok, channel}
-    end
   end
 end

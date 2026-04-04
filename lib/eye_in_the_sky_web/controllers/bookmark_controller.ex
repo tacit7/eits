@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWeb.BookmarkController do
   import EyeInTheSkyWeb.ControllerHelpers
 
   alias EyeInTheSky.Bookmarks
-  alias EyeInTheSky.Bookmarks.Bookmark
+  alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @doc """
   Lists bookmarks with optional filters.
@@ -19,15 +19,15 @@ defmodule EyeInTheSkyWeb.BookmarkController do
   def index(conn, params) do
     opts =
       []
-      |> add_opt(:bookmark_type, params["type"])
-      |> add_opt(:category, params["category"])
-      |> add_opt(:project_id, parse_int(params["project_id"]))
-      |> add_opt(:agent_id, params["agent_id"])
-      |> add_opt(:limit, parse_int(params["limit"]))
+      |> maybe_opt(:bookmark_type, params["type"])
+      |> maybe_opt(:category, params["category"])
+      |> maybe_opt(:project_id, parse_int(params["project_id"]))
+      |> maybe_opt(:agent_id, params["agent_id"])
+      |> maybe_opt(:limit, parse_int(params["limit"]))
 
     bookmarks = Bookmarks.list_bookmarks(opts)
 
-    json(conn, %{bookmarks: render_bookmarks(bookmarks)})
+    json(conn, %{bookmarks: Enum.map(bookmarks, &ApiPresenter.present_bookmark/1)})
   end
 
   @doc """
@@ -40,7 +40,7 @@ defmodule EyeInTheSkyWeb.BookmarkController do
         |> put_status(:created)
         |> json(%{
           id: bookmark.id,
-          bookmark: render_bookmark(bookmark)
+          bookmark: ApiPresenter.present_bookmark(bookmark)
         })
 
       {:error, %Ecto.Changeset{} = changeset} ->
@@ -59,7 +59,7 @@ defmodule EyeInTheSkyWeb.BookmarkController do
     # Touch the bookmark to update accessed_at
     {:ok, bookmark} = Bookmarks.touch_bookmark(bookmark)
 
-    json(conn, %{bookmark: render_bookmark(bookmark)})
+    json(conn, %{bookmark: ApiPresenter.present_bookmark(bookmark)})
   end
 
   @doc """
@@ -70,7 +70,7 @@ defmodule EyeInTheSkyWeb.BookmarkController do
 
     case Bookmarks.update_bookmark(bookmark, params) do
       {:ok, bookmark} ->
-        json(conn, %{bookmark: render_bookmark(bookmark)})
+        json(conn, %{bookmark: ApiPresenter.present_bookmark(bookmark)})
 
       {:error, %Ecto.Changeset{} = changeset} ->
         conn
@@ -102,37 +102,8 @@ defmodule EyeInTheSkyWeb.BookmarkController do
 
     json(conn, %{
       is_bookmarked: is_bookmarked,
-      bookmark: if(bookmark, do: render_bookmark(bookmark), else: nil)
+      bookmark: if(bookmark, do: ApiPresenter.present_bookmark(bookmark), else: nil)
     })
   end
 
-  # Private helpers
-
-  defp add_opt(opts, _key, nil), do: opts
-  defp add_opt(opts, key, value), do: Keyword.put(opts, key, value)
-
-  defp render_bookmarks(bookmarks) do
-    Enum.map(bookmarks, &render_bookmark/1)
-  end
-
-  defp render_bookmark(%Bookmark{} = bookmark) do
-    %{
-      id: bookmark.id,
-      bookmark_type: bookmark.bookmark_type,
-      bookmark_id: bookmark.bookmark_id,
-      file_path: bookmark.file_path,
-      line_number: bookmark.line_number,
-      url: bookmark.url,
-      title: bookmark.title,
-      description: bookmark.description,
-      category: bookmark.category,
-      priority: bookmark.priority,
-      position: bookmark.position,
-      project_id: bookmark.project_id,
-      agent_id: bookmark.agent_id,
-      accessed_at: bookmark.accessed_at,
-      inserted_at: bookmark.inserted_at,
-      updated_at: bookmark.updated_at
-    }
-  end
 end

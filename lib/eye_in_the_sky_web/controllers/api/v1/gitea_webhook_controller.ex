@@ -37,8 +37,16 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
 
         Logger.info("Gitea webhook: PR ##{pr_number} opened - spawning codex reviewer")
 
-        instructions =
-          build_review_instructions(pr_number, pr_title, pr_body, pr_url, head_branch, repo)
+        pr_context = %{
+          number: pr_number,
+          title: pr_title,
+          body: pr_body,
+          url: pr_url,
+          head_branch: head_branch,
+          repo: repo
+        }
+
+        instructions = build_review_instructions(pr_context)
 
         case AgentManager.create_agent(
                agent_type: "codex",
@@ -130,7 +138,14 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
     end
   end
 
-  defp build_review_instructions(pr_number, pr_title, pr_body, pr_url, head_branch, repo) do
+  defp build_review_instructions(%{
+         number: pr_number,
+         title: pr_title,
+         body: pr_body,
+         url: pr_url,
+         head_branch: head_branch,
+         repo: repo
+       }) do
     # repo is "owner/name", e.g. "claude/eits-web" -> tea --repo uses just "name" with --login owner
     {owner, repo_name} = split_repo(repo)
 

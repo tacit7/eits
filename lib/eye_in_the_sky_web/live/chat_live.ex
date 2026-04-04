@@ -11,6 +11,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_budget: 1]
   import EyeInTheSkyWeb.Helpers.UploadHelpers
+  import EyeInTheSkyWeb.ControllerHelpers, only: [maybe_opt: 3]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -696,10 +697,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
     |> assign(:channel_members, channel_members)
     |> assign(:sessions_by_project, sessions_by_project)
   end
-
-  defp maybe_opt(opts, _key, nil), do: opts
-  defp maybe_opt(opts, _key, ""), do: opts
-  defp maybe_opt(opts, key, val), do: opts ++ [{key, val}]
 
   defp maybe_int_opt(opts, _key, nil), do: opts
   defp maybe_int_opt(opts, _key, ""), do: opts

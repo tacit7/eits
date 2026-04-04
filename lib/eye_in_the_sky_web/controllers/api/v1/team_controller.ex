@@ -219,6 +219,4 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     end
   end
 
-  defp maybe_opt(opts, _key, nil), do: opts
-  defp maybe_opt(opts, key, val), do: Keyword.put(opts, key, val)
 end

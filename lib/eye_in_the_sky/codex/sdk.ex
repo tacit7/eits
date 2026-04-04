@@ -39,8 +39,7 @@ defmodule EyeInTheSky.Codex.SDK do
   @doc """
   Build the EITS init prompt prepended to new Codex sessions.
 
-  Teaches the agent to use EITS-CMD directives — intercepted in-process by
-  AgentWorker, stripped from visible output, no HTTP round-trips required.
+  Injects session-specific EITS context and eits CLI workflow instructions.
   Accepts any struct with the fields: eits_session_uuid, session_id, agent_id, project_id.
   """
   @spec eits_init_prompt(map()) :: String.t()
@@ -52,21 +51,16 @@ defmodule EyeInTheSky.Codex.SDK do
     - EITS_AGENT_UUID=#{state.agent_id}
     - EITS_PROJECT_ID=#{state.project_id}
 
-    Use EITS-CMD directives for task tracking (intercepted in-process, no HTTP required).
-    Write them as plain lines anywhere in your output — they are stripped before display.
+    Use the eits CLI script for all EITS operations:
 
-      EITS-CMD: task begin <title>
-      EITS-CMD: task annotate <id> <body>
-      EITS-CMD: task done <id>
-      EITS-CMD: note <body>
-      EITS-CMD: commit <hash>
-      EITS-CMD: dm --to #{state.session_id} --message <text>
-
-    DM targets accept either a numeric session ID or a session UUID. Prefer the
-    numeric session ID from EITS context when it is available.
+      eits tasks begin --title "<title>"
+      eits tasks annotate <id> --body "..."
+      eits tasks update <id> --state 4
+      eits dm --to <session_uuid> --message "<text>"
+      eits commits create --hash <hash>
 
     You MUST claim a task before editing files:
-      EITS-CMD: task begin <title of your work>
+      eits tasks begin --title "<title of your work>"
 
     Now proceed with the task:
     """

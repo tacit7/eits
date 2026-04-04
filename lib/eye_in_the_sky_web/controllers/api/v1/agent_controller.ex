@@ -139,23 +139,13 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
 
     ## EITS Command Protocol
 
-    How you issue EITS commands depends on your CLAUDE_CODE_ENTRYPOINT:
+    Use the eits CLI script for all EITS operations:
 
-    **If CLAUDE_CODE_ENTRYPOINT=sdk-cli (headless/spawned agent):** emit EITS-CMD: lines in your output.
-    The AgentWorker intercepts these in-process — no eits script, no HTTP calls needed.
-
-      EITS-CMD: task begin <title>
-      EITS-CMD: task annotate <task_id> <body>
-      EITS-CMD: task done <task_id>
-      EITS-CMD: dm --to <session_uuid> --message <msg>
-      EITS-CMD: commit <hash>
-
-    **If CLAUDE_CODE_ENTRYPOINT=cli (interactive session):** use the eits CLI script.
-
-      eits tasks begin --title "Task name"
-      eits tasks annotate <id> --body "What was done"
+      eits tasks begin --title "<title>"
+      eits tasks annotate <id> --body "..."
       eits tasks update <id> --state 4
-      eits dm --to <session_uuid> --message "done"
+      eits dm --to <session_uuid> --message "..."
+      eits commits create --hash <hash>
 
     ## Task Completion
     When you finish a task, follow this sequence exactly:
@@ -172,9 +162,9 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
   defp coerce_parent_id(val, _field) when is_integer(val), do: {:ok, val}
 
   defp coerce_parent_id(val, field) when is_binary(val) do
-    case Integer.parse(val) do
-      {int, ""} -> {:ok, int}
-      _ -> {:error, "invalid_parameter", "#{field} must be an integer"}
+    case parse_int(val) do
+      nil -> {:error, "invalid_parameter", "#{field} must be an integer"}
+      int -> {:ok, int}
     end
   end
 

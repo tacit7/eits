@@ -86,7 +86,7 @@ Session status is driven by Claude Code hooks and explicit commands:
 
 ## EITS Command Protocol
 
-All agents — interactive (`cli`) and spawned (`sdk-cli`) — use the `eits` CLI script:
+All agents — interactive (`cli`) and headless (`sdk-cli`) — use the `eits` CLI script directly. EITS-CMD directives are deprecated.
 
 ```bash
 eits tasks begin --title "Task name"   # create + start in one shot
@@ -94,6 +94,7 @@ eits tasks annotate <id> --body "..."
 eits tasks update <id> --state 4
 eits tasks complete <id> --message "Summary"
 eits dm --to <session_uuid> --message "done"
+eits dm --to 1740 --message "done"     # numeric session ID also works
 eits commits create --hash <hash>
 ```
 

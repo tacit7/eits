@@ -226,8 +226,8 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   """
   def list_channel_messages(conn, %{"channel_id" => channel_id} = params) do
     limit =
-      case Integer.parse(params["limit"] || "20") do
-        {n, ""} when n > 0 and n <= 200 -> n
+      case parse_int(params["limit"], 20) do
+        n when n > 0 and n <= 200 -> n
         _ -> 20
       end
 

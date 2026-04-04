@@ -58,7 +58,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
   @doc """
   Build the EITS init prompt appended to new Claude sdk-cli sessions.
 
-  Injects session-specific EITS context and EITS-CMD directive instructions.
+  Injects session-specific EITS context and eits CLI workflow instructions.
   Accepts any struct with the fields: eits_session_uuid, session_id, agent_id, project_id.
   """
   @spec eits_init_prompt(map()) :: String.t()
@@ -70,25 +70,16 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
     - EITS_AGENT_UUID=#{state.agent_id}
     - EITS_PROJECT_ID=#{state.project_id}
 
-    You are running as sdk-cli. Use EITS-CMD directives (intercepted in-process, no HTTP required):
+    Use the eits CLI script for all EITS operations:
 
-      EITS-CMD: task begin <title>
-      EITS-CMD: task annotate <id> <body>
-      EITS-CMD: task done <id>
-      EITS-CMD: note <body>
-      EITS-CMD: commit <hash>
-      EITS-CMD: dm --to <target_session_uuid_or_id> --message <text>
+      eits tasks begin --title "<title>"
+      eits tasks annotate <id> --body "..."
+      eits tasks update <id> --state 4
+      eits dm --to <session_uuid> --message "<text>"
+      eits commits create --hash <hash>
 
-    Write EITS-CMD lines anywhere in your output. They are stripped before display.
     You MUST claim a task before editing files:
-      EITS-CMD: task begin <title of your work>
-
-    ## Incoming DM Protocol
-
-    If your prompt starts with "DM from:<name> (session:<uuid>) <body>":
-    - Parse the sender UUID from (session:<uuid>)
-    - Reply immediately: EITS-CMD: dm --to <uuid> --message <your reply>
-    - Always respond — unanswered DMs block the sender.
+      eits tasks begin --title "<title of your work>"
     """
   end
 

@@ -351,11 +351,12 @@ defmodule EyeInTheSky.Claude.CLI do
 
   defp cli_db_defaults do
     alias EyeInTheSky.Settings
+    alias EyeInTheSky.Utils.ToolHelpers
 
     [
       model: Settings.get("model"),
       permission_mode: Settings.get("permission_mode"),
-      max_turns: parse_setting_integer(Settings.get("max_turns")),
+      max_turns: ToolHelpers.parse_int(Settings.get("max_turns")),
       output_format: Settings.get("output_format"),
       skip_permissions: parse_setting_boolean(Settings.get("skip_permissions"))
     ]
@@ -364,15 +365,6 @@ defmodule EyeInTheSky.Claude.CLI do
     DBConnection.ConnectionError ->
       Logger.warning("[cli_db_defaults] DB unavailable, using empty defaults")
       []
-  end
-
-  defp parse_setting_integer(nil), do: nil
-
-  defp parse_setting_integer(s) when is_binary(s) do
-    case Integer.parse(s) do
-      {n, ""} -> n
-      _ -> nil
-    end
   end
 
   defp parse_setting_boolean(nil), do: nil

@@ -8,6 +8,7 @@ defmodule EyeInTheSky.Messages.JsonlStorage do
 
   require Logger
   alias EyeInTheSky.Messages.Message
+  alias EyeInTheSky.Utils.ToolHelpers
 
   @doc """
   Gets the path to a session's JSONL file.
@@ -122,10 +123,7 @@ defmodule EyeInTheSky.Messages.JsonlStorage do
   defp parse_timestamp(_), do: nil
 
   defp parse_unix_timestamp(timestamp) when is_binary(timestamp) do
-    case Integer.parse(timestamp) do
-      {seconds, ""} -> DateTime.from_unix!(seconds)
-      _ -> nil
-    end
+    if s = ToolHelpers.parse_int(timestamp), do: DateTime.from_unix!(s)
   end
 
   defp parse_unix_timestamp(seconds) when is_integer(seconds) do

@@ -49,12 +49,14 @@ The startup/resume hooks inject these env vars automatically:
 
 ## Messaging Protocol
 
-All agents — interactive (`cli`) and spawned (`sdk-cli`) — use the `eits` CLI script:
+All agents use the `eits` CLI script for DMs and commands:
 
 ```bash
 eits dm --to <session_uuid> --message "your message"
-eits tasks update <id> --state 4
+eits tasks begin --title "<title>"
 eits tasks annotate <id> --body "..."
+eits tasks update <id> --state 4
+eits commits create --hash <hash>
 ```
 
 ## EITS Workflow

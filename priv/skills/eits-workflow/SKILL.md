@@ -1,6 +1,6 @@
 ---
 name: eits-workflow
-description: EITS task, commit, and note workflow for agents. Use when an agent needs to log work, create/claim/complete tasks, log commits, or add notes during a session. Triggers on: "begin a task", "log this commit", "mark task done", "add a note", task lifecycle questions.
+description: EITS task, commit, and note workflow for agents. Use when an agent needs to log work, create/claim/complete tasks, log commits, or add notes during a session. Triggers on: "begin a task", "log this commit", "mark task done", "add a note", or any task lifecycle questions.
 user-invocable: true
 allowed-tools: Bash
 argument-hint: "[task|commit|note|dm]"
@@ -8,7 +8,7 @@ argument-hint: "[task|commit|note|dm]"
 
 # EITS Workflow
 
-All agents — interactive (`cli`) and spawned (`sdk-cli`) — use the `eits` CLI script.
+## eits CLI
 
 ```bash
 # Task lifecycle

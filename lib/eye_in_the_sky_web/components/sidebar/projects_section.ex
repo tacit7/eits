@@ -159,7 +159,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                       <button
                         phx-click="set_bookmark"
                         phx-value-id={project.id}
-                        phx-value-value={"#{!project.bookmarked}"}
+                        phx-value-bookmarked={"#{!project.bookmarked}"}
                         phx-target={@myself}
                         phx-disable-with=""
                         class="flex items-center gap-2 text-sm"

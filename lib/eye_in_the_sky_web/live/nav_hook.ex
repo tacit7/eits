@@ -316,7 +316,7 @@ defmodule EyeInTheSkyWeb.NavHook do
     }
 
     result =
-      with {:ok, agent} <- find_or_create_agent(agent_attrs),
+      with {:ok, agent} <- Agents.find_or_create_agent(agent_attrs),
            session_attrs = %{
              uuid: session_uuid,
              agent_id: agent.id,
@@ -374,5 +374,4 @@ defmodule EyeInTheSkyWeb.NavHook do
     {:halt, push_event(socket, "palette:create-agent-result", result)}
   end
 
-  defp find_or_create_agent(attrs), do: Agents.find_or_create_agent(attrs)
 end

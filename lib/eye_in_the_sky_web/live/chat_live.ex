@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_budget: 1]
   import EyeInTheSkyWeb.Helpers.UploadHelpers
-  import EyeInTheSkyWeb.ControllerHelpers, only: [maybe_opt: 3]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [maybe_opt: 3, parse_int: 1]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -353,15 +353,20 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   @impl true
   def handle_event("delete_message", %{"id" => id_str}, socket) do
-    {id, ""} = Integer.parse(id_str)
-    message = Messages.get_message!(id)
-    {:ok, _} = Messages.delete_message(message)
+    case parse_int(id_str) do
+      nil ->
+        {:noreply, socket}
 
-    messages =
-      ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)
-      |> ChatPresenter.serialize_messages()
+      id ->
+        message = Messages.get_message!(id)
+        {:ok, _} = Messages.delete_message(message)
 
-    {:noreply, assign(socket, :messages, messages)}
+        messages =
+          ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)
+          |> ChatPresenter.serialize_messages()
+
+        {:noreply, assign(socket, :messages, messages)}
+    end
   end
 
   @impl true

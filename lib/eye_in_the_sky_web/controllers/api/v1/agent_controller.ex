@@ -323,26 +323,19 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
     ]
   end
 
-  defp build_response(agent, session, nil, _member_name) do
-    %{
+  defp build_response(agent, session, team, member_name) do
+    base = %{
       success: true,
       message: "Agent spawned",
       agent_id: agent.uuid,
       session_id: session.id,
       session_uuid: session.uuid
     }
-  end
 
-  defp build_response(agent, session, team, member_name) do
-    %{
-      success: true,
-      message: "Agent spawned",
-      agent_id: agent.uuid,
-      session_id: session.id,
-      session_uuid: session.uuid,
-      team_id: team.id,
-      team_name: team.name,
-      member_name: member_name
-    }
+    if team do
+      Map.merge(base, %{team_id: team.id, team_name: team.name, member_name: member_name})
+    else
+      base
+    end
   end
 end

@@ -305,6 +305,36 @@ defmodule EyeInTheSky.Claude.SessionReaderTest do
     end
   end
 
+  describe "discover_all_sessions/0 escaped_path regression" do
+    test "escaped_path preserves exact directory name for hyphenated paths" do
+      # Simulate a project with hyphens: /tmp/my-cool-app
+      # Escaped dir name: -tmp-my-cool-app
+      home = System.get_env("HOME")
+      escaped_name = "-tmp-my-cool-app"
+      project_dir = Path.join([home, ".claude", "projects", escaped_name])
+      session_id = "test-escaped-#{System.unique_integer([:positive])}"
+      file_path = Path.join(project_dir, "#{session_id}.jsonl")
+
+      File.mkdir_p!(project_dir)
+      File.write!(file_path, ~s|{"type":"user","message":{"content":"hi"}}\n|)
+
+      sessions = SessionReader.discover_all_sessions()
+      session = Enum.find(sessions, fn s -> s.session_id == session_id end)
+
+      assert session != nil
+      # escaped_path must be the raw directory name — no transformation
+      assert session.escaped_path == escaped_name
+
+      # project_path is lossy: it turns ALL hyphens into slashes,
+      # so /tmp/my-cool-app becomes /tmp/my/cool/app (wrong but documented)
+      assert session.project_path == "/tmp/my/cool/app"
+
+      # Cleanup
+      File.rm!(file_path)
+      File.rmdir(project_dir)
+    end
+  end
+
   describe "find_session_file/2" do
     test "returns {:ok, path} when file exists" do
       session_id = "test-find-#{System.unique_integer([:positive])}"

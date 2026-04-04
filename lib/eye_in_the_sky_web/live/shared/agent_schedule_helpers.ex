@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
   import Phoenix.Component, only: [assign: 2, assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3]
   import EyeInTheSkyWeb.Live.Shared.JobsHelpers, only: [parse_job_id: 1]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.{Prompts, ScheduledJobs, Projects}
   alias EyeInTheSky.Claude.AgentFileScanner
@@ -96,9 +97,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
               if is_fs do
                 Map.put(c, "agent_file_id", prompt_id_raw)
               else
-                case Integer.parse(prompt_id_raw || "") do
-                  {int_id, ""} -> Map.put(c, "prompt_id", int_id)
-                  _ -> c
+                case parse_int(prompt_id_raw) do
+                  nil -> c
+                  int_id -> Map.put(c, "prompt_id", int_id)
                 end
               end
             end)
@@ -125,10 +126,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
               "schedule_type" => params["schedule_type"],
               "schedule_value" => params["schedule_value"],
               "config" => config,
-              "prompt_id" => if(is_fs, do: nil, else: case Integer.parse(prompt_id_raw || "") do
-                {int_id, ""} -> int_id
-                _ -> nil
-              end),
+              "prompt_id" => if(is_fs, do: nil, else: parse_int(prompt_id_raw)),
               "enabled" => 1
             }
             |> put_if_present("timezone", params["timezone"])
@@ -264,9 +262,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
         AgentFileScanner.get_by_id(id)
 
       true ->
-        case Integer.parse(id) do
-          {int_id, ""} -> Prompts.get_prompt(int_id)
-          _ -> nil
+        case parse_int(id) do
+          nil -> nil
+          int_id -> Prompts.get_prompt(int_id)
         end
     end
   end
@@ -301,12 +299,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
 
     cond do
       override_id && override_id != "" ->
-        case Integer.parse(override_id) do
-          {int_id, ""} ->
+        case parse_int(override_id) do
+          nil ->
+            {:error, :no_project}
+
+          int_id ->
             project = Projects.get_project(int_id)
             if project && project.path, do: {:ok, project.path}, else: {:error, :no_project}
-          _ ->
-            {:error, :no_project}
         end
 
       prompt[:project_id] || Map.get(prompt, :project_id) ->

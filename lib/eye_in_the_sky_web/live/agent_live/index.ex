@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   import EyeInTheSkyWeb.Components.AgentList
   import EyeInTheSkyWeb.Helpers.SessionFilters
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_budget: 1]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   require Logger
 
@@ -237,9 +238,9 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
   @impl true
   def handle_event("rename_session", %{"session_id" => session_id}, socket) do
-    case Integer.parse(session_id) do
-      {id, ""} -> {:noreply, assign(socket, :editing_session_id, id)}
-      _ -> {:noreply, socket}
+    case parse_int(session_id) do
+      nil -> {:noreply, socket}
+      id -> {:noreply, assign(socket, :editing_session_id, id)}
     end
   end
 
@@ -278,11 +279,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
   @impl true
   def handle_event("create_new_session", params, socket) do
-    project_id =
-      case Integer.parse(params["project_id"] || "") do
-        {id, ""} -> id
-        _ -> nil
-      end
+    project_id = parse_int(params["project_id"])
 
     if is_nil(project_id) do
       {:noreply, put_flash(socket, :error, "Invalid project")}
@@ -301,8 +298,8 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
   @impl true
   def handle_event("add_to_canvas", %{"canvas-id" => cid, "session-id" => sid}, socket) do
-    with {canvas_id, _} <- Integer.parse(cid),
-         {session_id, _} <- Integer.parse(sid),
+    with canvas_id when not is_nil(canvas_id) <- parse_int(cid),
+         session_id when not is_nil(session_id) <- parse_int(sid),
          %{} = canvas <- Canvases.get_canvas(canvas_id) do
       Canvases.add_session(canvas_id, session_id)
 
@@ -320,8 +317,11 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
   @impl true
   def handle_event("add_to_new_canvas", %{"session_id" => sid, "canvas_name" => name}, socket) do
-    case Integer.parse(sid) do
-      {session_id, _} ->
+    case parse_int(sid) do
+      nil ->
+        {:noreply, socket}
+
+      session_id ->
         canvas_name =
           if name && String.trim(name) != "",
             do: String.trim(name),
@@ -342,9 +342,6 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
           {:error, _} ->
             {:noreply, put_flash(socket, :error, "Failed to create canvas")}
         end
-
-      _ ->
-        {:noreply, socket}
     end
   end
 

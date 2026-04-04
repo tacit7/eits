@@ -196,11 +196,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
     channel_id = params["channel_id"] || socket.assigns.active_channel_id
     content_blocks = consume_agent_images_as_content_blocks(socket)
 
-    target_session_id =
-      case Integer.parse(to_string(target_session_id_str)) do
-        {n, ""} -> n
-        _ -> nil
-      end
+    target_session_id = parse_int(target_session_id_str)
 
     case ChannelMessages.send_channel_message(%{
            channel_id: channel_id,
@@ -234,7 +230,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
     require Logger
     channel_id = socket.assigns.active_channel_id
 
-    with {session_id, ""} <- Integer.parse(session_id_str),
+    with session_id when not is_nil(session_id) <- parse_int(session_id_str),
          {:ok, session} <- Sessions.get_session(session_id) do
       agent_id = session.agent_id
 
@@ -270,7 +266,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
     require Logger
     channel_id = socket.assigns.active_channel_id
 
-    with {session_id, ""} <- Integer.parse(session_id_str),
+    with session_id when not is_nil(session_id) <- parse_int(session_id_str),
          {:ok, session} <- Sessions.get_session(session_id) do
       Channels.remove_member(channel_id, session_id)
 
@@ -693,8 +689,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
   defp maybe_int_opt(opts, _key, ""), do: opts
 
   defp maybe_int_opt(opts, key, val) when is_binary(val) do
-    case Integer.parse(val) do
-      {n, _} when n > 0 -> Keyword.put(opts, key, n)
+    case parse_int(val) do
+      n when is_integer(n) and n > 0 -> Keyword.put(opts, key, n)
       _ -> opts
     end
   end

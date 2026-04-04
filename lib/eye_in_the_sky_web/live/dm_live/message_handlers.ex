@@ -40,7 +40,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
         socket = TabHelpers.load_tab_data(socket, "messages", session_id)
 
         base_opts = SessionHelpers.continue_session_opts(model, effort_level, thinking_enabled, max_budget_usd)
-        cli_opts = Keyword.merge(base_opts, extra_cli_opts)
+        cli_opts = Keyword.merge(base_opts, extra_cli_opts) ++ [message_id: message.id]
 
         case AgentManager.continue_session(session_id, full_body, cli_opts) do
           {:ok, _admission} ->

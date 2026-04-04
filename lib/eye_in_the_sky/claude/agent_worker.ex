@@ -16,6 +16,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   alias EyeInTheSky.AgentWorkerEvents, as: WorkerEvents
   alias EyeInTheSky.Agents.CmdDispatcher
   alias EyeInTheSky.Claude.AgentWorker.{ErrorClassifier, ProcessCleanup, RetryPolicy}
+  alias EyeInTheSky.Messages
 
   @registry EyeInTheSky.Claude.AgentRegistry
   @max_queue_depth 5
@@ -298,6 +299,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     :telemetry.execute([:eits, :agent, :sdk, :complete], %{system_time: System.system_time()}, %{session_id: state.session_id})
 
     WorkerEvents.on_sdk_completed(state.session_id, state.provider_conversation_id, state.provider)
+    Messages.mark_delivered(state.current_job && state.current_job.context[:message_id])
 
     demonitor_handler(state.handler_monitor)
 
@@ -477,6 +479,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
         :telemetry.execute([:eits, :agent, :job, :started], %{system_time: System.system_time()}, %{session_id: state.session_id})
         WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
+        Messages.mark_processing(job.context[:message_id])
 
         {{:ok, :started},
          RetryPolicy.clear_retry_timer(%{
@@ -553,6 +556,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     case start_sdk(state, next_job) do
       {:ok, sdk_ref, handler_monitor} ->
         WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
+        Messages.mark_processing(next_job.context[:message_id])
 
         new_state =
           RetryPolicy.clear_retry_timer(%{
@@ -621,6 +625,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       eits_workflow: Map.get(context, :eits_workflow, "1"),
       bypass_sandbox: Map.get(context, :bypass_sandbox, false),
       content_blocks: Map.get(context, :content_blocks, []),
+      message_id: Map.get(context, :message_id),
       extra_cli_opts: Map.get(context, :extra_cli_opts, [])
     }
   end
@@ -694,6 +699,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   defp handle_systemic_error(state, reason) do
+    # Mark current job and all queued jobs as failed in DB before clearing.
+    WorkerEvents.on_current_job_failed(state.current_job, reason)
+
     WorkerEvents.on_queue_drained(
       state.session_id,
       state.provider_conversation_id,
@@ -708,6 +716,11 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   defp handle_transient_error(state) do
+    # Mark the current job's message as failed so it doesn't stay stuck in "processing".
+    if state.current_job do
+      Messages.mark_failed(state.current_job.context[:message_id], "transient_error")
+    end
+
     process_next_job(%{
       state
       | status: :idle,

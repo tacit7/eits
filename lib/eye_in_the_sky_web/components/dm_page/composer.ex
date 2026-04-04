@@ -8,15 +8,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
   attr :uploads, :map, required: true
   attr :selected_model, :string, default: "opus"
   attr :selected_effort, :string, default: "medium"
-  attr :show_effort_menu, :boolean, default: false
-  attr :show_model_menu, :boolean, default: false
+  attr :active_overlay, :any, default: nil
   attr :processing, :boolean, default: false
   attr :slash_items, :list, default: []
   attr :thinking_enabled, :boolean, default: false
   attr :max_budget_usd, :any, default: nil
   attr :provider, :string, default: "claude"
-  attr :total_tokens, :integer, default: 0
-  attr :total_cost, :float, default: 0.0
   attr :context_used, :integer, default: 0
   attr :context_window, :integer, default: 0
   attr :display_name, :string, default: nil
@@ -114,7 +111,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
                 <span class="font-medium">{effort_display_name(@selected_effort)}</span>
                 <.icon name="hero-chevron-down-mini" class="w-3.5 h-3.5" />
               </button>
-              <%= if @show_effort_menu do %>
+              <%= if @active_overlay == :effort_menu do %>
                 <ul
                   tabindex="0"
                   class="dropdown-content menu z-[1] w-52 rounded-xl border border-base-content/8 bg-base-100 p-1.5 shadow-lg"
@@ -191,7 +188,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
               <.icon name="hero-chevron-down-mini" class="w-3.5 h-3.5" />
             </button>
 
-            <%= if @show_model_menu do %>
+            <%= if @active_overlay == :model_menu do %>
               <ul
                 tabindex="0"
                 class="dropdown-content menu z-[1] w-72 rounded-xl border border-base-content/8 bg-base-100 p-1.5 shadow-lg"

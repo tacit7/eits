@@ -46,6 +46,32 @@ defmodule EyeInTheSky.Sessions.ModelInfo do
   end
 
   @doc """
+  Parses a model string like "claude-sonnet-4-5-20250929" into {provider, name}.
+
+  Handles:
+  - nil or "" → {"claude", nil}
+  - "claude-*" → {"anthropic", model}
+  - "provider/name" → {provider, name}
+  - other → {"anthropic", model}
+  """
+  def parse_model_string(nil), do: {"claude", nil}
+  def parse_model_string(""), do: {"claude", nil}
+
+  def parse_model_string(model) when is_binary(model) do
+    cond do
+      String.starts_with?(model, "claude-") ->
+        {"anthropic", model}
+
+      String.contains?(model, "/") ->
+        [provider | rest] = String.split(model, "/", parts: 2)
+        {provider, Enum.join(rest, "/")}
+
+      true ->
+        {"anthropic", model}
+    end
+  end
+
+  @doc """
   Gets model information for a session as a formatted string.
 
   Accepts a Session struct or any map with :model_name / :model_version keys.

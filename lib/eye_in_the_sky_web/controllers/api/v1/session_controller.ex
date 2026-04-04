@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     }
 
     with {:ok, agent} <- Agents.find_or_create_agent(agent_attrs) do
-      {model_provider, model_name} = parse_model(params["model"])
+      {model_provider, model_name} = Sessions.ModelInfo.parse_model_string(params["model"])
 
       session_attrs = %{
         uuid: session_uuid,
@@ -193,54 +193,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
             last_activity_at: DateTime.utc_now()
           })
 
-          tool_input = params["tool_input"] || %{}
-
-          case type do
-            "pre" ->
-              input_json = Jason.encode!(tool_input)
-              body = "Tool: #{tool_name}\n#{input_json}" |> String.slice(0..3999)
-
-              EyeInTheSky.Messages.create_message(%{
-                uuid: Ecto.UUID.generate(),
-                session_id: session.id,
-                sender_role: "tool",
-                recipient_role: "user",
-                direction: "inbound",
-                body: body,
-                status: "delivered",
-                provider: "claude",
-                metadata: %{
-                  "stream_type" => "tool_use",
-                  "tool_name" => tool_name,
-                  "input" => tool_input
-                }
-              })
-
-              EyeInTheSky.Events.agent_working(session)
-              EyeInTheSky.Events.session_tool_use(session.id, tool_name, tool_input)
-
-            "post" ->
-              input_json = Jason.encode!(tool_input)
-              body = "Tool: #{tool_name} (completed)\n#{input_json}" |> String.slice(0..3999)
-
-              EyeInTheSky.Messages.create_message(%{
-                uuid: Ecto.UUID.generate(),
-                session_id: session.id,
-                sender_role: "tool",
-                recipient_role: "user",
-                direction: "inbound",
-                body: body,
-                status: "delivered",
-                provider: "claude",
-                metadata: %{"stream_type" => "tool_result", "tool_name" => tool_name}
-              })
-
-              EyeInTheSky.Events.session_tool_result(session.id, tool_name, false)
-
-            _ ->
-              nil
-          end
-
+          Sessions.record_tool_event(session, type, params)
           json(conn, %{success: true})
 
         {:error, :not_found} ->
@@ -410,23 +363,5 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   defp handle_terminal_status(session, status) do
     member_status = if status == "failed", do: "failed", else: "done"
     EyeInTheSky.Teams.mark_member_done_by_session(session.id, member_status)
-  end
-
-  # Parse model string like "claude-sonnet-4-5-20250929" into provider/name
-  defp parse_model(nil), do: {"claude", nil}
-  defp parse_model(""), do: {"claude", nil}
-
-  defp parse_model(model) when is_binary(model) do
-    cond do
-      String.starts_with?(model, "claude-") ->
-        {"anthropic", model}
-
-      String.contains?(model, "/") ->
-        [provider | rest] = String.split(model, "/", parts: 2)
-        {provider, Enum.join(rest, "/")}
-
-      true ->
-        {"anthropic", model}
-    end
   end
 end

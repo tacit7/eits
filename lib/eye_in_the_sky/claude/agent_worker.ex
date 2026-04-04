@@ -238,7 +238,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     WorkerEvents.on_result_received(state.session_id, state.provider, text, metadata, channel_id)
 
     result_len = if(is_binary(text), do: String.length(text), else: 0)
-    emit_telemetry([:eits, :agent, :result, :saved], %{text_length: result_len}, %{session_id: state.session_id})
+    :telemetry.execute([:eits, :agent, :result, :saved], %{text_length: result_len}, %{session_id: state.session_id})
 
     {:noreply, state}
   end
@@ -295,7 +295,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     state = %{state | stream: StreamAssemblerProtocol.reset(state.stream)}
 
     Logger.info("[#{state.session_id}] SDK complete")
-    emit_telemetry([:eits, :agent, :sdk, :complete], %{system_time: System.system_time()}, %{session_id: state.session_id})
+    :telemetry.execute([:eits, :agent, :sdk, :complete], %{system_time: System.system_time()}, %{session_id: state.session_id})
 
     WorkerEvents.on_sdk_completed(state.session_id, state.provider_conversation_id, state.provider)
 
@@ -456,58 +456,68 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     )
 
     queue_len = length(state.queue)
-    emit_telemetry([:eits, :agent, :job, :received], %{system_time: System.system_time()}, %{session_id: state.session_id, queue_length: queue_len, has_messages: context.has_messages})
+    :telemetry.execute([:eits, :agent, :job, :received], %{system_time: System.system_time()}, %{session_id: state.session_id, queue_length: queue_len, has_messages: context.has_messages})
 
     job = Job.new(message, context, context[:content_blocks] || [])
 
     if state.status == :idle do
-      Logger.info("AgentWorker: starting SDK for session_id=#{state.session_id}")
-
-      case start_sdk(state, job) do
-        {:ok, sdk_ref, handler_monitor} ->
-          Logger.info("AgentWorker: SDK started for session_id=#{state.session_id}")
-
-          emit_telemetry([:eits, :agent, :job, :started], %{system_time: System.system_time()}, %{session_id: state.session_id})
-          WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
-
-          {{:ok, :started},
-           RetryPolicy.clear_retry_timer(%{
-             state
-             | status: :running,
-               sdk_ref: sdk_ref,
-               handler_monitor: handler_monitor,
-               current_job: job
-           })}
-
-        {:error, reason} ->
-          reason_str = inspect(reason)
-
-          Logger.error(
-            "AgentWorker: failed to start SDK for session_id=#{state.session_id} - #{reason_str}"
-          )
-
-          WorkerEvents.on_spawn_error(state.session_id, reason)
-
-          {{:ok, :retry_queued}, state |> enqueue_job(job) |> RetryPolicy.schedule_retry_start()}
-      end
+      admit_idle(state, job)
     else
-      if length(state.queue) >= @max_queue_depth do
-        Logger.warning(
-          "AgentWorker: queue full (#{@max_queue_depth}) for session_id=#{state.session_id}, rejecting message"
+      admit_busy(state, job)
+    end
+  end
+
+  # Handle starting SDK when idle
+  defp admit_idle(state, job) do
+    Logger.info("AgentWorker: starting SDK for session_id=#{state.session_id}")
+
+    case start_sdk(state, job) do
+      {:ok, sdk_ref, handler_monitor} ->
+        Logger.info("AgentWorker: SDK started for session_id=#{state.session_id}")
+
+        :telemetry.execute([:eits, :agent, :job, :started], %{system_time: System.system_time()}, %{session_id: state.session_id})
+        WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
+
+        {{:ok, :started},
+         RetryPolicy.clear_retry_timer(%{
+           state
+           | status: :running,
+             sdk_ref: sdk_ref,
+             handler_monitor: handler_monitor,
+             current_job: job
+         })}
+
+      {:error, reason} ->
+        reason_str = inspect(reason)
+
+        Logger.error(
+          "AgentWorker: failed to start SDK for session_id=#{state.session_id} - #{reason_str}"
         )
 
-        {{:error, :queue_full}, state}
-      else
-        new_queue_length = length(state.queue) + 1
+        WorkerEvents.on_spawn_error(state.session_id, reason)
 
-        Logger.info(
-          "AgentWorker: busy, queueing message for session_id=#{state.session_id}, " <>
-            "queue_length=#{new_queue_length}"
-        )
+        {{:ok, :retry_queued}, state |> enqueue_job(job) |> RetryPolicy.schedule_retry_start()}
+    end
+  end
 
-        emit_telemetry([:eits, :agent, :job, :queued], %{queue_length: new_queue_length}, %{session_id: state.session_id})
-        {{:ok, :queued}, enqueue_job(state, job)}
-      end
+  # Handle queueing when busy
+  defp admit_busy(state, job) do
+    if length(state.queue) >= @max_queue_depth do
+      Logger.warning(
+        "AgentWorker: queue full (#{@max_queue_depth}) for session_id=#{state.session_id}, rejecting message"
+      )
+
+      {{:error, :queue_full}, state}
+    else
+      new_queue_length = length(state.queue) + 1
+
+      Logger.info(
+        "AgentWorker: busy, queueing message for session_id=#{state.session_id}, " <>
+          "queue_length=#{new_queue_length}"
+      )
+
+      :telemetry.execute([:eits, :agent, :job, :queued], %{queue_length: new_queue_length}, %{session_id: state.session_id})
+      {{:ok, :queued}, enqueue_job(state, job)}
     end
   end
 
@@ -660,7 +670,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   defp do_handle_sdk_error(reason, state) do
     Logger.error("[#{state.session_id}] SDK error: #{inspect(reason)}")
-    emit_telemetry([:eits, :agent, :sdk, :error], %{system_time: System.system_time()}, %{session_id: state.session_id, reason: reason})
+    :telemetry.execute([:eits, :agent, :sdk, :error], %{system_time: System.system_time()}, %{session_id: state.session_id, reason: reason})
     cancel_active_sdk(state)
     WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
     demonitor_handler(state.handler_monitor)
@@ -705,13 +715,6 @@ defmodule EyeInTheSky.Claude.AgentWorker do
         handler_monitor: nil,
         current_job: nil
     })
-  end
-
-  # --- Telemetry Helpers ---
-
-  defp emit_telemetry(event, measurements, metadata) do
-    :telemetry.execute(event, measurements, metadata)
-    Logger.info("[telemetry] #{Enum.join(event, ".")} session_id=#{metadata[:session_id]}")
   end
 
 end

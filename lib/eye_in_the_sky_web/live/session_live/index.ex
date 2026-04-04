@@ -216,10 +216,20 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
     end
   end
 
-  # Real-time: reload sessions list when agents change
+  # Real-time: update a single row when a session changes — avoids a full stream
+  # reset (which causes heavy DOM churn and can disrupt the new-session modal).
+  @impl true
+  def handle_info({:agent_updated, session}, socket) do
+    case Sessions.get_session_overview_row(session.id) do
+      {:ok, row} -> {:noreply, stream_insert(socket, :sessions, row)}
+      {:error, :not_found} -> {:noreply, socket}
+    end
+  end
+
+  # Full reload for creates/deletes since counts and ordering can shift.
   @impl true
   def handle_info({event, _agent}, socket)
-      when event in [:agent_created, :agent_updated, :agent_deleted] do
+      when event in [:agent_created, :agent_deleted] do
     current_page = socket.assigns.page
     sessions = Sessions.list_session_overview_rows(limit: current_page * @per_page, offset: 0)
     total = Sessions.count_session_overview_rows()

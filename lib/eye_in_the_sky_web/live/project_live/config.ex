@@ -1,7 +1,8 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Config do
   use EyeInTheSkyWeb, :live_view
 
-  import EyeInTheSkyWeb.Helpers.FileHelpers, only: [path_within?: 2]
+  import EyeInTheSkyWeb.Helpers.FileHelpers,
+    only: [path_within?: 2, detect_file_type: 1, format_size: 1, cm_language: 1]
 
   alias EyeInTheSky.Projects
 
@@ -290,33 +291,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
         []
     end
   end
-
-  defp detect_file_type(path) do
-    ext = path |> Path.extname() |> String.downcase()
-
-    case ext do
-      ".md" -> :markdown
-      ".json" -> :json
-      ".ex" -> :elixir
-      ".exs" -> :elixir
-      ".sh" -> :bash
-      ".yml" -> :yaml
-      ".yaml" -> :yaml
-      ".toml" -> :toml
-      _ -> :text
-    end
-  end
-
-  defp format_size(bytes) when is_integer(bytes) and bytes < 1024, do: "#{bytes} B"
-  defp format_size(bytes) when is_integer(bytes), do: "#{Float.round(bytes / 1024, 1)} KB"
-  defp format_size(_), do: ""
-
-  defp cm_language(:elixir), do: "elixir"
-  defp cm_language(:markdown), do: "markdown"
-  defp cm_language(:json), do: "json"
-  defp cm_language(:bash), do: "shell"
-  defp cm_language(:yaml), do: "yaml"
-  defp cm_language(_), do: "text"
 
   # ── Tree-mode sidebar components ─────────────────────────────────────────────
 

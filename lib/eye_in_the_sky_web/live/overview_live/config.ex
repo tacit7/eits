@@ -1,7 +1,8 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Config do
   use EyeInTheSkyWeb, :live_view
 
-  import EyeInTheSkyWeb.Helpers.FileHelpers, only: [path_within?: 2]
+  import EyeInTheSkyWeb.Helpers.FileHelpers,
+    only: [path_within?: 2, detect_file_type: 1, format_size: 1, language_class: 1]
 
   @claude_dir Path.expand("~/.claude")
 
@@ -167,34 +168,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
   defp relative_path(path) do
     String.replace_prefix(path, @claude_dir <> "/", "")
   end
-
-  defp detect_file_type(path) do
-    ext = path |> Path.extname() |> String.downcase()
-
-    case ext do
-      ".md" -> :markdown
-      ".json" -> :json
-      ".ex" -> :elixir
-      ".exs" -> :elixir
-      ".sh" -> :bash
-      ".yml" -> :yaml
-      ".yaml" -> :yaml
-      ".toml" -> :toml
-      _ -> :text
-    end
-  end
-
-  defp format_size(bytes) when is_integer(bytes) and bytes < 1024, do: "#{bytes} B"
-  defp format_size(bytes) when is_integer(bytes), do: "#{Float.round(bytes / 1024, 1)} KB"
-  defp format_size(_), do: ""
-
-  defp language_class(:markdown), do: "markdown"
-  defp language_class(:json), do: "json"
-  defp language_class(:elixir), do: "elixir"
-  defp language_class(:bash), do: "bash"
-  defp language_class(:yaml), do: "yaml"
-  defp language_class(:toml), do: "toml"
-  defp language_class(_), do: "plaintext"
 
   @impl true
   def render(assigns) do

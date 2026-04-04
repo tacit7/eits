@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
     end
   end
 
-  @spec format_size(integer) :: String.t()
+  @spec format_size(integer | any) :: String.t()
   def format_size(size) when is_integer(size) and size < 1024, do: "#{size} B"
 
   def format_size(size) when is_integer(size) and size < 1024 * 1024,
@@ -19,6 +19,8 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
 
   def format_size(size) when is_integer(size),
     do: "#{Float.round(size / (1024 * 1024), 1)} MB"
+
+  def format_size(_), do: ""
 
   @spec detect_file_type(String.t()) :: atom
   def detect_file_type(path) do
@@ -48,6 +50,7 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
       ".sh" -> :bash
       ".sql" -> :sql
       ".xml" -> :xml
+      ".toml" -> :toml
       _ -> :text
     end
   end
@@ -73,6 +76,7 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
       :bash -> "bash"
       :sql -> "sql"
       :xml -> "xml"
+      :toml -> "toml"
       _ -> "plaintext"
     end
   end

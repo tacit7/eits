@@ -76,6 +76,13 @@ defmodule EyeInTheSky.Teams do
     Repo.get(TeamMember, id)
   end
 
+  def get_member(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {int_id, ""} -> get_member(int_id)
+      _ -> nil
+    end
+  end
+
   def get_member(team_id, name) do
     Repo.get_by(TeamMember, team_id: team_id, name: name)
   end

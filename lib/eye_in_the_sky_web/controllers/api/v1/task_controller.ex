@@ -224,14 +224,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     task_int_id = if is_binary(task_id), do: String.to_integer(task_id), else: task_id
 
     if int_id do
-      import Ecto.Query, only: [from: 2]
-
-      EyeInTheSky.Repo.delete_all(
-        from(ts in "task_sessions",
-          where: ts.task_id == ^task_int_id and ts.session_id == ^int_id
-        )
-      )
-
+      Tasks.unlink_session_from_task(task_int_id, int_id)
       json(conn, %{success: true, message: "Session unlinked from task #{task_id}"})
     else
       conn |> put_status(:not_found) |> json(%{error: "Session not found"})
@@ -268,11 +261,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     task_int_id = if is_binary(task_id), do: String.to_integer(task_id), else: task_id
 
     if int_id do
-      EyeInTheSky.Repo.insert_all(
-        "task_sessions",
-        [%{task_id: task_int_id, session_id: int_id}],
-        on_conflict: :nothing
-      )
+      Tasks.link_session_to_task(task_int_id, int_id)
     end
 
     :ok

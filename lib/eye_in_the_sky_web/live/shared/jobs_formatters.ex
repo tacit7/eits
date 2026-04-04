@@ -1,5 +1,6 @@
 defmodule EyeInTheSkyWeb.Live.Shared.JobsFormatters do
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [month_name: 1]
+  alias EyeInTheSky.Utils.ToolHelpers
 
   # ---------------------------------------------------------------------------
   # Schedule formatting
@@ -126,17 +127,11 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsFormatters do
   def parse_cron_num("*"), do: {:ok, :any}
 
   def parse_cron_num("*/" <> step) do
-    case Integer.parse(step) do
-      {n, ""} -> {:step, n}
-      _ -> :error
-    end
+    if n = ToolHelpers.parse_int(step), do: {:step, n}, else: :error
   end
 
   def parse_cron_num(s) do
-    case Integer.parse(s) do
-      {n, ""} -> {:ok, n}
-      _ -> :error
-    end
+    if n = ToolHelpers.parse_int(s), do: {:ok, n}, else: :error
   end
 
   # ---------------------------------------------------------------------------

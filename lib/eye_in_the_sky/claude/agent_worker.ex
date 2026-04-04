@@ -596,14 +596,10 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     new_state
   end
 
-  defp normalize_context(context) do
-    context =
-      cond do
-        is_list(context) -> Map.new(context)
-        is_map(context) -> context
-        true -> %{}
-      end
+  defp normalize_context(context) when is_list(context), do: normalize_context(Map.new(context))
+  defp normalize_context(context) when not is_map(context), do: normalize_context(%{})
 
+  defp normalize_context(context) do
     %{
       model: Map.get(context, :model),
       effort_level: Map.get(context, :effort_level),

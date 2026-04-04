@@ -37,16 +37,16 @@ defmodule EyeInTheSkyWeb.ControllerHelpers do
   def resolve_id(nil, _lookup_fn), do: nil
 
   def resolve_id(raw, lookup_fn) when is_binary(raw) do
-    case Integer.parse(raw) do
-      {n, ""} ->
-        n
-
-      _ ->
+    case parse_int(raw) do
+      nil ->
         case lookup_fn.(raw) do
           {:ok, %{id: id}} -> id
           {:ok, id} when is_integer(id) -> id
           _ -> nil
         end
+
+      n ->
+        n
     end
   end
 
@@ -68,10 +68,5 @@ defmodule EyeInTheSkyWeb.ControllerHelpers do
   def parse_starred(true), do: 1
   def parse_starred(false), do: 0
 
-  def parse_starred(val) when is_binary(val) do
-    case Integer.parse(val) do
-      {n, ""} -> n
-      _ -> nil
-    end
-  end
+  def parse_starred(val) when is_binary(val), do: parse_int(val)
 end

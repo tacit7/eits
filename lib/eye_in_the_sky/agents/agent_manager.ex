@@ -131,22 +131,13 @@ defmodule EyeInTheSky.Agents.AgentManager do
 
   defp resolve_project_id(opts) do
     # Inherit project_id from parent session if not explicitly provided
-    case opts[:project_id] do
-      nil ->
-        case opts[:parent_session_id] do
-          nil ->
-            nil
-
-          parent_id ->
-            case Sessions.get_session(parent_id) do
-              {:ok, parent} -> parent.project_id
-              _ -> nil
-            end
-        end
-
-      id ->
-        id
-    end
+    opts[:project_id] ||
+      with id when not is_nil(id) <- opts[:parent_session_id],
+           {:ok, parent} <- Sessions.get_session(id) do
+        parent.project_id
+      else
+        _ -> nil
+      end
   end
 
   defp resolve_worktree_path(opts) do

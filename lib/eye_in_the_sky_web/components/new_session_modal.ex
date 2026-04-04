@@ -26,10 +26,17 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   @impl true
   def update(assigns, socket) do
-    # When the form is open, skip parent re-renders to avoid DOM patches disrupting the modal,
-    # but always update uploads so image previews reflect the current state.
+    # When the form is open, skip parent re-renders entirely to prevent DOM patches from
+    # disrupting the modal (e.g. PubSub-driven list updates closing the form). Only update
+    # uploads when they actually change so image previews stay current.
     if socket.assigns[:show] == true && assigns[:show] == true do
-      {:ok, assign(socket, :file_uploads, assigns[:file_uploads])}
+      new_uploads = Map.get(assigns, :file_uploads)
+
+      if socket.assigns[:file_uploads] == new_uploads do
+        {:ok, socket}
+      else
+        {:ok, assign(socket, :file_uploads, new_uploads)}
+      end
     else
       project_path = assigns[:current_project] && assigns[:current_project].path
       available_agents = list_agents(project_path)

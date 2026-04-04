@@ -239,8 +239,9 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
   @impl true
   def handle_event("set_bookmark", params, socket) do
     with id when is_binary(id) <- Map.get(params, "id"),
+         value when value in ["true", "false"] <- Map.get(params, "value"),
          {project_id, ""} <- Integer.parse(id),
-         {:ok, project} <- Projects.set_bookmarked(project_id, Map.get(params, "value") == "true") do
+         {:ok, project} <- Projects.set_bookmarked(project_id, value == "true") do
       EyeInTheSky.Events.project_updated(project)
       {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
     else

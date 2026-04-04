@@ -75,19 +75,38 @@ defmodule EyeInTheSkyWeb.NavHook do
     project_id = Projects.parse_project_id(params["project_id"])
     tags = params["tags"]
 
-    form_params = %{
-      "title" => params["title"] || "",
-      "description" => params["description"] || "",
-      "state_id" => "1",
-      "tags" => if(is_list(tags), do: Enum.join(tags, ","), else: tags || "")
+    title = params["title"] || ""
+    description = params["description"] || ""
+    tags_string = if(is_list(tags), do: Enum.join(tags, ","), else: tags || "")
+
+    tag_names =
+      tags_string
+      |> String.split(",")
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+
+    now = DateTime.utc_now()
+
+    task_attrs = %{
+      uuid: Ecto.UUID.generate(),
+      title: title,
+      description: description,
+      state_id: Tasks.WorkflowState.todo_id(),
+      priority: 1,
+      created_at: now,
+      updated_at: now
     }
 
-    opts = if project_id, do: [project_id: project_id], else: []
+    task_attrs = if project_id, do: Map.put(task_attrs, :project_id, project_id), else: task_attrs
 
     result =
-      case Tasks.create_task_from_form(form_params, opts) do
-        {:ok, _task} -> %{ok: true}
-        {:error, _changeset} -> %{ok: false, error: "Failed to create task"}
+      case Tasks.create_task(task_attrs) do
+        {:ok, task} ->
+          if tag_names != [], do: Tasks.replace_task_tags(task.id, tag_names)
+          %{ok: true}
+
+        {:error, _changeset} ->
+          %{ok: false, error: "Failed to create task"}
       end
 
     {:halt, push_event(socket, "palette:create-task-result", result)}

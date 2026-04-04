@@ -240,59 +240,6 @@ defmodule EyeInTheSky.Tasks do
   end
 
   @doc """
-  Creates a task from form params (LiveView event data).
-
-  Handles UUID generation, timestamp creation, tag parsing, and tag assignment.
-  Returns `{:ok, task}` or `{:error, changeset}`.
-
-  ## Options
-
-    * `:project_id` - required for project-scoped task creation
-    * `:session_id` - optional, links the task to a session after creation
-
-  """
-  def create_task_from_form(params, opts \\ []) do
-    project_id = opts[:project_id]
-    session_id = opts[:session_id]
-
-    title = params["title"]
-    description = params["description"]
-    state_id = parse_form_int(params["state_id"], 0)
-    priority = parse_form_int(params["priority"], 1)
-    tags_string = params["tags"] || ""
-
-    tag_names =
-      tags_string
-      |> String.split(",")
-      |> Enum.map(&String.trim/1)
-      |> Enum.reject(&(&1 == ""))
-
-    now = DateTime.utc_now()
-
-    attrs = %{
-      uuid: Ecto.UUID.generate(),
-      title: title,
-      description: description,
-      state_id: if(state_id > 0, do: state_id, else: WorkflowState.todo_id()),
-      priority: priority,
-      created_at: now,
-      updated_at: now
-    }
-
-    attrs = if project_id, do: Map.put(attrs, :project_id, project_id), else: attrs
-
-    case create_task(attrs) do
-      {:ok, task} ->
-        if tag_names != [], do: replace_task_tags(task.id, tag_names)
-        if session_id, do: link_session_to_task(task.id, session_id)
-        {:ok, Repo.preload(task, [:state, :tags, :sessions, :checklist_items])}
-
-      error ->
-        error
-    end
-  end
-
-  @doc """
   Quick-creates a task with just a title, state, and project.
   Used by kanban quick-add and similar minimal-input flows.
   """
@@ -309,18 +256,6 @@ defmodule EyeInTheSky.Tasks do
       updated_at: now
     })
   end
-
-  defp parse_form_int(nil, default), do: default
-
-  defp parse_form_int(val, default) when is_binary(val) do
-    case Integer.parse(val) do
-      {int, _} -> int
-      :error -> default
-    end
-  end
-
-  defp parse_form_int(val, _default) when is_integer(val), do: val
-  defp parse_form_int(_, default), do: default
 
   @doc """
   Updates a task.

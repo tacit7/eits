@@ -238,10 +238,13 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
 
   @impl true
   def handle_event("set_bookmark", %{"id" => id, "value" => value}, socket) do
-    bookmarked = value == "true"
-    {:ok, project} = Projects.set_bookmarked(String.to_integer(id), bookmarked)
-    EyeInTheSky.Events.project_updated(project)
-    {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+    with {project_id, ""} <- Integer.parse(id),
+         {:ok, project} <- Projects.set_bookmarked(project_id, value == "true") do
+      EyeInTheSky.Events.project_updated(project)
+      {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+    else
+      _ -> {:noreply, socket}
+    end
   end
 
   @impl true

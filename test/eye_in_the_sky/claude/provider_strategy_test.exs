@@ -79,6 +79,55 @@ defmodule EyeInTheSky.Claude.ProviderStrategyTest do
     end
   end
 
+  describe "Claude.eits_init_prompt/1" do
+    test "includes DM placeholder instead of self-referential session_id" do
+      state = %{
+        eits_session_uuid: "test-uuid-123",
+        session_id: 42,
+        agent_id: 7,
+        project_id: 1
+      }
+
+      prompt = Claude.eits_init_prompt(state)
+
+      # Must NOT contain --to 42 (self-DM bug)
+      refute prompt =~ "dm --to 42"
+      # Must contain generic placeholder
+      assert prompt =~ "dm --to <target_session_uuid_or_id>"
+    end
+
+    test "includes incoming DM protocol instructions" do
+      state = %{
+        eits_session_uuid: "test-uuid-456",
+        session_id: 99,
+        agent_id: 5,
+        project_id: 2
+      }
+
+      prompt = Claude.eits_init_prompt(state)
+
+      assert prompt =~ "Incoming DM Protocol"
+      assert prompt =~ "DM from:"
+      assert prompt =~ "Always respond"
+    end
+
+    test "interpolates session context correctly" do
+      state = %{
+        eits_session_uuid: "abc-def",
+        session_id: 100,
+        agent_id: 50,
+        project_id: 3
+      }
+
+      prompt = Claude.eits_init_prompt(state)
+
+      assert prompt =~ "EITS_SESSION_UUID=abc-def"
+      assert prompt =~ "EITS_SESSION_ID=100"
+      assert prompt =~ "EITS_AGENT_UUID=50"
+      assert prompt =~ "EITS_PROJECT_ID=3"
+    end
+  end
+
   describe "Codex.format_content/1" do
     test "formats Text to OpenAI wire format" do
       block = ContentBlock.new_text("describe this")

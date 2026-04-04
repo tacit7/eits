@@ -247,27 +247,14 @@ defmodule EyeInTheSky.Messages do
           # (session file sync imports messages without usage data; later calls
           # may enrich with usage metadata using the same source_uuid)
           existing = Repo.get_by!(Message, source_uuid: source_uuid)
-
-          if metadata && metadata != %{} do
-            update_message(existing, %{metadata: metadata})
-          else
-            {:ok, existing}
-          end
+          maybe_enrich_metadata(existing, metadata)
 
         is_nil(source_uuid) ->
           # No source_uuid — check for a recent message with same content to avoid
           # duplicating a message already imported from the session file via periodic sync.
           case find_recent_agent_message(session_id, body) do
-            nil ->
-              create_message(attrs)
-
-            existing ->
-              # Enrich existing message with metadata if available
-              if metadata && metadata != %{} do
-                update_message(existing, %{metadata: metadata})
-              else
-                {:ok, existing}
-              end
+            nil -> create_message(attrs)
+            existing -> maybe_enrich_metadata(existing, metadata)
           end
 
         true ->
@@ -493,6 +480,14 @@ defmodule EyeInTheSky.Messages do
   end
 
   # Finds the most recent agent message in the session matching the given body,
+  defp maybe_enrich_metadata(message, metadata) do
+    if metadata && metadata != %{} do
+      update_message(message, %{metadata: metadata})
+    else
+      {:ok, message}
+    end
+  end
+
   # within the last minute. Used to detect duplicates before creating a new record.
   # Unlike find_unlinked_message, this does NOT filter on is_nil(source_uuid) because
   # a concurrent sync may have already stamped the source_uuid on an existing message.

@@ -162,21 +162,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
 
         case Sessions.update_session(session, attrs) do
           {:ok, updated} ->
-            if status do
-              if status in ["completed", "failed", "waiting", "stopped"] do
-                EyeInTheSky.Events.agent_stopped(updated)
-              else
-                EyeInTheSky.Events.agent_working(updated)
-              end
-            end
-
-            EyeInTheSky.Events.session_updated(updated)
-
-            # Sync team member status when session completes/fails
-            if status in ["completed", "failed"] do
-              member_status = if status == "failed", do: "failed", else: "done"
-              EyeInTheSky.Teams.mark_member_done_by_session(updated.id, member_status)
-            end
+            trigger_status_side_effects(updated, status)
 
             json(conn, %{
               id: updated.id,
@@ -423,6 +409,23 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
         {:error, :not_found} ->
           conn |> put_status(:not_found) |> json(%{error: "Session not found"})
       end
+    end
+  end
+
+  defp trigger_status_side_effects(updated, status) do
+    if status do
+      if status in ["completed", "failed", "waiting", "stopped"] do
+        EyeInTheSky.Events.agent_stopped(updated)
+      else
+        EyeInTheSky.Events.agent_working(updated)
+      end
+    end
+
+    EyeInTheSky.Events.session_updated(updated)
+
+    if status in ["completed", "failed"] do
+      member_status = if status == "failed", do: "failed", else: "done"
+      EyeInTheSky.Teams.mark_member_done_by_session(updated.id, member_status)
     end
   end
 

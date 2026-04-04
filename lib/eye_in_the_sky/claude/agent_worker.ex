@@ -715,7 +715,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   defp emit_telemetry(event, measurements, metadata) do
     :telemetry.execute(event, measurements, metadata)
-    Logger.info("[telemetry] #{Enum.join(event, ".")} #{inspect(metadata)}")
+    Logger.info("[telemetry] #{Enum.join(event, ".")} session_id=#{metadata[:session_id]}")
   end
 
 end

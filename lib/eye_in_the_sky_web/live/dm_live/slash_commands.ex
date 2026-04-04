@@ -77,17 +77,18 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
             arg = List.first(rest) |> then(&if(&1 == "", do: nil, else: &1))
 
             case route(cmd, arg) do
-              {:server, cmd_tuple} -> {scmds ++ [cmd_tuple], sopts, texts}
-              {:session, sess_opt} -> {scmds, sopts ++ [sess_opt], texts}
-              :unknown -> {scmds, sopts, texts ++ [line]}
+              {:server, cmd_tuple} -> {[cmd_tuple | scmds], sopts, texts}
+              {:session, sess_opt} -> {scmds, [sess_opt | sopts], texts}
+              :unknown -> {scmds, sopts, [line | texts]}
             end
 
           nil ->
-            {scmds, sopts, texts ++ [line]}
+            {scmds, sopts, [line | texts]}
         end
       end)
 
-    {server_cmds, session_opts, Enum.join(text_lines, "\n")}
+    {Enum.reverse(server_cmds), Enum.reverse(session_opts),
+     text_lines |> Enum.reverse() |> Enum.join("\n")}
   end
 
   # ---------------------------------------------------------------------------

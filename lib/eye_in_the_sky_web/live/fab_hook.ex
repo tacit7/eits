@@ -45,7 +45,7 @@ defmodule EyeInTheSkyWeb.FabHook do
 
   defp handle_fab_event("fab_open_chat", %{"session_id" => session_id}, socket) do
     socket =
-      case resolve_session(session_id) do
+      case Sessions.resolve(session_id) do
         {:ok, session} ->
           socket = switch_active_session(socket, session.id)
 
@@ -79,7 +79,7 @@ defmodule EyeInTheSkyWeb.FabHook do
 
   defp handle_fab_event("config_guide_open_chat", %{"session_id" => session_id}, socket) do
     socket =
-      case resolve_session(session_id) do
+      case Sessions.resolve(session_id) do
         {:ok, session} ->
           socket = unsubscribe_config_guide_session(socket)
           EyeInTheSky.Events.subscribe_session(session.id)
@@ -243,7 +243,7 @@ defmodule EyeInTheSkyWeb.FabHook do
   end
 
   defp send_session_message(session_id, body) do
-    with {:ok, session} <- resolve_session(session_id),
+    with {:ok, session} <- Sessions.resolve(session_id),
          {:ok, _message} <-
            Messages.send_message(%{
              session_id: session.id,
@@ -261,5 +261,4 @@ defmodule EyeInTheSkyWeb.FabHook do
     end
   end
 
-  defp resolve_session(session_id), do: Sessions.resolve(session_id)
 end

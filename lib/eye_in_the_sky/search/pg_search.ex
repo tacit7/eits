@@ -76,7 +76,7 @@ defmodule EyeInTheSky.Search.PgSearch do
         fallback_query
       end
 
-    search(opts ++ [query: query, fallback_query: fallback_query])
+    search(Keyword.merge(opts, query: query, fallback_query: fallback_query))
   end
 
   @doc """

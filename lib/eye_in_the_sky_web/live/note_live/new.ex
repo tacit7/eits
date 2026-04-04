@@ -1,9 +1,10 @@
 defmodule EyeInTheSkyWeb.NoteLive.New do
   use EyeInTheSkyWeb, :live_view
 
+  import EyeInTheSkyWeb.NoteLive.Helpers, only: [safe_return_to: 1]
+
   alias EyeInTheSky.Notes
 
-  @valid_return_paths ["/notes", ~r|^/projects/\d+/notes$|]
   @valid_parent_types ["session", "task", "agent", "project", "system"]
 
   @impl true
@@ -124,15 +125,4 @@ defmodule EyeInTheSkyWeb.NoteLive.New do
     """
   end
 
-  defp safe_return_to(path) when is_binary(path) do
-    if String.starts_with?(path, "/") and
-         Enum.any?(@valid_return_paths, fn
-           p when is_binary(p) -> p == path
-           r -> Regex.match?(r, path)
-         end),
-       do: path,
-       else: "/notes"
-  end
-
-  defp safe_return_to(_), do: "/notes"
 end

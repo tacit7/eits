@@ -2,10 +2,9 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
   use EyeInTheSkyWeb, :live_view
 
   import EyeInTheSkyWeb.ControllerHelpers, only: [normalize_parent_type: 1, parse_int: 1]
+  import EyeInTheSkyWeb.NoteLive.Helpers, only: [safe_return_to: 1]
 
   alias EyeInTheSky.Notes
-
-  @valid_return_paths ["/notes", ~r|^/projects/\d+/notes$|]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -177,18 +176,6 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
     </div>
     """
   end
-
-  defp safe_return_to(path) when is_binary(path) do
-    if String.starts_with?(path, "/") and
-         Enum.any?(@valid_return_paths, fn
-           p when is_binary(p) -> p == path
-           r -> Regex.match?(r, path)
-         end),
-       do: path,
-       else: "/notes"
-  end
-
-  defp safe_return_to(_), do: "/notes"
 
   defp context_suffix(note) do
     case normalize_parent_type(note.parent_type) do

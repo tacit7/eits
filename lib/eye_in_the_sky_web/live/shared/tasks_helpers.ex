@@ -177,8 +177,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
 
     title = params["title"]
     description = params["description"]
-    state_id = parse_int(params["state_id"], 0)
-    priority = parse_int(params["priority"], 1)
+    state_id = parse_form_int(params["state_id"], 0)
+    priority = parse_form_int(params["priority"], 1)
     tags_string = params["tags"] || ""
 
     tag_names =
@@ -278,4 +278,18 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
       {:noreply, socket}
     end
   end
+
+  # Lenient integer parser for form params. Accepts trailing chars ("2 " → 2)
+  # unlike ControllerHelpers.parse_int which requires exact match ("2 " → default).
+  defp parse_form_int(nil, default), do: default
+  defp parse_form_int(val, _default) when is_integer(val), do: val
+
+  defp parse_form_int(val, default) when is_binary(val) do
+    case Integer.parse(val) do
+      {int, _} -> int
+      :error -> default
+    end
+  end
+
+  defp parse_form_int(_, default), do: default
 end

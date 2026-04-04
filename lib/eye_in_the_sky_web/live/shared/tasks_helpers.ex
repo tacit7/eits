@@ -175,12 +175,37 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
     project_id = socket.assigns[:project_id]
     session_id = socket.assigns[:session_id]
 
-    opts =
-      [project_id: project_id, session_id: session_id]
-      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+    title = params["title"]
+    description = params["description"]
+    state_id = parse_form_int(params["state_id"], 0)
+    priority = parse_form_int(params["priority"], 1)
+    tags_string = params["tags"] || ""
 
-    case Tasks.create_task_from_form(params, opts) do
-      {:ok, _task} ->
+    tag_names =
+      tags_string
+      |> String.split(",")
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+
+    now = DateTime.utc_now()
+
+    task_attrs = %{
+      uuid: Ecto.UUID.generate(),
+      title: title,
+      description: description,
+      state_id: if(state_id > 0, do: state_id, else: Tasks.WorkflowState.todo_id()),
+      priority: priority,
+      created_at: now,
+      updated_at: now
+    }
+
+    task_attrs = if project_id, do: Map.put(task_attrs, :project_id, project_id), else: task_attrs
+
+    case Tasks.create_task(task_attrs) do
+      {:ok, task} ->
+        if tag_names != [], do: Tasks.replace_task_tags(task.id, tag_names)
+        if session_id, do: Tasks.link_session_to_task(task.id, session_id)
+
         {:noreply,
          socket
          |> assign(:show_new_task_drawer, false)
@@ -253,4 +278,18 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
       {:noreply, socket}
     end
   end
+
+  # Lenient integer parser for form params. Accepts trailing chars ("2 " → 2)
+  # unlike ControllerHelpers.parse_int which requires exact match ("2 " → default).
+  defp parse_form_int(nil, default), do: default
+  defp parse_form_int(val, _default) when is_integer(val), do: val
+
+  defp parse_form_int(val, default) when is_binary(val) do
+    case Integer.parse(val) do
+      {int, _} -> int
+      :error -> default
+    end
+  end
+
+  defp parse_form_int(_, default), do: default
 end

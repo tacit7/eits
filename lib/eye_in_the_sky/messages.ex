@@ -256,12 +256,12 @@ defmodule EyeInTheSky.Messages do
           # No source_uuid — check for a recent message with same content to avoid
           # duplicating a message already imported from the session file via periodic sync.
           case find_recent_matching_message(session_id, body) do
-            nil -> create_message(attrs)
+            nil -> insert_message(attrs)
             existing -> enrich_metadata_if_present(existing, metadata)
           end
 
         true ->
-          create_message(attrs)
+          insert_message(attrs)
       end
 
     result |> broadcast_and_return()
@@ -481,6 +481,13 @@ defmodule EyeInTheSky.Messages do
   end
 
   defp broadcast_and_return(error), do: error
+
+  # Routes to create_channel_message/1 when channel_id is present, otherwise create_message/1.
+  defp insert_message(attrs) do
+    cid = Map.get(attrs, :channel_id) || Map.get(attrs, "channel_id")
+
+    if cid, do: create_channel_message(attrs), else: create_message(attrs)
+  end
 
   # Enrich an existing message with metadata if metadata is provided and non-empty.
   defp enrich_metadata_if_present(message, metadata) do

@@ -21,29 +21,21 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :agent, :map, required: true
   attr :session_uuid, :string, required: true
   attr :active_tab, :string, required: true
+  attr :active_overlay, :any, default: nil
   attr :messages, :list, default: []
   attr :has_more_messages, :boolean, default: false
   attr :uploads, :map, required: true
+  attr :stream, :map, default: %{show: false, content: "", tool: nil, thinking: nil}
   attr :selected_model, :string, default: "opus"
   attr :selected_effort, :string, default: "medium"
-  attr :show_effort_menu, :boolean, default: false
-  attr :show_model_menu, :boolean, default: false
   attr :processing, :boolean, default: false
   attr :tasks, :list, default: []
   attr :commits, :list, default: []
   attr :diff_cache, :map, default: %{}
   attr :notes, :list, default: []
-  attr :show_live_stream, :boolean, default: true
-  attr :stream_content, :string, default: ""
-  attr :stream_tool, :string, default: nil
-  attr :stream_thinking, :string, default: nil
   attr :session, :map, default: nil
   attr :slash_items, :list, default: []
-  attr :show_new_task_drawer, :boolean, default: false
-  attr :workflow_states, :list, default: []
   attr :current_task, :map, default: nil
-  attr :total_tokens, :integer, default: 0
-  attr :total_cost, :float, default: 0.0
   attr :queued_prompts, :list, default: []
   attr :thinking_enabled, :boolean, default: false
   attr :max_budget_usd, :any, default: nil
@@ -436,10 +428,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             <MessagesTab.messages_tab
               messages={@messages}
               has_more_messages={@has_more_messages}
-              show_live_stream={@show_live_stream}
-              stream_content={@stream_content}
-              stream_tool={@stream_tool}
-              stream_thinking={@stream_thinking}
+              stream={@stream}
               session={@session}
               agent={@agent}
               message_search_query={@message_search_query}
@@ -456,10 +445,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             <MessagesTab.messages_tab
               messages={@messages}
               has_more_messages={@has_more_messages}
-              show_live_stream={@show_live_stream}
-              stream_content={@stream_content}
-              stream_tool={@stream_tool}
-              stream_thinking={@stream_thinking}
+              stream={@stream}
               session={@session}
               agent={@agent}
               message_search_query={@message_search_query}
@@ -480,15 +466,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             uploads={@uploads}
             selected_model={@selected_model}
             selected_effort={@selected_effort}
-            show_effort_menu={@show_effort_menu}
-            show_model_menu={@show_model_menu}
+            active_overlay={@active_overlay}
             processing={@processing}
             slash_items={@slash_items}
             thinking_enabled={@thinking_enabled}
             max_budget_usd={@max_budget_usd}
             provider={@agent.provider}
-            total_tokens={@total_tokens}
-            total_cost={@total_cost}
             context_used={@context_used}
             context_window={@context_window}
             display_name={if @agent_record && is_map(@agent_record.agent_definition) && not match?(%Ecto.Association.NotLoaded{}, @agent_record.agent_definition), do: @agent_record.agent_definition.display_name}

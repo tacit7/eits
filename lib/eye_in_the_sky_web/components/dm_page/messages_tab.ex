@@ -8,10 +8,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   attr :messages, :list, default: []
   attr :has_more_messages, :boolean, default: false
-  attr :show_live_stream, :boolean, default: false
-  attr :stream_content, :string, default: ""
-  attr :stream_tool, :string, default: nil
-  attr :stream_thinking, :string, default: nil
+  attr :stream, :map, default: %{show: false, content: "", tool: nil, thinking: nil}
   attr :session, :map, default: nil
   attr :agent, :map, default: nil
   attr :message_search_query, :string, default: ""
@@ -61,7 +58,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             </div>
 
             <%!-- Live streaming bubble --%>
-            <%= if @show_live_stream && (@stream_content != "" || @stream_tool || @stream_thinking) do %>
+            <%= if @stream.show && (@stream.content != "" || @stream.tool || @stream.thinking) do %>
               <div class="py-3 px-2" id="live-stream-bubble">
                 <div class="flex items-start gap-2.5">
                   <.stream_provider_avatar session={@session} />
@@ -69,19 +66,19 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                     <span class="text-[13px] font-semibold text-primary/80">
                       {stream_provider_label(@session)}
                     </span>
-                    <%= if @stream_thinking do %>
+                    <%= if @stream.thinking do %>
                       <div class="text-xs text-base-content/30 italic font-mono mt-1 line-clamp-3">
-                        {String.slice(@stream_thinking, -200, 200)}
+                        {String.slice(@stream.thinking, -200, 200)}
                       </div>
                     <% end %>
-                    <%= if @stream_tool do %>
+                    <%= if @stream.tool do %>
                       <div class="text-xs text-base-content/40 font-mono mt-1">
-                        Using {@stream_tool}...
+                        Using {@stream.tool}...
                       </div>
                     <% end %>
-                    <%= if @stream_content != "" do %>
+                    <%= if @stream.content != "" do %>
                       <div class="mt-1 text-sm text-base-content/60 whitespace-pre-wrap">
-                        {@stream_content}
+                        {@stream.content}
                       </div>
                     <% end %>
                   </div>

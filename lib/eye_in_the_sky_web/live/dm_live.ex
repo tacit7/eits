@@ -378,29 +378,21 @@ defmodule EyeInTheSkyWeb.DmLive do
         agent_record={@agent}
         session_uuid={@session_uuid}
         active_tab={@active_tab}
+        active_overlay={@active_overlay}
         messages={@messages}
         has_more_messages={@has_more_messages}
         uploads={@uploads}
+        stream={%{show: @show_live_stream, content: @stream_content, tool: @stream_tool, thinking: @stream_thinking}}
         selected_model={@selected_model}
         selected_effort={@selected_effort}
-        show_effort_menu={@active_overlay == :effort_menu}
-        show_model_menu={@active_overlay == :model_menu}
         processing={@processing}
-        show_live_stream={@show_live_stream}
-        stream_content={@stream_content}
-        stream_tool={@stream_tool}
-        stream_thinking={@stream_thinking}
         session={@session}
         tasks={@tasks}
         commits={@commits}
         diff_cache={@diff_cache}
         notes={@notes}
         slash_items={@slash_items}
-        show_new_task_drawer={@active_overlay == :task_drawer}
-        workflow_states={@workflow_states}
         current_task={@current_task}
-        total_tokens={@total_tokens}
-        total_cost={@total_cost}
         queued_prompts={@queued_prompts}
         thinking_enabled={@thinking_enabled}
         max_budget_usd={@max_budget_usd}

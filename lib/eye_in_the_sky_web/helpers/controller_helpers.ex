@@ -53,4 +53,12 @@ defmodule EyeInTheSkyWeb.ControllerHelpers do
         end
     end
   end
+
+  @doc """
+  Conditionally appends a keyword pair to `opts`.
+  Skips the pair when `val` is nil or an empty string.
+  """
+  def maybe_opt(opts, _key, nil), do: opts
+  def maybe_opt(opts, _key, ""), do: opts
+  def maybe_opt(opts, key, val), do: Keyword.put(opts, key, val)
 end

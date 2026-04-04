@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.Api.V1.JobController do
   import EyeInTheSkyWeb.ControllerHelpers
 
   alias EyeInTheSky.ScheduledJobs
+  alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @doc "GET /api/v1/jobs - List all scheduled jobs."
   def index(conn, params) do
@@ -22,14 +23,14 @@ defmodule EyeInTheSkyWeb.Api.V1.JobController do
     json(conn, %{
       success: true,
       count: length(jobs),
-      jobs: Enum.map(jobs, &serialize/1)
+      jobs: Enum.map(jobs, &ApiPresenter.present_job/1)
     })
   end
 
   @doc "GET /api/v1/jobs/:id - Get a single job."
   def show(conn, %{"id" => id}) do
     case ScheduledJobs.get_job(parse_int(id)) do
-      {:ok, job} -> json(conn, serialize(job))
+      {:ok, job} -> json(conn, ApiPresenter.present_job(job))
       {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "Job not found"})
     end
   end
@@ -49,7 +50,7 @@ defmodule EyeInTheSkyWeb.Api.V1.JobController do
 
     case ScheduledJobs.create_job(attrs) do
       {:ok, job} ->
-        conn |> put_status(:created) |> json(serialize(job))
+        conn |> put_status(:created) |> json(ApiPresenter.present_job(job))
 
       {:error, %Ecto.Changeset{} = cs} ->
         conn
@@ -69,7 +70,7 @@ defmodule EyeInTheSkyWeb.Api.V1.JobController do
 
         case ScheduledJobs.update_job(job, attrs) do
           {:ok, updated} ->
-            json(conn, serialize(updated))
+            json(conn, ApiPresenter.present_job(updated))
 
           {:error, cs} ->
             conn |> put_status(:unprocessable_entity) |> json(%{error: translate_errors(cs)})
@@ -109,24 +110,6 @@ defmodule EyeInTheSkyWeb.Api.V1.JobController do
       {:error, reason} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
     end
-  end
-
-  defp serialize(job) do
-    %{
-      id: job.id,
-      name: job.name,
-      description: job.description,
-      job_type: job.job_type,
-      origin: job.origin,
-      schedule_type: job.schedule_type,
-      schedule_value: job.schedule_value,
-      config: ScheduledJobs.decode_config(job),
-      enabled: job.enabled,
-      project_id: job.project_id,
-      last_run_at: job.last_run_at,
-      next_run_at: job.next_run_at,
-      run_count: job.run_count || 0
-    }
   end
 
   defp encode_config(nil), do: "{}"

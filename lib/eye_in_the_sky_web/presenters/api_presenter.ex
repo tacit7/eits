@@ -76,6 +76,47 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
     }
   end
 
+  def present_bookmark(bookmark) do
+    %{
+      id: bookmark.id,
+      bookmark_type: bookmark.bookmark_type,
+      bookmark_id: bookmark.bookmark_id,
+      file_path: bookmark.file_path,
+      line_number: bookmark.line_number,
+      url: bookmark.url,
+      title: bookmark.title,
+      description: bookmark.description,
+      category: bookmark.category,
+      priority: bookmark.priority,
+      position: bookmark.position,
+      project_id: bookmark.project_id,
+      agent_id: bookmark.agent_id,
+      accessed_at: bookmark.accessed_at,
+      inserted_at: bookmark.inserted_at,
+      updated_at: bookmark.updated_at
+    }
+  end
+
+  def present_job(job) do
+    alias EyeInTheSky.ScheduledJobs
+
+    %{
+      id: job.id,
+      name: job.name,
+      description: job.description,
+      job_type: job.job_type,
+      origin: job.origin,
+      schedule_type: job.schedule_type,
+      schedule_value: job.schedule_value,
+      config: ScheduledJobs.decode_config(job),
+      enabled: job.enabled,
+      project_id: job.project_id,
+      last_run_at: job.last_run_at,
+      next_run_at: job.next_run_at,
+      run_count: job.run_count || 0
+    }
+  end
+
   def present_member(m) do
     %{
       id: m.id,

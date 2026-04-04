@@ -130,10 +130,9 @@ defmodule EyeInTheSky.Agents.AgentManager do
   end
 
   defp resolve_project_id(opts) do
-    # Inherit project_id from parent session if not explicitly provided
     opts[:project_id] ||
-      with id when not is_nil(id) <- opts[:parent_session_id],
-           {:ok, parent} <- Sessions.get_session(id) do
+      with parent_id when not is_nil(parent_id) <- opts[:parent_session_id],
+           {:ok, parent} <- Sessions.get_session(parent_id) do
         parent.project_id
       else
         _ -> nil

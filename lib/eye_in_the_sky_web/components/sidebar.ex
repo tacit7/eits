@@ -185,7 +185,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
 
   @impl true
   def handle_event("new_session", %{"project_id" => project_id_str}, socket) do
-    with {project_id, ""} <- Integer.parse(project_id_str),
+    with project_id when not is_nil(project_id) <- parse_int(project_id_str),
          project <- Projects.get_project!(project_id),
          {:ok, %{session: session}} <-
            AgentManager.create_agent(
@@ -251,7 +251,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
   def handle_event("set_bookmark", params, socket) do
     with id when is_binary(id) <- Map.get(params, "id"),
          value when value in ["true", "false"] <- Map.get(params, "bookmarked"),
-         {project_id, ""} <- Integer.parse(id),
+         project_id when not is_nil(project_id) <- parse_int(id),
          {:ok, project} <- Projects.set_bookmarked(project_id, value == "true") do
       EyeInTheSky.Events.project_updated(project)
       {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}

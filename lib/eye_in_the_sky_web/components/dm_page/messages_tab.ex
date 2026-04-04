@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   alias EyeInTheSkyWeb.Components.DmPage.MessageToolWidget
   alias EyeInTheSkyWeb.Components.DmHelpers
+  import EyeInTheSkyWeb.Components.DmHelpers, only: [to_utc_string: 1]
 
   attr :messages, :list, default: []
   attr :has_more_messages, :boolean, default: false
@@ -396,12 +397,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     message.sender_role == "agent" and is_map(message.metadata) and
       not is_nil(message.metadata["total_cost_usd"])
   end
-
-  defp to_utc_string(nil), do: ""
-  defp to_utc_string(ts) when is_binary(ts), do: ts
-  defp to_utc_string(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
-  defp to_utc_string(%NaiveDateTime{} = dt), do: NaiveDateTime.to_iso8601(dt) <> "Z"
-  defp to_utc_string(_), do: ""
 
   defp parse_body_segments(nil), do: [{:text, ""}]
 

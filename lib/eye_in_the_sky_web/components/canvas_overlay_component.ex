@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.Components.CanvasOverlayComponent do
   use EyeInTheSkyWeb, :live_component
 
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+
   alias EyeInTheSkyWeb.Canvases
   alias EyeInTheSky.Events
   alias EyeInTheSkyWeb.Components.ChatWindowComponent
@@ -72,18 +74,16 @@ defmodule EyeInTheSkyWeb.Components.CanvasOverlayComponent do
   def handle_event("toggle", _params, socket), do: {:noreply, toggle_open(socket)}
 
   def handle_event("open", %{"canvas-id" => id_str}, socket) do
-    case Integer.parse(id_str) do
-      {canvas_id, _} ->
-        {:noreply, socket |> assign(:open, true) |> load_canvases() |> activate_canvas(canvas_id)}
-      :error ->
-        {:noreply, socket}
+    case parse_int(id_str) do
+      nil -> {:noreply, socket}
+      canvas_id -> {:noreply, socket |> assign(:open, true) |> load_canvases() |> activate_canvas(canvas_id)}
     end
   end
 
   def handle_event("switch_tab", %{"canvas-id" => id_str}, socket) do
-    case Integer.parse(id_str) do
-      {canvas_id, _} -> {:noreply, activate_canvas(socket, canvas_id)}
-      :error -> {:noreply, socket}
+    case parse_int(id_str) do
+      nil -> {:noreply, socket}
+      canvas_id -> {:noreply, activate_canvas(socket, canvas_id)}
     end
   end
 
@@ -109,18 +109,14 @@ defmodule EyeInTheSkyWeb.Components.CanvasOverlayComponent do
     {:noreply, assign(socket, :creating_canvas, false)}
   end
 
-  # cs_id arrives from JS as a string — must convert to integer
+  # cs_id arrives from JS as a string or integer — parse_int handles both
   def handle_event("window_moved", %{"id" => cs_id, "x" => x, "y" => y}, socket) do
-    with {id, _} <- Integer.parse(to_string(cs_id)) do
-      Canvases.update_window_layout(id, %{pos_x: x, pos_y: y})
-    end
+    if id = parse_int(cs_id), do: Canvases.update_window_layout(id, %{pos_x: x, pos_y: y})
     {:noreply, socket}
   end
 
   def handle_event("window_resized", %{"id" => cs_id, "w" => w, "h" => h}, socket) do
-    with {id, _} <- Integer.parse(to_string(cs_id)) do
-      Canvases.update_window_layout(id, %{width: w, height: h})
-    end
+    if id = parse_int(cs_id), do: Canvases.update_window_layout(id, %{width: w, height: h})
     {:noreply, socket}
   end
 

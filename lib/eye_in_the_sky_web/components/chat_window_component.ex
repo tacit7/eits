@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
   use EyeInTheSkyWeb, :live_component
 
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+
   alias EyeInTheSky.{Messages, Sessions}
   alias EyeInTheSky.Agents.AgentManager
 
@@ -97,7 +99,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
   end
 
   def handle_event("remove_window", %{"cs-id" => cs_id}, socket) do
-    with {id, _} <- Integer.parse(to_string(cs_id)) do
+    if id = parse_int(cs_id) do
       send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,
         id: "canvas-overlay",
         action: :remove_window,
@@ -108,16 +110,12 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
   end
 
   def handle_event("window_moved", %{"id" => cs_id, "x" => x, "y" => y}, socket) do
-    with {id, _} <- Integer.parse(to_string(cs_id)) do
-      EyeInTheSkyWeb.Canvases.update_window_layout(id, %{pos_x: x, pos_y: y})
-    end
+    if id = parse_int(cs_id), do: EyeInTheSkyWeb.Canvases.update_window_layout(id, %{pos_x: x, pos_y: y})
     {:noreply, socket}
   end
 
   def handle_event("window_resized", %{"id" => cs_id, "w" => w, "h" => h}, socket) do
-    with {id, _} <- Integer.parse(to_string(cs_id)) do
-      EyeInTheSkyWeb.Canvases.update_window_layout(id, %{width: w, height: h})
-    end
+    if id = parse_int(cs_id), do: EyeInTheSkyWeb.Canvases.update_window_layout(id, %{width: w, height: h})
     {:noreply, socket}
   end
 

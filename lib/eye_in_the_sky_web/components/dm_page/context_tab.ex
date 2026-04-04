@@ -3,6 +3,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ContextTab do
 
   use EyeInTheSkyWeb, :html
 
+  import EyeInTheSkyWeb.Components.DmHelpers, only: [to_utc_string: 1]
+
   attr :session_context, :map, default: nil
 
   def context_tab(assigns) do
@@ -93,9 +95,4 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ContextTab do
     end
   end
 
-  defp to_utc_string(nil), do: ""
-  defp to_utc_string(ts) when is_binary(ts), do: ts
-  defp to_utc_string(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
-  defp to_utc_string(%NaiveDateTime{} = dt), do: NaiveDateTime.to_iso8601(dt) <> "Z"
-  defp to_utc_string(_), do: ""
 end

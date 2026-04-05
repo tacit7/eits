@@ -5,6 +5,7 @@ defmodule EyeInTheSky.SessionsTest do
 
   alias EyeInTheSky.{Commits, Logs, Messages, Notes, Sessions, Tasks}
   alias EyeInTheSky.Sessions.Queries
+  alias EyeInTheSky.Tasks.WorkflowState
 
   # ---------------------------------------------------------------------------
   # Helpers
@@ -20,7 +21,7 @@ defmodule EyeInTheSky.SessionsTest do
   end
 
   defp in_progress_task(overrides \\ %{}) do
-    state_id = EyeInTheSky.Tasks.WorkflowState.in_progress_id()
+    state_id = WorkflowState.in_progress_id()
     create_task(Map.put(overrides, :state_id, state_id))
   end
 

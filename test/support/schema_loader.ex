@@ -4,6 +4,8 @@ defmodule EyeInTheSky.SchemaLoader do
   This module is kept for backwards compatibility with test_helper.exs.
   """
 
+  alias Ecto.Adapters.SQL
+
   def load_schema! do
     :ok
   end
@@ -13,7 +15,7 @@ defmodule EyeInTheSky.SchemaLoader do
   end
 
   def schema_loaded? do
-    case Ecto.Adapters.SQL.query(
+    case SQL.query(
            EyeInTheSky.Repo,
            "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'sessions'",
            []

@@ -193,6 +193,20 @@ defmodule EyeInTheSkyWeb.Helpers.DateHelpers do
   def format_relative_time(_), do: "-"
 
   @doc """
+  Extract the date portion from a timestamp string (e.g. "2026-01-15 10:30:00" → "2026-01-15").
+  """
+  def format_date(nil), do: "—"
+
+  def format_date(ts) when is_binary(ts) do
+    case String.split(ts, " ") do
+      [date | _] -> date
+      _ -> ts
+    end
+  end
+
+  def format_date(_), do: "—"
+
+  @doc """
   Month abbreviation from cron month field ("1"-"12").
   """
   def month_name("1"), do: "Jan"

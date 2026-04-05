@@ -35,54 +35,11 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
 
   # ── Model helpers ──────────────────────────────────────────────────────────
 
-  @doc """
-  Returns the list of Claude model {value, label} tuples for select inputs.
-  """
-  def claude_models do
-    [
-      {"sonnet", "Sonnet 4.5"},
-      {"opus", "Opus 4.6"},
-      {"sonnet[1m]", "Sonnet 4.5 (1M)"},
-      {"opus[1m]", "Opus 4.6 (1M)"},
-      {"haiku", "Haiku 4.5"}
-    ]
-  end
-
-  @doc """
-  Returns the list of Codex model {value, label} tuples for select inputs.
-  """
-  def codex_models do
-    [
-      {"gpt-5.3-codex", "GPT-5.3 Codex"},
-      {"gpt-5.2-codex", "GPT-5.2 Codex"},
-      {"gpt-5.2", "GPT-5.2"},
-      {"gpt-5.1", "GPT-5.1"},
-      {"gpt-5-codex-mini", "GPT-5 Codex Mini"}
-    ]
-  end
-
-  @doc """
-  Returns {value, label} tuples for the given provider.
-  """
-  def models_for_provider("codex"), do: codex_models()
-  def models_for_provider(_), do: claude_models()
-
-  @doc """
-  Returns a flat list of valid model slugs for the given provider.
-  """
-  def valid_model_slugs(provider) do
-    provider |> models_for_provider() |> Enum.map(&elem(&1, 0))
-  end
-
-  @doc """
-  Returns a map of provider => list of valid model slugs.
-  """
-  def valid_model_combos do
-    %{
-      "claude" => valid_model_slugs("claude"),
-      "codex" => valid_model_slugs("codex")
-    }
-  end
+  defdelegate claude_models(), to: EyeInTheSkyWeb.Helpers.ModelHelpers
+  defdelegate codex_models(), to: EyeInTheSkyWeb.Helpers.ModelHelpers
+  defdelegate models_for_provider(provider), to: EyeInTheSkyWeb.Helpers.ModelHelpers
+  defdelegate valid_model_slugs(provider), to: EyeInTheSkyWeb.Helpers.ModelHelpers
+  defdelegate valid_model_combos(), to: EyeInTheSkyWeb.Helpers.ModelHelpers
 
   # ── Parse helpers ──────────────────────────────────────────────────────────
 
@@ -172,19 +129,7 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
 
   # ── Misc helpers ───────────────────────────────────────────────────────────
 
-  @doc """
-  Extract the date portion from a timestamp string (e.g. "2026-01-15 10:30:00" → "2026-01-15").
-  """
-  def format_date(nil), do: "—"
-
-  def format_date(ts) when is_binary(ts) do
-    case String.split(ts, " ") do
-      [date | _] -> date
-      _ -> ts
-    end
-  end
-
-  def format_date(_), do: "—"
+  defdelegate format_date(v), to: EyeInTheSkyWeb.Helpers.DateHelpers
 
   @doc """
   Return a short display name for a Claude model ID.
@@ -201,23 +146,5 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
     end
   end
 
-  @doc """
-  Open a file with the system's default application (cross-platform).
-  """
-  def open_in_system(path) when is_binary(path) do
-    cmd =
-      case :os.type() do
-        {:unix, :darwin} -> "open"
-        {:unix, _} -> "xdg-open"
-        {:win32, _} -> "cmd"
-      end
-
-    args =
-      case :os.type() do
-        {:win32, _} -> ["/c", "start", "", path]
-        _ -> [path]
-      end
-
-    System.cmd(cmd, args, stderr_to_stdout: true)
-  end
+  defdelegate open_in_system(path), to: EyeInTheSkyWeb.Helpers.SystemHelpers
 end

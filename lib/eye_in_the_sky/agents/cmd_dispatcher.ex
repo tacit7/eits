@@ -54,9 +54,9 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
 
   require Logger
 
-  alias EyeInTheSky.{ChannelMessages, Commits, Notes, Tasks}
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Agents.CmdDispatcher.{DmHandler, Helpers, TaskHandler, TeamsHandler}
+  alias EyeInTheSky.{ChannelMessages, Commits, Notes, Tasks}
   alias EyeInTheSky.Utils.ToolHelpers
 
   import Helpers,

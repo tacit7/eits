@@ -7,10 +7,10 @@ defmodule EyeInTheSky.Agents.AgentManager do
 
   require Logger
 
+  alias EyeInTheSky.{AgentDefinitions, Agents, Sessions}
   alias EyeInTheSky.Agents.{InstructionBuilder, RuntimeContext}
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSky.Git.Worktrees
-  alias EyeInTheSky.{AgentDefinitions, Agents, Sessions}
   alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 

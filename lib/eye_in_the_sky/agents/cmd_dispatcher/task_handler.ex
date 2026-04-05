@@ -17,8 +17,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
 
   require Logger
 
-  alias EyeInTheSky.{Notes, Tasks}
   alias EyeInTheSky.Agents.CmdDispatcher.Helpers
+  alias EyeInTheSky.{Notes, Tasks}
   alias EyeInTheSky.Utils.ToolHelpers
 
   import Helpers, only: [notify_success: 2, notify_error: 3, get_session!: 1, with_task: 4]

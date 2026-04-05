@@ -14,9 +14,9 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
 
   require Logger
 
-  alias EyeInTheSky.{Repo, ScheduledJobs, Tasks}
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Notifications
+  alias EyeInTheSky.{Repo, ScheduledJobs, Tasks}
   alias EyeInTheSky.Workers.SpeakWorker
 
   import Ecto.Query

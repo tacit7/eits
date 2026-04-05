@@ -347,7 +347,6 @@ defmodule EyeInTheSky.Sessions do
     %{tasks: tasks, commits: commits, logs: logs, notes: notes, messages: messages}
   end
 
-
   @doc """
   Extracts and validates model information from a nested model object.
 

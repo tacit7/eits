@@ -33,15 +33,9 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ChannelActions do
              project_id: project_id
            }) do
         {:ok, _} ->
-          channels =
-            case Channels.list_channels() do
-              channels when is_list(channels) -> channels
-              _ -> []
-            end
-
           {:noreply,
            socket
-           |> assign(:channels, channels)
+           |> assign(:channels, fetch_channels())
            |> assign(:new_channel_name, nil)}
 
         {:error, _} ->
@@ -49,6 +43,13 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ChannelActions do
       end
     else
       {:noreply, assign(socket, :new_channel_name, nil)}
+    end
+  end
+
+  defp fetch_channels do
+    case Channels.list_channels() do
+      channels when is_list(channels) -> channels
+      _ -> []
     end
   end
 end

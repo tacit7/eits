@@ -128,19 +128,7 @@ defmodule EyeInTheSkyWeb.Presenters.AgentPresenter do
             {message.sender_role, message.body, message.inserted_at, message.provider}
 
           map when is_map(map) ->
-            role = map[:role] || map["role"]
-            content = map[:content] || map["content"]
-            timestamp = map[:timestamp] || map["timestamp"]
-            provider = map[:provider] || map["provider"] || "claude"
-
-            ui_role =
-              case role do
-                "assistant" -> "agent"
-                "user" -> "user"
-                other -> other
-              end
-
-            {ui_role, content, timestamp, provider}
+            serialize_map_message(map)
         end
 
       %{
@@ -153,6 +141,19 @@ defmodule EyeInTheSkyWeb.Presenters.AgentPresenter do
   end
 
   def serialize_claude_messages(_), do: []
+
+  defp serialize_map_message(map) do
+    role = map[:role] || map["role"]
+    content = map[:content] || map["content"]
+    timestamp = map[:timestamp] || map["timestamp"]
+    provider = map[:provider] || map["provider"] || "claude"
+    ui_role = map_role_to_ui(role)
+    {ui_role, content, timestamp, provider}
+  end
+
+  defp map_role_to_ui("assistant"), do: "agent"
+  defp map_role_to_ui("user"), do: "user"
+  defp map_role_to_ui(other), do: other
 
   @spec group_and_serialize_messages(list(map()) | any) :: list(map())
   def group_and_serialize_messages(messages) when is_list(messages) do

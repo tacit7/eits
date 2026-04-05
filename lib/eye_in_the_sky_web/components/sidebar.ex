@@ -213,7 +213,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
         <%!-- Branding --%>
         <div class="flex items-center gap-2 px-3 py-3 border-b border-base-content/5">
           <.link navigate="/" class="flex items-center gap-2 min-w-0 flex-1">
-            <img src="/images/logo.svg" class="w-7 h-7 flex-shrink-0" />
+            <img src="/images/logo.svg" class="w-7 h-7 flex-shrink-0" alt="Eye in the Sky" />
             <span class={[
               "text-sm font-semibold text-base-content/80 truncate",
               if(@collapsed, do: "hidden")
@@ -333,7 +333,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
       data-section-toggle="overview"
       class={[
         "flex items-center gap-2.5 w-full text-left text-sm transition-colors",
-        if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
+        if(@collapsed, do: "px-4 py-2 justify-center", else: "px-3 py-2"),
         if(overview_active,
           do: "text-base-content/80 hover:bg-base-content/5",
           else: "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5"
@@ -410,7 +410,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
           phx-target="#canvas-overlay"
           class={[
             "flex items-center gap-2 text-sm transition-colors w-full",
-            if(@collapsed, do: "px-4 py-1 justify-center", else: "pl-3 pr-3 py-0.5"),
+            if(@collapsed, do: "px-4 py-2 justify-center", else: "pl-3 pr-3 py-2"),
             "text-base-content/50 hover:text-base-content/75 hover:bg-base-content/5"
           ]}
           title="Canvas"
@@ -435,7 +435,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
       navigate={@href}
       class={[
         "flex items-center gap-2 text-sm transition-colors",
-        if(@collapsed, do: "px-4 py-1 justify-center", else: "pl-3 pr-3 py-0.5"),
+        if(@collapsed, do: "px-4 py-2 justify-center", else: "pl-3 pr-3 py-2"),
         if(@active,
           do: "text-primary bg-primary/5 font-medium",
           else: "text-base-content/50 hover:text-base-content/75 hover:bg-base-content/5"
@@ -460,7 +460,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
       navigate={@href}
       class={[
         "flex items-center gap-2 text-sm transition-colors",
-        if(@collapsed, do: "px-4 py-1 justify-center", else: "pl-3 pr-3 py-0.5"),
+        if(@collapsed, do: "px-4 py-2 justify-center", else: "pl-3 pr-3 py-2"),
         if(@active,
           do: "text-primary bg-primary/5 font-medium",
           else: "text-base-content/50 hover:text-base-content/75 hover:bg-base-content/5"
@@ -485,7 +485,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
     ~H"""
     <div class="flex items-center gap-0.5 rounded-full bg-base-content/5 p-0.5">
       <button
-        class="p-1 rounded-full hover:bg-base-content/10 transition-colors"
+        class="p-2.5 rounded-full hover:bg-base-content/10 transition-colors"
         phx-click={Phoenix.LiveView.JS.dispatch("phx:set-theme")}
         data-phx-theme="system"
         title="System theme"
@@ -493,7 +493,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
         <.icon name="hero-computer-desktop-micro" class="w-3.5 h-3.5 text-base-content/40" />
       </button>
       <button
-        class="p-1 rounded-full hover:bg-base-content/10 transition-colors"
+        class="p-2.5 rounded-full hover:bg-base-content/10 transition-colors"
         phx-click={Phoenix.LiveView.JS.dispatch("phx:set-theme")}
         data-phx-theme="light"
         title="Light theme"
@@ -501,7 +501,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
         <.icon name="hero-sun-micro" class="w-3.5 h-3.5 text-base-content/40" />
       </button>
       <button
-        class="p-1 rounded-full hover:bg-base-content/10 transition-colors"
+        class="p-2.5 rounded-full hover:bg-base-content/10 transition-colors"
         phx-click={Phoenix.LiveView.JS.dispatch("phx:set-theme")}
         data-phx-theme="dark"
         title="Dark theme"

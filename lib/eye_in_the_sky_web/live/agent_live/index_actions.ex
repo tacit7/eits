@@ -7,6 +7,11 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
   handle_info callbacks can reuse it.
   """
 
+  use Phoenix.VerifiedRoutes,
+    endpoint: EyeInTheSkyWeb.Endpoint,
+    router: EyeInTheSkyWeb.Router,
+    statics: EyeInTheSkyWeb.static_paths()
+
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3, push_navigate: 2]
   import EyeInTheSkyWeb.Helpers.ChannelRoutingHelpers
@@ -156,7 +161,7 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
   end
 
   def handle_navigate_dm(%{"id" => id}, socket) do
-    {:noreply, push_navigate(socket, to: "/dm/#{id}")}
+    {:noreply, push_navigate(socket, to: ~p"/dm/#{id}")}
   end
 
   def handle_rename_session(%{"session_id" => session_id}, socket) do
@@ -282,7 +287,7 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
         {:noreply,
          socket
          |> assign(:show_new_session_drawer, false)
-         |> push_navigate(to: "/dm/#{result.session.id}")}
+         |> push_navigate(to: ~p"/dm/#{result.session.id}")}
 
       {:error, reason} ->
         Logger.error("create_new_session: failed - #{inspect(reason)}")

@@ -3,8 +3,8 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
 
   @moduletag :capture_log
 
-  alias EyeInTheSky.AgentWorkerEvents
   alias EyeInTheSky.{Agents, Messages, Sessions}
+  alias EyeInTheSky.AgentWorkerEvents
 
   # --- Helpers ---
 

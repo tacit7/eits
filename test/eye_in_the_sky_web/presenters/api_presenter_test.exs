@@ -65,8 +65,16 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenterTest do
     end
 
     test "handles unloaded Ecto associations" do
-      not_loaded_agent = %Ecto.Association.NotLoaded{__field__: :agent, __owner__: TeamMember, __cardinality__: :one}
-      not_loaded_session = %Ecto.Association.NotLoaded{__field__: :session, __owner__: TeamMember, __cardinality__: :one}
+      not_loaded_agent = %Ecto.Association.NotLoaded{
+        __field__: :agent,
+        __owner__: TeamMember,
+        __cardinality__: :one
+      }
+      not_loaded_session = %Ecto.Association.NotLoaded{
+        __field__: :session,
+        __owner__: TeamMember,
+        __cardinality__: :one
+      }
 
       member = struct(TeamMember,
         id: 3,

@@ -1123,13 +1123,11 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
   end
 
   defp resolve_sdk_port(worker_pid) do
-    try do
-      worker_state = :sys.get_state(worker_pid)
-      sdk_ref = worker_state.sdk_ref
-      if sdk_ref, do: SDK.Registry.lookup(sdk_ref), else: nil
-    catch
-      :exit, _ -> nil
-    end
+    worker_state = :sys.get_state(worker_pid)
+    sdk_ref = worker_state.sdk_ref
+    if sdk_ref, do: SDK.Registry.lookup(sdk_ref), else: nil
+  catch
+    :exit, _ -> nil
   end
 
   # Helper: start a worker with one active job and one queued job, return

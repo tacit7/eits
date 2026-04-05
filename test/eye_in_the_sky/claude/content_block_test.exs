@@ -2,7 +2,7 @@ defmodule EyeInTheSky.Claude.ContentBlockTest do
   use ExUnit.Case, async: true
 
   alias EyeInTheSky.Claude.ContentBlock
-  alias EyeInTheSky.Claude.ContentBlock.{Text, Image, Document}
+  alias EyeInTheSky.Claude.ContentBlock.{Document, Image, Text}
 
   describe "constructors" do
     test "new_text/1 creates a Text block" do

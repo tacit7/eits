@@ -14,7 +14,7 @@ defmodule EyeInTheSky.SDKE2ETest do
 
   use ExUnit.Case, async: false
 
-  alias EyeInTheSky.Claude.{SDK, Message}
+  alias EyeInTheSky.Claude.{Message, SDK}
 
   @moduletag :integration
   @moduletag :sdk_e2e

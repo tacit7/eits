@@ -25,7 +25,7 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
       assert opts[:allowedTools] == "Write"
     end
 
-    test "string \"true\"/\"false\" coerced to booleans" do
+    test ~s(string "true"/"false" coerced to booleans) do
       opts = CLI.normalize_opts(skip_permissions: "true", verbose: "false")
       assert opts[:skip_permissions] == true
       assert opts[:verbose] == false

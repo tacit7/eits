@@ -8,7 +8,18 @@ defmodule EyeInTheSkyWeb.Router do
     plug :fetch_live_flash
     plug :put_root_layout, html: {EyeInTheSkyWeb.Layouts, :root}
     plug :protect_from_forgery
-    plug :put_secure_browser_headers
+
+    plug :put_secure_browser_headers, %{
+      "content-security-policy" =>
+        "default-src 'self'; " <>
+          "script-src 'self' 'unsafe-inline'; " <>
+          "style-src 'self' 'unsafe-inline'; " <>
+          "img-src 'self' data: blob:; " <>
+          "connect-src 'self' ws: wss:; " <>
+          "font-src 'self' data:; " <>
+          "frame-ancestors 'none'; " <>
+          "object-src 'none'"
+    }
   end
 
   pipeline :require_auth do

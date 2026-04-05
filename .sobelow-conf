@@ -1,0 +1,12 @@
+[
+  # Config.HTTPS -- force_ssl is configured in config/runtime.exs (prod block).
+  # Sobelow is a static analyzer and cannot see runtime config.
+  #
+  # Config.CSRF -- WebAuthn endpoints intentionally skip CSRF. Protection comes from:
+  #   - Registration: gated by a short-lived token in the session
+  #   - Login: WebAuthn challenge binding (single-use, origin-bound challenge)
+  ignore: "Config.HTTPS,Config.CSRF",
+
+  # Honor sobelow_skip comments in source (e.g. Misc.BinToTerm in accounts.ex)
+  skip: true
+]

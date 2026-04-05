@@ -155,5 +155,7 @@ defmodule EyeInTheSky.Accounts do
     end)
   end
 
+  # sobelow_skip ["Misc.BinToTerm"] -- [:safe] option prevents atom creation and unsafe deserialization;
+  # data originates from our DB (stored during passkey registration via wax_), not raw user input.
   defp decode_cose_key(bin), do: :erlang.binary_to_term(bin, [:safe])
 end

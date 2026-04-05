@@ -69,4 +69,30 @@ defmodule EyeInTheSky.Claude.Job do
   def as_resume(%__MODULE__{} = job) do
     %{job | context: %{job.context | has_messages: true}}
   end
+
+  @doc """
+  Normalize a raw context value into a well-typed map suitable for job creation.
+
+  Accepts a keyword list, any non-map value (treated as empty), or a map.
+  All three clauses must be kept together.
+  """
+  def normalize_context(context) when is_list(context), do: normalize_context(Map.new(context))
+  def normalize_context(context) when not is_map(context), do: normalize_context(%{})
+
+  def normalize_context(context) do
+    %{
+      model: Map.get(context, :model),
+      effort_level: Map.get(context, :effort_level),
+      has_messages: Map.get(context, :has_messages, false),
+      channel_id: Map.get(context, :channel_id),
+      thinking_budget: Map.get(context, :thinking_budget),
+      max_budget_usd: Map.get(context, :max_budget_usd),
+      agent: Map.get(context, :agent),
+      eits_workflow: Map.get(context, :eits_workflow, "1"),
+      bypass_sandbox: Map.get(context, :bypass_sandbox, false),
+      content_blocks: Map.get(context, :content_blocks, []),
+      message_id: Map.get(context, :message_id),
+      extra_cli_opts: Map.get(context, :extra_cli_opts, [])
+    }
+  end
 end

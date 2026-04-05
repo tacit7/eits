@@ -254,23 +254,6 @@ defmodule EyeInTheSky.Claude.CLI do
     idle_timeout_ms = resolve_idle_timeout(opts)
     project_path = Keyword.fetch!(opts, :project_path)
 
-    handler_pid =
-      spawn_link(fn ->
-        receive do
-          {:port, port} ->
-            EyeInTheSky.CLI.Port.handle_port_output(
-              port,
-              session_ref,
-              caller,
-              "",
-              idle_timeout_ms,
-              telemetry_prefix: [:eits, :cli],
-              log_prefix: "CLI",
-              max_buffer_bytes: @max_buffer_bytes
-            )
-        end
-      end)
-
     env = build_env(opts)
 
     port =
@@ -281,8 +264,12 @@ defmodule EyeInTheSky.Claude.CLI do
     # Pipe multimodal content blocks to stdin before handing port to handler.
     maybe_pipe_content_blocks(port, opts)
 
-    Port.connect(port, handler_pid)
-    send(handler_pid, {:port, port})
+    handler_pid =
+      EyeInTheSky.CLI.Port.spawn_handler(port, session_ref, caller, idle_timeout_ms,
+        telemetry_prefix: [:eits, :cli],
+        log_prefix: "CLI",
+        max_buffer_bytes: @max_buffer_bytes
+      )
 
     {port, handler_pid, session_ref}
   end

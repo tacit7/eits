@@ -206,22 +206,6 @@ defmodule EyeInTheSky.Codex.CLI do
         cmd_string = "codex " <> Enum.join(flags, " ") <> prompt_summary
         Logger.info("[Codex.CLI] Spawning in #{project_path}: #{cmd_string}")
 
-        handler_pid =
-          spawn_link(fn ->
-            receive do
-              {:port, port} ->
-                EyeInTheSky.CLI.Port.handle_port_output(
-                  port,
-                  session_ref,
-                  caller,
-                  "",
-                  idle_timeout_ms,
-                  telemetry_prefix: [:eits, :codex, :cli],
-                  log_prefix: "Codex.CLI"
-                )
-            end
-          end)
-
         env = build_env(opts)
 
         port =
@@ -238,8 +222,11 @@ defmodule EyeInTheSky.Codex.CLI do
             ]
           )
 
-        Port.connect(port, handler_pid)
-        send(handler_pid, {:port, port})
+        _handler_pid =
+          EyeInTheSky.CLI.Port.spawn_handler(port, session_ref, caller, idle_timeout_ms,
+            telemetry_prefix: [:eits, :codex, :cli],
+            log_prefix: "Codex.CLI"
+          )
 
         :telemetry.execute([:eits, :codex, :cli, :spawn], %{system_time: System.system_time()}, %{
           project_path: project_path,

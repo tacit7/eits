@@ -120,9 +120,8 @@ defmodule EyeInTheSky.Claude.CLI do
     with :ok <- validate_prompt(opts[:prompt]),
          :ok <- validate_max_turns(opts[:max_turns]),
          :ok <- validate_permission_mode(opts[:permission_mode]),
-         :ok <- validate_boolean(opts, :skip_permissions),
-         :ok <- validate_boolean(opts, :verbose) do
-      :ok
+         :ok <- validate_boolean(opts, :skip_permissions) do
+      validate_boolean(opts, :verbose)
     end
   end
 

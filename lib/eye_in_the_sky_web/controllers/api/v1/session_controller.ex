@@ -64,50 +64,51 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       source: "hook"
     }
 
-    with {:ok, agent} <- Agents.find_or_create_agent(agent_attrs) do
-      {model_provider, model_name} = Sessions.ModelInfo.parse_model_string(params["model"])
+    case Agents.find_or_create_agent(agent_attrs) do
+      {:ok, agent} ->
+        {model_provider, model_name} = Sessions.ModelInfo.parse_model_string(params["model"])
 
-      session_attrs = %{
-        uuid: session_uuid,
-        agent_id: agent.id,
-        name: params["name"],
-        description: params["description"],
-        status: "working",
-        started_at: DateTime.utc_now(),
-        provider: params["provider"] || "claude",
-        model: params["model"],
-        model_provider: model_provider,
-        model_name: model_name,
-        project_id: project_id,
-        git_worktree_path: params["worktree_path"],
-        entrypoint: params["entrypoint"]
-      }
+        session_attrs = %{
+          uuid: session_uuid,
+          agent_id: agent.id,
+          name: params["name"],
+          description: params["description"],
+          status: "working",
+          started_at: DateTime.utc_now(),
+          provider: params["provider"] || "claude",
+          model: params["model"],
+          model_provider: model_provider,
+          model_name: model_name,
+          project_id: project_id,
+          git_worktree_path: params["worktree_path"],
+          entrypoint: params["entrypoint"]
+        }
 
-      create_fn =
-        if model_name,
-          do: &Sessions.create_session_with_model/1,
-          else: &Sessions.create_session/1
+        create_fn =
+          if model_name,
+            do: &Sessions.create_session_with_model/1,
+            else: &Sessions.create_session/1
 
-      case create_fn.(session_attrs) do
-        {:ok, session} ->
-          EyeInTheSky.Events.session_started(session)
+        case create_fn.(session_attrs) do
+          {:ok, session} ->
+            EyeInTheSky.Events.session_started(session)
 
-          conn
-          |> put_status(:created)
-          |> json(%{
-            id: session.id,
-            uuid: session.uuid,
-            agent_id: agent.id,
-            agent_uuid: agent.uuid,
-            status: session.status
-          })
+            conn
+            |> put_status(:created)
+            |> json(%{
+              id: session.id,
+              uuid: session.uuid,
+              agent_id: agent.id,
+              agent_uuid: agent.uuid,
+              status: session.status
+            })
 
-        {:error, changeset} ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> json(%{error: "Failed to create session", details: translate_errors(changeset)})
-      end
-    else
+          {:error, changeset} ->
+            conn
+            |> put_status(:unprocessable_entity)
+            |> json(%{error: "Failed to create session", details: translate_errors(changeset)})
+        end
+
       {:error, changeset} ->
         conn
         |> put_status(:unprocessable_entity)

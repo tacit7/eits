@@ -69,15 +69,14 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
         _ -> %{}
       end
 
-    cond do
-      job_type == "shell_command" and (config["command"] || "") |> String.trim() == "" ->
-        add_error(changeset, :config, "command is required for shell jobs")
-
-      job_type == "mix_task" and (config["task"] || "") |> String.trim() == "" ->
+    if job_type == "shell_command" and (config["command"] || "") |> String.trim() == "" do
+      add_error(changeset, :config, "command is required for shell jobs")
+    else
+      if job_type == "mix_task" and (config["task"] || "") |> String.trim() == "" do
         add_error(changeset, :config, "task is required for mix jobs")
-
-      true ->
+      else
         changeset
+      end
     end
   end
 end

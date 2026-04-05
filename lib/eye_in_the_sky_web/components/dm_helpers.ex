@@ -209,9 +209,10 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
 
   def tool_widget_meta("Bash", rest) do
     command =
-      with {:ok, %{"command" => cmd}} <- Jason.decode(rest) do
-        cmd
-      else
+      case Jason.decode(rest) do
+        {:ok, %{"command" => cmd}} ->
+          cmd
+
         _ ->
           case Regex.run(~r/^`(.+?)`/s, rest, capture: :all_but_first) do
             [cmd] -> cmd
@@ -223,31 +224,45 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   end
 
   def tool_widget_meta("Read", rest) do
-    path = with {:ok, %{"file_path" => p}} <- Jason.decode(rest), do: p, else: (_ -> rest)
+    path = case Jason.decode(rest) do
+      {:ok, %{"file_path" => p}} -> p
+      _ -> rest
+    end
     {"hero-document-text", "Read", path}
   end
 
   def tool_widget_meta("Write", rest) do
-    path = with {:ok, %{"file_path" => p}} <- Jason.decode(rest), do: p, else: (_ -> rest)
+    path = case Jason.decode(rest) do
+      {:ok, %{"file_path" => p}} -> p
+      _ -> rest
+    end
     {"hero-pencil-square", "Write", path}
   end
 
   def tool_widget_meta("Edit", rest) do
-    path = with {:ok, %{"file_path" => p}} <- Jason.decode(rest), do: p, else: (_ -> rest)
+    path = case Jason.decode(rest) do
+      {:ok, %{"file_path" => p}} -> p
+      _ -> rest
+    end
     {"hero-pencil-square", "Edit", path}
   end
 
   def tool_widget_meta("Glob", rest) do
-    pat = with {:ok, %{"pattern" => p}} <- Jason.decode(rest), do: p, else: (_ -> rest)
+    pat = case Jason.decode(rest) do
+      {:ok, %{"pattern" => p}} -> p
+      _ -> rest
+    end
     {"hero-folder-open", "Glob", pat}
   end
 
   def tool_widget_meta("Task", rest) do
     prompt =
-      with {:ok, %{"prompt" => p}} <- Jason.decode(rest) do
-        String.slice(p, 0..80) <> if(String.length(p) > 81, do: "…", else: "")
-      else
-        _ -> rest
+      case Jason.decode(rest) do
+        {:ok, %{"prompt" => p}} ->
+          String.slice(p, 0..80) <> if(String.length(p) > 81, do: "…", else: "")
+
+        _ ->
+          rest
       end
 
     {"hero-cpu-chip", "Task", prompt}
@@ -273,7 +288,10 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   end
 
   def tool_widget_meta("WebSearch", rest) do
-    query = with {:ok, %{"query" => q}} <- Jason.decode(rest), do: q, else: (_ -> rest)
+    query = case Jason.decode(rest) do
+      {:ok, %{"query" => q}} -> q
+      _ -> rest
+    end
     {"hero-globe-alt", "WebSearch", query}
   end
 

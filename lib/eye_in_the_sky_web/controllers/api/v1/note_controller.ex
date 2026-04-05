@@ -17,13 +17,11 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
     limit = parse_int(params["limit"], 20)
 
     notes =
-      cond do
-        params["session_id"] ->
-          Notes.list_notes_for_session(params["session_id"]) |> Enum.take(limit)
-
-        true ->
-          query = params["q"] || ""
-          Notes.search_notes(query) |> Enum.take(limit)
+      if params["session_id"] do
+        Notes.list_notes_for_session(params["session_id"]) |> Enum.take(limit)
+      else
+        query = params["q"] || ""
+        Notes.search_notes(query) |> Enum.take(limit)
       end
 
     json(conn, %{

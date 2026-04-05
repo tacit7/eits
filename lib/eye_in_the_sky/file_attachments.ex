@@ -54,9 +54,8 @@ defmodule EyeInTheSky.FileAttachments do
   """
   def upload_file(message_id, upload, session_id) do
     with :ok <- validate_upload(upload),
-         {:ok, storage_path} <- save_file(upload),
-         {:ok, attachment} <- create_attachment(message_id, upload, storage_path, session_id) do
-      {:ok, attachment}
+         {:ok, storage_path} <- save_file(upload) do
+      create_attachment(message_id, upload, storage_path, session_id)
     end
   end
 

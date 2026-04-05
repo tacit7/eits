@@ -41,15 +41,15 @@ defmodule EyeInTheSky.Claude.ContentBlock do
   def document?(_), do: false
 
   @doc "Constructs a Text content block."
-  @spec new_text(String.t()) :: %Text{}
+  @spec new_text(String.t()) :: Text.t()
   def new_text(text), do: %Text{text: text}
 
   @doc "Constructs an Image content block."
-  @spec new_image(String.t(), String.t()) :: %Image{}
+  @spec new_image(String.t(), String.t()) :: Image.t()
   def new_image(data, mime_type), do: %Image{data: data, mime_type: mime_type}
 
   @doc "Constructs a Document content block."
-  @spec new_document(String.t(), map()) :: %Document{}
+  @spec new_document(String.t(), map()) :: Document.t()
   def new_document(media_type, data) do
     %Document{source: %{type: "base64", media_type: media_type, data: data}}
   end

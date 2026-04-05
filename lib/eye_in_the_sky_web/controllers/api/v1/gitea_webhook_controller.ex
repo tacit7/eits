@@ -78,13 +78,15 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
   end
 
   def handle(conn, params) do
-    with :ok <- verify_signature(conn) do
-      event = get_req_header(conn, "x-gitea-event") |> List.first()
-      action = params["action"]
-      Logger.debug("Gitea webhook ignored: event=#{event} action=#{action}")
-      json(conn, %{success: true, message: "Ignored"})
-    else
-      {:error, :unauthorized} -> unauthorized(conn)
+    case verify_signature(conn) do
+      :ok ->
+        event = get_req_header(conn, "x-gitea-event") |> List.first()
+        action = params["action"]
+        Logger.debug("Gitea webhook ignored: event=#{event} action=#{action}")
+        json(conn, %{success: true, message: "Ignored"})
+
+      {:error, :unauthorized} ->
+        unauthorized(conn)
     end
   end
 
@@ -184,30 +186,28 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
   defp verify_signature(conn) do
     secret = Application.get_env(:eye_in_the_sky, :gitea_webhook_secret, "")
 
-    cond do
-      secret == "" ->
-        if Application.get_env(:eye_in_the_sky, :allow_unsigned_webhooks, false) do
-          Logger.warning("Gitea webhook: no secret configured, allowing unsigned (dev opt-in)")
-          :ok
-        else
-          Logger.error("Gitea webhook: GITEA_WEBHOOK_SECRET not set — rejecting unsigned request")
+    if secret == "" do
+      if Application.get_env(:eye_in_the_sky, :allow_unsigned_webhooks, false) do
+        Logger.warning("Gitea webhook: no secret configured, allowing unsigned (dev opt-in)")
+        :ok
+      else
+        Logger.error("Gitea webhook: GITEA_WEBHOOK_SECRET not set — rejecting unsigned request")
 
-          {:error, :unauthorized}
-        end
+        {:error, :unauthorized}
+      end
+    else
+      sig_header = get_req_header(conn, "x-gitea-signature") |> List.first()
+      body = conn.assigns[:raw_body] || ""
+      expected = :crypto.mac(:hmac, :sha256, secret, body) |> Base.encode16(case: :lower)
+      # Normalize: strip "sha256=" prefix if present so we compare raw hex to raw hex
+      normalized_sig = (sig_header || "") |> String.replace_prefix("sha256=", "")
 
-      true ->
-        sig_header = get_req_header(conn, "x-gitea-signature") |> List.first()
-        body = conn.assigns[:raw_body] || ""
-        expected = :crypto.mac(:hmac, :sha256, secret, body) |> Base.encode16(case: :lower)
-        # Normalize: strip "sha256=" prefix if present so we compare raw hex to raw hex
-        normalized_sig = (sig_header || "") |> String.replace_prefix("sha256=", "")
-
-        if Plug.Crypto.secure_compare(expected, normalized_sig) do
-          :ok
-        else
-          Logger.warning("Gitea webhook: invalid signature")
-          {:error, :unauthorized}
-        end
+      if Plug.Crypto.secure_compare(expected, normalized_sig) do
+        :ok
+      else
+        Logger.warning("Gitea webhook: invalid signature")
+        {:error, :unauthorized}
+      end
     end
   end
 

@@ -165,47 +165,49 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   # ---------------------------------------------------------------------------
 
   defp dispatch_spawn(args, from_session_id) do
-    with {:ok, instructions} <- extract_flag(args, "--instructions") do
-      session = get_session!(from_session_id)
+    case extract_flag(args, "--instructions") do
+      {:ok, instructions} ->
+        session = get_session!(from_session_id)
 
-      description =
-        case extract_flag(args, "--description") do
-          {:ok, d} -> d
-          _ -> "Spawned by session #{from_session_id}"
+        description =
+          case extract_flag(args, "--description") do
+            {:ok, d} -> d
+            _ -> "Spawned by session #{from_session_id}"
+          end
+
+        opts =
+          [
+            instructions: instructions,
+            description: description,
+            project_id: session && session.project_id,
+            project_path: session && session.git_worktree_path
+          ]
+          |> put_optional_flag(args, "--model", :model)
+          |> put_optional_flag(args, "--worktree", :worktree)
+          |> put_optional_flag(args, "--effort-level", :effort_level)
+          |> put_optional_flag(args, "--team-name", :team_name)
+          |> put_optional_flag(args, "--member-name", :member_name)
+          |> put_optional_flag(args, "--agent", :agent)
+          |> put_optional_flag(args, "--provider", :agent_type)
+
+        opts =
+          if String.contains?(args, "--yolo"),
+            do: Keyword.put(opts, :bypass_sandbox, true),
+            else: opts
+
+        case AgentManager.create_agent(opts) do
+          {:ok, %{agent: agent, session: new_session}} ->
+            notify_success(
+              from_session_id,
+              "spawned agent=#{agent.id} session=#{new_session.id} uuid=#{new_session.uuid}"
+            )
+
+          {:error, reason} ->
+            notify_error(from_session_id, "spawn", reason)
         end
 
-      opts =
-        [
-          instructions: instructions,
-          description: description,
-          project_id: session && session.project_id,
-          project_path: session && session.git_worktree_path
-        ]
-        |> put_optional_flag(args, "--model", :model)
-        |> put_optional_flag(args, "--worktree", :worktree)
-        |> put_optional_flag(args, "--effort-level", :effort_level)
-        |> put_optional_flag(args, "--team-name", :team_name)
-        |> put_optional_flag(args, "--member-name", :member_name)
-        |> put_optional_flag(args, "--agent", :agent)
-        |> put_optional_flag(args, "--provider", :agent_type)
-
-      opts =
-        if String.contains?(args, "--yolo"),
-          do: Keyword.put(opts, :bypass_sandbox, true),
-          else: opts
-
-      case AgentManager.create_agent(opts) do
-        {:ok, %{agent: agent, session: new_session}} ->
-          notify_success(
-            from_session_id,
-            "spawned agent=#{agent.id} session=#{new_session.id} uuid=#{new_session.uuid}"
-          )
-
-        {:error, reason} ->
-          notify_error(from_session_id, "spawn", reason)
-      end
-    else
-      err -> notify_error(from_session_id, "spawn (missing --instructions)", err)
+      err ->
+        notify_error(from_session_id, "spawn (missing --instructions)", err)
     end
   end
 

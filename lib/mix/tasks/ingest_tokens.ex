@@ -23,12 +23,10 @@ defmodule Mix.Tasks.IngestTokens do
         aliases: [f: :force, s: :session]
       )
 
-    cond do
-      opts[:session] ->
-        ingest_single(opts[:session])
-
-      true ->
-        ingest_all(force: opts[:force] || false)
+    if opts[:session] do
+      ingest_single(opts[:session])
+    else
+      ingest_all(force: opts[:force] || false)
     end
   end
 

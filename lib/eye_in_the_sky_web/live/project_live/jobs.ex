@@ -10,7 +10,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Jobs do
       EyeInTheSky.Events.subscribe_scheduled_jobs()
     end
 
-    socket = mount_project(params, socket, sidebar_tab: :jobs, page_title_prefix: "Jobs")
+    socket = mount_project(socket, params, sidebar_tab: :jobs, page_title_prefix: "Jobs")
 
     if is_nil(socket.assigns.project) do
       {:ok, redirect(socket, to: "/projects")}

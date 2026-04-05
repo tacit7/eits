@@ -100,6 +100,8 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
           |> put_status(:unprocessable_entity)
           |> json(%{error: "Failed to update session", details: translate_errors(changeset)})
       end
+    else
+      {:error, :not_found} -> session_not_found(conn)
     end
   end
 
@@ -145,6 +147,8 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
         Sessions.update_session(session, %{last_activity_at: DateTime.utc_now()})
         Sessions.record_tool_event(session, params["type"], params)
         json(conn, %{success: true})
+      else
+        {:error, :not_found} -> session_not_found(conn)
       end
     end
   end
@@ -191,6 +195,8 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
         end
 
       json(conn, ApiPresenter.present_session_detail(session, agent_uuid: agent_uuid, is_spawned: is_spawned))
+    else
+      {:error, :not_found} -> session_not_found(conn)
     end
   end
 
@@ -222,6 +228,8 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
           |> put_status(:unprocessable_entity)
           |> json(%{error: "Failed", details: translate_errors(cs)})
       end
+    else
+      {:error, :not_found} -> session_not_found(conn)
     end
   end
 
@@ -241,6 +249,8 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
             updated_at: to_string(ctx.updated_at)
           })
       end
+    else
+      {:error, :not_found} -> session_not_found(conn)
     end
   end
 
@@ -255,6 +265,8 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     else
       with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
         do_upsert_context(conn, session, context)
+      else
+        {:error, :not_found} -> session_not_found(conn)
       end
     end
   end
@@ -292,5 +304,9 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   defp handle_terminal_status(session, status) do
     member_status = if status == "failed", do: "failed", else: "done"
     EyeInTheSky.Teams.mark_member_done_by_session(session.id, member_status)
+  end
+
+  defp session_not_found(conn) do
+    conn |> put_status(:not_found) |> json(%{error: "Session not found"})
   end
 end

@@ -18,7 +18,7 @@ defmodule EyeInTheSky.Notes do
 
   @doc """
   Batch-loads annotations for a list of tasks and sets :notes and :notes_count on each.
-  Notes are stored with parent_type "task"/"tasks" and parent_id as integer string or UUID.
+  Notes are stored with parent_type "task" and parent_id as integer string or UUID.
   """
   def with_notes_count(tasks) when is_list(tasks) do
     task_int_ids = Enum.map(tasks, &to_string(&1.id))
@@ -27,7 +27,7 @@ defmodule EyeInTheSky.Notes do
 
     notes_by_parent =
       Note
-      |> where([n], n.parent_type in ["task", "tasks"])
+      |> where([n], n.parent_type == "task")
       |> where([n], n.parent_id in ^all_ids)
       |> order_by([n], asc: n.created_at)
       |> Repo.all()
@@ -124,7 +124,6 @@ defmodule EyeInTheSky.Notes do
 
   @doc """
   Returns notes for a specific task.
-  Handles both "task" and "tasks" parent_type for backwards compatibility.
   Matches on both integer ID (as string) and UUID for migration compatibility.
   """
   def list_notes_for_task(task_id) do
@@ -139,7 +138,7 @@ defmodule EyeInTheSky.Notes do
         end
 
       Note
-      |> where([n], n.parent_type in ["task", "tasks"])
+      |> where([n], n.parent_type == "task")
       |> where(^uuid_filter)
       |> order_by([n], desc: n.created_at)
       |> Repo.all()
@@ -351,7 +350,7 @@ defmodule EyeInTheSky.Notes do
   defp note_type_variants("session"), do: ["session", "sessions"]
   defp note_type_variants("agent"), do: ["agent", "agents"]
   defp note_type_variants("project"), do: ["project", "projects"]
-  defp note_type_variants("task"), do: ["task", "tasks"]
+  defp note_type_variants("task"), do: ["task"]
   defp note_type_variants(type), do: [type]
 
   # Builds an Ecto dynamic OR filter across all parent types in scope.

@@ -6,8 +6,8 @@ defmodule EyeInTheSky.Claude.SessionImporter do
   deduplicating against existing DB records, and persisting new ones.
   """
 
-  alias EyeInTheSky.Messages
   alias EyeInTheSky.Claude.SessionReader
+  alias EyeInTheSky.Messages
 
   require Logger
 

@@ -8,12 +8,12 @@ defmodule EyeInTheSky.Sessions.Queries do
 
   import Ecto.Query, warn: false
 
+  alias EyeInTheSky.QueryBuilder
   alias EyeInTheSky.Repo
+  alias EyeInTheSky.Scopes.Archivable
+  alias EyeInTheSky.Search.PgSearch
   alias EyeInTheSky.Sessions.Session
   alias EyeInTheSky.Tasks.WorkflowState
-  alias EyeInTheSky.Scopes.Archivable
-  alias EyeInTheSky.QueryBuilder
-  alias EyeInTheSky.Search.PgSearch
 
   @current_task_title_fragment """
   (SELECT t.title FROM tasks t JOIN task_sessions ts ON ts.task_id = t.id WHERE ts.session_id = ? AND t.state_id = ? AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)

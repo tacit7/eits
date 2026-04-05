@@ -4,8 +4,8 @@ defmodule EyeInTheSky.Channels do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Channels.{Channel, ChannelMember}
+  alias EyeInTheSky.Repo
 
   @doc """
   Returns all channels (no project filter).

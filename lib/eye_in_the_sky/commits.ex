@@ -4,9 +4,9 @@ defmodule EyeInTheSky.Commits do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Commits.Commit
   alias EyeInTheSky.QueryHelpers
+  alias EyeInTheSky.Repo
 
   @doc """
   Returns the list of commits.

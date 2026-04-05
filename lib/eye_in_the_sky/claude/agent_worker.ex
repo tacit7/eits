@@ -10,10 +10,10 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   use GenServer, restart: :transient
   require Logger
 
-  alias EyeInTheSky.AgentWorkerEvents, as: WorkerEvents
   alias EyeInTheSky.Agents.CmdDispatcher
-  alias EyeInTheSky.Claude.{Job, Message, ProviderStrategy, StreamAssembler}
+  alias EyeInTheSky.AgentWorkerEvents, as: WorkerEvents
   alias EyeInTheSky.Claude.AgentWorker.{ErrorClassifier, ProcessCleanup, RetryPolicy}
+  alias EyeInTheSky.Claude.{Job, Message, ProviderStrategy, StreamAssembler}
   alias EyeInTheSky.Claude.StreamAssemblerProtocol
   alias EyeInTheSky.Codex.StreamAssembler, as: CodexStreamAssembler
   alias EyeInTheSky.Messages

@@ -1,9 +1,9 @@
 defmodule EyeInTheSky.ScheduledJobs do
   import Ecto.Query, warn: false
 
-  alias EyeInTheSky.Repo
-  alias EyeInTheSky.ScheduledJobs.{ScheduledJob, JobRun}
   alias Crontab.CronExpression.Parser
+  alias EyeInTheSky.Repo
+  alias EyeInTheSky.ScheduledJobs.{JobRun, ScheduledJob}
 
   def list_jobs do
     from(j in ScheduledJob,

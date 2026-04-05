@@ -6,12 +6,12 @@ defmodule EyeInTheSky.Tasks do
   use EyeInTheSky.CrudHelpers, schema: EyeInTheSky.Tasks.Task
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
-  alias EyeInTheSky.Tasks.{Task, WorkflowState}
-  alias EyeInTheSky.QueryHelpers
-  alias EyeInTheSky.QueryBuilder
-  alias EyeInTheSky.Search.PgSearch
   alias EyeInTheSky.Notes
+  alias EyeInTheSky.QueryBuilder
+  alias EyeInTheSky.QueryHelpers
+  alias EyeInTheSky.Repo
+  alias EyeInTheSky.Search.PgSearch
+  alias EyeInTheSky.Tasks.{Task, WorkflowState}
   alias EyeInTheSky.Utils.ToolHelpers
 
   # Workflow state ID accessors — source of truth is WorkflowState

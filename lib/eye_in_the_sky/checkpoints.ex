@@ -6,9 +6,9 @@ defmodule EyeInTheSky.Checkpoints do
   import Ecto.Query, warn: false
   require Logger
 
-  alias EyeInTheSky.Repo
+  alias EyeInTheSky.{Agents, Messages, Sessions}
   alias EyeInTheSky.Checkpoints.Checkpoint
-  alias EyeInTheSky.{Messages, Sessions, Agents}
+  alias EyeInTheSky.Repo
 
   @doc """
   Lists all checkpoints for a session, ordered oldest first.

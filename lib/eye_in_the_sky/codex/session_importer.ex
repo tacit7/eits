@@ -6,8 +6,8 @@ defmodule EyeInTheSky.Codex.SessionImporter do
   to parse the different file format Codex uses.
   """
 
-  alias EyeInTheSky.Messages
   alias EyeInTheSky.Codex.SessionReader
+  alias EyeInTheSky.Messages
 
   require Logger
 

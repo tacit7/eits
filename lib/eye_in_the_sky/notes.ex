@@ -4,8 +4,8 @@ defmodule EyeInTheSky.Notes do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Notes.Note
+  alias EyeInTheSky.Repo
   alias EyeInTheSky.Search.PgSearch
   alias EyeInTheSky.Sessions
 

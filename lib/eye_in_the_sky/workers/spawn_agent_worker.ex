@@ -3,8 +3,8 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
 
   require Logger
 
-  alias EyeInTheSky.ScheduledJobs
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.ScheduledJobs
   alias EyeInTheSky.Utils.ToolHelpers
 
   @impl Oban.Worker

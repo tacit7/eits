@@ -15,8 +15,8 @@ defmodule EyeInTheSky.AgentDefinitions do
 
   import Ecto.Query, warn: false
 
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.AgentDefinitions.AgentDefinition
+  alias EyeInTheSky.Repo
 
   @global_agents_dir Path.expand("~/.claude/agents")
 

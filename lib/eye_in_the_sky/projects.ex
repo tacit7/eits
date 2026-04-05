@@ -8,9 +8,9 @@ defmodule EyeInTheSky.Projects do
   require Logger
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Projects.Project
   alias EyeInTheSky.QueryBuilder
+  alias EyeInTheSky.Repo
 
   @doc """
   Returns the list of projects.

@@ -5,7 +5,7 @@ defmodule EyeInTheSky.Claude.SDKExamples do
   These examples show how to use the SDK in different scenarios.
   """
 
-  alias EyeInTheSky.Claude.{SDK, Message}
+  alias EyeInTheSky.Claude.{Message, SDK}
 
   @doc """
   Simple one-shot request with streaming output.

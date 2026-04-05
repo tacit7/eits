@@ -4,8 +4,8 @@ defmodule EyeInTheSky.Bookmarks do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Bookmarks.Bookmark
+  alias EyeInTheSky.Repo
 
   @doc """
   Returns the list of bookmarks with optional filters.

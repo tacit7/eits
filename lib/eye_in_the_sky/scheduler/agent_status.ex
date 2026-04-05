@@ -15,8 +15,8 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
   import Ecto.Query
 
   alias EyeInTheSky.{Agents, Repo, Sessions}
-  alias Agents.Agent
-  alias Sessions.Session
+  alias EyeInTheSky.Agents.Agent
+  alias EyeInTheSky.Sessions.Session
 
   # 5 minutes in milliseconds
   @interval 5 * 60 * 1000

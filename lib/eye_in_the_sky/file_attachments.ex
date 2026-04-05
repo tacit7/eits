@@ -4,8 +4,8 @@ defmodule EyeInTheSky.FileAttachments do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Messages.FileAttachment
+  alias EyeInTheSky.Repo
 
   @upload_dir "priv/static/uploads/attachments"
   # 50MB in bytes

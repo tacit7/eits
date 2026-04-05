@@ -7,9 +7,9 @@ defmodule EyeInTheSky.Notifications do
   """
 
   import Ecto.Query
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Notifications.Notification
   alias EyeInTheSky.PushSubscriptions
+  alias EyeInTheSky.Repo
 
   @doc """
   Create a notification and broadcast it via PubSub.

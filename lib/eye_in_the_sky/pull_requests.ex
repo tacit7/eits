@@ -1,7 +1,7 @@
 defmodule EyeInTheSky.PullRequests do
   import Ecto.Query
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.PullRequests.PullRequest
+  alias EyeInTheSky.Repo
 
   @doc """
   List all pull requests for a session.

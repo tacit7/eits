@@ -4,10 +4,10 @@ defmodule EyeInTheSky.Messages do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
-  alias EyeInTheSky.Messages.Message
   alias EyeInTheSky.Messages.JsonlStorage
+  alias EyeInTheSky.Messages.Message
   alias EyeInTheSky.QueryHelpers
+  alias EyeInTheSky.Repo
   require Logger
 
   @doc """

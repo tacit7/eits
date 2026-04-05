@@ -12,12 +12,12 @@ defmodule EyeInTheSky.Sessions do
   require Logger
 
   alias EyeInTheSky.Repo
-  alias EyeInTheSky.Utils.ToolHelpers
-  alias EyeInTheSky.Sessions.Session
-  alias EyeInTheSky.Sessions.ModelInfo
-  alias EyeInTheSky.Tasks.WorkflowState
   alias EyeInTheSky.Scopes.Archivable
+  alias EyeInTheSky.Sessions.ModelInfo
   alias EyeInTheSky.Sessions.Queries
+  alias EyeInTheSky.Sessions.Session
+  alias EyeInTheSky.Tasks.WorkflowState
+  alias EyeInTheSky.Utils.ToolHelpers
 
   @doc """
   Returns the list of sessions, excluding archived by default.
@@ -285,7 +285,7 @@ defmodule EyeInTheSky.Sessions do
 
   """
   def load_session_data(session_id, opts \\ []) do
-    alias EyeInTheSky.{Tasks, Commits, Logs, Contexts, Notes}
+    alias EyeInTheSky.{Commits, Contexts, Logs, Notes, Tasks}
 
     %{
       tasks:
@@ -317,7 +317,7 @@ defmodule EyeInTheSky.Sessions do
   Gets counts for all tabs (cheap aggregate queries).
   """
   def get_session_counts(session_id) do
-    alias EyeInTheSky.{Commits, Logs, Notes, Messages}
+    alias EyeInTheSky.{Commits, Logs, Messages, Notes}
 
     tasks =
       from(ts in "task_sessions", where: ts.session_id == ^session_id, select: count())

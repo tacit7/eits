@@ -4,8 +4,8 @@ defmodule EyeInTheSky.ChannelMessages do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Messages.Message
+  alias EyeInTheSky.Repo
 
   @doc """
   Returns the list of messages for a specific channel.

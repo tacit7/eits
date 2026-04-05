@@ -8,8 +8,8 @@ defmodule EyeInTheSky.Agents do
   use EyeInTheSky.CrudHelpers, schema: EyeInTheSky.Agents.Agent
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Agents.Agent
+  alias EyeInTheSky.Repo
 
   @doc """
   Returns the list of agents.

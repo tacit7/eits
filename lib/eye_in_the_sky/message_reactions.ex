@@ -4,8 +4,8 @@ defmodule EyeInTheSky.MessageReactions do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Messages.MessageReaction
+  alias EyeInTheSky.Repo
 
   @doc """
   Adds a reaction to a message.

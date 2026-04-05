@@ -4,9 +4,9 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
   into the session_metrics table. All DB writes use raw SQL via Repo.query!/2.
   """
 
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Claude.SessionReader
   alias EyeInTheSky.Metrics.TokenParser
+  alias EyeInTheSky.Repo
   alias EyeInTheSky.Settings
 
   @doc """

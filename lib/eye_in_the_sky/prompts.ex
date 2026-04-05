@@ -4,8 +4,8 @@ defmodule EyeInTheSky.Prompts do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Prompts.Prompt
+  alias EyeInTheSky.Repo
   alias EyeInTheSky.Search.PgSearch
   alias EyeInTheSky.Utils.ToolHelpers
 

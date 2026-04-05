@@ -11,7 +11,7 @@ defmodule EyeInTheSky.Workers.DailyDigestWorker do
 
   import Ecto.Query, warn: false
 
-  alias EyeInTheSky.{Repo, ScheduledJobs, Notes, Notifications, Tasks}
+  alias EyeInTheSky.{Notes, Notifications, Repo, ScheduledJobs, Tasks}
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"job_id" => job_id}}) do

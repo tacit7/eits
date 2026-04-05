@@ -4,9 +4,9 @@ defmodule EyeInTheSky.Contexts do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
-  alias EyeInTheSky.Contexts.{SessionContext, AgentContext}
+  alias EyeInTheSky.Contexts.{AgentContext, SessionContext}
   alias EyeInTheSky.QueryHelpers
+  alias EyeInTheSky.Repo
 
   # SessionContext functions
 

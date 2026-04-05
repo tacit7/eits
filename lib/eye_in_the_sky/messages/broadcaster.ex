@@ -18,8 +18,8 @@ defmodule EyeInTheSky.Messages.Broadcaster do
 
   use GenServer
   require Logger
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Messages.Message
+  alias EyeInTheSky.Repo
   import Ecto.Query
 
   @poll_interval 2_000

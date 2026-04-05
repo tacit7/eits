@@ -1,8 +1,8 @@
 defmodule EyeInTheSky.Accounts do
   import Ecto.Query
 
+  alias EyeInTheSky.Accounts.{Passkey, RegistrationToken, User, UserSession}
   alias EyeInTheSky.Repo
-  alias EyeInTheSky.Accounts.{User, Passkey, RegistrationToken, UserSession}
 
   # --- Users ---
 

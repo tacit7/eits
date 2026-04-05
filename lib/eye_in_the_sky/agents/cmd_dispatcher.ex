@@ -129,16 +129,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
     case String.split(rest, " ", parts: 2) do
       [id_str, body] ->
         case ToolHelpers.parse_int(String.trim(id_str)) do
-          nil ->
-            notify_error(from_session_id, "note task", {:invalid_id, id_str})
-
-          id ->
-            if Tasks.task_linked_to_session?(id, from_session_id) do
-              Notes.create_note(%{body: body, parent_id: id, parent_type: "task"})
-              notify_success(from_session_id, "note added to task #{id}")
-            else
-              notify_error(from_session_id, "note task", {:not_linked, id})
-            end
+          nil -> notify_error(from_session_id, "note task", {:invalid_id, id_str})
+          id -> do_add_task_note(id, body, from_session_id)
         end
 
       _ ->
@@ -238,13 +230,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
             sender_role: "agent"
           }
 
-          case ChannelMessages.send_channel_message(attrs) do
-            {:ok, msg} ->
-              notify_success(from_session_id, "channel #{channel_id} message sent (id=#{msg.id})")
-
-            {:error, reason} ->
-              notify_error(from_session_id, "channel send", reason)
-          end
+          do_send_channel_message(attrs, channel_id, from_session_id)
         else
           _ -> notify_error(from_session_id, "channel send", :invalid_channel_id_or_missing_body)
         end
@@ -257,4 +243,22 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   defp dispatch_channel(unknown, from_session_id),
     do: notify_error(from_session_id, "channel", {:unknown_subcommand, unknown})
 
+  defp do_add_task_note(id, body, from_session_id) do
+    if Tasks.task_linked_to_session?(id, from_session_id) do
+      Notes.create_note(%{body: body, parent_id: id, parent_type: "task"})
+      notify_success(from_session_id, "note added to task #{id}")
+    else
+      notify_error(from_session_id, "note task", {:not_linked, id})
+    end
+  end
+
+  defp do_send_channel_message(attrs, channel_id, from_session_id) do
+    case ChannelMessages.send_channel_message(attrs) do
+      {:ok, msg} ->
+        notify_success(from_session_id, "channel #{channel_id} message sent (id=#{msg.id})")
+
+      {:error, reason} ->
+        notify_error(from_session_id, "channel send", reason)
+    end
+  end
 end

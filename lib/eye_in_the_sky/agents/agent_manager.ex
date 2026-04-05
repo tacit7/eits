@@ -48,42 +48,52 @@ defmodule EyeInTheSky.Agents.AgentManager do
         {:ok, admission} ->
           # Only mark "running" when the SDK actually started. :retry_queued means
           # the spawn failed and was queued for retry — agent stays "pending".
-          status = if admission == :started, do: "running", else: "pending"
+          status = admission_to_status(admission)
 
           Logger.info(
             "✅ create_agent: admission=#{admission} for session.id=#{session.id}, setting status=#{status}"
           )
 
-          case Agents.update_agent(agent, %{status: status}) do
-            {:ok, updated_agent} ->
-              {:ok, %{agent: updated_agent, session: session}}
-
-            {:error, reason} ->
-              Logger.warning(
-                "create_agent: agent status update to '#{status}' failed for agent.id=#{agent.id} - #{inspect(reason)}"
-              )
-
-              # Non-fatal: dispatch succeeded, return original agent
-              {:ok, %{agent: agent, session: session}}
-          end
+          update_agent_after_send(agent, session, status)
 
         {:error, reason} ->
           Logger.error(
             "❌ create_agent: initial message failed for session.id=#{session.id} - #{inspect(reason)}"
           )
 
-          case Agents.update_agent(agent, %{status: "failed"}) do
-            {:ok, _} ->
-              :ok
-
-            {:error, update_err} ->
-              Logger.warning(
-                "create_agent: agent status update to 'failed' failed for agent.id=#{agent.id} - #{inspect(update_err)}"
-              )
-          end
-
+          mark_agent_failed(agent)
           {:error, {:send_failed, reason}}
       end
+    end
+  end
+
+  defp admission_to_status(:started), do: "running"
+  defp admission_to_status(_), do: "pending"
+
+  defp update_agent_after_send(agent, session, status) do
+    case Agents.update_agent(agent, %{status: status}) do
+      {:ok, updated_agent} ->
+        {:ok, %{agent: updated_agent, session: session}}
+
+      {:error, reason} ->
+        Logger.warning(
+          "create_agent: agent status update to '#{status}' failed for agent.id=#{agent.id} - #{inspect(reason)}"
+        )
+
+        # Non-fatal: dispatch succeeded, return original agent
+        {:ok, %{agent: agent, session: session}}
+    end
+  end
+
+  defp mark_agent_failed(agent) do
+    case Agents.update_agent(agent, %{status: "failed"}) do
+      {:ok, _} ->
+        :ok
+
+      {:error, update_err} ->
+        Logger.warning(
+          "create_agent: agent status update to 'failed' failed for agent.id=#{agent.id} - #{inspect(update_err)}"
+        )
     end
   end
 

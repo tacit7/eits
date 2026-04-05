@@ -84,18 +84,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
     id_str = String.trim(id_str)
 
     case ToolHelpers.parse_int(id_str) do
-      nil ->
-        notify_error(from_session_id, "task done", {:invalid_id, id_str})
-
-      id ->
-        if Tasks.task_linked_to_session?(id, from_session_id) do
-          with_task(id_str, from_session_id, "task done", fn id, task ->
-            Tasks.update_task_state(task, 3)
-            notify_success(from_session_id, "task #{id} -> done")
-          end)
-        else
-          notify_error(from_session_id, "task done", {:not_linked, id})
-        end
+      nil -> notify_error(from_session_id, "task done", {:invalid_id, id_str})
+      id -> do_task_done(id_str, id, from_session_id)
     end
   end
 
@@ -103,18 +93,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
     id_str = String.trim(id_str)
 
     case ToolHelpers.parse_int(id_str) do
-      nil ->
-        notify_error(from_session_id, "task delete", {:invalid_id, id_str})
-
-      id ->
-        if Tasks.task_linked_to_session?(id, from_session_id) do
-          with_task(id_str, from_session_id, "task delete", fn _id, task ->
-            Tasks.delete_task(task)
-            notify_success(from_session_id, "task #{id} deleted")
-          end)
-        else
-          notify_error(from_session_id, "task delete", {:not_linked, id})
-        end
+      nil -> notify_error(from_session_id, "task delete", {:invalid_id, id_str})
+      id -> do_task_delete(id_str, id, from_session_id)
     end
   end
 
@@ -122,22 +102,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
     case String.split(rest, " ", parts: 2) do
       [id_str, body] ->
         case id_str |> String.trim() |> ToolHelpers.parse_int() do
-          nil ->
-            notify_error(from_session_id, "task annotate", {:invalid_id, id_str})
-
-          id ->
-            if Tasks.task_linked_to_session?(id, from_session_id) do
-              Notes.create_note(%{
-                title: "Agent annotation",
-                body: body,
-                parent_id: id,
-                parent_type: "task"
-              })
-
-              notify_success(from_session_id, "task #{id} annotated")
-            else
-              notify_error(from_session_id, "task annotate", {:not_linked, id})
-            end
+          nil -> notify_error(from_session_id, "task annotate", {:invalid_id, id_str})
+          id -> do_annotate_task(id, body, from_session_id)
         end
 
       _ ->
@@ -181,4 +147,41 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
 
   def dispatch(unknown, from_session_id),
     do: notify_error(from_session_id, "task", {:unknown_subcommand, unknown})
+
+  defp do_task_done(id_str, id, from_session_id) do
+    if Tasks.task_linked_to_session?(id, from_session_id) do
+      with_task(id_str, from_session_id, "task done", fn id, task ->
+        Tasks.update_task_state(task, 3)
+        notify_success(from_session_id, "task #{id} -> done")
+      end)
+    else
+      notify_error(from_session_id, "task done", {:not_linked, id})
+    end
+  end
+
+  defp do_task_delete(id_str, id, from_session_id) do
+    if Tasks.task_linked_to_session?(id, from_session_id) do
+      with_task(id_str, from_session_id, "task delete", fn _id, task ->
+        Tasks.delete_task(task)
+        notify_success(from_session_id, "task #{id} deleted")
+      end)
+    else
+      notify_error(from_session_id, "task delete", {:not_linked, id})
+    end
+  end
+
+  defp do_annotate_task(id, body, from_session_id) do
+    if Tasks.task_linked_to_session?(id, from_session_id) do
+      Notes.create_note(%{
+        title: "Agent annotation",
+        body: body,
+        parent_id: id,
+        parent_type: "task"
+      })
+
+      notify_success(from_session_id, "task #{id} annotated")
+    else
+      notify_error(from_session_id, "task annotate", {:not_linked, id})
+    end
+  end
 end

@@ -33,12 +33,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
         with team_id when not is_nil(team_id) <- team_id_str |> String.trim() |> ToolHelpers.parse_int(),
              {:ok, name} <- extract_flag(args, "--name") do
           session = get_session!(from_session_id)
-
-          role =
-            case extract_flag(args, "--role") do
-              {:ok, r} -> r
-              _ -> "member"
-            end
+          role = extract_role(args)
 
           attrs = %{
             team_id: team_id,
@@ -48,16 +43,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
             agent_id: session && session.agent_id
           }
 
-          case Teams.join_team(attrs) do
-            {:ok, member} ->
-              notify_success(
-                from_session_id,
-                "joined team #{team_id} as #{member.name} (member_id=#{member.id})"
-              )
-
-            {:error, reason} ->
-              notify_error(from_session_id, "teams join", reason)
-          end
+          do_join_team(attrs, team_id, from_session_id)
         else
           _ -> notify_error(from_session_id, "teams join", :invalid_team_id_or_missing_name)
         end
@@ -71,18 +57,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
     case String.split(rest, " ", parts: 2) do
       [_team_id_str, member_id_str] ->
         case member_id_str |> String.trim() |> ToolHelpers.parse_int() do
-          nil ->
-            notify_error(from_session_id, "teams leave", {:invalid_member_id, member_id_str})
-
-          member_id ->
-            case Teams.get_member(member_id) do
-              nil ->
-                notify_error(from_session_id, "teams leave", {:member_not_found, member_id})
-
-              member ->
-                Teams.leave_team(member)
-                notify_success(from_session_id, "member #{member_id} left team")
-            end
+          nil -> notify_error(from_session_id, "teams leave", {:invalid_member_id, member_id_str})
+          member_id -> leave_member(member_id, from_session_id)
         end
 
       _ ->
@@ -102,14 +78,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
 
         with member_id when not is_nil(member_id) <- member_id_str |> String.trim() |> ToolHelpers.parse_int(),
              {:ok, status} <- extract_flag(args, "--status") do
-          case Teams.get_member(member_id) do
-            nil ->
-              notify_error(from_session_id, "teams update-member", {:member_not_found, member_id})
-
-            member ->
-              Teams.update_member_status(member, status)
-              notify_success(from_session_id, "team member #{member_id} status -> #{status}")
-          end
+          do_update_member(member_id, status, from_session_id)
         else
           _ ->
             notify_error(
@@ -143,11 +112,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
         sender_name = from_session.name || "session:#{from_session.uuid}"
         dm_body = "[team broadcast] from #{sender_name}: #{message}"
 
-        Enum.each(members, fn member ->
-          Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
-            AgentManager.send_message(member.session_id, dm_body)
-          end)
-        end)
+        Enum.each(members, &broadcast_to_member(&1, dm_body))
 
         notify_success(from_session_id, "team broadcast sent to #{length(members)} members")
 
@@ -158,4 +123,52 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
 
   def dispatch_team(unknown, from_session_id),
     do: notify_error(from_session_id, "team", {:unknown_subcommand, unknown})
+
+  defp extract_role(args) do
+    case extract_flag(args, "--role") do
+      {:ok, r} -> r
+      _ -> "member"
+    end
+  end
+
+  defp do_join_team(attrs, team_id, from_session_id) do
+    case Teams.join_team(attrs) do
+      {:ok, member} ->
+        notify_success(
+          from_session_id,
+          "joined team #{team_id} as #{member.name} (member_id=#{member.id})"
+        )
+
+      {:error, reason} ->
+        notify_error(from_session_id, "teams join", reason)
+    end
+  end
+
+  defp leave_member(member_id, from_session_id) do
+    case Teams.get_member(member_id) do
+      nil ->
+        notify_error(from_session_id, "teams leave", {:member_not_found, member_id})
+
+      member ->
+        Teams.leave_team(member)
+        notify_success(from_session_id, "member #{member_id} left team")
+    end
+  end
+
+  defp do_update_member(member_id, status, from_session_id) do
+    case Teams.get_member(member_id) do
+      nil ->
+        notify_error(from_session_id, "teams update-member", {:member_not_found, member_id})
+
+      member ->
+        Teams.update_member_status(member, status)
+        notify_success(from_session_id, "team member #{member_id} status -> #{status}")
+    end
+  end
+
+  defp broadcast_to_member(member, dm_body) do
+    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+      AgentManager.send_message(member.session_id, dm_body)
+    end)
+  end
 end

@@ -52,16 +52,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.DmHandler do
          {:ok, message} <- extract_flag(args, "--message") do
       case Sessions.get_session(from_session_id) do
         {:ok, from_session} ->
-          case Sessions.resolve(to_ref) do
-            {:ok, to_session} ->
-              send_dm(from_session, to_session, message, from_session_id)
-
-            {:error, :not_found} ->
-              notify_error(from_session_id, "dm", {:target_session_not_found, to_ref})
-
-            err ->
-              notify_error(from_session_id, "dm", err)
-          end
+          resolve_and_send_dm(from_session, to_ref, message, from_session_id)
 
         {:error, :not_found} ->
           notify_error(from_session_id, "dm", {:sender_session_not_found, from_session_id})
@@ -71,6 +62,19 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.DmHandler do
       end
     else
       err -> notify_error(from_session_id, "dm", err)
+    end
+  end
+
+  defp resolve_and_send_dm(from_session, to_ref, message, from_session_id) do
+    case Sessions.resolve(to_ref) do
+      {:ok, to_session} ->
+        send_dm(from_session, to_session, message, from_session_id)
+
+      {:error, :not_found} ->
+        notify_error(from_session_id, "dm", {:target_session_not_found, to_ref})
+
+      err ->
+        notify_error(from_session_id, "dm", err)
     end
   end
 

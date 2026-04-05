@@ -104,25 +104,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
       if String.trim(text) in ["", "[NO_RESPONSE]"] do
         Logger.info("[#{session_id}] Skipping DB save — empty or suppressed response")
       else
-        db_metadata = %{
-          duration_ms: metadata[:duration_ms],
-          total_cost_usd: metadata[:total_cost_usd],
-          usage: metadata[:usage],
-          model_usage: metadata[:model_usage],
-          num_turns: metadata[:num_turns],
-          is_error: metadata[:is_error]
-        }
-
-        opts = [metadata: db_metadata]
-        opts = if channel_id, do: Keyword.put(opts, :channel_id, channel_id), else: opts
-
-        case Messages.record_incoming_reply(session_id, provider, text, opts) do
-          {:ok, _message} ->
-            :ok
-
-          {:error, reason} ->
-            Logger.warning("[#{session_id}] DB save failed: #{inspect(reason)}")
-        end
+        save_result(session_id, provider, text, metadata, channel_id)
       end
     end)
 
@@ -164,6 +146,25 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     Events.queue_updated(session_id, queue)
   end
 
+  defp save_result(session_id, provider, text, metadata, channel_id) do
+    db_metadata = %{
+      duration_ms: metadata[:duration_ms],
+      total_cost_usd: metadata[:total_cost_usd],
+      usage: metadata[:usage],
+      model_usage: metadata[:model_usage],
+      num_turns: metadata[:num_turns],
+      is_error: metadata[:is_error]
+    }
+
+    opts = [metadata: db_metadata]
+    opts = if channel_id, do: Keyword.put(opts, :channel_id, channel_id), else: opts
+
+    case Messages.record_incoming_reply(session_id, provider, text, opts) do
+      {:ok, _message} -> :ok
+      {:error, reason} -> Logger.warning("[#{session_id}] DB save failed: #{inspect(reason)}")
+    end
+  end
+
   # Synchronous — fast DB write where ordering matters. Running in a Task risks
   # two concurrent read-then-write pairs racing each other, and the session_idle
   # broadcast must only fire after a successful update.
@@ -172,17 +173,18 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     attrs = if idle_like?, do: %{status: status, last_activity_at: DateTime.utc_now()}, else: %{status: status}
 
     case Sessions.get_session(session_id) do
-      {:ok, session} ->
-        case Sessions.update_session(session, attrs) do
-          {:ok, _} ->
-            if idle_like?, do: Events.session_idle(session_id)
+      {:ok, session} -> apply_session_update(session, attrs, session_id, idle_like?)
+      {:error, _} -> :ok
+    end
+  end
 
-          {:error, reason} ->
-            Logger.warning("[#{session_id}] update_session_status failed: #{inspect(reason)}")
-        end
+  defp apply_session_update(session, attrs, session_id, idle_like?) do
+    case Sessions.update_session(session, attrs) do
+      {:ok, _} ->
+        if idle_like?, do: Events.session_idle(session_id)
 
-      {:error, _} ->
-        :ok
+      {:error, reason} ->
+        Logger.warning("[#{session_id}] update_session_status failed: #{inspect(reason)}")
     end
   end
 

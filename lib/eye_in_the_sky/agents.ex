@@ -145,10 +145,7 @@ defmodule EyeInTheSky.Agents do
             err
 
           _ ->
-            case get_agent_by_uuid(uuid) do
-              {:ok, existing} -> {:ok, existing}
-              err -> err
-            end
+            get_agent_by_uuid(uuid)
         end
     end
   rescue

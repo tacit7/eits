@@ -20,6 +20,9 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers do
   @doc """
   Reads a file with a size guard.
   Returns {:ok, content} | {:too_large} | {:error, reason}.
+
+  Both stat failures and read failures return {:error, reason}. Callers that need
+  to distinguish stat errors from read errors should use read_file_safe_detailed/1.
   """
   def read_file_safe(full_path) do
     case File.stat(full_path) do
@@ -37,17 +40,42 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers do
     end
   end
 
+  # Detailed variant used by assign_file_read/4 to preserve original error message
+  # parity: stat failures produce "Failed to stat file" while read failures produce
+  # "Failed to read file", matching the original ProjectLive.Files implementation.
+  defp read_file_safe_detailed(full_path) do
+    case File.stat(full_path) do
+      {:ok, %{size: size}} when size > @max_file_size ->
+        {:too_large}
+
+      {:ok, _stat} ->
+        case File.read(full_path) do
+          {:ok, content} -> {:ok, content}
+          {:error, reason} -> {:read_error, reason}
+        end
+
+      {:error, reason} ->
+        {:stat_error, reason}
+    end
+  end
+
   @doc """
   Assigns file content to socket after a security-checked read.
   Sets :file_content, :file_type, :selected_file, :selected_file_path, :error.
   Returns {:ok, socket} | {:error, socket} (with :error assigned).
+
+  Error messages match the originals from ProjectLive.Config and ProjectLive.Files:
+  - too large     -> "File too large to display (over 1 MB)"
+  - read failure  -> "Failed to read file: <reason>"
+  - stat failure  -> "Failed to stat file: <reason>"
+  - access denied -> "Access denied"
 
   Use for LiveViews that track the open file via :selected_file/:selected_file_path
   (e.g. ProjectLive.Config).
   """
   def assign_file_read(socket, full_path, rel_path, base_dir) do
     if path_within?(full_path, base_dir) do
-      case read_file_safe(full_path) do
+      case read_file_safe_detailed(full_path) do
         {:ok, content} ->
           socket =
             socket
@@ -62,8 +90,11 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers do
         {:too_large} ->
           {:error, assign(socket, :error, "File too large to display (over 1 MB)")}
 
-        {:error, reason} ->
+        {:read_error, reason} ->
           {:error, assign(socket, :error, "Failed to read file: #{reason}")}
+
+        {:stat_error, reason} ->
+          {:error, assign(socket, :error, "Failed to stat file: #{reason}")}
       end
     else
       {:error, assign(socket, :error, "Access denied")}

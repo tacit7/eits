@@ -117,8 +117,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
     all_projects = Projects.list_projects()
 
     active_sessions =
-      Sessions.list_active_sessions()
-      |> EyeInTheSky.Repo.preload(:agent)
+      Sessions.list_active_sessions_for_project(project_id)
       |> Enum.map(fn session ->
         %{
           id: session.id,

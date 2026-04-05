@@ -8,14 +8,10 @@ defmodule EyeInTheSky.Agents.AgentManager do
   require Logger
 
   alias EyeInTheSky.{AgentDefinitions, Agents, Sessions}
-  alias EyeInTheSky.Agents.{InstructionBuilder, RuntimeContext}
+  alias EyeInTheSky.Agents.{AgentManager.SessionBridge, InstructionBuilder, RuntimeContext}
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSky.Git.Worktrees
   alias EyeInTheSky.Utils.ToolHelpers
-  alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
-
-  @registry EyeInTheSky.Claude.AgentRegistry
-  @supported_providers ["claude", "codex"]
 
   @doc """
   Creates an agent + session and starts the AgentWorker with the initial message.
@@ -243,7 +239,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
       "send_message: session_id=#{session_id}, message_length=#{String.length(message)}"
     )
 
-    case lookup_or_start(session_id, opts) do
+    case SessionBridge.ensure_worker_running(session_id, opts) do
       {:ok, pid, provider} ->
         Logger.debug(
           "send_message: worker found/started for session_id=#{session_id}, pid=#{inspect(pid)}"
@@ -288,138 +284,6 @@ defmodule EyeInTheSky.Agents.AgentManager do
     Logger.warning("send_message: invalid message payload for session_id=#{session_id}")
     {:error, :invalid_message}
   end
-
-  defp lookup_or_start(session_id, extra_opts) do
-    # Invariant: exactly one AgentWorker per session, keyed by {:session, session_id}
-    case Registry.lookup(@registry, {:session, session_id}) do
-      [{pid, provider}] ->
-        if Process.alive?(pid) do
-          Logger.debug(
-            "lookup_or_start: found existing worker for session_id=#{session_id}, pid=#{inspect(pid)}, provider=#{provider}"
-          )
-
-          {:ok, pid, provider}
-        else
-          start_agent_worker(session_id, extra_opts)
-        end
-
-      [] ->
-        Logger.info(
-          "🔍 lookup_or_start: no worker found for session_id=#{session_id}, starting new worker"
-        )
-
-        start_agent_worker(session_id, extra_opts)
-    end
-  end
-
-  defp start_agent_worker(session_id, extra_opts) do
-    Logger.info("🚀 start_agent_worker: loading session.id=#{session_id}")
-
-    with {:ok, session} <- Sessions.get_session(session_id),
-         {:ok, agent} <- Agents.get_agent(session.agent_id),
-         provider when not is_nil(provider) <- normalize_provider(session.provider),
-         {:ok, session} <- ensure_session_uuid(session, provider) do
-      project_path = resolve_project_path_with_fallback(session, agent)
-
-      Logger.info(
-        "✅ start_agent_worker: loaded session.uuid=#{session.uuid}, agent.id=#{agent.id}, project_path=#{project_path}"
-      )
-
-      spawn_worker(session, agent, provider, project_path, extra_opts)
-    else
-      nil ->
-        {:error, {:unsupported_provider, nil}}
-
-      {:error, reason} ->
-        Logger.error(
-          "❌ start_agent_worker: failed for session.id=#{session_id} - #{inspect(reason)}"
-        )
-
-        {:error, reason}
-    end
-  end
-
-  defp resolve_project_path_with_fallback(session, agent) do
-    case SessionHelpers.resolve_project_path(session, agent) do
-      {:ok, path} ->
-        path
-
-      {:error, :no_project_path} ->
-        fallback = File.cwd!()
-
-        Logger.error(
-          "resolve_project_path: no path for session.id=#{session.id}; " <>
-            "session.git_worktree_path=#{inspect(session.git_worktree_path)}, " <>
-            "agent.git_worktree_path=#{inspect(agent.git_worktree_path)}, " <>
-            "project.path=#{inspect(if agent.project, do: agent.project.path)} — falling back to cwd=#{fallback}"
-        )
-
-        fallback
-    end
-  end
-
-  # Codex sessions intentionally start with uuid=nil — the real UUID (provider thread_id)
-  # arrives via the thread.started event and is synced by on_provider_conversation_id_changed.
-  # Generating a temp UUID here would become stale and break dm resolve_session lookups.
-  defp ensure_session_uuid(session, "codex"), do: {:ok, session}
-
-  defp ensure_session_uuid(session, _provider) do
-    if is_nil(session.uuid) or session.uuid == "" do
-      uuid = Ecto.UUID.generate()
-      Logger.info("ensure_session_uuid: generating UUID=#{uuid} for session.id=#{session.id}")
-
-      case Sessions.update_session(session, %{uuid: uuid}) do
-        {:ok, updated} -> {:ok, updated}
-        {:error, reason} -> {:error, {:session_update_failed, reason}}
-      end
-    else
-      {:ok, session}
-    end
-  end
-
-  defp spawn_worker(session, agent, provider, project_path, extra_opts) do
-    opts = [
-      session_id: session.id,
-      # eits_session_uuid: stable EITS session UUID, never changes after assignment.
-      # Used for EITS tracking, env vars, and hooks. Distinct from provider_conversation_id.
-      eits_session_uuid: session.uuid,
-      # provider_conversation_id: the provider's resume key.
-      #   Claude: pre-generated UUID matching Claude's --session-id flag
-      #   Codex:  same value initially, but gets overwritten by the Codex thread_id
-      #           when the thread.started event fires (via maybe_sync_provider_conversation_id)
-      provider_conversation_id: session.uuid,
-      agent_id: agent.id,
-      project_id: session.project_id,
-      project_path: project_path,
-      provider: provider,
-      worktree: extra_opts[:worktree]
-    ]
-
-    case DynamicSupervisor.start_child(
-           EyeInTheSky.Claude.AgentSupervisor,
-           {AgentWorker, opts}
-         ) do
-      {:ok, pid} ->
-        Logger.info("✅ spawn_worker: started for session.id=#{session.id}, pid=#{inspect(pid)}")
-
-        {:ok, pid, provider}
-
-      {:error, {:already_started, pid}} ->
-        Logger.info(
-          "spawn_worker: already started for session.id=#{session.id}, pid=#{inspect(pid)}"
-        )
-
-        {:ok, pid, provider}
-
-      {:error, reason} = error ->
-        Logger.error("❌ spawn_worker: failed for session.id=#{session.id} - #{inspect(reason)}")
-
-        error
-    end
-  end
-
-  defp normalize_provider(provider) when provider in @supported_providers, do: provider
-  defp normalize_provider(_provider), do: nil
 
   # ── Agent definition resolution ────────────────────────────────────────
 

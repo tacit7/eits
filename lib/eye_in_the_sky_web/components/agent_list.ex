@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.AgentList do
+  @moduledoc false
   use EyeInTheSkyWeb, :html
 
   import EyeInTheSkyWeb.Components.Icons

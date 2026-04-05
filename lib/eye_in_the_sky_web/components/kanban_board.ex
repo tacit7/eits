@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.KanbanBoard do
+  @moduledoc false
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
   import EyeInTheSkyWeb.Components.TaskCard, only: [task_card: 1]

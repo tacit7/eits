@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTab do
+  @moduledoc false
   use Phoenix.Component
   import EyeInTheSkyWeb.OverviewLive.Settings.TabHelpers
 

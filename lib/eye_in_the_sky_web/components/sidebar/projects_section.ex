@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
+  @moduledoc false
   use EyeInTheSkyWeb, :html
 
   attr :projects, :list, required: true

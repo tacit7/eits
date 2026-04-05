@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Settings.PricingTab do
+  @moduledoc false
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
 

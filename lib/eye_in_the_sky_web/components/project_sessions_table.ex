@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
+  @moduledoc false
   use Phoenix.Component
 
   use Phoenix.VerifiedRoutes,

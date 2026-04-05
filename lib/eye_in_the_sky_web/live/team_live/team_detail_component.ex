@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.TeamDetailComponent do
+  @moduledoc false
   use EyeInTheSkyWeb, :live_component
 
   import EyeInTheSkyWeb.Components.SessionCard, only: [session_row: 1]

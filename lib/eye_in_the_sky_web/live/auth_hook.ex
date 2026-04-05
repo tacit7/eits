@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.AuthHook do
+  @moduledoc false
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [redirect: 2]
 

@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.KanbanBulkBar do
+  @moduledoc false
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
   import EyeInTheSkyWeb.Live.Shared.KanbanFilters, only: [state_dot_color: 1]

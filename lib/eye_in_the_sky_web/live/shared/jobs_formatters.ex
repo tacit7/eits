@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Live.Shared.JobsFormatters do
+  @moduledoc false
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [month_name: 1]
   alias EyeInTheSky.Utils.ToolHelpers
 

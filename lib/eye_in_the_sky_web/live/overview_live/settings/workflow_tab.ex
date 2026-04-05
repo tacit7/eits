@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Settings.WorkflowTab do
+  @moduledoc false
   use Phoenix.Component
 
   def render(assigns) do

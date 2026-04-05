@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.Sidebar do
+  @moduledoc false
   use EyeInTheSkyWeb, :live_component
 
   import EyeInTheSkyWeb.Components.Sidebar.SystemSection

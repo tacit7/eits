@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
+  @moduledoc false
   import Phoenix.LiveView, only: [push_event: 3, put_flash: 3]
 
   alias EyeInTheSky.Claude.SessionImporter

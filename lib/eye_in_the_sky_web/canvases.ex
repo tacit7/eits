@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Canvases do
+  @moduledoc false
   import Ecto.Query
 
   alias EyeInTheSky.Repo

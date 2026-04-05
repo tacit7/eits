@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.NotesList do
+  @moduledoc false
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1]

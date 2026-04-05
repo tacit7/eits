@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.CanvasOverlayComponent do
+  @moduledoc false
   use EyeInTheSkyWeb, :live_component
 
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]

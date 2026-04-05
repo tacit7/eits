@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
+  @moduledoc false
   use Phoenix.Component
 
   import EyeInTheSkyWeb.CoreComponents

@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.Sidebar.SystemSection do
+  @moduledoc false
   use EyeInTheSkyWeb, :html
 
   attr :sidebar_tab, :atom, required: true

@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Live.Shared.NotesHelpers do
+  @moduledoc false
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3]
 

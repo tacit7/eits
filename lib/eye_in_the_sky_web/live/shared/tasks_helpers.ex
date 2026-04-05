@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
+  @moduledoc false
   require Logger
 
   import Phoenix.Component, only: [assign: 3]

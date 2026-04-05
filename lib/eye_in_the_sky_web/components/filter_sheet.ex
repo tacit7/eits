@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.FilterSheet do
+  @moduledoc false
   use Phoenix.Component
 
   import EyeInTheSkyWeb.CoreComponents, only: [icon: 1]

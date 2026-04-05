@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
+  @moduledoc false
   import Phoenix.Component, only: [assign: 2, assign: 3, to_form: 1, to_form: 2]
   import Phoenix.LiveView, only: [put_flash: 3, push_navigate: 2]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 2]

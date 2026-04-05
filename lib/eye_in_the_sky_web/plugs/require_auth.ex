@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Plugs.RequireAuth do
+  @moduledoc false
   import Plug.Conn
 
   alias EyeInTheSky.Accounts.ApiKey

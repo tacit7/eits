@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.KanbanToolbar do
+  @moduledoc false
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
 

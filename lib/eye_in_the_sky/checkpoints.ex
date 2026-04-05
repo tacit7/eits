@@ -99,30 +99,12 @@ defmodule EyeInTheSky.Checkpoints do
         {:error, _} -> nil
       end
 
-    unless original_session do
-      {:error, :session_not_found}
-    else
-      with {:ok, agent} <- get_or_create_fork_agent(original_session, attrs),
-           {:ok, new_session} <- create_fork_session(original_session, agent, checkpoint, attrs),
-           :ok <-
-             copy_messages_to_fork(
-               checkpoint.session_id,
-               new_session.id,
-               checkpoint.message_index
-             ) do
-        if checkpoint.git_stash_ref && original_session.git_worktree_path &&
-             File.dir?(original_session.git_worktree_path) do
-          branch_name = attrs[:branch_name] || "fork/session-#{new_session.id}"
-
-          create_branch_from_stash(
-            original_session.git_worktree_path,
-            checkpoint.git_stash_ref,
-            branch_name
-          )
-        end
-
-        {:ok, new_session}
-      end
+    with {:ok, session} <- require_session(original_session),
+         {:ok, agent} <- get_or_create_fork_agent(session, attrs),
+         {:ok, new_session} <- create_fork_session(session, agent, checkpoint, attrs),
+         :ok <- copy_messages_to_fork(checkpoint.session_id, new_session.id, checkpoint.message_index) do
+      maybe_create_fork_branch(checkpoint, session, new_session, attrs)
+      {:ok, new_session}
     end
   end
 
@@ -145,6 +127,17 @@ defmodule EyeInTheSky.Checkpoints do
 
   # Private
 
+  defp require_session(nil), do: {:error, :session_not_found}
+  defp require_session(session), do: {:ok, session}
+
+  defp maybe_create_fork_branch(checkpoint, original_session, new_session, attrs) do
+    if checkpoint.git_stash_ref && original_session.git_worktree_path &&
+         File.dir?(original_session.git_worktree_path) do
+      branch_name = attrs[:branch_name] || "fork/session-#{new_session.id}"
+      create_branch_from_stash(original_session.git_worktree_path, checkpoint.git_stash_ref, branch_name)
+    end
+  end
+
   defp stash_session_state(project_path) do
     stash_message = "eits-checkpoint-#{System.system_time(:millisecond)}"
 
@@ -152,27 +145,23 @@ defmodule EyeInTheSky.Checkpoints do
            stderr_to_stdout: false
          ) do
       {output, 0} ->
-        # Parse the stash ref from output like "Saved working directory... stash@{0}"
-        ref =
-          case Regex.run(~r/stash@\{(\d+)\}/, output) do
-            [_, n] ->
-              # Resolve the stash ref to a commit hash for stable reference
-              case System.cmd("git", ["-C", project_path, "rev-parse", "stash@{#{n}}"],
-                     stderr_to_stdout: false
-                   ) do
-                {hash, 0} -> String.trim(hash)
-                _ -> "stash@{#{n}}"
-              end
-
-            _ ->
-              nil
-          end
-
-        ref
+        case Regex.run(~r/stash@\{(\d+)\}/, output) do
+          [_, n] -> resolve_stash_ref(project_path, n)
+          _ -> nil
+        end
 
       {reason, code} ->
         Logger.warning("git stash failed (exit #{code}): #{String.trim(reason)}")
         nil
+    end
+  end
+
+  defp resolve_stash_ref(project_path, n) do
+    case System.cmd("git", ["-C", project_path, "rev-parse", "stash@{#{n}}"],
+           stderr_to_stdout: false
+         ) do
+      {hash, 0} -> String.trim(hash)
+      _ -> "stash@{#{n}}"
     end
   end
 

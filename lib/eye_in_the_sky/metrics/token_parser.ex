@@ -51,15 +51,7 @@ defmodule EyeInTheSky.Metrics.TokenParser do
               |> Enum.filter(&String.ends_with?(&1, ".jsonl"))
               |> Enum.map(&Path.join(subagent_dir, &1))
 
-            usage =
-              agent_files
-              |> Enum.reduce(empty_usage(), fn path, acc ->
-                case parse_file(path) do
-                  {:ok, u} -> merge_usage(acc, u)
-                  {:error, _} -> acc
-                end
-              end)
-
+            usage = Enum.reduce(agent_files, empty_usage(), &merge_subagent_file/2)
             {usage, length(agent_files)}
 
           {:error, _} ->
@@ -90,6 +82,13 @@ defmodule EyeInTheSky.Metrics.TokenParser do
   end
 
   # -- Private --
+
+  defp merge_subagent_file(path, acc) do
+    case parse_file(path) do
+      {:ok, u} -> merge_usage(acc, u)
+      {:error, _} -> acc
+    end
+  end
 
   defp decode_line(line) do
     case Jason.decode(String.trim(line)) do

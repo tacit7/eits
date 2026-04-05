@@ -135,28 +135,25 @@ defmodule EyeInTheSky.Projects do
 
   defp resolve_project_by_path(path) do
     case get_project_by_path(path) do
-      nil ->
-        name = Path.basename(path)
+      nil -> create_or_retry_project(path)
+      project -> {:ok, project.id, project.name}
+    end
+  end
 
-        case create_project(%{name: name, path: path, active: true}) do
-          {:ok, project} ->
-            Logger.info("resolve_project: created project id=#{project.id} for path=#{path}")
-            {:ok, project.id, project.name}
+  defp create_or_retry_project(path) do
+    name = Path.basename(path)
 
-          {:error, _changeset} ->
-            # Race condition: try lookup again
-            case get_project_by_path(path) do
-              nil ->
-                {:error, "project_creation_failed",
-                 "failed to create project for path: #{path}"}
-
-              project ->
-                {:ok, project.id, project.name}
-            end
-        end
-
-      project ->
+    case create_project(%{name: name, path: path, active: true}) do
+      {:ok, project} ->
+        Logger.info("resolve_project: created project id=#{project.id} for path=#{path}")
         {:ok, project.id, project.name}
+
+      {:error, _changeset} ->
+        # Race condition: try lookup again
+        case get_project_by_path(path) do
+          nil -> {:error, "project_creation_failed", "failed to create project for path: #{path}"}
+          project -> {:ok, project.id, project.name}
+        end
     end
   end
 

@@ -29,26 +29,7 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
       end
 
     sessions
-    |> Enum.reduce({0, 0, 0}, fn session_info, {ingested, skipped, errors} ->
-      session_uuid = session_info.session_id
-
-      case lookup_session_by_uuid(session_uuid) do
-        nil ->
-          {ingested, skipped + 1, errors}
-
-        %{id: session_id, agent_id: agent_id} ->
-          if MapSet.member?(existing_session_ids, session_id) do
-            {ingested, skipped + 1, errors}
-          else
-            file_path = build_file_path(session_info)
-
-            case ingest_one(file_path, session_id, agent_id) do
-              :ok -> {ingested + 1, skipped, errors}
-              {:error, _reason} -> {ingested, skipped, errors + 1}
-            end
-          end
-      end
-    end)
+    |> Enum.reduce({0, 0, 0}, &process_session_entry(&1, existing_session_ids, &2))
   end
 
   @doc """
@@ -57,25 +38,48 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
   Returns `:ok` or `{:error, reason}`.
   """
   def ingest_session(session_uuid) do
-    case lookup_session_by_uuid(session_uuid) do
-      nil ->
-        {:error, :session_not_found}
-
-      %{id: session_id, agent_id: agent_id} ->
-        sessions = SessionReader.discover_all_sessions()
-
-        case Enum.find(sessions, fn s -> s.session_id == session_uuid end) do
-          nil ->
-            {:error, :jsonl_not_found}
-
-          session_info ->
-            file_path = build_file_path(session_info)
-            ingest_one(file_path, session_id, agent_id)
-        end
+    with {:ok, db_session} <- fetch_db_session(session_uuid),
+         {:ok, session_info} <- find_session_info(session_uuid) do
+      file_path = build_file_path(session_info)
+      ingest_one(file_path, db_session.id, db_session.agent_id)
     end
   end
 
   # -- Private --
+
+  defp process_session_entry(session_info, existing_session_ids, {ingested, skipped, errors}) do
+    case lookup_session_by_uuid(session_info.session_id) do
+      nil -> {ingested, skipped + 1, errors}
+      db_session -> process_found_session(session_info, db_session, existing_session_ids, {ingested, skipped, errors})
+    end
+  end
+
+  defp process_found_session(session_info, db_session, existing_session_ids, {ingested, skipped, errors}) do
+    if MapSet.member?(existing_session_ids, db_session.id) do
+      {ingested, skipped + 1, errors}
+    else
+      file_path = build_file_path(session_info)
+      case ingest_one(file_path, db_session.id, db_session.agent_id) do
+        :ok -> {ingested + 1, skipped, errors}
+        {:error, _} -> {ingested, skipped, errors + 1}
+      end
+    end
+  end
+
+  defp fetch_db_session(session_uuid) do
+    case lookup_session_by_uuid(session_uuid) do
+      nil -> {:error, :session_not_found}
+      db_session -> {:ok, db_session}
+    end
+  end
+
+  defp find_session_info(session_uuid) do
+    sessions = SessionReader.discover_all_sessions()
+    case Enum.find(sessions, fn s -> s.session_id == session_uuid end) do
+      nil -> {:error, :jsonl_not_found}
+      session_info -> {:ok, session_info}
+    end
+  end
 
   defp ingest_one(file_path, session_id, agent_id) do
     case TokenParser.parse_session(file_path) do

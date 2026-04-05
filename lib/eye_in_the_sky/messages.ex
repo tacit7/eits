@@ -175,23 +175,22 @@ defmodule EyeInTheSky.Messages do
     if cid && is_nil(has_number) do
       # Advisory lock on the channel prevents two concurrent inserts from reading
       # the same MAX and assigning duplicate channel_message_numbers.
-      Repo.transaction(fn ->
-        lock_key = :erlang.phash2(cid)
-        Repo.query!("SELECT pg_advisory_xact_lock($1)", [lock_key])
-
-        attrs = Map.put(attrs, :channel_message_number, next_channel_message_number(cid))
-
-        case %Message{}
-             |> Message.changeset(attrs)
-             |> Repo.insert() do
-          {:ok, message} -> message
-          {:error, changeset} -> Repo.rollback(changeset)
-        end
-      end)
+      Repo.transaction(fn -> insert_with_advisory_lock(cid, attrs) end)
     else
       %Message{}
       |> Message.changeset(attrs)
       |> Repo.insert()
+    end
+  end
+
+  defp insert_with_advisory_lock(cid, attrs) do
+    lock_key = :erlang.phash2(cid)
+    Repo.query!("SELECT pg_advisory_xact_lock($1)", [lock_key])
+    attrs = Map.put(attrs, :channel_message_number, next_channel_message_number(cid))
+
+    case %Message{} |> Message.changeset(attrs) |> Repo.insert() do
+      {:ok, message} -> message
+      {:error, changeset} -> Repo.rollback(changeset)
     end
   end
 
@@ -377,18 +376,18 @@ defmodule EyeInTheSky.Messages do
   # Remove duplicate messages by source_uuid, keeping the first occurrence
   defp deduplicate_by_source_uuid(messages) do
     messages
-    |> Enum.reduce({[], MapSet.new()}, fn msg, {acc, seen_uuids} ->
-      if msg.source_uuid && MapSet.member?(seen_uuids, msg.source_uuid) do
-        {acc, seen_uuids}
-      else
-        new_seen =
-          if msg.source_uuid, do: MapSet.put(seen_uuids, msg.source_uuid), else: seen_uuids
-
-        {[msg | acc], new_seen}
-      end
-    end)
+    |> Enum.reduce({[], MapSet.new()}, &dedup_step/2)
     |> elem(0)
     |> Enum.reverse()
+  end
+
+  defp dedup_step(msg, {acc, seen_uuids}) do
+    if msg.source_uuid && MapSet.member?(seen_uuids, msg.source_uuid) do
+      {acc, seen_uuids}
+    else
+      new_seen = if msg.source_uuid, do: MapSet.put(seen_uuids, msg.source_uuid), else: seen_uuids
+      {[msg | acc], new_seen}
+    end
   end
 
   @doc """

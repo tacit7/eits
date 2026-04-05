@@ -151,25 +151,25 @@ defmodule EyeInTheSky.Claude.SessionReader do
   defp parse_session_file_after(file_path, after_uuid) do
     case File.read(file_path) do
       {:ok, content} ->
-        lines = String.split(content, "\n", trim: true)
-
         all_messages =
-          lines
+          content
+          |> String.split("\n", trim: true)
           |> Enum.map(&parse_line/1)
           |> Enum.filter(&is_conversation_message?/1)
 
         # Find cursor position; if UUID not found (e.g. after context compaction),
         # fall back to returning all messages rather than returning empty.
-        messages =
-          case Enum.find_index(all_messages, fn msg -> msg["uuid"] == after_uuid end) do
-            nil -> all_messages
-            idx -> Enum.drop(all_messages, idx + 1)
-          end
-
-        {:ok, messages}
+        {:ok, drop_messages_before(all_messages, after_uuid)}
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  defp drop_messages_before(all_messages, after_uuid) do
+    case Enum.find_index(all_messages, fn msg -> msg["uuid"] == after_uuid end) do
+      nil -> all_messages
+      idx -> Enum.drop(all_messages, idx + 1)
     end
   end
 
@@ -191,38 +191,29 @@ defmodule EyeInTheSky.Claude.SessionReader do
   Returns {:ok, total_tokens, total_cost_usd} or {:error, reason}.
   """
   def read_usage(session_id, project_path) do
-    case find_session_file(session_id, project_path) do
-      {:ok, file_path} ->
-        case File.read(file_path) do
-          {:ok, content} ->
-            {tokens, cost} =
-              content
-              |> String.split("\n", trim: true)
-              |> Enum.reduce({0, 0.0}, fn line, {tok_acc, cost_acc} ->
-                case Jason.decode(line) do
-                  {:ok, %{"type" => "assistant", "message" => %{"usage" => usage}}}
-                  when is_map(usage) ->
-                    input = Map.get(usage, "input_tokens") || 0
-                    output = Map.get(usage, "output_tokens") || 0
-                    {tok_acc + input + output, cost_acc}
+    with {:ok, file_path} <- find_session_file(session_id, project_path),
+         {:ok, content} <- File.read(file_path) do
+      {tokens, cost} =
+        content
+        |> String.split("\n", trim: true)
+        |> Enum.reduce({0, 0.0}, &accumulate_token_usage_line/2)
 
-                  {:ok, %{"type" => "result", "total_cost_usd" => cost}}
-                  when is_number(cost) ->
-                    {tok_acc, cost_acc + cost}
+      {:ok, tokens, cost}
+    end
+  end
 
-                  _ ->
-                    {tok_acc, cost_acc}
-                end
-              end)
+  defp accumulate_token_usage_line(line, {tok_acc, cost_acc}) do
+    case Jason.decode(line) do
+      {:ok, %{"type" => "assistant", "message" => %{"usage" => usage}}} when is_map(usage) ->
+        input = Map.get(usage, "input_tokens") || 0
+        output = Map.get(usage, "output_tokens") || 0
+        {tok_acc + input + output, cost_acc}
 
-            {:ok, tokens, cost}
+      {:ok, %{"type" => "result", "total_cost_usd" => cost}} when is_number(cost) ->
+        {tok_acc, cost_acc + cost}
 
-          {:error, reason} ->
-            {:error, reason}
-        end
-
-      {:error, _} = err ->
-        err
+      _ ->
+        {tok_acc, cost_acc}
     end
   end
 

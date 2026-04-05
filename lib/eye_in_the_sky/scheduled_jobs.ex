@@ -115,45 +115,36 @@ defmodule EyeInTheSky.ScheduledJobs do
         |> maybe_encode_config()
 
       case job |> ScheduledJob.changeset(attrs) |> Repo.update() do
-        {:ok, updated} ->
-          if Map.has_key?(attrs, "next_run_at") do
-            {:ok, updated}
-          else
-            next =
-              compute_next_run_at(
-                updated.schedule_type,
-                updated.schedule_value,
-                nil,
-                updated.timezone || "Etc/UTC"
-              )
-
-            update_job_fields(updated, %{next_run_at: next})
-          end
-
-        error ->
-          error
+        {:ok, updated} -> maybe_recompute_next_run(updated, attrs)
+        error -> error
       end
     end
   end
 
+  defp maybe_recompute_next_run(updated, attrs) do
+    if Map.has_key?(attrs, "next_run_at") do
+      {:ok, updated}
+    else
+      next = compute_next_run_at(updated.schedule_type, updated.schedule_value, nil, updated.timezone || "Etc/UTC")
+      update_job_fields(updated, %{next_run_at: next})
+    end
+  end
+
   def run_now(job_id, caller_project_id \\ nil) do
-    case get_job(job_id) do
-      {:ok, job} ->
-        if not authorized?(job, caller_project_id) do
-          {:error, :unauthorized}
-        else
-          case enqueue_job(job) do
-            {:ok, _} = result ->
-              mark_job_executed(job)
-              result
+    with {:ok, job} <- get_job(job_id),
+         :ok <- check_authorized(job, caller_project_id) do
+      run_authorized_job(job)
+    end
+  end
 
-            error ->
-              error
-          end
-        end
+  defp run_authorized_job(job) do
+    case enqueue_job(job) do
+      {:ok, _} = result ->
+        mark_job_executed(job)
+        result
 
-      {:error, _} = err ->
-        err
+      error ->
+        error
     end
   end
 
@@ -255,21 +246,21 @@ defmodule EyeInTheSky.ScheduledJobs do
         NaiveDateTime.add(utc_now, seconds) |> DateTime.from_naive!("Etc/UTC")
 
       "cron" ->
-        case Crontab.CronExpression.Parser.parse(schedule_value) do
-          {:ok, parsed} ->
-            local_now = utc_to_local(utc_now, timezone)
+        next_cron_run_at(schedule_value, utc_now, timezone)
+    end
+  end
 
-            case Crontab.Scheduler.get_next_run_date(parsed, local_now) do
-              {:ok, next_local} ->
-                local_to_utc(next_local, timezone) |> DateTime.from_naive!("Etc/UTC")
-
-              _ ->
-                nil
-            end
-
-          {:error, _} ->
-            nil
+  defp next_cron_run_at(schedule_value, utc_now, timezone) do
+    case Crontab.CronExpression.Parser.parse(schedule_value) do
+      {:ok, parsed} ->
+        local_now = utc_to_local(utc_now, timezone)
+        case Crontab.Scheduler.get_next_run_date(parsed, local_now) do
+          {:ok, next_local} -> local_to_utc(next_local, timezone) |> DateTime.from_naive!("Etc/UTC")
+          _ -> nil
         end
+
+      {:error, _} ->
+        nil
     end
   end
 
@@ -355,6 +346,10 @@ defmodule EyeInTheSky.ScheduledJobs do
   defp authorized?(_job, nil), do: true
   defp authorized?(job, caller_project_id), do: job.project_id == caller_project_id
 
+  defp check_authorized(job, caller_project_id) do
+    if authorized?(job, caller_project_id), do: :ok, else: {:error, :unauthorized}
+  end
+
   defp update_job_fields(job, fields) do
     job |> ScheduledJob.changeset(fields) |> Repo.update()
   end
@@ -373,30 +368,32 @@ defmodule EyeInTheSky.ScheduledJobs do
     if prompt_id != nil and prompt_id != "" do
       false
     else
-      config_str = attrs["config"]
+      agent_file_id = extract_agent_file_id(attrs["config"])
+      scheduled_for_agent_file?(agent_file_id)
+    end
+  end
 
-      agent_file_id =
-        case config_str do
-          str when is_binary(str) ->
-            case Jason.decode(str) do
-              {:ok, %{"agent_file_id" => id}} when is_binary(id) -> id
-              _ -> nil
-            end
-
-          _ ->
-            nil
+  defp extract_agent_file_id(config_str) do
+    case config_str do
+      str when is_binary(str) ->
+        case Jason.decode(str) do
+          {:ok, %{"agent_file_id" => id}} when is_binary(id) -> id
+          _ -> nil
         end
 
-      if agent_file_id do
-        from(j in ScheduledJob,
-          where: j.job_type == "spawn_agent" and is_nil(j.prompt_id),
-          where: fragment("config::jsonb->>'agent_file_id' = ?", ^agent_file_id)
-        )
-        |> Repo.exists?()
-      else
-        false
-      end
+      _ ->
+        nil
     end
+  end
+
+  defp scheduled_for_agent_file?(nil), do: false
+
+  defp scheduled_for_agent_file?(agent_file_id) do
+    from(j in ScheduledJob,
+      where: j.job_type == "spawn_agent" and is_nil(j.prompt_id),
+      where: fragment("config::jsonb->>'agent_file_id' = ?", ^agent_file_id)
+    )
+    |> Repo.exists?()
   end
 
   defp maybe_encode_config(attrs) do

@@ -56,20 +56,19 @@ defmodule EyeInTheSky.Codex.SessionReader do
       total_tokens =
         content
         |> String.split("\n", trim: true)
-        |> Enum.reduce(0, fn line, acc ->
-          case Jason.decode(line) do
-            {:ok, %{"type" => "event_msg", "payload" => %{"type" => "token_count"} = payload}} ->
-              total =
-                get_in(payload, ["info", "total_token_usage", "total_tokens"]) || acc
-
-              total
-
-            _ ->
-              acc
-          end
-        end)
+        |> Enum.reduce(0, &count_tokens_in_line/2)
 
       {:ok, total_tokens, 0.0}
+    end
+  end
+
+  defp count_tokens_in_line(line, acc) do
+    case Jason.decode(line) do
+      {:ok, %{"type" => "event_msg", "payload" => %{"type" => "token_count"} = payload}} ->
+        get_in(payload, ["info", "total_token_usage", "total_tokens"]) || acc
+
+      _ ->
+        acc
     end
   end
 

@@ -55,29 +55,30 @@ defmodule EyeInTheSky.Media.ImageProcessor do
   @spec process_image(ContentBlock.Image.t(), pos_integer()) :: ContentBlock.Image.t()
   def process_image(%ContentBlock.Image{data: data, mime_type: mime_type} = block, max_dim \\ @max_dimension) do
     case Base.decode64(data) do
-      {:ok, raw} ->
-        raw_size = byte_size(raw)
-
-        cond do
-          raw_size > @hard_limit_bytes ->
-            Logger.warning("[ImageProcessor] Image exceeds hard limit (#{raw_size} bytes), attempting resize")
-            resize_and_compress(raw, mime_type, max_dim)
-
-          raw_size > @target_bytes ->
-            Logger.info("[ImageProcessor] Image above target (#{raw_size} bytes), compressing")
-            resize_and_compress(raw, mime_type, max_dim)
-
-          true ->
-            # Within limits, just normalize EXIF orientation
-            case auto_orient(raw, mime_type) do
-              {:ok, oriented} -> %ContentBlock.Image{data: Base.encode64(oriented), mime_type: mime_type}
-              :error -> block
-            end
-        end
-
+      {:ok, raw} -> process_decoded_image(raw, mime_type, max_dim, block)
       :error ->
         Logger.warning("[ImageProcessor] Invalid base64 data, passing through unchanged")
         block
+    end
+  end
+
+  defp process_decoded_image(raw, mime_type, max_dim, block) do
+    raw_size = byte_size(raw)
+
+    cond do
+      raw_size > @hard_limit_bytes ->
+        Logger.warning("[ImageProcessor] Image exceeds hard limit (#{raw_size} bytes), attempting resize")
+        resize_and_compress(raw, mime_type, max_dim)
+
+      raw_size > @target_bytes ->
+        Logger.info("[ImageProcessor] Image above target (#{raw_size} bytes), compressing")
+        resize_and_compress(raw, mime_type, max_dim)
+
+      true ->
+        case auto_orient(raw, mime_type) do
+          {:ok, oriented} -> %ContentBlock.Image{data: Base.encode64(oriented), mime_type: mime_type}
+          :error -> block
+        end
     end
   end
 
@@ -96,42 +97,7 @@ defmodule EyeInTheSky.Media.ImageProcessor do
     src = temp_path("src")
     File.write!(src, raw)
 
-    result =
-      Enum.reduce_while(@quality_steps, nil, fn quality, _acc ->
-        dst = temp_path("dst.jpg")
-
-        args = [
-          src,
-          "-auto-orient",
-          "-resize", "#{max_dim}x#{max_dim}>",
-          "-quality", to_string(quality),
-          "-strip",
-          dst
-        ]
-
-        case System.cmd("convert", args, stderr_to_stdout: true) do
-          {_, 0} ->
-            case File.read(dst) do
-              {:ok, processed} ->
-                File.rm(dst)
-
-                if byte_size(processed) <= @target_bytes do
-                  {:halt, {:ok, processed, quality}}
-                else
-                  {:cont, nil}
-                end
-
-              {:error, _} ->
-                File.rm(dst)
-                {:cont, nil}
-            end
-
-          {err, _} ->
-            Logger.warning("[ImageProcessor] convert failed: #{err}")
-            File.rm(dst)
-            {:halt, :error}
-        end
-      end)
+    result = Enum.reduce_while(@quality_steps, nil, &try_quality_step(src, max_dim, &1, &2))
 
     File.rm(src)
 
@@ -144,6 +110,32 @@ defmodule EyeInTheSky.Media.ImageProcessor do
         # Fallback: return original data with original mime type (not forced jpeg)
         Logger.warning("[ImageProcessor] All quality steps exceeded target, using original")
         %ContentBlock.Image{data: Base.encode64(raw), mime_type: original_mime_type}
+    end
+  end
+
+  defp try_quality_step(src, max_dim, quality, _acc) do
+    dst = temp_path("dst.jpg")
+
+    args = [src, "-auto-orient", "-resize", "#{max_dim}x#{max_dim}>", "-quality", to_string(quality), "-strip", dst]
+
+    case System.cmd("convert", args, stderr_to_stdout: true) do
+      {_, 0} -> check_compressed_output(dst, quality)
+      {err, _} ->
+        Logger.warning("[ImageProcessor] convert failed: #{err}")
+        File.rm(dst)
+        {:halt, :error}
+    end
+  end
+
+  defp check_compressed_output(dst, quality) do
+    case File.read(dst) do
+      {:ok, processed} ->
+        File.rm(dst)
+        if byte_size(processed) <= @target_bytes, do: {:halt, {:ok, processed, quality}}, else: {:cont, nil}
+
+      {:error, _} ->
+        File.rm(dst)
+        {:cont, nil}
     end
   end
 

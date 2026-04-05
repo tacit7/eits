@@ -18,32 +18,27 @@ defmodule EyeInTheSky.ProjectFiles do
         items
         |> Enum.reject(&String.starts_with?(&1, "."))
         |> Enum.sort()
-        |> Enum.map(fn item ->
-          full = Path.join(current_dir, item)
-          relative = Path.relative_to(full, base_dir)
-          is_dir = File.dir?(full)
-
-          if is_dir do
-            children =
-              if depth < @max_tree_depth,
-                do: scan_directory(base_dir, full, depth + 1),
-                else: []
-
-            %{name: item, path: full, relative: relative, is_dir: true, children: children}
-          else
-            size =
-              case File.stat(full) do
-                {:ok, %{size: s}} -> s
-                _ -> 0
-              end
-
-            %{name: item, path: full, relative: relative, is_dir: false, size: size}
-          end
-        end)
+        |> Enum.map(&build_scan_entry(base_dir, current_dir, depth, &1))
         |> Enum.sort_by(&{!&1.is_dir, &1.name})
 
       _ ->
         []
+    end
+  end
+
+  defp build_scan_entry(base_dir, current_dir, depth, item) do
+    full = Path.join(current_dir, item)
+    relative = Path.relative_to(full, base_dir)
+
+    if File.dir?(full) do
+      children = if depth < @max_tree_depth, do: scan_directory(base_dir, full, depth + 1), else: []
+      %{name: item, path: full, relative: relative, is_dir: true, children: children}
+    else
+      size = case File.stat(full) do
+        {:ok, %{size: s}} -> s
+        _ -> 0
+      end
+      %{name: item, path: full, relative: relative, is_dir: false, size: size}
     end
   end
 
@@ -61,18 +56,7 @@ defmodule EyeInTheSky.ProjectFiles do
         entries =
           items
           |> Enum.sort()
-          |> Enum.map(fn item ->
-            item_path = Path.join(full_path, item)
-            rel = if rel_path, do: Path.join(rel_path, item), else: item
-
-            size =
-              case File.stat(item_path) do
-                {:ok, %{size: s}} -> s
-                _ -> 0
-              end
-
-            %{name: item, path: rel, is_dir: File.dir?(item_path), size: size}
-          end)
+          |> Enum.map(&build_dir_entry(full_path, rel_path, &1))
           |> Enum.sort_by(&{!&1.is_dir, &1.name})
 
         {:ok, entries}
@@ -80,6 +64,16 @@ defmodule EyeInTheSky.ProjectFiles do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp build_dir_entry(full_path, rel_path, item) do
+    item_path = Path.join(full_path, item)
+    rel = if rel_path, do: Path.join(rel_path, item), else: item
+    size = case File.stat(item_path) do
+      {:ok, %{size: s}} -> s
+      _ -> 0
+    end
+    %{name: item, path: rel, is_dir: File.dir?(item_path), size: size}
   end
 
   @doc """

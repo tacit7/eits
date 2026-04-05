@@ -52,13 +52,15 @@ defmodule EyeInTheSky.Claude.BinaryFinder do
       |> File.ls!()
       |> Enum.filter(&semver_dir?/1)
       |> Enum.sort_by(&parse_version/1, {:desc, Version})
-      |> Enum.find_value(fn dir ->
-        path = Path.join([versions_dir, dir, "bin", "claude"])
-        if File.exists?(path), do: path
-      end)
+      |> Enum.find_value(&find_claude_in_nvm_dir(versions_dir, &1))
     else
       nil
     end
+  end
+
+  defp find_claude_in_nvm_dir(versions_dir, dir) do
+    path = Path.join([versions_dir, dir, "bin", "claude"])
+    if File.exists?(path), do: path
   end
 
   @doc false

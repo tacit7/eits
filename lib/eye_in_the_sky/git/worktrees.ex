@@ -74,16 +74,20 @@ defmodule EyeInTheSky.Git.Worktrees do
       {output, _} ->
         if String.contains?(output, "already exists") or
              String.contains?(output, "already checked out") do
-          # Branch exists but path doesn't — attach without -b
-          case System.cmd("git", ["-C", repo_path, "worktree", "add", wt_path, branch],
-                 stderr_to_stdout: true
-               ) do
-            {_, 0} -> :ok
-            {err, code} -> {:error, {code, err}}
-          end
+          attach_existing_worktree(repo_path, wt_path, branch)
         else
           {:error, output}
         end
+    end
+  end
+
+  defp attach_existing_worktree(repo_path, wt_path, branch) do
+    # Branch exists but path doesn't — attach without -b
+    case System.cmd("git", ["-C", repo_path, "worktree", "add", wt_path, branch],
+           stderr_to_stdout: true
+         ) do
+      {_, 0} -> :ok
+      {err, code} -> {:error, {code, err}}
     end
   end
 end

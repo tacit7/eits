@@ -1098,30 +1098,37 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
   defp wait_for_mock_port(session_id, attempts) do
     case Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session_id}) do
       [{worker_pid, _}] when is_pid(worker_pid) ->
-        if Process.alive?(worker_pid) do
-          mock_port =
-            try do
-              worker_state = :sys.get_state(worker_pid)
-              sdk_ref = worker_state.sdk_ref
-              if sdk_ref, do: SDK.Registry.lookup(sdk_ref), else: nil
-            catch
-              :exit, _ -> nil
-            end
-
-          if mock_port do
-            mock_port
-          else
-            Process.sleep(50)
-            wait_for_mock_port(session_id, attempts - 1)
-          end
-        else
-          Process.sleep(50)
-          wait_for_mock_port(session_id, attempts - 1)
-        end
+        fetch_mock_port(worker_pid, session_id, attempts)
 
       [] ->
         Process.sleep(50)
         wait_for_mock_port(session_id, attempts - 1)
+    end
+  end
+
+  defp fetch_mock_port(worker_pid, session_id, attempts) do
+    if Process.alive?(worker_pid) do
+      case resolve_sdk_port(worker_pid) do
+        nil ->
+          Process.sleep(50)
+          wait_for_mock_port(session_id, attempts - 1)
+
+        mock_port ->
+          mock_port
+      end
+    else
+      Process.sleep(50)
+      wait_for_mock_port(session_id, attempts - 1)
+    end
+  end
+
+  defp resolve_sdk_port(worker_pid) do
+    try do
+      worker_state = :sys.get_state(worker_pid)
+      sdk_ref = worker_state.sdk_ref
+      if sdk_ref, do: SDK.Registry.lookup(sdk_ref), else: nil
+    catch
+      :exit, _ -> nil
     end
   end
 

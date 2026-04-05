@@ -1,4 +1,5 @@
 defmodule EyeInTheSky.ScheduledJobs do
+  @moduledoc false
   import Ecto.Query, warn: false
 
   alias Crontab.CronExpression.Parser

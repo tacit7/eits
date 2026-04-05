@@ -1,4 +1,5 @@
 defmodule EyeInTheSky.PullRequests do
+  @moduledoc false
   import Ecto.Query
   alias EyeInTheSky.PullRequests.PullRequest
   alias EyeInTheSky.Repo

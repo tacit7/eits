@@ -1,4 +1,5 @@
 defmodule EyeInTheSky.Accounts do
+  @moduledoc false
   import Ecto.Query
 
   alias EyeInTheSky.Accounts.{Passkey, RegistrationToken, User, UserSession}

@@ -54,6 +54,7 @@ defmodule EyeInTheSky.Claude.SDK do
 
   # ETS-based registry for tracking running sessions (lock-free concurrent reads)
   defmodule Registry do
+    @moduledoc false
     use GenServer
 
     @table __MODULE__

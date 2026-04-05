@@ -1,4 +1,5 @@
 defmodule EyeInTheSky.Teams do
+  @moduledoc false
   import Ecto.Query, warn: false
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Teams.{Team, TeamMember}

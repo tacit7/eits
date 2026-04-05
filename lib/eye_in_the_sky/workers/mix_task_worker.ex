@@ -1,4 +1,5 @@
 defmodule EyeInTheSky.Workers.MixTaskWorker do
+  @moduledoc false
   use Oban.Worker, queue: :jobs, max_attempts: 3
 
   alias EyeInTheSky.ScheduledJobs

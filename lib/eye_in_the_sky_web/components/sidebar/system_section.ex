@@ -51,7 +51,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.SystemSection do
       navigate={@href}
       class={[
         "flex items-center gap-2 text-sm transition-colors",
-        if(@collapsed, do: "px-4 py-1 justify-center", else: "pl-3 pr-3 py-0.5"),
+        if(@collapsed, do: "px-4 py-2 justify-center", else: "pl-3 pr-3 py-2"),
         if(@active,
           do: "text-primary bg-primary/5 font-medium",
           else: "text-base-content/50 hover:text-base-content/75 hover:bg-base-content/5"

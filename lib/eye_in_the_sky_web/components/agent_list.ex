@@ -20,7 +20,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
         :for={{value, label, active_color} <- @tabs}
         phx-click="filter_session"
         phx-value-filter={value}
-        class={"px-3 py-1 rounded-md text-xs font-medium transition-all duration-150 " <>
+        class={"px-3 py-2 rounded-md text-xs font-medium transition-all duration-150 " <>
           if(@current == value,
             do: "bg-base-100 #{active_color} shadow-sm",
             else: "text-base-content/40 hover:text-base-content/60"

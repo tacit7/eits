@@ -144,7 +144,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
               </span>
             <% end %>
           </div>
-          <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
+          <div class="flex flex-wrap items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
             <span class="font-mono tabular-nums text-base-content/30 shrink-0">#{@session.id}</span>
             <span class="text-base-content/15">/</span>
             <span class={["font-medium shrink-0", @status_class]}>{@status_label}</span>
@@ -153,7 +153,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
               <.icon name="hero-command-line" class="w-3 h-3 text-base-content/40 flex-shrink-0" />
             <% end %>
             <%= if (agent = Map.get(@session, :agent)) && is_map(Map.get(agent, :agent_definition)) && not match?(%Ecto.Association.NotLoaded{}, Map.get(agent, :agent_definition)) && Map.get(agent.agent_definition, :display_name) do %>
-              <span class="text-base-content/50 truncate">{agent.agent_definition.display_name}</span>
+              <span class="text-base-content/50 truncate min-w-0">{agent.agent_definition.display_name}</span>
               <span class="text-base-content/15">/</span>
             <% end %>
             <span class="font-mono">{Sessions.format_model_info(@session)}</span>

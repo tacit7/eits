@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
       <!-- Sidebar -->
       <div
         id="config-tree-sidebar"
-        class="w-full md:w-80 md:flex-shrink-0 border-b md:border-b-0 md:border-r border-base-300 bg-base-100 overflow-y-auto max-h-64 md:max-h-none"
+        class="w-full md:w-80 md:flex-shrink-0 border-b md:border-b-0 md:border-r border-base-300 bg-base-100 overflow-y-auto max-h-[35dvh] md:max-h-none"
         phx-update="ignore"
       >
         <div class="p-4">

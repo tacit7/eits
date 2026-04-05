@@ -1,3 +1,5 @@
+import { createEnumAutocomplete } from './enum_autocomplete.js'
+
 export const SlashCommandPopup = {
   mounted() {
     // Slash command popup state
@@ -9,10 +11,7 @@ export const SlashCommandPopup = {
     this.slashTriggerPos = -1
     this.slashTriggerChar = '/'  // '/' or '@'
 
-    // Enum sub-popup state
-    this.enumMode = false
-    this.enumTriggerWordStart = -1
-    this.enumValues = []
+    this.enumAC = createEnumAutocomplete(this)
 
     this.loadSlashItems()
     this.buildPopup()
@@ -21,7 +20,7 @@ export const SlashCommandPopup = {
     this._inputListener = () => {
       this.loadSlashItems()
       this.checkSlashTrigger()
-      if (!this.slashOpen) this.checkEnumContext()
+      if (!this.slashOpen) this.enumAC.checkEnumContext()
     }
     this.el.addEventListener('input', this._inputListener)
 
@@ -376,21 +375,7 @@ export const SlashCommandPopup = {
     const item = (this.slashOrdered || this.slashFiltered)[this.slashIndex]
     if (!item) return
 
-    // Enum mode: insert selected enum value
-    if (this.enumMode) {
-      const val = this.el.value
-      const cursor = this.el.selectionStart
-      const prefix = val.slice(0, this.enumTriggerWordStart)
-      const suffix  = val.slice(cursor)
-      const newVal  = prefix + item.slug + ' ' + suffix
-      this.el.value = newVal
-      const pos = prefix.length + item.slug.length + 1
-      this.el.setSelectionRange(pos, pos)
-      this.slashClose()
-      this.enumMode = false
-      this.autoResize && this.autoResize()
-      return
-    }
+    if (this.enumAC.handleSelect()) return
 
     const val = this.el.value
     const cursor = this.el.selectionStart
@@ -414,90 +399,12 @@ export const SlashCommandPopup = {
     this.autoResize && this.autoResize()
   },
 
-  checkEnumContext() {
-    const val = this.el.value
-    const cursor = this.el.selectionStart
-
-    let wordStart = cursor
-    while (wordStart > 0 && val[wordStart-1] !== ' ' && val[wordStart-1] !== '\n') wordStart--
-    if (wordStart === 0 || val[wordStart-1] !== ' ') return
-
-    const partial = val.slice(wordStart, cursor)
-    let cmdEnd = wordStart - 1
-    let cmdStart = cmdEnd - 1
-    while (cmdStart > 0 && val[cmdStart-1] !== ' ' && val[cmdStart-1] !== '\n') cmdStart--
-
-    const cmdToken = val.slice(cmdStart, cmdEnd)
-    if (!cmdToken.startsWith('/')) return
-
-    const slug = cmdToken.slice(1)
-    const flagItem = this.slashItems && this.slashItems.find(i => i.slug === slug && i.type === 'flag')
-    if (!flagItem) return
-
-    const argType = flagItem.arg_type
-    if (!argType || typeof argType !== 'object' || argType.type !== 'enum') return
-
-    this.enumTriggerWordStart = wordStart
-    this.enumValues = argType.values
-    this.filterAndShowEnum(partial)
-  },
-
-  filterAndShowEnum(partial) {
-    const q = partial.toLowerCase()
-    const matches = this.enumValues.filter(v => v.toLowerCase().startsWith(q))
-    if (matches.length === 0) { this.slashClose(); return }
-
-    this.slashOrdered = matches.map(v => ({ slug: v, type: '_enum', description: '' }))
-    this.slashIndex = 0
-    this.slashOpen = true
-    this.enumMode = true
-    this.renderEnumPopup(matches, partial)
-  },
-
-  renderEnumPopup(matches, partial) {
-    if (!document.contains(this.popup)) {
-      const form = this.el.closest('form')
-      if (form) {
-        form.style.position = 'relative'
-        form.appendChild(this.popup)
-      }
-    }
-    this.popup.innerHTML = ''
-
-    for (let idx = 0; idx < matches.length; idx++) {
-      const v = matches[idx]
-      const row = document.createElement('button')
-      row.type = 'button'
-      row.dataset.slashIdx = idx
-      row.className = this.rowClass(idx)
-      row.innerHTML = `<span class="min-w-0 flex-1"><span class="font-medium text-base-content">${this.highlightMatch(v, partial)}</span></span>`
-      row.addEventListener('mouseenter', () => {
-        this.slashIndex = idx
-        this.highlightRow()
-      })
-      row.addEventListener('mousedown', (e) => {
-        e.preventDefault()
-        this.slashIndex = idx
-        this.slashSelect()
-      })
-      this.popup.appendChild(row)
-    }
-
-    const hint = document.createElement('div')
-    hint.className = 'px-3 py-1.5 text-[10px] text-base-content/30 border-t border-base-content/5 flex items-center gap-3 sticky bottom-0 bg-base-100'
-    hint.innerHTML = '<kbd class="font-mono">↑↓</kbd> navigate &nbsp;<kbd class="font-mono">↵</kbd> or <kbd class="font-mono">Tab</kbd> select &nbsp;<kbd class="font-mono">Esc</kbd> dismiss'
-    this.popup.appendChild(hint)
-
-    this.popup.classList.remove('hidden')
-    this.highlightRow()
-  },
-
   slashClose() {
     this.slashOpen = false
     this.slashTriggerPos = -1
     this.slashTriggerChar = '/'
     this.slashOrdered = []
-    this.enumMode = false
+    this.enumAC.close()
     this.popup.classList.add('hidden')
     this.popup.innerHTML = ''
   },

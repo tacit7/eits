@@ -107,7 +107,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       <div class="md:hidden sticky top-0 z-30 flex-shrink-0 flex items-center gap-1 px-2 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-base-100">
         <button
           phx-click={Phoenix.LiveView.JS.dispatch("sidebar:open", to: "#app-sidebar")}
-          class="btn btn-ghost btn-square w-10 h-10 text-base-content/60"
+          class="btn btn-ghost btn-square w-10 h-10 text-base-content/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
           aria-label="Open menu"
         >
           <.icon name="hero-bars-3" class="w-5 h-5" />
@@ -140,7 +140,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <div class="dropdown dropdown-end">
           <button
             tabindex="0"
-            class="btn btn-ghost btn-square w-10 h-10 text-base-content/60"
+            class="btn btn-ghost btn-square w-10 h-10 text-base-content/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
             aria-label="More options"
           >
             <.icon name="hero-ellipsis-horizontal" class="w-5 h-5" />

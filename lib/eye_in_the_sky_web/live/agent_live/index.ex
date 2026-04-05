@@ -5,12 +5,12 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Sessions
   alias EyeInTheSkyWeb.Canvases
+  alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Components.SessionCard
   import EyeInTheSkyWeb.Components.AgentList
   import EyeInTheSkyWeb.Helpers.SessionFilters
-  import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_budget: 1]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   require Logger
@@ -314,38 +314,22 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   end
 
   defp do_create_session(params, project, socket) do
-    agent_type = params["agent_type"] || "claude"
-    model = params["model"]
-    effort_level = params["effort_level"]
-    max_budget_usd = parse_budget(params["max_budget_usd"])
     description = params["description"]
     agent_name = params["agent_name"] || String.slice(description || "", 0, 60)
 
-    worktree =
-      case params["worktree"] do
-        nil -> nil
-        "" -> nil
-        v -> String.trim(v)
-      end
+    opts =
+      AgentCreationHelpers.build_opts(params,
+        project_path: project.path,
+        description: agent_name,
+        instructions: description
+      )
 
-    eits_workflow = params["eits_workflow"] || "1"
-
-    opts = [
-      agent_type: agent_type,
-      model: model,
-      effort_level: effort_level,
-      max_budget_usd: max_budget_usd,
-      project_id: project.id,
-      project_path: project.path,
-      description: agent_name,
-      instructions: description,
-      worktree: worktree,
-      agent: params["agent"],
-      eits_workflow: eits_workflow
-    ]
+    # Override project_id with the resolved struct id (params may have a string id
+    # that differs from the resolved project; ensure consistency)
+    opts = Keyword.put(opts, :project_id, project.id)
 
     Logger.info(
-      "create_new_session: model=#{model}, effort=#{inspect(effort_level)}, project_id=#{project.id}, project_path=#{project.path}"
+      "create_new_session: model=#{opts[:model]}, effort=#{inspect(opts[:effort_level])}, project_id=#{project.id}, project_path=#{project.path}"
     )
 
     case AgentManager.create_agent(opts) do

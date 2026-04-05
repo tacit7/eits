@@ -7,12 +7,12 @@ defmodule EyeInTheSkyWeb.ChatLive do
   alias EyeInTheSkyWeb.ChatLive.ChannelHeader
   alias EyeInTheSkyWeb.ChatLive.ChannelHelpers
   alias EyeInTheSkyWeb.ChatPresenter
+  alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
   alias EyeInTheSkyWeb.Helpers.SlashItems
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
-  import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_budget: 1]
   import EyeInTheSkyWeb.Helpers.UploadHelpers
-  import EyeInTheSkyWeb.ControllerHelpers, only: [maybe_opt: 3, parse_int: 1, parse_int: 2]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1, parse_int: 2]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -426,7 +426,20 @@ defmodule EyeInTheSkyWeb.ChatLive do
     uploaded_images = consume_agent_images(socket)
     instructions = append_image_paths(base_instructions, uploaded_images)
 
-    opts = build_agent_opts(params, socket.assigns.all_projects, channel_id, agent_description, instructions)
+    project_path =
+      case Enum.find(socket.assigns.all_projects, fn p ->
+             to_string(p.id) == to_string(params["project_id"])
+           end) do
+        nil -> File.cwd!()
+        project -> project.path
+      end
+
+    opts =
+      AgentCreationHelpers.build_opts(params,
+        project_path: project_path,
+        description: agent_description,
+        instructions: instructions
+      )
 
     case AgentManager.create_agent(opts) do
       {:ok, %{agent: agent, session: session}} ->
@@ -624,41 +637,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
     socket
     |> assign(:channel_members, channel_members)
     |> assign(:sessions_by_project, sessions_by_project)
-  end
-
-  defp build_agent_opts(params, all_projects, _channel_id, agent_description, instructions) do
-    selected_project_id = params["project_id"]
-
-    project_path =
-      case Enum.find(all_projects, fn p -> to_string(p.id) == to_string(selected_project_id) end) do
-        nil -> File.cwd!()
-        project -> project.path
-      end
-
-    max_turns = parse_int(params["max_turns"])
-
-    advanced_opts =
-      []
-      |> maybe_opt(:permission_mode, params["permission_mode"])
-      |> maybe_opt(:max_turns, if(is_integer(max_turns) and max_turns > 0, do: max_turns))
-      |> maybe_opt(:add_dir, params["add_dir"])
-      |> maybe_opt(:mcp_config, params["mcp_config"])
-      |> maybe_opt(:plugin_dir, params["plugin_dir"])
-      |> maybe_opt(:settings_file, params["settings_file"])
-      |> maybe_opt(:chrome, if(params["chrome"] == "true", do: true))
-      |> maybe_opt(:sandbox, if(params["sandbox"] == "true", do: true))
-
-    [
-      agent_type: params["agent_type"] || "claude",
-      model: params["model"] || "sonnet",
-      effort_level: params["effort_level"],
-      max_budget_usd: parse_budget(params["max_budget_usd"]),
-      project_id: selected_project_id,
-      project_path: project_path,
-      description: agent_description,
-      instructions: instructions,
-      agent: params["agent"]
-    ] ++ advanced_opts
   end
 
   defp join_agent_to_channel(nil, _agent, _session, _description), do: :ok

@@ -254,7 +254,7 @@ defmodule EyeInTheSky.Messages do
         is_nil(source_uuid) ->
           # No source_uuid — check for a recent message with same content to avoid
           # duplicating a message already imported from the session file via periodic sync.
-          case find_recent_matching_message(session_id, body) do
+          case find_recent_message(session_id, body) do
             nil -> insert_message(attrs)
             existing -> enrich_metadata_if_present(existing, metadata)
           end
@@ -448,22 +448,10 @@ defmodule EyeInTheSky.Messages do
   Returns {:ok, message} or :not_found.
   """
   def find_unlinked_message(session_id, sender_role, body) do
-    one_minute_ago =
-      DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
-
-    Message
-    |> where(
-      [m],
-      m.session_id == ^session_id and
-        m.sender_role == ^sender_role and
-        is_nil(m.source_uuid) and
-        m.body == ^body and
-        m.inserted_at >= ^one_minute_ago
-    )
-    |> order_by([m], desc: m.inserted_at)
-    |> limit(1)
-    |> Repo.one()
-    |> case do
+    case find_recent_message(session_id, body,
+           sender_role: sender_role,
+           require_nil_source_uuid: true
+         ) do
       nil -> :not_found
       message -> {:ok, message}
     end
@@ -497,11 +485,14 @@ defmodule EyeInTheSky.Messages do
     end
   end
 
-  # Finds the most recent agent message in the session matching the given body,
-  # within the last minute. Used to detect duplicates before creating a new record.
-  # Unlike find_unlinked_message, this does NOT filter on is_nil(source_uuid) because
-  # a concurrent sync may have already stamped the source_uuid on an existing message.
-  defp find_recent_matching_message(session_id, body) do
+  # Finds the most recent message in the session matching the given body within the last minute.
+  # opts:
+  #   sender_role: (default "agent")
+  #   require_nil_source_uuid: when true, only matches messages where source_uuid is nil (default false)
+  defp find_recent_message(session_id, body, opts \\ []) do
+    sender_role = Keyword.get(opts, :sender_role, "agent")
+    require_nil_source_uuid = Keyword.get(opts, :require_nil_source_uuid, false)
+
     one_minute_ago =
       DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
 
@@ -509,10 +500,13 @@ defmodule EyeInTheSky.Messages do
     |> where(
       [m],
       m.session_id == ^session_id and
-        m.sender_role == "agent" and
+        m.sender_role == ^sender_role and
         m.body == ^body and
         m.inserted_at >= ^one_minute_ago
     )
+    |> then(fn query ->
+      if require_nil_source_uuid, do: where(query, [m], is_nil(m.source_uuid)), else: query
+    end)
     |> order_by([m], desc: m.inserted_at)
     |> limit(1)
     |> Repo.one()

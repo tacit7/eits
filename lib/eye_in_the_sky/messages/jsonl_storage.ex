@@ -7,6 +7,7 @@ defmodule EyeInTheSky.Messages.JsonlStorage do
   """
 
   require Logger
+  alias EyeInTheSky.Claude.SessionFileLocator
   alias EyeInTheSky.Messages.Message
   alias EyeInTheSky.Utils.ToolHelpers
 
@@ -14,8 +15,7 @@ defmodule EyeInTheSky.Messages.JsonlStorage do
   Gets the path to a session's JSONL file.
   """
   def get_session_file_path(project_id, session_id) do
-    claude_dir = Path.expand("~/.claude")
-    Path.join([claude_dir, "projects", project_id, "#{session_id}.jsonl"])
+    SessionFileLocator.locate_by_id(project_id, session_id)
   end
 
   @doc """

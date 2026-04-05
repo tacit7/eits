@@ -3,6 +3,8 @@ defmodule EyeInTheSky.Claude.SessionReader do
   Reads Claude Code session files from ~/.claude/projects/ and extracts conversation messages.
   """
 
+  alias EyeInTheSky.Claude.SessionFileLocator
+
   @doc """
   Discovers all Claude Code sessions by scanning ~/.claude/projects/ directory.
   Returns a list of session maps with basic metadata.
@@ -90,26 +92,14 @@ defmodule EyeInTheSky.Claude.SessionReader do
   Claude stores sessions in: ~/.claude/projects/<escaped-project-path>/<session-id>.jsonl
   """
   def find_session_file(session_id, project_path) do
-    home = System.get_env("HOME")
-    escaped_path = escape_project_path(project_path)
-    file_path = Path.join([home, ".claude", "projects", escaped_path, "#{session_id}.jsonl"])
-
-    if File.exists?(file_path) do
-      {:ok, file_path}
-    else
-      {:error, :not_found}
-    end
+    SessionFileLocator.locate(session_id, project_path)
   end
 
   @doc """
   Escapes project path for Claude's directory naming convention.
-  Example: "/Users/user/projects/myapp" -> "-Users-user-projects-myapp"
+  Delegates to SessionFileLocator.escape_project_path/1.
   """
-  def escape_project_path(path) do
-    path
-    |> String.replace("/", "-")
-    |> String.replace(".", "-")
-  end
+  defdelegate escape_project_path(path), to: SessionFileLocator
 
   @doc """
   Reads messages from a session file that come after the given uuid.

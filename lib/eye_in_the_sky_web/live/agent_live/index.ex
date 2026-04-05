@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   alias EyeInTheSkyWeb.AgentLive.CanvasHandlers
   alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
+  import EyeInTheSkyWeb.Helpers.ChannelRoutingHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Components.SessionCard
   import EyeInTheSkyWeb.Components.AgentList
@@ -80,23 +81,21 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
         %{"session_id" => target_session_id, "body" => body},
         socket
       ) do
-    with {:session, {:ok, session}} <- {:session, Sessions.get_session(target_session_id)},
-         {:channel, {:ok, global_channel}} <- {:channel, EyeInTheSky.Channels.find_global_channel(session)},
+    with {:channel, {:ok, global_channel}} <-
+           {:channel, find_global_channel_for_session(target_session_id)},
          {:send, {:ok, _message}} <-
-           {:send,
-            EyeInTheSky.ChannelMessages.send_channel_message(%{
-              channel_id: global_channel.id,
-              session_id: "web-user",
-              sender_role: "user",
-              recipient_role: "agent",
-              provider: "claude",
-              body: body
-            })} do
-      maybe_continue_session(session, body, socket)
+           {:send, create_dm_channel_message(global_channel.id, body, "web-user")} do
+      maybe_continue_session(target_session_id, body)
+      {:noreply, socket}
     else
-      {:session, _} -> {:noreply, put_flash(socket, :error, "Session not found")}
-      {:channel, _} -> {:noreply, put_flash(socket, :error, "Global channel not found")}
-      {:send, _} -> {:noreply, put_flash(socket, :error, "Failed to send message")}
+      {:channel, {:error, :session_not_found}} ->
+        {:noreply, put_flash(socket, :error, "Session not found")}
+
+      {:channel, _} ->
+        {:noreply, put_flash(socket, :error, "Global channel not found")}
+
+      {:send, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to send message")}
     end
   end
 
@@ -389,41 +388,25 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
     end
   end
 
-  defp maybe_continue_session(session, body, socket) do
-    case Agents.get_agent(session.agent_id) do
-      {:ok, chat_agent} ->
-        project_path =
-          chat_agent.git_worktree_path ||
-            (chat_agent.project && chat_agent.project.path)
+  defp maybe_continue_session(target_session_id, body) do
+    with {:ok, session} <- Sessions.get_session(target_session_id),
+         {:ok, chat_agent} <- Agents.get_agent(session.agent_id) do
+      project_path =
+        chat_agent.git_worktree_path ||
+          (chat_agent.project && chat_agent.project.path)
 
-        continue_with_project_path(session, body, project_path, chat_agent, socket)
-
+      AgentManager.continue_session(
+        session.id,
+        direct_message_prompt(body),
+        model: "sonnet",
+        project_path: project_path
+      )
+    else
       _ ->
         Logger.warning(
-          "send_direct_message: agent #{session.agent_id} not found, message sent but session not continued"
+          "maybe_continue_session: could not continue session #{target_session_id}, message already sent"
         )
-
-        {:noreply, socket}
     end
-  end
-
-  defp continue_with_project_path(_session, _body, nil, chat_agent, socket) do
-    Logger.warning(
-      "send_direct_message: agent #{chat_agent.id} has no path (git_worktree_path and project.path both nil), session not continued"
-    )
-
-    {:noreply, socket}
-  end
-
-  defp continue_with_project_path(session, body, project_path, _chat_agent, socket) do
-    AgentManager.continue_session(
-      session.id,
-      direct_message_prompt(body),
-      model: "sonnet",
-      project_path: project_path
-    )
-
-    {:noreply, socket}
   end
 
   defp rename_session(session_id, name) do

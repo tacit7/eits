@@ -11,17 +11,20 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   function components (job_form_drawer, jobs_table, agent_schedule_form)
   that lack phx-target are forwarded by the parent's handle_event blanket
   relay using the same send_update pattern.
+
+  Agent-schedule state and the Claude AI drawer are delegated to:
+    - EyeInTheSkyWeb.Components.AgentScheduleSection
+    - EyeInTheSkyWeb.Components.AIJobCreator
   """
 
   use EyeInTheSkyWeb, :live_component
 
-  alias EyeInTheSky.Projects
   alias EyeInTheSky.ScheduledJobs
   alias EyeInTheSky.ScheduledJobs.ScheduledJob
+  alias EyeInTheSkyWeb.Components.AIJobCreator
+  alias EyeInTheSkyWeb.Components.AgentScheduleSection
   import EyeInTheSkyWeb.Live.Shared.JobsHelpers
   import EyeInTheSkyWeb.Components.JobFormDrawer
-  import EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers
-  import EyeInTheSkyWeb.Components.AgentScheduleForm
   import EyeInTheSkyWeb.Components.JobsTable
 
   # ---------------------------------------------------------------------------
@@ -42,7 +45,8 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
       |> reload_jobs()
       |> assign(:running_ids, MapSet.new(ScheduledJobs.list_running_job_ids()))
       |> assign(:last_run_map, ScheduledJobs.last_run_status_map())
-      |> maybe_reload_agent_schedule_data()
+
+    send_update(AgentScheduleSection, id: "agent-schedule-section", action: :refresh)
 
     {:ok, socket}
   end
@@ -70,9 +74,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
       socket =
         if assigns.project_id != prev_project_id do
           socket
-          |> maybe_assign_web_project(assigns.project_id)
           |> load_jobs()
-          |> maybe_reload_agent_schedule_data()
         else
           socket
         end
@@ -93,16 +95,13 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
         |> assign(:form_config, %{})
         |> assign(:expanded_job_id, nil)
         |> assign(:runs, [])
-        |> assign(:show_claude_drawer, false)
-        |> assign(:claude_model, "sonnet")
         |> assign(:search_query, "")
         |> assign(:filter_type, "all")
         |> assign(:filter_status, "all")
         |> assign(:filter_origin, "all")
         |> assign(:running_ids, MapSet.new(ScheduledJobs.list_running_job_ids()))
         |> assign(:last_run_map, ScheduledJobs.last_run_status_map())
-        |> maybe_assign_web_project(assigns.project_id)
-        |> assign_agent_schedule_defaults()
+        |> assign(:active_tab, :all_jobs)
         |> load_jobs()
 
       {:ok, socket}
@@ -199,38 +198,29 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   defp dispatch_event("expand_job", params, socket),
     do: handle_expand_job(params, socket)
 
-  defp dispatch_event("toggle_claude_drawer", params, socket),
-    do: handle_toggle_claude_drawer(params, socket)
-
-  defp dispatch_event("claude_model_changed", params, socket),
-    do: handle_claude_model_changed(params, socket)
-
-  defp dispatch_event("create_with_claude", params, socket) do
-    if socket.assigns.project_id do
-      handle_create_with_claude(params, socket, socket.assigns.project,
-        prompt_project: socket.assigns.project
-      )
-    else
-      handle_create_with_claude(params, socket, socket.assigns.web_project,
-        error_msg: "EITS Web project not found"
-      )
-    end
+  # Relay to AIJobCreator — toggle open/close from jobs_page header buttons
+  defp dispatch_event("toggle_claude_drawer", _params, socket) do
+    send_update(AIJobCreator, id: "ai-job-creator", action: :toggle_drawer)
+    {:noreply, socket}
   end
 
-  defp dispatch_event("switch_tab", params, socket),
-    do: handle_switch_tab(params, socket)
+  defp dispatch_event("switch_tab", %{"tab" => tab}, socket) do
+    new_tab = if tab == "agent_schedules", do: :agent_schedules, else: :all_jobs
+    {:noreply, assign(socket, :active_tab, new_tab)}
+  end
 
-  defp dispatch_event("schedule_prompt", params, socket),
-    do: handle_schedule_prompt(params, socket)
+  # Relay schedule form events to AgentScheduleSection.
+  # cancel_schedule and save_schedule come from agent_schedule_form (no phx-target),
+  # bubbling through the parent LiveView → here via event_relay.
+  defp dispatch_event(event, params, socket)
+       when event in ["cancel_schedule", "save_schedule"] do
+    send_update(AgentScheduleSection,
+      id: "agent-schedule-section",
+      event_relay: {event, params}
+    )
 
-  defp dispatch_event("edit_schedule", params, socket),
-    do: handle_edit_schedule(params, socket)
-
-  defp dispatch_event("cancel_schedule", params, socket),
-    do: handle_cancel_schedule(params, socket)
-
-  defp dispatch_event("save_schedule", params, socket),
-    do: handle_save_schedule(params, socket)
+    {:noreply, socket}
+  end
 
   defp dispatch_event("filter_jobs", params, socket) do
     if socket.assigns.project_id do
@@ -248,12 +238,6 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
-
-  defp maybe_assign_web_project(socket, nil) do
-    assign(socket, :web_project, Projects.get_project_by_name("EITS Web"))
-  end
-
-  defp maybe_assign_web_project(socket, _project_id), do: socket
 
   defp load_jobs(socket) do
     project_id = socket.assigns.project_id
@@ -384,89 +368,15 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
         />
       <% end %>
 
-      <%!-- Claude Create Drawer — all events target this component directly --%>
-      <div class={[
-        "fixed inset-y-0 right-0 safe-inset-y z-50 w-full max-w-sm bg-base-100 shadow-xl transform transition-transform duration-200 ease-in-out overflow-y-auto",
-        if(@show_claude_drawer, do: "translate-x-0", else: "translate-x-full")
-      ]}>
-        <div class="p-6">
-          <div class="flex items-center justify-between mb-6">
-            <h2 class="text-lg font-semibold">Create Job with Claude</h2>
-            <button
-              class="btn btn-ghost btn-sm btn-square"
-              phx-click="toggle_claude_drawer"
-              phx-target={@myself}
-            >
-              <span class="sr-only">Close Claude drawer</span>
-              <.icon name="hero-x-mark" class="w-4 h-4" />
-            </button>
-          </div>
-          <form phx-submit="create_with_claude" phx-target={@myself} class="flex flex-col gap-4">
-            <div class="form-control">
-              <label class="label"><span class="label-text font-medium">Model</span></label>
-              <select
-                name="model"
-                class="select select-bordered w-full"
-                phx-change="claude_model_changed"
-                phx-target={@myself}
-              >
-                <option value="opus" selected={@claude_model == "opus"}>
-                  Opus 4.6 &bull; Most capable for complex work
-                </option>
-                <option value="sonnet" selected={@claude_model == "sonnet"}>
-                  Sonnet 4.5 &bull; Best for everyday tasks
-                </option>
-                <option value="sonnet[1m]" selected={@claude_model == "sonnet[1m]"}>
-                  Sonnet 4.5 (1M) &bull; 1M context window
-                </option>
-                <option value="haiku" selected={@claude_model == "haiku"}>
-                  Haiku 4.5 &bull; Fastest for quick answers
-                </option>
-              </select>
-            </div>
-            <%= if @claude_model == "opus" do %>
-              <div class="form-control">
-                <label class="label"><span class="label-text font-medium">Effort Level</span></label>
-                <select name="effort_level" class="select select-bordered w-full">
-                  <option value="" selected>Default (high)</option>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="max">Max</option>
-                </select>
-              </div>
-            <% end %>
-            <div class="form-control">
-              <label class="label"><span class="label-text font-medium">Description</span></label>
-              <textarea
-                name="description"
-                class="textarea textarea-bordered w-full"
-                rows="3"
-                placeholder="What kind of job do you want to create?"
-              ></textarea>
-            </div>
-            <div class="flex gap-2 mt-4">
-              <button type="submit" class="btn btn-primary flex-1">Start</button>
-              <button
-                type="button"
-                phx-click="toggle_claude_drawer"
-                phx-target={@myself}
-                class="btn btn-ghost"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-      <%= if @show_claude_drawer do %>
-        <div
-          class="fixed inset-0 z-40 bg-black/30"
-          phx-click="toggle_claude_drawer"
-          phx-target={@myself}
-        >
-        </div>
-      <% end %>
+      <%!-- Claude AI Drawer — manages show_claude_drawer / claude_model state internally.
+           "Create with Claude" buttons above target @myself (jobs_page), which relays
+           via send_update(AIJobCreator, action: :toggle_drawer). --%>
+      <.live_component
+        module={AIJobCreator}
+        id="ai-job-creator"
+        project_id={@project_id}
+        project={@project}
+      />
 
       <%= if @active_tab == :all_jobs do %>
         <%!-- Filter Toolbar --%>
@@ -574,112 +484,14 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
         <% end %>
       <% end %>
 
-      <%= if @active_tab == :agent_schedules do %>
-        <div class="p-4 space-y-6">
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <%= for prompt <- @prompts do %>
-              <% job = Map.get(@prompt_job_map, prompt.id) %>
-              <div class={"card bg-base-200 border #{if job, do: "border-primary", else: "border-base-300"}"}>
-                <div class="card-body p-4 gap-2">
-                  <div class="flex items-start justify-between">
-                    <div class="flex items-center gap-1.5">
-                      <h3 class="font-semibold text-sm leading-tight">{prompt.name}</h3>
-                      <%= if Map.get(prompt, :source) do %>
-                        <span class={"badge badge-xs #{if prompt.source == :project, do: "badge-info", else: "badge-ghost"}"}>
-                          {if prompt.source == :project, do: "project", else: "global"}
-                        </span>
-                      <% end %>
-                    </div>
-                    <%= if job do %>
-                      <span class="badge badge-success badge-xs whitespace-nowrap">● active</span>
-                    <% end %>
-                  </div>
-                  <p class="text-xs text-base-content/60 line-clamp-2">{prompt.description}</p>
-                  <div class="flex items-center justify-between mt-1">
-                    <%= if job do %>
-                      <span class="font-mono text-xs text-base-content/50">{job.schedule_value}</span>
-                      <div class="flex gap-1">
-                        <button
-                          class="btn btn-ghost btn-xs"
-                          phx-click="edit_schedule"
-                          phx-value-job_id={job.id}
-                          phx-target={@myself}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          class="btn btn-ghost btn-xs"
-                          phx-click="run_now"
-                          phx-value-id={job.id}
-                          phx-target={@myself}
-                        >
-                          ▶
-                        </button>
-                      </div>
-                    <% else %>
-                      <span class="text-xs text-base-content/40">not scheduled</span>
-                      <button
-                        class="btn btn-primary btn-xs"
-                        phx-click="schedule_prompt"
-                        phx-value-id={prompt.id}
-                        phx-target={@myself}
-                      >
-                        + Schedule
-                      </button>
-                    <% end %>
-                  </div>
-                </div>
-              </div>
-            <% end %>
-          </div>
-
-          <%= if @orphaned_jobs != [] do %>
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-2">
-                Detached Schedules
-              </p>
-              <div class="space-y-2">
-                <%= for job <- @orphaned_jobs do %>
-                  <div class="flex items-center gap-3 p-3 rounded-lg bg-base-200 border border-warning/40">
-                    <div class="flex-1 min-w-0">
-                      <span class="text-sm truncate">{job.name}</span>
-                      <span class="badge badge-warning badge-xs ml-2">Prompt deactivated</span>
-                    </div>
-                    <span class="font-mono text-xs text-base-content/50 shrink-0">
-                      {job.schedule_value}
-                    </span>
-                    <button
-                      class="btn btn-ghost btn-xs"
-                      phx-click="run_now"
-                      phx-value-id={job.id}
-                      phx-target={@myself}
-                    >
-                      ▶
-                    </button>
-                    <button
-                      class="btn btn-ghost btn-xs text-error"
-                      phx-click="delete_job"
-                      phx-value-id={job.id}
-                      phx-target={@myself}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                <% end %>
-              </div>
-            </div>
-          <% end %>
-        </div>
-      <% end %>
-
-      <%!-- Agent Schedule Form — save_schedule / cancel_schedule events go to
-           parent LiveView which relays them back via send_update event_relay. --%>
-      <.agent_schedule_form
-        show={@scheduling_prompt != nil}
-        prompt={@scheduling_prompt || %{id: nil, name: "", description: nil, project_id: nil}}
-        job={@scheduling_job}
-        projects={@projects}
-        context_project_id={@project_id}
+      <%!-- Agent Schedule Section — manages schedule state + form internally.
+           Receives active_tab so it loads data on tab switch.
+           Always rendered so the scheduling form can appear above the tab content. --%>
+      <.live_component
+        module={AgentScheduleSection}
+        id="agent-schedule-section"
+        project_id={@project_id}
+        active_tab={@active_tab}
       />
     </div>
     """

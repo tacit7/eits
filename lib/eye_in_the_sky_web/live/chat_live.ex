@@ -235,17 +235,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
       case Channels.add_member(channel_id, agent_id, session_id) do
         {:ok, _member} ->
-          {:ok, sys_msg} =
-            ChannelMessages.send_channel_message(%{
-              channel_id: channel_id,
-              session_id: nil,
-              sender_role: "system",
-              recipient_role: "agent",
-              provider: "system",
-              body: "Agent @#{session_id} (#{session.name || "unnamed"}) joined the channel"
-            })
-
-          EyeInTheSky.Events.channel_message(channel_id, sys_msg)
+          broadcast_system_event(channel_id, "Agent @#{session_id} (#{session.name || "unnamed"}) joined the channel")
           Logger.info("Added agent session=#{session_id} to channel=#{channel_id}")
 
           {:noreply, refresh_members_and_picker(socket)}
@@ -269,17 +259,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
          {:ok, session} <- Sessions.get_session(session_id) do
       Channels.remove_member(channel_id, session_id)
 
-      {:ok, sys_msg} =
-        ChannelMessages.send_channel_message(%{
-          channel_id: channel_id,
-          session_id: nil,
-          sender_role: "system",
-          recipient_role: "agent",
-          provider: "system",
-          body: "Agent @#{session_id} (#{session.name || "unnamed"}) left the channel"
-        })
-
-      EyeInTheSky.Events.channel_message(channel_id, sys_msg)
+      broadcast_system_event(channel_id, "Agent @#{session_id} (#{session.name || "unnamed"}) left the channel")
       Logger.info("Removed agent session=#{session_id} from channel=#{channel_id}")
 
       {:noreply, refresh_members_and_picker(socket)}
@@ -633,17 +613,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
   defp join_agent_to_channel(channel_id, agent, session, description) do
     case Channels.add_member(channel_id, agent.id, session.id) do
       {:ok, _} ->
-        {:ok, sys_msg} =
-          ChannelMessages.send_channel_message(%{
-            channel_id: channel_id,
-            session_id: nil,
-            sender_role: "system",
-            recipient_role: "agent",
-            provider: "system",
-            body: "Agent @#{session.id} (#{description}) joined the channel"
-          })
-
-        EyeInTheSky.Events.channel_message(channel_id, sys_msg)
+        broadcast_system_event(channel_id, "Agent @#{session.id} (#{description}) joined the channel")
 
       {:error, _} ->
         :ok
@@ -651,6 +621,20 @@ defmodule EyeInTheSkyWeb.ChatLive do
   end
 
   defp agent_template_option(agent), do: %{id: agent.id, description: agent.description}
+
+  defp broadcast_system_event(channel_id, body) do
+    {:ok, sys_msg} =
+      ChannelMessages.send_channel_message(%{
+        channel_id: channel_id,
+        session_id: nil,
+        sender_role: "system",
+        recipient_role: "agent",
+        provider: "system",
+        body: body
+      })
+
+    EyeInTheSky.Events.channel_message(channel_id, sys_msg)
+  end
 
   defp reload_messages(socket) do
     ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)

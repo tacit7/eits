@@ -336,11 +336,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
     case MessageReactions.toggle_reaction(message_id, session_id, emoji) do
       {:ok, _action} ->
-        messages =
-          ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)
-          |> ChatPresenter.serialize_messages()
-
-        {:noreply, assign(socket, :messages, messages)}
+        {:noreply, assign(socket, :messages, reload_messages(socket))}
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Failed to add reaction")}
@@ -357,11 +353,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
         message = Messages.get_message!(id)
         {:ok, _} = Messages.delete_message(message)
 
-        messages =
-          ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)
-          |> ChatPresenter.serialize_messages()
-
-        {:noreply, assign(socket, :messages, messages)}
+        {:noreply, assign(socket, :messages, reload_messages(socket))}
     end
   end
 
@@ -480,9 +472,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
       "📨 Received new_message broadcast for channel #{socket.assigns.active_channel_id}"
     )
 
-    messages =
-      ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)
-      |> ChatPresenter.serialize_messages()
+    messages = reload_messages(socket)
 
     Logger.info("📬 Loaded #{length(messages)} messages from DB")
 
@@ -663,4 +653,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   defp agent_template_option(agent), do: %{id: agent.id, description: agent.description}
 
+  defp reload_messages(socket) do
+    ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)
+    |> ChatPresenter.serialize_messages()
+  end
 end

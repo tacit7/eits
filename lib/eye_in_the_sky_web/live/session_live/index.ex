@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Sessions
+  alias EyeInTheSky.Agents.AgentManager
   import EyeInTheSkyWeb.Components.SessionCard, only: [session_row: 1]
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
 
@@ -195,7 +196,7 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
       worktree: worktree
     ]
 
-    case EyeInTheSky.Agents.AgentManager.create_agent(opts) do
+    case AgentManager.create_agent(opts) do
       {:ok, _result} ->
         sessions = Sessions.list_session_overview_rows(limit: @per_page, offset: 0)
         total = Sessions.count_session_overview_rows()

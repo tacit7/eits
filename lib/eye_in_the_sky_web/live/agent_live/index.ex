@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Agents
+  alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Sessions
   alias EyeInTheSkyWeb.Canvases
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
@@ -347,7 +348,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
       "create_new_session: model=#{model}, effort=#{inspect(effort_level)}, project_id=#{project.id}, project_path=#{project.path}"
     )
 
-    case EyeInTheSky.Agents.AgentManager.create_agent(opts) do
+    case AgentManager.create_agent(opts) do
       {:ok, result} ->
         Logger.info(
           "create_new_session: agent created - agent_id=#{result.agent.id}, session_id=#{result.agent.id}, session_uuid=#{result.agent.uuid}"
@@ -469,7 +470,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   end
 
   defp continue_with_project_path(session, body, project_path, _chat_agent, socket) do
-    EyeInTheSky.Agents.AgentManager.continue_session(
+    AgentManager.continue_session(
       session.id,
       direct_message_prompt(body),
       model: "sonnet",

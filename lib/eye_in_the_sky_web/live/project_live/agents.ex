@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
 
   alias EyeInTheSkyWeb.Helpers.FileHelpers
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
 
   @user_agents_dir Path.expand("~/.claude/agents")
 
@@ -95,7 +96,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
            String.starts_with?(path, user_dir)) &&
         File.exists?(path)
 
-    if allowed, do: EyeInTheSkyWeb.Helpers.ViewHelpers.open_in_system(path)
+    if allowed, do: ViewHelpers.open_in_system(path)
 
     {:noreply, socket}
   end

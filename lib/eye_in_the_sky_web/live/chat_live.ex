@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
   alias EyeInTheSkyWeb.ChatLive.ChannelHeader
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   alias EyeInTheSkyWeb.ChatLive.ChannelHelpers
+  alias EyeInTheSkyWeb.Helpers.SlashItems
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_budget: 1]
   import EyeInTheSkyWeb.Helpers.UploadHelpers
@@ -72,7 +73,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
     |> assign(:show_agent_drawer, false)
     |> assign(:show_members, false)
     |> assign_new(:session_search, fn -> "" end)
-    |> assign(:slash_items, EyeInTheSkyWeb.Helpers.SlashItems.build())
+    |> assign(:slash_items, SlashItems.build())
   end
 
   defp load_channels(project_id) do

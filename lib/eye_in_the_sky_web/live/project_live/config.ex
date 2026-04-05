@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
 
   alias EyeInTheSky.Projects
   alias EyeInTheSky.ProjectFiles
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -116,7 +117,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
     claude_dir = socket.assigns.claude_dir
 
     if path && claude_dir && path_within?(path, claude_dir) && File.exists?(path) do
-      EyeInTheSkyWeb.Helpers.ViewHelpers.open_in_system(path)
+      ViewHelpers.open_in_system(path)
     end
 
     {:noreply, socket}

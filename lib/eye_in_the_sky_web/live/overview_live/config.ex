@@ -4,6 +4,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
   import EyeInTheSkyWeb.Helpers.FileHelpers,
     only: [path_within?: 2, detect_file_type: 1, format_size: 1, language_class: 1]
 
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
+
   @claude_dir Path.expand("~/.claude")
 
   @impl true
@@ -44,7 +46,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
   def handle_event("open_file", _params, socket) do
     if path = socket.assigns.selected_file_path do
       if path_within?(path, @claude_dir) do
-        EyeInTheSkyWeb.Helpers.ViewHelpers.open_in_system(path)
+        ViewHelpers.open_in_system(path)
       end
     end
 

@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Metrics.UsageReport
+  alias EyeInTheSky.Metrics.TokenIngestion
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
 
   @date_ranges %{"7d" => 7, "30d" => 30, "all" => nil}
@@ -39,7 +40,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
   @impl true
   def handle_info(:do_recalculate, socket) do
     {ingested, skipped, errors} =
-      EyeInTheSky.Metrics.TokenIngestion.ingest_all(force: true)
+      TokenIngestion.ingest_all(force: true)
 
     socket =
       socket

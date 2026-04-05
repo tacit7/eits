@@ -15,6 +15,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   import Phoenix.LiveView, only: [push_navigate: 2, put_flash: 3, stream_insert: 3]
 
   alias EyeInTheSky.Sessions
+  alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Loader
 
   # ---------------------------------------------------------------------------
@@ -40,7 +41,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
       agent: params["agent"]
     ]
 
-    case EyeInTheSky.Agents.AgentManager.create_agent(opts) do
+    case AgentManager.create_agent(opts) do
       {:ok, _result} ->
         socket =
           socket

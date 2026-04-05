@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageToolWidget do
   use EyeInTheSkyWeb, :html
 
   alias EyeInTheSkyWeb.Components.DmHelpers
+  alias EyeInTheSkyWeb.Components.DmMessageComponents
 
   attr :name, :string, required: true
   attr :rest, :string, required: true
@@ -50,73 +51,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageToolWidget do
     """
   end
 
-  attr :name, :string, required: true
-  attr :rest, :string, required: true
-  attr :detail, :string, required: true
-  attr :input, :any, default: nil
-
   defp tool_widget_body(assigns) do
-    body_type =
-      cond do
-        assigns.name == "Bash" and assigns.rest != "" ->
-          :bash
-
-        assigns.name == "Edit" and is_map(assigns.input) and
-            Map.has_key?(assigns.input, "old_string") ->
-          :edit
-
-        assigns.name == "Write" and is_map(assigns.input) and
-            Map.has_key?(assigns.input, "content") ->
-          :write
-
-        String.ends_with?(assigns.name, "i-speak") and assigns.detail != "" ->
-          :speak
-
-        is_map(assigns.input) and map_size(assigns.input) > 0 and
-            assigns.name not in ["Read", "Glob", "Grep", "WebSearch", "Task"] ->
-          :json
-
-        assigns.rest != "" and assigns.rest != assigns.detail ->
-          :text
-
-        true ->
-          :none
-      end
-
-    assigns = assign(assigns, :body_type, body_type)
-
-    ~H"""
-    <%= case @body_type do %>
-      <% :bash -> %>
-        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-          <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-[10px] text-base-content/70 whitespace-pre-wrap break-all leading-relaxed">{(@input && @input["command"]) || @detail}</pre>
-        </div>
-      <% :edit -> %>
-        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5 space-y-1.5">
-          <div class="font-mono text-[10px] text-base-content/40 pb-0.5">{@input["file_path"]}</div>
-          <pre class="bg-red-950/30 text-red-400/70 rounded px-2 py-1 font-mono text-[10px] whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{String.slice(@input["old_string"] || "", 0..500)}</pre>
-          <pre class="bg-green-950/30 text-green-400/70 rounded px-2 py-1 font-mono text-[10px] whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{String.slice(@input["new_string"] || "", 0..500)}</pre>
-        </div>
-      <% :write -> %>
-        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5 space-y-1">
-          <div class="font-mono text-[10px] text-base-content/40 pb-0.5">{@input["file_path"]}</div>
-          <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-[10px] text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-48 overflow-y-auto">{String.slice(@input["content"] || "", 0..500)}{if String.length(@input["content"] || "") > 500, do: "\n…", else: ""}</pre>
-        </div>
-      <% :speak -> %>
-        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-          <pre class="bg-base-200 rounded px-2 py-1.5 text-[11px] text-base-content/70 whitespace-pre-wrap break-all leading-relaxed">{@detail}</pre>
-        </div>
-      <% :json -> %>
-        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-          <pre class="font-mono text-[10px] text-base-content/40 whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto">{Jason.encode!(@input, pretty: true)}</pre>
-        </div>
-      <% :text -> %>
-        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-          <pre class="font-mono text-[10px] text-base-content/45 whitespace-pre-wrap break-all leading-relaxed">{@rest}</pre>
-        </div>
-      <% :none -> %>
-    <% end %>
-    """
+    DmMessageComponents.tool_widget_body(assigns)
   end
 
   defp tool_widget_meta(name, rest) do

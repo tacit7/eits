@@ -305,32 +305,36 @@ defmodule EyeInTheSkyWeb.PromptLive.Index do
   end
 
   defp filter_prompts(assigns) do
-    prompts = assigns.prompts
     query = String.downcase(assigns.search_query)
     scope_filter = assigns.scope_filter
 
-    prompts
-    |> Enum.filter(fn prompt ->
-      # Search filter
-      search_match =
-        if query == "" do
-          true
-        else
-          String.contains?(String.downcase(prompt.name || ""), query) ||
-            String.contains?(String.downcase(prompt.slug || ""), query) ||
-            String.contains?(String.downcase(prompt.description || ""), query)
-        end
+    assigns.prompts
+    |> filter_by_search(query)
+    |> filter_by_scope(scope_filter)
+  end
 
-      # Scope filter
-      scope_match =
-        case scope_filter do
-          "all" -> true
-          "global" -> is_nil(prompt.project_id)
-          "project" -> not is_nil(prompt.project_id)
-          _ -> true
-        end
+  defp filter_by_search(prompts, ""), do: prompts
 
-      search_match && scope_match
-    end)
+  defp filter_by_search(prompts, query) do
+    Enum.filter(prompts, &prompt_matches_search?(&1, query))
+  end
+
+  defp prompt_matches_search?(prompt, query) do
+    String.contains?(String.downcase(prompt.name || ""), query) ||
+      String.contains?(String.downcase(prompt.slug || ""), query) ||
+      String.contains?(String.downcase(prompt.description || ""), query)
+  end
+
+  defp filter_by_scope(prompts, scope_filter) do
+    Enum.filter(prompts, &prompt_matches_scope?(&1, scope_filter))
+  end
+
+  defp prompt_matches_scope?(prompt, scope_filter) do
+    case scope_filter do
+      "all" -> true
+      "global" -> is_nil(prompt.project_id)
+      "project" -> not is_nil(prompt.project_id)
+      _ -> true
+    end
   end
 end

@@ -28,29 +28,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
 
   def session_row(assigns) do
     display_status = derive_display_status(assigns.session)
-
-    {status_label, status_border} =
-      case display_status do
-        "working" -> {"Working", "border-success"}
-        "waiting" -> {"Waiting", "border-warning"}
-        "compacting" -> {"Compacting", "border-orange-500"}
-        "stopped" -> {"Stopped", "border-warning"}
-        "idle" -> {"Idle", "border-transparent"}
-        "idle_stale" -> {"Idle", "border-transparent"}
-        "idle_dead" -> {"Idle", "border-transparent"}
-        "completed" -> {"Done", "border-transparent"}
-        _ -> {"Idle", "border-transparent"}
-      end
-
-    status_class =
-      case display_status do
-        "working" -> "text-success"
-        "waiting" -> "text-warning"
-        "compacting" -> "text-orange-500"
-        "stopped" -> "text-warning"
-        "completed" -> "text-base-content/50"
-        _ -> "text-base-content/55"
-      end
+    {status_label, status_border, status_class} = session_status_display(display_status)
 
     assigns =
       assigns
@@ -201,5 +179,16 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
       </div>
     </div>
     """
+  end
+
+  defp session_status_display(status) do
+    case status do
+      "working" -> {"Working", "border-success", "text-success"}
+      "waiting" -> {"Waiting", "border-warning", "text-warning"}
+      "compacting" -> {"Compacting", "border-orange-500", "text-orange-500"}
+      "stopped" -> {"Stopped", "border-warning", "text-warning"}
+      "completed" -> {"Done", "border-transparent", "text-base-content/50"}
+      _ -> {"Idle", "border-transparent", "text-base-content/55"}
+    end
   end
 end

@@ -336,34 +336,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   attr :input, :any, default: nil
 
   def tool_widget_body(assigns) do
-    body_type =
-      cond do
-        assigns.name == "Bash" and assigns.rest != "" ->
-          :bash
-
-        assigns.name == "Edit" and is_map(assigns.input) and
-            Map.has_key?(assigns.input, "old_string") ->
-          :edit
-
-        assigns.name == "Write" and is_map(assigns.input) and
-            Map.has_key?(assigns.input, "content") ->
-          :write
-
-        String.ends_with?(assigns.name, "i-speak") and assigns.detail != "" ->
-          :speak
-
-        is_map(assigns.input) and map_size(assigns.input) > 0 and
-            assigns.name not in ["Read", "Glob", "Grep", "WebSearch", "Task"] ->
-          :json
-
-        assigns.rest != "" and assigns.rest != assigns.detail ->
-          :text
-
-        true ->
-          :none
-      end
-
-    assigns = assign(assigns, :body_type, body_type)
+    assigns = assign(assigns, :body_type, classify_body_type(assigns))
 
     ~H"""
     <%= case @body_type do %>
@@ -398,6 +371,43 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     <% end %>
     """
   end
+
+  # ---------------------------------------------------------------------------
+  # classify_body_type helpers
+  # ---------------------------------------------------------------------------
+
+  defp classify_body_type(assigns) do
+    cond do
+      bash_body?(assigns) -> :bash
+      edit_body?(assigns) -> :edit
+      write_body?(assigns) -> :write
+      speak_body?(assigns) -> :speak
+      json_body?(assigns) -> :json
+      text_body?(assigns) -> :text
+      true -> :none
+    end
+  end
+
+  defp bash_body?(assigns), do: assigns.name == "Bash" and assigns.rest != ""
+
+  defp edit_body?(assigns) do
+    assigns.name == "Edit" and is_map(assigns.input) and
+      Map.has_key?(assigns.input, "old_string")
+  end
+
+  defp write_body?(assigns) do
+    assigns.name == "Write" and is_map(assigns.input) and
+      Map.has_key?(assigns.input, "content")
+  end
+
+  defp speak_body?(assigns), do: String.ends_with?(assigns.name, "i-speak") and assigns.detail != ""
+
+  defp json_body?(assigns) do
+    is_map(assigns.input) and map_size(assigns.input) > 0 and
+      assigns.name not in ["Read", "Glob", "Grep", "WebSearch", "Task"]
+  end
+
+  defp text_body?(assigns), do: assigns.rest != "" and assigns.rest != assigns.detail
 
   # ---------------------------------------------------------------------------
   # stream_provider_avatar

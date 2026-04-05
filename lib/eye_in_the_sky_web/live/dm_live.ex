@@ -1,12 +1,12 @@
 defmodule EyeInTheSkyWeb.DmLive do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.{Sessions, Agents}
+  alias EyeInTheSky.{Agents, Sessions}
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSkyWeb.Components.DmPage
-  alias EyeInTheSkyWeb.DmLive.TaskHandlers
-  alias EyeInTheSkyWeb.DmLive.{MountState, MessageHandlers, AgentLifecycle, ExternalActions, SlashCommands}
+  alias EyeInTheSkyWeb.DmLive.{AgentLifecycle, ExternalActions, MessageHandlers, MountState, SlashCommands}
   alias EyeInTheSkyWeb.DmLive.TabHelpers
+  alias EyeInTheSkyWeb.DmLive.TaskHandlers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
   import EyeInTheSkyWeb.Live.Shared.TasksHelpers
   import EyeInTheSkyWeb.Live.Shared.DmExportHelpers

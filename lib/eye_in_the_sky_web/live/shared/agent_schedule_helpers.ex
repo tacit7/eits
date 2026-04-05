@@ -9,8 +9,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
   import EyeInTheSkyWeb.Live.Shared.JobsHelpers, only: [parse_job_id: 1]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
-  alias EyeInTheSky.{Prompts, ScheduledJobs, Projects}
   alias EyeInTheSky.Claude.AgentFileScanner
+  alias EyeInTheSky.{Projects, Prompts, ScheduledJobs}
 
   @doc "Initialize agent schedule assigns. Call from mount/3."
   def assign_agent_schedule_defaults(socket) do

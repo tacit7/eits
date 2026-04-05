@@ -1,8 +1,8 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.{Tasks, Notes}
-  alias EyeInTheSkyWeb.Live.Shared.{KanbanFilters, TasksHelpers, BulkHelpers}
+  alias EyeInTheSky.{Notes, Tasks}
+  alias EyeInTheSkyWeb.Live.Shared.{BulkHelpers, KanbanFilters, TasksHelpers}
   alias EyeInTheSkyWeb.ProjectLive.Kanban.{BoardActions, FilterHandlers}
 
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers

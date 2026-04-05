@@ -7,8 +7,8 @@ defmodule EyeInTheSkyWeb.FabHook do
   import Phoenix.LiveView
   import Phoenix.Component, only: [assign: 3]
 
-  alias EyeInTheSky.{Messages, Sessions}
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.{Messages, Sessions}
 
   require Logger
 

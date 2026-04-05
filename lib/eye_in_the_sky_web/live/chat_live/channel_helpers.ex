@@ -1,8 +1,8 @@
 defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
   require Logger
 
-  alias EyeInTheSky.{Channels, Messages, Sessions}
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.{Channels, Messages, Sessions}
   alias EyeInTheSky.Claude.ChannelProtocol
 
   def calculate_unread_counts(channels, session_id) do

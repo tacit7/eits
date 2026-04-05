@@ -4,8 +4,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmSessionHelpers do
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3]
 
-  alias EyeInTheSky.{Sessions, Notes, Events}
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.{Events, Notes, Sessions}
 
   def handle_update_session_name(%{"value" => value}, socket) do
     session = socket.assigns.session

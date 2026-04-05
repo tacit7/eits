@@ -5,8 +5,8 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
   import Phoenix.LiveView, only: [allow_upload: 3, connected?: 1]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
-  alias EyeInTheSky.{Tasks, Projects}
   alias EyeInTheSky.Claude.AgentWorker
+  alias EyeInTheSky.{Projects, Tasks}
   alias EyeInTheSkyWeb.Helpers.PubSubHelpers
   alias EyeInTheSkyWeb.Helpers.SlashItems
 

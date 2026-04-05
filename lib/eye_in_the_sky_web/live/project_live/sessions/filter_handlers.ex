@@ -10,7 +10,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.FilterHandlers do
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Loader
   alias EyeInTheSkyWeb.ProjectLive.Sessions.State
 
-
   def search(%{"query" => query}, socket) do
     effective_query = if String.length(String.trim(query)) >= 3, do: query, else: ""
 

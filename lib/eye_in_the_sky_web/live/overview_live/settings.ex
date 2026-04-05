@@ -1,9 +1,9 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Settings
   alias EyeInTheSky.Repo
-  alias EyeInTheSkyWeb.OverviewLive.Settings.{GeneralTab, AuthTab, EditorTab, WorkflowTab, PricingTab, SystemTab}
+  alias EyeInTheSky.Settings
+  alias EyeInTheSkyWeb.OverviewLive.Settings.{AuthTab, EditorTab, GeneralTab, PricingTab, SystemTab, WorkflowTab}
 
   @models [
     {"haiku", "Haiku"},

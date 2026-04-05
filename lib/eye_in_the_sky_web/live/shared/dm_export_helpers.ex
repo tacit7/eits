@@ -1,9 +1,11 @@
 defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
   import Phoenix.LiveView, only: [push_event: 3, put_flash: 3]
 
-  alias EyeInTheSky.{Messages, Claude.SessionImporter, Claude.SessionReader}
+  alias EyeInTheSky.Claude.SessionImporter
+  alias EyeInTheSky.Claude.SessionReader
   alias EyeInTheSky.Codex.SessionImporter, as: CodexImporter
   alias EyeInTheSky.Codex.SessionReader, as: CodexReader
+  alias EyeInTheSky.Messages
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 
   def handle_export_jsonl(socket) do

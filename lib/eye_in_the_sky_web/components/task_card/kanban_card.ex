@@ -68,7 +68,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
         phx-value-task_id={@task.uuid || to_string(@task.id)}
         aria-label={if @task.completed_at, do: "Mark task incomplete", else: "Mark task complete"}
         aria-pressed={to_string(!is_nil(@task.completed_at))}
-        class="flex-shrink-0 mt-0.5 flex items-center justify-center w-4 h-4 rounded text-base-content/30 hover:text-success transition-colors"
+        class="flex-shrink-0 mt-0.5 flex items-center justify-center min-w-[28px] min-h-[28px] rounded text-base-content/30 hover:text-success transition-colors"
       >
         <.icon
           name={if @task.completed_at, do: "hero-check-circle-mini", else: "hero-circle-mini"}
@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
 
   defp kanban_context_menu(assigns) do
     ~H"""
-    <div class="flex-shrink-0 opacity-0 group-hover/card:opacity-100 transition-opacity">
+    <div class="flex-shrink-0 md:opacity-0 md:group-hover/card:opacity-100 transition-opacity">
       <details class="dropdown dropdown-end">
         <summary class="flex items-center justify-center w-6 h-6 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/8 cursor-pointer list-none transition-colors">
           <.icon name="hero-ellipsis-horizontal-mini" class="w-3.5 h-3.5" />

@@ -4,6 +4,7 @@ defmodule EyeInTheSky.Messages do
   """
 
   import Ecto.Query, warn: false
+  alias EyeInTheSky.Messages.ChannelMessageNumbering
   alias EyeInTheSky.Messages.JsonlStorage
   alias EyeInTheSky.Messages.Message
   alias EyeInTheSky.QueryHelpers
@@ -175,34 +176,12 @@ defmodule EyeInTheSky.Messages do
     if cid && is_nil(has_number) do
       # Advisory lock on the channel prevents two concurrent inserts from reading
       # the same MAX and assigning duplicate channel_message_numbers.
-      Repo.transaction(fn -> insert_with_advisory_lock(cid, attrs) end)
+      ChannelMessageNumbering.create(cid, attrs)
     else
       %Message{}
       |> Message.changeset(attrs)
       |> Repo.insert()
     end
-  end
-
-  defp insert_with_advisory_lock(cid, attrs) do
-    lock_key = :erlang.phash2(cid)
-    Repo.query!("SELECT pg_advisory_xact_lock($1)", [lock_key])
-    attrs = Map.put(attrs, :channel_message_number, next_channel_message_number(cid))
-
-    case %Message{} |> Message.changeset(attrs) |> Repo.insert() do
-      {:ok, message} -> message
-      {:error, changeset} -> Repo.rollback(changeset)
-    end
-  end
-
-  defp next_channel_message_number(channel_id) do
-    current_max =
-      from(m in Message,
-        where: m.channel_id == ^channel_id and not is_nil(m.channel_message_number),
-        select: max(m.channel_message_number)
-      )
-      |> Repo.one()
-
-    (current_max || 0) + 1
   end
 
   @doc """

@@ -96,6 +96,12 @@ defmodule EyeInTheSky.Claude.SessionReader do
   end
 
   @doc """
+  Escapes project path for Claude's directory naming convention.
+  Delegates to SessionFileLocator.escape_project_path/1.
+  """
+  defdelegate escape_project_path(path), to: SessionFileLocator
+
+  @doc """
   Reads messages from a session file that come after the given uuid.
   If after_uuid is nil, reads all messages. Used for incremental sync.
   """

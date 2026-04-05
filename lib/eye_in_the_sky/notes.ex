@@ -382,33 +382,36 @@ defmodule EyeInTheSky.Notes do
       |> add_sql_clause(
         project_id_str != nil,
         fn {clauses, params, idx} ->
-          clause = "(n.parent_type IN ('project', 'projects') AND n.parent_id = $#{idx})"
+          types_sql = note_type_variants("project") |> Enum.map_join(", ", &"'#{&1}'")
+          clause = "(n.parent_type IN (#{types_sql}) AND n.parent_id = $#{idx})"
           {[clause | clauses], params ++ [project_id_str], idx + 1}
         end
       )
       |> add_sql_clause(
         agent_ids_str != [],
         fn {clauses, params, idx} ->
+          types_sql = note_type_variants("agent") |> Enum.map_join(", ", &"'#{&1}'")
+
           placeholders =
             agent_ids_str
             |> Enum.with_index(idx)
             |> Enum.map_join(",", fn {_, i} -> "$#{i}" end)
 
-          clause = "(n.parent_type IN ('agent', 'agents') AND n.parent_id IN (#{placeholders}))"
+          clause = "(n.parent_type IN (#{types_sql}) AND n.parent_id IN (#{placeholders}))"
           {[clause | clauses], params ++ agent_ids_str, idx + length(agent_ids_str)}
         end
       )
       |> add_sql_clause(
         session_ids_str != [],
         fn {clauses, params, idx} ->
+          types_sql = note_type_variants("session") |> Enum.map_join(", ", &"'#{&1}'")
+
           placeholders =
             session_ids_str
             |> Enum.with_index(idx)
             |> Enum.map_join(",", fn {_, i} -> "$#{i}" end)
 
-          clause =
-            "(n.parent_type IN ('session', 'sessions') AND n.parent_id IN (#{placeholders}))"
-
+          clause = "(n.parent_type IN (#{types_sql}) AND n.parent_id IN (#{placeholders}))"
           {[clause | clauses], params ++ session_ids_str, idx + length(session_ids_str)}
         end
       )

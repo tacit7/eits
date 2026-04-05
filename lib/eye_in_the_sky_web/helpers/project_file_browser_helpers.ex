@@ -115,4 +115,119 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers do
     |> assign(:file_content, nil)
     |> assign(:file_type, nil)
   end
+
+  # ── Pure file-browser I/O helpers ────────────────────────────────────────────
+  # These take and return plain values — no socket manipulation.
+
+  @max_tree_depth 2
+
+  @doc """
+  Recursively scans a directory up to @max_tree_depth levels deep.
+  Returns a sorted list of entry maps with :name, :path, :relative, :is_dir,
+  :children (for dirs), and :size (for files).
+  Hidden entries (names starting with ".") are skipped.
+  """
+  def scan_directory(base_dir, current_dir, depth) do
+    case File.ls(current_dir) do
+      {:ok, items} ->
+        items
+        |> Enum.reject(&String.starts_with?(&1, "."))
+        |> Enum.sort()
+        |> Enum.map(fn item ->
+          full = Path.join(current_dir, item)
+          relative = Path.relative_to(full, base_dir)
+          is_dir = File.dir?(full)
+
+          if is_dir do
+            children =
+              if depth < @max_tree_depth,
+                do: scan_directory(base_dir, full, depth + 1),
+                else: []
+
+            %{name: item, path: full, relative: relative, is_dir: true, children: children}
+          else
+            size =
+              case File.stat(full) do
+                {:ok, %{size: s}} -> s
+                _ -> 0
+              end
+
+            %{name: item, path: full, relative: relative, is_dir: false, size: size}
+          end
+        end)
+        |> Enum.sort_by(&{!&1.is_dir, &1.name})
+
+      _ ->
+        []
+    end
+  end
+
+  @doc """
+  Resolves the target path for list-mode navigation.
+  Returns {:ok, full_path, rel_path} | {:error, message}.
+  """
+  def resolve_list_target(path, base_dir) do
+    if path && path != "" do
+      full = Path.join(base_dir, path)
+      if path_within?(full, base_dir), do: {:ok, full, path}, else: {:error, "Access denied"}
+    else
+      {:ok, base_dir, nil}
+    end
+  end
+
+  @doc """
+  Builds a file-entry map for a single item within a directory listing.
+  """
+  def build_file_entry(item, dir_path, rel_path) do
+    item_path = Path.join(dir_path, item)
+    rel = if rel_path, do: Path.join(rel_path, item), else: item
+
+    size =
+      case File.stat(item_path) do
+        {:ok, %{size: s}} -> s
+        _ -> 0
+      end
+
+    %{name: item, path: rel, is_dir: File.dir?(item_path), size: size}
+  end
+
+  @doc """
+  Lists a directory and returns a sorted list of entry maps.
+  Returns {:ok, entries} | {:error, message}.
+  """
+  def list_directory(full_path, rel_path) do
+    case File.ls(full_path) do
+      {:ok, items} ->
+        file_list =
+          items
+          |> Enum.sort()
+          |> Enum.map(&build_file_entry(&1, full_path, rel_path))
+          |> Enum.sort_by(&{!&1.is_dir, &1.name})
+
+        {:ok, file_list}
+
+      {:error, reason} ->
+        {:error, "Failed to read directory: #{reason}"}
+    end
+  end
+
+  @doc """
+  Dispatches a resolved path to the appropriate result type.
+  Returns {:dir, files, rel_path} | {:file, full_path, rel_path} | {:error, message}.
+  """
+  def dispatch_path(full_path, rel_path, raw_path, _base_dir) do
+    cond do
+      File.dir?(full_path) ->
+        case list_directory(full_path, rel_path) do
+          {:ok, files} -> {:dir, files, rel_path}
+          {:error, msg} -> {:error, msg}
+        end
+
+      File.regular?(full_path) ->
+        {:file, full_path, rel_path}
+
+      true ->
+        {:error, "Path not found: #{raw_path}"}
+    end
+  end
 end

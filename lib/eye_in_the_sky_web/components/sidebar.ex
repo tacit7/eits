@@ -69,11 +69,13 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
      |> assign(:expanded_system, socket.assigns[:expanded_system] != false)}
   end
 
-  # --- UI toggles ---
+  # --- Navigation ---
 
   @impl true
   def handle_event("new_chat", _params, socket),
     do: {:noreply, push_navigate(socket, to: "/?new=1")}
+
+  # --- UI toggles ---
 
   @impl true
   def handle_event("toggle_collapsed", _params, socket),
@@ -174,6 +176,8 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
   @impl true
   def handle_event("create_channel", _params, socket),
     do: ChannelActions.handle_create_channel(socket)
+
+  # --- Async handlers ---
 
   @impl true
   def handle_async(:pick_folder, {:ok, result}, socket),

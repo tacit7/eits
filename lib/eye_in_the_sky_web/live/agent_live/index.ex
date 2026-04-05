@@ -326,7 +326,10 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
     # Override project_id with the resolved struct id (params may have a string id
     # that differs from the resolved project; ensure consistency)
-    opts = Keyword.put(opts, :project_id, project.id)
+    opts =
+      opts
+      |> Keyword.put(:project_id, project.id)
+      |> Keyword.put(:name, if(agent_name != "", do: agent_name))
 
     Logger.info(
       "create_new_session: model=#{opts[:model]}, effort=#{inspect(opts[:effort_level])}, project_id=#{project.id}, project_path=#{project.path}"

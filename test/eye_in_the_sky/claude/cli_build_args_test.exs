@@ -269,6 +269,20 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
       assert idx != nil
       assert Enum.at(args, idx + 1) == "stream-json"
     end
+
+    test "name produces --name <value>" do
+      args = CLI.build_args(prompt: "x", name: "My Agent")
+
+      idx = Enum.find_index(args, &(&1 == "--name"))
+      assert idx != nil
+      assert Enum.at(args, idx + 1) == "My Agent"
+    end
+
+    test "nil name omits --name flag" do
+      args = CLI.build_args(prompt: "x", name: nil)
+
+      refute "--name" in args
+    end
   end
 
   # ---------------------------------------------------------------------------

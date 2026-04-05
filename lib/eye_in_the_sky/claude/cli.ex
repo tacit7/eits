@@ -229,6 +229,7 @@ defmodule EyeInTheSky.Claude.CLI do
     * `:add_dir` - `--add-dir <path>`
     * `:plugin_dir` - `--plugin-dir <path>`
     * `:settings_file` - `--settings <file>`
+    * `:name` - `--name <name>` (session display name)
     * `:sandbox` - `true` → `--sandbox` (OS-level isolation; off by default, --no-sandbox is remote-control only)
     * `:chrome` - `true` → `--chrome`, `false` → `--no-chrome`
 
@@ -278,6 +279,7 @@ defmodule EyeInTheSky.Claude.CLI do
     args = maybe_flag(args, "--add-dir", opts[:add_dir])
     args = maybe_flag(args, "--plugin-dir", opts[:plugin_dir])
     args = maybe_flag(args, "--settings", opts[:settings_file])
+    args = maybe_flag(args, "--name", opts[:name])
 
     # Boolean flags — use maybe_bool_flag/3 for consistency with maybe_flag/3
     # stream-json requires --verbose for proper output parsing

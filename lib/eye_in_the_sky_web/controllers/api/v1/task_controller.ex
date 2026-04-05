@@ -16,49 +16,55 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   """
   def index(conn, params) do
     limit = parse_int(params["limit"], 50)
-
-    tasks =
-      cond do
-        params["q"] && params["q"] != "" ->
-          Tasks.search_tasks(params["q"]) |> Enum.take(limit)
-
-        params["session_id"] ->
-          session_int_id =
-            case Helpers.resolve_session_int_id(params["session_id"]) do
-              {:ok, id} -> id
-              _ -> nil
-            end
-
-          if session_int_id,
-            do: Tasks.list_tasks_for_session(session_int_id) |> Enum.take(limit),
-            else: []
-
-        params["agent_id"] ->
-          agent_int_id = resolve_agent_int_id(params["agent_id"])
-
-          if agent_int_id,
-            do: Tasks.list_tasks_for_agent(agent_int_id) |> Enum.take(limit),
-            else: []
-
-        params["project_id"] ->
-          Projects.get_project_tasks(parse_int(params["project_id"], nil)) |> Enum.take(limit)
-
-        true ->
-          Tasks.list_tasks() |> Enum.take(limit)
-      end
-
-    tasks =
-      if state_id = parse_int(params["state_id"], nil) do
-        tasks |> Enum.filter(&(&1.state_id == state_id)) |> Enum.take(limit)
-      else
-        tasks
-      end
+    tasks = fetch_tasks(params, limit)
 
     json(conn, %{
       success: true,
       message: "#{length(tasks)} task(s)",
       tasks: Enum.map(tasks, &ApiPresenter.present_task/1)
     })
+  end
+
+  defp fetch_tasks(params, limit) do
+    tasks = fetch_tasks_by_filter(params, limit)
+
+    if state_id = parse_int(params["state_id"], nil) do
+      tasks |> Enum.filter(&(&1.state_id == state_id)) |> Enum.take(limit)
+    else
+      tasks
+    end
+  end
+
+  defp fetch_tasks_by_filter(%{"q" => q}, limit) when is_binary(q) and q != "" do
+    Tasks.search_tasks(q) |> Enum.take(limit)
+  end
+
+  defp fetch_tasks_by_filter(%{"session_id" => session_id}, limit) when not is_nil(session_id) do
+    session_int_id =
+      case Helpers.resolve_session_int_id(session_id) do
+        {:ok, id} -> id
+        _ -> nil
+      end
+
+    if session_int_id,
+      do: Tasks.list_tasks_for_session(session_int_id) |> Enum.take(limit),
+      else: []
+  end
+
+  defp fetch_tasks_by_filter(%{"agent_id" => agent_id}, limit) when not is_nil(agent_id) do
+    agent_int_id = resolve_agent_int_id(agent_id)
+
+    if agent_int_id,
+      do: Tasks.list_tasks_for_agent(agent_int_id) |> Enum.take(limit),
+      else: []
+  end
+
+  defp fetch_tasks_by_filter(%{"project_id" => project_id}, limit) when not is_nil(project_id) do
+    Projects.get_project_tasks(parse_int(project_id, nil)) |> Enum.take(limit)
+  end
+
+  defp fetch_tasks_by_filter(_params, limit) do
+    Tasks.list_tasks() |> Enum.take(limit)
   end
 
   @doc """

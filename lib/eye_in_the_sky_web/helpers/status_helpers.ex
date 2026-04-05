@@ -44,23 +44,7 @@ defmodule EyeInTheSkyWeb.Helpers.StatusHelpers do
   Returns "idle" | "idle_stale" | "idle_dead"
   """
   def idle_tier(agent) do
-    activity_at = Map.get(agent, :last_activity_at)
-
-    hours_since =
-      case activity_at do
-        nil ->
-          nil
-
-        %DateTime{} = dt ->
-          DateTime.diff(DateTime.utc_now(), dt, :hour)
-
-        str when is_binary(str) ->
-          dt = parse_datetime_string(str)
-          if dt, do: DateTime.diff(DateTime.utc_now(), dt, :hour), else: nil
-
-        _ ->
-          nil
-      end
+    hours_since = agent |> Map.get(:last_activity_at) |> hours_since_activity()
 
     cond do
       is_nil(hours_since) -> "idle"
@@ -69,6 +53,18 @@ defmodule EyeInTheSkyWeb.Helpers.StatusHelpers do
       true -> "idle"
     end
   end
+
+  defp hours_since_activity(nil), do: nil
+
+  defp hours_since_activity(%DateTime{} = dt),
+    do: DateTime.diff(DateTime.utc_now(), dt, :hour)
+
+  defp hours_since_activity(str) when is_binary(str) do
+    dt = parse_datetime_string(str)
+    if dt, do: DateTime.diff(DateTime.utc_now(), dt, :hour), else: nil
+  end
+
+  defp hours_since_activity(_), do: nil
 
   defp parse_datetime_string(str) do
     case DateTime.from_iso8601(str) do

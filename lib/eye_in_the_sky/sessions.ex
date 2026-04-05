@@ -419,7 +419,7 @@ defmodule EyeInTheSky.Sessions do
   """
   @spec register_from_hook(map(), integer() | nil) ::
           {:ok, %{session: Session.t(), agent: struct()}}
-          | {:error, Ecto.Changeset.t()}
+          | {:error, :agent | :session, Ecto.Changeset.t()}
   def register_from_hook(params, project_id) do
     session_uuid = params["session_id"]
 
@@ -432,34 +432,42 @@ defmodule EyeInTheSky.Sessions do
       source: "hook"
     }
 
-    with {:ok, agent} <- EyeInTheSky.Agents.find_or_create_agent(agent_attrs) do
-      {model_provider, model_name} = ModelInfo.parse_model_string(params["model"])
+    case EyeInTheSky.Agents.find_or_create_agent(agent_attrs) do
+      {:ok, agent} ->
+        {model_provider, model_name} = ModelInfo.parse_model_string(params["model"])
 
-      session_attrs = %{
-        uuid: session_uuid,
-        agent_id: agent.id,
-        name: params["name"],
-        description: params["description"],
-        status: "working",
-        started_at: DateTime.utc_now(),
-        provider: params["provider"] || "claude",
-        model: params["model"],
-        model_provider: model_provider,
-        model_name: model_name,
-        project_id: project_id,
-        git_worktree_path: params["worktree_path"],
-        entrypoint: params["entrypoint"]
-      }
+        session_attrs = %{
+          uuid: session_uuid,
+          agent_id: agent.id,
+          name: params["name"],
+          description: params["description"],
+          status: "working",
+          started_at: DateTime.utc_now(),
+          provider: params["provider"] || "claude",
+          model: params["model"],
+          model_provider: model_provider,
+          model_name: model_name,
+          project_id: project_id,
+          git_worktree_path: params["worktree_path"],
+          entrypoint: params["entrypoint"]
+        }
 
-      create_fn =
-        if model_name,
-          do: &create_session_with_model/1,
-          else: &create_session/1
+        create_fn =
+          if model_name,
+            do: &create_session_with_model/1,
+            else: &create_session/1
 
-      with {:ok, session} <- create_fn.(session_attrs) do
-        EyeInTheSky.Events.session_started(session)
-        {:ok, %{session: session, agent: agent}}
-      end
+        case create_fn.(session_attrs) do
+          {:ok, session} ->
+            EyeInTheSky.Events.session_started(session)
+            {:ok, %{session: session, agent: agent}}
+
+          {:error, changeset} ->
+            {:error, :session, changeset}
+        end
+
+      {:error, changeset} ->
+        {:error, :agent, changeset}
     end
   end
 

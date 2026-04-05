@@ -65,10 +65,15 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
           status: session.status
         })
 
-      {:error, changeset} ->
+      {:error, :agent, changeset} ->
         conn
         |> put_status(:unprocessable_entity)
-        |> json(%{error: "Failed to register session", details: translate_errors(changeset)})
+        |> json(%{error: "Failed to create agent", details: translate_errors(changeset)})
+
+      {:error, :session, changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "Failed to create session", details: translate_errors(changeset)})
     end
   end
 

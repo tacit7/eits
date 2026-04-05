@@ -3,8 +3,8 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
 
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
-  alias EyeInTheSky.{Messages, Sessions}
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.{Messages, Sessions}
 
   @impl true
   def update(%{canvas_session: cs} = assigns, socket) do

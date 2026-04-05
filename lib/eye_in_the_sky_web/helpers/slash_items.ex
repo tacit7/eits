@@ -49,7 +49,6 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
   defp encode_arg_type(:path),           do: "path"
   defp encode_arg_type({:enum, values}), do: %{type: "enum", values: values}
 
-
   @doc false
   def load_skills(commands_dir, skills_dir) do
     commands = load_commands(commands_dir)

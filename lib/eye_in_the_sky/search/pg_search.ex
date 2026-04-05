@@ -8,8 +8,8 @@ defmodule EyeInTheSky.Search.PgSearch do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias Ecto.Adapters.SQL
+  alias EyeInTheSky.Repo
 
   # Only lowercase letters, digits, and underscores — no injection vectors
   @safe_identifier ~r/^[a-z][a-z0-9_]*$/
@@ -185,7 +185,8 @@ defmodule EyeInTheSky.Search.PgSearch do
        ) do
     alias_letter = String.first(table)
 
-    # Build tsvector expression from search columns: to_tsvector('english', coalesce(col1,'') || ' ' || coalesce(col2,''))
+    # Build tsvector expression from search columns:
+    # to_tsvector('english', coalesce(col1,'') || ' ' || coalesce(col2,''))
     tsvector_expr =
       Enum.map_join(search_columns, " || ' ' || ", fn col ->
         "coalesce(#{alias_letter}.#{col}, '')"

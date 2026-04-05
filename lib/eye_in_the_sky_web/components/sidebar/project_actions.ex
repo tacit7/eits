@@ -6,8 +6,8 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectActions do
 
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
-  alias EyeInTheSky.{Projects, Events}
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.{Events, Projects}
 
   def handle_select_project(%{"project_id" => id_str}, socket) do
     case parse_int(id_str) do

@@ -5,8 +5,8 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
   import EyeInTheSkyWeb.Components.Sidebar.ChatSection
   import EyeInTheSkyWeb.Components.Sidebar.ProjectsSection
 
-  alias EyeInTheSkyWeb.Components.Sidebar.{ProjectActions, ChannelActions}
-  alias EyeInTheSky.{Projects, Channels, Notifications}
+  alias EyeInTheSky.{Channels, Notifications, Projects}
+  alias EyeInTheSkyWeb.Components.Sidebar.{ChannelActions, ProjectActions}
 
   @impl true
   def mount(socket) do

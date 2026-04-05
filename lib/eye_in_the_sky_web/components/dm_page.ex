@@ -3,12 +3,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
   use EyeInTheSkyWeb, :html
 
-  alias EyeInTheSkyWeb.Components.DmPage.MessagesTab
-  alias EyeInTheSkyWeb.Components.DmPage.TasksTab
   alias EyeInTheSkyWeb.Components.DmPage.CommitsTab
-  alias EyeInTheSkyWeb.Components.DmPage.NotesTab
-  alias EyeInTheSkyWeb.Components.DmPage.ContextTab
   alias EyeInTheSkyWeb.Components.DmPage.Composer
+  alias EyeInTheSkyWeb.Components.DmPage.ContextTab
+  alias EyeInTheSkyWeb.Components.DmPage.MessagesTab
+  alias EyeInTheSkyWeb.Components.DmPage.NotesTab
+  alias EyeInTheSkyWeb.Components.DmPage.TasksTab
 
   @tabs [
     {"messages", "hero-chat-bubble-left-right", "Messages"},

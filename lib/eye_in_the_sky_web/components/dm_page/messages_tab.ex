@@ -3,8 +3,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   use EyeInTheSkyWeb, :html
 
-  alias EyeInTheSkyWeb.Components.DmPage.MessageToolWidget
   alias EyeInTheSkyWeb.Components.DmHelpers
+  alias EyeInTheSkyWeb.Components.DmPage.MessageToolWidget
   import EyeInTheSkyWeb.Components.DmHelpers, only: [to_utc_string: 1]
 
   attr :messages, :list, default: []

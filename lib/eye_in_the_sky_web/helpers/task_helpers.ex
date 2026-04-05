@@ -94,7 +94,7 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpers do
   def days_since_update(nil), do: nil
 
   def days_since_update(%DateTime{} = dt) do
-    DateTime.diff(DateTime.utc_now(), dt, :second) |> div(86400)
+    DateTime.diff(DateTime.utc_now(), dt, :second) |> div(86_400)
   end
 
   def days_since_update(str) when is_binary(str) do

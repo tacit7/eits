@@ -9,6 +9,7 @@ defmodule EyeInTheSky.Messages do
   alias EyeInTheSky.Messages.Deduplicator
   alias EyeInTheSky.Messages.JsonlStorage
   alias EyeInTheSky.Messages.Message
+  alias EyeInTheSky.Messages.StatusManager
   alias EyeInTheSky.QueryHelpers
   alias EyeInTheSky.Repo
   require Logger
@@ -474,49 +475,13 @@ defmodule EyeInTheSky.Messages do
     |> Repo.all()
   end
 
-  @doc """
-  Marks a message as processing (worker has claimed it for execution).
-  No-op if message_id is nil.
-  """
-  @spec mark_processing(integer() | nil) :: :ok
-  def mark_processing(nil), do: :ok
+  @doc "Marks a message as processing. No-op if message_id is nil."
+  defdelegate mark_processing(message_id), to: StatusManager
 
-  def mark_processing(message_id) do
-    Message
-    |> where([m], m.id == ^message_id)
-    |> Repo.update_all(set: [status: "processing"])
+  @doc "Marks a message as delivered. No-op if message_id is nil."
+  defdelegate mark_delivered(message_id), to: StatusManager
 
-    :ok
-  end
-
-  @doc """
-  Marks a message as delivered (Claude completed the run successfully).
-  No-op if message_id is nil.
-  """
-  @spec mark_delivered(integer() | nil) :: :ok
-  def mark_delivered(nil), do: :ok
-
-  def mark_delivered(message_id) do
-    Message
-    |> where([m], m.id == ^message_id)
-    |> Repo.update_all(set: [status: "delivered"])
-
-    :ok
-  end
-
-  @doc """
-  Marks a message as failed with a reason (worker dropped it due to error).
-  No-op if message_id is nil.
-  """
-  @spec mark_failed(integer() | nil, String.t()) :: :ok
-  def mark_failed(nil, _reason), do: :ok
-
-  def mark_failed(message_id, reason) when is_binary(reason) do
-    Message
-    |> where([m], m.id == ^message_id)
-    |> Repo.update_all(set: [status: "failed", failure_reason: reason])
-
-    :ok
-  end
+  @doc "Marks a message as failed with a reason. No-op if message_id is nil."
+  defdelegate mark_failed(message_id, reason), to: StatusManager
 
 end

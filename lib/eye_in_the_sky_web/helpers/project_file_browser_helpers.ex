@@ -40,10 +40,14 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers do
     end
   end
 
-  # Detailed variant used by assign_file_read/4 to preserve original error message
-  # parity: stat failures produce "Failed to stat file" while read failures produce
-  # "Failed to read file", matching the original ProjectLive.Files implementation.
-  defp read_file_safe_detailed(full_path) do
+  @doc """
+  Reads a file with a size guard, preserving error source distinction.
+  Returns {:ok, content} | {:too_large} | {:read_error, reason} | {:stat_error, reason}.
+
+  Callers that need "Failed to stat file" vs "Failed to read file" error message
+  parity should use this variant instead of read_file_safe/1.
+  """
+  def read_file_safe_detailed(full_path) do
     case File.stat(full_path) do
       {:ok, %{size: size}} when size > @max_file_size ->
         {:too_large}

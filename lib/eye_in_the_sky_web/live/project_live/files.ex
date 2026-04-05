@@ -1,8 +1,11 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Files do
   use EyeInTheSkyWeb, :live_view
 
-  import EyeInTheSkyWeb.Helpers.FileHelpers
-  import EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers, only: [read_file_safe: 1, path_within?: 2]
+  import EyeInTheSkyWeb.Helpers.FileHelpers,
+    only: [detect_file_type: 1, language_class: 1, get_file_size: 1, build_file_tree: 2, binary_file?: 1]
+
+  import EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers,
+    only: [read_file_safe_detailed: 1, path_within?: 2]
 
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Repo
@@ -90,7 +93,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
                   files
                   |> Enum.filter(fn file ->
                     file_path = Path.join(full_path, file)
-                    File.dir?(file_path) or !is_binary_file?(file_path)
+                    File.dir?(file_path) or !binary_file?(file_path)
                   end)
                   |> Enum.map(fn file ->
                     file_path = Path.join(full_path, file)
@@ -119,7 +122,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
             end
 
           File.regular?(full_path) ->
-            case read_file_safe(full_path) do
+            case read_file_safe_detailed(full_path) do
               {:ok, content} ->
                 {:noreply,
                  socket
@@ -138,7 +141,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
                  |> assign(:files, [])
                  |> assign(:error, "File too large to display (over 1 MB)")}
 
-              {:error, reason} ->
+              {:stat_error, reason} ->
+                {:noreply,
+                 socket
+                 |> assign(:error, "Failed to stat file: #{reason}")
+                 |> assign(:file_content, nil)}
+
+              {:read_error, reason} ->
                 {:noreply,
                  socket
                  |> assign(:error, "Failed to read file: #{reason}")
@@ -185,7 +194,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
               (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
                 file not in ignored_dirs and
-                (File.dir?(file_path) or !is_binary_file?(file_path))
+                (File.dir?(file_path) or !binary_file?(file_path))
             end)
             |> Enum.map(fn file ->
               file_path = Path.join(project.path, file)

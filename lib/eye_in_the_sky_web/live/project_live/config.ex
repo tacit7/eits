@@ -148,88 +148,77 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   defp load_list_path(socket, path) do
     claude_dir = socket.assigns.claude_dir
 
-    unless claude_dir && File.dir?(claude_dir) do
-      assign(socket, :error, "No .claude directory found")
-    else
-      target =
-        if path && path != "" do
-          full = Path.join(claude_dir, path)
-          expanded_base = Path.expand(claude_dir)
-          expanded_full = Path.expand(full)
-
-          if String.starts_with?(expanded_full, expanded_base),
-            do: {:ok, full, path},
-            else: {:error, "Access denied"}
-        else
-          {:ok, claude_dir, nil}
-        end
-
-      case target do
-        {:error, msg} ->
-          assign(socket, :error, msg)
-
-        {:ok, full_path, rel_path} ->
-          cond do
-            File.dir?(full_path) ->
-              case File.ls(full_path) do
-                {:ok, items} ->
-                  file_list =
-                    items
-                    |> Enum.sort()
-                    |> Enum.map(fn item ->
-                      item_path = Path.join(full_path, item)
-                      rel = if rel_path, do: Path.join(rel_path, item), else: item
-
-                      size =
-                        case File.stat(item_path) do
-                          {:ok, %{size: s}} -> s
-                          _ -> 0
-                        end
-
-                      %{name: item, path: rel, is_dir: File.dir?(item_path), size: size}
-                    end)
-                    |> Enum.sort_by(&{!&1.is_dir, &1.name})
-
-                  socket
-                  |> assign(:files, file_list)
-                  |> assign(:current_path, rel_path)
-                  |> assign(:file_content, nil)
-                  |> assign(:selected_file, nil)
-                  |> assign(:selected_file_path, nil)
-                  |> assign(:file_type, nil)
-                  |> assign(:error, nil)
-
-                {:error, reason} ->
-                  assign(socket, :error, "Failed to read directory: #{reason}")
-              end
-
-            File.regular?(full_path) ->
-              case read_file_safe(full_path) do
-                {:ok, content} ->
-                  socket
-                  |> assign(:current_path, rel_path)
-                  |> assign(:file_content, content)
-                  |> assign(:selected_file, rel_path)
-                  |> assign(:selected_file_path, full_path)
-                  |> assign(:file_type, detect_file_type(full_path))
-                  |> assign(:files, [])
-                  |> assign(:error, nil)
-
-                {:too_large} ->
-                  socket
-                  |> assign(:current_path, rel_path)
-                  |> assign(:file_content, nil)
-                  |> assign(:files, [])
-                  |> assign(:error, "File too large to display (over 1 MB)")
-
-                {:error, reason} ->
-                  assign(socket, :error, "Failed to read file: #{reason}")
-              end
-
-            true ->
-              assign(socket, :error, "Path not found: #{path}")
-          end
+    if claude_dir && File.dir?(claude_dir) do
+      case resolve_list_target(path, claude_dir) do
+        {:error, msg} -> assign(socket, :error, msg)
+        {:ok, full_path, rel_path} -> dispatch_path(socket, full_path, rel_path, path, claude_dir)
       end
+    else
+      assign(socket, :error, "No .claude directory found")
+    end
+  end
+
+  defp resolve_list_target(path, base_dir) do
+    if path && path != "" do
+      full = Path.join(base_dir, path)
+      if path_within?(full, base_dir), do: {:ok, full, path}, else: {:error, "Access denied"}
+    else
+      {:ok, base_dir, nil}
+    end
+  end
+
+  defp dispatch_path(socket, full_path, rel_path, path, base_dir) do
+    cond do
+      File.dir?(full_path) -> list_directory(socket, full_path, rel_path)
+      File.regular?(full_path) -> read_file_for_display(socket, full_path, rel_path, base_dir)
+      true -> assign(socket, :error, "Path not found: #{path}")
+    end
+  end
+
+  defp list_directory(socket, full_path, rel_path) do
+    case File.ls(full_path) do
+      {:ok, items} ->
+        file_list =
+          items
+          |> Enum.sort()
+          |> Enum.map(&build_file_entry(&1, full_path, rel_path))
+          |> Enum.sort_by(&{!&1.is_dir, &1.name})
+
+        socket
+        |> assign(:files, file_list)
+        |> assign(:current_path, rel_path)
+        |> assign(:file_content, nil)
+        |> assign(:selected_file, nil)
+        |> assign(:selected_file_path, nil)
+        |> assign(:file_type, nil)
+        |> assign(:error, nil)
+
+      {:error, reason} ->
+        assign(socket, :error, "Failed to read directory: #{reason}")
+    end
+  end
+
+  defp build_file_entry(item, full_path, rel_path) do
+    item_path = Path.join(full_path, item)
+    rel = if rel_path, do: Path.join(rel_path, item), else: item
+    size = case File.stat(item_path) do
+      {:ok, %{size: s}} -> s
+      _ -> 0
+    end
+    %{name: item, path: rel, is_dir: File.dir?(item_path), size: size}
+  end
+
+  defp read_file_for_display(socket, full_path, rel_path, base_dir) do
+    case assign_file_read(socket, full_path, rel_path, base_dir) do
+      {:ok, socket} ->
+        socket
+        |> assign(:current_path, rel_path)
+        |> assign(:files, [])
+
+      {:error, socket} ->
+        socket
+        |> assign(:current_path, rel_path)
+        |> assign(:files, [])
     end
   end
 

@@ -44,8 +44,16 @@ defmodule EyeInTheSky.Messages.BulkImporter do
       {:ok, existing} ->
         update_attrs = %{source_uuid: msg.uuid, updated_at: now}
         update_attrs = if metadata, do: Map.put(update_attrs, :metadata, metadata), else: update_attrs
-        Messages.update_message(existing, update_attrs)
-        true
+
+        case Messages.update_message(existing, update_attrs) do
+          {:ok, _} -> true
+          {:error, reason} ->
+            Logger.debug(
+              "BulkImporter: failed to link #{provider} message #{existing.id}: #{inspect(reason)}"
+            )
+
+            false
+        end
 
       :not_found ->
         case Messages.create_message(%{

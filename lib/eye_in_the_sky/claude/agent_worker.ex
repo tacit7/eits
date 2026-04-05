@@ -239,7 +239,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     WorkerEvents.on_result_received(state.session_id, state.provider, text, metadata, channel_id)
 
     result_len = if(is_binary(text), do: String.length(text), else: 0)
-    :telemetry.execute([:eits, :agent, :result, :saved], %{text_length: result_len}, %{session_id: state.session_id})
+    emit([:eits, :agent, :result, :saved], %{text_length: result_len}, state)
 
     {:noreply, state}
   end
@@ -297,11 +297,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
     Logger.info("[#{state.session_id}] SDK complete")
 
-    :telemetry.execute(
-      [:eits, :agent, :sdk, :complete],
-      %{system_time: System.system_time()},
-      %{session_id: state.session_id}
-    )
+    emit([:eits, :agent, :sdk, :complete], %{system_time: System.system_time()}, state)
 
     WorkerEvents.on_sdk_completed(state.session_id, state.provider_conversation_id, state.provider)
     Messages.mark_delivered(state.current_job && state.current_job.context[:message_id])
@@ -464,11 +460,8 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
     queue_len = length(state.queue)
 
-    :telemetry.execute(
-      [:eits, :agent, :job, :received],
-      %{system_time: System.system_time()},
-      %{session_id: state.session_id, queue_length: queue_len, has_messages: context.has_messages}
-    )
+    emit([:eits, :agent, :job, :received], %{system_time: System.system_time()},
+      %{queue_length: queue_len, has_messages: context.has_messages}, state)
 
     job = Job.new(message, context, context[:content_blocks] || [])
 
@@ -487,11 +480,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       {:ok, sdk_ref, handler_monitor} ->
         Logger.info("AgentWorker: SDK started for session_id=#{state.session_id}")
 
-        :telemetry.execute(
-          [:eits, :agent, :job, :started],
-          %{system_time: System.system_time()},
-          %{session_id: state.session_id}
-        )
+        emit([:eits, :agent, :job, :started], %{system_time: System.system_time()}, state)
         WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
         Messages.mark_processing(job.context[:message_id])
 
@@ -533,11 +522,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
           "queue_length=#{new_queue_length}"
       )
 
-      :telemetry.execute(
-        [:eits, :agent, :job, :queued],
-        %{queue_length: new_queue_length},
-        %{session_id: state.session_id}
-      )
+      emit([:eits, :agent, :job, :queued], %{queue_length: new_queue_length}, state)
       {{:ok, :queued}, enqueue_job(state, job)}
     end
   end
@@ -694,11 +679,8 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   defp do_handle_sdk_error(reason, state) do
     Logger.error("[#{state.session_id}] SDK error: #{inspect(reason)}")
 
-    :telemetry.execute(
-      [:eits, :agent, :sdk, :error],
-      %{system_time: System.system_time()},
-      %{session_id: state.session_id, reason: reason}
-    )
+    emit([:eits, :agent, :sdk, :error], %{system_time: System.system_time()},
+      %{reason: reason}, state)
     cancel_active_sdk(state)
     WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
     demonitor_handler(state.handler_monitor)
@@ -751,6 +733,14 @@ defmodule EyeInTheSky.Claude.AgentWorker do
         handler_monitor: nil,
         current_job: nil
     })
+  end
+
+  defp emit(event, measurements, state) do
+    emit(event, measurements, %{}, state)
+  end
+
+  defp emit(event, measurements, extra_meta, state) do
+    :telemetry.execute(event, measurements, Map.put(extra_meta, :session_id, state.session_id))
   end
 
 end

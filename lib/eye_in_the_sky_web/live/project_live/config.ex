@@ -82,8 +82,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
 
     if claude_dir && path_within?(path, claude_dir) do
       content =
-        case File.read(path) do
+        case ProjectFiles.read_file(path) do
           {:ok, data} -> data
+          {:too_large, _} -> "Error: file too large to display"
           {:error, _} -> "Error: could not read file"
         end
 
@@ -129,7 +130,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
     claude_dir = socket.assigns.claude_dir
 
     if path && claude_dir && path_within?(path, claude_dir) do
-      case File.write(path, content) do
+      case ProjectFiles.write_file(path, content) do
         :ok -> {:noreply, put_flash(socket, :info, "Saved")}
         {:error, reason} -> {:noreply, put_flash(socket, :error, "Save failed: #{reason}")}
       end

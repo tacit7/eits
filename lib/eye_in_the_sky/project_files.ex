@@ -94,4 +94,13 @@ defmodule EyeInTheSky.ProjectFiles do
         {:error, reason}
     end
   end
+
+  @doc """
+  Writes `content` to `full_path`.
+  Returns `:ok` or `{:error, reason}`.
+  """
+  @spec write_file(String.t(), String.t()) :: :ok | {:error, term()}
+  def write_file(full_path, content) do
+    File.write(full_path, content)
+  end
 end

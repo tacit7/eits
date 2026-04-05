@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
             id={"dm-commit-#{commit.id}"}
           >
             <input type="checkbox" phx-click="load_diff" phx-value-hash={hash} />
-            <div class="collapse-title py-3 px-4 min-h-0">
+            <div class="collapse-title py-3 px-4">
               <div class="flex items-center gap-3">
                 <.icon name="hero-code-bracket" class="h-4 w-4 flex-shrink-0 text-base-content/30" />
                 <div class="flex-1 min-w-0">

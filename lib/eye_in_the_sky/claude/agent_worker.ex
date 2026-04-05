@@ -12,14 +12,20 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   alias EyeInTheSky.Agents.CmdDispatcher
   alias EyeInTheSky.AgentWorkerEvents, as: WorkerEvents
-  alias EyeInTheSky.Claude.AgentWorker.{ErrorClassifier, ProcessCleanup, RetryPolicy}
-  alias EyeInTheSky.Claude.{Job, Message, ProviderStrategy, StreamAssembler}
+  alias EyeInTheSky.Claude.AgentWorker.{
+    ErrorClassifier,
+    ProcessCleanup,
+    QueueManager,
+    RetryPolicy,
+    SdkLifecycle,
+    WatchdogTimer
+  }
+  alias EyeInTheSky.Claude.{Job, Message, StreamAssembler}
   alias EyeInTheSky.Claude.StreamAssemblerProtocol
   alias EyeInTheSky.Codex.StreamAssembler, as: CodexStreamAssembler
   alias EyeInTheSky.Messages
 
   @registry EyeInTheSky.Claude.AgentRegistry
-  @max_queue_depth 5
 
   @type status :: :idle | :running | :retry_wait | :failed
 
@@ -212,9 +218,8 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   def handle_cast(:cancel, %__MODULE__{sdk_ref: ref} = state) when not is_nil(ref) do
     Logger.info("[#{state.session_id}] Cancelling SDK process (provider=#{state.provider})")
-    strategy = ProviderStrategy.for_provider(state.provider)
-    strategy.cancel(ref)
-    {:noreply, cancel_watchdog(state)}
+    SdkLifecycle.cancel_active_sdk(state)
+    {:noreply, WatchdogTimer.cancel_watchdog(state)}
   end
 
   # Cancel when in retry_wait or failed with no active SDK process — reset to idle
@@ -305,17 +310,18 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     WorkerEvents.on_sdk_completed(state.session_id, state.provider_conversation_id, state.provider)
     Messages.mark_delivered(state.current_job && state.current_job.context[:message_id])
 
-    state = cancel_watchdog(state)
-    demonitor_handler(state.handler_monitor)
+    state = WatchdogTimer.cancel_watchdog(state)
+    SdkLifecycle.demonitor_handler(state.handler_monitor)
 
-    process_next_job(%{
-      state
-      | status: :idle,
-        sdk_ref: nil,
-        handler_monitor: nil,
-        handler_pid: nil,
-        current_job: nil
-    })
+    {:noreply,
+     QueueManager.process_next_job(%{
+       state
+       | status: :idle,
+         sdk_ref: nil,
+         handler_monitor: nil,
+         handler_pid: nil,
+         current_job: nil
+     })}
   end
 
   # Stale Claude session — retry current job as a fresh start
@@ -333,7 +339,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
         "[#{state.session_id}] Stale Claude session UUID=#{state.provider_conversation_id}, retrying as new session"
       )
 
-      attempt_sdk_retry(state, Job.as_fresh_session(job), "Failed to restart fresh SDK")
+      dispatch_sdk_retry(state, Job.as_fresh_session(job), "Failed to restart fresh SDK")
     else
       do_handle_sdk_error(reason, state)
     end
@@ -365,7 +371,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       resume_job = Job.as_resume(job)
       resume_job = %{resume_job | context: Map.put(resume_job.context, :kill_retry, true)}
 
-      attempt_sdk_retry(state, resume_job, "Failed to resume after already-in-use",
+      dispatch_sdk_retry(state, resume_job, "Failed to resume after already-in-use",
         broadcast_started: true
       )
     else
@@ -392,7 +398,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   @impl true
   def handle_info(:retry_start, %__MODULE__{status: :retry_wait, queue: [_ | _]} = state) do
-    process_next_job(%{state | status: :idle, retry_timer_ref: nil})
+    {:noreply, QueueManager.process_next_job(%{state | status: :idle, retry_timer_ref: nil})}
   end
 
   @impl true
@@ -414,15 +420,14 @@ defmodule EyeInTheSky.Claude.AgentWorker do
         {:watchdog_check, run_ref},
         %__MODULE__{status: :running, watchdog_run_ref: run_ref} = state
       ) do
-    timeout = watchdog_timeout_ms()
+    timeout = WatchdogTimer.watchdog_timeout_ms()
 
     if state.handler_pid && Process.alive?(state.handler_pid) do
       Logger.warning(
         "[#{state.session_id}] Watchdog fired after #{timeout}ms but handler still alive — slow run, rearming"
       )
 
-      new_timer_ref = Process.send_after(self(), {:watchdog_check, run_ref}, timeout)
-      {:noreply, %{state | watchdog_timer_ref: new_timer_ref}}
+      {:noreply, WatchdogTimer.rearm(state, run_ref)}
     else
       Logger.error(
         "[#{state.session_id}] Watchdog fired after #{timeout}ms — handler dead, worker stuck in :running, forcing recovery"
@@ -474,11 +479,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   @impl true
   def terminate(_reason, %__MODULE__{} = state) do
-    if state.sdk_ref do
-      strategy = ProviderStrategy.for_provider(state.provider || "claude")
-      strategy.cancel(state.sdk_ref)
-    end
-
+    SdkLifecycle.cancel_active_sdk(state)
     :ok
   end
 
@@ -512,69 +513,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     job = Job.new(message, context, context[:content_blocks] || [])
 
     if state.status == :idle do
-      admit_idle(state, job)
+      QueueManager.admit_idle(state, job)
     else
-      admit_busy(state, job)
-    end
-  end
-
-  # Handle starting SDK when idle
-  defp admit_idle(state, job) do
-    Logger.info("AgentWorker: starting SDK for session_id=#{state.session_id}")
-
-    case start_sdk(state, job) do
-      {:ok, sdk_ref, handler_monitor, handler_pid} ->
-        Logger.info("AgentWorker: SDK started for session_id=#{state.session_id}")
-
-        emit([:eits, :agent, :job, :started], %{system_time: System.system_time()}, state)
-        WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
-        Messages.mark_processing(job.context[:message_id])
-
-        new_state =
-          %{
-            state
-            | status: :running,
-              sdk_ref: sdk_ref,
-              handler_monitor: handler_monitor,
-              handler_pid: handler_pid,
-              current_job: job
-          }
-          |> RetryPolicy.clear_retry_timer()
-          |> schedule_watchdog()
-
-        {{:ok, :started}, new_state}
-
-      {:error, reason} ->
-        reason_str = inspect(reason)
-
-        Logger.error(
-          "AgentWorker: failed to start SDK for session_id=#{state.session_id} - #{reason_str}"
-        )
-
-        WorkerEvents.on_spawn_error(state.session_id, reason)
-
-        {{:ok, :retry_queued}, state |> enqueue_job(job) |> RetryPolicy.schedule_retry_start()}
-    end
-  end
-
-  # Handle queueing when busy
-  defp admit_busy(state, job) do
-    if length(state.queue) >= @max_queue_depth do
-      Logger.warning(
-        "AgentWorker: queue full (#{@max_queue_depth}) for session_id=#{state.session_id}, rejecting message"
-      )
-
-      {{:error, :queue_full}, state}
-    else
-      new_queue_length = length(state.queue) + 1
-
-      Logger.info(
-        "AgentWorker: busy, queueing message for session_id=#{state.session_id}, " <>
-          "queue_length=#{new_queue_length}"
-      )
-
-      emit([:eits, :agent, :job, :queued], %{queue_length: new_queue_length}, state)
-      {{:ok, :queued}, enqueue_job(state, job)}
+      QueueManager.admit_busy(state, job)
     end
   end
 
@@ -595,100 +536,6 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   defp maybe_dispatch_commands(msg, _state), do: msg
-
-  defp process_next_job(%__MODULE__{queue: []} = state) do
-    WorkerEvents.broadcast_queue_update(state.session_id, state.queue)
-    {:noreply, state}
-  end
-
-  defp process_next_job(%__MODULE__{queue: [next_job | rest]} = state) do
-    # Re-evaluate has_messages at dequeue time — the prior job may have produced a reply
-    # since this job was submitted, making the stale value wrong (false → start instead of resume).
-    fresh_has_messages = EyeInTheSky.Messages.has_inbound_reply?(state.session_id, state.provider)
-    next_job = put_in(next_job.context[:has_messages], fresh_has_messages)
-
-    case start_sdk(state, next_job) do
-      {:ok, sdk_ref, handler_monitor, handler_pid} ->
-        WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
-        Messages.mark_processing(next_job.context[:message_id])
-
-        new_state =
-          %{
-            state
-            | status: :running,
-              sdk_ref: sdk_ref,
-              handler_monitor: handler_monitor,
-              handler_pid: handler_pid,
-              current_job: next_job,
-              queue: rest
-          }
-          |> RetryPolicy.clear_retry_timer()
-          |> schedule_watchdog()
-
-        WorkerEvents.broadcast_queue_update(state.session_id, new_state.queue)
-        {:noreply, new_state}
-
-      {:error, reason} ->
-        Logger.error("Failed to start SDK for next job: #{inspect(reason)}")
-        {:noreply, %{state | queue: [next_job | rest]} |> RetryPolicy.schedule_retry_start()}
-    end
-  end
-
-  defp start_sdk(%__MODULE__{} = state, job) do
-    strategy = ProviderStrategy.for_provider(state.provider)
-    has_messages = job.context[:has_messages] || false
-
-    result =
-      if has_messages do
-        strategy.resume(state, job)
-      else
-        strategy.start(state, job)
-      end
-
-    monitor_handler(result)
-  end
-
-  # Convert {:ok, sdk_ref, handler_pid} to {:ok, sdk_ref, monitor_ref, handler_pid}
-  defp monitor_handler({:ok, sdk_ref, handler_pid}) do
-    monitor_ref = Process.monitor(handler_pid)
-    {:ok, sdk_ref, monitor_ref, handler_pid}
-  end
-
-  defp monitor_handler({:error, _} = error), do: error
-
-  defp watchdog_timeout_ms do
-    Application.get_env(:eye_in_the_sky, :watchdog_timeout_ms, 10 * 60 * 1_000)
-  end
-
-  # Manages only watchdog_timer_ref and watchdog_run_ref.
-  # Does NOT touch handler_pid — that is set by callers before calling schedule_watchdog.
-  defp schedule_watchdog(state) do
-    state = cancel_watchdog(state)
-    run_ref = make_ref()
-    timeout = watchdog_timeout_ms()
-    timer_ref = Process.send_after(self(), {:watchdog_check, run_ref}, timeout)
-    %{state | watchdog_timer_ref: timer_ref, watchdog_run_ref: run_ref}
-  end
-
-  defp cancel_watchdog(%{watchdog_timer_ref: nil} = state) do
-    %{state | watchdog_run_ref: nil}
-  end
-
-  defp cancel_watchdog(%{watchdog_timer_ref: ref} = state) do
-    Process.cancel_timer(ref)
-    %{state | watchdog_timer_ref: nil, watchdog_run_ref: nil}
-  end
-
-  defp demonitor_handler(nil), do: :ok
-  defp demonitor_handler(ref), do: Process.demonitor(ref, [:flush])
-
-  defp enqueue_job(state, %Job{} = job) do
-    job = Job.assign_id(job)
-    new_queue = state.queue ++ [job]
-    new_state = %{state | queue: new_queue}
-    WorkerEvents.broadcast_queue_update(state.session_id, new_queue)
-    new_state
-  end
 
   defp normalize_context(context) when is_list(context), do: normalize_context(Map.new(context))
   defp normalize_context(context) when not is_map(context), do: normalize_context(%{})
@@ -727,34 +574,13 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   defp maybe_sync_provider_conversation_id(state, _), do: state
 
-  defp attempt_sdk_retry(state, new_job, log_label, opts \\ []) do
-    broadcast_started = Keyword.get(opts, :broadcast_started, false)
-
-    case start_sdk(state, new_job) do
-      {:ok, sdk_ref, handler_monitor, handler_pid} ->
-        if broadcast_started,
-          do: WorkerEvents.on_sdk_started(state.session_id, state.provider_conversation_id)
-
-        demonitor_handler(state.handler_monitor)
-
-        new_state =
-          %{state | sdk_ref: sdk_ref, handler_monitor: handler_monitor, handler_pid: handler_pid, current_job: new_job}
-          |> schedule_watchdog()
-
-        {:noreply, new_state}
-
-      {:error, start_reason} ->
-        Logger.error("[#{state.session_id}] #{log_label}: #{inspect(start_reason)}")
-        WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
-        demonitor_handler(state.handler_monitor)
-
-        process_next_job(%{
-          state
-          | status: :idle,
-            sdk_ref: nil,
-            handler_monitor: nil,
-            current_job: nil
-        })
+  # Dispatches attempt_sdk_retry to SdkLifecycle and handles the tagged result.
+  # {:ok, new_state}     → SDK restarted successfully
+  # {:start_next, state} → SDK start failed; process the next queued job
+  defp dispatch_sdk_retry(state, job, label, opts \\ []) do
+    case SdkLifecycle.attempt_sdk_retry(state, job, label, opts) do
+      {:ok, new_state} -> {:noreply, new_state}
+      {:start_next, clean_state} -> {:noreply, QueueManager.process_next_job(clean_state)}
     end
   end
 
@@ -763,10 +589,10 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
     emit([:eits, :agent, :sdk, :error], %{system_time: System.system_time()},
       %{reason: reason}, state)
-    state = cancel_watchdog(state)
-    cancel_active_sdk(state)
+    state = WatchdogTimer.cancel_watchdog(state)
+    SdkLifecycle.cancel_active_sdk(state)
     WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
-    demonitor_handler(state.handler_monitor)
+    SdkLifecycle.demonitor_handler(state.handler_monitor)
 
     state = %{state | handler_pid: nil, sdk_ref: nil, handler_monitor: nil}
 
@@ -775,17 +601,6 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     else
       handle_transient_error(state)
     end
-  end
-
-  # Cancel the underlying SDK process before clearing sdk_ref so the OS process
-  # is killed. Without this, the Claude process keeps running as an orphan because
-  # do_handle_sdk_error is called during error recovery while the worker stays alive
-  # (unlike terminate/2 which only fires when the worker itself stops).
-  defp cancel_active_sdk(%__MODULE__{sdk_ref: nil}), do: :ok
-
-  defp cancel_active_sdk(%__MODULE__{sdk_ref: ref, provider: provider}) do
-    strategy = ProviderStrategy.for_provider(provider || "claude")
-    strategy.cancel(ref)
   end
 
   defp handle_systemic_error(state, reason) do
@@ -811,13 +626,14 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       Messages.mark_failed(state.current_job.context[:message_id], "transient_error")
     end
 
-    process_next_job(%{
-      state
-      | status: :idle,
-        sdk_ref: nil,
-        handler_monitor: nil,
-        current_job: nil
-    })
+    {:noreply,
+     QueueManager.process_next_job(%{
+       state
+       | status: :idle,
+         sdk_ref: nil,
+         handler_monitor: nil,
+         current_job: nil
+     })}
   end
 
   defp emit(event, measurements, state) do
@@ -827,5 +643,4 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   defp emit(event, measurements, extra_meta, state) do
     :telemetry.execute(event, measurements, Map.put(extra_meta, :session_id, state.session_id))
   end
-
 end

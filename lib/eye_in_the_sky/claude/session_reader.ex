@@ -133,7 +133,7 @@ defmodule EyeInTheSky.Claude.SessionReader do
           content
           |> String.split("\n", trim: true)
           |> Enum.map(&parse_line/1)
-          |> Enum.filter(&is_conversation_message?/1)
+          |> Enum.filter(&conversation_message?/1)
           |> Enum.take(-limit)
 
         {:ok, messages}
@@ -155,7 +155,7 @@ defmodule EyeInTheSky.Claude.SessionReader do
           content
           |> String.split("\n", trim: true)
           |> Enum.map(&parse_line/1)
-          |> Enum.filter(&is_conversation_message?/1)
+          |> Enum.filter(&conversation_message?/1)
 
         # Find cursor position; if UUID not found (e.g. after context compaction),
         # fall back to returning all messages rather than returning empty.
@@ -180,9 +180,9 @@ defmodule EyeInTheSky.Claude.SessionReader do
     end
   end
 
-  defp is_conversation_message?(nil), do: false
-  defp is_conversation_message?(%{"type" => type}) when type in ["user", "assistant"], do: true
-  defp is_conversation_message?(_), do: false
+  defp conversation_message?(nil), do: false
+  defp conversation_message?(%{"type" => type}) when type in ["user", "assistant"], do: true
+  defp conversation_message?(_), do: false
 
   @doc """
   Reads total token usage and cost from a Claude session JSONL file.
@@ -232,7 +232,7 @@ defmodule EyeInTheSky.Claude.SessionReader do
               |> String.split("\n", trim: true)
               |> Enum.map(&parse_line/1)
               |> Enum.reject(&is_nil/1)
-              |> Enum.filter(&is_assistant_with_tools?/1)
+              |> Enum.filter(&assistant_with_tools?/1)
               |> Enum.flat_map(&extract_tool_events/1)
 
             {:ok, events}
@@ -246,12 +246,12 @@ defmodule EyeInTheSky.Claude.SessionReader do
     end
   end
 
-  defp is_assistant_with_tools?(%{"type" => "assistant", "message" => %{"content" => content}})
+  defp assistant_with_tools?(%{"type" => "assistant", "message" => %{"content" => content}})
        when is_list(content) do
     Enum.any?(content, &match?(%{"type" => "tool_use"}, &1))
   end
 
-  defp is_assistant_with_tools?(_), do: false
+  defp assistant_with_tools?(_), do: false
 
   defp extract_tool_events(%{"message" => %{"content" => content}} = entry) do
     ts = Map.get(entry, "timestamp")

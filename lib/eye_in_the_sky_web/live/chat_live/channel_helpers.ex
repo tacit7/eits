@@ -75,7 +75,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
   end
 
   defp maybe_auto_add_member(channel_id, mid) do
-    unless Channels.is_member?(channel_id, mid) do
+    unless Channels.member?(channel_id, mid) do
       case Sessions.get_session(mid) do
         {:ok, s} ->
           Channels.add_member(channel_id, s.agent_id, mid)

@@ -191,7 +191,7 @@ defmodule EyeInTheSky.Channels do
   @doc """
   Checks if a session is a member of a channel.
   """
-  def is_member?(channel_id, session_id) do
+  def member?(channel_id, session_id) do
     from(m in ChannelMember,
       where: m.channel_id == ^channel_id and m.session_id == ^session_id
     )

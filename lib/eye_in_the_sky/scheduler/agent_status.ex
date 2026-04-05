@@ -63,15 +63,15 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
   defp update_agent_status(agent, now) do
     cond do
       # Unknown: no activity in over 1 day
-      is_too_old(agent.last_activity_at, now) ->
+      too_old?(agent.last_activity_at, now) ->
         Agents.update_agent_status(agent, "unknown")
 
       # Stale: inactive for more than 1 hour
-      is_stale(agent.last_activity_at, now) ->
+      stale?(agent.last_activity_at, now) ->
         Agents.update_agent_status(agent, "stale")
 
       # Idle: active but created less than 1 hour ago
-      is_waiting(agent.created_at, now) ->
+      waiting?(agent.created_at, now) ->
         Agents.update_agent_status(agent, "idle")
 
       # Active: recent activity or just created
@@ -80,21 +80,21 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
     end
   end
 
-  defp is_too_old(nil, _now), do: false
+  defp too_old?(nil, _now), do: false
 
-  defp is_too_old(%DateTime{} = last_activity_at, now) do
+  defp too_old?(%DateTime{} = last_activity_at, now) do
     DateTime.diff(now, last_activity_at) > @one_day_ago
   end
 
-  defp is_stale(nil, _now), do: false
+  defp stale?(nil, _now), do: false
 
-  defp is_stale(%DateTime{} = last_activity_at, now) do
+  defp stale?(%DateTime{} = last_activity_at, now) do
     DateTime.diff(now, last_activity_at) > @one_hour_ago
   end
 
-  defp is_waiting(nil, _now), do: false
+  defp waiting?(nil, _now), do: false
 
-  defp is_waiting(%DateTime{} = created_at, now) do
+  defp waiting?(%DateTime{} = created_at, now) do
     DateTime.diff(now, created_at) < @one_hour_ago
   end
 

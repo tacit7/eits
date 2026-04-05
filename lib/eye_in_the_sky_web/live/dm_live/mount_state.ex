@@ -109,6 +109,6 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
   # ended and can be resumed — if the user sends a new message, a new worker
   # runs and its state must be reflected here.
   defp initial_processing?(%{id: session_id}) do
-    AgentWorker.is_processing?(session_id)
+    AgentWorker.processing?(session_id)
   end
 end

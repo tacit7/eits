@@ -39,9 +39,9 @@ defmodule EyeInTheSky.Claude.ChatWorker do
     end
   end
 
-  def is_processing?(channel_id) do
+  def processing?(channel_id) do
     case Registry.lookup(@registry, {:channel, channel_id}) do
-      [{pid, _}] -> GenServer.call(pid, :is_processing?)
+      [{pid, _}] -> GenServer.call(pid, :processing?)
       [] -> false
     end
   end
@@ -64,7 +64,7 @@ defmodule EyeInTheSky.Claude.ChatWorker do
   end
 
   @impl true
-  def handle_call(:is_processing?, _from, state) do
+  def handle_call(:processing?, _from, state) do
     {:reply, state.processing, state}
   end
 

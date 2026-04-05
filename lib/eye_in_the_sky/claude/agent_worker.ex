@@ -89,11 +89,11 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     )
   end
 
-  def is_processing?(session_id) do
+  def processing?(session_id) do
     with_worker(
       session_id,
       fn pid ->
-        GenServer.call(pid, :is_processing?)
+        GenServer.call(pid, :processing?)
       end,
       false
     )
@@ -173,7 +173,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   @impl true
-  def handle_call(:is_processing?, _from, state) do
+  def handle_call(:processing?, _from, state) do
     {:reply, state.status == :running, state}
   end
 

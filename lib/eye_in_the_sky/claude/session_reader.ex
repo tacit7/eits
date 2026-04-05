@@ -78,13 +78,15 @@ defmodule EyeInTheSky.Claude.SessionReader do
   List of message maps with :role, :content, :timestamp
   """
   def read_recent_messages(session_id, project_path, limit \\ 10) do
-    case find_session_file(session_id, project_path) do
-      {:ok, file_path} ->
-        parse_session_file(file_path, limit)
+    with_session_file(session_id, project_path, fn lines ->
+      messages =
+        lines
+        |> Enum.map(&parse_line/1)
+        |> Enum.filter(&conversation_message?/1)
+        |> Enum.take(-limit)
 
-      {:error, _} = error ->
-        error
-    end
+      {:ok, messages}
+    end)
   end
 
   @doc """
@@ -106,10 +108,15 @@ defmodule EyeInTheSky.Claude.SessionReader do
   If after_uuid is nil, reads all messages. Used for incremental sync.
   """
   def read_messages_after_uuid(session_id, project_path, after_uuid) do
-    case find_session_file(session_id, project_path) do
-      {:ok, file_path} -> parse_session_file_after(file_path, after_uuid)
-      {:error, _} = error -> error
-    end
+    with_session_file(session_id, project_path, fn lines ->
+      all_messages =
+        lines
+        |> Enum.map(&parse_line/1)
+        |> Enum.filter(&conversation_message?/1)
+
+      result = if after_uuid, do: drop_messages_before(all_messages, after_uuid), else: all_messages
+      {:ok, result}
+    end)
   end
 
   @doc """
@@ -132,25 +139,16 @@ defmodule EyeInTheSky.Claude.SessionReader do
     end
   end
 
-  defp parse_session_file_after(file_path, nil) do
-    # No cursor; read everything
-    parse_session_file(file_path, 999_999)
-  end
+  defp with_session_file(session_id, project_path, fun) do
+    case find_session_file(session_id, project_path) do
+      {:error, _} = error ->
+        error
 
-  defp parse_session_file_after(file_path, after_uuid) do
-    case read_all_lines(file_path) do
-      {:ok, lines} ->
-        all_messages =
-          lines
-          |> Enum.map(&parse_line/1)
-          |> Enum.filter(&conversation_message?/1)
-
-        # Find cursor position; if UUID not found (e.g. after context compaction),
-        # fall back to returning all messages rather than returning empty.
-        {:ok, drop_messages_before(all_messages, after_uuid)}
-
-      {:error, _} = err ->
-        err
+      {:ok, file_path} ->
+        case read_all_lines(file_path) do
+          {:error, _} = error -> error
+          {:ok, lines} -> fun.(lines)
+        end
     end
   end
 
@@ -186,37 +184,25 @@ defmodule EyeInTheSky.Claude.SessionReader do
   Returns {:ok, total_tokens, total_cost_usd} or {:error, reason}.
   """
   def read_usage(session_id, project_path) do
-    case find_session_file(session_id, project_path) do
-      {:ok, file_path} ->
-        case read_all_lines(file_path) do
-          {:ok, lines} ->
-            {tokens, cost} =
-              lines
-              |> Enum.reduce({0, 0.0}, fn line, {tok_acc, cost_acc} ->
-                case Jason.decode(line) do
-                  {:ok, %{"type" => "assistant", "message" => %{"usage" => usage}}}
-                  when is_map(usage) ->
-                    input = Map.get(usage, "input_tokens") || 0
-                    output = Map.get(usage, "output_tokens") || 0
-                    {tok_acc + input + output, cost_acc}
+    with_session_file(session_id, project_path, fn lines ->
+      {tokens, cost} =
+        Enum.reduce(lines, {0, 0.0}, fn line, {tok_acc, cost_acc} ->
+          case Jason.decode(line) do
+            {:ok, %{"type" => "assistant", "message" => %{"usage" => usage}}} when is_map(usage) ->
+              input = Map.get(usage, "input_tokens") || 0
+              output = Map.get(usage, "output_tokens") || 0
+              {tok_acc + input + output, cost_acc}
 
-                  {:ok, %{"type" => "result", "total_cost_usd" => cost}} when is_number(cost) ->
-                    {tok_acc, cost_acc + cost}
+            {:ok, %{"type" => "result", "total_cost_usd" => cost}} when is_number(cost) ->
+              {tok_acc, cost_acc + cost}
 
-                  _ ->
-                    {tok_acc, cost_acc}
-                end
-              end)
+            _ ->
+              {tok_acc, cost_acc}
+          end
+        end)
 
-            {:ok, tokens, cost}
-
-          {:error, _} = err ->
-            err
-        end
-
-      {:error, _} = err ->
-        err
-    end
+      {:ok, tokens, cost}
+    end)
   end
 
   @doc """
@@ -225,26 +211,16 @@ defmodule EyeInTheSky.Claude.SessionReader do
     %{id: String.t(), type: String.t(), message: String.t(), timestamp: String.t() | nil}
   """
   def read_tool_events(session_id, project_path) do
-    case find_session_file(session_id, project_path) do
-      {:ok, file_path} ->
-        case read_all_lines(file_path) do
-          {:ok, lines} ->
-            events =
-              lines
-              |> Enum.map(&parse_line/1)
-              |> Enum.reject(&is_nil/1)
-              |> Enum.filter(&assistant_with_tools?/1)
-              |> Enum.flat_map(&extract_tool_events/1)
+    with_session_file(session_id, project_path, fn lines ->
+      events =
+        lines
+        |> Enum.map(&parse_line/1)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.filter(&assistant_with_tools?/1)
+        |> Enum.flat_map(&extract_tool_events/1)
 
-            {:ok, events}
-
-          {:error, _} = err ->
-            err
-        end
-
-      {:error, _} = err ->
-        err
-    end
+      {:ok, events}
+    end)
   end
 
   defp assistant_with_tools?(%{"type" => "assistant", "message" => %{"content" => content}})

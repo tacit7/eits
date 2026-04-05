@@ -1,17 +1,21 @@
 defmodule EyeInTheSkyWeb.Router do
   use EyeInTheSkyWeb, :router
 
-  # connect-src: in dev, allow the Vite HMR websocket (default port 5173).
-  # In prod, 'self' covers the Phoenix LiveView websocket (same origin).
+  # In dev, allow the Vite dev server origins (default port 5173, worktree port 5174).
+  # In prod, 'self' is sufficient for all directives.
+  @vite_origins if Mix.env() == :dev,
+                  do: " http://localhost:5173 http://localhost:5174",
+                  else: ""
+
   @connect_src if Mix.env() == :dev,
                  do: "'self' ws://localhost:5173 ws://localhost:5174",
                  else: "'self'"
 
   @browser_csp "default-src 'self'; " <>
-                 "script-src 'self' 'unsafe-inline'; " <>
+                 "script-src 'self' 'unsafe-inline'" <> @vite_origins <> "; " <>
                  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " <>
                  "font-src 'self' data: https://fonts.gstatic.com; " <>
-                 "img-src 'self' data: blob:; " <>
+                 "img-src 'self' data: blob:" <> @vite_origins <> "; " <>
                  "connect-src " <> @connect_src <> "; " <>
                  "frame-ancestors 'none'; " <>
                  "object-src 'none'"

@@ -242,6 +242,36 @@ defmodule EyeInTheSky.CLI.Port do
   end
 
   # ---------------------------------------------------------------------------
+  # Handler spawning
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Spawns a handler process that waits for `{:port, port}`, then calls
+  `handle_port_output/6`. Connects `port` to the handler and sends it the
+  `{:port, port}` trigger message. Returns the handler `pid`.
+
+  ## Options
+
+  Same as `handle_port_output/6` — `:telemetry_prefix`, `:log_prefix`,
+  `:max_buffer_bytes`.
+  """
+  @spec spawn_handler(port(), reference(), pid(), pos_integer() | :infinity, keyword()) :: pid()
+  def spawn_handler(port, session_ref, caller, idle_timeout_ms, opts \\ []) do
+    handler_pid =
+      spawn_link(fn ->
+        receive do
+          {:port, received_port} ->
+            handle_port_output(received_port, session_ref, caller, "", idle_timeout_ms, opts)
+        end
+      end)
+
+    Port.connect(port, handler_pid)
+    send(handler_pid, {:port, port})
+
+    handler_pid
+  end
+
+  # ---------------------------------------------------------------------------
   # Environment helpers
   # ---------------------------------------------------------------------------
 

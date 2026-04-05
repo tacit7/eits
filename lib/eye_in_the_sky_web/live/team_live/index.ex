@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.TeamLive.Index do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.{Teams, Tasks, Notes}
+  alias EyeInTheSky.{Notes, Tasks, Teams}
 
   @impl true
   def mount(_params, _session, socket) do

@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
   import Phoenix.LiveView, only: [put_flash: 3]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 2]
 
-  alias EyeInTheSky.{Tasks, Notes}
+  alias EyeInTheSky.{Notes, Tasks}
 
   # ---------------------------------------------------------------------------
   # Event handlers with no dependency on per-LiveView private functions

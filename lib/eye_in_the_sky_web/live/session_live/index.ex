@@ -1,8 +1,8 @@
 defmodule EyeInTheSkyWeb.SessionLive.Index do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Sessions
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Sessions
   import EyeInTheSkyWeb.Components.SessionCard, only: [session_row: 1]
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
 

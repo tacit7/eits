@@ -5,8 +5,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
     only: [path_within?: 2, detect_file_type: 1, format_size: 1, cm_language: 1]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
-  alias EyeInTheSky.Projects
   alias EyeInTheSky.ProjectFiles
+  alias EyeInTheSky.Projects
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
 
   @impl true

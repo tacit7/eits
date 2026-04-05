@@ -11,8 +11,8 @@ defmodule EyeInTheSkyWeb.DmLive.TaskHandlers do
   import Phoenix.LiveView, only: [put_flash: 3]
   import EyeInTheSkyWeb.ControllerHelpers, only: [maybe_opt: 3]
 
-  alias EyeInTheSky.Tasks
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Tasks
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 
   @doc """

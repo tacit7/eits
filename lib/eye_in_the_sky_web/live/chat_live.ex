@@ -4,11 +4,11 @@ defmodule EyeInTheSkyWeb.ChatLive do
   alias EyeInTheSky.{Agents, ChannelMessages, Channels, MessageReactions, Messages, Projects, Prompts, Sessions}
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Claude.ChannelProtocol
-  alias EyeInTheSkyWeb.ChatPresenter
   alias EyeInTheSkyWeb.ChatLive.ChannelHeader
-  alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   alias EyeInTheSkyWeb.ChatLive.ChannelHelpers
+  alias EyeInTheSkyWeb.ChatPresenter
   alias EyeInTheSkyWeb.Helpers.SlashItems
+  alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_budget: 1]
   import EyeInTheSkyWeb.Helpers.UploadHelpers

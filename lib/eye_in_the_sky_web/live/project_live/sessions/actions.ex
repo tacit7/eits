@@ -14,8 +14,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [push_navigate: 2, put_flash: 3, stream_insert: 3]
 
-  alias EyeInTheSky.Sessions
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Sessions
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Loader
 
   # ---------------------------------------------------------------------------

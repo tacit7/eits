@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteAgentHandlers do
 
   import Phoenix.LiveView, only: [push_event: 3]
 
-  alias EyeInTheSky.{Agents, Sessions, Projects, Repo}
+  alias EyeInTheSky.{Agents, Projects, Repo, Sessions}
   alias EyeInTheSky.Agents.AgentManager
 
   # ---------------------------------------------------------------------------

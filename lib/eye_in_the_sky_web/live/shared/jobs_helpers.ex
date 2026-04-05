@@ -8,9 +8,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
     router: EyeInTheSkyWeb.Router,
     statics: EyeInTheSkyWeb.static_paths()
 
+  alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.ScheduledJobs
   alias EyeInTheSky.ScheduledJobs.JobHelper
-  alias EyeInTheSky.Agents.AgentManager
 
   # ---------------------------------------------------------------------------
   # Event handler helpers — return {:noreply, socket}

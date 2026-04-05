@@ -4,11 +4,11 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3, push_event: 3]
 
-  alias EyeInTheSky.Messages
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Claude.SessionImporter
   alias EyeInTheSky.Codex.SessionImporter, as: CodexImporter
   alias EyeInTheSky.Codex.SessionReader, as: CodexReader
+  alias EyeInTheSky.Messages
   alias EyeInTheSkyWeb.DmLive.TabHelpers
   alias EyeInTheSkyWeb.DmLive.UploadHelpers
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers

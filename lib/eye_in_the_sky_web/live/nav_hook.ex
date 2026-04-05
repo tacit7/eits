@@ -15,7 +15,7 @@ defmodule EyeInTheSkyWeb.NavHook do
   import Phoenix.LiveView
   import Phoenix.Component, only: [assign: 3]
 
-  alias EyeInTheSky.{Agents, Notes, Sessions, Projects, Tasks}
+  alias EyeInTheSky.{Agents, Notes, Projects, Sessions, Tasks}
   alias EyeInTheSkyWeb.Helpers.MobileNav
   alias EyeInTheSkyWeb.NavHook.PaletteAgentHandlers
 

@@ -1,8 +1,8 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Projects
   alias EyeInTheSky.Notes
+  alias EyeInTheSky.Projects
   alias EyeInTheSky.Repo
   import EyeInTheSkyWeb.Components.NotesList
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_id: 1]

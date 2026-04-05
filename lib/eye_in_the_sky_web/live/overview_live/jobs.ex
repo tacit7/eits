@@ -1,9 +1,9 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Jobs do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Projects
   alias EyeInTheSky.ScheduledJobs
   alias EyeInTheSky.ScheduledJobs.ScheduledJob
-  alias EyeInTheSky.Projects
   import EyeInTheSkyWeb.Live.Shared.JobsHelpers
   import EyeInTheSkyWeb.Components.JobFormDrawer
   import EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers

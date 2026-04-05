@@ -1,11 +1,11 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Show do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Projects
   alias EyeInTheSky.Agents
-  alias EyeInTheSky.Notes
-  alias EyeInTheSky.Sessions
   alias EyeInTheSky.Commits
+  alias EyeInTheSky.Notes
+  alias EyeInTheSky.Projects
+  alias EyeInTheSky.Sessions
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1, truncate_text: 1]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 

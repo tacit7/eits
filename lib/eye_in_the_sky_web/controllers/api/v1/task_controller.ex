@@ -39,7 +39,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     Tasks.search_tasks(q) |> Enum.take(limit)
   end
 
-  defp fetch_tasks_by_filter(%{"session_id" => session_id}, limit) when not is_nil(session_id) do
+  defp fetch_tasks_by_filter(%{"session_id" => session_id}, limit) do
     session_int_id =
       case Helpers.resolve_session_int_id(session_id) do
         {:ok, id} -> id
@@ -51,7 +51,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       else: []
   end
 
-  defp fetch_tasks_by_filter(%{"agent_id" => agent_id}, limit) when not is_nil(agent_id) do
+  defp fetch_tasks_by_filter(%{"agent_id" => agent_id}, limit) do
     agent_int_id = resolve_agent_int_id(agent_id)
 
     if agent_int_id,
@@ -59,7 +59,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       else: []
   end
 
-  defp fetch_tasks_by_filter(%{"project_id" => project_id}, limit) when not is_nil(project_id) do
+  defp fetch_tasks_by_filter(%{"project_id" => project_id}, limit) do
     Projects.get_project_tasks(parse_int(project_id, nil)) |> Enum.take(limit)
   end
 

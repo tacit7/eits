@@ -122,22 +122,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
           |> Enum.filter(&String.ends_with?(&1, ".md"))
           |> Enum.reject(&(&1 == "README.md"))
           |> Enum.sort()
-          |> Enum.map(fn item ->
-            full = Path.join(agents_dir, item)
-
-            size =
-              case File.stat(full) do
-                {:ok, %{size: s}} -> s
-                _ -> 0
-              end
-
-            %{
-              name: Path.rootname(item),
-              filename: item,
-              path: full,
-              size: size
-            }
-          end)
+          |> Enum.map(&build_agent_entry(&1, agents_dir))
 
         _ ->
           []
@@ -145,6 +130,15 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
     else
       []
     end
+  end
+
+  defp build_agent_entry(item, agents_dir) do
+    full = Path.join(agents_dir, item)
+    size = case File.stat(full) do
+      {:ok, %{size: s}} -> s
+      _ -> 0
+    end
+    %{name: Path.rootname(item), filename: item, path: full, size: size}
   end
 
   defp has_any_agents?(project_agents, user_agents) do

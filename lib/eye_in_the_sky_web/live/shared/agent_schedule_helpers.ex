@@ -46,18 +46,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
       if not job_accessible?(job, socket) do
         {:noreply, put_flash(socket, :error, "Access denied")}
       else
-        prompt =
-          cond do
-            job.prompt_id ->
-              Prompts.get_prompt!(job.prompt_id)
-
-            agent_file_id = get_config_field(job, "agent_file_id") ->
-              AgentFileScanner.get_by_id(agent_file_id)
-
-            true ->
-              nil
-          end
-
+        prompt = resolve_job_prompt(job)
         {:noreply, socket |> assign(:scheduling_prompt, prompt) |> assign(:scheduling_job, job)}
       end
     else
@@ -87,36 +76,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
            put_flash(socket, :error, "Could not resolve project path. Select a project override.")}
 
         {:ok, path} ->
-          config =
-            %{
-              "instructions" => prompt.prompt_text,
-              "model" => params["model"] || "sonnet",
-              "project_path" => path
-            }
-            |> then(fn c ->
-              if is_fs do
-                Map.put(c, "agent_file_id", prompt_id_raw)
-              else
-                case parse_int(prompt_id_raw) do
-                  nil -> c
-                  int_id -> Map.put(c, "prompt_id", int_id)
-                end
-              end
-            end)
-            |> put_if_present("max_budget_usd", params["max_budget_usd"])
-            |> put_if_present("max_turns", params["max_turns"])
-            |> put_if_present("fallback_model", params["fallback_model"])
-            |> put_if_present("allowed_tools", params["allowed_tools"])
-            |> put_if_present("output_format", params["output_format"])
-            |> Map.put("skip_permissions", params["skip_permissions"] == "true")
-            |> put_if_present("permission_mode", params["permission_mode"])
-            |> put_if_present("add_dir", params["add_dir"])
-            |> put_if_present("mcp_config", params["mcp_config"])
-            |> put_if_present("plugin_dir", params["plugin_dir"])
-            |> put_if_present("settings_file", params["settings_file"])
-            |> put_bool_if_true("chrome", params["chrome"])
-            |> put_bool_if_true("sandbox", params["sandbox"])
-            |> Jason.encode!()
+          config = build_schedule_config(prompt, params, path, is_fs, prompt_id_raw)
 
           job_attrs =
             %{
@@ -132,53 +92,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
             |> put_if_present("timezone", params["timezone"])
 
           caller_project_id = Map.get(socket.assigns, :project_id)
-
-          result =
-            if params["job_id"] && params["job_id"] != "" do
-              case parse_job_id(params["job_id"]) do
-                :error ->
-                  {:error, :invalid_id}
-
-                {:ok, int_id} ->
-                  case ScheduledJobs.get_job(int_id) do
-                    {:error, :not_found} -> {:error, :not_found}
-                    {:ok, job} ->
-                      if not job_accessible?(job, socket) do
-                        {:error, :access_denied}
-                      else
-                        ScheduledJobs.update_job(job, job_attrs, caller_project_id)
-                      end
-                  end
-              end
-            else
-              attrs = if caller_project_id, do: Map.put(job_attrs, "project_id", caller_project_id), else: job_attrs
-              ScheduledJobs.create_job(attrs)
-            end
-
-          case result do
-            {:ok, _} ->
-              {:noreply,
-               socket
-               |> assign(:scheduling_prompt, nil)
-               |> assign(:scheduling_job, nil)
-               |> load_agent_schedule_data()
-               |> put_flash(:info, "Schedule saved")}
-
-            {:error, :not_found} ->
-              {:noreply, put_flash(socket, :error, "Job not found")}
-
-            {:error, :invalid_id} ->
-              {:noreply, put_flash(socket, :error, "Invalid job ID")}
-
-            {:error, :access_denied} ->
-              {:noreply, put_flash(socket, :error, "Access denied")}
-
-            {:error, :already_scheduled} ->
-              {:noreply, put_flash(socket, :error, "This agent already has a schedule")}
-
-            {:error, _} ->
-              {:noreply, put_flash(socket, :error, "Failed to save schedule")}
-          end
+          result = save_or_update_job(params["job_id"], job_attrs, caller_project_id, socket)
+          handle_schedule_result(result, socket)
       end
     end
   end
@@ -299,26 +214,121 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
 
     cond do
       override_id && override_id != "" ->
-        case parse_int(override_id) do
-          nil ->
-            {:error, :no_project}
-
-          int_id ->
-            project = Projects.get_project(int_id)
-            if project && project.path, do: {:ok, project.path}, else: {:error, :no_project}
-        end
+        project_path_by_id(parse_int(override_id))
 
       prompt[:project_id] || Map.get(prompt, :project_id) ->
         pid = prompt[:project_id] || Map.get(prompt, :project_id)
-        project = Projects.get_project(pid)
-        if project && project.path, do: {:ok, project.path}, else: {:error, :no_project}
+        project_path_by_id(pid)
 
       project_id = Map.get(socket.assigns, :project_id) ->
-        project = Projects.get_project(project_id)
-        if project && project.path, do: {:ok, project.path}, else: {:error, :no_project}
+        project_path_by_id(project_id)
 
       true ->
         {:error, :no_project}
     end
   end
+
+  defp project_path_by_id(nil), do: {:error, :no_project}
+
+  defp project_path_by_id(id) do
+    project = Projects.get_project(id)
+    if project && project.path, do: {:ok, project.path}, else: {:error, :no_project}
+  end
+
+  defp resolve_job_prompt(job) do
+    cond do
+      job.prompt_id ->
+        Prompts.get_prompt!(job.prompt_id)
+
+      agent_file_id = get_config_field(job, "agent_file_id") ->
+        AgentFileScanner.get_by_id(agent_file_id)
+
+      true ->
+        nil
+    end
+  end
+
+  defp build_schedule_config(prompt, params, path, is_fs, prompt_id_raw) do
+    %{
+      "instructions" => prompt.prompt_text,
+      "model" => params["model"] || "sonnet",
+      "project_path" => path
+    }
+    |> put_prompt_id(is_fs, prompt_id_raw)
+    |> put_if_present("max_budget_usd", params["max_budget_usd"])
+    |> put_if_present("max_turns", params["max_turns"])
+    |> put_if_present("fallback_model", params["fallback_model"])
+    |> put_if_present("allowed_tools", params["allowed_tools"])
+    |> put_if_present("output_format", params["output_format"])
+    |> Map.put("skip_permissions", params["skip_permissions"] == "true")
+    |> put_if_present("permission_mode", params["permission_mode"])
+    |> put_if_present("add_dir", params["add_dir"])
+    |> put_if_present("mcp_config", params["mcp_config"])
+    |> put_if_present("plugin_dir", params["plugin_dir"])
+    |> put_if_present("settings_file", params["settings_file"])
+    |> put_bool_if_true("chrome", params["chrome"])
+    |> put_bool_if_true("sandbox", params["sandbox"])
+    |> Jason.encode!()
+  end
+
+  defp put_prompt_id(config, true, prompt_id_raw),
+    do: Map.put(config, "agent_file_id", prompt_id_raw)
+
+  defp put_prompt_id(config, false, prompt_id_raw) do
+    case parse_int(prompt_id_raw) do
+      nil -> config
+      int_id -> Map.put(config, "prompt_id", int_id)
+    end
+  end
+
+  defp save_or_update_job(job_id, job_attrs, caller_project_id, _socket) when job_id in [nil, ""] do
+    attrs = if caller_project_id, do: Map.put(job_attrs, "project_id", caller_project_id), else: job_attrs
+    ScheduledJobs.create_job(attrs)
+  end
+
+  defp save_or_update_job(job_id, job_attrs, caller_project_id, socket) do
+    case parse_job_id(job_id) do
+      :error ->
+        {:error, :invalid_id}
+
+      {:ok, int_id} ->
+        update_existing_job(int_id, job_attrs, caller_project_id, socket)
+    end
+  end
+
+  defp update_existing_job(int_id, job_attrs, caller_project_id, socket) do
+    case ScheduledJobs.get_job(int_id) do
+      {:error, :not_found} ->
+        {:error, :not_found}
+
+      {:ok, job} ->
+        if job_accessible?(job, socket),
+          do: ScheduledJobs.update_job(job, job_attrs, caller_project_id),
+          else: {:error, :access_denied}
+    end
+  end
+
+  defp handle_schedule_result({:ok, _}, socket) do
+    {:noreply,
+     socket
+     |> assign(:scheduling_prompt, nil)
+     |> assign(:scheduling_job, nil)
+     |> load_agent_schedule_data()
+     |> put_flash(:info, "Schedule saved")}
+  end
+
+  defp handle_schedule_result({:error, :not_found}, socket),
+    do: {:noreply, put_flash(socket, :error, "Job not found")}
+
+  defp handle_schedule_result({:error, :invalid_id}, socket),
+    do: {:noreply, put_flash(socket, :error, "Invalid job ID")}
+
+  defp handle_schedule_result({:error, :access_denied}, socket),
+    do: {:noreply, put_flash(socket, :error, "Access denied")}
+
+  defp handle_schedule_result({:error, :already_scheduled}, socket),
+    do: {:noreply, put_flash(socket, :error, "This agent already has a schedule")}
+
+  defp handle_schedule_result({:error, _}, socket),
+    do: {:noreply, put_flash(socket, :error, "Failed to save schedule")}
 end

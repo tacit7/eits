@@ -55,160 +55,26 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   @impl true
   def handle_params(%{"path" => path} = params, _uri, socket) do
     project = socket.assigns.project
-
-    mode =
-      case Map.get(params, "mode") do
-        "tree" -> :tree
-        _ -> :list
-      end
-
+    mode = if Map.get(params, "mode") == "tree", do: :tree, else: :list
     socket = assign(socket, :view_mode, mode)
 
-    if project.path do
-      full_path = Path.join(project.path, path)
-
-      if not path_within?(full_path, project.path) do
-        {:noreply,
-         socket
-         |> assign(:error, "Access denied: path outside project directory")
-         |> assign(:file_content, nil)
-         |> assign(:files, [])}
-      else
-        cond do
-          File.dir?(full_path) ->
-            # List directory contents (for list view)
-            case File.ls(full_path) do
-              {:ok, files} ->
-                file_list =
-                  files
-                  |> Enum.filter(fn file ->
-                    file_path = Path.join(full_path, file)
-                    File.dir?(file_path) or !is_binary_file?(file_path)
-                  end)
-                  |> Enum.map(fn file ->
-                    file_path = Path.join(full_path, file)
-
-                    %{
-                      name: file,
-                      path: Path.join(path, file),
-                      is_dir: File.dir?(file_path),
-                      size: get_file_size(file_path)
-                    }
-                  end)
-                  |> Enum.sort_by(&{!&1.is_dir, &1.name})
-
-                {:noreply,
-                 socket
-                 |> assign(:file_path, path)
-                 |> assign(:file_content, nil)
-                 |> assign(:files, file_list)
-                 |> assign(:error, nil)}
-
-              {:error, reason} ->
-                {:noreply,
-                 socket
-                 |> assign(:error, "Failed to read directory: #{reason}")
-                 |> assign(:files, [])}
-            end
-
-          File.regular?(full_path) ->
-            # Check file size before reading
-            case File.stat(full_path) do
-              {:ok, %{size: size}} when size > 1_048_576 ->
-                {:noreply,
-                 socket
-                 |> assign(:file_path, path)
-                 |> assign(:file_content, nil)
-                 |> assign(:file_type, nil)
-                 |> assign(:files, [])
-                 |> assign(:error, "File too large to display (over 1 MB)")}
-
-              {:ok, _stat} ->
-                case File.read(full_path) do
-                  {:ok, content} ->
-                    file_type = detect_file_type(path)
-
-                    {:noreply,
-                     socket
-                     |> assign(:file_path, path)
-                     |> assign(:file_content, content)
-                     |> assign(:file_type, file_type)
-                     |> assign(:files, [])
-                     |> assign(:error, nil)}
-
-                  {:error, reason} ->
-                    {:noreply,
-                     socket
-                     |> assign(:error, "Failed to read file: #{reason}")
-                     |> assign(:file_content, nil)}
-                end
-
-              {:error, reason} ->
-                {:noreply,
-                 socket
-                 |> assign(:error, "Failed to stat file: #{reason}")
-                 |> assign(:file_content, nil)}
-            end
-
-          true ->
-            {:noreply,
-             socket
-             |> assign(:error, "File not found: #{path}")
-             |> assign(:file_content, nil)
-             |> assign(:files, [])}
-        end
-      end
-    else
+    unless project.path do
       {:noreply,
        socket
        |> assign(:error, "Project path not configured")
        |> assign(:file_content, nil)}
+    else
+      {:noreply, navigate_to_path(socket, project.path, path)}
     end
   end
 
   def handle_params(params, _uri, socket) do
-    # Load root directory for list view
     project = socket.assigns.project
-
-    mode =
-      case Map.get(params, "mode") do
-        "tree" -> :tree
-        _ -> :list
-      end
-
+    mode = if Map.get(params, "mode") == "tree", do: :tree, else: :list
     socket = assign(socket, :view_mode, mode)
 
     if project.path && mode == :list do
-      case File.ls(project.path) do
-        {:ok, files} ->
-          ignored_dirs = ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
-
-          file_list =
-            files
-            |> Enum.filter(fn file ->
-              file_path = Path.join(project.path, file)
-
-              (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
-                file not in ignored_dirs and
-                (File.dir?(file_path) or !is_binary_file?(file_path))
-            end)
-            |> Enum.map(fn file ->
-              file_path = Path.join(project.path, file)
-
-              %{
-                name: file,
-                path: file,
-                is_dir: File.dir?(file_path),
-                size: get_file_size(file_path)
-              }
-            end)
-            |> Enum.sort_by(&{!&1.is_dir, &1.name})
-
-          {:noreply, assign(socket, :files, file_list)}
-
-        {:error, _reason} ->
-          {:noreply, socket}
-      end
+      {:noreply, load_root_directory(socket, project.path)}
     else
       {:noreply, socket}
     end
@@ -236,16 +102,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     file_path = socket.assigns.file_path
 
     if project && project.path && file_path do
-      full_path = Path.join(project.path, file_path)
-
-      if path_within?(full_path, project.path) do
-        case File.write(full_path, content) do
-          :ok -> {:noreply, put_flash(socket, :info, "Saved")}
-          {:error, reason} -> {:noreply, put_flash(socket, :error, "Save failed: #{reason}")}
-        end
-      else
-        {:noreply, put_flash(socket, :error, "Access denied")}
-      end
+      {:noreply, write_project_file(socket, project.path, file_path, content)}
     else
       {:noreply, socket}
     end
@@ -253,6 +110,124 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   @impl true
   def handle_info(_msg, socket), do: {:noreply, socket}
+
+  # ── Private helpers ──────────────────────────────────────────────────────────
+
+  defp navigate_to_path(socket, project_path, path) do
+    full_path = Path.join(project_path, path)
+
+    if not path_within?(full_path, project_path) do
+      socket
+      |> assign(:error, "Access denied: path outside project directory")
+      |> assign(:file_content, nil)
+      |> assign(:files, [])
+    else
+      dispatch_project_path(socket, full_path, path)
+    end
+  end
+
+  defp dispatch_project_path(socket, full_path, path) do
+    cond do
+      File.dir?(full_path) -> list_project_directory(socket, full_path, path)
+      File.regular?(full_path) -> read_project_file(socket, full_path, path)
+      true -> socket |> assign(:error, "File not found: #{path}") |> assign(:file_content, nil) |> assign(:files, [])
+    end
+  end
+
+  defp list_project_directory(socket, full_path, path) do
+    case File.ls(full_path) do
+      {:ok, files} ->
+        file_list =
+          files
+          |> Enum.filter(fn file ->
+            file_path = Path.join(full_path, file)
+            File.dir?(file_path) or !is_binary_file?(file_path)
+          end)
+          |> Enum.map(fn file ->
+            file_path = Path.join(full_path, file)
+            %{name: file, path: Path.join(path, file), is_dir: File.dir?(file_path), size: get_file_size(file_path)}
+          end)
+          |> Enum.sort_by(&{!&1.is_dir, &1.name})
+
+        socket
+        |> assign(:file_path, path)
+        |> assign(:file_content, nil)
+        |> assign(:files, file_list)
+        |> assign(:error, nil)
+
+      {:error, reason} ->
+        socket |> assign(:error, "Failed to read directory: #{reason}") |> assign(:files, [])
+    end
+  end
+
+  defp read_project_file(socket, full_path, path) do
+    case File.stat(full_path) do
+      {:ok, %{size: size}} when size > 1_048_576 ->
+        socket
+        |> assign(:file_path, path)
+        |> assign(:file_content, nil)
+        |> assign(:file_type, nil)
+        |> assign(:files, [])
+        |> assign(:error, "File too large to display (over 1 MB)")
+
+      {:ok, _stat} ->
+        case File.read(full_path) do
+          {:ok, content} ->
+            socket
+            |> assign(:file_path, path)
+            |> assign(:file_content, content)
+            |> assign(:file_type, detect_file_type(path))
+            |> assign(:files, [])
+            |> assign(:error, nil)
+
+          {:error, reason} ->
+            socket |> assign(:error, "Failed to read file: #{reason}") |> assign(:file_content, nil)
+        end
+
+      {:error, reason} ->
+        socket |> assign(:error, "Failed to stat file: #{reason}") |> assign(:file_content, nil)
+    end
+  end
+
+  defp load_root_directory(socket, project_path) do
+    case File.ls(project_path) do
+      {:ok, files} ->
+        ignored_dirs = ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
+
+        file_list =
+          files
+          |> Enum.filter(fn file ->
+            file_path = Path.join(project_path, file)
+
+            (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
+              file not in ignored_dirs and
+              (File.dir?(file_path) or !is_binary_file?(file_path))
+          end)
+          |> Enum.map(fn file ->
+            file_path = Path.join(project_path, file)
+            %{name: file, path: file, is_dir: File.dir?(file_path), size: get_file_size(file_path)}
+          end)
+          |> Enum.sort_by(&{!&1.is_dir, &1.name})
+
+        assign(socket, :files, file_list)
+
+      {:error, _reason} ->
+        socket
+    end
+  end
+
+  defp write_project_file(socket, project_path, file_path, content) do
+    full_path = Path.join(project_path, file_path)
+
+    if path_within?(full_path, project_path) do
+      case File.write(full_path, content) do
+        :ok -> put_flash(socket, :info, "Saved")
+        {:error, reason} -> put_flash(socket, :error, "Save failed: #{reason}")
+      end
+    else
+      put_flash(socket, :error, "Access denied")
+    end
+  end
 
   attr :item, :map, required: true
   attr :project_id, :integer, required: true

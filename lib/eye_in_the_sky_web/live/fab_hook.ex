@@ -235,10 +235,8 @@ defmodule EyeInTheSkyWeb.FabHook do
     Sessions.list_sessions_with_agent(include_archived: false)
     |> Enum.reduce(%{}, fn s, acc ->
       status = s.status || "idle"
-
-      acc
-      |> Map.put(to_string(s.id), status)
-      |> then(fn a -> if s.uuid, do: Map.put(a, s.uuid, status), else: a end)
+      acc = Map.put(acc, to_string(s.id), status)
+      if s.uuid, do: Map.put(acc, s.uuid, status), else: acc
     end)
   end
 

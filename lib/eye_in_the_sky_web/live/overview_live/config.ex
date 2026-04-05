@@ -69,91 +69,92 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
     unless File.dir?(@claude_dir) do
       assign(socket, :error, "~/.claude directory not found")
     else
-      target =
-        if path && path != "" do
-          full = Path.join(@claude_dir, path)
+      case resolve_list_target(path) do
+        {:error, msg} -> assign(socket, :error, msg)
+        {:ok, full_path, rel_path} -> dispatch_path(socket, full_path, rel_path, path)
+      end
+    end
+  end
 
-          if path_within?(full, @claude_dir),
-            do: {:ok, full, path},
-            else: {:error, "Access denied"}
-        else
-          {:ok, @claude_dir, nil}
+  defp resolve_list_target(path) do
+    if path && path != "" do
+      full = Path.join(@claude_dir, path)
+      if path_within?(full, @claude_dir), do: {:ok, full, path}, else: {:error, "Access denied"}
+    else
+      {:ok, @claude_dir, nil}
+    end
+  end
+
+  defp dispatch_path(socket, full_path, rel_path, path) do
+    cond do
+      File.dir?(full_path) -> list_directory(socket, full_path, rel_path)
+      File.regular?(full_path) -> read_file_for_display(socket, full_path, rel_path)
+      true -> assign(socket, :error, "Path not found: #{path}")
+    end
+  end
+
+  defp list_directory(socket, full_path, rel_path) do
+    case File.ls(full_path) do
+      {:ok, items} ->
+        file_list =
+          items
+          |> Enum.sort()
+          |> Enum.map(&build_file_entry(&1, full_path, rel_path))
+          |> Enum.sort_by(&sort_key/1)
+
+        socket
+        |> assign(:files, file_list)
+        |> assign(:current_path, rel_path)
+        |> assign(:file_content, nil)
+        |> assign(:selected_file, nil)
+        |> assign(:selected_file_path, nil)
+        |> assign(:file_type, nil)
+        |> assign(:error, nil)
+
+      {:error, reason} ->
+        assign(socket, :error, "Failed to read directory: #{reason}")
+    end
+  end
+
+  defp build_file_entry(item, full_path, rel_path) do
+    item_path = Path.join(full_path, item)
+    rel = if rel_path, do: Path.join(rel_path, item), else: item
+    size = case File.stat(item_path) do
+      {:ok, %{size: s}} -> s
+      _ -> 0
+    end
+    %{name: item, path: rel, is_dir: File.dir?(item_path), size: size}
+  end
+
+  defp read_file_for_display(socket, full_path, rel_path) do
+    case File.stat(full_path) do
+      {:ok, %{size: size}} when size > 1_048_576 ->
+        socket
+        |> assign(:current_path, rel_path)
+        |> assign(:file_content, nil)
+        |> assign(:files, [])
+        |> assign(:error, "File too large to display (over 1 MB)")
+
+      {:ok, _} ->
+        case File.read(full_path) do
+          {:ok, content} ->
+            file_type = detect_file_type(full_path)
+
+            socket
+            |> assign(:current_path, rel_path)
+            |> assign(:file_content, content)
+            |> assign(:selected_file, rel_path)
+            |> assign(:selected_file_path, full_path)
+            |> assign(:file_type, file_type)
+            |> assign(:files, [])
+            |> assign(:error, nil)
+
+          {:error, reason} ->
+            assign(socket, :error, "Failed to read file: #{reason}")
         end
 
-      case target do
-        {:error, msg} ->
-          assign(socket, :error, msg)
-
-        {:ok, full_path, rel_path} ->
-          cond do
-            File.dir?(full_path) ->
-              case File.ls(full_path) do
-                {:ok, items} ->
-                  file_list =
-                    items
-                    |> Enum.sort()
-                    |> Enum.map(fn item ->
-                      item_path = Path.join(full_path, item)
-                      rel = if rel_path, do: Path.join(rel_path, item), else: item
-
-                      size =
-                        case File.stat(item_path) do
-                          {:ok, %{size: s}} -> s
-                          _ -> 0
-                        end
-
-                      %{name: item, path: rel, is_dir: File.dir?(item_path), size: size}
-                    end)
-                    |> Enum.sort_by(&sort_key/1)
-
-                  socket
-                  |> assign(:files, file_list)
-                  |> assign(:current_path, rel_path)
-                  |> assign(:file_content, nil)
-                  |> assign(:selected_file, nil)
-                  |> assign(:selected_file_path, nil)
-                  |> assign(:file_type, nil)
-                  |> assign(:error, nil)
-
-                {:error, reason} ->
-                  assign(socket, :error, "Failed to read directory: #{reason}")
-              end
-
-            File.regular?(full_path) ->
-              case File.stat(full_path) do
-                {:ok, %{size: size}} when size > 1_048_576 ->
-                  socket
-                  |> assign(:current_path, rel_path)
-                  |> assign(:file_content, nil)
-                  |> assign(:files, [])
-                  |> assign(:error, "File too large to display (over 1 MB)")
-
-                {:ok, _} ->
-                  case File.read(full_path) do
-                    {:ok, content} ->
-                      file_type = detect_file_type(full_path)
-
-                      socket
-                      |> assign(:current_path, rel_path)
-                      |> assign(:file_content, content)
-                      |> assign(:selected_file, rel_path)
-                      |> assign(:selected_file_path, full_path)
-                      |> assign(:file_type, file_type)
-                      |> assign(:files, [])
-                      |> assign(:error, nil)
-
-                    {:error, reason} ->
-                      assign(socket, :error, "Failed to read file: #{reason}")
-                  end
-
-                {:error, reason} ->
-                  assign(socket, :error, "Failed to stat file: #{reason}")
-              end
-
-            true ->
-              assign(socket, :error, "Path not found: #{path}")
-          end
-      end
+      {:error, reason} ->
+        assign(socket, :error, "Failed to stat file: #{reason}")
     end
   end
 

@@ -125,33 +125,44 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
   defp extract_context_window(messages) do
     messages
     |> Enum.reverse()
-    |> Enum.find_value(fn msg ->
-      case msg.metadata do
-        %{"model_usage" => model_usage} when is_map(model_usage) and map_size(model_usage) > 0 ->
-          model_usage
-          |> Map.values()
-          |> Enum.find_value(fn entry when is_map(entry) ->
-            input = entry["inputTokens"] || 0
-            cache_read = entry["cacheReadInputTokens"] || 0
-            cache_creation = entry["cacheCreationInputTokens"] || 0
-            ctx_window = entry["contextWindow"] || 200_000
-            used = input + cache_read + cache_creation
+    |> Enum.find_value(&extract_context_from_metadata/1)
+    |> Kernel.||({0, 0})
+  end
 
-            if used > 0, do: {used, ctx_window}
-          end)
+  defp extract_context_from_metadata(msg) do
+    case msg.metadata do
+      %{"model_usage" => model_usage} when is_map(model_usage) and map_size(model_usage) > 0 ->
+        extract_from_model_usage(model_usage)
 
-        %{"usage" => %{"input_tokens" => _} = usage} ->
-          input = usage["input_tokens"] || 0
-          cache_read = usage["cache_read_input_tokens"] || 0
-          cache_creation = usage["cache_creation_input_tokens"] || 0
-          used = input + cache_read + cache_creation
+      %{"usage" => %{"input_tokens" => _} = usage} ->
+        extract_from_usage(usage)
 
-          if used > 0, do: {used, 200_000}
+      _ ->
+        nil
+    end
+  end
 
-        _ ->
-          nil
-      end
-    end) || {0, 0}
+  defp extract_from_model_usage(model_usage) do
+    model_usage
+    |> Map.values()
+    |> Enum.find_value(fn entry when is_map(entry) ->
+      input = entry["inputTokens"] || 0
+      cache_read = entry["cacheReadInputTokens"] || 0
+      cache_creation = entry["cacheCreationInputTokens"] || 0
+      ctx_window = entry["contextWindow"] || 200_000
+      used = input + cache_read + cache_creation
+
+      if used > 0, do: {used, ctx_window}
+    end)
+  end
+
+  defp extract_from_usage(usage) do
+    input = usage["input_tokens"] || 0
+    cache_read = usage["cache_read_input_tokens"] || 0
+    cache_creation = usage["cache_creation_input_tokens"] || 0
+    used = input + cache_read + cache_creation
+
+    if used > 0, do: {used, 200_000}
   end
 
   defp read_session_usage_stats(socket, session_id) do

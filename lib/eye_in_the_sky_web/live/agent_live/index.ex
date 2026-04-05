@@ -90,36 +90,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
               provider: "claude",
               body: body
             })} do
-      case Agents.get_agent(session.agent_id) do
-        {:ok, chat_agent} ->
-          project_path =
-            chat_agent.git_worktree_path ||
-              (chat_agent.project && chat_agent.project.path)
-
-          if project_path do
-            EyeInTheSky.Agents.AgentManager.continue_session(
-              session.id,
-              direct_message_prompt(body),
-              model: "sonnet",
-              project_path: project_path
-            )
-
-            {:noreply, socket}
-          else
-            Logger.warning(
-              "send_direct_message: agent #{chat_agent.id} has no path (git_worktree_path and project.path both nil), session not continued"
-            )
-
-            {:noreply, socket}
-          end
-
-        _ ->
-          Logger.warning(
-            "send_direct_message: agent #{session.agent_id} not found, message sent but session not continued"
-          )
-
-          {:noreply, socket}
-      end
+      maybe_continue_session(session, body, socket)
     else
       {:session, _} -> {:noreply, put_flash(socket, :error, "Session not found")}
       {:channel, _} -> {:noreply, put_flash(socket, :error, "Global channel not found")}
@@ -248,21 +219,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   def handle_event("save_session_name", %{"session_id" => session_id, "name" => name}, socket) do
     name = String.trim(name)
 
-    if name != "" do
-      case Sessions.get_session(session_id) do
-        {:ok, session} ->
-          case Sessions.update_session(session, %{name: name}) do
-            {:ok, _} ->
-              :ok
-
-            {:error, reason} ->
-              Logger.warning("save_session_name: failed to rename session #{session_id}: #{inspect(reason)}")
-          end
-
-        _ ->
-          :ok
-      end
-    end
+    if name != "", do: rename_session(session_id, name)
 
     {:noreply, socket |> assign(:editing_session_id, nil) |> load_agents()}
   end
@@ -470,17 +427,69 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
     updated_agents =
       socket.assigns.agents
-      |> Enum.map(fn agent ->
-        if agent.id == session_id do
-          agent = %{agent | status: new_status}
-          if new_status == "idle", do: %{agent | last_activity_at: now}, else: agent
-        else
-          agent
-        end
-      end)
+      |> Enum.map(&apply_agent_status(&1, session_id, new_status, now))
       |> sort_agents(socket.assigns.sort_by)
 
     assign(socket, :agents, updated_agents)
+  end
+
+  defp apply_agent_status(agent, session_id, new_status, now) do
+    if agent.id == session_id do
+      agent = %{agent | status: new_status}
+      if new_status == "idle", do: %{agent | last_activity_at: now}, else: agent
+    else
+      agent
+    end
+  end
+
+  defp maybe_continue_session(session, body, socket) do
+    case Agents.get_agent(session.agent_id) do
+      {:ok, chat_agent} ->
+        project_path =
+          chat_agent.git_worktree_path ||
+            (chat_agent.project && chat_agent.project.path)
+
+        continue_with_project_path(session, body, project_path, chat_agent, socket)
+
+      _ ->
+        Logger.warning(
+          "send_direct_message: agent #{session.agent_id} not found, message sent but session not continued"
+        )
+
+        {:noreply, socket}
+    end
+  end
+
+  defp continue_with_project_path(_session, _body, nil, chat_agent, socket) do
+    Logger.warning(
+      "send_direct_message: agent #{chat_agent.id} has no path (git_worktree_path and project.path both nil), session not continued"
+    )
+
+    {:noreply, socket}
+  end
+
+  defp continue_with_project_path(session, body, project_path, _chat_agent, socket) do
+    EyeInTheSky.Agents.AgentManager.continue_session(
+      session.id,
+      direct_message_prompt(body),
+      model: "sonnet",
+      project_path: project_path
+    )
+
+    {:noreply, socket}
+  end
+
+  defp rename_session(session_id, name) do
+    case Sessions.get_session(session_id) do
+      {:ok, session} ->
+        case Sessions.update_session(session, %{name: name}) do
+          {:ok, _} -> :ok
+          {:error, reason} -> Logger.warning("save_session_name: failed to rename session #{session_id}: #{inspect(reason)}")
+        end
+
+      _ ->
+        :ok
+    end
   end
 
   defp apply_session_action("archive_session", session), do: Sessions.archive_session(session)

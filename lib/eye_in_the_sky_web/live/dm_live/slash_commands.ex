@@ -69,26 +69,28 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
     lines = String.split(body, "\n")
 
     {server_cmds, session_opts, text_lines} =
-      Enum.reduce(lines, {[], [], []}, fn line, {scmds, sopts, texts} ->
-        trimmed = String.trim(line)
-
-        case Regex.run(@slash_pattern, trimmed, capture: :all_but_first) do
-          [cmd | rest] ->
-            arg = List.first(rest) |> then(&if(&1 == "", do: nil, else: &1))
-
-            case route(cmd, arg) do
-              {:server, cmd_tuple} -> {[cmd_tuple | scmds], sopts, texts}
-              {:session, sess_opt} -> {scmds, [sess_opt | sopts], texts}
-              :unknown -> {scmds, sopts, [line | texts]}
-            end
-
-          nil ->
-            {scmds, sopts, [line | texts]}
-        end
-      end)
+      Enum.reduce(lines, {[], [], []}, &classify_line/2)
 
     {Enum.reverse(server_cmds), Enum.reverse(session_opts),
      text_lines |> Enum.reverse() |> Enum.join("\n")}
+  end
+
+  defp classify_line(line, {scmds, sopts, texts}) do
+    trimmed = String.trim(line)
+
+    case Regex.run(@slash_pattern, trimmed, capture: :all_but_first) do
+      [cmd | rest] ->
+        arg = List.first(rest) |> then(&if(&1 == "", do: nil, else: &1))
+
+        case route(cmd, arg) do
+          {:server, cmd_tuple} -> {[cmd_tuple | scmds], sopts, texts}
+          {:session, sess_opt} -> {scmds, [sess_opt | sopts], texts}
+          :unknown -> {scmds, sopts, [line | texts]}
+        end
+
+      nil ->
+        {scmds, sopts, [line | texts]}
+    end
   end
 
   # ---------------------------------------------------------------------------

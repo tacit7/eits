@@ -12,22 +12,24 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActions do
     if Map.has_key?(socket.assigns.diff_cache, hash) do
       {:noreply, socket}
     else
-      diff =
-        case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
-          {:ok, project_path} ->
-            case System.cmd("git", ["-C", project_path, "show", hash, "--unified=5"],
-                   stderr_to_stdout: false
-                 ) do
-              {output, 0} -> output
-              _ -> :error
-            end
-
-          _ ->
-            :error
-        end
-
+      diff = fetch_git_diff(hash, socket)
       cache = Map.put(socket.assigns.diff_cache, hash, diff)
       {:noreply, assign(socket, :diff_cache, cache)}
+    end
+  end
+
+  defp fetch_git_diff(hash, socket) do
+    case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+      {:ok, project_path} ->
+        case System.cmd("git", ["-C", project_path, "show", hash, "--unified=5"],
+               stderr_to_stdout: false
+             ) do
+          {output, 0} -> output
+          _ -> :error
+        end
+
+      _ ->
+        :error
     end
   end
 

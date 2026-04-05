@@ -172,27 +172,28 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
 
   def handle_edit_job(%{"id" => id}, socket, scoping_project_id \\ nil) do
     with_scoped_job(id, socket, scoping_project_id, fn job ->
-      config = ScheduledJobs.decode_config(job)
-
-      socket =
-        socket
-        |> assign(:show_form, true)
-        |> assign(:editing_job, job)
-        |> assign(:form, to_form(ScheduledJobs.change_job(job)))
-        |> assign(:form_job_type, job.job_type)
-        |> assign(:form_schedule_type, job.schedule_type)
-        |> assign(:form_config, config)
-
-      socket =
-        if scoping_project_id do
-          scope = if is_nil(job.project_id), do: "global", else: "project"
-          assign(socket, :form_scope, scope)
-        else
-          socket
-        end
-
-      {:noreply, socket}
+      {:noreply, setup_edit_form(socket, job, scoping_project_id)}
     end)
+  end
+
+  defp setup_edit_form(socket, job, scoping_project_id) do
+    config = ScheduledJobs.decode_config(job)
+
+    socket =
+      socket
+      |> assign(:show_form, true)
+      |> assign(:editing_job, job)
+      |> assign(:form, to_form(ScheduledJobs.change_job(job)))
+      |> assign(:form_job_type, job.job_type)
+      |> assign(:form_schedule_type, job.schedule_type)
+      |> assign(:form_config, config)
+
+    if scoping_project_id do
+      scope = if is_nil(job.project_id), do: "global", else: "project"
+      assign(socket, :form_scope, scope)
+    else
+      socket
+    end
   end
 
   # ---------------------------------------------------------------------------

@@ -162,16 +162,17 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
       assign(socket, :error, "No .claude directory found")
     else
       case resolve_list_target(claude_dir, path) do
-        {:error, msg} ->
-          assign(socket, :error, msg)
-
-        {:ok, full_path, rel_path} ->
-          cond do
-            File.dir?(full_path) -> list_directory(socket, full_path, rel_path)
-            File.regular?(full_path) -> read_file_for_display(socket, full_path, rel_path)
-            true -> assign(socket, :error, "Path not found: #{path}")
-          end
+        {:error, msg} -> assign(socket, :error, msg)
+        {:ok, full_path, rel_path} -> dispatch_config_path(socket, full_path, rel_path, path)
       end
+    end
+  end
+
+  defp dispatch_config_path(socket, full_path, rel_path, path) do
+    cond do
+      File.dir?(full_path) -> list_directory(socket, full_path, rel_path)
+      File.regular?(full_path) -> read_file_for_display(socket, full_path, rel_path)
+      true -> assign(socket, :error, "Path not found: #{path}")
     end
   end
 

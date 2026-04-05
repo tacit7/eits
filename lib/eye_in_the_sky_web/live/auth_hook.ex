@@ -19,16 +19,20 @@ defmodule EyeInTheSkyWeb.AuthHook do
     if disable_auth and @env != :prod do
       {:cont, assign(socket, :current_user, nil)}
     else
-      case session["user_id"] do
-        nil ->
-          {:halt, redirect(socket, to: "/auth/login")}
+      authenticate_from_session(session, socket)
+    end
+  end
 
-        user_id ->
-          case Accounts.get_user(user_id) do
-            nil -> {:halt, redirect(socket, to: "/auth/login")}
-            user -> {:cont, assign(socket, :current_user, user)}
-          end
-      end
+  defp authenticate_from_session(session, socket) do
+    case session["user_id"] do
+      nil ->
+        {:halt, redirect(socket, to: "/auth/login")}
+
+      user_id ->
+        case Accounts.get_user(user_id) do
+          nil -> {:halt, redirect(socket, to: "/auth/login")}
+          user -> {:cont, assign(socket, :current_user, user)}
+        end
     end
   end
 end

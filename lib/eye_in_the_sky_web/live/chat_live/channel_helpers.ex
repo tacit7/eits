@@ -45,18 +45,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
   def route_to_members(channel_id, body, sender_session_id, content_blocks) do
     {_mode, mentioned_ids, _mention_all} = ChannelProtocol.parse_routing(body, -1)
 
-    Enum.each(mentioned_ids, fn mid ->
-      unless Channels.is_member?(channel_id, mid) do
-        case Sessions.get_session(mid) do
-          {:ok, s} ->
-            Channels.add_member(channel_id, s.agent_id, mid)
-            Logger.info("Auto-added session=#{mid} to channel=#{channel_id}")
-
-          _ ->
-            :ok
-        end
-      end
-    end)
+    Enum.each(mentioned_ids, &maybe_auto_add_member(channel_id, &1))
 
     agent_members = Channels.list_members(channel_id)
 
@@ -83,6 +72,19 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
         )
       end
     end)
+  end
+
+  defp maybe_auto_add_member(channel_id, mid) do
+    unless Channels.is_member?(channel_id, mid) do
+      case Sessions.get_session(mid) do
+        {:ok, s} ->
+          Channels.add_member(channel_id, s.agent_id, mid)
+          Logger.info("Auto-added session=#{mid} to channel=#{channel_id}")
+
+        _ ->
+          :ok
+      end
+    end
   end
 
   def build_sessions_by_project(channel_members, all_projects, search) do

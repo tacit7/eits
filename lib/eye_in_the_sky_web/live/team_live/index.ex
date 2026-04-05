@@ -258,17 +258,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
     member_session_ids = Enum.map(team.members, & &1.session_id) |> MapSet.new()
 
     tasks_by_session =
-      Enum.reduce(tasks, %{}, fn task, acc ->
-        matched_sessions = Enum.filter(task.session_ids, &MapSet.member?(member_session_ids, &1))
-
-        case matched_sessions do
-          [] ->
-            acc
-
-          sids ->
-            Enum.reduce(sids, acc, fn sid, a -> Map.update(a, sid, [task], &[task | &1]) end)
-        end
-      end)
+      Enum.reduce(tasks, %{}, &group_task_by_sessions(&1, &2, member_session_ids))
 
     unowned_tasks =
       Enum.filter(tasks, fn t ->
@@ -284,6 +274,15 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
     |> Map.put(:tasks, tasks)
     |> Map.put(:members, members_with_tasks)
     |> Map.put(:unowned_tasks, unowned_tasks)
+  end
+
+  defp group_task_by_sessions(task, acc, member_session_ids) do
+    matched = Enum.filter(task.session_ids, &MapSet.member?(member_session_ids, &1))
+
+    case matched do
+      [] -> acc
+      sids -> Enum.reduce(sids, acc, fn sid, a -> Map.update(a, sid, [task], &[task | &1]) end)
+    end
   end
 
   defp maybe_refresh_selected_team(%{assigns: %{selected_team_id: nil}} = socket), do: socket

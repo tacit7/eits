@@ -137,38 +137,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteAgentHandlers do
          error: "Agent UUID is required"
        })}
     else
-      case Agents.get_agent_by_uuid(agent_uuid) do
-        {:ok, agent} ->
-          agent = Repo.preload(agent, [:sessions, :project])
-
-          latest_status =
-            case agent.sessions do
-              [session | _] -> session.status
-              _ -> "no_sessions"
-            end
-
-          result = %{
-            ok: true,
-            agent: %{
-              uuid: agent.uuid,
-              name: agent.description || "Agent #{agent.id}",
-              status: latest_status,
-              session_count: length(agent.sessions || []),
-              instructions: nil,
-              project_name: agent.project && agent.project.name,
-              created_at: agent.created_at
-            }
-          }
-
-          {:halt, push_event(socket, "palette:get-agent-result", result)}
-
-        {:error, :not_found} ->
-          {:halt,
-           push_event(socket, "palette:get-agent-result", %{
-             ok: false,
-             error: "Agent not found"
-           })}
-      end
+      {:halt, push_event(socket, "palette:get-agent-result", fetch_agent_detail(agent_uuid))}
     end
   end
 
@@ -188,50 +157,70 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteAgentHandlers do
          error: "Agent UUID is required"
        })}
     else
-      case Agents.get_agent_by_uuid(agent_uuid) do
-        {:ok, agent} ->
-          agent = Repo.preload(agent, :sessions)
-
-          active_sessions =
-            Enum.filter(agent.sessions || [], fn session ->
-              session.status in ["working", "idle"]
-            end)
-
-          if active_sessions != [] do
-            {:halt,
-             push_event(socket, "palette:delete-agent-result", %{
-               ok: false,
-               error:
-                 "Cannot delete agent with active sessions (#{length(active_sessions)} active)"
-             })}
-          else
-            case Agents.delete_agent(agent) do
-              {:ok, _} ->
-                {:halt, push_event(socket, "palette:delete-agent-result", %{ok: true})}
-
-              {:error, _} ->
-                {:halt,
-                 push_event(socket, "palette:delete-agent-result", %{
-                   ok: false,
-                   error: "Failed to delete agent"
-                 })}
-            end
-          end
-
-        {:error, :not_found} ->
-          {:halt,
-           push_event(socket, "palette:delete-agent-result", %{
-             ok: false,
-             error: "Agent not found"
-           })}
-      end
+      {:halt, push_event(socket, "palette:delete-agent-result", do_delete_agent(agent_uuid))}
     end
   end
 
   def handle_delete_agent(_event, _params, socket), do: {:cont, socket}
 
   # ---------------------------------------------------------------------------
-  # Private
+  # Private — get/delete helpers
+  # ---------------------------------------------------------------------------
+
+  defp fetch_agent_detail(agent_uuid) do
+    case Agents.get_agent_by_uuid(agent_uuid) do
+      {:ok, agent} ->
+        agent = Repo.preload(agent, [:sessions, :project])
+
+        latest_status =
+          case agent.sessions do
+            [session | _] -> session.status
+            _ -> "no_sessions"
+          end
+
+        %{
+          ok: true,
+          agent: %{
+            uuid: agent.uuid,
+            name: agent.description || "Agent #{agent.id}",
+            status: latest_status,
+            session_count: length(agent.sessions || []),
+            instructions: nil,
+            project_name: agent.project && agent.project.name,
+            created_at: agent.created_at
+          }
+        }
+
+      {:error, :not_found} ->
+        %{ok: false, error: "Agent not found"}
+    end
+  end
+
+  defp do_delete_agent(agent_uuid) do
+    case Agents.get_agent_by_uuid(agent_uuid) do
+      {:ok, agent} ->
+        agent = Repo.preload(agent, :sessions)
+        active = Enum.filter(agent.sessions || [], &(&1.status in ["working", "idle"]))
+        attempt_delete_agent(agent, active)
+
+      {:error, :not_found} ->
+        %{ok: false, error: "Agent not found"}
+    end
+  end
+
+  defp attempt_delete_agent(_agent, active) when active != [] do
+    %{ok: false, error: "Cannot delete agent with active sessions (#{length(active)} active)"}
+  end
+
+  defp attempt_delete_agent(agent, _active) do
+    case Agents.delete_agent(agent) do
+      {:ok, _} -> %{ok: true}
+      {:error, _} -> %{ok: false, error: "Failed to delete agent"}
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Private — create helper
   # ---------------------------------------------------------------------------
 
   defp do_create_agent(instructions, params, socket) do

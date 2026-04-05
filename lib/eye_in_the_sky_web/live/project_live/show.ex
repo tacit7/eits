@@ -294,23 +294,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           |> File.ls!()
           |> Enum.reject(&String.starts_with?(&1, "."))
           |> Enum.sort()
-          |> Enum.map(fn name ->
-            full = Path.join(claude_dir, name)
-            rel = ".claude/#{name}"
-
-            if File.dir?(full) do
-              count =
-                case File.ls(full) do
-                  {:ok, entries} -> length(entries)
-                  _ -> 0
-                end
-
-              %{rel_path: rel, type: :dir, detail: "#{count} #{if count == 1, do: "item", else: "items"}"}
-            else
-              size = file_size_label(full)
-              %{rel_path: rel, type: :file, detail: size}
-            end
-          end)
+          |> Enum.map(&build_claude_entry(&1, claude_dir))
 
         entries ++ children
       else
@@ -318,6 +302,21 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
       end
 
     entries
+  end
+
+  defp build_claude_entry(name, claude_dir) do
+    full = Path.join(claude_dir, name)
+    rel = ".claude/#{name}"
+
+    if File.dir?(full) do
+      count = case File.ls(full) do
+        {:ok, entries} -> length(entries)
+        _ -> 0
+      end
+      %{rel_path: rel, type: :dir, detail: "#{count} #{if count == 1, do: "item", else: "items"}"}
+    else
+      %{rel_path: rel, type: :file, detail: file_size_label(full)}
+    end
   end
 
   defp file_size_label(path) do

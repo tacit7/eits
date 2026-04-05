@@ -102,9 +102,7 @@ defmodule EyeInTheSky.ScheduledJobs do
   end
 
   def update_job(%ScheduledJob{} = job, attrs, caller_project_id \\ nil) do
-    if not authorized?(job, caller_project_id) do
-      {:error, :unauthorized}
-    else
+    if authorized?(job, caller_project_id) do
       now = DateTime.utc_now()
 
       attrs =
@@ -118,6 +116,8 @@ defmodule EyeInTheSky.ScheduledJobs do
         {:ok, updated} -> maybe_recompute_next_run(updated, attrs)
         error -> error
       end
+    else
+      {:error, :unauthorized}
     end
   end
 
@@ -154,19 +154,19 @@ defmodule EyeInTheSky.ScheduledJobs do
     do: {:error, :system_job}
 
   def delete_job(%ScheduledJob{} = job, caller_project_id) do
-    if not authorized?(job, caller_project_id) do
-      {:error, :unauthorized}
-    else
+    if authorized?(job, caller_project_id) do
       Repo.delete(job)
+    else
+      {:error, :unauthorized}
     end
   end
 
   def toggle_job(%ScheduledJob{} = job, caller_project_id \\ nil) do
-    if not authorized?(job, caller_project_id) do
-      {:error, :unauthorized}
-    else
+    if authorized?(job, caller_project_id) do
       new_enabled = if job.enabled == 1, do: 0, else: 1
       update_job_fields(job, %{enabled: new_enabled, updated_at: DateTime.utc_now()})
+    else
+      {:error, :unauthorized}
     end
   end
 

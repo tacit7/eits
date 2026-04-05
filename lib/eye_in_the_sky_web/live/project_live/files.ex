@@ -116,13 +116,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   defp navigate_to_path(socket, project_path, path) do
     full_path = Path.join(project_path, path)
 
-    if not path_within?(full_path, project_path) do
+    if path_within?(full_path, project_path) do
+      dispatch_project_path(socket, full_path, path)
+    else
       socket
       |> assign(:error, "Access denied: path outside project directory")
       |> assign(:file_content, nil)
       |> assign(:files, [])
-    else
-      dispatch_project_path(socket, full_path, path)
     end
   end
 

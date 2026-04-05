@@ -43,11 +43,11 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
   def handle_edit_schedule(%{"job_id" => job_id}, socket) do
     with {:ok, int_id} <- parse_job_id(job_id),
          {:ok, job} <- ScheduledJobs.get_job(int_id) do
-      if not job_accessible?(job, socket) do
-        {:noreply, put_flash(socket, :error, "Access denied")}
-      else
+      if job_accessible?(job, socket) do
         prompt = resolve_job_prompt(job)
         {:noreply, socket |> assign(:scheduling_prompt, prompt) |> assign(:scheduling_job, job)}
+      else
+        {:noreply, put_flash(socket, :error, "Access denied")}
       end
     else
       :error ->

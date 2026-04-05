@@ -179,10 +179,10 @@ defmodule EyeInTheSky.Codex.CLI do
       |> Keyword.get(:project_path, File.cwd!())
       |> Path.expand()
 
-    if !File.dir?(project_path) do
-      {:error, {:invalid_project_path, project_path}}
-    else
+    if File.dir?(project_path) do
       do_spawn(opts, project_path)
+    else
+      {:error, {:invalid_project_path, project_path}}
     end
   end
 

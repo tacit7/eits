@@ -61,6 +61,36 @@ defmodule EyeInTheSky.Messages.Deduplicator do
   end
 
   @doc """
+  Finds an existing message or creates a new one, handling all deduplication cases.
+
+  Routing logic:
+    - `source_uuid` present and already stored → enrich metadata on the existing record
+    - `source_uuid` nil → look for a recent message with the same body; enrich if found, else insert
+    - `source_uuid` present but not yet stored → insert
+
+  Returns `{:ok, message}` in all cases.
+  """
+  @spec find_or_create(map(), map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
+  def find_or_create(attrs, metadata) do
+    source_uuid = Map.get(attrs, :source_uuid)
+
+    cond do
+      source_uuid && source_uuid_exists?(source_uuid) ->
+        existing = Repo.get_by!(Message, source_uuid: source_uuid)
+        enrich_metadata_if_present(existing, metadata)
+
+      is_nil(source_uuid) ->
+        case find_recent_message(Map.get(attrs, :session_id), Map.get(attrs, :body)) do
+          nil -> do_insert(attrs)
+          existing -> enrich_metadata_if_present(existing, metadata)
+        end
+
+      true ->
+        do_insert(attrs)
+    end
+  end
+
+  @doc """
   Enriches an existing message with metadata if metadata is provided and non-empty.
 
   When `metadata` is `nil` or `%{}`, returns `{:ok, message}` unchanged.
@@ -79,6 +109,20 @@ defmodule EyeInTheSky.Messages.Deduplicator do
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  defp source_uuid_exists?(source_uuid) do
+    Message
+    |> where([m], m.source_uuid == ^source_uuid)
+    |> Repo.exists?()
+  end
+
+  defp do_insert(attrs) do
+    cid = Map.get(attrs, :channel_id)
+
+    if cid,
+      do: EyeInTheSky.Messages.create_channel_message(attrs),
+      else: EyeInTheSky.Messages.create_message(attrs)
+  end
 
   defp dedup_step(msg, {acc, seen_uuids}) do
     if msg.source_uuid && MapSet.member?(seen_uuids, msg.source_uuid) do

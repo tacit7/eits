@@ -1,6 +1,21 @@
 defmodule EyeInTheSkyWeb.Router do
   use EyeInTheSkyWeb, :router
 
+  # connect-src: in dev, allow the Vite HMR websocket (default port 5173).
+  # In prod, 'self' covers the Phoenix LiveView websocket (same origin).
+  @connect_src if Mix.env() == :dev,
+                 do: "'self' ws://localhost:5173 ws://localhost:5174",
+                 else: "'self'"
+
+  @browser_csp "default-src 'self'; " <>
+                 "script-src 'self' 'unsafe-inline'; " <>
+                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " <>
+                 "font-src 'self' data: https://fonts.gstatic.com; " <>
+                 "img-src 'self' data: blob:; " <>
+                 "connect-src " <> @connect_src <> "; " <>
+                 "frame-ancestors 'none'; " <>
+                 "object-src 'none'"
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -8,18 +23,7 @@ defmodule EyeInTheSkyWeb.Router do
     plug :fetch_live_flash
     plug :put_root_layout, html: {EyeInTheSkyWeb.Layouts, :root}
     plug :protect_from_forgery
-
-    plug :put_secure_browser_headers, %{
-      "content-security-policy" =>
-        "default-src 'self'; " <>
-          "script-src 'self' 'unsafe-inline'; " <>
-          "style-src 'self' 'unsafe-inline'; " <>
-          "img-src 'self' data: blob:; " <>
-          "connect-src 'self' ws: wss:; " <>
-          "font-src 'self' data:; " <>
-          "frame-ancestors 'none'; " <>
-          "object-src 'none'"
-    }
+    plug :put_secure_browser_headers, %{"content-security-policy" => @browser_csp}
   end
 
   pipeline :require_auth do

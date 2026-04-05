@@ -1,10 +1,16 @@
 [
   # Config.HTTPS -- force_ssl is configured in config/runtime.exs (prod block).
-  # Sobelow is a static analyzer and cannot see runtime config.
+  # Sobelow cannot see runtime config -- this is a static false positive.
   #
-  # Config.CSRF -- WebAuthn endpoints intentionally skip CSRF. Protection comes from:
+  # Config.CSRF -- The ONLY pipeline without CSRF is :webauthn, scoped to four
+  # POST endpoints under /auth (register/challenge, register/complete,
+  # login/challenge, login/complete). These endpoints use WebAuthn challenge
+  # binding in place of CSRF tokens:
   #   - Registration: gated by a short-lived token in the session
-  #   - Login: WebAuthn challenge binding (single-use, origin-bound challenge)
+  #   - Login: challenge is single-use and origin-bound (wax_ enforces this)
+  # Standard CSRF tokens are incompatible with the fetch-based WebAuthn flow.
+  # WARNING: any new route added to the :webauthn pipeline must be reviewed --
+  # it will inherit this CSRF exemption.
   ignore: "Config.HTTPS,Config.CSRF",
 
   # Honor sobelow_skip comments in source (e.g. Misc.BinToTerm in accounts.ex)

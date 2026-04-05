@@ -224,28 +224,8 @@ defmodule EyeInTheSky.Messages do
 
     attrs = if channel_id, do: Map.put(attrs, :channel_id, channel_id), else: attrs
 
-    result =
-      cond do
-        source_uuid && message_exists_by_source_uuid?(source_uuid) ->
-          # Already recorded by source_uuid — enrich with metadata if provided
-          # (session file sync imports messages without usage data; later calls
-          # may enrich with usage metadata using the same source_uuid)
-          existing = Repo.get_by!(Message, source_uuid: source_uuid)
-          Deduplicator.enrich_metadata_if_present(existing, metadata)
-
-        is_nil(source_uuid) ->
-          # No source_uuid — check for a recent message with same content to avoid
-          # duplicating a message already imported from the session file via periodic sync.
-          case Deduplicator.find_recent_message(session_id, body) do
-            nil -> insert_message(attrs)
-            existing -> Deduplicator.enrich_metadata_if_present(existing, metadata)
-          end
-
-        true ->
-          insert_message(attrs)
-      end
-
-    result |> broadcast_and_return()
+    Deduplicator.find_or_create(attrs, metadata)
+    |> broadcast_and_return()
   end
 
   @doc """
@@ -415,13 +395,6 @@ defmodule EyeInTheSky.Messages do
   end
 
   defp broadcast_and_return(error), do: error
-
-  # Routes to create_channel_message/1 when channel_id is present, otherwise create_message/1.
-  defp insert_message(attrs) do
-    cid = Map.get(attrs, :channel_id) || Map.get(attrs, "channel_id")
-
-    if cid, do: create_channel_message(attrs), else: create_message(attrs)
-  end
 
   @doc """
   Returns true when a session already has at least one inbound reply

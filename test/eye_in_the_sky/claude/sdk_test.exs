@@ -1,7 +1,7 @@
 defmodule EyeInTheSky.Claude.SDKTest do
   use ExUnit.Case, async: false
 
-  alias EyeInTheSky.Claude.{SDK, Message}
+  alias EyeInTheSky.Claude.{Message, SDK}
 
   describe "SDK.start/2" do
     test "requires :to option" do

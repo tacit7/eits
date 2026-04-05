@@ -182,6 +182,19 @@ defmodule EyeInTheSky.Sessions do
   end
 
   @doc """
+  Lists active sessions for a specific project, with :agent preloaded.
+  Excludes ended and archived sessions.
+  """
+  def list_active_sessions_for_project(project_id) do
+    Session
+    |> where([s], s.project_id == ^project_id and is_nil(s.ended_at))
+    |> order_by([s], desc: s.started_at)
+    |> Archivable.include_archived([])
+    |> preload(:agent)
+    |> Repo.all()
+  end
+
+  @doc """
   Lists all sessions with agent preloaded for the overview page.
   Returns sessions ordered by most recent first, excluding archived by default.
   Pass `include_archived: true` to include archived sessions.

@@ -46,10 +46,12 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
   # Normal attrs update — called on every parent re-render with project_id + active_tab
   def update(assigns, socket) do
     prev_tab = Map.get(socket.assigns, :active_tab, :all_jobs)
+    prev_project_id = Map.get(socket.assigns, :project_id)
     new_tab = assigns.active_tab
+    initialized = Map.has_key?(socket.assigns, :initialized)
 
     socket =
-      if Map.has_key?(socket.assigns, :initialized) do
+      if initialized do
         socket
         |> assign(:project_id, assigns.project_id)
         |> assign(:active_tab, new_tab)
@@ -68,10 +70,14 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
         )
       end
 
-    # Load schedule data when switching to the agent_schedules tab
+    # Load schedule data when switching to agent_schedules tab OR when project_id
+    # changes while already on the agent_schedules tab (avoids stale data).
+    tab_switched = new_tab == :agent_schedules and prev_tab != :agent_schedules
+    project_changed = initialized and new_tab == :agent_schedules and assigns.project_id != prev_project_id
+
     socket =
-      if new_tab == :agent_schedules and prev_tab != :agent_schedules do
-        maybe_reload_agent_schedule_data(assign(socket, :active_tab, :agent_schedules))
+      if tab_switched or project_changed do
+        maybe_reload_agent_schedule_data(socket)
       else
         socket
       end

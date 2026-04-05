@@ -36,9 +36,7 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActions do
   def handle_open_iterm(socket) do
     session_uuid = socket.assigns.session_uuid
 
-    unless Regex.match?(@uuid_pattern, session_uuid) do
-      {:noreply, put_flash(socket, :error, "Invalid session UUID")}
-    else
+    if Regex.match?(@uuid_pattern, session_uuid) do
       dir =
         case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
           {:ok, path} -> path
@@ -59,6 +57,8 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActions do
 
       System.cmd("osascript", ["-e", script], stderr_to_stdout: true)
       {:noreply, socket}
+    else
+      {:noreply, put_flash(socket, :error, "Invalid session UUID")}
     end
   end
 end

@@ -58,13 +58,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     mode = if Map.get(params, "mode") == "tree", do: :tree, else: :list
     socket = assign(socket, :view_mode, mode)
 
-    unless project.path do
+    if project.path do
+      {:noreply, navigate_to_path(socket, project.path, path)}
+    else
       {:noreply,
        socket
        |> assign(:error, "Project path not configured")
        |> assign(:file_content, nil)}
-    else
-      {:noreply, navigate_to_path(socket, project.path, path)}
     end
   end
 

@@ -158,13 +158,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   defp load_list_path(socket, path) do
     claude_dir = socket.assigns.claude_dir
 
-    unless claude_dir && File.dir?(claude_dir) do
-      assign(socket, :error, "No .claude directory found")
-    else
+    if claude_dir && File.dir?(claude_dir) do
       case resolve_list_target(claude_dir, path) do
         {:error, msg} -> assign(socket, :error, msg)
         {:ok, full_path, rel_path} -> dispatch_config_path(socket, full_path, rel_path, path)
       end
+    else
+      assign(socket, :error, "No .claude directory found")
     end
   end
 

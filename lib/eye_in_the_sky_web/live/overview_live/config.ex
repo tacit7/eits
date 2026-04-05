@@ -66,13 +66,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
   # ── Private helpers ──────────────────────────────────────────────────────────
 
   defp load_list_path(socket, path) do
-    unless File.dir?(@claude_dir) do
-      assign(socket, :error, "~/.claude directory not found")
-    else
+    if File.dir?(@claude_dir) do
       case resolve_list_target(path) do
         {:error, msg} -> assign(socket, :error, msg)
         {:ok, full_path, rel_path} -> dispatch_path(socket, full_path, rel_path, path)
       end
+    else
+      assign(socket, :error, "~/.claude directory not found")
     end
   end
 

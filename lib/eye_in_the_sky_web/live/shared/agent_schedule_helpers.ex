@@ -67,9 +67,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
     is_fs = AgentFileScanner.filesystem_id?(prompt_id_raw)
     prompt = resolve_prompt(prompt_id_raw, socket)
 
-    unless prompt do
-      {:noreply, put_flash(socket, :error, "Agent not found")}
-    else
+    if prompt do
       case resolve_project_path(params, prompt, socket) do
         {:error, :no_project} ->
           {:noreply,
@@ -95,6 +93,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
           result = save_or_update_job(params["job_id"], job_attrs, caller_project_id, socket)
           handle_schedule_result(result, socket)
       end
+    else
+      {:noreply, put_flash(socket, :error, "Agent not found")}
     end
   end
 

@@ -9,7 +9,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
   alias EyeInTheSkyWeb.ChatLive.ChannelHeader
   alias EyeInTheSkyWeb.ChatLive.ChannelHelpers
   alias EyeInTheSkyWeb.ChatPresenter
-  alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
   alias EyeInTheSkyWeb.Helpers.SlashItems
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWeb.Helpers.ChannelRoutingHelpers
@@ -274,57 +273,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
     do: ChannelActions.handle_create_channel(socket, params)
 
   @impl true
-  def handle_event("create_agent", params, socket) do
-    channel_id = socket.assigns.active_channel_id
-    agent_name = params["agent_name"] || ""
-    agent_description = if agent_name != "", do: agent_name, else: "Channel agent for #{channel_id}"
-
-    {:ok, _creating_msg} =
-      ChannelMessages.send_channel_message(%{
-        channel_id: channel_id,
-        session_id: nil,
-        sender_role: "system",
-        recipient_role: "agent",
-        provider: "system",
-        body: "Creating new agent (#{params["model"] || "sonnet"})#{if agent_name != "", do: " - #{agent_name}", else: ""}..."
-      })
-
-    description = params["description"] || ""
-    base_instructions = if description != "", do: description, else: agent_description
-    uploaded_images = consume_agent_images(socket)
-    instructions = append_image_paths(base_instructions, uploaded_images)
-
-    project_path =
-      case Enum.find(socket.assigns.all_projects, fn p ->
-             to_string(p.id) == to_string(params["project_id"])
-           end) do
-        nil -> File.cwd!()
-        project -> project.path
-      end
-
-    opts =
-      AgentCreationHelpers.build_opts(params,
-        project_path: project_path,
-        description: agent_description,
-        instructions: instructions
-      )
-
-    case AgentManager.create_agent(opts) do
-      {:ok, %{agent: agent, session: session}} ->
-        join_agent_to_channel(channel_id, agent, session, agent_description)
-
-        {:noreply,
-         socket
-         |> assign(:show_agent_drawer, false)
-         |> refresh_members_and_picker()}
-
-      {:error, reason} ->
-        {:noreply,
-         socket
-         |> assign(:show_agent_drawer, false)
-         |> put_flash(:error, "Failed to create agent: #{inspect(reason)}")}
-    end
-  end
+  def handle_event("create_agent", params, socket),
+    do: ChannelActions.handle_create_agent(socket, params)
 
   @impl true
   def handle_info({:agent_working, msg}, socket) do
@@ -492,32 +442,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
     socket
     |> assign(:channel_members, channel_members)
     |> assign(:sessions_by_project, sessions_by_project)
-  end
-
-  defp join_agent_to_channel(nil, _agent, _session, _description), do: :ok
-
-  defp join_agent_to_channel(channel_id, agent, session, description) do
-    case Channels.add_member(channel_id, agent.id, session.id) do
-      {:ok, _} ->
-        broadcast_system_event(channel_id, "Agent @#{session.id} (#{description}) joined the channel")
-
-      {:error, _} ->
-        :ok
-    end
-  end
-
-  defp broadcast_system_event(channel_id, body) do
-    {:ok, sys_msg} =
-      ChannelMessages.send_channel_message(%{
-        channel_id: channel_id,
-        session_id: nil,
-        sender_role: "system",
-        recipient_role: "agent",
-        provider: "system",
-        body: body
-      })
-
-    EyeInTheSky.Events.channel_message(channel_id, sys_msg)
   end
 
   defp reload_messages(socket) do

@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
 
   import EyeInTheSkyWeb.Helpers.FileHelpers, only: [detect_file_type: 1]
   import EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers
+  import EyeInTheSkyWeb.Components.ConfigBrowser
 
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Repo
@@ -148,62 +149,31 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
 
     if claude_dir && File.dir?(claude_dir) do
       case resolve_list_target(path, claude_dir) do
-        {:error, msg} -> assign(socket, :error, msg)
-        {:ok, full_path, rel_path} -> dispatch_path(socket, full_path, rel_path, path, claude_dir)
+        {:error, msg} ->
+          assign(socket, :error, msg)
+
+        {:ok, full_path, rel_path} ->
+          case dispatch_path(full_path, rel_path, path, claude_dir) do
+            {:dir, files, dir_rel_path} ->
+              socket
+              |> assign(:files, files)
+              |> assign(:current_path, dir_rel_path)
+              |> assign(:file_content, nil)
+              |> assign(:selected_file, nil)
+              |> assign(:selected_file_path, nil)
+              |> assign(:file_type, nil)
+              |> assign(:error, nil)
+
+            {:file, full_path, file_rel_path} ->
+              read_file_for_display(socket, full_path, file_rel_path, claude_dir)
+
+            {:error, msg} ->
+              assign(socket, :error, msg)
+          end
       end
     else
       assign(socket, :error, "No .claude directory found")
     end
-  end
-
-  defp resolve_list_target(path, base_dir) do
-    if path && path != "" do
-      full = Path.join(base_dir, path)
-      if path_within?(full, base_dir), do: {:ok, full, path}, else: {:error, "Access denied"}
-    else
-      {:ok, base_dir, nil}
-    end
-  end
-
-  defp dispatch_path(socket, full_path, rel_path, path, base_dir) do
-    cond do
-      File.dir?(full_path) -> list_directory(socket, full_path, rel_path)
-      File.regular?(full_path) -> read_file_for_display(socket, full_path, rel_path, base_dir)
-      true -> assign(socket, :error, "Path not found: #{path}")
-    end
-  end
-
-  defp list_directory(socket, full_path, rel_path) do
-    case File.ls(full_path) do
-      {:ok, items} ->
-        file_list =
-          items
-          |> Enum.sort()
-          |> Enum.map(&build_file_entry(&1, full_path, rel_path))
-          |> Enum.sort_by(&{!&1.is_dir, &1.name})
-
-        socket
-        |> assign(:files, file_list)
-        |> assign(:current_path, rel_path)
-        |> assign(:file_content, nil)
-        |> assign(:selected_file, nil)
-        |> assign(:selected_file_path, nil)
-        |> assign(:file_type, nil)
-        |> assign(:error, nil)
-
-      {:error, reason} ->
-        assign(socket, :error, "Failed to read directory: #{reason}")
-    end
-  end
-
-  defp build_file_entry(item, full_path, rel_path) do
-    item_path = Path.join(full_path, item)
-    rel = if rel_path, do: Path.join(rel_path, item), else: item
-    size = case File.stat(item_path) do
-      {:ok, %{size: s}} -> s
-      _ -> 0
-    end
-    %{name: item, path: rel, is_dir: File.dir?(item_path), size: size}
   end
 
   defp read_file_for_display(socket, full_path, rel_path, base_dir) do
@@ -218,316 +188,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
         |> assign(:current_path, rel_path)
         |> assign(:files, [])
     end
-  end
-
-  @max_tree_depth 2
-
-  defp scan_directory(base_dir, current_dir, depth) do
-    case File.ls(current_dir) do
-      {:ok, items} ->
-        items
-        |> Enum.reject(&String.starts_with?(&1, "."))
-        |> Enum.sort()
-        |> Enum.map(fn item ->
-          full = Path.join(current_dir, item)
-          relative = Path.relative_to(full, base_dir)
-          is_dir = File.dir?(full)
-
-          if is_dir do
-            children =
-              if depth < @max_tree_depth,
-                do: scan_directory(base_dir, full, depth + 1),
-                else: []
-
-            %{name: item, path: full, relative: relative, is_dir: true, children: children}
-          else
-            size =
-              case File.stat(full) do
-                {:ok, %{size: s}} -> s
-                _ -> 0
-              end
-
-            %{name: item, path: full, relative: relative, is_dir: false, size: size}
-          end
-        end)
-        |> Enum.sort_by(&{!&1.is_dir, &1.name})
-
-      _ ->
-        []
-    end
-  end
-
-  defp format_size(bytes) when is_integer(bytes) and bytes < 1024, do: "#{bytes} B"
-  defp format_size(bytes) when is_integer(bytes), do: "#{Float.round(bytes / 1024, 1)} KB"
-  defp format_size(_), do: ""
-
-  defp language_class(:markdown), do: "markdown"
-  defp language_class(:json), do: "json"
-  defp language_class(:elixir), do: "elixir"
-  defp language_class(:bash), do: "bash"
-  defp language_class(:yaml), do: "yaml"
-  defp language_class(:toml), do: "toml"
-  defp language_class(_), do: "plaintext"
-
-  # ── Tree-mode sidebar components ─────────────────────────────────────────────
-
-  attr :entry, :map, required: true
-
-  defp tree_item(assigns) do
-    case assigns.entry.is_dir do
-      true ->
-        ~H"""
-        <li>
-          <details>
-            <summary>
-              <.icon name="hero-folder" class="w-4 h-4" />
-              {@entry.name}
-            </summary>
-            <ul>
-              <.tree_item :for={child <- @entry.children} entry={child} />
-            </ul>
-          </details>
-        </li>
-        """
-
-      false ->
-        ~H"""
-        <li>
-          <button
-            phx-click="view_file"
-            phx-value-path={@entry.path}
-            class="flex items-center gap-2 w-full text-left"
-          >
-            <.icon name="hero-document" class="w-4 h-4" />
-            <span class="truncate">{@entry.name}</span>
-            <span class="badge badge-ghost badge-xs ml-auto shrink-0">{format_size(@entry.size)}</span>
-          </button>
-        </li>
-        """
-    end
-  end
-
-  # ── View mode components ──────────────────────────────────────────────────────
-
-  defp tree_view(assigns) do
-    ~H"""
-    <div class="h-[calc(100dvh-10rem)] flex flex-col md:flex-row">
-      <!-- Sidebar -->
-      <div
-        id="config-tree-sidebar"
-        class="w-full md:w-80 md:flex-shrink-0 border-b md:border-b-0 md:border-r border-base-300 bg-base-100 overflow-y-auto max-h-64 md:max-h-none"
-        phx-update="ignore"
-      >
-        <div class="p-4">
-          <h2 class="text-sm font-semibold text-base-content/80 mb-2 flex items-center gap-1">
-            <.icon name="hero-cog-6-tooth" class="w-4 h-4" /> .claude/
-          </h2>
-          <ul class="menu menu-sm bg-base-200 rounded-lg">
-            <.tree_item :for={entry <- @entries} entry={entry} />
-          </ul>
-        </div>
-      </div>
-      <!-- Content viewer -->
-      <div class="flex-1 min-h-0 overflow-y-auto">
-        <%= if @selected_file do %>
-          <div class="p-6">
-            <div class="card bg-base-100 border border-base-300 shadow-sm">
-              <div class="card-body p-0">
-                <div class="flex items-center justify-between px-4 py-2 border-b border-base-300 bg-base-200/50">
-                  <code class="text-sm font-semibold text-base-content">{@selected_file}</code>
-                  <div class="flex items-center gap-1">
-                    <button
-                      phx-click="open_file"
-                      class="btn btn-ghost btn-xs"
-                      title="Open in editor"
-                    >
-                      <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit
-                    </button>
-                    <button phx-click="close_viewer" class="btn btn-ghost btn-xs btn-circle">
-                      <.icon name="hero-x-mark" class="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <div class="overflow-auto max-h-[calc(100dvh-18rem)]">
-                  <%= if @file_type == :markdown do %>
-                    <div
-                      id="config-viewer"
-                      class="dm-markdown p-4 text-sm text-base-content leading-relaxed"
-                      phx-hook="MarkdownMessage"
-                      data-raw-body={@file_content}
-                    >
-                    </div>
-                  <% else %>
-                    <pre class="p-4 text-xs font-mono text-base-content whitespace-pre-wrap break-all"><code class={"language-#{language_class(@file_type)}"}>{@file_content}</code></pre>
-                  <% end %>
-                </div>
-              </div>
-            </div>
-          </div>
-        <% else %>
-          <div class="flex items-center justify-center h-full">
-            <div class="text-center">
-              <.icon
-                name="hero-document-text"
-                class="w-16 h-16 mx-auto text-base-content/20 mb-4"
-              />
-              <h3 class="text-lg font-semibold text-base-content/60 mb-2">Select a file</h3>
-              <p class="text-sm text-base-content/40">
-                Choose a file from the tree to view its contents
-              </p>
-            </div>
-          </div>
-        <% end %>
-      </div>
-    </div>
-    """
-  end
-
-  defp list_view(assigns) do
-    ~H"""
-    <div class="h-[calc(100dvh-10rem)]">
-      <div class="p-6">
-        <%= if @error do %>
-          <div class="alert alert-error mb-4">
-            <.icon name="hero-x-circle" class="shrink-0 h-6 w-6" />
-            <span>{@error}</span>
-          </div>
-        <% end %>
-
-        <%= if @file_content do %>
-          <!-- File content -->
-          <div class="mb-4">
-            <div class="flex items-center gap-2 mb-4">
-              <.link
-                patch={
-                  if @current_path && Path.dirname(@current_path) != ".",
-                    do:
-                      ~p"/projects/#{@project.id}/config?mode=list&path=#{Path.dirname(@current_path)}",
-                    else: ~p"/projects/#{@project.id}/config?mode=list"
-                }
-                class="btn btn-sm btn-ghost"
-              >
-                <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
-              </.link>
-              <div>
-                <h2 class="text-lg font-semibold text-base-content">
-                  {Path.basename(@current_path)}
-                </h2>
-                <p class="text-sm text-base-content/60">.claude/{@current_path}</p>
-              </div>
-              <button
-                phx-click="open_file"
-                class="btn btn-sm btn-ghost ml-auto"
-                title="Open in editor"
-              >
-                <.icon name="hero-pencil-square" class="w-4 h-4" /> Edit
-              </button>
-            </div>
-            <div class="bg-base-200 rounded-lg overflow-x-auto">
-              <%= if @file_type == :markdown do %>
-                <div
-                  id="config-viewer-list"
-                  class="dm-markdown p-4 text-sm text-base-content leading-relaxed"
-                  phx-hook="MarkdownMessage"
-                  data-raw-body={@file_content}
-                >
-                </div>
-              <% else %>
-                <pre class="text-sm p-4"><code id="code-viewer" class={"language-#{language_class(@file_type)}"} phx-hook="Highlight"><%= @file_content %></code></pre>
-              <% end %>
-            </div>
-          </div>
-        <% else %>
-          <!-- Directory listing -->
-          <%= if length(@files) > 0 do %>
-            <div class="mb-4">
-              <%= if @current_path do %>
-                <.link
-                  patch={
-                    if Path.dirname(@current_path) != ".",
-                      do:
-                        ~p"/projects/#{@project.id}/config?mode=list&path=#{Path.dirname(@current_path)}",
-                      else: ~p"/projects/#{@project.id}/config?mode=list"
-                  }
-                  class="btn btn-sm btn-ghost mb-4"
-                >
-                  <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
-                </.link>
-              <% end %>
-              <h2 class="text-lg font-semibold text-base-content mb-2">
-                .claude/{@current_path || ""}
-              </h2>
-            </div>
-            <!-- Mobile list -->
-            <div class="md:hidden space-y-2">
-              <%= for file <- @files do %>
-                <.link
-                  patch={~p"/projects/#{@project.id}/config?mode=list&path=#{file.path}"}
-                  class="flex items-center gap-3 rounded-lg border border-base-content/10 bg-base-100 px-3 py-2"
-                >
-                  <%= if file.is_dir do %>
-                    <.icon name="hero-folder-solid" class="w-4 h-4 text-primary shrink-0" />
-                  <% else %>
-                    <.icon name="hero-document" class="w-4 h-4 shrink-0" />
-                  <% end %>
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm">{file.name}</p>
-                    <p class="text-xs text-base-content/55">
-                      {if file.is_dir, do: "Directory", else: format_size(file.size)}
-                    </p>
-                  </div>
-                </.link>
-              <% end %>
-            </div>
-            <!-- Desktop table -->
-            <div class="hidden md:block overflow-x-auto">
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th class="text-right">Size</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <%= for file <- @files do %>
-                    <tr class="hover">
-                      <td>
-                        <.link
-                          patch={~p"/projects/#{@project.id}/config?mode=list&path=#{file.path}"}
-                          class="flex items-center gap-2"
-                        >
-                          <%= if file.is_dir do %>
-                            <.icon name="hero-folder-solid" class="w-4 h-4 text-primary" />
-                          <% else %>
-                            <.icon name="hero-document" class="w-4 h-4" />
-                          <% end %>
-                          {file.name}
-                        </.link>
-                      </td>
-                      <td class="text-right text-base-content/60">
-                        {if file.is_dir, do: "", else: format_size(file.size)}
-                      </td>
-                    </tr>
-                  <% end %>
-                </tbody>
-              </table>
-            </div>
-          <% else %>
-            <div class="flex items-center justify-center h-[calc(100dvh-20rem)]">
-              <div class="text-center">
-                <.icon
-                  name="hero-document-text"
-                  class="w-16 h-16 mx-auto text-base-content/20 mb-4"
-                />
-                <h3 class="text-lg font-semibold text-base-content/60 mb-2">Empty directory</h3>
-                <p class="text-sm text-base-content/40">No files in this directory</p>
-              </div>
-            </div>
-          <% end %>
-        <% end %>
-      </div>
-    </div>
-    """
   end
 
   @impl true

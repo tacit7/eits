@@ -412,53 +412,20 @@ defmodule EyeInTheSky.Claude.CLI do
   end
 
   defp do_spawn(opts, project_path) do
-    caller = Keyword.get(opts, :caller, self())
-    session_ref = Keyword.get(opts, :session_ref, make_ref())
-    idle_timeout_ms = resolve_idle_timeout(opts)
-
     case find_claude_binary() do
       {:ok, claude_path} ->
         args = build_args(opts)
 
-        cmd_string = "claude " <> Enum.join(safe_log_args(args), " ")
-        Logger.info("Spawning Claude in #{project_path}: #{cmd_string}")
+        Logger.info(
+          "Spawning Claude in #{project_path}: claude #{Enum.join(safe_log_args(args), " ")}"
+        )
 
         Logger.info(
           "CLI env: CLAUDE_CODE_EFFORT_LEVEL=#{inspect(opts[:effort_level])} max_budget_usd=#{inspect(opts[:max_budget_usd])}"
         )
 
-        handler_pid =
-          spawn_link(fn ->
-            receive do
-              {:port, port} ->
-                EyeInTheSky.CLI.Port.handle_port_output(
-                  port,
-                  session_ref,
-                  caller,
-                  "",
-                  idle_timeout_ms,
-                  telemetry_prefix: [:eits, :cli],
-                  log_prefix: "CLI",
-                  max_buffer_bytes: @max_buffer_bytes
-                )
-            end
-          end)
-
-        env = build_env(opts)
-        use_script = Keyword.get(opts, :use_script, true)
-
-        port =
-          if use_script,
-            do: open_script_port(claude_path, args, project_path, env),
-            else: open_direct_port(claude_path, args, project_path, env)
-
-        # When multimodal content blocks are present, pipe the JSON user message
-        # to stdin before handing the port to the handler. This feeds Claude CLI
-        # the structured content via --input-format stream-json.
-        maybe_pipe_content_blocks(port, opts)
-
-        Port.connect(port, handler_pid)
-        send(handler_pid, {:port, port})
+        {port, _handler_pid, session_ref} =
+          spawn_handler(claude_path, args, Keyword.put(opts, :project_path, project_path))
 
         :telemetry.execute([:eits, :cli, :spawn], %{system_time: System.system_time()}, %{
           project_path: project_path,
@@ -473,6 +440,48 @@ defmodule EyeInTheSky.Claude.CLI do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  # Opens a port (script-wrapped or direct), pipes any multimodal content blocks,
+  # then wires up the handler process. Returns {port, handler_pid, session_ref}.
+  defp spawn_handler(claude_path, args, opts) do
+    caller = Keyword.get(opts, :caller, self())
+    session_ref = Keyword.get(opts, :session_ref, make_ref())
+    idle_timeout_ms = resolve_idle_timeout(opts)
+    project_path = Keyword.fetch!(opts, :project_path)
+
+    handler_pid =
+      spawn_link(fn ->
+        receive do
+          {:port, port} ->
+            EyeInTheSky.CLI.Port.handle_port_output(
+              port,
+              session_ref,
+              caller,
+              "",
+              idle_timeout_ms,
+              telemetry_prefix: [:eits, :cli],
+              log_prefix: "CLI",
+              max_buffer_bytes: @max_buffer_bytes
+            )
+        end
+      end)
+
+    env = build_env(opts)
+
+    port =
+      if Keyword.get(opts, :use_script, true),
+        do: open_script_port(claude_path, args, project_path, env),
+        else: open_direct_port(claude_path, args, project_path, env)
+
+    # Pipe multimodal content blocks to stdin before handing port to handler.
+    # This feeds Claude CLI structured content via --input-format stream-json.
+    maybe_pipe_content_blocks(port, opts)
+
+    Port.connect(port, handler_pid)
+    send(handler_pid, {:port, port})
+
+    {port, handler_pid, session_ref}
   end
 
   # Resolves the idle timeout from settings and caller opts.

@@ -55,30 +55,30 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpers do
   @doc """
   Check if a due date is overdue.
   """
-  def is_overdue?(nil), do: false
+  def overdue?(nil), do: false
 
-  def is_overdue?(datetime) when is_binary(datetime) do
+  def overdue?(datetime) when is_binary(datetime) do
     case Date.from_iso8601(String.slice(datetime, 0..9)) do
       {:ok, date} -> Date.compare(date, Date.utc_today()) == :lt
       _ -> false
     end
   end
 
-  def is_overdue?(_), do: false
+  def overdue?(_), do: false
 
   @doc """
   Check if a due date is today.
   """
-  def is_due_today?(nil), do: false
+  def due_today?(nil), do: false
 
-  def is_due_today?(datetime) when is_binary(datetime) do
+  def due_today?(datetime) when is_binary(datetime) do
     case Date.from_iso8601(String.slice(datetime, 0..9)) do
       {:ok, date} -> Date.compare(date, Date.utc_today()) == :eq
       _ -> false
     end
   end
 
-  def is_due_today?(_), do: false
+  def due_today?(_), do: false
 
   @doc """
   Format a date for HTML date input (YYYY-MM-DD).

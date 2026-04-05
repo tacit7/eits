@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
   use EyeInTheSkyWeb, :html
 
   import EyeInTheSkyWeb.Helpers.ViewHelpers,
-    only: [relative_time: 1, is_overdue?: 1, is_due_today?: 1, format_date_input: 1]
+    only: [relative_time: 1, overdue?: 1, due_today?: 1, format_date_input: 1]
 
   attr :id, :string, required: true
   attr :show, :boolean, required: true
@@ -117,11 +117,11 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                     <label class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                       <span>Due date</span>
                       <%= cond do %>
-                        <% is_overdue?(@task.due_at) -> %>
+                        <% overdue?(@task.due_at) -> %>
                           <span class="text-error text-[10px] normal-case tracking-normal font-medium">
                             Overdue
                           </span>
-                        <% is_due_today?(@task.due_at) -> %>
+                        <% due_today?(@task.due_at) -> %>
                           <span class="text-warning text-[10px] normal-case tracking-normal font-medium">
                             Today
                           </span>

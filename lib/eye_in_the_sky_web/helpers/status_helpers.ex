@@ -86,7 +86,7 @@ defmodule EyeInTheSkyWeb.Helpers.StatusHelpers do
   @doc """
   Check if agent is stale (idle >= 1h).
   """
-  def is_stale?(agent, _stale_threshold_hours \\ 1) do
+  def stale?(agent, _stale_threshold_hours \\ 1) do
     idle_tier(agent) in ["idle_stale", "idle_dead"]
   end
 

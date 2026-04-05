@@ -55,7 +55,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   </select>
                 </form>
                 <button
-                  :if={!is_default?(@settings, "default_model")}
+                  :if={!default?(@settings, "default_model")}
                   phx-click="reset_setting"
                   phx-value-key="default_model"
                   class="btn btn-ghost btn-xs"
@@ -100,7 +100,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   <span class="text-xs text-base-content/50">sec</span>
                 </form>
                 <button
-                  :if={!is_default?(@settings, "cli_idle_timeout_ms")}
+                  :if={!default?(@settings, "cli_idle_timeout_ms")}
                   phx-click="reset_setting"
                   phx-value-key="cli_idle_timeout_ms"
                   class="btn btn-ghost btn-xs"
@@ -129,7 +129,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   </select>
                 </form>
                 <button
-                  :if={!is_default?(@settings, "tts_voice")}
+                  :if={!default?(@settings, "tts_voice")}
                   phx-click="reset_setting"
                   phx-value-key="tts_voice"
                   class="btn btn-ghost btn-xs"
@@ -162,7 +162,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                 </form>
                 <span class="text-xs text-base-content/50">wpm</span>
                 <button
-                  :if={!is_default?(@settings, "tts_rate")}
+                  :if={!default?(@settings, "tts_rate")}
                   phx-click="reset_setting"
                   phx-value-key="tts_rate"
                   class="btn btn-ghost btn-xs"

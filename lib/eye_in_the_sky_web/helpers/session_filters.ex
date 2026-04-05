@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
       "all" -> true
       "active" -> is_nil(session.ended_at) and session.status != "discovered"
       "completed" -> not is_nil(session.ended_at)
-      "stale" -> is_session_stale?(session, @stale_threshold_hours)
+      "stale" -> session_stale?(session, @stale_threshold_hours)
       "discovered" -> session.status == "discovered"
       _ -> true
     end
@@ -185,9 +185,9 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
   @doc """
   Returns true if the session is stale given a threshold in hours.
   """
-  def is_session_stale?(%{ended_at: ended_at}, _hours) when not is_nil(ended_at), do: false
+  def session_stale?(%{ended_at: ended_at}, _hours) when not is_nil(ended_at), do: false
 
-  def is_session_stale?(%{started_at: started_at}, hours) do
+  def session_stale?(%{started_at: started_at}, hours) do
     dt = VH.coerce_datetime(started_at)
     now = DateTime.utc_now()
     DateTime.diff(now, dt, :hour) > hours

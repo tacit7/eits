@@ -20,15 +20,15 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
   defdelegate derive_display_status(agent), to: EyeInTheSkyWeb.Helpers.StatusHelpers
   defdelegate derive_display_status(agent, h), to: EyeInTheSkyWeb.Helpers.StatusHelpers
   defdelegate idle_tier(agent), to: EyeInTheSkyWeb.Helpers.StatusHelpers
-  defdelegate is_stale?(agent), to: EyeInTheSkyWeb.Helpers.StatusHelpers
-  defdelegate is_stale?(agent, h), to: EyeInTheSkyWeb.Helpers.StatusHelpers
+  defdelegate stale?(agent), to: EyeInTheSkyWeb.Helpers.StatusHelpers
+  defdelegate stale?(agent, h), to: EyeInTheSkyWeb.Helpers.StatusHelpers
   defdelegate render_status_badge(assigns, agent), to: EyeInTheSkyWeb.Helpers.StatusHelpers
   defdelegate render_project_badge(assigns, name), to: EyeInTheSkyWeb.Helpers.StatusHelpers
 
   defdelegate format_due_date(v), to: EyeInTheSkyWeb.Helpers.TaskHelpers
   defdelegate due_date_class(v), to: EyeInTheSkyWeb.Helpers.TaskHelpers
-  defdelegate is_overdue?(v), to: EyeInTheSkyWeb.Helpers.TaskHelpers
-  defdelegate is_due_today?(v), to: EyeInTheSkyWeb.Helpers.TaskHelpers
+  defdelegate overdue?(v), to: EyeInTheSkyWeb.Helpers.TaskHelpers
+  defdelegate due_today?(v), to: EyeInTheSkyWeb.Helpers.TaskHelpers
   defdelegate format_date_input(v), to: EyeInTheSkyWeb.Helpers.TaskHelpers
   defdelegate days_since_update(v), to: EyeInTheSkyWeb.Helpers.TaskHelpers
   defdelegate card_aging_indicator(v), to: EyeInTheSkyWeb.Helpers.TaskHelpers

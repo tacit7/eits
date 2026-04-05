@@ -147,7 +147,7 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
 
           (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
             file not in ignored_dirs and
-            (File.dir?(full_path) or !is_binary_file?(full_path))
+            (File.dir?(full_path) or !binary_file?(full_path))
         end)
         |> Enum.map(&build_tree_entry(base_path, current_path, &1, max_depth, current_depth))
         |> Enum.sort_by(&{&1.type != :directory, &1.name})
@@ -183,8 +183,8 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
   @doc """
   Returns true if the file at `path` is a known binary format based on extension.
   """
-  @spec is_binary_file?(String.t()) :: boolean
-  def is_binary_file?(path) do
+  @spec binary_file?(String.t()) :: boolean
+  def binary_file?(path) do
     binary_extensions = [
       # Executables and libraries
       ".so",

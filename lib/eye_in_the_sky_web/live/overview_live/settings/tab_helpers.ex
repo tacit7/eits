@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.TabHelpers do
 
   alias EyeInTheSky.Settings
 
-  def is_default?(settings, key) do
+  def default?(settings, key) do
     defaults = Settings.defaults()
     settings[key] == defaults[key]
   end

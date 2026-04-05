@@ -141,7 +141,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
           files
           |> Enum.filter(fn file ->
             file_path = Path.join(full_path, file)
-            File.dir?(file_path) or !is_binary_file?(file_path)
+            File.dir?(file_path) or !binary_file?(file_path)
           end)
           |> Enum.map(fn file ->
             file_path = Path.join(full_path, file)
@@ -201,7 +201,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
             (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
               file not in ignored_dirs and
-              (File.dir?(file_path) or !is_binary_file?(file_path))
+              (File.dir?(file_path) or !binary_file?(file_path))
           end)
           |> Enum.map(fn file ->
             file_path = Path.join(project_path, file)

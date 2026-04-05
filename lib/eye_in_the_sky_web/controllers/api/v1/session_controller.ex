@@ -81,58 +81,53 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   PATCH /api/v1/sessions/:uuid - Update session status (SessionEnd, Stop, Compact hooks).
   """
   def update(conn, %{"uuid" => uuid} = params) do
-    case Sessions.get_session_by_uuid(uuid) do
-      {:ok, session} ->
-        status = params["status"]
+    with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
+      attrs = build_update_attrs(params)
 
-        attrs =
-          %{}
-          |> Helpers.maybe_put(:status, status)
-          |> Helpers.maybe_put(:intent, params["intent"])
-          |> Helpers.maybe_put(:entrypoint, params["entrypoint"])
-          |> Helpers.maybe_put(:name, params["name"])
-          |> Helpers.maybe_put(:description, params["description"])
-          |> Helpers.maybe_put(:last_activity_at, DateTime.utc_now())
+      case Sessions.update_session(session, attrs) do
+        {:ok, updated} ->
+          trigger_status_side_effects(updated, params["status"])
 
-        # Explicit entrypoint clear — set to nil so LiveView removes the CLI icon
-        attrs =
-          if params["clear_entrypoint"] do
-            Map.put(attrs, :entrypoint, nil)
-          else
-            attrs
-          end
+          json(conn, %{
+            id: updated.id,
+            uuid: updated.uuid,
+            status: updated.status,
+            ended_at: updated.ended_at
+          })
 
-        # For terminal states, set ended_at
-        attrs =
-          if status in ["completed", "failed"] do
-            Map.put(
-              attrs,
-              :ended_at,
-              params["ended_at"] || DateTime.utc_now()
-            )
-          else
-            attrs
-          end
+        {:error, changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: "Failed to update session", details: translate_errors(changeset)})
+      end
+    else
+      {:error, :not_found} -> session_not_found(conn)
+    end
+  end
 
-        case Sessions.update_session(session, attrs) do
-          {:ok, updated} ->
-            trigger_status_side_effects(updated, status)
+  defp build_update_attrs(params) do
+    status = params["status"]
 
-            json(conn, %{
-              id: updated.id,
-              uuid: updated.uuid,
-              status: updated.status,
-              ended_at: updated.ended_at
-            })
+    attrs =
+      %{}
+      |> Helpers.maybe_put(:status, status)
+      |> Helpers.maybe_put(:intent, params["intent"])
+      |> Helpers.maybe_put(:entrypoint, params["entrypoint"])
+      |> Helpers.maybe_put(:name, params["name"])
+      |> Helpers.maybe_put(:description, params["description"])
+      |> Helpers.maybe_put(:last_activity_at, DateTime.utc_now())
 
-          {:error, changeset} ->
-            conn
-            |> put_status(:unprocessable_entity)
-            |> json(%{error: "Failed to update session", details: translate_errors(changeset)})
-        end
+    attrs =
+      if params["clear_entrypoint"] do
+        Map.put(attrs, :entrypoint, nil)
+      else
+        attrs
+      end
 
-      {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+    if status in ["completed", "failed"] do
+      Map.put(attrs, :ended_at, params["ended_at"] || DateTime.utc_now())
+    else
+      attrs
     end
   end
 
@@ -143,23 +138,17 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   Writes a Message record and broadcasts PubSub events for DmLive real-time UI.
   """
   def tool_event(conn, %{"uuid" => uuid} = params) do
-    type = params["type"]
     tool_name = params["tool_name"]
 
     if is_nil(tool_name) or tool_name == "" do
       conn |> put_status(:bad_request) |> json(%{error: "tool_name is required"})
     else
-      case Sessions.get_session_by_uuid(uuid) do
-        {:ok, session} ->
-          Sessions.update_session(session, %{
-            last_activity_at: DateTime.utc_now()
-          })
-
-          Sessions.record_tool_event(session, type, params)
-          json(conn, %{success: true})
-
-        {:error, :not_found} ->
-          conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+      with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
+        Sessions.update_session(session, %{last_activity_at: DateTime.utc_now()})
+        Sessions.record_tool_event(session, params["type"], params)
+        json(conn, %{success: true})
+      else
+        {:error, :not_found} -> session_not_found(conn)
       end
     end
   end
@@ -196,20 +185,18 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   Accepts UUID string or integer session ID.
   """
   def show(conn, %{"uuid" => id_or_uuid}) do
-    case resolve_session(id_or_uuid) do
-      {:ok, session} ->
-        agent_uuid = Helpers.resolve_agent_uuid(session.agent_id)
+    with {:ok, session} <- resolve_session(id_or_uuid) do
+      agent_uuid = Helpers.resolve_agent_uuid(session.agent_id)
 
-        is_spawned =
-          case Agents.get_agent(session.agent_id) do
-            {:ok, agent} -> not is_nil(agent.parent_agent_id)
-            _ -> false
-          end
+      is_spawned =
+        case Agents.get_agent(session.agent_id) do
+          {:ok, agent} -> not is_nil(agent.parent_agent_id)
+          _ -> false
+        end
 
-        json(conn, ApiPresenter.present_session_detail(session, agent_uuid: agent_uuid, is_spawned: is_spawned))
-
-      {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+      json(conn, ApiPresenter.present_session_detail(session, agent_uuid: agent_uuid, is_spawned: is_spawned))
+    else
+      {:error, :not_found} -> session_not_found(conn)
     end
   end
 
@@ -219,38 +206,30 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   POST /api/v1/sessions/:uuid/end - End a session with optional summary and final status.
   """
   def end_session(conn, %{"uuid" => uuid} = params) do
-    case Sessions.get_session_by_uuid(uuid) do
-      {:ok, session} ->
-        status = params["final_status"] || "waiting"
+    with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
+      status = params["final_status"] || "waiting"
 
-        attrs =
-          if status in ["completed", "failed"] do
-            %{
-              status: status,
-              ended_at: DateTime.utc_now()
-            }
-          else
-            %{status: status}
-          end
-
-        case Sessions.update_session(session, attrs) do
-          {:ok, updated} ->
-            EyeInTheSky.Events.agent_stopped(updated)
-            EyeInTheSky.Events.session_updated(updated)
-
-            # Sync team member status on session end
-            handle_terminal_status(updated, status)
-
-            json(conn, %{success: true, message: "Session ended", status: updated.status})
-
-          {:error, cs} ->
-            conn
-            |> put_status(:unprocessable_entity)
-            |> json(%{error: "Failed", details: translate_errors(cs)})
+      attrs =
+        if status in ["completed", "failed"] do
+          %{status: status, ended_at: DateTime.utc_now()}
+        else
+          %{status: status}
         end
 
-      {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+      case Sessions.update_session(session, attrs) do
+        {:ok, updated} ->
+          EyeInTheSky.Events.agent_stopped(updated)
+          EyeInTheSky.Events.session_updated(updated)
+          handle_terminal_status(updated, status)
+          json(conn, %{success: true, message: "Session ended", status: updated.status})
+
+        {:error, cs} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: "Failed", details: translate_errors(cs)})
+      end
+    else
+      {:error, :not_found} -> session_not_found(conn)
     end
   end
 
@@ -258,22 +237,20 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   GET /api/v1/sessions/:uuid/context - Load session context.
   """
   def get_context(conn, %{"uuid" => uuid}) do
-    case Sessions.get_session_by_uuid(uuid) do
-      {:ok, session} ->
-        case Contexts.get_session_context(session.id) do
-          nil ->
-            conn |> put_status(:not_found) |> json(%{error: "No context found"})
+    with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
+      case Contexts.get_session_context(session.id) do
+        nil ->
+          conn |> put_status(:not_found) |> json(%{error: "No context found"})
 
-          ctx ->
-            json(conn, %{
-              success: true,
-              context: ctx.context,
-              updated_at: to_string(ctx.updated_at)
-            })
-        end
-
-      {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+        ctx ->
+          json(conn, %{
+            success: true,
+            context: ctx.context,
+            updated_at: to_string(ctx.updated_at)
+          })
+      end
+    else
+      {:error, :not_found} -> session_not_found(conn)
     end
   end
 
@@ -286,9 +263,10 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     if is_nil(context) or context == "" do
       conn |> put_status(:bad_request) |> json(%{error: "context is required"})
     else
-      case Sessions.get_session_by_uuid(uuid) do
-        {:ok, session} -> do_upsert_context(conn, session, context)
-        {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+      with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
+        do_upsert_context(conn, session, context)
+      else
+        {:error, :not_found} -> session_not_found(conn)
       end
     end
   end
@@ -326,5 +304,9 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   defp handle_terminal_status(session, status) do
     member_status = if status == "failed", do: "failed", else: "done"
     EyeInTheSky.Teams.mark_member_done_by_session(session.id, member_status)
+  end
+
+  defp session_not_found(conn) do
+    conn |> put_status(:not_found) |> json(%{error: "Session not found"})
   end
 end

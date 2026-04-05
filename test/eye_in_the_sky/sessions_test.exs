@@ -26,6 +26,117 @@ defmodule EyeInTheSky.SessionsTest do
   end
 
   # ---------------------------------------------------------------------------
+  # register_from_hook/2
+  # ---------------------------------------------------------------------------
+
+  describe "register_from_hook/2" do
+    test "creates agent and session from hook params" do
+      uuid = Ecto.UUID.generate()
+
+      params = %{
+        "session_id" => uuid,
+        "description" => "test session",
+        "provider" => "claude"
+      }
+
+      assert {:ok, %{session: session, agent: agent}} =
+               Sessions.register_from_hook(params, nil)
+
+      assert session.uuid == uuid
+      assert session.status == "working"
+      assert session.agent_id == agent.id
+      assert agent.uuid == uuid
+    end
+
+    test "uses agent_id param when provided" do
+      session_uuid = Ecto.UUID.generate()
+      agent_uuid = Ecto.UUID.generate()
+
+      params = %{
+        "session_id" => session_uuid,
+        "agent_id" => agent_uuid,
+        "description" => "test"
+      }
+
+      assert {:ok, %{agent: agent}} = Sessions.register_from_hook(params, nil)
+      assert agent.uuid == agent_uuid
+    end
+
+    test "creates session with model info when model string is provided" do
+      uuid = Ecto.UUID.generate()
+
+      params = %{
+        "session_id" => uuid,
+        "description" => "test",
+        "model" => "claude-sonnet-4-20250514"
+      }
+
+      assert {:ok, %{session: session}} = Sessions.register_from_hook(params, nil)
+      assert session.model == "claude-sonnet-4-20250514"
+      assert session.model_name != nil
+    end
+
+    test "creates session without model info when model string is nil" do
+      uuid = Ecto.UUID.generate()
+
+      params = %{
+        "session_id" => uuid,
+        "description" => "test"
+      }
+
+      assert {:ok, %{session: session}} = Sessions.register_from_hook(params, nil)
+      assert is_nil(session.model_name)
+    end
+
+    test "sets project_id on both agent and session" do
+      uuid = Ecto.UUID.generate()
+      # Use a real project or nil — just verify passthrough
+      params = %{"session_id" => uuid, "description" => "test"}
+
+      assert {:ok, %{session: session}} = Sessions.register_from_hook(params, 1)
+      assert session.project_id == 1
+    end
+
+    test "reuses existing agent with same uuid" do
+      agent_uuid = Ecto.UUID.generate()
+      _agent = create_agent(%{uuid: agent_uuid})
+
+      params = %{
+        "session_id" => Ecto.UUID.generate(),
+        "agent_id" => agent_uuid,
+        "description" => "test"
+      }
+
+      assert {:ok, %{agent: agent}} = Sessions.register_from_hook(params, nil)
+      assert agent.uuid == agent_uuid
+    end
+
+    test "returns tagged :session error on duplicate session uuid" do
+      uuid = Ecto.UUID.generate()
+      params = %{"session_id" => uuid, "description" => "test"}
+
+      assert {:ok, _} = Sessions.register_from_hook(params, nil)
+      assert {:error, :session, changeset} = Sessions.register_from_hook(params, nil)
+      assert changeset.valid? == false
+    end
+
+    test "passes entrypoint and worktree_path through to session" do
+      uuid = Ecto.UUID.generate()
+
+      params = %{
+        "session_id" => uuid,
+        "description" => "test",
+        "entrypoint" => "sdk-cli",
+        "worktree_path" => "/tmp/test-worktree"
+      }
+
+      assert {:ok, %{session: session}} = Sessions.register_from_hook(params, nil)
+      assert session.entrypoint == "sdk-cli"
+      assert session.git_worktree_path == "/tmp/test-worktree"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # get_session_counts/1
   # ---------------------------------------------------------------------------
 

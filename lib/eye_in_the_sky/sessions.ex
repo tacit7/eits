@@ -339,6 +339,69 @@ defmodule EyeInTheSky.Sessions do
     end
   end
 
+  @doc """
+  Registers a new session from a SessionStart hook.
+
+  Takes the raw hook params map and an already-resolved project_id.
+  Finds or creates the agent, parses model info, then creates the session.
+  Fires `EyeInTheSky.Events.session_started/1` on success.
+
+  Returns `{:ok, %{session: session, agent: agent}}` or `{:error, changeset}`.
+  """
+  @spec register_from_hook(map(), integer() | nil) ::
+          {:ok, %{session: Session.t(), agent: struct()}}
+          | {:error, :agent | :session, Ecto.Changeset.t()}
+  def register_from_hook(params, project_id) do
+    session_uuid = params["session_id"]
+
+    agent_attrs = %{
+      uuid: params["agent_id"] || session_uuid,
+      description: params["agent_description"] || params["description"],
+      project_id: project_id,
+      project_name: params["project_name"],
+      git_worktree_path: params["worktree_path"],
+      source: "hook"
+    }
+
+    case EyeInTheSky.Agents.find_or_create_agent(agent_attrs) do
+      {:ok, agent} ->
+        {model_provider, model_name} = ModelInfo.parse_model_string(params["model"])
+
+        session_attrs = %{
+          uuid: session_uuid,
+          agent_id: agent.id,
+          name: params["name"],
+          description: params["description"],
+          status: "working",
+          started_at: DateTime.utc_now(),
+          provider: params["provider"] || "claude",
+          model: params["model"],
+          model_provider: model_provider,
+          model_name: model_name,
+          project_id: project_id,
+          git_worktree_path: params["worktree_path"],
+          entrypoint: params["entrypoint"]
+        }
+
+        create_fn =
+          if model_name,
+            do: &create_session_with_model/1,
+            else: &create_session/1
+
+        case create_fn.(session_attrs) do
+          {:ok, session} ->
+            EyeInTheSky.Events.session_started(session)
+            {:ok, %{session: session, agent: agent}}
+
+          {:error, changeset} ->
+            {:error, :session, changeset}
+        end
+
+      {:error, changeset} ->
+        {:error, :agent, changeset}
+    end
+  end
+
   defdelegate record_tool_event(session, type, params),
     to: EyeInTheSky.Sessions.ToolEventRecorder
 end

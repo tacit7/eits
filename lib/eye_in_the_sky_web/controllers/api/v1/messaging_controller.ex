@@ -61,22 +61,22 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     else
       # Try as session UUID first
       case Sessions.get_session_by_uuid(raw) do
-        {:ok, session} ->
-          {:ok, session}
-
-        {:error, :not_found} ->
-          # Fallback: treat as agent UUID (legacy sender_id)
-          case Agents.get_agent_by_uuid(raw) do
-            {:ok, agent} ->
-              case Sessions.list_sessions_for_agent(agent.id, limit: 1) do
-                [session | _] -> {:ok, session}
-                _ -> {:error, :not_found}
-              end
-
-            _ ->
-              {:error, :not_found}
-          end
+        {:ok, session} -> {:ok, session}
+        {:error, :not_found} -> resolve_session_from_agent_uuid(raw)
       end
+    end
+  end
+
+  defp resolve_session_from_agent_uuid(raw) do
+    case Agents.get_agent_by_uuid(raw) do
+      {:ok, agent} ->
+        case Sessions.list_sessions_for_agent(agent.id, limit: 1) do
+          [session | _] -> {:ok, session}
+          _ -> {:error, :not_found}
+        end
+
+      _ ->
+        {:error, :not_found}
     end
   end
 
@@ -116,24 +116,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
       case agent_manager_mod().send_message(to_session.id, dm_body) do
         result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
-          case Messages.create_message(attrs) do
-            {:ok, msg} ->
-              EyeInTheSky.Events.session_new_dm(to_session.id, msg)
-
-              conn
-              |> put_status(:created)
-              |> json(%{
-                success: true,
-                message: "DM delivered to session #{to_session.id}",
-                message_id: to_string(msg.id),
-                message_uuid: msg.uuid
-              })
-
-            {:error, cs} ->
-              conn
-              |> put_status(:unprocessable_entity)
-              |> json(%{error: "Failed to persist DM", details: translate_errors(cs)})
-          end
+          persist_dm(conn, to_session, attrs)
 
         {:error, reason} ->
           Logger.error("DM routing failed for session #{to_session.id}: #{inspect(reason)}")
@@ -188,35 +171,36 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
       true ->
         case ToolHelpers.resolve_session_int_id(params["session_id"]) do
-          {:ok, int_id} ->
-            attrs = %{
-              channel_id: channel_id,
-              session_id: int_id,
-              body: params["body"],
-              sender_role: params["sender_role"] || "agent",
-              recipient_role: params["recipient_role"] || "user",
-              provider: params["provider"] || "claude",
-              direction: "outbound",
-              status: "sent"
-            }
-
-            case ChannelMessages.create_channel_message(attrs) do
-              {:ok, msg} ->
-                EyeInTheSky.Events.channel_message(channel_id, msg)
-
-                conn
-                |> put_status(:created)
-                |> json(%{success: true, message: "Message sent", message_id: to_string(msg.id)})
-
-              {:error, cs} ->
-                conn
-                |> put_status(:unprocessable_entity)
-                |> json(%{error: "Failed to send message", details: translate_errors(cs)})
-            end
-
-          {:error, reason} ->
-            conn |> put_status(:not_found) |> json(%{error: reason})
+          {:ok, int_id} -> do_send_channel_message(conn, channel_id, int_id, params)
+          {:error, reason} -> conn |> put_status(:not_found) |> json(%{error: reason})
         end
+    end
+  end
+
+  defp do_send_channel_message(conn, channel_id, int_id, params) do
+    attrs = %{
+      channel_id: channel_id,
+      session_id: int_id,
+      body: params["body"],
+      sender_role: params["sender_role"] || "agent",
+      recipient_role: params["recipient_role"] || "user",
+      provider: params["provider"] || "claude",
+      direction: "outbound",
+      status: "sent"
+    }
+
+    case ChannelMessages.create_channel_message(attrs) do
+      {:ok, msg} ->
+        EyeInTheSky.Events.channel_message(channel_id, msg)
+
+        conn
+        |> put_status(:created)
+        |> json(%{success: true, message: "Message sent", message_id: to_string(msg.id)})
+
+      {:error, cs} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "Failed to send message", details: translate_errors(cs)})
     end
   end
 
@@ -239,6 +223,27 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       count: length(messages),
       messages: Enum.map(messages, &ApiPresenter.present_channel_message/1)
     })
+  end
+
+  defp persist_dm(conn, to_session, attrs) do
+    case Messages.create_message(attrs) do
+      {:ok, msg} ->
+        EyeInTheSky.Events.session_new_dm(to_session.id, msg)
+
+        conn
+        |> put_status(:created)
+        |> json(%{
+          success: true,
+          message: "DM delivered to session #{to_session.id}",
+          message_id: to_string(msg.id),
+          message_uuid: msg.uuid
+        })
+
+      {:error, cs} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "Failed to persist DM", details: translate_errors(cs)})
+    end
   end
 
   defp agent_manager_mod do

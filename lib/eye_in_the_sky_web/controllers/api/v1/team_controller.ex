@@ -152,19 +152,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
       _team ->
         case Teams.get_member(member_id) do
-          nil ->
-            conn |> put_status(:not_found) |> json(%{error: "Member not found"})
-
-          member ->
-            case Teams.update_member_status(member, params["status"]) do
-              {:ok, updated} ->
-                json(conn, %{success: true, member_id: updated.id, status: updated.status})
-
-              {:error, changeset} ->
-                conn
-                |> put_status(:unprocessable_entity)
-                |> json(%{error: "Failed to update member", details: translate_errors(changeset)})
-            end
+          nil -> conn |> put_status(:not_found) |> json(%{error: "Member not found"})
+          member -> do_update_member(conn, member, params)
         end
     end
   end
@@ -177,19 +166,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
       _team ->
         case Teams.get_member(member_id) do
-          nil ->
-            conn |> put_status(:not_found) |> json(%{error: "Member not found"})
-
-          member ->
-            case Teams.leave_team(member) do
-              {:ok, _} ->
-                json(conn, %{success: true, message: "Left team", member_id: member.id})
-
-              {:error, changeset} ->
-                conn
-                |> put_status(:unprocessable_entity)
-                |> json(%{error: "Failed to leave team", details: translate_errors(changeset)})
-            end
+          nil -> conn |> put_status(:not_found) |> json(%{error: "Member not found"})
+          member -> do_leave_team(conn, member)
         end
     end
   end
@@ -200,4 +178,27 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     if int_id = parse_int(id), do: Teams.get_team(int_id), else: Teams.get_team_by_name(id)
   end
 
+  defp do_update_member(conn, member, params) do
+    case Teams.update_member_status(member, params["status"]) do
+      {:ok, updated} ->
+        json(conn, %{success: true, member_id: updated.id, status: updated.status})
+
+      {:error, changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "Failed to update member", details: translate_errors(changeset)})
+    end
+  end
+
+  defp do_leave_team(conn, member) do
+    case Teams.leave_team(member) do
+      {:ok, _} ->
+        json(conn, %{success: true, message: "Left team", member_id: member.id})
+
+      {:error, changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "Failed to leave team", details: translate_errors(changeset)})
+    end
+  end
 end

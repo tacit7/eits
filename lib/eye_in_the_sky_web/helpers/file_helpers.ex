@@ -130,48 +130,53 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
   """
   @spec build_file_tree(String.t(), String.t(), non_neg_integer, non_neg_integer) :: list(map())
   def build_file_tree(base_path, current_path, max_depth \\ 5, current_depth \\ 0) do
-    ignored_dirs = ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
-
     if current_depth >= max_depth do
       []
     else
-      case File.ls(current_path) do
-        {:ok, files} ->
-          files
-          |> Enum.filter(fn file ->
-            full_path = Path.join(current_path, file)
+      ignored_dirs = ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
+      list_tree_files(base_path, current_path, ignored_dirs, max_depth, current_depth)
+    end
+  end
 
-            (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
-              file not in ignored_dirs and
-              (File.dir?(full_path) or !is_binary_file?(full_path))
-          end)
-          |> Enum.map(fn file ->
-            full_path = Path.join(current_path, file)
-            relative_path = Path.relative_to(full_path, base_path)
+  defp list_tree_files(base_path, current_path, ignored_dirs, max_depth, current_depth) do
+    case File.ls(current_path) do
+      {:ok, files} ->
+        files
+        |> Enum.filter(fn file ->
+          full_path = Path.join(current_path, file)
 
-            if File.dir?(full_path) do
-              children = build_file_tree(base_path, full_path, max_depth, current_depth + 1)
+          (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
+            file not in ignored_dirs and
+            (File.dir?(full_path) or !is_binary_file?(full_path))
+        end)
+        |> Enum.map(&build_tree_entry(base_path, current_path, &1, max_depth, current_depth))
+        |> Enum.sort_by(&{&1.type != :directory, &1.name})
 
-              %{
-                name: file,
-                path: relative_path,
-                type: :directory,
-                children: Enum.sort_by(children, &{&1.type != :directory, &1.name})
-              }
-            else
-              %{
-                name: file,
-                path: relative_path,
-                type: :file,
-                size: get_file_size(full_path)
-              }
-            end
-          end)
-          |> Enum.sort_by(&{&1.type != :directory, &1.name})
+      {:error, _reason} ->
+        []
+    end
+  end
 
-        {:error, _reason} ->
-          []
-      end
+  defp build_tree_entry(base_path, current_path, file, max_depth, current_depth) do
+    full_path = Path.join(current_path, file)
+    relative_path = Path.relative_to(full_path, base_path)
+
+    if File.dir?(full_path) do
+      children = build_file_tree(base_path, full_path, max_depth, current_depth + 1)
+
+      %{
+        name: file,
+        path: relative_path,
+        type: :directory,
+        children: Enum.sort_by(children, &{&1.type != :directory, &1.name})
+      }
+    else
+      %{
+        name: file,
+        path: relative_path,
+        type: :file,
+        size: get_file_size(full_path)
+      }
     end
   end
 

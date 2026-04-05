@@ -28,48 +28,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
       event = get_req_header(conn, "x-gitea-event") |> List.first()
 
       if event in ["pull_request", "pull_request_sync"] do
-        pr_number = pr["number"]
-        pr_title = pr["title"]
-        pr_body = pr["body"] || ""
-        pr_url = pr["html_url"] || ""
-        # head.ref is the plain branch name; head.label is "owner:branch"
-        head_branch = get_in(pr, ["head", "ref"]) || "unknown"
-
-        Logger.info("Gitea webhook: PR ##{pr_number} opened - spawning codex reviewer")
-
-        pr_context = %{
-          number: pr_number,
-          title: pr_title,
-          body: pr_body,
-          url: pr_url,
-          head_branch: head_branch,
-          repo: repo
-        }
-
-        instructions = build_review_instructions(pr_context)
-
-        case AgentManager.create_agent(
-               agent_type: "codex",
-               description: "PR Review: #{pr_title} (##{pr_number})",
-               instructions: instructions,
-               project_path: project_path
-             ) do
-          {:ok, %{session: session}} ->
-            Logger.info("Codex reviewer spawned for PR ##{pr_number}, session=#{session.uuid}")
-
-            json(conn, %{
-              success: true,
-              message: "Codex reviewer spawned",
-              session_id: session.uuid
-            })
-
-          {:error, reason} ->
-            Logger.error("Failed to spawn codex for PR ##{pr_number}: #{inspect(reason)}")
-
-            conn
-            |> put_status(:internal_server_error)
-            |> json(%{error: "Failed to spawn reviewer: #{inspect(reason)}"})
-        end
+        handle_pr_opened_event(conn, pr, repo, project_path)
       else
         json(conn, %{success: true, message: "Ignored: #{event} #{params["action"]}"})
       end
@@ -103,16 +62,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
       is_codex = commenter == "codex"
 
       if event in ["issue_comment", "pull_request_comment"] and is_pr and is_codex do
-        Logger.info("Gitea webhook: codex commented on PR ##{pr_number}")
-
-        case extract_session_uuid(pr_body) do
-          {:ok, session_uuid} ->
-            dm_session(conn, session_uuid, pr_number, comment_body, repo)
-
-          :not_found ->
-            Logger.warning("No Session-ID found in PR ##{pr_number} body; cannot notify session")
-            json(conn, %{success: true, message: "No session to notify"})
-        end
+        handle_codex_comment(conn, pr_body, pr_number, comment_body, repo)
       else
         json(conn, %{success: true, message: "Ignored: #{event} by #{commenter}"})
       end
@@ -135,6 +85,64 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
       json(conn, %{success: true, message: "Ignored"})
     else
       {:error, :unauthorized} -> unauthorized(conn)
+    end
+  end
+
+  defp handle_pr_opened_event(conn, pr, repo, project_path) do
+    pr_number = pr["number"]
+    pr_title = pr["title"]
+    pr_body = pr["body"] || ""
+    pr_url = pr["html_url"] || ""
+    # head.ref is the plain branch name; head.label is "owner:branch"
+    head_branch = get_in(pr, ["head", "ref"]) || "unknown"
+
+    Logger.info("Gitea webhook: PR ##{pr_number} opened - spawning codex reviewer")
+
+    pr_context = %{
+      number: pr_number,
+      title: pr_title,
+      body: pr_body,
+      url: pr_url,
+      head_branch: head_branch,
+      repo: repo
+    }
+
+    instructions = build_review_instructions(pr_context)
+
+    case AgentManager.create_agent(
+           agent_type: "codex",
+           description: "PR Review: #{pr_title} (##{pr_number})",
+           instructions: instructions,
+           project_path: project_path
+         ) do
+      {:ok, %{session: session}} ->
+        Logger.info("Codex reviewer spawned for PR ##{pr_number}, session=#{session.uuid}")
+
+        json(conn, %{
+          success: true,
+          message: "Codex reviewer spawned",
+          session_id: session.uuid
+        })
+
+      {:error, reason} ->
+        Logger.error("Failed to spawn codex for PR ##{pr_number}: #{inspect(reason)}")
+
+        conn
+        |> put_status(:internal_server_error)
+        |> json(%{error: "Failed to spawn reviewer: #{inspect(reason)}"})
+    end
+  end
+
+  defp handle_codex_comment(conn, pr_body, pr_number, comment_body, repo) do
+    Logger.info("Gitea webhook: codex commented on PR ##{pr_number}")
+
+    case extract_session_uuid(pr_body) do
+      {:ok, session_uuid} ->
+        dm_session(conn, session_uuid, pr_number, comment_body, repo)
+
+      :not_found ->
+        Logger.warning("No Session-ID found in PR ##{pr_number} body; cannot notify session")
+        json(conn, %{success: true, message: "No session to notify"})
     end
   end
 

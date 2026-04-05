@@ -127,34 +127,35 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   """
   def update(conn, %{"id" => id} = params) do
     case Tasks.get_task(id) do
-      nil ->
-        conn |> put_status(:not_found) |> json(%{error: "Task not found"})
+      nil -> conn |> put_status(:not_found) |> json(%{error: "Task not found"})
+      task -> do_update_task(conn, task, params)
+    end
+  end
 
-      task ->
-        result =
-          case params["state"] do
-            "done" -> move_to_state(task, "Done")
-            "start" -> move_to_state(task, "In Progress")
-            _ -> update_attrs(task, params)
-          end
+  defp do_update_task(conn, task, params) do
+    result =
+      case params["state"] do
+        "done" -> move_to_state(task, "Done")
+        "start" -> move_to_state(task, "In Progress")
+        _ -> update_attrs(task, params)
+      end
 
-        case result do
-          {:ok, updated} ->
-            if params["state"] == "start" do
-              maybe_link_session(updated.id, params["session_id"])
-            end
-
-            json(conn, %{
-              success: true,
-              message: "Task updated",
-              task: ApiPresenter.present_task(updated)
-            })
-
-          {:error, changeset} ->
-            conn
-            |> put_status(:unprocessable_entity)
-            |> json(%{error: "Failed to update task", details: translate_errors(changeset)})
+    case result do
+      {:ok, updated} ->
+        if params["state"] == "start" do
+          maybe_link_session(updated.id, params["session_id"])
         end
+
+        json(conn, %{
+          success: true,
+          message: "Task updated",
+          task: ApiPresenter.present_task(updated)
+        })
+
+      {:error, changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "Failed to update task", details: translate_errors(changeset)})
     end
   end
 

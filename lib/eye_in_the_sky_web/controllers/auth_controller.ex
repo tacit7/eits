@@ -122,33 +122,37 @@ defmodule EyeInTheSkyWeb.AuthController do
           |> put_status(:bad_request)
           |> json(%{error: "login not available"})
         else
-          wax_opts = webauthn_opts_for(conn, allow_credentials: allow_credentials)
-          challenge = Wax.new_authentication_challenge(wax_opts)
-
-          challenge_b64 = Base.url_encode64(challenge.bytes, padding: false)
-          serialized = serialize_challenge(challenge)
-
-          allow_creds_json =
-            Enum.map(allow_credentials, fn {cred_id, _} ->
-              %{type: "public-key", id: Base.url_encode64(cred_id, padding: false)}
-            end)
-
-          conn
-          |> put_session(:webauthn_challenge, serialized)
-          |> put_session(:webauthn_user_id, user.id)
-          |> json(%{
-            challenge: challenge_b64,
-            allowCredentials: allow_creds_json,
-            timeout: 60_000,
-            rpId: challenge.rp_id,
-            userVerification: "preferred"
-          })
+          build_auth_challenge(conn, user, allow_credentials)
         end
     end
   end
 
   def login_challenge(conn, _params) do
     conn |> put_status(:bad_request) |> json(%{error: "username is required"})
+  end
+
+  defp build_auth_challenge(conn, user, allow_credentials) do
+    wax_opts = webauthn_opts_for(conn, allow_credentials: allow_credentials)
+    challenge = Wax.new_authentication_challenge(wax_opts)
+
+    challenge_b64 = Base.url_encode64(challenge.bytes, padding: false)
+    serialized = serialize_challenge(challenge)
+
+    allow_creds_json =
+      Enum.map(allow_credentials, fn {cred_id, _} ->
+        %{type: "public-key", id: Base.url_encode64(cred_id, padding: false)}
+      end)
+
+    conn
+    |> put_session(:webauthn_challenge, serialized)
+    |> put_session(:webauthn_user_id, user.id)
+    |> json(%{
+      challenge: challenge_b64,
+      allowCredentials: allow_creds_json,
+      timeout: 60_000,
+      rpId: challenge.rp_id,
+      userVerification: "preferred"
+    })
   end
 
   @doc "POST /auth/login/complete — verify the authentication assertion"
@@ -173,17 +177,7 @@ defmodule EyeInTheSkyWeb.AuthController do
         |> put_status(:unauthorized)
         |> json(%{error: "credential cloning detected"})
       else
-        if passkey, do: Accounts.update_sign_count(passkey, auth_data.sign_count)
-
-        {:ok, session_token} = Accounts.create_user_session(user_id)
-
-        conn
-        |> configure_session(renew: true)
-        |> delete_session(:webauthn_challenge)
-        |> delete_session(:webauthn_user_id)
-        |> put_session(:user_id, user_id)
-        |> put_session(:session_token, session_token)
-        |> json(%{ok: true})
+        complete_auth(conn, passkey, auth_data, user_id)
       end
     else
       {:error, reason} ->
@@ -193,6 +187,20 @@ defmodule EyeInTheSkyWeb.AuthController do
       nil ->
         conn |> put_status(:bad_request) |> json(%{error: "session expired"})
     end
+  end
+
+  defp complete_auth(conn, passkey, auth_data, user_id) do
+    if passkey, do: Accounts.update_sign_count(passkey, auth_data.sign_count)
+
+    {:ok, session_token} = Accounts.create_user_session(user_id)
+
+    conn
+    |> configure_session(renew: true)
+    |> delete_session(:webauthn_challenge)
+    |> delete_session(:webauthn_user_id)
+    |> put_session(:user_id, user_id)
+    |> put_session(:session_token, session_token)
+    |> json(%{ok: true})
   end
 
   # --- Logout ---

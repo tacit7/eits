@@ -55,18 +55,7 @@ defmodule EyeInTheSkyWeb.Helpers.StatusHelpers do
           DateTime.diff(DateTime.utc_now(), dt, :hour)
 
         str when is_binary(str) ->
-          dt =
-            case DateTime.from_iso8601(str) do
-              {:ok, dt, _} ->
-                dt
-
-              _ ->
-                case DateHelpers.parse_datetime(str) do
-                  {:ok, dt} -> dt
-                  :error -> nil
-                end
-            end
-
+          dt = parse_datetime_string(str)
           if dt, do: DateTime.diff(DateTime.utc_now(), dt, :hour), else: nil
 
         _ ->
@@ -78,6 +67,19 @@ defmodule EyeInTheSkyWeb.Helpers.StatusHelpers do
       hours_since >= 24 -> "idle_dead"
       hours_since >= 1 -> "idle_stale"
       true -> "idle"
+    end
+  end
+
+  defp parse_datetime_string(str) do
+    case DateTime.from_iso8601(str) do
+      {:ok, dt, _} ->
+        dt
+
+      _ ->
+        case DateHelpers.parse_datetime(str) do
+          {:ok, dt} -> dt
+          :error -> nil
+        end
     end
   end
 

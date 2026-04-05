@@ -325,22 +325,23 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       conn |> put_status(:bad_request) |> json(%{error: "context is required"})
     else
       case Sessions.get_session_by_uuid(uuid) do
-        {:ok, session} ->
-          attrs = %{agent_id: session.agent_id, session_id: session.id, context: context}
-
-          case Contexts.upsert_session_context(attrs) do
-            {:ok, sc} ->
-              json(conn, %{success: true, context: sc.context})
-
-            {:error, cs} ->
-              conn
-              |> put_status(:unprocessable_entity)
-              |> json(%{error: "Failed", details: translate_errors(cs)})
-          end
-
-        {:error, :not_found} ->
-          conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+        {:ok, session} -> do_upsert_context(conn, session, context)
+        {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "Session not found"})
       end
+    end
+  end
+
+  defp do_upsert_context(conn, session, context) do
+    attrs = %{agent_id: session.agent_id, session_id: session.id, context: context}
+
+    case Contexts.upsert_session_context(attrs) do
+      {:ok, sc} ->
+        json(conn, %{success: true, context: sc.context})
+
+      {:error, cs} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "Failed", details: translate_errors(cs)})
     end
   end
 

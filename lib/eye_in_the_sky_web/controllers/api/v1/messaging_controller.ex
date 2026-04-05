@@ -7,8 +7,8 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   import EyeInTheSkyWeb.ControllerHelpers
 
   alias EyeInTheSky.{Agents, ChannelMessages, Channels, Messages, Sessions}
-  alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @doc """

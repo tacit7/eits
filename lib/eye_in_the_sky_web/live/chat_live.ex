@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
   alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
   alias EyeInTheSkyWeb.Helpers.SlashItems
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
+  import EyeInTheSkyWeb.Helpers.ChannelRoutingHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Helpers.UploadHelpers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1, parse_int: 2]
@@ -190,36 +191,24 @@ defmodule EyeInTheSkyWeb.ChatLive do
         %{"session_id" => target_session_id_str, "body" => body} = params,
         socket
       ) do
-    require Logger
     session_id = get_session_id(socket)
     channel_id = params["channel_id"] || socket.assigns.active_channel_id
-    content_blocks = consume_agent_images_as_content_blocks(socket)
 
     target_session_id = parse_int(target_session_id_str)
 
-    case ChannelMessages.send_channel_message(%{
-           channel_id: channel_id,
-           session_id: session_id,
-           sender_role: "user",
-           recipient_role: "agent",
-           provider: "claude",
-           body: body
-         }) do
-      {:ok, message} ->
-        EyeInTheSky.Events.channel_message(channel_id, message)
-
+    case create_dm_channel_message(channel_id, body, session_id) do
+      {:ok, _message} ->
         if target_session_id do
           prompt = ChannelProtocol.build_prompt(:direct, body)
 
           AgentManager.send_message(target_session_id, prompt,
-            channel_id: channel_id,
-            content_blocks: content_blocks
+            channel_id: channel_id
           )
         end
 
         {:noreply, socket}
 
-      {:error, _changeset} ->
+      {:error, _} ->
         {:noreply, put_flash(socket, :error, "Failed to send message")}
     end
   end

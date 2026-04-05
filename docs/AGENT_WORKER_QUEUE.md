@@ -129,3 +129,49 @@ ORDER BY inserted_at;
 ## Migration
 
 `priv/repo/migrations/20260404233239_add_failure_reason_to_messages.exs` — adds `failure_reason varchar(255)` to `messages`.
+
+## Zombie Worker Recovery
+
+A zombie worker is one where the handler process is dead but the worker still
+believes the run is active. The watchdog recovers from that state regardless of
+which terminal reconciliation path was missed.
+
+This watchdog only detects dead-handler zombies. It does not detect live-but-stalled
+handlers; that would require a separate progress-based timeout.
+
+This is distinct from:
+- Normal handler crash (triggers `DOWN` monitor → existing recovery)
+- Provider error (arrives as `{:claude_error, ...}`)
+- Slow-but-alive run (handler still alive; watchdog rearms)
+
+**Detection:** On each active run start (`admit_idle/2`, `process_next_job/1`,
+`attempt_sdk_retry/3`) the worker generates `run_ref = make_ref()`, stores it
+with `handler_pid`, and schedules `Process.send_after(self(), {:watchdog_check, run_ref}, timeout_ms)`.
+
+Default timeout: 10 minutes — a **safety ceiling for broken terminal reconciliation,
+not a maximum allowed runtime for healthy long-running jobs.**
+Configurable: `Application.get_env(:eye_in_the_sky, :watchdog_timeout_ms)`.
+
+**Liveness check:** Before declaring zombie, the watchdog calls `Process.alive?(state.handler_pid)`.
+If alive, the worker is just slow — watchdog rearms for the same `run_ref` with a fresh timer.
+A run that zombifies at minute 12 (after surviving the minute-10 check) is still caught.
+
+**Recovery:** Handler dead → `do_handle_sdk_error({:watchdog_timeout, ms}, state)` → classified as systemic:
+- current job marked `failed`, `failure_reason = "watchdog_timeout: Nms"`
+- all queued jobs also marked `failed`
+- worker transitions to `:failed`
+- session remains recoverable via next inbound message
+
+**Run correlation:** Timer message carries `run_ref`. Stale timers from previous runs
+do not match `state.watchdog_run_ref` and are ignored. `Process.cancel_timer/1`
+alone is not enough — run correlation defends against already-queued messages.
+
+**Helper boundaries:** `schedule_watchdog/1` and `cancel_watchdog/1` manage only
+`watchdog_timer_ref` and `watchdog_run_ref`. They do not touch `handler_pid`.
+`handler_pid` is set by active-run transitions and cleared by terminal cleanup paths.
+
+**Timer lifecycle:**
+- Scheduled: `admit_idle/2`, `process_next_job/1`, `attempt_sdk_retry/3` on active run start
+- Rearmed: watchdog handler when handler is still alive (slow run, same run_ref)
+- Cancelled (refs cleared): `{:claude_complete}`, `do_handle_sdk_error/2`, `:cancel` cast
+- Does not apply during `:retry_wait` backoff

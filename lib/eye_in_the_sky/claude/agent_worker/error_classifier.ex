@@ -12,6 +12,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
   # substring matching, but only within the message field — not on inspect output.
 
   @spec systemic?(term()) :: boolean()
+  def systemic?({:watchdog_timeout, _timeout_ms}), do: true
   def systemic?({:billing_error, _}), do: true
   def systemic?({:authentication_error, _}), do: true
 

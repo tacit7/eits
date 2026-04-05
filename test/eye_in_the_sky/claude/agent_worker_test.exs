@@ -1345,4 +1345,114 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
       assert final_state.sdk_ref == nil
     end
   end
+
+  describe "watchdog timer" do
+    @tag :watchdog
+    test "force-transitions worker to :failed and marks message failed when :claude_complete never arrives", ctx do
+      Application.put_env(:eye_in_the_sky, :watchdog_timeout_ms, 50)
+      on_exit(fn -> Application.delete_env(:eye_in_the_sky, :watchdog_timeout_ms) end)
+
+      {_agent, session} = create_test_agent_and_session(%{}, ctx)
+      Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "dm:#{session.id}:queue")
+
+      {:ok, message} =
+        EyeInTheSky.Messages.create_message(%{
+          session_id: session.id,
+          body: "test watchdog",
+          sender_role: "user",
+          direction: "outbound",
+          status: "pending"
+        })
+
+      assert {:ok, :started} =
+               EyeInTheSky.Agents.AgentManager.send_message(session.id, "test watchdog",
+                 model: "haiku",
+                 message_id: message.id
+               )
+
+      _mock_port = wait_for_mock_port(session.id)
+
+      # Blank out handler_pid in worker state so Process.alive? returns false when
+      # the watchdog fires. This simulates the handler dying without triggering the
+      # :DOWN monitor path, keeping the test on the watchdog recovery path.
+      [{worker_pid, _}] = Registry.lookup(AgentRegistry, {:session, session.id})
+      :sys.replace_state(worker_pid, fn s -> %{s | handler_pid: nil} end)
+
+      # Secondary: wait for broadcast indicating queue cleared
+      assert_receive {:queue_updated, []}, 500
+
+      # Primary: message marked failed in DB
+      updated = EyeInTheSky.Repo.get!(EyeInTheSky.Messages.Message, message.id)
+      assert updated.status == "failed"
+      assert updated.failure_reason =~ "watchdog_timeout"
+
+      # Primary: worker no longer :running (stop button condition cleared)
+      refute EyeInTheSky.Claude.AgentWorker.processing?(session.id)
+
+      # Primary: session status updated away from "working"
+      {:ok, session_after} = EyeInTheSky.Sessions.get_session(session.id)
+      refute session_after.status == "working"
+    end
+
+    @tag :watchdog
+    test "stale watchdog from previous run does not kill a subsequent valid run", ctx do
+      Application.put_env(:eye_in_the_sky, :watchdog_timeout_ms, 30)
+      on_exit(fn -> Application.delete_env(:eye_in_the_sky, :watchdog_timeout_ms) end)
+
+      {_agent, session} = create_test_agent_and_session(%{}, ctx)
+      Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "dm:#{session.id}:queue")
+
+      {:ok, msg1} =
+        EyeInTheSky.Messages.create_message(%{
+          session_id: session.id,
+          body: "run one",
+          sender_role: "user",
+          direction: "outbound",
+          status: "pending"
+        })
+
+      assert {:ok, :started} =
+               EyeInTheSky.Agents.AgentManager.send_message(session.id, "run one",
+                 model: "haiku",
+                 message_id: msg1.id
+               )
+
+      mock_port_1 = wait_for_mock_port(session.id)
+
+      # Complete run 1 normally — a stale watchdog (run_ref A) with 30ms timeout is now in-flight
+      send(mock_port_1, {:exit, 0})
+      assert_receive {:queue_updated, _}, 500
+
+      # Increase timeout so run 2 stays alive through the assertion window
+      Application.put_env(:eye_in_the_sky, :watchdog_timeout_ms, 10_000)
+
+      {:ok, msg2} =
+        EyeInTheSky.Messages.create_message(%{
+          session_id: session.id,
+          body: "run two",
+          sender_role: "user",
+          direction: "outbound",
+          status: "pending"
+        })
+
+      assert {:ok, :started} =
+               EyeInTheSky.Agents.AgentManager.send_message(session.id, "run two",
+                 model: "haiku",
+                 message_id: msg2.id
+               )
+
+      _mock_port_2 = wait_for_mock_port(session.id)
+
+      # Wait for stale watchdog from run 1 to arrive and be processed (timing-based compromise)
+      Process.sleep(100)
+
+      # Primary: run 2 must still be alive
+      assert EyeInTheSky.Claude.AgentWorker.processing?(session.id)
+
+      # Primary: message 2 must not be failed — watchdog must not have touched it
+      updated2 = EyeInTheSky.Repo.get!(EyeInTheSky.Messages.Message, msg2.id)
+      refute updated2.status == "failed"
+      assert is_nil(updated2.failure_reason)
+    end
+  end
 end

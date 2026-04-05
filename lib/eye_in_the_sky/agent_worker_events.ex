@@ -94,6 +94,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   defp classify_failure_reason({:authentication_error, _}), do: "authentication_error"
   defp classify_failure_reason({:unknown_error, msg}) when is_binary(msg), do: "unknown_error: #{String.slice(msg, 0, 120)}"
   defp classify_failure_reason(:retry_exhausted), do: "retry_exhausted"
+  defp classify_failure_reason({:watchdog_timeout, timeout_ms}), do: "watchdog_timeout: #{timeout_ms}ms"
   defp classify_failure_reason(reason), do: inspect(reason) |> String.slice(0, 120)
 
   # --- Data Events ---

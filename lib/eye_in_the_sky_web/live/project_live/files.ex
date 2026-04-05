@@ -10,22 +10,26 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Repo
 
+  @ignored_dirs ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
+
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    # Parse project ID safely
-    project_id =
-      case Integer.parse(id) do
-        {int, ""} -> int
-        _ -> nil
-      end
-
     socket =
-      if project_id do
+      socket
+      |> assign(:file_path, nil)
+      |> assign(:file_content, nil)
+      |> assign(:file_type, nil)
+      |> assign(:file_tree, [])
+      |> assign(:files, [])
+      |> assign(:view_mode, :list)
+      |> assign(:error, nil)
+
+    case Integer.parse(id) do
+      {project_id, ""} ->
         project =
           Projects.get_project!(project_id)
           |> Repo.preload([:agents])
 
-        # Build file tree
         file_tree =
           if project.path do
             build_file_tree(project.path, project.path)
@@ -33,33 +37,22 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
             []
           end
 
-        socket
-        |> assign(:page_title, "Files - #{project.name}")
-        |> assign(:project, project)
-        |> assign(:sidebar_tab, :files)
-        |> assign(:sidebar_project, project)
-        |> assign(:file_path, nil)
-        |> assign(:file_content, nil)
-        |> assign(:file_type, nil)
-        |> assign(:file_tree, file_tree)
-        |> assign(:files, [])
-        |> assign(:view_mode, :list)
-        |> assign(:error, nil)
-      else
-        socket
-        |> assign(:page_title, "Project Not Found")
-        |> assign(:project, nil)
-        |> assign(:file_path, nil)
-        |> assign(:file_content, nil)
-        |> assign(:file_type, nil)
-        |> assign(:file_tree, [])
-        |> assign(:files, [])
-        |> assign(:view_mode, :list)
-        |> assign(:error, "Invalid project ID")
-        |> put_flash(:error, "Invalid project ID")
-      end
+        {:ok,
+         socket
+         |> assign(:page_title, "Files - #{project.name}")
+         |> assign(:project, project)
+         |> assign(:sidebar_tab, :files)
+         |> assign(:sidebar_project, project)
+         |> assign(:file_tree, file_tree)}
 
-    {:ok, socket}
+      _ ->
+        {:ok,
+         socket
+         |> assign(:page_title, "Project Not Found")
+         |> assign(:project, nil)
+         |> assign(:error, "Invalid project ID")
+         |> put_flash(:error, "Invalid project ID")}
+    end
   end
 
   @impl true
@@ -86,27 +79,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       else
         cond do
           File.dir?(full_path) ->
-            # List directory contents (for list view)
-            case File.ls(full_path) do
-              {:ok, files} ->
-                file_list =
-                  files
-                  |> Enum.filter(fn file ->
-                    file_path = Path.join(full_path, file)
-                    File.dir?(file_path) or !binary_file?(file_path)
-                  end)
-                  |> Enum.map(fn file ->
-                    file_path = Path.join(full_path, file)
-
-                    %{
-                      name: file,
-                      path: Path.join(path, file),
-                      is_dir: File.dir?(file_path),
-                      size: get_file_size(file_path)
-                    }
-                  end)
-                  |> Enum.sort_by(&{!&1.is_dir, &1.name})
-
+            case build_file_listing(full_path, path) do
+              {:ok, file_list} ->
                 {:noreply,
                  socket
                  |> assign(:file_path, path)
@@ -171,7 +145,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   end
 
   def handle_params(params, _uri, socket) do
-    # Load root directory for list view
     project = socket.assigns.project
 
     mode =
@@ -183,31 +156,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     socket = assign(socket, :view_mode, mode)
 
     if project.path && mode == :list do
-      case File.ls(project.path) do
-        {:ok, files} ->
-          ignored_dirs = ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
-
-          file_list =
-            files
-            |> Enum.filter(fn file ->
-              file_path = Path.join(project.path, file)
-
-              (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
-                file not in ignored_dirs and
-                (File.dir?(file_path) or !binary_file?(file_path))
-            end)
-            |> Enum.map(fn file ->
-              file_path = Path.join(project.path, file)
-
-              %{
-                name: file,
-                path: file,
-                is_dir: File.dir?(file_path),
-                size: get_file_size(file_path)
-              }
-            end)
-            |> Enum.sort_by(&{!&1.is_dir, &1.name})
-
+      case build_file_listing(project.path, "",
+             ignore_hidden: true,
+             ignored_dirs: @ignored_dirs
+           ) do
+        {:ok, file_list} ->
           {:noreply, assign(socket, :files, file_list)}
 
         {:error, _reason} ->
@@ -236,6 +189,52 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   @impl true
   def handle_info(_msg, socket), do: {:noreply, socket}
+
+  # Builds a flat file listing for `dir`, with each entry's `:path` set to
+  # `Path.join(path_prefix, filename)`. When `path_prefix` is `""` the path
+  # is just the filename, matching root-level listing behaviour.
+  #
+  # Options:
+  #   :ignore_hidden   - when true, skip dotfiles (except .claude and .git)
+  #   :ignored_dirs    - list of directory names to exclude entirely
+  defp build_file_listing(dir, path_prefix, opts \\ []) do
+    ignore_hidden = Keyword.get(opts, :ignore_hidden, false)
+    ignored_dirs = Keyword.get(opts, :ignored_dirs, [])
+
+    case File.ls(dir) do
+      {:ok, files} ->
+        file_list =
+          files
+          |> Enum.filter(fn file ->
+            file_path = Path.join(dir, file)
+
+            hidden_ok =
+              !ignore_hidden or
+                !String.starts_with?(file, ".") or
+                file in [".claude", ".git"]
+
+            hidden_ok and
+              file not in ignored_dirs and
+              (File.dir?(file_path) or !binary_file?(file_path))
+          end)
+          |> Enum.map(fn file ->
+            file_path = Path.join(dir, file)
+
+            %{
+              name: file,
+              path: if(path_prefix == "", do: file, else: Path.join(path_prefix, file)),
+              is_dir: File.dir?(file_path),
+              size: get_file_size(file_path)
+            }
+          end)
+          |> Enum.sort_by(&{!&1.is_dir, &1.name})
+
+        {:ok, file_list}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
 
   attr :item, :map, required: true
   attr :project_id, :integer, required: true
@@ -313,7 +312,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
             </ul>
           </div>
         </div>
-        
+
     <!-- File Content Viewer -->
         <div class="flex-1 min-h-0 overflow-y-auto">
           <%= if @error do %>

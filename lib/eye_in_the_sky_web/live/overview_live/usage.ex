@@ -1,8 +1,8 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Usage do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Metrics.UsageReport
   alias EyeInTheSky.Metrics.TokenIngestion
+  alias EyeInTheSky.Metrics.UsageReport
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
 
   @date_ranges %{"7d" => 7, "30d" => 30, "all" => nil}

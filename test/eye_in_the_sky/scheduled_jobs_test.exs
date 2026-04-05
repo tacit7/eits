@@ -1,10 +1,10 @@
 defmodule EyeInTheSky.ScheduledJobsTest do
   use EyeInTheSky.DataCase, async: true
 
-  alias EyeInTheSky.ScheduledJobs
-  alias EyeInTheSky.ScheduledJobs.ScheduledJob
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Prompts
+  alias EyeInTheSky.ScheduledJobs
+  alias EyeInTheSky.ScheduledJobs.ScheduledJob
 
   # ---------------------------------------------------------------------------
   # Helpers

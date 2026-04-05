@@ -12,8 +12,8 @@ defmodule EyeInTheSky.Claude.ChatWorker do
   require Logger
 
   alias EyeInTheSky.Agents.AgentManager
-  alias EyeInTheSky.Claude.ChannelProtocol
   alias EyeInTheSky.Channels
+  alias EyeInTheSky.Claude.ChannelProtocol
 
   @registry EyeInTheSky.Claude.ChatRegistry
 

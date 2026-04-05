@@ -3,8 +3,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
 
   use EyeInTheSkyWeb, :html
 
-  alias EyeInTheSkyWeb.Helpers.FileHelpers
   alias EyeInTheSkyWeb.DmLive.SlashCommands
+  alias EyeInTheSkyWeb.Helpers.FileHelpers
 
   attr :uploads, :map, required: true
   attr :selected_model, :string, default: "opus"

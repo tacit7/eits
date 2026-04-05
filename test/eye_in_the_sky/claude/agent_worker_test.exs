@@ -4,8 +4,8 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
 
   @moduletag :capture_log
 
-  alias EyeInTheSky.Claude.SDK
   alias EyeInTheSky.{Agents, Messages, Sessions}
+  alias EyeInTheSky.Claude.SDK
 
   setup do
     # Track sessions created in this test so we can clean up only those workers

@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.TeamLive.IndexTest do
 
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSky.{Teams, Agents, Sessions}
+  alias EyeInTheSky.{Agents, Sessions, Teams}
 
   # ---------------------------------------------------------------------------
   # Helpers

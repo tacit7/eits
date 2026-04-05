@@ -1,10 +1,10 @@
 defmodule EyeInTheSkyWeb.Presenters.ApiPresenterTest do
   use ExUnit.Case, async: true
 
-  alias EyeInTheSkyWeb.Presenters.ApiPresenter
   alias EyeInTheSky.Agents.Agent
   alias EyeInTheSky.Sessions.Session
   alias EyeInTheSky.Teams.TeamMember
+  alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   describe "present_member/1" do
     test "includes all required payload fields with loaded associations" do

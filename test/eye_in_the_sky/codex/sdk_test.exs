@@ -1,8 +1,8 @@
 defmodule EyeInTheSky.Codex.SDKTest do
   use ExUnit.Case, async: false
 
-  alias EyeInTheSky.Codex.SDK
   alias EyeInTheSky.Claude.{Message, SDK.Registry}
+  alias EyeInTheSky.Codex.SDK
 
   # ---------------------------------------------------------------------------
   # start/2

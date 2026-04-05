@@ -3,10 +3,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
 
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Tasks
-  alias EyeInTheSkyWeb.Components.TaskCard
   alias EyeInTheSkyWeb.Components.FilterSheet
-  import EyeInTheSkyWeb.Helpers.PubSubHelpers
+  alias EyeInTheSkyWeb.Components.TaskCard
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
+  import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Live.Shared.TasksHelpers
 
   @per_page 50

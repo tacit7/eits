@@ -3,7 +3,7 @@ defmodule EyeInTheSky.SessionsTest do
 
   import EyeInTheSky.Factory
 
-  alias EyeInTheSky.{Sessions, Tasks, Commits, Logs, Notes, Messages}
+  alias EyeInTheSky.{Commits, Logs, Messages, Notes, Sessions, Tasks}
   alias EyeInTheSky.Sessions.Queries
 
   # ---------------------------------------------------------------------------

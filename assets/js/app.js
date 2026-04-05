@@ -114,6 +114,7 @@ Hooks.QuickCreateAgent = QuickCreateAgent
 Hooks.QuickUpdateAgent = QuickUpdateAgent
 Hooks.QuickGetAgent = QuickGetAgent
 Hooks.QuickDeleteAgent = QuickDeleteAgent
+Hooks.QuickResumeAgent = QuickResumeAgent
 Hooks.QuickCreateChat = QuickCreateChat
 Hooks.QuickCreateTask = QuickCreateTask
 Hooks.CommandPalette = CommandPalette

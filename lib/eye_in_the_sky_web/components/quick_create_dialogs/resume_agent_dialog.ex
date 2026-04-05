@@ -1,0 +1,73 @@
+defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ResumeAgentDialog do
+  @moduledoc false
+  use Phoenix.Component
+
+  def quick_resume_agent(assigns) do
+    ~H"""
+    <dialog
+      id="quick-resume-agent"
+      phx-hook="QuickResumeAgent"
+      class="modal modal-bottom sm:modal-middle p-0 bg-transparent"
+    >
+      <div class="modal-box max-w-lg p-0 overflow-hidden">
+        <div class="border-b border-base-content/10 px-4 py-3 flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-base-content">Resume Agent</h2>
+          <button
+            data-qra-cancel
+            type="button"
+            class="btn btn-ghost btn-xs btn-square"
+            aria-label="Close"
+          >
+            <span class="hero-x-mark w-4 h-4"></span>
+          </button>
+        </div>
+        <form data-qra-form class="p-4 flex flex-col gap-3">
+          <div>
+            <label class="sr-only" for="qra-agent-uuid">Agent UUID</label>
+            <input
+              id="qra-agent-uuid"
+              data-qra-agent-uuid
+              required
+              placeholder="Enter agent UUID to resume"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm"
+            />
+          </div>
+          <div>
+            <label class="sr-only" for="qra-instructions">Instructions (optional)</label>
+            <textarea
+              id="qra-instructions"
+              data-qra-instructions
+              placeholder="New instructions (optional - uses original if blank)"
+              rows="4"
+              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm resize-none"
+            ></textarea>
+          </div>
+          <div class="alert alert-info text-sm">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              class="stroke-current shrink-0 w-5 h-5"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              ></path>
+            </svg>
+            <span>This will spawn a new Claude session for the existing agent.</span>
+          </div>
+          <div class="flex justify-end gap-2 pt-1">
+            <button data-qra-cancel type="button" class="btn btn-ghost btn-sm">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">Resume Agent</button>
+          </div>
+        </form>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+      </form>
+    </dialog>
+    """
+  end
+end

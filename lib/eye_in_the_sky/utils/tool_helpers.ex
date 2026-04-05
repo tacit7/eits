@@ -21,17 +21,7 @@ defmodule EyeInTheSky.Utils.ToolHelpers do
   end
 
   @doc "Parse a string or integer to an integer. Returns nil for invalid or nil input."
-  def parse_int(nil), do: nil
-  def parse_int(val) when is_integer(val), do: val
-
-  def parse_int(val) when is_binary(val) do
-    case Integer.parse(val) do
-      {n, ""} -> n
-      _ -> nil
-    end
-  end
-
-  def parse_int(_), do: nil
+  defdelegate parse_int(val), to: EyeInTheSkyWeb.ControllerHelpers
 
   def maybe_put(map, _key, nil), do: map
   def maybe_put(map, key, value), do: Map.put(map, key, value)

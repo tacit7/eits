@@ -3,6 +3,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageToolWidget do
 
   use EyeInTheSkyWeb, :html
 
+  alias EyeInTheSkyWeb.Components.DmHelpers
+
   attr :name, :string, required: true
   attr :rest, :string, required: true
 
@@ -118,6 +120,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageToolWidget do
   end
 
   defp tool_widget_meta(name, rest) do
-    EyeInTheSkyWeb.Components.DmHelpers.tool_widget_meta(name, rest)
+    DmHelpers.tool_widget_meta(name, rest)
   end
 end

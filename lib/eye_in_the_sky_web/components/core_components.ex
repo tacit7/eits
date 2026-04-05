@@ -29,14 +29,14 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   use Phoenix.Component
 
   alias EyeInTheSky.Tasks.WorkflowState
+  alias Phoenix.HTML.Form
+  alias Phoenix.LiveView.JS
 
   @state_todo WorkflowState.todo_id()
   @state_in_progress WorkflowState.in_progress_id()
   @state_in_review WorkflowState.in_review_id()
   @state_done WorkflowState.done_id()
   use Gettext, backend: EyeInTheSkyWeb.Gettext
-
-  alias Phoenix.LiveView.JS
 
   @doc """
   Renders flash notices.
@@ -225,7 +225,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   def input(%{type: "checkbox"} = assigns) do
     assigns =
       assign_new(assigns, :checked, fn ->
-        Phoenix.HTML.Form.normalize_value("checkbox", assigns[:value])
+        Form.normalize_value("checkbox", assigns[:value])
       end)
 
     ~H"""

@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
   use EyeInTheSkyWeb, :html
 
   alias EyeInTheSkyWeb.Helpers.FileHelpers
+  alias EyeInTheSkyWeb.DmLive.SlashCommands
 
   attr :uploads, :map, required: true
   attr :selected_model, :string, default: "opus"
@@ -353,7 +354,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
   defp format_number(_), do: "0"
 
   defp serialize_cli_opts(opts) do
-    key_map = EyeInTheSkyWeb.DmLive.SlashCommands.opt_key_to_slug()
+    key_map = SlashCommands.opt_key_to_slug()
 
     opts
     |> Enum.reject(fn {k, _v} -> k in [:_clear, :_noop] end)

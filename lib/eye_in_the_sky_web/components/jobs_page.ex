@@ -72,6 +72,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
           socket
           |> maybe_assign_web_project(assigns.project_id)
           |> load_jobs()
+          |> maybe_reload_agent_schedule_data()
         else
           socket
         end

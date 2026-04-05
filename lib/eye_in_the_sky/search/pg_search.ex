@@ -9,6 +9,7 @@ defmodule EyeInTheSky.Search.PgSearch do
 
   import Ecto.Query, warn: false
   alias EyeInTheSky.Repo
+  alias Ecto.Adapters.SQL
 
   # Only lowercase letters, digits, and underscores — no injection vectors
   @safe_identifier ~r/^[a-z][a-z0-9_]*$/
@@ -205,7 +206,7 @@ defmodule EyeInTheSky.Search.PgSearch do
 
     params = [query | sql_params]
 
-    case Ecto.Adapters.SQL.query(Repo, sql, params) do
+    case SQL.query(Repo, sql, params) do
       {:ok, %{rows: rows, columns: columns}} ->
         results =
           Enum.map(rows, fn row ->

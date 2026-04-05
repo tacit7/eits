@@ -3,6 +3,7 @@ defmodule EyeInTheSky.ScheduledJobs do
 
   alias EyeInTheSky.Repo
   alias EyeInTheSky.ScheduledJobs.{ScheduledJob, JobRun}
+  alias Crontab.CronExpression.Parser
 
   def list_jobs do
     from(j in ScheduledJob,
@@ -251,7 +252,7 @@ defmodule EyeInTheSky.ScheduledJobs do
   end
 
   defp next_cron_run_at(schedule_value, utc_now, timezone) do
-    case Crontab.CronExpression.Parser.parse(schedule_value) do
+    case Parser.parse(schedule_value) do
       {:ok, parsed} ->
         local_now = utc_to_local(utc_now, timezone)
         case Crontab.Scheduler.get_next_run_date(parsed, local_now) do

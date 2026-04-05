@@ -19,6 +19,8 @@ defmodule EyeInTheSky.Claude.CLI do
 
   require Logger
 
+  alias EyeInTheSky.Claude.BinaryFinder
+
   # ---------------------------------------------------------------------------
   # Types and constants
   # ---------------------------------------------------------------------------
@@ -566,6 +568,6 @@ defmodule EyeInTheSky.Claude.CLI do
   # ---------------------------------------------------------------------------
 
   defp find_claude_binary do
-    EyeInTheSky.CLI.Port.find_binary(@persistent_term_key, &EyeInTheSky.Claude.BinaryFinder.find/0)
+    EyeInTheSky.CLI.Port.find_binary(@persistent_term_key, &BinaryFinder.find/0)
   end
 end

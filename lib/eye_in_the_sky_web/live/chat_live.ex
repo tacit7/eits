@@ -188,22 +188,25 @@ defmodule EyeInTheSkyWeb.ChatLive do
   @impl true
   def handle_event(
         "send_direct_message",
-        %{"session_id" => target_session_id_str, "body" => body},
+        %{"session_id" => target_session_id_str, "body" => body} = params,
         socket
       ) do
     session_id = get_session_id(socket)
+    channel_id = params["channel_id"] || socket.assigns.active_channel_id
 
     target_session_id = parse_int(target_session_id_str)
 
-    case send_dm_to_session(target_session_id, body, session_id) do
+    case create_dm_channel_message(channel_id, body, session_id) do
       {:ok, _message} ->
+        if target_session_id do
+          prompt = ChannelProtocol.build_prompt(:direct, body)
+
+          AgentManager.send_message(target_session_id, prompt,
+            channel_id: channel_id
+          )
+        end
+
         {:noreply, socket}
-
-      {:error, :session_not_found} ->
-        {:noreply, put_flash(socket, :error, "Session not found")}
-
-      {:error, :channel_not_found} ->
-        {:noreply, put_flash(socket, :error, "Global channel not found")}
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Failed to send message")}

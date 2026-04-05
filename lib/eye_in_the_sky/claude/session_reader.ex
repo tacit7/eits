@@ -127,19 +127,18 @@ defmodule EyeInTheSky.Claude.SessionReader do
   Returns the last N messages in chronological order.
   """
   def parse_session_file(file_path, limit) do
-    case File.read(file_path) do
-      {:ok, content} ->
+    case read_all_lines(file_path) do
+      {:ok, lines} ->
         messages =
-          content
-          |> String.split("\n", trim: true)
+          lines
           |> Enum.map(&parse_line/1)
           |> Enum.filter(&conversation_message?/1)
           |> Enum.take(-limit)
 
         {:ok, messages}
 
-      {:error, reason} ->
-        {:error, reason}
+      {:error, _} = err ->
+        err
     end
   end
 
@@ -149,11 +148,10 @@ defmodule EyeInTheSky.Claude.SessionReader do
   end
 
   defp parse_session_file_after(file_path, after_uuid) do
-    case File.read(file_path) do
-      {:ok, content} ->
+    case read_all_lines(file_path) do
+      {:ok, lines} ->
         all_messages =
-          content
-          |> String.split("\n", trim: true)
+          lines
           |> Enum.map(&parse_line/1)
           |> Enum.filter(&conversation_message?/1)
 
@@ -161,8 +159,15 @@ defmodule EyeInTheSky.Claude.SessionReader do
         # fall back to returning all messages rather than returning empty.
         {:ok, drop_messages_before(all_messages, after_uuid)}
 
-      {:error, reason} ->
-        {:error, reason}
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  defp read_all_lines(file_path) do
+    case File.read(file_path) do
+      {:ok, content} -> {:ok, String.split(content, "\n", trim: true)}
+      {:error, _} = err -> err
     end
   end
 
@@ -191,29 +196,36 @@ defmodule EyeInTheSky.Claude.SessionReader do
   Returns {:ok, total_tokens, total_cost_usd} or {:error, reason}.
   """
   def read_usage(session_id, project_path) do
-    with {:ok, file_path} <- find_session_file(session_id, project_path),
-         {:ok, content} <- File.read(file_path) do
-      {tokens, cost} =
-        content
-        |> String.split("\n", trim: true)
-        |> Enum.reduce({0, 0.0}, &accumulate_token_usage_line/2)
+    case find_session_file(session_id, project_path) do
+      {:ok, file_path} ->
+        case read_all_lines(file_path) do
+          {:ok, lines} ->
+            {tokens, cost} =
+              lines
+              |> Enum.reduce({0, 0.0}, fn line, {tok_acc, cost_acc} ->
+                case Jason.decode(line) do
+                  {:ok, %{"type" => "assistant", "message" => %{"usage" => usage}}}
+                  when is_map(usage) ->
+                    input = Map.get(usage, "input_tokens") || 0
+                    output = Map.get(usage, "output_tokens") || 0
+                    {tok_acc + input + output, cost_acc}
 
-      {:ok, tokens, cost}
-    end
-  end
+                  {:ok, %{"type" => "result", "total_cost_usd" => cost}} when is_number(cost) ->
+                    {tok_acc, cost_acc + cost}
 
-  defp accumulate_token_usage_line(line, {tok_acc, cost_acc}) do
-    case Jason.decode(line) do
-      {:ok, %{"type" => "assistant", "message" => %{"usage" => usage}}} when is_map(usage) ->
-        input = Map.get(usage, "input_tokens") || 0
-        output = Map.get(usage, "output_tokens") || 0
-        {tok_acc + input + output, cost_acc}
+                  _ ->
+                    {tok_acc, cost_acc}
+                end
+              end)
 
-      {:ok, %{"type" => "result", "total_cost_usd" => cost}} when is_number(cost) ->
-        {tok_acc, cost_acc + cost}
+            {:ok, tokens, cost}
 
-      _ ->
-        {tok_acc, cost_acc}
+          {:error, _} = err ->
+            err
+        end
+
+      {:error, _} = err ->
+        err
     end
   end
 
@@ -225,11 +237,10 @@ defmodule EyeInTheSky.Claude.SessionReader do
   def read_tool_events(session_id, project_path) do
     case find_session_file(session_id, project_path) do
       {:ok, file_path} ->
-        case File.read(file_path) do
-          {:ok, content} ->
+        case read_all_lines(file_path) do
+          {:ok, lines} ->
             events =
-              content
-              |> String.split("\n", trim: true)
+              lines
               |> Enum.map(&parse_line/1)
               |> Enum.reject(&is_nil/1)
               |> Enum.filter(&assistant_with_tools?/1)
@@ -237,8 +248,8 @@ defmodule EyeInTheSky.Claude.SessionReader do
 
             {:ok, events}
 
-          {:error, reason} ->
-            {:error, reason}
+          {:error, _} = err ->
+            err
         end
 
       {:error, _} = err ->

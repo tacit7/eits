@@ -4,7 +4,9 @@ defmodule EyeInTheSky.Messages do
   """
 
   import Ecto.Query, warn: false
+  alias EyeInTheSky.Messages.Aggregations
   alias EyeInTheSky.Messages.ChannelMessageNumbering
+  alias EyeInTheSky.Messages.Deduplicator
   alias EyeInTheSky.Messages.JsonlStorage
   alias EyeInTheSky.Messages.Message
   alias EyeInTheSky.QueryHelpers
@@ -228,14 +230,14 @@ defmodule EyeInTheSky.Messages do
           # (session file sync imports messages without usage data; later calls
           # may enrich with usage metadata using the same source_uuid)
           existing = Repo.get_by!(Message, source_uuid: source_uuid)
-          enrich_metadata_if_present(existing, metadata)
+          Deduplicator.enrich_metadata_if_present(existing, metadata)
 
         is_nil(source_uuid) ->
           # No source_uuid — check for a recent message with same content to avoid
           # duplicating a message already imported from the session file via periodic sync.
-          case find_recent_message(session_id, body) do
+          case Deduplicator.find_recent_message(session_id, body) do
             nil -> insert_message(attrs)
-            existing -> enrich_metadata_if_present(existing, metadata)
+            existing -> Deduplicator.enrich_metadata_if_present(existing, metadata)
           end
 
         true ->
@@ -289,30 +291,12 @@ defmodule EyeInTheSky.Messages do
   @doc """
   Returns the total cost in USD for all messages in a session.
   """
-  def total_cost_for_session(session_id) do
-    Message
-    |> where([m], m.session_id == ^session_id)
-    |> select(
-      [m],
-      fragment("COALESCE(SUM(CAST(COALESCE(metadata->>'total_cost_usd', '0') AS FLOAT)), 0.0)")
-    )
-    |> Repo.one() || 0.0
-  end
+  defdelegate total_cost_for_session(session_id), to: Aggregations
 
   @doc """
   Returns the total token count (input + output) for all messages in a session.
   """
-  def total_tokens_for_session(session_id) do
-    Message
-    |> where([m], m.session_id == ^session_id)
-    |> select(
-      [m],
-      fragment(
-        "COALESCE(SUM(CAST(COALESCE(metadata->'usage'->>'input_tokens', '0') AS INTEGER) + CAST(COALESCE(metadata->'usage'->>'output_tokens', '0') AS INTEGER)), 0)"
-      )
-    )
-    |> Repo.one() || 0
-  end
+  defdelegate total_tokens_for_session(session_id), to: Aggregations
 
   @doc """
   Returns recent messages for a session (default last 50).
@@ -327,7 +311,7 @@ defmodule EyeInTheSky.Messages do
     |> Repo.all()
     |> Repo.preload(:attachments)
     |> Enum.reverse()
-    |> deduplicate_by_source_uuid()
+    |> Deduplicator.deduplicate_by_source_uuid()
   end
 
   @doc """
@@ -345,28 +329,11 @@ defmodule EyeInTheSky.Messages do
     |> limit(100)
     |> Repo.all()
     |> Repo.preload(:attachments)
-    |> deduplicate_by_source_uuid()
+    |> Deduplicator.deduplicate_by_source_uuid()
   end
 
   def search_messages_for_session(session_id, _query) do
     list_recent_messages(session_id)
-  end
-
-  # Remove duplicate messages by source_uuid, keeping the first occurrence
-  defp deduplicate_by_source_uuid(messages) do
-    messages
-    |> Enum.reduce({[], MapSet.new()}, &dedup_step/2)
-    |> elem(0)
-    |> Enum.reverse()
-  end
-
-  defp dedup_step(msg, {acc, seen_uuids}) do
-    if msg.source_uuid && MapSet.member?(seen_uuids, msg.source_uuid) do
-      {acc, seen_uuids}
-    else
-      new_seen = if msg.source_uuid, do: MapSet.put(seen_uuids, msg.source_uuid), else: seen_uuids
-      {[msg | acc], new_seen}
-    end
   end
 
   @doc """
@@ -427,7 +394,7 @@ defmodule EyeInTheSky.Messages do
   Returns {:ok, message} or :not_found.
   """
   def find_unlinked_message(session_id, sender_role, body) do
-    case find_recent_message(session_id, body,
+    case Deduplicator.find_recent_message(session_id, body,
            sender_role: sender_role,
            require_nil_source_uuid: true
          ) do
@@ -453,42 +420,6 @@ defmodule EyeInTheSky.Messages do
     cid = Map.get(attrs, :channel_id) || Map.get(attrs, "channel_id")
 
     if cid, do: create_channel_message(attrs), else: create_message(attrs)
-  end
-
-  # Enrich an existing message with metadata if metadata is provided and non-empty.
-  defp enrich_metadata_if_present(message, metadata) do
-    if metadata && metadata != %{} do
-      update_message(message, %{metadata: metadata})
-    else
-      {:ok, message}
-    end
-  end
-
-  # Finds the most recent message in the session matching the given body within the last minute.
-  # opts:
-  #   sender_role: (default "agent")
-  #   require_nil_source_uuid: when true, only matches messages where source_uuid is nil (default false)
-  defp find_recent_message(session_id, body, opts \\ []) do
-    sender_role = Keyword.get(opts, :sender_role, "agent")
-    require_nil_source_uuid = Keyword.get(opts, :require_nil_source_uuid, false)
-
-    one_minute_ago =
-      DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
-
-    Message
-    |> where(
-      [m],
-      m.session_id == ^session_id and
-        m.sender_role == ^sender_role and
-        m.body == ^body and
-        m.inserted_at >= ^one_minute_ago
-    )
-    |> then(fn query ->
-      if require_nil_source_uuid, do: where(query, [m], is_nil(m.source_uuid)), else: query
-    end)
-    |> order_by([m], desc: m.inserted_at)
-    |> limit(1)
-    |> Repo.one()
   end
 
   @doc """

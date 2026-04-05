@@ -190,22 +190,7 @@ defmodule EyeInTheSky.Codex.CLI do
     caller = Keyword.get(opts, :caller, self())
     session_ref = Keyword.get(opts, :session_ref, make_ref())
 
-    raw_timeout = EyeInTheSky.Settings.get_integer("cli_idle_timeout_ms")
-
-    default_timeout =
-      case raw_timeout do
-        0 -> :infinity
-        n when is_integer(n) and n > 0 -> n
-        _ -> @default_idle_timeout_ms
-      end
-
-    idle_timeout_ms =
-      case Keyword.get(opts, :idle_timeout_ms, default_timeout) do
-        0 -> :infinity
-        n when is_integer(n) and n > 0 -> n
-        :infinity -> :infinity
-        _ -> default_timeout
-      end
+    idle_timeout_ms = EyeInTheSky.CLI.Port.resolve_idle_timeout(opts, @default_idle_timeout_ms)
 
     case find_codex_binary() do
       {:ok, codex_path} ->

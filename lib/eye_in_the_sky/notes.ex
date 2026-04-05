@@ -299,32 +299,8 @@ defmodule EyeInTheSky.Notes do
           Enum.map(ids, &to_string/1)
       end
 
-    has_scope = agent_ids_str != [] or project_id_str != nil or session_ids_str != []
-
-    scope_dynamic =
-      if has_scope, do: build_scope_dynamic(project_id_str, agent_ids_str, session_ids_str)
-
-    extra_where =
-      case {scope_dynamic, starred_only} do
-        {nil, false} -> nil
-        {nil, true} -> dynamic([n], n.starred == 1)
-        {scope, false} -> scope
-        {scope, true} -> dynamic([n], ^scope and n.starred == 1)
-      end
-
-    {scope_sql, scope_params} =
-      if has_scope,
-        do: build_scope_sql(project_id_str, agent_ids_str, session_ids_str),
-        else: {"", []}
-
-    {sql_filter, sql_params} =
-      if starred_only do
-        next_idx = length(scope_params) + 2
-        starred_clause = "AND n.starred = $#{next_idx}"
-        {scope_sql <> " " <> starred_clause, scope_params ++ [1]}
-      else
-        {scope_sql, scope_params}
-      end
+    {extra_where, sql_filter, sql_params} =
+      build_note_filters(project_id_str, agent_ids_str, session_ids_str, starred_only)
 
     PgSearch.search_for(query,
       table: "notes",
@@ -336,6 +312,40 @@ defmodule EyeInTheSky.Notes do
       order_by: [desc: :created_at],
       limit: Keyword.get(opts, :limit)
     )
+  end
+
+  defp build_note_filters(project_id_str, agent_ids_str, session_ids_str, starred_only) do
+    has_scope = agent_ids_str != [] or project_id_str != nil or session_ids_str != []
+    extra_where = build_extra_where(project_id_str, agent_ids_str, session_ids_str, starred_only, has_scope)
+    {sql_filter, sql_params} = build_sql_filter(project_id_str, agent_ids_str, session_ids_str, starred_only, has_scope)
+    {extra_where, sql_filter, sql_params}
+  end
+
+  defp build_extra_where(project_id_str, agent_ids_str, session_ids_str, starred_only, has_scope) do
+    scope_dynamic =
+      if has_scope, do: build_scope_dynamic(project_id_str, agent_ids_str, session_ids_str)
+
+    case {scope_dynamic, starred_only} do
+      {nil, false} -> nil
+      {nil, true} -> dynamic([n], n.starred == 1)
+      {scope, false} -> scope
+      {scope, true} -> dynamic([n], ^scope and n.starred == 1)
+    end
+  end
+
+  defp build_sql_filter(project_id_str, agent_ids_str, session_ids_str, starred_only, has_scope) do
+    {scope_sql, scope_params} =
+      if has_scope,
+        do: build_scope_sql(project_id_str, agent_ids_str, session_ids_str),
+        else: {"", []}
+
+    if starred_only do
+      next_idx = length(scope_params) + 2
+      starred_clause = "AND n.starred = $#{next_idx}"
+      {scope_sql <> " " <> starred_clause, scope_params ++ [1]}
+    else
+      {scope_sql, scope_params}
+    end
   end
 
   defp note_type_variants("session"), do: ["session", "sessions"]

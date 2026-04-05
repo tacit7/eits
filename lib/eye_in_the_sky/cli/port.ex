@@ -159,6 +159,40 @@ defmodule EyeInTheSky.CLI.Port do
   end
 
   # ---------------------------------------------------------------------------
+  # Idle timeout resolution
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Resolves the effective idle timeout from the `cli_idle_timeout_ms` setting
+  and the `:idle_timeout_ms` caller opt.
+
+  `fallback_ms` is used when both the setting and the opt are absent or invalid.
+  Pass `:infinity` to disable idle timeouts by default.
+  """
+  @spec resolve_idle_timeout(keyword(), pos_integer() | :infinity) :: pos_integer() | :infinity
+  def resolve_idle_timeout(opts, fallback_ms) do
+    default_timeout = resolve_default_timeout(fallback_ms)
+    resolve_opt_timeout(Keyword.get(opts, :idle_timeout_ms, default_timeout), default_timeout)
+  end
+
+  defp resolve_default_timeout(fallback_ms) do
+    case EyeInTheSky.Settings.get_integer("cli_idle_timeout_ms") do
+      0 -> :infinity
+      n when is_integer(n) and n > 0 -> n
+      _ -> fallback_ms
+    end
+  end
+
+  defp resolve_opt_timeout(opt_value, default_timeout) do
+    case opt_value do
+      0 -> :infinity
+      n when is_integer(n) and n > 0 -> n
+      :infinity -> :infinity
+      _ -> default_timeout
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Environment helpers
   # ---------------------------------------------------------------------------
 

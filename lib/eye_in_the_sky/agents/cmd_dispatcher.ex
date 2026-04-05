@@ -105,21 +105,24 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
 
   defp dispatch(@cmd_prefix <> rest, from_session_id) do
     case String.split(String.trim(rest), " ", parts: 2) do
-      ["dm", args]      -> DmHandler.dispatch(args, from_session_id)
-      ["task", args]    -> TaskHandler.dispatch(args, from_session_id)
-      ["note", args]    -> dispatch_note(args, from_session_id)
-      ["commit", hash]  -> dispatch_commit(String.trim(hash), from_session_id)
-      ["spawn", args]   -> dispatch_spawn(args, from_session_id)
-      ["teams", args]   -> TeamsHandler.dispatch_teams(args, from_session_id)
-      ["team", args]    -> TeamsHandler.dispatch_team(args, from_session_id)
-      ["channel", args] -> dispatch_channel(args, from_session_id)
-      [unknown]         -> notify_error(from_session_id, unknown, :unknown_command)
-      _                 -> notify_error(from_session_id, rest, :unknown_command)
+      [cmd, args] -> route_cmd(cmd, args, from_session_id)
+      [unknown] -> notify_error(from_session_id, unknown, :unknown_command)
+      _ -> notify_error(from_session_id, rest, :unknown_command)
     end
   end
 
   defp dispatch(line, from_session_id),
     do: notify_error(from_session_id, "parse", {:malformed_line, line})
+
+  defp route_cmd("dm", args, sid), do: DmHandler.dispatch(args, sid)
+  defp route_cmd("task", args, sid), do: TaskHandler.dispatch(args, sid)
+  defp route_cmd("note", args, sid), do: dispatch_note(args, sid)
+  defp route_cmd("commit", hash, sid), do: dispatch_commit(String.trim(hash), sid)
+  defp route_cmd("spawn", args, sid), do: dispatch_spawn(args, sid)
+  defp route_cmd("teams", args, sid), do: TeamsHandler.dispatch_teams(args, sid)
+  defp route_cmd("team", args, sid), do: TeamsHandler.dispatch_team(args, sid)
+  defp route_cmd("channel", args, sid), do: dispatch_channel(args, sid)
+  defp route_cmd(unknown, _args, sid), do: notify_error(sid, unknown, :unknown_command)
 
   # ---------------------------------------------------------------------------
   # note
@@ -168,32 +171,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
     case extract_flag(args, "--instructions") do
       {:ok, instructions} ->
         session = get_session!(from_session_id)
-
-        description =
-          case extract_flag(args, "--description") do
-            {:ok, d} -> d
-            _ -> "Spawned by session #{from_session_id}"
-          end
-
-        opts =
-          [
-            instructions: instructions,
-            description: description,
-            project_id: session && session.project_id,
-            project_path: session && session.git_worktree_path
-          ]
-          |> put_optional_flag(args, "--model", :model)
-          |> put_optional_flag(args, "--worktree", :worktree)
-          |> put_optional_flag(args, "--effort-level", :effort_level)
-          |> put_optional_flag(args, "--team-name", :team_name)
-          |> put_optional_flag(args, "--member-name", :member_name)
-          |> put_optional_flag(args, "--agent", :agent)
-          |> put_optional_flag(args, "--provider", :agent_type)
-
-        opts =
-          if String.contains?(args, "--yolo"),
-            do: Keyword.put(opts, :bypass_sandbox, true),
-            else: opts
+        opts = build_spawn_opts(args, session, instructions, from_session_id)
 
         case AgentManager.create_agent(opts) do
           {:ok, %{agent: agent, session: new_session}} ->
@@ -209,6 +187,33 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
       err ->
         notify_error(from_session_id, "spawn (missing --instructions)", err)
     end
+  end
+
+  defp build_spawn_opts(args, session, instructions, from_session_id) do
+    description =
+      case extract_flag(args, "--description") do
+        {:ok, d} -> d
+        _ -> "Spawned by session #{from_session_id}"
+      end
+
+    [
+      instructions: instructions,
+      description: description,
+      project_id: session && session.project_id,
+      project_path: session && session.git_worktree_path
+    ]
+    |> put_optional_flag(args, "--model", :model)
+    |> put_optional_flag(args, "--worktree", :worktree)
+    |> put_optional_flag(args, "--effort-level", :effort_level)
+    |> put_optional_flag(args, "--team-name", :team_name)
+    |> put_optional_flag(args, "--member-name", :member_name)
+    |> put_optional_flag(args, "--agent", :agent)
+    |> put_optional_flag(args, "--provider", :agent_type)
+    |> then(fn opts ->
+      if String.contains?(args, "--yolo"),
+        do: Keyword.put(opts, :bypass_sandbox, true),
+        else: opts
+    end)
   end
 
   # ---------------------------------------------------------------------------

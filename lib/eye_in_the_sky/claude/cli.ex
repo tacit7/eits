@@ -476,23 +476,8 @@ defmodule EyeInTheSky.Claude.CLI do
   end
 
   # Resolves the idle timeout from settings and caller opts.
-  # A raw_timeout of 0 or an invalid value falls back to @fallback_idle_timeout_ms.
   defp resolve_idle_timeout(opts) do
-    raw_timeout = EyeInTheSky.Settings.get_integer("cli_idle_timeout_ms")
-
-    default_timeout =
-      case raw_timeout do
-        0 -> :infinity
-        n when is_integer(n) and n > 0 -> n
-        _ -> @fallback_idle_timeout_ms
-      end
-
-    case Keyword.get(opts, :idle_timeout_ms, default_timeout) do
-      0 -> :infinity
-      n when is_integer(n) and n > 0 -> n
-      :infinity -> :infinity
-      _ -> default_timeout
-    end
+    EyeInTheSky.CLI.Port.resolve_idle_timeout(opts, @fallback_idle_timeout_ms)
   end
 
   # Opens a port using the `script` wrapper for interactive sessions.

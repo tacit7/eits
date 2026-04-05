@@ -1,34 +1,25 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Config do
   use EyeInTheSkyWeb, :live_view
 
-  import EyeInTheSkyWeb.Helpers.FileHelpers,
-    only: [path_within?: 2, detect_file_type: 1, format_size: 1, cm_language: 1]
-  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+  import EyeInTheSkyWeb.Helpers.FileHelpers, only: [detect_file_type: 1]
+  import EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers
 
-  alias EyeInTheSky.ProjectFiles
   alias EyeInTheSky.Projects
-  alias EyeInTheSkyWeb.Helpers.ViewHelpers
+  alias EyeInTheSky.Repo
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    project_id = parse_int(id)
-
-    socket =
-      socket
-      |> assign(:selected_file, nil)
-      |> assign(:selected_file_path, nil)
-      |> assign(:file_content, nil)
-      |> assign(:file_type, nil)
-      |> assign(:entries, [])
-      |> assign(:files, [])
-      |> assign(:current_path, nil)
-      |> assign(:view_mode, :tree)
-      |> assign(:error, nil)
+    project_id =
+      case Integer.parse(id) do
+        {int, ""} -> int
+        _ -> nil
+      end
 
     socket =
       if project_id do
         project =
-          Projects.get_project_with_agents!(project_id)
+          Projects.get_project!(project_id)
+          |> Repo.preload([:agents])
 
         claude_dir = if project.path, do: Path.join(project.path, ".claude"), else: nil
 
@@ -38,11 +29,29 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
         |> assign(:sidebar_tab, :config)
         |> assign(:sidebar_project, project)
         |> assign(:claude_dir, claude_dir)
+        |> assign(:selected_file, nil)
+        |> assign(:selected_file_path, nil)
+        |> assign(:file_content, nil)
+        |> assign(:file_type, nil)
+        |> assign(:entries, [])
+        |> assign(:files, [])
+        |> assign(:current_path, nil)
+        |> assign(:view_mode, :tree)
+        |> assign(:error, nil)
       else
         socket
         |> assign(:page_title, "Project Not Found")
         |> assign(:project, nil)
         |> assign(:claude_dir, nil)
+        |> assign(:selected_file, nil)
+        |> assign(:selected_file_path, nil)
+        |> assign(:file_content, nil)
+        |> assign(:file_type, nil)
+        |> assign(:entries, [])
+        |> assign(:files, [])
+        |> assign(:current_path, nil)
+        |> assign(:view_mode, :tree)
+        |> assign(:error, nil)
         |> put_flash(:error, "Invalid project ID")
       end
 
@@ -69,7 +78,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
 
         entries =
           if claude_dir && File.dir?(claude_dir),
-            do: ProjectFiles.scan_directory(claude_dir, claude_dir, 0),
+            do: scan_directory(claude_dir, claude_dir, 0),
             else: []
 
         {:noreply, assign(socket, :entries, entries)}
@@ -80,11 +89,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   def handle_event("view_file", %{"path" => path}, socket) do
     claude_dir = socket.assigns.claude_dir
 
-    if claude_dir && path_within?(path, claude_dir) do
+    if claude_dir && String.starts_with?(path, claude_dir) do
       content =
-        case ProjectFiles.read_file(path) do
+        case File.read(path) do
           {:ok, data} -> data
-          {:too_large, _} -> "Error: file too large to display"
           {:error, _} -> "Error: could not read file"
         end
 
@@ -104,12 +112,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
 
   @impl true
   def handle_event("close_viewer", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:selected_file, nil)
-     |> assign(:selected_file_path, nil)
-     |> assign(:file_content, nil)
-     |> assign(:file_type, nil)}
+    {:noreply, clear_file_assigns(socket)}
   end
 
   @impl true
@@ -117,26 +120,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
     path = socket.assigns.selected_file_path
     claude_dir = socket.assigns.claude_dir
 
-    if path && claude_dir && path_within?(path, claude_dir) && File.exists?(path) do
-      ViewHelpers.open_in_system(path)
+    if path && claude_dir && String.starts_with?(path, claude_dir) && File.exists?(path) do
+      EyeInTheSkyWeb.Helpers.ViewHelpers.open_in_system(path)
     end
 
     {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("file_changed", %{"content" => content}, socket) do
-    path = socket.assigns.selected_file_path
-    claude_dir = socket.assigns.claude_dir
-
-    if path && claude_dir && path_within?(path, claude_dir) do
-      case ProjectFiles.write_file(path, content) do
-        :ok -> {:noreply, put_flash(socket, :info, "Saved")}
-        {:error, reason} -> {:noreply, put_flash(socket, :error, "Save failed: #{reason}")}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "Access denied")}
-    end
   end
 
   @impl true
@@ -160,78 +148,139 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   defp load_list_path(socket, path) do
     claude_dir = socket.assigns.claude_dir
 
-    if claude_dir && File.dir?(claude_dir) do
-      case resolve_list_target(claude_dir, path) do
-        {:error, msg} -> assign(socket, :error, msg)
-        {:ok, full_path, rel_path} -> dispatch_config_path(socket, full_path, rel_path, path)
-      end
-    else
+    unless claude_dir && File.dir?(claude_dir) do
       assign(socket, :error, "No .claude directory found")
-    end
-  end
-
-  defp dispatch_config_path(socket, full_path, rel_path, path) do
-    cond do
-      File.dir?(full_path) -> list_directory(socket, full_path, rel_path)
-      File.regular?(full_path) -> read_file_for_display(socket, full_path, rel_path)
-      true -> assign(socket, :error, "Path not found: #{path}")
-    end
-  end
-
-  defp resolve_list_target(claude_dir, path) do
-    if path && path != "" do
-      full = Path.join(claude_dir, path)
-
-      if path_within?(full, claude_dir),
-        do: {:ok, full, path},
-        else: {:error, "Access denied"}
     else
-      {:ok, claude_dir, nil}
+      target =
+        if path && path != "" do
+          full = Path.join(claude_dir, path)
+          expanded_base = Path.expand(claude_dir)
+          expanded_full = Path.expand(full)
+
+          if String.starts_with?(expanded_full, expanded_base),
+            do: {:ok, full, path},
+            else: {:error, "Access denied"}
+        else
+          {:ok, claude_dir, nil}
+        end
+
+      case target do
+        {:error, msg} ->
+          assign(socket, :error, msg)
+
+        {:ok, full_path, rel_path} ->
+          cond do
+            File.dir?(full_path) ->
+              case File.ls(full_path) do
+                {:ok, items} ->
+                  file_list =
+                    items
+                    |> Enum.sort()
+                    |> Enum.map(fn item ->
+                      item_path = Path.join(full_path, item)
+                      rel = if rel_path, do: Path.join(rel_path, item), else: item
+
+                      size =
+                        case File.stat(item_path) do
+                          {:ok, %{size: s}} -> s
+                          _ -> 0
+                        end
+
+                      %{name: item, path: rel, is_dir: File.dir?(item_path), size: size}
+                    end)
+                    |> Enum.sort_by(&{!&1.is_dir, &1.name})
+
+                  socket
+                  |> assign(:files, file_list)
+                  |> assign(:current_path, rel_path)
+                  |> assign(:file_content, nil)
+                  |> assign(:selected_file, nil)
+                  |> assign(:selected_file_path, nil)
+                  |> assign(:file_type, nil)
+                  |> assign(:error, nil)
+
+                {:error, reason} ->
+                  assign(socket, :error, "Failed to read directory: #{reason}")
+              end
+
+            File.regular?(full_path) ->
+              case read_file_safe(full_path) do
+                {:ok, content} ->
+                  socket
+                  |> assign(:current_path, rel_path)
+                  |> assign(:file_content, content)
+                  |> assign(:selected_file, rel_path)
+                  |> assign(:selected_file_path, full_path)
+                  |> assign(:file_type, detect_file_type(full_path))
+                  |> assign(:files, [])
+                  |> assign(:error, nil)
+
+                {:too_large} ->
+                  socket
+                  |> assign(:current_path, rel_path)
+                  |> assign(:file_content, nil)
+                  |> assign(:files, [])
+                  |> assign(:error, "File too large to display (over 1 MB)")
+
+                {:error, reason} ->
+                  assign(socket, :error, "Failed to read file: #{reason}")
+              end
+
+            true ->
+              assign(socket, :error, "Path not found: #{path}")
+          end
+      end
     end
   end
 
-  defp list_directory(socket, full_path, rel_path) do
-    case ProjectFiles.list_directory_entries(full_path, rel_path) do
-      {:ok, entries} ->
-        socket
-        |> assign(:files, entries)
-        |> assign(:current_path, rel_path)
-        |> assign(:file_content, nil)
-        |> assign(:selected_file, nil)
-        |> assign(:selected_file_path, nil)
-        |> assign(:file_type, nil)
-        |> assign(:error, nil)
+  @max_tree_depth 2
 
-      {:error, reason} ->
-        assign(socket, :error, "Failed to read directory: #{reason}")
+  defp scan_directory(base_dir, current_dir, depth) do
+    case File.ls(current_dir) do
+      {:ok, items} ->
+        items
+        |> Enum.reject(&String.starts_with?(&1, "."))
+        |> Enum.sort()
+        |> Enum.map(fn item ->
+          full = Path.join(current_dir, item)
+          relative = Path.relative_to(full, base_dir)
+          is_dir = File.dir?(full)
+
+          if is_dir do
+            children =
+              if depth < @max_tree_depth,
+                do: scan_directory(base_dir, full, depth + 1),
+                else: []
+
+            %{name: item, path: full, relative: relative, is_dir: true, children: children}
+          else
+            size =
+              case File.stat(full) do
+                {:ok, %{size: s}} -> s
+                _ -> 0
+              end
+
+            %{name: item, path: full, relative: relative, is_dir: false, size: size}
+          end
+        end)
+        |> Enum.sort_by(&{!&1.is_dir, &1.name})
+
+      _ ->
+        []
     end
   end
 
-  defp read_file_for_display(socket, full_path, rel_path) do
-    case ProjectFiles.read_file(full_path) do
-      {:ok, content} ->
-        file_type = detect_file_type(full_path)
+  defp format_size(bytes) when is_integer(bytes) and bytes < 1024, do: "#{bytes} B"
+  defp format_size(bytes) when is_integer(bytes), do: "#{Float.round(bytes / 1024, 1)} KB"
+  defp format_size(_), do: ""
 
-        socket
-        |> assign(:current_path, rel_path)
-        |> assign(:file_content, content)
-        |> assign(:selected_file, rel_path)
-        |> assign(:selected_file_path, full_path)
-        |> assign(:file_type, file_type)
-        |> assign(:files, [])
-        |> assign(:error, nil)
-
-      {:too_large, _size} ->
-        socket
-        |> assign(:current_path, rel_path)
-        |> assign(:file_content, nil)
-        |> assign(:files, [])
-        |> assign(:error, "File too large to display (over 1 MB)")
-
-      {:error, reason} ->
-        assign(socket, :error, "Failed to read file: #{reason}")
-    end
-  end
+  defp language_class(:markdown), do: "markdown"
+  defp language_class(:json), do: "json"
+  defp language_class(:elixir), do: "elixir"
+  defp language_class(:bash), do: "bash"
+  defp language_class(:yaml), do: "yaml"
+  defp language_class(:toml), do: "toml"
+  defp language_class(_), do: "plaintext"
 
   # ── Tree-mode sidebar components ─────────────────────────────────────────────
 
@@ -347,13 +396,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
                         >
                         </div>
                       <% else %>
-                        <div
-                          id={"codemirror-#{Base.encode16(:crypto.hash(:md5, @selected_file), case: :lower)}"}
-                          phx-hook="CodeMirror"
-                          data-content={Base.encode64(@file_content)}
-                          data-lang={cm_language(@file_type)}
-                          class="min-h-[300px]"
-                        />
+                        <pre class="p-4 text-xs font-mono text-base-content whitespace-pre-wrap break-all"><code class={"language-#{language_class(@file_type)}"}>{@file_content}</code></pre>
                       <% end %>
                     </div>
                   </div>
@@ -415,7 +458,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
                     <.icon name="hero-pencil-square" class="w-4 h-4" /> Edit
                   </button>
                 </div>
-                <div class="rounded-lg overflow-hidden">
+                <div class="bg-base-200 rounded-lg overflow-x-auto">
                   <%= if @file_type == :markdown do %>
                     <div
                       id="config-viewer-list"
@@ -425,13 +468,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
                     >
                     </div>
                   <% else %>
-                    <div
-                      id={"codemirror-list-#{Base.encode16(:crypto.hash(:md5, @current_path), case: :lower)}"}
-                      phx-hook="CodeMirror"
-                      data-content={Base.encode64(@file_content)}
-                      data-lang={cm_language(@file_type)}
-                      class="min-h-[300px]"
-                    />
+                    <pre class="text-sm p-4"><code id="code-viewer" class={"language-#{language_class(@file_type)}"} phx-hook="Highlight"><%= @file_content %></code></pre>
                   <% end %>
                 </div>
               </div>

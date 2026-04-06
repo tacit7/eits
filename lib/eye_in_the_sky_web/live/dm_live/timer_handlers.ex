@@ -15,10 +15,13 @@ defmodule EyeInTheSkyWeb.DmLive.TimerHandlers do
     "1h" => 60 * 60 * 1_000
   }
 
-  def handle_schedule_timer(%{"mode" => mode, "preset" => preset}, socket) do
+  def handle_schedule_timer(%{"mode" => mode, "preset" => preset} = params, socket) do
     session_id = socket.assigns.session_id
     interval_ms = Map.get(@presets_ms, preset, 15 * 60 * 1_000)
-    message = OrchestratorTimers.default_message()
+    message = case Map.get(params, "message", "") do
+      "" -> OrchestratorTimers.default_message()
+      m -> String.trim(m)
+    end
 
     case mode do
       "once" -> OrchestratorTimers.schedule_once(session_id, interval_ms, message)

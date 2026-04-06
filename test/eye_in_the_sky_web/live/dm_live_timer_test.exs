@@ -60,6 +60,8 @@ defmodule EyeInTheSkyWeb.DmLive.TimerTest do
 
     html = render(view)
     refute html =~ "Cancel Schedule"
+  after
+    OrchestratorTimers.cancel(session.id)
   end
 
   test "active timer badge shown after remount", %{conn: conn, session: session} do

@@ -217,10 +217,13 @@ defmodule EyeInTheSky.Notes do
   end
 
   @doc """
-  Gets a single note. Returns nil if not found.
+  Gets a single note. Returns {:ok, note} if found, {:error, :not_found} otherwise.
   """
   def get_note(id) do
-    Repo.get(Note, id)
+    case Repo.get(Note, id) do
+      nil -> {:error, :not_found}
+      note -> {:ok, note}
+    end
   end
 
   @doc """

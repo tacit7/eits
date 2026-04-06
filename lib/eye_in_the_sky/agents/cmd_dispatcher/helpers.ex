@@ -3,8 +3,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.Helpers do
   Shared helpers for CmdDispatcher subcommand handlers.
 
   Provides notify_success/2, notify_error/3, extract_flag/2, get_session!/1,
-  put_optional_flag/4, and with_task/3 — a common wrapper that eliminates the
-  repeated `rescue Ecto.NoResultsError` pattern across task subcommands.
+  put_optional_flag/4, and with_task/4 — a common wrapper that handles task
+  lookup with proper tagged-tuple error handling.
   """
 
   require Logger
@@ -51,8 +51,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.Helpers do
   end
 
   @doc """
-  Wraps a task lookup + execution, converting Ecto.NoResultsError into
-  a notify_error call. Eliminates the repeated rescue block pattern.
+  Wraps a task lookup + execution, handling {:error, :not_found} from
+  Tasks.get_task/1 with a notify_error call.
 
   Usage:
       with_task(id_str, from_session_id, "task done", fn id, task ->
@@ -66,11 +66,11 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.Helpers do
         notify_error(from_session_id, cmd, {:invalid_id, id_str})
 
       id ->
-        task = EyeInTheSky.Tasks.get_task!(id)
-        fun.(id, task)
+        case EyeInTheSky.Tasks.get_task(id) do
+          {:ok, task} -> fun.(id, task)
+          {:error, :not_found} -> notify_error(from_session_id, cmd, :not_found)
+        end
     end
-  rescue
-    Ecto.NoResultsError -> notify_error(from_session_id, cmd, :not_found)
   end
 
   @doc """

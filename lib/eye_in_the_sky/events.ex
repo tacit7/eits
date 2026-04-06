@@ -24,7 +24,7 @@ defmodule EyeInTheSky.Events do
   | `"scheduled_jobs"`             | JobsLive                          |
   | `"session_lifecycle"`          | Teams.Subscriber                  |
   | `"projects"`                   | Sidebar                           |
-  | `"session:<id>:timer"`          | DMLive                            |
+  | `"session:<id>:timer"`         | DMLive                            |
 
   ## Note on payload shape inconsistency
 
@@ -60,6 +60,9 @@ defmodule EyeInTheSky.Events do
 
   @doc "Subscribe to session status string changes."
   def subscribe_session_status(session_id), do: sub("session:#{session_id}:status")
+
+  @doc "Subscribe to orchestrator timer events for a session."
+  def subscribe_session_timer(session_id), do: sub("session:#{session_id}:timer")
 
   @doc "Subscribe to real-time stream deltas for a session."
   def subscribe_dm_stream(session_id), do: sub("dm:#{session_id}:stream")
@@ -293,9 +296,6 @@ defmodule EyeInTheSky.Events do
 
   @doc "Unsubscribe from session status events."
   def unsubscribe_session_status(session_id), do: unsub("session:#{session_id}:status")
-
-  @doc "Subscribe to orchestrator timer events for a session."
-  def subscribe_session_timer(session_id), do: sub("session:#{session_id}:timer")
 
   # ---------------------------------------------------------------------------
   # Orchestrator timer events — topic: "session:<session_id>:timer"

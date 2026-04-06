@@ -38,15 +38,17 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
   end
 
   @impl true
-  def update(%{notification_count: :refresh}, socket) do
-    {:ok, assign(socket, :notification_count, Notifications.unread_count())}
-  end
+  def update(%{notification_count: :refresh} = _assigns, socket), do: refresh_notification_count(socket)
+  def update(%{refresh_projects: true} = _assigns, socket), do: refresh_projects(socket)
+  def update(assigns, socket), do: update_sidebar_state(assigns, socket)
 
-  def update(%{refresh_projects: true}, socket) do
-    {:ok, assign(socket, :projects, Projects.list_projects_for_sidebar())}
-  end
+  defp refresh_notification_count(socket),
+    do: {:ok, assign(socket, :notification_count, Notifications.unread_count())}
 
-  def update(assigns, socket) do
+  defp refresh_projects(socket),
+    do: {:ok, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+
+  defp update_sidebar_state(assigns, socket) do
     # Parent sets sidebar_project when on a project route; otherwise nil.
     # Prefer the parent value when present; keep the locally-pinned project
     # (set via select_project click) when the parent has none.
@@ -64,9 +66,9 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
      |> assign(:active_channel_id, assigns[:active_channel_id])
      |> assign(:expanded_chat, expanded_chat)
      |> assign(:mobile_open, false)
-     |> assign(:expanded_all_projects, socket.assigns[:expanded_all_projects] != false)
-     |> assign(:expanded_projects, socket.assigns[:expanded_projects] != false)
-     |> assign(:expanded_system, socket.assigns[:expanded_system] != false)}
+     |> assign(:expanded_all_projects, Map.get(socket.assigns, :expanded_all_projects, true))
+     |> assign(:expanded_projects, Map.get(socket.assigns, :expanded_projects, true))
+     |> assign(:expanded_system, Map.get(socket.assigns, :expanded_system, true))}
   end
 
   # --- Navigation ---

@@ -15,6 +15,7 @@ defmodule EyeInTheSky.OrchestratorTimers.Server do
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Events
+  alias EyeInTheSky.OrchestratorTimers.Timer
 
   def start_link(opts \\ []) do
     name = Keyword.get(opts, :name, __MODULE__)
@@ -28,54 +29,14 @@ defmodule EyeInTheSky.OrchestratorTimers.Server do
 
   @impl GenServer
   def handle_call({:schedule_once, session_id, delay_ms, message}, _from, state) do
-    result = if Map.has_key?(state, session_id), do: {:ok, :replaced}, else: {:ok, :scheduled}
-    state = cancel_existing(state, session_id)
-
-    token = make_ref()
-    timer_ref = Process.send_after(self(), {:fire_timer, session_id, token}, delay_ms)
-    now = DateTime.utc_now()
-
-    record = %{
-      token: token,
-      timer_ref: timer_ref,
-      mode: :once,
-      interval_ms: delay_ms,
-      message: message,
-      started_at: now,
-      next_fire_at: DateTime.add(now, delay_ms, :millisecond)
-    }
-
-    label = if result == {:ok, :replaced}, do: "replaced", else: "scheduled"
-    Logger.info("[OrchestratorTimers] #{label} once session=#{session_id} delay_ms=#{delay_ms} next_fire_at=#{record.next_fire_at}")
-
-    Events.timer_scheduled(session_id, record)
-    {:reply, result, Map.put(state, session_id, record)}
+    {result, new_state} = build_and_store_timer(session_id, :once, delay_ms, message, state)
+    {:reply, result, new_state}
   end
 
   @impl GenServer
   def handle_call({:schedule_repeating, session_id, interval_ms, message}, _from, state) do
-    result = if Map.has_key?(state, session_id), do: {:ok, :replaced}, else: {:ok, :scheduled}
-    state = cancel_existing(state, session_id)
-
-    token = make_ref()
-    timer_ref = Process.send_after(self(), {:fire_timer, session_id, token}, interval_ms)
-    now = DateTime.utc_now()
-
-    record = %{
-      token: token,
-      timer_ref: timer_ref,
-      mode: :repeating,
-      interval_ms: interval_ms,
-      message: message,
-      started_at: now,
-      next_fire_at: DateTime.add(now, interval_ms, :millisecond)
-    }
-
-    label = if result == {:ok, :replaced}, do: "replaced", else: "scheduled"
-    Logger.info("[OrchestratorTimers] #{label} repeating session=#{session_id} interval_ms=#{interval_ms} next_fire_at=#{record.next_fire_at}")
-
-    Events.timer_scheduled(session_id, record)
-    {:reply, result, Map.put(state, session_id, record)}
+    {result, new_state} = build_and_store_timer(session_id, :repeating, interval_ms, message, state)
+    {:reply, result, new_state}
   end
 
   @impl GenServer
@@ -105,7 +66,7 @@ defmodule EyeInTheSky.OrchestratorTimers.Server do
   @impl GenServer
   def handle_info({:fire_timer, session_id, token}, state) do
     case Map.get(state, session_id) do
-      %{token: ^token} = record ->
+      %Timer{token: ^token} = record ->
         do_fire(session_id, record, state)
 
       nil ->
@@ -119,19 +80,35 @@ defmodule EyeInTheSky.OrchestratorTimers.Server do
     end
   end
 
-  defp do_fire(session_id, record, state) do
+  defp build_and_store_timer(session_id, mode, interval_ms, message, state) do
+    result = if Map.has_key?(state, session_id), do: {:ok, :replaced}, else: {:ok, :scheduled}
+    state = cancel_existing(state, session_id)
+
+    token = make_ref()
+    timer_ref = Process.send_after(self(), {:fire_timer, session_id, token}, interval_ms)
+    now = DateTime.utc_now()
+
+    record = %Timer{
+      token: token,
+      timer_ref: timer_ref,
+      mode: mode,
+      interval_ms: interval_ms,
+      message: message,
+      started_at: now,
+      next_fire_at: DateTime.add(now, interval_ms, :millisecond)
+    }
+
+    label = if result == {:ok, :replaced}, do: "replaced", else: "scheduled"
+    Logger.info("[OrchestratorTimers] #{label} #{mode} session=#{session_id} interval_ms=#{interval_ms} next_fire_at=#{record.next_fire_at}")
+
+    Events.timer_scheduled(session_id, record)
+    {result, Map.put(state, session_id, record)}
+  end
+
+  defp do_fire(session_id, %Timer{} = record, state) do
     Logger.info("[OrchestratorTimers] timer fired session=#{session_id} mode=#{record.mode}")
 
-    result =
-      try do
-        AgentManager.send_message(session_id, record.message, [])
-      rescue
-        e -> {:error, e}
-      catch
-        kind, val -> {:error, {kind, val}}
-      end
-
-    case result do
+    case AgentManager.send_message(session_id, record.message, []) do
       {:ok, _} ->
         Logger.debug("[OrchestratorTimers] delivery succeeded session=#{session_id}")
 
@@ -149,7 +126,7 @@ defmodule EyeInTheSky.OrchestratorTimers.Server do
         timer_ref = Process.send_after(self(), {:fire_timer, session_id, token}, record.interval_ms)
         now = DateTime.utc_now()
 
-        new_record = %{
+        new_record = %Timer{
           record
           | token: token,
             timer_ref: timer_ref,
@@ -166,7 +143,7 @@ defmodule EyeInTheSky.OrchestratorTimers.Server do
       nil ->
         state
 
-      %{timer_ref: ref} ->
+      %Timer{timer_ref: ref} ->
         Process.cancel_timer(ref)
         Map.delete(state, session_id)
     end

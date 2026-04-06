@@ -18,7 +18,12 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
 
   def kanban_card(assigns) do
     aging = card_aging_indicator(Map.get(assigns.task, :updated_at))
-    assigns = assign(assigns, :aging, aging)
+    task_id = assigns.task.uuid || to_string(assigns.task.id)
+
+    assigns =
+      assigns
+      |> assign(:aging, aging)
+      |> assign(:task_id, task_id)
 
     ~H"""
     <div class={["group/card card bg-base-200 hover:bg-base-300 border border-base-content/8 transition-all cursor-pointer", @aging && elem(@aging, 0)]} {@rest}>
@@ -28,6 +33,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
       <div class="card-body p-2">
         <.kanban_card_content
           task={@task}
+          task_id={@task_id}
           on_click={@on_click}
           on_delete={@on_delete}
           aging={@aging}
@@ -40,11 +46,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
   end
 
   defp kanban_card_content(assigns) do
-    dm_session =
-      case assigns.task do
-        %{sessions: [s | _]} -> s
-        _ -> nil
-      end
+    dm_session = resolve_dm_session(assigns.task)
 
     assigns =
       assigns
@@ -65,7 +67,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
       <button
         type="button"
         phx-click="toggle_task_complete"
-        phx-value-task_id={@task.uuid || to_string(@task.id)}
+        phx-value-task_id={@task_id}
         aria-label={if @task.completed_at, do: "Mark task incomplete", else: "Mark task complete"}
         aria-pressed={to_string(!is_nil(@task.completed_at))}
         class="flex-shrink-0 mt-0.5 flex items-center justify-center min-w-[28px] min-h-[28px] rounded text-base-content/30 hover:text-success transition-colors"
@@ -82,11 +84,11 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
           !@task.completed_at && "text-base-content"
         ]}
         phx-click={@on_click}
-        phx-value-task_id={@task.uuid || to_string(@task.id)}
+        phx-value-task_id={@task_id}
       >
         {@task.title}
       </h4>
-      <.kanban_context_menu task={@task} on_click={@on_click} on_delete={@on_delete} workflow_states={@workflow_states} />
+      <.kanban_context_menu task={@task} task_id={@task_id} on_click={@on_click} on_delete={@on_delete} workflow_states={@workflow_states} />
     </div>
 
     <%!-- Tags --%>
@@ -119,7 +121,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
           <button
             type="button"
             phx-click={@on_click}
-            phx-value-task_id={@task.uuid || to_string(@task.id)}
+            phx-value-task_id={@task_id}
             class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
           >
             <.icon name="hero-rectangle-stack-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
@@ -129,7 +131,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
           <button
             type="button"
             phx-click="open_task_detail"
-            phx-value-task_id={@task.uuid || to_string(@task.id)}
+            phx-value-task_id={@task_id}
             phx-value-focus="tags"
             class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
           >
@@ -140,7 +142,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
           <button
             type="button"
             phx-click="open_date_picker"
-            phx-value-task_id={@task.uuid || to_string(@task.id)}
+            phx-value-task_id={@task_id}
             class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
           >
             <.icon name="hero-clock-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
@@ -151,7 +153,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             type="button"
             phx-hook="CopyToClipboard"
             id={"copy-task-kanban-#{@task.id}"}
-            data-copy={@task.uuid || to_string(@task.id)}
+            data-copy={@task_id}
             onclick="event.preventDefault();"
             class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
           >
@@ -172,7 +174,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
                   <button
                     type="button"
                     phx-click="move_task"
-                    phx-value-task_id={@task.uuid || to_string(@task.id)}
+                    phx-value-task_id={@task_id}
                     phx-value-state_id={state.id}
                     class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-base-content/80 hover:bg-base-content/10 transition-colors text-left"
                   >
@@ -192,7 +194,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             <button
               type="button"
               phx-click="archive_task"
-              phx-value-task_id={@task.uuid || to_string(@task.id)}
+              phx-value-task_id={@task_id}
               phx-confirm="Archive this task?"
               class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
             >
@@ -202,7 +204,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             <button
               type="button"
               phx-click={@on_delete}
-              phx-value-task_id={@task.uuid || to_string(@task.id)}
+              phx-value-task_id={@task_id}
               phx-confirm="Delete this task?"
               class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-error hover:bg-error/10 transition-colors text-left"
             >
@@ -303,4 +305,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
       true -> "transparent"
     end
   end
+
+  defp resolve_dm_session(%{sessions: [s | _]}), do: s
+  defp resolve_dm_session(_), do: nil
 end

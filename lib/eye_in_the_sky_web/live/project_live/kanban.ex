@@ -31,6 +31,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
         preload: [:agents]
       )
       |> init_assigns()
+      |> FilterHandlers.assign_filter_count()
 
     if socket.assigns.project do
       {:ok, KanbanFilters.load_tasks(socket)}
@@ -292,15 +293,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
       phx-hook="KanbanKeyboard"
       class="px-4 sm:px-6 py-6 h-[calc(100dvh-7rem)] md:h-[calc(100dvh-4rem)] flex flex-col"
     >
-      <% active_filter_count =
-        if(@filter_priority, do: 1, else: 0) + MapSet.size(@filter_tags) +
-          if(@filter_due_date, do: 1, else: 0) + if @filter_activity, do: 1, else: 0 %>
       <.kanban_toolbar
         project_id={@project.id}
         search_query={@search_query}
         show_completed={@show_completed}
         bulk_mode={@bulk_mode}
-        active_filter_count={active_filter_count}
+        active_filter_count={@active_filter_count}
       />
 
       <.kanban_bulk_bar

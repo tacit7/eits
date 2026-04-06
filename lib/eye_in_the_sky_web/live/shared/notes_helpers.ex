@@ -60,10 +60,10 @@ defmodule EyeInTheSkyWeb.Live.Shared.NotesHelpers do
     note_id = params["note_id"] || params["note-id"] || params["value"]
 
     case Notes.get_note(note_id) do
-      nil ->
+      {:error, :not_found} ->
         {:noreply, put_flash(socket, :error, "Note not found")}
 
-      note ->
+      {:ok, note} ->
         case Notes.delete_note(note) do
           {:ok, _} ->
             {:noreply, reload_fn.(socket)}

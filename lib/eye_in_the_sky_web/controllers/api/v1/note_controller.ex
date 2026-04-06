@@ -36,10 +36,10 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
   """
   def show(conn, %{"id" => note_id}) do
     case Notes.get_note(note_id) do
-      nil ->
+      {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "Note not found"})
 
-      note ->
+      {:ok, note} ->
         json(conn, %{
           note_id: to_string(note.id),
           parent_id: note.parent_id,
@@ -96,10 +96,10 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
   """
   def update(conn, %{"id" => note_id} = params) do
     case Notes.get_note(note_id) do
-      nil ->
+      {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "Note not found"})
 
-      note ->
+      {:ok, note} ->
         attrs =
           %{}
           |> Helpers.maybe_put(:body, params["body"])

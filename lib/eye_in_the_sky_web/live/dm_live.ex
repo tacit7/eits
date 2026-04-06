@@ -26,7 +26,7 @@ defmodule EyeInTheSkyWeb.DmLive do
 
     with {:session, {:ok, session}} <- {:session, session_result},
          {:agent, {:ok, agent}} <- {:agent, Agents.get_agent(session.agent_id)} do
-      MountState.maybe_subscribe(socket, session.id)
+      MountState.maybe_subscribe(connected?(socket), session.id)
 
       socket =
         socket

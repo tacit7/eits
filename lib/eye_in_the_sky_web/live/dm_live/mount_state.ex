@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
   @moduledoc false
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [allow_upload: 3, connected?: 1]
+  import Phoenix.LiveView, only: [allow_upload: 3]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Claude.AgentWorker
@@ -14,8 +14,8 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
 
   @default_message_limit 20
 
-  def maybe_subscribe(socket, session_id) do
-    if connected?(socket), do: setup_subscriptions(session_id)
+  def maybe_subscribe(is_connected, session_id) do
+    if is_connected, do: setup_subscriptions(session_id), else: :ok
   end
 
   def setup_subscriptions(session_id) do
@@ -74,7 +74,6 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:stream_tool, nil)
     |> assign(:stream_thinking, nil)
     |> assign(:slash_items, SlashItems.build())
-    |> assign(:session_cli_opts, [])
     |> assign(:diff_cache, %{})
     |> assign(:selected_task, nil)
     |> assign(:task_notes, [])

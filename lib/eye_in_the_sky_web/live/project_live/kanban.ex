@@ -296,6 +296,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
         if(@filter_priority, do: 1, else: 0) + MapSet.size(@filter_tags) +
           if(@filter_due_date, do: 1, else: 0) + if @filter_activity, do: 1, else: 0 %>
       <.kanban_toolbar
+        project_id={@project.id}
         search_query={@search_query}
         show_completed={@show_completed}
         bulk_mode={@bulk_mode}

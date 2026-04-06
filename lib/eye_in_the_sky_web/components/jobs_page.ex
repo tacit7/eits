@@ -180,15 +180,13 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
 
   defp dispatch_event("run_now", %{"id" => id} = params, socket) do
     with {:ok, int_id} <- parse_job_id(id),
-         {:ok, job} <- ScheduledJobs.get_job(int_id) do
-      if socket.assigns.project_id && job.project_id != socket.assigns.project_id do
-        {:noreply, put_flash(socket, :error, "Access denied")}
-      else
-        handle_run_now(params, socket)
-      end
+         {:ok, job} <- ScheduledJobs.get_job(int_id),
+         :ok <- check_job_access(job, socket.assigns.project_id) do
+      handle_run_now(params, socket)
     else
       :error -> {:noreply, put_flash(socket, :error, "Invalid job ID")}
       {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Job not found")}
+      {:error, :access_denied} -> {:noreply, put_flash(socket, :error, "Access denied")}
     end
   end
 
@@ -261,6 +259,10 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
       |> assign(:last_failed_runs, load_last_failed_runs(all_jobs))
     end
   end
+
+  defp check_job_access(_job, nil), do: :ok
+  defp check_job_access(%{project_id: job_project_id}, project_id) when job_project_id != project_id, do: {:error, :access_denied}
+  defp check_job_access(_job, _project_id), do: :ok
 
   defp reload_jobs(socket) do
     project_id = socket.assigns.project_id

@@ -332,7 +332,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
       phx-target={@myself}
       data-section-toggle="overview"
       class={[
-        "flex items-center gap-2.5 w-full text-left text-sm transition-colors",
+        "flex items-center gap-2.5 w-full text-left text-sm transition-colors min-h-[44px]",
         if(@collapsed, do: "px-4 py-2 justify-center", else: "px-3 py-2"),
         if(overview_active,
           do: "text-base-content/80 hover:bg-base-content/5",
@@ -409,7 +409,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
           phx-click="toggle"
           phx-target="#canvas-overlay"
           class={[
-            "flex items-center gap-2 text-sm transition-colors w-full",
+            "flex items-center gap-2 text-sm transition-colors w-full min-h-[44px]",
             if(@collapsed, do: "px-4 py-2 justify-center", else: "pl-3 pr-3 py-2"),
             "text-base-content/50 hover:text-base-content/75 hover:bg-base-content/5"
           ]}
@@ -434,7 +434,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
     <.link
       navigate={@href}
       class={[
-        "flex items-center gap-2 text-sm transition-colors",
+        "flex items-center gap-2 text-sm transition-colors min-h-[44px]",
         if(@collapsed, do: "px-4 py-2 justify-center", else: "pl-3 pr-3 py-2"),
         if(@active,
           do: "text-primary bg-primary/5 font-medium",
@@ -459,7 +459,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
     <.link
       navigate={@href}
       class={[
-        "flex items-center gap-2 text-sm transition-colors",
+        "flex items-center gap-2 text-sm transition-colors min-h-[44px]",
         if(@collapsed, do: "px-4 py-2 justify-center", else: "pl-3 pr-3 py-2"),
         if(@active,
           do: "text-primary bg-primary/5 font-medium",
@@ -485,7 +485,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
     ~H"""
     <div class="flex items-center gap-0.5 rounded-full bg-base-content/5 p-0.5">
       <button
-        class="p-2.5 rounded-full hover:bg-base-content/10 transition-colors"
+        class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-base-content/10 transition-colors"
         phx-click={Phoenix.LiveView.JS.dispatch("phx:set-theme")}
         data-phx-theme="system"
         title="System theme"
@@ -493,7 +493,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
         <.icon name="hero-computer-desktop-micro" class="w-3.5 h-3.5 text-base-content/40" />
       </button>
       <button
-        class="p-2.5 rounded-full hover:bg-base-content/10 transition-colors"
+        class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-base-content/10 transition-colors"
         phx-click={Phoenix.LiveView.JS.dispatch("phx:set-theme")}
         data-phx-theme="light"
         title="Light theme"
@@ -501,7 +501,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
         <.icon name="hero-sun-micro" class="w-3.5 h-3.5 text-base-content/40" />
       </button>
       <button
-        class="p-2.5 rounded-full hover:bg-base-content/10 transition-colors"
+        class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-base-content/10 transition-colors"
         phx-click={Phoenix.LiveView.JS.dispatch("phx:set-theme")}
         data-phx-theme="dark"
         title="Dark theme"

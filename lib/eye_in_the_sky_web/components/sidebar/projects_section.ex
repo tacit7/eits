@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
         phx-click="toggle_projects"
         phx-target={@myself}
         data-section-toggle="projects"
-        class="flex items-center gap-2.5 flex-1 text-left text-sm text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5 transition-colors"
+        class="flex items-center gap-2.5 flex-1 text-left text-sm text-base-content/55 hover:text-base-content/80 hover:bg-base-content/5 transition-colors min-h-[44px]"
         title="Projects"
       >
         <%= if !@collapsed do %>
@@ -38,7 +38,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
         <button
           phx-click="show_new_project"
           phx-target={@myself}
-          class="flex-shrink-0 text-base-content/30 hover:text-base-content/60 transition-colors"
+          class="flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center text-base-content/30 hover:text-base-content/60 transition-colors"
           title="New Project"
         >
           <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
@@ -117,7 +117,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                 phx-value-project_id={project.id}
                 phx-target={@myself}
                 class={[
-                  "flex items-center gap-2 flex-1 min-w-0 text-sm py-1 transition-colors text-left",
+                  "flex items-center gap-2 flex-1 min-w-0 text-sm py-1 min-h-[44px] transition-colors text-left",
                   if(@collapsed, do: "px-4 justify-center", else: "pl-3"),
                   if(is_selected,
                     do: "text-primary font-semibold",
@@ -137,7 +137,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                 <div class="opacity-0 group-hover:opacity-100 flex-shrink-0 relative dropdown dropdown-end transition-all">
                   <button
                     tabindex="0"
-                    class="px-1 py-1 text-base-content/35 hover:text-base-content/70 transition-colors"
+                    class="min-h-[44px] min-w-[44px] flex items-center justify-center text-base-content/35 hover:text-base-content/70 transition-colors"
                     title="More options"
                   >
                     <.icon name="hero-ellipsis-horizontal-mini" class="w-3.5 h-3.5" />
@@ -190,7 +190,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                   phx-click="new_session"
                   phx-value-project_id={project.id}
                   phx-target={@myself}
-                  class="opacity-0 group-hover:opacity-100 flex-shrink-0 px-1 py-1 text-base-content/35 hover:text-primary transition-all"
+                  class="opacity-0 group-hover:opacity-100 flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center text-base-content/35 hover:text-primary transition-all"
                   title="New session"
                 >
                   <.icon name="hero-pencil-square" class="w-3.5 h-3.5" />
@@ -268,7 +268,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
     <.link
       navigate={@href}
       class={[
-        "flex items-center gap-1.5 pl-2.5 pr-2 py-1 text-xs border-l-2 transition-colors",
+        "flex items-center gap-1.5 pl-2.5 pr-2 py-1 min-h-[44px] text-xs border-l-2 transition-colors",
         if(@active,
           do: "text-primary bg-primary/10 border-primary font-medium",
           else: "text-base-content/50 hover:text-base-content/75 hover:bg-primary/5 border-transparent"

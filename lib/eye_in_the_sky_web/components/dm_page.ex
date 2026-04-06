@@ -45,6 +45,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :message_search_query, :string, default: ""
   attr :session_context, :map, default: nil
   attr :reloading, :boolean, default: false
+  attr :active_timer, :any, default: nil
   attr :agent_record, :map, default: nil
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
@@ -78,6 +79,51 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           <button data-reload-cancel>close</button>
         </form>
       </dialog>
+
+      <%!-- Schedule timer modal --%>
+      <%= if @active_overlay == :schedule_timer do %>
+        <div class="modal modal-open" id="schedule-timer-modal">
+          <div class="modal-box max-w-sm">
+            <h3 class="font-semibold text-base mb-1">Schedule Message</h3>
+            <p class="text-xs text-base-content/50 mb-4 leading-relaxed">
+              Sends: "Please check in with your team members and report their current status and any blockers."
+            </p>
+
+            <div class="mb-3">
+              <p class="text-xs font-medium text-base-content/60 mb-2">Once</p>
+              <div class="flex flex-wrap gap-1.5">
+                <%= for preset <- ["5m", "10m", "15m", "30m", "1h"] do %>
+                  <button
+                    phx-click="schedule_timer"
+                    phx-value-mode="once"
+                    phx-value-preset={preset}
+                    class="btn btn-sm btn-outline"
+                  >{preset}</button>
+                <% end %>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <p class="text-xs font-medium text-base-content/60 mb-2">Repeating</p>
+              <div class="flex flex-wrap gap-1.5">
+                <%= for preset <- ["5m", "10m", "15m", "30m", "1h"] do %>
+                  <button
+                    phx-click="schedule_timer"
+                    phx-value-mode="repeating"
+                    phx-value-preset={preset}
+                    class="btn btn-sm btn-outline"
+                  >{preset}</button>
+                <% end %>
+              </div>
+            </div>
+
+            <div class="modal-action">
+              <button phx-click="close_schedule_modal" class="btn btn-ghost btn-sm">Cancel</button>
+            </div>
+          </div>
+          <div class="modal-backdrop" phx-click="close_schedule_modal"></div>
+        </div>
+      <% end %>
 
       <%!-- Reload loading overlay --%>
       <div
@@ -181,6 +227,24 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Export as Markdown
               </button>
             </li>
+            <li>
+              <button
+                phx-click="open_schedule_timer"
+                class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+              >
+                <.icon name="hero-clock" class="w-3.5 h-3.5" /> Schedule Message
+              </button>
+            </li>
+            <%= if @active_timer do %>
+              <li>
+                <button
+                  phx-click="cancel_timer"
+                  class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-error/10 text-error rounded"
+                >
+                  <.icon name="hero-x-circle" class="w-3.5 h-3.5" /> Cancel Schedule
+                </button>
+              </li>
+            <% end %>
           </ul>
         </div>
       </div>
@@ -247,60 +311,22 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               </div>
             </div>
             <div class="flex items-center gap-1 flex-shrink-0">
-              <button
-                phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
-                class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
-                id="dm-reload-button"
-              >
-                <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Reload
-              </button>
-              <div class="hidden sm:block dropdown dropdown-end" id="dm-export-dropdown">
+              <%!-- Active timer badge --%>
+              <%= if @active_timer do %>
+                <div class="hidden sm:flex items-center gap-1 px-2 py-1 rounded-lg bg-warning/10 text-warning text-xs font-medium">
+                  <.icon name="hero-clock" class="w-3.5 h-3.5" />
+                  <span>{if @active_timer.mode == :once, do: "Once", else: "Repeating"}</span>
+                </div>
+              <% end %>
+
+              <%!-- Unified hamburger menu (desktop + mobile) --%>
+              <div class="dropdown dropdown-end" id="dm-actions-menu">
                 <button
                   tabindex="0"
-                  class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+                  class="btn btn-ghost btn-square w-9 h-9 text-base-content/60"
+                  aria-label="More options"
                 >
-                  <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Export
-                </button>
-                <ul
-                  tabindex="0"
-                  class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-44 text-xs"
-                >
-                  <li>
-                    <button
-                      phx-click="export_jsonl"
-                      class="px-3 py-2 hover:bg-base-content/5 rounded text-left w-full"
-                    >
-                      Export as JSONL
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      phx-click="export_markdown"
-                      class="px-3 py-2 hover:bg-base-content/5 rounded text-left w-full"
-                    >
-                      Export as Markdown
-                    </button>
-                  </li>
-                </ul>
-              </div>
-              <button
-                id="dm-push-setup-btn"
-                phx-hook="PushSetup"
-                phx-update="ignore"
-                data-push-state="disabled"
-                title="Enable push notifications"
-                class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors"
-              >
-                <.icon name="hero-bell" class="w-3.5 h-3.5" />
-                <span>Notify</span>
-              </button>
-              <div class="sm:hidden dropdown dropdown-end" id="dm-mobile-menu">
-                <button
-                  tabindex="0"
-                  class="flex items-center justify-center w-7 h-7 rounded-lg text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
-                  title="More options"
-                >
-                  <.icon name="hero-ellipsis-vertical" class="w-4 h-4" />
+                  <.icon name="hero-ellipsis-horizontal" class="w-5 h-5" />
                 </button>
                 <ul
                   tabindex="0"
@@ -311,7 +337,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                       phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
                       class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
                     >
-                      <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Reload from file
+                      <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Reload
                     </button>
                   </li>
                   <li>
@@ -330,7 +356,37 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                       <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Export as Markdown
                     </button>
                   </li>
+                  <li>
+                    <button
+                      id="dm-push-setup-btn"
+                      phx-hook="PushSetup"
+                      phx-update="ignore"
+                      data-push-state="disabled"
+                      title="Enable push notifications"
+                      class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+                    >
+                      <.icon name="hero-bell" class="w-3.5 h-3.5" /> Notify
+                    </button>
+                  </li>
                   <li><hr class="border-base-content/10 my-1" /></li>
+                  <li>
+                    <button
+                      phx-click="open_schedule_timer"
+                      class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+                    >
+                      <.icon name="hero-clock" class="w-3.5 h-3.5" /> Schedule Message
+                    </button>
+                  </li>
+                  <%= if @active_timer do %>
+                    <li>
+                      <button
+                        phx-click="cancel_timer"
+                        class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-error/10 text-error rounded"
+                      >
+                        <.icon name="hero-x-circle" class="w-3.5 h-3.5" /> Cancel Schedule
+                      </button>
+                    </li>
+                  <% end %>
                 </ul>
               </div>
             </div>

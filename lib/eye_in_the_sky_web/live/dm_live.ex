@@ -434,6 +434,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         message_search_query={@message_search_query}
         session_context={@session_context}
         reloading={@reloading}
+        active_timer={@active_timer}
       />
 
       <EyeInTheSkyWeb.Components.NewTaskDrawer.new_task_drawer

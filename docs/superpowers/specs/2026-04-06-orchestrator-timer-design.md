@@ -68,15 +68,22 @@ One map entry per session with an active timer:
 OrchestratorTimers.schedule_once(session_id, delay_ms, message \\ default_message())
 OrchestratorTimers.schedule_repeating(session_id, interval_ms, message \\ default_message())
 OrchestratorTimers.cancel(session_id)
-OrchestratorTimers.get_timer(session_id)   # returns nil or timer map
-OrchestratorTimers.list_active()           # returns all active timers
-OrchestratorTimers.default_message()
+OrchestratorTimers.get_timer(session_id)   # returns nil | timer_map — never {:ok, _} or {:error, _}
+OrchestratorTimers.list_active()           # returns [timer_map]
+OrchestratorTimers.default_message()       # defined in OrchestratorTimers (public API module, not Server)
 ```
 
 **Default message:**
 ```
 "Please check in with your team members and report their current status and any blockers."
 ```
+
+`get_timer/1` returns `nil` when no timer is active for the session. DmLive mount assigns:
+```elixir
+assign(socket, :active_timer, OrchestratorTimers.get_timer(session_id))
+```
+
+The assign key is `@active_timer` throughout the LiveView and templates.
 
 ---
 
@@ -125,31 +132,49 @@ On `{:fire_timer, session_id, token}`:
 When a timer fires:
 
 1. Validate token matches — ignore if stale
-2. Call `AgentManager.send_message(session_id, message)`
+2. Call `AgentManager.send_message(session_id, message, [])` — actual arity is `/3` with `opts \\ []`; pass no opts
 3. On success: clear (one-shot) or reschedule (repeating)
 4. On failure:
    - One-shot: remove timer, log failure
    - Repeating: reschedule anyway, log failure
-   - Reason: scheduling and delivery are separate concerns; a transient delivery failure should not permanently kill a repeating reminder
+   - No backoff on repeating delivery failure. This is intentional: scheduling and delivery are separate concerns. A transient delivery failure should not permanently kill a repeating reminder. Expect log noise if the target session is gone for extended periods.
 
 ---
 
 ## PubSub Events
 
-Broadcast via the existing `EyeInTheSky.Events` module on:
+Broadcast via the existing `EyeInTheSky.Events` module. Three distinct functions matching the existing naming conventions. **Never call `Phoenix.PubSub` directly.**
 
-- Timer scheduled (new or replaced)
-- Timer cancelled
-- Timer fired (delivery succeeded or failed)
+**Topic:** `"session:<session_id>:timer"`
 
-This allows the DM page (if still open) to update its display without polling.
-
-Event shape (matches existing patterns):
+**Subscribe helper** (add to `Events`):
 ```elixir
-Events.orchestrator_timer_updated(session_id, timer_or_nil)
+def subscribe_session_timer(session_id), do: sub("session:#{session_id}:timer")
 ```
 
-The DM page subscribes to this event and refreshes its timer assigns.
+**Broadcast functions** (add to `Events`):
+```elixir
+def timer_scheduled(session_id, timer),
+  do: broadcast("session:#{session_id}:timer", {:timer_scheduled, timer})
+
+def timer_cancelled(session_id),
+  do: broadcast("session:#{session_id}:timer", :timer_cancelled)
+
+def timer_fired(session_id, timer_or_nil),
+  do: broadcast("session:#{session_id}:timer", {:timer_fired, timer_or_nil})
+```
+
+**DmLive `handle_info` clauses** (three patterns, not one):
+```elixir
+def handle_info({:timer_scheduled, timer}, socket), do: ...
+def handle_info(:timer_cancelled, socket), do: ...
+def handle_info({:timer_fired, timer_or_nil}, socket), do: ...
+```
+
+Add topic to the `Events` module docstring topic table:
+```
+| `"session:<id>:timer"` | DMLive |
+```
 
 ---
 
@@ -157,14 +182,14 @@ The DM page subscribes to this event and refreshes its timer assigns.
 
 ### Replace inline DM action buttons
 
-Current `[Reload | Export | Notify]` buttons become a hamburger/kebab menu.
+This applies to **both desktop and mobile**. The current `[Reload | Export | Notify]` buttons (desktop header) and the existing mobile kebab menu (`hero-ellipsis-vertical`) are unified into a single hamburger/kebab menu component used at all breakpoints.
 
 Menu items:
 - Reload
 - Export
 - Notify
 - Schedule Message
-- Cancel Scheduled Message *(only shown when timer is active)*
+- Cancel Scheduled Message *(only shown when `@active_timer` is not nil)*
 
 ### Schedule Message UI
 
@@ -177,12 +202,12 @@ Fields:
 
 ### Active timer display
 
-When a timer is active, the DM header or menu shows:
+When `@active_timer` is not nil, the DM header or menu shows:
 - Mode (once / repeating)
-- Next fire time (absolute)
-- Countdown (client-side rendering, backend is authoritative)
+- Next fire time (absolute, from `next_fire_at`)
+- Countdown (client-side rendering from `next_fire_at`; backend state is authoritative — `next_fire_at` is advisory and may drift slightly from actual fire time)
 
-On mount, DM page calls `OrchestratorTimers.get_timer(session_id)` to populate initial state.
+On mount, DM page assigns `@active_timer` via `OrchestratorTimers.get_timer(session_id)`.
 
 ---
 
@@ -219,7 +244,15 @@ On mount, DM page calls `OrchestratorTimers.get_timer(session_id)` to populate i
 
 ## Application Wiring
 
-Add `OrchestratorTimers.Server` to the supervision tree in `application.ex`. This gives app-lifetime ownership instead of page-lifetime ownership.
+Add `OrchestratorTimers.Server` to the supervision tree in `application.ex`. Insert it **after `EyeInTheSky.RateLimiter` and before `EyeInTheSkyWeb.Endpoint`**:
+
+```elixir
+EyeInTheSky.RateLimiter,
+EyeInTheSky.OrchestratorTimers.Server,  # <-- here
+EyeInTheSkyWeb.Endpoint
+```
+
+The supervisor uses `strategy: :rest_for_one`. Any process listed above `OrchestratorTimers.Server` in the children list (Repo, PubSub, AgentSupervisor, etc.) will restart the timer server if it crashes, wiping all in-memory timer state. This is acceptable given the "does not survive restart" constraint and is expected behavior.
 
 ---
 
@@ -251,8 +284,8 @@ Log at each lifecycle point with `session_id`, `mode`, `next_fire_at`:
 
 ### LiveView tests — `DmLive`
 
-- Hamburger menu renders with all four items
-- "Cancel Scheduled Message" only shown when timer active
+- Hamburger menu renders with all five items (Reload, Export, Notify, Schedule Message, Cancel Scheduled Message)
+- "Cancel Scheduled Message" only shown when `@active_timer` is not nil
 - Scheduling updates timer display
 - Cancelling removes timer display
 - Active timer shown after remount (via `get_timer` on mount)

@@ -7,7 +7,12 @@ defmodule EyeInTheSky.Accounts do
 
   # --- Users ---
 
-  def get_user(id), do: Repo.get(User, id)
+  def get_user(id) do
+    case Repo.get(User, id) do
+      nil -> {:error, :not_found}
+      user -> {:ok, user}
+    end
+  end
 
   def get_user_by_username(username) do
     Repo.get_by(User, username: username)

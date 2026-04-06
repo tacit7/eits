@@ -31,8 +31,8 @@ defmodule EyeInTheSkyWeb.AuthHook do
 
       user_id ->
         case Accounts.get_user(user_id) do
-          nil -> {:halt, redirect(socket, to: "/auth/login")}
-          user -> {:cont, assign(socket, :current_user, user)}
+          {:error, :not_found} -> {:halt, redirect(socket, to: "/auth/login")}
+          {:ok, user} -> {:cont, assign(socket, :current_user, user)}
         end
     end
   end

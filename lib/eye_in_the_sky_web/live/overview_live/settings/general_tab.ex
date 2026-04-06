@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                 :for={{val, label} <- @themes}
                 phx-click="set_theme"
                 phx-value-theme={val}
-                class={"btn btn-sm #{if @settings["theme"] == val, do: "btn-primary", else: "btn-outline"}"}
+                class={"btn btn-md sm:btn-sm #{if @settings["theme"] == val, do: "btn-primary", else: "btn-outline"}"}
               >
                 {label}
               </button>

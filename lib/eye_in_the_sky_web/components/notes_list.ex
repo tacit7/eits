@@ -96,7 +96,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
               <div class="collapse-title py-3 px-0 min-h-0 flex flex-col gap-1">
                 <%!-- Title — clicking navigates to full editor --%>
                 <div class="flex items-center gap-2 pr-6">
-                  <%= if note.starred == 1 do %>
+                  <%= if starred?(note) do %>
                     <.icon name="hero-star-solid" class="w-3 h-3 text-warning flex-shrink-0" />
                   <% end %>
                   <.link
@@ -169,14 +169,14 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                 phx-click="toggle_star"
                 phx-value-note_id={note.id}
                 class={"flex items-center px-1 py-1 rounded transition-colors " <>
-                  if(note.starred == 1,
+                  if(starred?(note),
                     do: "text-warning",
                     else: "text-base-content/20 hover:text-warning"
                   )}
-                aria-label={if note.starred == 1, do: "Unstar note", else: "Star note"}
+                aria-label={if starred?(note), do: "Unstar note", else: "Star note"}
               >
                 <.icon
-                  name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}
+                  name={if starred?(note), do: "hero-star-solid", else: "hero-star"}
                   class="w-3.5 h-3.5"
                 />
               </button>
@@ -294,6 +294,8 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
       if String.length(text) >= 50, do: text <> "...", else: text
     end)
   end
+
+  defp starred?(note), do: note.starred == 1
 
   defp extract_snippet(nil), do: nil
 

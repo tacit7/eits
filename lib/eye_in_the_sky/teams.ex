@@ -32,7 +32,12 @@ defmodule EyeInTheSky.Teams do
     Repo.all(query)
   end
 
-  def get_team(id), do: Repo.get(Team, id)
+  def get_team(id) do
+    case Repo.get(Team, id) do
+      nil -> {:error, :not_found}
+      team -> {:ok, team}
+    end
+  end
 
   def get_team!(id), do: Repo.get!(Team, id)
 
@@ -41,9 +46,19 @@ defmodule EyeInTheSky.Teams do
     Repo.preload(team, members: [session: [:agent]])
   end
 
-  def get_team_by_uuid(uuid), do: Repo.get_by(Team, uuid: uuid)
+  def get_team_by_uuid(uuid) do
+    case Repo.get_by(Team, uuid: uuid) do
+      nil -> {:error, :not_found}
+      team -> {:ok, team}
+    end
+  end
 
-  def get_team_by_name(name), do: Repo.get_by(Team, name: name)
+  def get_team_by_name(name) do
+    case Repo.get_by(Team, name: name) do
+      nil -> {:error, :not_found}
+      team -> {:ok, team}
+    end
+  end
 
   def create_team(attrs) do
     %Team{}

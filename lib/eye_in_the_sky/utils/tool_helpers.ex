@@ -48,7 +48,7 @@ defmodule EyeInTheSky.Utils.ToolHelpers do
     cond do
       params[:team_id] -> Teams.get_team(params[:team_id])
       params[:team_name] -> Teams.get_team_by_name(params[:team_name])
-      true -> nil
+      true -> {:ok, nil}
     end
   end
 end

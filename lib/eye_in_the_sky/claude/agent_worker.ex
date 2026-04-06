@@ -203,6 +203,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     {:reply, reply, new_state}
   end
 
+  @impl true
   def handle_call({:submit_message, message, _context}, _from, state) do
     Logger.warning(
       "AgentWorker.submit_message: invalid message payload for session_id=#{state.session_id} message=#{inspect(message)}"

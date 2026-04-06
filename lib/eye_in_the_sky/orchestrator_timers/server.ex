@@ -82,13 +82,13 @@ defmodule EyeInTheSky.OrchestratorTimers.Server do
   def handle_call({:cancel, session_id}, _from, state) do
     case Map.get(state, session_id) do
       nil ->
-        {:reply, :ok, state}
+        {:reply, {:ok, :noop}, state}
 
       _ ->
         new_state = cancel_existing(state, session_id)
         Logger.info("[OrchestratorTimers] cancelled session=#{session_id}")
         Events.timer_cancelled(session_id)
-        {:reply, :ok, new_state}
+        {:reply, {:ok, :cancelled}, new_state}
     end
   end
 

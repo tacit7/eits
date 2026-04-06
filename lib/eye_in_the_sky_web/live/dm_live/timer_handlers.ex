@@ -32,6 +32,6 @@ defmodule EyeInTheSkyWeb.DmLive.TimerHandlers do
 
   def handle_cancel_timer(socket) do
     OrchestratorTimers.cancel(socket.assigns.session_id)
-    {:noreply, assign(socket, :active_timer, nil)}
+    {:noreply, socket}
   end
 end

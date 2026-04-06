@@ -202,7 +202,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
             
     <!-- Right: skill viewer -->
             <%= if @selected_skill do %>
-              <div class="sticky top-20">
+              <div class="sticky top-[calc(3rem+env(safe-area-inset-top))] md:top-20">
                 <div class="card bg-base-100 border border-base-300 shadow-sm">
                   <div class="card-body p-0">
                     <div class="flex items-center justify-between px-4 py-2 border-b border-base-300 bg-base-200/50">

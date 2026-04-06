@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Sessions
+  alias EyeInTheSkyWeb.ControllerHelpers
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Loader
 
   # ---------------------------------------------------------------------------
@@ -140,7 +141,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   end
 
   def rename_session(%{"session_id" => session_id}, socket) do
-    session_id_int = String.to_integer(session_id)
+    session_id_int = ControllerHelpers.parse_int(session_id)
     socket = assign(socket, :editing_session_id, session_id_int)
 
     socket =

@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   alias EyeInTheSky.Tasks
   alias EyeInTheSkyWeb.Components.FilterSheet
   alias EyeInTheSkyWeb.Components.TaskCard
+  alias EyeInTheSkyWeb.ControllerHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Live.Shared.TasksHelpers
@@ -50,7 +51,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
 
   @impl true
   def handle_event("filter_status", %{"state_id" => state_id}, socket) do
-    state_id = if state_id == "", do: nil, else: String.to_integer(state_id)
+    state_id = if state_id == "", do: nil, else: ControllerHelpers.parse_int(state_id)
 
     {:noreply,
      socket

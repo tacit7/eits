@@ -51,8 +51,14 @@ defmodule EyeInTheSky.Notifications do
 
   def list_notifications(opts \\ []) do
     limit = opts[:limit] || 50
+    category = opts[:category]
 
     Notification
+    |> then(fn q ->
+      if category && category != "all",
+        do: where(q, [n], n.category == ^category),
+        else: q
+    end)
     |> order_by([n], desc: n.inserted_at, desc: n.id)
     |> limit(^limit)
     |> Repo.all()

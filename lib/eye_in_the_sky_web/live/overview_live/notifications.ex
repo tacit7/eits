@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Notifications
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1]
 
   @impl true
@@ -27,23 +28,23 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
   end
 
   @impl true
-  def handle_info({:notification_read, id}, socket) do
-    notifications =
-      Enum.map(socket.assigns.notifications, fn n ->
-        if n.id == id, do: %{n | read: true}, else: n
-      end)
-
-    {:noreply, assign(socket, :notifications, notifications)}
+  def handle_info({:notification_read, _id}, socket) do
+    {:noreply, assign(socket, :notifications, load_notifications(socket.assigns.filter))}
   end
 
+  @impl true
   def handle_info({:notifications_updated, _}, socket) do
     {:noreply, assign(socket, :notifications, load_notifications(socket.assigns.filter))}
   end
 
   @impl true
   def handle_event("mark_read", %{"id" => id}, socket) do
-    Notifications.mark_read(String.to_integer(id))
-    {:noreply, assign(socket, :notifications, load_notifications(socket.assigns.filter))}
+    case parse_int(id) do
+      nil -> {:noreply, socket}
+      int_id ->
+        Notifications.mark_read(int_id)
+        {:noreply, assign(socket, :notifications, load_notifications(socket.assigns.filter))}
+    end
   end
 
   @impl true
@@ -63,8 +64,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
   defp load_notifications("all"), do: Notifications.list_notifications()
 
   defp load_notifications(category) do
-    Notifications.list_notifications()
-    |> Enum.filter(&(&1.category == category))
+    Notifications.list_notifications(category: category)
   end
 
   defp resource_link(%{resource_type: "session", resource_id: id}) when is_binary(id),

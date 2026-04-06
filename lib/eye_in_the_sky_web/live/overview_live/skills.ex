@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSkyWeb.Helpers.FileHelpers
+  alias EyeInTheSkyWeb.OverviewLive.Skills.Skill
 
   @impl true
   def mount(_params, _session, socket) do
@@ -78,7 +79,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
         slug = String.replace_trailing(filename, ".md", "")
         content = File.read!(path)
 
-        %{
+        %Skill{
           slug: slug,
           filename: filename,
           source: :commands,
@@ -106,7 +107,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
         path = Path.join([skills_dir, dir, "SKILL.md"])
         content = File.read!(path)
 
-        %{
+        %Skill{
           slug: dir,
           filename: "skills/#{dir}/SKILL.md",
           source: :skills,

@@ -1,7 +1,7 @@
 defmodule EyeInTheSky.Utils.ToolHelpers do
   @moduledoc "Shared utilities for resolving entity IDs used by REST API and Claude workers"
 
-  alias EyeInTheSky.{Agents, Sessions, Teams}
+  alias EyeInTheSky.{Agents, Sessions}
 
   def resolve_session_int_id(nil), do: {:error, "session_id is required"}
 
@@ -44,11 +44,4 @@ defmodule EyeInTheSky.Utils.ToolHelpers do
   def normalize_parent_type("projects"), do: "project"
   def normalize_parent_type(type), do: type
 
-  def resolve_team(params) do
-    cond do
-      params[:team_id] -> Teams.get_team(params[:team_id])
-      params[:team_name] -> Teams.get_team_by_name(params[:team_name])
-      true -> {:ok, nil}
-    end
-  end
 end

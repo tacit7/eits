@@ -94,7 +94,10 @@ defmodule EyeInTheSky.Teams do
   end
 
   def get_member(id) when is_binary(id) do
-    if int_id = ToolHelpers.parse_int(id), do: get_member(int_id)
+    case ToolHelpers.parse_int(id) do
+      nil -> nil
+      int_id -> get_member(int_id)
+    end
   end
 
   def get_member(team_id, name) do

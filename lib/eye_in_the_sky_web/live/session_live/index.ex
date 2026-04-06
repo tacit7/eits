@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
   alias EyeInTheSky.Sessions
   import EyeInTheSkyWeb.Components.SessionCard, only: [session_row: 1]
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   @per_page 20
 
@@ -67,16 +68,23 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
 
   @impl true
   def handle_event("rename_session", %{"session_id" => session_id}, socket) do
-    session_id_int = String.to_integer(session_id)
-    socket = assign(socket, :editing_session_id, session_id_int)
+    session_id_int = parse_int(session_id)
 
-    socket =
-      case Sessions.get_session_overview_row(session_id_int) do
-        {:ok, row} -> stream_insert(socket, :sessions, row)
-        _ -> socket
-      end
+    case session_id_int do
+      nil ->
+        {:noreply, socket}
 
-    {:noreply, socket}
+      id ->
+        socket = assign(socket, :editing_session_id, id)
+
+        socket =
+          case Sessions.get_session_overview_row(id) do
+            {:ok, row} -> stream_insert(socket, :sessions, row)
+            _ -> socket
+          end
+
+        {:noreply, socket}
+    end
   end
 
   @impl true
@@ -172,48 +180,55 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
   def handle_event("create_new_session", params, socket) do
     model = params["model"]
     effort_level = params["effort_level"]
-    project_id = String.to_integer(params["project_id"])
+    project_id = parse_int(params["project_id"])
     description = params["description"]
-    agent_name = params["agent_name"] || String.slice(description || "", 0, 60)
 
-    project = EyeInTheSky.Projects.get_project!(project_id)
+    case project_id do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Invalid project")}
 
-    worktree =
-      case params["worktree"] do
-        nil -> nil
-        "" -> nil
-        w -> w
-      end
+      pid ->
+        agent_name = params["agent_name"] || String.slice(description || "", 0, 60)
 
-    opts = [
-      model: model,
-      effort_level: effort_level,
-      project_id: project_id,
-      project_path: project.path,
-      description: agent_name,
-      instructions: description,
-      agent: params["agent"],
-      worktree: worktree
-    ]
+        project = EyeInTheSky.Projects.get_project!(pid)
 
-    case AgentManager.create_agent(opts) do
-      {:ok, _result} ->
-        sessions = Sessions.list_session_overview_rows(limit: @per_page, offset: 0)
-        total = Sessions.count_session_overview_rows()
+        worktree =
+          case params["worktree"] do
+            nil -> nil
+            "" -> nil
+            w -> w
+          end
 
-        socket =
-          socket
-          |> assign(:show_new_session_modal, false)
-          |> assign(:page, 1)
-          |> assign(:has_more, length(sessions) < total)
-          |> assign(:total_sessions, total)
-          |> stream(:sessions, sessions, reset: true)
-          |> put_flash(:info, "Session launched")
+        opts = [
+          model: model,
+          effort_level: effort_level,
+          project_id: pid,
+          project_path: project.path,
+          description: agent_name,
+          instructions: description,
+          agent: params["agent"],
+          worktree: worktree
+        ]
 
-        {:noreply, socket}
+        case AgentManager.create_agent(opts) do
+          {:ok, _result} ->
+            sessions = Sessions.list_session_overview_rows(limit: @per_page, offset: 0)
+            total = Sessions.count_session_overview_rows()
 
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to create session: #{inspect(reason)}")}
+            socket =
+              socket
+              |> assign(:show_new_session_modal, false)
+              |> assign(:page, 1)
+              |> assign(:has_more, length(sessions) < total)
+              |> assign(:total_sessions, total)
+              |> stream(:sessions, sessions, reset: true)
+              |> put_flash(:info, "Session launched")
+
+            {:noreply, socket}
+
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, "Failed to create session: #{inspect(reason)}")}
+        end
     end
   end
 

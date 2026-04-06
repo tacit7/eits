@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
       |> FilterHandlers.assign_filter_count()
 
     if socket.assigns.project do
-      {:ok, KanbanFilters.load_tasks(socket)}
+      {:ok, socket |> KanbanFilters.load_tasks() |> rebuild_session_status_ids()}
     else
       {:ok, socket}
     end
@@ -229,7 +229,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_info(:tasks_changed, socket) do
-    socket = KanbanFilters.load_tasks(socket)
+    socket =
+      socket
+      |> KanbanFilters.load_tasks()
+      |> rebuild_session_status_ids()
 
     socket =
       if socket.assigns.selected_task && socket.assigns.show_task_detail_drawer do
@@ -246,14 +249,28 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   @impl true
   def handle_info({:agent_working, msg}, socket) do
     handle_agent_working(socket, msg, fn socket, session_id ->
-      update(socket, :working_session_ids, &MapSet.put(&1, session_id))
+      socket
+      |> update(:working_session_ids, &MapSet.put(&1, session_id))
+      |> update(:waiting_session_ids, &MapSet.delete(&1, session_id))
     end)
+  end
+
+  @impl true
+  def handle_info({:agent_stopped, %{status: "waiting", id: session_id}}, socket) do
+    socket =
+      socket
+      |> update(:working_session_ids, &MapSet.delete(&1, session_id))
+      |> update(:waiting_session_ids, &MapSet.put(&1, session_id))
+
+    {:noreply, socket}
   end
 
   @impl true
   def handle_info({:agent_stopped, msg}, socket) do
     handle_agent_stopped(socket, msg, fn socket, session_id ->
-      update(socket, :working_session_ids, &MapSet.delete(&1, session_id))
+      socket
+      |> update(:working_session_ids, &MapSet.delete(&1, session_id))
+      |> update(:waiting_session_ids, &MapSet.delete(&1, session_id))
     end)
   end
 
@@ -304,6 +321,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
         selected_tasks={@selected_tasks}
         quick_add_column={@quick_add_column}
         working_session_ids={@working_session_ids}
+        waiting_session_ids={@waiting_session_ids}
       />
     </div>
 
@@ -367,6 +385,22 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   # Private
   # ---------------------------------------------------------------------------
 
+  # Seeds working_session_ids and waiting_session_ids from preloaded task sessions.
+  # PubSub only delivers events that fire while the LiveView is connected, so without
+  # this, any session that went working/waiting before mount is invisible to the board.
+  defp rebuild_session_status_ids(socket) do
+    all_sessions =
+      (socket.assigns[:tasks] || [])
+      |> Enum.flat_map(&(Map.get(&1, :sessions, []) || []))
+
+    working_ids = all_sessions |> Enum.filter(&(&1.status == "working")) |> Enum.map(& &1.id) |> MapSet.new()
+    waiting_ids = all_sessions |> Enum.filter(&(&1.status == "waiting")) |> Enum.map(& &1.id) |> MapSet.new()
+
+    socket
+    |> update(:working_session_ids, &MapSet.union(&1, working_ids))
+    |> assign(:waiting_session_ids, waiting_ids)
+  end
+
   defp init_assigns(socket) do
     socket
     |> assign(:search_query, "")
@@ -394,6 +428,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
     |> assign(:filter_due_date, nil)
     |> assign(:filter_activity, nil)
     |> assign(:working_session_ids, MapSet.new())
+    |> assign(:waiting_session_ids, MapSet.new())
     |> assign(:show_date_picker, false)
     |> assign(:date_picker_task, nil)
     |> assign(:date_picker_year, nil)

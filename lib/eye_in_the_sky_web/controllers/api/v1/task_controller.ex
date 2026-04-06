@@ -106,10 +106,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   """
   def show(conn, %{"id" => id}) do
     case Tasks.get_task(id) do
-      nil ->
+      {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "Task not found"})
 
-      task ->
+      {:ok, task} ->
         annotations = Notes.list_notes_for_task(id)
         presented = ApiPresenter.present_task(task)
 
@@ -133,8 +133,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   """
   def update(conn, %{"id" => id} = params) do
     case Tasks.get_task(id) do
-      nil -> conn |> put_status(:not_found) |> json(%{error: "Task not found"})
-      task -> do_update_task(conn, task, params)
+      {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "Task not found"})
+      {:ok, task} -> do_update_task(conn, task, params)
     end
   end
 
@@ -170,10 +170,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   """
   def delete(conn, %{"id" => id}) do
     case Tasks.get_task(id) do
-      nil ->
+      {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "Task not found"})
 
-      task ->
+      {:ok, task} ->
         case Tasks.delete_task(task) do
           {:ok, _} ->
             json(conn, %{success: true, message: "Task deleted"})

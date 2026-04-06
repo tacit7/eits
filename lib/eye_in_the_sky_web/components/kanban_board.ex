@@ -11,6 +11,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
   attr :selected_tasks, :any, required: true
   attr :quick_add_column, :any, required: true
   attr :working_session_ids, :any, required: true
+  attr :waiting_session_ids, :any, default: nil
 
   def kanban_board(assigns) do
     ~H"""
@@ -117,6 +118,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                       on_delete="delete_task"
                       id={"kanban-task-#{task.id}"}
                       working_session_ids={@working_session_ids}
+                      waiting_session_ids={@waiting_session_ids}
                       workflow_states={@workflow_states}
                     />
                   </div>

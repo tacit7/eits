@@ -19,6 +19,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
   attr :on_click, :string, default: nil
   attr :on_delete, :string, default: nil
   attr :working_session_ids, :any, default: nil
+  attr :waiting_session_ids, :any, default: nil
   attr :workflow_states, :list, default: []
   attr :rest, :global
 
@@ -35,6 +36,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
           on_click={@on_click}
           on_delete={@on_delete}
           working_session_ids={@working_session_ids}
+          waiting_session_ids={@waiting_session_ids}
           workflow_states={@workflow_states}
           {@rest}
         />

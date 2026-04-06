@@ -13,6 +13,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
   attr :on_click, :string, default: nil
   attr :on_delete, :string, default: nil
   attr :working_session_ids, :any, default: nil
+  attr :waiting_session_ids, :any, default: nil
   attr :workflow_states, :list, default: []
   attr :rest, :global
 
@@ -38,6 +39,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
           on_delete={@on_delete}
           aging={@aging}
           working_session_ids={@working_session_ids}
+          waiting_session_ids={@waiting_session_ids}
           workflow_states={@workflow_states}
         />
       </div>
@@ -52,6 +54,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
       assigns
       |> assign(:dm_session, dm_session)
       |> assign_new(:workflow_states, fn -> [] end)
+      |> assign_new(:waiting_session_ids, fn -> nil end)
 
     ~H"""
     <%!-- Title + drag handle + delete --%>
@@ -105,7 +108,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
       </div>
     <% end %>
 
-    <.kanban_card_footer task={@task} aging={@aging} dm_session={@dm_session} working_session_ids={@working_session_ids} />
+    <.kanban_card_footer task={@task} aging={@aging} dm_session={@dm_session} working_session_ids={@working_session_ids} waiting_session_ids={@waiting_session_ids} />
     """
   end
 
@@ -231,6 +234,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
       |> assign(:checklist, checklist)
       |> assign(:notes_count, notes_count)
       |> assign(:has_footer, has_footer)
+      |> assign_new(:waiting_session_ids, fn -> nil end)
 
     ~H"""
     <%= if @has_footer do %>
@@ -274,20 +278,32 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
         <% end %>
         <%= if @dm_session do %>
           <% is_working = @working_session_ids && MapSet.member?(@working_session_ids, @dm_session.id) %>
+          <% is_waiting = !is_working && @waiting_session_ids && MapSet.member?(@waiting_session_ids, @dm_session.id) %>
           <a
             href={"/dm/#{@dm_session.uuid}"}
             target="_blank"
             class="ml-auto flex-shrink-0 text-base-content/30 hover:text-primary transition-colors"
             onclick="event.stopPropagation();"
-            title={if is_working, do: "Agent is working", else: "Open agent DM"}
+            title={cond do
+              is_working -> "Agent is working"
+              is_waiting -> "Agent is waiting"
+              true -> "Open agent DM"
+            end}
           >
             <span class="relative inline-flex">
               <.icon
                 name="hero-user-circle"
-                class={"w-3.5 h-3.5 #{if is_working, do: "text-primary", else: ""}"}
+                class={"w-3.5 h-3.5 #{cond do
+                  is_working -> "text-primary"
+                  is_waiting -> "text-warning"
+                  true -> ""
+                end}"}
               />
               <%= if is_working do %>
                 <span class="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-success rounded-full animate-pulse" />
+              <% end %>
+              <%= if is_waiting do %>
+                <span class="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-warning rounded-full animate-pulse" />
               <% end %>
             </span>
           </a>

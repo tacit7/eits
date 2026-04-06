@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.Helpers.StatusHelpers do
   Returns one of: working | compacting | idle | idle_stale | idle_dead | completed | failed
   """
   def derive_display_status(agent, _stale_threshold_hours \\ 24) do
-    status = Map.get(agent, :status)
+    status = agent.status
 
     if status == "idle" do
       idle_tier(agent)
@@ -44,7 +44,7 @@ defmodule EyeInTheSkyWeb.Helpers.StatusHelpers do
   Returns "idle" | "idle_stale" | "idle_dead"
   """
   def idle_tier(agent) do
-    hours_since = agent |> Map.get(:last_activity_at) |> hours_since_activity()
+    hours_since = agent.last_activity_at |> hours_since_activity()
 
     cond do
       is_nil(hours_since) -> "idle"

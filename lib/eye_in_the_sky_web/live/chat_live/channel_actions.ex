@@ -38,8 +38,14 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
           {:noreply, put_flash(socket, :error, "Agent already in channel or invalid")}
       end
     else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Invalid session ID format")}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Session not found")}
+
       _ ->
-        {:noreply, put_flash(socket, :error, "Invalid session ID")}
+        {:noreply, put_flash(socket, :error, "Failed to add agent to channel")}
     end
   end
 
@@ -60,8 +66,14 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
       Logger.info("Removed agent session=#{session_id} from channel=#{channel_id}")
       {:noreply, refresh_members_and_picker(socket)}
     else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Invalid session ID format")}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Session not found")}
+
       _ ->
-        {:noreply, put_flash(socket, :error, "Invalid session ID")}
+        {:noreply, put_flash(socket, :error, "Failed to remove agent from channel")}
     end
   end
 

@@ -28,7 +28,8 @@ defmodule EyeInTheSkyWeb.AgentLive.CanvasHandlers do
 
       {:noreply, put_flash(socket, :info, "Added to #{canvas.name}")}
     else
-      _ -> {:noreply, socket}
+      nil -> {:noreply, put_flash(socket, :error, "Invalid canvas or session ID")}
+      _ -> {:noreply, put_flash(socket, :error, "Canvas not found")}
     end
   end
 

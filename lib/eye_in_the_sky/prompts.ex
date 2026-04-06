@@ -142,15 +142,12 @@ defmodule EyeInTheSky.Prompts do
 
   @doc """
   Hard deletes a prompt.
-  Returns `{:error, :has_active_schedule}` if a scheduled job references this prompt.
+  Returns `{:error, changeset}` if a scheduled job references this prompt.
   """
   def delete_prompt(%Prompt{} = prompt) do
-    case Repo.delete(prompt) do
-      {:ok, p} -> {:ok, p}
-      {:error, %Ecto.Changeset{} = cs} -> {:error, cs}
-    end
-  rescue
-    Ecto.ConstraintError -> {:error, :has_active_schedule}
+    prompt
+    |> Prompt.delete_changeset()
+    |> Repo.delete()
   end
 
   @doc """

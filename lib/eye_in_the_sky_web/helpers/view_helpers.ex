@@ -73,19 +73,12 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
     |> String.upcase()
   end
 
-  def truncate_text(nil), do: nil
-
-  def truncate_text(text) when is_binary(text) do
-    if String.length(text) > 50 do
-      String.slice(text, 0, 50) <> "..."
-    else
-      text
-    end
-  end
-
   @doc """
-  Truncate text to a given max length, appending "…" when truncated.
+  Truncate text to a given max length (default 50), appending "…" when truncated.
+  Returns empty string for nil input.
   """
+  def truncate_text(text), do: truncate_text(text, 50)
+
   def truncate_text(nil, _max), do: ""
 
   def truncate_text(text, max) when is_binary(text) do

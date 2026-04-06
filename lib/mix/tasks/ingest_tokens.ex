@@ -49,7 +49,7 @@ defmodule Mix.Tasks.IngestTokens do
     mode = if force, do: "force", else: "incremental"
     Mix.shell().info("Ingesting token usage (#{mode})...")
 
-    {ingested, skipped, errors} =
+    %{ingested: ingested, skipped: skipped, errors: errors} =
       TokenIngestion.ingest_all(force: force)
 
     Mix.shell().info("""

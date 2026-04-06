@@ -16,7 +16,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ChatSection do
       phx-click="toggle_chat"
       phx-target={@myself}
       class={[
-        "flex items-center gap-2.5 w-full text-left text-sm transition-colors",
+        "flex items-center gap-2.5 w-full text-left text-sm transition-colors min-h-[44px]",
         if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1"),
         if(@sidebar_tab == :chat,
           do: "text-base-content/80 hover:bg-base-content/5",
@@ -44,7 +44,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ChatSection do
           <.link
             navigate={~p"/chat?channel_id=#{channel.id}"}
             class={[
-              "block pl-3 pr-3 py-0.5 text-sm transition-colors",
+              "flex items-center pl-3 pr-3 py-0.5 min-h-[44px] text-sm transition-colors",
               if(@active_channel_id && to_string(@active_channel_id) == to_string(channel.id),
                 do: "text-primary font-medium bg-primary/5",
                 else: "text-base-content/50 hover:text-base-content/75 hover:bg-base-content/5"
@@ -77,7 +77,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ChatSection do
           <button
             phx-click="show_new_channel"
             phx-target={@myself}
-            class="block pl-3 pr-3 py-0.5 text-sm text-base-content/30 hover:text-base-content/55 transition-colors w-full text-left"
+            class="flex items-center pl-3 pr-3 py-0.5 min-h-[44px] text-sm text-base-content/30 hover:text-base-content/55 transition-colors w-full text-left"
           >
             + New Channel
           </button>

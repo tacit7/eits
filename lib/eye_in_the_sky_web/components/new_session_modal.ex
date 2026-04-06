@@ -29,7 +29,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     # When the form is open, skip parent re-renders entirely to prevent DOM patches from
     # disrupting the modal (e.g. PubSub-driven list updates closing the form). Only update
     # uploads when they actually change so image previews stay current.
-    if socket.assigns[:show] == true && assigns[:show] == true do
+    if socket.assigns[:show] && assigns[:show] do
       new_uploads = Map.get(assigns, :file_uploads)
 
       if socket.assigns[:file_uploads] == new_uploads do

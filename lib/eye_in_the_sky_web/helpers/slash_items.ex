@@ -181,7 +181,7 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
   defp parse_enabled_plugins(content) do
     case Jason.decode(content) do
       {:ok, %{"enabledPlugins" => plugins}} when is_map(plugins) ->
-        plugins |> Enum.filter(fn {_k, v} -> v == true end) |> Map.new()
+        plugins |> Enum.filter(fn {_k, v} -> v end) |> Map.new()
 
       _ ->
         %{}

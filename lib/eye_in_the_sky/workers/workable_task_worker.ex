@@ -66,29 +66,32 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
       available_slots = @max_active_agents - active_count
       limit = min(@batch_limit, available_slots)
       tasks = fetch_workable_tasks(tag_name, limit, job.project_id)
-      spawn_tasks(tasks, model, tag_name, job.project_id)
+      spawn_tasks(tasks, %{model: model, tag_name: tag_name, project_id: job.project_id})
     end
   end
 
-  defp spawn_tasks([], _model, _tag_name, _project_id), do: {:ok, :no_work}
+  defp spawn_tasks([], _config), do: {:ok, :no_work}
 
-  defp spawn_tasks(tasks, model, tag_name, project_id) do
-    results = Enum.map(tasks, &process_task(&1, model, project_id))
+  defp spawn_tasks(tasks, config) do
+    results = Enum.map(tasks, &process_task(&1, config.model, config.project_id))
     spawned = Enum.count(results, &match?({:ok, _}, &1))
     failed = Enum.count(results, &match?({:error, _}, &1))
-    {:ok, "Spawned #{spawned} agents for tag=#{tag_name} (#{failed} failed)"}
+    {:ok, "Spawned #{spawned} agents for tag=#{config.tag_name} (#{failed} failed)"}
   end
 
   defp process_task(task, model, project_id) do
     mark_in_progress(task.id)
     result = spawn_agent(task, model, project_id)
 
-    if match?({:error, _}, result) do
-      Logger.warning("WorkableTaskWorker: spawn failed for task ##{task.id}, rolling back to To Do")
-      reset_to_todo(task.id)
-    end
+    case result do
+      {:error, _} ->
+        Logger.warning("WorkableTaskWorker: spawn failed for task ##{task.id}, rolling back to To Do")
+        reset_to_todo(task.id)
+        result
 
-    result
+      _ ->
+        result
+    end
   end
 
   defp count_active_agents do

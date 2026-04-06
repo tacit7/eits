@@ -220,16 +220,17 @@ On mount, DM page assigns `@active_timer` via `OrchestratorTimers.get_timer(sess
 3. LiveView sends `schedule_timer` event
 4. Backend calls `OrchestratorTimers.schedule_once/3` or `schedule_repeating/3`
 5. Server cancels existing timer if present, stores new state
-6. Server broadcasts `timer_updated` event
-7. LiveView updates assigns from broadcast
+6. Server broadcasts `Events.timer_scheduled(session_id, timer)`
+7. LiveView `handle_info({:timer_scheduled, timer}, socket)` updates `@active_timer`
 
 ### Fire
 
 1. GenServer receives `{:fire_timer, session_id, token}`
 2. Validates token
-3. Calls `AgentManager.send_message(session_id, message)`
-4. Clears or reschedules based on mode
-5. Broadcasts `timer_updated` event
+3. Calls `AgentManager.send_message(session_id, message, [])`
+4. One-shot: removes timer, broadcasts `Events.timer_fired(session_id, nil)`
+   Repeating: reschedules with new `next_fire_at`, broadcasts `Events.timer_fired(session_id, new_timer)` — the payload is the **updated** timer map with the rescheduled `next_fire_at`, so the LiveView countdown refreshes correctly
+5. LiveView `handle_info({:timer_fired, timer_or_nil}, socket)` updates `@active_timer`
 
 ### Cancel
 
@@ -237,8 +238,8 @@ On mount, DM page assigns `@active_timer` via `OrchestratorTimers.get_timer(sess
 2. LiveView sends `cancel_timer` event
 3. Backend calls `OrchestratorTimers.cancel(session_id)`
 4. Server cancels timer ref, removes state
-5. Broadcasts `timer_updated` with `nil`
-6. LiveView clears timer display
+5. Broadcasts `Events.timer_cancelled(session_id)`
+6. LiveView `handle_info(:timer_cancelled, socket)` clears `@active_timer`
 
 ---
 

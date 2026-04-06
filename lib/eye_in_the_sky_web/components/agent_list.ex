@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
 
   def search_bar(assigns) do
     ~H"""
-    <div class="sticky safe-top-sticky md:top-16 z-10 bg-base-100/85 backdrop-blur-md -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 border-b border-base-content/5">
+    <div class="sticky top-[calc(3rem+env(safe-area-inset-top))] md:top-16 z-10 bg-base-100/85 backdrop-blur-md -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 border-b border-base-content/5">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
         <form phx-change="search" class="flex-1 max-w-sm">
           <label for="search" class="sr-only">Search agents</label>

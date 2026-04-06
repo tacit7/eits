@@ -229,6 +229,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             </li>
             <li>
               <button
+                id="dm-schedule-timer-btn"
                 phx-click="open_schedule_timer"
                 class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
               >
@@ -238,6 +239,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             <%= if @active_timer do %>
               <li>
                 <button
+                  id="dm-cancel-timer-btn"
                   phx-click="cancel_timer"
                   class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-error/10 text-error rounded"
                 >

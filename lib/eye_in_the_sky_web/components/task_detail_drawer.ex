@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
               <button
                 type="button"
                 phx-click={@toggle_event}
-                class="p-2.5 rounded-md text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5 transition-colors"
+                class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5 transition-colors"
               >
                 <.icon name="hero-x-mark" class="w-5 h-5" />
               </button>

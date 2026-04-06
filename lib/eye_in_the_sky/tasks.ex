@@ -165,12 +165,15 @@ defmodule EyeInTheSky.Tasks do
   end
 
   @doc """
-  Gets a single task. Returns `nil` if not found.
+  Gets a single task. Returns `{:ok, task}` or `{:error, :not_found}`.
   """
   def get_task(id) do
-    Task
-    |> preload([:state, :tags, :sessions, :checklist_items])
-    |> Repo.get(id)
+    case Task
+         |> preload([:state, :tags, :sessions, :checklist_items])
+         |> Repo.get(id) do
+      nil -> {:error, :not_found}
+      task -> {:ok, task}
+    end
   end
 
   @doc """

@@ -24,7 +24,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
           id="new-agent-panel"
           phx-hook="DrawerSwipeClose"
           data-close-event={@toggle_event}
-          class="menu p-6 w-96 min-h-full bg-base-100 text-base-content"
+          class="menu p-6 w-full max-w-sm min-h-full bg-base-100 text-base-content"
         >
           <.modal_header title="New Agent" toggle_event={@toggle_event} />
 

@@ -17,8 +17,8 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
   def notes_list(assigns) do
     ~H"""
     <%!-- Search + Filter --%>
-    <div class="mb-5 flex items-center gap-3">
-      <form phx-change="search" class="flex-1 sm:max-w-sm">
+    <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+      <form phx-change="search" class="w-full sm:flex-1 sm:max-w-sm">
         <div class="relative">
           <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
@@ -35,46 +35,48 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
           />
         </div>
       </form>
-      <button
-        type="button"
-        phx-click="toggle_starred_filter"
-        class={"flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 " <>
-          if(@starred_filter,
-            do: "bg-warning/10 text-warning",
-            else: "text-base-content/35 hover:text-base-content/50 hover:bg-base-200/40"
-          )}
-      >
-        <.icon
-          name={if @starred_filter, do: "hero-star-solid", else: "hero-star"}
-          class="w-3.5 h-3.5"
-        /> Starred
-      </button>
-      <form phx-change="filter_type">
-        <label for={"#{@empty_id}-type"} class="sr-only">Filter by type</label>
-        <select
-          name="value"
-          id={"#{@empty_id}-type"}
-          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-0 h-8 text-xs"
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          phx-click="toggle_starred_filter"
+          class={"flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 " <>
+            if(@starred_filter,
+              do: "bg-warning/10 text-warning",
+              else: "text-base-content/35 hover:text-base-content/50 hover:bg-base-200/40"
+            )}
         >
-          <option value="all" selected={@type_filter == "all"}>All Types</option>
-          <option value="session" selected={@type_filter == "session"}>Session</option>
-          <option value="agent" selected={@type_filter == "agent"}>Agent</option>
-          <option value="project" selected={@type_filter == "project"}>Project</option>
-          <option value="task" selected={@type_filter == "task"}>Task</option>
-          <option value="system" selected={@type_filter == "system"}>System</option>
-        </select>
-      </form>
-      <form phx-change="sort_notes">
-        <label for={"#{@empty_id}-sort"} class="sr-only">Sort notes</label>
-        <select
-          name="value"
-          id={"#{@empty_id}-sort"}
-          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-0 h-8 text-xs"
-        >
-          <option value="newest" selected={@sort_by == "newest"}>Newest</option>
-          <option value="oldest" selected={@sort_by == "oldest"}>Oldest</option>
-        </select>
-      </form>
+          <.icon
+            name={if @starred_filter, do: "hero-star-solid", else: "hero-star"}
+            class="w-3.5 h-3.5"
+          /> Starred
+        </button>
+        <form phx-change="filter_type">
+          <label for={"#{@empty_id}-type"} class="sr-only">Filter by type</label>
+          <select
+            name="value"
+            id={"#{@empty_id}-type"}
+            class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-0 h-8 text-xs"
+          >
+            <option value="all" selected={@type_filter == "all"}>All Types</option>
+            <option value="session" selected={@type_filter == "session"}>Session</option>
+            <option value="agent" selected={@type_filter == "agent"}>Agent</option>
+            <option value="project" selected={@type_filter == "project"}>Project</option>
+            <option value="task" selected={@type_filter == "task"}>Task</option>
+            <option value="system" selected={@type_filter == "system"}>System</option>
+          </select>
+        </form>
+        <form phx-change="sort_notes">
+          <label for={"#{@empty_id}-sort"} class="sr-only">Sort notes</label>
+          <select
+            name="value"
+            id={"#{@empty_id}-sort"}
+            class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-0 h-8 text-xs"
+          >
+            <option value="newest" selected={@sort_by == "newest"}>Newest</option>
+            <option value="oldest" selected={@sort_by == "oldest"}>Oldest</option>
+          </select>
+        </form>
+      </div>
     </div>
 
     <%!-- Notes count --%>

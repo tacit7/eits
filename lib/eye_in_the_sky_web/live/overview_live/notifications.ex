@@ -90,34 +90,34 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
   def render(assigns) do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-6">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
         <h1 class="text-xl font-semibold">Notifications</h1>
         <div class="flex items-center gap-2">
           <%!-- Category filter --%>
           <div class="join">
             <button
-              class={"join-item btn btn-xs #{if @filter == "all", do: "btn-active"}"}
+              class={"join-item btn btn-sm #{if @filter == "all", do: "btn-active"}"}
               phx-click="filter"
               phx-value-category="all"
             >
               All
             </button>
             <button
-              class={"join-item btn btn-xs #{if @filter == "agent", do: "btn-active"}"}
+              class={"join-item btn btn-sm #{if @filter == "agent", do: "btn-active"}"}
               phx-click="filter"
               phx-value-category="agent"
             >
               Agent
             </button>
             <button
-              class={"join-item btn btn-xs #{if @filter == "job", do: "btn-active"}"}
+              class={"join-item btn btn-sm #{if @filter == "job", do: "btn-active"}"}
               phx-click="filter"
               phx-value-category="job"
             >
               Job
             </button>
             <button
-              class={"join-item btn btn-xs #{if @filter == "system", do: "btn-active"}"}
+              class={"join-item btn btn-sm #{if @filter == "system", do: "btn-active"}"}
               phx-click="filter"
               phx-value-category="system"
             >

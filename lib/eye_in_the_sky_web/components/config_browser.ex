@@ -9,37 +9,39 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
   attr :entry, :map, required: true
 
   def tree_item(assigns) do
-    case assigns.entry.is_dir do
-      true ->
-        ~H"""
-        <li>
-          <details>
-            <summary>
-              <.icon name="hero-folder" class="w-4 h-4" />
-              {@entry.name}
-            </summary>
-            <ul>
-              <.tree_item :for={child <- @entry.children} entry={child} />
-            </ul>
-          </details>
-        </li>
-        """
+    if assigns.entry.is_dir, do: dir_item(assigns), else: file_item(assigns)
+  end
 
-      false ->
-        ~H"""
-        <li>
-          <button
-            phx-click="view_file"
-            phx-value-path={@entry.path}
-            class="flex items-center gap-2 w-full text-left"
-          >
-            <.icon name="hero-document" class="w-4 h-4" />
-            <span class="truncate">{@entry.name}</span>
-            <span class="badge badge-ghost badge-xs ml-auto shrink-0">{format_size(@entry.size)}</span>
-          </button>
-        </li>
-        """
-    end
+  defp dir_item(assigns) do
+    ~H"""
+    <li>
+      <details>
+        <summary>
+          <.icon name="hero-folder" class="w-4 h-4" />
+          {@entry.name}
+        </summary>
+        <ul>
+          <.tree_item :for={child <- @entry.children} entry={child} />
+        </ul>
+      </details>
+    </li>
+    """
+  end
+
+  defp file_item(assigns) do
+    ~H"""
+    <li>
+      <button
+        phx-click="view_file"
+        phx-value-path={@entry.path}
+        class="flex items-center gap-2 w-full text-left"
+      >
+        <.icon name="hero-document" class="w-4 h-4" />
+        <span class="truncate">{@entry.name}</span>
+        <span class="badge badge-ghost badge-xs ml-auto shrink-0">{format_size(@entry.size)}</span>
+      </button>
+    </li>
+    """
   end
 
   def tree_view(assigns) do

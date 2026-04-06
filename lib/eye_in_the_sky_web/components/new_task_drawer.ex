@@ -29,7 +29,7 @@ defmodule EyeInTheSkyWeb.Components.NewTaskDrawer do
 
         <%!-- Modal box --%>
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-          <div class="bg-base-100 rounded-box shadow-xl p-6 w-96 max-w-lg pointer-events-auto overflow-y-auto max-h-[calc(100dvh-2rem)]">
+          <div class="bg-base-100 rounded-box shadow-xl p-6 w-full max-w-lg pointer-events-auto overflow-y-auto max-h-[calc(100dvh-2rem)]">
             <.modal_header title="New Task" toggle_event={@toggle_event} />
 
             <form id={"#{@id}-form"} phx-submit={@submit_event} class="flex flex-col gap-4">

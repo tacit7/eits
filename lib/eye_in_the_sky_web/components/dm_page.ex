@@ -33,7 +33,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :commits, :list, default: []
   attr :diff_cache, :map, default: %{}
   attr :notes, :list, default: []
-  attr :session, :map, default: nil
   attr :slash_items, :list, default: []
   attr :current_task, :map, default: nil
   attr :queued_prompts, :list, default: []
@@ -488,7 +487,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               messages={@messages}
               has_more_messages={@has_more_messages}
               stream={@stream}
-              session={@session}
+              session={@agent}
               agent={@agent}
               message_search_query={@message_search_query}
             />
@@ -505,7 +504,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               messages={@messages}
               has_more_messages={@has_more_messages}
               stream={@stream}
-              session={@session}
+              session={@agent}
               agent={@agent}
               message_search_query={@message_search_query}
             />

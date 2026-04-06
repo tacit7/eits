@@ -105,6 +105,7 @@ defmodule EyeInTheSkyWeb.DmLive do
     {:noreply, assign(socket, :active_overlay, overlay)}
   end
 
+  @impl true
   def handle_event("keydown", _params, socket), do: {:noreply, socket}
 
   # ---------------------------------------------------------------------------
@@ -418,7 +419,6 @@ defmodule EyeInTheSkyWeb.DmLive do
         selected_model={@selected_model}
         selected_effort={@selected_effort}
         processing={@processing}
-        session={@session}
         tasks={@tasks}
         commits={@commits}
         diff_cache={@diff_cache}

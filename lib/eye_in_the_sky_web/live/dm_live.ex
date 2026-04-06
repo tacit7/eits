@@ -377,6 +377,21 @@ defmodule EyeInTheSkyWeb.DmLive do
     do: handle_queue_updated(prompts, socket)
 
   @impl true
+  def handle_info({:timer_scheduled, timer}, socket) do
+    {:noreply, assign(socket, :active_timer, timer)}
+  end
+
+  @impl true
+  def handle_info(:timer_cancelled, socket) do
+    {:noreply, assign(socket, :active_timer, nil)}
+  end
+
+  @impl true
+  def handle_info({:timer_fired, timer_or_nil}, socket) do
+    {:noreply, assign(socket, :active_timer, timer_or_nil)}
+  end
+
+  @impl true
   def handle_info(msg, socket) do
     Logger.debug("Unhandled message in DM LiveView: #{inspect(msg)}")
     {:noreply, socket}

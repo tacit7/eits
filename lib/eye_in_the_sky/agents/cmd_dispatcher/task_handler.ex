@@ -65,19 +65,18 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
         with id when not is_nil(id) <- id_str |> String.trim() |> ToolHelpers.parse_int(),
              state_id when not is_nil(state_id) <- state_str |> String.trim() |> ToolHelpers.parse_int(),
              true <- Tasks.task_linked_to_session?(id, from_session_id),
-             task <- Tasks.get_task!(id) do
+             {:ok, task} <- Tasks.get_task(id) do
           Tasks.update_task_state(task, state_id)
           notify_success(from_session_id, "task #{id} state -> #{state_id}")
         else
           false -> notify_error(from_session_id, "task update", {:not_linked, rest})
+          {:error, :not_found} -> notify_error(from_session_id, "task update", :not_found)
           _ -> notify_error(from_session_id, "task update", :invalid_id_or_state_id)
         end
 
       _ ->
         notify_error(from_session_id, "task update", :expected_id_and_state_id)
     end
-  rescue
-    Ecto.NoResultsError -> notify_error(from_session_id, "task update", :not_found)
   end
 
   def dispatch("done " <> id_str, from_session_id) do
@@ -130,19 +129,19 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
       [id_str, tag_id_str] ->
         with id when not is_nil(id) <- id_str |> String.trim() |> ToolHelpers.parse_int(),
              tag_id when not is_nil(tag_id) <- tag_id_str |> String.trim() |> ToolHelpers.parse_int(),
-             true <- Tasks.task_linked_to_session?(id, from_session_id) do
+             true <- Tasks.task_linked_to_session?(id, from_session_id),
+             {:ok, _task} <- Tasks.get_task(id) do
           Tasks.link_tag_to_task(id, tag_id)
           notify_success(from_session_id, "task #{id} tagged with #{tag_id}")
         else
           false -> notify_error(from_session_id, "task tag", {:not_linked, id_str})
+          {:error, :not_found} -> notify_error(from_session_id, "task tag", :not_found)
           _ -> notify_error(from_session_id, "task tag", {:invalid_id_or_tag_id, rest})
         end
 
       _ ->
         notify_error(from_session_id, "task tag", :expected_id_and_tag_id)
     end
-  rescue
-    Ecto.NoResultsError -> notify_error(from_session_id, "task tag", :not_found)
   end
 
   def dispatch(unknown, from_session_id),

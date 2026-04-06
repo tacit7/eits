@@ -9,13 +9,17 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Settings
 
+  defmodule Acc do
+    defstruct ingested: 0, skipped: 0, errors: 0
+  end
+
   @doc """
   Ingest token usage for all discovered sessions.
 
   Options:
   - `:force` - re-process sessions that already have metrics (default: false)
 
-  Returns `{ingested, skipped, errors}` counts.
+  Returns a map with `:ingested`, `:skipped`, `:errors` counts.
   """
   def ingest_all(opts \\ []) do
     force = Keyword.get(opts, :force, false)
@@ -28,8 +32,11 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
         fetch_existing_metric_session_ids()
       end
 
-    sessions
-    |> Enum.reduce({0, 0, 0}, &process_session_entry(&1, existing_session_ids, &2))
+    acc =
+      sessions
+      |> Enum.reduce(%Acc{}, &process_session_entry(&1, existing_session_ids, &2))
+
+    %{ingested: acc.ingested, skipped: acc.skipped, errors: acc.errors}
   end
 
   @doc """
@@ -47,21 +54,21 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
 
   # -- Private --
 
-  defp process_session_entry(session_info, existing_session_ids, {ingested, skipped, errors}) do
+  defp process_session_entry(session_info, existing_session_ids, %Acc{} = acc) do
     case lookup_session_by_uuid(session_info.session_id) do
-      nil -> {ingested, skipped + 1, errors}
-      db_session -> process_found_session(session_info, db_session, existing_session_ids, {ingested, skipped, errors})
+      nil -> %{acc | skipped: acc.skipped + 1}
+      db_session -> process_found_session(session_info, db_session, existing_session_ids, acc)
     end
   end
 
-  defp process_found_session(session_info, db_session, existing_session_ids, {ingested, skipped, errors}) do
+  defp process_found_session(session_info, db_session, existing_session_ids, %Acc{} = acc) do
     if MapSet.member?(existing_session_ids, db_session.id) do
-      {ingested, skipped + 1, errors}
+      %{acc | skipped: acc.skipped + 1}
     else
       file_path = build_file_path(session_info)
       case ingest_one(file_path, db_session.id, db_session.agent_id) do
-        :ok -> {ingested + 1, skipped, errors}
-        {:error, _} -> {ingested, skipped, errors + 1}
+        :ok -> %{acc | ingested: acc.ingested + 1}
+        {:error, _} -> %{acc | errors: acc.errors + 1}
       end
     end
   end

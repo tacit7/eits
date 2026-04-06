@@ -39,7 +39,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
 
   @impl true
   def handle_info(:do_recalculate, socket) do
-    {ingested, skipped, errors} =
+    %{ingested: ingested, skipped: skipped, errors: errors} =
       TokenIngestion.ingest_all(force: true)
 
     socket =

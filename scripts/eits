@@ -364,10 +364,10 @@ cmd_agents() {
       # eits agents spawn --instructions <text> [--model <m>] [--provider <p>]
       #   [--project-id <n>] [--project-path <path>] [--worktree <branch>]
       #   [--effort-level <level>] [--parent-session-id <n>] [--parent-agent-id <n>]
-      #   [--team-name <name>] [--member-name <alias>] [--agent <name>] [--yolo]
+      #   [--team-name <name>] [--member-name <alias>] [--agent <name>] [--name <n>] [--yolo]
       local instructions="" model="" provider="" project_id="" project_path=""
       local worktree="" effort_level="" parent_session_id="" parent_agent_id=""
-      local team_name="" member_name="" agent_name="" bypass_sandbox="false"
+      local team_name="" member_name="" agent_name="" session_name="" bypass_sandbox="false"
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --instructions)      instructions="$2";      shift 2 ;;
@@ -382,6 +382,7 @@ cmd_agents() {
           --team-name)         team_name="$2";         shift 2 ;;
           --member-name)       member_name="$2";       shift 2 ;;
           --agent)             agent_name="$2";        shift 2 ;;
+          --name)              session_name="$2";      shift 2 ;;
           --yolo)              bypass_sandbox="true";  shift ;;
           *) die "unknown flag: $1" ;;
         esac
@@ -398,6 +399,7 @@ cmd_agents() {
         --arg     team_name         "$team_name" \
         --arg     member_name       "$member_name" \
         --arg     agent             "$agent_name" \
+        --arg     name              "$session_name" \
         --argjson project_id        "${project_id:-null}" \
         --argjson parent_session_id "${parent_session_id:-null}" \
         --argjson parent_agent_id   "${parent_agent_id:-null}" \
@@ -411,6 +413,7 @@ cmd_agents() {
          + (if $team_name         != "" then {team_name: $team_name}                   else {} end)
          + (if $member_name       != "" then {member_name: $member_name}               else {} end)
          + (if $agent             != "" then {agent: $agent}                           else {} end)
+         + (if $name              != "" then {name: $name}                             else {} end)
          + (if $project_id        != null then {project_id: $project_id}               else {} end)
          + (if $parent_session_id != null then {parent_session_id: $parent_session_id} else {} end)
          + (if $parent_agent_id   != null then {parent_agent_id: $parent_agent_id}     else {} end)

@@ -230,8 +230,8 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteAgentHandlers do
     project_path =
       if project_id do
         case Projects.get_project(project_id) do
-          %{path: path} -> path
-          _ -> nil
+          {:ok, %{path: path}} -> path
+          {:error, :not_found} -> nil
         end
       end
 

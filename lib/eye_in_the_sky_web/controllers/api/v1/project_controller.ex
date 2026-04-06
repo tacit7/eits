@@ -23,10 +23,10 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectController do
   """
   def show(conn, %{"id" => id}) do
     case Projects.get_project(id) do
-      nil ->
+      {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "Project not found"})
 
-      project ->
+      {:ok, project} ->
         json(conn, %{success: true, project: ApiPresenter.present_project(project)})
     end
   end

@@ -44,9 +44,14 @@ defmodule EyeInTheSky.Projects do
   def get_project!(id), do: get!(id)
 
   @doc """
-  Gets a single project by id. Returns nil if not found.
+  Gets a single project by id. Returns {:ok, project} | {:error, :not_found}.
   """
-  def get_project(id), do: Repo.get(Project, id)
+  def get_project(id) do
+    case Repo.get(Project, id) do
+      nil -> {:error, :not_found}
+      project -> {:ok, project}
+    end
+  end
 
   @doc """
   Gets a project with agents preloaded. Raises if not found.
@@ -89,10 +94,10 @@ defmodule EyeInTheSky.Projects do
   """
   def set_bookmarked(project_id, bookmarked) when is_boolean(bookmarked) do
     case get_project(project_id) do
-      nil ->
+      {:error, :not_found} ->
         {:error, :not_found}
 
-      project ->
+      {:ok, project} ->
         project
         |> Project.changeset(%{bookmarked: bookmarked})
         |> Repo.update()
@@ -115,8 +120,8 @@ defmodule EyeInTheSky.Projects do
     cond do
       project_id != nil ->
         case get_project(project_id) do
-          nil -> {:error, "project_not_found", "project_id #{project_id} does not exist"}
-          project -> {:ok, project.id, project.name}
+          {:error, :not_found} -> {:error, "project_not_found", "project_id #{project_id} does not exist"}
+          {:ok, project} -> {:ok, project.id, project.name}
         end
 
       project_path not in [nil, ""] ->

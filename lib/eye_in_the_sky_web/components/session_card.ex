@@ -28,7 +28,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
 
   def session_row(assigns) do
     display_status = derive_display_status(assigns.session)
-    {status_label, status_border, status_class} = session_status_display(display_status)
+    %{label: status_label, border: status_border, class: status_class} = session_status_display(display_status)
 
     assigns =
       assigns
@@ -50,10 +50,10 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
           id={"swipe-fav-#{@session.id}"}
           phx-hook="BookmarkAgent"
           phx-update="ignore"
-          data-agent-id={Map.get(@session, :agent) && Map.get(@session, :agent).uuid}
+          data-agent-id={@session.agent && @session.agent.uuid}
           data-session-id={@session.uuid}
           data-agent-name={
-            @session.name || (Map.get(@session, :agent) && Map.get(@session, :agent).description) ||
+            @session.name || (@session.agent && @session.agent.description) ||
               "Agent"
           }
           data-agent-status={@session.status}
@@ -139,7 +139,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
             <% else %>
               <span class="text-[13px] font-medium text-base-content/85 truncate">
                 {@session.name ||
-                  truncate_text(Map.get(@session, :agent) && Map.get(@session, :agent).description) ||
+                  truncate_text(@session.agent && @session.agent.description) ||
                   "Unnamed session"}
               </span>
             <% end %>
@@ -149,11 +149,11 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
             <span class="text-base-content/15">/</span>
             <span class={["font-medium shrink-0", @status_class]}>{@status_label}</span>
             <span class="text-base-content/15">/</span>
-            <%= if Map.get(@session, :entrypoint) == "cli" do %>
+            <%= if @session.entrypoint == "cli" do %>
               <.icon name="hero-command-line" class="w-3 h-3 text-base-content/40 flex-shrink-0" />
             <% end %>
-            <%= if (agent = Map.get(@session, :agent)) && is_map(Map.get(agent, :agent_definition)) && not match?(%Ecto.Association.NotLoaded{}, Map.get(agent, :agent_definition)) && Map.get(agent.agent_definition, :display_name) do %>
-              <span class="text-base-content/50 truncate min-w-0">{agent.agent_definition.display_name}</span>
+            <%= if name = agent_display_name(@session) do %>
+              <span class="text-base-content/50 truncate min-w-0">{name}</span>
               <span class="text-base-content/15">/</span>
             <% end %>
             <span class="font-mono">{Sessions.format_model_info(@session)}</span>
@@ -163,7 +163,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
               <span class="text-base-content/15">/</span>
               <span class="truncate text-base-content/50">{@project_name}</span>
             <% end %>
-            <%= if task_title = Map.get(@session, :current_task_title) do %>
+            <%= if task_title = @session.current_task_title do %>
               <span class="text-base-content/15">/</span>
               <span class="truncate text-primary/60 font-medium">{task_title}</span>
             <% end %>
@@ -181,14 +181,27 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
     """
   end
 
+  # Extracts the agent definition display name from a session, guarding against
+  # unloaded associations and nil values.
+  defp agent_display_name(session) do
+    with agent when not is_nil(agent) <- session.agent,
+         defn when is_map(defn) <- Map.get(agent, :agent_definition),
+         false <- match?(%Ecto.Association.NotLoaded{}, defn),
+         name when not is_nil(name) <- Map.get(defn, :display_name) do
+      name
+    else
+      _ -> nil
+    end
+  end
+
   defp session_status_display(status) do
     case status do
-      "working" -> {"Working", "border-success", "text-success"}
-      "waiting" -> {"Waiting", "border-warning", "text-warning"}
-      "compacting" -> {"Compacting", "border-orange-500", "text-orange-500"}
-      "stopped" -> {"Stopped", "border-warning", "text-warning"}
-      "completed" -> {"Done", "border-transparent", "text-base-content/50"}
-      _ -> {"Idle", "border-transparent", "text-base-content/55"}
+      "working" -> %{label: "Working", border: "border-success", class: "text-success"}
+      "waiting" -> %{label: "Waiting", border: "border-warning", class: "text-warning"}
+      "compacting" -> %{label: "Compacting", border: "border-orange-500", class: "text-orange-500"}
+      "stopped" -> %{label: "Stopped", border: "border-warning", class: "text-warning"}
+      "completed" -> %{label: "Done", border: "border-transparent", class: "text-base-content/50"}
+      _ -> %{label: "Idle", border: "border-transparent", class: "text-base-content/55"}
     end
   end
 end

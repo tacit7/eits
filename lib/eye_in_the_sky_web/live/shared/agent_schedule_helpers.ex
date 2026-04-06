@@ -36,7 +36,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
   def handle_switch_tab(_, socket), do: {:noreply, socket}
 
   def handle_schedule_prompt(%{"id" => id}, socket) do
-    prompt = resolve_prompt(id, socket)
+    prompt = resolve_prompt(id)
     {:noreply, socket |> assign(:scheduling_prompt, prompt) |> assign(:scheduling_job, nil)}
   end
 
@@ -65,36 +65,30 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
   def handle_save_schedule(%{"schedule" => params}, socket) do
     prompt_id_raw = params["prompt_id"]
     is_fs = AgentFileScanner.filesystem_id?(prompt_id_raw)
-    prompt = resolve_prompt(prompt_id_raw, socket)
 
-    if prompt do
-      case resolve_project_path(params, prompt, socket) do
-        {:error, :no_project} ->
-          {:noreply,
-           put_flash(socket, :error, "Could not resolve project path. Select a project override.")}
+    with prompt when not is_nil(prompt) <- resolve_prompt(prompt_id_raw),
+         {:ok, path} <- resolve_project_path(params, prompt, socket) do
+      config = build_schedule_config(%{prompt: prompt, params: params, path: path, is_fs: is_fs, prompt_id_raw: prompt_id_raw})
 
-        {:ok, path} ->
-          config = build_schedule_config(prompt, params, path, is_fs, prompt_id_raw)
+      job_attrs =
+        %{
+          "name" => prompt.name,
+          "description" => prompt.description || "",
+          "job_type" => "spawn_agent",
+          "schedule_type" => params["schedule_type"],
+          "schedule_value" => params["schedule_value"],
+          "config" => config,
+          "prompt_id" => if(is_fs, do: nil, else: parse_int(prompt_id_raw)),
+          "enabled" => 1
+        }
+        |> put_if_present("timezone", params["timezone"])
 
-          job_attrs =
-            %{
-              "name" => prompt.name,
-              "description" => prompt.description || "",
-              "job_type" => "spawn_agent",
-              "schedule_type" => params["schedule_type"],
-              "schedule_value" => params["schedule_value"],
-              "config" => config,
-              "prompt_id" => if(is_fs, do: nil, else: parse_int(prompt_id_raw)),
-              "enabled" => 1
-            }
-            |> put_if_present("timezone", params["timezone"])
-
-          caller_project_id = Map.get(socket.assigns, :project_id)
-          result = save_or_update_job(params["job_id"], job_attrs, caller_project_id, socket)
-          handle_schedule_result(result, socket)
-      end
+      caller_project_id = Map.get(socket.assigns, :project_id)
+      result = save_or_update_job(params["job_id"], job_attrs, caller_project_id, socket)
+      handle_schedule_result(result, socket)
     else
-      {:noreply, put_flash(socket, :error, "Agent not found")}
+      nil -> {:noreply, put_flash(socket, :error, "Agent not found")}
+      {:error, :no_project} -> {:noreply, put_flash(socket, :error, "Could not resolve project path. Select a project override.")}
     end
   end
 
@@ -168,7 +162,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
     end
   end
 
-  defp resolve_prompt(id, _socket) do
+  defp resolve_prompt(id) do
     cond do
       is_nil(id) || id == "" ->
         nil
@@ -216,8 +210,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
       override_id && override_id != "" ->
         project_path_by_id(parse_int(override_id))
 
-      prompt[:project_id] || Map.get(prompt, :project_id) ->
-        pid = prompt[:project_id] || Map.get(prompt, :project_id)
+      Map.get(prompt, :project_id) ->
+        pid = Map.get(prompt, :project_id)
         project_path_by_id(pid)
 
       project_id = Map.get(socket.assigns, :project_id) ->
@@ -248,7 +242,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
     end
   end
 
-  defp build_schedule_config(prompt, params, path, is_fs, prompt_id_raw) do
+  defp build_schedule_config(%{prompt: prompt, params: params, path: path, is_fs: is_fs, prompt_id_raw: prompt_id_raw}) do
     %{
       "instructions" => prompt.prompt_text,
       "model" => params["model"] || "sonnet",

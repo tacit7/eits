@@ -49,6 +49,8 @@ defmodule EyeInTheSky.Application do
       EyeInTheSky.Messages.Broadcaster,
       # Rate limiter ETS backend for auth endpoint throttling
       EyeInTheSky.RateLimiter,
+      # In-memory timer registry for orchestrator sessions
+      EyeInTheSky.OrchestratorTimers.Server,
       # Start to serve requests, typically the last entry
       EyeInTheSkyWeb.Endpoint
     ]

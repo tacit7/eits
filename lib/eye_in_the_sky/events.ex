@@ -24,6 +24,7 @@ defmodule EyeInTheSky.Events do
   | `"scheduled_jobs"`             | JobsLive                          |
   | `"session_lifecycle"`          | Teams.Subscriber                  |
   | `"projects"`                   | Sidebar                           |
+  | `"session:<id>:timer"`         | DMLive                            |
 
   ## Note on payload shape inconsistency
 
@@ -59,6 +60,9 @@ defmodule EyeInTheSky.Events do
 
   @doc "Subscribe to session status string changes."
   def subscribe_session_status(session_id), do: sub("session:#{session_id}:status")
+
+  @doc "Subscribe to orchestrator timer events for a session."
+  def subscribe_session_timer(session_id), do: sub("session:#{session_id}:timer")
 
   @doc "Subscribe to real-time stream deltas for a session."
   def subscribe_dm_stream(session_id), do: sub("dm:#{session_id}:stream")
@@ -292,6 +296,22 @@ defmodule EyeInTheSky.Events do
 
   @doc "Unsubscribe from session status events."
   def unsubscribe_session_status(session_id), do: unsub("session:#{session_id}:status")
+
+  # ---------------------------------------------------------------------------
+  # Orchestrator timer events — topic: "session:<session_id>:timer"
+  # ---------------------------------------------------------------------------
+
+  @doc "An orchestrator timer was scheduled (new or replacing an existing one)."
+  def timer_scheduled(session_id, timer),
+    do: broadcast("session:#{session_id}:timer", {:timer_scheduled, timer})
+
+  @doc "An orchestrator timer was explicitly cancelled."
+  def timer_cancelled(session_id),
+    do: broadcast("session:#{session_id}:timer", :timer_cancelled)
+
+  @doc "An orchestrator timer fired. Payload is the rescheduled timer map (repeating) or nil (one-shot)."
+  def timer_fired(session_id, timer_or_nil),
+    do: broadcast("session:#{session_id}:timer", {:timer_fired, timer_or_nil})
 
   defp broadcast(topic, message), do: Phoenix.PubSub.broadcast(@pubsub, topic, message)
   defp sub(topic), do: Phoenix.PubSub.subscribe(@pubsub, topic)

@@ -215,7 +215,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                 active={@sidebar_tab == :sessions}
               />
               <.panel_nav_item
-                href={~p"/projects/#{@sidebar_project.id}/tasks"}
+                href={~p"/projects/#{@sidebar_project.id}/kanban"}
                 icon="hero-clipboard-document-list"
                 label="Tasks"
                 active={@sidebar_tab in [:tasks, :kanban]}

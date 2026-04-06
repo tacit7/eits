@@ -6,9 +6,11 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Claude.AgentWorker
+  alias EyeInTheSky.Events
   alias EyeInTheSky.{Projects, Tasks}
   alias EyeInTheSkyWeb.Helpers.PubSubHelpers
   alias EyeInTheSkyWeb.Helpers.SlashItems
+  alias EyeInTheSky.OrchestratorTimers
 
   @default_message_limit 20
 
@@ -23,6 +25,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     PubSubHelpers.subscribe_dm_stream(session_id)
     PubSubHelpers.subscribe_dm_queue(session_id)
     PubSubHelpers.subscribe_tasks()
+    Events.subscribe_session_timer(session_id)
   end
 
   def assign_sidebar_context(socket, %{"from" => "project", "project_id" => project_id_str}) do
@@ -90,6 +93,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:message_search_query, "")
     |> assign(:session_context, nil)
     |> assign(:reloading, false)
+    |> assign(:active_timer, OrchestratorTimers.get_timer(session.id))
     |> allow_upload(:files,
       accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
       max_entries: 10,

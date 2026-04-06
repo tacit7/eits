@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.DmLive do
   alias EyeInTheSkyWeb.DmLive.{AgentLifecycle, ExternalActions, MessageHandlers, MountState, SlashCommands}
   alias EyeInTheSkyWeb.DmLive.TabHelpers
   alias EyeInTheSkyWeb.DmLive.TaskHandlers
+  alias EyeInTheSkyWeb.DmLive.TimerHandlers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
   import EyeInTheSkyWeb.Live.Shared.TasksHelpers
   import EyeInTheSkyWeb.Live.Shared.DmExportHelpers
@@ -76,6 +77,24 @@ defmodule EyeInTheSkyWeb.DmLive do
     overlay = if socket.assigns.active_overlay == :task_detail, do: nil, else: :task_detail
     {:noreply, assign(socket, :active_overlay, overlay)}
   end
+
+  @impl true
+  def handle_event("open_schedule_timer", _params, socket) do
+    {:noreply, assign(socket, :active_overlay, :schedule_timer)}
+  end
+
+  @impl true
+  def handle_event("close_schedule_modal", _params, socket) do
+    {:noreply, assign(socket, :active_overlay, nil)}
+  end
+
+  @impl true
+  def handle_event("schedule_timer", params, socket),
+    do: TimerHandlers.handle_schedule_timer(params, socket)
+
+  @impl true
+  def handle_event("cancel_timer", _params, socket),
+    do: TimerHandlers.handle_cancel_timer(socket)
 
   @impl true
   def handle_event("toggle_thinking", _params, socket), do: handle_toggle_thinking(socket)
@@ -358,6 +377,21 @@ defmodule EyeInTheSkyWeb.DmLive do
     do: handle_queue_updated(prompts, socket)
 
   @impl true
+  def handle_info({:timer_scheduled, timer}, socket) do
+    {:noreply, assign(socket, :active_timer, timer)}
+  end
+
+  @impl true
+  def handle_info(:timer_cancelled, socket) do
+    {:noreply, assign(socket, :active_timer, nil)}
+  end
+
+  @impl true
+  def handle_info({:timer_fired, timer_or_nil}, socket) do
+    {:noreply, assign(socket, :active_timer, timer_or_nil)}
+  end
+
+  @impl true
   def handle_info(msg, socket) do
     Logger.debug("Unhandled message in DM LiveView: #{inspect(msg)}")
     {:noreply, socket}
@@ -400,6 +434,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         message_search_query={@message_search_query}
         session_context={@session_context}
         reloading={@reloading}
+        active_timer={@active_timer}
       />
 
       <EyeInTheSkyWeb.Components.NewTaskDrawer.new_task_drawer

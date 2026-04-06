@@ -80,10 +80,16 @@ defmodule EyeInTheSky.OrchestratorTimers.Server do
 
   @impl GenServer
   def handle_call({:cancel, session_id}, _from, state) do
-    state = cancel_existing(state, session_id)
-    Logger.info("[OrchestratorTimers] cancelled session=#{session_id}")
-    Events.timer_cancelled(session_id)
-    {:reply, :ok, state}
+    case Map.get(state, session_id) do
+      nil ->
+        {:reply, :ok, state}
+
+      _ ->
+        new_state = cancel_existing(state, session_id)
+        Logger.info("[OrchestratorTimers] cancelled session=#{session_id}")
+        Events.timer_cancelled(session_id)
+        {:reply, :ok, new_state}
+    end
   end
 
   @impl GenServer
@@ -127,7 +133,7 @@ defmodule EyeInTheSky.OrchestratorTimers.Server do
 
     case result do
       {:ok, _} ->
-        Logger.info("[OrchestratorTimers] delivery succeeded session=#{session_id}")
+        Logger.debug("[OrchestratorTimers] delivery succeeded session=#{session_id}")
 
       {:error, reason} ->
         Logger.warning("[OrchestratorTimers] delivery failed session=#{session_id} reason=#{inspect(reason)}")

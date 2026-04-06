@@ -259,8 +259,8 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
 
       name ->
         case Teams.get_team_by_name(name) do
-          nil -> {:error, "team_not_found", "team not found: #{name}"}
-          team -> {:ok, team}
+          {:error, :not_found} -> {:error, "team_not_found", "team not found: #{name}"}
+          {:ok, team} -> {:ok, team}
         end
     end
   end

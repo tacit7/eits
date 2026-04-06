@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 </p>
               <% end %>
             </div>
-            <button class="btn btn-ghost btn-sm btn-square" phx-click="cancel_form">
+            <button class="btn btn-ghost btn-square min-w-[44px] min-h-[44px]" phx-click="cancel_form">
               <span class="sr-only">Close job form</span>
               <.icon name="hero-x-mark" class="w-4 h-4" />
             </button>

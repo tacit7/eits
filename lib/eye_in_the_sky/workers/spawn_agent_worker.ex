@@ -42,28 +42,7 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
       base_instructions <>
         "\n\nYour DM page link (include this in any notifications): #{dm_link}"
 
-    opts =
-      [
-        instructions: instructions,
-        model: config["model"],
-        project_path: config["project_path"],
-        description: config["description"] || "Scheduled agent",
-        project_id: job.project_id,
-        session_uuid: session_uuid
-      ]
-      |> maybe_put(:max_budget_usd, parse_float(config["max_budget_usd"]))
-      |> maybe_put(:max_turns, ToolHelpers.parse_int(config["max_turns"]))
-      |> maybe_put(:fallback_model, config["fallback_model"])
-      |> maybe_put(:allowed_tools, config["allowed_tools"])
-      |> maybe_put(:output_format, config["output_format"])
-      |> maybe_put(:skip_permissions, config["skip_permissions"])
-      |> maybe_put(:permission_mode, config["permission_mode"])
-      |> maybe_put(:add_dir, config["add_dir"])
-      |> maybe_put(:mcp_config, config["mcp_config"])
-      |> maybe_put(:plugin_dir, config["plugin_dir"])
-      |> maybe_put(:settings_file, config["settings_file"])
-      |> maybe_put(:chrome, config["chrome"])
-      |> maybe_put(:sandbox, config["sandbox"])
+    opts = build_agent_opts(config, session_uuid, instructions, job)
 
     log_opts = Keyword.drop(opts, [:instructions])
 
@@ -78,6 +57,30 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
       {:error, reason} ->
         {:error, "Failed to spawn agent: #{inspect(reason)}"}
     end
+  end
+
+  defp build_agent_opts(config, session_uuid, instructions, job) do
+    [
+      instructions: instructions,
+      model: config["model"],
+      project_path: config["project_path"],
+      description: config["description"] || "Scheduled agent",
+      project_id: job.project_id,
+      session_uuid: session_uuid
+    ]
+    |> maybe_put(:max_budget_usd, parse_float(config["max_budget_usd"]))
+    |> maybe_put(:max_turns, ToolHelpers.parse_int(config["max_turns"]))
+    |> maybe_put(:fallback_model, config["fallback_model"])
+    |> maybe_put(:allowed_tools, config["allowed_tools"])
+    |> maybe_put(:output_format, config["output_format"])
+    |> maybe_put(:skip_permissions, config["skip_permissions"])
+    |> maybe_put(:permission_mode, config["permission_mode"])
+    |> maybe_put(:add_dir, config["add_dir"])
+    |> maybe_put(:mcp_config, config["mcp_config"])
+    |> maybe_put(:plugin_dir, config["plugin_dir"])
+    |> maybe_put(:settings_file, config["settings_file"])
+    |> maybe_put(:chrome, config["chrome"])
+    |> maybe_put(:sandbox, config["sandbox"])
   end
 
   defp maybe_put(opts, _key, nil), do: opts

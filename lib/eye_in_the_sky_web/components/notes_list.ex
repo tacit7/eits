@@ -39,7 +39,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
         <button
           type="button"
           phx-click="toggle_starred_filter"
-          class={"flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 " <>
+          class={"flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 min-h-[44px] min-w-[44px] " <>
             if(@starred_filter,
               do: "bg-warning/10 text-warning",
               else: "text-base-content/35 hover:text-base-content/50 hover:bg-base-200/40"
@@ -55,7 +55,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
           <select
             name="value"
             id={"#{@empty_id}-type"}
-            class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-0 h-8 text-xs"
+            class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
           >
             <option value="all" selected={@type_filter == "all"}>All Types</option>
             <option value="session" selected={@type_filter == "session"}>Session</option>
@@ -70,7 +70,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
           <select
             name="value"
             id={"#{@empty_id}-sort"}
-            class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-0 h-8 text-xs"
+            class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
           >
             <option value="newest" selected={@sort_by == "newest"}>Newest</option>
             <option value="oldest" selected={@sort_by == "oldest"}>Oldest</option>

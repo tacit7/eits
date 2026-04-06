@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
   import EyeInTheSkyWeb.OverviewLive.Settings.TabHelpers
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   def render(assigns) do
     ~H"""
@@ -81,17 +82,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   <input
                     type="number"
                     name="value"
-                    value={
-                      div(
-                        String.to_integer(
-                          case @settings["cli_idle_timeout_ms"] do
-                            v when v in [nil, ""] -> "0"
-                            v -> v
-                          end
-                        ),
-                        1000
-                      )
-                    }
+                    value={ms_to_seconds(@settings["cli_idle_timeout_ms"])}
                     min="0"
                     max="3600"
                     step="30"
@@ -178,5 +169,15 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
       </section>
     </div>
     """
+  end
+
+  defp ms_to_seconds(value) do
+    int =
+      case value do
+        v when v in [nil, ""] -> 0
+        v -> parse_int(v) || 0
+      end
+
+    div(int, 1000)
   end
 end

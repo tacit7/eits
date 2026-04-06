@@ -129,7 +129,7 @@ defmodule EyeInTheSky.Agents do
 
   @doc """
   Finds an agent by UUID or creates one with the given attrs.
-  Handles Ecto.ConstraintError races (concurrent inserts) by re-fetching.
+  Uses on_conflict: :nothing to handle UUID uniqueness races without exceptions.
   """
   def find_or_create_agent(%{uuid: uuid} = attrs) do
     case get_agent_by_uuid(uuid) do
@@ -137,23 +137,22 @@ defmodule EyeInTheSky.Agents do
         {:ok, existing}
 
       {:error, :not_found} ->
-        case create_agent(attrs) do
+        %Agent{}
+        |> Agent.changeset(attrs)
+        |> Repo.insert(on_conflict: :nothing, conflict_target: :uuid)
+        |> case do
+          {:ok, %Agent{id: nil}} ->
+            # on_conflict: :nothing means no row returned; re-fetch the winner
+            get_agent_by_uuid(uuid)
+
           {:ok, agent} ->
+            EyeInTheSky.Events.agent_created(agent)
             {:ok, agent}
 
-          {:error, %Ecto.Changeset{}} = err ->
+          {:error, _changeset} = err ->
             err
-
-          _ ->
-            get_agent_by_uuid(uuid)
         end
     end
-  rescue
-    Ecto.ConstraintError ->
-      case get_agent_by_uuid(uuid) do
-        {:ok, existing} -> {:ok, existing}
-        _ -> {:error, :constraint_race}
-      end
   end
 
   @doc """

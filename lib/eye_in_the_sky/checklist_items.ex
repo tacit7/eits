@@ -30,18 +30,24 @@ defmodule EyeInTheSky.ChecklistItems do
   Toggles a checklist item's completed state.
   """
   def toggle_checklist_item(id) do
-    item = Repo.get!(ChecklistItem, id)
+    case Repo.get(ChecklistItem, id) do
+      nil ->
+        {:error, :not_found}
 
-    item
-    |> ChecklistItem.changeset(%{completed: !item.completed})
-    |> Repo.update()
+      item ->
+        item
+        |> ChecklistItem.changeset(%{completed: !item.completed})
+        |> Repo.update()
+    end
   end
 
   @doc """
   Deletes a checklist item.
   """
   def delete_checklist_item(id) do
-    Repo.get!(ChecklistItem, id)
-    |> Repo.delete()
+    case Repo.get(ChecklistItem, id) do
+      nil -> {:error, :not_found}
+      item -> Repo.delete(item)
+    end
   end
 end

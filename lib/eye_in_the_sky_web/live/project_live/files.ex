@@ -8,7 +8,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     only: [read_file_safe_detailed: 1, path_within?: 2]
 
   alias EyeInTheSky.Projects
-  alias EyeInTheSky.Repo
 
   @ignored_dirs ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
 
@@ -27,8 +26,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     case Integer.parse(id) do
       {project_id, ""} ->
         project =
-          Projects.get_project!(project_id)
-          |> Repo.preload([:agents])
+          Projects.get_project_with_agents!(project_id)
 
         file_tree =
           if project.path do

@@ -5,6 +5,7 @@ defmodule EyeInTheSky.ScheduledJobs do
   alias Crontab.CronExpression.Parser
   alias EyeInTheSky.Repo
   alias EyeInTheSky.ScheduledJobs.{JobRun, ScheduledJob}
+  alias EyeInTheSky.Utils.ToolHelpers
 
   def list_jobs do
     from(j in ScheduledJob,
@@ -244,7 +245,7 @@ defmodule EyeInTheSky.ScheduledJobs do
 
     case schedule_type do
       "interval" ->
-        seconds = String.to_integer(schedule_value)
+        seconds = ToolHelpers.parse_int(schedule_value) || 0
         NaiveDateTime.add(utc_now, seconds) |> DateTime.from_naive!("Etc/UTC")
 
       "cron" ->

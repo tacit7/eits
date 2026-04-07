@@ -12,11 +12,7 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
 
   require Logger
 
-  import Ecto.Query
-
-  alias EyeInTheSky.{Agents, Repo, Sessions}
-  alias EyeInTheSky.Agents.Agent
-  alias EyeInTheSky.Sessions.Session
+  alias EyeInTheSky.{Agents, Sessions, Tasks}
 
   # 5 minutes in milliseconds
   @interval 5 * 60 * 1000
@@ -47,11 +43,7 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
   defp mark_stale_agents do
     now = DateTime.utc_now()
 
-    agents =
-      from(a in Agent,
-        where: a.status not in ["completed", "failed"]
-      )
-      |> Repo.all()
+    agents = Agents.list_agents_pending_status_check()
 
     Enum.each(agents, fn agent -> update_agent_status(agent, now) end)
 
@@ -64,15 +56,15 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
     cond do
       # Unknown: no activity in over 1 day
       too_old?(agent.last_activity_at, now) ->
-        Agents.update_agent_status(agent, "unknown")
+        Agents.update_agent(agent, %{status: "unknown"})
 
       # Stale: inactive for more than 1 hour
       stale?(agent.last_activity_at, now) ->
-        Agents.update_agent_status(agent, "stale")
+        Agents.update_agent(agent, %{status: "stale"})
 
       # Idle: active but created less than 1 hour ago
       waiting?(agent.created_at, now) ->
-        Agents.update_agent_status(agent, "idle")
+        Agents.update_agent(agent, %{status: "idle"})
 
       # Active: recent activity or just created
       true ->
@@ -103,22 +95,7 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
     now = DateTime.utc_now()
     cutoff = DateTime.add(now, -@thirty_minutes, :second)
 
-    # Sessions that are idle, not archived, and inactive for >30 min.
-    # Use last_activity_at when available, fall back to started_at.
-    idle_sessions =
-      from(s in Session,
-        where: s.status in ["idle", "waiting"],
-        where: is_nil(s.archived_at),
-        where: not is_nil(s.started_at),
-        where:
-          fragment(
-            "coalesce(?, ?) < ?",
-            s.last_activity_at,
-            s.started_at,
-            ^cutoff
-          )
-      )
-      |> Repo.all()
+    idle_sessions = Sessions.list_idle_sessions_older_than(cutoff)
 
     archived_count =
       idle_sessions
@@ -138,17 +115,7 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
   # Returns true when a session has no linked tasks, or all linked tasks are done/archived.
   # state_id 3 = Done (see workflow_states table)
   defp no_active_tasks?(session) do
-    active_task_count =
-      from(ts in "task_sessions",
-        join: t in EyeInTheSky.Tasks.Task,
-        on: t.id == ts.task_id,
-        where: ts.session_id == ^session.id,
-        where: t.state_id != 3 and t.archived == false,
-        select: count()
-      )
-      |> Repo.one()
-
-    active_task_count == 0
+    Tasks.active_task_count_for_session(session.id) == 0
   end
 
   defp archive_session_and_agent(session, now) do
@@ -157,14 +124,9 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
 
     # Archive the associated agent if present
     if session.agent_id do
-      case Repo.get(Agent, session.agent_id) do
-        nil ->
-          :ok
-
-        agent ->
-          agent
-          |> Ecto.Changeset.change(%{archived_at: now})
-          |> Repo.update()
+      case Agents.get_agent(session.agent_id) do
+        {:ok, agent} -> Agents.archive_agent(agent, now)
+        {:error, :not_found} -> :ok
       end
     end
   end

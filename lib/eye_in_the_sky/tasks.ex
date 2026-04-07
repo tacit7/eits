@@ -421,6 +421,22 @@ defmodule EyeInTheSky.Tasks do
     {:ok, count}
   end
 
+  @doc """
+  Returns the count of active (not done, not archived) tasks linked to the given session.
+  Used by the scheduler to determine if an idle session can be auto-archived.
+  State ID 3 = Done.
+  """
+  def active_task_count_for_session(session_id) do
+    from(ts in "task_sessions",
+      join: t in Task,
+      on: t.id == ts.task_id,
+      where: ts.session_id == ^session_id,
+      where: t.state_id != 3 and t.archived == false,
+      select: count()
+    )
+    |> Repo.one()
+  end
+
   # PubSub
 
   defp broadcast_change({tag, task}) when tag in [:ok, :deleted] do

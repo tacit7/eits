@@ -264,7 +264,7 @@ defmodule EyeInTheSky.AgentDefinitions do
   def absolute_path(%AgentDefinition{scope: "project", path: path, project_id: project_id}) do
     case EyeInTheSky.Projects.get_project(project_id) do
       {:ok, project} -> Path.join(project.path, path)
-      _ -> path
+      {:error, :not_found} -> path
     end
   end
 

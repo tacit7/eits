@@ -156,8 +156,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
 
       project_id ->
         case Projects.get_project(project_id) do
-          nil -> nil
-          project -> project.path
+          {:error, :not_found} -> nil
+          {:ok, project} -> project.path
         end
     end
   end
@@ -225,8 +225,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
   defp project_path_by_id(nil), do: {:error, :no_project}
 
   defp project_path_by_id(id) do
-    project = Projects.get_project(id)
-    if project && project.path, do: {:ok, project.path}, else: {:error, :no_project}
+    case Projects.get_project(id) do
+      {:ok, project} when is_map(project) and not is_nil(project.path) ->
+        {:ok, project.path}
+
+      _ ->
+        {:error, :no_project}
+    end
   end
 
   defp resolve_job_prompt(job) do

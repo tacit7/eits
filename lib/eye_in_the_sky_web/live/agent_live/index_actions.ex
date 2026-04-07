@@ -250,10 +250,10 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
 
   defp create_new_session_with_project(params, project_id, socket) do
     case EyeInTheSky.Projects.get_project(project_id) do
-      nil ->
+      {:error, :not_found} ->
         {:noreply, put_flash(socket, :error, "Project not found")}
 
-      project ->
+      {:ok, project} ->
         do_create_session(params, project, socket)
     end
   end

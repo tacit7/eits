@@ -166,13 +166,22 @@ defmodule EyeInTheSky.Agents do
   end
 
   @doc """
-  No-op. Agent status is tracked on the Session, not the Agent.
-  Use `Sessions.update_session/2` with `%{status: status}` instead.
-
-  @deprecated
+  Returns agents whose status is not "completed" or "failed".
+  Used by the scheduler to check agents that may need status updates.
   """
-  def update_agent_status(%Agent{} = agent, _status) do
-    {:ok, agent}
+  def list_agents_pending_status_check do
+    Agent
+    |> where([a], a.status not in ["completed", "failed"])
+    |> Repo.all()
+  end
+
+  @doc """
+  Archives an agent by setting its archived_at timestamp.
+  """
+  def archive_agent(%Agent{} = agent, now) do
+    agent
+    |> Agent.changeset(%{archived_at: now})
+    |> Repo.update()
   end
 
   @doc """

@@ -44,6 +44,21 @@ defmodule EyeInTheSky.Sessions do
   end
 
   @doc """
+  Returns idle or waiting sessions that have not been archived and whose
+  last activity (or started_at as fallback) is older than the given cutoff.
+  Used by the scheduler to auto-archive dead idle sessions.
+  """
+  def list_idle_sessions_older_than(cutoff) do
+    from(s in Session,
+      where: s.status in ["idle", "waiting"],
+      where: is_nil(s.archived_at),
+      where: not is_nil(s.started_at),
+      where: fragment("coalesce(?, ?) < ?", s.last_activity_at, s.started_at, ^cutoff)
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Gets a single session.
 
   Raises `Ecto.NoResultsError` if the Session does not exist.

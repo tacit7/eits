@@ -43,8 +43,13 @@ defmodule EyeInTheSky.Prompts do
   """
   def get_prompt!(id), do: Repo.get!(Prompt, id)
 
-  @doc "Gets a single prompt by ID. Returns nil if not found."
-  def get_prompt(id), do: Repo.get(Prompt, id)
+  @doc "Gets a single prompt by ID. Returns `{:ok, prompt}` or `{:error, :not_found}`."
+  def get_prompt(id) do
+    case Repo.get(Prompt, id) do
+      nil -> {:error, :not_found}
+      prompt -> {:ok, prompt}
+    end
+  end
 
   @doc """
   Gets a single prompt by UUID.
@@ -84,16 +89,10 @@ defmodule EyeInTheSky.Prompts do
   def get_prompt_by_ref(ref, project_id \\ nil) do
     cond do
       id = ToolHelpers.parse_int(ref) ->
-        case get_prompt(id) do
-          nil -> {:error, :not_found}
-          prompt -> {:ok, prompt}
-        end
+        get_prompt(id)
 
       Regex.match?(~r/^[0-9a-f-]{36}$/, ref) ->
-        case get_prompt(ref) do
-          nil -> {:error, :not_found}
-          prompt -> {:ok, prompt}
-        end
+        get_prompt(ref)
 
       true ->
         prompt =

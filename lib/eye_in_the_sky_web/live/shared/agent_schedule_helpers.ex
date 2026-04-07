@@ -64,11 +64,11 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
 
   def handle_save_schedule(%{"schedule" => params}, socket) do
     prompt_id_raw = params["prompt_id"]
-    is_fs = AgentFileScanner.filesystem_id?(prompt_id_raw)
+    prompt_source = if AgentFileScanner.filesystem_id?(prompt_id_raw), do: :filesystem, else: :db
 
-    with prompt when not is_nil(prompt) <- resolve_prompt(prompt_id_raw),
+    with {:ok, prompt} <- resolve_prompt(prompt_id_raw),
          {:ok, path} <- resolve_project_path(params, prompt, socket) do
-      config = build_schedule_config(%{prompt: prompt, params: params, path: path, is_fs: is_fs, prompt_id_raw: prompt_id_raw})
+      config = build_schedule_config(%{prompt: prompt, params: params, path: path, prompt_source: prompt_source, prompt_id_raw: prompt_id_raw})
 
       job_attrs =
         %{
@@ -78,7 +78,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
           "schedule_type" => params["schedule_type"],
           "schedule_value" => params["schedule_value"],
           "config" => config,
-          "prompt_id" => if(is_fs, do: nil, else: parse_int(prompt_id_raw)),
+          "prompt_id" => if(prompt_source == :filesystem, do: nil, else: parse_int(prompt_id_raw)),
           "enabled" => 1
         }
         |> put_if_present("timezone", params["timezone"])
@@ -87,7 +87,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
       result = save_or_update_job(params["job_id"], job_attrs, caller_project_id, socket)
       handle_schedule_result(result, socket)
     else
-      nil -> {:noreply, put_flash(socket, :error, "Agent not found")}
+      {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Agent not found")}
       {:error, :no_project} -> {:noreply, put_flash(socket, :error, "Could not resolve project path. Select a project override.")}
     end
   end
@@ -165,14 +165,17 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
   defp resolve_prompt(id) do
     cond do
       is_nil(id) || id == "" ->
-        nil
+        {:error, :not_found}
 
       AgentFileScanner.filesystem_id?(id) ->
-        AgentFileScanner.get_by_id(id)
+        case AgentFileScanner.get_by_id(id) do
+          nil -> {:error, :not_found}
+          prompt -> {:ok, prompt}
+        end
 
       true ->
         case parse_int(id) do
-          nil -> nil
+          nil -> {:error, :not_found}
           int_id -> Prompts.get_prompt(int_id)
         end
     end
@@ -247,13 +250,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
     end
   end
 
-  defp build_schedule_config(%{prompt: prompt, params: params, path: path, is_fs: is_fs, prompt_id_raw: prompt_id_raw}) do
+  defp build_schedule_config(%{prompt: prompt, params: params, path: path, prompt_source: prompt_source, prompt_id_raw: prompt_id_raw}) do
     %{
       "instructions" => prompt.prompt_text,
       "model" => params["model"] || "sonnet",
       "project_path" => path
     }
-    |> put_prompt_id(is_fs, prompt_id_raw)
+    |> put_prompt_id(prompt_source, prompt_id_raw)
     |> put_if_present("max_budget_usd", params["max_budget_usd"])
     |> put_if_present("max_turns", params["max_turns"])
     |> put_if_present("fallback_model", params["fallback_model"])
@@ -270,10 +273,10 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
     |> Jason.encode!()
   end
 
-  defp put_prompt_id(config, true, prompt_id_raw),
+  defp put_prompt_id(config, :filesystem, prompt_id_raw),
     do: Map.put(config, "agent_file_id", prompt_id_raw)
 
-  defp put_prompt_id(config, false, prompt_id_raw) do
+  defp put_prompt_id(config, :db, prompt_id_raw) do
     case parse_int(prompt_id_raw) do
       nil -> config
       int_id -> Map.put(config, "prompt_id", int_id)

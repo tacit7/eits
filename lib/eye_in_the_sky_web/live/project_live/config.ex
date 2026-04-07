@@ -6,7 +6,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   import EyeInTheSkyWeb.Components.ConfigBrowser
 
   alias EyeInTheSky.Projects
-  alias EyeInTheSky.Repo
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -21,8 +20,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
     socket =
       if project_id do
         project =
-          Projects.get_project!(project_id)
-          |> Repo.preload([:agents])
+          Projects.get_project_with_agents!(project_id)
 
         claude_dir = if project.path, do: Path.join(project.path, ".claude"), else: nil
 

@@ -3,7 +3,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
 
   alias EyeInTheSky.Notes
   alias EyeInTheSky.Projects
-  alias EyeInTheSky.Repo
   import EyeInTheSkyWeb.Components.NotesList
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_id: 1]
   import EyeInTheSkyWeb.Live.Shared.NotesHelpers
@@ -15,8 +14,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
     socket =
       if project_id do
         project =
-          Projects.get_project!(project_id)
-          |> Repo.preload([:agents])
+          Projects.get_project_with_agents!(project_id)
 
         socket
         |> assign(:page_title, "Notes - #{project.name}")

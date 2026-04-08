@@ -143,15 +143,80 @@ State IDs are stable regardless of column display order:
 
 Each column header displays the current task count for that column. Task counts are real-time and update as tasks are created, moved, or archived.
 
+## Navigation Between Views
+
+### Sidebar Task Links
+
+The sidebar "Tasks" nav item links directly to the kanban board (`/projects/:id/kanban`) instead of the list view. The kanban tab highlights as active for both `:tasks` and `:kanban` routes.
+
+**File**: `lib/eye_in_the_sky_web/components/sidebar/projects_section.ex` — `panel_nav_item` href changed from `/projects/:id/tasks` to `/projects/:id/kanban`.
+
+### Kanban Toolbar List View Link
+
+The kanban toolbar includes a "List" button that navigates to the task list view (`/projects/:id/tasks`), allowing users to switch between kanban and list layouts. The toolbar receives `project_id` as a required attr.
+
+**File**: `lib/eye_in_the_sky_web/components/kanban_toolbar.ex`
+
+### Related commits
+
+- `a5824f3` — sidebar tasks links to kanban; kanban toolbar has list view link
+
+## Component Improvements
+
+### KanbanCard Helper Extraction
+
+The `KanbanCard` component (`lib/eye_in_the_sky_web/components/task_card/kanban_card.ex`) was refactored to:
+
+- **Deduplicate `task_id`**: The `task.uuid || to_string(task.id)` expression was computed once in `kanban_card/1` and passed as a `task_id` assign to all inner components, eliminating repeated derivation across `toggle_task_complete`, title click, context menu, and footer.
+- **Extract `resolve_dm_session/1`**: The inline pattern match that finds a task's first associated session was extracted into a named helper, clarifying the intent and making it reusable.
+
+**Commit**: `60fc345`
+
+### Active Filter Count Assign
+
+The `active_filter_count` computation was moved out of the kanban template (inline `<% %>` block) into a dedicated `FilterHandlers.assign_filter_count/1` function. This keeps the template declarative and ensures the count updates correctly after every filter change.
+
+**Files**:
+- `lib/eye_in_the_sky_web/live/project_live/kanban.ex` — template uses `@active_filter_count` assign
+- `lib/eye_in_the_sky_web/live/project_live/kanban/filter_handlers.ex` — `assign_filter_count/1` and `count_active_filters/1`
+
+**Commit**: `cb05a1d`
+
+## Event Consolidation
+
+### Agent Working/Stopped Events
+
+Duplicate `handle_info` clauses for `{:agent_working, ...}` and `{:agent_stopped, ...}` with the 3-tuple pattern (`{event, session_ref, session_int_id}`) were removed from the kanban LiveView. The remaining handlers use the map-based message format and delegate to `handle_agent_stopped/3`, which handles both the MapSet update and task reload.
+
+**File**: `lib/eye_in_the_sky_web/live/project_live/kanban.ex`
+**Commit**: `0351df5`
+
+## Mobile Drawer Fixes
+
+The task detail drawer and new agent drawer received mobile touch-target improvements:
+
+- **Task detail drawer**: Close button uses `min-h-[44px] min-w-[44px]` with flexbox centering for reliable touch targets.
+- **New agent drawer**: Uses `w-full max-w-sm` instead of fixed `w-96` to fit smaller screens.
+
+**Files**:
+- `lib/eye_in_the_sky_web/components/task_detail_drawer.ex`
+- `lib/eye_in_the_sky_web/components/new_agent_drawer.ex`
+
+**Commit**: `3b6a053`
+
 ## File Locations
 
 | Component | Path |
 |-----------|------|
-| LiveView | `lib/eye_in_the_sky_web_web/live/project_live/kanban.ex` |
-| Task Card | `lib/eye_in_the_sky_web_web/components/task_card.ex` |
-| Detail Drawer | `lib/eye_in_the_sky_web_web/components/task_detail_drawer.ex` |
-| New Task Drawer | `lib/eye_in_the_sky_web_web/components/new_task_drawer.ex` |
-| View Helpers | `lib/eye_in_the_sky_web_web/helpers/view_helpers.ex` |
+| LiveView | `lib/eye_in_the_sky_web/live/project_live/kanban.ex` |
+| Filter Handlers | `lib/eye_in_the_sky_web/live/project_live/kanban/filter_handlers.ex` |
+| Kanban Toolbar | `lib/eye_in_the_sky_web/components/kanban_toolbar.ex` |
+| Kanban Card | `lib/eye_in_the_sky_web/components/task_card/kanban_card.ex` |
+| Detail Drawer | `lib/eye_in_the_sky_web/components/task_detail_drawer.ex` |
+| New Task Drawer | `lib/eye_in_the_sky_web/components/new_task_drawer.ex` |
+| New Agent Drawer | `lib/eye_in_the_sky_web/components/new_agent_drawer.ex` |
+| Sidebar Projects | `lib/eye_in_the_sky_web/components/sidebar/projects_section.ex` |
+| View Helpers | `lib/eye_in_the_sky_web/helpers/view_helpers.ex` |
 | Tasks Context | `lib/eye_in_the_sky_web/tasks.ex` |
 | Task Schema | `lib/eye_in_the_sky_web/tasks/task.ex` |
 | ChecklistItem | `lib/eye_in_the_sky_web/tasks/checklist_item.ex` |

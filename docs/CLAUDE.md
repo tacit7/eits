@@ -19,6 +19,8 @@
 - [CODEX_SDK.md](CODEX_SDK.md) — Codex SDK: session lifecycle, JSONL events, resume flow
 - [CHAT.md](CHAT.md) — Chat system: channels, routing, @mentions, cross-project membership
 - [EVENTS.md](EVENTS.md) — PubSub Events: all topics, payload shapes, subscribe helpers
+- [ORCHESTRATOR_TIMERS.md](ORCHESTRATOR_TIMERS.md) — OrchestratorTimers: session-scoped auto-nudge timers, PubSub events, UI integration
+- [MOBILE.md](MOBILE.md) — Mobile layout standards: touch targets, sticky offsets, viewport, overflow
 
 ## Claude API Key Blocking
 

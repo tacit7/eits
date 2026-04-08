@@ -591,6 +591,57 @@ end
 
 ---
 
+### Scheduler and Context Separation
+
+**Problem:** Scheduler modules (e.g., `AgentStatusScheduler`) that contain direct `Repo` calls or inline `Ecto.Query` logic leak implementation details into job orchestration code. This makes schedulers harder to test, harder to reuse, and tightly coupled to schema internals.
+
+**Solution:** Move all query logic to context functions. Schedulers should only orchestrate (decide *when* and *what* to run), never *how* data is fetched or mutated.
+
+**Example:**
+
+```elixir
+# ❌ Before: Direct Repo/schema queries in scheduler
+defmodule AgentStatusScheduler do
+  def check_agents do
+    agents = Repo.all(
+      from a in Agent,
+      where: a.status == "working",
+      where: a.last_heartbeat_at < ago(5, "minute")
+    )
+
+    Enum.each(agents, fn agent ->
+      agent |> Ecto.Changeset.change(%{status: "idle"}) |> Repo.update()
+    end)
+  end
+end
+
+# ✅ After: Delegate to context functions
+defmodule AgentStatusScheduler do
+  def check_agents do
+    Agents.list_agents_pending_status_check()
+    |> Enum.each(&Agents.archive_agent(&1, "heartbeat_timeout"))
+  end
+end
+```
+
+**Context functions created in this refactor (commit 9a0bc21):**
+
+| Function | Context | Purpose |
+|----------|---------|---------|
+| `Agents.list_agents_pending_status_check/0` | Agents | Agents needing status review |
+| `Agents.archive_agent/2` | Agents | Archive agent with reason |
+| `Sessions.list_idle_sessions_older_than/1` | Sessions | Idle sessions past threshold |
+| `Tasks.active_task_count_for_session/1` | Tasks | Active task count for a session |
+
+**Removed:** `Agents.update_agent_status/2` (deprecated no-op).
+
+**Benefits:**
+- **Separation of concerns:** Schedulers orchestrate; contexts own data access
+- **Testability:** Context functions are independently testable without running the scheduler
+- **Reusability:** Same queries available to LiveViews, REST API, and other callers
+
+---
+
 ### Chat Presenter
 
 **ChatPresenter** (`lib/eye_in_the_sky_web_web/live/chat_presenter.ex`): Extracted chat presentation logic from `ChatLive`. Handles message formatting, typing indicator state, and ambient message filtering.
@@ -993,6 +1044,109 @@ Session flags passed via CLI (`--effort-level`, `--model`, `--worktree`, etc.) a
 3. The palette's session submenu will pick up the flag automatically
 
 **Do not** re-parse CLI flag strings on the client side; read from the session record's `flags` map.
+
+---
+
+## Tagged Tuple Returns for Context Lookups
+
+Context `get_*` functions return `{:ok, record}` or `{:error, :not_found}` instead of `record | nil`. This makes error handling explicit at call sites and eliminates silent nil propagation.
+
+**Why:** Bare `nil` returns force callers to add `if` guards and make it easy to forget a nil check, leading to `(FunctionClauseError) no function clause matching in ...` crashes downstream. Tagged tuples make the caller handle both paths via `case` or `with`, and the compiler/dialyzer can verify exhaustive matching.
+
+**Affected functions:**
+- `Accounts.get_user/1`
+- `Projects.get_project/1`
+- `Tasks.get_task/1`
+- `Notes.get_note/1`
+- `Teams.get_team/1`, `Teams.get_team_by_name/1`
+- `Prompts.get_prompt/1`
+- `ChecklistItems.get_checklist_item/1`
+
+### Before / After
+
+```elixir
+# Before: nil return
+def get_user(id) do
+  Repo.get(User, id)
+end
+
+# After: tagged tuple
+def get_user(id) do
+  case Repo.get(User, id) do
+    nil -> {:error, :not_found}
+    user -> {:ok, user}
+  end
+end
+```
+
+### Caller Changes
+
+```elixir
+# Before: nil check
+user = Accounts.get_user(id)
+if user do
+  # use user
+else
+  # handle missing
+end
+
+# After: pattern match
+case Accounts.get_user(id) do
+  {:ok, user} -> # use user
+  {:error, :not_found} -> # handle missing
+end
+```
+
+### LiveView Event Handlers
+
+```elixir
+def handle_event("select_project", %{"id" => id}, socket) do
+  case Projects.get_project(id) do
+    {:ok, project} ->
+      {:noreply, assign(socket, :project, project)}
+
+    {:error, :not_found} ->
+      {:noreply, put_flash(socket, :error, "Project not found")}
+  end
+end
+```
+
+### API Controllers
+
+```elixir
+def show(conn, %{"id" => id}) do
+  case Tasks.get_task(id) do
+    {:ok, task} ->
+      json(conn, %{data: task})
+
+    {:error, :not_found} ->
+      conn |> put_status(:not_found) |> json(%{error: "not found"})
+  end
+end
+```
+
+### With Chains
+
+Tagged tuples compose cleanly in `with` blocks:
+
+```elixir
+with {:ok, user} <- Accounts.get_user(user_id),
+     {:ok, project} <- Projects.get_project(project_id),
+     {:ok, task} <- Tasks.create_task(%{user_id: user.id, project_id: project.id}) do
+  {:ok, task}
+else
+  {:error, :not_found} -> {:error, "resource not found"}
+  {:error, changeset} -> {:error, changeset}
+end
+```
+
+### Bang Variants
+
+For internal code paths where the record must exist (preloaded associations, known IDs), bang variants like `get_project!/1` still raise on missing records. Use the tagged tuple version at boundaries (user input, API params, event handlers).
+
+**Rule:** New context `get_*` functions must return `{:ok, record} | {:error, :not_found}`. Reserve `get_*!/1` for internal paths where absence is a bug, not a user error.
+
+> Commits: 625655a, 96ce027, 2827d63, 0949e18, ee3e586
 
 ### Deduplicated SQL fragments for task title queries
 

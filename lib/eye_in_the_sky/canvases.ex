@@ -1,15 +1,21 @@
-defmodule EyeInTheSkyWeb.Canvases do
+defmodule EyeInTheSky.Canvases do
   @moduledoc false
   import Ecto.Query
 
   alias EyeInTheSky.Repo
-  alias EyeInTheSkyWeb.Canvases.{Canvas, CanvasSession}
+  alias EyeInTheSky.Canvases.{Canvas, CanvasSession}
 
   def list_canvases do
     Repo.all(from c in Canvas, order_by: [asc: c.inserted_at])
   end
 
-  def get_canvas(id), do: Repo.get(Canvas, id)
+  def get_canvas(id) do
+    case Repo.get(Canvas, id) do
+      nil -> {:error, :not_found}
+      canvas -> {:ok, canvas}
+    end
+  end
+
   def get_canvas!(id), do: Repo.get!(Canvas, id)
 
   def create_canvas(attrs) do

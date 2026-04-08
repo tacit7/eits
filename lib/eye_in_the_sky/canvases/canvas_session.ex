@@ -1,9 +1,9 @@
-defmodule EyeInTheSkyWeb.Canvases.CanvasSession do
+defmodule EyeInTheSky.Canvases.CanvasSession do
   use Ecto.Schema
   import Ecto.Changeset
 
   schema "canvas_sessions" do
-    belongs_to :canvas, EyeInTheSkyWeb.Canvases.Canvas
+    belongs_to :canvas, EyeInTheSky.Canvases.Canvas
     # Bare integer field — FK to sessions.id (integer PK, not UUID).
     # No belongs_to :session to keep Canvases context decoupled from Sessions context.
     field :session_id, :integer

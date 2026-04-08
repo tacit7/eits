@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.AgentLive.Index do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSkyWeb.Canvases
+  alias EyeInTheSky.Canvases
   alias EyeInTheSkyWeb.AgentLive.CanvasHandlers
   alias EyeInTheSkyWeb.AgentLive.IndexActions
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers

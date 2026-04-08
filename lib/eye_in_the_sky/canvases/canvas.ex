@@ -1,10 +1,10 @@
-defmodule EyeInTheSkyWeb.Canvases.Canvas do
+defmodule EyeInTheSky.Canvases.Canvas do
   use Ecto.Schema
   import Ecto.Changeset
 
   schema "canvases" do
     field :name, :string
-    has_many :canvas_sessions, EyeInTheSkyWeb.Canvases.CanvasSession
+    has_many :canvas_sessions, EyeInTheSky.Canvases.CanvasSession
     timestamps()
   end
 

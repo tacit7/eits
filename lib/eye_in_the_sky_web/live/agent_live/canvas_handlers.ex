@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.AgentLive.CanvasHandlers do
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3]
 
-  alias EyeInTheSkyWeb.Canvases
+  alias EyeInTheSky.Canvases
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   def handle_event("show_new_canvas_form", %{"agent-id" => id}, socket) do
@@ -17,7 +17,7 @@ defmodule EyeInTheSkyWeb.AgentLive.CanvasHandlers do
   def handle_event("add_to_canvas", %{"canvas-id" => cid, "session-id" => sid}, socket) do
     with canvas_id when not is_nil(canvas_id) <- parse_int(cid),
          session_id when not is_nil(session_id) <- parse_int(sid),
-         %{} = canvas <- Canvases.get_canvas(canvas_id) do
+         {:ok, canvas} <- Canvases.get_canvas(canvas_id) do
       Canvases.add_session(canvas_id, session_id)
 
       Phoenix.LiveView.send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,

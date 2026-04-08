@@ -98,7 +98,11 @@ defmodule EyeInTheSkyWeb.BookmarkController do
   """
   def check(conn, %{"type" => type, "id" => identifier}) do
     is_bookmarked = Bookmarks.check_if_bookmarked(type, identifier)
-    bookmark = if is_bookmarked, do: Bookmarks.get_bookmark_by(type, identifier), else: nil
+    bookmark =
+      case Bookmarks.get_bookmark_by(type, identifier) do
+        {:ok, b} -> b
+        {:error, :not_found} -> nil
+      end
 
     json(conn, %{
       is_bookmarked: is_bookmarked,

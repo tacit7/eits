@@ -139,12 +139,12 @@ defmodule EyeInTheSky.Accounts do
   def get_valid_user_session(token) when is_binary(token) do
     case Repo.get_by(UserSession, session_token: token) do
       nil ->
-        nil
+        {:error, :not_found}
 
       session ->
         if NaiveDateTime.compare(session.expires_at, NaiveDateTime.utc_now()) == :gt,
-          do: session,
-          else: nil
+          do: {:ok, session},
+          else: {:error, :expired}
     end
   end
 

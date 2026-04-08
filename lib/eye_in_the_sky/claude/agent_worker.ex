@@ -13,8 +13,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   alias EyeInTheSky.Agents.CmdDispatcher
   alias EyeInTheSky.AgentWorkerEvents, as: WorkerEvents
   alias EyeInTheSky.Claude.AgentWorker.{
-    ErrorClassifier,
-    ProcessCleanup,
+    ErrorRecovery,
     QueueManager,
     RetryPolicy,
     SdkLifecycle,
@@ -329,21 +328,10 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   @impl true
   def handle_info(
         {:claude_error, ref, {:claude_result_error, %{errors: errors}} = reason},
-        %__MODULE__{sdk_ref: ref, current_job: job} = state
+        %__MODULE__{sdk_ref: ref} = state
       )
       when is_list(errors) do
-    WorkerEvents.broadcast_stream_clear(state.session_id)
-    state = %{state | stream: StreamAssemblerProtocol.reset(state.stream)}
-
-    if Enum.any?(errors, &String.contains?(&1, "No conversation found")) && not is_nil(job) do
-      Logger.warning(
-        "[#{state.session_id}] Stale Claude session UUID=#{state.provider_conversation_id}, retrying as new session"
-      )
-
-      dispatch_sdk_retry(state, Job.as_fresh_session(job), "Failed to restart fresh SDK")
-    else
-      do_handle_sdk_error(reason, state)
-    end
+    ErrorRecovery.handle_stale_session(reason, state)
   end
 
   # Session ID already in use — either JSONL exists (no live process) or an orphaned Claude
@@ -352,39 +340,16 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   @impl true
   def handle_info(
         {:claude_error, ref, {:cli_error, msg} = reason},
-        %__MODULE__{sdk_ref: ref, current_job: job} = state
+        %__MODULE__{sdk_ref: ref} = state
       )
       when is_binary(msg) do
-    WorkerEvents.broadcast_stream_clear(state.session_id)
-    state = %{state | stream: StreamAssemblerProtocol.reset(state.stream)}
-
-    already_retried = Map.get(job.context, :kill_retry, false)
-
-    if String.contains?(msg, "already in use") && not is_nil(job) && not already_retried do
-      uuid = state.provider_conversation_id
-
-      Logger.warning(
-        "[#{state.session_id}] Session UUID=#{uuid} already in use — killing orphan and retrying as resume"
-      )
-
-      ProcessCleanup.kill_orphaned(uuid)
-
-      resume_job = Job.as_resume(job)
-      resume_job = %{resume_job | context: Map.put(resume_job.context, :kill_retry, true)}
-
-      dispatch_sdk_retry(state, resume_job, "Failed to resume after already-in-use",
-        broadcast_started: true
-      )
-    else
-      do_handle_sdk_error(reason, state)
-    end
+    ErrorRecovery.handle_session_in_use(reason, state)
   end
 
   # SDK error
   @impl true
   def handle_info({:claude_error, ref, reason}, %__MODULE__{sdk_ref: ref} = state) do
-    WorkerEvents.broadcast_stream_clear(state.session_id)
-    do_handle_sdk_error(reason, %{state | stream: StreamAssemblerProtocol.reset(state.stream)})
+    ErrorRecovery.handle_generic_error(reason, state)
   end
 
   # Stale messages from previous SDK refs - ignore
@@ -436,7 +401,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
       WorkerEvents.broadcast_stream_clear(state.session_id)
 
-      do_handle_sdk_error(
+      ErrorRecovery.do_handle_sdk_error(
         {:watchdog_timeout, timeout},
         %{
           state
@@ -462,7 +427,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
     WorkerEvents.broadcast_stream_clear(state.session_id)
 
-    do_handle_sdk_error(
+    ErrorRecovery.do_handle_sdk_error(
       {:handler_crash, reason},
       %{state | stream: StreamAssemblerProtocol.reset(state.stream), handler_monitor: nil}
     )
@@ -554,68 +519,6 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   defp maybe_sync_provider_conversation_id(state, _), do: state
-
-  # Dispatches attempt_sdk_retry to SdkLifecycle and handles the tagged result.
-  # {:ok, new_state}     → SDK restarted successfully
-  # {:start_next, state} → SDK start failed; process the next queued job
-  defp dispatch_sdk_retry(state, job, label, opts \\ []) do
-    case SdkLifecycle.attempt_sdk_retry(state, job, label, opts) do
-      {:ok, new_state} -> {:noreply, new_state}
-      {:start_next, clean_state} -> {:noreply, QueueManager.process_next_job(clean_state)}
-    end
-  end
-
-  defp do_handle_sdk_error(reason, state) do
-    Logger.error("[#{state.session_id}] SDK error: #{inspect(reason)}")
-
-    emit([:eits, :agent, :sdk, :error], %{system_time: System.system_time()},
-      %{reason: reason}, state)
-    state = WatchdogTimer.cancel_watchdog(state)
-    SdkLifecycle.cancel_active_sdk(state)
-    WorkerEvents.on_sdk_errored(state.session_id, state.provider_conversation_id)
-    SdkLifecycle.demonitor_handler(state.handler_monitor)
-
-    state = %{state | handler_pid: nil, sdk_ref: nil, handler_monitor: nil}
-
-    if ErrorClassifier.systemic?(reason) do
-      handle_systemic_error(state, reason)
-    else
-      handle_transient_error(state)
-    end
-  end
-
-  defp handle_systemic_error(state, reason) do
-    # Mark current job and all queued jobs as failed in DB before clearing.
-    WorkerEvents.on_current_job_failed(state.current_job, reason)
-
-    WorkerEvents.on_queue_drained(
-      state.session_id,
-      state.provider_conversation_id,
-      state.queue,
-      reason
-    )
-
-    WorkerEvents.broadcast_queue_update(state.session_id, [])
-
-    {:noreply,
-     %{state | status: :failed, sdk_ref: nil, handler_monitor: nil, current_job: nil, queue: []}}
-  end
-
-  defp handle_transient_error(state) do
-    # Mark the current job's message as failed so it doesn't stay stuck in "processing".
-    if state.current_job do
-      Messages.mark_failed(state.current_job.context[:message_id], "transient_error")
-    end
-
-    {:noreply,
-     QueueManager.process_next_job(%{
-       state
-       | status: :idle,
-         sdk_ref: nil,
-         handler_monitor: nil,
-         current_job: nil
-     })}
-  end
 
   defp emit(event, measurements, state) do
     emit(event, measurements, %{}, state)

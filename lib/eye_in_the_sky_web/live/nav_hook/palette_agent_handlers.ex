@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteAgentHandlers do
 
   import Phoenix.LiveView, only: [push_event: 3]
 
-  alias EyeInTheSky.{Agents, Projects, Repo, Sessions}
+  alias EyeInTheSky.{Agents, Projects, Sessions}
   alias EyeInTheSky.Agents.AgentManager
 
   # ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteAgentHandlers do
   defp fetch_agent_detail(agent_uuid) do
     case Agents.get_agent_by_uuid(agent_uuid) do
       {:ok, agent} ->
-        agent = Repo.preload(agent, [:sessions, :project])
+        agent = Agents.preload_agent_associations(agent)
 
         latest_status =
           case agent.sessions do
@@ -199,7 +199,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteAgentHandlers do
   defp do_delete_agent(agent_uuid) do
     case Agents.get_agent_by_uuid(agent_uuid) do
       {:ok, agent} ->
-        agent = Repo.preload(agent, :sessions)
+        agent = Agents.preload_agent_associations(agent, [:sessions])
         active = Enum.filter(agent.sessions || [], &(&1.status in ["working", "idle"]))
         attempt_delete_agent(agent, active)
 

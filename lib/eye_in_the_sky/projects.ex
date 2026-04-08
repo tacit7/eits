@@ -196,6 +196,11 @@ defmodule EyeInTheSky.Projects do
     |> EyeInTheSky.Repo.aggregate(:count, :id)
   end
 
+  @doc "Preloads associations onto a project struct."
+  def preload_project(%Project{} = project, assocs) do
+    Repo.preload(project, assocs)
+  end
+
   defp base_project_tasks_query(project_id, opts) do
     include_archived = Keyword.get(opts, :include_archived, false)
 

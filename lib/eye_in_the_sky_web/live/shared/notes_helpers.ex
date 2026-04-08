@@ -27,16 +27,6 @@ defmodule EyeInTheSkyWeb.Live.Shared.NotesHelpers do
     {:noreply, socket |> assign(:type_filter, type) |> reload_fn.()}
   end
 
-  @doc """
-  Returns the list of parent_type variants (singular + plural) for a given type filter.
-  Used in queries to match both legacy plural forms and canonical singular forms.
-  """
-  def type_filter_variants("session"), do: ["session", "sessions"]
-  def type_filter_variants("agent"), do: ["agent", "agents"]
-  def type_filter_variants("project"), do: ["project", "projects"]
-  def type_filter_variants("task"), do: ["task", "tasks"]
-  def type_filter_variants(type), do: [type]
-
   def handle_toggle_starred_filter(_params, socket, reload_fn) do
     {:noreply,
      socket

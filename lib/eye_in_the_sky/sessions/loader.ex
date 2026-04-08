@@ -85,7 +85,7 @@ defmodule EyeInTheSky.Sessions.Loader do
     notes =
       from(n in Notes.Note,
         where:
-          n.parent_type in ["session", "sessions"] and
+          n.parent_type == "session" and
             n.parent_id == ^to_string(session_id),
         select: count()
       )

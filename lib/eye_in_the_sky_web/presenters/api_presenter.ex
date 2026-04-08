@@ -144,7 +144,7 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
     case session.agent_id && Agents.get_agent(session.agent_id) do
       {:ok, agent} ->
         case Teams.get_member_by_agent_id(agent.id) do
-          %{name: name} when is_binary(name) and name != "" -> name
+          {:ok, %{name: name}} when is_binary(name) and name != "" -> name
           _ -> session.name || agent.description || "agent"
         end
 

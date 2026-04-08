@@ -152,8 +152,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
       {:ok, _team} ->
         case Teams.get_member(member_id) do
-          nil -> conn |> put_status(:not_found) |> json(%{error: "Member not found"})
-          member -> do_update_member(conn, member, params)
+          {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "Member not found"})
+          {:ok, member} -> do_update_member(conn, member, params)
         end
     end
   end
@@ -166,8 +166,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
       {:ok, _team} ->
         case Teams.get_member(member_id) do
-          nil -> conn |> put_status(:not_found) |> json(%{error: "Member not found"})
-          member -> do_leave_team(conn, member)
+          {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "Member not found"})
+          {:ok, member} -> do_leave_team(conn, member)
         end
     end
   end

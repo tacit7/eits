@@ -45,6 +45,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :session_context, :map, default: nil
   attr :reloading, :boolean, default: false
   attr :active_timer, :any, default: nil
+  attr :schedule_message, :string, default: nil
   attr :agent_record, :map, default: nil
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
@@ -84,9 +85,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <div class="modal modal-open" id="schedule-timer-modal">
           <div class="modal-box max-w-sm">
             <h3 class="font-semibold text-base mb-1">Schedule Message</h3>
-            <p class="text-xs text-base-content/50 mb-4 leading-relaxed">
-              Sends: "Please check in with your team members and report their current status and any blockers."
-            </p>
+            <div class="mb-4">
+              <textarea
+                name="message"
+                rows="3"
+                phx-change="update_schedule_message"
+                class="w-full text-xs rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30 placeholder:text-base-content/30 text-base-content/80 transition-colors resize-none p-2"
+                placeholder="Message to send..."
+              >{@schedule_message}</textarea>
+            </div>
 
             <div class="mb-3">
               <p class="text-xs font-medium text-base-content/60 mb-2">Once</p>

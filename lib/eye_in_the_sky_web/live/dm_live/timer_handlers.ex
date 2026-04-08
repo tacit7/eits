@@ -18,7 +18,8 @@ defmodule EyeInTheSkyWeb.DmLive.TimerHandlers do
   def handle_schedule_timer(%{"mode" => mode, "preset" => preset}, socket) do
     session_id = socket.assigns.session_id
     interval_ms = Map.get(@presets_ms, preset, 15 * 60 * 1_000)
-    message = OrchestratorTimers.default_message()
+    raw = socket.assigns[:schedule_message]
+    message = if is_binary(raw) and raw != "", do: raw, else: OrchestratorTimers.default_message()
 
     case mode do
       "once" -> OrchestratorTimers.schedule_once(session_id, interval_ms, message)

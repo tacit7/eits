@@ -208,15 +208,20 @@ defmodule EyeInTheSky.Codex.CLI do
 
         env = build_env(opts)
 
+        # Codex reads stdin when it detects a pipe (even with a positional prompt),
+        # blocking until EOF. The BEAM port never closes stdin, so without this
+        # redirect Codex hangs after turn.started. Wrapping via sh redirects
+        # /dev/null to stdin before exec'ing codex, giving immediate EOF.
+        # Args are passed as separate argv elements so no shell escaping is needed.
         port =
           Port.open(
-            {:spawn_executable, codex_path},
+            {:spawn_executable, "/bin/sh"},
             [
               :binary,
               :exit_status,
               :use_stdio,
               :stderr_to_stdout,
-              {:args, args},
+              {:args, ["-c", "exec \"$@\" </dev/null", "sh", codex_path | args]},
               {:cd, project_path},
               {:env, env}
             ]

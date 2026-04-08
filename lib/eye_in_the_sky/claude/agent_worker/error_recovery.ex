@@ -30,7 +30,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorRecovery do
 
       dispatch_sdk_retry(state, Job.as_fresh_session(job), "Failed to restart fresh SDK")
     else
-      do_handle_sdk_error(reason, state)
+      handle_sdk_error(reason, state)
     end
   end
 
@@ -44,7 +44,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorRecovery do
     state = %{state | stream: StreamAssemblerProtocol.reset(state.stream)}
     job = state.current_job
 
-    already_retried = Map.get(job.context, :kill_retry, false)
+    already_retried = if job, do: Map.get(job.context, :kill_retry, false), else: true
 
     if String.contains?(msg, "already in use") && not is_nil(job) && not already_retried do
       uuid = state.provider_conversation_id
@@ -62,7 +62,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorRecovery do
         broadcast_started: true
       )
     else
-      do_handle_sdk_error(reason, state)
+      handle_sdk_error(reason, state)
     end
   end
 
@@ -71,7 +71,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorRecovery do
   """
   def handle_generic_error(reason, state) do
     WorkerEvents.broadcast_stream_clear(state.session_id)
-    do_handle_sdk_error(reason, %{state | stream: StreamAssemblerProtocol.reset(state.stream)})
+    handle_sdk_error(reason, %{state | stream: StreamAssemblerProtocol.reset(state.stream)})
   end
 
   @doc """
@@ -81,7 +81,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorRecovery do
   Called directly by watchdog and handler-crash paths in addition to the three
   error recovery entry points above.
   """
-  def do_handle_sdk_error(reason, state) do
+  def handle_sdk_error(reason, state) do
     Logger.error("[#{state.session_id}] SDK error: #{inspect(reason)}")
 
     :telemetry.execute(

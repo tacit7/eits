@@ -401,7 +401,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
       WorkerEvents.broadcast_stream_clear(state.session_id)
 
-      ErrorRecovery.do_handle_sdk_error(
+      ErrorRecovery.handle_sdk_error(
         {:watchdog_timeout, timeout},
         %{
           state
@@ -427,7 +427,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
     WorkerEvents.broadcast_stream_clear(state.session_id)
 
-    ErrorRecovery.do_handle_sdk_error(
+    ErrorRecovery.handle_sdk_error(
       {:handler_crash, reason},
       %{state | stream: StreamAssemblerProtocol.reset(state.stream), handler_monitor: nil}
     )

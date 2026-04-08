@@ -42,7 +42,11 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
     case parse_int(id) do
       nil -> {:noreply, socket}
       int_id ->
-        Notifications.mark_read(int_id)
+        case Notifications.mark_read(int_id) do
+          {:ok, _} -> :ok
+          {:error, _} -> :ok
+        end
+
         {:noreply, assign(socket, :notifications, load_notifications(socket.assigns.filter))}
     end
   end

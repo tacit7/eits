@@ -41,7 +41,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.NotesHelpers do
       {:ok, _note} ->
         {:noreply, reload_fn.(socket)}
 
-      {:error, _changeset} ->
+      {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Failed to toggle star")}
     end
   end

@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
 
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Agents, Projects, Sessions, Teams}
+  alias EyeInTheSky.{Agents, Sessions}
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
@@ -58,20 +58,12 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
         parent_agent_id, parent_session_id, worktree, team_name
   """
   def create(conn, params) do
-    with {:ok, params} <- validate_params(params),
-         {:ok, project_id, project_name} <- Projects.resolve_project(params),
-         {:ok, team} <- resolve_team(params) do
-      params = Map.merge(params, %{"project_id" => project_id, "project_name" => project_name})
-      instructions = apply_team_context(params["instructions"], team, params["member_name"])
-      opts = build_spawn_opts(%{params | "instructions" => instructions}, team)
-
-      case AgentManager.create_agent(opts) do
-        {:ok, %{agent: agent, session: session}} ->
-          maybe_join_team(team, agent, session, params["member_name"])
-
+    with {:ok, params} <- validate_params(params) do
+      case AgentManager.spawn_agent(params) do
+        {:ok, %{agent: agent, session: session, team: team, member_name: member_name}} ->
           conn
           |> put_status(:created)
-          |> json(build_response(agent, session, team, params["member_name"]))
+          |> json(build_response(agent, session, team, member_name))
 
         {:error, :dirty_working_tree} ->
           conn
@@ -81,6 +73,9 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
             message:
               "project_path has uncommitted changes; commit or stash before spawning a worktree agent"
           })
+
+        {:error, code, message} when is_binary(code) ->
+          conn |> put_status(:bad_request) |> json(%{error_code: code, message: message})
 
         {:error, reason} ->
           Logger.error("Agent spawn failed: #{inspect(reason)}")
@@ -100,61 +95,6 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
         |> put_status(:internal_server_error)
         |> json(%{error_code: "internal_error", message: "An unexpected error occurred"})
     end
-  end
-
-  defp maybe_join_team(nil, _agent, _session, _name), do: :ok
-
-  defp maybe_join_team(team, agent, session, member_name) do
-    result =
-      Teams.join_team(%{
-        team_id: team.id,
-        agent_id: agent.id,
-        session_id: session.id,
-        name: member_name || agent.uuid,
-        role: member_name || "agent",
-        status: "active"
-      })
-
-    case result do
-      {:ok, _} ->
-        :ok
-
-      {:error, reason} ->
-        Logger.warning(
-          "Team join failed: agent_id=#{agent.id} team_id=#{team.id} reason=#{inspect(reason)}"
-        )
-
-        :ok
-
-      _ ->
-        :ok
-    end
-  end
-
-  defp build_team_context(team, member_name) do
-    """
-    ## Team Context
-    You are member "#{member_name || "agent"}" of team "#{team.name}" (team_id: #{team.id}).
-    You have been registered as a team member automatically.
-
-    ## EITS Command Protocol
-
-    Use the eits CLI script for all EITS operations:
-
-      eits tasks begin --title "<title>"
-      eits tasks annotate <id> --body "..."
-      eits tasks update <id> --state 4
-      eits dm --to <session_uuid> --message "..."
-      eits commits create --hash <hash>
-
-    ## Task Completion
-    When you finish a task, follow this sequence exactly:
-    1. Annotate the task with a summary of what was done
-    2. Mark it done (or move to in-review, state 4)
-    3. DM the orchestrator session to report completion
-    4. Run the `/i-update-status` slash command to commit work and update session tracking
-    Do NOT skip any steps. The orchestrator needs to see what you did.
-    """
   end
 
   defp coerce_parent_id(nil, _field), do: {:ok, nil}
@@ -250,64 +190,6 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
          "parent_session_id" => parent_session_id
        })}
     end
-  end
-
-  defp resolve_team(params) do
-    case params["team_name"] do
-      name when name in [nil, ""] ->
-        {:ok, nil}
-
-      name ->
-        case Teams.get_team_by_name(name) do
-          {:error, :not_found} -> {:error, "team_not_found", "team not found: #{name}"}
-          {:ok, team} -> {:ok, team}
-        end
-    end
-  end
-
-  defp apply_team_context(instructions, nil, _member_name), do: instructions
-
-  defp apply_team_context(instructions, team, member_name) do
-    instructions <> "\n\n" <> build_team_context(team, member_name)
-  end
-
-  # Fix 2: accept name param, auto-generate from member_name+team or truncated instructions
-  defp resolve_session_name(params, team) do
-    name = params["name"]
-
-    if name && String.trim(name) != "" do
-      String.trim(name)
-    else
-      member_name = params["member_name"]
-      team_name = team && team.name
-
-      cond do
-        member_name && team_name -> "#{member_name} @ #{team_name}"
-        member_name -> member_name
-        true -> String.slice(params["instructions"] || "Agent session", 0, 250)
-      end
-    end
-  end
-
-  defp build_spawn_opts(params, team) do
-    name = resolve_session_name(params, team)
-
-    [
-      instructions: params["instructions"],
-      model: params["model"],
-      agent_type: params["provider"] || "claude",
-      project_id: params["project_id"],
-      project_name: params["project_name"],
-      project_path: params["project_path"],
-      name: name,
-      description: name,
-      worktree: params["worktree"],
-      effort_level: params["effort_level"],
-      parent_agent_id: params["parent_agent_id"],
-      parent_session_id: params["parent_session_id"],
-      agent: params["agent"],
-      bypass_sandbox: params["bypass_sandbox"] == true
-    ]
   end
 
   defp build_response(agent, session, team, member_name) do

@@ -7,7 +7,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
 
   require Logger
 
-  alias EyeInTheSky.{AgentDefinitions, Agents, Sessions}
+  alias EyeInTheSky.{AgentDefinitions, Agents, Projects, Sessions, Teams}
   alias EyeInTheSky.Agents.{AgentManager.SessionBridge, InstructionBuilder, RuntimeContext}
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSky.Git.Worktrees
@@ -213,6 +213,142 @@ defmodule EyeInTheSky.Agents.AgentManager do
       {:error, reason} ->
         Logger.error("❌ create_agent: DB record creation failed - #{inspect(reason)}")
         {:error, reason}
+    end
+  end
+
+  @doc """
+  Orchestrates agent spawning from validated HTTP params.
+
+  Resolves project and team, applies team context to instructions,
+  creates the agent, and joins the team if applicable.
+
+  Returns `{:ok, %{agent: agent, session: session, team: team, member_name: member_name}}`
+  or `{:error, code, message}` for validation errors, or `{:error, reason}` for spawn failures.
+  """
+  def spawn_agent(params) do
+    with {:ok, project_id, project_name} <- Projects.resolve_project(params),
+         {:ok, team} <- resolve_spawn_team(params["team_name"]) do
+      params = Map.merge(params, %{"project_id" => project_id, "project_name" => project_name})
+      instructions = apply_team_context(params["instructions"], team, params["member_name"])
+      opts = build_spawn_opts(%{params | "instructions" => instructions}, team)
+
+      case create_agent(opts) do
+        {:ok, %{agent: agent, session: session}} ->
+          maybe_join_team(team, agent, session, params["member_name"])
+          {:ok, %{agent: agent, session: session, team: team, member_name: params["member_name"]}}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  defp resolve_spawn_team(nil), do: {:ok, nil}
+  defp resolve_spawn_team(""), do: {:ok, nil}
+
+  defp resolve_spawn_team(name) do
+    case Teams.get_team_by_name(name) do
+      {:error, :not_found} -> {:error, "team_not_found", "team not found: #{name}"}
+      {:ok, team} -> {:ok, team}
+    end
+  end
+
+  defp apply_team_context(instructions, nil, _member_name), do: instructions
+
+  defp apply_team_context(instructions, team, member_name) do
+    instructions <> "\n\n" <> build_team_context(team, member_name)
+  end
+
+  defp build_team_context(team, member_name) do
+    """
+    ## Team Context
+    You are member "#{member_name || "agent"}" of team "#{team.name}" (team_id: #{team.id}).
+    You have been registered as a team member automatically.
+
+    ## EITS Command Protocol
+
+    Use the eits CLI script for all EITS operations:
+
+      eits tasks begin --title "<title>"
+      eits tasks annotate <id> --body "..."
+      eits tasks update <id> --state 4
+      eits dm --to <session_uuid> --message "..."
+      eits commits create --hash <hash>
+
+    ## Task Completion
+    When you finish a task, follow this sequence exactly:
+    1. Annotate the task with a summary of what was done
+    2. Mark it done (or move to in-review, state 4)
+    3. DM the orchestrator session to report completion
+    4. Run the `/i-update-status` slash command to commit work and update session tracking
+    Do NOT skip any steps. The orchestrator needs to see what you did.
+    """
+  end
+
+  defp resolve_session_name(params, team) do
+    name = params["name"]
+
+    if name && String.trim(name) != "" do
+      String.trim(name)
+    else
+      member_name = params["member_name"]
+      team_name = team && team.name
+
+      cond do
+        member_name && team_name -> "#{member_name} @ #{team_name}"
+        member_name -> member_name
+        true -> String.slice(params["instructions"] || "Agent session", 0, 250)
+      end
+    end
+  end
+
+  defp build_spawn_opts(params, team) do
+    name = resolve_session_name(params, team)
+
+    [
+      instructions: params["instructions"],
+      model: params["model"],
+      agent_type: params["provider"] || "claude",
+      project_id: params["project_id"],
+      project_name: params["project_name"],
+      project_path: params["project_path"],
+      name: name,
+      description: name,
+      worktree: params["worktree"],
+      effort_level: params["effort_level"],
+      parent_agent_id: params["parent_agent_id"],
+      parent_session_id: params["parent_session_id"],
+      agent: params["agent"],
+      bypass_sandbox: params["bypass_sandbox"] == true
+    ]
+  end
+
+  defp maybe_join_team(nil, _agent, _session, _name), do: :ok
+
+  defp maybe_join_team(team, agent, session, member_name) do
+    result =
+      Teams.join_team(%{
+        team_id: team.id,
+        agent_id: agent.id,
+        session_id: session.id,
+        name: member_name || agent.uuid,
+        role: member_name || "agent",
+        status: "active"
+      })
+
+    case result do
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning(
+          "Team join failed: agent_id=#{agent.id} team_id=#{team.id} reason=#{inspect(reason)}"
+        )
+
+        :ok
+
+      _ ->
+        :ok
     end
   end
 

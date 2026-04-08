@@ -7,7 +7,9 @@ defmodule EyeInTheSky.Notes do
   alias EyeInTheSky.Notes.Note
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Search.PgSearch
+  alias EyeInTheSky.Agents
   alias EyeInTheSky.Sessions
+  alias EyeInTheSky.Tasks
 
   @doc """
   Returns the list of notes.
@@ -85,7 +87,11 @@ defmodule EyeInTheSky.Notes do
   Matches on both integer ID (as string) and UUID for migration compatibility.
   """
   def count_notes_for_session(session_id) do
-    session = Repo.get(EyeInTheSky.Sessions.Session, session_id)
+    session =
+      case Sessions.get_session(session_id) do
+        {:ok, s} -> s
+        {:error, :not_found} -> nil
+      end
 
     if session do
       Note
@@ -104,7 +110,11 @@ defmodule EyeInTheSky.Notes do
   Returns notes for a specific agent.
   """
   def list_notes_for_agent(agent_id) do
-    agent = Repo.get(EyeInTheSky.Agents.Agent, agent_id)
+    agent =
+      case Agents.get_agent(agent_id) do
+        {:ok, a} -> a
+        {:error, :not_found} -> nil
+      end
 
     if agent do
       Note
@@ -125,7 +135,11 @@ defmodule EyeInTheSky.Notes do
   Matches on both integer ID (as string) and UUID for migration compatibility.
   """
   def list_notes_for_task(task_id) do
-    task = Repo.get(EyeInTheSky.Tasks.Task, task_id)
+    task =
+      case Tasks.get_task(task_id) do
+        {:ok, t} -> t
+        {:error, :not_found} -> nil
+      end
 
     if task do
       uuid_filter =

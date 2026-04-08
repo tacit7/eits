@@ -14,11 +14,14 @@ defmodule EyeInTheSky.Contexts do
   Gets session context for a specific session.
   """
   def get_session_context(session_id) do
-    SessionContext
-    |> where([sc], sc.session_id == ^session_id)
-    |> order_by([sc], desc: sc.updated_at)
-    |> limit(1)
-    |> Repo.one()
+    case SessionContext
+         |> where([sc], sc.session_id == ^session_id)
+         |> order_by([sc], desc: sc.updated_at)
+         |> limit(1)
+         |> Repo.one() do
+      nil -> {:error, :not_found}
+      ctx -> {:ok, ctx}
+    end
   end
 
   @doc """
@@ -27,7 +30,12 @@ defmodule EyeInTheSky.Contexts do
   def upsert_session_context(attrs) do
     QueryHelpers.upsert(
       SessionContext,
-      fn -> get_session_context(attrs.session_id) end,
+      fn ->
+        case get_session_context(attrs.session_id) do
+          {:ok, ctx} -> ctx
+          {:error, :not_found} -> nil
+        end
+      end,
       attrs
     )
   end

@@ -96,13 +96,7 @@ defmodule EyeInTheSky.Checkpoints do
   Returns `{:ok, new_session}` or `{:error, reason}`.
   """
   def fork_checkpoint(%Checkpoint{} = checkpoint, attrs \\ %{}) do
-    original_session =
-      case Sessions.get_session(checkpoint.session_id) do
-        {:ok, s} -> s
-        {:error, _} -> nil
-      end
-
-    with {:ok, session} <- require_session(original_session),
+    with {:ok, session} <- Sessions.get_session(checkpoint.session_id),
          {:ok, agent} <- get_or_create_fork_agent(session, attrs),
          {:ok, new_session} <- create_fork_session(session, agent, checkpoint, attrs),
          :ok <- copy_messages_to_fork(checkpoint.session_id, new_session.id, checkpoint.message_index) do
@@ -129,9 +123,6 @@ defmodule EyeInTheSky.Checkpoints do
   end
 
   # Private
-
-  defp require_session(nil), do: {:error, :session_not_found}
-  defp require_session(session), do: {:ok, session}
 
   defp maybe_create_fork_branch(checkpoint, original_session, new_session, attrs) do
     if checkpoint.git_stash_ref && original_session.git_worktree_path &&

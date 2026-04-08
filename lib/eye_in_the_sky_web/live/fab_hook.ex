@@ -26,10 +26,25 @@ defmodule EyeInTheSkyWeb.FabHook do
       |> assign(:fab_timer, nil)
       |> assign(:fab_active_session_id, nil)
       |> assign(:config_guide_active_session_id, nil)
+      |> assign(:fab_bookmarks, [])
+      |> assign(:fab_statuses, %{})
       |> attach_hook(:fab_events, :handle_event, &handle_fab_event/3)
       |> attach_hook(:fab_info, :handle_info, &handle_fab_info/2)
 
     {:cont, socket}
+  end
+
+  defp handle_fab_event("fab_set_bookmarks", %{"bookmarks" => bookmarks}, socket) do
+    statuses = fetch_bookmark_statuses()
+
+    socket =
+      socket
+      |> assign(:fab_bookmarks, bookmarks || [])
+      |> assign(:fab_statuses, statuses)
+      |> schedule_fab_refresh()
+
+    update_fab_component(socket)
+    {:halt, socket}
   end
 
   defp handle_fab_event("fab_request_statuses", _params, socket) do
@@ -37,9 +52,10 @@ defmodule EyeInTheSkyWeb.FabHook do
 
     socket =
       socket
-      |> push_event("fab_status_update", %{statuses: statuses})
+      |> assign(:fab_statuses, statuses)
       |> schedule_fab_refresh()
 
+    update_fab_component(socket)
     {:halt, socket}
   end
 
@@ -134,9 +150,10 @@ defmodule EyeInTheSkyWeb.FabHook do
 
     socket =
       socket
-      |> push_event("fab_status_update", %{statuses: statuses})
+      |> assign(:fab_statuses, statuses)
       |> schedule_fab_refresh()
 
+    update_fab_component(socket)
     {:halt, socket}
   end
 
@@ -238,6 +255,14 @@ defmodule EyeInTheSkyWeb.FabHook do
       acc = Map.put(acc, to_string(s.id), status)
       if s.uuid, do: Map.put(acc, s.uuid, status), else: acc
     end)
+  end
+
+  defp update_fab_component(socket) do
+    send_update(EyeInTheSkyWeb.Components.FavoriteFabComponent,
+      id: "favorite-fab",
+      bookmarks: socket.assigns.fab_bookmarks,
+      statuses: socket.assigns.fab_statuses
+    )
   end
 
   defp send_session_message(session_id, body) do

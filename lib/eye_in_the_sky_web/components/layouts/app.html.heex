@@ -191,5 +191,10 @@
     </dialog>
   </div>
 
-  <div id="favorite-fab" phx-hook="FavoriteFab" phx-update="ignore" class="fab fab-flower"></div>
+  <.live_component
+    module={EyeInTheSkyWeb.Components.FavoriteFabComponent}
+    id="favorite-fab"
+    bookmarks={[]}
+    statuses={%{}}
+  />
 </div>

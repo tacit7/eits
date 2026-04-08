@@ -42,9 +42,12 @@ defmodule EyeInTheSky.WorkflowStates do
   end
 
   @doc """
-  Gets a workflow state by name.
+  Gets a workflow state by name. Returns {:ok, state} | {:error, :not_found}.
   """
   def get_workflow_state_by_name(name) do
-    Repo.get_by(WorkflowState, name: name)
+    case Repo.get_by(WorkflowState, name: name) do
+      nil -> {:error, :not_found}
+      state -> {:ok, state}
+    end
   end
 end

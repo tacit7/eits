@@ -15,17 +15,20 @@ defmodule EyeInTheSky.Accounts do
   end
 
   def get_user_by_username(username) do
-    Repo.get_by(User, username: username)
+    case Repo.get_by(User, username: username) do
+      nil -> {:error, :not_found}
+      user -> {:ok, user}
+    end
   end
 
   def get_or_create_user(username) do
     case get_user_by_username(username) do
-      nil ->
+      {:error, :not_found} ->
         %User{}
         |> User.changeset(%{username: username, display_name: username})
         |> Repo.insert()
 
-      user ->
+      {:ok, user} ->
         {:ok, user}
     end
   end
@@ -37,7 +40,10 @@ defmodule EyeInTheSky.Accounts do
   end
 
   def get_passkey_by_credential_id(credential_id) do
-    Repo.get_by(Passkey, credential_id: credential_id)
+    case Repo.get_by(Passkey, credential_id: credential_id) do
+      nil -> {:error, :not_found}
+      passkey -> {:ok, passkey}
+    end
   end
 
   def create_passkey(attrs) do

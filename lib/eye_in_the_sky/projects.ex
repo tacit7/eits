@@ -61,17 +61,23 @@ defmodule EyeInTheSky.Projects do
   end
 
   @doc """
-  Gets a single project by name.
+  Gets a single project by name. Returns {:ok, project} | {:error, :not_found}.
   """
   def get_project_by_name(name) do
-    Repo.get_by(Project, name: name)
+    case Repo.get_by(Project, name: name) do
+      nil -> {:error, :not_found}
+      project -> {:ok, project}
+    end
   end
 
   @doc """
-  Gets a single project by path.
+  Gets a single project by path. Returns {:ok, project} | {:error, :not_found}.
   """
   def get_project_by_path(path) do
-    Repo.get_by(Project, path: path)
+    case Repo.get_by(Project, path: path) do
+      nil -> {:error, :not_found}
+      project -> {:ok, project}
+    end
   end
 
   @doc """
@@ -129,8 +135,8 @@ defmodule EyeInTheSky.Projects do
 
       project_name not in [nil, ""] ->
         case get_project_by_name(project_name) do
-          nil -> {:ok, nil, nil}
-          project -> {:ok, project.id, project.name}
+          {:error, :not_found} -> {:ok, nil, nil}
+          {:ok, project} -> {:ok, project.id, project.name}
         end
 
       true ->
@@ -140,8 +146,8 @@ defmodule EyeInTheSky.Projects do
 
   defp resolve_project_by_path(path) do
     case get_project_by_path(path) do
-      nil -> create_or_retry_project(path)
-      project -> {:ok, project.id, project.name}
+      {:error, :not_found} -> create_or_retry_project(path)
+      {:ok, project} -> {:ok, project.id, project.name}
     end
   end
 
@@ -156,8 +162,8 @@ defmodule EyeInTheSky.Projects do
       {:error, _changeset} ->
         # Race condition: try lookup again
         case get_project_by_path(path) do
-          nil -> {:error, "project_creation_failed", "failed to create project for path: #{path}"}
-          project -> {:ok, project.id, project.name}
+          {:error, :not_found} -> {:error, "project_creation_failed", "failed to create project for path: #{path}"}
+          {:ok, project} -> {:ok, project.id, project.name}
         end
     end
   end

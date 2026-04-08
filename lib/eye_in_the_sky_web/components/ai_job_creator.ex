@@ -91,7 +91,13 @@ defmodule EyeInTheSkyWeb.Components.AIJobCreator do
   # ---------------------------------------------------------------------------
 
   defp maybe_assign_web_project(socket, nil) do
-    assign(socket, :web_project, Projects.get_project_by_name("EITS Web"))
+    web_project =
+      case Projects.get_project_by_name("EITS Web") do
+        {:ok, project} -> project
+        {:error, :not_found} -> nil
+      end
+
+    assign(socket, :web_project, web_project)
   end
 
   defp maybe_assign_web_project(socket, _project_id), do: socket

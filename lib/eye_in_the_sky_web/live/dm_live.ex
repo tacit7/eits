@@ -33,7 +33,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         |> MountState.assign_sidebar_context(params)
         |> MountState.assign_session_state(session, agent)
         |> MountState.assign_defaults(session)
-        |> load_messages_on_mount()
+        |> MessageHandlers.load_messages_on_mount()
 
       {:ok, socket}
     else
@@ -187,8 +187,8 @@ defmodule EyeInTheSkyWeb.DmLive do
   @impl true
   def handle_event("send_message", %{"body" => body}, socket) when body != "" do
     {server_cmds, session_opts, clean_body} = SlashCommands.parse(body)
-    socket = apply_server_commands(server_cmds, socket)
-    socket = apply_session_opts(session_opts, socket)
+    socket = SlashCommands.apply_server_commands(server_cmds, socket)
+    socket = SlashCommands.apply_session_opts(session_opts, socket)
 
     trimmed = String.trim(clean_body)
 
@@ -465,68 +465,4 @@ defmodule EyeInTheSkyWeb.DmLive do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Private
-  # ---------------------------------------------------------------------------
-
-  # On connected mount, sync messages from the session file into the DB first
-  # so navigating back after an agent run shows the full conversation (including
-  # tool blocks), not just the final text saved by on_result_received.
-  # Falls back to a plain DB query if no session file / project path found.
-  defp load_messages_on_mount(socket) do
-    if connected?(socket) do
-      case MessageHandlers.sync_messages_from_session_file(socket) do
-        {:ok, socket, _imported} -> socket
-        {:error, _reason} -> TabHelpers.load_tab_data(socket, "messages", socket.assigns.session_id)
-      end
-    else
-      TabHelpers.load_tab_data(socket, "messages", socket.assigns.session_id)
-    end
-  end
-
-  # Apply server-side commands to socket state
-  defp apply_server_commands([], socket), do: socket
-
-  defp apply_server_commands([{:rename, name} | rest], socket) do
-    socket =
-      case Sessions.update_session(socket.assigns.session, %{name: name}) do
-        {:ok, updated_session} ->
-          socket
-          |> assign(:session, updated_session)
-          |> assign(:page_title, name)
-
-        {:error, _} ->
-          socket
-      end
-
-    apply_server_commands(rest, socket)
-  end
-
-  defp apply_server_commands([{:model, model} | rest], socket) do
-    apply_server_commands(rest, assign(socket, :selected_model, model))
-  end
-
-  defp apply_server_commands([{:effort, level} | rest], socket) do
-    apply_server_commands(rest, assign(socket, :selected_effort, level))
-  end
-
-  defp apply_server_commands([_ | rest], socket), do: apply_server_commands(rest, socket)
-
-  # Merge session-level CLI opts into socket assigns.
-  # _noop entries are dropped. For keyed flags (chrome: false), the value is stored
-  # so --no-chrome fires on every message. Omitting a key entirely means no flag sent.
-  defp apply_session_opts([], socket), do: socket
-
-  defp apply_session_opts([{:_noop, _} | rest], socket),
-    do: apply_session_opts(rest, socket)
-
-  defp apply_session_opts([{:_clear, key} | rest], socket) do
-    updated = Keyword.delete(socket.assigns.session_cli_opts, key)
-    apply_session_opts(rest, assign(socket, :session_cli_opts, updated))
-  end
-
-  defp apply_session_opts([{k, v} | rest], socket) do
-    updated = Keyword.put(socket.assigns.session_cli_opts, k, v)
-    apply_session_opts(rest, assign(socket, :session_cli_opts, updated))
-  end
 end

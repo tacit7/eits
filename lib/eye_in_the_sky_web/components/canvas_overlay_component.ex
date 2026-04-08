@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.Components.CanvasOverlayComponent do
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Events
-  alias EyeInTheSkyWeb.Canvases
+  alias EyeInTheSky.Canvases
   alias EyeInTheSkyWeb.Components.ChatWindowComponent
 
   @impl true

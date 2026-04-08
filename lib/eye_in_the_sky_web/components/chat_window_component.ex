@@ -111,12 +111,12 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
   end
 
   def handle_event("window_moved", %{"id" => cs_id, "x" => x, "y" => y}, socket) do
-    if id = parse_int(cs_id), do: EyeInTheSkyWeb.Canvases.update_window_layout(id, %{pos_x: x, pos_y: y})
+    if id = parse_int(cs_id), do: EyeInTheSky.Canvases.update_window_layout(id, %{pos_x: x, pos_y: y})
     {:noreply, socket}
   end
 
   def handle_event("window_resized", %{"id" => cs_id, "w" => w, "h" => h}, socket) do
-    if id = parse_int(cs_id), do: EyeInTheSkyWeb.Canvases.update_window_layout(id, %{width: w, height: h})
+    if id = parse_int(cs_id), do: EyeInTheSky.Canvases.update_window_layout(id, %{width: w, height: h})
     {:noreply, socket}
   end
 

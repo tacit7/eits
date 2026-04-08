@@ -591,6 +591,57 @@ end
 
 ---
 
+### Scheduler and Context Separation
+
+**Problem:** Scheduler modules (e.g., `AgentStatusScheduler`) that contain direct `Repo` calls or inline `Ecto.Query` logic leak implementation details into job orchestration code. This makes schedulers harder to test, harder to reuse, and tightly coupled to schema internals.
+
+**Solution:** Move all query logic to context functions. Schedulers should only orchestrate (decide *when* and *what* to run), never *how* data is fetched or mutated.
+
+**Example:**
+
+```elixir
+# ❌ Before: Direct Repo/schema queries in scheduler
+defmodule AgentStatusScheduler do
+  def check_agents do
+    agents = Repo.all(
+      from a in Agent,
+      where: a.status == "working",
+      where: a.last_heartbeat_at < ago(5, "minute")
+    )
+
+    Enum.each(agents, fn agent ->
+      agent |> Ecto.Changeset.change(%{status: "idle"}) |> Repo.update()
+    end)
+  end
+end
+
+# ✅ After: Delegate to context functions
+defmodule AgentStatusScheduler do
+  def check_agents do
+    Agents.list_agents_pending_status_check()
+    |> Enum.each(&Agents.archive_agent(&1, "heartbeat_timeout"))
+  end
+end
+```
+
+**Context functions created in this refactor (commit 9a0bc21):**
+
+| Function | Context | Purpose |
+|----------|---------|---------|
+| `Agents.list_agents_pending_status_check/0` | Agents | Agents needing status review |
+| `Agents.archive_agent/2` | Agents | Archive agent with reason |
+| `Sessions.list_idle_sessions_older_than/1` | Sessions | Idle sessions past threshold |
+| `Tasks.active_task_count_for_session/1` | Tasks | Active task count for a session |
+
+**Removed:** `Agents.update_agent_status/2` (deprecated no-op).
+
+**Benefits:**
+- **Separation of concerns:** Schedulers orchestrate; contexts own data access
+- **Testability:** Context functions are independently testable without running the scheduler
+- **Reusability:** Same queries available to LiveViews, REST API, and other callers
+
+---
+
 ### Chat Presenter
 
 **ChatPresenter** (`lib/eye_in_the_sky_web_web/live/chat_presenter.ex`): Extracted chat presentation logic from `ChatLive`. Handles message formatting, typing indicator state, and ambient message filtering.

@@ -71,17 +71,22 @@ defmodule EyeInTheSky.Notifications do
   end
 
   def mark_read(id) do
-    result =
-      Notification
-      |> Repo.get!(id)
-      |> Ecto.Changeset.change(read: true)
-      |> Repo.update()
+    case Repo.get(Notification, id) do
+      nil ->
+        {:error, :not_found}
 
-    with {:ok, notification} <- result do
-      broadcast(:notification_read, notification.id)
+      notification ->
+        result =
+          notification
+          |> Notification.changeset(%{read: true})
+          |> Repo.update()
+
+        with {:ok, updated} <- result do
+          broadcast(:notification_read, updated.id)
+        end
+
+        result
     end
-
-    result
   end
 
   def mark_all_read do

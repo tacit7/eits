@@ -274,12 +274,14 @@ defmodule EyeInTheSky.Notes do
   Toggles the starred status of a note.
   """
   def toggle_starred(note_id) do
-    note = get_note!(note_id)
-    new_starred = if note.starred == 1, do: 0, else: 1
+    case get_note(note_id) do
+      {:error, :not_found} ->
+        {:error, :not_found}
 
-    note
-    |> Ecto.Changeset.change(starred: new_starred)
-    |> Repo.update()
+      {:ok, note} ->
+        new_starred = if note.starred == 1, do: 0, else: 1
+        update_note(note, %{starred: new_starred})
+    end
   end
 
   @doc """

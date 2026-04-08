@@ -47,7 +47,6 @@ defmodule EyeInTheSky.Notes do
 
   @doc """
   Returns notes for a specific session.
-  Handles both "session" and "sessions" parent_type for backwards compatibility.
   Matches on both integer ID (as string) and UUID for migration compatibility.
   """
   def list_notes_for_session(session_id, opts \\ []) do
@@ -67,7 +66,7 @@ defmodule EyeInTheSky.Notes do
         Note
         |> where(
           [n],
-          n.parent_type in ["session", "sessions"] and
+          n.parent_type == "session" and
             (n.parent_id == ^session_int_str or n.parent_id == ^session.uuid)
         )
         |> order_by([n], desc: n.created_at)
@@ -92,7 +91,7 @@ defmodule EyeInTheSky.Notes do
       Note
       |> where(
         [n],
-        n.parent_type in ["session", "sessions"] and
+        n.parent_type == "session" and
           (n.parent_id == ^to_string(session_id) or n.parent_id == ^session.uuid)
       )
       |> Repo.aggregate(:count, :id)
@@ -103,7 +102,6 @@ defmodule EyeInTheSky.Notes do
 
   @doc """
   Returns notes for a specific agent.
-  Handles both "agent" and "agents" parent_type for backwards compatibility.
   """
   def list_notes_for_agent(agent_id) do
     agent = Repo.get(EyeInTheSky.Agents.Agent, agent_id)
@@ -112,7 +110,7 @@ defmodule EyeInTheSky.Notes do
       Note
       |> where(
         [n],
-        n.parent_type in ["agent", "agents"] and
+        n.parent_type == "agent" and
           (n.parent_id == ^to_string(agent_id) or n.parent_id == ^agent.uuid)
       )
       |> order_by([n], desc: n.created_at)
@@ -156,7 +154,7 @@ defmodule EyeInTheSky.Notes do
     project_id_str = to_string(project_id)
 
     Note
-    |> where([n], n.parent_type in ["project", "projects"] and n.parent_id == ^project_id_str)
+    |> where([n], n.parent_type == "project" and n.parent_id == ^project_id_str)
     |> order_by([n], desc: n.created_at)
     |> limit(^limit_val)
     |> Repo.all()
@@ -207,7 +205,7 @@ defmodule EyeInTheSky.Notes do
 
     base =
       if type_filter != "all" do
-        from(n in base, where: n.parent_type in ^note_type_variants(type_filter))
+        from(n in base, where: n.parent_type == ^type_filter)
       else
         base
       end
@@ -347,24 +345,18 @@ defmodule EyeInTheSky.Notes do
     end
   end
 
-  defp note_type_variants("session"), do: ["session", "sessions"]
-  defp note_type_variants("agent"), do: ["agent", "agents"]
-  defp note_type_variants("project"), do: ["project", "projects"]
-  defp note_type_variants("task"), do: ["task"]
-  defp note_type_variants(type), do: [type]
-
   # Builds an Ecto dynamic OR filter across all parent types in scope.
   defp build_scope_dynamic(project_id_str, agent_ids_str, session_ids_str) do
     clauses =
       []
       |> maybe_add_dynamic(project_id_str != nil, fn ->
-        dynamic([n], n.parent_type in ["project", "projects"] and n.parent_id == ^project_id_str)
+        dynamic([n], n.parent_type == "project" and n.parent_id == ^project_id_str)
       end)
       |> maybe_add_dynamic(agent_ids_str != [], fn ->
-        dynamic([n], n.parent_type in ["agent", "agents"] and n.parent_id in ^agent_ids_str)
+        dynamic([n], n.parent_type == "agent" and n.parent_id in ^agent_ids_str)
       end)
       |> maybe_add_dynamic(session_ids_str != [], fn ->
-        dynamic([n], n.parent_type in ["session", "sessions"] and n.parent_id in ^session_ids_str)
+        dynamic([n], n.parent_type == "session" and n.parent_id in ^session_ids_str)
       end)
 
     Enum.reduce(clauses, fn clause, acc -> dynamic([n], ^acc or ^clause) end)
@@ -381,36 +373,31 @@ defmodule EyeInTheSky.Notes do
       |> add_sql_clause(
         project_id_str != nil,
         fn {clauses, params, idx} ->
-          types_sql = note_type_variants("project") |> Enum.map_join(", ", &"'#{&1}'")
-          clause = "(n.parent_type IN (#{types_sql}) AND n.parent_id = $#{idx})"
+          clause = "(n.parent_type = 'project' AND n.parent_id = $#{idx})"
           {[clause | clauses], params ++ [project_id_str], idx + 1}
         end
       )
       |> add_sql_clause(
         agent_ids_str != [],
         fn {clauses, params, idx} ->
-          types_sql = note_type_variants("agent") |> Enum.map_join(", ", &"'#{&1}'")
-
           placeholders =
             agent_ids_str
             |> Enum.with_index(idx)
             |> Enum.map_join(",", fn {_, i} -> "$#{i}" end)
 
-          clause = "(n.parent_type IN (#{types_sql}) AND n.parent_id IN (#{placeholders}))"
+          clause = "(n.parent_type = 'agent' AND n.parent_id IN (#{placeholders}))"
           {[clause | clauses], params ++ agent_ids_str, idx + length(agent_ids_str)}
         end
       )
       |> add_sql_clause(
         session_ids_str != [],
         fn {clauses, params, idx} ->
-          types_sql = note_type_variants("session") |> Enum.map_join(", ", &"'#{&1}'")
-
           placeholders =
             session_ids_str
             |> Enum.with_index(idx)
             |> Enum.map_join(",", fn {_, i} -> "$#{i}" end)
 
-          clause = "(n.parent_type IN (#{types_sql}) AND n.parent_id IN (#{placeholders}))"
+          clause = "(n.parent_type = 'session' AND n.parent_id IN (#{placeholders}))"
           {[clause | clauses], params ++ session_ids_str, idx + length(session_ids_str)}
         end
       )

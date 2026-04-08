@@ -37,9 +37,9 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommandsTest do
       assert body == ""
     end
 
-    test "session flag /plan produces permission_mode" do
+    test "session flag /plan produces plan: true" do
       {_server, session, body} = SlashCommands.parse("/plan")
-      assert session == [{:permission_mode, "plan"}]
+      assert session == [{:plan, true}]
       assert body == ""
     end
 
@@ -115,7 +115,7 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommandsTest do
       input = "/model sonnet\n/effort high\n/plan\nDo the thing"
       {server, session, body} = SlashCommands.parse(input)
       assert server == [{:model, "sonnet"}, {:effort, "high"}]
-      assert session == [{:permission_mode, "plan"}]
+      assert session == [{:plan, true}]
       assert body == "Do the thing"
     end
 
@@ -148,7 +148,7 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommandsTest do
     end
 
     test "plan returns session tuple" do
-      assert SlashCommands.route("plan", nil) == {:session, {:permission_mode, "plan"}}
+      assert SlashCommands.route("plan", nil) == {:session, {:plan, true}}
     end
 
     test "chrome returns session tuple" do

@@ -1,7 +1,14 @@
 defmodule EyeInTheSkyWeb.DmLive.SlashCommandsTest do
-  use ExUnit.Case, async: true
+  use EyeInTheSky.DataCase, async: true
 
+  alias EyeInTheSky.Factory
   alias EyeInTheSkyWeb.DmLive.SlashCommands
+
+  # Builds a minimal Phoenix.LiveView.Socket with the given assigns merged in.
+  defp build_socket(assigns) do
+    base = %{__changed__: %{}, session_cli_opts: []}
+    %Phoenix.LiveView.Socket{assigns: Map.merge(base, assigns)}
+  end
 
   describe "parse/1" do
     test "plain text passes through unchanged" do
@@ -154,6 +161,101 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommandsTest do
 
     test "rename without arg returns :unknown" do
       assert SlashCommands.route("rename", nil) == :unknown
+    end
+  end
+
+  describe "apply_server_commands/2" do
+    test "empty list returns socket unchanged" do
+      socket = build_socket(%{selected_model: "sonnet"})
+      assert SlashCommands.apply_server_commands([], socket) == socket
+    end
+
+    test ":model command updates selected_model assign" do
+      socket = build_socket(%{selected_model: "sonnet"})
+      result = SlashCommands.apply_server_commands([{:model, "opus"}], socket)
+      assert result.assigns.selected_model == "opus"
+    end
+
+    test ":effort command updates selected_effort assign" do
+      socket = build_socket(%{selected_effort: "medium"})
+      result = SlashCommands.apply_server_commands([{:effort, "high"}], socket)
+      assert result.assigns.selected_effort == "high"
+    end
+
+    test "multiple commands applied in order" do
+      socket = build_socket(%{selected_model: "sonnet", selected_effort: "low"})
+
+      result =
+        SlashCommands.apply_server_commands(
+          [{:model, "opus"}, {:effort, "high"}],
+          socket
+        )
+
+      assert result.assigns.selected_model == "opus"
+      assert result.assigns.selected_effort == "high"
+    end
+
+    test "unknown tuples are dropped without error" do
+      socket = build_socket(%{selected_model: "sonnet"})
+      result = SlashCommands.apply_server_commands([{:unknown_cmd, "val"}], socket)
+      assert result.assigns.selected_model == "sonnet"
+    end
+
+    test ":rename updates session name and page_title on success" do
+      agent = Factory.create_agent()
+      session = Factory.create_session(agent)
+      socket = build_socket(%{session: session, page_title: "old title"})
+
+      result = SlashCommands.apply_server_commands([{:rename, "new name"}], socket)
+
+      assert result.assigns.page_title == "new name"
+      assert result.assigns.session.name == "new name"
+    end
+
+  end
+
+  describe "apply_session_opts/2" do
+    test "empty list returns socket unchanged" do
+      socket = build_socket(%{session_cli_opts: [chrome: true]})
+      assert SlashCommands.apply_session_opts([], socket) == socket
+    end
+
+    test ":_noop is dropped without mutating session_cli_opts" do
+      socket = build_socket(%{session_cli_opts: []})
+      result = SlashCommands.apply_session_opts([{:_noop, nil}], socket)
+      assert result.assigns.session_cli_opts == []
+    end
+
+    test ":_clear removes the key from session_cli_opts" do
+      socket = build_socket(%{session_cli_opts: [sandbox: true, chrome: true]})
+      result = SlashCommands.apply_session_opts([{:_clear, :sandbox}], socket)
+      assert result.assigns.session_cli_opts == [chrome: true]
+    end
+
+    test "keyed opt is added to session_cli_opts" do
+      socket = build_socket(%{session_cli_opts: []})
+      result = SlashCommands.apply_session_opts([{:chrome, false}], socket)
+      assert result.assigns.session_cli_opts == [chrome: false]
+    end
+
+    test "keyed opt overwrites existing value" do
+      socket = build_socket(%{session_cli_opts: [chrome: true]})
+      result = SlashCommands.apply_session_opts([{:chrome, false}], socket)
+      assert result.assigns.session_cli_opts == [chrome: false]
+    end
+
+    test "multiple opts applied in order" do
+      socket = build_socket(%{session_cli_opts: []})
+
+      result =
+        SlashCommands.apply_session_opts(
+          [{:chrome, true}, {:sandbox, true}, {:_noop, nil}],
+          socket
+        )
+
+      opts = result.assigns.session_cli_opts
+      assert opts[:chrome] == true
+      assert opts[:sandbox] == true
     end
   end
 end

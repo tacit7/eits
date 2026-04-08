@@ -59,7 +59,11 @@ defmodule EyeInTheSky.Sessions.Loader do
           limit: Keyword.get(opts, :notes_limit),
           offset: Keyword.get(opts, :notes_offset)
         ),
-      session_context: Contexts.get_session_context(session_id),
+      session_context:
+        case Contexts.get_session_context(session_id) do
+          {:ok, ctx} -> ctx
+          {:error, :not_found} -> nil
+        end,
       metrics: nil
     }
   end

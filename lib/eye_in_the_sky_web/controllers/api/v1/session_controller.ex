@@ -239,10 +239,10 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   def get_context(conn, %{"uuid" => uuid}) do
     with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
       case Contexts.get_session_context(session.id) do
-        nil ->
+        {:error, :not_found} ->
           conn |> put_status(:not_found) |> json(%{error: "No context found"})
 
-        ctx ->
+        {:ok, ctx} ->
           json(conn, %{
             success: true,
             context: ctx.context,

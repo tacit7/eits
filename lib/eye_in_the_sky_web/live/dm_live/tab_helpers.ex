@@ -63,7 +63,10 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     |> assign(
       :session_context,
       maybe_load_tab_data(tab, "context", socket.assigns[:session_context], fn ->
-        Contexts.get_session_context(session_id)
+        case Contexts.get_session_context(session_id) do
+          {:ok, ctx} -> ctx
+          {:error, :not_found} -> nil
+        end
       end)
     )
   end

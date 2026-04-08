@@ -16,7 +16,7 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Notifications
-  alias EyeInTheSky.{Repo, ScheduledJobs, Tasks}
+  alias EyeInTheSky.{Projects, Repo, ScheduledJobs, Tasks}
   alias EyeInTheSky.Workers.SpeakWorker
 
   import Ecto.Query
@@ -151,8 +151,8 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
     project_id = task.project_id || job_project_id
 
     project_path =
-      case project_id && Repo.get(EyeInTheSky.Projects.Project, project_id) do
-        %{path: path} when is_binary(path) -> path
+      case project_id && Projects.get_project(project_id) do
+        {:ok, %{path: path}} when is_binary(path) -> path
         _ -> File.cwd!()
       end
 

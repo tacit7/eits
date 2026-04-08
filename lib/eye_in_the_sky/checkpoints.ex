@@ -71,7 +71,10 @@ defmodule EyeInTheSky.Checkpoints do
       Messages.truncate_messages_after_index(checkpoint.session_id, checkpoint.message_index)
 
     if checkpoint.git_stash_ref do
-      session = Repo.get(EyeInTheSky.Sessions.Session, checkpoint.session_id)
+      session = case Sessions.get_session(checkpoint.session_id) do
+        {:ok, s} -> s
+        {:error, :not_found} -> nil
+      end
 
       project_path = session && session.git_worktree_path
 

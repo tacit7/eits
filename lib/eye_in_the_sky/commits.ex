@@ -79,7 +79,10 @@ defmodule EyeInTheSky.Commits do
   Gets a commit by hash.
   """
   def get_commit_by_hash(hash) do
-    Repo.get_by(Commit, commit_hash: hash)
+    case Repo.get_by(Commit, commit_hash: hash) do
+      nil -> {:error, :not_found}
+      commit -> {:ok, commit}
+    end
   end
 
   @doc """

@@ -96,17 +96,23 @@ defmodule EyeInTheSky.Bookmarks do
   Gets a bookmark by type and identifier.
   """
   def get_bookmark_by(bookmark_type, identifier) do
-    case bookmark_type do
-      "file" ->
-        from(b in Bookmark, where: b.bookmark_type == "file" and b.file_path == ^identifier)
-        |> Repo.one()
+    result =
+      case bookmark_type do
+        "file" ->
+          from(b in Bookmark, where: b.bookmark_type == "file" and b.file_path == ^identifier)
+          |> Repo.one()
 
-      type when type in ["note", "agent", "session", "task"] ->
-        from(b in Bookmark, where: b.bookmark_type == ^type and b.bookmark_id == ^identifier)
-        |> Repo.one()
+        type when type in ["note", "agent", "session", "task"] ->
+          from(b in Bookmark, where: b.bookmark_type == ^type and b.bookmark_id == ^identifier)
+          |> Repo.one()
 
-      _ ->
-        nil
+        _ ->
+          nil
+      end
+
+    case result do
+      nil -> {:error, :not_found}
+      bookmark -> {:ok, bookmark}
     end
   end
 
@@ -114,9 +120,7 @@ defmodule EyeInTheSky.Bookmarks do
   Records that a bookmark was accessed (updates accessed_at).
   """
   def touch_bookmark(%Bookmark{} = bookmark) do
-    bookmark
-    |> Ecto.Changeset.change(accessed_at: DateTime.utc_now())
-    |> Repo.update()
+    update_bookmark(bookmark, %{accessed_at: DateTime.utc_now()})
   end
 
   # Private helpers

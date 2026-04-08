@@ -1,5 +1,16 @@
 # Documentation Update Suggestions
 
+## 2026-04-07
+**Commits reviewed**: ca015ef..f786c5d
+
+- **CODE_GUIDELINES.md** — Document tagged tuple pattern for context functions (commits 625655a, 96ce027, 2827d63, 0949e18, ee3e586, et al): systematic refactoring of Accounts.get_user/1, Projects.get_project/1, Tasks.get_task/1, Notes.get_note/1, Teams.get_team/*, Prompts.get_prompt/1, ChecklistItems functions to return `{:ok, value} | {:error, :not_found}` instead of nil; show pattern with before/after examples; explain caller changes (nil checks → pattern matching); benefits for explicit error handling and call-site clarity
+- **NEW: docs/ORCHESTRATOR_TIMERS.md** — Document OrchestratorTimers feature (commits 2193b4c–8a3f530): GenServer with token-correlated session timers, PubSub event broadcast on timer start/cancel, DmLive integration with hamburger menu + schedule modal UI, subscribe/broadcast helpers in Events module, timer event handlers (timer_started, timer_cancelled), timer badge on DM page, database persistence of active_timer, support for resumable sessions
+- **CODE_GUIDELINES.md** — Document scheduler context refactoring (commit 9a0bc21): move direct Repo/schema queries out of scheduler modules into dedicated context functions (Agents.list_agents_pending_status_check/0, Agents.archive_agent/2, Sessions.list_idle_sessions_older_than/1, Tasks.active_task_count_for_session/1); remove deprecated Agents.update_agent_status/2 no-op; scheduler now delegates exclusively through contexts
+- **CODE_GUIDELINES.md** — Document Projects.get_project_with_agents!/1 helper (commit 0949e18): new context function prevents Repo.preload leakage from web layer into LiveViews; replaces direct preload calls in config.ex, files.ex, notes.ex; centralizes eager-load query logic
+- **CODE_GUIDELINES.md** — Document boolean simplification pattern (commit dfc4e8e): remove redundant `== true` boolean comparisons and excessive boolean-tracking assignments; simplify to direct pattern matching and direct boolean fields; applied across LiveView event handlers and helper modules
+- **KANBAN.md** — Document sidebar and kanban task improvements (commits a5824f3–eb95482): sidebar task links to kanban with filtered view, kanban toolbar with list view link, deduplicated task_id assigns, KanbanCard helper extraction (resolve_dm_session), consolidated handle_info for agent_working/agent_stopped events, task_detail_drawer and new_agent_drawer integration
+- **CODE_GUIDELINES.md or MOBILE.md** — Document mobile layout fixes (commits ab17275–a21fdd0): sticky header offset fixes for mobile nav, min-h-[44px] touch target sizing on sidebar nav/drawers/notifications, consistent viewport alignment with 320px min width, mobile-safe overflow handling in task lists
+
 ## 2026-04-03
 **Commits reviewed**: 42ae046..7c77b83
 

@@ -146,10 +146,10 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
 
   defp leave_member(member_id, from_session_id) do
     case Teams.get_member(member_id) do
-      nil ->
+      {:error, :not_found} ->
         notify_error(from_session_id, "teams leave", {:member_not_found, member_id})
 
-      member ->
+      {:ok, member} ->
         Teams.leave_team(member)
         notify_success(from_session_id, "member #{member_id} left team")
     end
@@ -157,10 +157,10 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
 
   defp do_update_member(member_id, status, from_session_id) do
     case Teams.get_member(member_id) do
-      nil ->
+      {:error, :not_found} ->
         notify_error(from_session_id, "teams update-member", {:member_not_found, member_id})
 
-      member ->
+      {:ok, member} ->
         Teams.update_member_status(member, status)
         notify_success(from_session_id, "team member #{member_id} status -> #{status}")
     end

@@ -90,26 +90,38 @@ defmodule EyeInTheSky.Teams do
   end
 
   def get_member(id) when is_integer(id) do
-    Repo.get(TeamMember, id)
+    case Repo.get(TeamMember, id) do
+      nil -> {:error, :not_found}
+      member -> {:ok, member}
+    end
   end
 
   def get_member(id) when is_binary(id) do
     case ToolHelpers.parse_int(id) do
-      nil -> nil
+      nil -> {:error, :not_found}
       int_id -> get_member(int_id)
     end
   end
 
   def get_member(team_id, name) do
-    Repo.get_by(TeamMember, team_id: team_id, name: name)
+    case Repo.get_by(TeamMember, team_id: team_id, name: name) do
+      nil -> {:error, :not_found}
+      member -> {:ok, member}
+    end
   end
 
   def get_member_by_agent_id(agent_id) do
-    TeamMember
-    |> where([m], m.agent_id == ^agent_id)
-    |> order_by([m], desc: m.joined_at)
-    |> limit(1)
-    |> Repo.one()
+    result =
+      TeamMember
+      |> where([m], m.agent_id == ^agent_id)
+      |> order_by([m], desc: m.joined_at)
+      |> limit(1)
+      |> Repo.one()
+
+    case result do
+      nil -> {:error, :not_found}
+      member -> {:ok, member}
+    end
   end
 
   def join_team(attrs) do

@@ -60,7 +60,7 @@ defmodule EyeInTheSky.Prompts do
 
   @doc """
   Gets a single prompt by slug.
-  Returns nil if not found.
+  Returns `{:ok, prompt}` or `{:error, :not_found}`.
   """
   def get_prompt_by_slug(slug, project_id \\ nil) do
     query =
@@ -78,7 +78,10 @@ defmodule EyeInTheSky.Prompts do
             order_by: [desc: fragment("CASE WHEN ? IS NULL THEN 0 ELSE 1 END", p.project_id)]
       end
 
-    Repo.one(query)
+    case Repo.one(query) do
+      nil -> {:error, :not_found}
+      prompt -> {:ok, prompt}
+    end
   end
 
   @doc """
@@ -95,14 +98,14 @@ defmodule EyeInTheSky.Prompts do
         get_prompt(ref)
 
       true ->
-        prompt =
-          if project_id do
-            get_prompt_by_slug(ref, project_id) || get_prompt_by_slug(ref, nil)
-          else
-            get_prompt_by_slug(ref, nil)
+        if project_id do
+          case get_prompt_by_slug(ref, project_id) do
+            {:ok, prompt} -> {:ok, prompt}
+            {:error, :not_found} -> get_prompt_by_slug(ref, nil)
           end
-
-        if prompt, do: {:ok, prompt}, else: {:error, :not_found}
+        else
+          get_prompt_by_slug(ref, nil)
+        end
     end
   end
 

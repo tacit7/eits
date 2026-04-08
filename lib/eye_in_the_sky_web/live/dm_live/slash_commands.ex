@@ -1,5 +1,8 @@
 defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+  import Phoenix.Component, only: [assign: 3]
+
+  alias EyeInTheSky.Sessions
 
   @moduledoc """
   Single source of truth for CLI slash-command metadata and parsing.
@@ -127,4 +130,52 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
   end
 
   def route(_, _), do: :unknown
+
+  # ---------------------------------------------------------------------------
+  # Socket state applicators
+  # ---------------------------------------------------------------------------
+
+  @doc "Apply parsed server-side commands to the socket."
+  def apply_server_commands([], socket), do: socket
+
+  def apply_server_commands([{:rename, name} | rest], socket) do
+    socket =
+      case Sessions.update_session(socket.assigns.session, %{name: name}) do
+        {:ok, updated_session} ->
+          socket
+          |> assign(:session, updated_session)
+          |> assign(:page_title, name)
+
+        {:error, _} ->
+          socket
+      end
+
+    apply_server_commands(rest, socket)
+  end
+
+  def apply_server_commands([{:model, model} | rest], socket) do
+    apply_server_commands(rest, assign(socket, :selected_model, model))
+  end
+
+  def apply_server_commands([{:effort, level} | rest], socket) do
+    apply_server_commands(rest, assign(socket, :selected_effort, level))
+  end
+
+  def apply_server_commands([_ | rest], socket), do: apply_server_commands(rest, socket)
+
+  @doc "Merge parsed session-level CLI opts into socket assigns."
+  def apply_session_opts([], socket), do: socket
+
+  def apply_session_opts([{:_noop, _} | rest], socket),
+    do: apply_session_opts(rest, socket)
+
+  def apply_session_opts([{:_clear, key} | rest], socket) do
+    updated = Keyword.delete(socket.assigns.session_cli_opts, key)
+    apply_session_opts(rest, assign(socket, :session_cli_opts, updated))
+  end
+
+  def apply_session_opts([{k, v} | rest], socket) do
+    updated = Keyword.put(socket.assigns.session_cli_opts, k, v)
+    apply_session_opts(rest, assign(socket, :session_cli_opts, updated))
+  end
 end

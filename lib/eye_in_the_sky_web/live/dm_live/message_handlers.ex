@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   @moduledoc false
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [put_flash: 3, push_event: 3]
+  import Phoenix.LiveView, only: [connected?: 1, put_flash: 3, push_event: 3]
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Claude.SessionImporter
@@ -102,6 +102,22 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
       TabHelpers.load_tab_data(socket, "messages", socket.assigns.session_id)
     else
       socket
+    end
+  end
+
+  @doc """
+  On connected mount, syncs messages from the session file into the DB first
+  so navigating back after an agent run shows the full conversation.
+  Falls back to a plain DB query if no session file / project path found.
+  """
+  def load_messages_on_mount(socket) do
+    if connected?(socket) do
+      case sync_messages_from_session_file(socket) do
+        {:ok, socket, _imported} -> socket
+        {:error, _reason} -> TabHelpers.load_tab_data(socket, "messages", socket.assigns.session_id)
+      end
+    else
+      TabHelpers.load_tab_data(socket, "messages", socket.assigns.session_id)
     end
   end
 

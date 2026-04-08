@@ -6,7 +6,7 @@ defmodule EyeInTheSky.Tasks do
   use EyeInTheSky.CrudHelpers, schema: EyeInTheSky.Tasks.Task
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Notes
+  alias EyeInTheSky.Notes.NoteQueries
   alias EyeInTheSky.QueryBuilder
   alias EyeInTheSky.QueryHelpers
   alias EyeInTheSky.Repo
@@ -104,7 +104,7 @@ defmodule EyeInTheSky.Tasks do
       limit: Keyword.get(opts, :limit),
       offset: Keyword.get(opts, :offset)
     )
-    |> Notes.with_notes_count()
+    |> NoteQueries.with_notes_count()
   end
 
   @doc """

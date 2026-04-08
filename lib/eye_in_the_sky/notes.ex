@@ -8,43 +8,17 @@ defmodule EyeInTheSky.Notes do
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Search.PgSearch
   alias EyeInTheSky.Agents
+  alias EyeInTheSky.Notes.NoteQueries
   alias EyeInTheSky.Sessions
-  alias EyeInTheSky.Tasks
+
+  # Delegate to NoteQueries to avoid a circular dependency with EyeInTheSky.Tasks.
+  defdelegate with_notes_count(tasks), to: NoteQueries
 
   @doc """
   Returns the list of notes.
   """
   def list_notes do
     Repo.all(Note)
-  end
-
-  @doc """
-  Batch-loads annotations for a list of tasks and sets :notes and :notes_count on each.
-  Notes are stored with parent_type "task" and parent_id as integer string or UUID.
-  """
-  def with_notes_count(tasks) when is_list(tasks) do
-    task_int_ids = Enum.map(tasks, &to_string(&1.id))
-    task_uuids = tasks |> Enum.map(& &1.uuid) |> Enum.reject(&is_nil/1)
-    all_ids = task_int_ids ++ task_uuids
-
-    notes_by_parent =
-      Note
-      |> where([n], n.parent_type == "task")
-      |> where([n], n.parent_id in ^all_ids)
-      |> order_by([n], asc: n.created_at)
-      |> Repo.all()
-      |> Enum.group_by(& &1.parent_id)
-
-    Enum.map(tasks, fn task ->
-      notes =
-        (Map.get(notes_by_parent, to_string(task.id), []) ++
-           if(task.uuid, do: Map.get(notes_by_parent, task.uuid, []), else: []))
-        |> Enum.uniq_by(& &1.id)
-
-      task
-      |> Map.put(:notes, notes)
-      |> Map.put(:notes_count, length(notes))
-    end)
   end
 
   @doc """
@@ -132,31 +106,20 @@ defmodule EyeInTheSky.Notes do
 
   @doc """
   Returns notes for a specific task.
-  Matches on both integer ID (as string) and UUID for migration compatibility.
+  Accepts either an integer task ID or a UUID string.
+  Matches notes on both integer ID (as string) and UUID without calling the Tasks context.
   """
   def list_notes_for_task(task_id) do
-    task =
-      case Tasks.get_task(task_id) do
-        {:ok, t} -> t
-        {:error, :not_found} -> nil
-      end
+    task_id_str = to_string(task_id)
 
-    if task do
-      uuid_filter =
-        if task.uuid do
-          dynamic([n], n.parent_id == ^to_string(task_id) or n.parent_id == ^task.uuid)
-        else
-          dynamic([n], n.parent_id == ^to_string(task_id))
-        end
-
-      Note
-      |> where([n], n.parent_type == "task")
-      |> where(^uuid_filter)
-      |> order_by([n], desc: n.created_at)
-      |> Repo.all()
-    else
-      []
-    end
+    from(n in Note,
+      join: t in EyeInTheSky.Tasks.Task,
+      on: n.parent_id == fragment("CAST(? AS text)", t.id) or n.parent_id == t.uuid,
+      where: n.parent_type == "task",
+      where: fragment("CAST(? AS text)", t.id) == ^task_id_str or t.uuid == ^task_id_str,
+      order_by: [desc: n.created_at]
+    )
+    |> Repo.all()
   end
 
   @doc """

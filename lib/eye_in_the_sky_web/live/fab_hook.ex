@@ -35,7 +35,14 @@ defmodule EyeInTheSkyWeb.FabHook do
   end
 
   defp handle_fab_event("fab_set_bookmarks", %{"bookmarks" => bookmarks}, socket) do
-    socket = assign(socket, :fab_bookmarks, bookmarks || [])
+    statuses = fetch_bookmark_statuses()
+
+    socket =
+      socket
+      |> assign(:fab_bookmarks, bookmarks || [])
+      |> assign(:fab_statuses, statuses)
+      |> schedule_fab_refresh()
+
     update_fab_component(socket)
     {:halt, socket}
   end

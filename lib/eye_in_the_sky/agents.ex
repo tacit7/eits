@@ -298,4 +298,9 @@ defmodule EyeInTheSky.Agents do
       active_session: active_session
     }
   end
+
+  @doc "Preloads associations onto an agent struct. Defaults to [:sessions, :project]."
+  def preload_agent_associations(%Agent{} = agent, assocs \\ [:sessions, :project]) do
+    Repo.preload(agent, assocs)
+  end
 end

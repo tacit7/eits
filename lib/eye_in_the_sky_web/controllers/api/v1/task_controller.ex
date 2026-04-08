@@ -241,12 +241,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   # Helpers
 
   defp move_to_state(task, state_name) do
-    state = Tasks.get_workflow_state_by_name(state_name)
-
-    if state do
-      Tasks.update_task_state(task, state.id)
-    else
-      {:error, "Workflow state '#{state_name}' not found"}
+    case Tasks.get_workflow_state_by_name(state_name) do
+      {:ok, state} -> Tasks.update_task_state(task, state.id)
+      {:error, :not_found} -> {:error, "Workflow state '#{state_name}' not found"}
     end
   end
 

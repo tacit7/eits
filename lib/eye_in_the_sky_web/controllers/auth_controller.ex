@@ -111,11 +111,11 @@ defmodule EyeInTheSkyWeb.AuthController do
   def login_challenge(conn, %{"username" => username})
       when is_binary(username) and username != "" do
     case Accounts.get_user_by_username(username) do
-      nil ->
+      {:error, :not_found} ->
         # Return same error as "no passkeys" to prevent username enumeration
         conn |> put_status(:bad_request) |> json(%{error: "login not available"})
 
-      user ->
+      {:ok, user} ->
         allow_credentials = Accounts.build_allowed_credentials(user.id)
 
         if allow_credentials == [] do
@@ -166,18 +166,22 @@ defmodule EyeInTheSkyWeb.AuthController do
          {:ok, client_data_json} <- decode_b64url(params["clientDataJSON"]),
          {:ok, auth_data} <-
            Wax.authenticate(credential_id, auth_data_bin, sig, client_data_json, challenge) do
-      passkey = Accounts.get_passkey_by_credential_id(credential_id)
+      passkey_result = Accounts.get_passkey_by_credential_id(credential_id)
 
       cloning_detected =
-        passkey != nil and
-          (passkey.sign_count > 0 or auth_data.sign_count > 0) and
-          auth_data.sign_count <= passkey.sign_count
+        match?({:ok, _}, passkey_result) and
+          (elem(passkey_result, 1).sign_count > 0 or auth_data.sign_count > 0) and
+          auth_data.sign_count <= elem(passkey_result, 1).sign_count
 
       if cloning_detected do
         conn
         |> put_status(:unauthorized)
         |> json(%{error: "credential cloning detected"})
       else
+        passkey = case passkey_result do
+          {:ok, pk} -> pk
+          {:error, :not_found} -> nil
+        end
         complete_auth(conn, passkey, auth_data, user_id)
       end
     else

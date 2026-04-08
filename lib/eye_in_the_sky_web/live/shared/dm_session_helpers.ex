@@ -43,7 +43,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmSessionHelpers do
       {:ok, _note} ->
         {:noreply, load_notes_fn.(socket)}
 
-      {:error, _changeset} ->
+      {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Failed to toggle star")}
     end
   end

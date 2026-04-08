@@ -16,14 +16,14 @@ defmodule EyeInTheSkyWeb.Plugs.ValidateSession do
 
       token ->
         case Accounts.get_valid_user_session(token) do
-          nil ->
+          {:error, _} ->
             conn
             |> clear_session()
             |> put_resp_header("location", "/auth/login")
             |> send_resp(302, "")
             |> halt()
 
-          _session ->
+          {:ok, _session} ->
             conn
         end
     end

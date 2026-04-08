@@ -202,10 +202,13 @@ defmodule EyeInTheSky.Channels do
   Gets a channel member record.
   """
   def get_member(channel_id, session_id) do
-    from(m in ChannelMember,
-      where: m.channel_id == ^channel_id and m.session_id == ^session_id
-    )
-    |> Repo.one()
+    case from(m in ChannelMember,
+           where: m.channel_id == ^channel_id and m.session_id == ^session_id
+         )
+         |> Repo.one() do
+      nil -> {:error, :not_found}
+      member -> {:ok, member}
+    end
   end
 
   @doc """
@@ -256,7 +259,10 @@ defmodule EyeInTheSky.Channels do
   def count_unread_messages(channel_id, session_id) do
     alias EyeInTheSky.Messages.Message
 
-    member = get_member(channel_id, session_id)
+    member = case get_member(channel_id, session_id) do
+      {:ok, m} -> m
+      {:error, :not_found} -> nil
+    end
 
     if member && member.last_read_at do
       from(m in Message,

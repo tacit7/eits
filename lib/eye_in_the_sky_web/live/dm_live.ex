@@ -97,6 +97,11 @@ defmodule EyeInTheSkyWeb.DmLive do
     do: TimerHandlers.handle_cancel_timer(socket)
 
   @impl true
+  def handle_event("update_schedule_message", %{"message" => msg}, socket) do
+    {:noreply, assign(socket, :schedule_message, msg)}
+  end
+
+  @impl true
   def handle_event("toggle_thinking", _params, socket), do: handle_toggle_thinking(socket)
 
   @impl true
@@ -435,6 +440,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         session_context={@session_context}
         reloading={@reloading}
         active_timer={@active_timer}
+        schedule_message={@schedule_message}
       />
 
       <EyeInTheSkyWeb.Components.NewTaskDrawer.new_task_drawer

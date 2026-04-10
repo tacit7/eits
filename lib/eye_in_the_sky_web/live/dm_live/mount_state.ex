@@ -93,7 +93,6 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:session_context, nil)
     |> assign(:reloading, false)
     |> assign(:active_timer, OrchestratorTimers.get_timer(session.id))
-    |> assign(:schedule_message, OrchestratorTimers.default_message())
     |> allow_upload(:files,
       accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
       max_entries: 10,

@@ -23,33 +23,11 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
 
   import Helpers, only: [notify_success: 2, notify_error: 3, get_session!: 1, with_task: 4]
 
-  def dispatch("create " <> title, from_session_id) do
-    title = String.trim(title)
-    session = get_session!(from_session_id)
+  def dispatch("create " <> title, from_session_id),
+    do: create_and_link_task(String.trim(title), 1, "created", from_session_id)
 
-    case Tasks.create_task(%{title: title, state_id: 1, project_id: session && session.project_id}) do
-      {:ok, task} ->
-        Tasks.link_session_to_task(task.id, from_session_id)
-        notify_success(from_session_id, "task created id=#{task.id} title=#{title}")
-
-      {:error, reason} ->
-        notify_error(from_session_id, "task create", reason)
-    end
-  end
-
-  def dispatch("begin " <> title, from_session_id) do
-    title = String.trim(title)
-    session = get_session!(from_session_id)
-
-    case Tasks.create_task(%{title: title, state_id: 2, project_id: session && session.project_id}) do
-      {:ok, task} ->
-        Tasks.link_session_to_task(task.id, from_session_id)
-        notify_success(from_session_id, "task begun id=#{task.id} title=#{title}")
-
-      {:error, reason} ->
-        notify_error(from_session_id, "task begin", reason)
-    end
-  end
+  def dispatch("begin " <> title, from_session_id),
+    do: create_and_link_task(String.trim(title), 2, "begun", from_session_id)
 
   def dispatch("start " <> id_str, from_session_id) do
     with_task(id_str, from_session_id, "task start", fn id, task ->
@@ -146,6 +124,19 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
 
   def dispatch(unknown, from_session_id),
     do: notify_error(from_session_id, "task", {:unknown_subcommand, unknown})
+
+  defp create_and_link_task(title, state_id, verb, from_session_id) do
+    session = get_session!(from_session_id)
+
+    case Tasks.create_task(%{title: title, state_id: state_id, project_id: session && session.project_id}) do
+      {:ok, task} ->
+        Tasks.link_session_to_task(task.id, from_session_id)
+        notify_success(from_session_id, "task #{verb} id=#{task.id} title=#{title}")
+
+      {:error, reason} ->
+        notify_error(from_session_id, "task #{verb}", reason)
+    end
+  end
 
   defp do_task_done(id_str, id, from_session_id) do
     if Tasks.task_linked_to_session?(id, from_session_id) do

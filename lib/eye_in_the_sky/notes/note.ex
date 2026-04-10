@@ -9,7 +9,7 @@ defmodule EyeInTheSky.Notes.Note do
     field :parent_id, :string
     field :title, :string
     field :body, :string
-    field :starred, :integer, default: 0
+    field :starred, :boolean, default: false
     field :created_at, :utc_datetime_usec
   end
 

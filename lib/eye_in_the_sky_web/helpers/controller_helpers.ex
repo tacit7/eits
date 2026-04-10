@@ -59,14 +59,22 @@ defmodule EyeInTheSkyWeb.ControllerHelpers do
   def maybe_opt(opts, key, val), do: Keyword.put(opts, key, val)
 
   @doc """
-  Coerces a `starred` param value to an integer (0 or 1).
-  Accepts nil, integer, boolean, or string representations.
+  Coerces a `starred` param value to a boolean.
+  Accepts nil, boolean, integer (1/0), or string representations ("1"/"true").
   Returns nil if the value cannot be parsed.
   """
   def parse_starred(nil), do: nil
-  def parse_starred(val) when is_integer(val), do: val
-  def parse_starred(true), do: 1
-  def parse_starred(false), do: 0
+  def parse_starred(true), do: true
+  def parse_starred(false), do: false
+  def parse_starred(val) when is_integer(val), do: val != 0
 
-  def parse_starred(val) when is_binary(val), do: parse_int(val)
+  def parse_starred(val) when is_binary(val) do
+    case val do
+      "1" -> true
+      "true" -> true
+      "0" -> false
+      "false" -> false
+      _ -> nil
+    end
+  end
 end

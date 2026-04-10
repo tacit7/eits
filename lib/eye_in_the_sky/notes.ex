@@ -63,9 +63,9 @@ defmodule EyeInTheSky.Notes do
   """
   def count_notes_for_session(session_id) do
     session =
-      case Sessions.get_session(session_id) do
+      case Sessions.resolve(to_string(session_id)) do
         {:ok, s} -> s
-        {:error, :not_found} -> nil
+        _ -> nil
       end
 
     if session do
@@ -185,7 +185,7 @@ defmodule EyeInTheSky.Notes do
         from(n in Note, order_by: ^order, limit: ^limit_val)
       end
 
-    base = if starred_only, do: from(n in base, where: n.starred == 1), else: base
+    base = if starred_only, do: from(n in base, where: n.starred == true), else: base
 
     base =
       if type_filter != "all" do
@@ -249,8 +249,7 @@ defmodule EyeInTheSky.Notes do
         {:error, :not_found}
 
       {:ok, note} ->
-        new_starred = if note.starred == 1, do: 0, else: 1
-        update_note(note, %{starred: new_starred})
+        update_note(note, %{starred: !note.starred})
     end
   end
 
@@ -305,9 +304,9 @@ defmodule EyeInTheSky.Notes do
 
     case {scope_dynamic, starred_only} do
       {nil, false} -> nil
-      {nil, true} -> dynamic([n], n.starred == 1)
+      {nil, true} -> dynamic([n], n.starred == true)
       {scope, false} -> scope
-      {scope, true} -> dynamic([n], ^scope and n.starred == 1)
+      {scope, true} -> dynamic([n], ^scope and n.starred == true)
     end
   end
 

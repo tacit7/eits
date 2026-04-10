@@ -38,8 +38,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
                   id={"toggle-note-star-#{note.id}"}
                 >
                   <.icon
-                    name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}
-                    class={"w-4 h-4 #{if note.starred == 1, do: "text-warning", else: "text-base-content/15 hover:text-base-content/30"}"}
+                    name={if note.starred, do: "hero-star-solid", else: "hero-star"}
+                    class={"w-4 h-4 #{if note.starred, do: "text-warning", else: "text-base-content/15 hover:text-base-content/30"}"}
                   />
                 </button>
                 <%!-- Title + meta --%>

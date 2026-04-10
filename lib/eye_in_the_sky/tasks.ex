@@ -219,7 +219,7 @@ defmodule EyeInTheSky.Tasks do
 
   @doc """
   Returns `{:ok, {integer_id, uuid}}` for a task identified by an integer ID or UUID string,
-  or `:error` if no task is found. No preloads.
+  or `{:error, :not_found}` if no task is found. No preloads.
   """
   def get_task_ids(id_str) do
     id_str = to_string(id_str)
@@ -232,7 +232,7 @@ defmodule EyeInTheSky.Tasks do
       end
 
     case task do
-      nil -> :error
+      nil -> {:error, :not_found}
       t -> {:ok, {t.id, t.uuid}}
     end
   end
@@ -245,7 +245,7 @@ defmodule EyeInTheSky.Tasks do
   def get_task_ids!(id_str) do
     case get_task_ids(id_str) do
       {:ok, ids} -> ids
-      :error -> raise Ecto.NoResultsError, queryable: Task
+      {:error, :not_found} -> raise Ecto.NoResultsError, queryable: Task
     end
   end
 
@@ -322,15 +322,7 @@ defmodule EyeInTheSky.Tasks do
   Archives a task (sets archived = true). Non-destructive.
   """
   def archive_task(%Task{} = task) do
-    result =
-      update_task(task, %{archived: true, updated_at: DateTime.utc_now()})
-
-    case result do
-      {:ok, updated} -> broadcast_change({:updated, updated})
-      _ -> :ok
-    end
-
-    result
+    update_task(task, %{archived: true, updated_at: DateTime.utc_now()})
   end
 
   @doc """
@@ -442,8 +434,6 @@ defmodule EyeInTheSky.Tasks do
   """
   def task_linked_to_session?(task_id, session_id)
       when is_integer(task_id) and is_integer(session_id) do
-    import Ecto.Query
-
     Repo.exists?(
       from ts in "task_sessions",
         where: ts.task_id == ^task_id and ts.session_id == ^session_id

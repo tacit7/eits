@@ -3,6 +3,10 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   Helpers for Claude and Codex model selection in forms.
   """
 
+  alias EyeInTheSky.Agents.ModelConfig
+
+  defdelegate valid_model_combos, to: ModelConfig
+
   @doc """
   Returns the list of Claude model {value, label} tuples for select inputs.
   """
@@ -40,15 +44,5 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def valid_model_slugs(provider) do
     provider |> models_for_provider() |> Enum.map(&elem(&1, 0))
-  end
-
-  @doc """
-  Returns a map of provider => list of valid model slugs.
-  """
-  def valid_model_combos do
-    %{
-      "claude" => valid_model_slugs("claude"),
-      "codex" => valid_model_slugs("codex")
-    }
   end
 end

@@ -4,7 +4,7 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
   """
 
   alias EyeInTheSky.{Agents, Sessions}
-  alias EyeInTheSkyWeb.Helpers.ViewHelpers
+  alias EyeInTheSky.Agents.ModelConfig
 
   @doc """
   Validates and normalizes spawn parameters.
@@ -67,7 +67,7 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
   end
 
   defp validate_provider_model(provider, model) do
-    combos = ViewHelpers.valid_model_combos()
+    combos = ModelConfig.valid_model_combos()
 
     case Map.get(combos, provider) do
       nil ->

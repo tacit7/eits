@@ -89,8 +89,9 @@ defmodule EyeInTheSky.Codex.SDK do
     Logger.info("[telemetry] codex.sdk.start session_id=#{meta.session_id} model=#{meta.model}")
 
     cli = Keyword.get(opts, :cli_module) || Utils.codex_cli_module()
+    task_supervisor = Keyword.get(opts, :task_supervisor, EyeInTheSky.TaskSupervisor)
 
-    case spawn_handler_process(sdk_ref, to, opts[:session_id]) do
+    case spawn_handler_process(sdk_ref, to, opts[:session_id], task_supervisor) do
       {:ok, handler_pid} ->
         cli_opts =
           opts
@@ -144,8 +145,9 @@ defmodule EyeInTheSky.Codex.SDK do
     Logger.info("[telemetry] codex.sdk.resume session_id=#{session_id} model=#{meta.model}")
 
     cli = Keyword.get(opts, :cli_module) || Utils.codex_cli_module()
+    task_supervisor = Keyword.get(opts, :task_supervisor, EyeInTheSky.TaskSupervisor)
 
-    case spawn_handler_process(sdk_ref, to, opts[:session_id]) do
+    case spawn_handler_process(sdk_ref, to, opts[:session_id], task_supervisor) do
       {:ok, handler_pid} ->
         cli_opts =
           opts
@@ -208,9 +210,9 @@ defmodule EyeInTheSky.Codex.SDK do
   # Handler process
   # ---------------------------------------------------------------------------
 
-  defp spawn_handler_process(sdk_ref, caller_pid, fallback_session_id) do
+  defp spawn_handler_process(sdk_ref, caller_pid, fallback_session_id, supervisor) do
     Task.Supervisor.start_child(
-      EyeInTheSky.TaskSupervisor,
+      supervisor,
       fn ->
         Process.monitor(caller_pid)
 

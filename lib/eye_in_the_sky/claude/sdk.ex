@@ -142,8 +142,9 @@ defmodule EyeInTheSky.Claude.SDK do
     Logger.info("[telemetry] sdk.#{mode} session_id=#{meta_session_id} model=#{meta.model}")
 
     cli = Keyword.get(opts, :cli_module) || Utils.cli_module()
+    task_supervisor = Keyword.get(opts, :task_supervisor, EyeInTheSky.TaskSupervisor)
 
-    case spawn_handler_process(sdk_ref, to) do
+    case spawn_handler_process(sdk_ref, to, task_supervisor) do
       {:ok, handler_pid} ->
         cli_opts =
           opts
@@ -216,9 +217,9 @@ defmodule EyeInTheSky.Claude.SDK do
   # Spawn a monitored handler process that will receive CLI messages.
   # Uses spawn (not spawn_link) so handler crashes don't kill the caller.
   # Handler monitors caller so it exits cleanly if caller goes down.
-  defp spawn_handler_process(sdk_ref, caller_pid) do
+  defp spawn_handler_process(sdk_ref, caller_pid, supervisor) do
     Task.Supervisor.start_child(
-      EyeInTheSky.TaskSupervisor,
+      supervisor,
       fn ->
         Process.monitor(caller_pid)
 

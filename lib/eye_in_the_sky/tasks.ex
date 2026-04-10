@@ -437,6 +437,47 @@ defmodule EyeInTheSky.Tasks do
     |> Repo.one()
   end
 
+  @doc """
+  Lists tasks for a project with optional filtering and pagination.
+
+  ## Options
+    - `:sort_by` - "created_asc", "priority", or default (position asc, created desc)
+    - `:state_id` - filter by workflow state
+    - `:include_archived` - include archived tasks (default: false)
+    - `:limit` / `:offset` - pagination
+  """
+  def list_tasks_for_project(project_id, opts \\ []) when is_integer(project_id) do
+    sort_by = Keyword.get(opts, :sort_by, "created_desc")
+
+    order =
+      case sort_by do
+        "created_asc" -> [asc: :created_at]
+        "priority" -> [desc: :priority, asc: :position]
+        _ -> [asc: :position, desc: :created_at]
+      end
+
+    base_project_tasks_query(project_id, opts)
+    |> order_by(^order)
+    |> QueryBuilder.maybe_limit(opts)
+    |> QueryBuilder.maybe_offset(opts)
+    |> preload([:state, :tags, :sessions, :checklist_items])
+    |> Repo.all()
+  end
+
+  @doc "Counts tasks for a project with optional filtering."
+  def count_tasks_for_project(project_id, opts \\ []) when is_integer(project_id) do
+    base_project_tasks_query(project_id, opts)
+    |> Repo.aggregate(:count, :id)
+  end
+
+  defp base_project_tasks_query(project_id, opts) do
+    include_archived = Keyword.get(opts, :include_archived, false)
+
+    query = from(t in Task, where: t.project_id == ^project_id)
+    query = if include_archived, do: query, else: where(query, [t], t.archived == false)
+    QueryBuilder.maybe_where(query, opts, :state_id)
+  end
+
   # PubSub
 
   defp broadcast_change({tag, task}) when tag in [:ok, :deleted] do

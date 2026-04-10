@@ -1,7 +1,6 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Projects
   alias EyeInTheSky.Tasks
   alias EyeInTheSkyWeb.Components.FilterSheet
   alias EyeInTheSkyWeb.Components.TaskCard
@@ -142,10 +141,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       |> assign(:total_tasks, length(tasks))
       |> stream(:tasks, tasks, reset: true)
     else
-      total = Projects.count_project_tasks(project_id, state_id: filter_state_id)
+      total = Tasks.count_tasks_for_project(project_id, state_id: filter_state_id)
 
       tasks =
-        Projects.get_project_tasks(project_id,
+        Tasks.list_tasks_for_project(project_id,
           state_id: filter_state_id,
           sort_by: sort_by,
           limit: @per_page,
@@ -170,7 +169,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     total = socket.assigns.total_tasks
 
     new_tasks =
-      Projects.get_project_tasks(project_id,
+      Tasks.list_tasks_for_project(project_id,
         state_id: filter_state_id,
         sort_by: sort_by,
         limit: @per_page,

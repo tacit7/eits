@@ -9,7 +9,6 @@ defmodule EyeInTheSky.Projects do
 
   import Ecto.Query, warn: false
   alias EyeInTheSky.Projects.Project
-  alias EyeInTheSky.QueryBuilder
   alias EyeInTheSky.Repo
 
   @doc """
@@ -170,42 +169,8 @@ defmodule EyeInTheSky.Projects do
 
   defdelegate parse_project_id(id), to: EyeInTheSky.Utils.ToolHelpers, as: :parse_int
 
-  @doc """
-  Gets tasks for a project.
-  """
-  def get_project_tasks(project_id, opts \\ []) when is_integer(project_id) do
-    sort_by = Keyword.get(opts, :sort_by, "created_desc")
-
-    order =
-      case sort_by do
-        "created_asc" -> [asc: :created_at]
-        "priority" -> [desc: :priority, asc: :position]
-        _ -> [asc: :position, desc: :created_at]
-      end
-
-    base_project_tasks_query(project_id, opts)
-    |> order_by(^order)
-    |> QueryBuilder.maybe_limit(opts)
-    |> QueryBuilder.maybe_offset(opts)
-    |> preload([:state, :tags, :sessions, :checklist_items])
-    |> Repo.all()
-  end
-
-  def count_project_tasks(project_id, opts \\ []) when is_integer(project_id) do
-    base_project_tasks_query(project_id, opts)
-    |> EyeInTheSky.Repo.aggregate(:count, :id)
-  end
-
   @doc "Preloads associations onto a project struct."
   def preload_project(%Project{} = project, assocs) do
     Repo.preload(project, assocs)
-  end
-
-  defp base_project_tasks_query(project_id, opts) do
-    include_archived = Keyword.get(opts, :include_archived, false)
-
-    query = from(t in EyeInTheSky.Tasks.Task, where: t.project_id == ^project_id)
-    query = if include_archived, do: query, else: where(query, [t], t.archived == false)
-    QueryBuilder.maybe_where(query, opts, :state_id)
   end
 end

@@ -173,7 +173,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
             <button
               type="button"
               phx-click="open_quick_note_modal"
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-base-200/60 hover:bg-base-200 text-base-content/70 hover:text-base-content transition-colors"
+              class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-lg text-xs font-medium bg-base-200/60 hover:bg-base-200 text-base-content/70 hover:text-base-content transition-colors"
             >
               <.icon name="hero-bolt" class="w-3.5 h-3.5" /> Quick Note
             </button>
@@ -181,7 +181,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
               navigate={
                 ~p"/notes/new?#{%{parent_type: "project", parent_id: @project.id, return_to: "/projects/#{@project.id}/notes"}}"
               }
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-content hover:bg-primary/80 transition-colors"
+              class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-lg text-xs font-medium bg-primary text-primary-content hover:bg-primary/80 transition-colors"
             >
               <.icon name="hero-plus" class="w-3.5 h-3.5" /> New Note
             </.link>

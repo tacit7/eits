@@ -168,7 +168,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                 type="button"
                 phx-click="toggle_star"
                 phx-value-note_id={note.id}
-                class={"flex items-center px-1 py-1 rounded transition-colors " <>
+                class={"flex items-center justify-center min-h-[44px] min-w-[44px] px-1 py-1 rounded transition-colors " <>
                   if(starred?(note),
                     do: "text-warning",
                     else: "text-base-content/20 hover:text-warning"
@@ -184,7 +184,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                 <button
                   tabindex="0"
                   role="button"
-                  class="flex items-center px-1 py-1 rounded text-base-content/20 hover:text-base-content/60 hover:bg-base-200/50 transition-colors sm:opacity-0 sm:group-hover:opacity-100"
+                  class="flex items-center justify-center min-h-[44px] min-w-[44px] px-1 py-1 rounded text-base-content/20 hover:text-base-content/60 hover:bg-base-200/50 transition-colors sm:opacity-0 sm:group-hover:opacity-100"
                   aria-label="More actions"
                 >
                   <.icon name="hero-ellipsis-vertical" class="w-4 h-4" />

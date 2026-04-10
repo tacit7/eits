@@ -85,7 +85,8 @@ defmodule EyeInTheSky.Search.PgSearch do
     # maintain a parallel raw-SQL representation of the same predicate.
     opts =
       if extra_where do
-        {sql_filter, sql_params} = extra_where_to_sql(schema, extra_where)
+        table = Keyword.get(opts, :table, "")
+        {sql_filter, sql_params} = extra_where_to_sql(schema, extra_where, table)
         Keyword.merge(opts, sql_filter: sql_filter, sql_params: sql_params)
       else
         opts
@@ -99,20 +100,28 @@ defmodule EyeInTheSky.Search.PgSearch do
   #
   # Strategy: build a minimal Ecto query with just `where: ^dynamic`, call
   # `Repo.to_sql/2` to get the PostgreSQL SQL + params, extract the WHERE
-  # clause text, then renumber all $N placeholders by +1 (since $1 is already
-  # taken by the FTS search term in the outer CTE query).
-  defp extra_where_to_sql(schema, dynamic) do
+  # clause text, then:
+  #   1. Replace Ecto's binding alias (always "n0" since we use `from(n in ...)`)
+  #      with the FTS query's table alias (first letter of the table name).
+  #   2. Renumber all $N placeholders by +1 (since $1 is already taken by the
+  #      FTS search term in the outer CTE query).
+  defp extra_where_to_sql(schema, dynamic, table) do
     base = from(n in schema, where: ^dynamic)
 
     {sql, params} = Repo.to_sql(:all, base)
 
     # Extract everything after "WHERE" in the generated SQL.
-    # Ecto generates: SELECT ... FROM table AS n0 WHERE <predicate>
+    # Ecto generates: SELECT ... FROM "table" AS n0 WHERE n0."col" = $1 ...
     case Regex.run(~r/\bWHERE\b(.+?)(?:\s*ORDER\s+BY|\s*LIMIT|\s*$)/si, sql, capture: :all_but_first) do
       [where_clause] ->
+        # Replace Ecto's "n0" alias with the FTS alias (first letter of table name).
+        # The FTS query uses `String.first(table)` as its alias, so "notes" → "n".
+        fts_alias = if table != "", do: String.first(table), else: "n"
+        aliased_clause = String.replace(String.trim(where_clause), ~r/\bn0\b/, fts_alias)
+
         # Ecto numbers its params starting at $1; we need to offset by 1 since
         # the FTS CTE already uses $1 for the search term.
-        shifted_clause = Regex.replace(~r/\$(\d+)/, String.trim(where_clause), fn _, n ->
+        shifted_clause = Regex.replace(~r/\$(\d+)/, aliased_clause, fn _, n ->
           "$#{String.to_integer(n) + 1}"
         end)
 

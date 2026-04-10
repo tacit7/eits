@@ -31,6 +31,7 @@
     "@uiw/codemirror-theme-eclipse": "^4.25.9",
     "@uiw/codemirror-theme-tokyo-night": "^4.25.9",
     "codemirror": "^6.0.2",
+    "codemirror-lang-diff": "^1.0.0",
     "codemirror-lang-elixir": "^4.0.1",
     "diff2html": "^3.4.56",
     "heroicons": "^2.2.0",

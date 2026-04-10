@@ -191,16 +191,11 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
 
         case AgentManager.create_agent(opts) do
           {:ok, _result} ->
-            sessions = Sessions.list_session_overview_rows(limit: @per_page, offset: 0)
-            total = Sessions.count_session_overview_rows()
-
             socket =
               socket
               |> assign(:show_new_session_modal, false)
               |> assign(:page, 1)
-              |> assign(:has_more, length(sessions) < total)
-              |> assign(:total_sessions, total)
-              |> stream(:sessions, sessions, reset: true)
+              |> reload_sessions()
               |> put_flash(:info, "Session launched")
 
             {:noreply, socket}

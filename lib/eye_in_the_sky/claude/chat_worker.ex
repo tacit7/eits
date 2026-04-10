@@ -137,17 +137,7 @@ defmodule EyeInTheSky.Claude.ChatWorker do
 
       prompt = ChannelProtocol.build_prompt(mode, message)
 
-      result =
-        try do
-          AgentManager.send_message(member.session_id, prompt, opts)
-        catch
-          :exit, reason ->
-            Logger.error(
-              "ChatWorker: routing failed session=#{member.session_id} - #{inspect(reason)}"
-            )
-
-            {:error, {:exit, reason}}
-        end
+      result = AgentManager.send_message(member.session_id, prompt, opts)
 
       case result do
         {:ok, admission} ->

@@ -96,7 +96,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
     <div class="px-4 sm:px-6 lg:px-8 py-6">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
         <h1 class="text-xl font-semibold">Notifications</h1>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
           <%!-- Category filter --%>
           <div class="join">
             <button

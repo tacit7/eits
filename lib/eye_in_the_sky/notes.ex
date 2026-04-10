@@ -335,7 +335,7 @@ defmodule EyeInTheSky.Notes do
   defp resolve_task_ids(task_id) do
     case Tasks.get_task_ids(task_id) do
       {:ok, ids} -> ids
-      :error -> nil
+      {:error, :not_found} -> nil
     end
   end
 end

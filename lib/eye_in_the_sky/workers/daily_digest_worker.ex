@@ -100,7 +100,7 @@ defmodule EyeInTheSky.Workers.DailyDigestWorker do
       from c in "commits",
         left_join: s in "sessions",
         on: s.id == c.session_id,
-        where: fragment("?::text", c.created_at) >= ^since,
+        where: c.created_at >= ^since,
         select: %{
           hash: c.commit_hash,
           message: c.commit_message,

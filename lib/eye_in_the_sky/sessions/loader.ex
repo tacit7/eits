@@ -8,10 +8,6 @@ defmodule EyeInTheSky.Sessions.Loader do
   where multiple sessions are rendered — it will cause N+1 query problems.
   """
 
-  import Ecto.Query, warn: false
-
-  alias EyeInTheSky.Repo
-
   @doc """
   Loads associated data for a specific session detail view.
 
@@ -72,33 +68,14 @@ defmodule EyeInTheSky.Sessions.Loader do
   Gets counts for all tabs (cheap aggregate queries).
   """
   def get_session_counts(session_id) do
-    alias EyeInTheSky.{Commits, Logs, Messages, Notes}
+    alias EyeInTheSky.{Commits, Logs, Messages, Notes, Tasks}
 
-    tasks =
-      from(ts in "task_sessions", where: ts.session_id == ^session_id, select: count())
-      |> Repo.one()
-
-    commits =
-      from(c in Commits.Commit, where: c.session_id == ^session_id, select: count())
-      |> Repo.one()
-
-    logs =
-      from(l in Logs.SessionLog, where: l.session_id == ^session_id, select: count())
-      |> Repo.one()
-
-    notes =
-      from(n in Notes.Note,
-        where:
-          n.parent_type == "session" and
-            n.parent_id == ^to_string(session_id),
-        select: count()
-      )
-      |> Repo.one()
-
-    messages =
-      from(m in Messages.Message, where: m.session_id == ^session_id, select: count())
-      |> Repo.one()
-
-    %{tasks: tasks, commits: commits, logs: logs, notes: notes, messages: messages}
+    %{
+      tasks: Tasks.count_tasks_for_session(session_id),
+      commits: Commits.count_commits_for_session(session_id),
+      logs: Logs.count_logs_for_session(session_id),
+      notes: Notes.count_notes_for_session(session_id),
+      messages: Messages.count_messages_for_session(session_id)
+    }
   end
 end

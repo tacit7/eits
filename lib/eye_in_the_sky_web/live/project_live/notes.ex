@@ -116,7 +116,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   @impl true
   def handle_event("create_quick_note", params, socket) do
     project = socket.assigns.project
-    starred = if params["starred"] == "1", do: 1, else: 0
+    starred = params["starred"] == "1"
 
     case Notes.create_note(%{
            parent_type: "project",

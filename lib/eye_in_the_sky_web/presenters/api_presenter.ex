@@ -23,7 +23,7 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       parent_type: note.parent_type,
       title: note.title,
       body: note.body,
-      starred: note.starred || 0
+      starred: note.starred || false
     }
   end
 

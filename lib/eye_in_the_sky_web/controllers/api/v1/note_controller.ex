@@ -46,7 +46,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
           parent_type: note.parent_type,
           title: note.title,
           body: note.body,
-          starred: note.starred || 0,
+          starred: note.starred || false,
           created_at: to_string(note.created_at)
         })
     end
@@ -68,7 +68,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
       parent_id: to_string(params["parent_id"]),
       title: params["title"],
       body: params["body"],
-      starred: params["starred"] || 0
+      starred: params["starred"] || false
     }
 
     case Notes.create_note(attrs) do
@@ -113,7 +113,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
               id: updated.id,
               body: updated.body,
               title: updated.title,
-              starred: updated.starred || 0
+              starred: updated.starred || false
             })
 
           {:error, changeset} ->

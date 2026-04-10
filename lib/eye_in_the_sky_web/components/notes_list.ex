@@ -295,7 +295,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
     end)
   end
 
-  defp starred?(note), do: note.starred == 1
+  defp starred?(note), do: note.starred == true
 
   defp extract_snippet(nil), do: nil
 

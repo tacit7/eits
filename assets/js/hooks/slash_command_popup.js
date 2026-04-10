@@ -1,4 +1,6 @@
 import { createEnumAutocomplete } from './enum_autocomplete.js'
+import { filterAndScore } from './slash_scorer.js'
+import { renderItems, updateActiveItem } from './slash_renderer.js'
 
 export const SlashCommandPopup = {
   mounted() {
@@ -145,53 +147,8 @@ export const SlashCommandPopup = {
     this.slashFilter(query, null)
   },
 
-  // Score an item against a query. Higher = better match.
-  // 3: exact match on slug
-  // 2: slug starts with query
-  // 1: slug contains query
-  // 0: description/type contains query
-  scoreItem(item, q) {
-    if (!q) {
-      let score = 1
-      if (item.type === 'flag' && this.activeFlags && this.activeFlags[item.slug] !== undefined) {
-        score += 10
-      }
-      return score
-    }
-    const slug = item.slug.toLowerCase()
-    const desc = (item.description || '').toLowerCase()
-    const type = (item.type || '').toLowerCase()
-    let score = -1
-    if (slug === q) score = 3
-    else if (slug.startsWith(q)) score = 2
-    else if (slug.includes(q)) score = 1
-    else if (desc.includes(q) || type.includes(q)) score = 0
-
-    if (score >= 0 && item.type === 'flag' && this.activeFlags && this.activeFlags[item.slug] !== undefined) {
-      score += 10
-    }
-    return score
-  },
-
   slashFilter(query, typeFilter) {
-    const q = query.toLowerCase()
-    const MAX_RESULTS = 8
-
-    let pool = typeFilter
-      ? this.slashItems.filter(item => item.type === typeFilter)
-      : this.slashItems.filter(item => item.type !== 'agent')
-
-    let scored = pool
-      .map(item => ({ item, score: this.scoreItem(item, q) }))
-      .filter(({ score }) => score >= 0)
-
-    // Sort by score desc, then slug asc for ties
-    scored.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score
-      return a.item.slug.localeCompare(b.item.slug)
-    })
-
-    this.slashFiltered = scored.slice(0, MAX_RESULTS).map(({ item }) => item)
+    this.slashFiltered = filterAndScore(this.slashItems, query, typeFilter, this.activeFlags)
 
     if (this.slashFiltered.length === 0) {
       this.slashClose()
@@ -212,140 +169,31 @@ export const SlashCommandPopup = {
         form.appendChild(this.popup)
       }
     }
-    this.popup.innerHTML = ''
 
-    // Build groups in typeOrder — this determines DOM order
-    const groups = {}
-    for (const item of this.slashFiltered) {
-      const t = item.type || 'other'
-      if (!groups[t]) groups[t] = []
-      groups[t].push(item)
-    }
-
-    const typeOrder = ['skill', 'command', 'flag', 'agent', 'prompt']
-    const typeLabels = { skill: 'Skills', command: 'Commands', flag: 'Flags', agent: 'Agents', prompt: 'Prompts' }
-    const allTypes = [...typeOrder, ...Object.keys(groups).filter(t => !typeOrder.includes(t))]
-
-    // slashOrdered tracks items in exact DOM render order — used by slashSelect
-    this.slashOrdered = []
-
-    for (const type of allTypes) {
-      if (!groups[type]) continue
-
-      const header = document.createElement('div')
-      header.className = 'px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-base-content/40 bg-base-content/[0.02] sticky top-0'
-      header.textContent = typeLabels[type] || type
-      this.popup.appendChild(header)
-
-      for (const item of groups[type]) {
-        const idx = this.slashOrdered.length
-        this.slashOrdered.push(item)
-
-        const row = document.createElement('button')
-        row.type = 'button'
-        row.dataset.slashIdx = idx
-        row.className = this.rowClass(idx)
-        row.innerHTML = this.rowHTML(item, query)
-        row.addEventListener('mouseenter', () => {
-          this.slashIndex = idx
-          this.highlightRow()
-        })
-        row.addEventListener('mousedown', (e) => {
-          e.preventDefault()
-          this.slashIndex = idx
-          this.slashSelect()
-        })
-        this.popup.appendChild(row)
+    this.slashOrdered = renderItems(
+      this.popup,
+      this.slashFiltered,
+      this.slashIndex,
+      query,
+      this.activeFlags,
+      (idx) => {
+        this.slashIndex = idx
+        updateActiveItem(this.popup, idx)
+      },
+      (idx) => {
+        this.slashIndex = idx
+        this.slashSelect()
       }
-    }
-
-    // Keyboard hint footer
-    const hint = document.createElement('div')
-    hint.className = 'px-3 py-1.5 text-[10px] text-base-content/30 border-t border-base-content/5 flex items-center gap-3 sticky bottom-0 bg-base-100'
-    hint.innerHTML = '<kbd class="font-mono">↑↓</kbd> navigate &nbsp;<kbd class="font-mono">↵</kbd> or <kbd class="font-mono">Tab</kbd> select &nbsp;<kbd class="font-mono">Esc</kbd> dismiss'
-    this.popup.appendChild(hint)
+    )
 
     this.popup.classList.remove('hidden')
-    this.highlightRow()
-  },
-
-  // Highlight query match in text — wraps matching part in <mark>
-  highlightMatch(text, query) {
-    if (!query) return this.escapeHtml(text)
-    const q = query.toLowerCase()
-    const idx = text.toLowerCase().indexOf(q)
-    if (idx === -1) return this.escapeHtml(text)
-    return (
-      this.escapeHtml(text.slice(0, idx)) +
-      `<mark class="bg-primary/20 text-primary rounded px-0.5">${this.escapeHtml(text.slice(idx, idx + q.length))}</mark>` +
-      this.escapeHtml(text.slice(idx + q.length))
-    )
-  },
-
-  escapeHtml(str) {
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-  },
-
-  rowClass(idx) {
-    return 'w-full flex items-start gap-3 px-3 py-2 text-left transition-colors text-sm'
-  },
-
-  rowHTML(item, query) {
-    const badge = {
-      skill: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary">skill</span>',
-      command: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary/10 text-secondary">cmd</span>',
-      flag: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-info/10 text-info">flag</span>',
-      agent: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent">agent</span>',
-      prompt: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-warning/10 text-warning">prompt</span>',
-    }[item.type] || ''
-
-    const prefix = item.type === 'agent' ? '@' : '/'
-    const nameHtml = this.highlightMatch(item.slug, query)
-    const name = `<span class="font-medium text-base-content">${prefix}${nameHtml}</span>`
-
-    const isActive = item.type === 'flag' && this.activeFlags && this.activeFlags[item.slug] !== undefined
-    const activeVal = isActive ? this.activeFlags[item.slug] : null
-    const activeBadge = isActive
-      ? `<span class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-success/10 text-success ml-1">${activeVal === true ? 'on' : activeVal === false ? 'off' : this.escapeHtml(String(activeVal))}</span>`
-      : ''
-
-    const desc = item.description
-      ? `<span class="text-xs text-base-content/50 truncate">${this.escapeHtml(item.description)}</span>`
-      : ''
-
-    return `
-      ${badge}
-      <span class="min-w-0 flex-1">
-        <span class="flex items-center gap-2">
-          ${name}${activeBadge}
-        </span>
-        ${desc}
-      </span>
-    `
-  },
-
-  highlightRow() {
-    const rows = this.popup.querySelectorAll('button[data-slash-idx]')
-    rows.forEach(row => {
-      const idx = parseInt(row.dataset.slashIdx)
-      if (idx === this.slashIndex) {
-        row.classList.add('bg-base-content/[0.06]')
-        row.scrollIntoView({ block: 'nearest' })
-      } else {
-        row.classList.remove('bg-base-content/[0.06]')
-      }
-    })
   },
 
   slashMove(delta) {
     const total = (this.slashOrdered || this.slashFiltered).length
     if (total === 0) return
     this.slashIndex = (this.slashIndex + delta + total) % total
-    this.highlightRow()
+    updateActiveItem(this.popup, this.slashIndex)
   },
 
   slashBuildInsertion(item) {

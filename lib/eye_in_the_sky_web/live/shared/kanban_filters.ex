@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.KanbanFilters do
       if String.length(String.trim(query)) >= 4 do
         EyeInTheSky.Tasks.search_tasks(query, project_id)
       else
-        EyeInTheSky.Projects.get_project_tasks(project_id, include_archived: show_archived)
+        EyeInTheSky.Tasks.list_tasks_for_project(project_id, include_archived: show_archived)
       end
       |> then(fn tasks ->
         if show_completed, do: tasks, else: Enum.reject(tasks, & &1.completed_at)

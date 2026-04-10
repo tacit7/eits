@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
   alias EyeInTheSky.Notes
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Sessions
+  alias EyeInTheSky.Tasks
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1, truncate_text: 1]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
@@ -20,7 +21,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           Projects.get_project_with_agents!(project_id)
 
         # Load tasks manually due to type mismatch (projects.id is INT, tasks.project_id is TEXT)
-        tasks = Projects.get_project_tasks(project_id)
+        tasks = Tasks.list_tasks_for_project(project_id)
 
         # Load active sessions for this project (max 5) — filtered in SQL
         active_sessions =

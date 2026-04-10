@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Agents, Notes, Projects, Sessions, Tasks}
+  alias EyeInTheSky.{Agents, Notes, Sessions, Tasks}
   alias EyeInTheSky.Tasks.WorkflowState
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   end
 
   defp fetch_tasks_by_filter(%{"project_id" => project_id}, limit) do
-    Projects.get_project_tasks(parse_int(project_id, nil)) |> Enum.take(limit)
+    Tasks.list_tasks_for_project(parse_int(project_id, nil)) |> Enum.take(limit)
   end
 
   defp fetch_tasks_by_filter(_params, limit) do

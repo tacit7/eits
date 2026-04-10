@@ -365,6 +365,17 @@ code.hljs { padding: 3px 5px; }
 [data-theme="light"] .hljs-addition { color: #22863a; background-color: #f0fff4; }
 [data-theme="light"] .hljs-deletion { color: #b31d28; background-color: #ffeef0; }
 
+/* ===== CodeMirror diff viewer line highlighting ===== */
+/* Full-width line backgrounds applied via ViewPlugin decorations */
+.cm-diff-added   { background-color: rgba(46, 160, 67, 0.18) !important; }
+.cm-diff-deleted { background-color: rgba(248, 81, 73, 0.18) !important; }
+.cm-diff-hunk    { background-color: rgba(56, 139, 253, 0.12) !important; color: rgba(88, 166, 255, 0.9); }
+.cm-diff-meta    { opacity: 0.45; }
+
+[data-theme="light"] .cm-diff-added   { background-color: #e6ffec !important; }
+[data-theme="light"] .cm-diff-deleted { background-color: #ffebe9 !important; }
+[data-theme="light"] .cm-diff-hunk    { background-color: #ddf4ff !important; color: #0550ae; }
+[data-theme="light"] .cm-diff-meta    { opacity: 0.55; }
 
 /* ===== DM Composer: keyboard-aware scroll anchoring ===== */
 /* Disable scroll anchoring on all children except the sentinel at the bottom */

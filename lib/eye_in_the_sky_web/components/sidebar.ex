@@ -473,7 +473,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
       <div class="relative">
         <.icon name="hero-bell" class="w-3.5 h-3.5 flex-shrink-0" />
         <%= if @count > 0 do %>
-          <span class="absolute -top-1.5 -right-1.5 badge badge-xs badge-primary text-xs min-w-[14px] h-[14px] p-0">
+          <span class="absolute -top-1.5 -right-1.5 badge badge-xs badge-primary text-xs leading-none min-w-[14px] h-[14px] p-0">
             {if @count > 99, do: "99+", else: @count}
           </span>
         <% end %>

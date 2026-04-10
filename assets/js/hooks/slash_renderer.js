@@ -1,4 +1,4 @@
-function escapeHtml(str) {
+export function escapeHtml(str) {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -6,7 +6,7 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
 }
 
-function highlightMatch(text, query) {
+export function highlightMatch(text, query) {
   if (!query) return escapeHtml(text)
   const q = query.toLowerCase()
   const idx = text.toLowerCase().indexOf(q)

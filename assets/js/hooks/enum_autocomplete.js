@@ -6,7 +6,9 @@
 //   this.enumAC = createEnumAutocomplete(this)  // pass the parent hook as ctx
 //
 // ctx must expose: el, popup, slashItems, slashOrdered, slashIndex, slashOpen,
-//   rowClass(), highlightMatch(), highlightRow(), slashSelect(), slashClose(), autoResize
+//   slashSelect(), slashClose(), autoResize
+
+import { highlightMatch, updateActiveItem } from './slash_renderer.js'
 
 export function createEnumAutocomplete(ctx) {
   let enumMode = false
@@ -28,11 +30,11 @@ export function createEnumAutocomplete(ctx) {
       const row = document.createElement('button')
       row.type = 'button'
       row.dataset.slashIdx = idx
-      row.className = ctx.rowClass(idx)
-      row.innerHTML = `<span class="min-w-0 flex-1"><span class="font-medium text-base-content">${ctx.highlightMatch(v, partial)}</span></span>`
+      row.className = 'w-full flex items-start gap-3 px-3 py-2 text-left transition-colors text-sm'
+      row.innerHTML = `<span class="min-w-0 flex-1"><span class="font-medium text-base-content">${highlightMatch(v, partial)}</span></span>`
       row.addEventListener('mouseenter', () => {
         ctx.slashIndex = idx
-        ctx.highlightRow()
+        updateActiveItem(ctx.popup, idx)
       })
       row.addEventListener('mousedown', (e) => {
         e.preventDefault()
@@ -48,7 +50,7 @@ export function createEnumAutocomplete(ctx) {
     ctx.popup.appendChild(hint)
 
     ctx.popup.classList.remove('hidden')
-    ctx.highlightRow()
+    updateActiveItem(ctx.popup, ctx.slashIndex)
   }
 
   function filterAndShowEnum(partial) {

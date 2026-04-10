@@ -268,9 +268,13 @@ defmodule EyeInTheSky.Agents.AgentManager do
   # 2. "member_name @ team_name" when both present
   # 3. "member_name" alone
   # 4. First 250 chars of instructions (or "Agent session" fallback)
-  defp resolve_session_name(%{"name" => name}, _team)
-       when is_binary(name) and name != "",
-       do: String.trim(name)
+  defp resolve_session_name(%{"name" => name} = params, team)
+       when is_binary(name) and name != "" do
+    case String.trim(name) do
+      "" -> resolve_session_name(Map.delete(params, "name"), team)
+      trimmed -> trimmed
+    end
+  end
 
   defp resolve_session_name(params, %{name: team_name})
        when is_binary(team_name) do

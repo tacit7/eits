@@ -21,25 +21,23 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :agent, :map, required: true
   attr :session_uuid, :string, required: true
   attr :active_tab, :string, required: true
-  attr :active_overlay, :any, default: nil
-  attr :messages, :list, default: []
-  attr :has_more_messages, :boolean, default: false
   attr :uploads, :map, required: true
   attr :stream, :map, default: %{show: false, content: "", tool: nil, thinking: nil}
   attr :session_state, :map, required: true
-  attr :tasks, :list, default: []
   attr :commits, :list, default: []
   attr :diff_cache, :map, default: %{}
   attr :notes, :list, default: []
   attr :slash_items, :list, default: []
-  attr :current_task, :map, default: nil
-  attr :queued_prompts, :list, default: []
-  attr :message_search_query, :string, default: ""
   attr :session_context, :map, default: nil
-  attr :reloading, :boolean, default: false
-  attr :active_timer, :any, default: nil
-  attr :schedule_message, :string, default: nil
   attr :agent_record, :map, default: nil
+  # Grouped maps replacing 10 individual attrs
+  attr :message_data, :map,
+    default: %{messages: [], has_more_messages: false, message_search_query: "", queued_prompts: []}
+
+  attr :task_data, :map, default: %{tasks: [], current_task: nil}
+
+  attr :overlay_data, :map,
+    default: %{active_overlay: nil, active_timer: nil, schedule_message: nil, reloading: false}
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
 
@@ -74,7 +72,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       </dialog>
 
       <%!-- Schedule timer modal --%>
-      <%= if @active_overlay == :schedule_timer do %>
+      <%= if @overlay_data.active_overlay == :schedule_timer do %>
         <div class="modal modal-open" id="schedule-timer-modal">
           <div class="modal-box max-w-sm">
             <h3 class="font-semibold text-base mb-1">Schedule Message</h3>
@@ -85,7 +83,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 phx-change="update_schedule_message"
                 class="w-full text-xs rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30 placeholder:text-base-content/30 text-base-content/80 transition-colors resize-none p-2"
                 placeholder="Message to send..."
-              >{@schedule_message}</textarea>
+              >{@overlay_data.schedule_message}</textarea>
             </div>
 
             <div class="mb-3">
@@ -126,7 +124,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
       <%!-- Reload loading overlay --%>
       <div
-        :if={@reloading}
+        :if={@overlay_data.reloading}
         class="absolute inset-0 z-40 flex items-center justify-center bg-base-100/80 backdrop-blur-sm rounded-xl"
       >
         <div class="flex flex-col items-center gap-3">
@@ -230,7 +228,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 <.icon name="hero-clock" class="w-3.5 h-3.5" /> Schedule Message
               </button>
             </li>
-            <%= if @active_timer do %>
+            <%= if @overlay_data.active_timer do %>
               <li>
                 <button
                   id="dm-cancel-timer-btn"
@@ -303,10 +301,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             </div>
             <div class="flex items-center gap-1 flex-shrink-0">
               <%!-- Active timer badge --%>
-              <%= if @active_timer do %>
+              <%= if @overlay_data.active_timer do %>
                 <div class="hidden sm:flex items-center gap-1 px-2 py-1 rounded-lg bg-warning/10 text-warning text-xs font-medium">
                   <.icon name="hero-clock" class="w-3.5 h-3.5" />
-                  <span>{if @active_timer.mode == :once, do: "Once", else: "Repeating"}</span>
+                  <span>{if @overlay_data.active_timer.mode == :once, do: "Once", else: "Repeating"}</span>
                 </div>
               <% end %>
 
@@ -368,7 +366,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                       <.icon name="hero-clock" class="w-3.5 h-3.5" /> Schedule Message
                     </button>
                   </li>
-                  <%= if @active_timer do %>
+                  <%= if @overlay_data.active_timer do %>
                     <li>
                       <button
                         id="dm-cancel-timer-btn-desktop"
@@ -386,7 +384,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         </div>
 
         <%!-- Current task strip --%>
-        <%= if @current_task do %>
+        <%= if @task_data.current_task do %>
           <div class="px-5 py-2 border-t border-base-content/5" id="dm-current-task">
             <div class="flex items-center gap-2">
               <span class="text-[10px] font-semibold uppercase tracking-wider text-base-content/30 flex-shrink-0">
@@ -395,11 +393,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               <div class="flex items-center gap-1.5 min-w-0">
                 <div class="w-1.5 h-1.5 rounded-full bg-info animate-pulse flex-shrink-0" />
                 <span class="text-[12px] font-medium text-base-content/70 truncate">
-                  {@current_task.title}
+                  {@task_data.current_task.title}
                 </span>
               </div>
               <span class="flex-shrink-0 text-[10px] text-base-content/25 font-mono">
-                {String.slice(to_string(@current_task.id), 0..7)}
+                {String.slice(to_string(@task_data.current_task.id), 0..7)}
               </span>
             </div>
           </div>
@@ -447,13 +445,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 <input
                   type="text"
                   name="query"
-                  value={@message_search_query}
+                  value={@message_data.message_search_query}
                   placeholder="Search messages..."
                   autocomplete="off"
                   phx-debounce="300"
                   class="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30 placeholder:text-base-content/25 text-base-content/70 transition-colors"
                 />
-                <%= if @message_search_query != "" do %>
+                <%= if @message_data.message_search_query != "" do %>
                   <button
                     type="button"
                     phx-click="search_messages"
@@ -474,15 +472,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <%= case @active_tab do %>
           <% "messages" -> %>
             <MessagesTab.messages_tab
-              messages={@messages}
-              has_more_messages={@has_more_messages}
+              messages={@message_data.messages}
+              has_more_messages={@message_data.has_more_messages}
               stream={@stream}
               session={@agent}
               agent={@agent}
-              message_search_query={@message_search_query}
+              message_search_query={@message_data.message_search_query}
             />
           <% "tasks" -> %>
-            <TasksTab.tasks_tab tasks={@tasks} />
+            <TasksTab.tasks_tab tasks={@task_data.tasks} />
           <% "commits" -> %>
             <CommitsTab.commits_tab commits={@commits} diff_cache={@diff_cache} />
           <% "notes" -> %>
@@ -491,12 +489,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             <ContextTab.context_tab session_context={@session_context} />
           <% _ -> %>
             <MessagesTab.messages_tab
-              messages={@messages}
-              has_more_messages={@has_more_messages}
+              messages={@message_data.messages}
+              has_more_messages={@message_data.has_more_messages}
               stream={@stream}
               session={@agent}
               agent={@agent}
-              message_search_query={@message_search_query}
+              message_search_query={@message_data.message_search_query}
             />
         <% end %>
       </div>
@@ -507,14 +505,14 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           id="dm-page-composer"
           class="flex-shrink-0 max-w-4xl mx-auto w-full pt-2 safe-inset-bottom"
         >
-          <%= if @queued_prompts != [] do %>
-            <Composer.prompt_queue prompts={@queued_prompts} />
+          <%= if @message_data.queued_prompts != [] do %>
+            <Composer.prompt_queue prompts={@message_data.queued_prompts} />
           <% end %>
           <Composer.message_form
             uploads={@uploads}
             selected_model={@session_state.model}
             selected_effort={@session_state.effort}
-            active_overlay={@active_overlay}
+            active_overlay={@overlay_data.active_overlay}
             processing={@session_state.processing}
             slash_items={@slash_items}
             thinking_enabled={@session_state.thinking_enabled}

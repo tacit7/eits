@@ -141,43 +141,52 @@ defmodule EyeInTheSky.Claude.SDK do
     :telemetry.execute([:eits, :sdk, :start], %{system_time: System.system_time()}, meta)
     Logger.info("[telemetry] sdk.#{mode} session_id=#{meta_session_id} model=#{meta.model}")
 
-    handler_pid = spawn_handler_process(sdk_ref, to)
     cli = Keyword.get(opts, :cli_module) || Utils.cli_module()
 
-    cli_opts =
-      opts
-      |> Keyword.put(:output_format, "stream-json")
-      |> Keyword.put(:verbose, true)
-      |> Keyword.put(:include_partial_messages, true)
-      |> Keyword.put(:caller, handler_pid)
-      |> Keyword.delete(:to)
-      |> Keyword.delete(:cli_module)
+    case spawn_handler_process(sdk_ref, to) do
+      {:ok, handler_pid} ->
+        cli_opts =
+          opts
+          |> Keyword.put(:output_format, "stream-json")
+          |> Keyword.put(:verbose, true)
+          |> Keyword.put(:include_partial_messages, true)
+          |> Keyword.put(:caller, handler_pid)
+          |> Keyword.delete(:to)
+          |> Keyword.delete(:cli_module)
 
-    cli_result =
-      case mode do
-        :start -> cli.spawn_new_session(prompt, cli_opts)
-        :resume -> cli.resume_session(session_id, prompt, cli_opts)
-      end
+        cli_result =
+          case mode do
+            :start -> cli.spawn_new_session(prompt, cli_opts)
+            :resume -> cli.resume_session(session_id, prompt, cli_opts)
+          end
 
-    case cli_result do
-      {:ok, port, _cli_ref} ->
-        Registry.register(sdk_ref, port)
-        send(handler_pid, {:start_handling, sdk_ref})
-        {:ok, sdk_ref, handler_pid}
+        case cli_result do
+          {:ok, port, _cli_ref} ->
+            Registry.register(sdk_ref, port)
+            send(handler_pid, {:start_handling, sdk_ref})
+            {:ok, sdk_ref, handler_pid}
+
+          {:error, reason} ->
+            :telemetry.execute(
+              [:eits, :sdk, :error],
+              %{system_time: System.system_time()},
+              Map.put(meta, :reason, reason)
+            )
+
+            Logger.error(
+              "[telemetry] sdk.error session_id=#{meta_session_id} reason=#{inspect(reason)}"
+            )
+
+            Process.exit(handler_pid, :kill)
+            {:error, reason}
+        end
 
       {:error, reason} ->
-        :telemetry.execute(
-          [:eits, :sdk, :error],
-          %{system_time: System.system_time()},
-          Map.put(meta, :reason, reason)
-        )
-
         Logger.error(
-          "[telemetry] sdk.error session_id=#{meta_session_id} reason=#{inspect(reason)}"
+          "[telemetry] sdk.error session_id=#{meta_session_id} reason=handler_start_failed #{inspect(reason)}"
         )
 
-        Process.exit(handler_pid, :kill)
-        {:error, reason}
+        {:error, {:handler_start_failed, reason}}
     end
   end
 
@@ -208,34 +217,31 @@ defmodule EyeInTheSky.Claude.SDK do
   # Uses spawn (not spawn_link) so handler crashes don't kill the caller.
   # Handler monitors caller so it exits cleanly if caller goes down.
   defp spawn_handler_process(sdk_ref, caller_pid) do
-    {:ok, pid} =
-      Task.Supervisor.start_child(
-        EyeInTheSky.TaskSupervisor,
-        fn ->
-          Process.monitor(caller_pid)
+    Task.Supervisor.start_child(
+      EyeInTheSky.TaskSupervisor,
+      fn ->
+        Process.monitor(caller_pid)
 
-          receive do
-            {:start_handling, ^sdk_ref} ->
-              :telemetry.execute(
-                [:eits, :sdk, :handler, :ready],
-                %{system_time: System.system_time()},
-                %{}
-              )
+        receive do
+          {:start_handling, ^sdk_ref} ->
+            :telemetry.execute(
+              [:eits, :sdk, :handler, :ready],
+              %{system_time: System.system_time()},
+              %{}
+            )
 
-              state = %{sdk_ref: sdk_ref, caller_pid: caller_pid, session_id: nil}
-              MessageHandler.run_loop(__MODULE__, state, @loop_opts)
+            state = %{sdk_ref: sdk_ref, caller_pid: caller_pid, session_id: nil}
+            MessageHandler.run_loop(__MODULE__, state, @loop_opts)
 
-            {:DOWN, _ref, :process, ^caller_pid, _reason} ->
-              MessageHandler.stop_and_unregister(sdk_ref)
-          after
-            5_000 ->
-              send(caller_pid, {:claude_error, sdk_ref, :handler_timeout})
-          end
-        end,
-        restart: :temporary
-      )
-
-    pid
+          {:DOWN, _ref, :process, ^caller_pid, _reason} ->
+            MessageHandler.stop_and_unregister(sdk_ref)
+        after
+          5_000 ->
+            send(caller_pid, {:claude_error, sdk_ref, :handler_timeout})
+        end
+      end,
+      restart: :temporary
+    )
   end
 
   # ---------------------------------------------------------------------------

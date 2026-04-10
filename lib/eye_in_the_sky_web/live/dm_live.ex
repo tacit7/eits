@@ -406,9 +406,6 @@ defmodule EyeInTheSkyWeb.DmLive do
         agent_record={@agent}
         session_uuid={@session_uuid}
         active_tab={@active_tab}
-        active_overlay={@active_overlay}
-        messages={@messages}
-        has_more_messages={@has_more_messages}
         uploads={@uploads}
         stream={%{show: @show_live_stream, content: @stream_content, tool: @stream_tool, thinking: @stream_thinking}}
         session_state={%{
@@ -421,18 +418,24 @@ defmodule EyeInTheSkyWeb.DmLive do
           context_used: @context_used,
           context_window: @context_window
         }}
-        tasks={@tasks}
+        message_data={%{
+          messages: @messages,
+          has_more_messages: @has_more_messages,
+          message_search_query: @message_search_query,
+          queued_prompts: @queued_prompts
+        }}
+        task_data={%{tasks: @tasks, current_task: @current_task}}
+        overlay_data={%{
+          active_overlay: @active_overlay,
+          active_timer: @active_timer,
+          schedule_message: @schedule_message,
+          reloading: @reloading
+        }}
         commits={@commits}
         diff_cache={@diff_cache}
         notes={@notes}
         slash_items={@slash_items}
-        current_task={@current_task}
-        queued_prompts={@queued_prompts}
-        message_search_query={@message_search_query}
         session_context={@session_context}
-        reloading={@reloading}
-        active_timer={@active_timer}
-        schedule_message={@schedule_message}
       />
 
       <EyeInTheSkyWeb.Components.NewTaskDrawer.new_task_drawer

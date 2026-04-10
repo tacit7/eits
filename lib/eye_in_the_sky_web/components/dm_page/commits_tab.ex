@@ -65,7 +65,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
                     id={"diff-#{commit.id}"}
                     phx-hook="DiffViewer"
                     data-diff={diff}
-                    class="diff2html-wrap text-xs"
                   />
               <% end %>
             </div>

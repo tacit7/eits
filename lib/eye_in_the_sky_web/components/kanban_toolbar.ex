@@ -41,7 +41,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanToolbar do
       <div class="flex items-center gap-1.5">
         <button
           phx-click="toggle_show_completed"
-          class={"btn btn-sm sm:btn-xs gap-1 h-9 sm:h-7 min-h-0 " <> if(@show_completed, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
+          class={"btn btn-sm sm:btn-xs gap-1 h-11 sm:h-7 min-h-0 " <> if(@show_completed, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
           title="Show completed tasks"
         >
           <.icon name="hero-check-circle-mini" class="w-3.5 h-3.5" />
@@ -49,7 +49,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanToolbar do
         </button>
         <button
           phx-click="toggle_bulk_mode"
-          class={"btn btn-sm sm:btn-xs gap-1 h-9 sm:h-7 min-h-0 " <> if(@bulk_mode, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
+          class={"btn btn-sm sm:btn-xs gap-1 h-11 sm:h-7 min-h-0 " <> if(@bulk_mode, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
           title="Bulk select mode"
         >
           <.icon name="hero-check-mini" class="w-3.5 h-3.5" />
@@ -57,7 +57,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanToolbar do
         </button>
         <button
           phx-click="toggle_filter_drawer"
-          class={"btn btn-sm sm:btn-xs gap-1 h-9 sm:h-7 min-h-0 " <> if(@active_filter_count > 0, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
+          class={"btn btn-sm sm:btn-xs gap-1 h-11 sm:h-7 min-h-0 " <> if(@active_filter_count > 0, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
           title="Filter tasks"
         >
           <.icon name="hero-funnel-mini" class="w-3.5 h-3.5" />
@@ -68,7 +68,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanToolbar do
         </button>
         <.link
           navigate={~p"/projects/#{@project_id}/tasks"}
-          class="btn btn-sm sm:btn-xs btn-ghost border border-base-content/10 gap-1 h-9 sm:h-7 min-h-0"
+          class="btn btn-sm sm:btn-xs btn-ghost border border-base-content/10 gap-1 h-11 sm:h-7 min-h-0"
           title="List view"
         >
           <.icon name="hero-list-bullet-mini" class="w-3.5 h-3.5" />
@@ -76,7 +76,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanToolbar do
         </.link>
         <button
           phx-click="toggle_new_task_drawer"
-          class="btn btn-sm btn-primary gap-1.5 h-9 sm:h-7 min-h-0 text-xs"
+          class="btn btn-sm btn-primary gap-1.5 h-11 sm:h-7 min-h-0 text-xs"
         >
           <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Task
         </button>

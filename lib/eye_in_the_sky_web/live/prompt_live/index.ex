@@ -245,7 +245,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Index do
                     <div class="flex justify-end gap-2">
                       <.link
                         navigate={~p"/prompts/#{prompt.uuid}"}
-                        class="btn btn-ghost btn-xs"
+                        class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
                         title="View prompt details"
                       >
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -264,7 +264,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Index do
                         </svg>
                       </.link>
                       <button
-                        class="btn btn-ghost btn-xs"
+                        class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
                         title="Edit prompt"
                       >
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -279,7 +279,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Index do
                       <button
                         phx-click="delete"
                         phx-value-id={prompt.uuid}
-                        class="btn btn-ghost btn-xs text-error"
+                        class="btn btn-ghost btn-xs text-error min-h-[44px] min-w-[44px]"
                         title="Deactivate prompt"
                         data-confirm="Are you sure you want to deactivate this prompt?"
                       >

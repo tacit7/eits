@@ -218,6 +218,27 @@ defmodule EyeInTheSky.Tasks do
   end
 
   @doc """
+  Returns `{integer_id, uuid}` for a task identified by an integer ID or UUID string.
+  No preloads — use this when only the IDs are needed.
+  Raises `Ecto.NoResultsError` if nothing is found.
+  """
+  def get_task_ids!(id_str) do
+    id_str = to_string(id_str)
+
+    task =
+      if int_id = ToolHelpers.parse_int(id_str) do
+        Repo.get!(Task, int_id)
+      else
+        case Repo.get_by(Task, uuid: id_str) do
+          nil -> raise Ecto.NoResultsError, queryable: Task
+          task -> task
+        end
+      end
+
+    {task.id, task.uuid}
+  end
+
+  @doc """
   Creates a task.
   """
   def create_task(attrs \\ %{}) do

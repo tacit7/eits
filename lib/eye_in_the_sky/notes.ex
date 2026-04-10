@@ -395,7 +395,6 @@ defmodule EyeInTheSky.Notes do
   # Resolves a task identifier (integer ID or UUID string) via the Tasks context,
   # returning {integer_id, uuid_string} for use in note queries.
   defp resolve_task_ids(task_id) do
-    task = Tasks.get_task_by_uuid_or_id!(to_string(task_id))
-    {task.id, task.uuid}
+    Tasks.get_task_ids!(task_id)
   end
 end

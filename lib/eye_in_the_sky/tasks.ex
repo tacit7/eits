@@ -219,7 +219,7 @@ defmodule EyeInTheSky.Tasks do
 
   @doc """
   Returns `{:ok, {integer_id, uuid}}` for a task identified by an integer ID or UUID string,
-  or `:error` if no task is found. No preloads.
+  or `{:error, :not_found}` if no task is found. No preloads.
   """
   def get_task_ids(id_str) do
     id_str = to_string(id_str)

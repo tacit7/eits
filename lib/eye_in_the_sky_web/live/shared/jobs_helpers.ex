@@ -159,8 +159,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
   defp filter_jobs_by_type(jobs, type), do: Enum.filter(jobs, &(&1.job_type == type))
 
   defp filter_jobs_by_status(jobs, "all"), do: jobs
-  defp filter_jobs_by_status(jobs, "enabled"), do: Enum.filter(jobs, &(&1.enabled == 1))
-  defp filter_jobs_by_status(jobs, "disabled"), do: Enum.filter(jobs, &(&1.enabled != 1))
+  defp filter_jobs_by_status(jobs, "enabled"), do: Enum.filter(jobs, &(&1.enabled))
+  defp filter_jobs_by_status(jobs, "disabled"), do: Enum.filter(jobs, &(not &1.enabled))
   defp filter_jobs_by_status(jobs, _), do: jobs
 
   defp filter_jobs_by_origin(jobs, "all"), do: jobs

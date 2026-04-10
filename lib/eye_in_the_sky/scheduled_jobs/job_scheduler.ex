@@ -13,7 +13,7 @@ defmodule EyeInTheSky.ScheduledJobs.JobScheduler do
     now = DateTime.utc_now()
 
     from(j in ScheduledJob,
-      where: j.enabled == 1 and not is_nil(j.next_run_at) and j.next_run_at <= ^now
+      where: j.enabled and not is_nil(j.next_run_at) and j.next_run_at <= ^now
     )
     |> Repo.all()
   end

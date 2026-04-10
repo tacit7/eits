@@ -88,9 +88,9 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
               <span class="text-xs text-base-content/60">Enabled</span>
               <span class={[
                 "badge badge-xs",
-                if(job.enabled == 1, do: "badge-success", else: "badge-ghost")
+                if(job.enabled, do: "badge-success", else: "badge-ghost")
               ]}>
-                {if job.enabled == 1, do: "Yes", else: "No"}
+                {if job.enabled, do: "Yes", else: "No"}
               </span>
             </div>
 
@@ -111,7 +111,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
               <input
                 type="checkbox"
                 class="toggle toggle-xs toggle-primary"
-                checked={job.enabled == 1}
+                checked={job.enabled}
                 phx-click="toggle_job"
                 phx-value-id={job.id}
               />
@@ -250,7 +250,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                   <input
                     type="checkbox"
                     class="toggle toggle-sm toggle-primary"
-                    checked={job.enabled == 1}
+                    checked={job.enabled}
                     phx-click="toggle_job"
                     phx-value-id={job.id}
                   />

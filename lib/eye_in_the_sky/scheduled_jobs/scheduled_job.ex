@@ -12,7 +12,7 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
     field :schedule_type, :string
     field :schedule_value, :string
     field :config, :string, default: "{}"
-    field :enabled, :integer, default: 1
+    field :enabled, :boolean, default: true
     field :last_run_at, :utc_datetime_usec
     field :next_run_at, :utc_datetime_usec
     field :run_count, :integer, default: 0

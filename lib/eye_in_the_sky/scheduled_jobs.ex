@@ -199,7 +199,7 @@ defmodule EyeInTheSky.ScheduledJobs do
 
   def toggle_job(%ScheduledJob{} = job, caller_project_id \\ nil) do
     if authorized?(job, caller_project_id) do
-      new_enabled = if job.enabled == 1, do: 0, else: 1
+      new_enabled = not job.enabled
       update_job_fields(job, %{enabled: new_enabled, updated_at: DateTime.utc_now()})
     else
       {:error, :unauthorized}

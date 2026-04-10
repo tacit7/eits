@@ -144,7 +144,7 @@ defmodule EyeInTheSky.ScheduledJobsTest do
       assert job.name == "Test Job"
       assert job.job_type == "shell_command"
       assert job.origin == "user"
-      assert job.enabled == 1
+      assert job.enabled == true
     end
 
     test "sets project_id when provided" do
@@ -242,16 +242,16 @@ defmodule EyeInTheSky.ScheduledJobsTest do
   describe "toggle_job/1" do
     test "disables an enabled job" do
       {:ok, job} = ScheduledJobs.create_job(job_attrs())
-      assert job.enabled == 1
+      assert job.enabled == true
       {:ok, toggled} = ScheduledJobs.toggle_job(job)
-      assert toggled.enabled == 0
+      assert toggled.enabled == false
     end
 
     test "enables a disabled job" do
       {:ok, job} = ScheduledJobs.create_job(job_attrs())
       {:ok, disabled} = ScheduledJobs.toggle_job(job)
       {:ok, enabled} = ScheduledJobs.toggle_job(disabled)
-      assert enabled.enabled == 1
+      assert enabled.enabled == true
     end
   end
 

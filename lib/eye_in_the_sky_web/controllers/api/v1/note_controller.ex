@@ -104,7 +104,12 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
           %{}
           |> Helpers.maybe_put(:body, params["body"])
           |> Helpers.maybe_put(:title, params["title"])
-          |> Helpers.maybe_put(:starred, parse_starred(params["starred"]))
+
+        attrs =
+          case parse_starred(params["starred"]) do
+            {:ok, val} -> Map.put(attrs, :starred, val)
+            :error -> attrs
+          end
 
         case Notes.update_note(note, attrs) do
           {:ok, updated} ->

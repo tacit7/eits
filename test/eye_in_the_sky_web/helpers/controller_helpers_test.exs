@@ -4,52 +4,52 @@ defmodule EyeInTheSkyWeb.ControllerHelpersTest do
   import EyeInTheSkyWeb.ControllerHelpers
 
   describe "parse_starred/1" do
-    test "nil returns nil" do
-      assert parse_starred(nil) == nil
+    test "nil returns :error" do
+      assert parse_starred(nil) == :error
     end
 
-    test "true returns true" do
-      assert parse_starred(true) == true
+    test "true returns {:ok, true}" do
+      assert parse_starred(true) == {:ok, true}
     end
 
-    test "false returns false" do
-      assert parse_starred(false) == false
+    test "false returns {:ok, false}" do
+      assert parse_starred(false) == {:ok, false}
     end
 
-    test "integer 1 returns true" do
-      assert parse_starred(1) == true
+    test "integer 1 returns {:ok, true}" do
+      assert parse_starred(1) == {:ok, true}
     end
 
-    test "integer 0 returns false" do
-      assert parse_starred(0) == false
+    test "integer 0 returns {:ok, false}" do
+      assert parse_starred(0) == {:ok, false}
     end
 
-    test "non-zero integer returns true (no FunctionClauseError)" do
-      assert parse_starred(2) == true
-      assert parse_starred(-1) == true
-      assert parse_starred(99) == true
+    test "non-zero integer returns {:ok, true}" do
+      assert parse_starred(2) == {:ok, true}
+      assert parse_starred(-1) == {:ok, true}
+      assert parse_starred(99) == {:ok, true}
     end
 
-    test "string '1' returns true" do
-      assert parse_starred("1") == true
+    test "string '1' returns {:ok, true}" do
+      assert parse_starred("1") == {:ok, true}
     end
 
-    test "string 'true' returns true" do
-      assert parse_starred("true") == true
+    test "string 'true' returns {:ok, true}" do
+      assert parse_starred("true") == {:ok, true}
     end
 
-    test "string '0' returns false" do
-      assert parse_starred("0") == false
+    test "string '0' returns {:ok, false}" do
+      assert parse_starred("0") == {:ok, false}
     end
 
-    test "string 'false' returns false" do
-      assert parse_starred("false") == false
+    test "string 'false' returns {:ok, false}" do
+      assert parse_starred("false") == {:ok, false}
     end
 
-    test "unrecognized string returns nil" do
-      assert parse_starred("yes") == nil
-      assert parse_starred("") == nil
-      assert parse_starred("2") == nil
+    test "unrecognized string returns :error" do
+      assert parse_starred("yes") == :error
+      assert parse_starred("") == :error
+      assert parse_starred("2") == :error
     end
   end
 end

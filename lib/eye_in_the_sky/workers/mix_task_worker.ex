@@ -27,17 +27,13 @@ defmodule EyeInTheSky.Workers.MixTaskWorker do
     args = config["args"] || []
     project_path = blank_to_nil(config["project_path"]) || File.cwd!()
 
-    try do
-      {output, exit_code} =
-        System.cmd("mix", [task | args], cd: project_path, stderr_to_stdout: true)
+    {output, exit_code} =
+      System.cmd("mix", [task | args], cd: project_path, stderr_to_stdout: true)
 
-      if exit_code == 0 do
-        {:ok, String.trim(output)}
-      else
-        {:error, "Exit code #{exit_code}: #{String.trim(output)}"}
-      end
-    rescue
-      e -> {:error, "Mix task failed: #{inspect(e)}"}
+    if exit_code == 0 do
+      {:ok, String.trim(output)}
+    else
+      {:error, "Exit code #{exit_code}: #{String.trim(output)}"}
     end
   end
 

@@ -60,21 +60,20 @@ defmodule EyeInTheSkyWeb.ControllerHelpers do
 
   @doc """
   Coerces a `starred` param value to a boolean.
-  Accepts nil, boolean, integer (1/0), or string representations ("1"/"true").
-  Returns nil if the value cannot be parsed.
+  Accepts boolean, integer (1/0), or string representations ("1"/"true"/"0"/"false").
+
+  Returns `{:ok, bool}` on success or `:error` when the value is absent or unrecognisable.
   """
-  def parse_starred(nil), do: nil
-  def parse_starred(true), do: true
-  def parse_starred(false), do: false
-  def parse_starred(val) when is_integer(val), do: val != 0
+  def parse_starred(nil), do: :error
+  def parse_starred(true), do: {:ok, true}
+  def parse_starred(false), do: {:ok, false}
+  def parse_starred(val) when is_integer(val), do: {:ok, val != 0}
 
   def parse_starred(val) when is_binary(val) do
     case val do
-      "1" -> true
-      "true" -> true
-      "0" -> false
-      "false" -> false
-      _ -> nil
+      v when v in ["1", "true"] -> {:ok, true}
+      v when v in ["0", "false"] -> {:ok, false}
+      _ -> :error
     end
   end
 end

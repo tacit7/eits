@@ -39,9 +39,29 @@ defmodule EyeInTheSky.CLI.Port do
   """
   @spec handle_port_output(port(), reference(), pid(), binary(), pos_integer() | :infinity, keyword()) :: :ok
   def handle_port_output(port, session_ref, caller, buffer, idle_timeout_ms, opts \\ []) do
-    telemetry_prefix = Keyword.get(opts, :telemetry_prefix, [:eits, :cli])
-    log_prefix = Keyword.get(opts, :log_prefix, "CLI")
-    max_buffer_bytes = Keyword.get(opts, :max_buffer_bytes, @max_buffer_bytes_default)
+    config = %{
+      port: port,
+      session_ref: session_ref,
+      caller: caller,
+      idle_timeout_ms: idle_timeout_ms,
+      telemetry_prefix: Keyword.get(opts, :telemetry_prefix, [:eits, :cli]),
+      log_prefix: Keyword.get(opts, :log_prefix, "CLI"),
+      max_buffer_bytes: Keyword.get(opts, :max_buffer_bytes, @max_buffer_bytes_default)
+    }
+
+    do_handle_port_output(config, buffer)
+  end
+
+  defp do_handle_port_output(%{} = config, buffer) do
+    %{
+      port: port,
+      session_ref: session_ref,
+      caller: caller,
+      idle_timeout_ms: idle_timeout_ms,
+      telemetry_prefix: telemetry_prefix,
+      log_prefix: log_prefix,
+      max_buffer_bytes: max_buffer_bytes
+    } = config
 
     receive do
       {^port, {:data, data}} ->
@@ -74,7 +94,7 @@ defmodule EyeInTheSky.CLI.Port do
           end
         end)
 
-        handle_port_output(port, session_ref, caller, remaining, idle_timeout_ms, opts)
+        do_handle_port_output(config, remaining)
 
       {^port, {:exit_status, status}} ->
         unless buffer == "" do

@@ -191,34 +191,41 @@ defmodule EyeInTheSky.Codex.SDK do
   # ---------------------------------------------------------------------------
 
   defp spawn_handler_process(sdk_ref, caller_pid, fallback_session_id) do
-    spawn(fn ->
-      Process.monitor(caller_pid)
+    {:ok, pid} =
+      Task.Supervisor.start_child(
+        EyeInTheSky.TaskSupervisor,
+        fn ->
+          Process.monitor(caller_pid)
 
-      receive do
-        {:start_handling, ^sdk_ref} ->
-          :telemetry.execute(
-            [:eits, :codex, :sdk, :handler, :ready],
-            %{system_time: System.system_time()},
-            %{}
-          )
+          receive do
+            {:start_handling, ^sdk_ref} ->
+              :telemetry.execute(
+                [:eits, :codex, :sdk, :handler, :ready],
+                %{system_time: System.system_time()},
+                %{}
+              )
 
-          state = %{
-            sdk_ref: sdk_ref,
-            caller_pid: caller_pid,
-            session_id: nil,
-            accumulated_text: "",
-            fallback_session_id: fallback_session_id
-          }
+              state = %{
+                sdk_ref: sdk_ref,
+                caller_pid: caller_pid,
+                session_id: nil,
+                accumulated_text: "",
+                fallback_session_id: fallback_session_id
+              }
 
-          MessageHandler.run_loop(__MODULE__, state, @loop_opts)
+              MessageHandler.run_loop(__MODULE__, state, @loop_opts)
 
-        {:DOWN, _ref, :process, ^caller_pid, _reason} ->
-          MessageHandler.stop_and_unregister(sdk_ref)
-      after
-        5_000 ->
-          send(caller_pid, {:claude_error, sdk_ref, :handler_timeout})
-      end
-    end)
+            {:DOWN, _ref, :process, ^caller_pid, _reason} ->
+              MessageHandler.stop_and_unregister(sdk_ref)
+          after
+            5_000 ->
+              send(caller_pid, {:claude_error, sdk_ref, :handler_timeout})
+          end
+        end,
+        restart: :temporary
+      )
+
+    pid
   end
 
   # ---------------------------------------------------------------------------

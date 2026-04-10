@@ -26,9 +26,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :has_more_messages, :boolean, default: false
   attr :uploads, :map, required: true
   attr :stream, :map, default: %{show: false, content: "", tool: nil, thinking: nil}
-  attr :selected_model, :string, default: "opus"
-  attr :selected_effort, :string, default: "medium"
-  attr :processing, :boolean, default: false
+  attr :session_state, :map, required: true
   attr :tasks, :list, default: []
   attr :commits, :list, default: []
   attr :diff_cache, :map, default: %{}
@@ -36,11 +34,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :slash_items, :list, default: []
   attr :current_task, :map, default: nil
   attr :queued_prompts, :list, default: []
-  attr :thinking_enabled, :boolean, default: false
-  attr :max_budget_usd, :any, default: nil
-  attr :compacting, :boolean, default: false
-  attr :context_used, :integer, default: 0
-  attr :context_window, :integer, default: 0
   attr :message_search_query, :string, default: ""
   attr :session_context, :map, default: nil
   attr :reloading, :boolean, default: false
@@ -165,12 +158,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           <.icon name="hero-bars-3" class="w-5 h-5" />
         </button>
         <div class="flex-1 flex items-center justify-center gap-1.5 min-w-0 px-1">
-          <div class={"w-1.5 h-1.5 rounded-full flex-shrink-0 " <> case @agent.status do
-            "working" -> "bg-success animate-pulse"
-            "waiting" -> "bg-warning animate-pulse"
-            "compacting" -> "bg-orange-500 animate-pulse"
-            _ -> "bg-base-content/20"
-          end} />
+          <div class={"w-1.5 h-1.5 rounded-full flex-shrink-0 " <> status_dot_class(@agent.status)} />
           <%= if @agent.entrypoint == "cli" do %>
             <.icon name="hero-command-line" class="w-3.5 h-3.5 text-base-content/40 flex-shrink-0" />
           <% end %>
@@ -265,12 +253,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <div class="px-4 sm:px-5 py-3" id="dm-header">
           <div class="flex items-center gap-2 min-w-0">
             <div class="flex items-start gap-2 min-w-0 flex-1">
-              <div class={"w-2 h-2 rounded-full flex-shrink-0 mt-[5px] " <> case @agent.status do
-                "working" -> "bg-success animate-pulse"
-                "waiting" -> "bg-warning animate-pulse"
-                "compacting" -> "bg-orange-500 animate-pulse"
-                _ -> "bg-base-content/20"
-              end} />
+              <div class={"w-2 h-2 rounded-full flex-shrink-0 mt-[5px] " <> status_dot_class(@agent.status)} />
               <div class="flex flex-col min-w-0 flex-1">
                 <div class="flex items-center gap-2 min-w-0">
                   <%= if @agent.entrypoint == "cli" do %>
@@ -423,7 +406,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <% end %>
 
         <%!-- Compacting indicator --%>
-        <%= if @compacting do %>
+        <%= if @session_state.compacting do %>
           <div
             class="px-5 py-2 border-t border-orange-500/20 bg-orange-500/5"
             id="dm-compacting-strip"
@@ -529,16 +512,16 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           <% end %>
           <Composer.message_form
             uploads={@uploads}
-            selected_model={@selected_model}
-            selected_effort={@selected_effort}
+            selected_model={@session_state.model}
+            selected_effort={@session_state.effort}
             active_overlay={@active_overlay}
-            processing={@processing}
+            processing={@session_state.processing}
             slash_items={@slash_items}
-            thinking_enabled={@thinking_enabled}
-            max_budget_usd={@max_budget_usd}
+            thinking_enabled={@session_state.thinking_enabled}
+            max_budget_usd={@session_state.max_budget_usd}
             provider={@agent.provider}
-            context_used={@context_used}
-            context_window={@context_window}
+            context_used={@session_state.context_used}
+            context_window={@session_state.context_window}
             display_name={if @agent_record && is_map(@agent_record.agent_definition) && not match?(%Ecto.Association.NotLoaded{}, @agent_record.agent_definition), do: @agent_record.agent_definition.display_name}
             session_cli_opts={assigns[:session_cli_opts] || []}
           />
@@ -547,4 +530,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
     </div>
     """
   end
+
+  defp status_dot_class("working"), do: "bg-success animate-pulse"
+  defp status_dot_class("waiting"), do: "bg-warning animate-pulse"
+  defp status_dot_class("compacting"), do: "bg-orange-500 animate-pulse"
+  defp status_dot_class(_), do: "bg-base-content/20"
 end

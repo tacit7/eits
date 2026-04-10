@@ -117,7 +117,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   # --- Data Events ---
 
   @doc "Result received from SDK — save to DB."
-  def on_result_received(session_id, provider, text, metadata, channel_id) when is_binary(text) do
+  def on_result_received(session_id, %{provider: provider, text: text, metadata: metadata, channel_id: channel_id}) when is_binary(text) do
     Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
       if String.trim(text) in ["", "[NO_RESPONSE]"] do
         Logger.info("[#{session_id}] Skipping DB save — empty or suppressed response")
@@ -129,7 +129,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     :ok
   end
 
-  def on_result_received(session_id, _provider, _text, _metadata, _channel_id) do
+  def on_result_received(session_id, _params) do
     Logger.warning("[#{session_id}] Result has no text content")
   end
 

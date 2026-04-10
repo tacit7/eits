@@ -103,7 +103,7 @@ defmodule EyeInTheSky.Teams do
     end
   end
 
-  def get_member(team_id, name) do
+  def get_member_by_name(team_id, name) do
     case Repo.get_by(TeamMember, team_id: team_id, name: name) do
       nil -> {:error, :not_found}
       member -> {:ok, member}

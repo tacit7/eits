@@ -181,7 +181,7 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
 
   # --- on_result_received ---
 
-  describe "on_result_received/5" do
+  describe "on_result_received/2" do
     test "saves message to DB" do
       {_agent, session} = create_session()
 
@@ -194,7 +194,12 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
         is_error: false
       }
 
-      AgentWorkerEvents.on_result_received(session.id, "claude", "hello world", metadata, nil)
+      AgentWorkerEvents.on_result_received(session.id, %{
+        provider: "claude",
+        text: "hello world",
+        metadata: metadata,
+        channel_id: nil
+      })
 
       # Task.Supervisor async — allow it to complete
       Process.sleep(100)
@@ -206,7 +211,12 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
     test "skips DB save for empty text" do
       {_agent, session} = create_session()
 
-      AgentWorkerEvents.on_result_received(session.id, "claude", "   ", %{}, nil)
+      AgentWorkerEvents.on_result_received(session.id, %{
+        provider: "claude",
+        text: "   ",
+        metadata: %{},
+        channel_id: nil
+      })
 
       Process.sleep(100)
 
@@ -217,7 +227,12 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
     test "skips DB save for [NO_RESPONSE]" do
       {_agent, session} = create_session()
 
-      AgentWorkerEvents.on_result_received(session.id, "claude", "[NO_RESPONSE]", %{}, nil)
+      AgentWorkerEvents.on_result_received(session.id, %{
+        provider: "claude",
+        text: "[NO_RESPONSE]",
+        metadata: %{},
+        channel_id: nil
+      })
 
       Process.sleep(100)
 
@@ -227,7 +242,15 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
 
     test "returns :ok for non-binary text (no crash)" do
       {_agent, session} = create_session()
-      result = AgentWorkerEvents.on_result_received(session.id, "claude", nil, %{}, nil)
+
+      result =
+        AgentWorkerEvents.on_result_received(session.id, %{
+          provider: "claude",
+          text: nil,
+          metadata: %{},
+          channel_id: nil
+        })
+
       # Second clause — returns :ok from Logger.warning
       assert result == :ok
     end

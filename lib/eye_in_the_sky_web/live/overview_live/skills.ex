@@ -158,7 +158,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                 name="search"
                 value={@search}
                 placeholder="Filter skills..."
-                class="input input-bordered input-sm w-full max-w-xs"
+                class="input input-bordered input-sm w-full max-w-xs text-base"
                 phx-debounce="150"
               />
               <%= if @search != "" do %>

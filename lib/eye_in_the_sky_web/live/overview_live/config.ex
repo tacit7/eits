@@ -374,7 +374,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
                   type="text"
                   name="name"
                   placeholder={if @creating == :dir, do: "Folder name", else: "File name"}
-                  class="input input-sm input-bordered flex-1"
+                  class="input input-sm input-bordered flex-1 text-base"
                   autofocus
                 />
                 <button type="submit" class="btn btn-sm btn-primary">Create</button>

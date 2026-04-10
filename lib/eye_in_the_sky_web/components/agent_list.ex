@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
               id="search"
               value={@search_query}
               phx-debounce="300"
-              class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
+              class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-base"
               placeholder="Search..."
             />
           </div>
@@ -224,7 +224,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
         <% else %>
           <form phx-submit="add_to_new_canvas" class="flex flex-col gap-1 p-1">
             <input type="hidden" name="session_id" value={@agent.id} />
-            <input type="text" name="canvas_name" class="input input-xs w-full" placeholder="Canvas name..." autocomplete="off" />
+            <input type="text" name="canvas_name" class="input input-xs w-full text-base" placeholder="Canvas name..." autocomplete="off" />
             <button type="submit" class="btn btn-primary btn-xs w-full">Create &amp; Add</button>
           </form>
         <% end %>

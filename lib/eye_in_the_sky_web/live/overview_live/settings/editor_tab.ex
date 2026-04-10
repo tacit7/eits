@@ -44,7 +44,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.EditorTab do
                   name="value"
                   value={@settings["preferred_editor"]}
                   placeholder="e.g. code, vim, zed"
-                  class="input input-bordered input-sm w-36"
+                  class="input input-bordered input-sm w-36 text-base"
                   phx-debounce="500"
                 />
               </form>

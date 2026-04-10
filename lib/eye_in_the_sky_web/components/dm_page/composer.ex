@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
           name="body"
           rows="1"
           placeholder={if @processing, do: "Queue a message...", else: "Reply..."}
-          class="w-full bg-transparent border-0 outline-none focus:ring-0 text-sm resize-none min-h-[28px] max-h-40 overflow-y-auto placeholder:text-base-content/30 p-0"
+          class="w-full bg-transparent border-0 outline-none focus:ring-0 text-base resize-none min-h-[28px] max-h-40 overflow-y-auto placeholder:text-base-content/30 p-0"
           autocomplete="off"
           phx-hook="CommandHistory"
           id="message-input"

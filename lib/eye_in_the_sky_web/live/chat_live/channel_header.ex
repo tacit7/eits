@@ -138,7 +138,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
             name="session_search"
             value={@session_search}
             placeholder="Search sessions..."
-            class="w-full input input-xs bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 text-xs"
+            class="w-full input input-xs bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 text-base"
             autocomplete="off"
             phx-debounce="200"
           />

@@ -127,7 +127,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
                   type="text"
                   name="name"
                   value={@session.name || ""}
-                  class="input input-xs w-full text-[13px] font-medium border-primary/40 focus:border-primary bg-base-100"
+                  class="input input-xs w-full text-[13px] font-medium border-primary/40 focus:border-primary bg-base-100 text-base"
                   phx-keyup="cancel_rename"
                   phx-key="Escape"
                   phx-blur="cancel_rename"

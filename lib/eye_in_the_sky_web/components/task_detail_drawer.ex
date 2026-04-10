@@ -134,7 +134,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                       name="due_at"
                       value={format_date_input(@task.due_at)}
                       phx-mounted={if @focus == "due_at", do: JS.focus()}
-                      class="input input-sm w-full bg-base-200 border-base-300 text-sm focus:border-primary/30"
+                      class="input input-sm w-full bg-base-200 border-base-300 text-base focus:border-primary/30"
                     />
                   </div>
                   <div>
@@ -146,7 +146,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                       value={format_tags(@task.tags)}
                       placeholder="tag1, tag2"
                       phx-mounted={if @focus == "tags", do: JS.focus()}
-                      class="input input-sm w-full bg-base-200 border-base-300 text-sm placeholder:text-base-content/20 focus:border-primary/30"
+                      class="input input-sm w-full bg-base-200 border-base-300 text-base placeholder:text-base-content/20 focus:border-primary/30"
                     />
                   </div>
                 </div>
@@ -156,7 +156,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                   <.detail_label text="Description" />
                   <textarea
                     name="description"
-                    class="w-full min-h-[100px] bg-base-200 border border-base-300 rounded-lg px-3 py-2 text-sm focus:border-primary/30 focus:outline-none resize-y"
+                    class="w-full min-h-[100px] bg-base-200 border border-base-300 rounded-lg px-3 py-2 text-base focus:border-primary/30 focus:outline-none resize-y"
                     placeholder="Add details..."
                   >{@task.description}</textarea>
                 </div>
@@ -222,7 +222,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                     name="body"
                     rows="3"
                     placeholder="Add a note..."
-                    class="w-full bg-base-200 border border-base-300 rounded-lg px-3 py-2 text-sm focus:border-primary/30 focus:outline-none resize-none"
+                    class="w-full bg-base-200 border border-base-300 rounded-lg px-3 py-2 text-base focus:border-primary/30 focus:outline-none resize-none"
                     required
                   ></textarea>
                   <button

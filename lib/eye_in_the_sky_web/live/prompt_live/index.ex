@@ -142,7 +142,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Index do
               phx-keyup="search"
               phx-debounce="300"
               value={@search_query}
-              class="input input-bordered w-full pl-10"
+              class="input input-bordered w-full pl-10 text-base"
               placeholder="Search prompts by name, slug, or description..."
             />
           </div>

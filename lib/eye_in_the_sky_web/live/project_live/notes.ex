@@ -229,7 +229,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
               id="qn-title-proj"
               required
               placeholder="Title..."
-              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base"
               autocomplete="off"
               autofocus
             />
@@ -241,7 +241,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
               id="qn-body-proj"
               rows="4"
               placeholder="Note content..."
-              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 resize-none"
+              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 resize-none text-base"
             ></textarea>
           </div>
           <label class="flex items-center gap-2 cursor-pointer select-none">

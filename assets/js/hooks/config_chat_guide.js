@@ -106,7 +106,7 @@ export const ConfigChatGuide = {
               type="text"
               id="config-guide-input"
               placeholder="Ask about Claude configuration..."
-              class="input input-sm flex-1 bg-base-200/50 border-base-content/8 text-sm placeholder:text-base-content/25"
+              class="input input-sm flex-1 bg-base-200/50 border-base-content/8 text-base placeholder:text-base-content/25"
               autocomplete="off"
             />
             <button id="config-guide-send" class="btn btn-primary btn-sm btn-square">

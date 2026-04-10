@@ -52,7 +52,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.AuthTab do
                     type="text"
                     readonly
                     value={@generated_api_key}
-                    class="input input-bordered input-xs font-mono w-full"
+                    class="input input-bordered input-xs font-mono w-full text-base"
                   />
                 </div>
               <% else %>

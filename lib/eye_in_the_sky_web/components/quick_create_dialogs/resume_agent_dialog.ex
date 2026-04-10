@@ -29,7 +29,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ResumeAgentDialog do
               data-qra-agent-uuid
               required
               placeholder="Enter agent UUID to resume"
-              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base"
             />
           </div>
           <div>
@@ -39,7 +39,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ResumeAgentDialog do
               data-qra-instructions
               placeholder="New instructions (optional - uses original if blank)"
               rows="4"
-              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm resize-none"
+              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base resize-none"
             ></textarea>
           </div>
           <div class="alert alert-info text-sm">

@@ -143,7 +143,7 @@ defmodule EyeInTheSkyWeb.Components.CanvasOverlayComponent do
               <% end %>
               <%= if @creating_canvas do %>
                 <form phx-submit="create_canvas" phx-target={@myself} class="flex gap-1 ml-1">
-                  <input type="text" name="name" class="input input-xs w-28" placeholder="Canvas name" autofocus />
+                  <input type="text" name="name" class="input input-xs w-28 text-base" placeholder="Canvas name" autofocus />
                   <button type="submit" class="btn btn-primary btn-xs">+</button>
                 </form>
               <% else %>

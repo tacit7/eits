@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ChatSection do
               phx-keyup="update_channel_name"
               phx-target={@myself}
               placeholder="channel-name"
-              class="flex-1 bg-transparent border-b border-base-content/15 text-xs text-base-content/70 placeholder:text-base-content/25 outline-none py-0.5 font-mono"
+              class="flex-1 bg-transparent border-b border-base-content/15 text-base text-base-content/70 placeholder:text-base-content/25 outline-none py-0.5 font-mono"
               autofocus
             />
           </form>

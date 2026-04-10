@@ -32,7 +32,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ChatDialog do
               type="text"
               data-qcc-name
               placeholder="Session name (optional)..."
-              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base"
               autocomplete="off"
             />
           </div>

@@ -29,7 +29,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.DeleteAgentDialog do
               data-qda-agent-uuid
               required
               placeholder="Enter agent UUID to delete"
-              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base"
             />
           </div>
           <div class="alert alert-warning text-sm">

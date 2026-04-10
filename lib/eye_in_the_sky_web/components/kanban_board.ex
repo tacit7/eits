@@ -136,7 +136,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                     autofocus
                     phx-keydown="hide_quick_add"
                     phx-key="Escape"
-                    class="input input-md sm:input-sm w-full bg-base-100 border-base-content/10 text-sm placeholder:text-base-content/25 focus:border-primary/30"
+                    class="input input-md sm:input-sm w-full bg-base-100 border-base-content/10 text-base placeholder:text-base-content/25 focus:border-primary/30"
                   />
                 </form>
               <% else %>

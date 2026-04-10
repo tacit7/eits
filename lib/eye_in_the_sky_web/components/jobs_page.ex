@@ -363,7 +363,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
           <input
             type="text"
             name="search"
-            class="input input-bordered input-sm flex-1 min-w-[200px]"
+            class="input input-bordered input-sm flex-1 min-w-[200px] text-base"
             placeholder="Search by name or description…"
             value={@search_query}
             phx-debounce="200"

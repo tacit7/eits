@@ -61,7 +61,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
             phx-keyup="update_project_path"
             phx-target={@myself}
             placeholder="/path/to/project"
-            class="flex-1 bg-transparent border-b border-base-content/15 text-xs text-base-content/70 placeholder:text-base-content/25 outline-none py-0.5 font-mono"
+            class="flex-1 bg-transparent border-b border-base-content/15 text-base text-base-content/70 placeholder:text-base-content/25 outline-none py-0.5 font-mono"
             autofocus
           />
           <button
@@ -99,7 +99,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                   value={@rename_value}
                   phx-keyup="update_rename_value"
                   phx-target={@myself}
-                  class="flex-1 min-w-0 bg-transparent border-b border-primary/40 text-sm text-base-content/80 outline-none py-0.5"
+                  class="flex-1 min-w-0 bg-transparent border-b border-primary/40 text-base text-base-content/80 outline-none py-0.5"
                   autofocus
                 />
                 <button

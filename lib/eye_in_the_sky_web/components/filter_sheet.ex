@@ -46,7 +46,7 @@ defmodule EyeInTheSkyWeb.Components.FilterSheet do
             <h2 class="text-sm font-semibold">{@title}</h2>
             <button
               phx-click="close_filter_sheet"
-              class="btn btn-ghost btn-xs btn-square"
+              class="btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px]"
               aria-label="Close filter panel"
             >
               <.icon name="hero-x-mark-mini" class="w-4 h-4" />

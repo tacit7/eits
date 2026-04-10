@@ -18,7 +18,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.TaskDialog do
           <button
             data-qct-cancel
             type="button"
-            class="btn btn-ghost btn-xs btn-square"
+            class="btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px]"
             aria-label="Close"
           >
             <span class="hero-x-mark w-4 h-4"></span>

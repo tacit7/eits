@@ -67,7 +67,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
             <%!-- DM badge --%>
             <span
               :if={@is_dm}
-              class="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/40 uppercase tracking-wide"
+              class="inline-flex items-center gap-1 text-xs font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/40 uppercase tracking-wide"
             >
               <.icon name="hero-envelope-mini" class="w-2.5 h-2.5" /> dm
             </span>
@@ -271,7 +271,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         />
       </summary>
       <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-        <pre class="font-mono text-[10px] text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto">{@body}</pre>
+        <pre class="font-mono text-xs text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto">{@body}</pre>
       </div>
     </details>
     """
@@ -342,18 +342,18 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     <%= case @body_type do %>
       <% :bash -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-          <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-[10px] text-base-content/70 whitespace-pre-wrap break-all leading-relaxed">{(@input && @input["command"]) || @detail}</pre>
+          <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-xs text-base-content/70 whitespace-pre-wrap break-all leading-relaxed">{(@input && @input["command"]) || @detail}</pre>
         </div>
       <% :edit -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5 space-y-1.5">
-          <div class="font-mono text-[10px] text-base-content/40 pb-0.5">{@input["file_path"]}</div>
-          <pre class="bg-red-950/30 text-red-400/70 rounded px-2 py-1 font-mono text-[10px] whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{String.slice(@input["old_string"] || "", 0..500)}</pre>
-          <pre class="bg-green-950/30 text-green-400/70 rounded px-2 py-1 font-mono text-[10px] whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{String.slice(@input["new_string"] || "", 0..500)}</pre>
+          <div class="font-mono text-xs text-base-content/40 pb-0.5">{@input["file_path"]}</div>
+          <pre class="bg-red-950/30 text-red-400/70 rounded px-2 py-1 font-mono text-xs whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{String.slice(@input["old_string"] || "", 0..500)}</pre>
+          <pre class="bg-green-950/30 text-green-400/70 rounded px-2 py-1 font-mono text-xs whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{String.slice(@input["new_string"] || "", 0..500)}</pre>
         </div>
       <% :write -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5 space-y-1">
-          <div class="font-mono text-[10px] text-base-content/40 pb-0.5">{@input["file_path"]}</div>
-          <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-[10px] text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-48 overflow-y-auto">{String.slice(@input["content"] || "", 0..500)}{if String.length(@input["content"] || "") > 500, do: "\n…", else: ""}</pre>
+          <div class="font-mono text-xs text-base-content/40 pb-0.5">{@input["file_path"]}</div>
+          <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-xs text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-48 overflow-y-auto">{String.slice(@input["content"] || "", 0..500)}{if String.length(@input["content"] || "") > 500, do: "\n…", else: ""}</pre>
         </div>
       <% :speak -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
@@ -361,11 +361,11 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         </div>
       <% :json -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-          <pre class="font-mono text-[10px] text-base-content/40 whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto">{Jason.encode!(@input, pretty: true)}</pre>
+          <pre class="font-mono text-xs text-base-content/40 whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto">{Jason.encode!(@input, pretty: true)}</pre>
         </div>
       <% :text -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-          <pre class="font-mono text-[10px] text-base-content/45 whitespace-pre-wrap break-all leading-relaxed">{@rest}</pre>
+          <pre class="font-mono text-xs text-base-content/45 whitespace-pre-wrap break-all leading-relaxed">{@rest}</pre>
         </div>
       <% :none -> %>
     <% end %>

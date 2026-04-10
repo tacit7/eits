@@ -148,7 +148,7 @@ export const CommandPalette = {
       })
       .map(([group, groupItems]) => {
         const buttons = groupItems.map(item => this.renderRow(item, idx++, null)).join("")
-        return `<section class="px-1 py-1"><h3 class="px-2 py-1 text-[10px] uppercase tracking-wider text-base-content/40">${escapeHtml(group)}</h3><div>${buttons}</div></section>`
+        return `<section class="px-1 py-1"><h3 class="px-2 py-1 text-xs uppercase tracking-wider text-base-content/40">${escapeHtml(group)}</h3><div>${buttons}</div></section>`
       }).join("")
   },
 
@@ -167,7 +167,7 @@ export const CommandPalette = {
       : ""
 
     const shortcutHtml = item.shortcut
-      ? item.shortcut.split(" ").map(k => `<kbd class="text-[10px] px-1 py-0.5 rounded border border-base-content/20 text-base-content/50">${escapeHtml(k)}</kbd>`).join(" ")
+      ? item.shortcut.split(" ").map(k => `<kbd class="text-xs px-1 py-0.5 rounded border border-base-content/20 text-base-content/50">${escapeHtml(k)}</kbd>`).join(" ")
       : ""
 
     const chevronHtml = item.type === "submenu"

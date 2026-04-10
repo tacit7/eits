@@ -99,7 +99,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
       <div class="flex flex-wrap gap-1 mt-2">
         <%= for tag <- Enum.take(@task.tags, 3) do %>
           <span
-            class="text-[10px] px-1.5 py-0.5 rounded font-medium leading-none"
+            class="text-xs px-1.5 py-0.5 rounded font-medium leading-none"
             style={"background-color: #{tag.color || "hsl(var(--bc) / 0.3)"}26; color: #{tag.color || "hsl(var(--bc) / 0.3)"}"}
           >
             {tag.name}

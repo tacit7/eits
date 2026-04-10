@@ -227,7 +227,7 @@ export const FavoriteFab = {
             <span class="font-bold text-xs bg-primary/10 text-primary rounded-full w-7 h-7 flex items-center justify-center">${this._initials(agent.name)}</span>
             <div>
               <span class="text-xs font-semibold text-base-content/70">${this._escapeHtml(agent.name || 'Agent')}</span>
-              <span id="fab-chat-status" class="text-[10px] font-medium uppercase tracking-wider ml-1.5 ${isActive ? 'text-success' : 'text-base-content/30'}">${statusLabel}</span>
+              <span id="fab-chat-status" class="text-xs font-medium uppercase tracking-wider ml-1.5 ${isActive ? 'text-success' : 'text-base-content/30'}">${statusLabel}</span>
             </div>
           </div>
           <div class="flex items-center gap-1">

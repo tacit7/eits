@@ -244,7 +244,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 </td>
                 <td class="text-xs">
                   <span class="font-mono">{format_schedule(job)}</span>
-                  <span class="text-base-content/40 ml-1 text-[10px]">{job.timezone || "UTC"}</span>
+                  <span class="text-base-content/40 ml-1 text-xs">{job.timezone || "UTC"}</span>
                 </td>
                 <td>
                   <input

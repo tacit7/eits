@@ -321,7 +321,7 @@
           {#if idx === 0 || formatDateRelative(messages[idx - 1].inserted_at) !== formatDateRelative(message.inserted_at)}
             <div class="flex items-center gap-3 my-4">
               <div class="flex-1 h-px bg-base-content/5"></div>
-              <span class="text-[10px] uppercase tracking-wider font-medium text-base-content/25 whitespace-nowrap">{formatDateRelative(message.inserted_at)}</span>
+              <span class="text-xs uppercase tracking-wider font-medium text-base-content/25 whitespace-nowrap">{formatDateRelative(message.inserted_at)}</span>
               <div class="flex-1 h-px bg-base-content/5"></div>
             </div>
           {/if}
@@ -372,7 +372,7 @@
                     {/if}
 
                     {#if message.number}
-                      <span class="font-mono text-[10px] text-base-content/20">#{message.number}</span>
+                      <span class="font-mono text-xs text-base-content/20">#{message.number}</span>
                     {/if}
                     <span class="text-[11px] text-base-content/25">{formatTime(message.inserted_at)}</span>
                     <button
@@ -499,7 +499,7 @@
             <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-base-100 border border-base-content/10 rounded-xl shadow-xl max-h-[280px] overflow-y-auto z-50">
               {#each groupSlashItems(slashOptions) as entry, idx}
                 {#if entry.header}
-                  <div class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-base-content/40 bg-base-content/[0.02] sticky top-0">
+                  <div class="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-base-content/40 bg-base-content/[0.02] sticky top-0">
                     {{ skill: 'Skills', command: 'Commands', agent: 'Agents', prompt: 'Prompts' }[entry.type] || entry.type}
                   </div>
                 {:else}
@@ -511,7 +511,7 @@
                     on:mouseenter={() => { selectedSlashIndex = flatIdx }}
                   >
                     {#if typeBadges[entry.type]}
-                      <span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium {typeBadges[entry.type].cls}">
+                      <span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium {typeBadges[entry.type].cls}">
                         {typeBadges[entry.type].label}
                       </span>
                     {/if}

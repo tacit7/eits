@@ -24,11 +24,11 @@ function rowClass() {
 
 function rowHTML(item, query, activeFlags) {
   const badge = {
-    skill: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary">skill</span>',
-    command: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary/10 text-secondary">cmd</span>',
-    flag: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-info/10 text-info">flag</span>',
-    agent: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent">agent</span>',
-    prompt: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-warning/10 text-warning">prompt</span>',
+    skill: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">skill</span>',
+    command: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-secondary/10 text-secondary">cmd</span>',
+    flag: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-info/10 text-info">flag</span>',
+    agent: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-accent/10 text-accent">agent</span>',
+    prompt: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-warning/10 text-warning">prompt</span>',
   }[item.type] || ''
 
   const prefix = item.type === 'agent' ? '@' : '/'
@@ -38,7 +38,7 @@ function rowHTML(item, query, activeFlags) {
   const isActive = item.type === 'flag' && activeFlags && activeFlags[item.slug] !== undefined
   const activeVal = isActive ? activeFlags[item.slug] : null
   const activeBadge = isActive
-    ? `<span class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-success/10 text-success ml-1">${activeVal === true ? 'on' : activeVal === false ? 'off' : escapeHtml(String(activeVal))}</span>`
+    ? `<span class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-success/10 text-success ml-1">${activeVal === true ? 'on' : activeVal === false ? 'off' : escapeHtml(String(activeVal))}</span>`
     : ''
 
   const desc = item.description
@@ -78,7 +78,7 @@ export function renderItems(container, items, activeIndex, query, activeFlags, o
     if (!groups[type]) continue
 
     const header = document.createElement('div')
-    header.className = 'px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-base-content/40 bg-base-content/[0.02] sticky top-0'
+    header.className = 'px-3 py-1 text-xs font-semibold uppercase tracking-wider text-base-content/40 bg-base-content/[0.02] sticky top-0'
     header.textContent = typeLabels[type] || type
     container.appendChild(header)
 
@@ -101,7 +101,7 @@ export function renderItems(container, items, activeIndex, query, activeFlags, o
   }
 
   const hint = document.createElement('div')
-  hint.className = 'px-3 py-1.5 text-[10px] text-base-content/30 border-t border-base-content/5 flex items-center gap-3 sticky bottom-0 bg-base-100'
+  hint.className = 'px-3 py-1.5 text-xs text-base-content/30 border-t border-base-content/5 flex items-center gap-3 sticky bottom-0 bg-base-100'
   hint.innerHTML = '<kbd class="font-mono">↑↓</kbd> navigate &nbsp;<kbd class="font-mono">↵</kbd> or <kbd class="font-mono">Tab</kbd> select &nbsp;<kbd class="font-mono">Esc</kbd> dismiss'
   container.appendChild(hint)
 

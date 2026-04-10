@@ -120,7 +120,7 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
 
         <%= if @note.parent_type do %>
           <span class={[
-            "hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0",
+            "hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium flex-shrink-0",
             parent_type_class(@note.parent_type)
           ]}>
             <.icon name={parent_type_icon(@note.parent_type)} class="w-2.5 h-2.5" />
@@ -142,7 +142,7 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
           <%= if @saved do %>
             <.icon name="hero-check" class="w-3.5 h-3.5" /> Saved
           <% else %>
-            Save <kbd class="text-[9px] opacity-70 ml-0.5">⌘S</kbd>
+            Save <kbd class="text-xs opacity-70 ml-0.5">⌘S</kbd>
           <% end %>
         </button>
       </div>
@@ -161,7 +161,7 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
       </div>
 
       <%!-- Status bar --%>
-      <div class="flex items-center justify-between px-4 py-1 border-t border-base-content/8 bg-base-100 flex-shrink-0 text-[10px] text-base-content/35">
+      <div class="flex items-center justify-between px-4 py-1 border-t border-base-content/8 bg-base-100 flex-shrink-0 text-xs text-base-content/35">
         <div class="flex items-center gap-4">
           <span class="flex items-center gap-1">
             <span class="w-1.5 h-1.5 rounded-full bg-success inline-block"></span> Markdown

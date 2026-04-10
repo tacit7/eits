@@ -118,11 +118,11 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                       <span>Due date</span>
                       <%= cond do %>
                         <% overdue?(@task.due_at) -> %>
-                          <span class="text-error text-[10px] normal-case tracking-normal font-medium">
+                          <span class="text-error text-xs normal-case tracking-normal font-medium">
                             Overdue
                           </span>
                         <% due_today?(@task.due_at) -> %>
-                          <span class="text-warning text-[10px] normal-case tracking-normal font-medium">
+                          <span class="text-warning text-xs normal-case tracking-normal font-medium">
                             Today
                           </span>
                         <% true -> %>

@@ -86,7 +86,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
     ~H"""
     <div class="px-5 pb-3 border-t border-base-content/5 pt-3" id="chat-members-panel">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-[10px] uppercase tracking-wider font-medium text-base-content/30">
+        <span class="text-xs uppercase tracking-wider font-medium text-base-content/30">
           Channel Agents
         </span>
       </div>
@@ -128,7 +128,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
 
       <div class="border-t border-base-content/5 pt-2 mt-1">
         <div class="flex items-center justify-between mb-1.5">
-          <span class="text-[10px] uppercase tracking-wider font-medium text-base-content/30">
+          <span class="text-xs uppercase tracking-wider font-medium text-base-content/30">
             Add Agent
           </span>
         </div>
@@ -147,7 +147,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
           <div class="max-h-48 overflow-y-auto space-y-2">
             <%= for group <- @sessions_by_project do %>
               <div>
-                <span class="text-[10px] font-medium text-base-content/25 uppercase tracking-wider">
+                <span class="text-xs font-medium text-base-content/25 uppercase tracking-wider">
                   {group.project_name}
                 </span>
                 <div class="flex flex-wrap gap-1 mt-0.5">
@@ -170,9 +170,9 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
                                                                                                   do:
                                                                                                     "…"}
                       </span>
-                      <span class="text-[9px] text-base-content/15">{session.model}</span>
+                      <span class="text-xs text-base-content/15">{session.model}</span>
                       <%= if session.ended_at do %>
-                        <span class="text-[9px] text-base-content/15">ended</span>
+                        <span class="text-xs text-base-content/15">ended</span>
                       <% end %>
                     </button>
                   <% end %>

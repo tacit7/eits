@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWeb.Components.DatePickerModal do
             <%!-- Day headers --%>
             <div class="grid grid-cols-7 mb-1">
               <%= for day <- @day_names do %>
-                <div class="text-center text-[10px] font-medium text-base-content/40 py-1">
+                <div class="text-center text-xs font-medium text-base-content/40 py-1">
                   {day}
                 </div>
               <% end %>

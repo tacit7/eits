@@ -86,7 +86,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 <textarea
                   name="message"
                   rows="3"
-                  class="textarea textarea-bordered w-full text-xs resize-none"
+                  class="textarea textarea-bordered w-full text-base resize-none"
                   placeholder="Message to send when timer fires..."
                 ><%= EyeInTheSky.OrchestratorTimers.default_message() %></textarea>
               </div>
@@ -178,7 +178,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               phx-blur="update_session_name"
               phx-keydown={JS.push("update_session_name") |> JS.focus(to: "#message-input")}
               phx-key="Enter"
-              class="text-sm font-semibold text-base-content/85 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 w-full text-center placeholder:text-base-content/20 transition-colors"
+              class="text-base font-semibold text-base-content/85 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 w-full text-center placeholder:text-base-content/20 transition-colors"
             />
             <%= if @agent_record && is_map(@agent_record.agent_definition) && not match?(%Ecto.Association.NotLoaded{}, @agent_record.agent_definition) && @agent_record.agent_definition.display_name do %>
               <span class="text-[10px] text-base-content/35 truncate">{@agent_record.agent_definition.display_name}</span>
@@ -241,7 +241,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                   phx-blur="update_session_description"
                   phx-keydown="update_session_description"
                   phx-key="Enter"
-                  class="text-xs text-base-content/40 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 placeholder:text-base-content/20 transition-colors w-full"
+                  class="text-base text-base-content/40 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 placeholder:text-base-content/20 transition-colors w-full"
                 />
               </div>
             </div>
@@ -335,7 +335,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                   placeholder="Search messages..."
                   autocomplete="off"
                   phx-debounce="300"
-                  class="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30 placeholder:text-base-content/25 text-base-content/70 transition-colors"
+                  class="w-full pl-8 pr-7 py-1.5 text-base rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30 placeholder:text-base-content/25 text-base-content/70 transition-colors"
                 />
                 <%= if @message_data.message_search_query != "" do %>
                   <button

@@ -148,7 +148,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
               <input
                 type="text"
                 name="agent_name"
-                class="input input-bordered w-full"
+                class="input input-bordered w-full text-base"
                 placeholder="e.g., Fix login bug, Code review..."
               />
             </div>
@@ -159,7 +159,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
               <textarea
                 id={"desc-#{@selected_prompt_id || "none"}"}
                 name="description"
-                class="textarea textarea-bordered w-full h-20 text-sm"
+                class="textarea textarea-bordered w-full h-20 text-base"
                 placeholder="What should this agent work on?"
                 required
                 autofocus
@@ -284,7 +284,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
               <input
                 type="text"
                 name="worktree"
-                class="input input-bordered w-full font-mono text-sm"
+                class="input input-bordered w-full font-mono text-base"
                 placeholder="e.g., fix-login-bug"
               />
               <p class="text-xs text-base-content/35 mt-1">

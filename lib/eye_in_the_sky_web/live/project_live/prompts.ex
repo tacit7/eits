@@ -76,7 +76,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
               name="query"
               value={@search_query}
               placeholder="Search prompts by name, description, or content..."
-              class="input input-bordered w-full"
+              class="input input-bordered w-full text-base"
               autocomplete="off"
             />
           </form>

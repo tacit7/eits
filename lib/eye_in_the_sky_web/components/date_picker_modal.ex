@@ -110,7 +110,7 @@ defmodule EyeInTheSkyWeb.Components.DatePickerModal do
                 type="date"
                 name="due_at"
                 value={@selected_date || ""}
-                class="input input-sm w-full bg-base-300 dark:bg-base-100/10 border-base-content/15 text-sm focus:border-primary/50"
+                class="input input-sm w-full bg-base-300 dark:bg-base-100/10 border-base-content/15 text-base focus:border-primary/50"
               />
             </div>
             <div class="flex gap-2">

@@ -78,7 +78,7 @@ defmodule EyeInTheSkyWeb.Components.TaskChecklistComponent do
           type="text"
           name="title"
           placeholder="Add item..."
-          class="input input-xs flex-1 bg-base-200 border-base-300 text-sm placeholder:text-base-content/20 focus:border-primary/30"
+          class="input input-xs flex-1 bg-base-200 border-base-300 text-base placeholder:text-base-content/20 focus:border-primary/30"
         />
         <button
           type="submit"

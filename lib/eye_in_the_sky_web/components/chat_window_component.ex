@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
           <input
             type="text"
             name="body"
-            class="input input-xs flex-1 bg-base-200 text-xs"
+            class="input input-xs flex-1 bg-base-200 text-base"
             placeholder="Message..."
             autocomplete="off"
           />

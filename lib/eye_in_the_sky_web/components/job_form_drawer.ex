@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 type="text"
                 name="job[name]"
                 value={@form[:name].value || ""}
-                class={["input input-bordered w-full", @form[:name].errors != [] && "input-error"]}
+                class={["input input-bordered w-full text-base", @form[:name].errors != [] && "input-error"]}
               />
               <p :for={err <- @form[:name].errors} class="mt-1 text-xs text-error">
                 {translate_error(err)}
@@ -95,7 +95,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 type="text"
                 name="job[description]"
                 value={@form[:description].value || ""}
-                class="input input-bordered w-full"
+                class="input input-bordered w-full text-base"
               />
             </div>
 
@@ -155,7 +155,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 value={@form[:schedule_value].value || ""}
                 placeholder={if @form_schedule_type == "interval", do: "60", else: "*/5 * * * *"}
                 class={[
-                  "input input-bordered w-full font-mono",
+                  "input input-bordered w-full font-mono text-base",
                   @form[:schedule_value].errors != [] && "input-error"
                 ]}
               />
@@ -187,7 +187,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                   type="text"
                   name="job[config_command]"
                   value={cfg(@form_config, "command")}
-                  class="input input-bordered w-full font-mono"
+                  class="input input-bordered w-full font-mono text-base"
                   required
                 />
               </div>
@@ -197,7 +197,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                   type="text"
                   name="job[config_working_dir]"
                   value={cfg(@form_config, "working_dir")}
-                  class="input input-bordered w-full"
+                  class="input input-bordered w-full text-base"
                 />
               </div>
             <% end %>
@@ -207,7 +207,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 <label class="label"><span class="label-text">Instructions</span></label>
                 <textarea
                   name="job[config_instructions]"
-                  class="textarea textarea-bordered w-full"
+                  class="textarea textarea-bordered w-full text-base"
                   rows="3"
                 ><%= cfg(@form_config, "instructions") %></textarea>
               </div>
@@ -232,7 +232,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                     type="text"
                     name="job[config_project_path]"
                     value={cfg(@form_config, "project_path")}
-                    class="input input-bordered w-full"
+                    class="input input-bordered w-full text-base"
                   />
                 </div>
               </div>
@@ -242,7 +242,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                   type="text"
                   name="job[config_description]"
                   value={cfg(@form_config, "description")}
-                  class="input input-bordered w-full"
+                  class="input input-bordered w-full text-base"
                 />
               </div>
             <% end %>
@@ -254,7 +254,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                   type="text"
                   name="job[config_task]"
                   value={cfg(@form_config, "task")}
-                  class="input input-bordered w-full font-mono"
+                  class="input input-bordered w-full font-mono text-base"
                   required
                 />
               </div>
@@ -266,7 +266,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                   type="text"
                   name="job[config_args]"
                   value={cfg(@form_config, "args")}
-                  class="input input-bordered w-full"
+                  class="input input-bordered w-full text-base"
                 />
               </div>
               <div class="form-control">
@@ -275,7 +275,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                   type="text"
                   name="job[config_project_path]"
                   value={cfg(@form_config, "project_path")}
-                  class="input input-bordered w-full"
+                  class="input input-bordered w-full text-base"
                 />
               </div>
             <% end %>

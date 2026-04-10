@@ -33,7 +33,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.TaskDialog do
               data-qct-title
               required
               placeholder="Task title..."
-              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base"
               autocomplete="off"
             />
           </div>
@@ -44,7 +44,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.TaskDialog do
               data-qct-description
               placeholder="Description (optional)..."
               rows="3"
-              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm resize-none"
+              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base resize-none"
             ></textarea>
           </div>
           <div>
@@ -54,7 +54,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.TaskDialog do
               type="text"
               data-qct-tags
               placeholder="tag1, tag2, tag3"
-              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base"
               autocomplete="off"
             />
           </div>

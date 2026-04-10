@@ -33,7 +33,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.AgentDialog do
               required
               placeholder="What should this agent do?"
               rows="4"
-              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm resize-none"
+              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base resize-none"
             ></textarea>
           </div>
           <div>
@@ -42,7 +42,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.AgentDialog do
               id="qca-parent-session"
               data-qca-parent-session
               placeholder="Parent session UUID (optional)"
-              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base"
             />
           </div>
           <div>

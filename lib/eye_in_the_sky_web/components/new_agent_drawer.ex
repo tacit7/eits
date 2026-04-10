@@ -94,7 +94,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
               <input
                 type="text"
                 name="agent_name"
-                class="input input-bordered"
+                class="input input-bordered text-base"
                 placeholder="e.g., Code Reviewer, Bug Fixer..."
               />
             </.form_field>
@@ -103,7 +103,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
             <.form_field label="Instructions">
               <textarea
                 name="description"
-                class="textarea textarea-bordered h-24"
+                class="textarea textarea-bordered h-24 text-base"
                 placeholder="What should this agent do?"
                 required
               ></textarea>
@@ -114,7 +114,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
               <input
                 type="text"
                 name="worktree"
-                class="input input-bordered font-mono text-sm"
+                class="input input-bordered font-mono text-base"
                 placeholder="e.g., fix-login-bug"
               />
               <label class="label">
@@ -163,7 +163,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                     type="text"
                     name="add_dir"
                     placeholder="/path/to/shared-lib"
-                    class="input input-bordered input-sm w-full font-mono"
+                    class="input input-bordered input-sm w-full font-mono text-base"
                   />
                 </div>
 
@@ -176,7 +176,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                     type="text"
                     name="mcp_config"
                     placeholder="./mcp-servers.json"
-                    class="input input-bordered input-sm w-full font-mono"
+                    class="input input-bordered input-sm w-full font-mono text-base"
                   />
                 </div>
 
@@ -189,7 +189,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                     type="text"
                     name="plugin_dir"
                     placeholder="./my-plugins"
-                    class="input input-bordered input-sm w-full font-mono"
+                    class="input input-bordered input-sm w-full font-mono text-base"
                   />
                 </div>
 
@@ -202,7 +202,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                     type="text"
                     name="settings_file"
                     placeholder="./settings.json"
-                    class="input input-bordered input-sm w-full font-mono"
+                    class="input input-bordered input-sm w-full font-mono text-base"
                   />
                 </div>
 

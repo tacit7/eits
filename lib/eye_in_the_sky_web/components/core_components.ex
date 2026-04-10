@@ -273,7 +273,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
           id={@id}
           name={@name}
           class={[
-            @class || "w-full textarea",
+            @class || "w-full textarea text-base",
             @errors != [] && (@error_class || "textarea-error")
           ]}
           {@rest}
@@ -296,7 +296,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
           id={@id}
           value={Phoenix.HTML.Form.normalize_value(@type, @value)}
           class={[
-            @class || "w-full input",
+            @class || "w-full input text-base",
             @errors != [] && (@error_class || "input-error")
           ]}
           {@rest}
@@ -541,7 +541,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   ## Examples
 
       <.form_field label="Title">
-        <input type="text" name="title" class="input input-bordered" />
+        <input type="text" name="title" class="input input-bordered text-base" />
       </.form_field>
 
       <.form_field label="Budget" hint="Optional">

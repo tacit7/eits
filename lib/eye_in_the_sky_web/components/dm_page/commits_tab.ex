@@ -28,8 +28,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
           <div
             class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
             id={"dm-commit-#{commit.id}"}
+            phx-hook="DiffCollapse"
+            data-hash={hash}
+            data-loaded={cond do
+              is_nil(diff) -> "false"
+              diff == :error -> "error"
+              true -> "true"
+            end}
           >
-            <input type="checkbox" phx-click="load_diff" phx-value-hash={hash} />
+            <input type="checkbox" />
             <div class="collapse-title py-3 px-4">
               <div class="flex items-center gap-3">
                 <.icon name="hero-code-bracket" class="h-4 w-4 flex-shrink-0 text-base-content/30" />
@@ -48,6 +55,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
                       phx-hook="LocalTime"
                     >
                     </time>
+                    <span
+                      class="loading loading-spinner loading-xs hidden"
+                      data-role="diff-spinner"
+                    ></span>
                   </div>
                 </div>
               </div>
@@ -55,7 +66,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
             <div class="collapse-content pb-2 overflow-x-auto">
               <%= cond do %>
                 <% is_nil(diff) -> %>
-                  <div class="px-4 py-2 text-xs text-base-content/30 italic">Loading diff...</div>
+                  <div></div>
                 <% diff == :error -> %>
                   <div class="px-4 py-2 text-xs text-error/60">
                     Could not load diff — repo path unavailable

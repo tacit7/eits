@@ -36,6 +36,7 @@ import {MarkdownMessage} from "./hooks/markdown_message"
 // CommandHistory.mounted() to share the same hook context.
 import {CommandHistory} from "./hooks/command_history"
 import {DiffViewer} from "./hooks/diff_viewer"
+import {DiffCollapse} from "./hooks/diff_collapse"
 import {PasskeyAuth} from "./hooks/passkey_auth"
 import {InfiniteScroll} from "./hooks/infinite_scroll"
 import {DmComposer} from "./hooks/dm_composer"
@@ -86,6 +87,7 @@ Hooks.AutoScroll = AutoScroll
 Hooks.CommandHistory = CommandHistory
 Hooks.MarkdownMessage = MarkdownMessage
 Hooks.DiffViewer = DiffViewer
+Hooks.DiffCollapse = DiffCollapse
 Hooks.PasskeyAuth = PasskeyAuth
 Hooks.PushSetup = PushSetup
 Hooks.InfiniteScroll = InfiniteScroll

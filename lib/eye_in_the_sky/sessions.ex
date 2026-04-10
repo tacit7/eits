@@ -326,31 +326,33 @@ defmodule EyeInTheSky.Sessions do
         session.id
 
       {:error, :not_found} ->
-        agent =
-          case EyeInTheSky.Agents.get_agent_by_uuid(@web_agent_uuid) do
-            {:ok, a} ->
-              a
+        with {:ok, agent} <- find_or_create_web_agent(),
+             {:ok, session} <-
+               create_session(%{
+                 uuid: @web_session_uuid,
+                 agent_id: agent.id,
+                 name: "Web UI",
+                 started_at: DateTime.utc_now()
+               }) do
+          session.id
+        else
+          {:error, reason} ->
+            raise "ensure_web_ui_session bootstrap failed: #{inspect(reason)}"
+        end
+    end
+  end
 
-            {:error, :not_found} ->
-              {:ok, a} =
-                EyeInTheSky.Agents.create_agent(%{
-                  uuid: @web_agent_uuid,
-                  description: "Web UI User",
-                  source: "web"
-                })
+  defp find_or_create_web_agent do
+    case EyeInTheSky.Agents.get_agent_by_uuid(@web_agent_uuid) do
+      {:ok, agent} ->
+        {:ok, agent}
 
-              a
-          end
-
-        {:ok, session} =
-          create_session(%{
-            uuid: @web_session_uuid,
-            agent_id: agent.id,
-            name: "Web UI",
-            started_at: DateTime.utc_now()
-          })
-
-        session.id
+      {:error, :not_found} ->
+        EyeInTheSky.Agents.create_agent(%{
+          uuid: @web_agent_uuid,
+          description: "Web UI User",
+          source: "web"
+        })
     end
   end
 
@@ -398,12 +400,12 @@ defmodule EyeInTheSky.Sessions do
           entrypoint: params["entrypoint"]
         }
 
-        create_fn =
+        result =
           if model_name,
-            do: &create_session_with_model/1,
-            else: &create_session/1
+            do: create_session_with_model(session_attrs),
+            else: create_session(session_attrs)
 
-        case create_fn.(session_attrs) do
+        case result do
           {:ok, session} ->
             EyeInTheSky.Events.session_started(session)
             {:ok, %{session: session, agent: agent}}

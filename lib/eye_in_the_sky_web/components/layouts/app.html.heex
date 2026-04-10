@@ -31,7 +31,7 @@
   <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
     <%!-- Mobile top bar — hidden on md+ since sidebar is always visible --%>
     <header class={[
-      "md:hidden flex-shrink-0 flex items-center gap-3 px-4 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-base-100",
+      "md:hidden flex-shrink-0 flex items-center gap-3 px-4 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-base-100 z-50",
       assigns[:hide_mobile_header] && "hidden"
     ]}>
       <button
@@ -181,7 +181,7 @@
           class="max-h-[55dvh] overflow-y-auto p-2"
         >
         </div>
-        <div class="px-3 py-2 text-[11px] text-base-content/55 border-t border-base-content/10">
+        <div class="px-3 py-2 text-[11px] text-base-content/55 border-t border-base-content/10 hidden sm:block">
           ↑↓ to move · Enter to select · Esc to close/back · Backspace to go back
         </div>
       </div>

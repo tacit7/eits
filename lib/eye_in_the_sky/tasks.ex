@@ -376,10 +376,24 @@ defmodule EyeInTheSky.Tasks do
   Returns {:ok, task} or {:error, reason}.
   """
   def delete_task_with_associations(%Task{} = task) do
-    Repo.delete_all(from(t in "task_tags", where: t.task_id == ^task.id))
-    Repo.delete_all(from(t in "task_sessions", where: t.task_id == ^task.id))
-    Repo.delete_all(from(t in "commit_tasks", where: t.task_id == ^task.id))
-    delete_task(task)
+    result =
+      Repo.transaction(fn ->
+        Repo.delete_all(from(t in "task_tags", where: t.task_id == ^task.id))
+        Repo.delete_all(from(t in "task_sessions", where: t.task_id == ^task.id))
+        Repo.delete_all(from(t in "commit_tasks", where: t.task_id == ^task.id))
+
+        case Repo.delete(task) do
+          {:ok, t} -> t
+          {:error, reason} -> Repo.rollback(reason)
+        end
+      end)
+
+    case result do
+      {:ok, deleted} -> broadcast_change({:deleted, deleted})
+      _ -> :ok
+    end
+
+    result
   end
 
   @doc """

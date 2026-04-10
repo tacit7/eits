@@ -217,7 +217,7 @@ defmodule EyeInTheSky.Sessions do
   """
   def list_sessions_with_agent(opts \\ []) do
     Session
-    |> preload(agent: :agent_definition)
+    |> with_agent_preload()
     |> order_by([s], desc: s.started_at)
     |> Archivable.include_archived(opts)
     |> Repo.all()
@@ -237,7 +237,7 @@ defmodule EyeInTheSky.Sessions do
 
     query =
       project_sessions_base_query(project_id)
-      |> preload(agent: :agent_definition)
+      |> with_agent_preload()
       |> order_by([s], desc: s.started_at)
       |> Archivable.include_archived(opts)
 
@@ -297,6 +297,11 @@ defmodule EyeInTheSky.Sessions do
   Delegates to ModelInfo.extract_model_info/1.
   """
   defdelegate extract_model_info(model_data), to: ModelInfo
+
+  # Preload helpers
+  defp with_agent_preload(query) do
+    preload(query, agent: :agent_definition)
+  end
 
   @doc """
   Gets model information for a session as a formatted string.

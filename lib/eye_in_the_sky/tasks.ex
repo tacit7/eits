@@ -14,6 +14,8 @@ defmodule EyeInTheSky.Tasks do
   alias EyeInTheSky.Tasks.{Task, WorkflowState}
   alias EyeInTheSky.Utils.ToolHelpers
 
+  @full_task_preloads [:state, :tags, :sessions, :checklist_items]
+
   # Workflow state ID accessors — source of truth is WorkflowState
   defdelegate state_todo, to: WorkflowState, as: :todo_id
   defdelegate state_in_progress, to: WorkflowState, as: :in_progress_id
@@ -52,7 +54,7 @@ defmodule EyeInTheSky.Tasks do
     sort_by = Keyword.get(opts, :sort_by, "created_desc")
 
     base_tasks_query(opts)
-    |> preload([:state, :tags, :sessions, :checklist_items])
+    |> preload(^@full_task_preloads)
     |> task_order(sort_by)
     |> QueryBuilder.maybe_limit(opts)
     |> QueryBuilder.maybe_offset(opts)
@@ -85,7 +87,7 @@ defmodule EyeInTheSky.Tasks do
   def list_tasks_for_agent(agent_id) do
     Task
     |> where([t], t.agent_id == ^agent_id)
-    |> preload([:state, :tags, :sessions, :checklist_items])
+    |> preload(^@full_task_preloads)
     |> order_by([t],
       desc: fragment("CASE WHEN ? IS NULL THEN 0 ELSE 1 END", t.archived),
       desc: t.priority,
@@ -175,7 +177,7 @@ defmodule EyeInTheSky.Tasks do
   """
   def get_task(id) do
     case Task
-         |> preload([:state, :tags, :sessions, :checklist_items])
+         |> preload(^@full_task_preloads)
          |> Repo.get(id) do
       nil -> {:error, :not_found}
       task -> {:ok, task}
@@ -189,7 +191,7 @@ defmodule EyeInTheSky.Tasks do
   """
   def get_task!(id) do
     Task
-    |> preload([:state, :tags, :sessions, :checklist_items])
+    |> preload(^@full_task_preloads)
     |> Repo.get!(id)
   end
 
@@ -200,7 +202,7 @@ defmodule EyeInTheSky.Tasks do
   """
   def get_task_by_uuid!(uuid) do
     Task
-    |> preload([:state, :tags, :sessions, :checklist_items])
+    |> preload(^@full_task_preloads)
     |> Repo.get_by!(uuid: uuid)
   end
 
@@ -220,7 +222,7 @@ defmodule EyeInTheSky.Tasks do
         end
       end
 
-    Repo.preload(task, [:state, :tags, :sessions, :checklist_items])
+    Repo.preload(task, @full_task_preloads)
   end
 
   @doc """
@@ -416,7 +418,7 @@ defmodule EyeInTheSky.Tasks do
       sql_params: if(project_id, do: [project_id], else: []),
       extra_where: extra_where,
       order_by: [desc: :priority, desc: :created_at],
-      preload: [:state, :tags, :sessions, :checklist_items]
+      preload: @full_task_preloads
     )
   end
 
@@ -502,7 +504,7 @@ defmodule EyeInTheSky.Tasks do
     |> order_by(^order)
     |> QueryBuilder.maybe_limit(opts)
     |> QueryBuilder.maybe_offset(opts)
-    |> preload([:state, :tags, :sessions, :checklist_items])
+    |> preload(^@full_task_preloads)
     |> Repo.all()
   end
 

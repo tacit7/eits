@@ -151,7 +151,12 @@ defmodule EyeInTheSky.Media.ImageProcessor do
 
         case System.cmd("convert", [src, "-auto-orient", "-strip", dst], stderr_to_stdout: true) do
           {_, 0} ->
-            result = File.read(dst)
+            result =
+              case File.read(dst) do
+                {:ok, _} = ok -> ok
+                _ -> :error
+              end
+
             File.rm(src)
             File.rm(dst)
             result

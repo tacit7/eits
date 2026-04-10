@@ -10,7 +10,6 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
 
   alias EyeInTheSky.{Agents, Sessions}
   alias EyeInTheSky.Claude.AgentWorker
-  alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 
   @registry EyeInTheSky.Claude.AgentRegistry
   @supported_providers ["claude", "codex"]
@@ -72,11 +71,17 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
   defp normalize_provider(_provider), do: nil
 
   defp resolve_project_path_with_fallback(session, agent) do
-    case SessionHelpers.resolve_project_path(session, agent) do
-      {:ok, path} ->
-        path
+    cond do
+      session.git_worktree_path ->
+        session.git_worktree_path
 
-      {:error, :no_project_path} ->
+      agent.git_worktree_path ->
+        agent.git_worktree_path
+
+      agent.project && agent.project.path ->
+        agent.project.path
+
+      true ->
         fallback = File.cwd!()
 
         Logger.error(

@@ -170,11 +170,8 @@ defmodule EyeInTheSky.Messages do
       %{inserted_at: now, updated_at: now}
       |> Map.merge(attrs)
 
-    # Extract channel_id; handles both atom and string key maps
-    cid = Map.get(attrs, :channel_id) || Map.get(attrs, "channel_id")
-
-    has_number =
-      Map.get(attrs, :channel_message_number) || Map.get(attrs, "channel_message_number")
+    cid = Map.get(attrs, :channel_id)
+    has_number = Map.get(attrs, :channel_message_number)
 
     if cid && is_nil(has_number) do
       # Advisory lock on the channel prevents two concurrent inserts from reading

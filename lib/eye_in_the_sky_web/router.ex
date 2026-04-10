@@ -1,25 +1,6 @@
 defmodule EyeInTheSkyWeb.Router do
   use EyeInTheSkyWeb, :router
 
-  # In dev, allow the Vite dev server origins (default port 5173, worktree port 5174).
-  # In prod, 'self' is sufficient for all directives.
-  @vite_origins if Mix.env() == :dev,
-                  do: " http://localhost:5173 http://localhost:5174",
-                  else: ""
-
-  @connect_src if Mix.env() == :dev,
-                 do: "'self' ws://localhost:5173 ws://localhost:5174",
-                 else: "'self'"
-
-  @browser_csp "default-src 'self'; " <>
-                 "script-src 'self' 'unsafe-inline'" <> @vite_origins <> "; " <>
-                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " <>
-                 "font-src 'self' data: https://fonts.gstatic.com; " <>
-                 "img-src 'self' data: blob:" <> @vite_origins <> "; " <>
-                 "connect-src " <> @connect_src <> "; " <>
-                 "frame-ancestors 'none'; " <>
-                 "object-src 'none'"
-
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -27,7 +8,40 @@ defmodule EyeInTheSkyWeb.Router do
     plug :fetch_live_flash
     plug :put_root_layout, html: {EyeInTheSkyWeb.Layouts, :root}
     plug :protect_from_forgery
-    plug :put_secure_browser_headers, %{"content-security-policy" => @browser_csp}
+    plug :put_secure_browser_headers, %{}
+    plug :put_csp
+  end
+
+  defp put_csp(conn, _opts) do
+    put_resp_header(conn, "content-security-policy", build_csp())
+  end
+
+  if Mix.env() == :dev do
+    defp build_csp do
+      port = System.get_env("VITE_PORT", "5173")
+      origin = "http://localhost:#{port}"
+      ws_origin = "ws://localhost:#{port}"
+
+      "default-src 'self'; " <>
+        "script-src 'self' 'unsafe-inline' #{origin}; " <>
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " <>
+        "font-src 'self' data: https://fonts.gstatic.com; " <>
+        "img-src 'self' data: blob: #{origin}; " <>
+        "connect-src 'self' #{ws_origin}; " <>
+        "frame-ancestors 'none'; " <>
+        "object-src 'none'"
+    end
+  else
+    defp build_csp do
+      "default-src 'self'; " <>
+        "script-src 'self' 'unsafe-inline'; " <>
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " <>
+        "font-src 'self' data: https://fonts.gstatic.com; " <>
+        "img-src 'self' data: blob:; " <>
+        "connect-src 'self'; " <>
+        "frame-ancestors 'none'; " <>
+        "object-src 'none'"
+    end
   end
 
   pipeline :require_auth do

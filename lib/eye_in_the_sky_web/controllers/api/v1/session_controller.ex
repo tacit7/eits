@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
 
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Agents, Contexts, Projects, Sessions}
+  alias EyeInTheSky.{Agents, Commits, Contexts, Notes, Projects, Sessions, Tasks}
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
@@ -194,7 +194,20 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
           _ -> false
         end
 
-      json(conn, ApiPresenter.present_session_detail(session, agent_uuid: agent_uuid, is_spawned: is_spawned))
+      tasks = Tasks.list_tasks_for_session(session.id)
+      notes = Notes.list_notes_for_session(session.id, limit: 5)
+      commits = Commits.list_commits_for_session(session.id, limit: 5)
+
+      json(
+        conn,
+        ApiPresenter.present_session_detail(session,
+          agent_uuid: agent_uuid,
+          is_spawned: is_spawned,
+          tasks: tasks,
+          recent_notes: notes,
+          recent_commits: commits
+        )
+      )
     else
       {:error, :not_found} -> session_not_found(conn)
     end

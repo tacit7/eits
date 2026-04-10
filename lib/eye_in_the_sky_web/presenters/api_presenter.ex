@@ -115,9 +115,14 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
 
   @doc """
   Full session detail shape for the show endpoint.
-  `opts` accepts: agent_uuid (string), is_spawned (boolean).
+  `opts` accepts: agent_uuid (string), is_spawned (boolean),
+  tasks (list), recent_notes (list), recent_commits (list).
   """
   def present_session_detail(session, opts \\ []) do
+    tasks = Keyword.get(opts, :tasks, [])
+    recent_notes = Keyword.get(opts, :recent_notes, [])
+    recent_commits = Keyword.get(opts, :recent_commits, [])
+
     %{
       id: session.id,
       uuid: session.uuid,
@@ -129,7 +134,38 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       name: session.name,
       description: session.description,
       is_spawned: Keyword.get(opts, :is_spawned, false),
-      initialized: true
+      initialized: true,
+      tasks: Enum.map(tasks, &present_session_task/1),
+      recent_notes: Enum.map(recent_notes, &present_session_note/1),
+      recent_commits: Enum.map(recent_commits, &present_session_commit/1)
+    }
+  end
+
+  defp present_session_task(task) do
+    %{
+      id: task.id,
+      title: task.title,
+      state: if(Ecto.assoc_loaded?(task.state) && task.state, do: task.state.name),
+      state_id: task.state_id
+    }
+  end
+
+  defp present_session_note(note) do
+    %{
+      id: note.id,
+      title: note.title,
+      body: if(note.body, do: String.slice(note.body, 0, 120), else: nil),
+      starred: note.starred || false,
+      created_at: to_string(note.created_at)
+    }
+  end
+
+  defp present_session_commit(commit) do
+    %{
+      id: commit.id,
+      commit_hash: commit.commit_hash,
+      commit_message: commit.commit_message,
+      inserted_at: to_string(commit.created_at)
     }
   end
 

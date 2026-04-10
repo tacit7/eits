@@ -512,7 +512,7 @@ defmodule EyeInTheSky.Tasks do
 
   # PubSub
 
-  defp broadcast_change({tag, task}) when tag in [:ok, :deleted] do
+  defp broadcast_change({tag, task}) when tag in [:ok, :deleted, :updated] do
     EyeInTheSky.Events.task_updated(task)
   end
 

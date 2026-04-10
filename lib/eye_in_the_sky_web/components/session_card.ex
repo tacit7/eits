@@ -58,7 +58,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
           }
           data-agent-status={@session.status}
           data-swipe-fav="true"
-          class="bookmark-button w-[53px] flex flex-col items-center justify-center gap-1 bg-error text-white text-[9px] font-bold uppercase tracking-wide border-none"
+          class="bookmark-button w-[53px] sm:w-16 flex flex-col items-center justify-center gap-1 bg-error text-white text-xs font-bold uppercase tracking-wide border-none"
           aria-label="Bookmark session"
         >
           <.icon name="hero-heart" class="bookmark-icon w-5 h-5" /> Fav
@@ -68,7 +68,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
           type="button"
           phx-click="rename_session"
           phx-value-session_id={@session.id}
-          class="w-[53px] flex flex-col items-center justify-center gap-1 bg-primary text-white text-[9px] font-bold uppercase tracking-wide border-none"
+          class="w-[53px] sm:w-16 flex flex-col items-center justify-center gap-1 bg-primary text-white text-xs font-bold uppercase tracking-wide border-none"
           aria-label="Rename session"
         >
           <.icon name="hero-pencil-square" class="w-5 h-5" /> Rename
@@ -78,7 +78,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
           type="button"
           phx-click="archive_session"
           phx-value-session_id={@session.id}
-          class="w-[53px] flex flex-col items-center justify-center gap-1 bg-warning text-white text-[9px] font-bold uppercase tracking-wide border-none"
+          class="w-[53px] sm:w-16 flex flex-col items-center justify-center gap-1 bg-warning text-white text-xs font-bold uppercase tracking-wide border-none"
           aria-label="Archive session"
         >
           <.icon name="hero-archive-box" class="w-5 h-5" /> Archive

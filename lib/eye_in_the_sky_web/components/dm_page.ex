@@ -182,7 +182,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               class="text-sm font-semibold text-base-content/85 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 w-full text-center placeholder:text-base-content/20 transition-colors"
             />
             <%= if @agent_record && is_map(@agent_record.agent_definition) && not match?(%Ecto.Association.NotLoaded{}, @agent_record.agent_definition) && @agent_record.agent_definition.display_name do %>
-              <span class="text-[10px] text-base-content/35 truncate">{@agent_record.agent_definition.display_name}</span>
+              <span class="text-xs text-base-content/35 truncate">{@agent_record.agent_definition.display_name}</span>
             <% end %>
           </div>
         </div>
@@ -274,7 +274,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <%= if @task_data.current_task do %>
           <div class="px-5 py-2 border-t border-base-content/5" id="dm-current-task">
             <div class="flex items-center gap-2">
-              <span class="text-[10px] font-semibold uppercase tracking-wider text-base-content/30 flex-shrink-0">
+              <span class="text-xs font-semibold uppercase tracking-wider text-base-content/30 flex-shrink-0">
                 Working on
               </span>
               <div class="flex items-center gap-1.5 min-w-0">
@@ -283,7 +283,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                   {@task_data.current_task.title}
                 </span>
               </div>
-              <span class="flex-shrink-0 text-[10px] text-base-content/25 font-mono">
+              <span class="flex-shrink-0 text-xs text-base-content/25 font-mono">
                 {String.slice(to_string(@task_data.current_task.id), 0..7)}
               </span>
             </div>

@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                 <%!-- Metadata: type badge • source ref • age --%>
                 <div class="flex items-center gap-1.5 text-[11px] text-base-content/40">
                   <span class={[
-                    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium",
+                    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium",
                     parent_type_class(note.parent_type)
                   ]}>
                     <.icon name={parent_type_icon(note.parent_type)} class="w-2.5 h-2.5" />

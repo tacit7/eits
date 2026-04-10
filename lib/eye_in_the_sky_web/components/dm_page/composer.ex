@@ -118,7 +118,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
                   class="dropdown-content menu z-[1] w-52 rounded-xl border border-base-content/8 bg-base-100 p-1.5 shadow-lg"
                   id="effort-selector-menu"
                 >
-                  <li class="menu-title text-[10px] px-3 pt-1 pb-0.5 text-base-content/40">
+                  <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">
                     Effort Level
                   </li>
                   <%= for {label, value, desc, icon_color} <- [
@@ -196,7 +196,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
                 id="model-selector-menu"
               >
                 <%= if @provider == "codex" do %>
-                  <li class="menu-title text-[10px] px-3 pt-1 pb-0.5 text-base-content/40">Codex</li>
+                  <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">Codex</li>
                   <%= for {model, desc, color} <- [
                     {"gpt-5.4", "Latest frontier agentic coding", "text-warning"},
                     {"gpt-5.3-codex", "Frontier Codex-optimized", "text-warning"},
@@ -221,7 +221,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
                     </li>
                   <% end %>
                 <% else %>
-                  <li class="menu-title text-[10px] px-3 pt-1 pb-0.5 text-base-content/40">Claude</li>
+                  <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">Claude</li>
                   <%= for {model, label, desc, color} <- [
                     {"opus", "Opus 4.6", "Most capable", "text-warning"},
                     {"opus[1m]", "Opus 4.6 (1M)", "Most capable, extended context", "text-warning"},
@@ -299,7 +299,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
       <div class="mt-1 rounded-xl border border-base-content/8 bg-base-content/[0.02] divide-y divide-base-content/5 overflow-hidden">
         <%= for prompt <- @prompts do %>
           <div class="flex items-center gap-2 px-3 py-2">
-            <span class="flex-shrink-0 text-[10px] font-mono font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-base-content/[0.06] text-base-content/40">
+            <span class="flex-shrink-0 text-xs font-mono font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-base-content/[0.06] text-base-content/40">
               {model_display_name(prompt.context[:model] || "opus")}
             </span>
             <span class="text-xs text-base-content/50 truncate flex-1 min-w-0">

@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.SystemSection do
   def system_section(assigns) do
     ~H"""
     <div class={["px-3 pt-3 pb-0.5", if(@collapsed, do: "hidden")]}>
-      <span class="text-[10px] font-semibold uppercase tracking-widest text-base-content/30">
+      <span class="text-xs font-semibold uppercase tracking-widest text-base-content/30">
         System
       </span>
     </div>

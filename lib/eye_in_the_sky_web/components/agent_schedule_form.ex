@@ -247,7 +247,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
             <div class="form-control">
               <label class="label">
                 <span class="label-text text-xs">Max Turns</span>
-                <span class="label-text-alt text-base-content/40 font-mono text-[10px]">--max-turns</span>
+                <span class="label-text-alt text-base-content/40 font-mono text-xs">--max-turns</span>
               </label>
               <input
                 type="number"
@@ -284,7 +284,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
           <div class="form-control">
             <label class="label">
               <span class="label-text text-xs">Permission Mode</span>
-              <span class="label-text-alt text-base-content/40 font-mono text-[10px]">--permission-mode</span>
+              <span class="label-text-alt text-base-content/40 font-mono text-xs">--permission-mode</span>
             </label>
             <select name="schedule[permission_mode]" class="select select-bordered select-sm w-full">
               <option value="" selected={@permission_mode == ""}>Default</option>
@@ -312,7 +312,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
           <div class="form-control">
             <label class="label">
               <span class="label-text text-xs">Add Directory</span>
-              <span class="label-text-alt text-base-content/40 font-mono text-[10px]">--add-dir</span>
+              <span class="label-text-alt text-base-content/40 font-mono text-xs">--add-dir</span>
             </label>
             <input
               type="text"
@@ -326,7 +326,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
           <div class="form-control">
             <label class="label">
               <span class="label-text text-xs">MCP Config File</span>
-              <span class="label-text-alt text-base-content/40 font-mono text-[10px]">--mcp-config</span>
+              <span class="label-text-alt text-base-content/40 font-mono text-xs">--mcp-config</span>
             </label>
             <input
               type="text"
@@ -341,7 +341,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
             <div class="form-control">
               <label class="label">
                 <span class="label-text text-xs">Plugin Directory</span>
-                <span class="label-text-alt text-base-content/40 font-mono text-[10px]">--plugin-dir</span>
+                <span class="label-text-alt text-base-content/40 font-mono text-xs">--plugin-dir</span>
               </label>
               <input
                 type="text"
@@ -354,7 +354,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
             <div class="form-control">
               <label class="label">
                 <span class="label-text text-xs">Settings File</span>
-                <span class="label-text-alt text-base-content/40 font-mono text-[10px]">--settings</span>
+                <span class="label-text-alt text-base-content/40 font-mono text-xs">--settings</span>
               </label>
               <input
                 type="text"
@@ -377,7 +377,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
               />
               <span class="label-text text-xs">
                 Skip permissions
-                <span class="font-mono text-base-content/40 text-[10px] ml-1">--dangerously-skip-permissions</span>
+                <span class="font-mono text-base-content/40 text-xs ml-1">--dangerously-skip-permissions</span>
               </span>
             </label>
             <label class="label cursor-pointer justify-start gap-2 py-1">
@@ -390,7 +390,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
               />
               <span class="label-text text-xs">
                 Chrome integration
-                <span class="font-mono text-base-content/40 text-[10px] ml-1">--chrome</span>
+                <span class="font-mono text-base-content/40 text-xs ml-1">--chrome</span>
               </span>
             </label>
             <label class="label cursor-pointer justify-start gap-2 py-1">
@@ -403,7 +403,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
               />
               <span class="label-text text-xs">
                 OS sandbox isolation
-                <span class="font-mono text-base-content/40 text-[10px] ml-1">--sandbox</span>
+                <span class="font-mono text-base-content/40 text-xs ml-1">--sandbox</span>
               </span>
             </label>
           </div>

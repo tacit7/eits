@@ -145,7 +145,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             <%!-- DM badge --%>
             <span
               :if={@is_dm}
-              class="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/40 uppercase tracking-wide"
+              class="inline-flex items-center gap-1 text-xs font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/40 uppercase tracking-wide"
             >
               <.icon name="hero-envelope-mini" class="w-2.5 h-2.5" /> dm
             </span>
@@ -333,7 +333,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
         />
       </summary>
       <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-        <pre class="font-mono text-[10px] text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto">{@body}</pre>
+        <pre class="font-mono text-xs text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto">{@body}</pre>
       </div>
     </details>
     """

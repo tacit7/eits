@@ -85,9 +85,9 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycle do
   end
 
   # Sync processing/compacting assigns from session status as a fallback.
-  # The agent_stopped PubSub event is the primary mechanism, but it can be
-  # missed (e.g. 3-tuple from AgentWorker, or hook delivery issues). The
-  # session_updated broadcast always fires and carries the authoritative status.
+  # The agent_stopped PubSub event is the primary mechanism, but hook delivery
+  # issues can cause misses. The session_updated broadcast always fires and
+  # carries the authoritative status.
   defp sync_processing_from_status(socket, "working") do
     socket |> assign(:compacting, false) |> assign(:processing, true)
   end

@@ -291,11 +291,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
   end
 
   @impl true
-  def handle_info({:agent_stopped, _ref, session_id}, socket) do
-    {:noreply, assign(socket, :working_agents, Map.delete(socket.assigns.working_agents, session_id))}
-  end
-
-  @impl true
   def handle_info({:new_message, _message}, socket) do
     require Logger
 

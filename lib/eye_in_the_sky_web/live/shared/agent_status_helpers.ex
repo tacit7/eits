@@ -2,21 +2,17 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers do
   @moduledoc """
   Shared helpers for handling agent status changes across LiveViews.
 
-  Provides helper functions that extract session IDs from both map and 3-tuple
-  message formats for `:agent_working` and `:agent_stopped` events.
+  All `:agent_working` and `:agent_stopped` PubSub messages carry a single
+  `%Session{}` struct as payload. Use these helpers to extract the session ID
+  and dispatch callbacks uniformly.
   """
 
   @doc """
-  Extracts session_id from agent status messages.
+  Extracts session_id from an agent status message (a Session struct).
 
-  Handles both message formats:
-  - Map form: `%{id: session_id, ...}` → returns session_id
-  - Tuple form: `session_id` (3rd element already extracted) → returns session_id
-
-  Returns nil if format is not recognized.
+  Returns nil if the message is not a recognized struct.
   """
   def extract_session_id(%{id: session_id}), do: session_id
-  def extract_session_id(session_id) when is_integer(session_id), do: session_id
   def extract_session_id(_), do: nil
 
   @doc """

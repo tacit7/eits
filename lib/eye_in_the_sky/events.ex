@@ -26,15 +26,11 @@ defmodule EyeInTheSky.Events do
   | `"projects"`                   | Sidebar                           |
   | `"session:<id>:timer"`         | DMLive                            |
 
-  ## Note on payload shape inconsistency
+  ## Payload shape for `agent:working`
 
-  The `agent:working` topic has two payload shapes depending on the caller:
-  - Workers: `{:agent_working, session_ref, session_int_id}` (string, integer)
-  - REST API: `{:agent_working, session_struct}` (single struct arg)
-
-  This is a known inconsistency inherited from the migration. Use the 2-arg
-  variants from workers and the 1-arg variants from REST API controllers until
-  normalization is done in a follow-up.
+  All callers use the single-struct form:
+  - `{:agent_working, %Session{}}` — agent transitioned to working state
+  - `{:agent_stopped, %Session{}}` — agent transitioned to idle/stopped state
   """
 
   @pubsub EyeInTheSky.PubSub
@@ -163,20 +159,10 @@ defmodule EyeInTheSky.Events do
   # Agent working status — topic: "agent:working"
   # ---------------------------------------------------------------------------
 
-  @doc "Agent transitioned to working state (2-arg form for workers)."
-  def agent_working(session_ref, session_int_id) do
-    broadcast("agent:working", {:agent_working, session_ref, session_int_id})
-  end
-
-  @doc "Agent transitioned to working state (1-arg form for REST API)."
+  @doc "Agent transitioned to working state. Broadcasts `{:agent_working, session}` on `agent:working`."
   def agent_working(session), do: broadcast("agent:working", {:agent_working, session})
 
-  @doc "Agent transitioned to stopped/idle state (2-arg form for workers)."
-  def agent_stopped(session_ref, session_int_id) do
-    broadcast("agent:working", {:agent_stopped, session_ref, session_int_id})
-  end
-
-  @doc "Agent transitioned to stopped/idle state (1-arg form for REST API)."
+  @doc "Agent transitioned to stopped/idle state. Broadcasts `{:agent_stopped, session}` on `agent:working`."
   def agent_stopped(session), do: broadcast("agent:working", {:agent_stopped, session})
 
   # ---------------------------------------------------------------------------

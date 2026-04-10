@@ -25,36 +25,53 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   # --- Lifecycle Events ---
 
   @doc "SDK started processing a job. Promotes agent to running if still pending."
-  def on_sdk_started(session_id, provider_conversation_id) do
-    update_session_status(session_id, "working")
-    promote_agent_if_pending(session_id)
-    Events.agent_working(provider_conversation_id, session_id)
+  def on_sdk_started(session_id, _provider_conversation_id) do
+    case update_session_status(session_id, "working") do
+      {:ok, session} ->
+        promote_agent_if_pending(session_id)
+        Events.agent_working(session)
+
+      :error ->
+        :ok
+    end
   end
 
   @doc "SDK completed successfully."
   def on_sdk_completed(session_id, provider_conversation_id, provider \\ "claude") do
     status = if provider == "codex", do: "waiting", else: "idle"
-    update_session_status(session_id, status)
-    Events.agent_stopped(provider_conversation_id, session_id)
-    notify_agent_complete(session_id, provider_conversation_id)
+
+    case update_session_status(session_id, status) do
+      {:ok, session} ->
+        Events.agent_stopped(session)
+        notify_agent_complete(session_id, provider_conversation_id)
+
+      :error ->
+        :ok
+    end
   end
 
   @doc "Codex thread.started received — confirm session is working."
   def on_codex_thread_started(session_id) do
     update_session_status(session_id, "working")
+    :ok
   end
 
   @doc "SDK errored (transient or systemic)."
-  def on_sdk_errored(session_id, provider_conversation_id) do
-    update_session_status(session_id, "idle")
-    Events.agent_stopped(provider_conversation_id, session_id)
+  def on_sdk_errored(session_id, _provider_conversation_id) do
+    case update_session_status(session_id, "idle") do
+      {:ok, session} -> Events.agent_stopped(session)
+      :error -> :ok
+    end
   end
 
   @doc "Max retries exceeded — worker giving up."
   def on_max_retries_exceeded(session_id, provider_conversation_id) do
     Events.stream_error(session_id, provider_conversation_id, "Max retries exceeded")
-    update_session_status(session_id, "failed")
-    Events.agent_stopped(provider_conversation_id, session_id)
+
+    case update_session_status(session_id, "failed") do
+      {:ok, session} -> Events.agent_stopped(session)
+      :error -> :ok
+    end
   end
 
   @doc "SDK spawn failed — record system error message."
@@ -169,23 +186,26 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   # Synchronous — fast DB write where ordering matters. Running in a Task risks
   # two concurrent read-then-write pairs racing each other, and the session_idle
   # broadcast must only fire after a successful update.
+  # Returns {:ok, updated_session} or :error.
   defp update_session_status(session_id, status) do
     idle_like? = status in ["idle", "waiting"]
     attrs = if idle_like?, do: %{status: status, last_activity_at: DateTime.utc_now()}, else: %{status: status}
 
     case Sessions.get_session(session_id) do
       {:ok, session} -> apply_session_update(session, attrs, session_id, idle_like?)
-      {:error, _} -> :ok
+      {:error, _} -> :error
     end
   end
 
   defp apply_session_update(session, attrs, session_id, idle_like?) do
     case Sessions.update_session(session, attrs) do
-      {:ok, _} ->
+      {:ok, updated} ->
         if idle_like?, do: Events.session_idle(session_id)
+        {:ok, updated}
 
       {:error, reason} ->
         Logger.warning("[#{session_id}] update_session_status failed: #{inspect(reason)}")
+        :error
     end
   end
 

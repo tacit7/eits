@@ -108,16 +108,21 @@ defmodule EyeInTheSky.Notes do
   @doc """
   Returns notes for a specific task.
   Accepts either an integer task ID or a UUID string.
+  Returns [] if the task does not exist (preserves prior behavior).
   Resolves the task via the Tasks context, then matches notes on both integer ID (as string) and UUID.
   """
   def list_notes_for_task(task_id) do
-    {int_id, uuid} = resolve_task_ids(task_id)
+    case resolve_task_ids(task_id) do
+      nil ->
+        []
 
-    Note
-    |> where([n], n.parent_type == "task")
-    |> where([n], n.parent_id == ^to_string(int_id) or n.parent_id == ^uuid)
-    |> order_by([n], desc: n.created_at)
-    |> Repo.all()
+      {int_id, uuid} ->
+        Note
+        |> where([n], n.parent_type == "task")
+        |> where([n], n.parent_id == ^to_string(int_id) or n.parent_id == ^uuid)
+        |> order_by([n], desc: n.created_at)
+        |> Repo.all()
+    end
   end
 
   @doc """
@@ -392,9 +397,12 @@ defmodule EyeInTheSky.Notes do
   defp add_sql_clause(acc, false, _fun), do: acc
   defp add_sql_clause(acc, true, fun), do: fun.(acc)
 
-  # Resolves a task identifier (integer ID or UUID string) via the Tasks context,
-  # returning {integer_id, uuid_string} for use in note queries.
+  # Resolves a task identifier (integer ID or UUID string) via the Tasks context.
+  # Returns {integer_id, uuid_string} or nil if the task does not exist.
   defp resolve_task_ids(task_id) do
-    Tasks.get_task_ids!(task_id)
+    case Tasks.get_task_ids(task_id) do
+      {:ok, ids} -> ids
+      :error -> nil
+    end
   end
 end

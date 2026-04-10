@@ -26,16 +26,19 @@ defmodule EyeInTheSky.Messages.BulkImporter do
     metadata_fn = Keyword.get(opts, :metadata_fn, fn _msg -> nil end)
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
+    context = %{session_id: session_id, now: now, provider: provider, metadata_fn: metadata_fn}
+
     messages
     |> Enum.filter(& &1.uuid)
-    |> Enum.count(&import_message(&1, session_id, now, provider, metadata_fn))
+    |> Enum.count(&import_message(&1, context))
   end
 
   # ---------------------------------------------------------------------------
   # Private
   # ---------------------------------------------------------------------------
 
-  defp import_message(msg, session_id, now, provider, metadata_fn) do
+  defp import_message(msg, context) do
+    %{session_id: session_id, now: now, provider: provider, metadata_fn: metadata_fn} = context
     {sender_role, recipient_role, direction} = message_roles(msg.role)
     inserted_at = parse_timestamp(msg.timestamp, now)
     metadata = metadata_fn.(msg)

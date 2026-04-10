@@ -141,15 +141,21 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
   def resolve_session_sender_name(session) do
     alias EyeInTheSky.{Agents, Teams}
 
-    case session.agent_id && Agents.get_agent(session.agent_id) do
-      {:ok, agent} ->
-        case Teams.get_member_by_agent_id(agent.id) do
-          {:ok, %{name: name}} when is_binary(name) and name != "" -> name
-          _ -> session.name || agent.description || "agent"
-        end
-
-      _ ->
+    case session.agent_id do
+      nil ->
         session.name || "agent"
+
+      agent_id ->
+        case Agents.get_agent(agent_id) do
+          {:ok, agent} ->
+            case Teams.get_member_by_agent_id(agent.id) do
+              {:ok, %{name: name}} when is_binary(name) and name != "" -> name
+              _ -> session.name || agent.description || "agent"
+            end
+
+          {:error, :not_found} ->
+            session.name || "agent"
+        end
     end
   end
 

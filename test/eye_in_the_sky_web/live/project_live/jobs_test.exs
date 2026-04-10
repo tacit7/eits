@@ -146,7 +146,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
       |> render_click()
 
       {:ok, updated} = ScheduledJobs.get_job(job.id)
-      assert updated.enabled == 0
+      assert updated.enabled == false
     end
 
     test "run now button triggers job", %{conn: conn, project: project, job: job} do

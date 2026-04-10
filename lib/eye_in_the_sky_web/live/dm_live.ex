@@ -14,6 +14,7 @@ defmodule EyeInTheSkyWeb.DmLive do
   import EyeInTheSkyWeb.Live.Shared.DmModelHelpers
   import EyeInTheSkyWeb.Live.Shared.DmSessionHelpers
   import EyeInTheSkyWeb.Live.Shared.DmStreamHelpers
+  import EyeInTheSkyWeb.Live.Shared.OverlayHelpers
 
   require Logger
 
@@ -388,9 +389,6 @@ defmodule EyeInTheSkyWeb.DmLive do
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
-
-  defp toggle_overlay(current, target) when current == target, do: nil
-  defp toggle_overlay(_current, target), do: target
 
   # ---------------------------------------------------------------------------
   # Render

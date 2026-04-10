@@ -74,7 +74,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                     else: ""}
                 </span>
                 <button
-                  class="btn btn-ghost btn-xs text-error shrink-0"
+                  class="btn btn-ghost btn-sm text-error shrink-0"
                   phx-click="run_now"
                   phx-value-id={job.id}
                   title="Retry"
@@ -116,7 +116,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 phx-value-id={job.id}
               />
               <button
-                class="btn btn-ghost btn-xs"
+                class="btn btn-ghost btn-sm"
                 phx-click="run_now"
                 phx-value-id={job.id}
                 title="Run Now"
@@ -124,7 +124,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 <.icon name="hero-play" class="w-3 h-3" />
               </button>
               <button
-                class="btn btn-ghost btn-xs"
+                class="btn btn-ghost btn-sm"
                 phx-click="edit_job"
                 phx-value-id={job.id}
                 title="Edit"
@@ -132,7 +132,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 <.icon name="hero-pencil-square" class="w-3 h-3" />
               </button>
               <button
-                class="btn btn-ghost btn-xs text-error"
+                class="btn btn-ghost btn-sm text-error"
                 phx-click="delete_job"
                 phx-value-id={job.id}
                 data-confirm="Delete this job?"
@@ -218,7 +218,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                           else: ""}
                       </span>
                       <button
-                        class="btn btn-ghost btn-xs text-error"
+                        class="btn btn-ghost btn-sm text-error"
                         phx-click="run_now"
                         phx-value-id={job.id}
                         title="Retry"
@@ -265,7 +265,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 <td>
                   <div class="flex items-center gap-1">
                     <button
-                      class="btn btn-ghost btn-xs"
+                      class="btn btn-ghost btn-sm"
                       phx-click="run_now"
                       phx-value-id={job.id}
                       title="Run Now"
@@ -275,7 +275,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                     </button>
                     <%= if job.origin != "system" do %>
                       <button
-                        class="btn btn-ghost btn-xs"
+                        class="btn btn-ghost btn-sm"
                         phx-click="edit_job"
                         phx-value-id={job.id}
                         title="Edit"
@@ -284,7 +284,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                         <.icon name="hero-pencil-square" class="w-3.5 h-3.5" />
                       </button>
                       <button
-                        class="btn btn-ghost btn-xs text-error"
+                        class="btn btn-ghost btn-sm text-error"
                         phx-click="delete_job"
                         phx-value-id={job.id}
                         data-confirm="Delete this job?"

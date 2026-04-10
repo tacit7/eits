@@ -227,7 +227,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
             phx-click="new_chat"
             phx-target={@myself}
             class={[
-              "btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-primary hover:bg-primary/10 transition-colors",
+              "btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-primary hover:bg-primary/10 transition-colors",
               if(@mobile_open, do: "hidden")
             ]}
             title="New Chat"
@@ -238,7 +238,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
             :if={@mobile_open}
             phx-click="close_mobile"
             phx-target={@myself}
-            class="md:hidden btn btn-ghost btn-xs btn-square text-base-content/40"
+            class="md:hidden btn btn-ghost btn-sm btn-square text-base-content/40"
           >
             <.icon name="hero-x-mark" class="w-4 h-4" />
           </button>
@@ -293,7 +293,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
           <.link
             href="/auth/logout"
             method="delete"
-            class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-red-500"
+            class="btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-red-500"
             title="Sign out"
           >
             <.icon name="hero-arrow-right-on-rectangle-mini" class="w-4 h-4" />
@@ -301,7 +301,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
           <button
             phx-click="toggle_collapsed"
             phx-target={@myself}
-            class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-base-content/70"
+            class="btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-base-content/70"
             title={if @collapsed, do: "Expand sidebar", else: "Collapse sidebar"}
           >
             <svg

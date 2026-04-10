@@ -158,7 +158,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           <.icon name="hero-bars-3" class="w-5 h-5" />
         </button>
         <div class="flex-1 flex items-center justify-center gap-1.5 min-w-0 px-1">
-          <div class={"w-1.5 h-1.5 rounded-full flex-shrink-0 " <> status_dot_class(@agent.status)} />
+          <.status_dot status={@agent.status} class="w-1.5 h-1.5" />
           <%= if @agent.entrypoint == "cli" do %>
             <.icon name="hero-command-line" class="w-3.5 h-3.5 text-base-content/40 flex-shrink-0" />
           <% end %>
@@ -253,7 +253,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <div class="px-4 sm:px-5 py-3" id="dm-header">
           <div class="flex items-center gap-2 min-w-0">
             <div class="flex items-start gap-2 min-w-0 flex-1">
-              <div class={"w-2 h-2 rounded-full flex-shrink-0 mt-[5px] " <> status_dot_class(@agent.status)} />
+              <.status_dot status={@agent.status} class="w-2 h-2 mt-[5px]" />
               <div class="flex flex-col min-w-0 flex-1">
                 <div class="flex items-center gap-2 min-w-0">
                   <%= if @agent.entrypoint == "cli" do %>
@@ -528,6 +528,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         </div>
       <% end %>
     </div>
+    """
+  end
+
+  attr :status, :string, required: true
+  attr :class, :string, default: "w-2 h-2"
+
+  defp status_dot(assigns) do
+    ~H"""
+    <div class={"rounded-full flex-shrink-0 #{@class} #{status_dot_class(@status)}"} />
     """
   end
 

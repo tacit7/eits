@@ -2,7 +2,6 @@
    https://tailwindcss.com/docs/configuration */
 
 @import "tailwindcss" source(none);
-@import "diff2html/bundles/css/diff2html.min.css";
 /* highlight.js theme-aware styles are defined below under [data-theme] selectors */
 @source "../css";
 @source "../js";
@@ -366,56 +365,17 @@ code.hljs { padding: 3px 5px; }
 [data-theme="light"] .hljs-addition { color: #22863a; background-color: #f0fff4; }
 [data-theme="light"] .hljs-deletion { color: #b31d28; background-color: #ffeef0; }
 
-/* ===== diff2html theme overrides ===== */
-/* diff2html defaults to light vars on :root; remap them per theme */
-[data-theme="dark"] {
-  --d2h-bg-color: hsl(60 2.7% 14.5%);        /* --bg-100 */
-  --d2h-border-color: hsl(30 3.3% 11.8%);    /* --bg-200 */
-  --d2h-dim-color: hsl(50 9% 73.7%);         /* --text-200 */
-  --d2h-line-border-color: hsl(60 2.1% 18.4%);
-  --d2h-file-header-bg-color: hsl(60 2.1% 18.4%); /* --bg-000 */
-  --d2h-file-header-border-color: hsl(30 3.3% 11.8%);
-  --d2h-empty-placeholder-bg-color: hsl(60 2.1% 18.4% / 0.5);
-  --d2h-empty-placeholder-border-color: hsl(30 3.3% 11.8%);
-  --d2h-selected-color: rgba(56, 139, 253, 0.1);
-  --d2h-ins-bg-color: rgba(46, 160, 67, 0.25);
-  --d2h-ins-border-color: rgba(46, 160, 67, 0.5);
-  --d2h-ins-highlight-bg-color: rgba(46, 160, 67, 0.55);
-  --d2h-ins-label-color: #3fb950;
-  --d2h-del-bg-color: rgba(248, 81, 73, 0.22);
-  --d2h-del-border-color: rgba(248, 81, 73, 0.5);
-  --d2h-del-highlight-bg-color: rgba(248, 81, 73, 0.55);
-  --d2h-del-label-color: #f85149;
-  --d2h-change-del-color: rgba(210, 153, 34, 0.2);
-  --d2h-change-ins-color: rgba(46, 160, 67, 0.25);
-  --d2h-info-bg-color: rgba(56, 139, 253, 0.1);
-  --d2h-info-border-color: rgba(56, 139, 253, 0.4);
-  --d2h-change-label-color: #d29922;
-}
+/* ===== CodeMirror diff viewer line highlighting ===== */
+/* Full-width line backgrounds applied via ViewPlugin decorations */
+.cm-diff-added   { background-color: rgba(46, 160, 67, 0.18) !important; }
+.cm-diff-deleted { background-color: rgba(248, 81, 73, 0.18) !important; }
+.cm-diff-hunk    { background-color: rgba(56, 139, 253, 0.12) !important; color: rgba(88, 166, 255, 0.9); }
+.cm-diff-meta    { opacity: 0.45; }
 
-[data-theme="light"] {
-  --d2h-bg-color: oklch(96% 0.006 85);
-  --d2h-border-color: oklch(91% 0.012 90);
-  --d2h-line-border-color: oklch(93% 0.008 85);
-  --d2h-file-header-bg-color: oklch(94.5% 0.006 85);
-  --d2h-file-header-border-color: oklch(91% 0.012 90);
-  --d2h-empty-placeholder-bg-color: oklch(93% 0.008 85);
-  --d2h-empty-placeholder-border-color: oklch(91% 0.012 90);
-  /* ins/del colors: clearly visible but not neon */
-  --d2h-ins-bg-color: #e6f4ea;
-  --d2h-ins-border-color: #a8d5b0;
-  --d2h-ins-highlight-bg-color: #b8e0be;
-  --d2h-ins-label-color: #276b30;
-  --d2h-del-bg-color: #fce8e6;
-  --d2h-del-border-color: #f0b8b4;
-  --d2h-del-highlight-bg-color: #f5c4c0;
-  --d2h-del-label-color: #a83232;
-  --d2h-change-del-color: #fef3d0;
-  --d2h-change-ins-color: #e8f5e9;
-  --d2h-info-bg-color: oklch(94% 0.008 250);
-  --d2h-info-border-color: oklch(84% 0.015 250);
-  --d2h-dim-color: rgba(0, 0, 0, 0.35);
-}
+[data-theme="light"] .cm-diff-added   { background-color: #e6ffec !important; }
+[data-theme="light"] .cm-diff-deleted { background-color: #ffebe9 !important; }
+[data-theme="light"] .cm-diff-hunk    { background-color: #ddf4ff !important; color: #0550ae; }
+[data-theme="light"] .cm-diff-meta    { opacity: 0.55; }
 
 /* ===== DM Composer: keyboard-aware scroll anchoring ===== */
 /* Disable scroll anchoring on all children except the sentinel at the bottom */

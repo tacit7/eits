@@ -120,6 +120,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
                         type="button"
                         phx-click="rename_session"
                         phx-value-session_id={agent.id}
+                        onclick="this.blur()"
                         class="flex items-center gap-2"
                       >
                         <.icon name="hero-pencil-square-mini" class="w-3.5 h-3.5" />
@@ -151,6 +152,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
                             type="button"
                             phx-click="unarchive_session"
                             phx-value-session_id={agent.id}
+                            onclick="this.blur()"
                             class="flex items-center gap-2 text-info"
                           >
                             <.icon name="hero-arrow-up-tray-mini" class="w-3.5 h-3.5" />
@@ -162,6 +164,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
                             type="button"
                             phx-click="delete_session"
                             phx-value-session_id={agent.id}
+                            onclick="this.blur()"
                             class="flex items-center gap-2 text-error"
                           >
                             <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
@@ -174,6 +177,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
                             type="button"
                             phx-click="archive_session"
                             phx-value-session_id={agent.id}
+                            onclick="this.blur()"
                             class="flex items-center gap-2 text-warning"
                           >
                             <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />

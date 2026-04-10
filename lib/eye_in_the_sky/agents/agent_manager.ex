@@ -8,7 +8,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
   require Logger
 
   alias EyeInTheSky.{AgentDefinitions, Agents, Projects, Sessions, Teams}
-  alias EyeInTheSky.Agents.{AgentManager.SessionBridge, InstructionBuilder, RuntimeContext}
+  alias EyeInTheSky.Agents.{AgentManager.SessionBridge, InstructionBuilder, InstructionTemplates, RuntimeContext}
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSky.Git.Worktrees
   alias EyeInTheSky.Utils.ToolHelpers
@@ -260,29 +260,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
   end
 
   defp build_team_context(team, member_name) do
-    """
-    ## Team Context
-    You are member "#{member_name || "agent"}" of team "#{team.name}" (team_id: #{team.id}).
-    You have been registered as a team member automatically.
-
-    ## EITS Command Protocol
-
-    Use the eits CLI script for all EITS operations:
-
-      eits tasks begin --title "<title>"
-      eits tasks annotate <id> --body "..."
-      eits tasks update <id> --state 4
-      eits dm --to <session_uuid> --message "..."
-      eits commits create --hash <hash>
-
-    ## Task Completion
-    When you finish a task, follow this sequence exactly:
-    1. Annotate the task with a summary of what was done
-    2. Mark it done (or move to in-review, state 4)
-    3. DM the orchestrator session to report completion
-    4. Run the `/i-update-status` slash command to commit work and update session tracking
-    Do NOT skip any steps. The orchestrator needs to see what you did.
-    """
+    InstructionTemplates.team_context(team, member_name)
   end
 
   defp resolve_session_name(params, team) do

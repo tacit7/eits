@@ -263,22 +263,26 @@ defmodule EyeInTheSky.Agents.AgentManager do
     InstructionTemplates.team_context(team, member_name)
   end
 
-  defp resolve_session_name(params, team) do
-    name = params["name"]
+  # Name resolution priority:
+  # 1. Explicit "name" param (trimmed, non-empty)
+  # 2. "member_name @ team_name" when both present
+  # 3. "member_name" alone
+  # 4. First 250 chars of instructions (or "Agent session" fallback)
+  defp resolve_session_name(%{"name" => name}, _team)
+       when is_binary(name) and name != "",
+       do: String.trim(name)
 
-    if name && String.trim(name) != "" do
-      String.trim(name)
-    else
-      member_name = params["member_name"]
-      team_name = team && team.name
-
-      cond do
-        member_name && team_name -> "#{member_name} @ #{team_name}"
-        member_name -> member_name
-        true -> String.slice(params["instructions"] || "Agent session", 0, 250)
-      end
-    end
+  defp resolve_session_name(params, %{name: team_name})
+       when is_binary(team_name) do
+    member = params["member_name"]
+    if member, do: "#{member} @ #{team_name}", else: String.slice(params["instructions"] || "Agent session", 0, 250)
   end
+
+  defp resolve_session_name(%{"member_name" => member}, _team) when is_binary(member),
+    do: member
+
+  defp resolve_session_name(params, _team),
+    do: String.slice(params["instructions"] || "Agent session", 0, 250)
 
   defp build_spawn_opts(params, team) do
     name = resolve_session_name(params, team)
@@ -323,9 +327,6 @@ defmodule EyeInTheSky.Agents.AgentManager do
           "Team join failed: agent_id=#{agent.id} team_id=#{team.id} reason=#{inspect(reason)}"
         )
 
-        :ok
-
-      _ ->
         :ok
     end
   end

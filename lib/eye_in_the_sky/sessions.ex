@@ -236,8 +236,7 @@ defmodule EyeInTheSky.Sessions do
     active_only = Keyword.get(opts, :active_only, false)
 
     query =
-      Session
-      |> where([s], s.project_id == ^project_id)
+      project_sessions_base_query(project_id)
       |> preload(agent: :agent_definition)
       |> order_by([s], desc: s.started_at)
       |> Archivable.include_archived(opts)
@@ -255,8 +254,7 @@ defmodule EyeInTheSky.Sessions do
   """
   def count_and_ids_for_project(project_id) do
     rows =
-      Session
-      |> where([s], s.project_id == ^project_id)
+      project_sessions_base_query(project_id)
       |> select([s], s.id)
       |> Repo.all()
 
@@ -421,4 +419,8 @@ defmodule EyeInTheSky.Sessions do
 
   defdelegate record_tool_event(session, type, params),
     to: EyeInTheSky.Sessions.ToolEventRecorder
+
+  defp project_sessions_base_query(project_id) do
+    from(s in Session, where: s.project_id == ^project_id)
+  end
 end

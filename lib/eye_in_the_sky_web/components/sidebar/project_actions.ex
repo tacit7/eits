@@ -126,7 +126,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectActions do
 
   def handle_new_session(%{"project_id" => project_id_str}, socket) do
     with project_id when not is_nil(project_id) <- parse_int(project_id_str),
-         {:ok, project} <- get_project_safe(project_id),
+         {:ok, project} <- Projects.get_project(project_id),
          {:ok, %{session: session}} <-
            AgentManager.create_agent(
              project_id: project.id,
@@ -141,12 +141,6 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectActions do
       {:error, _reason} -> {:noreply, put_flash(socket, :error, "Failed to create agent")}
       _ -> {:noreply, socket}
     end
-  end
-
-  defp get_project_safe(id) do
-    {:ok, Projects.get_project!(id)}
-  rescue _ in Ecto.NoResultsError ->
-    {:error, :not_found}
   end
 
   def handle_pick_folder({path, 0}, socket) do

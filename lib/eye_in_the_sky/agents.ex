@@ -63,8 +63,7 @@ defmodule EyeInTheSky.Agents do
   """
   @spec get_agent!(integer()) :: Agent.t()
   def get_agent!(id) do
-    Agent
-    |> preload([:project, :agent_definition])
+    base_agent_query()
     |> Repo.get!(id)
     |> populate_project_name()
   end
@@ -76,8 +75,7 @@ defmodule EyeInTheSky.Agents do
   """
   @spec get_agent(integer()) :: {:ok, Agent.t()} | {:error, :not_found}
   def get_agent(id) do
-    case Agent
-         |> preload([:project, :agent_definition])
+    case base_agent_query()
          |> Repo.get(id) do
       nil -> {:error, :not_found}
       agent -> {:ok, populate_project_name(agent)}
@@ -302,5 +300,9 @@ defmodule EyeInTheSky.Agents do
   @doc "Preloads associations onto an agent struct. Defaults to [:sessions, :project]."
   def preload_agent_associations(%Agent{} = agent, assocs \\ [:sessions, :project]) do
     Repo.preload(agent, assocs)
+  end
+
+  defp base_agent_query do
+    from(a in Agent, preload: [:project, :agent_definition])
   end
 end

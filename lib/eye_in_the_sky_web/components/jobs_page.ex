@@ -42,7 +42,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   def update(%{jobs_refresh: true}, socket) do
     socket =
       socket
-      |> reload_jobs()
+      |> load_jobs()
       |> assign(:running_ids, MapSet.new(ScheduledJobs.list_running_job_ids()))
       |> assign(:last_run_map, ScheduledJobs.last_run_status_map())
 
@@ -74,7 +74,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
       socket =
         if assigns.project_id != prev_project_id do
           socket
-          |> load_jobs()
+          |> load_jobs(apply_filters: false)
         else
           socket
         end
@@ -102,7 +102,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
         |> assign(:running_ids, MapSet.new(ScheduledJobs.list_running_job_ids()))
         |> assign(:last_run_map, ScheduledJobs.last_run_status_map())
         |> assign(:active_tab, :all_jobs)
-        |> load_jobs()
+        |> load_jobs(apply_filters: false)
 
       {:ok, socket}
     end
@@ -169,14 +169,14 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
     do: handle_change_schedule_type(params, socket)
 
   defp dispatch_event("save_job", params, socket) do
-    handle_save_job(params, socket, &reload_jobs/1, scoping_project_id: socket.assigns.project_id)
+    handle_save_job(params, socket, &load_jobs/1, scoping_project_id: socket.assigns.project_id)
   end
 
   defp dispatch_event("edit_job", params, socket),
     do: handle_edit_job(params, socket, socket.assigns.project_id)
 
   defp dispatch_event("toggle_job", params, socket),
-    do: handle_toggle_job(params, socket, &reload_jobs/1, socket.assigns.project_id)
+    do: handle_toggle_job(params, socket, &load_jobs/1, socket.assigns.project_id)
 
   defp dispatch_event("run_now", %{"id" => id} = params, socket) do
     with {:ok, int_id} <- parse_job_id(id),
@@ -191,7 +191,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   end
 
   defp dispatch_event("delete_job", params, socket),
-    do: handle_delete_job(params, socket, &reload_jobs/1, socket.assigns.project_id)
+    do: handle_delete_job(params, socket, &load_jobs/1, socket.assigns.project_id)
 
   defp dispatch_event("expand_job", params, socket),
     do: handle_expand_job(params, socket)
@@ -237,7 +237,8 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   # Private helpers
   # ---------------------------------------------------------------------------
 
-  defp load_jobs(socket) do
+  defp load_jobs(socket, opts \\ []) do
+    apply_filters = Keyword.get(opts, :apply_filters, true)
     project_id = socket.assigns.project_id
 
     if project_id do
@@ -247,15 +248,15 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
       socket
       |> assign(:all_project_jobs, all_project)
       |> assign(:all_global_jobs, all_global)
-      |> assign(:project_jobs, all_project)
-      |> assign(:global_jobs, all_global)
+      |> assign(:project_jobs, if(apply_filters, do: apply_job_filters(all_project, socket.assigns), else: all_project))
+      |> assign(:global_jobs, if(apply_filters, do: apply_job_filters(all_global, socket.assigns), else: all_global))
       |> assign(:last_failed_runs, load_last_failed_runs(all_project ++ all_global))
     else
       all_jobs = ScheduledJobs.list_jobs()
 
       socket
       |> assign(:all_jobs, all_jobs)
-      |> assign(:jobs, all_jobs)
+      |> assign(:jobs, if(apply_filters, do: apply_job_filters(all_jobs, socket.assigns), else: all_jobs))
       |> assign(:last_failed_runs, load_last_failed_runs(all_jobs))
     end
   end
@@ -263,29 +264,6 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   defp check_job_access(_job, nil), do: :ok
   defp check_job_access(%{project_id: job_project_id}, project_id) when job_project_id != project_id, do: {:error, :access_denied}
   defp check_job_access(_job, _project_id), do: :ok
-
-  defp reload_jobs(socket) do
-    project_id = socket.assigns.project_id
-
-    if project_id do
-      all_project = ScheduledJobs.list_jobs_for_project(project_id)
-      all_global = ScheduledJobs.list_global_jobs()
-
-      socket
-      |> assign(:all_project_jobs, all_project)
-      |> assign(:all_global_jobs, all_global)
-      |> assign(:project_jobs, apply_job_filters(all_project, socket.assigns))
-      |> assign(:global_jobs, apply_job_filters(all_global, socket.assigns))
-      |> assign(:last_failed_runs, load_last_failed_runs(all_project ++ all_global))
-    else
-      all_jobs = ScheduledJobs.list_jobs()
-
-      socket
-      |> assign(:all_jobs, all_jobs)
-      |> assign(:jobs, apply_job_filters(all_jobs, socket.assigns))
-      |> assign(:last_failed_runs, load_last_failed_runs(all_jobs))
-    end
-  end
 
   # ---------------------------------------------------------------------------
   # Template

@@ -139,6 +139,10 @@ defmodule EyeInTheSky.Channels do
 
   # Channel Membership Functions
 
+  defp channel_member_query(channel_id, session_id) do
+    from(m in ChannelMember, where: m.channel_id == ^channel_id and m.session_id == ^session_id)
+  end
+
   @doc """
   Adds a member to a channel.
   """
@@ -171,9 +175,7 @@ defmodule EyeInTheSky.Channels do
   Removes a member from a channel.
   """
   def remove_member(channel_id, session_id) do
-    from(m in ChannelMember,
-      where: m.channel_id == ^channel_id and m.session_id == ^session_id
-    )
+    channel_member_query(channel_id, session_id)
     |> Repo.delete_all()
   end
 
@@ -192,9 +194,7 @@ defmodule EyeInTheSky.Channels do
   Checks if a session is a member of a channel.
   """
   def member?(channel_id, session_id) do
-    from(m in ChannelMember,
-      where: m.channel_id == ^channel_id and m.session_id == ^session_id
-    )
+    channel_member_query(channel_id, session_id)
     |> Repo.exists?()
   end
 
@@ -202,9 +202,7 @@ defmodule EyeInTheSky.Channels do
   Gets a channel member record.
   """
   def get_member(channel_id, session_id) do
-    case from(m in ChannelMember,
-           where: m.channel_id == ^channel_id and m.session_id == ^session_id
-         )
+    case channel_member_query(channel_id, session_id)
          |> Repo.one() do
       nil -> {:error, :not_found}
       member -> {:ok, member}
@@ -217,9 +215,7 @@ defmodule EyeInTheSky.Channels do
   def mark_as_read(channel_id, session_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    from(m in ChannelMember,
-      where: m.channel_id == ^channel_id and m.session_id == ^session_id
-    )
+    channel_member_query(channel_id, session_id)
     |> Repo.update_all(set: [last_read_at: now])
   end
 

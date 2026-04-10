@@ -33,7 +33,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
           </span>
           <button
             phx-click="delete_selected"
-            class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1"
+            class="btn btn-ghost btn-sm min-h-[44px] text-error/70 hover:text-error hover:bg-error/10 gap-1"
           >
             <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
           </button>

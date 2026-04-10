@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
             <h2 class="text-sm font-semibold text-base-content/80">Filter</h2>
             <button
               phx-click="toggle_filter_drawer"
-              class="btn btn-ghost btn-xs btn-circle"
+              class="btn btn-ghost btn-sm btn-circle min-h-[44px] min-w-[44px]"
               aria-label="Close"
             >
               <.icon name="hero-x-mark-mini" class="w-4 h-4" />

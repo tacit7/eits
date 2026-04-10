@@ -6,9 +6,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
   alias EyeInTheSkyWeb.Components.FilterSheet
   alias EyeInTheSkyWeb.Components.TaskCard
   alias EyeInTheSkyWeb.ControllerHelpers
+  alias EyeInTheSkyWeb.Live.Shared.TasksListHelpers
   import EyeInTheSkyWeb.Live.Shared.TasksHelpers
-
-  @per_page 50
 
   @impl true
   def mount(_params, _session, socket) do
@@ -116,57 +115,17 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
   def handle_info(:tasks_changed, socket),
     do: handle_tasks_changed(socket, &load_tasks/1)
 
-  # Resets to page 1, replaces the task list
   defp load_tasks(socket) do
-    query = socket.assigns.search_query
-    state_id = socket.assigns.filter_state_id
-    sort_by = socket.assigns.sort_by
-
-    if query != "" and String.trim(query) != "" do
-      tasks = Tasks.search_tasks(query)
-
-      tasks =
-        if state_id,
-          do: Enum.filter(tasks, &(&1.state_id == state_id)),
-          else: tasks
-
-      socket
-      |> assign(:task_count, length(tasks))
-      |> assign(:page, 1)
-      |> assign(:has_more, false)
-      |> assign(:total_tasks, length(tasks))
-      |> stream(:tasks, tasks, reset: true)
-    else
-      total = Tasks.count_tasks(state_id: state_id)
-      tasks = Tasks.list_tasks(limit: @per_page, offset: 0, state_id: state_id, sort_by: sort_by)
-
-      socket
-      |> assign(:task_count, length(tasks))
-      |> assign(:page, 1)
-      |> assign(:has_more, length(tasks) < total)
-      |> assign(:total_tasks, total)
-      |> stream(:tasks, tasks, reset: true)
-    end
+    TasksListHelpers.load_tasks(
+      socket,
+      &Tasks.search_tasks/1,
+      &Tasks.list_tasks/1,
+      &Tasks.count_tasks/1
+    )
   end
 
-  # Appends the next page to the existing task list
   defp load_tasks_page(socket, page) do
-    state_id = socket.assigns.filter_state_id
-    sort_by = socket.assigns.sort_by
-    offset = (page - 1) * @per_page
-    total = socket.assigns.total_tasks
-
-    new_tasks = Tasks.list_tasks(limit: @per_page, offset: offset, state_id: state_id, sort_by: sort_by)
-
-    socket =
-      socket
-      |> update(:task_count, &(&1 + length(new_tasks)))
-      |> assign(:page, page)
-      |> assign(:has_more, offset + length(new_tasks) < total)
-
-    Enum.reduce(new_tasks, socket, fn task, acc ->
-      stream_insert(acc, :tasks, task)
-    end)
+    TasksListHelpers.load_tasks_page(socket, page, &Tasks.list_tasks/1)
   end
 
   @impl true

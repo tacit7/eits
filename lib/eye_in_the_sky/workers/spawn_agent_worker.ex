@@ -33,7 +33,7 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
   defp execute(job) do
     config = ScheduledJobs.decode_config(job)
     session_uuid = Ecto.UUID.generate()
-    base_url = EyeInTheSkyWeb.Endpoint.url()
+    base_url = server_base_url()
     dm_link = "#{base_url}/dm/#{session_uuid}"
 
     base_instructions = config["instructions"] || "Scheduled agent task"
@@ -101,5 +101,12 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
 
   defp broadcast do
     EyeInTheSky.Events.jobs_updated()
+  end
+
+  defp server_base_url do
+    cfg = Application.get_env(:eye_in_the_sky, EyeInTheSkyWeb.Endpoint, [])
+    port = cfg |> Keyword.get(:http, []) |> Keyword.get(:port, 5001)
+    host = cfg |> Keyword.get(:url, []) |> Keyword.get(:host, "localhost")
+    "http://#{host}:#{port}"
   end
 end

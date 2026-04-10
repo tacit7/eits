@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.ControllerHelpers do
   @moduledoc "Shared helpers for API controllers and LiveViews."
 
-  def parse_int(val), do: parse_int(val, nil)
+  def parse_int(val), do: EyeInTheSky.Utils.ToolHelpers.parse_int(val)
 
   def parse_int(nil, default), do: default
   def parse_int(val, _default) when is_integer(val), do: val

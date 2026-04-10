@@ -57,6 +57,29 @@ defmodule EyeInTheSky.Codex.SDKTest do
   # cancel/1
   # ---------------------------------------------------------------------------
 
+  describe "handler_start_failed error path" do
+    test "SDK.start returns {:error, {:handler_start_failed, reason}} when TaskSupervisor is at max_children" do
+      {:ok, sup} = Task.Supervisor.start_link(max_children: 0)
+
+      result = SDK.start("hello", to: self(), project_path: "/tmp", task_supervisor: sup)
+
+      assert {:error, {:handler_start_failed, _reason}} = result
+    end
+
+    test "SDK.resume returns {:error, {:handler_start_failed, reason}} when TaskSupervisor is at max_children" do
+      {:ok, sup} = Task.Supervisor.start_link(max_children: 0)
+
+      result =
+        SDK.resume("thread-123", "continue",
+          to: self(),
+          project_path: "/tmp",
+          task_supervisor: sup
+        )
+
+      assert {:error, {:handler_start_failed, _reason}} = result
+    end
+  end
+
   describe "SDK.cancel/1" do
     test "returns {:error, :not_found} for unknown ref" do
       ref = make_ref()

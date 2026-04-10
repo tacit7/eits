@@ -99,6 +99,22 @@ defmodule EyeInTheSky.Claude.SDKTest do
     end
   end
 
+  describe "handler_start_failed error path" do
+    test "returns {:error, {:handler_start_failed, reason}} when TaskSupervisor is at max_children" do
+      {:ok, sup} = Task.Supervisor.start_link(max_children: 0)
+
+      result =
+        SDK.start("hello",
+          to: self(),
+          cli_module: EyeInTheSky.Claude.MockCLI,
+          task_supervisor: sup,
+          model: "haiku"
+        )
+
+      assert {:error, {:handler_start_failed, _reason}} = result
+    end
+  end
+
   describe "orphan handler cleanup" do
     test "handler cleans up registry when caller dies while in handle_messages" do
       # Spawn a separate caller process so we can kill it independently

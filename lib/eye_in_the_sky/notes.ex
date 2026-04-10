@@ -27,14 +27,7 @@ defmodule EyeInTheSky.Notes do
   Matches on both integer ID (as string) and UUID for migration compatibility.
   """
   def list_notes_for_session(session_id, opts \\ []) do
-    # session_id can be a UUID string or an integer string
-    session =
-      case Sessions.resolve(to_string(session_id)) do
-        {:ok, s} -> s
-        _ -> nil
-      end
-
-    if session do
+    with {:ok, session} <- resolve_session(session_id) do
       session_int_str = to_string(session.id)
       limit_val = Keyword.get(opts, :limit)
       offset_val = Keyword.get(opts, :offset)
@@ -53,7 +46,7 @@ defmodule EyeInTheSky.Notes do
 
       Repo.all(query)
     else
-      []
+      _ -> []
     end
   end
 
@@ -62,13 +55,7 @@ defmodule EyeInTheSky.Notes do
   Matches on both integer ID (as string) and UUID for migration compatibility.
   """
   def count_notes_for_session(session_id) do
-    session =
-      case Sessions.resolve(to_string(session_id)) do
-        {:ok, s} -> s
-        _ -> nil
-      end
-
-    if session do
+    with {:ok, session} <- resolve_session(session_id) do
       session_int_str = to_string(session.id)
 
       Note
@@ -79,7 +66,7 @@ defmodule EyeInTheSky.Notes do
       )
       |> Repo.aggregate(:count, :id)
     else
-      0
+      _ -> 0
     end
   end
 
@@ -87,13 +74,7 @@ defmodule EyeInTheSky.Notes do
   Returns notes for a specific agent.
   """
   def list_notes_for_agent(agent_id) do
-    agent =
-      case Agents.get_agent(agent_id) do
-        {:ok, a} -> a
-        {:error, :not_found} -> nil
-      end
-
-    if agent do
+    with {:ok, agent} <- Agents.get_agent(agent_id) do
       agent_int_str = to_string(agent.id)
 
       Note
@@ -105,7 +86,7 @@ defmodule EyeInTheSky.Notes do
       |> order_by([n], desc: n.created_at)
       |> Repo.all()
     else
-      []
+      _ -> []
     end
   end
 
@@ -168,14 +149,7 @@ defmodule EyeInTheSky.Notes do
     project_id_str = project_id && to_string(project_id)
     agent_id_strs = Enum.map(agent_ids, &to_string/1)
 
-    session_id_strs =
-      if agent_ids != [] do
-        from(s in EyeInTheSky.Sessions.Session, where: s.agent_id in ^agent_ids, select: s.id)
-        |> Repo.all()
-        |> Enum.map(&to_string/1)
-      else
-        []
-      end
+    session_id_strs = session_id_strs_for_agents(agent_ids)
 
     base =
       if project_id_str || agent_id_strs != [] || session_id_strs != [] do
@@ -271,17 +245,9 @@ defmodule EyeInTheSky.Notes do
     # When session_ids not provided but agent_ids are, resolve them automatically
     # so session-parented notes appear in project search scope.
     session_ids_str =
-      case {Keyword.get(opts, :session_ids), agent_ids} do
-        {nil, []} ->
-          []
-
-        {nil, _} ->
-          from(s in EyeInTheSky.Sessions.Session, where: s.agent_id in ^agent_ids, select: s.id)
-          |> Repo.all()
-          |> Enum.map(&to_string/1)
-
-        {ids, _} ->
-          Enum.map(ids, &to_string/1)
+      case Keyword.get(opts, :session_ids) do
+        nil -> session_id_strs_for_agents(agent_ids)
+        ids -> Enum.map(ids, &to_string/1)
       end
 
     extra_where = build_extra_where(project_id_str, agent_ids_str, session_ids_str, starred_only)
@@ -329,6 +295,18 @@ defmodule EyeInTheSky.Notes do
 
   defp maybe_add_dynamic(list, false, _fun), do: list
   defp maybe_add_dynamic(list, true, fun), do: list ++ [fun.()]
+
+  defp resolve_session(session_id) do
+    Sessions.resolve(to_string(session_id))
+  end
+
+  defp session_id_strs_for_agents([]), do: []
+
+  defp session_id_strs_for_agents(agent_ids) do
+    from(s in EyeInTheSky.Sessions.Session, where: s.agent_id in ^agent_ids, select: s.id)
+    |> Repo.all()
+    |> Enum.map(&to_string/1)
+  end
 
   # Resolves a task identifier (integer ID or UUID string) via the Tasks context.
   # Returns {integer_id, uuid_string} or nil if the task does not exist.

@@ -68,8 +68,9 @@ PYEOF
   )
 
   if [ "${TASK_UPDATED:-}" != "found" ]; then
-    # Only enforce if an in-progress task is linked to this session
-    in_progress=$(eits tasks list --session "${EITS_SESSION_UUID:-}" --state 2 2>/dev/null | python3 -c "
+    # Only enforce if an in-progress task is linked to this session.
+    # Use $session_id parsed from hook payload — EITS_SESSION_UUID may be empty in some envs.
+    in_progress=$(eits tasks list --session "$session_id" --state 2 2>/dev/null | python3 -c "
 import sys, json
 try:
     d = json.load(sys.stdin)

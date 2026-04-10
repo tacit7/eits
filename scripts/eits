@@ -51,7 +51,34 @@ cmd_sessions() {
   local sub="${1:-}"; shift || true
   case "$sub" in
     list)
-      _get "/sessions"
+      # eits sessions list [--search <q>] [--status <s>] [--agent <uuid>] [--project <id>] [--limit <n>]
+      local qs=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --search)  qs="${qs}&q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$2")"; shift 2 ;;
+          --status)  qs="${qs}&status=$2";     shift 2 ;;
+          --agent)   qs="${qs}&agent_id=$2";   shift 2 ;;
+          --project) qs="${qs}&project_id=$2"; shift 2 ;;
+          --limit)   qs="${qs}&limit=$2";      shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      _curl "$BASE_URL/sessions?${qs#&}" | jq .
+      ;;
+    search)
+      # eits sessions search <query>
+      local query="${1:-}"; need query
+      _curl "$BASE_URL/sessions?q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$query")" | jq .
+      ;;
+    tasks)
+      # eits sessions tasks <uuid>
+      local uuid="${1:-}"; need uuid
+      _curl "$BASE_URL/tasks?session_id=$uuid" | jq .
+      ;;
+    notes)
+      # eits sessions notes <uuid>
+      local uuid="${1:-}"; need uuid
+      _curl "$BASE_URL/notes?session_id=$uuid" | jq .
       ;;
     get)
       local uuid="${1:-}"; need uuid
@@ -99,7 +126,7 @@ cmd_sessions() {
       _get "/sessions/$uuid/context"
       ;;
     *)
-      echo "usage: eits sessions <list|get|create|update|end|context>"
+      echo "usage: eits sessions <list|search|get|create|update|end|context|tasks|notes>"
       ;;
   esac
 }
@@ -311,8 +338,13 @@ cmd_notes() {
       done
       _patch "/notes/$id" "${body:-{\}}"
       ;;
+    search)
+      # eits notes search <query>
+      local query="${1:-}"; need query
+      _curl "$BASE_URL/notes?q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$query")" | jq .
+      ;;
     *)
-      echo "usage: eits notes <list|get|create|update>"
+      echo "usage: eits notes <list|search|get|create|update>"
       ;;
   esac
 }
@@ -432,7 +464,15 @@ cmd_commits() {
   local sub="${1:-}"; shift || true
   case "$sub" in
     list)
-      _get "/commits"
+      # eits commits list [--session <uuid>]
+      local qs=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --session) qs="${qs}&session_id=$2"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      _curl "$BASE_URL/commits?${qs#&}" | jq .
       ;;
     create)
       # eits commits create [--agent <uuid>] --hash <h1> [--hash <h2>] [--message <m>] ...

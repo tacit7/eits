@@ -82,6 +82,20 @@ _agent_uuid() { cat "$BATS_FILE_TMPDIR/agent_uuid"; }
   echo "$output" | jq -e '.success == true' >/dev/null
 }
 
+@test "sessions list --search: filters by query string" {
+  run "$EITS" sessions list --search "cli-worker"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  echo "$output" | jq -e '.results | type == "array"' >/dev/null
+}
+
+@test "sessions list --project: filters by project id" {
+  run "$EITS" sessions list --project 1
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  echo "$output" | jq -e '.results | type == "array"' >/dev/null
+}
+
 @test "sessions list: rejects unknown flags" {
   run "$EITS" sessions list --bogus foo 2>&1
   [ "$status" -ne 0 ]

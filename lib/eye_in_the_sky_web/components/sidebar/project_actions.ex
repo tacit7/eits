@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectActions do
   @moduledoc false
 
   import Phoenix.Component, only: [assign: 2, assign: 3]
-  import Phoenix.LiveView, only: [start_async: 3, push_navigate: 2]
+  import Phoenix.LiveView, only: [start_async: 3, push_navigate: 2, put_flash: 3]
 
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
@@ -78,6 +78,8 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectActions do
       Events.project_updated(project)
       {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
     else
+      nil -> {:noreply, socket}
+      {:error, _reason} -> {:noreply, socket}
       _ -> {:noreply, socket}
     end
   end
@@ -124,7 +126,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectActions do
 
   def handle_new_session(%{"project_id" => project_id_str}, socket) do
     with project_id when not is_nil(project_id) <- parse_int(project_id_str),
-         project <- Projects.get_project!(project_id),
+         {:ok, project} <- get_project_safe(project_id),
          {:ok, %{session: session}} <-
            AgentManager.create_agent(
              project_id: project.id,
@@ -134,8 +136,17 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectActions do
            ) do
       {:noreply, push_navigate(socket, to: "/dm/#{session.id}")}
     else
+      nil -> {:noreply, socket}
+      {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Project not found")}
+      {:error, _reason} -> {:noreply, put_flash(socket, :error, "Failed to create agent")}
       _ -> {:noreply, socket}
     end
+  end
+
+  defp get_project_safe(id) do
+    {:ok, Projects.get_project!(id)}
+  rescue _ in Ecto.NoResultsError ->
+    {:error, :not_found}
   end
 
   def handle_pick_folder({path, 0}, socket) do

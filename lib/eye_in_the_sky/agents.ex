@@ -219,7 +219,7 @@ defmodule EyeInTheSky.Agents do
   """
   def list_bookmarked_agents do
     Agent
-    |> where([a], a.bookmarked == true)
+    |> where([a], a.bookmarked)
     |> preload([:project])
     |> order_by([a], desc: a.created_at)
     |> Repo.all()

@@ -256,7 +256,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <div class="max-w-4xl mx-auto space-y-6">
-        <div class="tabs tabs-bordered">
+        <div class="tabs tabs-bordered overflow-x-auto flex-nowrap whitespace-nowrap">
           <%= for {label, key} <- [
             {"General", "general"}, {"Editor", "editor"}, {"Auth & Keys", "auth"},
             {"Workflow", "workflow"}, {"Pricing", "pricing"}, {"System", "system"}

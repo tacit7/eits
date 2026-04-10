@@ -16,15 +16,20 @@ Worktrees live in `.claude/worktrees/` relative to the project root.
 
 When using git worktrees, always verify you are editing files in the worktree directory, NOT the main project directory. Check `pwd` before making edits.
 
-If deps are missing in the worktree, symlink them before compiling. Worktrees live at `.claude/worktrees/<name>/`, which is **3 levels deep** from the project root — use `../../../`:
+If deps are missing in the worktree, symlink only `deps` — never `_build`. Worktrees live at `.claude/worktrees/<name>/`, which is **3 levels deep** from the project root — use `../../../`:
 ```bash
 cd .claude/worktrees/<name>
-ln -s ../../../deps deps && ln -s ../../../_build _build
+ln -s ../../../deps deps
 ```
 
-Do NOT use `../../` — that resolves to `.claude/`, not the project root, and the symlinks will be broken.
+Do NOT use `../../` — that resolves to `.claude/`, not the project root, and the symlink will be broken.
 
-**Exception: when adding new Elixir modules or deps**, do NOT symlink `_build`. A symlinked `_build` causes stale module conflicts when the worktree introduces modules that don't exist in the main tree (compiled beams collide). For tasks that add new modules, run `mix deps.get` and `mix compile` directly in the worktree to get an isolated `_build`.
+**NEVER symlink `_build` to the main project.** Always use an isolated `_build` in each worktree. A symlinked `_build` lets agent compilations overwrite main's `.beam` files with worktree versions, producing stale/conflicting modules when main restarts — this is the root cause of needing `mix clean` to recover. For all worktrees, run `mix compile` directly to get an isolated `_build`:
+```bash
+cd .claude/worktrees/<name>
+ln -s ../../../deps deps
+mix compile
+```
 
 **CRITICAL: `rm` is aliased to `rm-trash` on this system.** It follows symlinks and trashes the target, not the symlink. To remove symlinks, always use `unlink`:
 ```bash

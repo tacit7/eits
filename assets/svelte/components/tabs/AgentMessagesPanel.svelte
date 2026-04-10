@@ -472,7 +472,7 @@
             on:input={handleInputChange}
             on:keydown={handleInputKeydown}
             placeholder="Message agents... @id to mention, /skill for commands"
-            class="input input-sm w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm h-10"
+            class="input input-sm w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-base h-10"
             autocomplete="off"
           />
 

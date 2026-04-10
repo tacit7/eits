@@ -257,7 +257,7 @@ export const FavoriteFab = {
               type="text"
               id="fab-chat-input"
               placeholder="Message ${this._escapeHtml(agent.name || 'agent')}..."
-              class="input input-sm flex-1 bg-base-200/50 border-base-content/8 text-sm placeholder:text-base-content/25"
+              class="input input-sm flex-1 bg-base-200/50 border-base-content/8 text-base placeholder:text-base-content/25"
               autocomplete="off"
             />
             <button id="fab-chat-send" class="btn btn-primary btn-sm btn-square">

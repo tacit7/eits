@@ -273,13 +273,12 @@ defmodule EyeInTheSky.ScheduledJobs do
 
   defp fs_agent_already_scheduled?(attrs) do
     # Only applies to fs: agents (no prompt_id, agent_file_id in config)
-    prompt_id = attrs["prompt_id"]
+    case attrs["prompt_id"] do
+      p when p in [nil, ""] ->
+        attrs["config"] |> extract_agent_file_id() |> scheduled_for_agent_file?()
 
-    if prompt_id != nil and prompt_id != "" do
-      false
-    else
-      agent_file_id = extract_agent_file_id(attrs["config"])
-      scheduled_for_agent_file?(agent_file_id)
+      _ ->
+        false
     end
   end
 

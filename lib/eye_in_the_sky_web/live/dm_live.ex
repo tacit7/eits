@@ -68,14 +68,12 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("toggle_new_task_drawer", _params, socket) do
-    overlay = if socket.assigns.active_overlay == :task_drawer, do: nil, else: :task_drawer
-    {:noreply, assign(socket, :active_overlay, overlay)}
+    {:noreply, assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, :task_drawer))}
   end
 
   @impl true
   def handle_event("toggle_task_detail_drawer", _params, socket) do
-    overlay = if socket.assigns.active_overlay == :task_detail, do: nil, else: :task_detail
-    {:noreply, assign(socket, :active_overlay, overlay)}
+    {:noreply, assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, :task_detail))}
   end
 
   @impl true
@@ -101,8 +99,7 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("keydown", %{"key" => "k", "ctrlKey" => true}, socket) do
-    overlay = if socket.assigns.active_overlay == :task_drawer, do: nil, else: :task_drawer
-    {:noreply, assign(socket, :active_overlay, overlay)}
+    {:noreply, assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, :task_drawer))}
   end
 
   @impl true
@@ -387,6 +384,13 @@ defmodule EyeInTheSkyWeb.DmLive do
     Logger.debug("Unhandled message in DM LiveView: #{inspect(msg)}")
     {:noreply, socket}
   end
+
+  # ---------------------------------------------------------------------------
+  # Private helpers
+  # ---------------------------------------------------------------------------
+
+  defp toggle_overlay(current, target) when current == target, do: nil
+  defp toggle_overlay(_current, target), do: target
 
   # ---------------------------------------------------------------------------
   # Render

@@ -69,11 +69,13 @@ defmodule EyeInTheSky.Notes do
       end
 
     if session do
+      session_int_str = to_string(session.id)
+
       Note
       |> where(
         [n],
         n.parent_type == "session" and
-          (n.parent_id == ^to_string(session_id) or n.parent_id == ^session.uuid)
+          (n.parent_id == ^session_int_str or n.parent_id == ^session.uuid)
       )
       |> Repo.aggregate(:count, :id)
     else
@@ -92,11 +94,13 @@ defmodule EyeInTheSky.Notes do
       end
 
     if agent do
+      agent_int_str = to_string(agent.id)
+
       Note
       |> where(
         [n],
         n.parent_type == "agent" and
-          (n.parent_id == ^to_string(agent_id) or n.parent_id == ^agent.uuid)
+          (n.parent_id == ^agent_int_str or n.parent_id == ^agent.uuid)
       )
       |> order_by([n], desc: n.created_at)
       |> Repo.all()

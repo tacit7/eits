@@ -14,28 +14,28 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers do
   end
 
   def handle_agent_working(socket, msg, callback) do
-    session_id = get_in(msg, [:session, :id])
+    session_id = msg.id
     if session_id, do: {:noreply, callback.(socket, session_id)}, else: {:noreply, socket}
   end
 
   def handle_agent_stopped(socket, msg, callback) do
-    session_id = get_in(msg, [:session, :id])
+    session_id = msg.id
     if session_id, do: {:noreply, callback.(socket, session_id)}, else: {:noreply, socket}
   end
 
-  def handle_agent_working_if_match(socket, msg, key, callback) do
-    value = get_in(msg, [key])
-    if value == get_in(socket.assigns, [key]) do
-      {:noreply, callback.(socket, value)}
+  def handle_agent_working_if_match(socket, msg, session_assign_key, callback) do
+    session_id = msg.id
+    if session_id == socket.assigns[session_assign_key] do
+      {:noreply, callback.(socket, session_id)}
     else
       {:noreply, socket}
     end
   end
 
-  def handle_agent_stopped_if_match(socket, msg, key, callback) do
-    value = get_in(msg, [key])
-    if value == get_in(socket.assigns, [key]) do
-      {:noreply, callback.(socket, value)}
+  def handle_agent_stopped_if_match(socket, msg, session_assign_key, callback) do
+    session_id = msg.id
+    if session_id == socket.assigns[session_assign_key] do
+      {:noreply, callback.(socket, session_id)}
     else
       {:noreply, socket}
     end

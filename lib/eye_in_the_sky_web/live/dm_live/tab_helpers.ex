@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSky.{Commits, Contexts, Messages, Notes, Tasks}
+  alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 
   require Logger
 
@@ -52,6 +53,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
       :commits,
       maybe_load_tab_data(tab, "commits", socket.assigns[:commits], fn ->
         Commits.list_commits_for_session(session_id)
+        |> enrich_commit_messages(socket)
       end)
     )
     |> assign(
@@ -166,6 +168,51 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     used = input + cache_read + cache_creation
 
     if used > 0, do: {used, 200_000}
+  end
+
+  # Enriches commits that have no stored message by fetching subjects from git.
+  # Uses a single `git log --no-walk` call for all missing hashes at once.
+  # Returns commits unchanged if project path can't be resolved.
+  defp enrich_commit_messages(commits, socket) do
+    missing = Enum.filter(commits, &is_nil(&1.commit_message))
+
+    if missing == [] do
+      commits
+    else
+      case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+        {:ok, project_path} ->
+          hashes = Enum.map(missing, & &1.commit_hash)
+
+          messages =
+            case System.cmd(
+                   "git",
+                   ["-C", project_path, "log", "--no-walk", "--format=%H\t%s"] ++ hashes,
+                   stderr_to_stdout: false
+                 ) do
+              {output, 0} ->
+                output
+                |> String.split("\n", trim: true)
+                |> Map.new(fn line ->
+                  [hash | rest] = String.split(line, "\t", parts: 2)
+                  {String.trim(hash), Enum.join(rest, "\t")}
+                end)
+
+              _ ->
+                %{}
+            end
+
+          Enum.map(commits, fn commit ->
+            if is_nil(commit.commit_message) do
+              %{commit | commit_message: Map.get(messages, commit.commit_hash)}
+            else
+              commit
+            end
+          end)
+
+        _ ->
+          commits
+      end
+    end
   end
 
   defp read_session_usage_stats(socket, session_id) do

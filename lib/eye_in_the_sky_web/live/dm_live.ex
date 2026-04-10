@@ -421,9 +421,16 @@ defmodule EyeInTheSkyWeb.DmLive do
         has_more_messages={@has_more_messages}
         uploads={@uploads}
         stream={%{show: @show_live_stream, content: @stream_content, tool: @stream_tool, thinking: @stream_thinking}}
-        selected_model={@selected_model}
-        selected_effort={@selected_effort}
-        processing={@processing}
+        session_state={%{
+          model: @selected_model,
+          effort: @selected_effort,
+          processing: @processing,
+          thinking_enabled: @thinking_enabled,
+          max_budget_usd: @max_budget_usd,
+          compacting: @compacting,
+          context_used: @context_used,
+          context_window: @context_window
+        }}
         tasks={@tasks}
         commits={@commits}
         diff_cache={@diff_cache}
@@ -431,11 +438,6 @@ defmodule EyeInTheSkyWeb.DmLive do
         slash_items={@slash_items}
         current_task={@current_task}
         queued_prompts={@queued_prompts}
-        thinking_enabled={@thinking_enabled}
-        max_budget_usd={@max_budget_usd}
-        compacting={@compacting}
-        context_used={@context_used}
-        context_window={@context_window}
         message_search_query={@message_search_query}
         session_context={@session_context}
         reloading={@reloading}

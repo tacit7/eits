@@ -43,11 +43,15 @@ defmodule EyeInTheSky.Search.PgSearch do
 
   Accepts the same options as `search/1`, plus:
 
-  - `:extra_where` - An `Ecto.Query.dynamic/2` expression ANDed onto the ILIKE fallback
+  - `:extra_where` - An `Ecto.Query.dynamic/2` expression ANDed onto both the ILIKE fallback
+    and the FTS raw SQL path (replaces `:sql_filter`/`:sql_params`)
   - `:order_by` - Ecto order_by keyword list for the fallback query (e.g. `[desc: :created_at]`)
 
   The fallback is built as:
       WHERE col1 ILIKE pattern OR col2 ILIKE pattern [AND extra_where] ORDER BY order_by
+
+  The FTS SQL path derives the WHERE clause and params from `extra_where` automatically,
+  eliminating the need for manually-indexed `:sql_filter`/`:sql_params`.
   """
   def search_for(query, opts) when is_binary(query) do
     schema = Keyword.fetch!(opts, :schema)
@@ -77,7 +81,46 @@ defmodule EyeInTheSky.Search.PgSearch do
         fallback_query
       end
 
+    # Derive sql_filter + sql_params from extra_where so callers no longer need to
+    # maintain a parallel raw-SQL representation of the same predicate.
+    opts =
+      if extra_where do
+        {sql_filter, sql_params} = extra_where_to_sql(schema, extra_where)
+        Keyword.merge(opts, sql_filter: sql_filter, sql_params: sql_params)
+      else
+        opts
+      end
+
     search(Keyword.merge(opts, query: query, fallback_query: fallback_query))
+  end
+
+  # Converts an Ecto dynamic expression into a raw SQL AND-clause and param list
+  # suitable for embedding in the FTS CTE query.
+  #
+  # Strategy: build a minimal Ecto query with just `where: ^dynamic`, call
+  # `Repo.to_sql/2` to get the PostgreSQL SQL + params, extract the WHERE
+  # clause text, then renumber all $N placeholders by +1 (since $1 is already
+  # taken by the FTS search term in the outer CTE query).
+  defp extra_where_to_sql(schema, dynamic) do
+    base = from(n in schema, where: ^dynamic)
+
+    {sql, params} = Repo.to_sql(:all, base)
+
+    # Extract everything after "WHERE" in the generated SQL.
+    # Ecto generates: SELECT ... FROM table AS n0 WHERE <predicate>
+    case Regex.run(~r/\bWHERE\b(.+?)(?:\s*ORDER\s+BY|\s*LIMIT|\s*$)/si, sql, capture: :all_but_first) do
+      [where_clause] ->
+        # Ecto numbers its params starting at $1; we need to offset by 1 since
+        # the FTS CTE already uses $1 for the search term.
+        shifted_clause = Regex.replace(~r/\$(\d+)/, String.trim(where_clause), fn _, n ->
+          "$#{String.to_integer(n) + 1}"
+        end)
+
+        {"AND (#{shifted_clause})", params}
+
+      nil ->
+        {"", []}
+    end
   end
 
   @doc """
@@ -89,13 +132,13 @@ defmodule EyeInTheSky.Search.PgSearch do
   - `:schema` - Ecto schema module (required)
   - `:query` - Search query string (required)
   - `:search_columns` - List of column names to search (required)
-  - `:sql_filter` - Additional SQL WHERE clause (optional, use $N params starting after search param)
-  - `:sql_params` - Parameters for SQL filter (optional, default: [])
   - `:fallback_query` - Ecto query for ILIKE fallback (required)
   - `:preload` - Associations to preload (optional, default: [])
 
-  ## Deprecated Options (ignored, kept for backwards compatibility)
+  ## Deprecated Options (kept for backwards compatibility, do not use in new code)
 
+  - `:sql_filter` - Raw SQL WHERE clause with manual $N params. Use `:extra_where` via `search_for/2` instead.
+  - `:sql_params` - Parameters for `:sql_filter`. Derived automatically when using `:extra_where`.
   - `:fts_table` - No longer used (PostgreSQL doesn't need separate FTS tables)
   - `:join_key` - No longer used
   """

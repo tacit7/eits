@@ -281,29 +281,21 @@ defmodule EyeInTheSky.Notes do
           Enum.map(ids, &to_string/1)
       end
 
-    {extra_where, sql_filter, sql_params} =
-      build_note_filters(project_id_str, agent_ids_str, session_ids_str, starred_only)
+    extra_where = build_extra_where(project_id_str, agent_ids_str, session_ids_str, starred_only)
 
     PgSearch.search_for(query,
       table: "notes",
       schema: Note,
       search_columns: ["title", "body"],
-      sql_filter: sql_filter,
-      sql_params: sql_params,
       extra_where: extra_where,
       order_by: [desc: :created_at],
       limit: Keyword.get(opts, :limit)
     )
   end
 
-  defp build_note_filters(project_id_str, agent_ids_str, session_ids_str, starred_only) do
+  defp build_extra_where(project_id_str, agent_ids_str, session_ids_str, starred_only) do
     has_scope = agent_ids_str != [] or project_id_str != nil or session_ids_str != []
-    extra_where = build_extra_where(project_id_str, agent_ids_str, session_ids_str, starred_only, has_scope)
-    {sql_filter, sql_params} = build_sql_filter(project_id_str, agent_ids_str, session_ids_str, starred_only, has_scope)
-    {extra_where, sql_filter, sql_params}
-  end
 
-  defp build_extra_where(project_id_str, agent_ids_str, session_ids_str, starred_only, has_scope) do
     scope_dynamic =
       if has_scope, do: build_scope_dynamic(project_id_str, agent_ids_str, session_ids_str)
 
@@ -312,21 +304,6 @@ defmodule EyeInTheSky.Notes do
       {nil, true} -> dynamic([n], n.starred == 1)
       {scope, false} -> scope
       {scope, true} -> dynamic([n], ^scope and n.starred == 1)
-    end
-  end
-
-  defp build_sql_filter(project_id_str, agent_ids_str, session_ids_str, starred_only, has_scope) do
-    {scope_sql, scope_params} =
-      if has_scope,
-        do: build_scope_sql(project_id_str, agent_ids_str, session_ids_str),
-        else: {"", []}
-
-    if starred_only do
-      next_idx = length(scope_params) + 2
-      starred_clause = "AND n.starred = $#{next_idx}"
-      {scope_sql <> " " <> starred_clause, scope_params ++ [1]}
-    else
-      {scope_sql, scope_params}
     end
   end
 
@@ -349,53 +326,6 @@ defmodule EyeInTheSky.Notes do
 
   defp maybe_add_dynamic(list, false, _fun), do: list
   defp maybe_add_dynamic(list, true, fun), do: list ++ [fun.()]
-
-  # Builds a raw SQL AND-clause and param list for the FTS query.
-  # Params are numbered starting at $2 (since $1 is the FTS search term).
-  defp build_scope_sql(project_id_str, agent_ids_str, session_ids_str) do
-    {clauses, params, _idx} =
-      {[], [], 2}
-      |> add_sql_clause(
-        project_id_str != nil,
-        fn {clauses, params, idx} ->
-          clause = "(n.parent_type = 'project' AND n.parent_id = $#{idx})"
-          {[clause | clauses], params ++ [project_id_str], idx + 1}
-        end
-      )
-      |> add_sql_clause(
-        agent_ids_str != [],
-        fn {clauses, params, idx} ->
-          placeholders =
-            agent_ids_str
-            |> Enum.with_index(idx)
-            |> Enum.map_join(",", fn {_, i} -> "$#{i}" end)
-
-          clause = "(n.parent_type = 'agent' AND n.parent_id IN (#{placeholders}))"
-          {[clause | clauses], params ++ agent_ids_str, idx + length(agent_ids_str)}
-        end
-      )
-      |> add_sql_clause(
-        session_ids_str != [],
-        fn {clauses, params, idx} ->
-          placeholders =
-            session_ids_str
-            |> Enum.with_index(idx)
-            |> Enum.map_join(",", fn {_, i} -> "$#{i}" end)
-
-          clause = "(n.parent_type = 'session' AND n.parent_id IN (#{placeholders}))"
-          {[clause | clauses], params ++ session_ids_str, idx + length(session_ids_str)}
-        end
-      )
-
-    if clauses == [] do
-      {"", []}
-    else
-      {"AND (" <> (clauses |> Enum.reverse() |> Enum.join(" OR ")) <> ")", params}
-    end
-  end
-
-  defp add_sql_clause(acc, false, _fun), do: acc
-  defp add_sql_clause(acc, true, fun), do: fun.(acc)
 
   # Resolves a task identifier (integer ID or UUID string) via the Tasks context.
   # Returns {integer_id, uuid_string} or nil if the task does not exist.

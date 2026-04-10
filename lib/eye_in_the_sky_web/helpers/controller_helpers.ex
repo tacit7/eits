@@ -66,8 +66,7 @@ defmodule EyeInTheSkyWeb.ControllerHelpers do
   def parse_starred(nil), do: nil
   def parse_starred(true), do: true
   def parse_starred(false), do: false
-  def parse_starred(1), do: true
-  def parse_starred(0), do: false
+  def parse_starred(val) when is_integer(val), do: val != 0
 
   def parse_starred(val) when is_binary(val) do
     case val do

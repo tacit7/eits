@@ -37,7 +37,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :task_data, :map, default: %{tasks: [], current_task: nil}
 
   attr :overlay_data, :map,
-    default: %{active_overlay: nil, active_timer: nil, schedule_message: nil, reloading: false}
+    default: %{active_overlay: nil, active_timer: nil, reloading: false}
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
 
@@ -75,48 +75,58 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       <%= if @overlay_data.active_overlay == :schedule_timer do %>
         <div class="modal modal-open" id="schedule-timer-modal">
           <div class="modal-box max-w-sm">
-            <h3 class="font-semibold text-base mb-1">Schedule Message</h3>
-            <div class="mb-4">
-              <textarea
-                name="message"
-                rows="3"
-                phx-change="update_schedule_message"
-                class="w-full text-xs rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30 placeholder:text-base-content/30 text-base-content/80 transition-colors resize-none p-2"
-                placeholder="Message to send..."
-              >{@overlay_data.schedule_message}</textarea>
-            </div>
+            <h3 class="font-semibold text-base mb-3">Schedule Message</h3>
 
-            <div class="mb-3">
-              <p class="text-xs font-medium text-base-content/60 mb-2">Once</p>
-              <div class="flex flex-wrap gap-1.5">
-                <%= for preset <- ["5m", "10m", "15m", "30m", "1h"] do %>
-                  <button
-                    phx-click="schedule_timer"
-                    phx-value-mode="once"
-                    phx-value-preset={preset}
-                    class="btn btn-sm btn-outline"
-                  >{preset}</button>
-                <% end %>
+            <form id="schedule-timer-form" phx-submit="schedule_timer">
+              <input type="hidden" name="mode" id="timer-mode-input" value="once" />
+              <input type="hidden" name="preset" id="timer-preset-input" value="15m" />
+
+              <div class="mb-4">
+                <label class="text-xs font-medium text-base-content/60 mb-1.5 block">Message</label>
+                <textarea
+                  name="message"
+                  rows="3"
+                  class="textarea textarea-bordered w-full text-xs resize-none"
+                  placeholder="Message to send when timer fires..."
+                ><%= EyeInTheSky.OrchestratorTimers.default_message() %></textarea>
               </div>
-            </div>
 
-            <div class="mb-4">
-              <p class="text-xs font-medium text-base-content/60 mb-2">Repeating</p>
-              <div class="flex flex-wrap gap-1.5">
-                <%= for preset <- ["5m", "10m", "15m", "30m", "1h"] do %>
-                  <button
-                    phx-click="schedule_timer"
-                    phx-value-mode="repeating"
-                    phx-value-preset={preset}
-                    class="btn btn-sm btn-outline"
-                  >{preset}</button>
-                <% end %>
+              <div class="mb-3">
+                <p class="text-xs font-medium text-base-content/60 mb-2">Once</p>
+                <div class="flex flex-wrap gap-1.5">
+                  <%= for preset <- ["5m", "10m", "15m", "30m", "1h"] do %>
+                    <button
+                      type="submit"
+                      phx-click={
+                        JS.set_attribute({"value", "once"}, to: "#timer-mode-input")
+                        |> JS.set_attribute({"value", preset}, to: "#timer-preset-input")
+                      }
+                      class="btn btn-sm btn-outline"
+                    >{preset}</button>
+                  <% end %>
+                </div>
               </div>
-            </div>
 
-            <div class="modal-action">
-              <button phx-click="close_schedule_modal" class="btn btn-ghost btn-sm">Cancel</button>
-            </div>
+              <div class="mb-4">
+                <p class="text-xs font-medium text-base-content/60 mb-2">Repeating</p>
+                <div class="flex flex-wrap gap-1.5">
+                  <%= for preset <- ["5m", "10m", "15m", "30m", "1h"] do %>
+                    <button
+                      type="submit"
+                      phx-click={
+                        JS.set_attribute({"value", "repeating"}, to: "#timer-mode-input")
+                        |> JS.set_attribute({"value", preset}, to: "#timer-preset-input")
+                      }
+                      class="btn btn-sm btn-outline"
+                    >{preset}</button>
+                  <% end %>
+                </div>
+              </div>
+
+              <div class="modal-action">
+                <button type="button" phx-click="close_schedule_modal" class="btn btn-ghost btn-sm">Cancel</button>
+              </div>
+            </form>
           </div>
           <div class="modal-backdrop" phx-click="close_schedule_modal"></div>
         </div>
@@ -279,14 +289,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                     {if @session_uuid, do: String.slice(@session_uuid, 0..7), else: "—"}
                     <.icon name="hero-clipboard-document" class="w-3 h-3" />
                   </button>
-                  <button
-                    type="button"
-                    phx-click="open_iterm"
-                    title="Open in iTerm"
-                    class="hidden sm:flex items-center gap-1 text-[11px] text-base-content/30 bg-base-content/5 px-2 py-0.5 rounded hover:text-base-content/50 hover:bg-base-content/8 transition-colors cursor-pointer flex-shrink-0"
-                  >
-                    <.icon name="hero-command-line" class="w-3 h-3" />
-                  </button>
                 </div>
                 <input
                   type="text"
@@ -355,6 +357,14 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                       class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
                     >
                       <.icon name="hero-bell" class="w-3.5 h-3.5" /> Notify
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      phx-click="open_iterm"
+                      class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+                    >
+                      <.icon name="hero-command-line" class="w-3.5 h-3.5" /> Open in iTerm
                     </button>
                   </li>
                   <li><hr class="border-base-content/10 my-1" /></li>

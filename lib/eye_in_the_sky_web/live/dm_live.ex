@@ -97,11 +97,6 @@ defmodule EyeInTheSkyWeb.DmLive do
     do: TimerHandlers.handle_cancel_timer(socket)
 
   @impl true
-  def handle_event("update_schedule_message", %{"message" => msg}, socket) do
-    {:noreply, assign(socket, :schedule_message, msg)}
-  end
-
-  @impl true
   def handle_event("toggle_thinking", _params, socket), do: handle_toggle_thinking(socket)
 
   @impl true
@@ -428,7 +423,6 @@ defmodule EyeInTheSkyWeb.DmLive do
         overlay_data={%{
           active_overlay: @active_overlay,
           active_timer: @active_timer,
-          schedule_message: @schedule_message,
           reloading: @reloading
         }}
         commits={@commits}

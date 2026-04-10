@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Sessions
   import EyeInTheSkyWeb.Components.SessionCard, only: [session_row: 1]
+  import EyeInTheSkyWeb.Helpers.AgentCreationHelpers, only: [build_opts: 2]
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
@@ -157,8 +158,6 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
 
   @impl true
   def handle_event("create_new_session", params, socket) do
-    model = params["model"]
-    effort_level = params["effort_level"]
     project_id = parse_int(params["project_id"])
     description = params["description"]
 
@@ -171,23 +170,13 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
 
         project = EyeInTheSky.Projects.get_project!(pid)
 
-        worktree =
-          case params["worktree"] do
-            nil -> nil
-            "" -> nil
-            w -> w
-          end
-
-        opts = [
-          model: model,
-          effort_level: effort_level,
-          project_id: pid,
-          project_path: project.path,
-          description: agent_name,
-          instructions: description,
-          agent: params["agent"],
-          worktree: worktree
-        ]
+        opts =
+          build_opts(params,
+            project_path: project.path,
+            description: agent_name,
+            instructions: description
+          )
+          |> Keyword.put(:project_id, pid)
 
         case AgentManager.create_agent(opts) do
           {:ok, _result} ->

@@ -17,6 +17,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Sessions
   alias EyeInTheSkyWeb.ControllerHelpers
+  import EyeInTheSkyWeb.Helpers.AgentCreationHelpers, only: [build_opts: 2]
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Loader
 
   # ---------------------------------------------------------------------------
@@ -24,23 +25,17 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   # ---------------------------------------------------------------------------
 
   def create_new_session(params, socket) do
-    agent_type = params["agent_type"] || "claude"
-    model = params["model"]
-    effort_level = params["effort_level"]
     project = socket.assigns.project
     description = params["description"]
     agent_name = params["agent_name"] || String.slice(description || "", 0, 60)
 
-    opts = [
-      agent_type: agent_type,
-      model: model,
-      effort_level: effort_level,
-      project_id: project.id,
-      project_path: project.path,
-      description: agent_name,
-      instructions: description,
-      agent: params["agent"]
-    ]
+    opts =
+      build_opts(params,
+        project_path: project.path,
+        description: agent_name,
+        instructions: description
+      )
+      |> Keyword.put(:project_id, project.id)
 
     case AgentManager.create_agent(opts) do
       {:ok, _result} ->

@@ -10,6 +10,7 @@ defmodule EyeInTheSky.Notes do
   alias EyeInTheSky.Agents
   alias EyeInTheSky.Notes.NoteQueries
   alias EyeInTheSky.Sessions
+  alias EyeInTheSky.Tasks
 
   # Delegate to NoteQueries to avoid a circular dependency with EyeInTheSky.Tasks.
   defdelegate with_notes_count(tasks), to: NoteQueries
@@ -107,18 +108,15 @@ defmodule EyeInTheSky.Notes do
   @doc """
   Returns notes for a specific task.
   Accepts either an integer task ID or a UUID string.
-  Matches notes on both integer ID (as string) and UUID without calling the Tasks context.
+  Resolves the task via the Tasks context, then matches notes on both integer ID (as string) and UUID.
   """
   def list_notes_for_task(task_id) do
-    task_id_str = to_string(task_id)
+    {int_id, uuid} = resolve_task_ids(task_id)
 
-    from(n in Note,
-      join: t in EyeInTheSky.Tasks.Task,
-      on: n.parent_id == fragment("CAST(? AS text)", t.id) or n.parent_id == t.uuid,
-      where: n.parent_type == "task",
-      where: fragment("CAST(? AS text)", t.id) == ^task_id_str or t.uuid == ^task_id_str,
-      order_by: [desc: n.created_at]
-    )
+    Note
+    |> where([n], n.parent_type == "task")
+    |> where([n], n.parent_id == ^to_string(int_id) or n.parent_id == ^uuid)
+    |> order_by([n], desc: n.created_at)
     |> Repo.all()
   end
 
@@ -393,4 +391,11 @@ defmodule EyeInTheSky.Notes do
 
   defp add_sql_clause(acc, false, _fun), do: acc
   defp add_sql_clause(acc, true, fun), do: fun.(acc)
+
+  # Resolves a task identifier (integer ID or UUID string) via the Tasks context,
+  # returning {integer_id, uuid_string} for use in note queries.
+  defp resolve_task_ids(task_id) do
+    task = Tasks.get_task_by_uuid_or_id!(to_string(task_id))
+    {task.id, task.uuid}
+  end
 end

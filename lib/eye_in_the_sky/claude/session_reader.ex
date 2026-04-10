@@ -4,6 +4,7 @@ defmodule EyeInTheSky.Claude.SessionReader do
   """
 
   alias EyeInTheSky.Claude.SessionFileLocator
+  alias EyeInTheSky.Claude.MessageFormatter
 
   @doc """
   Discovers all Claude Code sessions by scanning ~/.claude/projects/ directory.
@@ -241,7 +242,7 @@ defmodule EyeInTheSky.Claude.SessionReader do
       %{
         id: tool_id,
         type: name,
-        message: format_tool_call(name, input),
+        message: MessageFormatter.format_tool_call(name, input),
         timestamp: ts
       }
     end)
@@ -253,169 +254,13 @@ defmodule EyeInTheSky.Claude.SessionReader do
   Formats messages for the UI.
   Extracts role, content, and timestamp from Claude session JSON.
   Tool result blocks from "user" messages are emitted as separate entries.
+  Delegates to `EyeInTheSky.Claude.MessageFormatter`.
   """
-  def format_messages(messages) when is_list(messages) do
-    count = Enum.count(messages)
+  defdelegate format_messages(messages), to: MessageFormatter
 
-    messages
-    |> Enum.with_index()
-    |> Enum.flat_map(fn {msg, idx} ->
-      timestamp =
-        msg["timestamp"] || msg["created_at"] ||
-          DateTime.utc_now()
-          |> DateTime.add(-count + idx, :second)
-          |> DateTime.to_iso8601()
-
-      tool_results = extract_tool_result_messages(msg, timestamp)
-
-      base = %{
-        uuid: msg["uuid"],
-        role: get_in(msg, ["message", "role"]) || msg["type"],
-        content: extract_content(msg),
-        timestamp: timestamp,
-        usage: get_in(msg, ["message", "usage"]),
-        stream_type: nil
-      }
-
-      regular =
-        if base.content == "" || String.starts_with?(String.trim(base.content), "<") do
-          []
-        else
-          [base]
-        end
-
-      regular ++ tool_results
-    end)
-  end
-
-  defp extract_tool_result_messages(
-         %{"type" => "user", "message" => %{"content" => content}} = _msg,
-         timestamp
-       )
-       when is_list(content) do
-    content
-    |> Enum.filter(&match?(%{"type" => "tool_result"}, &1))
-    |> Enum.map(fn block ->
-      tool_use_id = block["tool_use_id"] || ""
-      result_content = block["content"] || ""
-      body = if is_binary(result_content), do: result_content, else: Jason.encode!(result_content)
-      body = String.slice(body, 0..4000)
-
-      %{
-        uuid: derive_tool_result_uuid(tool_use_id),
-        role: "tool_result",
-        content: body,
-        timestamp: timestamp,
-        usage: nil,
-        stream_type: "tool_result"
-      }
-    end)
-  end
-
-  defp extract_tool_result_messages(_, _), do: []
-
-  defp derive_tool_result_uuid(seed) when is_binary(seed) and seed != "" do
-    hex = :crypto.hash(:sha, seed) |> Base.encode16(case: :lower)
-
-    "#{String.slice(hex, 0, 8)}-#{String.slice(hex, 8, 4)}-#{String.slice(hex, 12, 4)}-#{String.slice(hex, 16, 4)}-#{String.slice(hex, 20, 12)}"
-  end
-
-  defp derive_tool_result_uuid(_), do: nil
-
-  defp extract_content(%{"message" => %{"content" => content}}) when is_binary(content) do
-    content
-  end
-
-  defp extract_content(%{"message" => %{"content" => content}}) when is_list(content) do
-    content
-    |> Enum.filter(&is_map/1)
-    |> Enum.flat_map(fn
-      %{"type" => "text", "text" => text} ->
-        [text]
-
-      %{"type" => "tool_use", "name" => name, "input" => input} ->
-        [format_tool_call(name, input)]
-
-      _ ->
-        []
-    end)
-    |> Enum.join("\n\n")
-  end
-
-  # Handle case where content is directly in message (not nested)
-  defp extract_content(%{"content" => content}) when is_binary(content) do
-    content
-  end
-
-  defp extract_content(%{"content" => content}) when is_list(content) do
-    content
-    |> Enum.filter(&is_map/1)
-    |> Enum.flat_map(fn
-      %{"type" => "text", "text" => text} ->
-        [text]
-
-      %{"type" => "tool_use", "name" => name, "input" => input} ->
-        [format_tool_call(name, input)]
-
-      _ ->
-        []
-    end)
-    |> Enum.join("\n\n")
-  end
-
-  defp extract_content(_), do: ""
-
-  # Tool call formatting - compact summaries for chat display
-  defp format_tool_call("Read", %{"file_path" => path}), do: "> `Read` #{path}"
-  defp format_tool_call("Write", %{"file_path" => path}), do: "> `Write` #{path}"
-  defp format_tool_call("Edit", %{"file_path" => path}), do: "> `Edit` #{path}"
-  defp format_tool_call("Glob", %{"pattern" => pat}), do: "> `Glob` #{pat}"
-
-  defp format_tool_call("Grep", %{"pattern" => pat} = input) do
-    path = input["path"] || ""
-    "> `Grep` `#{pat}` #{path}"
-  end
-
-  defp format_tool_call("Bash", %{"command" => cmd}) do
-    "> `Bash` #{cmd}"
-  end
-
-  defp format_tool_call("Task", %{"prompt" => prompt}) do
-    truncated = String.slice(prompt, 0..80)
-    suffix = if String.length(prompt) > 81, do: "...", else: ""
-    "> `Task` #{truncated}#{suffix}"
-  end
-
-  defp format_tool_call(name, %{"message" => msg} = input)
-       when is_binary(name) and is_binary(msg) do
-    voice = Map.get(input, "voice", "")
-    rate = Map.get(input, "rate")
-
-    parts =
-      [
-        "message: #{msg}",
-        if(voice != "", do: "voice: #{voice}", else: nil),
-        if(rate, do: "rate: #{rate}", else: nil)
-      ]
-      |> Enum.reject(&is_nil/1)
-      |> Enum.join(", ")
-
-    "> `#{name}` #{parts}"
-  end
-
-  defp format_tool_call(name, input) when is_map(input) do
-    summary =
-      input
-      |> Map.to_list()
-      |> Enum.take(2)
-      |> Enum.filter(fn {_k, v} -> is_binary(v) or is_number(v) or is_atom(v) end)
-      |> Enum.map_join(", ", fn {k, v} ->
-        val = v |> to_string() |> String.slice(0..500)
-        "#{k}: #{val}"
-      end)
-
-    "> `#{name}` #{summary}"
-  end
-
-  defp format_tool_call(name, _), do: "> `#{name}`"
+  @doc """
+  Returns a compact summary string for a tool call, suitable for chat display.
+  Delegates to `EyeInTheSky.Claude.MessageFormatter`.
+  """
+  defdelegate format_tool_call(name, input), to: MessageFormatter
 end

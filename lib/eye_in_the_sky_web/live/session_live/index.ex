@@ -98,17 +98,10 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
       end
     end
 
-    sessions =
-      Sessions.list_session_overview_rows(limit: socket.assigns.page * @per_page, offset: 0)
-
-    total = Sessions.count_session_overview_rows()
-
     socket =
       socket
       |> assign(:editing_session_id, nil)
-      |> assign(:has_more, length(sessions) < total)
-      |> assign(:total_sessions, total)
-      |> stream(:sessions, sessions, reset: true)
+      |> reload_sessions()
 
     {:noreply, socket}
   end
@@ -131,16 +124,9 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
   def handle_event("archive_session", %{"session_id" => session_id}, socket) do
     with {:ok, session} <- Sessions.get_session(session_id),
          {:ok, _} <- Sessions.archive_session(session) do
-      sessions =
-        Sessions.list_session_overview_rows(limit: socket.assigns.page * @per_page, offset: 0)
-
-      total = Sessions.count_session_overview_rows()
-
       socket =
         socket
-        |> assign(:has_more, length(sessions) < total)
-        |> assign(:total_sessions, total)
-        |> stream(:sessions, sessions, reset: true)
+        |> reload_sessions()
         |> put_flash(:info, "Session archived")
 
       {:noreply, socket}
@@ -153,16 +139,9 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
   def handle_event("delete_session", %{"session_id" => session_id}, socket) do
     with {:ok, session} <- Sessions.get_session(session_id),
          {:ok, _} <- Sessions.delete_session(session) do
-      sessions =
-        Sessions.list_session_overview_rows(limit: socket.assigns.page * @per_page, offset: 0)
-
-      total = Sessions.count_session_overview_rows()
-
       socket =
         socket
-        |> assign(:has_more, length(sessions) < total)
-        |> assign(:total_sessions, total)
-        |> stream(:sessions, sessions, reset: true)
+        |> reload_sessions()
         |> put_flash(:info, "Session deleted")
 
       {:noreply, socket}

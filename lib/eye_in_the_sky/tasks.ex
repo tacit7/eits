@@ -98,13 +98,19 @@ defmodule EyeInTheSky.Tasks do
   Returns the list of tasks for a specific session.
   """
   def list_tasks_for_session(session_id, opts \\ []) do
-    QueryHelpers.for_session_join(Task, session_id, "task_sessions",
-      preload: [:state, :tags],
-      order_by: [desc: :priority, asc: :created_at],
-      limit: Keyword.get(opts, :limit),
-      offset: Keyword.get(opts, :offset)
-    )
-    |> NoteQueries.with_notes_count()
+    query =
+      QueryHelpers.for_session_join(Task, session_id, "task_sessions",
+        preload: [:state, :tags],
+        order_by: [desc: :priority, asc: :created_at],
+        limit: Keyword.get(opts, :limit),
+        offset: Keyword.get(opts, :offset)
+      )
+
+    if Keyword.get(opts, :notes_count, true) do
+      NoteQueries.with_notes_count(query)
+    else
+      query
+    end
   end
 
   @doc """

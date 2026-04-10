@@ -62,7 +62,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
 
   # Initial mount — called once with project_id + project attrs.
   def update(assigns, socket) do
-    if Map.has_key?(socket.assigns, :initialized) do
+    if Map.has_key?(socket.assigns, :project_id) do
       # Re-mount (e.g. project context changed); refresh jobs if project changed.
       prev_project_id = socket.assigns.project_id
 
@@ -83,7 +83,6 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
     else
       socket =
         socket
-        |> assign(:initialized, true)
         |> assign(:project_id, assigns.project_id)
         |> assign(:project, assigns.project)
         |> assign(:form_scope, if(assigns.project_id, do: "project", else: "global"))

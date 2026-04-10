@@ -74,19 +74,18 @@ defmodule EyeInTheSky.Messages.Deduplicator do
   def find_or_create(attrs, metadata) do
     source_uuid = Map.get(attrs, :source_uuid)
 
-    cond do
-      source_uuid && source_uuid_exists?(source_uuid) ->
-        existing = Repo.get_by!(Message, source_uuid: source_uuid)
-        enrich_metadata_if_present(existing, metadata)
-
-      is_nil(source_uuid) ->
+    case source_uuid do
+      nil ->
         case find_recent_message(Map.get(attrs, :session_id), Map.get(attrs, :body)) do
           nil -> do_insert(attrs)
           existing -> enrich_metadata_if_present(existing, metadata)
         end
 
-      true ->
-        do_insert(attrs)
+      uuid ->
+        case Repo.get_by(Message, source_uuid: uuid) do
+          nil -> do_insert(attrs)
+          existing -> enrich_metadata_if_present(existing, metadata)
+        end
     end
   end
 
@@ -109,12 +108,6 @@ defmodule EyeInTheSky.Messages.Deduplicator do
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
-
-  defp source_uuid_exists?(source_uuid) do
-    Message
-    |> where([m], m.source_uuid == ^source_uuid)
-    |> Repo.exists?()
-  end
 
   defp do_insert(attrs) do
     cid = Map.get(attrs, :channel_id)

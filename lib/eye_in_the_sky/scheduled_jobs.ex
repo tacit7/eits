@@ -4,6 +4,7 @@ defmodule EyeInTheSky.ScheduledJobs do
 
   alias EyeInTheSky.Repo
   alias EyeInTheSky.ScheduledJobs.ScheduledJob
+  alias EyeInTheSky.ScheduledJobs.CronParser
   alias EyeInTheSky.ScheduledJobs.JobRunTracker
   alias EyeInTheSky.ScheduledJobs.JobScheduler
 
@@ -23,7 +24,7 @@ defmodule EyeInTheSky.ScheduledJobs do
   # ---------------------------------------------------------------------------
 
   defdelegate compute_next_run_at(schedule_type, schedule_value, from \\ nil, timezone \\ "Etc/UTC"),
-    to: JobScheduler
+    to: CronParser
 
   defdelegate due_jobs(), to: JobScheduler
   defdelegate mark_job_executed(job), to: JobScheduler

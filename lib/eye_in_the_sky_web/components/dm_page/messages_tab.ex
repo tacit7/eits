@@ -127,6 +127,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             src={provider_icon(@message.provider)}
             class={"w-4 h-4 mt-1 flex-shrink-0 #{provider_icon_class(@message.provider)}"}
             alt={@message.provider || "Agent"}
+            width="16"
+            height="16"
+            loading="lazy"
           />
         <% end %>
 
@@ -348,12 +351,18 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
         src="/images/openai.svg"
         class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
         alt="Codex"
+        width="16"
+        height="16"
+        loading="lazy"
       />
     <% else %>
       <img
         src="/images/claude.svg"
         class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
         alt="Claude"
+        width="16"
+        height="16"
+        loading="lazy"
       />
     <% end %>
     """

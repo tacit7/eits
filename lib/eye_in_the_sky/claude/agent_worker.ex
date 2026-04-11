@@ -26,6 +26,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   @registry EyeInTheSky.Claude.AgentRegistry
 
+  # Workers shut themselves down after this many ms of idle with an empty queue.
+  @idle_timeout_ms :timer.minutes(30)
+
   @type status :: :idle | :running | :retry_wait | :failed
 
   defstruct [
@@ -51,6 +54,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     :watchdog_timer_ref,
     :watchdog_run_ref,
     :handler_pid,
+    :idle_timer_ref,
     status: :idle,
     queue: [],
     stream: nil,
@@ -177,7 +181,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       "AgentWorker started for session=#{session_id} agent=#{agent_id} provider=#{provider}"
     )
 
-    {:ok, state}
+    {:ok, schedule_idle_timer(state)}
   end
 
   @impl true
@@ -227,7 +231,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       when status in [:retry_wait, :failed] do
     Logger.info("[#{state.session_id}] Cancelling worker in #{status} state (no active SDK)")
     state = RetryPolicy.clear_retry_timer(state)
-    {:noreply, %{state | status: :idle}}
+    {:noreply, %{state | status: :idle} |> maybe_schedule_idle_timer()}
   end
 
   def handle_cast({:remove_queued_prompt, prompt_id}, state) do
@@ -321,7 +325,8 @@ defmodule EyeInTheSky.Claude.AgentWorker do
          handler_monitor: nil,
          handler_pid: nil,
          current_job: nil
-     })}
+     })
+     |> maybe_schedule_idle_timer()}
   end
 
   # Stale Claude session — retry current job as a fresh start
@@ -364,12 +369,14 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   @impl true
   def handle_info(:retry_start, %__MODULE__{status: :retry_wait, queue: [_ | _]} = state) do
-    {:noreply, QueueManager.process_next_job(%{state | status: :idle, retry_timer_ref: nil})}
+    {:noreply,
+     QueueManager.process_next_job(%{state | status: :idle, retry_timer_ref: nil})
+     |> maybe_schedule_idle_timer()}
   end
 
   @impl true
   def handle_info(:retry_start, %__MODULE__{status: :retry_wait} = state) do
-    {:noreply, %{state | status: :idle, retry_timer_ref: nil}}
+    {:noreply, %{state | status: :idle, retry_timer_ref: nil} |> maybe_schedule_idle_timer()}
   end
 
   @impl true
@@ -416,6 +423,16 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   # Stale watchdog (run_ref mismatch) or fired after worker already transitioned — ignore.
   @impl true
   def handle_info({:watchdog_check, _run_ref}, state), do: {:noreply, state}
+
+  # Idle timeout — stop the worker to free the AgentSupervisor slot
+  @impl true
+  def handle_info(:idle_timeout, %__MODULE__{status: :idle, queue: []} = state) do
+    Logger.info("AgentWorker: idle timeout, stopping for session_id=#{state.session_id}")
+    {:stop, :normal, state}
+  end
+
+  # Raced with a new job — ignore
+  def handle_info(:idle_timeout, state), do: {:noreply, state}
 
   # Handler process crashed — treat as SDK error so worker survives
   @impl true
@@ -471,6 +488,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
         "model=#{inspect(context.model)}"
     )
 
+    state = cancel_idle_timer(state)
     queue_len = length(state.queue)
 
     emit([:eits, :agent, :job, :received], %{system_time: System.system_time()},
@@ -527,4 +545,26 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   defp emit(event, measurements, extra_meta, state) do
     :telemetry.execute(event, measurements, Map.put(extra_meta, :session_id, state.session_id))
   end
+
+  # Schedules an idle timeout, cancelling any existing timer first.
+  defp schedule_idle_timer(%__MODULE__{} = state) do
+    state = cancel_idle_timer(state)
+    ref = Process.send_after(self(), :idle_timeout, @idle_timeout_ms)
+    %{state | idle_timer_ref: ref}
+  end
+
+  defp cancel_idle_timer(%__MODULE__{idle_timer_ref: nil} = state), do: state
+
+  defp cancel_idle_timer(%__MODULE__{idle_timer_ref: ref} = state) do
+    Process.cancel_timer(ref)
+    %{state | idle_timer_ref: nil}
+  end
+
+  # Schedules idle timer only when the worker is truly idle with an empty queue.
+  # Called after process_next_job or idle transitions; no-ops when a job was dequeued.
+  defp maybe_schedule_idle_timer(%__MODULE__{status: :idle, queue: []} = state) do
+    schedule_idle_timer(state)
+  end
+
+  defp maybe_schedule_idle_timer(state), do: state
 end

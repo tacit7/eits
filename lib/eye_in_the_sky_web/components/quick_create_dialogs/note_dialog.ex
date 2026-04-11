@@ -45,8 +45,8 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.NoteDialog do
             ></textarea>
           </div>
           <div class="flex justify-end gap-2 pt-1">
-            <button data-qcn-cancel type="button" class="btn btn-ghost btn-sm">Cancel</button>
-            <button type="submit" class="btn btn-primary btn-sm">Create Note</button>
+            <button data-qcn-cancel type="button" class="btn btn-ghost btn-sm min-h-[44px]">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm min-h-[44px]">Create Note</button>
           </div>
         </form>
       </div>

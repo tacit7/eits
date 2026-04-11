@@ -44,8 +44,8 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.UpdateAgentDialog do
             ></textarea>
           </div>
           <div class="flex justify-end gap-2 pt-1">
-            <button data-qua-cancel type="button" class="btn btn-ghost btn-sm">Cancel</button>
-            <button type="submit" class="btn btn-primary btn-sm">Update Agent</button>
+            <button data-qua-cancel type="button" class="btn btn-ghost btn-sm min-h-[44px]">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm min-h-[44px]">Update Agent</button>
           </div>
         </form>
       </div>

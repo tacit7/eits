@@ -50,15 +50,15 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.AgentDialog do
             <select
               id="qca-model"
               data-qca-model
-              class="select select-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm"
+              class="select select-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-sm min-h-[44px]"
             >
               <option value="haiku">Haiku (fast)</option>
               <option value="sonnet">Sonnet (balanced)</option>
             </select>
           </div>
           <div class="flex justify-end gap-2 pt-1">
-            <button data-qca-cancel type="button" class="btn btn-ghost btn-sm">Cancel</button>
-            <button type="submit" class="btn btn-primary btn-sm">Spawn Agent</button>
+            <button data-qca-cancel type="button" class="btn btn-ghost btn-sm min-h-[44px]">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm min-h-[44px]">Spawn Agent</button>
           </div>
         </form>
       </div>

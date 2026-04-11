@@ -532,7 +532,7 @@
 
         <button
           type="submit"
-          class="btn btn-sm btn-primary min-h-0 h-10 px-5"
+          class="btn btn-sm btn-primary min-h-0 h-11 px-5"
           disabled={!inputValue || inputValue.trim() === ''}
           aria-label="Send message"
         >

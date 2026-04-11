@@ -59,8 +59,8 @@ defmodule EyeInTheSkyWeb.Presenters.AgentPresenter do
         title: task.title,
         description: task.description,
         priority: task.priority,
-        state_name: task.state && task.state.name,
-        tags: task.tags && Enum.map(task.tags, &%{id: format_uuid(&1.id), name: &1.name}),
+        state_name: if(task.state, do: task.state.name),
+        tags: if(task.tags, do: Enum.map(task.tags, &%{id: format_uuid(&1.id), name: &1.name})),
         created_at: task.created_at
       }
     end)

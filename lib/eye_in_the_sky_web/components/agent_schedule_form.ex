@@ -54,7 +54,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
 
   defp form_body(assigns) do
     config =
-      case Jason.decode((assigns.job && assigns.job.config) || "{}") do
+      case Jason.decode((if assigns.job, do: assigns.job.config) || "{}") do
         {:ok, m} -> m
         _ -> %{}
       end
@@ -62,8 +62,8 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     assigns =
       assigns
       |> assign(:editing, assigns.job != nil)
-      |> assign(:schedule_type, (assigns.job && assigns.job.schedule_type) || "cron")
-      |> assign(:schedule_value, (assigns.job && assigns.job.schedule_value) || "")
+      |> assign(:schedule_type, (if assigns.job, do: assigns.job.schedule_type) || "cron")
+      |> assign(:schedule_value, (if assigns.job, do: assigns.job.schedule_value) || "")
       |> assign(:model, Map.get(config, "model", "sonnet"))
       |> assign(:max_budget_usd, Map.get(config, "max_budget_usd", ""))
       |> assign(:max_turns, Map.get(config, "max_turns", ""))

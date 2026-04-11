@@ -81,7 +81,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
 
   def handle_event("send_message", %{"body" => body}, socket) do
     session_id = socket.assigns.canvas_session.session_id
-    provider = (socket.assigns.session && socket.assigns.session.provider) || "claude"
+    provider = (if socket.assigns.session, do: socket.assigns.session.provider) || "claude"
 
     case Messages.send_message(%{
       session_id: session_id,

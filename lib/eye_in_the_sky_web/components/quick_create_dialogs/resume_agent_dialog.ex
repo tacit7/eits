@@ -2,6 +2,8 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ResumeAgentDialog do
   @moduledoc false
   use Phoenix.Component
 
+  import EyeInTheSkyWeb.CoreComponents
+
   def quick_resume_agent(assigns) do
     ~H"""
     <dialog
@@ -43,19 +45,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ResumeAgentDialog do
             ></textarea>
           </div>
           <div class="alert alert-info text-sm">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              class="stroke-current shrink-0 w-5 h-5"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              ></path>
-            </svg>
+            <.icon name="hero-information-circle" class="shrink-0 w-5 h-5" />
             <span>This will spawn a new Claude session for the existing agent.</span>
           </div>
           <div class="flex justify-end gap-2 pt-1">

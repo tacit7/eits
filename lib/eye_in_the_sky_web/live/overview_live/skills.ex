@@ -181,9 +181,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                   >
                     <div class="card-body p-4">
                       <div class="flex items-center gap-2 mb-2">
-                        <svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 16 16">
-                          <path d="M6.122.392a1.75 1.75 0 0 1 1.756 0l5.25 3.045c.54.313.872.89.872 1.514V7.25a.75.75 0 0 1-1.5 0V5.677L7.75 8.432v6.384a1 1 0 0 1-1.502.865L.872 12.563A1.75 1.75 0 0 1 0 11.049V4.951c0-.624.332-1.2.872-1.514ZM7 7.564 11.546 5 7 2.437 2.454 5Z" />
-                        </svg>
+                        <.icon name="hero-puzzle-piece" class="w-4 h-4 text-primary" />
                         <code class="text-sm font-semibold text-primary">/{skill.slug}</code>
                       </div>
                       <p class="text-sm text-base-content/70 line-clamp-2 mb-3">

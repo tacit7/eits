@@ -99,10 +99,10 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
             s.uuid,
             s.id,
             s.name,
-            s.agent && s.agent.uuid,
-            s.agent && s.agent.id,
-            s.agent && s.agent.description,
-            s.agent && s.agent.project_name
+            if(s.agent, do: s.agent.uuid),
+            if(s.agent, do: s.agent.id),
+            if(s.agent, do: s.agent.description),
+            if(s.agent, do: s.agent.project_name)
           ]
           |> Enum.map_join(" ", &to_string_or_empty/1)
           |> String.downcase()

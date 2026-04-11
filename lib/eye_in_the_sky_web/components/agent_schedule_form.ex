@@ -71,7 +71,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
       |> assign(:allowed_tools, Map.get(config, "allowed_tools", ""))
       |> assign(:skip_permissions, Map.get(config, "skip_permissions", true))
       |> assign(:output_format, Map.get(config, "output_format", ""))
-      |> assign(:timezone, (assigns.job && assigns.job.timezone) || system_timezone())
+      |> assign(:timezone, (if assigns.job, do: assigns.job.timezone) || system_timezone())
       |> assign(:permission_mode, Map.get(config, "permission_mode", ""))
       |> assign(:add_dir, Map.get(config, "add_dir", ""))
       |> assign(:mcp_config, Map.get(config, "mcp_config", ""))

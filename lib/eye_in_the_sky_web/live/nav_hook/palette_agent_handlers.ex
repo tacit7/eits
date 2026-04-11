@@ -186,7 +186,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteAgentHandlers do
             status: latest_status,
             session_count: length(agent.sessions || []),
             instructions: nil,
-            project_name: agent.project && agent.project.name,
+            project_name: if(agent.project, do: agent.project.name),
             created_at: agent.created_at
           }
         }

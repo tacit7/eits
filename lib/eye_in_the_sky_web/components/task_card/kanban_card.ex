@@ -125,7 +125,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             type="button"
             phx-click={@on_click}
             phx-value-task_id={@task_id}
-            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+            class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
           >
             <.icon name="hero-rectangle-stack-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
             Open card
@@ -136,7 +136,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             phx-click="open_task_detail"
             phx-value-task_id={@task_id}
             phx-value-focus="tags"
-            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+            class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
           >
             <.icon name="hero-tag-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
             Edit labels
@@ -146,7 +146,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             type="button"
             phx-click="open_date_picker"
             phx-value-task_id={@task_id}
-            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+            class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
           >
             <.icon name="hero-clock-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
             Edit dates
@@ -158,7 +158,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             id={"copy-task-kanban-#{@task.id}"}
             data-copy={@task_id}
             onclick="event.preventDefault();"
-            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+            class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
           >
             <.icon name="hero-link-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
             Copy link
@@ -167,7 +167,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
           <%= if @workflow_states != [] do %>
             <div class="border-t border-base-content/10 my-0.5" />
             <details class="group/move">
-              <summary class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors cursor-pointer list-none">
+              <summary class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors cursor-pointer list-none">
                 <.icon name="hero-arrow-right-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
                 <span class="flex-1">Move</span>
                 <.icon name="hero-chevron-right-mini" class="w-3 h-3 text-base-content/40" />
@@ -179,7 +179,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
                     phx-click="move_task"
                     phx-value-task_id={@task_id}
                     phx-value-state_id={state.id}
-                    class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-base-content/80 hover:bg-base-content/10 transition-colors text-left"
+                    class="w-full flex items-center gap-2 px-3 py-3 rounded-lg text-sm text-base-content/80 hover:bg-base-content/10 transition-colors text-left"
                   >
                     <span
                       class="w-2 h-2 rounded-full flex-shrink-0"
@@ -199,7 +199,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
               phx-click="archive_task"
               phx-value-task_id={@task_id}
               phx-confirm="Archive this task?"
-              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+              class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
             >
               <.icon name="hero-archive-box-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
               Archive
@@ -209,7 +209,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
               phx-click={@on_delete}
               phx-value-task_id={@task_id}
               phx-confirm="Delete this task?"
-              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-error hover:bg-error/10 transition-colors text-left"
+              class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-error hover:bg-error/10 transition-colors text-left"
             >
               <.icon name="hero-trash-mini" class="w-4 h-4 flex-shrink-0" />
               Delete

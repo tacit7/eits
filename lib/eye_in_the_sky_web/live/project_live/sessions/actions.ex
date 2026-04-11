@@ -58,7 +58,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
          {:ok, _} <- Sessions.archive_session(session) do
       {:noreply, socket |> Loader.load_agents() |> put_flash(:info, "Session archived")}
     else
-      {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to archive session")}
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Session not found")}
+
+      {:error, reason} ->
+        Logger.warning("archive_session failed for #{session_id}: #{inspect(reason)}")
+        {:noreply, put_flash(socket, :error, "Failed to archive session")}
     end
   end
 
@@ -67,7 +72,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
          {:ok, _} <- Sessions.unarchive_session(session) do
       {:noreply, socket |> Loader.load_agents() |> put_flash(:info, "Session unarchived")}
     else
-      {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to unarchive session")}
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Session not found")}
+
+      {:error, reason} ->
+        Logger.warning("unarchive_session failed for #{session_id}: #{inspect(reason)}")
+        {:noreply, put_flash(socket, :error, "Failed to unarchive session")}
     end
   end
 
@@ -76,7 +86,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
          {:ok, _} <- Sessions.delete_session(session) do
       {:noreply, socket |> Loader.load_agents() |> put_flash(:info, "Session deleted")}
     else
-      {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to delete session")}
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Session not found")}
+
+      {:error, reason} ->
+        Logger.warning("delete_session failed for #{session_id}: #{inspect(reason)}")
+        {:noreply, put_flash(socket, :error, "Failed to delete session")}
     end
   end
 
@@ -111,7 +126,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
              {:ok, _} <- Sessions.delete_session(session) do
           :ok
         else
-          _ -> :error
+          {:error, :not_found} ->
+            :error
+
+          {:error, reason} ->
+            Logger.warning("bulk delete: failed to delete session #{id}: #{inspect(reason)}")
+            :error
         end
       end)
 

@@ -139,7 +139,6 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectActions do
       nil -> {:noreply, socket}
       {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Project not found")}
       {:error, _reason} -> {:noreply, put_flash(socket, :error, "Failed to create agent")}
-      _ -> {:noreply, socket}
     end
   end
 

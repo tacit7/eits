@@ -173,7 +173,7 @@ defmodule EyeInTheSky.Messages do
     cid = Map.get(attrs, :channel_id)
     has_number = Map.get(attrs, :channel_message_number)
 
-    if cid && is_nil(has_number) do
+    if not is_nil(cid) && is_nil(has_number) do
       # Advisory lock on the channel prevents two concurrent inserts from reading
       # the same MAX and assigning duplicate channel_message_numbers.
       ChannelMessageNumbering.create(cid, attrs)

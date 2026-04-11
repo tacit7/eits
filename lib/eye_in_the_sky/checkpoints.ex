@@ -125,7 +125,7 @@ defmodule EyeInTheSky.Checkpoints do
   # Private
 
   defp maybe_create_fork_branch(checkpoint, original_session, new_session, attrs) do
-    if checkpoint.git_stash_ref && original_session.git_worktree_path &&
+    if not is_nil(checkpoint.git_stash_ref) && not is_nil(original_session.git_worktree_path) &&
          File.dir?(original_session.git_worktree_path) do
       branch_name = attrs[:branch_name] || "fork/session-#{new_session.id}"
       create_branch_from_stash(original_session.git_worktree_path, checkpoint.git_stash_ref, branch_name)

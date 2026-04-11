@@ -80,12 +80,11 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
              {:ok, status} <- extract_flag(args, "--status") do
           do_update_member(member_id, status, from_session_id)
         else
-          _ ->
-            notify_error(
-              from_session_id,
-              "teams update-member",
-              :invalid_member_id_or_missing_status
-            )
+          nil ->
+            notify_error(from_session_id, "teams update-member", :invalid_member_id_or_missing_status)
+
+          {:error, _} ->
+            notify_error(from_session_id, "teams update-member", :invalid_member_id_or_missing_status)
         end
 
       _ ->

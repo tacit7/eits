@@ -28,8 +28,8 @@ defmodule EyeInTheSky.Notifications do
       title: title,
       body: opts[:body],
       category: category,
-      resource_type: resource_type && to_string(resource_type),
-      resource_id: resource_id && to_string(resource_id)
+      resource_type: if(resource_type, do: to_string(resource_type)),
+      resource_id: if(resource_id, do: to_string(resource_id))
     }
 
     case create_notification(attrs) do

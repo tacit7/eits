@@ -223,7 +223,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
             >
               <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Agent
             </button>
-            <label class="swap swap-rotate btn btn-ghost btn-xs btn-circle">
+            <label class="swap swap-rotate btn btn-ghost btn-xs btn-circle min-h-[44px] min-w-[44px]">
               <input type="checkbox" class="theme-controller" value="dark" />
               <.icon name="hero-sun" class="swap-on w-4 h-4" />
               <.icon name="hero-moon" class="swap-off w-4 h-4" />

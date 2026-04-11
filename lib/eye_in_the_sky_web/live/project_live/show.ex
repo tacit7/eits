@@ -170,7 +170,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                       <%= if session.id do %>
                         <.link
                           navigate={~p"/dm/#{session.id}"}
-                          class="btn btn-ghost btn-xs text-base-content/60 hover:text-primary transition-colors"
+                          class="btn btn-ghost btn-xs text-base-content/60 hover:text-primary transition-colors min-h-[44px] min-w-[44px]"
                           title="Direct message"
                           onclick="event.stopPropagation()"
                         >

@@ -384,7 +384,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
               </form>
             <% end %>
 
-            <%= if length(@files) > 0 do %>
+            <%= if @files != [] do %>
               <!-- Mobile list -->
               <div class="md:hidden space-y-2">
                 <%= for file <- @files do %>

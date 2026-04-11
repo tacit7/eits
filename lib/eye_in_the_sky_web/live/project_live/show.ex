@@ -122,7 +122,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                   <p class="text-xs font-mono text-base-content/90 break-all">{@project.path}</p>
                 </div>
               <% end %>
-              <%= if length(@claude_files) > 0 do %>
+              <%= if @claude_files != [] do %>
                 <div class="space-y-1">
                   <%= for entry <- @claude_files do %>
                     <a
@@ -149,7 +149,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           </div>
           
     <!-- Active Sessions -->
-          <%= if length(@active_sessions) > 0 do %>
+          <%= if @active_sessions != [] do %>
             <div class="card bg-base-100 shadow-sm">
               <div class="card-body p-4">
                 <h2 class="card-title text-base mb-3">Active Sessions</h2>
@@ -185,7 +185,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           <% end %>
           
     <!-- Recent Tasks -->
-          <%= if length(@tasks) > 0 do %>
+          <%= if @tasks != [] do %>
             <div class="card bg-base-100 shadow-sm">
               <div class="card-body p-4">
                 <h2 class="card-title text-base mb-2">Recent Tasks</h2>
@@ -216,7 +216,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           <% end %>
           
     <!-- Recent Notes -->
-          <%= if length(@recent_notes) > 0 do %>
+          <%= if @recent_notes != [] do %>
             <div class="card bg-base-100 shadow-sm">
               <div class="card-body p-4">
                 <h2 class="card-title text-base mb-2">Recent Notes</h2>
@@ -236,7 +236,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
             </div>
           <% end %>
           <!-- Recent Commits -->
-          <%= if length(@recent_commits) > 0 do %>
+          <%= if @recent_commits != [] do %>
             <div class="card bg-base-100 shadow-sm">
               <div class="card-body p-4">
                 <h2 class="card-title text-base mb-2">Recent Commits</h2>

@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
           </form>
         </div>
 
-        <%= if length(@prompts) > 0 do %>
+        <%= if @prompts != [] do %>
           <!-- Prompts List -->
           <div class="space-y-4">
             <%= for prompt <- @prompts do %>

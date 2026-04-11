@@ -174,7 +174,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
           </div>
         <% else %>
           <!-- Directory listing -->
-          <%= if length(@files) > 0 do %>
+          <%= if @files != [] do %>
             <div class="mb-4">
               <%= if @current_path do %>
                 <.link

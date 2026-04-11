@@ -108,7 +108,7 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
         </div>
         
     <!-- Bookmarks List -->
-        <%= if length(@bookmarks) == 0 do %>
+        <%= if @bookmarks == [] do %>
           <div class="card bg-base-100 shadow-sm">
             <div class="card-body text-center py-12">
               <.icon name="hero-bookmark" class="w-16 h-16 mx-auto text-base-content/20 mb-4" />

@@ -153,7 +153,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
 
   defp agent_list(assigns) do
     ~H"""
-    <%= if length(@agents) > 0 do %>
+    <%= if @agents != [] do %>
       <div class="space-y-2">
         <%= for agent <- @agents do %>
           <button

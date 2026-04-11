@@ -36,7 +36,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
 
   def jobs_table(assigns) do
     ~H"""
-    <%= if length(@jobs) > 0 do %>
+    <%= if @jobs != [] do %>
       <div class="md:hidden space-y-3">
         <%= for job <- @jobs do %>
           <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
@@ -147,7 +147,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
             <%= if @expanded_job_id == job.id do %>
               <div class="mt-3 rounded-lg bg-base-200/50 p-2">
                 <p class="text-xs font-medium mb-2">Recent Runs</p>
-                <%= if length(@runs) > 0 do %>
+                <%= if @runs != [] do %>
                   <div class="space-y-1.5">
                     <%= for run <- @runs do %>
                       <div class="rounded-md bg-base-100/70 p-2 text-xs">
@@ -303,7 +303,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 <tr>
                   <td colspan={if @show_origin, do: "9", else: "8"} class="bg-base-200 p-4">
                     <div class="text-sm font-medium mb-2">Recent Runs</div>
-                    <%= if length(@runs) > 0 do %>
+                    <%= if @runs != [] do %>
                       <table class="table table-xs">
                         <thead>
                           <tr>

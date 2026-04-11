@@ -166,7 +166,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
               <%= render_slot(@checklist) %>
 
               <%!-- Annotations --%>
-              <%= if @notes && length(@notes) > 0 do %>
+              <%= if @notes && @notes != [] do %>
                 <div>
                   <div class="flex items-center gap-2 mb-2">
                     <span class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider">

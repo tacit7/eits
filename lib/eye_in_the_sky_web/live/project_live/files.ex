@@ -398,7 +398,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
           </div>
         <% else %>
           <!-- Directory Listing -->
-          <%= if length(@files) > 0 do %>
+          <%= if @files != [] do %>
             <div class="mb-4">
               <%= if @file_path && @file_path != "." do %>
                 <.link

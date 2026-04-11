@@ -86,7 +86,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
       </span>
     </div>
 
-    <%= if length(@notes) > 0 do %>
+    <%= if @notes != [] do %>
       <div class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5">
         <%= for note <- @notes do %>
           <div class="py-1 flex items-start gap-1 group">

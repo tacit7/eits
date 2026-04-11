@@ -149,7 +149,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <div class="max-w-6xl mx-auto">
-        <%= if length(@skills) > 0 do %>
+        <%= if @skills != [] do %>
           <!-- Search -->
           <div class="mb-6">
             <form phx-change="search" class="relative">

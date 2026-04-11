@@ -135,7 +135,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
         </div>
       </div>
 
-      <%= if length(@notifications) > 0 do %>
+      <%= if @notifications != [] do %>
         <div class="space-y-1">
           <%= for n <- @notifications do %>
             <% link = resource_link(n) %>

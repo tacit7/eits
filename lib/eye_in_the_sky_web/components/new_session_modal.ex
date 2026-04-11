@@ -105,7 +105,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
             </div>
 
             <%!-- Agent --%>
-            <%= if length(@available_agents) > 0 do %>
+            <%= if @available_agents != [] do %>
               <div>
                 <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Agent</label>
                 <select name="agent" class="select select-bordered w-full">

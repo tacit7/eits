@@ -134,7 +134,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                       name="due_at"
                       value={format_date_input(@task.due_at)}
                       phx-mounted={if @focus == "due_at", do: JS.focus()}
-                      class="input input-sm w-full bg-base-200 border-base-300 text-base focus:border-primary/30"
+                      class="input input-sm w-full bg-base-200 border-base-300 text-base focus:border-primary/30 min-h-[44px]"
                     />
                   </div>
                   <div>
@@ -146,7 +146,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                       value={format_tags(@task.tags)}
                       placeholder="tag1, tag2"
                       phx-mounted={if @focus == "tags", do: JS.focus()}
-                      class="input input-sm w-full bg-base-200 border-base-300 text-base placeholder:text-base-content/20 focus:border-primary/30"
+                      class="input input-sm w-full bg-base-200 border-base-300 text-base placeholder:text-base-content/20 focus:border-primary/30 min-h-[44px]"
                     />
                   </div>
                 </div>

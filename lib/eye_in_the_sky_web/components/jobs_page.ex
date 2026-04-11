@@ -368,18 +368,18 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
             value={@search_query}
             phx-debounce="200"
           />
-          <select name="type" class="select select-bordered select-sm">
+          <select name="type" class="select select-bordered select-sm min-h-[44px]">
             <option value="all" selected={@filter_type == "all"}>All Types</option>
             <option value="shell_command" selected={@filter_type == "shell_command"}>Shell</option>
             <option value="spawn_agent" selected={@filter_type == "spawn_agent"}>Agent</option>
             <option value="mix_task" selected={@filter_type == "mix_task"}>Mix</option>
           </select>
-          <select name="status" class="select select-bordered select-sm">
+          <select name="status" class="select select-bordered select-sm min-h-[44px]">
             <option value="all" selected={@filter_status == "all"}>All Status</option>
             <option value="enabled" selected={@filter_status == "enabled"}>Enabled</option>
             <option value="disabled" selected={@filter_status == "disabled"}>Disabled</option>
           </select>
-          <select name="origin" class="select select-bordered select-sm">
+          <select name="origin" class="select select-bordered select-sm min-h-[44px]">
             <option value="all" selected={@filter_origin == "all"}>All Origins</option>
             <option value="system" selected={@filter_origin == "system"}>System</option>
             <option value="user" selected={@filter_origin == "user"}>User</option>

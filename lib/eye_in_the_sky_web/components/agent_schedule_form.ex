@@ -412,8 +412,8 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
       </div>
 
       <div class="flex justify-end gap-2 pt-2">
-        <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_schedule">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm">Save Schedule</button>
+        <button type="button" class="btn btn-ghost btn-sm min-h-[44px]" phx-click="cancel_schedule">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm min-h-[44px]">Save Schedule</button>
       </div>
     </form>
     """

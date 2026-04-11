@@ -281,10 +281,10 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
             <% end %>
 
             <div class="sticky bottom-0 bg-base-100 pt-4 pb-1 flex justify-end gap-2">
-              <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_form">
+              <button type="button" class="btn btn-ghost btn-sm min-h-[44px]" phx-click="cancel_form">
                 Cancel
               </button>
-              <button type="submit" class="btn btn-primary btn-sm">Save</button>
+              <button type="submit" class="btn btn-primary btn-sm min-h-[44px]">Save</button>
             </div>
           </.form>
         </div>

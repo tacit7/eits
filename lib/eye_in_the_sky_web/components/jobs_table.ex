@@ -108,13 +108,15 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
             </div>
 
             <div class="mt-3 flex items-center justify-end gap-1 border-t border-base-content/10 pt-2">
-              <input
-                type="checkbox"
-                class="toggle toggle-xs toggle-primary"
-                checked={job.enabled}
-                phx-click="toggle_job"
-                phx-value-id={job.id}
-              />
+              <label class="flex items-center justify-center min-h-[44px] min-w-[44px] cursor-pointer">
+                <input
+                  type="checkbox"
+                  class="toggle toggle-xs toggle-primary"
+                  checked={job.enabled}
+                  phx-click="toggle_job"
+                  phx-value-id={job.id}
+                />
+              </label>
               <button
                 class="btn btn-ghost btn-sm min-h-[44px]"
                 phx-click="run_now"

@@ -125,7 +125,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               </div>
 
               <div class="modal-action">
-                <button type="button" phx-click="close_schedule_modal" class="btn btn-ghost btn-sm">Cancel</button>
+                <button type="button" phx-click="close_schedule_modal" class="btn btn-ghost btn-sm min-h-[44px]">Cancel</button>
               </div>
             </form>
           </div>

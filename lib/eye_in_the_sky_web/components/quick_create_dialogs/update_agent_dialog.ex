@@ -29,7 +29,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.UpdateAgentDialog do
               data-qua-agent-uuid
               required
               placeholder="Agent UUID"
-              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base min-h-[44px]"
             />
           </div>
           <div>

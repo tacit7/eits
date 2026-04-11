@@ -86,7 +86,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                     min="0"
                     max="3600"
                     step="30"
-                    class="input input-bordered input-sm w-24 text-right"
+                    class="input input-bordered input-sm w-24 text-right min-h-[44px]"
                     phx-debounce="500"
                   />
                   <span class="text-xs text-base-content/50">sec</span>
@@ -148,7 +148,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                     min="90"
                     max="450"
                     step="10"
-                    class="input input-bordered input-sm w-24 text-right"
+                    class="input input-bordered input-sm w-24 text-right min-h-[44px]"
                     phx-debounce="500"
                   />
                 </form>

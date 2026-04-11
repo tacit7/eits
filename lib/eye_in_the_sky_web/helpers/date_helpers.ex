@@ -186,7 +186,7 @@ defmodule EyeInTheSkyWeb.Helpers.DateHelpers do
       diff = NaiveDateTime.diff(ndt, now, :second)
       format_relative_diff(diff)
     else
-      _ -> "-"
+      {:error, _} -> "-"
     end
   end
 

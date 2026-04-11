@@ -103,7 +103,7 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
          {:ok, real_child} <- safe_realpath(child_path) do
       String.starts_with?(real_child, real_root <> "/")
     else
-      _ -> false
+      {:error, _} -> false
     end
   end
 

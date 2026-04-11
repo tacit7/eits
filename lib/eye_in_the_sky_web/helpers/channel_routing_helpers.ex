@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.Helpers.ChannelRoutingHelpers do
     with {:ok, session} <- Sessions.get_session(target_session_id) do
       Channels.find_global_channel(session)
     else
-      _ -> {:error, :session_not_found}
+      {:error, _} -> {:error, :session_not_found}
     end
   end
 end

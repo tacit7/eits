@@ -36,7 +36,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
           </span>
           <button
             phx-click="toggle_new_session_drawer"
-            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-8 sm:h-7 text-xs w-full sm:w-auto"
+            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 sm:h-7 text-xs w-full sm:w-auto"
           >
             <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Agent
           </button>

@@ -219,7 +219,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
           <div class="flex items-center gap-2">
             <button
               phx-click="toggle_new_session_drawer"
-              class="btn btn-sm btn-primary gap-1.5 min-h-0 h-7 text-xs"
+              class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 sm:h-7 text-xs"
             >
               <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Agent
             </button>

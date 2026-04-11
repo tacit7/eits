@@ -105,7 +105,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
               <button
                 type="button"
                 tabindex="0"
-                class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-base-content/50 hover:text-base-content/70 transition-colors"
+                class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-base-content/50 hover:text-base-content/70 transition-colors min-h-[44px]"
                 id="effort-selector-button"
               >
                 <.icon name="hero-adjustments-horizontal" class="w-3.5 h-3.5" />
@@ -182,7 +182,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
             <button
               type="button"
               tabindex="0"
-              class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-base-content/50 hover:text-base-content/70 transition-colors"
+              class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-base-content/50 hover:text-base-content/70 transition-colors min-h-[44px]"
               id="model-selector-button"
             >
               <span class="font-medium">{model_display_name(@selected_model)}</span>

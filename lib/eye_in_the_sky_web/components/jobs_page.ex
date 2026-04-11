@@ -279,20 +279,20 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
           <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <.link
               navigate="/oban"
-              class="btn btn-ghost btn-sm w-full sm:w-auto text-base-content/50"
+              class="btn btn-ghost btn-sm min-h-[44px] w-full sm:w-auto text-base-content/50"
               title="Oban queue dashboard"
             >
               <.icon name="hero-queue-list" class="w-3.5 h-3.5" /> Oban
             </.link>
             <button
-              class="btn btn-outline btn-sm w-full sm:w-auto"
+              class="btn btn-outline btn-sm min-h-[44px] w-full sm:w-auto"
               phx-click="toggle_claude_drawer"
               phx-target={@myself}
             >
               <.icon name="hero-sparkles" class="w-3.5 h-3.5" /> Create with Claude
             </button>
             <button
-              class="btn btn-primary btn-sm w-full sm:w-auto"
+              class="btn btn-primary btn-sm min-h-[44px] w-full sm:w-auto"
               phx-click="new_job"
               phx-target={@myself}
             >
@@ -304,7 +304,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
 
       <div class={"flex border-b border-base-300 #{if @project_id, do: "", else: "px-4"} mb-4"}>
         <button
-          class={"tab tab-bordered #{if @active_tab == :all_jobs, do: "tab-active"}"}
+          class={"btn btn-sm min-h-[44px] #{if @active_tab == :all_jobs, do: "btn-active"}"}
           phx-click="switch_tab"
           phx-value-tab="all_jobs"
           phx-target={@myself}
@@ -312,7 +312,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
           All Jobs
         </button>
         <button
-          class={"tab tab-bordered #{if @active_tab == :agent_schedules, do: "tab-active"}"}
+          class={"btn btn-sm min-h-[44px] #{if @active_tab == :agent_schedules, do: "btn-active"}"}
           phx-click="switch_tab"
           phx-value-tab="agent_schedules"
           phx-target={@myself}
@@ -396,14 +396,14 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
               </div>
               <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                 <button
-                  class="btn btn-outline btn-sm w-full sm:w-auto"
+                  class="btn btn-outline btn-sm min-h-[44px] w-full sm:w-auto"
                   phx-click="toggle_claude_drawer"
                   phx-target={@myself}
                 >
                   <.icon name="hero-sparkles" class="w-3.5 h-3.5" /> Create with Claude
                 </button>
                 <button
-                  class="btn btn-primary btn-sm w-full sm:w-auto"
+                  class="btn btn-primary btn-sm min-h-[44px] w-full sm:w-auto"
                   phx-click="new_job"
                   phx-value-scope="project"
                   phx-target={@myself}
@@ -432,7 +432,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
                 <p class="text-xs text-base-content/50">Run across all projects</p>
               </div>
               <button
-                class="btn btn-ghost btn-sm w-full sm:w-auto"
+                class="btn btn-ghost btn-sm min-h-[44px] w-full sm:w-auto"
                 phx-click="new_job"
                 phx-value-scope="global"
                 phx-target={@myself}

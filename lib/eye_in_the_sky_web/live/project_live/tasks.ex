@@ -164,7 +164,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
             phx-click="open_filter_sheet"
             aria-label="Open filters"
             aria-haspopup="dialog"
-            class="sm:hidden relative btn btn-ghost btn-sm btn-square"
+            class="sm:hidden relative btn btn-ghost btn-sm btn-square h-11 w-11"
           >
             <.icon name="hero-funnel-mini" class="w-4 h-4" />
             <%= if !is_nil(@filter_state_id) || @sort_by != "created_desc" do %>
@@ -178,7 +178,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
 
           <.link
             navigate={~p"/projects/#{@project.id}/kanban"}
-            class="btn btn-sm sm:btn-xs btn-ghost border border-base-content/10 gap-1 min-h-0 h-8 sm:h-7"
+            class="btn btn-sm sm:btn-xs btn-ghost border border-base-content/10 gap-1 min-h-0 h-11 sm:h-7"
             title="Kanban board"
           >
             <.icon name="hero-view-columns-mini" class="w-3.5 h-3.5" />
@@ -186,7 +186,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
           </.link>
           <button
             phx-click="toggle_new_task_drawer"
-            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-8 sm:h-7 text-xs"
+            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 sm:h-7 text-xs"
           >
             <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Task
           </button>

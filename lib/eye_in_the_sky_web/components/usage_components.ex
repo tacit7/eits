@@ -14,7 +14,7 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
           phx-click="set_range"
           phx-value-range="7d"
           class={[
-            "join-item btn btn-sm",
+            "join-item btn btn-sm min-h-[44px]",
             if(@date_range == "7d", do: "btn-primary", else: "btn-outline")
           ]}
         >
@@ -24,7 +24,7 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
           phx-click="set_range"
           phx-value-range="30d"
           class={[
-            "join-item btn btn-sm",
+            "join-item btn btn-sm min-h-[44px]",
             if(@date_range == "30d", do: "btn-primary", else: "btn-outline")
           ]}
         >
@@ -34,14 +34,14 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
           phx-click="set_range"
           phx-value-range="all"
           class={[
-            "join-item btn btn-sm",
+            "join-item btn btn-sm min-h-[44px]",
             if(@date_range == "all", do: "btn-primary", else: "btn-outline")
           ]}
         >
           All time
         </button>
       </div>
-      <button phx-click="recalculate" disabled={@recalculating} class="btn btn-sm btn-outline">
+      <button phx-click="recalculate" disabled={@recalculating} class="btn btn-sm min-h-[44px] btn-outline">
         <.icon
           name="hero-arrow-path"
           class={if @recalculating, do: "size-4 animate-spin", else: "size-4"}

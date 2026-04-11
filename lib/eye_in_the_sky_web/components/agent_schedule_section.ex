@@ -240,7 +240,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
            send_update event_relay. Rendered outside the tab guard so it can show
            regardless of which tab is active. --%>
       <.agent_schedule_form
-        show={@scheduling_prompt != nil}
+        show={not is_nil(@scheduling_prompt)}
         prompt={@scheduling_prompt || %{id: nil, name: "", description: nil, project_id: nil}}
         job={@scheduling_job}
         projects={@projects}

@@ -166,7 +166,7 @@ defmodule EyeInTheSkyWeb.Components.CanvasOverlayComponent do
               canvas_session={cs}
             />
           <% end %>
-          <%= if @canvas_sessions == [] and @active_canvas_id != nil do %>
+          <%= if @canvas_sessions == [] and not is_nil(@active_canvas_id) do %>
             <div class="flex items-center justify-center h-full text-base-content/30 text-sm select-none">
               No sessions -- use "Add to Canvas" on a session card.
             </div>

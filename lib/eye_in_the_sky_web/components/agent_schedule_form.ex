@@ -61,7 +61,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
 
     assigns =
       assigns
-      |> assign(:editing, assigns.job != nil)
+      |> assign(:editing, not is_nil(assigns.job))
       |> assign(:schedule_type, (if assigns.job, do: assigns.job.schedule_type) || "cron")
       |> assign(:schedule_value, (if assigns.job, do: assigns.job.schedule_value) || "")
       |> assign(:model, Map.get(config, "model", "sonnet"))

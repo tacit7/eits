@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
 
     <%= if @expanded_projects || @collapsed do %>
       <%!-- Inline new project path form --%>
-      <%= if @new_project_path != nil && !@collapsed do %>
+      <%= if not is_nil(@new_project_path) && !@collapsed do %>
         <form
           phx-submit="create_project"
           phx-target={@myself}

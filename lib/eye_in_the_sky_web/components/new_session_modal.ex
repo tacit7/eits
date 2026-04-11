@@ -38,7 +38,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         {:ok, assign(socket, :file_uploads, new_uploads)}
       end
     else
-      project_path = assigns[:current_project] && assigns[:current_project].path
+      project_path = if assigns[:current_project], do: assigns[:current_project].path
       available_agents = list_agents(project_path)
       {:ok, assign(socket, Map.put(assigns, :available_agents, available_agents))}
     end
@@ -118,7 +118,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
             <% end %>
 
             <%!-- Agent Prompt (when prompts exist) --%>
-            <%= if length(assigns[:prompts] || []) > 0 do %>
+            <%= if (assigns[:prompts] || []) != [] do %>
               <div>
                 <label class="text-sm font-medium text-base-content/70 mb-1.5 block">
                   Agent Prompt

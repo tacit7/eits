@@ -113,9 +113,13 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
     socket = assign(socket, :editing_session_id, nil)
 
     socket =
-      case editing_id && Sessions.get_session_overview_row(editing_id) do
-        {:ok, row} -> stream_insert(socket, :sessions, row)
-        _ -> socket
+      if editing_id do
+        case Sessions.get_session_overview_row(editing_id) do
+          {:ok, row} -> stream_insert(socket, :sessions, row)
+          _ -> socket
+        end
+      else
+        socket
       end
 
     {:noreply, socket}

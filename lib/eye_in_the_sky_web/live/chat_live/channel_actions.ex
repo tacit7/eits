@@ -44,7 +44,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
       {:error, :not_found} ->
         {:noreply, put_flash(socket, :error, "Session not found")}
 
-      _ ->
+      {:error, _} ->
         {:noreply, put_flash(socket, :error, "Failed to add agent to channel")}
     end
   end
@@ -72,7 +72,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
       {:error, :not_found} ->
         {:noreply, put_flash(socket, :error, "Session not found")}
 
-      _ ->
+      {:error, _} ->
         {:noreply, put_flash(socket, :error, "Failed to remove agent from channel")}
     end
   end

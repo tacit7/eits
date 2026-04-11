@@ -218,7 +218,8 @@ defmodule EyeInTheSky.AgentWorkerEvents do
       {:error, reason} ->
         Logger.warning("[#{session_id}] Failed to promote agent: #{inspect(reason)}")
 
-      _ ->
+      {:ok, _} ->
+        # agent_id is nil or agent status is not "pending" — nothing to do
         :ok
     end
   end

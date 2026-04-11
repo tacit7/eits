@@ -64,6 +64,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
       notify_success: 2,
       notify_error: 3,
       get_session!: 1,
+      session_field: 2,
       extract_flag: 2,
       put_optional_flag: 4
     ]
@@ -199,8 +200,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
     [
       instructions: instructions,
       description: description,
-      project_id: session && session.project_id,
-      project_path: session && session.git_worktree_path
+      project_id: session_field(session, :project_id),
+      project_path: session_field(session, :git_worktree_path)
     ]
     |> put_optional_flag(args, "--model", :model)
     |> put_optional_flag(args, "--worktree", :worktree)
@@ -232,7 +233,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
           attrs = %{
             channel_id: channel_id,
             session_id: from_session_id,
-            agent_id: session && session.agent_id,
+            agent_id: session_field(session, :agent_id),
             body: body,
             sender_role: "agent"
           }

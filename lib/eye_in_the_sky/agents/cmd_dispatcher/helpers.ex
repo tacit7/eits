@@ -3,8 +3,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.Helpers do
   Shared helpers for CmdDispatcher subcommand handlers.
 
   Provides notify_success/2, notify_error/3, extract_flag/2, get_session!/1,
-  put_optional_flag/4, and with_task/4 — a common wrapper that handles task
-  lookup with proper tagged-tuple error handling.
+  session_field/2, put_optional_flag/4, and with_task/4 — a common wrapper
+  that handles task lookup with proper tagged-tuple error handling.
   """
 
   require Logger
@@ -39,6 +39,13 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.Helpers do
       _ -> nil
     end
   end
+
+  @doc """
+  Safely reads a field from a session struct that may be nil.
+  Returns nil if session is nil; otherwise returns the field value.
+  """
+  def session_field(nil, _key), do: nil
+  def session_field(session, key), do: Map.get(session, key)
 
   @doc """
   Adds a flag to opts if the named flag is present in args string.

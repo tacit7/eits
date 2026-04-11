@@ -19,7 +19,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
   alias EyeInTheSky.{Sessions, Teams}
   alias EyeInTheSky.Utils.ToolHelpers
 
-  import Helpers, only: [notify_success: 2, notify_error: 3, extract_flag: 2, get_session!: 1]
+  import Helpers, only: [notify_success: 2, notify_error: 3, extract_flag: 2, get_session!: 1, session_field: 2]
 
   # ---------------------------------------------------------------------------
   # teams (plural)
@@ -40,7 +40,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
             name: name,
             role: role,
             session_id: from_session_id,
-            agent_id: session && session.agent_id
+            agent_id: session_field(session, :agent_id)
           }
 
           do_join_team(attrs, team_id, from_session_id)

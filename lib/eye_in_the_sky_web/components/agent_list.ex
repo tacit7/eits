@@ -99,7 +99,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
           <a
             href={~p"/dm/#{@agent.id}"}
             target="_blank"
-            class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors"
+            class="flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors"
           >
             <.icon name="hero-arrow-top-right-on-square-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
             Open in new tab
@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
           type="button"
           phx-click="rename_session"
           phx-value-session_id={@agent.id}
-          class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+          class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
         >
           <.icon name="hero-pencil-square-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
           Rename
@@ -125,7 +125,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
             data-session-id={@agent.uuid}
             data-agent-name={@agent.name || @agent.agent.description || "Agent"}
             data-agent-status={@agent.status}
-            class="bookmark-button w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+            class="bookmark-button w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
             aria-label="Bookmark agent"
           >
             <.heart class="bookmark-icon w-4 h-4 text-base-content/60 flex-shrink-0" />
@@ -139,7 +139,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
               type="button"
               phx-click="unarchive_session"
               phx-value-session_id={@agent.id}
-              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-info hover:bg-base-content/10 transition-colors text-left"
+              class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-info hover:bg-base-content/10 transition-colors text-left"
             >
               <.icon name="hero-arrow-up-tray-mini" class="w-4 h-4 flex-shrink-0" />
               Unarchive
@@ -148,7 +148,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
               type="button"
               phx-click="delete_session"
               phx-value-session_id={@agent.id}
-              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-error hover:bg-base-content/10 transition-colors text-left"
+              class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-error hover:bg-base-content/10 transition-colors text-left"
             >
               <.icon name="hero-trash-mini" class="w-4 h-4 flex-shrink-0" />
               Delete
@@ -158,7 +158,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
               type="button"
               phx-click="archive_session"
               phx-value-session_id={@agent.id}
-              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-warning hover:bg-base-content/10 transition-colors text-left"
+              class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-warning hover:bg-base-content/10 transition-colors text-left"
             >
               <.icon name="hero-archive-box-mini" class="w-4 h-4 flex-shrink-0" />
               Archive
@@ -182,8 +182,8 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
           Permanently delete {MapSet.size(@selected_ids)} selected session{if MapSet.size(@selected_ids) != 1, do: "s"}? This cannot be undone.
         </p>
         <div class="modal-action">
-          <button phx-click="cancel_delete_selected" class="btn btn-sm btn-ghost">Cancel</button>
-          <button phx-click="delete_selected" class="btn btn-sm btn-error">Delete</button>
+          <button phx-click="cancel_delete_selected" class="btn btn-sm btn-ghost min-h-[44px]">Cancel</button>
+          <button phx-click="delete_selected" class="btn btn-sm btn-error min-h-[44px]">Delete</button>
         </div>
       </div>
       <form method="dialog" class="modal-backdrop">
@@ -196,7 +196,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
   def canvas_submenu(assigns) do
     ~H"""
     <details class="group/canvas">
-      <summary class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors cursor-pointer list-none">
+      <summary class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors cursor-pointer list-none">
         <.icon name="hero-squares-2x2-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
         <span class="flex-1">Canvas</span>
         <.icon name="hero-chevron-right-mini" class="w-3 h-3 text-base-content/40" />
@@ -208,7 +208,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
             phx-click="add_to_canvas"
             phx-value-canvas-id={canvas.id}
             phx-value-session-id={@agent.id}
-            class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-base-content/80 hover:bg-base-content/10 transition-colors text-left"
+            class="w-full flex items-center gap-2 px-3 py-3 rounded-lg text-sm text-base-content/80 hover:bg-base-content/10 transition-colors text-left"
           >
             {canvas.name}
           </button>
@@ -219,7 +219,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
             type="button"
             phx-click="show_new_canvas_form"
             phx-value-agent-id={@agent.id}
-            class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-secondary hover:bg-base-content/10 transition-colors text-left"
+            class="w-full flex items-center gap-2 px-3 py-3 rounded-lg text-sm text-secondary hover:bg-base-content/10 transition-colors text-left"
           >+ New canvas</button>
         <% else %>
           <form phx-submit="add_to_new_canvas" class="flex flex-col gap-1 p-1">

@@ -247,8 +247,8 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       session_id: m.session_id,
       session_uuid: if(Ecto.assoc_loaded?(m.session) && m.session, do: m.session.uuid),
       session_status: if(Ecto.assoc_loaded?(m.session) && m.session, do: m.session.status),
-      joined_at: m.joined_at && to_string(m.joined_at),
-      last_activity_at: m.last_activity_at && to_string(m.last_activity_at)
+      joined_at: if(m.joined_at, do: to_string(m.joined_at)),
+      last_activity_at: if(m.last_activity_at, do: to_string(m.last_activity_at))
     }
   end
 end

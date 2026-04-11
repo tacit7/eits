@@ -207,11 +207,11 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
   # -- Private helpers -------------------------------------------------------
 
   defp maybe_continue_session(target_session_id, body) do
-    with {:ok, session} <- Sessions.get_session(target_session_id),
-         {:ok, chat_agent} <- Agents.get_agent(session.agent_id) do
+    with {:session, {:ok, session}} <- {:session, Sessions.get_session(target_session_id)},
+         {:agent, {:ok, chat_agent}} <- {:agent, Agents.get_agent(session.agent_id)} do
       project_path =
         chat_agent.git_worktree_path ||
-          (chat_agent.project && chat_agent.project.path)
+          if(chat_agent.project, do: chat_agent.project.path)
 
       AgentManager.continue_session(
         session.id,
@@ -220,9 +220,14 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
         project_path: project_path
       )
     else
-      _ ->
+      {:session, _} ->
         Logger.warning(
-          "maybe_continue_session: could not continue session #{target_session_id}, message already sent"
+          "maybe_continue_session: session #{target_session_id} not found, message already sent"
+        )
+
+      {:agent, _} ->
+        Logger.warning(
+          "maybe_continue_session: agent not found for session #{target_session_id}, message already sent"
         )
     end
   end

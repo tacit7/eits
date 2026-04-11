@@ -23,9 +23,11 @@ session_id=$(echo "$input_json" | jq -r '.session_id // empty' 2>/dev/null) || e
 transcript_path=$(echo "$input_json" | jq -r '.transcript_path // empty' 2>/dev/null)
 
 if [ -n "$transcript_path" ] && [ -f "$transcript_path" ]; then
-  # Check if last assistant turn contained an eits task annotation/update call
+  # Check if last assistant turn contained an eits task annotation/update call.
+  # Detection is line-by-line to avoid false positives from string literals
+  # embedded in Python/shell code within heredocs.
   TASK_UPDATED=$(TRANSCRIPT_PATH="$transcript_path" python3 - <<'PYEOF'
-import sys, json, os
+import sys, json, os, re
 
 transcript_path = os.environ.get('TRANSCRIPT_PATH', '')
 try:
@@ -43,6 +45,24 @@ for line in lines:
     except Exception:
         continue
 
+# Matches actual eits task commands at the start of a logical shell line.
+# Pattern: optional leading whitespace / chained operators, then "eits tasks <verb>"
+# Excludes matches where eits is inside a quoted string (preceded by ' or ").
+EITS_CMD = re.compile(
+    r'(?:^|[;&|])\s*(?:EITS_\w+=\S+\s+)*eits\s+tasks?\s+(?:annotate|update|complete|done)\b',
+    re.MULTILINE
+)
+
+def is_real_eits_call(cmd):
+    for line in cmd.splitlines():
+        stripped = line.strip()
+        # Skip lines that are clearly string literals (inside quotes in Python/shell source)
+        if stripped.startswith(("'eits", '"eits')):
+            continue
+        if EITS_CMD.search(line):
+            return True
+    return False
+
 # Walk backwards through entries: collect last assistant turn.
 # Stop when we hit a real human prompt (type=user without toolUseResult).
 for entry in reversed(entries):
@@ -56,12 +76,7 @@ for entry in reversed(entries):
             if block.get('type') != 'tool_use' or block.get('name') != 'Bash':
                 continue
             cmd = block.get('input', {}).get('command', '')
-            if any(x in cmd for x in [
-                'eits tasks annotate',
-                'eits tasks update',
-                'eits tasks complete',
-                'eits tasks done',
-            ]):
+            if is_real_eits_call(cmd):
                 print('found')
                 sys.exit(0)
 PYEOF

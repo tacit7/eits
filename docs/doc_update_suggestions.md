@@ -1,5 +1,12 @@
 # Documentation Update Suggestions
 
+## 2026-04-10
+**Commits reviewed**: ca015ef..4cf15dc
+
+- **REST_API.md** — Document GET /sessions/:uuid endpoint (commits 5c9493b, 33b4756): new endpoint returns session detail with recent tasks, notes, commits (limit 5 each), and is_spawned boolean flag; response includes agent_uuid and preloaded related resources; supports both integer ID and UUID resolution
+- **CODE_GUIDELINES.md** — Document query preload extraction pattern (commit 4cf15dc): extract repeated preload lists to module constants/helpers (e.g., SESSION_DETAIL_PRELOADS, SESSION_LIST_PRELOADS); improves readability and maintainability; reference ApiPresenter.present_session_detail/2 for example
+- **MOBILE.md** — Document 44px touch target standards (commits 2a9b73e, 0e33a0e, 8db8967, 54e3c3b): all mobile touch targets now meet 44x44px minimum via btn-sm/min-h-[44px]/min-w-[44px] Tailwind classes; covers notes actions, dialog close buttons, kanban toolbar actions, input elements text-base sizing to prevent iOS zoom
+
 ## 2026-04-07
 **Commits reviewed**: ca015ef..f786c5d
 

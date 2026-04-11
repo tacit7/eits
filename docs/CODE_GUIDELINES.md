@@ -1047,6 +1047,106 @@ Session flags passed via CLI (`--effort-level`, `--model`, `--worktree`, etc.) a
 
 ---
 
+## Query and Preload Patterns
+
+### Preload List Extraction
+
+When preload lists are repeated across multiple query functions in a context, extract them to module constants or private helper functions. This improves maintainability and ensures consistent association loading across the module.
+
+**Why:** 
+- Repeated preload lists make the code harder to maintain (DRY principle). Changing requirements means updating multiple locations.
+- Constants serve as documentation for what associations are loaded where.
+- Using a constant forces consistency across all queries that need the same associations.
+
+**Pattern:**
+
+#### Using a Module Constant
+
+When the same preload list appears in 3+ query functions, define it as a module constant:
+
+```elixir
+defmodule EyeInTheSky.Tasks do
+  @full_task_preloads [:state, :tags, :sessions, :checklist_items]
+
+  def list_tasks_for_agent(agent_id) do
+    Task
+    |> where([t], t.agent_id == ^agent_id)
+    |> preload(^@full_task_preloads)
+    |> Repo.all()
+  end
+
+  def get_task(id) do
+    case Task
+         |> preload(^@full_task_preloads)
+         |> Repo.get(id) do
+      nil -> {:error, :not_found}
+      task -> {:ok, task}
+    end
+  end
+
+  def get_task!(id) do
+    Task
+    |> preload(^@full_task_preloads)
+    |> Repo.get!(id)
+  end
+end
+```
+
+#### Using a Private Helper Function
+
+When preloads are more complex or need conditional logic, use a private helper:
+
+```elixir
+defmodule EyeInTheSky.Sessions do
+  def list_sessions_with_agent(opts \\ []) do
+    Session
+    |> with_agent_preload()
+    |> order_by([s], desc: s.started_at)
+    |> Repo.all()
+  end
+
+  def get_sessions_for_project(project_id) do
+    Session
+    |> where([s], s.project_id == ^project_id)
+    |> with_agent_preload()
+    |> Repo.all()
+  end
+
+  # Preload helpers
+  defp with_agent_preload(query) do
+    preload(query, agent: :agent_definition)
+  end
+end
+```
+
+**When to use constants vs helpers:**
+- **Constants:** Simple, static preload lists used in 3+ places. Good for searchability and documentation.
+- **Helpers:** Complex preloads, conditional logic, or nested associations. Cleaner than inline `preload/2` chains.
+
+**Example: `ApiPresenter.present_session_detail/2`**
+
+The presenter function uses preloaded associations without extracting them again:
+
+```elixir
+def present_session_detail(session, opts \\ []) do
+  # Assumes session was already loaded with tasks, notes, commits
+  tasks = Keyword.get(opts, :tasks, [])
+  recent_notes = Keyword.get(opts, :recent_notes, [])
+  
+  %{
+    id: session.id,
+    tasks: Enum.map(tasks, &present_session_task/1),
+    recent_notes: Enum.map(recent_notes, &present_session_note/1)
+  }
+end
+```
+
+The calling context (e.g., `Sessions.get_session_with_details/1`) handles the preload, not the presenter.
+
+**Rule:** Extract repeated preload lists to constants or helpers. Don't inline identical preload logic in multiple query functions.
+
+---
+
 ## Tagged Tuple Returns for Context Lookups
 
 Context `get_*` functions return `{:ok, record}` or `{:error, :not_found}` instead of `record | nil`. This makes error handling explicit at call sites and eliminates silent nil propagation.

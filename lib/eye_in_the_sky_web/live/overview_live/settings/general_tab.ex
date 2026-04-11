@@ -46,7 +46,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
               <div class="flex items-center gap-2">
                 <form phx-change="save_setting">
                   <input type="hidden" name="key" value="default_model" />
-                  <select class="select select-bordered select-sm w-36" name="value">
+                  <select class="select select-bordered select-sm w-36 min-h-[44px]" name="value">
                     <option
                       :for={{val, label} <- @models}
                       value={val}
@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   :if={!default?(@settings, "default_model")}
                   phx-click="reset_setting"
                   phx-value-key="default_model"
-                  class="btn btn-ghost btn-xs"
+                  class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
                   title="Reset to default"
                 >
                   <.icon name="hero-arrow-uturn-left" class="w-3.5 h-3.5" />
@@ -95,7 +95,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   :if={!default?(@settings, "cli_idle_timeout_ms")}
                   phx-click="reset_setting"
                   phx-value-key="cli_idle_timeout_ms"
-                  class="btn btn-ghost btn-xs"
+                  class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
                   title="Reset to default"
                 >
                   <.icon name="hero-arrow-uturn-left" class="w-3.5 h-3.5" />
@@ -114,7 +114,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
               <div class="flex items-center gap-2">
                 <form phx-change="save_setting">
                   <input type="hidden" name="key" value="tts_voice" />
-                  <select class="select select-bordered select-sm w-36" name="value">
+                  <select class="select select-bordered select-sm w-36 min-h-[44px]" name="value">
                     <option :for={v <- @voices} value={v} selected={@settings["tts_voice"] == v}>
                       {v}
                     </option>
@@ -124,7 +124,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   :if={!default?(@settings, "tts_voice")}
                   phx-click="reset_setting"
                   phx-value-key="tts_voice"
-                  class="btn btn-ghost btn-xs"
+                  class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
                   title="Reset to default"
                 >
                   <.icon name="hero-arrow-uturn-left" class="w-3.5 h-3.5" />
@@ -157,7 +157,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   :if={!default?(@settings, "tts_rate")}
                   phx-click="reset_setting"
                   phx-value-key="tts_rate"
-                  class="btn btn-ghost btn-xs"
+                  class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
                   title="Reset to default"
                 >
                   <.icon name="hero-arrow-uturn-left" class="w-3.5 h-3.5" />

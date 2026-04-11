@@ -81,7 +81,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
           phx-click="open_filter_sheet"
           aria-label="Open filters"
           aria-haspopup="dialog"
-          class="sm:hidden relative btn btn-ghost btn-sm btn-square"
+          class="sm:hidden relative btn btn-ghost btn-sm btn-square min-h-[44px] min-w-[44px]"
         >
           <.icon name="hero-funnel-mini" class="w-4 h-4" />
           <%= if @session_filter != "all" || @sort_by != "last_message" do %>

@@ -170,7 +170,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
                 <div class="flex items-center gap-3 mt-1">
                   <span class="text-xs text-base-content/35">{relative_time(n.inserted_at)}</span>
                   <%= if link do %>
-                    <.link navigate={link} class="text-xs text-primary hover:underline">
+                    <.link navigate={link} class="text-xs text-primary hover:underline inline-flex items-center min-h-[44px] px-1">
                       View
                     </.link>
                   <% end %>
@@ -180,7 +180,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
               <%!-- Actions --%>
               <%= if !n.read do %>
                 <button
-                  class="btn btn-ghost btn-xs text-base-content/40"
+                  class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px] text-base-content/40"
                   phx-click="mark_read"
                   phx-value-id={n.id}
                   title="Mark as read"

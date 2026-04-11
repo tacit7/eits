@@ -20,7 +20,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.EditorTab do
               </div>
               <form phx-change="save_setting" class="flex items-center gap-2">
                 <input type="hidden" name="key" value="preferred_editor" />
-                <select class="select select-bordered select-sm w-36" name="value">
+                <select class="select select-bordered select-sm w-36 min-h-[44px]" name="value">
                   <%= for {label, val} <- [
                     {"VS Code", "code"}, {"Cursor", "cursor"},
                     {"vim", "vim"}, {"nano", "nano"}

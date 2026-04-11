@@ -119,7 +119,7 @@ defmodule EyeInTheSkyWeb.Components.AIJobCreator do
           <div class="flex items-center justify-between mb-6">
             <h2 class="text-lg font-semibold">Create Job with Claude</h2>
             <button
-              class="btn btn-ghost btn-sm btn-square"
+              class="btn btn-ghost btn-sm btn-square min-h-[44px] min-w-[44px]"
               phx-click="toggle_claude_drawer"
               phx-target={@myself}
             >

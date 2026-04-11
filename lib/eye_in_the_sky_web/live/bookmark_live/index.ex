@@ -137,7 +137,7 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
                         <%= if bookmark.category do %>
                           <span class="badge badge-sm badge-outline">{bookmark.category}</span>
                         <% end %>
-                        <%= if bookmark.priority && bookmark.priority > 0 do %>
+                        <%= if not is_nil(bookmark.priority) && bookmark.priority > 0 do %>
                           <span class="badge badge-sm badge-warning">P{bookmark.priority}</span>
                         <% end %>
                       </div>

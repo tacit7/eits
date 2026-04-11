@@ -205,7 +205,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                           <p class="text-xs text-base-content/60 truncate">{task.description}</p>
                         <% end %>
                       </div>
-                      <%= if task.priority && task.priority > 0 do %>
+                      <%= if not is_nil(task.priority) && task.priority > 0 do %>
                         <span class="badge badge-xs">P{task.priority}</span>
                       <% end %>
                     </div>

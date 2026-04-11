@@ -127,7 +127,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
                         Rename
                       </button>
                     </li>
-                    <%= if agent.agent && agent.agent.uuid && agent.uuid do %>
+                    <%= if not is_nil(agent.agent) && not is_nil(agent.agent.uuid) && not is_nil(agent.uuid) do %>
                       <li>
                         <button
                           id={"bookmark-btn-#{agent.uuid}"}

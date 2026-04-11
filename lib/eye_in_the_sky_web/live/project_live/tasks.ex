@@ -153,7 +153,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
                 id="project-tasks-search"
                 value={@search_query}
                 placeholder="Search tasks..."
-                class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-base"
+                class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-base min-h-[44px]"
                 autocomplete="off"
               />
             </div>

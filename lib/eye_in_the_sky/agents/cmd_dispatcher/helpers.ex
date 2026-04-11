@@ -2,7 +2,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.Helpers do
   @moduledoc """
   Shared helpers for CmdDispatcher subcommand handlers.
 
-  Provides notify_success/2, notify_error/3, extract_flag/2, get_session!/1,
+  Provides notify_success/2, notify_error/3, extract_flag/2, get_session_or_nil/1,
   session_field/2, put_optional_flag/4, and with_task/4 — a common wrapper
   that handles task lookup with proper tagged-tuple error handling.
   """
@@ -31,9 +31,10 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.Helpers do
   end
 
   @doc """
-  Resolves a session by ID, returning nil on failure (non-raising).
+  Resolves a session by ID, returning nil on failure.
+  Named without `!` because it does not raise — callers must handle nil via session_field/2.
   """
-  def get_session!(session_id) do
+  def get_session_or_nil(session_id) do
     case Sessions.get_session(session_id) do
       {:ok, session} -> session
       _ -> nil

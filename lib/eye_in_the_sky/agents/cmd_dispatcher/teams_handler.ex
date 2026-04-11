@@ -19,7 +19,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
   alias EyeInTheSky.{Sessions, Teams}
   alias EyeInTheSky.Utils.ToolHelpers
 
-  import Helpers, only: [notify_success: 2, notify_error: 3, extract_flag: 2, get_session!: 1, session_field: 2]
+  import Helpers, only: [notify_success: 2, notify_error: 3, extract_flag: 2, get_session_or_nil: 1, session_field: 2]
 
   # ---------------------------------------------------------------------------
   # teams (plural)
@@ -32,7 +32,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
 
         with team_id when not is_nil(team_id) <- team_id_str |> String.trim() |> ToolHelpers.parse_int(),
              {:ok, name} <- extract_flag(args, "--name") do
-          session = get_session!(from_session_id)
+          session = get_session_or_nil(from_session_id)
           role = extract_role(args)
 
           attrs = %{

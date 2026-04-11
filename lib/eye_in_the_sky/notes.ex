@@ -146,7 +146,7 @@ defmodule EyeInTheSky.Notes do
 
     order = if sort == "oldest", do: [asc: :created_at], else: [desc: :created_at]
 
-    project_id_str = project_id && to_string(project_id)
+    project_id_str = if project_id, do: to_string(project_id)
     agent_id_strs = Enum.map(agent_ids, &to_string/1)
 
     session_id_strs = session_id_strs_for_agents(agent_ids)

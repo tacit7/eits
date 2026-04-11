@@ -21,7 +21,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
   alias EyeInTheSky.{Notes, Tasks}
   alias EyeInTheSky.Utils.ToolHelpers
 
-  import Helpers, only: [notify_success: 2, notify_error: 3, get_session!: 1, session_field: 2, with_task: 4]
+  import Helpers, only: [notify_success: 2, notify_error: 3, get_session_or_nil: 1, session_field: 2, with_task: 4]
 
   def dispatch("create " <> title, from_session_id),
     do: create_and_link_task(String.trim(title), 1, "created", from_session_id)
@@ -126,7 +126,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
     do: notify_error(from_session_id, "task", {:unknown_subcommand, unknown})
 
   defp create_and_link_task(title, state_id, verb, from_session_id) do
-    session = get_session!(from_session_id)
+    session = get_session_or_nil(from_session_id)
 
     case Tasks.create_task(%{title: title, state_id: state_id, project_id: session_field(session, :project_id)}) do
       {:ok, task} ->

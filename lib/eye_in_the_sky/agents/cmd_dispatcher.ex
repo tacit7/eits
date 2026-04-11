@@ -63,7 +63,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
     only: [
       notify_success: 2,
       notify_error: 3,
-      get_session!: 1,
+      get_session_or_nil: 1,
       session_field: 2,
       extract_flag: 2,
       put_optional_flag: 4
@@ -171,7 +171,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   defp dispatch_spawn(args, from_session_id) do
     case extract_flag(args, "--instructions") do
       {:ok, instructions} ->
-        session = get_session!(from_session_id)
+        session = get_session_or_nil(from_session_id)
         opts = build_spawn_opts(args, session, instructions, from_session_id)
 
         case AgentManager.create_agent(opts) do
@@ -228,7 +228,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
 
         with channel_id when not is_nil(channel_id) <- ToolHelpers.parse_int(String.trim(channel_id_str)),
              {:ok, body} <- extract_flag(args, "--body") do
-          session = get_session!(from_session_id)
+          session = get_session_or_nil(from_session_id)
 
           attrs = %{
             channel_id: channel_id,

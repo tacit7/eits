@@ -131,7 +131,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
           name="schedule[schedule_value]"
           value={@schedule_value}
           placeholder={if @schedule_type == "cron", do: "0 9 * * *", else: "3600"}
-          class="input input-bordered input-sm w-full font-mono text-base"
+          class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
           required
         />
       </div>
@@ -241,7 +241,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
                 placeholder="e.g. 5.00"
                 step="0.01"
                 min="0"
-                class="input input-bordered input-sm w-full font-mono"
+                class="input input-bordered input-sm w-full font-mono min-h-[44px]"
               />
             </div>
             <div class="form-control">
@@ -255,7 +255,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
                 value={@max_turns}
                 placeholder="e.g. 25"
                 min="1"
-                class="input input-bordered input-sm w-full font-mono"
+                class="input input-bordered input-sm w-full font-mono min-h-[44px]"
               />
             </div>
           </div>
@@ -302,7 +302,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
               name="schedule[allowed_tools]"
               value={@allowed_tools}
               placeholder="e.g. Bash,Read,Edit,Write,Grep,Glob"
-              class="input input-bordered input-sm w-full font-mono text-base"
+              class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
             />
             <label class="label">
               <span class="label-text-alt text-base-content/40">Comma-separated. Supports wildcards: Bash(git *)</span>
@@ -319,7 +319,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
               name="schedule[add_dir]"
               value={@add_dir}
               placeholder="/path/to/shared-lib"
-              class="input input-bordered input-sm w-full font-mono text-base"
+              class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
             />
           </div>
 
@@ -333,7 +333,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
               name="schedule[mcp_config]"
               value={@mcp_config}
               placeholder="./mcp-servers.json"
-              class="input input-bordered input-sm w-full font-mono text-base"
+              class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
             />
           </div>
 
@@ -348,7 +348,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
                 name="schedule[plugin_dir]"
                 value={@plugin_dir}
                 placeholder="./my-plugins"
-                class="input input-bordered input-sm w-full font-mono text-base"
+                class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
               />
             </div>
             <div class="form-control">
@@ -361,7 +361,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
                 name="schedule[settings_file]"
                 value={@settings_file}
                 placeholder="./settings.json"
-                class="input input-bordered input-sm w-full font-mono text-base"
+                class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
               />
             </div>
           </div>

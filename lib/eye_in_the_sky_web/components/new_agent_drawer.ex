@@ -150,7 +150,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                     name="max_turns"
                     min="1"
                     placeholder="unlimited"
-                    class="input input-bordered input-sm w-full font-mono"
+                    class="input input-bordered input-sm w-full font-mono min-h-[44px]"
                   />
                 </div>
 
@@ -163,7 +163,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                     type="text"
                     name="add_dir"
                     placeholder="/path/to/shared-lib"
-                    class="input input-bordered input-sm w-full font-mono text-base"
+                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
                   />
                 </div>
 
@@ -176,7 +176,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                     type="text"
                     name="mcp_config"
                     placeholder="./mcp-servers.json"
-                    class="input input-bordered input-sm w-full font-mono text-base"
+                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
                   />
                 </div>
 
@@ -189,7 +189,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                     type="text"
                     name="plugin_dir"
                     placeholder="./my-plugins"
-                    class="input input-bordered input-sm w-full font-mono text-base"
+                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
                   />
                 </div>
 
@@ -202,7 +202,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                     type="text"
                     name="settings_file"
                     placeholder="./settings.json"
-                    class="input input-bordered input-sm w-full font-mono text-base"
+                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
                   />
                 </div>
 

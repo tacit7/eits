@@ -188,7 +188,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
           <button
             type="button"
             phx-click="close_quick_note_modal"
-            class="btn btn-ghost btn-xs btn-square"
+            class="btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px]"
             aria-label="Close"
           >
             <.icon name="hero-x-mark" class="w-4 h-4" />
@@ -203,7 +203,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
               id="qn-title"
               required
               placeholder="Title..."
-              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base min-h-[44px]"
               autocomplete="off"
               autofocus
             />

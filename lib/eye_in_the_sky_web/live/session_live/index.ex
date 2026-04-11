@@ -272,7 +272,7 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
                 editing_session_id={@editing_session_id}
               >
                 <:actions>
-                  <div class="hidden md:block md:opacity-0 md:group-hover:opacity-100 relative dropdown dropdown-end transition-all">
+                  <div class="relative dropdown dropdown-end transition-all md:opacity-0 md:group-hover:opacity-100">
                     <button
                       tabindex="0"
                       type="button"

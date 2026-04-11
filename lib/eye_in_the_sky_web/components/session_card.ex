@@ -38,57 +38,12 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
 
     ~H"""
     <div
-      id={"swipe-row-#{@session.id}"}
-      class={"relative overflow-hidden md:overflow-visible bg-base-100 border-l-2 pl-2 " <> @status_border}
-      phx-hook="SwipeRow"
+      id={"session-row-#{@session.id}"}
+      class={"relative bg-base-100 border-l-2 pl-2 " <> @status_border}
     >
-      <%!-- Action panel (mobile only, sits behind the row, revealed by swipe) --%>
-      <div class="md:hidden absolute right-0 top-0 bottom-0 flex items-stretch" aria-hidden="true">
-        <%!-- Fav --%>
-        <button
-          type="button"
-          id={"swipe-fav-#{@session.id}"}
-          phx-hook="BookmarkAgent"
-          phx-update="ignore"
-          data-agent-id={if @session.agent, do: @session.agent.uuid}
-          data-session-id={@session.uuid}
-          data-agent-name={
-            @session.name || (if @session.agent, do: @session.agent.description) ||
-              "Agent"
-          }
-          data-agent-status={@session.status}
-          data-swipe-fav="true"
-          class="bookmark-button w-[53px] sm:w-16 flex flex-col items-center justify-center gap-1 bg-error text-white text-xs font-bold uppercase tracking-wide border-none"
-          aria-label="Bookmark session"
-        >
-          <.icon name="hero-heart" class="bookmark-icon w-5 h-5" /> Fav
-        </button>
-        <%!-- Rename --%>
-        <button
-          type="button"
-          phx-click="rename_session"
-          phx-value-session_id={@session.id}
-          class="w-[53px] sm:w-16 flex flex-col items-center justify-center gap-1 bg-primary text-white text-xs font-bold uppercase tracking-wide border-none"
-          aria-label="Rename session"
-        >
-          <.icon name="hero-pencil-square" class="w-5 h-5" /> Rename
-        </button>
-        <%!-- Archive --%>
-        <button
-          type="button"
-          phx-click="archive_session"
-          phx-value-session_id={@session.id}
-          class="w-[53px] sm:w-16 flex flex-col items-center justify-center gap-1 bg-warning text-white text-xs font-bold uppercase tracking-wide border-none"
-          aria-label="Archive session"
-        >
-          <.icon name="hero-archive-box" class="w-5 h-5" /> Archive
-        </button>
-      </div>
-
-      <%!-- Row content (slides left on swipe) --%>
+      <%!-- Row content --%>
       <div
-        data-swipe-row
-        class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer bg-inherit relative z-[1] will-change-transform md:will-change-auto md:z-auto"
+        class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer relative"
         phx-click={if !@select_mode, do: @click_event}
         phx-value-id={@session.id}
         role="button"

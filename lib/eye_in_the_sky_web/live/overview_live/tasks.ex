@@ -168,7 +168,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
             class="sm:hidden relative btn btn-ghost btn-sm btn-square min-h-[44px] min-w-[44px]"
           >
             <.icon name="hero-funnel-mini" class="w-4 h-4" />
-            <%= if !is_nil(@filter_state_id) || @sort_by != "created_desc" do %>
+            <%= if not is_nil(@filter_state_id) || @sort_by != "created_desc" do %>
               <span
                 class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full"
                 aria-hidden="true"
@@ -275,12 +275,12 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
             id="overview-tasks-empty"
             icon="hero-clipboard-document-list"
             title={
-              if @search_query != "" || !is_nil(@filter_state_id),
+              if @search_query != "" || not is_nil(@filter_state_id),
                 do: "No tasks found",
                 else: "No tasks yet"
             }
             subtitle={
-              if @search_query != "" || !is_nil(@filter_state_id),
+              if @search_query != "" || not is_nil(@filter_state_id),
                 do: "Try adjusting your search or filters",
                 else: "Tasks created by agents will appear here"
             }

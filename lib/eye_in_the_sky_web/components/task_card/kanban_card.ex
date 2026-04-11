@@ -72,7 +72,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
         phx-click="toggle_task_complete"
         phx-value-task_id={@task_id}
         aria-label={if @task.completed_at, do: "Mark task incomplete", else: "Mark task complete"}
-        aria-pressed={to_string(!is_nil(@task.completed_at))}
+        aria-pressed={to_string(not is_nil(@task.completed_at))}
         class="flex-shrink-0 mt-0.5 flex items-center justify-center min-w-[44px] min-h-[44px] rounded text-base-content/30 hover:text-success transition-colors"
       >
         <.icon

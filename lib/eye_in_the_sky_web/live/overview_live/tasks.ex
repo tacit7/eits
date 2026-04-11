@@ -155,7 +155,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
 
           <button
             phx-click="toggle_create_task_drawer"
-            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-8 text-xs"
+            class="btn btn-sm btn-primary gap-1.5 h-11 sm:h-8 sm:min-h-0 text-xs"
           >
             <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Task
           </button>
@@ -165,7 +165,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
             phx-click="open_filter_sheet"
             aria-label="Open filters"
             aria-haspopup="dialog"
-            class="sm:hidden relative btn btn-ghost btn-sm btn-square"
+            class="sm:hidden relative btn btn-ghost btn-sm btn-square min-h-[44px] min-w-[44px]"
           >
             <.icon name="hero-funnel-mini" class="w-4 h-4" />
             <%= if !is_nil(@filter_state_id) || @sort_by != "created_desc" do %>

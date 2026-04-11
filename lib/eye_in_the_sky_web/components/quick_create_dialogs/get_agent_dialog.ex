@@ -33,8 +33,8 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.GetAgentDialog do
             />
           </div>
           <div class="flex justify-end gap-2 pt-1">
-            <button data-qga-cancel type="button" class="btn btn-ghost btn-sm">Cancel</button>
-            <button type="submit" class="btn btn-primary btn-sm">Get Details</button>
+            <button data-qga-cancel type="button" class="btn btn-ghost btn-sm min-h-[44px]">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm min-h-[44px]">Get Details</button>
           </div>
         </form>
         <div data-qga-result class="hidden p-4 border-t border-base-content/10">

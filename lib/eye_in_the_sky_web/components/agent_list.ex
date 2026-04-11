@@ -74,7 +74,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
         </span>
         <button
           phx-click="confirm_delete_selected"
-          class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1"
+          class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1 min-h-[44px] min-w-[44px]"
         >
           <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
         </button>

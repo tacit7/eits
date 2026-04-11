@@ -240,12 +240,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                       <div class="flex items-center gap-1">
                         <button
                           phx-click="open_file"
-                          class="btn btn-ghost btn-xs"
+                          class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
                           title="Open in editor"
                         >
                           <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit
                         </button>
-                        <button phx-click="close_viewer" class="btn btn-ghost btn-xs btn-circle">
+                        <button phx-click="close_viewer" class="btn btn-ghost btn-xs btn-circle min-h-[44px] min-w-[44px]">
                           <.icon name="hero-x-mark" class="w-4 h-4" />
                         </button>
                       </div>

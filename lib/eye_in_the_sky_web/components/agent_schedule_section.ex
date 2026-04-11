@@ -163,7 +163,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
                       <span class="font-mono text-xs text-base-content/50">{job.schedule_value}</span>
                       <div class="flex gap-1">
                         <button
-                          class="btn btn-ghost btn-xs"
+                          class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
                           phx-click="edit_schedule"
                           phx-value-job_id={job.id}
                           phx-target={@myself}
@@ -171,7 +171,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
                           Edit
                         </button>
                         <button
-                          class="btn btn-ghost btn-xs"
+                          class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
                           phx-click="run_now"
                           phx-value-id={job.id}
                           phx-target={@myself}
@@ -212,7 +212,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
                       {job.schedule_value}
                     </span>
                     <button
-                      class="btn btn-ghost btn-xs"
+                      class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
                       phx-click="run_now"
                       phx-value-id={job.id}
                       phx-target={@myself}
@@ -220,7 +220,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
                       ▶
                     </button>
                     <button
-                      class="btn btn-ghost btn-xs text-error"
+                      class="btn btn-ghost btn-xs text-error min-h-[44px] min-w-[44px]"
                       phx-click="delete_job"
                       phx-value-id={job.id}
                       phx-target={@myself}

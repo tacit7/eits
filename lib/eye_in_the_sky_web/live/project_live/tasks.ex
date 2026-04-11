@@ -164,7 +164,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
             phx-click="open_filter_sheet"
             aria-label="Open filters"
             aria-haspopup="dialog"
-            class="sm:hidden relative btn btn-ghost btn-sm btn-square"
+            class="sm:hidden relative btn btn-ghost btn-sm btn-square h-11 w-11"
           >
             <.icon name="hero-funnel-mini" class="w-4 h-4" />
             <%= if !is_nil(@filter_state_id) || @sort_by != "created_desc" do %>

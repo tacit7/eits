@@ -214,7 +214,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
       >
         <%!-- Branding --%>
         <div class="flex items-center gap-2 px-3 py-3 border-b border-base-content/5">
-          <.link navigate="/" class="flex items-center gap-2 min-w-0 flex-1">
+          <.link navigate="/" class="flex items-center gap-2 min-w-0 flex-1 min-h-[44px]">
             <img src="/images/logo.svg" class="w-7 h-7 flex-shrink-0" alt="Eye in the Sky" width="28" height="28" loading="eager" />
             <span class={[
               "text-sm font-semibold text-base-content/80 truncate",

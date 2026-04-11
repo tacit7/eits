@@ -33,7 +33,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.TaskDialog do
               data-qct-title
               required
               placeholder="Task title..."
-              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base min-h-[44px]"
               autocomplete="off"
             />
           </div>

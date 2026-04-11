@@ -42,7 +42,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.AgentDialog do
               id="qca-parent-session"
               data-qca-parent-session
               placeholder="Parent session UUID (optional)"
-              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base min-h-[44px]"
             />
           </div>
           <div>

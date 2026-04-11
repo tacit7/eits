@@ -412,7 +412,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
           phx-target="#canvas-overlay"
           class={[
             "flex items-center gap-2 text-sm transition-colors w-full min-h-[44px]",
-            if(@collapsed, do: "px-4 py-2 justify-center", else: "pl-3 pr-3 py-2"),
+            if(@collapsed, do: "px-4 py-3 justify-center", else: "pl-3 pr-3 py-3"),
             "text-base-content/50 hover:text-base-content/75 hover:bg-base-content/5"
           ]}
           title="Canvas"
@@ -437,7 +437,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
       navigate={@href}
       class={[
         "flex items-center gap-2 text-sm transition-colors min-h-[44px]",
-        if(@collapsed, do: "px-4 py-2 justify-center", else: "pl-3 pr-3 py-2"),
+        if(@collapsed, do: "px-4 py-3 justify-center", else: "pl-3 pr-3 py-3"),
         if(@active,
           do: "text-primary bg-primary/5 font-medium",
           else: "text-base-content/50 hover:text-base-content/75 hover:bg-base-content/5"
@@ -462,7 +462,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
       navigate={@href}
       class={[
         "flex items-center gap-2 text-sm transition-colors min-h-[44px]",
-        if(@collapsed, do: "px-4 py-2 justify-center", else: "pl-3 pr-3 py-2"),
+        if(@collapsed, do: "px-4 py-3 justify-center", else: "pl-3 pr-3 py-3"),
         if(@active,
           do: "text-primary bg-primary/5 font-medium",
           else: "text-base-content/50 hover:text-base-content/75 hover:bg-base-content/5"

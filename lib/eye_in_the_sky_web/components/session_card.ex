@@ -50,10 +50,10 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
           id={"swipe-fav-#{@session.id}"}
           phx-hook="BookmarkAgent"
           phx-update="ignore"
-          data-agent-id={@session.agent && @session.agent.uuid}
+          data-agent-id={if @session.agent, do: @session.agent.uuid}
           data-session-id={@session.uuid}
           data-agent-name={
-            @session.name || (@session.agent && @session.agent.description) ||
+            @session.name || (if @session.agent, do: @session.agent.description) ||
               "Agent"
           }
           data-agent-status={@session.status}
@@ -139,7 +139,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
             <% else %>
               <span class="text-[13px] font-medium text-base-content/85 truncate">
                 {@session.name ||
-                  truncate_text(@session.agent && @session.agent.description) ||
+                  truncate_text(if @session.agent, do: @session.agent.description) ||
                   "Unnamed session"}
               </span>
             <% end %>

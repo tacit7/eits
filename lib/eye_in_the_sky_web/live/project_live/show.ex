@@ -162,7 +162,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                             {String.slice(session.uuid || to_string(session.id), 0..7)}
                           </code>
                           <span class="text-sm text-base-content/80 truncate">
-                            {session.name || truncate_text(session.agent && session.agent.description) ||
+                            {session.name || truncate_text(if session.agent, do: session.agent.description) ||
                               "Unnamed"}
                           </span>
                         </div>

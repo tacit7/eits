@@ -46,7 +46,7 @@ defmodule EyeInTheSky.Notes do
 
       Repo.all(query)
     else
-      _ -> []
+      {:error, _} -> []
     end
   end
 
@@ -66,7 +66,7 @@ defmodule EyeInTheSky.Notes do
       )
       |> Repo.aggregate(:count, :id)
     else
-      _ -> 0
+      {:error, _} -> 0
     end
   end
 
@@ -86,7 +86,7 @@ defmodule EyeInTheSky.Notes do
       |> order_by([n], desc: n.created_at)
       |> Repo.all()
     else
-      _ -> []
+      {:error, _} -> []
     end
   end
 

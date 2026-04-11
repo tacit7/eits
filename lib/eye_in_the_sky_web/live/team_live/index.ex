@@ -217,7 +217,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
                       <button
                         phx-click="delete_team"
                         phx-value-id={team.id}
-                        class="shrink-0 p-1.5 rounded hover:bg-base-200 text-base-content/20 hover:text-error/60 transition-colors opacity-0 group-hover:opacity-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                        class="shrink-0 p-1.5 rounded hover:bg-base-200 text-base-content/20 hover:text-error/60 transition-colors opacity-0 group-hover:opacity-100 max-sm:opacity-30 pointer-events-none group-hover:pointer-events-auto max-sm:pointer-events-auto min-h-[44px] min-w-[44px] flex items-center justify-center"
                         title="Delete team"
                       >
                         <.icon name="hero-trash" class="w-3.5 h-3.5" />

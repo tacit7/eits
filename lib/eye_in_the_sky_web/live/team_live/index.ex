@@ -146,7 +146,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
             <button
               phx-click="toggle_archived"
               class={[
-                "text-xs font-medium px-2 py-1 rounded transition-colors",
+                "text-xs font-medium px-2 py-1 rounded transition-colors min-h-[44px] inline-flex items-center",
                 if(@show_archived,
                   do: "bg-base-content/10 text-base-content/60",
                   else: "text-base-content/30 hover:text-base-content/50"
@@ -217,7 +217,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
                       <button
                         phx-click="delete_team"
                         phx-value-id={team.id}
-                        class="shrink-0 p-1.5 rounded hover:bg-base-200 text-base-content/20 hover:text-error/60 transition-colors opacity-0 group-hover:opacity-100"
+                        class="shrink-0 p-1.5 rounded hover:bg-base-200 text-base-content/20 hover:text-error/60 transition-colors opacity-0 group-hover:opacity-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
                         title="Delete team"
                       >
                         <.icon name="hero-trash" class="w-3.5 h-3.5" />

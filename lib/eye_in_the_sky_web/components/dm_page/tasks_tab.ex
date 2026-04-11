@@ -90,7 +90,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
                           {task.state.name}
                         </span>
                       <% end %>
-                      <%= if task.tags && length(task.tags) > 0 do %>
+                      <%= if task.tags not in [nil, []] do %>
                         <span class="text-base-content/15">&middot;</span>
                         <span class="text-base-content/35">
                           {Enum.map_join(Enum.take(task.tags, 2), ", ", & &1.name)}

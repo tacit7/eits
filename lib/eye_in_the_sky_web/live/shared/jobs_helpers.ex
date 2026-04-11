@@ -235,7 +235,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
   defp with_scoped_job(id, socket, scoping_project_id, fun) do
     with {:ok, int_id} <- parse_job_id(id),
          {:ok, job} <- ScheduledJobs.get_job(int_id) do
-      if scoping_project_id && job.project_id != scoping_project_id do
+      if not is_nil(scoping_project_id) && job.project_id != scoping_project_id do
         {:noreply, put_flash(socket, :error, "Access denied")}
       else
         fun.(job)

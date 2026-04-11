@@ -68,7 +68,7 @@ defmodule EyeInTheSky.CLI.Port do
         new_buffer = buffer <> data
 
         new_buffer =
-          if max_buffer_bytes && byte_size(new_buffer) > max_buffer_bytes do
+          if not is_nil(max_buffer_bytes) && byte_size(new_buffer) > max_buffer_bytes do
             Logger.warning(
               "[#{log_prefix}] port buffer exceeded #{max_buffer_bytes} bytes, flushing"
             )

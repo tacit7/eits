@@ -190,7 +190,7 @@ defmodule EyeInTheSkyWeb.Presenters.AgentPresenter do
     |> Enum.with_index()
     |> Enum.map(fn {group, idx} ->
       prev_date = if idx > 0, do: Enum.at(groups, idx - 1).date, else: nil
-      show_date = prev_date && group.date != prev_date
+      show_date = not is_nil(prev_date) && group.date != prev_date
       Map.put(group, :show_date_separator, show_date)
     end)
   end

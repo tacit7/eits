@@ -235,7 +235,7 @@ defmodule EyeInTheSky.Channels do
   @doc """
   Finds the global (#global) channel for a session, scoped to the session's project if set.
 
-  Returns `{:ok, channel}` or `{:error, :channel_not_found}`.
+  Returns `{:ok, channel}` or `{:error, :not_found}`.
   """
   def find_global_channel(session) do
     channels =
@@ -244,7 +244,7 @@ defmodule EyeInTheSky.Channels do
         else: list_channels()
 
     case Enum.find(channels, fn c -> c.name == "#global" end) do
-      nil -> {:error, :channel_not_found}
+      nil -> {:error, :not_found}
       channel -> {:ok, channel}
     end
   end

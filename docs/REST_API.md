@@ -87,6 +87,75 @@ curl -X PATCH localhost:5001/api/v1/sessions/abc-123 \
 
 ---
 
+### GET /sessions/:uuid
+
+Fetch session detail with related resources (tasks, notes, commits).
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `uuid` | string or integer | Session UUID or integer ID |
+
+**Response:** `200 OK`
+
+```json
+{
+  "id": 42,
+  "uuid": "session-uuid",
+  "session_id": "session-uuid",
+  "agent_id": "agent-uuid",
+  "agent_int_id": 10,
+  "project_id": 1,
+  "status": "working",
+  "name": "fix auth bug",
+  "description": "fixing the oauth flow",
+  "is_spawned": true,
+  "initialized": true,
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Add unit tests",
+      "state": "In Progress",
+      "state_id": 2
+    }
+  ],
+  "recent_notes": [
+    {
+      "id": 5,
+      "title": "Key finding",
+      "body": "Found the root cause in session_controller.ex...",
+      "starred": false,
+      "created_at": "2026-03-15T10:30:00Z"
+    }
+  ],
+  "recent_commits": [
+    {
+      "id": 1,
+      "commit_hash": "abc123def456",
+      "commit_message": "fix: add idle timeout to AgentWorker",
+      "inserted_at": "2026-03-15T10:25:00Z"
+    }
+  ]
+}
+```
+
+**Example:**
+
+```bash
+curl localhost:5001/api/v1/sessions/abc-123 \
+  -H 'Authorization: Bearer <token>'
+```
+
+Or with integer ID:
+
+```bash
+curl localhost:5001/api/v1/sessions/42 \
+  -H 'Authorization: Bearer <token>'
+```
+
+---
+
 ### POST /agents
 
 Spawn a new Claude Code agent. Creates an Agent + Session, starts an AgentWorker, and sends the initial instructions as the first message.

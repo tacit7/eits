@@ -8,7 +8,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
   require Logger
 
   alias EyeInTheSky.{AgentDefinitions, Agents, Projects, Sessions, Teams}
-  alias EyeInTheSky.Agents.{AgentManager.SessionBridge, InstructionBuilder, InstructionTemplates, RuntimeContext}
+  alias EyeInTheSky.Agents.AgentManager.SessionBridge
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSky.Git.Worktrees
   alias EyeInTheSky.Utils.ToolHelpers
@@ -29,7 +29,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
   """
   def create_agent(opts) do
     with {:ok, %{agent: agent, session: session}} <- create_records(opts) do
-      instructions = InstructionBuilder.build(opts)
+      instructions = EyeInTheSky.Agents.InstructionBuilder.build(opts)
 
       Logger.info("📤 create_agent: sending initial message to session.id=#{session.id}")
 
@@ -260,7 +260,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
   end
 
   defp build_team_context(team, member_name) do
-    InstructionTemplates.team_context(team, member_name)
+    EyeInTheSky.Agents.InstructionTemplates.team_context(team, member_name)
   end
 
   # Name resolution priority:
@@ -364,7 +364,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
           "send_message: worker found/started for session_id=#{session_id}, pid=#{inspect(pid)}"
         )
 
-        context = RuntimeContext.build(session_id, provider, opts)
+        context = EyeInTheSky.Agents.RuntimeContext.build(session_id, provider, opts)
 
         try do
           case GenServer.call(pid, {:submit_message, message, context}) do

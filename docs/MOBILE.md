@@ -41,6 +41,92 @@ All interactive elements (buttons, links, nav items, filter controls) must meet 
 <button class="join-item btn btn-sm min-h-[44px] ...">
 ```
 
+**Notes star/kebab actions** (`notes_list.ex`):
+```heex
+<button class="flex items-center justify-center min-h-[44px] min-w-[44px] px-1 py-1 rounded transition-colors ...">
+```
+
+**Quick-create dialog close buttons** (`quick_create_dialogs/*.ex`):
+```heex
+<button class="btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px]" aria-label="Close">
+```
+
+**Notes action buttons** (`notes.ex`):
+```heex
+<button class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-lg text-xs font-medium ...">
+  <.icon ... /> Action Label
+</button>
+```
+
+---
+
+## Form Input Sizing
+
+All text input fields and textareas must use **`text-base`** (16px) to prevent iOS Safari auto-zoom on focus. This is critical for mobile UX.
+
+### Rules
+
+- Replace `text-sm` / `text-xs` with `text-base` on all text, email, password, search, and textarea inputs
+- Apply to both custom input components and inline `<input>` / `<textarea>` elements
+- Update `core_components.ex` defaults to include `text-base` (already done)
+
+### Why
+
+iOS Safari auto-zooms input fields when the font size is less than 16px. This causes a jarring visual jump and breaks the user's scroll position. Using `text-base` prevents this behavior.
+
+### Examples
+
+**Input fields** (`core_components.ex`):
+```heex
+<input type={@type} class="input input-bordered text-base ..." />
+<textarea class="textarea textarea-bordered text-base ..."></textarea>
+```
+
+**Search fields**:
+```heex
+<input type="search" placeholder="Search..." class="input input-sm text-base ..." />
+```
+
+**Form components**:
+```heex
+<input type="email" class="input text-base ..." />
+<input type="password" class="input text-base ..." />
+```
+
+---
+
+## Modal Safe-Area Padding
+
+Modals and bottom sheets that can be dismissed or contain interactive elements near the bottom must account for the iPhone home indicator (safe-area-inset-bottom).
+
+### Pattern
+
+Add `pb-[env(safe-area-inset-bottom)]` to modal content containers:
+
+```heex
+<div class="modal-box pb-[env(safe-area-inset-bottom)] ...">
+  <!-- modal content -->
+</div>
+```
+
+### Examples
+
+**Command palette modal** (`command_palette.ex`):
+```heex
+<div class="modal-box pb-[env(safe-area-inset-bottom)] max-w-lg ...">
+```
+
+**Filter sheet** (`filter_sheet.ex`):
+```heex
+<div class="modal-box pb-[env(safe-area-inset-bottom)] ...">
+```
+
+### Key points
+
+- Prevents content from being hidden behind the home indicator on notched iPhones
+- Only needed for modals/sheets that extend near the bottom of the viewport
+- Use alongside sticky header offsets for full-screen modals
+
 ---
 
 ## Sticky Header Offsets

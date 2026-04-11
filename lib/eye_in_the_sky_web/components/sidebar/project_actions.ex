@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectActions do
   def handle_commit_rename(socket) do
     name = String.trim(socket.assigns.rename_value)
 
-    if name != "" && socket.assigns.renaming_project_id do
+    if name != "" && not is_nil(socket.assigns.renaming_project_id) do
       project = Projects.get_project!(socket.assigns.renaming_project_id)
       Projects.update_project(project, %{name: name})
     end

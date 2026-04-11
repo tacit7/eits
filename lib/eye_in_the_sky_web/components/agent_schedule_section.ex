@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
   defp dispatch_event("run_now", %{"id" => id} = params, socket) do
     with {:ok, int_id} <- parse_job_id(id),
          {:ok, job} <- ScheduledJobs.get_job(int_id) do
-      if socket.assigns.project_id && job.project_id != socket.assigns.project_id do
+      if not is_nil(socket.assigns.project_id) && job.project_id != socket.assigns.project_id do
         {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Access denied")}
       else
         handle_run_now(params, socket)

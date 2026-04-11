@@ -235,7 +235,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
       |> rebuild_session_status_ids()
 
     socket =
-      if socket.assigns.selected_task && socket.assigns.show_task_detail_drawer do
+      if not is_nil(socket.assigns.selected_task) && socket.assigns.show_task_detail_drawer do
         task = Tasks.get_task!(socket.assigns.selected_task.id)
         notes = Notes.list_notes_for_task(task.id)
         socket |> assign(:selected_task, task) |> assign(:task_notes, notes)

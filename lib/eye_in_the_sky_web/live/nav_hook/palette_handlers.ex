@@ -6,6 +6,8 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
   Each public function is attached as a `handle_event` hook in NavHook.on_mount/4.
   """
 
+  require Logger
+
   import Phoenix.LiveView, only: [push_event: 3]
 
   alias EyeInTheSky.{Agents, Notes, Projects, Sessions, Tasks}
@@ -127,7 +129,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
     }
 
     result =
-      with {:ok, agent} <- Agents.find_or_create_agent(agent_attrs),
+      with {:agent, {:ok, agent}} <- {:agent, Agents.find_or_create_agent(agent_attrs)},
            session_attrs = %{
              uuid: session_uuid,
              agent_id: agent.id,
@@ -138,10 +140,16 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
              status: "stopped",
              started_at: DateTime.utc_now()
            },
-           {:ok, session} <- Sessions.create_session_with_model(session_attrs) do
+           {:session, {:ok, session}} <- {:session, Sessions.create_session_with_model(session_attrs)} do
         %{ok: true, session_uuid: session.uuid}
       else
-        _ -> %{ok: false, error: "Failed to create chat"}
+        {:agent, {:error, reason}} ->
+          Logger.warning("palette create-chat: agent creation failed: #{inspect(reason)}")
+          %{ok: false, error: "Failed to create agent"}
+
+        {:session, {:error, reason}} ->
+          Logger.warning("palette create-chat: session creation failed: #{inspect(reason)}")
+          %{ok: false, error: "Failed to create session"}
       end
 
     {:halt, push_event(socket, "palette:create-chat-result", result)}

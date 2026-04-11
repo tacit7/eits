@@ -140,11 +140,16 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
 
     results =
       Enum.map(ids, fn id ->
-        with {:ok, agent} <- Sessions.get_session(id),
-             {:ok, _} <- Sessions.delete_session(agent) do
+        with {:ok, session} <- Sessions.get_session(id),
+             {:ok, _} <- Sessions.delete_session(session) do
           :ok
         else
-          _ -> :error
+          {:error, :not_found} ->
+            :error
+
+          {:error, reason} ->
+            Logger.warning("bulk delete: failed to delete session #{id}: #{inspect(reason)}")
+            :error
         end
       end)
 

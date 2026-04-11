@@ -138,6 +138,8 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
            SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent),
          {:ok, imported} <- SessionImporter.sync(session_uuid, project_path, session_id) do
       {:ok, TabHelpers.load_tab_data(socket, "messages", session_id), imported}
+    else
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -148,6 +150,8 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
     with {:ok, messages} <- CodexReader.read_messages(thread_id) do
       imported = CodexImporter.import_messages(messages, session_id)
       {:ok, TabHelpers.load_tab_data(socket, "messages", session_id), imported}
+    else
+      {:error, reason} -> {:error, reason}
     end
   end
 

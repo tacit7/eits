@@ -200,7 +200,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
             phx-value-state_id=""
             aria-pressed={is_nil(@filter_state_id)}
             class={[
-              "btn btn-xs gap-1 min-h-0 h-8",
+              "btn btn-xs gap-1 h-11 sm:h-8 sm:min-h-0",
               if(is_nil(@filter_state_id), do: "btn-neutral", else: "btn-ghost text-base-content/50")
             ]}
           >
@@ -212,7 +212,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
               phx-value-state_id={state.id}
               aria-pressed={@filter_state_id == state.id}
               class={[
-                "btn btn-xs gap-1 min-h-0 h-8",
+                "btn btn-xs gap-1 h-11 sm:h-8 sm:min-h-0",
                 if(@filter_state_id == state.id,
                   do: "btn-neutral",
                   else: "btn-ghost text-base-content/50"
@@ -231,7 +231,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
             <select
               name="value"
               id="project-tasks-sort"
-              class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-0 h-8 text-xs"
+              class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 h-11 sm:h-8 sm:min-h-0 text-xs"
             >
               <option value="created_desc" selected={@sort_by == "created_desc"}>Newest first</option>
               <option value="created_asc" selected={@sort_by == "created_asc"}>Oldest first</option>

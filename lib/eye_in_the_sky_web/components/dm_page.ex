@@ -57,14 +57,14 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             This will delete all messages and re-import from the JSONL file.
           </p>
           <div class="form-control mb-4">
-            <label class="label cursor-pointer gap-2 justify-start">
+            <label class="label cursor-pointer gap-2 justify-start min-h-[44px] flex items-center">
               <input type="checkbox" data-reload-skip class="checkbox checkbox-sm" />
               <span class="label-text text-sm">Don't show this message again</span>
             </label>
           </div>
           <div class="modal-action">
-            <button data-reload-cancel class="btn btn-ghost btn-sm">Cancel</button>
-            <button data-reload-confirm class="btn btn-error btn-sm">Reload</button>
+            <button data-reload-cancel class="btn btn-ghost btn-sm min-h-[44px]">Cancel</button>
+            <button data-reload-confirm class="btn btn-error btn-sm min-h-[44px]">Reload</button>
           </div>
         </div>
         <form method="dialog" class="modal-backdrop">

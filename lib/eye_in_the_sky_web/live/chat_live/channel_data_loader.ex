@@ -42,7 +42,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelDataLoader do
 
     agent_templates =
       Agents.list_active_agents()
-      |> Enum.filter(fn a -> a.description && a.description != "" end)
+      |> Enum.filter(fn a -> a.description not in [nil, ""] end)
       |> Enum.take(50)
       |> Enum.map(&agent_template_option/1)
 

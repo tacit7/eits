@@ -29,8 +29,8 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
         agent_id: member.agent_id,
         role: member.role,
         joined_at: member.joined_at,
-        session_name: session_data && session_data.name,
-        session_uuid: session_data && session_data.uuid
+        session_name: if(session_data, do: session_data.name),
+        session_uuid: if(session_data, do: session_data.uuid)
       }
     end)
   end

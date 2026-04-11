@@ -141,7 +141,8 @@ defmodule EyeInTheSky.Agents.AgentManager do
            {:ok, parent} <- Sessions.get_session(parent_id) do
         parent.project_id
       else
-        _ -> nil
+        nil -> nil
+        {:error, _} -> nil
       end
   end
 

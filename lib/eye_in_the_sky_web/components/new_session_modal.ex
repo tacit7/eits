@@ -66,7 +66,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         nil -> nil
         id ->
           project = Enum.find(projects, fn p -> p.id == id end)
-          project && project.path
+          if(project, do: project.path)
       end
 
     {:noreply, assign(socket, :available_agents, list_agents(project_path))}

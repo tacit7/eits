@@ -93,7 +93,7 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
                 <.session_row
                   session={member.session}
                   click_event="select_agent"
-                  project_name={if member.role && member.role != "", do: member.role}
+                  project_name={if member.role not in [nil, ""], do: member.role}
                 />
               <% else %>
                 <%!-- Member without an associated session --%>

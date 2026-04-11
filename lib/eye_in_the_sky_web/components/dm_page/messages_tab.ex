@@ -378,29 +378,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   defdelegate strip_dm_prefix(body), to: DmHelpers
   defdelegate provider_icon(provider), to: DmHelpers
   defdelegate provider_icon_class(provider), to: DmHelpers
-
-  defp message_model(%{metadata: %{"model_usage" => model_usage}}) when is_map(model_usage) do
-    case Map.keys(model_usage) do
-      [model_id | _] -> format_model_id(model_id)
-      _ -> nil
-    end
-  end
-
-  defp message_model(_), do: nil
-
-  defp message_cost(%{metadata: %{"total_cost_usd" => cost}}) when is_number(cost), do: cost
-  defp message_cost(_), do: nil
-
-  defp format_model_id(id) when is_binary(id) do
-    cond do
-      String.contains?(id, "opus") -> "opus"
-      String.contains?(id, "sonnet") -> "sonnet"
-      String.contains?(id, "haiku") -> "haiku"
-      true -> id |> String.split("-") |> Enum.take(2) |> Enum.join("-")
-    end
-  end
-
-  defp format_model_id(_), do: nil
+  defdelegate message_model(msg), to: DmHelpers
+  defdelegate message_cost(msg), to: DmHelpers
 
   defp show_message_metrics?(message) do
     message.sender_role == "agent" and is_map(message.metadata) and

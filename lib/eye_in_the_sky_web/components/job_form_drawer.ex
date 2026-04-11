@@ -103,9 +103,6 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
               <div class="form-control">
                 <label class="label"><span class="label-text">Job Type</span></label>
                 <select name="job[job_type]" class="select select-bordered w-full">
-                  <option value="shell_command" selected={@form_job_type == "shell_command"}>
-                    Shell Command
-                  </option>
                   <option value="spawn_agent" selected={@form_job_type == "spawn_agent"}>
                     Spawn Agent
                   </option>
@@ -177,28 +174,6 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                     </option>
                   <% end %>
                 </select>
-              </div>
-            <% end %>
-
-            <%= if @form_job_type == "shell_command" do %>
-              <div class="form-control">
-                <label class="label"><span class="label-text">Command</span></label>
-                <input
-                  type="text"
-                  name="job[config_command]"
-                  value={cfg(@form_config, "command")}
-                  class="input input-bordered w-full font-mono text-base"
-                  required
-                />
-              </div>
-              <div class="form-control">
-                <label class="label"><span class="label-text">Working Directory</span></label>
-                <input
-                  type="text"
-                  name="job[config_working_dir]"
-                  value={cfg(@form_config, "working_dir")}
-                  class="input input-bordered w-full text-base"
-                />
               </div>
             <% end %>
 

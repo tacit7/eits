@@ -89,13 +89,6 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
           "description" => params["config_description"] || ""
         }
 
-      "shell_command" ->
-        %{
-          "command" => params["config_command"] || "",
-          "working_dir" => params["config_working_dir"] || "",
-          "timeout_ms" => parse_int(params["config_timeout_ms"], 30_000)
-        }
-
       "mix_task" ->
         args =
           (params["config_args"] || "")

@@ -46,16 +46,13 @@ defmodule EyeInTheSky.ScheduledJobs.JobHelper do
 
     ## Job Types
 
-    1. **shell_command** - Run a shell command
-       Config: `{"command": "...", "working_dir": "/path", "timeout_ms": 30000}`
-
-    2. **spawn_agent** - Spawn a Claude Code agent
+    1. **spawn_agent** - Spawn a Claude Code agent
        Config: `{"instructions": "...", "model": "sonnet", "project_path": "/path", "description": "..."}`
 
-    3. **mix_task** - Run an Elixir mix task
+    2. **mix_task** - Run an Elixir mix task
        Config: `{"task": "task_name", "args": ["arg1"], "project_path": "/path"}`
 
-    4. **daily_digest** - Generate a daily summary of sessions, tasks, and commits
+    3. **daily_digest** - Generate a daily summary of sessions, tasks, and commits
        Config: `{}` (no config needed)
 
     ## Schedule Types
@@ -87,7 +84,6 @@ defmodule EyeInTheSky.ScheduledJobs.JobHelper do
     ## New Job Types — Worker Required
 
     Existing job types (use these whenever possible):
-    - `shell_command` → `ShellCommandWorker`
     - `spawn_agent` → `SpawnAgentWorker`
     - `mix_task` → `MixTaskWorker`
     - `daily_digest` → `DailyDigestWorker`

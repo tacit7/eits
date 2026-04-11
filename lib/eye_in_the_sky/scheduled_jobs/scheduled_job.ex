@@ -52,7 +52,7 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
       :timezone
     ])
     |> validate_required([:name, :job_type, :schedule_type, :schedule_value])
-    |> validate_inclusion(:job_type, ["spawn_agent", "shell_command", "mix_task", "daily_digest"])
+    |> validate_inclusion(:job_type, ["spawn_agent", "mix_task", "daily_digest"])
     |> validate_inclusion(:origin, ["system", "user"])
     |> validate_inclusion(:schedule_type, ["interval", "cron"])
     |> validate_job_config()
@@ -70,19 +70,10 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
       end
 
     case job_type do
-      "shell_command" -> validate_shell_command_config(changeset, config)
       "mix_task" -> validate_mix_task_config(changeset, config)
       "spawn_agent" -> validate_spawn_agent_config(changeset, config)
       "daily_digest" -> validate_daily_digest_config(changeset, config)
       _ -> changeset
-    end
-  end
-
-  defp validate_shell_command_config(changeset, config) do
-    if (config["command"] || "") |> String.trim() == "" do
-      add_error(changeset, :config, "command is required for shell jobs")
-    else
-      changeset
     end
   end
 

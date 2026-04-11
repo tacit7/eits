@@ -234,7 +234,6 @@ defmodule EyeInTheSky.ScheduledJobs do
   def enqueue_job(%ScheduledJob{} = job) do
     worker =
       case job.job_type do
-        "shell_command" -> EyeInTheSky.Workers.ShellCommandWorker
         "spawn_agent" -> EyeInTheSky.Workers.SpawnAgentWorker
         "mix_task" -> EyeInTheSky.Workers.MixTaskWorker
         "daily_digest" -> EyeInTheSky.Workers.DailyDigestWorker

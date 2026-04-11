@@ -89,7 +89,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
         |> assign(:show_form, false)
         |> assign(:editing_job, nil)
         |> assign(:form, to_form(ScheduledJobs.change_job(%ScheduledJob{})))
-        |> assign(:form_job_type, "shell_command")
+        |> assign(:form_job_type, "spawn_agent")
         |> assign(:form_schedule_type, "interval")
         |> assign(:form_config, %{})
         |> assign(:expanded_job_id, nil)
@@ -128,7 +128,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
 
   defp dispatch_event("new_job", %{"scope" => scope}, socket) do
     default_type =
-      if socket.assigns.active_tab == :agent_schedules, do: "spawn_agent", else: "shell_command"
+      "spawn_agent"
 
     {:noreply,
      socket
@@ -143,7 +143,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
 
   defp dispatch_event("new_job", _params, socket) do
     default_type =
-      if socket.assigns.active_tab == :agent_schedules, do: "spawn_agent", else: "shell_command"
+      "spawn_agent"
 
     default_scope = if socket.assigns.project_id, do: "project", else: "global"
 
@@ -370,7 +370,6 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
           />
           <select name="type" class="select select-bordered select-sm min-h-[44px]">
             <option value="all" selected={@filter_type == "all"}>All Types</option>
-            <option value="shell_command" selected={@filter_type == "shell_command"}>Shell</option>
             <option value="spawn_agent" selected={@filter_type == "spawn_agent"}>Agent</option>
             <option value="mix_task" selected={@filter_type == "mix_task"}>Mix</option>
           </select>

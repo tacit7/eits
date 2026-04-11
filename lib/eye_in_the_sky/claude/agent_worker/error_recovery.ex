@@ -9,7 +9,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorRecovery do
   require Logger
 
   alias EyeInTheSky.AgentWorkerEvents, as: WorkerEvents
-  alias EyeInTheSky.Claude.AgentWorker.{ErrorClassifier, ProcessCleanup, QueueManager, SdkLifecycle, WatchdogTimer}
+  alias EyeInTheSky.Claude.AgentWorker.{ErrorClassifier, IdleTimer, ProcessCleanup, QueueManager, SdkLifecycle, WatchdogTimer}
   alias EyeInTheSky.Claude.{Job, StreamAssemblerProtocol}
   alias EyeInTheSky.Messages
 
@@ -134,13 +134,14 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorRecovery do
          sdk_ref: nil,
          handler_monitor: nil,
          current_job: nil
-     })}
+     })
+     |> IdleTimer.maybe_schedule()}
   end
 
   defp dispatch_sdk_retry(state, job, label, opts \\ []) do
     case SdkLifecycle.attempt_sdk_retry(state, job, label, opts) do
       {:ok, new_state} -> {:noreply, new_state}
-      {:start_next, clean_state} -> {:noreply, QueueManager.process_next_job(clean_state)}
+      {:start_next, clean_state} -> {:noreply, QueueManager.process_next_job(clean_state) |> IdleTimer.maybe_schedule()}
     end
   end
 end

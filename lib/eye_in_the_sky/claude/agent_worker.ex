@@ -14,6 +14,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   alias EyeInTheSky.AgentWorkerEvents, as: WorkerEvents
   alias EyeInTheSky.Claude.AgentWorker.{
     ErrorRecovery,
+    IdleTimer,
     QueueManager,
     RetryPolicy,
     SdkLifecycle,
@@ -25,9 +26,6 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   alias EyeInTheSky.Messages
 
   @registry EyeInTheSky.Claude.AgentRegistry
-
-  # Workers shut themselves down after this many ms of idle with an empty queue.
-  @idle_timeout_ms :timer.minutes(30)
 
   @type status :: :idle | :running | :retry_wait | :failed
 
@@ -181,7 +179,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       "AgentWorker started for session=#{session_id} agent=#{agent_id} provider=#{provider}"
     )
 
-    {:ok, schedule_idle_timer(state)}
+    {:ok, IdleTimer.schedule(state)}
   end
 
   @impl true
@@ -231,7 +229,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       when status in [:retry_wait, :failed] do
     Logger.info("[#{state.session_id}] Cancelling worker in #{status} state (no active SDK)")
     state = RetryPolicy.clear_retry_timer(state)
-    {:noreply, %{state | status: :idle} |> maybe_schedule_idle_timer()}
+    {:noreply, %{state | status: :idle} |> IdleTimer.maybe_schedule()}
   end
 
   def handle_cast({:remove_queued_prompt, prompt_id}, state) do
@@ -326,7 +324,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
          handler_pid: nil,
          current_job: nil
      })
-     |> maybe_schedule_idle_timer()}
+     |> IdleTimer.maybe_schedule()}
   end
 
   # Stale Claude session — retry current job as a fresh start
@@ -371,12 +369,12 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   def handle_info(:retry_start, %__MODULE__{status: :retry_wait, queue: [_ | _]} = state) do
     {:noreply,
      QueueManager.process_next_job(%{state | status: :idle, retry_timer_ref: nil})
-     |> maybe_schedule_idle_timer()}
+     |> IdleTimer.maybe_schedule()}
   end
 
   @impl true
   def handle_info(:retry_start, %__MODULE__{status: :retry_wait} = state) do
-    {:noreply, %{state | status: :idle, retry_timer_ref: nil} |> maybe_schedule_idle_timer()}
+    {:noreply, %{state | status: :idle, retry_timer_ref: nil} |> IdleTimer.maybe_schedule()}
   end
 
   @impl true
@@ -488,7 +486,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
         "model=#{inspect(context.model)}"
     )
 
-    state = cancel_idle_timer(state)
+    state = IdleTimer.cancel(state)
     queue_len = length(state.queue)
 
     emit([:eits, :agent, :job, :received], %{system_time: System.system_time()},
@@ -546,25 +544,4 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     :telemetry.execute(event, measurements, Map.put(extra_meta, :session_id, state.session_id))
   end
 
-  # Schedules an idle timeout, cancelling any existing timer first.
-  defp schedule_idle_timer(%__MODULE__{} = state) do
-    state = cancel_idle_timer(state)
-    ref = Process.send_after(self(), :idle_timeout, @idle_timeout_ms)
-    %{state | idle_timer_ref: ref}
-  end
-
-  defp cancel_idle_timer(%__MODULE__{idle_timer_ref: nil} = state), do: state
-
-  defp cancel_idle_timer(%__MODULE__{idle_timer_ref: ref} = state) do
-    Process.cancel_timer(ref)
-    %{state | idle_timer_ref: nil}
-  end
-
-  # Schedules idle timer only when the worker is truly idle with an empty queue.
-  # Called after process_next_job or idle transitions; no-ops when a job was dequeued.
-  defp maybe_schedule_idle_timer(%__MODULE__{status: :idle, queue: []} = state) do
-    schedule_idle_timer(state)
-  end
-
-  defp maybe_schedule_idle_timer(state), do: state
 end

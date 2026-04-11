@@ -86,17 +86,15 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   end
 
   @doc "Systemic error draining queued jobs. Marks each as failed in DB before clearing."
-  def on_queue_drained(session_id, provider_conversation_id, queue, reason) do
+  def on_queue_drained(
+        %{session_id: session_id, provider_conversation_id: pcid, queue: queue},
+        reason
+      ) do
     reason_str = classify_failure_reason(reason)
 
     Enum.each(queue, fn job ->
       Messages.mark_failed(job.context[:message_id], reason_str)
-
-      Events.stream_error(
-        session_id,
-        provider_conversation_id,
-        "Queued job dropped due to systemic error: #{reason_str}"
-      )
+      Events.stream_error(session_id, pcid, "Queued job dropped due to systemic error: #{reason_str}")
     end)
   end
 

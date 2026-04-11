@@ -151,9 +151,13 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
     project_id = task.project_id || job_project_id
 
     project_path =
-      case project_id && Projects.get_project(project_id) do
-        {:ok, %{path: path}} when is_binary(path) -> path
-        _ -> File.cwd!()
+      if project_id do
+        case Projects.get_project(project_id) do
+          {:ok, %{path: path}} when is_binary(path) -> path
+          _ -> File.cwd!()
+        end
+      else
+        File.cwd!()
       end
 
     instructions = """

@@ -76,7 +76,7 @@ defmodule EyeInTheSky.Checkpoints do
         {:error, :not_found} -> nil
       end
 
-      project_path = session && session.git_worktree_path
+      project_path = if session, do: session.git_worktree_path
 
       if project_path && File.dir?(project_path) do
         pop_stash(project_path, checkpoint.git_stash_ref)

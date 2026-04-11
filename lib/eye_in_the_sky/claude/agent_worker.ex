@@ -310,7 +310,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     emit([:eits, :agent, :sdk, :complete], %{system_time: System.system_time()}, state)
 
     WorkerEvents.on_sdk_completed(state.session_id, state.provider_conversation_id, state.provider)
-    Messages.mark_delivered(state.current_job && state.current_job.context[:message_id])
+    Messages.mark_delivered(if state.current_job, do: state.current_job.context[:message_id])
 
     state = WatchdogTimer.cancel_watchdog(state)
     SdkLifecycle.demonitor_handler(state.handler_monitor)

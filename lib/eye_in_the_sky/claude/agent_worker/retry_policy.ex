@@ -28,12 +28,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.RetryPolicy do
     Logger.error("[#{state.session_id}] Max retries (#{@max_retries}) exceeded, giving up")
 
     # Mark all queued messages failed before clearing — DB must reflect loss before memory is cleared.
-    WorkerEvents.on_queue_drained(
-      state.session_id,
-      state.provider_conversation_id,
-      state.queue,
-      :retry_exhausted
-    )
+    WorkerEvents.on_queue_drained(state, :retry_exhausted)
 
     WorkerEvents.on_max_retries_exceeded(state.session_id, state.provider_conversation_id)
     WorkerEvents.broadcast_queue_update(state.session_id, [])

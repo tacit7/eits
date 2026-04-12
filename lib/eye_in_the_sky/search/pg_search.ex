@@ -180,6 +180,30 @@ defmodule EyeInTheSky.Search.PgSearch do
   end
 
   @doc """
+  Returns session IDs whose messages match the given full-text search query.
+
+  Filters to user/assistant messages only to avoid tool output noise.
+  Uses the GIN index on `to_tsvector('english', COALESCE(body, ''))`.
+  """
+  def search_session_ids_by_messages(query, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 50)
+
+    from(m in EyeInTheSky.Messages.Message,
+      where: m.sender_role in ["user", "assistant"],
+      where:
+        fragment(
+          "to_tsvector('english', COALESCE(?, '')) @@ plainto_tsquery('english', ?)",
+          m.body,
+          ^query
+        ),
+      distinct: m.session_id,
+      select: m.session_id,
+      limit: ^limit
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Returns a dynamic Ecto expression that matches rows where the tsvector of
   `name || description` satisfies a prefix-aware tsquery for `search_query`.
 

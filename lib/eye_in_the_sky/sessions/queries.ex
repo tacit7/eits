@@ -58,7 +58,13 @@ defmodule EyeInTheSky.Sessions.Queries do
 
     base_query =
       if search_query != "" do
-        where(base_query, [s, a], ^PgSearch.fts_name_description_match(search_query))
+        message_session_ids = PgSearch.search_session_ids_by_messages(search_query, limit: limit)
+        fts_match = PgSearch.fts_name_description_match(search_query)
+
+        combined =
+          dynamic([s], ^fts_match or s.id in ^message_session_ids)
+
+        where(base_query, ^combined)
       else
         base_query
       end
@@ -189,7 +195,13 @@ defmodule EyeInTheSky.Sessions.Queries do
     query = if project_id, do: where(query, [s, a], a.project_id == ^project_id), else: query
 
     if search_query != "" do
-      where(query, [s], ^PgSearch.fts_name_description_match(search_query))
+      message_session_ids = PgSearch.search_session_ids_by_messages(search_query, limit: 50)
+      fts_match = PgSearch.fts_name_description_match(search_query)
+
+      combined =
+        dynamic([s], ^fts_match or s.id in ^message_session_ids)
+
+      where(query, ^combined)
     else
       query
     end

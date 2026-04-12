@@ -40,7 +40,7 @@ defmodule EyeInTheSkyWeb.AgentLive.CanvasHandlers do
 
       session_id ->
         canvas_name =
-          if name && String.trim(name) != "",
+          if not is_nil(name) && String.trim(name) != "",
             do: String.trim(name),
             else: "Canvas #{:os.system_time(:second)}"
 

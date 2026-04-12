@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
     path = socket.assigns.current_path
 
     target =
-      if path && Path.dirname(path) != ".",
+      if not is_nil(path) && Path.dirname(path) != ".",
         do: ~p"/config?path=#{Path.dirname(path)}",
         else: ~p"/config"
 
@@ -157,7 +157,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
   end
 
   defp resolve_list_target(path) do
-    if path && path != "" do
+    if not is_nil(path) && path != "" do
       full = Path.join(@claude_dir, path)
       if path_within?(full, @claude_dir), do: {:ok, full, path}, else: {:error, "Access denied"}
     else

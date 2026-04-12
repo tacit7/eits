@@ -153,7 +153,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
     socket = assign(socket, :view_mode, mode)
 
-    if project.path && mode == :list do
+    if not is_nil(project.path) && mode == :list do
       case build_file_listing(project.path, "",
              ignore_hidden: true,
              ignored_dirs: @ignored_dirs

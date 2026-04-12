@@ -32,7 +32,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                 {if @agent, do: @agent.name, else: "No messages yet"}
               </p>
               <p class="mt-1.5 text-xs text-base-content/25 max-w-xs">
-                <%= if @agent && @agent.git_worktree_path do %>
+                <%= if not is_nil(@agent) && not is_nil(@agent.git_worktree_path) do %>
                   <span class="font-mono">{Path.basename(@agent.git_worktree_path)}</span>
                   &nbsp;&mdash;
                   Send a message to start the conversation
@@ -274,7 +274,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     ~H"""
     <div class="mt-1 space-y-1.5">
       <details
-        :if={@thinking && @thinking != ""}
+        :if={not is_nil(@thinking) && @thinking != ""}
         class="group rounded border-l-2 border-primary/50 bg-zinc-950/50 overflow-hidden"
       >
         <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">

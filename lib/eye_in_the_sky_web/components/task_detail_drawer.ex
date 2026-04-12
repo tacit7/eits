@@ -166,7 +166,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
               <%= render_slot(@checklist) %>
 
               <%!-- Annotations --%>
-              <%= if @notes && @notes != [] do %>
+              <%= if not is_nil(@notes) && @notes != [] do %>
                 <div>
                   <div class="flex items-center gap-2 mb-2">
                     <span class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider">
@@ -196,7 +196,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
 
               <%!-- Metadata --%>
               <div class="flex items-center gap-3 text-[11px] text-base-content/25 pt-2">
-                <%= if @task.updated_at && @task.updated_at != @task.created_at do %>
+                <%= if not is_nil(@task.updated_at) && @task.updated_at != @task.created_at do %>
                   <span>Updated {relative_time(@task.updated_at)}</span>
                   <span class="text-base-content/10">&middot;</span>
                 <% end %>
@@ -249,7 +249,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                 <.icon name="hero-play" class="w-3.5 h-3.5" /> Start Agent
               </button>
               <div class="ml-auto flex items-center gap-1">
-                <%= if @copy_event && @projects != [] do %>
+                <%= if not is_nil(@copy_event) && @projects != [] do %>
                   <% other_projects = Enum.reject(@projects, &(&1.id == @current_project_id)) %>
                   <%= if other_projects != [] do %>
                     <div class="dropdown dropdown-top dropdown-end">

@@ -257,7 +257,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
       <% end %>
       
     <!-- Additional Info (if available) -->
-      <%= if @prompt.tags || @prompt.created_by || @prompt.project_id do %>
+      <%= if not is_nil(@prompt.tags) || not is_nil(@prompt.created_by) || not is_nil(@prompt.project_id) do %>
         <div class="card bg-base-100 shadow-xl mt-6">
           <div class="card-body">
             <h2 class="card-title text-lg">Additional Information</h2>

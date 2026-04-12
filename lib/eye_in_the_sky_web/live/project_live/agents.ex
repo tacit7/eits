@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
     user_dir = socket.assigns.user_agents_dir
 
     allowed =
-      (project_dir && String.starts_with?(path, project_dir)) ||
+      (not is_nil(project_dir) && String.starts_with?(path, project_dir)) ||
         String.starts_with?(path, user_dir)
 
     if allowed do
@@ -61,7 +61,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
       relative = Path.basename(path)
 
       scope =
-        if project_dir && String.starts_with?(path, project_dir), do: :project, else: :user
+        if not is_nil(project_dir) && String.starts_with?(path, project_dir), do: :project, else: :user
 
       {:noreply,
        socket
@@ -91,8 +91,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
     user_dir = socket.assigns.user_agents_dir
 
     allowed =
-      path &&
-        ((project_dir && String.starts_with?(path, project_dir)) ||
+      not is_nil(path) &&
+        ((not is_nil(project_dir) && String.starts_with?(path, project_dir)) ||
            String.starts_with?(path, user_dir)) &&
         File.exists?(path)
 

@@ -96,7 +96,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
 
     {children, top_level} =
       Enum.split_with(sessions, fn s ->
-        s.parent_session_id && MapSet.member?(session_ids, s.parent_session_id)
+        not is_nil(s.parent_session_id) && MapSet.member?(session_ids, s.parent_session_id)
       end)
 
     children_by_parent = Enum.group_by(children, & &1.parent_session_id)

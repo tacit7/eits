@@ -6,7 +6,6 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectActions do
 
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
-  alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.{Events, Projects}
 
   def handle_select_project(%{"project_id" => id_str}, socket) do
@@ -128,7 +127,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectActions do
     with project_id when not is_nil(project_id) <- parse_int(project_id_str),
          {:ok, project} <- Projects.get_project(project_id),
          {:ok, %{session: session}} <-
-           AgentManager.create_agent(
+           EyeInTheSky.Agents.AgentManager.create_agent(
              project_id: project.id,
              project_path: project.path,
              model: "sonnet",

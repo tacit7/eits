@@ -45,27 +45,26 @@ Context window is hardcoded to `200_000` — Anubis does not report it.
 
 ```
 used = input_tokens + cache_read_input_tokens + cache_creation_input_tokens
-remaining = max(0, context_window - used)
-pct = remaining / context_window * 100
+pct  = min(used / context_window * 100, 100.0)
 ```
 
-`remaining` is clamped to `0` because `cache_read_input_tokens` can exceed `context_window` in practice (e.g. session 773: 584k cache reads vs 200k window), which would otherwise produce a negative display.
+`pct` is clamped to `100.0` because `cache_read_input_tokens` can exceed `context_window` on long-running sessions (e.g. 38-round anti-pattern agent: ~1360% raw), which would otherwise produce absurd display values.
 
 ## Display
 
-Rendered in `dm_page.ex` in the message toolbar:
+Rendered in `composer.ex` in the message toolbar:
 
 | pct         | Color                     |
 |-------------|---------------------------|
-| > 40%       | `text-base-content/30`    |
-| 20% – 40%   | `text-warning/70`         |
-| < 20%       | `text-error/70`           |
+| < 60%       | `text-base-content/30`    |
+| 60% – 80%   | `text-warning/70`         |
+| ≥ 80%       | `text-error/70`           |
 
-Tooltip shows: `{remaining} / {context_window} tokens remaining`.
+Tooltip shows: `{used} / {context_window} tokens used`.
 
 Hidden entirely when `context_window == 0` (no usage data yet).
 
 ## Source Files
 
-- Extraction: `lib/eye_in_the_sky_web_web/live/dm_live.ex` — `extract_context_window/1` (~line 818)
-- Display: `lib/eye_in_the_sky_web_web/components/dm_page.ex` (~line 1040)
+- Extraction: `lib/eye_in_the_sky_web/live/dm_live/tab_helpers.ex` — `extract_context_window/1`
+- Display: `lib/eye_in_the_sky_web/components/dm_page/composer.ex`

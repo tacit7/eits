@@ -156,7 +156,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
         <%!-- Center: context used --%>
         <div class="inline-flex items-center gap-2">
           <%= if @context_window > 0 and @context_used > 0 do %>
-            <% pct = Float.round(@context_used / @context_window * 100, 1) %>
+            <% pct = min(Float.round(@context_used / @context_window * 100, 1), 100.0) %>
             <% color_class =
               cond do
                 pct < 60 -> "text-base-content/30"

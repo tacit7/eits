@@ -24,13 +24,18 @@ Requires `curl` and `jq`.
 ## sessions
 
 ```bash
-eits sessions list
+eits sessions list [--search <q>] [--status <s>] [--project <id>] [--limit <n>]
+eits sessions search <query>
 eits sessions get <uuid>
+eits sessions tasks <uuid>
+eits sessions notes <uuid>
 eits sessions create --session-id <uuid> [--name <n>] [--description <d>] [--project <name>] [--model <m>] [--entrypoint <e>]
 eits sessions update <uuid> [--status <s>] [--intent <text>] [--entrypoint <e>]
 eits sessions end <uuid>
 eits sessions context <uuid>
 ```
+
+`sessions get <uuid>` returns a rich response that includes the session, its linked tasks, `recent_notes` (last 5, body truncated to 120 chars), and `recent_commits` (last 5) in a single call.
 
 ---
 
@@ -109,6 +114,7 @@ eits tasks annotate 42 --body "Implemented via migration + controller change"
 
 ```bash
 eits notes list [--q <query>] [--session <uuid>] [--limit <n>]
+eits notes search <query>
 eits notes get <id>
 eits notes create --parent-type <session|task|agent> --parent-id <id> --body <text> \
   [--title <t>] [--starred]
@@ -143,7 +149,7 @@ eits agents spawn --instructions <text> [--model <m>] [--provider <p>] \
 ## commits
 
 ```bash
-eits commits list
+eits commits list [--session <uuid>]
 eits commits create [--agent <uuid>] --hash <h1> [--hash <h2>] [--message <m>]
 # --agent defaults to $EITS_AGENT_UUID
 ```

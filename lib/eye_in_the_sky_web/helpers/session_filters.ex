@@ -77,7 +77,7 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
         Enum.filter(sessions, &(&1.status == "completed" and is_nil(&1.archived_at)))
 
       "archived" ->
-        Enum.filter(sessions, &(!is_nil(&1.archived_at)))
+        Enum.filter(sessions, &(not is_nil(&1.archived_at)))
 
       _ ->
         sessions

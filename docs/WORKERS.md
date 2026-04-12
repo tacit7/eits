@@ -32,6 +32,30 @@ When the server restarts while a Claude subprocess is still running, that orphan
 
 ---
 
+## AgentWorker Idle Timeout (Supervisor Slot Management)
+
+AgentWorker processes that remain idle with empty job queues auto-terminate after 30 minutes to prevent supervisor slot exhaustion under sustained load.
+
+**Why:** `AgentSupervisor` has a maximum number of children. Long-running idle workers tie up slots that could be used for new agents. Without idle timeout, idle workers accumulate and new spawn requests hit `max_children` errors.
+
+**How it works:**
+1. Worker enters idle state with empty queue → `IdleTimer.maybe_schedule(state)` schedules a 30-minute timer via `Process.send_after/3`
+2. If a new job arrives during the 30 minutes → timer is cancelled via `IdleTimer.cancel/1`
+3. If no job arrives within 30 minutes → `:idle_timeout` message triggers `exit(:normal)`
+4. Supervisor sees `:normal` exit (not a crash) and does NOT restart due to `restart: :transient` config
+5. Slot is freed for a new agent spawn
+
+**Configuration:** Hard-coded to 30 minutes via `@idle_timeout_ms :timer.minutes(30)` in the IdleTimer module. No user-facing setting (CLI idle timeout is different — see section below).
+
+**Code locations:**
+- `lib/eye_in_the_sky/claude/agent_worker.ex` — calls `IdleTimer.maybe_schedule/1` in handle_info
+- `lib/eye_in_the_sky/claude/agent_worker/idle_timer.ex` — `IdleTimer` module with schedule/cancel logic
+- `lib/eye_in_the_sky/claude/supervisor.ex` — `restart: :transient` configuration
+
+**Commits:** d74450ce (idle timeout feature), error recovery integration in agent_worker error handlers
+
+---
+
 ## Agent Process Idle Timeout
 
 Claude and Codex agent processes have a configurable idle timeout — if the subprocess produces no output for the configured duration, it is killed and the agent worker receives an error.

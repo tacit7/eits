@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
         <% end %>
         <.icon name="hero-folder-open" class="w-4 h-4 flex-shrink-0" />
         <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>Projects</span>
-        <%= if !is_nil(@sidebar_project) && !@collapsed do %>
+        <%= if not is_nil(@sidebar_project) && !@collapsed do %>
           <span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"></span>
         <% end %>
       </button>

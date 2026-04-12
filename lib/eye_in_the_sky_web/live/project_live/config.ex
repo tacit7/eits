@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
         claude_dir = socket.assigns.claude_dir
 
         entries =
-          if claude_dir && File.dir?(claude_dir),
+          if not is_nil(claude_dir) && File.dir?(claude_dir),
             do: scan_directory(claude_dir, claude_dir, 0),
             else: []
 
@@ -72,7 +72,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   def handle_event("view_file", %{"path" => path}, socket) do
     claude_dir = socket.assigns.claude_dir
 
-    if claude_dir && String.starts_with?(path, claude_dir) do
+    if not is_nil(claude_dir) && String.starts_with?(path, claude_dir) do
       content =
         case File.read(path) do
           {:ok, data} -> data
@@ -103,7 +103,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
     path = socket.assigns.selected_file_path
     claude_dir = socket.assigns.claude_dir
 
-    if path && claude_dir && String.starts_with?(path, claude_dir) && File.exists?(path) do
+    if not is_nil(path) && not is_nil(claude_dir) && String.starts_with?(path, claude_dir) && File.exists?(path) do
       EyeInTheSkyWeb.Helpers.ViewHelpers.open_in_system(path)
     end
 

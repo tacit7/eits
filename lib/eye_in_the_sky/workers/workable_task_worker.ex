@@ -45,9 +45,10 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
           :ok
 
         {:error, reason} ->
-          ScheduledJobs.record_run_complete(run, "failed", result: inspect(reason))
+          reason_str = if is_binary(reason), do: reason, else: inspect(reason)
+          ScheduledJobs.record_run_complete(run, "failed", result: reason_str)
           broadcast()
-          notify_error(inspect(reason))
+          notify_error(reason_str)
           {:error, reason}
       end
     rescue

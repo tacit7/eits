@@ -237,10 +237,18 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
     end
   end
 
-  defp sanitize_branch(b), do: Regex.replace(~r/[^a-zA-Z0-9_\-\.\/]/, b, "_")
+  @doc false
+  def sanitize_branch(b) do
+    b
+    |> then(&Regex.replace(~r/[^a-zA-Z0-9_\-\.\/]/, &1, "_"))
+    |> String.replace("..", "_")
+  end
 
-  defp sanitize_text(nil), do: ""
-  defp sanitize_text(s), do: s |> String.slice(0, 2000) |> String.replace("\0", "")
+  @doc false
+  def sanitize_text(nil), do: ""
+  def sanitize_text(s) when is_binary(s), do: s |> String.slice(0, 2000) |> String.replace("\0", "")
+  def sanitize_text(s) when is_number(s) or is_atom(s), do: sanitize_text(to_string(s))
+  def sanitize_text(_), do: ""
 
   defp extract_session_uuid(pr_body) do
     case Regex.run(~r/Session-ID:\s*([0-9a-f-]{36})/i, pr_body, capture: :all_but_first) do

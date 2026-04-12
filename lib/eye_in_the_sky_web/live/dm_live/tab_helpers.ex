@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
 
   require Logger
 
+  @default_context_window 200_000
   @default_message_limit 20
 
   def load_tab_data(socket, tab, session_id) do
@@ -154,7 +155,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
       input = entry["inputTokens"] || 0
       cache_read = entry["cacheReadInputTokens"] || 0
       cache_creation = entry["cacheCreationInputTokens"] || 0
-      ctx_window = entry["contextWindow"] || 200_000
+      ctx_window = entry["contextWindow"] || @default_context_window
       used = input + cache_read + cache_creation
 
       if used > ctx_window do
@@ -174,14 +175,14 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     cache_creation = usage["cache_creation_input_tokens"] || 0
     used = input + cache_read + cache_creation
 
-    if used > 200_000 do
+    if used > @default_context_window do
       Logger.warning(
-        "[ctx_overflow] usage: used=#{used} window=200000 " <>
+        "[ctx_overflow] usage: used=#{used} window=#{@default_context_window} " <>
           "input=#{input} cache_read=#{cache_read} cache_creation=#{cache_creation}"
       )
     end
 
-    if used > 0, do: {used, 200_000}
+    if used > 0, do: {used, @default_context_window}
   end
 
   # Enriches commits that have no stored message by fetching subjects from git.

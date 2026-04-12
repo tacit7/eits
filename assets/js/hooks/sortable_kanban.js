@@ -1,11 +1,17 @@
-import Sortable from 'sortablejs'
+// Sortable is loaded lazily — only needed on the kanban board.
+let _Sortable = null
+async function getSortable() {
+  if (!_Sortable) _Sortable = (await import('sortablejs')).default
+  return _Sortable
+}
 
 export const SortableKanban = {
-  mounted() { this._init() },
+  async mounted() { await this._init() },
   updated() {
     // Sortable handles DOM mutations internally; no need to destroy/recreate
   },
-  _init() {
+  async _init() {
+    const Sortable = await getSortable()
     const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0
     this.sortable = Sortable.create(this.el, {
       group: "kanban",
@@ -59,7 +65,8 @@ export const SortableKanban = {
 }
 
 export const SortableColumns = {
-  mounted() {
+  async mounted() {
+    const Sortable = await getSortable()
     this.sortable = Sortable.create(this.el, {
       animation: 150,
       ghostClass: "opacity-30",

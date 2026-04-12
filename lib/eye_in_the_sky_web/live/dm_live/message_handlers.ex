@@ -106,16 +106,38 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   end
 
   @doc """
-  On connected mount, syncs messages from the session file into the DB first
-  so navigating back after an agent run shows the full conversation.
-  Falls back to a plain DB query if no session file / project path found.
+  On connected mount, loads messages from the DB immediately and kicks off an
+  async Task to sync from the session file. The sync can involve many individual
+  DB round-trips (one per message) and must not block the LiveView process —
+  holding a DB connection in the LV for the full sync duration triggers a
+  15 s DBConnection timeout for long sessions.
+
+  The Task sends `:do_message_reload` when done so the LV picks up any newly
+  imported messages without the user seeing a blank conversation.
   """
   def load_messages_on_mount(socket) do
     if connected?(socket) do
-      case sync_messages_from_session_file(socket) do
-        {:ok, socket, _imported} -> socket
-        {:error, _reason} -> TabHelpers.load_tab_data(socket, "messages", socket.assigns.session_id)
-      end
+      session = socket.assigns.session
+      agent = socket.assigns.agent
+      session_id = socket.assigns.session_id
+      session_uuid = socket.assigns.session_uuid
+      lv_pid = self()
+
+      Task.start(fn ->
+        result =
+          if session.provider == "codex" do
+            sync_codex_async(session_id, session_uuid)
+          else
+            sync_claude_async(session_id, session_uuid, session, agent)
+          end
+
+        case result do
+          {:ok, _} -> send(lv_pid, :do_message_reload)
+          {:error, _} -> :ok
+        end
+      end)
+
+      TabHelpers.load_tab_data(socket, "messages", session_id)
     else
       TabHelpers.load_tab_data(socket, "messages", socket.assigns.session_id)
     end
@@ -152,6 +174,19 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
       {:ok, TabHelpers.force_reload_messages(socket, session_id), imported}
     else
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # Async-safe variants — take plain data, no socket. Used by load_messages_on_mount/1.
+  defp sync_claude_async(session_id, session_uuid, session, agent) do
+    with {:ok, project_path} <- SessionHelpers.resolve_project_path(session, agent) do
+      SessionImporter.sync(session_uuid, project_path, session_id)
+    end
+  end
+
+  defp sync_codex_async(session_id, session_uuid) do
+    with {:ok, messages} <- CodexReader.read_messages(session_uuid) do
+      {:ok, CodexImporter.import_messages(messages, session_id)}
     end
   end
 

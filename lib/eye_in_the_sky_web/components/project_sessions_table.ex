@@ -93,7 +93,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
                   <button
                     tabindex="0"
                     type="button"
-                    class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/35 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+                    class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/60 md:text-base-content/35 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
                     aria-label="More options"
                     phx-click="noop"
                   >

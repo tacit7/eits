@@ -174,9 +174,9 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
     ~H"""
     <dialog
       id="delete-confirm-modal"
-      class={"modal " <> if(@show_delete_confirm, do: "modal-open", else: "")}
+      class={"modal modal-bottom sm:modal-middle " <> if(@show_delete_confirm, do: "modal-open", else: "")}
     >
-      <div class="modal-box max-w-sm">
+      <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
         <h3 class="text-lg font-bold">Delete sessions</h3>
         <p class="py-4 text-sm text-base-content/70">
           Permanently delete {MapSet.size(@selected_ids)} selected session{if MapSet.size(@selected_ids) != 1, do: "s"}? This cannot be undone.

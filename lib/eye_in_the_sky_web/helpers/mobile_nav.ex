@@ -31,6 +31,7 @@ defmodule EyeInTheSkyWeb.Helpers.MobileNav do
       path == "/tasks" -> :tasks
       path == "/notes" -> :notes
       path in ["/", "/sessions"] -> :sessions
+      String.starts_with?(path, "/dm/") -> :sessions
       true -> :none
     end
   end

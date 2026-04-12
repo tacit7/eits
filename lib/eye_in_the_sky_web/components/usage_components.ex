@@ -113,49 +113,66 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
     """
   end
 
-  attr :by_project, :list, required: true
-  attr :recalculating, :boolean, required: true
+  # ── Generic usage table ──────────────────────────────────────────────────────
+  #
+  # Each column_def is a map with:
+  #   label       - header text (required)
+  #   key         - atom key to read from each row map (required)
+  #   format      - :plain | :number | :cost | :short_model | :date | :link (required)
+  #   class       - <td> CSS class string (optional, default "")
+  #   link_key    - atom key for the href suffix (required when format: :link)
+  #   link_prefix - URL prefix string, e.g. "/dm/" (required when format: :link)
 
-  def project_breakdown_table(assigns) do
+  attr :title, :string, required: true
+  attr :subtitle, :string, default: nil
+  attr :rows, :list, required: true
+  attr :column_defs, :list, required: true
+  attr :recalculating, :boolean, default: false
+  attr :empty_message, :string, default: "No data"
+  attr :loading_rows, :integer, default: 5
+
+  def usage_table(assigns) do
     ~H"""
     <div class="card bg-base-100 border border-base-300 shadow-sm">
       <div class="card-body p-4">
-        <h2 class="text-lg font-semibold mb-3">By Project</h2>
+        <h2 class="text-lg font-semibold mb-3">
+          {@title}
+          <span :if={@subtitle} class="text-sm font-normal text-base-content/40">{@subtitle}</span>
+        </h2>
         <div class="overflow-x-auto">
           <table class="table table-sm">
             <thead>
               <tr class="text-base-content/60">
-                <th>Project</th>
-                <th class="text-right">Sessions</th>
-                <th class="text-right">Input Tokens</th>
-                <th class="text-right">Output Tokens</th>
-                <th class="text-right">Requests</th>
-                <th class="text-right">Subagents</th>
-                <th class="text-right">Cost</th>
+                <th :for={col <- @column_defs} class={header_class(col)}>
+                  {col.label}
+                </th>
               </tr>
             </thead>
             <tbody>
-              <tr :if={@by_project == [] && !@recalculating} class="hover">
-                <td colspan="7" class="text-center text-base-content/40 py-6">
-                  No data for this period
+              <tr :if={@rows == [] && !@recalculating} class="hover">
+                <td colspan={length(@column_defs)} class="text-center text-base-content/40 py-6">
+                  {@empty_message}
                 </td>
               </tr>
               <%= if @recalculating do %>
-                <tr :for={_ <- 1..5} class="hover">
-                  <td :for={_ <- 1..7}>
+                <tr :for={_ <- 1..@loading_rows} class="hover">
+                  <td :for={_ <- 1..length(@column_defs)}>
                     <div class="skeleton h-4 w-full"></div>
                   </td>
                 </tr>
               <% else %>
-                <tr :for={row <- @by_project} class="hover">
-                  <td class="font-medium">{row.project}</td>
-                  <td class="text-right">{ViewHelpers.format_number(row.sessions)}</td>
-                  <td class="text-right">{ViewHelpers.format_number(row.input_tokens)}</td>
-                  <td class="text-right">{ViewHelpers.format_number(row.output_tokens)}</td>
-                  <td class="text-right">{ViewHelpers.format_number(row.requests)}</td>
-                  <td class="text-right">{ViewHelpers.format_number(row.subagents)}</td>
-                  <td class="text-right font-medium text-warning">
-                    {ViewHelpers.format_cost(row.cost)}
+                <tr :for={row <- @rows} class="hover">
+                  <td :for={col <- @column_defs} class={col[:class] || ""}>
+                    <%= if col.format == :link do %>
+                      <a
+                        href={"#{col.link_prefix}#{Map.get(row, col.link_key)}"}
+                        class="link link-hover link-primary"
+                      >
+                        {Map.get(row, col.key)}
+                      </a>
+                    <% else %>
+                      {render_cell(Map.get(row, col.key), col.format)}
+                    <% end %>
                   </td>
                 </tr>
               <% end %>
@@ -167,46 +184,28 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
     """
   end
 
+  # ── Table wrappers (preserve existing public API) ────────────────────────────
+
+  attr :by_project, :list, required: true
+  attr :recalculating, :boolean, required: true
+
+  def project_breakdown_table(assigns) do
+    ~H"""
+    <.usage_table
+      title="By Project"
+      rows={@by_project}
+      column_defs={project_column_defs()}
+      recalculating={@recalculating}
+      empty_message="No data for this period"
+    />
+    """
+  end
+
   attr :by_month, :list, required: true
 
   def by_month_table(assigns) do
     ~H"""
-    <div class="card bg-base-100 border border-base-300 shadow-sm">
-      <div class="card-body p-4">
-        <h2 class="text-lg font-semibold mb-3">By Month</h2>
-        <div class="overflow-x-auto">
-          <table class="table table-sm">
-            <thead>
-              <tr class="text-base-content/60">
-                <th>Month</th>
-                <th class="text-right">Sessions</th>
-                <th class="text-right">Input Tokens</th>
-                <th class="text-right">Output Tokens</th>
-                <th class="text-right">Total Tokens</th>
-                <th class="text-right">Requests</th>
-                <th class="text-right">Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr :if={@by_month == []} class="hover">
-                <td colspan="7" class="text-center text-base-content/40 py-6">No data</td>
-              </tr>
-              <tr :for={row <- @by_month} class="hover">
-                <td class="font-medium tabular-nums">{row.period}</td>
-                <td class="text-right">{ViewHelpers.format_number(row.sessions)}</td>
-                <td class="text-right">{ViewHelpers.format_number(row.input_tokens)}</td>
-                <td class="text-right">{ViewHelpers.format_number(row.output_tokens)}</td>
-                <td class="text-right">{ViewHelpers.format_number(row.total_tokens)}</td>
-                <td class="text-right">{ViewHelpers.format_number(row.requests)}</td>
-                <td class="text-right font-medium text-warning">
-                  {ViewHelpers.format_cost(row.cost)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+    <.usage_table title="By Month" rows={@by_month} column_defs={month_column_defs()} />
     """
   end
 
@@ -214,44 +213,12 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
 
   def by_week_table(assigns) do
     ~H"""
-    <div class="card bg-base-100 border border-base-300 shadow-sm">
-      <div class="card-body p-4">
-        <h2 class="text-lg font-semibold mb-3">
-          By Week <span class="text-sm font-normal text-base-content/40">(last 26 weeks)</span>
-        </h2>
-        <div class="overflow-x-auto">
-          <table class="table table-sm">
-            <thead>
-              <tr class="text-base-content/60">
-                <th>Week of</th>
-                <th class="text-right">Sessions</th>
-                <th class="text-right">Input Tokens</th>
-                <th class="text-right">Output Tokens</th>
-                <th class="text-right">Total Tokens</th>
-                <th class="text-right">Requests</th>
-                <th class="text-right">Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr :if={@by_week == []} class="hover">
-                <td colspan="7" class="text-center text-base-content/40 py-6">No data</td>
-              </tr>
-              <tr :for={row <- @by_week} class="hover">
-                <td class="font-medium tabular-nums">{row.period}</td>
-                <td class="text-right">{ViewHelpers.format_number(row.sessions)}</td>
-                <td class="text-right">{ViewHelpers.format_number(row.input_tokens)}</td>
-                <td class="text-right">{ViewHelpers.format_number(row.output_tokens)}</td>
-                <td class="text-right">{ViewHelpers.format_number(row.total_tokens)}</td>
-                <td class="text-right">{ViewHelpers.format_number(row.requests)}</td>
-                <td class="text-right font-medium text-warning">
-                  {ViewHelpers.format_cost(row.cost)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+    <.usage_table
+      title="By Week"
+      subtitle="(last 26 weeks)"
+      rows={@by_week}
+      column_defs={week_column_defs()}
+    />
     """
   end
 
@@ -260,51 +227,12 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
 
   def model_breakdown_table(assigns) do
     ~H"""
-    <div class="card bg-base-100 border border-base-300 shadow-sm">
-      <div class="card-body p-4">
-        <h2 class="text-lg font-semibold mb-3">By Model</h2>
-        <div class="overflow-x-auto">
-          <table class="table table-sm">
-            <thead>
-              <tr class="text-base-content/60">
-                <th>Model</th>
-                <th class="text-right">Sessions</th>
-                <th class="text-right">Input Tokens</th>
-                <th class="text-right">Output Tokens</th>
-                <th class="text-right">Cache Read</th>
-                <th class="text-right">Cache Create</th>
-                <th class="text-right">Requests</th>
-                <th class="text-right">Cost</th>
-                <th class="text-right">Avg/Session</th>
-              </tr>
-            </thead>
-            <tbody>
-              <%= if @recalculating do %>
-                <tr :for={_ <- 1..5} class="hover">
-                  <td :for={_ <- 1..9}>
-                    <div class="skeleton h-4 w-full"></div>
-                  </td>
-                </tr>
-              <% else %>
-                <tr :for={row <- @model_breakdown} class="hover">
-                  <td class="font-medium">{ViewHelpers.short_model(row.model)}</td>
-                  <td class="text-right">{ViewHelpers.format_number(row.sessions)}</td>
-                  <td class="text-right">{ViewHelpers.format_number(row.input_tokens)}</td>
-                  <td class="text-right">{ViewHelpers.format_number(row.output_tokens)}</td>
-                  <td class="text-right">{ViewHelpers.format_number(row.cache_read)}</td>
-                  <td class="text-right">{ViewHelpers.format_number(row.cache_create)}</td>
-                  <td class="text-right">{ViewHelpers.format_number(row.requests)}</td>
-                  <td class="text-right font-medium text-warning">
-                    {ViewHelpers.format_cost(row.cost)}
-                  </td>
-                  <td class="text-right">{ViewHelpers.format_cost(row.avg_cost)}</td>
-                </tr>
-              <% end %>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+    <.usage_table
+      title="By Model"
+      rows={@model_breakdown}
+      column_defs={model_column_defs()}
+      recalculating={@recalculating}
+    />
     """
   end
 
@@ -313,61 +241,99 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
 
   def top_sessions_table(assigns) do
     ~H"""
-    <div class="card bg-base-100 border border-base-300 shadow-sm">
-      <div class="card-body p-4">
-        <h2 class="text-lg font-semibold mb-3">Top Sessions by Cost</h2>
-        <div class="overflow-x-auto">
-          <table class="table table-sm">
-            <thead>
-              <tr class="text-base-content/60">
-                <th>Session</th>
-                <th>Project</th>
-                <th>Model</th>
-                <th>Date</th>
-                <th class="text-right">Input</th>
-                <th class="text-right">Output</th>
-                <th class="text-right">Cache Read</th>
-                <th class="text-right">Cache Create</th>
-                <th class="text-right">Requests</th>
-                <th class="text-right">Subagents</th>
-                <th class="text-right">Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              <%= if @recalculating do %>
-                <tr :for={_ <- 1..10} class="hover">
-                  <td :for={_ <- 1..11}>
-                    <div class="skeleton h-4 w-full"></div>
-                  </td>
-                </tr>
-              <% else %>
-                <tr :for={row <- @top_sessions} class="hover">
-                  <td class="max-w-xs truncate">
-                    <a href={"/dm/#{row.uuid}"} class="link link-hover link-primary">
-                      {row.name}
-                    </a>
-                  </td>
-                  <td class="text-base-content/60 whitespace-nowrap">{row.project}</td>
-                  <td class="whitespace-nowrap">{ViewHelpers.short_model(row.model)}</td>
-                  <td class="text-base-content/60 whitespace-nowrap">
-                    {ViewHelpers.format_date(row.started_at)}
-                  </td>
-                  <td class="text-right">{ViewHelpers.format_number(row.input_tokens)}</td>
-                  <td class="text-right">{ViewHelpers.format_number(row.output_tokens)}</td>
-                  <td class="text-right">{ViewHelpers.format_number(row.cache_read)}</td>
-                  <td class="text-right">{ViewHelpers.format_number(row.cache_create)}</td>
-                  <td class="text-right">{ViewHelpers.format_number(row.requests)}</td>
-                  <td class="text-right">{ViewHelpers.format_number(row.subagents)}</td>
-                  <td class="text-right font-medium text-warning">
-                    {ViewHelpers.format_cost(row.cost)}
-                  </td>
-                </tr>
-              <% end %>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+    <.usage_table
+      title="Top Sessions by Cost"
+      rows={@top_sessions}
+      column_defs={sessions_column_defs()}
+      recalculating={@recalculating}
+      loading_rows={10}
+    />
     """
   end
+
+  # ── Column definitions ───────────────────────────────────────────────────────
+
+  defp project_column_defs do
+    [
+      %{label: "Project", key: :project, format: :plain, class: "font-medium"},
+      %{label: "Sessions", key: :sessions, format: :number, class: "text-right"},
+      %{label: "Input Tokens", key: :input_tokens, format: :number, class: "text-right"},
+      %{label: "Output Tokens", key: :output_tokens, format: :number, class: "text-right"},
+      %{label: "Requests", key: :requests, format: :number, class: "text-right"},
+      %{label: "Subagents", key: :subagents, format: :number, class: "text-right"},
+      %{label: "Cost", key: :cost, format: :cost, class: "text-right font-medium text-warning"}
+    ]
+  end
+
+  defp month_column_defs do
+    [
+      %{label: "Month", key: :period, format: :plain, class: "font-medium tabular-nums"},
+      %{label: "Sessions", key: :sessions, format: :number, class: "text-right"},
+      %{label: "Input Tokens", key: :input_tokens, format: :number, class: "text-right"},
+      %{label: "Output Tokens", key: :output_tokens, format: :number, class: "text-right"},
+      %{label: "Total Tokens", key: :total_tokens, format: :number, class: "text-right"},
+      %{label: "Requests", key: :requests, format: :number, class: "text-right"},
+      %{label: "Cost", key: :cost, format: :cost, class: "text-right font-medium text-warning"}
+    ]
+  end
+
+  defp week_column_defs do
+    [
+      %{label: "Week of", key: :period, format: :plain, class: "font-medium tabular-nums"},
+      %{label: "Sessions", key: :sessions, format: :number, class: "text-right"},
+      %{label: "Input Tokens", key: :input_tokens, format: :number, class: "text-right"},
+      %{label: "Output Tokens", key: :output_tokens, format: :number, class: "text-right"},
+      %{label: "Total Tokens", key: :total_tokens, format: :number, class: "text-right"},
+      %{label: "Requests", key: :requests, format: :number, class: "text-right"},
+      %{label: "Cost", key: :cost, format: :cost, class: "text-right font-medium text-warning"}
+    ]
+  end
+
+  defp model_column_defs do
+    [
+      %{label: "Model", key: :model, format: :short_model, class: "font-medium"},
+      %{label: "Sessions", key: :sessions, format: :number, class: "text-right"},
+      %{label: "Input Tokens", key: :input_tokens, format: :number, class: "text-right"},
+      %{label: "Output Tokens", key: :output_tokens, format: :number, class: "text-right"},
+      %{label: "Cache Read", key: :cache_read, format: :number, class: "text-right"},
+      %{label: "Cache Create", key: :cache_create, format: :number, class: "text-right"},
+      %{label: "Requests", key: :requests, format: :number, class: "text-right"},
+      %{label: "Cost", key: :cost, format: :cost, class: "text-right font-medium text-warning"},
+      %{label: "Avg/Session", key: :avg_cost, format: :cost, class: "text-right"}
+    ]
+  end
+
+  defp sessions_column_defs do
+    [
+      %{
+        label: "Session",
+        key: :name,
+        format: :link,
+        class: "max-w-xs truncate",
+        link_key: :uuid,
+        link_prefix: "/dm/"
+      },
+      %{label: "Project", key: :project, format: :plain, class: "text-base-content/60 whitespace-nowrap"},
+      %{label: "Model", key: :model, format: :short_model, class: "whitespace-nowrap"},
+      %{label: "Date", key: :started_at, format: :date, class: "text-base-content/60 whitespace-nowrap"},
+      %{label: "Input", key: :input_tokens, format: :number, class: "text-right"},
+      %{label: "Output", key: :output_tokens, format: :number, class: "text-right"},
+      %{label: "Cache Read", key: :cache_read, format: :number, class: "text-right"},
+      %{label: "Cache Create", key: :cache_create, format: :number, class: "text-right"},
+      %{label: "Requests", key: :requests, format: :number, class: "text-right"},
+      %{label: "Subagents", key: :subagents, format: :number, class: "text-right"},
+      %{label: "Cost", key: :cost, format: :cost, class: "text-right font-medium text-warning"}
+    ]
+  end
+
+  # Derives <th> alignment class from the cell class. Headers mirror data alignment.
+  defp header_class(col) do
+    if String.contains?(col[:class] || "", "text-right"), do: "text-right", else: ""
+  end
+
+  defp render_cell(val, :number), do: ViewHelpers.format_number(val)
+  defp render_cell(val, :cost), do: ViewHelpers.format_cost(val)
+  defp render_cell(val, :short_model), do: ViewHelpers.short_model(val)
+  defp render_cell(val, :date), do: ViewHelpers.format_date(val)
+  defp render_cell(val, _), do: val
 end

@@ -213,7 +213,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
               value={p.id}
               selected={
                 is_nil(@prompt.project_id) &&
-                  @context_project_id &&
+                  not is_nil(@context_project_id) &&
                   @context_project_id == p.id
               }
             >

@@ -25,6 +25,15 @@ export default defineConfig({
         manifest: true,
         rollupOptions: {
           input: ["js/app.js"],
+          output: {
+            manualChunks(id) {
+              // Split heavy syntax-highlighting libs into a separate lazy chunk.
+              // These are only loaded when markdown or code blocks are rendered.
+              if (id.includes('highlight.js') || id.includes('marked')) {
+                return 'syntax'
+              }
+            },
+          },
         },
         outDir: "../priv/static",
         emptyOutDir: false,

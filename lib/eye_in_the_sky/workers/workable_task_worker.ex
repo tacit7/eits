@@ -43,6 +43,12 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
           broadcast()
           notify(output)
           :ok
+
+        {:error, reason} ->
+          ScheduledJobs.record_run_complete(run, "failed", result: inspect(reason))
+          broadcast()
+          notify_error(inspect(reason))
+          {:error, reason}
       end
     rescue
       e ->
@@ -76,7 +82,12 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
     results = Enum.map(tasks, &process_task(&1, config.model, config.project_id))
     spawned = Enum.count(results, &match?({:ok, _}, &1))
     failed = Enum.count(results, &match?({:error, _}, &1))
-    {:ok, "Spawned #{spawned} agents for tag=#{config.tag_name} (#{failed} failed)"}
+
+    if spawned == 0 and failed > 0 do
+      {:error, "All #{failed} spawn(s) failed for tag=#{config.tag_name}"}
+    else
+      {:ok, "Spawned #{spawned} agents for tag=#{config.tag_name} (#{failed} failed)"}
+    end
   end
 
   defp process_task(task, model, project_id) do

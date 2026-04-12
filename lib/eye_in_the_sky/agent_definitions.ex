@@ -144,9 +144,11 @@ defmodule EyeInTheSky.AgentDefinitions do
         |> Enum.filter(&String.ends_with?(&1, ".md"))
         |> Enum.reject(&(&1 == "README.md"))
 
+      ctx = %{scope: scope, project_id: project_id, now: now}
+
       synced_slugs =
         Enum.map(md_files, fn filename ->
-          sync_file(Path.join(dir, filename), Path.rootname(filename), scope, project_id, now)
+          sync_file(Path.join(dir, filename), Path.rootname(filename), ctx)
         end)
         |> Enum.reject(&is_nil/1)
 
@@ -159,8 +161,8 @@ defmodule EyeInTheSky.AgentDefinitions do
     end
   end
 
-  defp sync_file(file_path, slug, scope, project_id, now) do
-    case sync_one(file_path, slug, scope, project_id, now) do
+  defp sync_file(file_path, slug, %{scope: _, project_id: _, now: _} = ctx) do
+    case sync_one(file_path, slug, ctx) do
       {:ok, _defn} -> slug
       {:error, _reason} -> nil
     end
@@ -172,7 +174,7 @@ defmodule EyeInTheSky.AgentDefinitions do
     :erlang.phash2({:agent_def_sync, scope, project_id})
   end
 
-  defp sync_one(file_path, slug, scope, project_id, now) do
+  defp sync_one(file_path, slug, %{scope: scope, project_id: project_id, now: now}) do
     content = File.read!(file_path)
     checksum = :crypto.hash(:sha256, content) |> Base.encode16(case: :lower)
 

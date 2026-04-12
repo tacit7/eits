@@ -4,7 +4,6 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ChannelActions do
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSky.Channels
-  alias EyeInTheSky.Channels.Channel
 
   def handle_show_new_channel(socket) do
     {:noreply, assign(socket, :new_channel_name, "")}
@@ -23,7 +22,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ChannelActions do
 
     if name != "" do
       project_id = get_in(socket.assigns, [:sidebar_project, Access.key(:id)]) || 1
-      channel_id = Channel.generate_id(project_id, name)
+      channel_id = EyeInTheSky.Channels.Channel.generate_id(project_id, name)
 
       case Channels.create_channel(%{
              id: channel_id,

@@ -59,32 +59,33 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:agent, agent)
   end
 
-  def assign_defaults(socket, session) do
+  # Fast path — safe for disconnected mount. No DB or GenServer calls.
+  def assign_essential_defaults(socket, session) do
     socket
     |> assign(:active_tab, "messages")
     |> assign(:session_ref, nil)
-    |> assign(:processing, initial_processing?(session))
+    |> assign(:processing, false)
     |> assign(:message_limit, @default_message_limit)
     |> assign(:has_more_messages, false)
     |> assign(:selected_model, session.model || "opus")
     |> assign(:selected_effort, "medium")
     |> assign(:active_overlay, nil)
     |> assign(:show_live_stream, true)
-    |> assign(:stream_content, AgentWorker.get_stream_state(session.id))
+    |> assign(:stream_content, nil)
     |> assign(:stream_tool, nil)
     |> assign(:stream_thinking, nil)
     |> assign(:slash_items, SlashItems.build())
     |> assign(:diff_cache, %{})
     |> assign(:selected_task, nil)
     |> assign(:task_notes, [])
-    |> assign(:workflow_states, Tasks.list_workflow_states())
-    |> assign(:current_task, Tasks.get_current_task_for_session(session.id))
+    |> assign(:workflow_states, [])
+    |> assign(:current_task, nil)
     |> assign(:reload_timer, nil)
     |> assign(:total_tokens, 0)
     |> assign(:total_cost, 0.0)
     |> assign(:context_used, 0)
     |> assign(:context_window, 0)
-    |> assign(:queued_prompts, AgentWorker.get_queue(session.id))
+    |> assign(:queued_prompts, [])
     |> assign(:thinking_enabled, false)
     |> assign(:max_budget_usd, nil)
     |> assign(:session_cli_opts, [])
@@ -92,13 +93,24 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:message_search_query, "")
     |> assign(:session_context, nil)
     |> assign(:reloading, false)
-    |> assign(:active_timer, OrchestratorTimers.get_timer(session.id))
+    |> assign(:active_timer, nil)
     |> allow_upload(:files,
       accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
       max_entries: 10,
       max_file_size: 50_000_000,
       auto_upload: true
     )
+  end
+
+  # Connected-only — runs DB queries and GenServer calls after WebSocket upgrade.
+  def assign_connected_defaults(socket, session) do
+    socket
+    |> assign(:processing, initial_processing?(session))
+    |> assign(:stream_content, AgentWorker.get_stream_state(session.id))
+    |> assign(:workflow_states, Tasks.list_workflow_states())
+    |> assign(:current_task, Tasks.get_current_task_for_session(session.id))
+    |> assign(:queued_prompts, AgentWorker.get_queue(session.id))
+    |> assign(:active_timer, OrchestratorTimers.get_timer(session.id))
   end
 
   # For definitively-ended sessions (interactive close, crash), never show the

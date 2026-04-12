@@ -76,7 +76,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
       <% end %>
 
       <%= for project <- @projects do %>
-        <% is_selected = @sidebar_project && @sidebar_project.id == project.id %>
+        <% is_selected = not is_nil(@sidebar_project) && @sidebar_project.id == project.id %>
         <div data-project-id={project.id}>
           <%!-- Project row --%>
           <div class={[

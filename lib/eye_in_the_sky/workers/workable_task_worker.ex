@@ -190,7 +190,9 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
       instructions: instructions
     ]
 
-    case AgentManager.create_agent(opts) do
+    agent_manager = Application.get_env(:eye_in_the_sky, :agent_manager_module, AgentManager)
+
+    case agent_manager.create_agent(opts) do
       {:ok, %{session: session}} ->
         Logger.info(
           "WorkableTaskWorker: spawned agent for task ##{task.id} session=#{session.uuid} project_path=#{project_path}"

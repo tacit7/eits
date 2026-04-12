@@ -44,14 +44,14 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
     ~H"""
     <div
-      class="flex flex-col h-[100dvh] md:h-[calc(100dvh-2rem)] px-0 sm:px-4 lg:px-8 py-0 sm:py-4 relative"
+      class="flex flex-col h-[calc(100dvh-4.25rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-2rem)] px-0 sm:px-4 lg:px-8 py-0 sm:py-4 relative"
       id="dm-page"
       phx-drop-target={@uploads.files.ref}
       phx-hook="DragUpload"
     >
       <%!-- Reload confirm modal --%>
-      <dialog id="dm-reload-confirm-modal" class="modal" phx-hook="ReloadConfirmModal">
-        <div class="modal-box">
+      <dialog id="dm-reload-confirm-modal" class="modal modal-bottom sm:modal-middle" phx-hook="ReloadConfirmModal">
+        <div class="modal-box pb-[env(safe-area-inset-bottom)]">
           <h3 class="font-semibold text-base">Reload from file?</h3>
           <p class="py-3 text-sm text-base-content/70">
             This will delete all messages and re-import from the JSONL file.
@@ -74,8 +74,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
       <%!-- Schedule timer modal --%>
       <%= if @overlay_data.active_overlay == :schedule_timer do %>
-        <div class="modal modal-open" id="schedule-timer-modal">
-          <div class="modal-box max-w-sm">
+        <div class="modal modal-open modal-bottom sm:modal-middle" id="schedule-timer-modal">
+          <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
             <h3 class="font-semibold text-base mb-3">Schedule Message</h3>
 
             <form id="schedule-timer-form" phx-submit="schedule_timer">

@@ -95,7 +95,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
     </div>
 
     <%!-- Tags --%>
-    <%= if @task.tags && length(@task.tags) > 0 do %>
+    <%= if not is_nil(@task.tags) && @task.tags != [] do %>
       <div class="flex flex-wrap gap-1 mt-2">
         <%= for tag <- Enum.take(@task.tags, 3) do %>
           <span

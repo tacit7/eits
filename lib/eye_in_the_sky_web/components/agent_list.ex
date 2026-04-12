@@ -116,7 +116,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
         </button>
         <%!-- Canvas submenu --%>
         <.canvas_submenu agent={@agent} canvases={@canvases} show_new_canvas_for={@show_new_canvas_for} />
-        <%= if @agent.agent && @agent.agent.uuid && @agent.uuid do %>
+        <%= if not is_nil(@agent.agent) && not is_nil(@agent.agent.uuid) && not is_nil(@agent.uuid) do %>
           <button
             id={"bookmark-btn-#{@agent.uuid}"}
             type="button"

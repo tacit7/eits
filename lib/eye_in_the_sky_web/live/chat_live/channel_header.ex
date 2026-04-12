@@ -27,7 +27,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
                 Chat
               <% end %>
             </h1>
-            <%= if @active_channel && @active_channel[:description] do %>
+            <%= if not is_nil(@active_channel) && not is_nil(@active_channel[:description]) do %>
               <span class="text-xs text-base-content/30">{@active_channel.description}</span>
             <% end %>
           </div>

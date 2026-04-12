@@ -87,7 +87,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
             {relative_time(@task.updated_at || @task.created_at)}
           </span>
           <%!-- Tags (compact, lower priority) --%>
-          <%= if @task.tags && length(@task.tags) > 0 do %>
+          <%= if not is_nil(@task.tags) && @task.tags != [] do %>
             <span class="text-base-content/15">&middot;</span>
             <span class="text-base-content/35">
               {Enum.map_join(Enum.take(@task.tags, 2), ", ", & &1.name)}

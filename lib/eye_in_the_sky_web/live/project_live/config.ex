@@ -225,7 +225,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
           <.icon name="hero-cog-6-tooth" class="mx-auto h-12 w-12 text-base-content/40" />
           <h3 class="mt-2 text-sm font-medium text-base-content">No .claude directory</h3>
           <p class="mt-1 text-sm text-base-content/60">
-            <%= if @project && @project.path do %>
+            <%= if not is_nil(@project) && not is_nil(@project.path) do %>
               No .claude directory found at {@project.path}
             <% else %>
               Project path not configured

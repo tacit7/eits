@@ -72,7 +72,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.GridCard do
             </span>
           <% end %>
 
-          <%= if @task.tags && length(@task.tags) > 0 do %>
+          <%= if not is_nil(@task.tags) && @task.tags != [] do %>
             <%= for tag <- Enum.take(@task.tags, 3) do %>
               <span class="badge badge-ghost badge-sm">
                 {tag.name}

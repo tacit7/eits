@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.Components.DatePickerModal do
       |> assign(:day_names, @day_names)
 
     ~H"""
-    <%= if @show && @task do %>
+    <%= if @show && not is_nil(@task) do %>
       <%!-- Backdrop --%>
       <div
         class="fixed inset-0 z-50 bg-black/40"

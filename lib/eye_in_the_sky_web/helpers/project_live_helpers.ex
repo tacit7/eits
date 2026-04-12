@@ -40,7 +40,7 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectLiveHelpers do
       {:ok, p} -> p
       {:error, :not_found} -> nil
     end), else: nil
-    project = if project && preload != [], do: Projects.preload_project(project, preload), else: project
+    project = if not is_nil(project) && preload != [], do: Projects.preload_project(project, preload), else: project
 
     if project do
       socket

@@ -246,7 +246,7 @@ defmodule EyeInTheSkyWeb.AuthController do
     request_origin = get_req_header(conn, "origin") |> List.first()
     extra_origins = Application.get_env(:eye_in_the_sky, :webauthn_extra_origins, [])
 
-    if request_origin && request_origin in extra_origins do
+    if not is_nil(request_origin) && request_origin in extra_origins do
       rp_id = URI.parse(request_origin).host
       [origin: request_origin, rp_id: rp_id] ++ base_opts
     else

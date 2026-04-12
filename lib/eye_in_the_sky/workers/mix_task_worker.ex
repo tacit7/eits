@@ -29,8 +29,8 @@ defmodule EyeInTheSky.Workers.MixTaskWorker do
     task = config["task"] || "help"
     args = config["args"] || []
 
-    unless task in @allowed_tasks do
-      {:error, "Disallowed mix task: #{task}"}
+    unless is_binary(task) && task in @allowed_tasks do
+      {:error, "Disallowed mix task: #{inspect(task)}"}
     else
       project_path = blank_to_nil(config["project_path"]) || File.cwd!()
 

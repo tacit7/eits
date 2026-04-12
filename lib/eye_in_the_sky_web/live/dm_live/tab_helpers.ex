@@ -16,17 +16,22 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     {messages, has_more} = load_message_data(socket, tab, session_id)
 
     {total_tokens, total_cost} =
-      maybe_load_value(
+      maybe_load_once(
         tab,
         "messages",
         {socket.assigns[:total_tokens], socket.assigns[:total_cost]},
+        {0, 0.0},
         fn -> read_session_usage_stats(socket, session_id) end
       )
 
     current_task =
-      maybe_load_value(tab, ["messages", "tasks"], socket.assigns[:current_task], fn ->
-        Tasks.get_current_task_for_session(session_id)
-      end)
+      maybe_load_once(
+        tab,
+        ["messages", "tasks"],
+        socket.assigns[:current_task],
+        nil,
+        fn -> Tasks.get_current_task_for_session(session_id) end
+      )
 
     {context_used, context_window} =
       maybe_load_value(
@@ -91,17 +96,25 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
 
       {messages, false}
     else
-      limit = socket.assigns[:message_limit] || @default_message_limit
+      # Messages are kept live via PubSub handle_info — skip the DB round-trip
+      # when switching back to the messages tab if they're already loaded.
+      existing = socket.assigns[:messages]
 
-      fetched_messages =
-        Messages.list_recent_messages(session_id, limit + 1)
-
-      Logger.info("Loaded #{length(fetched_messages)} messages for session=#{session_id}")
-
-      if length(fetched_messages) > limit do
-        {Enum.drop(fetched_messages, 1), true}
+      if existing != nil do
+        {existing, socket.assigns[:has_more_messages] || false}
       else
-        {fetched_messages, false}
+        limit = socket.assigns[:message_limit] || @default_message_limit
+
+        fetched_messages =
+          Messages.list_recent_messages(session_id, limit + 1)
+
+        Logger.info("Loaded #{length(fetched_messages)} messages for session=#{session_id}")
+
+        if length(fetched_messages) > limit do
+          {Enum.drop(fetched_messages, 1), true}
+        else
+          {fetched_messages, false}
+        end
       end
     end
   end
@@ -122,6 +135,18 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     targets = List.wrap(target_tabs)
 
     if active_tab in targets do
+      loader.()
+    else
+      existing_value
+    end
+  end
+
+  # Like maybe_load_value but skips the loader if the value is already loaded
+  # (i.e. not equal to the empty sentinel). Avoids redundant DB/IO on tab switch.
+  defp maybe_load_once(active_tab, target_tabs, existing_value, empty_sentinel, loader) do
+    targets = List.wrap(target_tabs)
+
+    if active_tab in targets and existing_value == empty_sentinel do
       loader.()
     else
       existing_value

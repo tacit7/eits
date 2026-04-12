@@ -65,5 +65,5 @@ defmodule EyeInTheSkyWeb.DmLive.UploadHelpers do
     end
   end
 
-  defp mime_from_ext(filename), do: MIME.from_path(filename)
+  def mime_from_ext(filename), do: MIME.from_path(filename)
 end

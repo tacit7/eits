@@ -25,6 +25,22 @@ defmodule EyeInTheSky.SessionsTest do
     create_task(Map.put(overrides, :state_id, state_id))
   end
 
+  defp create_message(session_id, body, role \\ "agent") do
+    {:ok, msg} =
+      Messages.create_message(%{
+        uuid: Ecto.UUID.generate(),
+        session_id: session_id,
+        sender_role: role,
+        recipient_role: "user",
+        direction: "inbound",
+        body: body,
+        status: "delivered",
+        provider: "test"
+      })
+
+    msg
+  end
+
   # ---------------------------------------------------------------------------
   # register_from_hook/2
   # ---------------------------------------------------------------------------
@@ -568,22 +584,6 @@ defmodule EyeInTheSky.SessionsTest do
   # ---------------------------------------------------------------------------
 
   describe "list_sessions_filtered message body FTS" do
-    defp create_message(session_id, body, role \\ "agent") do
-      {:ok, msg} =
-        Messages.create_message(%{
-          uuid: Ecto.UUID.generate(),
-          session_id: session_id,
-          sender_role: role,
-          recipient_role: "user",
-          direction: "inbound",
-          body: body,
-          status: "delivered",
-          provider: "test"
-        })
-
-      msg
-    end
-
     test "surfaces session matched only by message body, not name/description" do
       agent = create_agent()
       session = create_session(agent, %{name: "generic-name", description: "generic-desc"})

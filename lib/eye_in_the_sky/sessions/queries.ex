@@ -56,18 +56,7 @@ defmodule EyeInTheSky.Sessions.Queries do
         base_query
       end
 
-    base_query =
-      if search_query != "" do
-        msg_subq = PgSearch.message_fts_session_ids(search_query)
-        fts_match = PgSearch.fts_name_description_match(search_query)
-
-        combined =
-          dynamic([s], ^fts_match or s.id in subquery(msg_subq))
-
-        where(base_query, ^combined)
-      else
-        base_query
-      end
+    base_query = apply_search_filter(base_query, search_query)
 
     base_query =
       case status_filter do
@@ -194,16 +183,15 @@ defmodule EyeInTheSky.Sessions.Queries do
     query = Archivable.include_archived(query, opts)
     query = if project_id, do: where(query, [s, a], a.project_id == ^project_id), else: query
 
-    if search_query != "" do
-      msg_subq = PgSearch.message_fts_session_ids(search_query)
-      fts_match = PgSearch.fts_name_description_match(search_query)
+    apply_search_filter(query, search_query)
+  end
 
-      combined =
-        dynamic([s], ^fts_match or s.id in subquery(msg_subq))
+  defp apply_search_filter(query, ""), do: query
 
-      where(query, ^combined)
-    else
-      query
-    end
+  defp apply_search_filter(query, search_query) do
+    msg_subq = PgSearch.message_fts_session_ids(search_query)
+    fts_match = PgSearch.fts_name_description_match(search_query)
+    combined = dynamic([s], ^fts_match or s.id in subquery(msg_subq))
+    where(query, ^combined)
   end
 end

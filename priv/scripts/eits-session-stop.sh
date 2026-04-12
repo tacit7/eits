@@ -96,7 +96,7 @@ except Exception:
 ")
 
     if [ "$in_progress" = "yes" ]; then
-      printf '{"decision":"block","reason":"You have an in-progress EITS task but did not annotate it this turn. Run: eits tasks annotate <id> --body \"summary of what you did\" before finishing."}'
+      echo "You have an in-progress EITS task but did not annotate it this turn. Run: eits tasks annotate <id> --body \"summary of what you did\" before finishing." >&2
       exit 2
     fi
   fi

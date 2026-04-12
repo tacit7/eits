@@ -25,7 +25,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
           id="dm-task-list"
         >
           <%= for task <- @tasks do %>
-            <% has_expandable = task.description || Map.get(task, :notes, []) != [] %>
+            <% has_expandable = not is_nil(task.description) || Map.get(task, :notes, []) != [] %>
             <div class="flex items-start" id={"dm-task-#{task.id}"}>
               <%!-- Edit button — outside collapse so checkbox overlay can't intercept --%>
               <button

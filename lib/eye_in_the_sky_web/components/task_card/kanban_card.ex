@@ -226,8 +226,10 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
     notes_count = Map.get(assigns.task, :notes_count, 0)
 
     has_footer =
-      assigns.task.description || assigns.aging || assigns.task.due_at || checklist != [] ||
-        notes_count > 0 || assigns.dm_session || Map.get(assigns.task, :created_at)
+      not is_nil(assigns.task.description) || not is_nil(assigns.aging) ||
+        not is_nil(assigns.task.due_at) || checklist != [] ||
+        notes_count > 0 || not is_nil(assigns.dm_session) ||
+        not is_nil(Map.get(assigns.task, :created_at))
 
     assigns =
       assigns
@@ -277,8 +279,8 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
           </span>
         <% end %>
         <%= if @dm_session do %>
-          <% is_working = @working_session_ids && MapSet.member?(@working_session_ids, @dm_session.id) %>
-          <% is_waiting = !is_working && @waiting_session_ids && MapSet.member?(@waiting_session_ids, @dm_session.id) %>
+          <% is_working = not is_nil(@working_session_ids) && MapSet.member?(@working_session_ids, @dm_session.id) %>
+          <% is_waiting = not is_working && not is_nil(@waiting_session_ids) && MapSet.member?(@waiting_session_ids, @dm_session.id) %>
           <a
             href={"/dm/#{@dm_session.uuid}"}
             target="_blank"

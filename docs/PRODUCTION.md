@@ -19,14 +19,32 @@ Same as dev setup (see [SETUP.md](SETUP.md)). You need:
 - A working `.env` file with VAPID keys, API key, etc.
 - The `eits_dev` database already set up (`mix ecto.setup`)
 
+## Required `.env` variables
+
+Before building, ensure `.env` contains all of these (missing any will raise at build time):
+
+| Variable | How to generate |
+|----------|----------------|
+| `VAPID_PUBLIC_KEY` | `mix run -e '{pub, priv} = :crypto.generate_key(:ecdh, :prime256v1); IO.puts("VAPID_PUBLIC_KEY=" <> Base.url_encode64(pub, padding: false))'` |
+| `VAPID_PRIVATE_KEY` | Same command (generate both together, never mix keys from separate runs) |
+| `WEBAUTHN_ORIGIN` | Your app's full origin, e.g. `https://your-subdomain.ngrok-free.app` |
+| `WEBAUTHN_RP_ID` | Registrable domain only, e.g. `your-subdomain.ngrok-free.app` |
+| `SECRET_KEY_BASE` | `mix phx.gen.secret` (must be 64+ bytes) |
+| `DATABASE_URL` | `ecto://postgres:postgres@localhost/eits_dev` |
+
+**Important:** `dotenvy` does not reliably inject new env vars into the Erlang system env during `mix` commands. Always use `set -a; source .env; set +a` before any `MIX_ENV=prod mix` command — this exports all `.env` vars into the shell so they're available to the Erlang runtime.
+
 ## Quick start
 
 ```bash
+# 0. Export .env into shell (required — dotenvy alone is not enough for mix commands)
+set -a; source .env; set +a
+
 # 1. Build everything
 MIX_ENV=prod mix assets.deploy        # tailwind + vite client + vite SSR + phx.digest
 MIX_ENV=prod mix release --overwrite  # compile BEAM release
 
-# 2. Run it
+# 2. Run it (from project root so dotenvy finds .env)
 source .env
 DATABASE_URL="ecto://postgres:postgres@localhost/eits_dev" \
 WEBAUTHN_ORIGIN="https://eits.dev" \
@@ -120,6 +138,12 @@ ngrok http http://localhost:5001
 ```
 
 ## Troubleshooting
+
+**`VAPID_PRIVATE_KEY environment variable is required in production`** (even though it's in `.env`)
+`dotenvy`'s `source!/1` does not reliably set new env vars into the Erlang system env during `mix` commands. Fix: always prefix with `set -a; source .env; set +a` before any `MIX_ENV=prod mix` command.
+
+**`The module LiveSvelte.SSR.NodeJS.Supervisor was given as a child to a supervisor but it does not exist`**
+Caused by `alias LiveSvelte.SSR.NodeJS` in `application.ex` shadowing the `NodeJS` package — `NodeJS.Supervisor` resolved to the wrong module. Fixed in `application.ex`: alias removed, `NodeJS.Supervisor` used directly, `LiveSvelte.SSR.NodeJS.server_path()` fully qualified.
 
 **`cookie store expects conn.secret_key_base to be at least 64 bytes`**
 Your `SECRET_KEY_BASE` is too short. Use `openssl rand -hex 64` (produces 128 hex chars).

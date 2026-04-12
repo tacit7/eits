@@ -55,117 +55,114 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   @impl true
   def handle_params(%{"path" => path} = params, _uri, socket) do
-    project = socket.assigns.project
-
-    mode =
-      case Map.get(params, "mode") do
-        "tree" -> :tree
-        _ -> :list
-      end
-
+    mode = parse_mode(params)
     socket = assign(socket, :view_mode, mode)
+    project = socket.assigns.project
 
     if project.path do
       full_path = Path.join(project.path, path)
-
-      if not path_within?(full_path, project.path) do
-        {:noreply,
-         socket
-         |> assign(:error, "Access denied: path outside project directory")
-         |> assign(:file_content, nil)
-         |> assign(:files, [])}
-      else
-        cond do
-          File.dir?(full_path) ->
-            case build_file_listing(full_path, path) do
-              {:ok, file_list} ->
-                {:noreply,
-                 socket
-                 |> assign(:file_path, path)
-                 |> assign(:file_content, nil)
-                 |> assign(:files, file_list)
-                 |> assign(:error, nil)}
-
-              {:error, reason} ->
-                {:noreply,
-                 socket
-                 |> assign(:error, "Failed to read directory: #{reason}")
-                 |> assign(:files, [])}
-            end
-
-          File.regular?(full_path) ->
-            case read_file_safe_detailed(full_path) do
-              {:ok, content} ->
-                {:noreply,
-                 socket
-                 |> assign(:file_path, path)
-                 |> assign(:file_content, content)
-                 |> assign(:file_type, detect_file_type(path))
-                 |> assign(:files, [])
-                 |> assign(:error, nil)}
-
-              {:too_large} ->
-                {:noreply,
-                 socket
-                 |> assign(:file_path, path)
-                 |> assign(:file_content, nil)
-                 |> assign(:file_type, nil)
-                 |> assign(:files, [])
-                 |> assign(:error, "File too large to display (over 1 MB)")}
-
-              {:stat_error, reason} ->
-                {:noreply,
-                 socket
-                 |> assign(:error, "Failed to stat file: #{reason}")
-                 |> assign(:file_content, nil)}
-
-              {:read_error, reason} ->
-                {:noreply,
-                 socket
-                 |> assign(:error, "Failed to read file: #{reason}")
-                 |> assign(:file_content, nil)}
-            end
-
-          true ->
-            {:noreply,
-             socket
-             |> assign(:error, "File not found: #{path}")
-             |> assign(:file_content, nil)
-             |> assign(:files, [])}
-        end
-      end
+      handle_full_path(socket, full_path, path, project.path)
     else
-      {:noreply,
-       socket
-       |> assign(:error, "Project path not configured")
-       |> assign(:file_content, nil)}
+      {:noreply, socket |> assign(:error, "Project path not configured") |> assign(:file_content, nil)}
     end
   end
 
   def handle_params(params, _uri, socket) do
+    mode = parse_mode(params)
+    socket = assign(socket, :view_mode, mode)
     project = socket.assigns.project
 
-    mode =
-      case Map.get(params, "mode") do
-        "tree" -> :tree
-        _ -> :list
-      end
-
-    socket = assign(socket, :view_mode, mode)
-
     if not is_nil(project.path) && mode == :list do
-      case build_file_listing(project.path, "",
-             ignore_hidden: true,
-             ignored_dirs: @ignored_dirs
-           ) do
-        {:ok, file_list} ->
-          {:noreply, assign(socket, :files, file_list)}
-
-        {:error, _reason} ->
-          {:noreply, socket}
+      case build_file_listing(project.path, "", ignore_hidden: true, ignored_dirs: @ignored_dirs) do
+        {:ok, file_list} -> {:noreply, assign(socket, :files, file_list)}
+        {:error, _reason} -> {:noreply, socket}
       end
     else
       {:noreply, socket}
+    end
+  end
+
+  defp parse_mode(params) do
+    case Map.get(params, "mode") do
+      "tree" -> :tree
+      _ -> :list
+    end
+  end
+
+  defp handle_full_path(socket, full_path, path, project_path) do
+    if not path_within?(full_path, project_path) do
+      {:noreply,
+       socket
+       |> assign(:error, "Access denied: path outside project directory")
+       |> assign(:file_content, nil)
+       |> assign(:files, [])}
+    else
+      dispatch_path(socket, full_path, path)
+    end
+  end
+
+  defp dispatch_path(socket, full_path, path) do
+    cond do
+      File.dir?(full_path) -> handle_directory(socket, full_path, path)
+      File.regular?(full_path) -> handle_file(socket, full_path, path)
+      true ->
+        {:noreply,
+         socket
+         |> assign(:error, "File not found: #{path}")
+         |> assign(:file_content, nil)
+         |> assign(:files, [])}
+    end
+  end
+
+  defp handle_directory(socket, full_path, path) do
+    case build_file_listing(full_path, path) do
+      {:ok, file_list} ->
+        {:noreply,
+         socket
+         |> assign(:file_path, path)
+         |> assign(:file_content, nil)
+         |> assign(:files, file_list)
+         |> assign(:error, nil)}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:error, "Failed to read directory: #{reason}")
+         |> assign(:files, [])}
+    end
+  end
+
+  defp handle_file(socket, full_path, path) do
+    case read_file_safe_detailed(full_path) do
+      {:ok, content} ->
+        {:noreply,
+         socket
+         |> assign(:file_path, path)
+         |> assign(:file_content, content)
+         |> assign(:file_type, detect_file_type(path))
+         |> assign(:files, [])
+         |> assign(:error, nil)}
+
+      {:too_large} ->
+        {:noreply,
+         socket
+         |> assign(:file_path, path)
+         |> assign(:file_content, nil)
+         |> assign(:file_type, nil)
+         |> assign(:files, [])
+         |> assign(:error, "File too large to display (over 1 MB)")}
+
+      {:stat_error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:error, "Failed to stat file: #{reason}")
+         |> assign(:file_content, nil)}
+
+      {:read_error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:error, "Failed to read file: #{reason}")
+         |> assign(:file_content, nil)}
     end
   end
 
@@ -232,6 +229,17 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  attr :file_content, :string, required: true
+  attr :file_type, :string, default: nil
+
+  defp file_content_viewer(assigns) do
+    ~H"""
+    <div class="bg-base-200 rounded-lg overflow-x-auto">
+      <pre class="text-sm"><code id="code-viewer" class={"language-#{language_class(@file_type)}"} phx-hook="Highlight"><%= @file_content %></code></pre>
+    </div>
+    """
   end
 
   attr :item, :map, required: true
@@ -339,10 +347,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
               <h2 class="text-lg font-semibold text-base-content">{Path.basename(@file_path)}</h2>
               <p class="text-sm text-base-content/60">{@file_path}</p>
             </div>
-            <!-- Syntax Highlighted Code -->
-            <div class="bg-base-200 rounded-lg overflow-x-auto">
-              <pre class="text-sm"><code id="code-viewer" class={"language-#{language_class(@file_type)}"} phx-hook="Highlight"><%= @file_content %></code></pre>
-            </div>
+            <.file_content_viewer file_content={@file_content} file_type={@file_type} />
           </div>
         <% else %>
           <!-- Empty State -->
@@ -391,10 +396,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
                 <p class="text-sm text-base-content/60">{@file_path}</p>
               </div>
             </div>
-            <!-- Syntax Highlighted Code -->
-            <div class="bg-base-200 rounded-lg overflow-x-auto">
-              <pre class="text-sm"><code id="code-viewer" class={"language-#{language_class(@file_type)}"} phx-hook="Highlight"><%= @file_content %></code></pre>
-            </div>
+            <.file_content_viewer file_content={@file_content} file_type={@file_type} />
           </div>
         <% else %>
           <!-- Directory Listing -->

@@ -37,7 +37,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
       {:ok, message} ->
         Logger.info("Message created in DB with id=#{message.id}")
 
-        socket = TabHelpers.load_tab_data(socket, "messages", session_id)
+        socket = TabHelpers.force_reload_messages(socket, session_id)
 
         base_opts = SessionHelpers.continue_session_opts(model, effort_level, thinking_enabled, max_budget_usd)
         cli_opts = Keyword.merge(base_opts, extra_cli_opts) ++ [message_id: message.id]
@@ -58,7 +58,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
             {:noreply,
              socket
-             |> TabHelpers.load_tab_data("messages", session_id)
+             |> TabHelpers.force_reload_messages(session_id)
              |> assign(:processing, false)
              |> put_flash(:error, "Queue is full — max 5 messages pending")}
 
@@ -68,7 +68,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
             {:noreply,
              socket
-             |> TabHelpers.load_tab_data("messages", session_id)
+             |> TabHelpers.force_reload_messages(session_id)
              |> assign(:processing, false)
              |> put_flash(:error, "Failed to send message: #{inspect(reason)}")}
         end
@@ -99,7 +99,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
   def maybe_reload_messages(socket) do
     if socket.assigns.active_tab == "messages" do
-      TabHelpers.load_tab_data(socket, "messages", socket.assigns.session_id)
+      TabHelpers.force_reload_messages(socket, socket.assigns.session_id)
     else
       socket
     end
@@ -137,7 +137,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
     with {:ok, project_path} <-
            SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent),
          {:ok, imported} <- SessionImporter.sync(session_uuid, project_path, session_id) do
-      {:ok, TabHelpers.load_tab_data(socket, "messages", session_id), imported}
+      {:ok, TabHelpers.force_reload_messages(socket, session_id), imported}
     else
       {:error, reason} -> {:error, reason}
     end
@@ -149,7 +149,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
     with {:ok, messages} <- CodexReader.read_messages(thread_id) do
       imported = CodexImporter.import_messages(messages, session_id)
-      {:ok, TabHelpers.load_tab_data(socket, "messages", session_id), imported}
+      {:ok, TabHelpers.force_reload_messages(socket, session_id), imported}
     else
       {:error, reason} -> {:error, reason}
     end

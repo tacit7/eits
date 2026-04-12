@@ -216,7 +216,7 @@ defmodule EyeInTheSkyWeb.DmLive do
     socket =
       socket
       |> assign(:message_limit, new_limit)
-      |> TabHelpers.load_tab_data("messages", socket.assigns.session_id)
+      |> TabHelpers.force_reload_messages(socket.assigns.session_id)
 
     {:noreply, socket}
   end

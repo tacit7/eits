@@ -92,11 +92,11 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
 
   defp handle_pr_opened_event(conn, pr, repo, project_path) do
     pr_number = pr["number"]
-    pr_title = pr["title"]
-    pr_body = pr["body"] || ""
+    pr_title = sanitize_text(pr["title"])
+    pr_body = sanitize_text(pr["body"])
     pr_url = pr["html_url"] || ""
     # head.ref is the plain branch name; head.label is "owner:branch"
-    head_branch = get_in(pr, ["head", "ref"]) || "unknown"
+    head_branch = sanitize_branch(get_in(pr, ["head", "ref"]) || "unknown")
 
     Logger.info("Gitea webhook: PR ##{pr_number} opened - spawning codex reviewer")
 
@@ -236,6 +236,11 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
       _ -> {"claude", repo}
     end
   end
+
+  defp sanitize_branch(b), do: Regex.replace(~r/[^a-zA-Z0-9_\-\.\/]/, b, "_")
+
+  defp sanitize_text(nil), do: ""
+  defp sanitize_text(s), do: s |> String.slice(0, 2000) |> String.replace("\0", "")
 
   defp extract_session_uuid(pr_body) do
     case Regex.run(~r/Session-ID:\s*([0-9a-f-]{36})/i, pr_body, capture: :all_but_first) do

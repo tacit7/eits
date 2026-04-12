@@ -219,3 +219,18 @@
 - Document Kanban search improvements: lowered threshold to 2 characters, search hint text, and removal of WIP limit display
 - Add mobile UI improvements documentation: FAB (floating action button) navigation to DM page, dark mode code block rendering fixes, and string timestamp handling in session filters
 
+
+## 2026-04-11
+**Commits reviewed**: 4cf15dc..ef512001
+
+- **EITS_CLI.md** — Already updated (commit ef512001): session search, list filters, sessions tasks/notes, notes search, commits --session, and sessions show rich response now documented with examples
+- **MOBILE.md** — Document session action menu UX pattern change (commits 14d199c, 73df7b61): replaced mobile swipe panel with persistent dropdown menu for session actions (archive, rename, delete); dropdown hidden on mobile for space efficiency; pattern applicable to other mobile action menus
+- **CODE_GUIDELINES.md** — Document Elixir idiom improvements (commits c7091a8, ebc9751d, 4215866c, 5a5117f0, c332ca9, 41adbeb, 3e84d2b, d7876e3f, 9b8f442a, 2dab6e95, 78340e23, ec5ad9da, f0af2836, dc0beccc, 274ac700): systematic refactoring across 37+ commits includes (r37 through r23):
+  - Replace `!is_nil()` with `not is_nil()` (Elixir standard negation operator)
+  - Replace `== nil`/`!= nil` with `is_nil()/not is_nil()` for clarity
+  - Replace `length(list) > 0` with `list != []` (O(1) vs O(n) performance, idiomatic check)
+  - Replace inline SVGs with `<.icon>` Heroicons component (consolidates icon library)
+  - Replace boolean nil-guards (`&&`) with explicit `not is_nil()` or `if` expressions in LiveView handlers/components
+  - Fix bare `_ -> catch-alls` in `with/else` clauses to `{:error, _}` for explicit error handling
+  - Simplify `{:ok, x}` pattern matches with direct value assignment when error path irrelevant
+- **WORKERS.md or SESSION_MANAGER.md** — Document AgentWorker idle timeout (commit d74450ce): new IdleTimer module tracks worker idleness, auto-terminates stale workers after timeout to prevent max_children exhaustion under load; includes error recovery integration

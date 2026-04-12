@@ -1,5 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { CommandPalette } from './command_palette.js'
+
+// jsdom does not implement scrollIntoView — stub it globally
+beforeEach(() => {
+  HTMLElement.prototype.scrollIntoView = vi.fn()
+})
 
 // Minimal hook context that simulates a rendered palette results list.
 function makeHook(buttonCount = 3) {

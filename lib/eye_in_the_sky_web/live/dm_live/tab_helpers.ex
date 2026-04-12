@@ -15,6 +15,8 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     Logger.info("Loading DM tab data tab=#{tab} session_id=#{session_id}")
     {messages, has_more} = load_message_data(socket, tab, session_id)
 
+    # Sentinel {0, 0.0} means "not yet loaded". A session with genuinely zero
+    # usage also returns {0, 0.0}, which will correctly cache and skip re-reads.
     {total_tokens, total_cost} =
       maybe_load_once(
         tab,

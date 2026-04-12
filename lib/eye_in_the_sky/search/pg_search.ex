@@ -182,8 +182,9 @@ defmodule EyeInTheSky.Search.PgSearch do
   @doc """
   Returns an Ecto subquery of session IDs whose messages match the given full-text search query.
 
-  Filters to user/agent messages only to avoid tool output noise.
-  ("agent" is the primary role for assistant outputs in this codebase; "assistant" is rarely used.)
+  Filters to user/agent/assistant messages to avoid tool output noise.
+  ("agent" is the primary role for assistant outputs in this codebase, but "assistant" is included
+  for completeness.) Excludes "tool" and "system" roles.
   Uses the GIN index on `to_tsvector('english', COALESCE(body, ''))`.
 
   Returns a composable query — call `subquery/1` on the result or use it directly
@@ -191,7 +192,7 @@ defmodule EyeInTheSky.Search.PgSearch do
   """
   def message_fts_session_ids(query) do
     from(m in EyeInTheSky.Messages.Message,
-      where: m.sender_role in ["user", "agent"],
+      where: m.sender_role in ["user", "agent", "assistant"],
       where:
         fragment(
           "to_tsvector('english', COALESCE(?, '')) @@ plainto_tsquery('english', ?)",

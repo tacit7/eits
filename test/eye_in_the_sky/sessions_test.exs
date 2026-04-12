@@ -562,4 +562,85 @@ defmodule EyeInTheSky.SessionsTest do
       assert is_integer(Sessions.count_session_overview_rows())
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # message body FTS via list_sessions_filtered
+  # ---------------------------------------------------------------------------
+
+  describe "list_sessions_filtered message body FTS" do
+    defp create_message(session_id, body, role \\ "agent") do
+      {:ok, msg} =
+        Messages.create_message(%{
+          uuid: Ecto.UUID.generate(),
+          session_id: session_id,
+          sender_role: role,
+          recipient_role: "user",
+          direction: "inbound",
+          body: body,
+          status: "delivered",
+          provider: "test"
+        })
+
+      msg
+    end
+
+    test "surfaces session matched only by message body, not name/description" do
+      agent = create_agent()
+      session = create_session(agent, %{name: "generic-name", description: "generic-desc"})
+      create_message(session.id, "the phosphorescent jellyfish swam slowly")
+
+      results =
+        Sessions.list_sessions_filtered(
+          search_query: "phosphorescent",
+          status_filter: "all",
+          limit: 10
+        )
+
+      ids = Enum.map(results, & &1.id)
+      assert session.id in ids
+    end
+
+    test "does not surface session with tool-role message matching the term" do
+      agent = create_agent()
+      session = create_session(agent, %{name: "generic-name-2"})
+      create_message(session.id, "phosphorescent tool output", "tool")
+
+      results =
+        Sessions.list_sessions_filtered(
+          search_query: "phosphorescent",
+          status_filter: "all",
+          limit: 10
+        )
+
+      ids = Enum.map(results, & &1.id)
+      refute session.id in ids
+    end
+
+    test "includes session matched by assistant role message" do
+      agent = create_agent()
+      session = create_session(agent, %{name: "generic-name-3"})
+      create_message(session.id, "the phosphorescent jellyfish appeared", "assistant")
+
+      results =
+        Sessions.list_sessions_filtered(
+          search_query: "phosphorescent",
+          status_filter: "all",
+          limit: 10
+        )
+
+      ids = Enum.map(results, & &1.id)
+      assert session.id in ids
+    end
+
+    test "returns no results for term not in any message or session field" do
+      results =
+        Sessions.list_sessions_filtered(
+          search_query: "xyzzyuniquetermnotindata",
+          status_filter: "all",
+          limit: 10
+        )
+
+      assert results == []
+    end
+  end
 end

@@ -74,7 +74,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                     phx-click="archive_column"
                     phx-value-state-id={state.id}
                     phx-confirm={"Archive all #{task_count} done tasks?"}
-                    class="p-1 rounded text-base-content/20 hover:text-warning hover:bg-warning/10 transition-colors"
+                    class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded text-base-content/20 hover:text-warning hover:bg-warning/10 transition-colors"
                     title="Archive all done tasks"
                   >
                     <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />

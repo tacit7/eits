@@ -15,6 +15,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
   require Logger
 
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Agents.WebhookSanitizer
   alias EyeInTheSky.{Messages, Sessions}
 
   defp unauthorized(conn),
@@ -92,11 +93,11 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
 
   defp handle_pr_opened_event(conn, pr, repo, project_path) do
     pr_number = pr["number"]
-    pr_title = sanitize_text(pr["title"])
-    pr_body = sanitize_text(pr["body"])
+    pr_title = WebhookSanitizer.sanitize_text(pr["title"])
+    pr_body = WebhookSanitizer.sanitize_text(pr["body"])
     pr_url = pr["html_url"] || ""
     # head.ref is the plain branch name; head.label is "owner:branch"
-    head_branch = sanitize_branch(get_in(pr, ["head", "ref"]) || "unknown")
+    head_branch = WebhookSanitizer.sanitize_branch(get_in(pr, ["head", "ref"]) || "unknown")
 
     Logger.info("Gitea webhook: PR ##{pr_number} opened - spawning codex reviewer")
 
@@ -236,19 +237,6 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
       _ -> {"claude", repo}
     end
   end
-
-  @doc false
-  def sanitize_branch(b) do
-    b
-    |> then(&Regex.replace(~r/[^a-zA-Z0-9_\-\.\/]/, &1, "_"))
-    |> String.replace("..", "_")
-  end
-
-  @doc false
-  def sanitize_text(nil), do: ""
-  def sanitize_text(s) when is_binary(s), do: s |> String.slice(0, 2000) |> String.replace("\0", "")
-  def sanitize_text(s) when is_number(s) or is_atom(s), do: sanitize_text(to_string(s))
-  def sanitize_text(_), do: ""
 
   defp extract_session_uuid(pr_body) do
     case Regex.run(~r/Session-ID:\s*([0-9a-f-]{36})/i, pr_body, capture: :all_but_first) do

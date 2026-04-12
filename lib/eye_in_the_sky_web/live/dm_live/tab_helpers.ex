@@ -157,6 +157,13 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
       ctx_window = entry["contextWindow"] || 200_000
       used = input + cache_read + cache_creation
 
+      if used > ctx_window do
+        Logger.warning(
+          "[ctx_overflow] model_usage: used=#{used} window=#{ctx_window} " <>
+            "input=#{input} cache_read=#{cache_read} cache_creation=#{cache_creation}"
+        )
+      end
+
       if used > 0, do: {used, ctx_window}
     end)
   end
@@ -166,6 +173,13 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     cache_read = usage["cache_read_input_tokens"] || 0
     cache_creation = usage["cache_creation_input_tokens"] || 0
     used = input + cache_read + cache_creation
+
+    if used > 200_000 do
+      Logger.warning(
+        "[ctx_overflow] usage: used=#{used} window=200000 " <>
+          "input=#{input} cache_read=#{cache_read} cache_creation=#{cache_creation}"
+      )
+    end
 
     if used > 0, do: {used, 200_000}
   end

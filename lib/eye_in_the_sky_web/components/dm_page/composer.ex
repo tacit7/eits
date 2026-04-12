@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
                 type="button"
                 phx-click="cancel_upload"
                 phx-value-ref={entry.ref}
-                class="text-base-content/30 hover:text-error transition-colors"
+                class="text-base-content/30 hover:text-error transition-colors min-w-[44px] min-h-[44px]"
                 id={"cancel-upload-#{entry.ref}"}
               >
                 <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
@@ -78,7 +78,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
           <label
             for={@uploads.files.ref}
             phx-drop-target={@uploads.files.ref}
-            class="flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-lg cursor-pointer text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5 transition-colors"
+            class="flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 rounded-lg cursor-pointer text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5 transition-colors"
           >
             <.icon name="hero-plus" class="w-5 h-5" />
           </label>
@@ -254,7 +254,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
             <%= if @processing do %>
               <button
                 type="submit"
-                class="flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-base-content/[0.06] text-base-content/40 hover:bg-base-content/10 transition-colors"
+                class="flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 rounded-lg bg-base-content/[0.06] text-base-content/40 hover:bg-base-content/10 transition-colors"
                 id="dm-queue-button"
                 title="Add to queue"
               >
@@ -263,7 +263,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
               <button
                 type="button"
                 phx-click="kill_session"
-                class="flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-error/80 text-error-content hover:bg-error transition-colors"
+                class="flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 rounded-lg bg-error/80 text-error-content hover:bg-error transition-colors"
                 id="dm-stop-button"
               >
                 <.icon name="hero-stop-solid" class="w-4 h-4" />
@@ -271,7 +271,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
             <% else %>
               <button
                 type="submit"
-                class="flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-primary/70 text-primary-content hover:bg-primary transition-colors"
+                class="flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 rounded-lg bg-primary/70 text-primary-content hover:bg-primary transition-colors"
                 id="dm-send-button"
               >
                 <.icon name="hero-arrow-up-mini" class="w-5 h-5" />

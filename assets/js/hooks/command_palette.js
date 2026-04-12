@@ -192,18 +192,36 @@ export const CommandPalette = {
     }
   },
 
+  updateActiveClass(prevIndex, nextIndex) {
+    const prevBtn = this.results?.querySelector(`button[data-index="${prevIndex}"]`)
+    const nextBtn = this.results?.querySelector(`button[data-index="${nextIndex}"]`)
+    if (prevBtn) {
+      prevBtn.classList.remove("bg-base-content/8", "text-base-content")
+      prevBtn.classList.add("hover:bg-base-content/5", "text-base-content/80")
+      prevBtn.setAttribute("aria-selected", "false")
+    }
+    if (nextBtn) {
+      nextBtn.classList.remove("hover:bg-base-content/5", "text-base-content/80")
+      nextBtn.classList.add("bg-base-content/8", "text-base-content")
+      nextBtn.setAttribute("aria-selected", "true")
+      nextBtn.scrollIntoView({ block: "nearest" })
+    }
+  },
+
   onInputKeydown(e) {
     const items = this.visibleItems || []
     const len = Math.max(items.length, 1)
 
     if (e.key === "ArrowDown") {
       e.preventDefault()
+      const prevIndex = this.activeIndex
       this.activeIndex = (this.activeIndex + 1) % len
-      this.render()
+      this.updateActiveClass(prevIndex, this.activeIndex)
     } else if (e.key === "ArrowUp") {
       e.preventDefault()
+      const prevIndex = this.activeIndex
       this.activeIndex = (this.activeIndex - 1 + len) % len
-      this.render()
+      this.updateActiveClass(prevIndex, this.activeIndex)
     } else if (e.key === "Enter") {
       e.preventDefault()
       const cmd = items[this.activeIndex]

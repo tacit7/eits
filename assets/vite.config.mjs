@@ -32,6 +32,10 @@ export default defineConfig({
               if (id.includes('highlight.js') || id.includes('marked')) {
                 return 'syntax'
               }
+              // Split codemirror into its own chunk — loaded only when the editor hook mounts.
+              if (id.includes('@codemirror') || id.includes('codemirror-lang') || id.includes('@uiw/codemirror') || id.includes('@replit/codemirror')) {
+                return 'editor'
+              }
             },
           },
         },

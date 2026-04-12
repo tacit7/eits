@@ -17,7 +17,7 @@ defmodule EyeInTheSkyWeb.DmLive.UploadHelpers do
          storage_path: destination,
          filename: Path.basename(destination),
          original_filename: entry.client_name,
-         content_type: mime_from_ext(entry.client_name),
+         content_type: MIME.from_path(entry.client_name),
          size_bytes: entry.client_size
        }}
     end)

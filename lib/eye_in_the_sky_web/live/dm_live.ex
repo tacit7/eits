@@ -216,7 +216,7 @@ defmodule EyeInTheSkyWeb.DmLive do
     socket =
       socket
       |> assign(:message_limit, new_limit)
-      |> TabHelpers.load_tab_data("messages", socket.assigns.session_id)
+      |> TabHelpers.force_reload_messages(socket.assigns.session_id)
 
     {:noreply, socket}
   end
@@ -225,10 +225,18 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_event("search_messages", %{"query" => query}, socket) do
     query = String.trim(query)
 
+    # When clearing search (blank query), force a fresh DB load — the cache
+    # holds the filtered result set and must not be reused for the full list.
     socket =
-      socket
-      |> assign(:message_search_query, query)
-      |> TabHelpers.load_tab_data("messages", socket.assigns.session_id)
+      if query == "" do
+        socket
+        |> assign(:message_search_query, query)
+        |> TabHelpers.force_reload_messages(socket.assigns.session_id)
+      else
+        socket
+        |> assign(:message_search_query, query)
+        |> TabHelpers.load_tab_data("messages", socket.assigns.session_id)
+      end
 
     {:noreply, socket}
   end
@@ -287,7 +295,7 @@ defmodule EyeInTheSkyWeb.DmLive do
     {_reply, new_socket} =
       handle_reload_from_session_file(
         socket,
-        &TabHelpers.load_tab_data(&1, "messages", &1.assigns.session_id)
+        &TabHelpers.force_reload_messages(&1, &1.assigns.session_id)
       )
 
     {:noreply, assign(new_socket, :reloading, false)}

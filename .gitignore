@@ -86,3 +86,10 @@ priv/cert/
 .env
 deps
 assets/node_modules
+
+# PR review scratch files
+pr-*.md
+
+# Generated mockup previews
+/priv/static/mockups/
+/priv/static/mockups-*.html

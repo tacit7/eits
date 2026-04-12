@@ -85,6 +85,14 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     assign(socket, :tasks, Tasks.list_tasks_for_session(socket.assigns.session_id))
   end
 
+  # Force a fresh DB load of messages, bypassing the tab-switch cache.
+  # Use this after mutations (send message, reload, sync) instead of load_tab_data.
+  def force_reload_messages(socket, session_id) do
+    socket
+    |> assign(:messages, nil)
+    |> load_tab_data("messages", session_id)
+  end
+
   defp load_message_data(socket, "messages", session_id) do
     query = socket.assigns[:message_search_query] || ""
 
@@ -99,7 +107,8 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
       {messages, false}
     else
       # Messages are kept live via PubSub handle_info — skip the DB round-trip
-      # when switching back to the messages tab if they're already loaded.
+      # only when switching back to the messages tab. Mutations must call
+      # force_reload_messages/2 instead, which clears the cache before loading.
       existing = socket.assigns[:messages]
 
       if existing != nil do

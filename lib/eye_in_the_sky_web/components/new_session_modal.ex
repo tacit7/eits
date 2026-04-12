@@ -85,8 +85,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   def render(assigns) do
     ~H"""
     <div>
-      <div :if={@show} class="modal modal-open" phx-window-keydown={@toggle_event} phx-key="Escape">
-        <div class="modal-box max-w-md">
+      <div :if={@show} class="modal modal-open modal-bottom sm:modal-middle" phx-window-keydown={@toggle_event} phx-key="Escape">
+        <div class="modal-box w-full sm:max-w-md pb-[env(safe-area-inset-bottom)]">
           <.modal_header title={assigns[:title] || "New Agent"} toggle_event={@toggle_event} />
 
           <form phx-submit={@submit_event} class="flex flex-col gap-4">

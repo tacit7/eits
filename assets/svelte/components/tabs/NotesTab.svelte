@@ -1,5 +1,4 @@
 <script>
-  import { marked } from 'marked'
   import { onMount } from 'svelte'
   import { formatDateTime, shortId } from '../../utils/datetime.js'
   import { formatUUID, copyToClipboard } from '../../utils/clipboard.js'
@@ -11,14 +10,23 @@
 
   export let notes = []
 
-  marked.setOptions({ gfm: true, breaks: true })
-
-  // hljs is loaded lazily; once ready, re-render notes.
-  let hljsReady = false
+  // marked and hljs are loaded lazily in onMount; renderReady triggers re-render
+  // when both are available. Until then renderMarkdown returns raw text safely.
+  let markedParse = null
+  let renderReady = false
 
   onMount(async () => {
-    const { default: hljs } = await import('highlight.js')
-    marked.setOptions({
+    const [{ marked }, { default: hljs }] = await Promise.all([
+      import('marked'),
+      import('highlight.js'),
+    ])
+
+    marked.use({
+      gfm: true,
+      breaks: true,
+    })
+
+    marked.use({
       highlight: function(code, lang) {
         if (lang && hljs.getLanguage(lang)) {
           try {
@@ -30,12 +38,15 @@
         return hljs.highlightAuto(code).value
       }
     })
-    hljsReady = true
+
+    markedParse = (content) => marked.parse(content || '')
+    renderReady = true
   })
 
-  function renderMarkdown(content) {
+  function renderMarkdown(content, _ready) {
+    if (!markedParse) return content || ''
     try {
-      return marked.parse(content || '')
+      return markedParse(content)
     } catch (e) {
       console.error('Markdown parse error:', e)
       return content || ''
@@ -53,7 +64,7 @@
     {#each notes as note (note.id)}
       <div class="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition-shadow">
         <div class="card-body p-4">
-          <!-- Markdown content; re-renders when hljsReady flips true -->
+          <!-- Markdown content; re-renders when renderReady flips true -->
           <div class="prose prose-sm max-w-none dark:prose-invert
                       prose-headings:font-semibold
                       prose-h1:text-2xl prose-h1:mb-3
@@ -65,7 +76,7 @@
                       prose-code:bg-base-200 prose-code:px-1 prose-code:py-0.5 prose-code:rounded
                       prose-pre:bg-base-300 prose-pre:p-3 prose-pre:rounded-lg
                       prose-blockquote:border-l-4 prose-blockquote:border-primary prose-blockquote:pl-4">
-            {@html renderMarkdown(note.body, hljsReady)}
+            {@html renderMarkdown(note.body, renderReady)}
           </div>
 
           <!-- Footer with ID and Timestamp -->

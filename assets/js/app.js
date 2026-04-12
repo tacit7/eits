@@ -166,14 +166,16 @@ window.addEventListener("click", (e) => {
   }
 })
 
-// connect if there are any LiveViews on the page
-liveSocket.connect()
-
-// expose liveSocket on window for web console debug logs and latency simulation:
-// >> liveSocket.enableDebug()
-// >> liveSocket.enableLatencySim(1000)  // enabled for duration of browser session
-// >> liveSocket.disableLatencySim()
-window.liveSocket = liveSocket
+// connect if there are any LiveViews on the page.
+// Guard against double-execution: Vite exports a __vite_preload helper from this entry
+// chunk, so any dynamic import (codemirror, highlight.js, etc.) triggers the browser to
+// load this module a second time under a different URL (without the ?vsn=d cache-buster).
+// Since ES modules are keyed by URL, these are treated as distinct module instances.
+// The guard ensures the second evaluation is a no-op — the first LiveSocket wins.
+if (!window.liveSocket) {
+  liveSocket.connect()
+  window.liveSocket = liveSocket
+}
 
 // The lines below enable quality of life phoenix_live_reload
 // development features:

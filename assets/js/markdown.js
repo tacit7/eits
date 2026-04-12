@@ -1,29 +1,32 @@
 import { marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
+// highlight.js is already statically imported by hooks/highlight.js (bundled into app.js).
+// Using a static import here avoids Vite creating a re-export stub chunk that would
+// import app.js without the ?vsn=d cache-buster, causing a second module evaluation
+// and the "Cannot bind multiple views to the same DOM element" console error.
+import hljs from 'highlight.js';
 
-// hljs is large (~9 MB). Load it once on first use, then cache.
 let _ready = null;
 
 function ensureReady() {
   if (!_ready) {
-    _ready = import('highlight.js').then(({ default: hljs }) => {
-      marked.use(
-        markedHighlight({
-          langPrefix: 'hljs language-',
-          highlight(code, lang) {
-            if (lang && hljs.getLanguage(lang)) {
-              try {
-                return hljs.highlight(code, { language: lang }).value;
-              } catch (err) {
-                console.error('Highlight error:', err);
-              }
+    marked.use(
+      markedHighlight({
+        langPrefix: 'hljs language-',
+        highlight(code, lang) {
+          if (lang && hljs.getLanguage(lang)) {
+            try {
+              return hljs.highlight(code, { language: lang }).value;
+            } catch (err) {
+              console.error('Highlight error:', err);
             }
-            return hljs.highlightAuto(code).value;
           }
-        })
-      );
-      marked.setOptions({ breaks: true, gfm: true });
-    });
+          return hljs.highlightAuto(code).value;
+        }
+      })
+    );
+    marked.setOptions({ breaks: true, gfm: true });
+    _ready = Promise.resolve();
   }
   return _ready;
 }

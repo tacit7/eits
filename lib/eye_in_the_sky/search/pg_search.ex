@@ -185,9 +185,7 @@ defmodule EyeInTheSky.Search.PgSearch do
   Filters to user/assistant messages only to avoid tool output noise.
   Uses the GIN index on `to_tsvector('english', COALESCE(body, ''))`.
   """
-  def search_session_ids_by_messages(query, opts \\ []) do
-    limit = Keyword.get(opts, :limit, 50)
-
+  def search_session_ids_by_messages(query) do
     from(m in EyeInTheSky.Messages.Message,
       where: m.sender_role in ["user", "assistant"],
       where:
@@ -197,8 +195,7 @@ defmodule EyeInTheSky.Search.PgSearch do
           ^query
         ),
       distinct: m.session_id,
-      select: m.session_id,
-      limit: ^limit
+      select: m.session_id
     )
     |> Repo.all()
   end

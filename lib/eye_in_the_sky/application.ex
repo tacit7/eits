@@ -5,15 +5,13 @@ defmodule EyeInTheSky.Application do
 
   use Application
 
-  alias LiveSvelte.SSR.NodeJS
-
   @impl true
   def start(_type, _args) do
     Oban.Telemetry.attach_default_logger(:info)
 
     children =
       if Application.get_env(:live_svelte, :ssr_module) != LiveSvelte.SSR.ViteJS do
-        [{NodeJS.Supervisor, [path: NodeJS.server_path(), pool_size: 4]}]
+        [{NodeJS.Supervisor, [path: LiveSvelte.SSR.NodeJS.server_path(), pool_size: 4]}]
       else
         []
       end

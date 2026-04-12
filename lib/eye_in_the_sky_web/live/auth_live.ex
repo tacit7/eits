@@ -17,7 +17,7 @@ defmodule EyeInTheSkyWeb.AuthLive do
         |> assign(:token_valid, token_valid)
         |> assign(:error, nil)
 
-      {:ok, socket, layout: {EyeInTheSkyWeb.Layouts, :root}}
+      {:ok, socket, layout: false}
     end
   end
 

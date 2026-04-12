@@ -16,7 +16,7 @@ defmodule EyeInTheSkyWeb.Helpers.MobileNav do
   ## Mapping
 
   - `/projects/:id` and all `/projects/:id/*` sub-routes → `:project`
-  - `/dm/:session_id` with no project context → `:none`
+  - `/dm/:session_id` → `:sessions` (highlights Sessions tab so users can navigate back)
   - `/tasks` → `:tasks`
   - `/notes` → `:notes`
   - `/`, `/sessions` → `:sessions`

@@ -42,9 +42,9 @@ defmodule EyeInTheSkyWeb.Helpers.MobileNavTest do
       assert MobileNav.active_tab_for_path("/projects/1/prompts") == :project
     end
 
-    test "returns :none for DM routes without project context" do
-      assert MobileNav.active_tab_for_path("/dm/123") == :none
-      assert MobileNav.active_tab_for_path("/dm/abc-uuid-123") == :none
+    test "returns :sessions for DM routes (highlights Sessions tab for navigation back)" do
+      assert MobileNav.active_tab_for_path("/dm/123") == :sessions
+      assert MobileNav.active_tab_for_path("/dm/abc-uuid-123") == :sessions
     end
 
     test "returns :none for unrelated top-level routes" do

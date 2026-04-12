@@ -4,6 +4,8 @@ defmodule EyeInTheSky.Workers.MixTaskWorker do
 
   alias EyeInTheSky.ScheduledJobs
 
+  @allowed_tasks ~w(test format deps.get assets.deploy ecto.migrate ecto.rollback help)
+
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"job_id" => job_id}}) do
     job = ScheduledJobs.get_job!(job_id)
@@ -26,15 +28,20 @@ defmodule EyeInTheSky.Workers.MixTaskWorker do
     config = ScheduledJobs.decode_config(job)
     task = config["task"] || "help"
     args = config["args"] || []
-    project_path = blank_to_nil(config["project_path"]) || File.cwd!()
 
-    {output, exit_code} =
-      System.cmd("mix", [task | args], cd: project_path, stderr_to_stdout: true)
-
-    if exit_code == 0 do
-      {:ok, String.trim(output)}
+    unless is_binary(task) && task in @allowed_tasks do
+      {:error, "Disallowed mix task: #{inspect(task)}"}
     else
-      {:error, "Exit code #{exit_code}: #{String.trim(output)}"}
+      project_path = blank_to_nil(config["project_path"]) || File.cwd!()
+
+      {output, exit_code} =
+        System.cmd("mix", [task | args], cd: project_path, stderr_to_stdout: true)
+
+      if exit_code == 0 do
+        {:ok, String.trim(output)}
+      else
+        {:error, "Exit code #{exit_code}: #{String.trim(output)}"}
+      end
     end
   end
 

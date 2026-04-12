@@ -6,12 +6,18 @@ async function getSortable() {
 }
 
 export const SortableKanban = {
-  async mounted() { await this._init() },
+  async mounted() {
+    this._destroyed = false
+    await this._init()
+  },
   updated() {
     // Sortable handles DOM mutations internally; no need to destroy/recreate
   },
   async _init() {
     const Sortable = await getSortable()
+    // Guard: destroyed() may have fired while import was resolving
+    if (this._destroyed) return
+
     const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0
     this.sortable = Sortable.create(this.el, {
       group: "kanban",
@@ -60,13 +66,18 @@ export const SortableKanban = {
     })
   },
   destroyed() {
+    this._destroyed = true
     if (this.sortable) this.sortable.destroy()
   }
 }
 
 export const SortableColumns = {
   async mounted() {
+    this._destroyed = false
     const Sortable = await getSortable()
+    // Guard: destroyed() may have fired while import was resolving
+    if (this._destroyed) return
+
     this.sortable = Sortable.create(this.el, {
       animation: 150,
       ghostClass: "opacity-30",
@@ -80,6 +91,7 @@ export const SortableColumns = {
     })
   },
   destroyed() {
+    this._destroyed = true
     if (this.sortable) this.sortable.destroy()
   }
 }

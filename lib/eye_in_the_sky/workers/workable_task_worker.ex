@@ -43,6 +43,13 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
           broadcast()
           notify(output)
           :ok
+
+        {:error, reason} ->
+          reason_str = if is_binary(reason), do: reason, else: inspect(reason)
+          ScheduledJobs.record_run_complete(run, "failed", result: reason_str)
+          broadcast()
+          notify_error(reason_str)
+          {:error, reason}
       end
     rescue
       e ->
@@ -76,7 +83,12 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
     results = Enum.map(tasks, &process_task(&1, config.model, config.project_id))
     spawned = Enum.count(results, &match?({:ok, _}, &1))
     failed = Enum.count(results, &match?({:error, _}, &1))
-    {:ok, "Spawned #{spawned} agents for tag=#{config.tag_name} (#{failed} failed)"}
+
+    if spawned == 0 and failed > 0 do
+      {:error, "All #{failed} spawn(s) failed for tag=#{config.tag_name}"}
+    else
+      {:ok, "Spawned #{spawned} agents for tag=#{config.tag_name} (#{failed} failed)"}
+    end
   end
 
   defp process_task(task, model, project_id) do
@@ -178,7 +190,9 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
       instructions: instructions
     ]
 
-    case AgentManager.create_agent(opts) do
+    agent_manager = Application.get_env(:eye_in_the_sky, :agent_manager_module, AgentManager)
+
+    case agent_manager.create_agent(opts) do
       {:ok, %{session: session}} ->
         Logger.info(
           "WorkableTaskWorker: spawned agent for task ##{task.id} session=#{session.uuid} project_path=#{project_path}"

@@ -2,7 +2,6 @@ defmodule EyeInTheSkyWeb.DmLive.UploadHelpers do
   @moduledoc false
 
   alias EyeInTheSky.FileAttachments
-  alias EyeInTheSkyWeb.Helpers.UploadHelpers
 
   require Logger
 
@@ -18,7 +17,7 @@ defmodule EyeInTheSkyWeb.DmLive.UploadHelpers do
          storage_path: destination,
          filename: Path.basename(destination),
          original_filename: entry.client_name,
-         content_type: UploadHelpers.mime_from_ext(entry.client_name),
+         content_type: mime_from_ext(entry.client_name),
          size_bytes: entry.client_size
        }}
     end)
@@ -65,4 +64,6 @@ defmodule EyeInTheSkyWeb.DmLive.UploadHelpers do
       _ -> Path.basename(abs_path)
     end
   end
+
+  defp mime_from_ext(filename), do: MIME.from_path(filename)
 end

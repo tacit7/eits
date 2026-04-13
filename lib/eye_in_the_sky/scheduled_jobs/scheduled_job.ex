@@ -52,11 +52,27 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
       :timezone
     ])
     |> validate_required([:name, :job_type, :schedule_type, :schedule_value])
-    |> validate_inclusion(:job_type, ["spawn_agent", "mix_task", "daily_digest"])
+    |> validate_inclusion(:job_type, ["spawn_agent", "mix_task", "daily_digest", "workable_task"])
     |> validate_inclusion(:origin, ["system", "user"])
     |> validate_inclusion(:schedule_type, ["interval", "cron"])
+    |> validate_timezone()
     |> validate_job_config()
     |> unique_constraint(:prompt_id, name: :idx_scheduled_jobs_unique_prompt)
+  end
+
+  defp validate_timezone(changeset) do
+    case get_change(changeset, :timezone) do
+      nil ->
+        changeset
+
+      tz ->
+        probe = DateTime.from_naive!(~N[2000-01-01 00:00:00], "Etc/UTC")
+
+        case DateTime.shift_zone(probe, tz) do
+          {:ok, _} -> changeset
+          _ -> add_error(changeset, :timezone, "is not a valid timezone")
+        end
+    end
   end
 
   defp validate_job_config(changeset) do

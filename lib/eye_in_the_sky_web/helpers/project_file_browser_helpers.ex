@@ -14,7 +14,9 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers do
   Prevents directory traversal attacks.
   """
   def path_within?(path, base_dir) do
-    String.starts_with?(Path.expand(path), Path.expand(base_dir))
+    expanded_path = Path.expand(path)
+    expanded_base = Path.expand(base_dir)
+    expanded_path == expanded_base or String.starts_with?(expanded_path, expanded_base <> "/")
   end
 
   @doc """

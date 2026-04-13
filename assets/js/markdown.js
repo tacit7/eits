@@ -1,27 +1,40 @@
-import { marked } from 'marked';
-import { markedHighlight } from 'marked-highlight';
-import hljs from 'highlight.js';
+// marked, marked-highlight, and highlight.js are all loaded lazily.
+// Both this module and hooks/highlight.js use dynamic imports for hljs,
+// so Vite creates one standalone hljs chunk — no static import means
+// no re-export stub that would re-load app.js without the ?vsn=d cache-buster.
 
-marked.use(
-  markedHighlight({
-    langPrefix: 'hljs language-',
-    highlight(code, lang) {
-      if (lang && hljs.getLanguage(lang)) {
-        try {
-          return hljs.highlight(code, { language: lang }).value;
-        } catch (err) {
-          console.error('Highlight error:', err);
-        }
-      }
-      return hljs.highlightAuto(code).value;
-    }
-  })
-);
+let _ready = null;
 
-marked.setOptions({
-  breaks: true,
-  gfm: true
-});
+async function ensureReady() {
+  if (!_ready) {
+    _ready = (async () => {
+      const [{ marked }, { markedHighlight }, { default: hljs }] = await Promise.all([
+        import('marked'),
+        import('marked-highlight'),
+        import('highlight.js'),
+      ]);
+
+      marked.use(
+        markedHighlight({
+          langPrefix: 'hljs language-',
+          highlight(code, lang) {
+            if (lang && hljs.getLanguage(lang)) {
+              try {
+                return hljs.highlight(code, { language: lang }).value;
+              } catch (err) {
+                console.error('Highlight error:', err);
+              }
+            }
+            return hljs.highlightAuto(code).value;
+          }
+        })
+      );
+      marked.setOptions({ breaks: true, gfm: true });
+      return marked;
+    })();
+  }
+  return _ready;
+}
 
 function stripFrontmatter(markdown) {
   if (!markdown.startsWith('---')) return markdown;
@@ -59,12 +72,12 @@ function escapeHtml(str) {
 }
 
 /**
- * Render markdown with syntax highlighting
- * @param {string} markdown - The markdown text to render
- * @returns {string} HTML string with syntax highlighting
+ * Render markdown with syntax highlighting.
+ * Returns a Promise<string>. All deps are loaded lazily on first call.
  */
-export function renderMarkdown(markdown) {
+export async function renderMarkdown(markdown) {
   if (!markdown) return '';
+  const marked = await ensureReady();
   return marked.parse(preprocessEitsCmds(stripFrontmatter(markdown)));
 }
 

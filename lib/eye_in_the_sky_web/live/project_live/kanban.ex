@@ -1,9 +1,9 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.{Tasks, Notes}
-  alias EyeInTheSkyWeb.Live.Shared.{KanbanFilters, TasksHelpers, BulkHelpers}
-  alias EyeInTheSkyWeb.ProjectLive.Kanban.{BoardActions, FilterHandlers}
+  alias EyeInTheSky.{Notes, Tasks}
+  alias EyeInTheSkyWeb.Live.Shared.{BulkHelpers, KanbanFilters, TasksHelpers}
+  alias EyeInTheSkyWeb.ProjectLive.Kanban.{BoardActions, DatePickerHandlers, FilterHandlers}
 
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Live.Shared.AgentHelpers, only: [handle_start_agent_for_task: 2]
@@ -31,9 +31,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
         preload: [:agents]
       )
       |> init_assigns()
+      |> FilterHandlers.assign_filter_count()
 
     if socket.assigns.project do
-      {:ok, KanbanFilters.load_tasks(socket)}
+      {:ok, socket |> KanbanFilters.load_tasks() |> rebuild_session_status_ids()}
     else
       {:ok, socket}
     end
@@ -87,95 +88,36 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
     do: TasksHelpers.handle_archive_task(params, socket, &KanbanFilters.load_tasks/1)
 
   # ---------------------------------------------------------------------------
-  # Events: date picker
+  # Events: date picker (delegated to DatePickerHandlers)
   # ---------------------------------------------------------------------------
 
   @impl true
-  def handle_event("open_date_picker", %{"task_id" => task_id}, socket) do
-    task = EyeInTheSky.Tasks.get_task_by_uuid_or_id!(task_id)
-    today = Date.utc_today()
-
-    selected =
-      case task.due_at do
-        nil -> nil
-        dt -> dt |> DateTime.to_date() |> Date.to_iso8601()
-      end
-
-    {year, month} =
-      case task.due_at do
-        nil -> {today.year, today.month}
-        dt -> dt = DateTime.to_date(dt); {dt.year, dt.month}
-      end
-
-    {:noreply,
-     socket
-     |> assign(:show_date_picker, true)
-     |> assign(:date_picker_task, task)
-     |> assign(:date_picker_year, year)
-     |> assign(:date_picker_month, month)
-     |> assign(:date_picker_selected, selected)}
-  end
+  def handle_event("open_date_picker", params, socket),
+    do: DatePickerHandlers.handle_open_date_picker(params, socket)
 
   @impl true
-  def handle_event("close_date_picker", _params, socket) do
-    {:noreply, assign(socket, :show_date_picker, false)}
-  end
+  def handle_event("close_date_picker", _params, socket),
+    do: DatePickerHandlers.handle_close_date_picker(socket)
 
   @impl true
-  def handle_event("date_picker_prev_month", _params, socket) do
-    {year, month} = prev_month(socket.assigns.date_picker_year, socket.assigns.date_picker_month)
-    {:noreply, socket |> assign(:date_picker_year, year) |> assign(:date_picker_month, month)}
-  end
+  def handle_event("date_picker_prev_month", _params, socket),
+    do: DatePickerHandlers.handle_date_picker_prev_month(socket)
 
   @impl true
-  def handle_event("date_picker_next_month", _params, socket) do
-    {year, month} = next_month(socket.assigns.date_picker_year, socket.assigns.date_picker_month)
-    {:noreply, socket |> assign(:date_picker_year, year) |> assign(:date_picker_month, month)}
-  end
+  def handle_event("date_picker_next_month", _params, socket),
+    do: DatePickerHandlers.handle_date_picker_next_month(socket)
 
   @impl true
-  def handle_event("select_due_date", %{"date" => date_str}, socket) do
-    {:noreply, assign(socket, :date_picker_selected, date_str)}
-  end
+  def handle_event("select_due_date", params, socket),
+    do: DatePickerHandlers.handle_select_due_date(params, socket)
 
   @impl true
-  def handle_event("save_due_date", %{"task_id" => task_id, "due_at" => due_at_str}, socket) do
-    task = EyeInTheSky.Tasks.get_task_by_uuid_or_id!(task_id)
-    due_at = if due_at_str == "", do: nil, else: due_at_str
-
-    case EyeInTheSky.Tasks.update_task(task, %{due_at: due_at, updated_at: DateTime.utc_now()}) do
-      {:ok, _updated} ->
-        {:noreply,
-         socket
-         |> assign(:show_date_picker, false)
-         |> KanbanFilters.load_tasks()}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Could not update due date")}
-    end
-  end
+  def handle_event("save_due_date", params, socket),
+    do: DatePickerHandlers.handle_save_due_date(params, socket)
 
   @impl true
-  def handle_event("remove_due_date", %{"task_id" => task_id}, socket) do
-    task = EyeInTheSky.Tasks.get_task_by_uuid_or_id!(task_id)
-
-    case EyeInTheSky.Tasks.update_task(task, %{due_at: nil, updated_at: DateTime.utc_now()}) do
-      {:ok, _updated} ->
-        {:noreply,
-         socket
-         |> assign(:show_date_picker, false)
-         |> KanbanFilters.load_tasks()}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Could not remove due date")}
-    end
-  end
-
-  defp prev_month(year, 1), do: {year - 1, 12}
-  defp prev_month(year, month), do: {year, month - 1}
-
-  defp next_month(year, 12), do: {year + 1, 1}
-  defp next_month(year, month), do: {year, month + 1}
+  def handle_event("remove_due_date", params, socket),
+    do: DatePickerHandlers.handle_remove_due_date(params, socket)
 
   @impl true
   def handle_event("add_task_annotation", params, socket),
@@ -287,10 +229,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_info(:tasks_changed, socket) do
-    socket = KanbanFilters.load_tasks(socket)
+    socket =
+      socket
+      |> KanbanFilters.load_tasks()
+      |> rebuild_session_status_ids()
 
     socket =
-      if socket.assigns.selected_task && socket.assigns.show_task_detail_drawer do
+      if not is_nil(socket.assigns.selected_task) && socket.assigns.show_task_detail_drawer do
         task = Tasks.get_task!(socket.assigns.selected_task.id)
         notes = Notes.list_notes_for_task(task.id)
         socket |> assign(:selected_task, task) |> assign(:task_notes, notes)
@@ -304,14 +249,28 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   @impl true
   def handle_info({:agent_working, msg}, socket) do
     handle_agent_working(socket, msg, fn socket, session_id ->
-      update(socket, :working_session_ids, &MapSet.put(&1, session_id))
+      socket
+      |> update(:working_session_ids, &MapSet.put(&1, session_id))
+      |> update(:waiting_session_ids, &MapSet.delete(&1, session_id))
     end)
+  end
+
+  @impl true
+  def handle_info({:agent_stopped, %{status: "waiting", id: session_id}}, socket) do
+    socket =
+      socket
+      |> update(:working_session_ids, &MapSet.delete(&1, session_id))
+      |> update(:waiting_session_ids, &MapSet.put(&1, session_id))
+
+    {:noreply, socket}
   end
 
   @impl true
   def handle_info({:agent_stopped, msg}, socket) do
     handle_agent_stopped(socket, msg, fn socket, session_id ->
-      update(socket, :working_session_ids, &MapSet.delete(&1, session_id))
+      socket
+      |> update(:working_session_ids, &MapSet.delete(&1, session_id))
+      |> update(:waiting_session_ids, &MapSet.delete(&1, session_id))
     end)
   end
 
@@ -341,14 +300,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
       phx-hook="KanbanKeyboard"
       class="px-4 sm:px-6 py-6 h-[calc(100dvh-7rem)] md:h-[calc(100dvh-4rem)] flex flex-col"
     >
-      <% active_filter_count =
-        if(@filter_priority, do: 1, else: 0) + MapSet.size(@filter_tags) +
-          if(@filter_due_date, do: 1, else: 0) + if @filter_activity, do: 1, else: 0 %>
       <.kanban_toolbar
+        project_id={@project.id}
         search_query={@search_query}
         show_completed={@show_completed}
         bulk_mode={@bulk_mode}
-        active_filter_count={active_filter_count}
+        active_filter_count={@active_filter_count}
       />
 
       <.kanban_bulk_bar
@@ -364,6 +321,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
         selected_tasks={@selected_tasks}
         quick_add_column={@quick_add_column}
         working_session_ids={@working_session_ids}
+        waiting_session_ids={@waiting_session_ids}
       />
     </div>
 
@@ -427,6 +385,22 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   # Private
   # ---------------------------------------------------------------------------
 
+  # Seeds working_session_ids and waiting_session_ids from preloaded task sessions.
+  # PubSub only delivers events that fire while the LiveView is connected, so without
+  # this, any session that went working/waiting before mount is invisible to the board.
+  defp rebuild_session_status_ids(socket) do
+    all_sessions =
+      (socket.assigns[:tasks] || [])
+      |> Enum.flat_map(&(Map.get(&1, :sessions, []) || []))
+
+    working_ids = all_sessions |> Enum.filter(&(&1.status == "working")) |> Enum.map(& &1.id) |> MapSet.new()
+    waiting_ids = all_sessions |> Enum.filter(&(&1.status == "waiting")) |> Enum.map(& &1.id) |> MapSet.new()
+
+    socket
+    |> update(:working_session_ids, &MapSet.union(&1, working_ids))
+    |> assign(:waiting_session_ids, waiting_ids)
+  end
+
   defp init_assigns(socket) do
     socket
     |> assign(:search_query, "")
@@ -454,6 +428,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
     |> assign(:filter_due_date, nil)
     |> assign(:filter_activity, nil)
     |> assign(:working_session_ids, MapSet.new())
+    |> assign(:waiting_session_ids, MapSet.new())
     |> assign(:show_date_picker, false)
     |> assign(:date_picker_task, nil)
     |> assign(:date_picker_year, nil)

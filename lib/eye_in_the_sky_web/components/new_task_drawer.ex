@@ -29,7 +29,7 @@ defmodule EyeInTheSkyWeb.Components.NewTaskDrawer do
 
         <%!-- Modal box --%>
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-          <div class="bg-base-100 rounded-box shadow-xl p-6 w-96 max-w-lg pointer-events-auto overflow-y-auto max-h-[calc(100dvh-2rem)]">
+          <div class="bg-base-100 rounded-box shadow-xl p-6 w-full max-w-lg pointer-events-auto overflow-y-auto max-h-[calc(100dvh-2rem)]">
             <.modal_header title="New Task" toggle_event={@toggle_event} />
 
             <form id={"#{@id}-form"} phx-submit={@submit_event} class="flex flex-col gap-4">
@@ -37,7 +37,7 @@ defmodule EyeInTheSkyWeb.Components.NewTaskDrawer do
                 <input
                   type="text"
                   name="title"
-                  class="input input-bordered"
+                  class="input input-bordered text-base"
                   placeholder="Task title"
                   required
                   autofocus={@show}
@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.Components.NewTaskDrawer do
               <.form_field label="Description">
                 <textarea
                   name="description"
-                  class="textarea textarea-bordered h-24"
+                  class="textarea textarea-bordered h-24 text-base"
                   placeholder="Task description (optional)"
                 ></textarea>
               </.form_field>
@@ -75,7 +75,7 @@ defmodule EyeInTheSkyWeb.Components.NewTaskDrawer do
                 <input
                   type="text"
                   name="tags"
-                  class="input input-bordered"
+                  class="input input-bordered text-base"
                   placeholder="tag1, tag2, tag3"
                 />
                 <label class="label">

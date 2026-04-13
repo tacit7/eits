@@ -52,6 +52,9 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
             src={provider_icon(@message.provider)}
             class={"w-4 h-4 mt-1 flex-shrink-0 #{provider_icon_class(@message.provider)}"}
             alt={@message.provider || "Agent"}
+            width="16"
+            height="16"
+            loading="lazy"
           />
         <% end %>
 
@@ -67,7 +70,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
             <%!-- DM badge --%>
             <span
               :if={@is_dm}
-              class="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/40 uppercase tracking-wide"
+              class="inline-flex items-center gap-1 text-xs font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/40 uppercase tracking-wide"
             >
               <.icon name="hero-envelope-mini" class="w-2.5 h-2.5" /> dm
             </span>
@@ -209,11 +212,11 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     <div class="mt-1 space-y-1.5">
       <details
         :if={@thinking && @thinking != ""}
-        class="group rounded border-l-2 border-purple-500/50 bg-zinc-950/50 overflow-hidden"
+        class="group rounded border-l-2 border-primary/50 bg-zinc-950/50 overflow-hidden"
       >
         <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
-          <.icon name="hero-sparkles" class="w-3.5 h-3.5 flex-shrink-0 text-purple-400/60" />
-          <span class="text-[11px] font-mono font-semibold text-purple-400/60 uppercase tracking-wide">
+          <.icon name="hero-sparkles" class="w-3.5 h-3.5 flex-shrink-0 text-primary/60" />
+          <span class="text-[11px] font-mono font-semibold text-primary/60 uppercase tracking-wide">
             Thinking
           </span>
           <.icon
@@ -221,7 +224,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
             class="w-3 h-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
           />
         </summary>
-        <div class="px-2.5 pb-2 pt-1 border-t border-purple-500/10">
+        <div class="px-2.5 pb-2 pt-1 border-t border-primary/10">
           <pre class="font-mono text-xs text-base-content/40 whitespace-pre-wrap break-words leading-relaxed">{@thinking}</pre>
         </div>
       </details>
@@ -271,7 +274,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         />
       </summary>
       <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-        <pre class="font-mono text-[10px] text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto">{@body}</pre>
+        <pre class="font-mono text-xs text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto">{@body}</pre>
       </div>
     </details>
     """
@@ -336,51 +339,24 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   attr :input, :any, default: nil
 
   def tool_widget_body(assigns) do
-    body_type =
-      cond do
-        assigns.name == "Bash" and assigns.rest != "" ->
-          :bash
-
-        assigns.name == "Edit" and is_map(assigns.input) and
-            Map.has_key?(assigns.input, "old_string") ->
-          :edit
-
-        assigns.name == "Write" and is_map(assigns.input) and
-            Map.has_key?(assigns.input, "content") ->
-          :write
-
-        String.ends_with?(assigns.name, "i-speak") and assigns.detail != "" ->
-          :speak
-
-        is_map(assigns.input) and map_size(assigns.input) > 0 and
-            assigns.name not in ["Read", "Glob", "Grep", "WebSearch", "Task"] ->
-          :json
-
-        assigns.rest != "" and assigns.rest != assigns.detail ->
-          :text
-
-        true ->
-          :none
-      end
-
-    assigns = assign(assigns, :body_type, body_type)
+    assigns = assign(assigns, :body_type, classify_body_type(assigns))
 
     ~H"""
     <%= case @body_type do %>
       <% :bash -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-          <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-[10px] text-base-content/70 whitespace-pre-wrap break-all leading-relaxed">{(@input && @input["command"]) || @detail}</pre>
+          <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-xs text-base-content/70 whitespace-pre-wrap break-all leading-relaxed">{(@input && @input["command"]) || @detail}</pre>
         </div>
       <% :edit -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5 space-y-1.5">
-          <div class="font-mono text-[10px] text-base-content/40 pb-0.5">{@input["file_path"]}</div>
-          <pre class="bg-red-950/30 text-red-400/70 rounded px-2 py-1 font-mono text-[10px] whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{String.slice(@input["old_string"] || "", 0..500)}</pre>
-          <pre class="bg-green-950/30 text-green-400/70 rounded px-2 py-1 font-mono text-[10px] whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{String.slice(@input["new_string"] || "", 0..500)}</pre>
+          <div class="font-mono text-xs text-base-content/40 pb-0.5">{@input["file_path"]}</div>
+          <pre class="bg-red-950/30 text-red-400/70 rounded px-2 py-1 font-mono text-xs whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{String.slice(@input["old_string"] || "", 0..500)}</pre>
+          <pre class="bg-green-950/30 text-green-400/70 rounded px-2 py-1 font-mono text-xs whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{String.slice(@input["new_string"] || "", 0..500)}</pre>
         </div>
       <% :write -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5 space-y-1">
-          <div class="font-mono text-[10px] text-base-content/40 pb-0.5">{@input["file_path"]}</div>
-          <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-[10px] text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-48 overflow-y-auto">{String.slice(@input["content"] || "", 0..500)}{if String.length(@input["content"] || "") > 500, do: "\n…", else: ""}</pre>
+          <div class="font-mono text-xs text-base-content/40 pb-0.5">{@input["file_path"]}</div>
+          <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-xs text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-48 overflow-y-auto">{String.slice(@input["content"] || "", 0..500)}{if String.length(@input["content"] || "") > 500, do: "\n…", else: ""}</pre>
         </div>
       <% :speak -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
@@ -388,16 +364,53 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         </div>
       <% :json -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-          <pre class="font-mono text-[10px] text-base-content/40 whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto">{Jason.encode!(@input, pretty: true)}</pre>
+          <pre class="font-mono text-xs text-base-content/40 whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto">{Jason.encode!(@input, pretty: true)}</pre>
         </div>
       <% :text -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-          <pre class="font-mono text-[10px] text-base-content/45 whitespace-pre-wrap break-all leading-relaxed">{@rest}</pre>
+          <pre class="font-mono text-xs text-base-content/45 whitespace-pre-wrap break-all leading-relaxed">{@rest}</pre>
         </div>
       <% :none -> %>
     <% end %>
     """
   end
+
+  # ---------------------------------------------------------------------------
+  # classify_body_type helpers
+  # ---------------------------------------------------------------------------
+
+  defp classify_body_type(assigns) do
+    cond do
+      bash_body?(assigns) -> :bash
+      edit_body?(assigns) -> :edit
+      write_body?(assigns) -> :write
+      speak_body?(assigns) -> :speak
+      json_body?(assigns) -> :json
+      text_body?(assigns) -> :text
+      true -> :none
+    end
+  end
+
+  defp bash_body?(assigns), do: assigns.name == "Bash" and assigns.rest != ""
+
+  defp edit_body?(assigns) do
+    assigns.name == "Edit" and is_map(assigns.input) and
+      Map.has_key?(assigns.input, "old_string")
+  end
+
+  defp write_body?(assigns) do
+    assigns.name == "Write" and is_map(assigns.input) and
+      Map.has_key?(assigns.input, "content")
+  end
+
+  defp speak_body?(assigns), do: String.ends_with?(assigns.name, "i-speak") and assigns.detail != ""
+
+  defp json_body?(assigns) do
+    is_map(assigns.input) and map_size(assigns.input) > 0 and
+      assigns.name not in ["Read", "Glob", "Grep", "WebSearch", "Task"]
+  end
+
+  defp text_body?(assigns), do: assigns.rest != "" and assigns.rest != assigns.detail
 
   # ---------------------------------------------------------------------------
   # stream_provider_avatar
@@ -415,12 +428,18 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         src="/images/openai.svg"
         class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
         alt="Codex"
+        width="16"
+        height="16"
+        loading="lazy"
       />
     <% else %>
       <img
         src="/images/claude.svg"
         class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
         alt="Claude"
+        width="16"
+        height="16"
+        loading="lazy"
       />
     <% end %>
     """

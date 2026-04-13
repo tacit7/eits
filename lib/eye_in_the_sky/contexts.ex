@@ -4,9 +4,9 @@ defmodule EyeInTheSky.Contexts do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
-  alias EyeInTheSky.Contexts.{SessionContext, AgentContext}
+  alias EyeInTheSky.Contexts.{AgentContext, SessionContext}
   alias EyeInTheSky.QueryHelpers
+  alias EyeInTheSky.Repo
 
   # SessionContext functions
 
@@ -14,11 +14,14 @@ defmodule EyeInTheSky.Contexts do
   Gets session context for a specific session.
   """
   def get_session_context(session_id) do
-    SessionContext
-    |> where([sc], sc.session_id == ^session_id)
-    |> order_by([sc], desc: sc.updated_at)
-    |> limit(1)
-    |> Repo.one()
+    case SessionContext
+         |> where([sc], sc.session_id == ^session_id)
+         |> order_by([sc], desc: sc.updated_at)
+         |> limit(1)
+         |> Repo.one() do
+      nil -> {:error, :not_found}
+      ctx -> {:ok, ctx}
+    end
   end
 
   @doc """
@@ -27,7 +30,12 @@ defmodule EyeInTheSky.Contexts do
   def upsert_session_context(attrs) do
     QueryHelpers.upsert(
       SessionContext,
-      fn -> get_session_context(attrs.session_id) end,
+      fn ->
+        case get_session_context(attrs.session_id) do
+          {:ok, ctx} -> ctx
+          {:error, :not_found} -> nil
+        end
+      end,
       attrs
     )
   end
@@ -35,10 +43,13 @@ defmodule EyeInTheSky.Contexts do
   # AgentContext functions
 
   @doc """
-  Gets agent context for a specific agent and project.
+  Gets agent context for a specific agent and project. Returns {:ok, context} | {:error, :not_found}.
   """
   def get_agent_context(agent_id, project_id) do
-    Repo.get_by(AgentContext, agent_id: agent_id, project_id: project_id)
+    case Repo.get_by(AgentContext, agent_id: agent_id, project_id: project_id) do
+      nil -> {:error, :not_found}
+      context -> {:ok, context}
+    end
   end
 
   @doc """
@@ -47,7 +58,12 @@ defmodule EyeInTheSky.Contexts do
   def upsert_agent_context(attrs) do
     QueryHelpers.upsert(
       AgentContext,
-      fn -> get_agent_context(attrs.agent_id, attrs.project_id) end,
+      fn ->
+        case get_agent_context(attrs.agent_id, attrs.project_id) do
+          {:ok, context} -> context
+          {:error, :not_found} -> nil
+        end
+      end,
       attrs
     )
   end

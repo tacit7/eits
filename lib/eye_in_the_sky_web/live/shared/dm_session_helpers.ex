@@ -1,11 +1,12 @@
 defmodule EyeInTheSkyWeb.Live.Shared.DmSessionHelpers do
+  @moduledoc false
   require Logger
 
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3]
 
-  alias EyeInTheSky.{Sessions, Notes, Events}
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.{Events, Notes, Sessions}
 
   def handle_update_session_name(%{"value" => value}, socket) do
     session = socket.assigns.session
@@ -42,7 +43,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmSessionHelpers do
       {:ok, _note} ->
         {:noreply, load_notes_fn.(socket)}
 
-      {:error, _changeset} ->
+      {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Failed to toggle star")}
     end
   end

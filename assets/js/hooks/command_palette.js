@@ -1,176 +1,5 @@
-function getCommands() {
-  return [
-    // --- Workspace navigation ---
-    { id: "go-sessions",      label: "Sessions",      icon: "hero-cpu-chip",                  group: "Workspace", hint: "Workspace", keywords: [],                        shortcut: null, type: "navigate", href: "/",              when: null },
-    { id: "go-tasks",         label: "Tasks",         icon: "hero-clipboard-document-list",   group: "Workspace", hint: "Workspace", keywords: [],                        shortcut: null, type: "navigate", href: "/tasks",          when: null },
-    { id: "go-notes",         label: "Notes",         icon: "hero-document-text",             group: "Workspace", hint: "Workspace", keywords: [],                        shortcut: null, type: "navigate", href: "/notes",          when: null },
-    { id: "go-usage",         label: "Usage",         icon: "hero-chart-bar",                 group: "Insights",  hint: "Insights",  keywords: ["analytics", "stats"],    shortcut: null, type: "navigate", href: "/usage",          when: null },
-    { id: "go-prompts",       label: "Prompts",       icon: "hero-book-open",                 group: "Knowledge", hint: "Knowledge", keywords: [],                        shortcut: null, type: "navigate", href: "/prompts",        when: null },
-    { id: "go-skills",        label: "Skills",        icon: "hero-bolt",                      group: "Knowledge", hint: "Knowledge", keywords: [],                        shortcut: null, type: "navigate", href: "/skills",         when: null },
-    { id: "go-notifications", label: "Notifications", icon: "hero-bell",                      group: "Knowledge", hint: "Knowledge", keywords: ["alerts"],                shortcut: null, type: "navigate", href: "/notifications",  when: null },
-    { id: "go-jobs",          label: "Jobs",          icon: "hero-cog-6-tooth",               group: "System",    hint: "System",    keywords: ["scheduled", "cron"],     shortcut: null, type: "navigate", href: "/jobs",           when: null },
-    { id: "go-settings",      label: "Settings",      icon: "hero-adjustments-horizontal",    group: "System",    hint: "System",    keywords: ["config", "preferences"], shortcut: null, type: "navigate", href: "/settings",       when: null },
-
-    // --- Actions ---
-    {
-      id: "create-task",
-      label: "Create Task",
-      icon: "hero-plus",
-      group: "Tasks",
-      hint: null,
-      keywords: ["new", "add", "todo"],
-      shortcut: null,
-      type: "callback",
-      fn: () => { window.dispatchEvent(new CustomEvent("palette:create-task")) },
-      when: null
-    },
-    {
-      id: "create-note",
-      label: "Create Note",
-      icon: "hero-document-text",
-      group: "Notes",
-      hint: null,
-      keywords: ["new", "add", "write", "memo"],
-      shortcut: null,
-      type: "callback",
-      fn: () => { window.dispatchEvent(new CustomEvent("palette:create-note")) },
-      when: null
-    },
-    {
-      id: "create-agent",
-      label: "New Agent",
-      icon: "hero-cpu-chip",
-      group: "Agents",
-      hint: null,
-      keywords: ["spawn", "run", "claude", "ai", "bot"],
-      shortcut: null,
-      type: "callback",
-      fn: () => { window.dispatchEvent(new CustomEvent("palette:create-agent")) },
-      when: null
-    },
-    {
-      id: "create-chat",
-      label: "New Chat",
-      icon: "hero-chat-bubble-left-right",
-      group: "Workspace",
-      hint: null,
-      keywords: ["session", "dm", "conversation", "talk"],
-      shortcut: null,
-      type: "callback",
-      fn: () => { window.dispatchEvent(new CustomEvent("palette:create-chat")) },
-      when: null
-    },
-    {
-      id: "toggle-theme",
-      label: "Toggle Theme",
-      icon: "hero-moon",
-      group: "System",
-      hint: null,
-      keywords: ["dark", "light", "mode"],
-      shortcut: null,
-      type: "callback",
-      fn: () => {
-        const current = document.documentElement.getAttribute("data-theme") || localStorage.getItem("theme") || "light"
-        const next = current === "dark" ? "light" : "dark"
-        localStorage.setItem("theme", next)
-        document.documentElement.setAttribute("data-theme", next)
-        document.querySelectorAll(".theme-controller").forEach(c => {
-          if (c.type === "checkbox") c.checked = next === "dark"
-        })
-      },
-      when: null
-    },
-    {
-      id: "copy-url",
-      label: "Copy Current URL",
-      icon: "hero-link",
-      group: "System",
-      hint: null,
-      keywords: ["clipboard", "share", "link"],
-      shortcut: null,
-      type: "callback",
-      fn: () => {
-        navigator.clipboard.writeText(window.location.href)
-          .then(() => {
-            window.dispatchEvent(new CustomEvent("phx:copy_to_clipboard", {
-              detail: { text: window.location.href, format: "text/plain" }
-            }))
-          })
-          .catch(() => {
-            window.dispatchEvent(new CustomEvent("phx:copy_to_clipboard", {
-              detail: { text: "", format: "text/plain", error: true }
-            }))
-          })
-      },
-      when: null
-    },
-
-    // --- Submenus ---
-    {
-      id: "list-sessions",
-      label: "Go to Session...",
-      icon: "hero-chat-bubble-left-right",
-      group: "Workspace",
-      hint: null,
-      keywords: ["dm", "chat", "open", "history", "recent"],
-      shortcut: null,
-      type: "submenu",
-      commands: async () => {
-        try {
-          const projectId = document.getElementById("quick-create-task")?.dataset?.projectId
-          const url = projectId
-            ? `/api/v1/sessions?limit=30&status=all&project_id=${projectId}`
-            : "/api/v1/sessions?limit=30&status=all"
-          const res = await fetch(url)
-          if (!res.ok) return []
-          const data = await res.json()
-          return (data.results || []).map(s => ({
-            id: "session-" + s.uuid,
-            label: s.name || s.description || s.uuid.slice(0, 8),
-            icon: "hero-chat-bubble-left-right",
-            group: projectId ? "Project Sessions" : "Recent",
-            hint: s.status,
-            keywords: [],
-            shortcut: null,
-            type: "navigate",
-            href: "/dm/" + s.uuid,
-            when: null
-          }))
-        } catch (_) { return [] }
-      },
-      when: null
-    },
-    {
-      id: "go-project",
-      label: "Go to Project...",
-      icon: "hero-folder",
-      group: "Projects",
-      hint: null,
-      keywords: ["open", "switch", "navigate"],
-      shortcut: null,
-      type: "submenu",
-      commands: () => {
-        const registryHrefs = new Set(getCommands().map(c => c.href).filter(Boolean))
-        return [...document.querySelectorAll("#app-sidebar a[href^='/projects/']")]
-          .map(a => ({ label: (a.textContent || "").trim().replace(/\s+/g, " "), href: a.getAttribute("href") }))
-          .filter(({ label, href }) => label && href && href !== "#" && !registryHrefs.has(href))
-          .map(({ label, href }) => ({
-            id: "go-project-" + href.replace(/[^a-z0-9]+/gi, "-").toLowerCase(),
-            label,
-            icon: "hero-folder",
-            group: "Projects",
-            hint: "Projects",
-            keywords: [],
-            shortcut: null,
-            type: "navigate",
-            href,
-            when: null
-          }))
-      },
-      when: null
-    }
-  ]
-}
+import { fuzzyPositions, scoreCmd, escapeHtml, highlightLabel } from "./palette_utils.js"
+import { getCommands } from "./palette_commands/index.js"
 
 export const CommandPalette = {
   mounted() {
@@ -185,8 +14,36 @@ export const CommandPalette = {
       ? navigator.userAgentData.platform === "macOS"
       : navigator.platform.toUpperCase().includes("MAC")
 
+    // Read shortcut from root layout div (data-palette-shortcut) on each keydown
+    // so live-navigation setting changes are picked up without remounting.
+    // "auto" = Cmd OR Ctrl on Mac, Ctrl elsewhere; "cmd" = metaKey only;
+    // "ctrl" = ctrlKey only; "alt" = altKey only
+    this._matchesModifier = (e) => {
+      const el = document.querySelector("[data-palette-shortcut]")
+      const shortcut = el ? (el.dataset.paletteShortcut || "auto") : "auto"
+      if (shortcut === "cmd")  return e.metaKey
+      if (shortcut === "ctrl") return e.ctrlKey
+      if (shortcut === "alt")  return e.altKey
+      // auto: on Mac accept both Cmd+K and Ctrl+K so either key works
+      return this._isMac ? (e.metaKey || e.ctrlKey) : e.ctrlKey
+    }
+
+    this.handleEvent("palette:sessions-result", ({ sessions }) => {
+      if (this._paletteSessionsResolve) {
+        this._paletteSessionsResolve(sessions)
+        this._paletteSessionsResolve = null
+      }
+    })
+
+    this.handleEvent("palette:list-agents-result", ({ agents }) => {
+      if (this._paletteAgentsResolve) {
+        this._paletteAgentsResolve(agents)
+        this._paletteAgentsResolve = null
+      }
+    })
+
     this._globalKeyHandler = (e) => {
-      if ((this._isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "k") {
+      if (this._matchesModifier(e) && e.key.toLowerCase() === "k") {
         const inEditor = document.activeElement?.closest(".cm-editor, .monaco-editor, [data-palette-no-intercept]")
         if (inEditor) return
         e.preventDefault()
@@ -233,7 +90,7 @@ export const CommandPalette = {
   },
 
   activeCommands() {
-    if (this.stack.length === 0) return getCommands()
+    if (this.stack.length === 0) return getCommands(this)
     return this.stack[this.stack.length - 1].commands
   },
 
@@ -258,48 +115,13 @@ export const CommandPalette = {
 
     return cmds
       .map(cmd => {
-        const positions = this.fuzzyPositions(cmd.label, q)
-        return { cmd, score: this.scoreCmd(cmd, q, positions), positions }
+        const positions = fuzzyPositions(cmd.label, q)
+        return { cmd, score: scoreCmd(cmd, q, positions), positions }
       })
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score || a.cmd.label.localeCompare(b.cmd.label))
       .slice(0, 40)
       .map(({ cmd, positions }) => ({ ...cmd, _matchPositions: positions }))
-  },
-
-  scoreCmd(cmd, q, positions) {
-    const label = cmd.label.toLowerCase()
-    let score = 0
-
-    if (label === q) score += 200
-    if (label.startsWith(q)) score += 100
-    if (label.includes(q)) score += 50
-
-    if (positions !== null) {
-      score += 60
-      let consecutive = 0
-      for (let i = 1; i < positions.length; i++) {
-        if (positions[i] === positions[i - 1] + 1) consecutive++
-      }
-      score += consecutive * 2
-    }
-
-    const kws = (cmd.keywords || []).join(" ").toLowerCase()
-    if (kws && kws.includes(q)) score += 30
-    if (cmd.hint && cmd.hint.toLowerCase().includes(q)) score += 15
-    if (cmd.group && cmd.group.toLowerCase().includes(q)) score += 10
-
-    return score
-  },
-
-  fuzzyPositions(label, q) {
-    const lc = label.toLowerCase()
-    const positions = []
-    let qi = 0
-    for (let i = 0; i < lc.length && qi < q.length; i++) {
-      if (lc[i] === q[qi]) { positions.push(i); qi++ }
-    }
-    return qi === q.length ? positions : null
   },
 
   render() {
@@ -340,7 +162,7 @@ export const CommandPalette = {
       })
       .map(([group, groupItems]) => {
         const buttons = groupItems.map(item => this.renderRow(item, idx++, null)).join("")
-        return `<section class="px-1 py-1"><h3 class="px-2 py-1 text-[10px] uppercase tracking-wider text-base-content/40">${this.escapeHtml(group)}</h3><div>${buttons}</div></section>`
+        return `<section class="px-1 py-1"><h3 class="px-2 py-1 text-xs uppercase tracking-wider text-base-content/40">${escapeHtml(group)}</h3><div>${buttons}</div></section>`
       }).join("")
   },
 
@@ -351,15 +173,15 @@ export const CommandPalette = {
   renderRow(item, idx, matchPositions) {
     const isActive = idx === this.activeIndex
     const labelHtml = matchPositions
-      ? this.highlightLabel(item.label, new Set(matchPositions))
-      : this.escapeHtml(item.label)
+      ? highlightLabel(item.label, new Set(matchPositions))
+      : escapeHtml(item.label)
 
     const hintHtml = item.hint
-      ? `<div class="text-xs text-base-content/45 truncate">${this.escapeHtml(item.hint)}</div>`
+      ? `<div class="text-xs text-base-content/45 truncate">${escapeHtml(item.hint)}</div>`
       : ""
 
     const shortcutHtml = item.shortcut
-      ? item.shortcut.split(" ").map(k => `<kbd class="text-[10px] px-1 py-0.5 rounded border border-base-content/20 text-base-content/50">${this.escapeHtml(k)}</kbd>`).join(" ")
+      ? item.shortcut.split(" ").map(k => `<kbd class="text-xs px-1 py-0.5 rounded border border-base-content/20 text-base-content/50">${escapeHtml(k)}</kbd>`).join(" ")
       : ""
 
     const chevronHtml = item.type === "submenu"
@@ -370,15 +192,7 @@ export const CommandPalette = {
       ? `<div class="flex items-center gap-1 ml-2 shrink-0">${shortcutHtml}${chevronHtml}</div>`
       : ""
 
-    return `<button type="button" data-index="${idx}" role="option" aria-selected="${isActive}" class="w-full text-left rounded-lg px-3 py-2 text-sm flex items-center gap-2 transition-colors ${isActive ? "bg-base-content/8 text-base-content" : "hover:bg-base-content/5 text-base-content/80"}"><span class="${this.escapeHtml(item.icon)} w-4 h-4 shrink-0 text-base-content/50"></span><div class="flex-1 min-w-0"><div class="font-medium truncate">${labelHtml}</div>${hintHtml}</div>${rightHtml}</button>`
-  },
-
-  highlightLabel(label, matchedPositions) {
-    return [...label].map((char, i) =>
-      matchedPositions.has(i)
-        ? `<mark class="bg-transparent text-primary font-semibold">${this.escapeHtml(char)}</mark>`
-        : this.escapeHtml(char)
-    ).join("")
+    return `<button type="button" data-index="${idx}" role="option" aria-selected="${isActive}" class="w-full text-left rounded-lg px-3 py-2 text-sm flex items-center gap-2 transition-colors ${isActive ? "bg-base-content/8 text-base-content" : "hover:bg-base-content/5 text-base-content/80"}"><span class="${escapeHtml(item.icon)} w-4 h-4 shrink-0 text-base-content/50"></span><div class="flex-1 min-w-0"><div class="font-medium truncate">${labelHtml}</div>${hintHtml}</div>${rightHtml}</button>`
   },
 
   updateBreadcrumb() {
@@ -392,18 +206,36 @@ export const CommandPalette = {
     }
   },
 
+  updateActiveClass(prevIndex, nextIndex) {
+    const prevBtn = this.results?.querySelector(`button[data-index="${prevIndex}"]`)
+    const nextBtn = this.results?.querySelector(`button[data-index="${nextIndex}"]`)
+    if (prevBtn) {
+      prevBtn.classList.remove("bg-base-content/8", "text-base-content")
+      prevBtn.classList.add("hover:bg-base-content/5", "text-base-content/80")
+      prevBtn.setAttribute("aria-selected", "false")
+    }
+    if (nextBtn) {
+      nextBtn.classList.remove("hover:bg-base-content/5", "text-base-content/80")
+      nextBtn.classList.add("bg-base-content/8", "text-base-content")
+      nextBtn.setAttribute("aria-selected", "true")
+      nextBtn.scrollIntoView({ block: "nearest" })
+    }
+  },
+
   onInputKeydown(e) {
     const items = this.visibleItems || []
     const len = Math.max(items.length, 1)
 
     if (e.key === "ArrowDown") {
       e.preventDefault()
+      const prevIndex = this.activeIndex
       this.activeIndex = (this.activeIndex + 1) % len
-      this.render()
+      this.updateActiveClass(prevIndex, this.activeIndex)
     } else if (e.key === "ArrowUp") {
       e.preventDefault()
+      const prevIndex = this.activeIndex
       this.activeIndex = (this.activeIndex - 1 + len) % len
-      this.render()
+      this.updateActiveClass(prevIndex, this.activeIndex)
     } else if (e.key === "Enter") {
       e.preventDefault()
       const cmd = items[this.activeIndex]
@@ -475,12 +307,4 @@ export const CommandPalette = {
     localStorage.setItem("command_palette_recent", JSON.stringify(next))
   },
 
-  escapeHtml(value) {
-    return String(value || "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;")
-  }
 }

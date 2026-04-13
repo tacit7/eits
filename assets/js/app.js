@@ -30,8 +30,13 @@ import {FavoriteFab} from "./hooks/favorite_fab"
 import {ScrollToBottom} from "./hooks/scroll_to_bottom"
 import {AutoScroll} from "./hooks/auto_scroll"
 import {MarkdownMessage} from "./hooks/markdown_message"
+// CommandHistory composes SlashCommandPopup internally (see hooks/command_history.js).
+// Phoenix allows only one phx-hook per element, so SlashCommandPopup is NOT registered
+// here — it is imported and called via SlashCommandPopup.mounted.call(this) inside
+// CommandHistory.mounted() to share the same hook context.
 import {CommandHistory} from "./hooks/command_history"
 import {DiffViewer} from "./hooks/diff_viewer"
+import {DiffCollapse} from "./hooks/diff_collapse"
 import {PasskeyAuth} from "./hooks/passkey_auth"
 import {InfiniteScroll} from "./hooks/infinite_scroll"
 import {DmComposer} from "./hooks/dm_composer"
@@ -48,43 +53,31 @@ import {ModalDialog} from "./hooks/modal_dialog"
 import {LiveStreamToggle} from "./hooks/live_stream_toggle"
 import {RefreshDot} from "./hooks/refresh_dot"
 import {Highlight} from "./hooks/highlight"
-import {GlobalKeydown} from "./hooks/global_keydown"
 import {LocalTime} from "./hooks/local_time"
 import {DragUpload} from "./hooks/drag_upload"
 import {SidebarState} from "./hooks/sidebar_state"
 import {DrawerSwipeClose} from "./hooks/drawer_swipe_close"
-import {QuickCreateNote, QuickCreateAgent, QuickCreateChat, QuickCreateTask} from "./hooks/quick_create"
+import {QuickCreateNote, QuickCreateAgent, QuickUpdateAgent, QuickGetAgent, QuickDeleteAgent, QuickResumeAgent, QuickCreateChat, QuickCreateTask} from "./hooks/quick_create"
 import {CommandPalette} from "./hooks/command_palette"
 import {FlashTimeout} from "./hooks/flash_timeout"
 import {ReloadConfirmModal} from "./hooks/reload_confirm_modal"
+import {ChatWindowHook} from "./hooks/chat_window_hook"
+import {TimerCountdown} from "./hooks/timer_countdown"
 import {showToast} from "./hooks/utils"
 import {getHooks} from "live_svelte"
 import "./theme"
 
-// Import Svelte components manually (esbuild doesn't support import.meta.glob)
-import SessionsSidebar from "../svelte/components/SessionsSidebar.svelte"
-import MainWorkArea from "../svelte/components/MainWorkArea.svelte"
-import ContextPanel from "../svelte/components/ContextPanel.svelte"
-import TasksTab from "../svelte/components/tabs/TasksTab.svelte"
-import CommitsTab from "../svelte/components/tabs/CommitsTab.svelte"
-import LogsTab from "../svelte/components/tabs/LogsTab.svelte"
-import NotesTab from "../svelte/components/tabs/NotesTab.svelte"
-import AgentDetail from "../svelte/components/AgentDetail.svelte"
-import AgentMessagesPanel from "../svelte/components/tabs/AgentMessagesPanel.svelte"
-import FABFlower from "../svelte/components/FABFlower.svelte"
+// Auto-discover Svelte components via live_svelte's Vite plugin.
+// The virtual module keys include the path (e.g. "components/tabs/TasksTab"),
+// but Elixir templates reference bare names (e.g. name="TasksTab"), so we
+// strip the directory prefix to produce a flat name -> Component map.
+import _components from "virtual:live-svelte-components"
 
-let Hooks = getHooks({
-  SessionsSidebar,
-  MainWorkArea,
-  ContextPanel,
-  TasksTab,
-  CommitsTab,
-  LogsTab,
-  NotesTab,
-  AgentDetail,
-  AgentMessagesPanel,
-  FABFlower
-})
+const components = Object.fromEntries(
+  Object.entries(_components).map(([key, comp]) => [key.split("/").pop(), comp])
+)
+
+let Hooks = getHooks(components)
 Hooks.CopyToClipboard = CopyToClipboard
 Hooks.CopySessionId = CopySessionId
 Hooks.BookmarkAgent = BookmarkAgent
@@ -94,6 +87,7 @@ Hooks.AutoScroll = AutoScroll
 Hooks.CommandHistory = CommandHistory
 Hooks.MarkdownMessage = MarkdownMessage
 Hooks.DiffViewer = DiffViewer
+Hooks.DiffCollapse = DiffCollapse
 Hooks.PasskeyAuth = PasskeyAuth
 Hooks.PushSetup = PushSetup
 Hooks.InfiniteScroll = InfiniteScroll
@@ -112,18 +106,23 @@ Hooks.ModalDialog = ModalDialog
 Hooks.LiveStreamToggle = LiveStreamToggle
 Hooks.RefreshDot = RefreshDot
 Hooks.Highlight = Highlight
-Hooks.GlobalKeydown = GlobalKeydown
 Hooks.LocalTime = LocalTime
 Hooks.DragUpload = DragUpload
 Hooks.SidebarState = SidebarState
 Hooks.DrawerSwipeClose = DrawerSwipeClose
 Hooks.QuickCreateNote = QuickCreateNote
 Hooks.QuickCreateAgent = QuickCreateAgent
+Hooks.QuickUpdateAgent = QuickUpdateAgent
+Hooks.QuickGetAgent = QuickGetAgent
+Hooks.QuickDeleteAgent = QuickDeleteAgent
+Hooks.QuickResumeAgent = QuickResumeAgent
 Hooks.QuickCreateChat = QuickCreateChat
 Hooks.QuickCreateTask = QuickCreateTask
 Hooks.CommandPalette = CommandPalette
 Hooks.FlashTimeout = FlashTimeout
 Hooks.ReloadConfirmModal = ReloadConfirmModal
+Hooks.ChatWindowHook = ChatWindowHook
+Hooks.TimerCountdown = TimerCountdown
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
@@ -167,14 +166,16 @@ window.addEventListener("click", (e) => {
   }
 })
 
-// connect if there are any LiveViews on the page
-liveSocket.connect()
-
-// expose liveSocket on window for web console debug logs and latency simulation:
-// >> liveSocket.enableDebug()
-// >> liveSocket.enableLatencySim(1000)  // enabled for duration of browser session
-// >> liveSocket.disableLatencySim()
-window.liveSocket = liveSocket
+// connect if there are any LiveViews on the page.
+// Guard against double-execution: Vite exports a __vite_preload helper from this entry
+// chunk, so any dynamic import (codemirror, highlight.js, etc.) triggers the browser to
+// load this module a second time under a different URL (without the ?vsn=d cache-buster).
+// Since ES modules are keyed by URL, these are treated as distinct module instances.
+// The guard ensures the second evaluation is a no-op — the first LiveSocket wins.
+if (!window.liveSocket) {
+  liveSocket.connect()
+  window.liveSocket = liveSocket
+}
 
 // The lines below enable quality of life phoenix_live_reload
 // development features:
@@ -182,7 +183,7 @@ window.liveSocket = liveSocket
 //     1. stream server logs to the browser console
 //     2. click on elements to jump to their definitions in your code editor
 //
-if (process.env.NODE_ENV === "development") {
+if (import.meta.env.DEV) {
   window.addEventListener("phx:live_reload:attached", ({detail: reloader}) => {
     // Enable server log streaming to client.
     // Disable with reloader.disableServerLogs()

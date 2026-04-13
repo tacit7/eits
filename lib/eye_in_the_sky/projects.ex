@@ -8,9 +8,8 @@ defmodule EyeInTheSky.Projects do
   require Logger
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Projects.Project
-  alias EyeInTheSky.QueryBuilder
+  alias EyeInTheSky.Repo
 
   @doc """
   Returns the list of projects.
@@ -22,6 +21,21 @@ defmodule EyeInTheSky.Projects do
   end
 
   @doc """
+  Returns active projects ordered for sidebar display:
+  bookmarked first, then case-insensitive name, then id for stability.
+  """
+  def list_projects_for_sidebar do
+    Project
+    |> where([p], p.active == true)
+    |> order_by([p], [
+      asc: not p.bookmarked,
+      asc: fragment("lower(?)", p.name),
+      asc: p.id
+    ])
+    |> Repo.all()
+  end
+
+  @doc """
   Gets a single project.
 
   Raises `Ecto.NoResultsError` if the Project does not exist.
@@ -29,22 +43,40 @@ defmodule EyeInTheSky.Projects do
   def get_project!(id), do: get!(id)
 
   @doc """
-  Gets a single project by id. Returns nil if not found.
+  Gets a single project by id. Returns {:ok, project} | {:error, :not_found}.
   """
-  def get_project(id), do: Repo.get(Project, id)
-
-  @doc """
-  Gets a single project by name.
-  """
-  def get_project_by_name(name) do
-    Repo.get_by(Project, name: name)
+  def get_project(id) do
+    case Repo.get(Project, id) do
+      nil -> {:error, :not_found}
+      project -> {:ok, project}
+    end
   end
 
   @doc """
-  Gets a single project by path.
+  Gets a project with agents preloaded. Raises if not found.
+  """
+  def get_project_with_agents!(id) do
+    get_project!(id) |> Repo.preload([:agents])
+  end
+
+  @doc """
+  Gets a single project by name. Returns {:ok, project} | {:error, :not_found}.
+  """
+  def get_project_by_name(name) do
+    case Repo.get_by(Project, name: name) do
+      nil -> {:error, :not_found}
+      project -> {:ok, project}
+    end
+  end
+
+  @doc """
+  Gets a single project by path. Returns {:ok, project} | {:error, :not_found}.
   """
   def get_project_by_path(path) do
-    Repo.get_by(Project, path: path)
+    case Repo.get_by(Project, path: path) do
+      nil -> {:error, :not_found}
+      project -> {:ok, project}
+    end
   end
 
   @doc """
@@ -63,6 +95,21 @@ defmodule EyeInTheSky.Projects do
   def delete_project(%Project{} = project), do: delete(project)
 
   @doc """
+  Sets the bookmarked state of a project. Returns {:ok, project} or {:error, :not_found}.
+  """
+  def set_bookmarked(project_id, bookmarked) when is_boolean(bookmarked) do
+    case get_project(project_id) do
+      {:error, :not_found} ->
+        {:error, :not_found}
+
+      {:ok, project} ->
+        project
+        |> Project.changeset(%{bookmarked: bookmarked})
+        |> Repo.update()
+    end
+  end
+
+  @doc """
   Resolves a project from request params.
 
   Looks up by `"project_id"`, `"project_path"` (creating if not found), or `"project_name"` —
@@ -78,8 +125,8 @@ defmodule EyeInTheSky.Projects do
     cond do
       project_id != nil ->
         case get_project(project_id) do
-          nil -> {:error, "project_not_found", "project_id #{project_id} does not exist"}
-          project -> {:ok, project.id, project.name}
+          {:error, :not_found} -> {:error, "project_not_found", "project_id #{project_id} does not exist"}
+          {:ok, project} -> {:ok, project.id, project.name}
         end
 
       project_path not in [nil, ""] ->
@@ -87,8 +134,8 @@ defmodule EyeInTheSky.Projects do
 
       project_name not in [nil, ""] ->
         case get_project_by_name(project_name) do
-          nil -> {:ok, nil, nil}
-          project -> {:ok, project.id, project.name}
+          {:error, :not_found} -> {:ok, nil, nil}
+          {:ok, project} -> {:ok, project.id, project.name}
         end
 
       true ->
@@ -98,72 +145,32 @@ defmodule EyeInTheSky.Projects do
 
   defp resolve_project_by_path(path) do
     case get_project_by_path(path) do
-      nil ->
-        name = Path.basename(path)
+      {:error, :not_found} -> create_or_retry_project(path)
+      {:ok, project} -> {:ok, project.id, project.name}
+    end
+  end
 
-        case create_project(%{name: name, path: path, active: true}) do
-          {:ok, project} ->
-            Logger.info("resolve_project: created project id=#{project.id} for path=#{path}")
-            {:ok, project.id, project.name}
+  defp create_or_retry_project(path) do
+    name = Path.basename(path)
 
-          {:error, _changeset} ->
-            # Race condition: try lookup again
-            case get_project_by_path(path) do
-              nil ->
-                {:error, "project_creation_failed",
-                 "failed to create project for path: #{path}"}
-
-              project ->
-                {:ok, project.id, project.name}
-            end
-        end
-
-      project ->
+    case create_project(%{name: name, path: path, active: true}) do
+      {:ok, project} ->
+        Logger.info("resolve_project: created project id=#{project.id} for path=#{path}")
         {:ok, project.id, project.name}
+
+      {:error, _changeset} ->
+        # Race condition: try lookup again
+        case get_project_by_path(path) do
+          {:error, :not_found} -> {:error, "project_creation_failed", "failed to create project for path: #{path}"}
+          {:ok, project} -> {:ok, project.id, project.name}
+        end
     end
   end
 
-  defp parse_project_id(nil), do: nil
-  defp parse_project_id(id) when is_integer(id), do: id
+  defdelegate parse_project_id(id), to: EyeInTheSky.Utils.ToolHelpers, as: :parse_int
 
-  defp parse_project_id(id) when is_binary(id) do
-    case Integer.parse(id) do
-      {n, ""} -> n
-      _ -> nil
-    end
-  end
-
-  @doc """
-  Gets tasks for a project.
-  """
-  def get_project_tasks(project_id, opts \\ []) when is_integer(project_id) do
-    sort_by = Keyword.get(opts, :sort_by, "created_desc")
-
-    order =
-      case sort_by do
-        "created_asc" -> [asc: :created_at]
-        "priority" -> [desc: :priority, asc: :position]
-        _ -> [asc: :position, desc: :created_at]
-      end
-
-    base_project_tasks_query(project_id, opts)
-    |> order_by(^order)
-    |> QueryBuilder.maybe_limit(opts)
-    |> QueryBuilder.maybe_offset(opts)
-    |> preload([:state, :tags, :sessions, :checklist_items])
-    |> Repo.all()
-  end
-
-  def count_project_tasks(project_id, opts \\ []) when is_integer(project_id) do
-    base_project_tasks_query(project_id, opts)
-    |> EyeInTheSky.Repo.aggregate(:count, :id)
-  end
-
-  defp base_project_tasks_query(project_id, opts) do
-    include_archived = Keyword.get(opts, :include_archived, false)
-
-    query = from(t in EyeInTheSky.Tasks.Task, where: t.project_id == ^project_id)
-    query = if include_archived, do: query, else: where(query, [t], t.archived == false)
-    QueryBuilder.maybe_where(query, opts, :state_id)
+  @doc "Preloads associations onto a project struct."
+  def preload_project(%Project{} = project, assocs) do
+    Repo.preload(project, assocs)
   end
 end

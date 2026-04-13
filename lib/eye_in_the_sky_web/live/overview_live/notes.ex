@@ -2,11 +2,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Notes
-  alias EyeInTheSky.Notes.Note
-  alias EyeInTheSky.Repo
-  import Ecto.Query
   import EyeInTheSkyWeb.Components.NotesList
   import EyeInTheSkyWeb.Live.Shared.NotesHelpers
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -21,6 +19,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
       |> assign(:sidebar_tab, :notes)
       |> assign(:sidebar_project, nil)
       |> assign(:show_quick_note_modal, false)
+      |> assign(:type_filter, "all")
       |> load_notes()
 
     {:ok, socket}
@@ -33,6 +32,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
   @impl true
   def handle_event("sort_notes", params, socket),
     do: handle_sort_notes(params, socket, &load_notes/1)
+
+  @impl true
+  def handle_event("filter_type", params, socket),
+    do: handle_filter_type(params, socket, &load_notes/1)
 
   @impl true
   def handle_event("toggle_starred_filter", params, socket),
@@ -48,24 +51,33 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
 
   @impl true
   def handle_event("edit_note", %{"note_id" => note_id}, socket) do
-    {:noreply, assign(socket, :editing_note_id, String.to_integer(note_id))}
+    case parse_int(note_id) do
+      nil -> {:noreply, socket}
+      id -> {:noreply, assign(socket, :editing_note_id, id)}
+    end
   end
 
   @impl true
   def handle_event("note_saved", %{"note_id" => note_id, "body" => body}, socket) do
-    note = Notes.get_note!(String.to_integer(note_id))
-
-    case Notes.update_note(note, %{body: body}) do
-      {:ok, _note} ->
-        socket =
-          socket
-          |> assign(:editing_note_id, nil)
-          |> load_notes()
-
+    case parse_int(note_id) do
+      nil ->
         {:noreply, socket}
 
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to save note.")}
+      id ->
+        note = Notes.get_note!(id)
+
+        case Notes.update_note(note, %{body: body}) do
+          {:ok, _note} ->
+            socket =
+              socket
+              |> assign(:editing_note_id, nil)
+              |> load_notes()
+
+            {:noreply, socket}
+
+          {:error, _changeset} ->
+            {:noreply, put_flash(socket, :error, "Failed to save note.")}
+        end
     end
   end
 
@@ -86,7 +98,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
 
   @impl true
   def handle_event("create_quick_note", params, socket) do
-    starred = if params["starred"] == "1", do: 1, else: 0
+    starred = params["starred"] == "1"
 
     case Notes.create_note(%{
            parent_type: "system",
@@ -105,22 +117,17 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
 
   defp load_notes(socket) do
     query = socket.assigns.search_query
-    starred_only = socket.assigns.starred_filter
-    sort_by = socket.assigns.notes_sort_by
-    order = if sort_by == "oldest", do: [asc: :created_at], else: [desc: :created_at]
 
     notes =
       if query != "" and String.trim(query) != "" do
-        Notes.search_notes(query, [], starred: starred_only)
+        Notes.search_notes(query, [], starred: socket.assigns.starred_filter)
       else
-        base =
-          from(n in Note,
-            order_by: ^order,
-            limit: 200
-          )
-
-        base = if starred_only, do: from(n in base, where: n.starred == 1), else: base
-        Repo.all(base)
+        Notes.list_notes_filtered(
+          starred: socket.assigns.starred_filter,
+          sort: socket.assigns.notes_sort_by,
+          type_filter: socket.assigns.type_filter,
+          limit: 200
+        )
       end
 
     assign(socket, :notes, notes)
@@ -142,13 +149,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
             <button
               type="button"
               phx-click="open_quick_note_modal"
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-base-200/60 hover:bg-base-200 text-base-content/70 hover:text-base-content transition-colors"
+              class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-lg text-xs font-medium bg-base-200/60 hover:bg-base-200 text-base-content/70 hover:text-base-content transition-colors"
             >
               <.icon name="hero-bolt" class="w-3.5 h-3.5" /> Quick Note
             </button>
             <.link
               navigate={~p"/notes/new"}
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-content hover:bg-primary/80 transition-colors"
+              class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-lg text-xs font-medium bg-primary text-primary-content hover:bg-primary/80 transition-colors"
             >
               <.icon name="hero-plus" class="w-3.5 h-3.5" /> New Note
             </.link>
@@ -160,6 +167,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
           starred_filter={@starred_filter}
           search_query={@search_query}
           sort_by={@notes_sort_by}
+          type_filter={@type_filter}
           empty_id="overview-notes-empty"
           editing_note_id={@editing_note_id}
           current_path="/notes"
@@ -180,7 +188,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
           <button
             type="button"
             phx-click="close_quick_note_modal"
-            class="btn btn-ghost btn-xs btn-square"
+            class="btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px]"
             aria-label="Close"
           >
             <.icon name="hero-x-mark" class="w-4 h-4" />
@@ -195,7 +203,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
               id="qn-title"
               required
               placeholder="Title..."
-              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base min-h-[44px]"
               autocomplete="off"
               autofocus
             />
@@ -207,7 +215,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
               id="qn-body"
               rows="4"
               placeholder="Note content..."
-              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 resize-none"
+              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 resize-none text-base"
             ></textarea>
           </div>
           <label class="flex items-center gap-2 cursor-pointer select-none">

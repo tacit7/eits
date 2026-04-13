@@ -1,7 +1,12 @@
 defmodule EyeInTheSky.Workers.MixTaskWorker do
+  @moduledoc false
   use Oban.Worker, queue: :jobs, max_attempts: 3
 
+  require Logger
+
   alias EyeInTheSky.ScheduledJobs
+
+  @allowed_tasks ~w(test format deps.get assets.deploy ecto.migrate ecto.rollback help)
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"job_id" => job_id}}) do
@@ -24,10 +29,23 @@ defmodule EyeInTheSky.Workers.MixTaskWorker do
   defp execute(job) do
     config = ScheduledJobs.decode_config(job)
     task = config["task"] || "help"
-    args = config["args"] || []
-    project_path = blank_to_nil(config["project_path"]) || File.cwd!()
 
-    try do
+    raw_args = config["args"] || []
+
+    args =
+      if is_list(raw_args) do
+        raw_args
+      else
+        Logger.warning(
+          "[MixTaskWorker] config[\"args\"] is not a list (got #{inspect(raw_args)}), coercing to []"
+        )
+
+        []
+      end
+
+    if is_binary(task) && task in @allowed_tasks do
+      project_path = blank_to_nil(config["project_path"]) || File.cwd!()
+
       {output, exit_code} =
         System.cmd("mix", [task | args], cd: project_path, stderr_to_stdout: true)
 
@@ -36,8 +54,8 @@ defmodule EyeInTheSky.Workers.MixTaskWorker do
       else
         {:error, "Exit code #{exit_code}: #{String.trim(output)}"}
       end
-    rescue
-      e -> {:error, "Mix task failed: #{inspect(e)}"}
+    else
+      {:error, "Disallowed mix task: #{inspect(task)}"}
     end
   end
 

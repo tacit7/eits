@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
+  @moduledoc false
   use Phoenix.Component
 
   import EyeInTheSkyWeb.CoreComponents
@@ -24,7 +25,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
               id="project-sessions-search"
               value={@search_query}
               phx-debounce="300"
-              class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
+              class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-base min-h-[44px]"
               placeholder="Search..."
             />
           </div>
@@ -80,7 +81,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
           phx-click="open_filter_sheet"
           aria-label="Open filters"
           aria-haspopup="dialog"
-          class="sm:hidden relative btn btn-ghost btn-sm btn-square"
+          class="sm:hidden relative btn btn-ghost btn-sm btn-square min-h-[44px] min-w-[44px]"
         >
           <.icon name="hero-funnel-mini" class="w-4 h-4" />
           <%= if @session_filter != "all" || @sort_by != "last_message" do %>
@@ -122,7 +123,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
           <h2 class="text-sm font-semibold">Filter &amp; Sort</h2>
           <button
             phx-click="close_filter_sheet"
-            class="btn btn-ghost btn-xs btn-square"
+            class="btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px]"
             aria-label="Close filter panel"
           >
             <.icon name="hero-x-mark-mini" class="w-4 h-4" />

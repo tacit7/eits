@@ -305,6 +305,141 @@ defmodule EyeInTheSky.Claude.SessionReaderTest do
     end
   end
 
+  describe "discover_all_sessions/0 escaped_path regression" do
+    test "escaped_path preserves exact directory name for hyphenated paths" do
+      # Simulate a project with hyphens: /tmp/my-cool-app
+      # Escaped dir name: -tmp-my-cool-app
+      home = System.get_env("HOME")
+      escaped_name = "-tmp-my-cool-app"
+      project_dir = Path.join([home, ".claude", "projects", escaped_name])
+      session_id = "test-escaped-#{System.unique_integer([:positive])}"
+      file_path = Path.join(project_dir, "#{session_id}.jsonl")
+
+      File.mkdir_p!(project_dir)
+      File.write!(file_path, ~s|{"type":"user","message":{"content":"hi"}}\n|)
+
+      sessions = SessionReader.discover_all_sessions()
+      session = Enum.find(sessions, fn s -> s.session_id == session_id end)
+
+      assert session != nil
+      # escaped_path must be the raw directory name — no transformation
+      assert session.escaped_path == escaped_name
+
+      # project_path is lossy: it turns ALL hyphens into slashes,
+      # so /tmp/my-cool-app becomes /tmp/my/cool/app (wrong but documented)
+      assert session.project_path == "/tmp/my/cool/app"
+
+      # Cleanup
+      File.rm!(file_path)
+      File.rmdir(project_dir)
+    end
+  end
+
+  describe "read_usage/2" do
+    defp write_usage_session(session_id, project_path, lines) do
+      home = System.get_env("HOME")
+      escaped = SessionReader.escape_project_path(project_path)
+      dir = Path.join([home, ".claude", "projects", escaped])
+      file_path = Path.join(dir, "#{session_id}.jsonl")
+      File.mkdir_p!(dir)
+      File.write!(file_path, Enum.join(lines, "\n") <> "\n")
+      file_path
+    end
+
+    test "happy path: sums tokens from assistant entry and cost from result entry" do
+      session_id = "test-usage-happy-#{System.unique_integer([:positive])}"
+      project_path = "/tmp/test-usage-project"
+
+      file_path =
+        write_usage_session(session_id, project_path, [
+          Jason.encode!(%{
+            "type" => "assistant",
+            "message" => %{
+              "role" => "assistant",
+              "content" => [%{"type" => "text", "text" => "hello"}],
+              "usage" => %{"input_tokens" => 10, "output_tokens" => 5}
+            }
+          }),
+          Jason.encode!(%{
+            "type" => "result",
+            "total_cost_usd" => 0.002
+          })
+        ])
+
+      assert {:ok, 15, 0.002} = SessionReader.read_usage(session_id, project_path)
+
+      File.rm!(file_path)
+    end
+
+    test "irrelevant lines only: returns zero tokens and zero cost" do
+      session_id = "test-usage-irrelevant-#{System.unique_integer([:positive])}"
+      project_path = "/tmp/test-usage-project"
+
+      file_path =
+        write_usage_session(session_id, project_path, [
+          Jason.encode!(%{
+            "type" => "user",
+            "message" => %{"role" => "user", "content" => "hi"}
+          }),
+          Jason.encode!(%{
+            "type" => "assistant",
+            "message" => %{
+              "role" => "assistant",
+              "content" => [%{"type" => "tool_use", "id" => "t1", "name" => "Read", "input" => %{}}]
+            }
+          }),
+          "this is garbage"
+        ])
+
+      assert {:ok, 0, 0.0} = SessionReader.read_usage(session_id, project_path)
+
+      File.rm!(file_path)
+    end
+
+    test "mixed: only valid assistant/result lines are summed" do
+      session_id = "test-usage-mixed-#{System.unique_integer([:positive])}"
+      project_path = "/tmp/test-usage-project"
+
+      file_path =
+        write_usage_session(session_id, project_path, [
+          Jason.encode!(%{
+            "type" => "user",
+            "message" => %{"role" => "user", "content" => "go"}
+          }),
+          Jason.encode!(%{
+            "type" => "assistant",
+            "message" => %{
+              "role" => "assistant",
+              "content" => [%{"type" => "text", "text" => "step 1"}],
+              "usage" => %{"input_tokens" => 20, "output_tokens" => 8}
+            }
+          }),
+          Jason.encode!(%{
+            "type" => "assistant",
+            "message" => %{
+              "role" => "assistant",
+              "content" => [%{"type" => "text", "text" => "step 2"}],
+              "usage" => %{"input_tokens" => 5, "output_tokens" => 3}
+            }
+          }),
+          Jason.encode!(%{
+            "type" => "result",
+            "total_cost_usd" => 0.001
+          }),
+          Jason.encode!(%{
+            "type" => "result",
+            "total_cost_usd" => 0.003
+          }),
+          "bad json line"
+        ])
+
+      assert {:ok, 36, cost} = SessionReader.read_usage(session_id, project_path)
+      assert_in_delta cost, 0.004, 1.0e-9
+
+      File.rm!(file_path)
+    end
+  end
+
   describe "find_session_file/2" do
     test "returns {:ok, path} when file exists" do
       session_id = "test-find-#{System.unique_integer([:positive])}"

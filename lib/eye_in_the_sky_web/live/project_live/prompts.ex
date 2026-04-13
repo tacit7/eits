@@ -1,24 +1,19 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
   use EyeInTheSkyWeb, :live_view
 
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Prompts
-  alias EyeInTheSky.Repo
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    # Parse project ID safely
-    project_id =
-      case Integer.parse(id) do
-        {int, ""} -> int
-        _ -> nil
-      end
+    project_id = parse_int(id)
 
     socket =
       if project_id do
         project =
-          Projects.get_project!(project_id)
-          |> Repo.preload([:agents])
+          Projects.get_project_with_agents!(project_id)
 
         socket
         |> assign(:page_title, "Prompts - #{project.name}")
@@ -81,13 +76,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
               name="query"
               value={@search_query}
               placeholder="Search prompts by name, description, or content..."
-              class="input input-bordered w-full"
+              class="input input-bordered w-full text-base"
               autocomplete="off"
             />
           </form>
         </div>
 
-        <%= if length(@prompts) > 0 do %>
+        <%= if @prompts != [] do %>
           <!-- Prompts List -->
           <div class="space-y-4">
             <%= for prompt <- @prompts do %>

@@ -33,56 +33,21 @@ defmodule EyeInTheSkyWeb.Api.V1.PromptController do
   Query params: project_id (for slug scope), include_text (default true)
   """
   def show(conn, %{"id" => id} = params) do
-    include_text = params["include_text"] != "false"
+    include_text = params["include_text"] not in ["false", false]
 
-    result =
-      cond do
-        # If it looks like a UUID or integer, try by ID first
-        Regex.match?(~r/^\d+$/, id) ->
-          try do
-            {:ok, Prompts.get_prompt!(id)}
-          rescue
-            Ecto.NoResultsError -> {:error, :not_found}
-          end
-
-        Regex.match?(~r/^[0-9a-f-]{36}$/, id) ->
-          try do
-            {:ok, Prompts.get_prompt!(id)}
-          rescue
-            Ecto.NoResultsError -> {:error, :not_found}
-          end
-
-        # Otherwise treat as slug
-        true ->
-          prompt =
-            if params["project_id"] do
-              Prompts.get_prompt_by_slug(id, params["project_id"]) ||
-                Prompts.get_prompt_by_slug(id, nil)
-            else
-              Prompts.get_prompt_by_slug(id, nil)
-            end
-
-          if prompt, do: {:ok, prompt}, else: {:error, :not_found}
-      end
-
-    case result do
-      {:ok, prompt} ->
-        base = %{
-          success: true,
-          prompt: ApiPresenter.present_prompt(prompt)
-        }
-
-        response =
-          if include_text do
-            put_in(base, [:prompt, :prompt_text], prompt.prompt_text)
-          else
-            base
-          end
-
-        json(conn, response)
-
+    case Prompts.get_prompt_by_ref(id, params["project_id"]) do
       {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "Prompt not found"})
+
+      {:ok, prompt} ->
+        base = %{success: true, prompt: ApiPresenter.present_prompt(prompt)}
+
+        response =
+          if include_text,
+            do: put_in(base, [:prompt, :prompt_text], prompt.prompt_text),
+            else: base
+
+        json(conn, response)
     end
   end
 

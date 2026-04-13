@@ -3,8 +3,8 @@ defmodule EyeInTheSky.PushSubscriptions do
   Manages Web Push subscriptions and sends push notifications.
   """
 
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.PushSubscriptions.PushSubscription
+  alias EyeInTheSky.Repo
   require Logger
 
   def upsert(endpoint, auth, p256dh) do

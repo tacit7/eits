@@ -317,6 +317,131 @@ end
 
 ---
 
+## Message Queue Bug Fixes
+
+**Commits:** `1a09115`, `9e8d312`
+
+Three bugs in the DM message queue admission flow were identified and fixed:
+
+### 1. Orphaned Message Cleanup on Rejection
+
+When queue admission fails (queue full or worker error), the DB message record created before admission was left behind as a pending message with no response. The fix deletes the orphaned DB message on any rejection path, so the UI never shows a phantom "sent" message.
+
+**File:** `lib/eye_in_the_sky_web/live/dm_live/message_handlers.ex`
+
+### 2. Message List Reload After Rejection
+
+After deleting the orphaned message on rejection, the LiveView assigns were not refreshed. The message list is now reloaded on rejection paths so the deleted message disappears from the UI immediately.
+
+**File:** `lib/eye_in_the_sky_web/live/dm_live/message_handlers.ex`
+
+### 3. Deterministic Deduplication at Dequeue Time
+
+`process_next_job` in AgentManager re-evaluates `has_messages` at dequeue time rather than trusting the value captured at enqueue time. This prevents queued jobs from starting a fresh provider session when messages have arrived in the interim, ensuring the correct provider session is resumed.
+
+**File:** `lib/eye_in_the_sky/agents/agent_manager.ex`
+
+### Worker Death Guard
+
+`send_message` now guards the `GenServer.call` against worker death between lookup and call. Instead of raising an exit that could crash the LiveView process, it returns `{:error, :worker_not_found}`.
+
+**File:** `lib/eye_in_the_sky/claude/agent_worker.ex`
+
+### Regression Tests
+
+Dedicated tests cover the fixed paths (commit `9e8d312`):
+- `process_next_job` re-evaluates `has_messages` at dequeue time
+- `send_message` returns error (not crash) when worker dies between lookup and `GenServer.call`
+
+**Test file:** `test/eye_in_the_sky/claude/agent_worker_test.exs`
+
+---
+
+## Multimodal Content Blocks
+
+**Commits:** `baa1bf9`, `9391dd8`, `b90e4c4`, `85edb0e`, `0bac1bf`
+
+### ContentBlock Foundation
+
+The `EyeInTheSky.Claude.ContentBlock` module provides structured types for multimodal messages:
+
+| Struct | Fields | Constructor |
+|--------|--------|-------------|
+| `ContentBlock.Text` | `text` | `new_text/1` |
+| `ContentBlock.Image` | `data`, `mime_type` | `new_image/2` |
+| `ContentBlock.Document` | `source` | `new_document/2` |
+
+Type guards (`text?/1`, `image?/1`, `document?/1`) allow pipeline stages to dispatch on block type.
+
+**File:** `lib/eye_in_the_sky/claude/content_block.ex`
+
+### Provider-Aware Pipeline
+
+Each provider strategy implements `format_content/1` to convert `ContentBlock` structs into its wire format:
+
+- **Claude (Anthropic):** Formats blocks into the Anthropic messages API content array format
+- **Codex (OpenAI):** Formats blocks into the OpenAI chat completions content array format
+
+Content blocks flow through the pipeline as:
+1. `RuntimeContext` carries `content_blocks` from the upload consumer
+2. `AgentWorker` passes blocks into `Job.new/3`
+3. Provider strategy formats blocks via `format_content/1` into SDK opts
+
+**Files:**
+- `lib/eye_in_the_sky/claude/provider_strategy.ex` (behavior callbacks)
+- `lib/eye_in_the_sky/claude/provider_strategy/claude.ex` (Anthropic wire format)
+- `lib/eye_in_the_sky/claude/provider_strategy/codex.ex` (OpenAI wire format)
+- `lib/eye_in_the_sky/agents/runtime_context.ex`
+- `lib/eye_in_the_sky/claude/job.ex`
+
+### CLI Stdin Input Mode
+
+When `content_blocks` are present in opts, the CLI module adds `--input-format stream-json` to `build_args`. The `content_blocks_json/1` function serializes blocks into a JSON user message that is piped to Claude CLI stdin. This is the delivery mechanism for multimodal content to the Claude process.
+
+**File:** `lib/eye_in_the_sky/claude/cli.ex`
+
+### Image Preprocessing
+
+`EyeInTheSky.Media.ImageProcessor` preprocesses uploaded images before they enter the content block pipeline. Uses ImageMagick (`convert`) when available; passes through as-is otherwise.
+
+**Limits:**
+| Parameter | Value |
+|-----------|-------|
+| Hard limit per image | 6 MB |
+| API target after processing | 5 MB |
+| Max dimension (multi-image) | 1200 px |
+| Max dimension (single image) | 2000 px |
+| Quality stepping | 85 → 75 → 65 → 55 → 45 → 35 |
+
+**Processing steps:**
+1. Decode base64 image data
+2. Auto-orient using EXIF data (normalize rotation)
+3. Strip all EXIF metadata
+4. Resize to max dimension if over limit
+5. Step down JPEG quality until under 5 MB target
+6. Re-encode to base64 and return updated `ContentBlock.Image`
+
+PNG images with transparency are not converted to JPEG. If ImageMagick is unavailable or base64 data is invalid, the block passes through unchanged.
+
+**File:** `lib/eye_in_the_sky/media/image_processor.ex`
+
+### Test Coverage
+
+- `ContentBlock` struct construction and type guards
+- `Job` content block propagation
+- Provider `format_content/1` for both Claude and Codex wire formats
+- CLI `build_args` with `--input-format stream-json` flag
+- `ImageProcessor` resize and compression behavior
+
+**Test files:**
+- `test/eye_in_the_sky/claude/content_block_test.exs`
+- `test/eye_in_the_sky/claude/job_test.exs`
+- `test/eye_in_the_sky/claude/provider_strategy_test.exs`
+- `test/eye_in_the_sky/claude/cli_build_args_test.exs`
+- `test/eye_in_the_sky/media/image_processor_test.exs`
+
+---
+
 ## Performance Considerations
 
 **Streaming:**

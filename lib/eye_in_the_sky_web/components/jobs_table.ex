@@ -14,17 +14,17 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
 
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
-  import EyeInTheSkyWeb.Live.Shared.JobsHelpers,
+  import EyeInTheSkyWeb.Live.Shared.JobsFormatters,
     only: [
       job_row_state: 3,
       row_border_class: 1,
       format_schedule: 1,
-      format_time: 1,
       type_label: 1,
       status_badge_class: 1
     ]
 
-  import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [format_relative_time: 1]
+  import EyeInTheSkyWeb.Helpers.ViewHelpers,
+    only: [format_relative_time: 1, format_datetime_short_time: 1]
 
   attr :jobs, :list, required: true
   attr :expanded_job_id, :any, required: true
@@ -36,7 +36,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
 
   def jobs_table(assigns) do
     ~H"""
-    <%= if length(@jobs) > 0 do %>
+    <%= if @jobs != [] do %>
       <div class="md:hidden space-y-3">
         <%= for job <- @jobs do %>
           <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
@@ -74,7 +74,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                     else: ""}
                 </span>
                 <button
-                  class="btn btn-ghost btn-xs text-error shrink-0"
+                  class="btn btn-ghost btn-sm min-h-[44px] text-error shrink-0"
                   phx-click="run_now"
                   phx-value-id={job.id}
                   title="Retry"
@@ -88,19 +88,19 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
               <span class="text-xs text-base-content/60">Enabled</span>
               <span class={[
                 "badge badge-xs",
-                if(job.enabled == 1, do: "badge-success", else: "badge-ghost")
+                if(job.enabled, do: "badge-success", else: "badge-ghost")
               ]}>
-                {if job.enabled == 1, do: "Yes", else: "No"}
+                {if job.enabled, do: "Yes", else: "No"}
               </span>
             </div>
 
             <div class="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
               <span class="text-base-content/50">Last Run</span>
-              <span class="text-right" title={format_time(job.last_run_at)}>
+              <span class="text-right" title={format_datetime_short_time(job.last_run_at)}>
                 {format_relative_time(job.last_run_at)}
               </span>
               <span class="text-base-content/50">Next Run</span>
-              <span class="text-right" title={format_time(job.next_run_at)}>
+              <span class="text-right" title={format_datetime_short_time(job.next_run_at)}>
                 {format_relative_time(job.next_run_at)}
               </span>
               <span class="text-base-content/50">Runs</span>
@@ -108,15 +108,17 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
             </div>
 
             <div class="mt-3 flex items-center justify-end gap-1 border-t border-base-content/10 pt-2">
-              <input
-                type="checkbox"
-                class="toggle toggle-xs toggle-primary"
-                checked={job.enabled == 1}
-                phx-click="toggle_job"
-                phx-value-id={job.id}
-              />
+              <label class="flex items-center justify-center min-h-[44px] min-w-[44px] cursor-pointer">
+                <input
+                  type="checkbox"
+                  class="toggle toggle-xs toggle-primary"
+                  checked={job.enabled}
+                  phx-click="toggle_job"
+                  phx-value-id={job.id}
+                />
+              </label>
               <button
-                class="btn btn-ghost btn-xs"
+                class="btn btn-ghost btn-sm min-h-[44px]"
                 phx-click="run_now"
                 phx-value-id={job.id}
                 title="Run Now"
@@ -124,7 +126,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 <.icon name="hero-play" class="w-3 h-3" />
               </button>
               <button
-                class="btn btn-ghost btn-xs"
+                class="btn btn-ghost btn-sm min-h-[44px]"
                 phx-click="edit_job"
                 phx-value-id={job.id}
                 title="Edit"
@@ -132,7 +134,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 <.icon name="hero-pencil-square" class="w-3 h-3" />
               </button>
               <button
-                class="btn btn-ghost btn-xs text-error"
+                class="btn btn-ghost btn-sm min-h-[44px] text-error"
                 phx-click="delete_job"
                 phx-value-id={job.id}
                 data-confirm="Delete this job?"
@@ -145,7 +147,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
             <%= if @expanded_job_id == job.id do %>
               <div class="mt-3 rounded-lg bg-base-200/50 p-2">
                 <p class="text-xs font-medium mb-2">Recent Runs</p>
-                <%= if length(@runs) > 0 do %>
+                <%= if @runs != [] do %>
                   <div class="space-y-1.5">
                     <%= for run <- @runs do %>
                       <div class="rounded-md bg-base-100/70 p-2 text-xs">
@@ -154,7 +156,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                             {run.status}
                           </span>
                           <span class="text-base-content/60 truncate">
-                            {format_time(run.started_at)}
+                            {format_datetime_short_time(run.started_at)}
                           </span>
                         </div>
                         <p class="mt-1 text-base-content/60 truncate">{run.result || "-"}</p>
@@ -218,7 +220,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                           else: ""}
                       </span>
                       <button
-                        class="btn btn-ghost btn-xs text-error"
+                        class="btn btn-ghost btn-sm min-h-[44px] text-error"
                         phx-click="run_now"
                         phx-value-id={job.id}
                         title="Retry"
@@ -244,28 +246,28 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 </td>
                 <td class="text-xs">
                   <span class="font-mono">{format_schedule(job)}</span>
-                  <span class="text-base-content/40 ml-1 text-[10px]">{job.timezone || "UTC"}</span>
+                  <span class="text-base-content/40 ml-1 text-xs">{job.timezone || "UTC"}</span>
                 </td>
                 <td>
                   <input
                     type="checkbox"
                     class="toggle toggle-sm toggle-primary"
-                    checked={job.enabled == 1}
+                    checked={job.enabled}
                     phx-click="toggle_job"
                     phx-value-id={job.id}
                   />
                 </td>
-                <td class="text-xs" title={format_time(job.last_run_at)}>
+                <td class="text-xs" title={format_datetime_short_time(job.last_run_at)}>
                   {format_relative_time(job.last_run_at)}
                 </td>
-                <td class="text-xs" title={format_time(job.next_run_at)}>
+                <td class="text-xs" title={format_datetime_short_time(job.next_run_at)}>
                   {format_relative_time(job.next_run_at)}
                 </td>
                 <td class="text-xs">{job.run_count || 0}</td>
                 <td>
                   <div class="flex items-center gap-1">
                     <button
-                      class="btn btn-ghost btn-xs"
+                      class="btn btn-ghost btn-sm min-h-[44px]"
                       phx-click="run_now"
                       phx-value-id={job.id}
                       title="Run Now"
@@ -275,7 +277,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                     </button>
                     <%= if job.origin != "system" do %>
                       <button
-                        class="btn btn-ghost btn-xs"
+                        class="btn btn-ghost btn-sm min-h-[44px]"
                         phx-click="edit_job"
                         phx-value-id={job.id}
                         title="Edit"
@@ -284,7 +286,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                         <.icon name="hero-pencil-square" class="w-3.5 h-3.5" />
                       </button>
                       <button
-                        class="btn btn-ghost btn-xs text-error"
+                        class="btn btn-ghost btn-sm min-h-[44px] text-error"
                         phx-click="delete_job"
                         phx-value-id={job.id}
                         data-confirm="Delete this job?"
@@ -301,7 +303,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 <tr>
                   <td colspan={if @show_origin, do: "9", else: "8"} class="bg-base-200 p-4">
                     <div class="text-sm font-medium mb-2">Recent Runs</div>
-                    <%= if length(@runs) > 0 do %>
+                    <%= if @runs != [] do %>
                       <table class="table table-xs">
                         <thead>
                           <tr>
@@ -319,8 +321,8 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                                   {run.status}
                                 </span>
                               </td>
-                              <td class="text-xs">{format_time(run.started_at)}</td>
-                              <td class="text-xs">{format_time(run.completed_at)}</td>
+                              <td class="text-xs">{format_datetime_short_time(run.started_at)}</td>
+                              <td class="text-xs">{format_datetime_short_time(run.completed_at)}</td>
                               <td class="text-xs max-w-xs truncate" title={run.result || ""}>
                                 {String.slice(run.result || "-", 0, 120)}
                               </td>

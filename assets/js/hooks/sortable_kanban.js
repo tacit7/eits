@@ -1,11 +1,23 @@
-import Sortable from 'sortablejs'
+// Sortable is loaded lazily — only needed on the kanban board.
+let _Sortable = null
+async function getSortable() {
+  if (!_Sortable) _Sortable = (await import('sortablejs')).default
+  return _Sortable
+}
 
 export const SortableKanban = {
-  mounted() { this._init() },
+  async mounted() {
+    this._destroyed = false
+    await this._init()
+  },
   updated() {
     // Sortable handles DOM mutations internally; no need to destroy/recreate
   },
-  _init() {
+  async _init() {
+    const Sortable = await getSortable()
+    // Guard: destroyed() may have fired while import was resolving
+    if (this._destroyed) return
+
     const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0
     this.sortable = Sortable.create(this.el, {
       group: "kanban",
@@ -54,16 +66,23 @@ export const SortableKanban = {
     })
   },
   destroyed() {
+    this._destroyed = true
     if (this.sortable) this.sortable.destroy()
   }
 }
 
 export const SortableColumns = {
-  mounted() {
+  async mounted() {
+    this._destroyed = false
+    const Sortable = await getSortable()
+    // Guard: destroyed() may have fired while import was resolving
+    if (this._destroyed) return
+
     this.sortable = Sortable.create(this.el, {
       animation: 150,
       ghostClass: "opacity-30",
       handle: "[data-column-handle]",
+      filter: "input, button, a, select, textarea",
       draggable: "[data-column-id]",
       onEnd: () => {
         const order = [...this.el.querySelectorAll("[data-column-id]")].map(el => el.dataset.columnId)
@@ -72,6 +91,7 @@ export const SortableColumns = {
     })
   },
   destroyed() {
+    this._destroyed = true
     if (this.sortable) this.sortable.destroy()
   }
 }

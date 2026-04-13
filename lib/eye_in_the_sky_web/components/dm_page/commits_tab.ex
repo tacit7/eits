@@ -3,6 +3,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
 
   use EyeInTheSkyWeb, :html
 
+  import EyeInTheSkyWeb.Components.DmHelpers, only: [extract_commit_title: 1, to_utc_string: 1]
+
   attr :commits, :list, default: []
   attr :diff_cache, :map, default: %{}
 
@@ -26,9 +28,16 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
           <div
             class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
             id={"dm-commit-#{commit.id}"}
+            phx-hook="DiffCollapse"
+            data-hash={hash}
+            data-loaded={cond do
+              is_nil(diff) -> "false"
+              diff == :error -> "error"
+              true -> "true"
+            end}
           >
-            <input type="checkbox" phx-click="load_diff" phx-value-hash={hash} />
-            <div class="collapse-title py-3 px-4 min-h-0">
+            <input type="checkbox" />
+            <div class="collapse-title py-3 px-4">
               <div class="flex items-center gap-3">
                 <.icon name="hero-code-bracket" class="h-4 w-4 flex-shrink-0 text-base-content/30" />
                 <div class="flex-1 min-w-0">
@@ -46,6 +55,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
                       phx-hook="LocalTime"
                     >
                     </time>
+                    <span
+                      class="loading loading-spinner loading-xs hidden"
+                      data-role="diff-spinner"
+                    ></span>
                   </div>
                 </div>
               </div>
@@ -53,7 +66,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
             <div class="collapse-content pb-2 overflow-x-auto">
               <%= cond do %>
                 <% is_nil(diff) -> %>
-                  <div class="px-4 py-2 text-xs text-base-content/30 italic">Loading diff...</div>
+                  <div></div>
                 <% diff == :error -> %>
                   <div class="px-4 py-2 text-xs text-error/60">
                     Could not load diff — repo path unavailable
@@ -63,7 +76,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
                     id={"diff-#{commit.id}"}
                     phx-hook="DiffViewer"
                     data-diff={diff}
-                    class="diff2html-wrap text-xs"
                   />
               <% end %>
             </div>
@@ -74,22 +86,4 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
     """
   end
 
-  defp to_utc_string(nil), do: ""
-  defp to_utc_string(ts) when is_binary(ts), do: ts
-  defp to_utc_string(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
-  defp to_utc_string(%NaiveDateTime{} = dt), do: NaiveDateTime.to_iso8601(dt) <> "Z"
-  defp to_utc_string(_), do: ""
-
-  defp extract_commit_title(nil), do: "No message"
-
-  defp extract_commit_title(message) when is_binary(message) do
-    message
-    |> String.trim()
-    |> String.split("\n")
-    |> List.first()
-    |> String.slice(0..60)
-    |> then(fn text ->
-      if String.length(text) >= 60, do: text <> "...", else: text
-    end)
-  end
 end

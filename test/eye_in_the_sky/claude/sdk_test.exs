@@ -1,7 +1,7 @@
 defmodule EyeInTheSky.Claude.SDKTest do
   use ExUnit.Case, async: false
 
-  alias EyeInTheSky.Claude.{SDK, Message}
+  alias EyeInTheSky.Claude.{Message, SDK}
 
   describe "SDK.start/2" do
     test "requires :to option" do
@@ -32,7 +32,7 @@ defmodule EyeInTheSky.Claude.SDKTest do
 
         # Should receive text messages
         text_messages = Enum.filter(messages, &(&1.type == :text))
-        assert length(text_messages) > 0
+        assert text_messages != []
 
         # Should get completion
         assert_receive {:claude_complete, ^ref, session_id}, 30_000
@@ -96,6 +96,22 @@ defmodule EyeInTheSky.Claude.SDKTest do
       # Stream should be unregistered once terminal event is handled
       Process.sleep(50)
       assert SDK.Registry.lookup(ref) == nil
+    end
+  end
+
+  describe "handler_start_failed error path" do
+    test "returns {:error, {:handler_start_failed, reason}} when TaskSupervisor is at max_children" do
+      {:ok, sup} = Task.Supervisor.start_link(max_children: 0)
+
+      result =
+        SDK.start("hello",
+          to: self(),
+          cli_module: EyeInTheSky.Claude.MockCLI,
+          task_supervisor: sup,
+          model: "haiku"
+        )
+
+      assert {:error, {:handler_start_failed, _reason}} = result
     end
   end
 

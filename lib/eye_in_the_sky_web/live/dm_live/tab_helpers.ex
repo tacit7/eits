@@ -3,28 +3,37 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
 
   import Phoenix.Component, only: [assign: 3]
 
-  alias EyeInTheSky.{Commits, Contexts, Messages, Notes, Repo, Tasks}
+  alias EyeInTheSky.{Commits, Contexts, Messages, Notes, Tasks}
+  alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 
   require Logger
 
-  @default_message_limit 20
+  @default_context_window 200_000
+  @default_message_limit 50
 
   def load_tab_data(socket, tab, session_id) do
     Logger.info("Loading DM tab data tab=#{tab} session_id=#{session_id}")
     {messages, has_more} = load_message_data(socket, tab, session_id)
 
+    # Sentinel {0, 0.0} means "not yet loaded". A session with genuinely zero
+    # usage also returns {0, 0.0}, which will correctly cache and skip re-reads.
     {total_tokens, total_cost} =
-      maybe_load_value(
+      maybe_load_once(
         tab,
         "messages",
         {socket.assigns[:total_tokens], socket.assigns[:total_cost]},
+        {0, 0.0},
         fn -> read_session_usage_stats(socket, session_id) end
       )
 
     current_task =
-      maybe_load_value(tab, ["messages", "tasks"], socket.assigns[:current_task], fn ->
-        Tasks.get_current_task_for_session(session_id)
-      end)
+      maybe_load_once(
+        tab,
+        ["messages", "tasks"],
+        socket.assigns[:current_task],
+        nil,
+        fn -> Tasks.get_current_task_for_session(session_id) end
+      )
 
     {context_used, context_window} =
       maybe_load_value(
@@ -52,6 +61,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
       :commits,
       maybe_load_tab_data(tab, "commits", socket.assigns[:commits], fn ->
         Commits.list_commits_for_session(session_id)
+        |> enrich_commit_messages(socket)
       end)
     )
     |> assign(
@@ -63,7 +73,10 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     |> assign(
       :session_context,
       maybe_load_tab_data(tab, "context", socket.assigns[:session_context], fn ->
-        Contexts.get_session_context(session_id)
+        case Contexts.get_session_context(session_id) do
+          {:ok, ctx} -> ctx
+          {:error, :not_found} -> nil
+        end
       end)
     )
   end
@@ -72,13 +85,20 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     assign(socket, :tasks, Tasks.list_tasks_for_session(socket.assigns.session_id))
   end
 
+  # Force a fresh DB load of messages, bypassing the tab-switch cache.
+  # Use this after mutations (send message, reload, sync) instead of load_tab_data.
+  def force_reload_messages(socket, session_id) do
+    socket
+    |> assign(:messages, nil)
+    |> load_tab_data("messages", session_id)
+  end
+
   defp load_message_data(socket, "messages", session_id) do
     query = socket.assigns[:message_search_query] || ""
 
     if query != "" do
       messages =
         Messages.search_messages_for_session(session_id, query)
-        |> Repo.preload(:attachments)
 
       Logger.info(
         "Searched #{length(messages)} messages for session=#{session_id} query=#{inspect(query)}"
@@ -86,18 +106,26 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
 
       {messages, false}
     else
-      limit = socket.assigns[:message_limit] || @default_message_limit
+      # Messages are kept live via PubSub handle_info — skip the DB round-trip
+      # only when switching back to the messages tab. Mutations must call
+      # force_reload_messages/2 instead, which clears the cache before loading.
+      existing = socket.assigns[:messages]
 
-      fetched_messages =
-        Messages.list_recent_messages(session_id, limit + 1)
-        |> Repo.preload(:attachments)
-
-      Logger.info("Loaded #{length(fetched_messages)} messages for session=#{session_id}")
-
-      if length(fetched_messages) > limit do
-        {Enum.drop(fetched_messages, 1), true}
+      if existing != nil do
+        {existing, socket.assigns[:has_more_messages] || false}
       else
-        {fetched_messages, false}
+        limit = socket.assigns[:message_limit] || @default_message_limit
+
+        fetched_messages =
+          Messages.list_recent_messages(session_id, limit + 1)
+
+        Logger.info("Loaded #{length(fetched_messages)} messages for session=#{session_id}")
+
+        if length(fetched_messages) > limit do
+          {Enum.drop(fetched_messages, 1), true}
+        else
+          {fetched_messages, false}
+        end
       end
     end
   end
@@ -124,36 +152,118 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     end
   end
 
+  # Like maybe_load_value but skips the loader if the value is already loaded
+  # (i.e. not equal to the empty sentinel). Avoids redundant DB/IO on tab switch.
+  defp maybe_load_once(active_tab, target_tabs, existing_value, empty_sentinel, loader) do
+    targets = List.wrap(target_tabs)
+
+    if active_tab in targets and existing_value == empty_sentinel do
+      loader.()
+    else
+      existing_value
+    end
+  end
+
   defp extract_context_window(messages) do
     messages
     |> Enum.reverse()
-    |> Enum.find_value(fn msg ->
-      case msg.metadata do
-        %{"model_usage" => model_usage} when is_map(model_usage) and map_size(model_usage) > 0 ->
-          model_usage
-          |> Map.values()
-          |> Enum.find_value(fn entry when is_map(entry) ->
-            input = entry["inputTokens"] || 0
-            cache_read = entry["cacheReadInputTokens"] || 0
-            cache_creation = entry["cacheCreationInputTokens"] || 0
-            ctx_window = entry["contextWindow"] || 200_000
-            used = input + cache_read + cache_creation
+    |> Enum.find_value(&extract_context_from_metadata/1)
+    |> Kernel.||({0, 0})
+  end
 
-            if used > 0, do: {used, ctx_window}
+  defp extract_context_from_metadata(msg) do
+    case msg.metadata do
+      %{"model_usage" => model_usage} when is_map(model_usage) and map_size(model_usage) > 0 ->
+        extract_from_model_usage(model_usage)
+
+      %{"usage" => %{"input_tokens" => _} = usage} ->
+        extract_from_usage(usage)
+
+      _ ->
+        nil
+    end
+  end
+
+  defp extract_from_model_usage(model_usage) do
+    model_usage
+    |> Map.values()
+    |> Enum.find_value(fn entry when is_map(entry) ->
+      input = entry["inputTokens"] || 0
+      cache_read = entry["cacheReadInputTokens"] || 0
+      cache_creation = entry["cacheCreationInputTokens"] || 0
+      ctx_window = entry["contextWindow"] || @default_context_window
+      used = input + cache_read + cache_creation
+
+      if used > ctx_window do
+        Logger.warning(
+          "[ctx_overflow] model_usage: used=#{used} window=#{ctx_window} " <>
+            "input=#{input} cache_read=#{cache_read} cache_creation=#{cache_creation}"
+        )
+      end
+
+      if used > 0, do: {used, ctx_window}
+    end)
+  end
+
+  defp extract_from_usage(usage) do
+    input = usage["input_tokens"] || 0
+    cache_read = usage["cache_read_input_tokens"] || 0
+    cache_creation = usage["cache_creation_input_tokens"] || 0
+    used = input + cache_read + cache_creation
+
+    if used > @default_context_window do
+      Logger.warning(
+        "[ctx_overflow] usage: used=#{used} window=#{@default_context_window} " <>
+          "input=#{input} cache_read=#{cache_read} cache_creation=#{cache_creation}"
+      )
+    end
+
+    if used > 0, do: {used, @default_context_window}
+  end
+
+  # Enriches commits that have no stored message by fetching subjects from git.
+  # Uses a single `git log --no-walk` call for all missing hashes at once.
+  # Returns commits unchanged if project path can't be resolved.
+  defp enrich_commit_messages(commits, socket) do
+    missing = Enum.filter(commits, &is_nil(&1.commit_message))
+
+    if missing == [] do
+      commits
+    else
+      case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+        {:ok, project_path} ->
+          hashes = Enum.map(missing, & &1.commit_hash)
+
+          messages =
+            case System.cmd(
+                   "git",
+                   ["-C", project_path, "log", "--no-walk", "--format=%H\t%s"] ++ hashes,
+                   stderr_to_stdout: false
+                 ) do
+              {output, 0} ->
+                output
+                |> String.split("\n", trim: true)
+                |> Map.new(fn line ->
+                  [hash | rest] = String.split(line, "\t", parts: 2)
+                  {String.trim(hash), Enum.join(rest, "\t")}
+                end)
+
+              _ ->
+                %{}
+            end
+
+          Enum.map(commits, fn commit ->
+            if is_nil(commit.commit_message) do
+              %{commit | commit_message: Map.get(messages, commit.commit_hash)}
+            else
+              commit
+            end
           end)
 
-        %{"usage" => %{"input_tokens" => _} = usage} ->
-          input = usage["input_tokens"] || 0
-          cache_read = usage["cache_read_input_tokens"] || 0
-          cache_creation = usage["cache_creation_input_tokens"] || 0
-          used = input + cache_read + cache_creation
-
-          if used > 0, do: {used, 200_000}
-
         _ ->
-          nil
+          commits
       end
-    end) || {0, 0}
+    end
   end
 
   defp read_session_usage_stats(socket, session_id) do

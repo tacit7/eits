@@ -8,8 +8,8 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityTest do
 
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSkyWeb.Components.TaskCard
   alias EyeInTheSkyWeb.Components.SessionCard
+  alias EyeInTheSkyWeb.Components.TaskCard
 
   defp sample_task(overrides \\ %{}) do
     Map.merge(

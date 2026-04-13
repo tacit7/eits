@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
   Registered at POST /api/v1/webhooks/gitea.
 
   Events handled:
-  - pull_request (action: opened) -> spawn codex agent to review the PR
+  - pull_request (action: opened | synchronize) -> spawn codex agent to review the PR
   - issue_comment (commenter: codex) -> DM the claude session that owns the PR
   - pull_request_comment (commenter: codex) -> same as above
   """
@@ -15,7 +15,11 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
   require Logger
 
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Agents.WebhookSanitizer
   alias EyeInTheSky.{Messages, Sessions}
+
+  defp agent_manager,
+    do: Application.get_env(:eye_in_the_sky, :agent_manager_module, AgentManager)
 
   defp unauthorized(conn),
     do: conn |> put_status(:unauthorized) |> json(%{error: "Invalid signature"}) |> halt()
@@ -25,46 +29,29 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
     with :ok <- verify_signature(conn),
          {:ok, repo} <- require_repo(params),
          {:ok, project_path} <- require_project_path() do
-      event = get_req_header(conn, "x-gitea-event") |> List.first()
+      handle_pr_opened_event(conn, pr, repo, project_path)
+    else
+      {:error, :unauthorized} ->
+        unauthorized(conn)
 
-      if event in ["pull_request", "pull_request_sync"] do
-        pr_number = pr["number"]
-        pr_title = pr["title"]
-        pr_body = pr["body"] || ""
-        pr_url = pr["html_url"] || ""
-        # head.ref is the plain branch name; head.label is "owner:branch"
-        head_branch = get_in(pr, ["head", "ref"]) || "unknown"
+      {:error, :missing_repo} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Missing repository.full_name in payload"})
 
-        Logger.info("Gitea webhook: PR ##{pr_number} opened - spawning codex reviewer")
+      {:error, :project_path_not_configured} ->
+        conn
+        |> put_status(:internal_server_error)
+        |> json(%{error: "Server misconfigured: project_path not set"})
+    end
+  end
 
-        instructions =
-          build_review_instructions(pr_number, pr_title, pr_body, pr_url, head_branch, repo)
-
-        case AgentManager.create_agent(
-               agent_type: "codex",
-               description: "PR Review: #{pr_title} (##{pr_number})",
-               instructions: instructions,
-               project_path: project_path
-             ) do
-          {:ok, %{session: session}} ->
-            Logger.info("Codex reviewer spawned for PR ##{pr_number}, session=#{session.uuid}")
-
-            json(conn, %{
-              success: true,
-              message: "Codex reviewer spawned",
-              session_id: session.uuid
-            })
-
-          {:error, reason} ->
-            Logger.error("Failed to spawn codex for PR ##{pr_number}: #{inspect(reason)}")
-
-            conn
-            |> put_status(:internal_server_error)
-            |> json(%{error: "Failed to spawn reviewer: #{inspect(reason)}"})
-        end
-      else
-        json(conn, %{success: true, message: "Ignored: #{event} #{params["action"]}"})
-      end
+  # PR synchronized (push to open PR branch) -> spawn codex reviewer
+  def handle(conn, %{"action" => "synchronize", "pull_request" => pr} = params) do
+    with :ok <- verify_signature(conn),
+         {:ok, repo} <- require_repo(params),
+         {:ok, project_path} <- require_project_path() do
+      handle_pr_opened_event(conn, pr, repo, project_path)
     else
       {:error, :unauthorized} ->
         unauthorized(conn)
@@ -95,16 +82,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
       is_codex = commenter == "codex"
 
       if event in ["issue_comment", "pull_request_comment"] and is_pr and is_codex do
-        Logger.info("Gitea webhook: codex commented on PR ##{pr_number}")
-
-        case extract_session_uuid(pr_body) do
-          {:ok, session_uuid} ->
-            dm_session(conn, session_uuid, pr_number, comment_body, repo)
-
-          :not_found ->
-            Logger.warning("No Session-ID found in PR ##{pr_number} body; cannot notify session")
-            json(conn, %{success: true, message: "No session to notify"})
-        end
+        handle_codex_comment(conn, %{pr_body: pr_body, pr_number: pr_number, comment_body: comment_body, repo: repo})
       else
         json(conn, %{success: true, message: "Ignored: #{event} by #{commenter}"})
       end
@@ -120,17 +98,85 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
   end
 
   def handle(conn, params) do
-    with :ok <- verify_signature(conn) do
-      event = get_req_header(conn, "x-gitea-event") |> List.first()
-      action = params["action"]
-      Logger.debug("Gitea webhook ignored: event=#{event} action=#{action}")
-      json(conn, %{success: true, message: "Ignored"})
-    else
-      {:error, :unauthorized} -> unauthorized(conn)
+    case verify_signature(conn) do
+      :ok ->
+        event = get_req_header(conn, "x-gitea-event") |> List.first()
+        action = params["action"]
+        Logger.debug("Gitea webhook ignored: event=#{event} action=#{action}")
+        json(conn, %{success: true, message: "Ignored"})
+
+      {:error, :unauthorized} ->
+        unauthorized(conn)
     end
   end
 
-  defp build_review_instructions(pr_number, pr_title, pr_body, pr_url, head_branch, repo) do
+  defp handle_pr_opened_event(conn, pr, repo, project_path) do
+    pr_number = pr["number"]
+    pr_title = WebhookSanitizer.sanitize_text(pr["title"])
+    pr_body = WebhookSanitizer.sanitize_text(pr["body"])
+    pr_url = pr["html_url"] || ""
+    # head.ref is the plain branch name; head.label is "owner:branch"
+    head_branch = WebhookSanitizer.sanitize_branch(get_in(pr, ["head", "ref"]) || "unknown")
+
+    Logger.info("Gitea webhook: PR ##{pr_number} - spawning codex reviewer")
+
+    pr_context = %{
+      number: pr_number,
+      title: pr_title,
+      body: pr_body,
+      url: pr_url,
+      head_branch: head_branch,
+      repo: repo
+    }
+
+    instructions = build_review_instructions(pr_context)
+
+    case agent_manager().create_agent(
+           agent_type: "codex",
+           description: "PR Review: #{pr_title} (##{pr_number})",
+           instructions: instructions,
+           project_path: project_path
+         ) do
+      {:ok, %{session: session}} ->
+        Logger.info("Codex reviewer spawned for PR ##{pr_number}, session=#{session.uuid}")
+
+        json(conn, %{
+          success: true,
+          message: "Codex reviewer spawned",
+          session_id: session.uuid
+        })
+
+      {:error, reason} ->
+        Logger.error("Failed to spawn codex for PR ##{pr_number}: #{inspect(reason)}")
+
+        conn
+        |> put_status(:internal_server_error)
+        |> json(%{error: "Failed to spawn reviewer"})
+    end
+  end
+
+  defp handle_codex_comment(conn, event) do
+    %{pr_body: pr_body, pr_number: pr_number, comment_body: comment_body, repo: repo} = event
+    Logger.info("Gitea webhook: codex commented on PR ##{pr_number}")
+
+    case extract_session_uuid(pr_body) do
+      {:ok, session_uuid} ->
+        dm_session(conn, %{session_uuid: session_uuid, pr_number: pr_number, comment_body: comment_body, repo: repo})
+
+      :not_found ->
+        Logger.warning("No Session-ID found in PR ##{pr_number} body; cannot notify session")
+        json(conn, %{success: true, message: "No session to notify"})
+    end
+  end
+
+  defp build_review_instructions(%{
+         number: pr_number,
+         title: pr_title,
+         body: pr_body,
+         url: pr_url,
+         head_branch: head_branch,
+         repo: repo
+       }) do
     # repo is "owner/name", e.g. "claude/eits-web" -> tea --repo uses just "name" with --login owner
     {owner, repo_name} = split_repo(repo)
 
@@ -161,30 +207,28 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
   defp verify_signature(conn) do
     secret = Application.get_env(:eye_in_the_sky, :gitea_webhook_secret, "")
 
-    cond do
-      secret == "" ->
-        if Application.get_env(:eye_in_the_sky, :allow_unsigned_webhooks, false) do
-          Logger.warning("Gitea webhook: no secret configured, allowing unsigned (dev opt-in)")
-          :ok
-        else
-          Logger.error("Gitea webhook: GITEA_WEBHOOK_SECRET not set — rejecting unsigned request")
+    if secret == "" do
+      if Application.get_env(:eye_in_the_sky, :allow_unsigned_webhooks, false) do
+        Logger.warning("Gitea webhook: no secret configured, allowing unsigned (dev opt-in)")
+        :ok
+      else
+        Logger.error("Gitea webhook: GITEA_WEBHOOK_SECRET not set — rejecting unsigned request")
 
-          {:error, :unauthorized}
-        end
+        {:error, :unauthorized}
+      end
+    else
+      sig_header = get_req_header(conn, "x-gitea-signature") |> List.first()
+      body = conn.assigns[:raw_body] || ""
+      expected = :crypto.mac(:hmac, :sha256, secret, body) |> Base.encode16(case: :lower)
+      # Normalize: strip "sha256=" prefix if present so we compare raw hex to raw hex
+      normalized_sig = (sig_header || "") |> String.replace_prefix("sha256=", "")
 
-      true ->
-        sig_header = get_req_header(conn, "x-gitea-signature") |> List.first()
-        body = conn.assigns[:raw_body] || ""
-        expected = :crypto.mac(:hmac, :sha256, secret, body) |> Base.encode16(case: :lower)
-        # Normalize: strip "sha256=" prefix if present so we compare raw hex to raw hex
-        normalized_sig = (sig_header || "") |> String.replace_prefix("sha256=", "")
-
-        if Plug.Crypto.secure_compare(expected, normalized_sig) do
-          :ok
-        else
-          Logger.warning("Gitea webhook: invalid signature")
-          {:error, :unauthorized}
-        end
+      if Plug.Crypto.secure_compare(expected, normalized_sig) do
+        :ok
+      else
+        Logger.warning("Gitea webhook: invalid signature")
+        {:error, :unauthorized}
+      end
     end
   end
 
@@ -220,7 +264,8 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
     end
   end
 
-  defp dm_session(conn, session_uuid, pr_number, comment_body, repo) do
+  defp dm_session(conn, event) do
+    %{session_uuid: session_uuid, pr_number: pr_number, comment_body: comment_body, repo: repo} = event
     {owner, repo_name} = split_repo(repo)
 
     case Sessions.get_session_by_uuid(session_uuid) do

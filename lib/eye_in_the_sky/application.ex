@@ -9,9 +9,14 @@ defmodule EyeInTheSky.Application do
   def start(_type, _args) do
     Oban.Telemetry.attach_default_logger(:info)
 
-    children = [
-      # Disabled SSR - server module not built
-      # {NodeJS.Supervisor, [path: LiveSvelte.SSR.NodeJS.server_path(), pool_size: 4]},
+    children =
+      if Application.get_env(:live_svelte, :ssr_module) != LiveSvelte.SSR.ViteJS do
+        [{NodeJS.Supervisor, [path: LiveSvelte.SSR.NodeJS.server_path(), pool_size: 4]}]
+      else
+        []
+      end
+
+    children = children ++ [
       EyeInTheSkyWeb.Telemetry,
       EyeInTheSky.Repo,
       {Ecto.Migrator,
@@ -42,6 +47,8 @@ defmodule EyeInTheSky.Application do
       EyeInTheSky.Messages.Broadcaster,
       # Rate limiter ETS backend for auth endpoint throttling
       EyeInTheSky.RateLimiter,
+      # In-memory timer registry for orchestrator sessions
+      EyeInTheSky.OrchestratorTimers.Server,
       # Start to serve requests, typically the last entry
       EyeInTheSkyWeb.Endpoint
     ]
@@ -60,7 +67,7 @@ defmodule EyeInTheSky.Application do
     :ok
   end
 
-  defp skip_migrations?() do
+  defp skip_migrations? do
     # By default, migrations are run when using a release
     System.get_env("RELEASE_NAME") == nil
   end

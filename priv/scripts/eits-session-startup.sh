@@ -14,6 +14,15 @@ fi
 LOG_FILE="${HOME}/.claude/hooks/eits.log"
 _log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [startup] $*" >> "$LOG_FILE" 2>/dev/null; }
 
+# --- Load EITS_API_KEY from .env (overrides stale key in settings.json) ---
+# The prod release .env is authoritative. If settings.json key drifts, this self-heals.
+_EITS_DOT_ENV="$(cd "$(dirname "$0")/../.." 2>/dev/null && pwd)/.env"
+if [ -f "$_EITS_DOT_ENV" ]; then
+  _DOT_ENV_KEY=$(grep '^EITS_API_KEY=' "$_EITS_DOT_ENV" | head -1 | cut -d= -f2-)
+  [ -n "$_DOT_ENV_KEY" ] && export EITS_API_KEY="$_DOT_ENV_KEY"
+fi
+unset _EITS_DOT_ENV _DOT_ENV_KEY
+
 INPUT=$(cat)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || echo "")
 MODEL=$(echo "$INPUT" | jq -r '.model // empty' 2>/dev/null || echo "")
@@ -31,6 +40,15 @@ PROJECT_NAME=$(basename "$PROJECT_DIR")
 
 _log "project_dir=$PROJECT_DIR env_file=${CLAUDE_ENV_FILE:-unset}"
 
+# If running inside a worktree (.claude/worktrees/<name>), resolve project from
+# the main project root — never create a separate project record for a worktree path.
+LOOKUP_DIR="$PROJECT_DIR"
+if [[ "$PROJECT_DIR" == *"/.claude/worktrees/"* ]]; then
+  LOOKUP_DIR="${PROJECT_DIR%%/.claude/worktrees/*}"
+  _log "worktree detected — using main project path for lookup: $LOOKUP_DIR"
+  echo "[EITS] startup: worktree detected, resolving project from $LOOKUP_DIR" >&2
+fi
+
 # Check if session was pre-registered (spawned by workable task worker)
 EXISTING_AGENT_UUID=""
 SESSION_INFO=$(eits sessions get "$SESSION_ID" 2>/dev/null || true)
@@ -40,11 +58,11 @@ if [ -n "$SESSION_INFO" ]; then
   echo "[EITS] startup: pre-registered agent_id=${EXISTING_AGENT_UUID:-none}" >&2
 fi
 
-# Resolve or create project
-PROJECT_ID=$(eits projects list 2>/dev/null | jq -r --arg path "$PROJECT_DIR" '.projects[]? | select(.path == $path) | .id' | head -1 || true)
+# Resolve or create project using the canonical (non-worktree) path
+PROJECT_ID=$(eits projects list 2>/dev/null | jq -r --arg path "$LOOKUP_DIR" '.projects[]? | select(.path == $path) | .id' | head -1 || true)
 if [ -z "$PROJECT_ID" ]; then
-  _log "project not found, creating: $PROJECT_NAME"
-  PROJECT_ID=$(eits projects create --name "$PROJECT_NAME" --path "$PROJECT_DIR" 2>/dev/null | jq -r '.id // empty' || true)
+  _log "project not found, creating: $(basename "$LOOKUP_DIR")"
+  PROJECT_ID=$(eits projects create --name "$(basename "$LOOKUP_DIR")" --path "$LOOKUP_DIR" 2>/dev/null | jq -r '.id // empty' || true)
   _log "project created: id=${PROJECT_ID:-FAILED}"
 else
   _log "project found: id=$PROJECT_ID"

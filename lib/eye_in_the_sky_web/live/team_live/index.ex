@@ -1,7 +1,8 @@
 defmodule EyeInTheSkyWeb.TeamLive.Index do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.{Teams, Tasks, Notes}
+  alias EyeInTheSky.{Notes, Tasks, Teams}
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -33,28 +34,40 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
   end
 
   @impl true
+  def handle_info({:new_message, _message}, socket), do: {:noreply, socket}
+
+  @impl true
   def handle_event("search", %{"search" => query}, socket) do
     {:noreply, assign(socket, :search, query)}
   end
 
   @impl true
   def handle_event("delete_team", %{"id" => id}, socket) do
-    team = Teams.get_team!(String.to_integer(id))
-    {:ok, _} = Teams.delete_team(team)
+    case parse_int(id) do
+      nil ->
+        {:noreply, socket}
 
-    socket =
-      socket
-      |> assign(:teams, load_teams(socket.assigns.show_archived))
-      |> maybe_close_if_deleted(team.id)
+      team_id ->
+        team = Teams.get_team!(team_id)
+        {:ok, _} = Teams.delete_team(team)
 
-    {:noreply, socket}
+        socket =
+          socket
+          |> assign(:teams, load_teams(socket.assigns.show_archived))
+          |> maybe_close_if_deleted(team.id)
+
+        {:noreply, socket}
+    end
   end
 
   @impl true
   def handle_event("select_team", %{"id" => id}, socket) do
-    team_id = String.to_integer(id)
-    team = Teams.get_team!(team_id) |> load_team_detail()
-    {:noreply, socket |> assign(:agent_session_id, nil) |> show_team_detail(team_id, team)}
+    case parse_int(id) do
+      nil -> {:noreply, socket}
+      team_id ->
+        team = Teams.get_team!(team_id) |> load_team_detail()
+        {:noreply, socket |> assign(:agent_session_id, nil) |> show_team_detail(team_id, team)}
+    end
   end
 
   @impl true
@@ -64,15 +77,20 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
 
   @impl true
   def handle_event("select_agent", %{"id" => session_id_str}, socket) do
-    session_id = String.to_integer(session_id_str)
-    member = Enum.find(socket.assigns.selected_team.members, &(&1.session_id == session_id))
+    case parse_int(session_id_str) do
+      nil ->
+        {:noreply, socket}
 
-    socket =
-      socket
-      |> assign(:agent_session_id, session_id)
-      |> maybe_open_fab_chat(member)
+      session_id ->
+        member = Enum.find(socket.assigns.selected_team.members, &(&1.session_id == session_id))
 
-    {:noreply, socket}
+        socket =
+          socket
+          |> assign(:agent_session_id, session_id)
+          |> maybe_open_fab_chat(member)
+
+        {:noreply, socket}
+    end
   end
 
   # No-ops for session_row swipe actions (not applicable in teams context)
@@ -101,12 +119,14 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
 
   @impl true
   def handle_event("assign_task", %{"task-id" => task_id, "session-id" => session_id}, socket) do
-    task_id = String.to_integer(task_id)
-    session_id = String.to_integer(session_id)
-    Tasks.link_session_to_task(task_id, session_id)
-
-    team = Teams.get_team!(socket.assigns.selected_team_id) |> load_team_detail()
-    {:noreply, assign(socket, :selected_team, team)}
+    case {parse_int(task_id), parse_int(session_id)} do
+      {nil, _} -> {:noreply, socket}
+      {_, nil} -> {:noreply, socket}
+      {task_id_int, session_id_int} ->
+        Tasks.link_session_to_task(task_id_int, session_id_int)
+        team = Teams.get_team!(socket.assigns.selected_team_id) |> load_team_detail()
+        {:noreply, assign(socket, :selected_team, team)}
+    end
   end
 
   @impl true
@@ -126,7 +146,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
             <button
               phx-click="toggle_archived"
               class={[
-                "text-xs font-medium px-2 py-1 rounded transition-colors",
+                "text-xs font-medium px-2 py-1 rounded transition-colors min-h-[44px] inline-flex items-center",
                 if(@show_archived,
                   do: "bg-base-content/10 text-base-content/60",
                   else: "text-base-content/30 hover:text-base-content/50"
@@ -148,7 +168,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
                 name="search"
                 value={@search}
                 placeholder="Search teams..."
-                class="w-full bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] border-0 rounded-xl py-2.5 pl-9 pr-4 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                class="w-full bg-base-100 border-0 rounded-xl py-2.5 pl-9 pr-4 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:ring-1 focus:ring-primary/30"
                 phx-debounce="150"
               />
             </form>
@@ -157,7 +177,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
           <%!-- Teams list --%>
           <div class="rounded-xl shadow-sm">
             <%= if @filtered_teams == [] do %>
-              <div class="flex flex-col items-center justify-center py-16 px-4 text-center gap-3 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl">
+              <div class="flex flex-col items-center justify-center py-16 px-4 text-center gap-3 bg-base-100 rounded-xl">
                 <div class="w-10 h-10 rounded-full bg-base-200 flex items-center justify-center">
                   <.icon name="hero-user-group" class="w-5 h-5 text-base-content/30" />
                 </div>
@@ -166,7 +186,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
                 </p>
               </div>
             <% else %>
-              <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl px-4">
+              <div class="divide-y divide-base-content/5 bg-base-100 rounded-xl px-4">
                 <%= for team <- @filtered_teams do %>
                   <div class={"relative overflow-hidden border-l-2 #{team_status_border(team.members)}"}>
                     <div class="group flex items-center gap-4 py-3">
@@ -197,7 +217,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
                       <button
                         phx-click="delete_team"
                         phx-value-id={team.id}
-                        class="shrink-0 p-1.5 rounded hover:bg-base-200 text-base-content/20 hover:text-error/60 transition-colors opacity-0 group-hover:opacity-100"
+                        class="shrink-0 p-1.5 rounded hover:bg-base-200 text-base-content/20 hover:text-error/60 transition-colors opacity-0 group-hover:opacity-100 max-sm:opacity-30 pointer-events-none group-hover:pointer-events-auto max-sm:pointer-events-auto min-h-[44px] min-w-[44px] flex items-center justify-center"
                         title="Delete team"
                       >
                         <.icon name="hero-trash" class="w-3.5 h-3.5" />
@@ -221,7 +241,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
           </button>
 
           <%= if @selected_team do %>
-            <div id="team-detail" class="overflow-hidden rounded-xl bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)]">
+            <div id="team-detail" class="overflow-hidden rounded-xl bg-base-100">
               <.live_component
                 module={EyeInTheSkyWeb.TeamDetailComponent}
                 id="team-detail-component"
@@ -255,17 +275,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
     member_session_ids = Enum.map(team.members, & &1.session_id) |> MapSet.new()
 
     tasks_by_session =
-      Enum.reduce(tasks, %{}, fn task, acc ->
-        matched_sessions = Enum.filter(task.session_ids, &MapSet.member?(member_session_ids, &1))
-
-        case matched_sessions do
-          [] ->
-            acc
-
-          sids ->
-            Enum.reduce(sids, acc, fn sid, a -> Map.update(a, sid, [task], &(&1 ++ [task])) end)
-        end
-      end)
+      Enum.reduce(tasks, %{}, &group_task_by_sessions(&1, &2, member_session_ids))
 
     unowned_tasks =
       Enum.filter(tasks, fn t ->
@@ -274,7 +284,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
 
     members_with_tasks =
       Enum.map(team.members, fn m ->
-        Map.put(m, :tasks, Map.get(tasks_by_session, m.session_id, []))
+        Map.put(m, :tasks, tasks_by_session |> Map.get(m.session_id, []) |> Enum.reverse())
       end)
 
     team
@@ -283,12 +293,21 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
     |> Map.put(:unowned_tasks, unowned_tasks)
   end
 
+  defp group_task_by_sessions(task, acc, member_session_ids) do
+    matched = Enum.filter(task.session_ids, &MapSet.member?(member_session_ids, &1))
+
+    case matched do
+      [] -> acc
+      sids -> Enum.reduce(sids, acc, fn sid, a -> Map.update(a, sid, [task], &[task | &1]) end)
+    end
+  end
+
   defp maybe_refresh_selected_team(%{assigns: %{selected_team_id: nil}} = socket), do: socket
 
   defp maybe_refresh_selected_team(%{assigns: %{selected_team_id: id}} = socket) do
     case Teams.get_team(id) do
-      nil -> show_team_list(socket)
-      team -> assign(socket, :selected_team, load_team_detail(team))
+      {:error, :not_found} -> show_team_list(socket)
+      {:ok, team} -> assign(socket, :selected_team, load_team_detail(team))
     end
   end
 

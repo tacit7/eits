@@ -1,5 +1,6 @@
 # lib/eye_in_the_sky_web/components/file_editor_component.ex
 defmodule EyeInTheSkyWeb.Components.FileEditorComponent do
+  @moduledoc false
   use EyeInTheSkyWeb, :html
 
   @doc """
@@ -49,6 +50,7 @@ defmodule EyeInTheSkyWeb.Components.FileEditorComponent do
       ".html" -> "html"
       ".heex" -> "html"
       ".md" -> "markdown"
+      ".json" -> "json"
       ".sh" -> "shell"
       ".bash" -> "shell"
       _ -> "text"

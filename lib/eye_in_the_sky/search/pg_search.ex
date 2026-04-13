@@ -8,6 +8,7 @@ defmodule EyeInTheSky.Search.PgSearch do
   """
 
   import Ecto.Query, warn: false
+  alias Ecto.Adapters.SQL
   alias EyeInTheSky.Repo
 
   # Only lowercase letters, digits, and underscores — no injection vectors
@@ -42,11 +43,15 @@ defmodule EyeInTheSky.Search.PgSearch do
 
   Accepts the same options as `search/1`, plus:
 
-  - `:extra_where` - An `Ecto.Query.dynamic/2` expression ANDed onto the ILIKE fallback
+  - `:extra_where` - An `Ecto.Query.dynamic/2` expression ANDed onto both the ILIKE fallback
+    and the FTS raw SQL path (replaces `:sql_filter`/`:sql_params`)
   - `:order_by` - Ecto order_by keyword list for the fallback query (e.g. `[desc: :created_at]`)
 
   The fallback is built as:
       WHERE col1 ILIKE pattern OR col2 ILIKE pattern [AND extra_where] ORDER BY order_by
+
+  The FTS SQL path derives the WHERE clause and params from `extra_where` automatically,
+  eliminating the need for manually-indexed `:sql_filter`/`:sql_params`.
   """
   def search_for(query, opts) when is_binary(query) do
     schema = Keyword.fetch!(opts, :schema)
@@ -76,7 +81,55 @@ defmodule EyeInTheSky.Search.PgSearch do
         fallback_query
       end
 
-    search(opts ++ [query: query, fallback_query: fallback_query])
+    # Derive sql_filter + sql_params from extra_where so callers no longer need to
+    # maintain a parallel raw-SQL representation of the same predicate.
+    opts =
+      if extra_where do
+        table = Keyword.get(opts, :table, "")
+        {sql_filter, sql_params} = extra_where_to_sql(schema, extra_where, table)
+        Keyword.merge(opts, sql_filter: sql_filter, sql_params: sql_params)
+      else
+        opts
+      end
+
+    search(Keyword.merge(opts, query: query, fallback_query: fallback_query))
+  end
+
+  # Converts an Ecto dynamic expression into a raw SQL AND-clause and param list
+  # suitable for embedding in the FTS CTE query.
+  #
+  # Strategy: build a minimal Ecto query with just `where: ^dynamic`, call
+  # `Repo.to_sql/2` to get the PostgreSQL SQL + params, extract the WHERE
+  # clause text, then:
+  #   1. Replace Ecto's binding alias (always "n0" since we use `from(n in ...)`)
+  #      with the FTS query's table alias (first letter of the table name).
+  #   2. Renumber all $N placeholders by +1 (since $1 is already taken by the
+  #      FTS search term in the outer CTE query).
+  defp extra_where_to_sql(schema, dynamic, table) do
+    base = from(n in schema, where: ^dynamic)
+
+    {sql, params} = Repo.to_sql(:all, base)
+
+    # Extract everything after "WHERE" in the generated SQL.
+    # Ecto generates: SELECT ... FROM "table" AS n0 WHERE n0."col" = $1 ...
+    case Regex.run(~r/\bWHERE\b(.+?)(?:\s*ORDER\s+BY|\s*LIMIT|\s*$)/si, sql, capture: :all_but_first) do
+      [where_clause] ->
+        # Replace Ecto's "n0" alias with the FTS alias (first letter of table name).
+        # The FTS query uses `String.first(table)` as its alias, so "notes" → "n".
+        fts_alias = if table != "", do: String.first(table), else: "n"
+        aliased_clause = String.replace(String.trim(where_clause), ~r/\bn0\b/, fts_alias)
+
+        # Ecto numbers its params starting at $1; we need to offset by 1 since
+        # the FTS CTE already uses $1 for the search term.
+        shifted_clause = Regex.replace(~r/\$(\d+)/, aliased_clause, fn _, n ->
+          "$#{String.to_integer(n) + 1}"
+        end)
+
+        {"AND (#{shifted_clause})", params}
+
+      nil ->
+        {"", []}
+    end
   end
 
   @doc """
@@ -88,13 +141,13 @@ defmodule EyeInTheSky.Search.PgSearch do
   - `:schema` - Ecto schema module (required)
   - `:query` - Search query string (required)
   - `:search_columns` - List of column names to search (required)
-  - `:sql_filter` - Additional SQL WHERE clause (optional, use $N params starting after search param)
-  - `:sql_params` - Parameters for SQL filter (optional, default: [])
   - `:fallback_query` - Ecto query for ILIKE fallback (required)
   - `:preload` - Associations to preload (optional, default: [])
 
-  ## Deprecated Options (ignored, kept for backwards compatibility)
+  ## Deprecated Options (kept for backwards compatibility, do not use in new code)
 
+  - `:sql_filter` - Raw SQL WHERE clause with manual $N params. Use `:extra_where` via `search_for/2` instead.
+  - `:sql_params` - Parameters for `:sql_filter`. Derived automatically when using `:extra_where`.
   - `:fts_table` - No longer used (PostgreSQL doesn't need separate FTS tables)
   - `:join_key` - No longer used
   """
@@ -124,6 +177,30 @@ defmodule EyeInTheSky.Search.PgSearch do
     else
       run_fallback(fallback_query, preloads, limit)
     end
+  end
+
+  @doc """
+  Returns an Ecto subquery of session IDs whose messages match the given full-text search query.
+
+  Filters to user/agent/assistant messages to avoid tool output noise.
+  ("agent" is the primary role for assistant outputs in this codebase, but "assistant" is included
+  for completeness.) Excludes "tool" and "system" roles.
+  Uses the GIN index on `to_tsvector('english', COALESCE(body, ''))`.
+
+  Returns a composable query — call `subquery/1` on the result or use it directly
+  in an `in` clause: `s.id in subquery(PgSearch.message_fts_session_ids(q))`.
+  """
+  def message_fts_session_ids(query) do
+    from(m in EyeInTheSky.Messages.Message,
+      where: m.sender_role in ["user", "agent", "assistant"],
+      where:
+        fragment(
+          "to_tsvector('english', COALESCE(?, '')) @@ plainto_tsquery('english', ?)",
+          m.body,
+          ^query
+        ),
+      select: m.session_id
+    )
   end
 
   @doc """
@@ -161,7 +238,7 @@ defmodule EyeInTheSky.Search.PgSearch do
   defp safe_identifier?(value), do: Regex.match?(@safe_identifier, value)
 
   defp run_fallback(fallback_query, preloads, limit) do
-    effective_limit = limit || 50
+    effective_limit = if is_integer(limit) and limit > 0, do: limit, else: 50
 
     query_result = limit(fallback_query, ^effective_limit)
 
@@ -184,13 +261,17 @@ defmodule EyeInTheSky.Search.PgSearch do
        ) do
     alias_letter = String.first(table)
 
-    # Build tsvector expression from search columns: to_tsvector('english', coalesce(col1,'') || ' ' || coalesce(col2,''))
+    # Build tsvector expression from search columns:
+    # to_tsvector('english', coalesce(col1,'') || ' ' || coalesce(col2,''))
     tsvector_expr =
-      search_columns
-      |> Enum.map(fn col -> "coalesce(#{alias_letter}.#{col}, '')" end)
-      |> Enum.join(" || ' ' || ")
+      Enum.map_join(search_columns, " || ' ' || ", fn col ->
+        "coalesce(#{alias_letter}.#{col}, '')"
+      end)
 
-    effective_limit = limit || 50
+    effective_limit = if is_integer(limit) and limit > 0, do: limit, else: 50
+
+    # $1 = search query, trailing param = limit — never interpolated into SQL.
+    limit_placeholder = "$#{length(sql_params) + 2}"
 
     # CTE pre-computes the tsquery once; WHERE and ORDER BY reference it without re-evaluation.
     sql = """
@@ -200,12 +281,12 @@ defmodule EyeInTheSky.Search.PgSearch do
     WHERE to_tsvector('english', #{tsvector_expr}) @@ _q.tsq
     #{sql_filter}
     ORDER BY ts_rank(to_tsvector('english', #{tsvector_expr}), _q.tsq) DESC
-    LIMIT #{effective_limit}
+    LIMIT #{limit_placeholder}
     """
 
-    params = [query | sql_params]
+    params = [query | sql_params] ++ [effective_limit]
 
-    case Ecto.Adapters.SQL.query(Repo, sql, params) do
+    case SQL.query(Repo, sql, params) do
       {:ok, %{rows: rows, columns: columns}} ->
         results =
           Enum.map(rows, fn row ->

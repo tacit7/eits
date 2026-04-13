@@ -23,7 +23,7 @@ defmodule EyeInTheSky.Codex.CLI do
   @type cli_opts :: keyword()
   @type spawn_result :: {:ok, port(), reference()} | {:error, term()}
 
-  @default_idle_timeout_ms 300_000
+  @default_idle_timeout_ms :infinity
   @standard_paths [
     "/usr/local/bin/codex",
     "/opt/homebrew/bin/codex",
@@ -65,38 +65,13 @@ defmodule EyeInTheSky.Codex.CLI do
 
   @doc """
   Cancels a running Codex process by killing the OS process (group and direct), then closing the port.
+
+  Delegates to `EyeInTheSky.CLI.Port.cancel_port/2` which sends SIGTERM to both
+  the process group and direct PID, then escalates to SIGKILL if needed.
   """
   @spec cancel(port()) :: :ok
   def cancel(port) when is_port(port) do
-    case Port.info(port, :os_pid) do
-      {:os_pid, os_pid} ->
-        # Send TERM to both process group and PID directly
-        # (process group for child processes, direct PID in case it's not a group leader)
-        System.cmd("kill", ["-TERM", "-#{os_pid}"], stderr_to_stdout: true)
-        System.cmd("kill", ["-TERM", "#{os_pid}"], stderr_to_stdout: true)
-        Process.sleep(500)
-
-        case System.cmd("kill", ["-0", "#{os_pid}"], stderr_to_stdout: true) do
-          {_, 0} ->
-            Logger.info("[Codex.CLI] Process #{os_pid} still alive, sending SIGKILL")
-            System.cmd("kill", ["-9", "-#{os_pid}"], stderr_to_stdout: true)
-            System.cmd("kill", ["-9", "#{os_pid}"], stderr_to_stdout: true)
-
-          _ ->
-            :ok
-        end
-
-      nil ->
-        :ok
-    end
-
-    try do
-      Port.close(port)
-    rescue
-      ArgumentError -> :ok
-    end
-
-    :ok
+    EyeInTheSky.CLI.Port.cancel_port(port, "Codex.CLI")
   end
 
   # ---------------------------------------------------------------------------
@@ -156,23 +131,23 @@ defmodule EyeInTheSky.Codex.CLI do
 
     # Inject EITS env vars via shell_environment_policy.set so they're
     # available to shell commands the agent runs (bypasses default filters)
-    args =
-      Enum.reduce(
-        [
-          {"EITS_SESSION_UUID", opts[:eits_session_uuid]},
-          {"EITS_SESSION_ID", opts[:eits_session_id]},
-          {"EITS_AGENT_UUID", opts[:eits_agent_uuid]},
-          {"EITS_AGENT_ID", opts[:eits_agent_id]},
-          {"EITS_PROJECT_ID", opts[:eits_project_id]},
-          {"EITS_MODEL", opts[:eits_model]},
-          {"EITS_URL",
-           opts[:eits_url] || System.get_env("EITS_URL", "http://localhost:5001/api/v1")}
-        ],
-        args,
-        fn {key, val}, acc ->
-          if val, do: acc ++ ["-c", "shell_environment_policy.set.#{key}=\"#{val}\""], else: acc
-        end
-      )
+    env_args =
+      [
+        {"EITS_SESSION_UUID", opts[:eits_session_uuid]},
+        {"EITS_SESSION_ID", opts[:eits_session_id]},
+        {"EITS_AGENT_UUID", opts[:eits_agent_uuid]},
+        {"EITS_AGENT_ID", opts[:eits_agent_id]},
+        {"EITS_PROJECT_ID", opts[:eits_project_id]},
+        {"EITS_MODEL", opts[:eits_model]},
+        {"EITS_URL",
+         opts[:eits_url] || System.get_env("EITS_URL", "http://localhost:5001/api/v1")}
+      ]
+      |> Enum.filter(fn {_key, val} -> val end)
+      |> Enum.flat_map(fn {key, val} ->
+        ["-c", "shell_environment_policy.set.#{key}=\"#{val}\""]
+      end)
+
+    args = args ++ env_args
 
     # Prompt goes last as positional argument
     if prompt = opts[:prompt] do
@@ -204,10 +179,10 @@ defmodule EyeInTheSky.Codex.CLI do
       |> Keyword.get(:project_path, File.cwd!())
       |> Path.expand()
 
-    if !File.dir?(project_path) do
-      {:error, {:invalid_project_path, project_path}}
-    else
+    if File.dir?(project_path) do
       do_spawn(opts, project_path)
+    else
+      {:error, {:invalid_project_path, project_path}}
     end
   end
 
@@ -215,11 +190,7 @@ defmodule EyeInTheSky.Codex.CLI do
     caller = Keyword.get(opts, :caller, self())
     session_ref = Keyword.get(opts, :session_ref, make_ref())
 
-    idle_timeout_ms =
-      case Keyword.get(opts, :idle_timeout_ms, @default_idle_timeout_ms) do
-        n when is_integer(n) and n > 0 -> n
-        _ -> @default_idle_timeout_ms
-      end
+    idle_timeout_ms = EyeInTheSky.CLI.Port.resolve_idle_timeout(opts, @default_idle_timeout_ms)
 
     case find_codex_binary() do
       {:ok, codex_path} ->
@@ -235,40 +206,32 @@ defmodule EyeInTheSky.Codex.CLI do
         cmd_string = "codex " <> Enum.join(flags, " ") <> prompt_summary
         Logger.info("[Codex.CLI] Spawning in #{project_path}: #{cmd_string}")
 
-        handler_pid =
-          spawn_link(fn ->
-            receive do
-              {:port, port} ->
-                EyeInTheSky.CLI.Port.handle_port_output(
-                  port,
-                  session_ref,
-                  caller,
-                  "",
-                  idle_timeout_ms,
-                  telemetry_prefix: [:eits, :codex, :cli],
-                  log_prefix: "Codex.CLI"
-                )
-            end
-          end)
-
         env = build_env(opts)
 
+        # Codex reads stdin when it detects a pipe (even with a positional prompt),
+        # blocking until EOF. The BEAM port never closes stdin, so without this
+        # redirect Codex hangs after turn.started. Wrapping via sh redirects
+        # /dev/null to stdin before exec'ing codex, giving immediate EOF.
+        # Args are passed as separate argv elements so no shell escaping is needed.
         port =
           Port.open(
-            {:spawn_executable, codex_path},
+            {:spawn_executable, "/bin/sh"},
             [
               :binary,
               :exit_status,
               :use_stdio,
               :stderr_to_stdout,
-              {:args, args},
+              {:args, ["-c", "exec \"$@\" </dev/null", "sh", codex_path | args]},
               {:cd, project_path},
               {:env, env}
             ]
           )
 
-        Port.connect(port, handler_pid)
-        send(handler_pid, {:port, port})
+        _handler_pid =
+          EyeInTheSky.CLI.Port.spawn_handler(port, session_ref, caller, idle_timeout_ms,
+            telemetry_prefix: [:eits, :codex, :cli],
+            log_prefix: "Codex.CLI"
+          )
 
         :telemetry.execute([:eits, :codex, :cli, :spawn], %{system_time: System.system_time()}, %{
           project_path: project_path,

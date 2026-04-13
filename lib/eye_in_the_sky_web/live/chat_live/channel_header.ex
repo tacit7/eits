@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
   def channel_header(assigns) do
     ~H"""
     <div
-      class="max-w-6xl mx-auto w-full bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0"
+      class="max-w-6xl mx-auto w-full bg-base-100 rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0"
       id="chat-header-card"
     >
       <div class="px-5 py-3">
@@ -27,7 +27,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
                 Chat
               <% end %>
             </h1>
-            <%= if @active_channel && @active_channel[:description] do %>
+            <%= if not is_nil(@active_channel) && not is_nil(@active_channel[:description]) do %>
               <span class="text-xs text-base-content/30">{@active_channel.description}</span>
             <% end %>
           </div>
@@ -59,7 +59,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
             </button>
             <button
               phx-click="toggle_agent_drawer"
-              class="btn btn-xs btn-primary gap-1"
+              class="btn btn-xs btn-primary gap-1 min-h-[44px] min-w-[44px]"
             >
               <.icon name="hero-plus-mini" class="w-3 h-3" /> New Agent
             </button>
@@ -86,7 +86,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
     ~H"""
     <div class="px-5 pb-3 border-t border-base-content/5 pt-3" id="chat-members-panel">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-[10px] uppercase tracking-wider font-medium text-base-content/30">
+        <span class="text-xs uppercase tracking-wider font-medium text-base-content/30">
           Channel Agents
         </span>
       </div>
@@ -97,7 +97,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
             <div class="inline-flex items-center gap-0.5 group">
               <a
                 href={~p"/dm/#{member.session_id}"}
-                class="inline-flex items-center gap-1 font-mono text-[11px] font-medium px-2 py-0.5 rounded-l bg-base-content/[0.04] text-base-content/50 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
+                class="inline-flex items-center gap-1 font-mono text-[11px] font-medium px-2 py-0.5 min-h-[44px] rounded-l bg-base-content/[0.04] text-base-content/50 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
                 title={"Session ##{member.session_id}"}
               >
                 @{member.session_id}
@@ -128,7 +128,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
 
       <div class="border-t border-base-content/5 pt-2 mt-1">
         <div class="flex items-center justify-between mb-1.5">
-          <span class="text-[10px] uppercase tracking-wider font-medium text-base-content/30">
+          <span class="text-xs uppercase tracking-wider font-medium text-base-content/30">
             Add Agent
           </span>
         </div>
@@ -138,7 +138,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
             name="session_search"
             value={@session_search}
             placeholder="Search sessions..."
-            class="w-full input input-xs bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 text-xs"
+            class="w-full input input-xs bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 text-base"
             autocomplete="off"
             phx-debounce="200"
           />
@@ -147,7 +147,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
           <div class="max-h-48 overflow-y-auto space-y-2">
             <%= for group <- @sessions_by_project do %>
               <div>
-                <span class="text-[10px] font-medium text-base-content/25 uppercase tracking-wider">
+                <span class="text-xs font-medium text-base-content/25 uppercase tracking-wider">
                   {group.project_name}
                 </span>
                 <div class="flex flex-wrap gap-1 mt-0.5">
@@ -155,7 +155,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
                     <button
                       phx-click="add_agent_to_channel"
                       phx-value-session_id={session.id}
-                      class="inline-flex items-center gap-1 font-mono text-[11px] px-2 py-0.5 rounded bg-base-content/[0.03] text-base-content/40 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
+                      class="inline-flex items-center gap-1 font-mono text-[11px] px-2 py-0.5 min-h-[44px] rounded bg-base-content/[0.03] text-base-content/40 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
                       title={"Add @#{session.id} to channel"}
                     >
                       <.icon name="hero-plus-mini" class="w-2.5 h-2.5 opacity-50" />
@@ -170,9 +170,9 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
                                                                                                   do:
                                                                                                     "…"}
                       </span>
-                      <span class="text-[9px] text-base-content/15">{session.model}</span>
+                      <span class="text-xs text-base-content/15">{session.model}</span>
                       <%= if session.ended_at do %>
-                        <span class="text-[9px] text-base-content/15">ended</span>
+                        <span class="text-xs text-base-content/15">ended</span>
                       <% end %>
                     </button>
                   <% end %>

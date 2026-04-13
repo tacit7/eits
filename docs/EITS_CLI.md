@@ -24,13 +24,18 @@ Requires `curl` and `jq`.
 ## sessions
 
 ```bash
-eits sessions list
+eits sessions list [--search <q>] [--status <s>] [--project <id>] [--limit <n>]
+eits sessions search <query>
 eits sessions get <uuid>
+eits sessions tasks <uuid>
+eits sessions notes <uuid>
 eits sessions create --session-id <uuid> [--name <n>] [--description <d>] [--project <name>] [--model <m>] [--entrypoint <e>]
 eits sessions update <uuid> [--status <s>] [--intent <text>] [--entrypoint <e>]
 eits sessions end <uuid>
 eits sessions context <uuid>
 ```
+
+`sessions get <uuid>` returns a rich response that includes the session, its linked tasks, `recent_notes` (last 5, body truncated to 120 chars), and `recent_commits` (last 5) in a single call.
 
 ---
 
@@ -109,6 +114,7 @@ eits tasks annotate 42 --body "Implemented via migration + controller change"
 
 ```bash
 eits notes list [--q <query>] [--session <uuid>] [--limit <n>]
+eits notes search <query>
 eits notes get <id>
 eits notes create --parent-type <session|task|agent> --parent-id <id> --body <text> \
   [--title <t>] [--starred]
@@ -143,7 +149,7 @@ eits agents spawn --instructions <text> [--model <m>] [--provider <p>] \
 ## commits
 
 ```bash
-eits commits list
+eits commits list [--session <uuid>]
 eits commits create [--agent <uuid>] --hash <h1> [--hash <h2>] [--message <m>]
 # --agent defaults to $EITS_AGENT_UUID
 ```
@@ -203,3 +209,59 @@ eits teams status <id>
 eits teams update-member <team_id> <member_id> --status <s>
 eits teams leave <team_id> <member_id>
 ```
+
+---
+
+## EITS-CMD Feedback Protocol
+
+> **Since commit 73f64bd.** All `EITS-CMD:` directives processed by AgentWorker now return a feedback line to the originating session.
+
+### Response format
+
+Every directive produces exactly one feedback line written back to the agent's output stream:
+
+```
+[EITS-CMD ok] <result>
+[EITS-CMD error] <reason>
+```
+
+### Success — returned IDs
+
+| Directive | Returned value |
+|-----------|---------------|
+| `task begin <title>` | `task_id=<id>` |
+| `task annotate <id> <body>` | `task_id=<id>` |
+| `task done <id>` | `task_id=<id>` |
+| `team add <team_id> <name>` | `member_id=<id>` |
+| `spawn <instructions>` | `agent_id=<uuid>` |
+| `dm --to <target> --message <msg>` | `ok` |
+| `commit <hash>` | `ok` |
+
+### Failure
+
+```
+[EITS-CMD error] task not found: 9999
+[EITS-CMD error] team_id is required
+```
+
+### Required agent behavior
+
+Agents **must wait for the feedback line** before issuing follow-up commands that depend on the result. In particular:
+
+- After `task begin`, read the returned `task_id` before calling `task done` or `task annotate`.
+- After `spawn`, read the returned `agent_id` before sending a DM to the new agent.
+- After `team add`, read the returned `member_id` before calling `teams leave`.
+
+**Pattern:**
+
+```
+EITS-CMD: task begin Implement feature X
+# Wait for: [EITS-CMD ok] task_id=42
+
+EITS-CMD: task annotate 42 Completed the implementation
+# Wait for: [EITS-CMD ok] task_id=42
+
+EITS-CMD: task done 42
+```
+
+Issuing a dependent command before receiving feedback risks referencing a task/agent/member ID that hasn't been created yet.

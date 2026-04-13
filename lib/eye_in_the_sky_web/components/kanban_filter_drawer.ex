@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
             <h2 class="text-sm font-semibold text-base-content/80">Filter</h2>
             <button
               phx-click="toggle_filter_drawer"
-              class="btn btn-ghost btn-xs btn-circle"
+              class="btn btn-ghost btn-sm btn-circle min-h-[44px] min-w-[44px]"
               aria-label="Close"
             >
               <.icon name="hero-x-mark-mini" class="w-4 h-4" />
@@ -59,7 +59,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
                     value={@search_query}
                     placeholder="Enter a keyword..."
                     phx-debounce="300"
-                    class="input input-sm w-full pl-8 bg-base-100 border-base-content/10 placeholder:text-base-content/25 text-sm"
+                    class="input input-sm w-full pl-8 bg-base-100 border-base-content/10 placeholder:text-base-content/25 text-base min-h-[44px]"
                     autocomplete="off"
                   />
                 </div>
@@ -129,7 +129,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
                 Priority
               </h3>
               <div class="space-y-1.5">
-                <%= for {label, value, color} <- [{"High", 3, "#EF4444"}, {"Med", 2, "#F59E0B"}, {"Low", 1, "#3B82F6"}] do %>
+                <%= for {label, value, color} <- [{"High", 3, "hsl(var(--er))"}, {"Med", 2, "hsl(var(--wa))"}, {"Low", 1, "hsl(var(--in))"}] do %>
                   <label class="flex items-center gap-3 cursor-pointer py-0.5 group">
                     <input
                       type="checkbox"
@@ -167,7 +167,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
                       />
                       <div
                         class="flex-1 h-5 rounded flex items-center px-2"
-                        style={"background-color: #{tag.color || "#6B7280"}"}
+                        style={"background-color: #{tag.color || "hsl(var(--bc) / 0.3)"}"}
                       >
                         <span class="text-[11px] font-medium text-white/90 truncate">{tag.name}</span>
                       </div>

@@ -1,24 +1,25 @@
 defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
+  @moduledoc false
   import Phoenix.LiveView, only: [push_event: 3, put_flash: 3]
 
-  alias EyeInTheSky.{Messages, Claude.SessionImporter, Claude.SessionReader}
+  alias EyeInTheSky.Claude.SessionImporter
+  alias EyeInTheSky.Claude.SessionReader
   alias EyeInTheSky.Codex.SessionImporter, as: CodexImporter
   alias EyeInTheSky.Codex.SessionReader, as: CodexReader
+  alias EyeInTheSky.Messages
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 
   def handle_export_jsonl(socket) do
     messages = socket.assigns[:messages] || []
 
     text =
-      messages
-      |> Enum.map(fn msg ->
+      Enum.map_join(messages, "\n", fn msg ->
         Jason.encode!(%{
           role: msg.sender_role,
           body: msg.body,
           timestamp: msg.inserted_at
         })
       end)
-      |> Enum.join("\n")
 
     {:noreply, push_event(socket, "copy_to_clipboard", %{text: text, format: "JSONL"})}
   end
@@ -27,12 +28,10 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
     messages = socket.assigns[:messages] || []
 
     text =
-      messages
-      |> Enum.map(fn msg ->
+      Enum.map_join(messages, "\n\n", fn msg ->
         role = String.capitalize(to_string(msg.sender_role))
         "**#{role}**: #{msg.body}"
       end)
-      |> Enum.join("\n\n")
 
     {:noreply, push_event(socket, "copy_to_clipboard", %{text: text, format: "Markdown"})}
   end

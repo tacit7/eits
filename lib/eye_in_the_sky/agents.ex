@@ -8,8 +8,8 @@ defmodule EyeInTheSky.Agents do
   use EyeInTheSky.CrudHelpers, schema: EyeInTheSky.Agents.Agent
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Agents.Agent
+  alias EyeInTheSky.Repo
 
   @doc """
   Returns the list of agents.
@@ -33,9 +33,11 @@ defmodule EyeInTheSky.Agents do
 
   @doc """
   Returns the list of active agents.
+  Active agents are those whose status is not "completed" or "failed".
   """
   def list_active_agents do
     Agent
+    |> where([a], a.status not in ["completed", "failed"])
     |> preload([:project])
     |> order_by([a], desc: a.created_at)
     |> Repo.all()
@@ -63,8 +65,7 @@ defmodule EyeInTheSky.Agents do
   """
   @spec get_agent!(integer()) :: Agent.t()
   def get_agent!(id) do
-    Agent
-    |> preload([:project, :agent_definition])
+    base_agent_query()
     |> Repo.get!(id)
     |> populate_project_name()
   end
@@ -76,8 +77,7 @@ defmodule EyeInTheSky.Agents do
   """
   @spec get_agent(integer()) :: {:ok, Agent.t()} | {:error, :not_found}
   def get_agent(id) do
-    case Agent
-         |> preload([:project, :agent_definition])
+    case base_agent_query()
          |> Repo.get(id) do
       nil -> {:error, :not_found}
       agent -> {:ok, populate_project_name(agent)}
@@ -128,6 +128,34 @@ defmodule EyeInTheSky.Agents do
   end
 
   @doc """
+  Finds an agent by UUID or creates one with the given attrs.
+  Uses on_conflict: :nothing to handle UUID uniqueness races without exceptions.
+  """
+  def find_or_create_agent(%{uuid: uuid} = attrs) do
+    case get_agent_by_uuid(uuid) do
+      {:ok, existing} ->
+        {:ok, existing}
+
+      {:error, :not_found} ->
+        %Agent{}
+        |> Agent.changeset(attrs)
+        |> Repo.insert(on_conflict: :nothing, conflict_target: :uuid)
+        |> case do
+          {:ok, %Agent{id: nil}} ->
+            # on_conflict: :nothing means no row returned; re-fetch the winner
+            get_agent_by_uuid(uuid)
+
+          {:ok, agent} ->
+            EyeInTheSky.Events.agent_created(agent)
+            {:ok, agent}
+
+          {:error, _changeset} = err ->
+            err
+        end
+    end
+  end
+
+  @doc """
   Updates an agent.
   """
   @spec update_agent(Agent.t(), map()) :: {:ok, Agent.t()} | {:error, Ecto.Changeset.t()}
@@ -138,13 +166,22 @@ defmodule EyeInTheSky.Agents do
   end
 
   @doc """
-  No-op. Agent status is tracked on the Session, not the Agent.
-  Use `Sessions.update_session/2` with `%{status: status}` instead.
-
-  @deprecated
+  Returns agents whose status is not "completed" or "failed".
+  Used by the scheduler to check agents that may need status updates.
   """
-  def update_agent_status(%Agent{} = agent, _status) do
-    {:ok, agent}
+  def list_agents_pending_status_check do
+    Agent
+    |> where([a], a.status not in ["completed", "failed"])
+    |> Repo.all()
+  end
+
+  @doc """
+  Archives an agent by setting its archived_at timestamp.
+  """
+  def archive_agent(%Agent{} = agent, now) do
+    agent
+    |> Agent.changeset(%{archived_at: now})
+    |> Repo.update()
   end
 
   @doc """
@@ -182,7 +219,7 @@ defmodule EyeInTheSky.Agents do
   """
   def list_bookmarked_agents do
     Agent
-    |> where([a], a.bookmarked == true)
+    |> where([a], a.bookmarked)
     |> preload([:project])
     |> order_by([a], desc: a.created_at)
     |> Repo.all()
@@ -260,5 +297,14 @@ defmodule EyeInTheSky.Agents do
       sessions: sessions,
       active_session: active_session
     }
+  end
+
+  @doc "Preloads associations onto an agent struct. Defaults to [:sessions, :project]."
+  def preload_agent_associations(%Agent{} = agent, assocs \\ [:sessions, :project]) do
+    Repo.preload(agent, assocs)
+  end
+
+  defp base_agent_query do
+    from(a in Agent, preload: [:project, :agent_definition])
   end
 end

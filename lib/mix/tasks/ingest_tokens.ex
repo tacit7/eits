@@ -11,6 +11,8 @@ defmodule Mix.Tasks.IngestTokens do
 
   use Mix.Task
 
+  alias EyeInTheSky.Metrics.TokenIngestion
+
   @shortdoc "Ingest token usage from Claude JSONL files into session_metrics"
 
   @impl Mix.Task
@@ -23,19 +25,17 @@ defmodule Mix.Tasks.IngestTokens do
         aliases: [f: :force, s: :session]
       )
 
-    cond do
-      opts[:session] ->
-        ingest_single(opts[:session])
-
-      true ->
-        ingest_all(force: opts[:force] || false)
+    if opts[:session] do
+      ingest_single(opts[:session])
+    else
+      ingest_all(force: opts[:force] || false)
     end
   end
 
   defp ingest_single(uuid) do
     Mix.shell().info("Ingesting session #{uuid}...")
 
-    case EyeInTheSky.Metrics.TokenIngestion.ingest_session(uuid) do
+    case TokenIngestion.ingest_session(uuid) do
       :ok ->
         Mix.shell().info("Done.")
 
@@ -49,8 +49,8 @@ defmodule Mix.Tasks.IngestTokens do
     mode = if force, do: "force", else: "incremental"
     Mix.shell().info("Ingesting token usage (#{mode})...")
 
-    {ingested, skipped, errors} =
-      EyeInTheSky.Metrics.TokenIngestion.ingest_all(force: force)
+    %{ingested: ingested, skipped: skipped, errors: errors} =
+      TokenIngestion.ingest_all(force: force)
 
     Mix.shell().info("""
     Done.

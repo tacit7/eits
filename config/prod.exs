@@ -8,8 +8,11 @@ import Config
 config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
   cache_static_manifest: "priv/static/cache_manifest.json"
 
+# LiveSvelte SSR via Node.js in production
+config :live_svelte, ssr_module: LiveSvelte.SSR.NodeJS
+
 # Configures Swoosh API Client
-config :swoosh, api_client: Swoosh.ApiClient.Req
+config :swoosh, api_client: false
 
 # Disable Swoosh Local Memory Storage
 config :swoosh, local: false

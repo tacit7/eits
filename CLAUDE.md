@@ -8,10 +8,6 @@ Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky.
 
 This project uses Phoenix LiveView with Elixir. Primary languages: TypeScript, JavaScript, Elixir/HEEx, Go, Rust. Use Tailwind CSS for styling.
 
-## Project Conventions
-
-- The `tasks` table uses `created_at`, **not** `inserted_at`. Always verify timestamp field names against the schema before using them — using `inserted_at` will cause KeyErrors at runtime.
-
 ## Git Worktrees
 
 **Always start any code change work in a worktree.** Never modify files directly in the main project directory. Create a worktree first, make changes there, then merge/PR back.
@@ -20,15 +16,20 @@ Worktrees live in `.claude/worktrees/` relative to the project root.
 
 When using git worktrees, always verify you are editing files in the worktree directory, NOT the main project directory. Check `pwd` before making edits.
 
-If deps are missing in the worktree, symlink them before compiling. Worktrees live at `.claude/worktrees/<name>/`, which is **3 levels deep** from the project root — use `../../../`:
+If deps are missing in the worktree, symlink only `deps` — never `_build`. Worktrees live at `.claude/worktrees/<name>/`, which is **3 levels deep** from the project root — use `../../../`:
 ```bash
 cd .claude/worktrees/<name>
-ln -s ../../../deps deps && ln -s ../../../_build _build
+ln -s ../../../deps deps
 ```
 
-Do NOT use `../../` — that resolves to `.claude/`, not the project root, and the symlinks will be broken.
+Do NOT use `../../` — that resolves to `.claude/`, not the project root, and the symlink will be broken.
 
-**Exception: when adding new Elixir modules or deps**, do NOT symlink `_build`. A symlinked `_build` causes stale module conflicts when the worktree introduces modules that don't exist in the main tree (compiled beams collide). For tasks that add new modules, run `mix deps.get` and `mix compile` directly in the worktree to get an isolated `_build`.
+**NEVER symlink `_build` to the main project.** Always use an isolated `_build` in each worktree. A symlinked `_build` lets agent compilations overwrite main's `.beam` files with worktree versions, producing stale/conflicting modules when main restarts — this is the root cause of needing `mix clean` to recover. For all worktrees, run `mix compile` directly to get an isolated `_build`:
+```bash
+cd .claude/worktrees/<name>
+ln -s ../../../deps deps
+mix compile
+```
 
 **CRITICAL: `rm` is aliased to `rm-trash` on this system.** It follows symlinks and trashes the target, not the symlink. To remove symlinks, always use `unlink`:
 ```bash
@@ -44,7 +45,13 @@ PORT=5002 mix phx.server # Override port via PORT env var (range 5001-5020)
 mix compile              # Compile only
 ```
 
-Assets: `cd assets && npm install` for JS dependencies. Esbuild and Tailwind run as Phoenix watchers.
+Assets: `cd assets && npm install` for JS dependencies. Vite, Tailwind, and TypeScript compilation run as Phoenix watchers.
+
+Asset pipeline uses **Vite** (`assets/vite.config.mjs`). Dev server runs on port 5173 (override with `VITE_PORT`). When running a worktree server alongside main, use a different port to avoid conflicts:
+
+```bash
+VITE_PORT=5174 PORT=5002 mix phx.server
+```
 
 ## Playwright / Browser Testing
 
@@ -58,9 +65,7 @@ Navigate Playwright to `http://localhost:5002`. This avoids interfering with the
 
 ## Development Workflow
 
-**Before committing:** Always run `mix compile` to ensure the project compiles without errors. Only warnings are acceptable.
-
-After completing code changes, always run `mix compile --warnings-as-errors` to verify clean compilation before committing.
+**Before committing:** Run `mix compile --warnings-as-errors`. Only warnings are acceptable, no errors.
 
 **Before staging/committing:** Run `git status` and `git diff --staged` to check for pre-existing staged changes. Never assume a clean staging area — only commit the files relevant to the current task.
 
@@ -68,7 +73,7 @@ After completing code changes, always run `mix compile --warnings-as-errors` to 
 
 When fixing bugs, grep the **entire codebase** for ALL occurrences of the problematic pattern before making any edits. List every file and line number, then fix all of them in a single pass. Don't fix just the first occurrence.
 
-When a UI bug is reported, read the exact symptom carefully before investigating. Do not assume the category of bug. Don't investigate duplicate messages when the report is about dark mode CSS. Read the report literally, trace the code, then propose a fix.
+When a UI bug is reported, read the exact symptom carefully before investigating. Do not assume the category of bug. Read the report literally, trace the code, then propose a fix.
 
 ## Session Status Lifecycle
 
@@ -84,38 +89,21 @@ Session status is driven by Claude Code hooks and explicit commands:
 
 `CLAUDE_CODE_ENTRYPOINT` distinguishes `cli` (interactive) from `sdk-cli` (headless/spawned).
 
-## Entrypoint-Based Command Protocol
+## EITS Command Protocol
 
-> **IMPORTANT: Check your entrypoint before dispatching ANY EITS command.**
-> Run `echo $CLAUDE_CODE_ENTRYPOINT` at the start of every session.
-> Using the wrong method silently fails or breaks session hierarchy.
+All agents — interactive (`cli`) and headless (`sdk-cli`) — use the `eits` CLI script directly. EITS-CMD directives are deprecated.
 
-**How you dispatch EITS commands depends on your `CLAUDE_CODE_ENTRYPOINT`:**
-
-| Entrypoint | Mode | Use |
-|------------|------|-----|
-| `cli` | Interactive | `eits` CLI script |
-| `sdk-cli` | Headless/spawned agent | `EITS-CMD:` directives in output |
-
-**`sdk-cli` (headless/spawned agents) — use `EITS-CMD:` lines:**
-```
-EITS-CMD: task begin Fix broken import
-EITS-CMD: task done 1234
-EITS-CMD: task annotate 1234 What I did and why
-EITS-CMD: dm --to <session_uuid> --message "done"
-EITS-CMD: commit abc1234
-```
-These are intercepted by AgentWorker in-process — no HTTP round-trips. **Never use the `eits` bash script when running as `sdk-cli`.**
-
-**`cli` (interactive sessions) — use `eits` script:**
 ```bash
-eits tasks begin --title "Task name"   # replaces: create + start
+eits tasks begin --title "Task name"   # create + start in one shot
 eits tasks annotate <id> --body "..."
 eits tasks update <id> --state 4
+eits tasks complete <id> --message "Summary"
 eits dm --to <session_uuid> --message "done"
+eits dm --to 1740 --message "done"     # numeric session ID also works
+eits commits create --hash <hash>
 ```
 
-**When spawning agents:** their `CLAUDE_CODE_ENTRYPOINT` will be `sdk-cli`. Write their instructions using `EITS-CMD:` directives, not `eits` CLI calls.
+**DM targets support both UUID and numeric session ID.** Pass either format to `dm --to`.
 
 ## REST API
 
@@ -125,9 +113,9 @@ JSON API at `/api/v1` for Claude Code hooks and external integrations. See [docs
 
 This app spawns Claude CLI processes to run agents. API key configuration:
 
-- **Environment-based**: Claude CLI uses `ANTHROPIC_API_KEY` from the system environment or `~/.config/claude/config.toml`
-- **No DB storage**: API keys are NOT stored in the database
-- **Pass-through**: The CLI module passes through all system environment variables to spawned Claude processes
+- **Max plan OAuth**: Spawned Claude processes authenticate via Max plan OAuth credentials stored in the macOS keychain — no API key needed.
+- **ANTHROPIC_API_KEY is blocked**: `build_env` in `claude/cli.ex` explicitly strips `ANTHROPIC_API_KEY` from the spawned process environment. This prevents a leaked API key in the server env from overriding Max plan OAuth and causing "Credit balance is too low" billing errors.
+- **No DB storage**: API keys are NOT stored in the database.
 
 Common error when API key has insufficient credits:
 ```json
@@ -142,131 +130,11 @@ PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. **T
 
 ## Architecture
 
-- `lib/eye_in_the_sky_web/` - Contexts (Sessions, Tasks, Agents, Projects, Notes, Prompts, Commits)
-- `lib/eye_in_the_sky_web_web/` - Web layer (LiveViews, components, router)
-- `lib/eye_in_the_sky_web/search/pg_search.ex` - Full-text search using PostgreSQL tsvector/tsquery with ILIKE fallback (`EyeInTheSkyWeb.Search.PgSearch`)
-
-## PubSub
-
-All PubSub broadcasting and subscribing goes through `EyeInTheSkyWeb.Events` (`lib/eye_in_the_sky_web/events.ex`). **Never call `Phoenix.PubSub.broadcast` or `Phoenix.PubSub.subscribe` directly** — use the named functions in Events.
-
-```elixir
-# GOOD
-EyeInTheSkyWeb.Events.agent_updated(agent)
-EyeInTheSkyWeb.Events.subscribe_session(session_id)
-
-# BAD
-Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, agent})
-Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session_id}")
-```
-
-Events owns all topic strings. If you need a new broadcast, add a named function to Events — don't hardcode a topic anywhere else. `EyeInTheSkyWebWeb.Helpers.PubSubHelpers` is a thin compatibility wrapper that delegates to Events; prefer calling Events directly in new code.
+See `lib/CLAUDE.md` for full architecture, schema conventions, PubSub rules, and UI standards.
 
 ## Documentation
 
-Project docs live in `docs/`. Key references:
+See `docs/CLAUDE.md` for the full documentation index.
 
-- [docs/SECURITY.md](docs/SECURITY.md) — Security architecture: auth, session handling, rate limiting, secrets, transport security
-- [docs/REST_API.md](docs/REST_API.md) — Full API endpoint reference
-- [docs/SETUP.md](docs/SETUP.md) — Project setup guide
-- [docs/CODE_GUIDELINES.md](docs/CODE_GUIDELINES.md) — Coding standards
-- [docs/EITS_CLI.md](docs/EITS_CLI.md) — CLI reference
-- [docs/EITS_HOOKS.md](docs/EITS_HOOKS.md) — Hook system
-- [docs/DM_FEATURES.md](docs/DM_FEATURES.md) — DM/messaging features
-- [docs/SESSION_MANAGER.md](docs/SESSION_MANAGER.md) — Session lifecycle
-- [docs/WORKERS.md](docs/WORKERS.md) — Background workers
-- [docs/KANBAN.md](docs/KANBAN.md) — Kanban board
-- [docs/COMMAND_PALETTE.md](docs/COMMAND_PALETTE.md) — Command palette
-- [docs/chat-mention-workflow.md](docs/chat-mention-workflow.md) — Chat @mention system
-- [docs/claude-cli-flags.md](docs/claude-cli-flags.md) — Claude CLI flag reference
-- [docs/CONTEXT_WINDOW.md](docs/CONTEXT_WINDOW.md) — Context window handling
-- [docs/SEARCH.md](docs/SEARCH.md) — Full-text search: PgSearch implementation, prefix-aware tsquery, callers
-- [docs/CODEX_SDK.md](docs/CODEX_SDK.md) — Codex SDK: session lifecycle, JSONL events, resume flow, env vars
-- [docs/CHAT.md](docs/CHAT.md) — Chat system: channels, routing protocol, @mentions, cross-project membership
-- [docs/EVENTS.md](docs/EVENTS.md) — PubSub Events module: all topics, payload shapes, subscribe helpers, how to add new events
-
-## UI Standards
-
-### Icons
-
-**Always use Heroicons** via the Phoenix `<.icon>` component. Never use inline SVG paths.
-
-```heex
-<!-- GOOD -->
-<.icon name="hero-folder" class="w-4 h-4" />
-<.icon name="hero-document-text" class="w-4 h-4" />
-<.icon name="hero-chevron-right" class="w-4 h-4" />
-
-<!-- BAD -->
-<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="..." />
-</svg>
-```
-
-Common icons:
-- `hero-folder` - Directories
-- `hero-document-text` - Files
-- `hero-chevron-right` - Expand/collapse indicators
-- `hero-x-mark` - Close buttons
-- `hero-pencil-square` - Edit buttons
-
-### Full-Text Search
-
-`lib/eye_in_the_sky_web/search/pg_search.ex` (`EyeInTheSkyWeb.Search.PgSearch`) wraps PostgreSQL `tsvector/tsquery` full-text search with an ILIKE fallback. Use `PgSearch.search_for/2` for all full-text queries across sessions, tasks, and notes.
-
-**Helper Function: `PgSearch.fts_name_description_match/1`**
-
-Extracts reusable tsvector query fragments for common search patterns across sessions, tasks, and notes. This helper:
-- Builds PostgreSQL `@@` operator queries on indexed columns
-- Returns parameterized tsvector expressions for use in composed queries
-- Falls back to ILIKE for partial matching when tsquery doesn't match
-- Used in Sessions, Tasks, and Notes contexts for consistent search behavior
-- Performance: tsvector queries are O(log N) on indexed columns vs O(N) for ILIKE
-
-### Workflow States
-
-The `workflow_states` table defines kanban columns. Current states:
-
-| ID | Name        | Position | Color   |
-|----|-------------|----------|---------|
-| 1  | To Do       | 1        | #6B7280 |
-| 2  | In Progress | 2        | #3B82F6 |
-| 4  | In Review   | 3        | #F59E0B |
-| 3  | Done        | 4        | #10B981 |
-
-### Type Quirks
-
-- Project PK is integer (`@primary_key {:id, :id, autogenerate: false}`). Task `project_id` uses `type: :string` in the Ecto association for legacy compatibility.
-- Agent `project_name` is a real DB column (not virtual).
-
-### Schema Naming
-
-Two schemas map to different DB tables:
-
-- **`Agent` schema** (`lib/eye_in_the_sky_web/agents/agent.ex`) → **`agents` DB table** (agent identity/participant)
-- **`Session` schema** (`lib/eye_in_the_sky_web/sessions/session.ex`) → **`sessions` DB table** (execution session)
-
-The old `ChatAgent` schema and `ChatAgents` context have been removed. All agent identity operations go through `EyeInTheSkyWeb.Agents`.
-
-In LiveViews and components:
-- `@session` typically refers to a `Session` struct (from sessions table)
-- Sessions have an `agent_id` foreign key pointing to the agents table
-- The `Agents` context handles agent CRUD; the `Sessions` context handles session-specific logic like `format_model_info/1`
-
-### Agent `last_activity_at` Schema
-
-**Migration History:**
-- Previous: DateTime field (Elixir datetime)
-- Current: ISO8601 text field (standardized string format)
-- Migration: `20260309000001_change_agent_last_activity_at_to_text.exs`
-
-**Impact:**
-- Agent status scheduling in `lib/eye_in_the_sky_web/scheduler/agent_status.ex` now uses ISO8601 strings
-- Queries comparing timestamps must use string comparison or convert to datetime
-- Use `DateTime.from_iso8601/1` when comparing with Elixir datetime values
-- Always pass ISO8601 strings when updating `last_activity_at` on agents
-
-**Sessions `last_activity_at` Ordering:**
-- Sessions can be sorted by `last_activity_at`, `created_at`, or `last_message_at`
-- Use `Sessions.list_sessions/2` with `:last_activity_at`, `:created_at`, or `:last_message_at` sort options
-- Filtering works with ISO8601 string values; comparisons use standard string ordering
+Key references:
+- `docs/AGENT_WORKER_QUEUE.md` — AgentWorker queue design, message lifecycle (pending→processing→delivered/failed), error paths, `normalize_context` gotcha

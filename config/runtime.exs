@@ -125,13 +125,25 @@ if config_env() == :prod do
       You can generate one by calling: mix phx.gen.secret
       """
 
-  host = System.get_env("PHX_HOST") || "example.com"
+  host = System.get_env("PHX_HOST") || "eits.dev"
   port = String.to_integer(System.get_env("PORT") || "4000")
 
   config :eye_in_the_sky, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
+  # Build check_origin list from PHX_HOST + any WEBAUTHN_EXTRA_ORIGINS.
+  # Use "//host" format (scheme-agnostic) so it works correctly behind
+  # reverse proxies regardless of how the Origin header arrives.
+  extra_origins =
+    case webauthn_extra_raw do
+      nil -> []
+      raw -> raw |> String.split(",") |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
+    end
+
+  allowed_origins = ["//#{host}" | extra_origins]
+
   config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
+    check_origin: allowed_origins,
     http: [
       # Enable IPv6 and bind on all interfaces.
       # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.

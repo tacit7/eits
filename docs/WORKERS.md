@@ -2,6 +2,85 @@
 
 This document describes the OTP workers (GenServers) that process async jobs and background tasks.
 
+## AgentWorker: Orphaned Claude Process Cleanup
+
+When the server restarts while a Claude subprocess is still running, that orphaned process holds the Claude session lock. The next attempt to start the same session gets a `"Session ID already in use"` error from the CLI.
+
+**Retry flow (in `agent_worker.ex`):**
+
+1. `handle_info({:claude_error, ref, {:cli_error, msg}}, ...)` receives the error.
+2. If `msg` contains `"already in use"` and `:kill_retry` is not set in the job context, the worker:
+   - Calls `kill_orphaned_claude(uuid)` — runs `pkill -f <session_uuid>` to kill any process with the UUID in its argv, then sleeps 200ms.
+   - Converts the job to a resume via `Job.as_resume/1`.
+   - Sets `:kill_retry true` in the job context to prevent a second retry loop.
+   - Retries `start_sdk/2` with the resume job.
+   - On success: fires `WorkerEvents.on_sdk_started/2` and continues normally.
+   - On failure: falls through to the normal error handler.
+3. If `:kill_retry` is already set (second attempt), the error falls through — no infinite retry.
+
+**Why `pkill -f <uuid>`:** Session UUIDs are unique enough that false matches are not a concern. The UUID appears in the Claude subprocess argv (`--resume <uuid>`), making it a reliable match target.
+
+**`Job.as_resume/1`:** Sets `has_messages: true` on the job context, preserving all other context fields and message/block data. This tells the CLI layer to use `--resume` instead of a fresh start.
+
+**Code locations:**
+- `lib/eye_in_the_sky/claude/agent_worker.ex` — `handle_info` clause for `already in use`, `kill_orphaned_claude/1`
+- `lib/eye_in_the_sky/claude/job.ex` — `Job.as_resume/1`
+- `test/eye_in_the_sky/claude/agent_worker_test.exs` — retry and fall-through tests
+- `test/eye_in_the_sky/claude/job_test.exs` — `as_resume/1` tests
+
+**Commits:** `29f9684` (orphan kill + retry), `428b0c8` (tests + `on_sdk_started` fix)
+
+---
+
+## AgentWorker Idle Timeout (Supervisor Slot Management)
+
+AgentWorker processes that remain idle with empty job queues auto-terminate after 30 minutes to prevent supervisor slot exhaustion under sustained load.
+
+**Why:** `AgentSupervisor` has a maximum number of children. Long-running idle workers tie up slots that could be used for new agents. Without idle timeout, idle workers accumulate and new spawn requests hit `max_children` errors.
+
+**How it works:**
+1. Worker enters idle state with empty queue → `IdleTimer.maybe_schedule(state)` schedules a 30-minute timer via `Process.send_after/3`
+2. If a new job arrives during the 30 minutes → timer is cancelled via `IdleTimer.cancel/1`
+3. If no job arrives within 30 minutes → `:idle_timeout` message triggers `exit(:normal)`
+4. Supervisor sees `:normal` exit (not a crash) and does NOT restart due to `restart: :transient` config
+5. Slot is freed for a new agent spawn
+
+**Configuration:** Hard-coded to 30 minutes via `@idle_timeout_ms :timer.minutes(30)` in the IdleTimer module. No user-facing setting (CLI idle timeout is different — see section below).
+
+**Code locations:**
+- `lib/eye_in_the_sky/claude/agent_worker.ex` — calls `IdleTimer.maybe_schedule/1` in handle_info
+- `lib/eye_in_the_sky/claude/agent_worker/idle_timer.ex` — `IdleTimer` module with schedule/cancel logic
+- `lib/eye_in_the_sky/claude/supervisor.ex` — `restart: :transient` configuration
+
+**Commits:** d74450ce (idle timeout feature), error recovery integration in agent_worker error handlers
+
+---
+
+## Agent Process Idle Timeout
+
+Claude and Codex agent processes have a configurable idle timeout — if the subprocess produces no output for the configured duration, it is killed and the agent worker receives an error.
+
+**Configuration:** `cli_idle_timeout_ms` setting (Settings UI → "CLI Idle Timeout", in seconds). Stored as milliseconds.
+
+| Value | Meaning |
+|-------|---------|
+| `0` | No timeout (default) — process runs indefinitely |
+| `N > 0` | Kill process after N milliseconds of silence |
+
+**Default:** `0` (no timeout). Processes run until they exit naturally.
+
+**Timeout cascade:**
+1. `EyeInTheSky.CLI.Port.handle_port_output/6` — `after idle_timeout_ms` (`:infinity` when disabled). Closes the OS port and sends `{:claude_exit, ref, :timeout}` to the caller.
+2. `EyeInTheSky.SDK.MessageHandler` — maps `:timeout` → `{:claude_error, sdk_ref, :timeout}` and unregisters.
+3. `EyeInTheSky.Claude.AgentWorker.do_handle_sdk_error/2` — since `:timeout` is not a systemic error (billing/auth), the worker **survives**: drops the current job and processes the next queue item.
+
+**Code locations:**
+- `lib/eye_in_the_sky/cli/port.ex` — port receive loop
+- `lib/eye_in_the_sky/claude/cli.ex` — reads setting, resolves `:infinity` when value is 0
+- `lib/eye_in_the_sky/codex/cli.ex` — same for Codex processes
+- `lib/eye_in_the_sky/claude/agent_worker.ex` — `do_handle_sdk_error/2` recovery logic
+- `lib/eye_in_the_sky_web/live/overview_live/settings.ex` — UI
+
 ## JobDispatcherWorker
 
 Periodically scans for workable tasks and spawns appropriate agents.

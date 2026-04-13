@@ -3,6 +3,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
 
   use EyeInTheSkyWeb, :html
 
+  import EyeInTheSkyWeb.Components.DmHelpers, only: [extract_title: 1, to_utc_string: 1]
+
   attr :notes, :list, default: []
 
   def notes_tab(assigns) do
@@ -36,8 +38,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
                   id={"toggle-note-star-#{note.id}"}
                 >
                   <.icon
-                    name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}
-                    class={"w-4 h-4 #{if note.starred == 1, do: "text-warning", else: "text-base-content/15 hover:text-base-content/30"}"}
+                    name={if note.starred, do: "hero-star-solid", else: "hero-star"}
+                    class={"w-4 h-4 #{if note.starred, do: "text-warning", else: "text-base-content/15 hover:text-base-content/30"}"}
                   />
                 </button>
                 <%!-- Title + meta --%>
@@ -93,23 +95,4 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
     """
   end
 
-  defp to_utc_string(nil), do: ""
-  defp to_utc_string(ts) when is_binary(ts), do: ts
-  defp to_utc_string(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
-  defp to_utc_string(%NaiveDateTime{} = dt), do: NaiveDateTime.to_iso8601(dt) <> "Z"
-  defp to_utc_string(_), do: ""
-
-  defp extract_title(nil), do: "Untitled"
-
-  defp extract_title(body) when is_binary(body) do
-    body
-    |> String.trim()
-    |> String.split("\n")
-    |> List.first()
-    |> String.replace(~r/^#+\s*/, "")
-    |> String.slice(0..50)
-    |> then(fn text ->
-      if String.length(text) >= 50, do: text <> "...", else: text
-    end)
-  end
 end

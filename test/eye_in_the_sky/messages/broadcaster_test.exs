@@ -1,9 +1,9 @@
 defmodule EyeInTheSky.Messages.BroadcasterTest do
   use EyeInTheSky.DataCase, async: false
 
+  alias EyeInTheSky.{Agents, Messages, Sessions}
   alias EyeInTheSky.Messages.Broadcaster
   alias EyeInTheSky.Messages.Message
-  alias EyeInTheSky.{Agents, Sessions, Messages}
   import Ecto.Query
 
   defp uniq, do: System.unique_integer([:positive])

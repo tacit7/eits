@@ -5,7 +5,7 @@
 | Dependency | Version | Notes |
 |-----------|---------|-------|
 | Elixir | 1.15+ | OTP 26+ included |
-| Node.js | 22 LTS | Svelte 5 + esbuild require 18+ |
+| Node.js | 22 LTS | Svelte 5 + Vite require 18+ |
 | PostgreSQL | 12+ | `eits_dev` database |
 | Caddy | any | HTTPS proxy for WebAuthn |
 | NATS | optional | Port 4222, currently disabled in code |
@@ -67,6 +67,15 @@ mix phx.server
 ```
 
 App is available at `https://eits.dev`.
+
+**Vite dev server port (commits 2907189, 8686abb):**
+The Vite asset server defaults to port 5173. Override with `VITE_PORT` when running multiple worktrees in parallel to avoid asset conflicts:
+
+```bash
+VITE_PORT=5174 PORT=5002 mix phx.server
+```
+
+Each running instance needs its own `PORT` (Phoenix) and `VITE_PORT` (Vite) pair.
 
 ## 5. Register the first user
 
@@ -268,12 +277,59 @@ The app includes Web Push and PWA install capability.
 - Runs at `priv/static/sw.js`
 - Handles incoming push events and displays notifications
 
+**Static asset note (commits b194105, f25d0de, f7704bd):**
+`sw.js`, `manifest.json`, and mockup HTML files are committed and tracked in git. They were previously excluded via `.gitignore`; that exclusion was removed. These files are present in the repo and included in production builds — do not re-add them to `.gitignore`.
+
 **Configuration (production):**
-Set `WEB_PUSH_ENCRYPTION_KEY` env var (base64-encoded 16-byte key) for push encryption. Missing key disables push (app still works).
+Push encryption uses VAPID keys (`VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in `.env`). Missing keys disable push in dev; raises at startup in prod.
 
 ---
 
-## 10. CLI Tools
+## 10. Background Jobs (Oban)
+
+The app uses Oban for background job processing and scheduled tasks.
+
+**Development configuration (commit 804fb9e):**
+In `config/dev.exs`, Oban runs with a full plugin set — no inline testing mode. All job lifecycle management is active in development:
+
+```elixir
+# config/dev.exs
+config :eye_in_the_sky_web, Oban,
+  notifier: Oban.Notifiers.PG,
+  plugins: [
+    Oban.Plugins.Pruner,    # deletes completed/discarded jobs after retention window
+    Oban.Plugins.Stager,    # moves scheduled jobs into the executing queue on time
+    Oban.Plugins.Lifeline,  # rescues jobs stuck in executing state (crashed processes)
+    Oban.Plugins.Cron       # runs jobs on a cron schedule
+  ]
+```
+
+**Previous behavior (deprecated):**
+Earlier versions had `testing: :inline` in dev config, which disabled the cron plugin and prevented scheduled jobs from running. This was removed to enable scheduled job testing in development.
+
+**Scheduled jobs:**
+Jobs that run on a cron schedule are defined in the same Oban config. To add a new scheduled job, add a job definition to `:cron` in the config:
+
+```elixir
+config :eye_in_the_sky_web, Oban,
+  plugins: [
+    {Oban.Plugins.Cron, crontab: [
+      {"*/5 * * * *", MyJob, args: %{}},  # Every 5 minutes
+      {"0 0 * * *", DailyDigestWorker, args: %{}}  # Daily at midnight
+    ]}
+  ]
+```
+
+**Production configuration:**
+Oban in production uses `Oban.Notifiers.PG` for real-time job notification via `LISTEN/NOTIFY` (requires superuser or special permission). For environments like Supabase where the app user is not a superuser, use `Oban.Notifiers.Postgres` (poll-based, less efficient but always works).
+
+**Verify jobs are running:**
+- Check `oban_jobs` table for recent entries
+- Monitor job status in the `/oban` dashboard (via SessionAuth, requires session cookie)
+
+---
+
+## 11. CLI Tools
 
 The `scripts/eits` script provides shell access to the REST API.
 

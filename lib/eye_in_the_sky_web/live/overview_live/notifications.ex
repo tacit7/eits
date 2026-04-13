@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Notifications
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1]
 
   @impl true
@@ -27,23 +28,27 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
   end
 
   @impl true
-  def handle_info({:notification_read, id}, socket) do
-    notifications =
-      Enum.map(socket.assigns.notifications, fn n ->
-        if n.id == id, do: %{n | read: true}, else: n
-      end)
-
-    {:noreply, assign(socket, :notifications, notifications)}
+  def handle_info({:notification_read, _id}, socket) do
+    {:noreply, assign(socket, :notifications, load_notifications(socket.assigns.filter))}
   end
 
+  @impl true
   def handle_info({:notifications_updated, _}, socket) do
     {:noreply, assign(socket, :notifications, load_notifications(socket.assigns.filter))}
   end
 
   @impl true
   def handle_event("mark_read", %{"id" => id}, socket) do
-    Notifications.mark_read(String.to_integer(id))
-    {:noreply, assign(socket, :notifications, load_notifications(socket.assigns.filter))}
+    case parse_int(id) do
+      nil -> {:noreply, socket}
+      int_id ->
+        case Notifications.mark_read(int_id) do
+          {:ok, _} -> :ok
+          {:error, _} -> :ok
+        end
+
+        {:noreply, assign(socket, :notifications, load_notifications(socket.assigns.filter))}
+    end
   end
 
   @impl true
@@ -63,8 +68,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
   defp load_notifications("all"), do: Notifications.list_notifications()
 
   defp load_notifications(category) do
-    Notifications.list_notifications()
-    |> Enum.filter(&(&1.category == category))
+    Notifications.list_notifications(category: category)
   end
 
   defp resource_link(%{resource_type: "session", resource_id: id}) when is_binary(id),
@@ -90,34 +94,34 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
   def render(assigns) do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-6">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
         <h1 class="text-xl font-semibold">Notifications</h1>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
           <%!-- Category filter --%>
           <div class="join">
             <button
-              class={"join-item btn btn-xs #{if @filter == "all", do: "btn-active"}"}
+              class={"join-item btn btn-sm min-h-[44px] #{if @filter == "all", do: "btn-active"}"}
               phx-click="filter"
               phx-value-category="all"
             >
               All
             </button>
             <button
-              class={"join-item btn btn-xs #{if @filter == "agent", do: "btn-active"}"}
+              class={"join-item btn btn-sm min-h-[44px] #{if @filter == "agent", do: "btn-active"}"}
               phx-click="filter"
               phx-value-category="agent"
             >
               Agent
             </button>
             <button
-              class={"join-item btn btn-xs #{if @filter == "job", do: "btn-active"}"}
+              class={"join-item btn btn-sm min-h-[44px] #{if @filter == "job", do: "btn-active"}"}
               phx-click="filter"
               phx-value-category="job"
             >
               Job
             </button>
             <button
-              class={"join-item btn btn-xs #{if @filter == "system", do: "btn-active"}"}
+              class={"join-item btn btn-sm min-h-[44px] #{if @filter == "system", do: "btn-active"}"}
               phx-click="filter"
               phx-value-category="system"
             >
@@ -125,13 +129,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
             </button>
           </div>
 
-          <button class="btn btn-ghost btn-sm" phx-click="mark_all_read">
+          <button class="btn btn-ghost btn-sm min-h-[44px]" phx-click="mark_all_read">
             <.icon name="hero-check" class="w-4 h-4" /> Mark all read
           </button>
         </div>
       </div>
 
-      <%= if length(@notifications) > 0 do %>
+      <%= if @notifications != [] do %>
         <div class="space-y-1">
           <%= for n <- @notifications do %>
             <% link = resource_link(n) %>
@@ -166,7 +170,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
                 <div class="flex items-center gap-3 mt-1">
                   <span class="text-xs text-base-content/35">{relative_time(n.inserted_at)}</span>
                   <%= if link do %>
-                    <.link navigate={link} class="text-xs text-primary hover:underline">
+                    <.link navigate={link} class="text-xs text-primary hover:underline inline-flex items-center min-h-[44px] px-1">
                       View
                     </.link>
                   <% end %>
@@ -176,7 +180,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
               <%!-- Actions --%>
               <%= if !n.read do %>
                 <button
-                  class="btn btn-ghost btn-xs text-base-content/40"
+                  class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px] text-base-content/40"
                   phx-click="mark_read"
                   phx-value-id={n.id}
                   title="Mark as read"

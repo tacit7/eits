@@ -2,8 +2,8 @@ defmodule EyeInTheSky.Workers.JobDispatcherWorkerTest do
   use EyeInTheSky.DataCase, async: true
   use Oban.Testing, repo: EyeInTheSky.Repo
 
-  alias EyeInTheSky.Workers.JobDispatcherWorker
   alias EyeInTheSky.ScheduledJobs
+  alias EyeInTheSky.Workers.JobDispatcherWorker
 
   defp job_attrs(overrides \\ %{}) do
     Map.merge(

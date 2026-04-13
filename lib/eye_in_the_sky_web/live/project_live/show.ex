@@ -1,56 +1,42 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Show do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Projects
   alias EyeInTheSky.Agents
-  alias EyeInTheSky.Notes
-  alias EyeInTheSky.Repo
-  alias EyeInTheSky.Sessions
   alias EyeInTheSky.Commits
+  alias EyeInTheSky.Notes
+  alias EyeInTheSky.Projects
+  alias EyeInTheSky.Sessions
+  alias EyeInTheSky.Tasks
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1, truncate_text: 1]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    # Parse project ID safely, handling both integer and UUID inputs
-    project_id =
-      case Integer.parse(id) do
-        {int, ""} -> int
-        # Not a valid integer
-        _ -> nil
-      end
+    project_id = parse_int(id)
 
     # Load project only if ID is valid
     socket =
       if project_id do
         project =
-          Projects.get_project!(project_id)
-          |> Repo.preload([:agents])
+          Projects.get_project_with_agents!(project_id)
 
         # Load tasks manually due to type mismatch (projects.id is INT, tasks.project_id is TEXT)
-        tasks = Projects.get_project_tasks(project_id)
+        tasks = Tasks.list_tasks_for_project(project_id)
 
-        # Load active sessions for this project (max 5)
+        # Load active sessions for this project (max 5) — filtered in SQL
         active_sessions =
-          Sessions.list_project_sessions_with_agent(project_id)
-          |> Enum.filter(&is_nil(&1.ended_at))
-          |> Enum.take(5)
+          Sessions.list_project_sessions_with_agent(project_id, active_only: true, limit: 5)
 
         # Load recent notes for this project (max 5)
-        recent_notes =
-          Notes.list_notes()
-          |> Enum.filter(&(&1.parent_type == "project" and &1.parent_id == to_string(project_id)))
-          |> Enum.sort_by(& &1.created_at, :desc)
-          |> Enum.take(5)
+        recent_notes = Notes.list_notes_for_project(project_id, limit: 5)
 
         # Load agents for this project
         project_agents = Agents.list_agents_by_project(project_id)
 
-        # Load all sessions for count (include archived for accurate total)
-        all_sessions =
-          Sessions.list_project_sessions_with_agent(project_id, include_archived: true)
+        # Lightweight count + IDs for display and commits query (no preloads)
+        {session_count, session_ids} = Sessions.count_and_ids_for_project(project_id)
 
         # Load recent commits via single batch query
-        session_ids = Enum.map(all_sessions, & &1.id)
         recent_commits = Commits.list_commits_for_sessions(session_ids, limit: 10)
 
         # Task stats
@@ -68,7 +54,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
         |> assign(:active_sessions, active_sessions)
         |> assign(:recent_notes, recent_notes)
         |> assign(:project_agents, project_agents)
-        |> assign(:all_sessions, all_sessions)
+        |> assign(:session_count, session_count)
         |> assign(:recent_commits, recent_commits)
         |> assign(:open_tasks, open_tasks)
         |> assign(:done_tasks, done_tasks)
@@ -95,7 +81,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           <div class="card bg-base-100 shadow-sm">
             <div class="card-body p-3">
               <p class="text-xs text-base-content/50 uppercase tracking-wider">Sessions</p>
-              <p class="text-2xl font-semibold text-base-content">{length(@all_sessions)}</p>
+              <p class="text-2xl font-semibold text-base-content">{@session_count}</p>
               <p class="text-xs text-base-content/40">{length(@active_sessions)} active</p>
             </div>
           </div>
@@ -136,7 +122,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                   <p class="text-xs font-mono text-base-content/90 break-all">{@project.path}</p>
                 </div>
               <% end %>
-              <%= if length(@claude_files) > 0 do %>
+              <%= if @claude_files != [] do %>
                 <div class="space-y-1">
                   <%= for entry <- @claude_files do %>
                     <a
@@ -163,7 +149,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           </div>
           
     <!-- Active Sessions -->
-          <%= if length(@active_sessions) > 0 do %>
+          <%= if @active_sessions != [] do %>
             <div class="card bg-base-100 shadow-sm">
               <div class="card-body p-4">
                 <h2 class="card-title text-base mb-3">Active Sessions</h2>
@@ -176,7 +162,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                             {String.slice(session.uuid || to_string(session.id), 0..7)}
                           </code>
                           <span class="text-sm text-base-content/80 truncate">
-                            {session.name || truncate_text(session.agent && session.agent.description) ||
+                            {session.name || truncate_text(if session.agent, do: session.agent.description) ||
                               "Unnamed"}
                           </span>
                         </div>
@@ -184,7 +170,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                       <%= if session.id do %>
                         <.link
                           navigate={~p"/dm/#{session.id}"}
-                          class="btn btn-ghost btn-xs text-base-content/60 hover:text-primary transition-colors"
+                          class="btn btn-ghost btn-xs text-base-content/60 hover:text-primary transition-colors min-h-[44px] min-w-[44px]"
                           title="Direct message"
                           onclick="event.stopPropagation()"
                         >
@@ -199,7 +185,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           <% end %>
           
     <!-- Recent Tasks -->
-          <%= if length(@tasks) > 0 do %>
+          <%= if @tasks != [] do %>
             <div class="card bg-base-100 shadow-sm">
               <div class="card-body p-4">
                 <h2 class="card-title text-base mb-2">Recent Tasks</h2>
@@ -219,7 +205,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                           <p class="text-xs text-base-content/60 truncate">{task.description}</p>
                         <% end %>
                       </div>
-                      <%= if task.priority && task.priority > 0 do %>
+                      <%= if not is_nil(task.priority) && task.priority > 0 do %>
                         <span class="badge badge-xs">P{task.priority}</span>
                       <% end %>
                     </div>
@@ -230,7 +216,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           <% end %>
           
     <!-- Recent Notes -->
-          <%= if length(@recent_notes) > 0 do %>
+          <%= if @recent_notes != [] do %>
             <div class="card bg-base-100 shadow-sm">
               <div class="card-body p-4">
                 <h2 class="card-title text-base mb-2">Recent Notes</h2>
@@ -250,7 +236,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
             </div>
           <% end %>
           <!-- Recent Commits -->
-          <%= if length(@recent_commits) > 0 do %>
+          <%= if @recent_commits != [] do %>
             <div class="card bg-base-100 shadow-sm">
               <div class="card-body p-4">
                 <h2 class="card-title text-base mb-2">Recent Commits</h2>
@@ -309,23 +295,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           |> File.ls!()
           |> Enum.reject(&String.starts_with?(&1, "."))
           |> Enum.sort()
-          |> Enum.map(fn name ->
-            full = Path.join(claude_dir, name)
-            rel = ".claude/#{name}"
-
-            if File.dir?(full) do
-              count = count_files_recursive(full)
-
-              %{
-                rel_path: rel,
-                type: :dir,
-                detail: "#{count} #{if count == 1, do: "item", else: "items"}"
-              }
-            else
-              size = file_size_label(full)
-              %{rel_path: rel, type: :file, detail: size}
-            end
-          end)
+          |> Enum.map(&build_claude_entry(&1, claude_dir))
 
         entries ++ children
       else
@@ -333,6 +303,21 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
       end
 
     entries
+  end
+
+  defp build_claude_entry(name, claude_dir) do
+    full = Path.join(claude_dir, name)
+    rel = ".claude/#{name}"
+
+    if File.dir?(full) do
+      count = case File.ls(full) do
+        {:ok, entries} -> length(entries)
+        _ -> 0
+      end
+      %{rel_path: rel, type: :dir, detail: "#{count} #{if count == 1, do: "item", else: "items"}"}
+    else
+      %{rel_path: rel, type: :file, detail: file_size_label(full)}
+    end
   end
 
   defp file_size_label(path) do
@@ -343,23 +328,4 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
     end
   end
 
-  defp count_files_recursive(dir) do
-    case File.ls(dir) do
-      {:ok, entries} ->
-        entries
-        |> Enum.reject(&String.starts_with?(&1, "."))
-        |> Enum.reduce(0, fn name, acc ->
-          full = Path.join(dir, name)
-
-          if File.dir?(full) do
-            acc + count_files_recursive(full)
-          else
-            acc + 1
-          end
-        end)
-
-      _ ->
-        0
-    end
-  end
 end

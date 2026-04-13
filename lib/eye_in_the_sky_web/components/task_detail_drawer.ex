@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
   use EyeInTheSkyWeb, :html
 
   import EyeInTheSkyWeb.Helpers.ViewHelpers,
-    only: [relative_time: 1, is_overdue?: 1, is_due_today?: 1, format_date_input: 1]
+    only: [relative_time: 1, overdue?: 1, due_today?: 1, format_date_input: 1]
 
   attr :id, :string, required: true
   attr :show, :boolean, required: true
@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
               <button
                 type="button"
                 phx-click={@toggle_event}
-                class="p-1 rounded-md text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5 transition-colors"
+                class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5 transition-colors"
               >
                 <.icon name="hero-x-mark" class="w-5 h-5" />
               </button>
@@ -117,12 +117,12 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                     <label class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                       <span>Due date</span>
                       <%= cond do %>
-                        <% is_overdue?(@task.due_at) -> %>
-                          <span class="text-error text-[10px] normal-case tracking-normal font-medium">
+                        <% overdue?(@task.due_at) -> %>
+                          <span class="text-error text-xs normal-case tracking-normal font-medium">
                             Overdue
                           </span>
-                        <% is_due_today?(@task.due_at) -> %>
-                          <span class="text-warning text-[10px] normal-case tracking-normal font-medium">
+                        <% due_today?(@task.due_at) -> %>
+                          <span class="text-warning text-xs normal-case tracking-normal font-medium">
                             Today
                           </span>
                         <% true -> %>
@@ -134,7 +134,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                       name="due_at"
                       value={format_date_input(@task.due_at)}
                       phx-mounted={if @focus == "due_at", do: JS.focus()}
-                      class="input input-sm w-full bg-base-200 border-base-300 text-sm focus:border-primary/30"
+                      class="input input-sm w-full bg-base-200 border-base-300 text-base focus:border-primary/30 min-h-[44px]"
                     />
                   </div>
                   <div>
@@ -146,7 +146,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                       value={format_tags(@task.tags)}
                       placeholder="tag1, tag2"
                       phx-mounted={if @focus == "tags", do: JS.focus()}
-                      class="input input-sm w-full bg-base-200 border-base-300 text-sm placeholder:text-base-content/20 focus:border-primary/30"
+                      class="input input-sm w-full bg-base-200 border-base-300 text-base placeholder:text-base-content/20 focus:border-primary/30 min-h-[44px]"
                     />
                   </div>
                 </div>
@@ -156,7 +156,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                   <.detail_label text="Description" />
                   <textarea
                     name="description"
-                    class="w-full min-h-[100px] bg-base-200 border border-base-300 rounded-lg px-3 py-2 text-sm focus:border-primary/30 focus:outline-none resize-y"
+                    class="w-full min-h-[100px] bg-base-200 border border-base-300 rounded-lg px-3 py-2 text-base focus:border-primary/30 focus:outline-none resize-y"
                     placeholder="Add details..."
                   >{@task.description}</textarea>
                 </div>
@@ -166,7 +166,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
               <%= render_slot(@checklist) %>
 
               <%!-- Annotations --%>
-              <%= if @notes && length(@notes) > 0 do %>
+              <%= if not is_nil(@notes) && @notes != [] do %>
                 <div>
                   <div class="flex items-center gap-2 mb-2">
                     <span class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider">
@@ -196,7 +196,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
 
               <%!-- Metadata --%>
               <div class="flex items-center gap-3 text-[11px] text-base-content/25 pt-2">
-                <%= if @task.updated_at && @task.updated_at != @task.created_at do %>
+                <%= if not is_nil(@task.updated_at) && @task.updated_at != @task.created_at do %>
                   <span>Updated {relative_time(@task.updated_at)}</span>
                   <span class="text-base-content/10">&middot;</span>
                 <% end %>
@@ -222,7 +222,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                     name="body"
                     rows="3"
                     placeholder="Add a note..."
-                    class="w-full bg-base-200 border border-base-300 rounded-lg px-3 py-2 text-sm focus:border-primary/30 focus:outline-none resize-none"
+                    class="w-full bg-base-200 border border-base-300 rounded-lg px-3 py-2 text-base focus:border-primary/30 focus:outline-none resize-none"
                     required
                   ></textarea>
                   <button
@@ -249,7 +249,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                 <.icon name="hero-play" class="w-3.5 h-3.5" /> Start Agent
               </button>
               <div class="ml-auto flex items-center gap-1">
-                <%= if @copy_event && @projects != [] do %>
+                <%= if not is_nil(@copy_event) && @projects != [] do %>
                   <% other_projects = Enum.reject(@projects, &(&1.id == @current_project_id)) %>
                   <%= if other_projects != [] do %>
                     <div class="dropdown dropdown-top dropdown-end">
@@ -318,8 +318,6 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
   defp format_tags([]), do: ""
 
   defp format_tags(tags) when is_list(tags) do
-    tags
-    |> Enum.map(& &1.name)
-    |> Enum.join(", ")
+    Enum.map_join(tags, ", ", & &1.name)
   end
 end

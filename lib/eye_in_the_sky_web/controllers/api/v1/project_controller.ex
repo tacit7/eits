@@ -22,16 +22,12 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectController do
   GET /api/v1/projects/:id - Get a project by ID.
   """
   def show(conn, %{"id" => id}) do
-    try do
-      project = Projects.get_project!(id)
-
-      json(conn, %{
-        success: true,
-        project: ApiPresenter.present_project(project)
-      })
-    rescue
-      Ecto.NoResultsError ->
+    case Projects.get_project(id) do
+      {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "Project not found"})
+
+      {:ok, project} ->
+        json(conn, %{success: true, project: ApiPresenter.present_project(project)})
     end
   end
 
@@ -47,7 +43,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectController do
       git_remote: params["git_remote"],
       repo_url: params["repo_url"],
       branch: params["branch"],
-      active: if(params["active"] == false, do: false, else: true)
+      active: Map.get(params, "active", true)
     }
 
     case Projects.create_project(attrs) do

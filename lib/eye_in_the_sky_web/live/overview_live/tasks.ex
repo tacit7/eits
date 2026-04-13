@@ -5,9 +5,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
 
   alias EyeInTheSkyWeb.Components.FilterSheet
   alias EyeInTheSkyWeb.Components.TaskCard
+  alias EyeInTheSkyWeb.ControllerHelpers
+  alias EyeInTheSkyWeb.Live.Shared.TasksListHelpers
   import EyeInTheSkyWeb.Live.Shared.TasksHelpers
-
-  @per_page 50
 
   @impl true
   def mount(_params, _session, socket) do
@@ -56,7 +56,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
 
   @impl true
   def handle_event("filter_status", %{"state_id" => state_id}, socket) do
-    state_id = if state_id == "", do: nil, else: String.to_integer(state_id)
+    state_id = if state_id == "", do: nil, else: ControllerHelpers.parse_int(state_id)
 
     {:noreply,
      socket
@@ -115,57 +115,17 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
   def handle_info(:tasks_changed, socket),
     do: handle_tasks_changed(socket, &load_tasks/1)
 
-  # Resets to page 1, replaces the task list
   defp load_tasks(socket) do
-    query = socket.assigns.search_query
-    state_id = socket.assigns.filter_state_id
-    sort_by = socket.assigns.sort_by
-
-    if query != "" and String.trim(query) != "" do
-      tasks = Tasks.search_tasks(query)
-
-      tasks =
-        if state_id,
-          do: Enum.filter(tasks, &(&1.state_id == state_id)),
-          else: tasks
-
-      socket
-      |> assign(:task_count, length(tasks))
-      |> assign(:page, 1)
-      |> assign(:has_more, false)
-      |> assign(:total_tasks, length(tasks))
-      |> stream(:tasks, tasks, reset: true)
-    else
-      total = Tasks.count_tasks(state_id: state_id)
-      tasks = Tasks.list_tasks(limit: @per_page, offset: 0, state_id: state_id, sort_by: sort_by)
-
-      socket
-      |> assign(:task_count, length(tasks))
-      |> assign(:page, 1)
-      |> assign(:has_more, length(tasks) < total)
-      |> assign(:total_tasks, total)
-      |> stream(:tasks, tasks, reset: true)
-    end
+    TasksListHelpers.load_tasks(
+      socket,
+      &Tasks.search_tasks/1,
+      &Tasks.list_tasks/1,
+      &Tasks.count_tasks/1
+    )
   end
 
-  # Appends the next page to the existing task list
   defp load_tasks_page(socket, page) do
-    state_id = socket.assigns.filter_state_id
-    sort_by = socket.assigns.sort_by
-    offset = (page - 1) * @per_page
-    total = socket.assigns.total_tasks
-
-    new_tasks = Tasks.list_tasks(limit: @per_page, offset: offset, state_id: state_id, sort_by: sort_by)
-
-    socket =
-      socket
-      |> update(:task_count, &(&1 + length(new_tasks)))
-      |> assign(:page, page)
-      |> assign(:has_more, offset + length(new_tasks) < total)
-
-    Enum.reduce(new_tasks, socket, fn task, acc ->
-      stream_insert(acc, :tasks, task)
-    end)
+    TasksListHelpers.load_tasks_page(socket, page, &Tasks.list_tasks/1)
   end
 
   @impl true
@@ -187,7 +147,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
                 id="overview-tasks-search"
                 value={@search_query}
                 placeholder="Search tasks..."
-                class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
+                class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-base min-h-[44px]"
                 autocomplete="off"
               />
             </div>
@@ -195,7 +155,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
 
           <button
             phx-click="toggle_create_task_drawer"
-            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-8 text-xs"
+            class="btn btn-sm btn-primary gap-1.5 h-11 sm:h-8 sm:min-h-0 text-xs"
           >
             <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Task
           </button>
@@ -205,10 +165,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
             phx-click="open_filter_sheet"
             aria-label="Open filters"
             aria-haspopup="dialog"
-            class="sm:hidden relative btn btn-ghost btn-sm btn-square"
+            class="sm:hidden relative btn btn-ghost btn-sm btn-square min-h-[44px] min-w-[44px]"
           >
             <.icon name="hero-funnel-mini" class="w-4 h-4" />
-            <%= if !is_nil(@filter_state_id) || @sort_by != "created_desc" do %>
+            <%= if not is_nil(@filter_state_id) || @sort_by != "created_desc" do %>
               <span
                 class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full"
                 aria-hidden="true"
@@ -287,7 +247,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
           <div
             id="overview-tasks-list"
             phx-update="stream"
-            class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-5"
+            class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5"
           >
             <div :for={{dom_id, task} <- @streams.tasks} id={dom_id}>
               <TaskCard.task_card
@@ -315,12 +275,12 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
             id="overview-tasks-empty"
             icon="hero-clipboard-document-list"
             title={
-              if @search_query != "" || !is_nil(@filter_state_id),
+              if @search_query != "" || not is_nil(@filter_state_id),
                 do: "No tasks found",
                 else: "No tasks yet"
             }
             subtitle={
-              if @search_query != "" || !is_nil(@filter_state_id),
+              if @search_query != "" || not is_nil(@filter_state_id),
                 do: "Try adjusting your search or filters",
                 else: "Tasks created by agents will appear here"
             }

@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Live.Shared.DmStreamHelpers do
+  @moduledoc false
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSkyWeb.DmLive.StreamState

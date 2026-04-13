@@ -1,25 +1,34 @@
 defmodule EyeInTheSky.Accounts do
+  @moduledoc false
   import Ecto.Query
 
+  alias EyeInTheSky.Accounts.{Passkey, RegistrationToken, User, UserSession}
   alias EyeInTheSky.Repo
-  alias EyeInTheSky.Accounts.{User, Passkey, RegistrationToken, UserSession}
 
   # --- Users ---
 
-  def get_user(id), do: Repo.get(User, id)
+  def get_user(id) do
+    case Repo.get(User, id) do
+      nil -> {:error, :not_found}
+      user -> {:ok, user}
+    end
+  end
 
   def get_user_by_username(username) do
-    Repo.get_by(User, username: username)
+    case Repo.get_by(User, username: username) do
+      nil -> {:error, :not_found}
+      user -> {:ok, user}
+    end
   end
 
   def get_or_create_user(username) do
     case get_user_by_username(username) do
-      nil ->
+      {:error, :not_found} ->
         %User{}
         |> User.changeset(%{username: username, display_name: username})
         |> Repo.insert()
 
-      user ->
+      {:ok, user} ->
         {:ok, user}
     end
   end
@@ -31,7 +40,10 @@ defmodule EyeInTheSky.Accounts do
   end
 
   def get_passkey_by_credential_id(credential_id) do
-    Repo.get_by(Passkey, credential_id: credential_id)
+    case Repo.get_by(Passkey, credential_id: credential_id) do
+      nil -> {:error, :not_found}
+      passkey -> {:ok, passkey}
+    end
   end
 
   def create_passkey(attrs) do
@@ -127,12 +139,12 @@ defmodule EyeInTheSky.Accounts do
   def get_valid_user_session(token) when is_binary(token) do
     case Repo.get_by(UserSession, session_token: token) do
       nil ->
-        nil
+        {:error, :not_found}
 
       session ->
         if NaiveDateTime.compare(session.expires_at, NaiveDateTime.utc_now()) == :gt,
-          do: session,
-          else: nil
+          do: {:ok, session},
+          else: {:error, :expired}
     end
   end
 
@@ -154,5 +166,7 @@ defmodule EyeInTheSky.Accounts do
     end)
   end
 
+  # sobelow_skip ["Misc.BinToTerm"] -- [:safe] option prevents atom creation and unsafe deserialization;
+  # data originates from our DB (stored during passkey registration via wax_), not raw user input.
   defp decode_cose_key(bin), do: :erlang.binary_to_term(bin, [:safe])
 end

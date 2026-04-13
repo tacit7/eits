@@ -7,9 +7,9 @@ defmodule EyeInTheSky.Notifications do
   """
 
   import Ecto.Query
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Notifications.Notification
   alias EyeInTheSky.PushSubscriptions
+  alias EyeInTheSky.Repo
 
   @doc """
   Create a notification and broadcast it via PubSub.
@@ -28,8 +28,8 @@ defmodule EyeInTheSky.Notifications do
       title: title,
       body: opts[:body],
       category: category,
-      resource_type: resource_type && to_string(resource_type),
-      resource_id: resource_id && to_string(resource_id)
+      resource_type: if(resource_type, do: to_string(resource_type)),
+      resource_id: if(resource_id, do: to_string(resource_id))
     }
 
     case create_notification(attrs) do
@@ -51,8 +51,14 @@ defmodule EyeInTheSky.Notifications do
 
   def list_notifications(opts \\ []) do
     limit = opts[:limit] || 50
+    category = opts[:category]
 
     Notification
+    |> then(fn q ->
+      if category && category != "all",
+        do: where(q, [n], n.category == ^category),
+        else: q
+    end)
     |> order_by([n], desc: n.inserted_at, desc: n.id)
     |> limit(^limit)
     |> Repo.all()
@@ -65,17 +71,22 @@ defmodule EyeInTheSky.Notifications do
   end
 
   def mark_read(id) do
-    result =
-      Notification
-      |> Repo.get!(id)
-      |> Ecto.Changeset.change(read: true)
-      |> Repo.update()
+    case Repo.get(Notification, id) do
+      nil ->
+        {:error, :not_found}
 
-    with {:ok, notification} <- result do
-      broadcast(:notification_read, notification.id)
+      notification ->
+        result =
+          notification
+          |> Notification.changeset(%{read: true})
+          |> Repo.update()
+
+        with {:ok, updated} <- result do
+          broadcast(:notification_read, updated.id)
+        end
+
+        result
     end
-
-    result
   end
 
   def mark_all_read do
@@ -89,7 +100,7 @@ defmodule EyeInTheSky.Notifications do
   end
 
   def purge_old(days \\ 7) do
-    cutoff = NaiveDateTime.utc_now() |> NaiveDateTime.add(-days * 86400, :second)
+    cutoff = NaiveDateTime.utc_now() |> NaiveDateTime.add(-days * 86_400, :second)
 
     {count, _} =
       Notification
@@ -110,7 +121,7 @@ defmodule EyeInTheSky.Notifications do
   defp maybe_push(%{category: "agent"} = notification) do
     url = build_url(notification.resource_type, notification.resource_id)
 
-    Task.start(fn ->
+    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
       PushSubscriptions.broadcast(notification.title, notification.body, url)
     end)
   end

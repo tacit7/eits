@@ -1,9 +1,56 @@
 defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
-  alias EyeInTheSky.{Contexts, Sessions}
+  alias EyeInTheSky.{Commits, Contexts, Notes, Sessions, Tasks}
+  alias EyeInTheSky.Accounts.ApiKey
 
   import EyeInTheSky.Factory
+
+  defp api_conn do
+    token = "test_api_key_#{System.unique_integer([:positive])}"
+    {:ok, _} = ApiKey.create(token, "test")
+    Phoenix.ConnTest.build_conn() |> Plug.Conn.put_req_header("authorization", "Bearer #{token}")
+  end
+
+  defp create_task(overrides \\ %{}) do
+    {:ok, task} =
+      Tasks.create_task(
+        Map.merge(
+          %{uuid: Ecto.UUID.generate(), title: "Task #{uniq()}", state_id: 1},
+          overrides
+        )
+      )
+
+    task
+  end
+
+  defp create_note(session, overrides \\ %{}) do
+    {:ok, note} =
+      Notes.create_note(
+        Map.merge(
+          %{parent_id: to_string(session.id), parent_type: "session", body: "Note #{uniq()}"},
+          overrides
+        )
+      )
+
+    note
+  end
+
+  defp create_commit(session, overrides \\ %{}) do
+    {:ok, commit} =
+      Commits.create_commit(
+        Map.merge(
+          %{
+            session_id: session.id,
+            commit_hash: "hash#{uniq()}",
+            commit_message: "Commit #{uniq()}"
+          },
+          overrides
+        )
+      )
+
+    commit
+  end
 
   # ---- GET /api/v1/sessions ----
 
@@ -175,6 +222,86 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
       conn = get(conn, ~p"/api/v1/sessions/#{Ecto.UUID.generate()}")
       assert json_response(conn, 404)["error"] == "Session not found"
     end
+
+    test "returns tasks linked to the session" do
+      agent = create_agent()
+      session = create_session(agent)
+      task = create_task()
+      Tasks.link_session_to_task(task.id, session.id)
+
+      resp = api_conn() |> get(~p"/api/v1/sessions/#{session.uuid}") |> json_response(200)
+
+      assert is_list(resp["tasks"])
+      assert Enum.any?(resp["tasks"], &(&1["id"] == task.id))
+      assert Enum.all?(resp["tasks"], &Map.has_key?(&1, "state_id"))
+    end
+
+    test "returns empty tasks list when none linked" do
+      agent = create_agent()
+      session = create_session(agent)
+
+      resp = api_conn() |> get(~p"/api/v1/sessions/#{session.uuid}") |> json_response(200)
+
+      assert resp["tasks"] == []
+    end
+
+    test "returns recent_notes for the session" do
+      agent = create_agent()
+      session = create_session(agent)
+      create_note(session)
+
+      resp = api_conn() |> get(~p"/api/v1/sessions/#{session.uuid}") |> json_response(200)
+
+      assert is_list(resp["recent_notes"])
+      assert length(resp["recent_notes"]) == 1
+      assert Map.has_key?(hd(resp["recent_notes"]), "starred")
+      assert Map.has_key?(hd(resp["recent_notes"]), "created_at")
+    end
+
+    test "truncates note body to 120 chars in recent_notes" do
+      agent = create_agent()
+      session = create_session(agent)
+      long_body = String.duplicate("x", 200)
+      create_note(session, %{body: long_body})
+
+      resp = api_conn() |> get(~p"/api/v1/sessions/#{session.uuid}") |> json_response(200)
+
+      note = hd(resp["recent_notes"])
+      assert String.length(note["body"]) == 120
+    end
+
+    test "caps recent_notes at 5" do
+      agent = create_agent()
+      session = create_session(agent)
+      for _ <- 1..7, do: create_note(session)
+
+      resp = api_conn() |> get(~p"/api/v1/sessions/#{session.uuid}") |> json_response(200)
+
+      assert length(resp["recent_notes"]) == 5
+    end
+
+    test "returns recent_commits for the session" do
+      agent = create_agent()
+      session = create_session(agent)
+      commit = create_commit(session)
+
+      resp = api_conn() |> get(~p"/api/v1/sessions/#{session.uuid}") |> json_response(200)
+
+      assert is_list(resp["recent_commits"])
+      assert Enum.any?(resp["recent_commits"], &(&1["id"] == commit.id))
+      assert Map.has_key?(hd(resp["recent_commits"]), "commit_hash")
+      assert Map.has_key?(hd(resp["recent_commits"]), "inserted_at")
+    end
+
+    test "caps recent_commits at 5" do
+      agent = create_agent()
+      session = create_session(agent)
+      for _ <- 1..7, do: create_commit(session)
+
+      resp = api_conn() |> get(~p"/api/v1/sessions/#{session.uuid}") |> json_response(200)
+
+      assert length(resp["recent_commits"]) == 5
+    end
   end
 
   # ---- PATCH /api/v1/sessions/:uuid ----
@@ -230,6 +357,26 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
       session = create_session(agent, %{entrypoint: "cli"})
 
       patch(conn, ~p"/api/v1/sessions/#{session.uuid}", %{"clear_entrypoint" => false})
+
+      {:ok, updated} = Sessions.get_session_by_uuid(session.uuid)
+      assert updated.entrypoint == "cli"
+    end
+
+    test "clear_entrypoint string 'true' clears entrypoint" do
+      agent = create_agent()
+      session = create_session(agent, %{entrypoint: "cli"})
+
+      api_conn() |> patch(~p"/api/v1/sessions/#{session.uuid}", %{"clear_entrypoint" => "true"})
+
+      {:ok, updated} = Sessions.get_session_by_uuid(session.uuid)
+      assert updated.entrypoint == nil
+    end
+
+    test "clear_entrypoint string 'false' does not clear entrypoint" do
+      agent = create_agent()
+      session = create_session(agent, %{entrypoint: "cli"})
+
+      api_conn() |> patch(~p"/api/v1/sessions/#{session.uuid}", %{"clear_entrypoint" => "false"})
 
       {:ok, updated} = Sessions.get_session_by_uuid(session.uuid)
       assert updated.entrypoint == "cli"

@@ -1,4 +1,10 @@
-import * as Components from "../svelte/**/*.svelte"
+import _components from "virtual:live-svelte-components"
 import {getRender} from "live_svelte"
 
-export const render = getRender(Components)
+// Strip directory prefixes from component keys so they match the bare names
+// used in Elixir templates (e.g. "components/tabs/TasksTab" -> "TasksTab").
+const components = Object.fromEntries(
+  Object.entries(_components).map(([key, comp]) => [key.split("/").pop(), comp])
+)
+
+export const render = getRender(components)

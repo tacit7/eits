@@ -4,8 +4,8 @@ defmodule EyeInTheSky.Bookmarks do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Bookmarks.Bookmark
+  alias EyeInTheSky.Repo
 
   @doc """
   Returns the list of bookmarks with optional filters.
@@ -78,17 +78,9 @@ defmodule EyeInTheSky.Bookmarks do
 
   """
   def check_if_bookmarked(bookmark_type, identifier) do
-    case bookmark_type do
-      "file" ->
-        from(b in Bookmark, where: b.bookmark_type == "file" and b.file_path == ^identifier)
-        |> Repo.exists?()
-
-      type when type in ["note", "agent", "session", "task"] ->
-        from(b in Bookmark, where: b.bookmark_type == ^type and b.bookmark_id == ^identifier)
-        |> Repo.exists?()
-
-      _ ->
-        false
+    case build_bookmark_query(bookmark_type, identifier) do
+      nil -> false
+      query -> Repo.exists?(query)
     end
   end
 
@@ -96,17 +88,13 @@ defmodule EyeInTheSky.Bookmarks do
   Gets a bookmark by type and identifier.
   """
   def get_bookmark_by(bookmark_type, identifier) do
-    case bookmark_type do
-      "file" ->
-        from(b in Bookmark, where: b.bookmark_type == "file" and b.file_path == ^identifier)
-        |> Repo.one()
-
-      type when type in ["note", "agent", "session", "task"] ->
-        from(b in Bookmark, where: b.bookmark_type == ^type and b.bookmark_id == ^identifier)
-        |> Repo.one()
-
-      _ ->
-        nil
+    case build_bookmark_query(bookmark_type, identifier) do
+      nil -> {:error, :not_found}
+      query ->
+        case Repo.one(query) do
+          nil -> {:error, :not_found}
+          bookmark -> {:ok, bookmark}
+        end
     end
   end
 
@@ -114,12 +102,26 @@ defmodule EyeInTheSky.Bookmarks do
   Records that a bookmark was accessed (updates accessed_at).
   """
   def touch_bookmark(%Bookmark{} = bookmark) do
-    bookmark
-    |> Ecto.Changeset.change(accessed_at: DateTime.utc_now())
-    |> Repo.update()
+    update_bookmark(bookmark, %{accessed_at: DateTime.utc_now()})
   end
 
   # Private helpers
+
+  defp build_bookmark_query(type, identifier) do
+    case type do
+      "file" ->
+        from(b in Bookmark, where: b.bookmark_type == "file" and b.file_path == ^identifier)
+
+      "url" ->
+        from(b in Bookmark, where: b.bookmark_type == "url" and b.url == ^identifier)
+
+      type when type in ["note", "agent", "session", "task"] ->
+        from(b in Bookmark, where: b.bookmark_type == ^type and b.bookmark_id == ^identifier)
+
+      _ ->
+        nil
+    end
+  end
 
   defp maybe_filter_by_type(query, nil), do: query
 

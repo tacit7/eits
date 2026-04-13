@@ -23,16 +23,14 @@ defmodule EyeInTheSky.Events do
   | `"settings"`                   | OverviewSettings                  |
   | `"scheduled_jobs"`             | JobsLive                          |
   | `"session_lifecycle"`          | Teams.Subscriber                  |
+  | `"projects"`                   | Sidebar                           |
+  | `"session:<id>:timer"`         | DMLive                            |
 
-  ## Note on payload shape inconsistency
+  ## Payload shape for `agent:working`
 
-  The `agent:working` topic has two payload shapes depending on the caller:
-  - Workers: `{:agent_working, session_ref, session_int_id}` (string, integer)
-  - REST API: `{:agent_working, session_struct}` (single struct arg)
-
-  This is a known inconsistency inherited from the migration. Use the 2-arg
-  variants from workers and the 1-arg variants from REST API controllers until
-  normalization is done in a follow-up.
+  All callers use the single-struct form:
+  - `{:agent_working, %Session{}}` — agent transitioned to working state
+  - `{:agent_stopped, %Session{}}` — agent transitioned to idle/stopped state
   """
 
   @pubsub EyeInTheSky.PubSub
@@ -59,6 +57,9 @@ defmodule EyeInTheSky.Events do
   @doc "Subscribe to session status string changes."
   def subscribe_session_status(session_id), do: sub("session:#{session_id}:status")
 
+  @doc "Subscribe to orchestrator timer events for a session."
+  def subscribe_session_timer(session_id), do: sub("session:#{session_id}:timer")
+
   @doc "Subscribe to real-time stream deltas for a session."
   def subscribe_dm_stream(session_id), do: sub("dm:#{session_id}:stream")
 
@@ -73,6 +74,12 @@ defmodule EyeInTheSky.Events do
 
   @doc "Subscribe to team/member events."
   def subscribe_teams, do: sub("teams")
+
+  @doc "Subscribe to project metadata changes (bookmark toggled, etc.)."
+  def subscribe_projects, do: sub("projects")
+
+  @doc "A project record was updated. Broadcasts to projects topic."
+  def project_updated(project), do: broadcast("projects", {:project_updated, project})
 
   @doc "Subscribe to settings changes."
   def subscribe_settings, do: sub("settings")
@@ -152,20 +159,10 @@ defmodule EyeInTheSky.Events do
   # Agent working status — topic: "agent:working"
   # ---------------------------------------------------------------------------
 
-  @doc "Agent transitioned to working state (2-arg form for workers)."
-  def agent_working(session_ref, session_int_id) do
-    broadcast("agent:working", {:agent_working, session_ref, session_int_id})
-  end
-
-  @doc "Agent transitioned to working state (1-arg form for REST API)."
+  @doc "Agent transitioned to working state. Broadcasts `{:agent_working, session}` on `agent:working`."
   def agent_working(session), do: broadcast("agent:working", {:agent_working, session})
 
-  @doc "Agent transitioned to stopped/idle state (2-arg form for workers)."
-  def agent_stopped(session_ref, session_int_id) do
-    broadcast("agent:working", {:agent_stopped, session_ref, session_int_id})
-  end
-
-  @doc "Agent transitioned to stopped/idle state (1-arg form for REST API)."
+  @doc "Agent transitioned to stopped/idle state. Broadcasts `{:agent_stopped, session}` on `agent:working`."
   def agent_stopped(session), do: broadcast("agent:working", {:agent_stopped, session})
 
   # ---------------------------------------------------------------------------
@@ -282,6 +279,25 @@ defmodule EyeInTheSky.Events do
 
   @doc "Unsubscribe from session-scoped events."
   def unsubscribe_session(session_id), do: unsub("session:#{session_id}")
+
+  @doc "Unsubscribe from session status events."
+  def unsubscribe_session_status(session_id), do: unsub("session:#{session_id}:status")
+
+  # ---------------------------------------------------------------------------
+  # Orchestrator timer events — topic: "session:<session_id>:timer"
+  # ---------------------------------------------------------------------------
+
+  @doc "An orchestrator timer was scheduled (new or replacing an existing one)."
+  def timer_scheduled(session_id, timer),
+    do: broadcast("session:#{session_id}:timer", {:timer_scheduled, timer})
+
+  @doc "An orchestrator timer was explicitly cancelled."
+  def timer_cancelled(session_id),
+    do: broadcast("session:#{session_id}:timer", :timer_cancelled)
+
+  @doc "An orchestrator timer fired. Payload is the rescheduled timer map (repeating) or nil (one-shot)."
+  def timer_fired(session_id, timer_or_nil),
+    do: broadcast("session:#{session_id}:timer", {:timer_fired, timer_or_nil})
 
   defp broadcast(topic, message), do: Phoenix.PubSub.broadcast(@pubsub, topic, message)
   defp sub(topic), do: Phoenix.PubSub.subscribe(@pubsub, topic)

@@ -21,7 +21,7 @@ defmodule EyeInTheSky.PromptsTest do
       assert {:ok, _} = Prompts.delete_prompt(prompt)
     end
 
-    test "returns {:error, :has_active_schedule} when a schedule exists" do
+    test "returns {:error, changeset} when a schedule exists" do
       prompt = create_prompt("Scheduled")
 
       {:ok, _} =
@@ -33,7 +33,8 @@ defmodule EyeInTheSky.PromptsTest do
           "prompt_id" => prompt.id
         })
 
-      assert Prompts.delete_prompt(prompt) == {:error, :has_active_schedule}
+      assert {:error, %Ecto.Changeset{} = changeset} = Prompts.delete_prompt(prompt)
+      assert {"has active schedules", _} = changeset.errors[:scheduled_jobs]
     end
   end
 end

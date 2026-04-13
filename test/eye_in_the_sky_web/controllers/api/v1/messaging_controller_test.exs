@@ -107,8 +107,8 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
         })
 
       resp = json_response(conn, 500)
-      assert resp["error"] == "Failed to route message to agent"
-      assert resp["reason"] == ":worker_failed"
+      assert resp["error"] == "Failed to deliver message"
+      refute Map.has_key?(resp, "reason")
 
       # Message must NOT be persisted when routing fails (no duplicates on retry)
       assert EyeInTheSky.Messages.list_messages_for_session(session.id) == []
@@ -131,7 +131,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
       conn = get(conn, ~p"/api/v1/channels")
       resp = json_response(conn, 200)
 
-      assert length(resp["channels"]) >= 1
+      assert resp["channels"] != []
 
       ch = hd(resp["channels"])
       assert Map.has_key?(ch, "id")

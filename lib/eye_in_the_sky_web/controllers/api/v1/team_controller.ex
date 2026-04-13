@@ -5,8 +5,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Repo, Teams}
-  alias EyeInTheSky.Teams.TeamMember
+  alias EyeInTheSky.Teams
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   # GET /api/v1/teams
@@ -27,10 +26,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   # GET /api/v1/teams/:id
   def show(conn, %{"id" => id}) do
     case resolve_team(id) do
-      nil ->
+      {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "Team not found"})
 
-      team ->
+      {:ok, team} ->
         members = Teams.list_members(team.id)
 
         json(conn, %{
@@ -41,8 +40,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
           status: team.status,
           project_id: team.project_id,
           created_at: to_string(team.created_at),
-          archived_at: team.archived_at && to_string(team.archived_at),
-          members: Enum.map(members, &serialize_member/1)
+          archived_at: if(team.archived_at, do: to_string(team.archived_at)),
+          members: Enum.map(members, &ApiPresenter.present_member/1)
         })
     end
   end
@@ -77,10 +76,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   # DELETE /api/v1/teams/:id
   def delete(conn, %{"id" => id}) do
     case resolve_team(id) do
-      nil ->
+      {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "Team not found"})
 
-      team ->
+      {:ok, team} ->
         case Teams.delete_team(team) do
           {:ok, _} ->
             json(conn, %{success: true, message: "Team archived", id: team.id})
@@ -96,16 +95,16 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   # GET /api/v1/teams/:team_id/members
   def list_members(conn, %{"team_id" => id}) do
     case resolve_team(id) do
-      nil ->
+      {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "Team not found"})
 
-      team ->
+      {:ok, team} ->
         members = Teams.list_members(team.id)
 
         json(conn, %{
           success: true,
           team_id: team.id,
-          members: Enum.map(members, &serialize_member/1)
+          members: Enum.map(members, &ApiPresenter.present_member/1)
         })
     end
   end
@@ -113,16 +112,16 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   # POST /api/v1/teams/:team_id/members
   def join(conn, %{"team_id" => id} = params) do
     case resolve_team(id) do
-      nil ->
+      {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "Team not found"})
 
-      team ->
+      {:ok, team} ->
         attrs = %{
           team_id: team.id,
           name: params["name"],
           role: params["role"] || "member",
           agent_id: params["agent_id"],
-          session_id: resolve_session_id(params["session_id"])
+          session_id: resolve_id(params["session_id"], &EyeInTheSky.Sessions.get_session_by_uuid/1)
         }
 
         case Teams.join_team(attrs) do
@@ -148,24 +147,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   # PATCH /api/v1/teams/:team_id/members/:member_id
   def update_member(conn, %{"team_id" => team_id, "member_id" => member_id} = params) do
     case resolve_team(team_id) do
-      nil ->
+      {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "Team not found"})
 
-      _team ->
-        case Repo.get(TeamMember, member_id) do
-          nil ->
-            conn |> put_status(:not_found) |> json(%{error: "Member not found"})
-
-          member ->
-            case Teams.update_member_status(member, params["status"]) do
-              {:ok, updated} ->
-                json(conn, %{success: true, member_id: updated.id, status: updated.status})
-
-              {:error, changeset} ->
-                conn
-                |> put_status(:unprocessable_entity)
-                |> json(%{error: "Failed to update member", details: translate_errors(changeset)})
-            end
+      {:ok, _team} ->
+        case Teams.get_member(member_id) do
+          {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "Member not found"})
+          {:ok, member} -> do_update_member(conn, member, params)
         end
     end
   end
@@ -173,24 +161,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   # DELETE /api/v1/teams/:team_id/members/:member_id
   def leave(conn, %{"team_id" => team_id, "member_id" => member_id}) do
     case resolve_team(team_id) do
-      nil ->
+      {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "Team not found"})
 
-      _team ->
-        case Repo.get(TeamMember, member_id) do
-          nil ->
-            conn |> put_status(:not_found) |> json(%{error: "Member not found"})
-
-          member ->
-            case Teams.leave_team(member) do
-              {:ok, _} ->
-                json(conn, %{success: true, message: "Left team", member_id: member.id})
-
-              {:error, changeset} ->
-                conn
-                |> put_status(:unprocessable_entity)
-                |> json(%{error: "Failed to leave team", details: translate_errors(changeset)})
-            end
+      {:ok, _team} ->
+        case Teams.get_member(member_id) do
+          {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "Member not found"})
+          {:ok, member} -> do_leave_team(conn, member)
         end
     end
   end
@@ -198,44 +175,30 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   # ── helpers ──────────────────────────────────────────────────────────────────
 
   defp resolve_team(id) do
-    case Integer.parse(id) do
-      {int_id, ""} -> Teams.get_team(int_id)
-      _ -> Teams.get_team_by_name(id)
+    if int_id = parse_int(id), do: Teams.get_team(int_id), else: Teams.get_team_by_name(id)
+  end
+
+  defp do_update_member(conn, member, params) do
+    case Teams.update_member_status(member, params["status"]) do
+      {:ok, updated} ->
+        json(conn, %{success: true, member_id: updated.id, status: updated.status})
+
+      {:error, changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "Failed to update member", details: translate_errors(changeset)})
     end
   end
 
-  # Accept either a UUID string (resolves to integer PK) or an integer string
-  defp resolve_session_id(nil), do: nil
+  defp do_leave_team(conn, member) do
+    case Teams.leave_team(member) do
+      {:ok, _} ->
+        json(conn, %{success: true, message: "Left team", member_id: member.id})
 
-  defp resolve_session_id(id) do
-    case Integer.parse(id) do
-      {int_id, ""} ->
-        int_id
-
-      _ ->
-        case EyeInTheSky.Sessions.get_session_by_uuid(id) do
-          {:ok, session} -> session.id
-          _ -> nil
-        end
+      {:error, changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "Failed to leave team", details: translate_errors(changeset)})
     end
   end
-
-  defp serialize_member(m) do
-    %{
-      id: m.id,
-      name: m.name,
-      role: m.role,
-      status: m.status,
-      agent_id: m.agent_id,
-      agent_uuid: if(Ecto.assoc_loaded?(m.agent) && m.agent, do: m.agent.uuid),
-      session_id: m.session_id,
-      session_uuid: if(Ecto.assoc_loaded?(m.session) && m.session, do: m.session.uuid),
-      session_status: m.session && m.session.status,
-      joined_at: m.joined_at && to_string(m.joined_at),
-      last_activity_at: m.last_activity_at && to_string(m.last_activity_at)
-    }
-  end
-
-  defp maybe_opt(opts, _key, nil), do: opts
-  defp maybe_opt(opts, key, val), do: Keyword.put(opts, key, val)
 end

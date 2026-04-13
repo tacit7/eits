@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.Components.NotesListTest do
 
   alias EyeInTheSky.Notes
   alias EyeInTheSky.Projects
+  alias EyeInTheSkyWeb.Components.NotesList
 
   defp build_note(overrides \\ %{}) do
     {:ok, project} =
@@ -34,7 +35,7 @@ defmodule EyeInTheSkyWeb.Components.NotesListTest do
 
     html =
       render_component(
-        &EyeInTheSkyWeb.Components.NotesList.notes_list/1,
+        &NotesList.notes_list/1,
         notes: [note],
         starred_filter: false,
         search_query: "",
@@ -52,7 +53,7 @@ defmodule EyeInTheSkyWeb.Components.NotesListTest do
 
     html =
       render_component(
-        &EyeInTheSkyWeb.Components.NotesList.notes_list/1,
+        &NotesList.notes_list/1,
         notes: [note],
         starred_filter: false,
         search_query: "",

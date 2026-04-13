@@ -1,10 +1,8 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Projects
   alias EyeInTheSky.Notes
-  alias EyeInTheSky.Repo
-  import Ecto.Query
+  alias EyeInTheSky.Projects
   import EyeInTheSkyWeb.Components.NotesList
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_id: 1]
   import EyeInTheSkyWeb.Live.Shared.NotesHelpers
@@ -16,8 +14,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
     socket =
       if project_id do
         project =
-          Projects.get_project!(project_id)
-          |> Repo.preload([:agents])
+          Projects.get_project_with_agents!(project_id)
 
         socket
         |> assign(:page_title, "Notes - #{project.name}")
@@ -30,6 +27,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
         |> assign(:notes, [])
         |> assign(:editing_note_id, nil)
         |> assign(:show_quick_note_modal, false)
+        |> assign(:type_filter, "all")
         |> load_notes()
       else
         socket
@@ -53,6 +51,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
     do: handle_sort_notes(params, socket, &load_notes/1)
 
   @impl true
+  def handle_event("filter_type", params, socket),
+    do: handle_filter_type(params, socket, &load_notes/1)
+
+  @impl true
   def handle_event("toggle_starred_filter", params, socket),
     do: handle_toggle_starred_filter(params, socket, &load_notes/1)
 
@@ -66,24 +68,33 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
 
   @impl true
   def handle_event("edit_note", %{"note_id" => note_id}, socket) do
-    {:noreply, assign(socket, :editing_note_id, String.to_integer(note_id))}
+    case parse_id(note_id) do
+      nil -> {:noreply, socket}
+      id -> {:noreply, assign(socket, :editing_note_id, id)}
+    end
   end
 
   @impl true
   def handle_event("note_saved", %{"note_id" => note_id, "body" => body}, socket) do
-    note = Notes.get_note!(String.to_integer(note_id))
-
-    case Notes.update_note(note, %{body: body}) do
-      {:ok, _note} ->
-        socket =
-          socket
-          |> assign(:editing_note_id, nil)
-          |> load_notes()
-
+    case parse_id(note_id) do
+      nil ->
         {:noreply, socket}
 
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to save note.")}
+      id ->
+        note = Notes.get_note!(id)
+
+        case Notes.update_note(note, %{body: body}) do
+          {:ok, _note} ->
+            socket =
+              socket
+              |> assign(:editing_note_id, nil)
+              |> load_notes()
+
+            {:noreply, socket}
+
+          {:error, _changeset} ->
+            {:noreply, put_flash(socket, :error, "Failed to save note.")}
+        end
     end
   end
 
@@ -105,7 +116,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   @impl true
   def handle_event("create_quick_note", params, socket) do
     project = socket.assigns.project
-    starred = if params["starred"] == "1", do: 1, else: 0
+    starred = params["starred"] == "1"
 
     case Notes.create_note(%{
            parent_type: "project",
@@ -125,43 +136,22 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   defp load_notes(socket) do
     project = socket.assigns.project
     agent_ids = Enum.map(project.agents, & &1.id)
-
-    session_ids =
-      from(s in EyeInTheSky.Sessions.Session,
-        where: s.agent_id in ^agent_ids,
-        select: s.id
-      )
-      |> Repo.all()
-
     query = socket.assigns.search_query
-    starred_only = socket.assigns.starred_filter
-    sort_by = socket.assigns.notes_sort_by
-    order = if sort_by == "oldest", do: [asc: :created_at], else: [desc: :created_at]
 
     notes =
       if query != "" and String.trim(query) != "" do
         Notes.search_notes(query, agent_ids,
           project_id: project.id,
-          session_ids: session_ids,
-          starred: starred_only
+          starred: socket.assigns.starred_filter
         )
       else
-        project_id_str = to_string(project.id)
-        agent_id_strs = Enum.map(agent_ids, &to_string/1)
-        session_id_strs = Enum.map(session_ids, &to_string/1)
-
-        base =
-          from(n in EyeInTheSky.Notes.Note,
-            where:
-              (n.parent_type in ["project", "projects"] and n.parent_id == ^project_id_str) or
-                (n.parent_type in ["agent", "agents"] and n.parent_id in ^agent_id_strs) or
-                (n.parent_type in ["session", "sessions"] and
-                   n.parent_id in ^session_id_strs),
-            order_by: ^order
-          )
-
-        base = if starred_only, do: from(n in base, where: n.starred == 1), else: base
-        Repo.all(base)
+        Notes.list_notes_filtered(
+          project_id: project.id,
+          agent_ids: agent_ids,
+          starred: socket.assigns.starred_filter,
+          sort: socket.assigns.notes_sort_by,
+          type_filter: socket.assigns.type_filter
+        )
       end
 
     assign(socket, :notes, notes)
@@ -183,7 +173,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
             <button
               type="button"
               phx-click="open_quick_note_modal"
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-base-200/60 hover:bg-base-200 text-base-content/70 hover:text-base-content transition-colors"
+              class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-lg text-xs font-medium bg-base-200/60 hover:bg-base-200 text-base-content/70 hover:text-base-content transition-colors"
             >
               <.icon name="hero-bolt" class="w-3.5 h-3.5" /> Quick Note
             </button>
@@ -191,7 +181,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
               navigate={
                 ~p"/notes/new?#{%{parent_type: "project", parent_id: @project.id, return_to: "/projects/#{@project.id}/notes"}}"
               }
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-content hover:bg-primary/80 transition-colors"
+              class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-lg text-xs font-medium bg-primary text-primary-content hover:bg-primary/80 transition-colors"
             >
               <.icon name="hero-plus" class="w-3.5 h-3.5" /> New Note
             </.link>
@@ -203,6 +193,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
           starred_filter={@starred_filter}
           search_query={@search_query}
           sort_by={@notes_sort_by}
+          type_filter={@type_filter}
           empty_id="project-notes-empty"
           editing_note_id={@editing_note_id}
           current_path={~p"/projects/#{@project.id}/notes"}
@@ -223,7 +214,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
           <button
             type="button"
             phx-click="close_quick_note_modal"
-            class="btn btn-ghost btn-xs btn-square"
+            class="btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px]"
             aria-label="Close"
           >
             <.icon name="hero-x-mark" class="w-4 h-4" />
@@ -238,7 +229,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
               id="qn-title-proj"
               required
               placeholder="Title..."
-              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base min-h-[44px]"
               autocomplete="off"
               autofocus
             />
@@ -250,7 +241,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
               id="qn-body-proj"
               rows="4"
               placeholder="Note content..."
-              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 resize-none"
+              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 resize-none text-base"
             ></textarea>
           </div>
           <label class="flex items-center gap-2 cursor-pointer select-none">

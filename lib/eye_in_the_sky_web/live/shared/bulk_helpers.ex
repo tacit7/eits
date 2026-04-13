@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Live.Shared.BulkHelpers do
+  @moduledoc false
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 2]

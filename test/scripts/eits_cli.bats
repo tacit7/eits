@@ -64,6 +64,83 @@ _agent_uuid() { cat "$BATS_FILE_TMPDIR/agent_uuid"; }
   [ "$status" -eq 0 ]
 }
 
+@test "sessions list: returns success field" {
+  run "$EITS" sessions list
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+}
+
+@test "sessions list --status: filters by status" {
+  run "$EITS" sessions list --status working
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+}
+
+@test "sessions list --limit: accepts limit flag" {
+  run "$EITS" sessions list --limit 2
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+}
+
+@test "sessions list --search: filters by query string" {
+  run "$EITS" sessions list --search "cli-worker"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  echo "$output" | jq -e '.results | type == "array"' >/dev/null
+}
+
+@test "sessions list --project: filters by project id" {
+  run "$EITS" sessions list --project 1
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  echo "$output" | jq -e '.results | type == "array"' >/dev/null
+}
+
+@test "sessions list: rejects unknown flags" {
+  run "$EITS" sessions list --bogus foo 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "unknown flag" ]]
+}
+
+@test "sessions search: returns success and results array" {
+  run "$EITS" sessions search "bats"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  echo "$output" | jq -e '.results | type == "array"' >/dev/null
+}
+
+@test "sessions search: requires query argument" {
+  run "$EITS" sessions search 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "query" ]]
+}
+
+@test "sessions tasks: returns tasks for a session" {
+  run "$EITS" sessions tasks "$TEST_SESSION"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  echo "$output" | jq -e '.tasks | type == "array"' >/dev/null
+}
+
+@test "sessions tasks: requires session uuid" {
+  run "$EITS" sessions tasks 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "uuid" ]]
+}
+
+@test "sessions notes: returns notes for a session" {
+  run "$EITS" sessions notes "$TEST_SESSION"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  echo "$output" | jq -e '.results | type == "array"' >/dev/null
+}
+
+@test "sessions notes: requires session uuid" {
+  run "$EITS" sessions notes 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "uuid" ]]
+}
+
 # ── tasks create ──────────────────────────────────────────────────────────────
 
 @test "tasks create: returns task_id" {
@@ -182,7 +259,43 @@ _agent_uuid() { cat "$BATS_FILE_TMPDIR/agent_uuid"; }
   echo "$output" | jq -e 'length > 0' >/dev/null
 }
 
+@test "notes search: returns matching results" {
+  unique="bats-notessearch-$(date +%s)"
+  "$EITS" notes create \
+    --parent-type session \
+    --parent-id "$TEST_SESSION" \
+    --body "$unique" >/dev/null
+  run "$EITS" notes search "$unique"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  echo "$output" | jq -e '.results | type == "array"' >/dev/null
+}
+
+@test "notes search: requires query argument" {
+  run "$EITS" notes search 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "query" ]]
+}
+
 # ── commits ───────────────────────────────────────────────────────────────────
+
+@test "commits list: returns commits array" {
+  run "$EITS" commits list
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.commits | type == "array"' >/dev/null
+}
+
+@test "commits list --session: filters by session uuid" {
+  run "$EITS" commits list --session "$TEST_SESSION"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.commits | type == "array"' >/dev/null
+}
+
+@test "commits list: rejects unknown flags" {
+  run "$EITS" commits list --bogus foo 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "unknown flag" ]]
+}
 
 @test "commits create: requires at least one --hash" {
   export EITS_AGENT_UUID="$(_agent_uuid)"

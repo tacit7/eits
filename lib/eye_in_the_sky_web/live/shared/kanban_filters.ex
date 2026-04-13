@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.KanbanFilters do
       if String.length(String.trim(query)) >= 4 do
         EyeInTheSky.Tasks.search_tasks(query, project_id)
       else
-        EyeInTheSky.Projects.get_project_tasks(project_id, include_archived: show_archived)
+        EyeInTheSky.Tasks.list_tasks_for_project(project_id, include_archived: show_archived)
       end
       |> then(fn tasks ->
         if show_completed, do: tasks, else: Enum.reject(tasks, & &1.completed_at)
@@ -103,14 +103,16 @@ defmodule EyeInTheSkyWeb.Live.Shared.KanbanFilters do
     if MapSet.size(tags) == 0 do
       tasks
     else
-      Enum.filter(tasks, fn t ->
-        task_tag_names = MapSet.new(t.tags || [], & &1.name)
+      Enum.filter(tasks, &task_matches_tags?(&1, tags, mode))
+    end
+  end
 
-        case mode do
-          :and -> MapSet.subset?(tags, task_tag_names)
-          :or -> MapSet.size(MapSet.intersection(tags, task_tag_names)) > 0
-        end
-      end)
+  defp task_matches_tags?(t, tags, mode) do
+    task_tag_names = MapSet.new(t.tags || [], & &1.name)
+
+    case mode do
+      :and -> MapSet.subset?(tags, task_tag_names)
+      :or -> MapSet.size(MapSet.intersection(tags, task_tag_names)) > 0
     end
   end
 
@@ -119,55 +121,57 @@ defmodule EyeInTheSkyWeb.Live.Shared.KanbanFilters do
 
   defp filter_by_due_date(tasks, filter) do
     today = Date.utc_today()
+    Enum.filter(tasks, &task_matches_due_date?(&1, filter, today))
+  end
 
-    Enum.filter(tasks, fn task ->
-      case task.due_at do
-        nil ->
-          false
+  defp task_matches_due_date?(task, filter, today) do
+    case task.due_at do
+      nil -> false
+      due_str -> check_due_date(due_str, filter, today)
+    end
+  end
 
-        due_str ->
-          case Date.from_iso8601(String.slice(due_str, 0, 10)) do
-            {:ok, due} ->
-              case filter do
-                :overdue -> Date.compare(due, today) == :lt
-                :next_day -> Date.compare(due, today) != :lt && Date.diff(due, today) <= 1
-                :next_week -> Date.compare(due, today) != :lt && Date.diff(due, today) <= 7
-                :next_month -> Date.compare(due, today) != :lt && Date.diff(due, today) <= 30
-                _ -> true
-              end
+  defp check_due_date(due_str, filter, today) do
+    case Date.from_iso8601(String.slice(due_str, 0, 10)) do
+      {:ok, due} ->
+        case filter do
+          :overdue -> Date.compare(due, today) == :lt
+          :next_day -> Date.compare(due, today) != :lt && Date.diff(due, today) <= 1
+          :next_week -> Date.compare(due, today) != :lt && Date.diff(due, today) <= 7
+          :next_month -> Date.compare(due, today) != :lt && Date.diff(due, today) <= 30
+          _ -> true
+        end
 
-            _ ->
-              false
-          end
-      end
-    end)
+      _ ->
+        false
+    end
   end
 
   defp filter_by_activity(tasks, nil), do: tasks
 
   defp filter_by_activity(tasks, filter) do
     now = DateTime.utc_now()
+    Enum.filter(tasks, &task_matches_activity?(&1, filter, now))
+  end
 
-    Enum.filter(tasks, fn task ->
-      days_ago =
-        case task.updated_at do
-          nil ->
-            999
+  defp task_matches_activity?(task, filter, now) do
+    days_ago = task_days_ago(task.updated_at, now)
 
-          str ->
-            case DateTime.from_iso8601(str) do
-              {:ok, dt, _} -> DateTime.diff(now, dt, :second) |> div(86400)
-              _ -> 999
-            end
-        end
+    case filter do
+      :week -> days_ago <= 7
+      :two_weeks -> days_ago <= 14
+      :four_weeks -> days_ago <= 28
+      :inactive -> days_ago > 28
+      _ -> true
+    end
+  end
 
-      case filter do
-        :week -> days_ago <= 7
-        :two_weeks -> days_ago <= 14
-        :four_weeks -> days_ago <= 28
-        :inactive -> days_ago > 28
-        _ -> true
-      end
-    end)
+  defp task_days_ago(nil, _now), do: 999
+
+  defp task_days_ago(str, now) do
+    case DateTime.from_iso8601(str) do
+      {:ok, dt, _} -> DateTime.diff(now, dt, :second) |> div(86_400)
+      _ -> 999
+    end
   end
 end

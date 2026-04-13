@@ -1,8 +1,8 @@
 defmodule EyeInTheSky.Codex.ParserTest do
   use ExUnit.Case, async: true
 
-  alias EyeInTheSky.Codex.Parser
   alias EyeInTheSky.Claude.Message
+  alias EyeInTheSky.Codex.Parser
 
   # ---------------------------------------------------------------------------
   # thread.started

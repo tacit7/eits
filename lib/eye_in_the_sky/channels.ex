@@ -4,8 +4,8 @@ defmodule EyeInTheSky.Channels do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Channels.{Channel, ChannelMember}
+  alias EyeInTheSky.Repo
 
   @doc """
   Returns all channels (no project filter).
@@ -139,6 +139,10 @@ defmodule EyeInTheSky.Channels do
 
   # Channel Membership Functions
 
+  defp channel_member_query(channel_id, session_id) do
+    from(m in ChannelMember, where: m.channel_id == ^channel_id and m.session_id == ^session_id)
+  end
+
   @doc """
   Adds a member to a channel.
   """
@@ -171,9 +175,7 @@ defmodule EyeInTheSky.Channels do
   Removes a member from a channel.
   """
   def remove_member(channel_id, session_id) do
-    from(m in ChannelMember,
-      where: m.channel_id == ^channel_id and m.session_id == ^session_id
-    )
+    channel_member_query(channel_id, session_id)
     |> Repo.delete_all()
   end
 
@@ -191,10 +193,8 @@ defmodule EyeInTheSky.Channels do
   @doc """
   Checks if a session is a member of a channel.
   """
-  def is_member?(channel_id, session_id) do
-    from(m in ChannelMember,
-      where: m.channel_id == ^channel_id and m.session_id == ^session_id
-    )
+  def member?(channel_id, session_id) do
+    channel_member_query(channel_id, session_id)
     |> Repo.exists?()
   end
 
@@ -202,10 +202,11 @@ defmodule EyeInTheSky.Channels do
   Gets a channel member record.
   """
   def get_member(channel_id, session_id) do
-    from(m in ChannelMember,
-      where: m.channel_id == ^channel_id and m.session_id == ^session_id
-    )
-    |> Repo.one()
+    case channel_member_query(channel_id, session_id)
+         |> Repo.one() do
+      nil -> {:error, :not_found}
+      member -> {:ok, member}
+    end
   end
 
   @doc """
@@ -214,9 +215,7 @@ defmodule EyeInTheSky.Channels do
   def mark_as_read(channel_id, session_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    from(m in ChannelMember,
-      where: m.channel_id == ^channel_id and m.session_id == ^session_id
-    )
+    channel_member_query(channel_id, session_id)
     |> Repo.update_all(set: [last_read_at: now])
   end
 
@@ -234,14 +233,34 @@ defmodule EyeInTheSky.Channels do
   end
 
   @doc """
+  Finds the global (#global) channel for a session, scoped to the session's project if set.
+
+  Returns `{:ok, channel}` or `{:error, :not_found}`.
+  """
+  def find_global_channel(session) do
+    channels =
+      if session.project_id,
+        do: list_channels_for_project(session.project_id),
+        else: list_channels()
+
+    case Enum.find(channels, fn c -> c.name == "#global" end) do
+      nil -> {:error, :not_found}
+      channel -> {:ok, channel}
+    end
+  end
+
+  @doc """
   Counts unread messages for a session in a channel.
   """
   def count_unread_messages(channel_id, session_id) do
     alias EyeInTheSky.Messages.Message
 
-    member = get_member(channel_id, session_id)
+    member = case get_member(channel_id, session_id) do
+      {:ok, m} -> m
+      {:error, :not_found} -> nil
+    end
 
-    if member && member.last_read_at do
+    if not is_nil(member) && member.last_read_at do
       from(m in Message,
         where: m.channel_id == ^channel_id and m.inserted_at > ^member.last_read_at
       )

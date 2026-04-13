@@ -9,9 +9,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
   import EyeInTheSkyWeb.Helpers.SessionFilters
 
   alias EyeInTheSky.Sessions
+  alias EyeInTheSkyWeb.ProjectLive.Sessions.State
+  alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
 
   @telemetry_prefix [:eye_in_the_sky, :project_sessions]
-  @page_size 25
 
   @doc "Reload sessions from the database and rebuild the view."
   def load_agents(socket) do
@@ -36,7 +37,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
 
   @doc "Reapply filter/sort/pagination on the already-loaded agent list."
   def apply_agent_view(socket, reset_page \\ false) do
-    visible_count = if reset_page, do: @page_size, else: socket.assigns.visible_count
+    visible_count = if reset_page, do: State.page_size(), else: socket.assigns.visible_count
 
     {duration_us, {ordered_agents, depths}} =
       :timer.tc(fn ->
@@ -79,20 +80,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
   @doc "Update a single session's status in-memory and re-render the view."
   def update_agent_status_in_list(socket, session_id, new_status) do
     now = DateTime.utc_now()
-
-    update_status = fn agents ->
-      Enum.map(agents, fn agent ->
-        if agent.id == session_id do
-          agent = %{agent | status: new_status}
-          if new_status == "idle", do: %{agent | last_activity_at: now}, else: agent
-        else
-          agent
-        end
-      end)
-    end
+    updated = Enum.map(socket.assigns.all_agents, &AgentStatusHelpers.apply_agent_status(&1, session_id, new_status, now))
 
     socket
-    |> assign(:all_agents, update_status.(socket.assigns.all_agents))
+    |> assign(:all_agents, updated)
     |> apply_agent_view()
   end
 
@@ -105,7 +96,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
 
     {children, top_level} =
       Enum.split_with(sessions, fn s ->
-        s.parent_session_id && MapSet.member?(session_ids, s.parent_session_id)
+        not is_nil(s.parent_session_id) && MapSet.member?(session_ids, s.parent_session_id)
       end)
 
     children_by_parent = Enum.group_by(children, & &1.parent_session_id)

@@ -39,8 +39,7 @@ defmodule EyeInTheSky.Codex.SDK do
   @doc """
   Build the EITS init prompt prepended to new Codex sessions.
 
-  Teaches the agent to use EITS-CMD directives — intercepted in-process by
-  AgentWorker, stripped from visible output, no HTTP round-trips required.
+  Injects session-specific EITS context and eits CLI workflow instructions.
   Accepts any struct with the fields: eits_session_uuid, session_id, agent_id, project_id.
   """
   @spec eits_init_prompt(map()) :: String.t()
@@ -52,18 +51,16 @@ defmodule EyeInTheSky.Codex.SDK do
     - EITS_AGENT_UUID=#{state.agent_id}
     - EITS_PROJECT_ID=#{state.project_id}
 
-    Use EITS-CMD directives for task tracking (intercepted in-process, no HTTP required).
-    Write them as plain lines anywhere in your output — they are stripped before display.
+    Use the eits CLI script for all EITS operations:
 
-      EITS-CMD: task begin <title>
-      EITS-CMD: task annotate <id> <body>
-      EITS-CMD: task done <id>
-      EITS-CMD: note <body>
-      EITS-CMD: commit <hash>
-      EITS-CMD: dm --to #{state.eits_session_uuid} --message <text>
+      eits tasks begin --title "<title>"
+      eits tasks annotate <id> --body "..."
+      eits tasks update <id> --state 4
+      eits dm --to <session_uuid> --message "<text>"
+      eits commits create --hash <hash>
 
     You MUST claim a task before editing files:
-      EITS-CMD: task begin <title of your work>
+      eits tasks begin --title "<title of your work>"
 
     Now proceed with the task:
     """
@@ -91,34 +88,44 @@ defmodule EyeInTheSky.Codex.SDK do
     :telemetry.execute([:eits, :codex, :sdk, :start], %{system_time: System.system_time()}, meta)
     Logger.info("[telemetry] codex.sdk.start session_id=#{meta.session_id} model=#{meta.model}")
 
-    handler_pid = spawn_handler_process(sdk_ref, to, opts[:session_id])
     cli = Keyword.get(opts, :cli_module) || Utils.codex_cli_module()
+    task_supervisor = Keyword.get(opts, :task_supervisor, EyeInTheSky.TaskSupervisor)
 
-    cli_opts =
-      opts
-      |> Keyword.put(:caller, handler_pid)
-      |> Keyword.delete(:to)
-      |> Keyword.delete(:cli_module)
+    case spawn_handler_process(sdk_ref, to, opts[:session_id], task_supervisor) do
+      {:ok, handler_pid} ->
+        cli_opts =
+          opts
+          |> Keyword.put(:caller, handler_pid)
+          |> Keyword.delete(:to)
+          |> Keyword.delete(:cli_module)
 
-    case cli.spawn_new_session(prompt, cli_opts) do
-      {:ok, port, _cli_ref} ->
-        Registry.register(sdk_ref, port)
-        send(handler_pid, {:start_handling, sdk_ref})
-        {:ok, sdk_ref, handler_pid}
+        case cli.spawn_new_session(prompt, cli_opts) do
+          {:ok, port, _cli_ref} ->
+            Registry.register(sdk_ref, port)
+            send(handler_pid, {:start_handling, sdk_ref})
+            {:ok, sdk_ref, handler_pid}
+
+          {:error, reason} ->
+            :telemetry.execute(
+              [:eits, :codex, :sdk, :error],
+              %{system_time: System.system_time()},
+              Map.put(meta, :reason, reason)
+            )
+
+            Logger.error(
+              "[telemetry] codex.sdk.error session_id=#{meta.session_id} reason=#{inspect(reason)}"
+            )
+
+            Process.exit(handler_pid, :kill)
+            {:error, reason}
+        end
 
       {:error, reason} ->
-        :telemetry.execute(
-          [:eits, :codex, :sdk, :error],
-          %{system_time: System.system_time()},
-          Map.put(meta, :reason, reason)
-        )
-
         Logger.error(
-          "[telemetry] codex.sdk.error session_id=#{meta.session_id} reason=#{inspect(reason)}"
+          "[telemetry] codex.sdk.error session_id=#{meta.session_id} reason=handler_start_failed #{inspect(reason)}"
         )
 
-        Process.exit(handler_pid, :kill)
-        {:error, reason}
+        {:error, {:handler_start_failed, reason}}
     end
   end
 
@@ -137,34 +144,44 @@ defmodule EyeInTheSky.Codex.SDK do
 
     Logger.info("[telemetry] codex.sdk.resume session_id=#{session_id} model=#{meta.model}")
 
-    handler_pid = spawn_handler_process(sdk_ref, to, opts[:session_id])
     cli = Keyword.get(opts, :cli_module) || Utils.codex_cli_module()
+    task_supervisor = Keyword.get(opts, :task_supervisor, EyeInTheSky.TaskSupervisor)
 
-    cli_opts =
-      opts
-      |> Keyword.put(:caller, handler_pid)
-      |> Keyword.delete(:to)
-      |> Keyword.delete(:cli_module)
+    case spawn_handler_process(sdk_ref, to, opts[:session_id], task_supervisor) do
+      {:ok, handler_pid} ->
+        cli_opts =
+          opts
+          |> Keyword.put(:caller, handler_pid)
+          |> Keyword.delete(:to)
+          |> Keyword.delete(:cli_module)
 
-    case cli.resume_session(session_id, prompt, cli_opts) do
-      {:ok, port, _cli_ref} ->
-        Registry.register(sdk_ref, port)
-        send(handler_pid, {:start_handling, sdk_ref})
-        {:ok, sdk_ref, handler_pid}
+        case cli.resume_session(session_id, prompt, cli_opts) do
+          {:ok, port, _cli_ref} ->
+            Registry.register(sdk_ref, port)
+            send(handler_pid, {:start_handling, sdk_ref})
+            {:ok, sdk_ref, handler_pid}
+
+          {:error, reason} ->
+            :telemetry.execute(
+              [:eits, :codex, :sdk, :error],
+              %{system_time: System.system_time()},
+              Map.put(meta, :reason, reason)
+            )
+
+            Logger.error(
+              "[telemetry] codex.sdk.error session_id=#{session_id} reason=#{inspect(reason)}"
+            )
+
+            Process.exit(handler_pid, :kill)
+            {:error, reason}
+        end
 
       {:error, reason} ->
-        :telemetry.execute(
-          [:eits, :codex, :sdk, :error],
-          %{system_time: System.system_time()},
-          Map.put(meta, :reason, reason)
-        )
-
         Logger.error(
-          "[telemetry] codex.sdk.error session_id=#{session_id} reason=#{inspect(reason)}"
+          "[telemetry] codex.sdk.error session_id=#{session_id} reason=handler_start_failed #{inspect(reason)}"
         )
 
-        Process.exit(handler_pid, :kill)
-        {:error, reason}
+        {:error, {:handler_start_failed, reason}}
     end
   end
 
@@ -193,35 +210,39 @@ defmodule EyeInTheSky.Codex.SDK do
   # Handler process
   # ---------------------------------------------------------------------------
 
-  defp spawn_handler_process(sdk_ref, caller_pid, fallback_session_id) do
-    spawn(fn ->
-      Process.monitor(caller_pid)
+  defp spawn_handler_process(sdk_ref, caller_pid, fallback_session_id, supervisor) do
+    Task.Supervisor.start_child(
+      supervisor,
+      fn ->
+        Process.monitor(caller_pid)
 
-      receive do
-        {:start_handling, ^sdk_ref} ->
-          :telemetry.execute(
-            [:eits, :codex, :sdk, :handler, :ready],
-            %{system_time: System.system_time()},
-            %{}
-          )
+        receive do
+          {:start_handling, ^sdk_ref} ->
+            :telemetry.execute(
+              [:eits, :codex, :sdk, :handler, :ready],
+              %{system_time: System.system_time()},
+              %{}
+            )
 
-          state = %{
-            sdk_ref: sdk_ref,
-            caller_pid: caller_pid,
-            session_id: nil,
-            accumulated_text: "",
-            fallback_session_id: fallback_session_id
-          }
+            state = %{
+              sdk_ref: sdk_ref,
+              caller_pid: caller_pid,
+              session_id: nil,
+              accumulated_text: "",
+              fallback_session_id: fallback_session_id
+            }
 
-          MessageHandler.run_loop(__MODULE__, state, @loop_opts)
+            MessageHandler.run_loop(__MODULE__, state, @loop_opts)
 
-        {:DOWN, _ref, :process, ^caller_pid, _reason} ->
-          MessageHandler.stop_and_unregister(sdk_ref)
-      after
-        5_000 ->
-          send(caller_pid, {:claude_error, sdk_ref, :handler_timeout})
-      end
-    end)
+          {:DOWN, _ref, :process, ^caller_pid, _reason} ->
+            MessageHandler.stop_and_unregister(sdk_ref)
+        after
+          5_000 ->
+            send(caller_pid, {:claude_error, sdk_ref, :handler_timeout})
+        end
+      end,
+      restart: :temporary
+    )
   end
 
   # ---------------------------------------------------------------------------

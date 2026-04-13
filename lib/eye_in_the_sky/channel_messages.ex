@@ -4,8 +4,8 @@ defmodule EyeInTheSky.ChannelMessages do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Messages.Message
+  alias EyeInTheSky.Repo
 
   @doc """
   Returns the list of messages for a specific channel.
@@ -29,7 +29,7 @@ defmodule EyeInTheSky.ChannelMessages do
   def create_channel_message(attrs) do
     attrs
     |> Map.put(:uuid, Ecto.UUID.generate())
-    |> EyeInTheSky.Messages.create_message()
+    |> EyeInTheSky.Messages.create_channel_message()
   end
 
   @doc """
@@ -41,7 +41,7 @@ defmodule EyeInTheSky.ChannelMessages do
       |> Map.put(:uuid, Ecto.UUID.generate())
       |> Map.put(:direction, "outbound")
       |> Map.put(:status, "pending")
-      |> EyeInTheSky.Messages.create_message()
+      |> EyeInTheSky.Messages.create_channel_message()
 
     case result do
       {:ok, message} ->

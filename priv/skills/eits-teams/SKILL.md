@@ -11,19 +11,6 @@ EITS teams coordinate multiple Claude agents in parallel. Membership is server-s
 
 ---
 
-## Entrypoint
-
-```bash
-echo "$CLAUDE_CODE_ENTRYPOINT"
-```
-
-| Value | Method |
-|-------|--------|
-| `sdk-cli` | `EITS-CMD:` directives in output |
-| `cli` | `eits` CLI script |
-
----
-
 ## CLI Reference
 
 ```bash
@@ -54,16 +41,6 @@ eits agents spawn \
 ```
 
 Only `--instructions` is required. `--project-id` is inherited from parent session automatically — do not pass it.
-
----
-
-## EITS-CMD (sdk-cli only)
-
-```
-EITS-CMD: dm --to <session_uuid> --message "text"
-```
-
-No team-specific EITS-CMD directives exist — use the `eits` CLI for all team operations even in spawned agents via a Bash tool call.
 
 ---
 

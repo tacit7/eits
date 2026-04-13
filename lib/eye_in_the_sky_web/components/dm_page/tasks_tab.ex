@@ -25,7 +25,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
           id="dm-task-list"
         >
           <%= for task <- @tasks do %>
-            <% has_expandable = task.description || Map.get(task, :notes, []) != [] %>
+            <% has_expandable = not is_nil(task.description) || Map.get(task, :notes, []) != [] %>
             <div class="flex items-start" id={"dm-task-#{task.id}"}>
               <%!-- Edit button — outside collapse so checkbox overlay can't intercept --%>
               <button
@@ -90,7 +90,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
                           {task.state.name}
                         </span>
                       <% end %>
-                      <%= if task.tags && length(task.tags) > 0 do %>
+                      <%= if task.tags not in [nil, []] do %>
                         <span class="text-base-content/15">&middot;</span>
                         <span class="text-base-content/35">
                           {Enum.map_join(Enum.take(task.tags, 2), ", ", & &1.name)}

@@ -18,6 +18,8 @@ if (!deploy) {
 let optsClient = {
     entryPoints: ["js/app.js"],
     bundle: true,
+    splitting: true,
+    format: "esm",
     minify: deploy,
     conditions: clientConditions,
     alias: {svelte: "svelte"},
@@ -32,7 +34,7 @@ let optsClient = {
         importGlobPlugin(),
         sveltePlugin({
             preprocess: sveltePreprocess(),
-            compilerOptions: {dev: !deploy, css: "injected", generate: "client"},
+            compilerOptions: {dev: !deploy, css: "external", generate: "client"},
         }),
     ],
 }

@@ -1,18 +1,20 @@
 defmodule EyeInTheSkyWeb.Live.Shared.DmModelHelpers do
+  @moduledoc false
   require Logger
 
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3]
+  import EyeInTheSkyWeb.Live.Shared.OverlayHelpers
 
   alias EyeInTheSky.Sessions
 
   def handle_toggle_model_menu(socket) do
-    overlay = if socket.assigns.active_overlay == :model_menu, do: nil, else: :model_menu
+    overlay = toggle_overlay(socket.assigns.active_overlay, :model_menu)
     {:noreply, assign(socket, :active_overlay, overlay)}
   end
 
   def handle_toggle_effort_menu(socket) do
-    overlay = if socket.assigns.active_overlay == :effort_menu, do: nil, else: :effort_menu
+    overlay = toggle_overlay(socket.assigns.active_overlay, :effort_menu)
     {:noreply, assign(socket, :active_overlay, overlay)}
   end
 

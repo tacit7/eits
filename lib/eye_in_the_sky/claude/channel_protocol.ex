@@ -39,12 +39,7 @@ defmodule EyeInTheSky.Claude.ChannelProtocol do
 
     mentioned_ids =
       Regex.scan(~r/@(\d+)/, body)
-      |> Enum.flat_map(fn [_, id_str] ->
-        case Integer.parse(id_str) do
-          {id, ""} -> [id]
-          _ -> []
-        end
-      end)
+      |> Enum.map(fn [_, id_str] -> String.to_integer(id_str) end)
       |> Enum.uniq()
 
     mode =

@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
+  @moduledoc false
   use Phoenix.Component
 
   use Phoenix.VerifiedRoutes,
@@ -32,7 +33,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
           </span>
           <button
             phx-click="delete_selected"
-            class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1"
+            class="btn btn-ghost btn-sm min-h-[44px] text-error/70 hover:text-error hover:bg-error/10 gap-1"
           >
             <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
           </button>
@@ -70,7 +71,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
         <div
           id="ps-list"
           phx-update="stream"
-          class="divide-y divide-base-content/5 bg-base-200 rounded-xl px-4"
+          class="divide-y divide-base-content/5"
         >
           <div
             :for={{dom_id, agent} <- @streams.session_list}
@@ -88,60 +89,105 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
               editing_session_id={@editing_session_id}
             >
               <:actions>
-                <%= if agent.id do %>
-                  <a
-                    href={~p"/dm/#{agent.id}"}
-                    target="_blank"
-                    class="hidden sm:inline-flex md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-base-content/30 hover:text-primary hover:bg-primary/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    aria-label="Open in new tab"
-                  >
-                    <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
-                  </a>
-                <% end %>
-                <%= if agent.agent && agent.agent.uuid && agent.uuid do %>
+                <div class="relative dropdown dropdown-end transition-all md:opacity-0 md:group-hover:opacity-100">
                   <button
-                    id={"bookmark-btn-#{agent.uuid}"}
+                    tabindex="0"
                     type="button"
-                    phx-hook="BookmarkAgent"
-                    data-agent-id={agent.agent.uuid}
-                    data-session-id={agent.uuid}
-                    data-agent-name={agent.name || agent.agent.description || "Agent"}
-                    data-agent-status={agent.status}
-                    class="bookmark-button md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
-                    aria-label="Bookmark agent"
+                    class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/60 md:text-base-content/35 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+                    aria-label="More options"
+                    phx-click="noop"
                   >
-                    <.heart class="bookmark-icon w-3.5 h-3.5" />
+                    <.icon name="hero-ellipsis-horizontal-mini" class="w-4 h-4" />
                   </button>
-                <% end %>
-                <%= if agent.uuid do %>
-                  <%= if agent.archived_at do %>
-                    <.icon_button
-                      icon="hero-arrow-up-tray-mini"
-                      on_click="unarchive_session"
-                      aria_label="Unarchive"
-                      color="info"
-                      show_on_hover={false}
-                      values={%{"session_id" => agent.id}}
-                    />
-                    <.icon_button
-                      icon="hero-trash-mini"
-                      on_click="delete_session"
-                      aria_label="Delete"
-                      color="error"
-                      show_on_hover={false}
-                      values={%{"session_id" => agent.id}}
-                    />
-                  <% else %>
-                    <.icon_button
-                      icon="hero-archive-box-mini"
-                      on_click="archive_session"
-                      aria_label="Archive"
-                      color="warning"
-                      class="hidden sm:flex"
-                      values={%{"session_id" => agent.id}}
-                    />
-                  <% end %>
-                <% end %>
+                  <ul
+                    tabindex="0"
+                    class="dropdown-content z-50 menu menu-xs bg-base-200 border border-base-content/10 rounded-lg shadow-lg w-44 p-1"
+                  >
+                    <%= if agent.id do %>
+                      <li>
+                        <a
+                          href={~p"/dm/#{agent.id}"}
+                          target="_blank"
+                          class="flex items-center gap-2"
+                        >
+                          <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
+                          Open in new tab
+                        </a>
+                      </li>
+                    <% end %>
+                    <li>
+                      <button
+                        type="button"
+                        phx-click="rename_session"
+                        phx-value-session_id={agent.id}
+                        onclick="this.blur()"
+                        class="flex items-center gap-2"
+                      >
+                        <.icon name="hero-pencil-square-mini" class="w-3.5 h-3.5" />
+                        Rename
+                      </button>
+                    </li>
+                    <%= if not is_nil(agent.agent) && not is_nil(agent.agent.uuid) && not is_nil(agent.uuid) do %>
+                      <li>
+                        <button
+                          id={"bookmark-btn-#{agent.uuid}"}
+                          type="button"
+                          phx-hook="BookmarkAgent"
+                          data-agent-id={agent.agent.uuid}
+                          data-session-id={agent.uuid}
+                          data-agent-name={agent.name || agent.agent.description || "Agent"}
+                          data-agent-status={agent.status}
+                          class="bookmark-button flex items-center gap-2"
+                          aria-label="Bookmark agent"
+                        >
+                          <.heart class="bookmark-icon w-3.5 h-3.5" />
+                          <span class="bookmark-label">Favorite</span>
+                        </button>
+                      </li>
+                    <% end %>
+                    <%= if agent.uuid do %>
+                      <%= if agent.archived_at do %>
+                        <li>
+                          <button
+                            type="button"
+                            phx-click="unarchive_session"
+                            phx-value-session_id={agent.id}
+                            onclick="this.blur()"
+                            class="flex items-center gap-2 text-info"
+                          >
+                            <.icon name="hero-arrow-up-tray-mini" class="w-3.5 h-3.5" />
+                            Unarchive
+                          </button>
+                        </li>
+                        <li>
+                          <button
+                            type="button"
+                            phx-click="delete_session"
+                            phx-value-session_id={agent.id}
+                            onclick="this.blur()"
+                            class="flex items-center gap-2 text-error"
+                          >
+                            <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
+                            Delete
+                          </button>
+                        </li>
+                      <% else %>
+                        <li>
+                          <button
+                            type="button"
+                            phx-click="archive_session"
+                            phx-value-session_id={agent.id}
+                            onclick="this.blur()"
+                            class="flex items-center gap-2 text-warning"
+                          >
+                            <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
+                            Archive
+                          </button>
+                        </li>
+                      <% end %>
+                    <% end %>
+                  </ul>
+                </div>
               </:actions>
             </.session_row>
           </div>

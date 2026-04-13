@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.ControllerHelpers do
   @moduledoc "Shared helpers for API controllers and LiveViews."
 
-  def parse_int(val), do: parse_int(val, nil)
+  def parse_int(val), do: EyeInTheSky.Utils.ToolHelpers.parse_int(val)
 
   def parse_int(nil, default), do: default
   def parse_int(val, _default) when is_integer(val), do: val
@@ -23,11 +23,7 @@ defmodule EyeInTheSkyWeb.ControllerHelpers do
 
   def translate_errors(_), do: %{}
 
-  def normalize_parent_type("sessions"), do: "session"
-  def normalize_parent_type("agents"), do: "agent"
-  def normalize_parent_type("tasks"), do: "task"
-  def normalize_parent_type("projects"), do: "project"
-  def normalize_parent_type(type), do: type
+  defdelegate normalize_parent_type(type), to: EyeInTheSky.Utils.ToolHelpers
 
   @doc """
   Resolves a raw string to an integer ID.
@@ -41,16 +37,43 @@ defmodule EyeInTheSkyWeb.ControllerHelpers do
   def resolve_id(nil, _lookup_fn), do: nil
 
   def resolve_id(raw, lookup_fn) when is_binary(raw) do
-    case Integer.parse(raw) do
-      {n, ""} ->
-        n
-
-      _ ->
+    case parse_int(raw) do
+      nil ->
         case lookup_fn.(raw) do
           {:ok, %{id: id}} -> id
           {:ok, id} when is_integer(id) -> id
           _ -> nil
         end
+
+      n ->
+        n
+    end
+  end
+
+  @doc """
+  Conditionally appends a keyword pair to `opts`.
+  Skips the pair when `val` is nil or an empty string.
+  """
+  def maybe_opt(opts, _key, nil), do: opts
+  def maybe_opt(opts, _key, ""), do: opts
+  def maybe_opt(opts, key, val), do: Keyword.put(opts, key, val)
+
+  @doc """
+  Coerces a `starred` param value to a boolean.
+  Accepts boolean, integer (1/0), or string representations ("1"/"true"/"0"/"false").
+
+  Returns `{:ok, bool}` on success or `:error` when the value is absent or unrecognisable.
+  """
+  def parse_starred(nil), do: :error
+  def parse_starred(true), do: {:ok, true}
+  def parse_starred(false), do: {:ok, false}
+  def parse_starred(val) when is_integer(val), do: {:ok, val != 0}
+
+  def parse_starred(val) when is_binary(val) do
+    case val do
+      v when v in ["1", "true"] -> {:ok, true}
+      v when v in ["0", "false"] -> {:ok, false}
+      _ -> :error
     end
   end
 end

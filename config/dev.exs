@@ -2,7 +2,6 @@ import Config
 
 # Gitea webhook HMAC secret — set this in Gitea webhook settings and here
 config :eye_in_the_sky, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SECRET", "")
-config :eye_in_the_sky, Oban, testing: :inline
 config :eye_in_the_sky, :env, :dev
 config :eye_in_the_sky, :bypass_auth, true
 # Allow unsigned webhooks in dev when no secret is set (never enable in prod)
@@ -35,8 +34,7 @@ config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "N/iElaaIGg/5yCN4JOKd13aAXziMbsBDWfTjQFgjjLY32KpeZ7hBDnQEx1AcpSLO",
   watchers: [
-    node: ["build.js", "--watch", cd: Path.expand("../assets", __DIR__)],
-    # esbuild: {Esbuild, :install_and_run, [:eye_in_the_sky, ~w(--sourcemap=inline --watch)]},
+    vite: {PhoenixVite.Npm, :run, [:vite, ~w(dev)]},
     tailwind: {Tailwind, :install_and_run, [:eye_in_the_sky, ~w(--watch)]}
   ]
 
@@ -78,6 +76,13 @@ config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
         ]
       ]
     end)
+
+# LiveSvelte SSR via Vite dev server in development
+config :live_svelte,
+  ssr_module: LiveSvelte.SSR.ViteJS,
+  vite_host: "http://localhost:#{System.get_env("VITE_PORT", "5173")}"
+
+config :eye_in_the_sky, :vite_host, "http://localhost:#{System.get_env("VITE_PORT", "5173")}"
 
 # Enable dev routes for dashboard and mailbox
 config :eye_in_the_sky, dev_routes: true

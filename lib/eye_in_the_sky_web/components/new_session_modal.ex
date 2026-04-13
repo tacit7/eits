@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   use Phoenix.LiveComponent
   import EyeInTheSkyWeb.CoreComponents, only: [icon: 1, modal_header: 1]
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [models_for_provider: 1]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Claude.AgentFileScanner
 
@@ -25,12 +26,19 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   @impl true
   def update(assigns, socket) do
-    # When the form is open, skip parent re-renders to avoid DOM patches disrupting the modal,
-    # but always update uploads so image previews reflect the current state.
-    if socket.assigns[:show] == true && assigns[:show] == true do
-      {:ok, assign(socket, :file_uploads, assigns[:file_uploads])}
+    # When the form is open, skip parent re-renders entirely to prevent DOM patches from
+    # disrupting the modal (e.g. PubSub-driven list updates closing the form). Only update
+    # uploads when they actually change so image previews stay current.
+    if socket.assigns[:show] && assigns[:show] do
+      new_uploads = Map.get(assigns, :file_uploads)
+
+      if socket.assigns[:file_uploads] == new_uploads do
+        {:ok, socket}
+      else
+        {:ok, assign(socket, :file_uploads, new_uploads)}
+      end
     else
-      project_path = assigns[:current_project] && assigns[:current_project].path
+      project_path = if assigns[:current_project], do: assigns[:current_project].path
       available_agents = list_agents(project_path)
       {:ok, assign(socket, Map.put(assigns, :available_agents, available_agents))}
     end
@@ -50,6 +58,20 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     {:noreply, assign(socket, selected_prompt_id: nil, prefill_text: "")}
   end
 
+  def handle_event("project_changed", %{"project_id" => project_id_str}, socket) do
+    projects = socket.assigns[:projects] || []
+
+    project_path =
+      case parse_int(project_id_str) do
+        nil -> nil
+        id ->
+          project = Enum.find(projects, fn p -> p.id == id end)
+          if(project, do: project.path)
+      end
+
+    {:noreply, assign(socket, :available_agents, list_agents(project_path))}
+  end
+
   def handle_event("prompt_selected", %{"prompt_id" => prompt_id}, socket) do
     prompts = socket.assigns[:prompts] || []
     prompt = Enum.find(prompts, fn p -> to_string(p.id) == prompt_id end)
@@ -63,8 +85,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   def render(assigns) do
     ~H"""
     <div>
-      <div :if={@show} class="modal modal-open" phx-window-keydown={@toggle_event} phx-key="Escape">
-        <div class="modal-box max-w-md">
+      <div :if={@show} class="modal modal-open modal-bottom sm:modal-middle" phx-window-keydown={@toggle_event} phx-key="Escape">
+        <div class="modal-box w-full sm:max-w-md pb-[env(safe-area-inset-bottom)]">
           <.modal_header title={assigns[:title] || "New Agent"} toggle_event={@toggle_event} />
 
           <form phx-submit={@submit_event} class="flex flex-col gap-4">
@@ -83,7 +105,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
             </div>
 
             <%!-- Agent --%>
-            <%= if length(@available_agents) > 0 do %>
+            <%= if @available_agents != [] do %>
               <div>
                 <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Agent</label>
                 <select name="agent" class="select select-bordered w-full">
@@ -96,7 +118,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
             <% end %>
 
             <%!-- Agent Prompt (when prompts exist) --%>
-            <%= if length(assigns[:prompts] || []) > 0 do %>
+            <%= if (assigns[:prompts] || []) != [] do %>
               <div>
                 <label class="text-sm font-medium text-base-content/70 mb-1.5 block">
                   Agent Prompt
@@ -126,7 +148,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
               <input
                 type="text"
                 name="agent_name"
-                class="input input-bordered w-full"
+                class="input input-bordered w-full text-base"
                 placeholder="e.g., Fix login bug, Code review..."
               />
             </div>
@@ -137,7 +159,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
               <textarea
                 id={"desc-#{@selected_prompt_id || "none"}"}
                 name="description"
-                class="textarea textarea-bordered w-full h-20 text-sm"
+                class="textarea textarea-bordered w-full h-20 text-base"
                 placeholder="What should this agent work on?"
                 required
                 autofocus
@@ -208,7 +230,13 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
             <% else %>
               <div>
                 <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Project</label>
-                <select name="project_id" class="select select-bordered w-full" required>
+                <select
+                  name="project_id"
+                  class="select select-bordered w-full"
+                  required
+                  phx-change="project_changed"
+                  phx-target={@myself}
+                >
                   <option value="">Select project...</option>
                   <%= for project <- @projects || [] do %>
                     <option value={project.id}>{project.name}</option>
@@ -256,7 +284,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
               <input
                 type="text"
                 name="worktree"
-                class="input input-bordered w-full font-mono text-sm"
+                class="input input-bordered w-full font-mono text-base"
                 placeholder="e.g., fix-login-bug"
               />
               <p class="text-xs text-base-content/35 mt-1">
@@ -276,6 +304,109 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
               />
               <span class="text-sm text-base-content/70">EITS Workflow</span>
             </label>
+
+            <%!-- Advanced CLI Flags --%>
+            <div class="collapse collapse-arrow bg-base-200 rounded-lg">
+              <input type="checkbox" class="min-h-0" />
+              <div class="collapse-title min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-xs font-medium text-base-content/60">
+                <.icon name="hero-adjustments-horizontal" class="w-3.5 h-3.5" /> Advanced
+              </div>
+              <div class="collapse-content px-3 pb-3 space-y-3">
+                <div class="form-control">
+                  <label class="label"><span class="label-text text-xs">Permission Mode</span></label>
+                  <select name="permission_mode" class="select select-bordered select-sm w-full">
+                    <option value="">Default</option>
+                    <option value="acceptEdits">acceptEdits — auto-accept file edits</option>
+                    <option value="bypassPermissions">bypassPermissions — skip all prompts</option>
+                    <option value="dontAsk">dontAsk — never ask for confirmation</option>
+                    <option value="plan">plan — read-only, no file changes</option>
+                  </select>
+                </div>
+
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text text-xs">Max Turns</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--max-turns</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="max_turns"
+                    min="1"
+                    placeholder="unlimited"
+                    class="input input-bordered input-sm w-full font-mono min-h-[44px]"
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text text-xs">Add Directory</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--add-dir</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="add_dir"
+                    placeholder="/path/to/shared-lib"
+                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text text-xs">MCP Config File</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--mcp-config</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="mcp_config"
+                    placeholder="./mcp-servers.json"
+                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text text-xs">Plugin Directory</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--plugin-dir</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="plugin_dir"
+                    placeholder="./my-plugins"
+                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text text-xs">Settings File</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--settings</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="settings_file"
+                    placeholder="./settings.json"
+                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+                  />
+                </div>
+
+                <div class="flex flex-col gap-1 pt-1">
+                  <label class="label cursor-pointer justify-start gap-2 py-1">
+                    <input type="checkbox" name="chrome" value="true" class="checkbox checkbox-sm checkbox-primary" />
+                    <span class="label-text text-xs">
+                      Chrome integration
+                      <span class="font-mono text-base-content/40 text-xs ml-1">--chrome</span>
+                    </span>
+                  </label>
+                  <label class="label cursor-pointer justify-start gap-2 py-1">
+                    <input type="checkbox" name="sandbox" value="true" class="checkbox checkbox-sm checkbox-primary" />
+                    <span class="label-text text-xs">
+                      OS sandbox isolation
+                      <span class="font-mono text-base-content/40 text-xs ml-1">--sandbox</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
 
             <%!-- Submit --%>
             <button type="submit" class="btn btn-primary w-full mt-2">

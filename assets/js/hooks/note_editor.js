@@ -1,18 +1,36 @@
 // assets/js/hooks/note_editor.js
-import { EditorView, keymap, highlightActiveLine } from "@codemirror/view"
-import { EditorState } from "@codemirror/state"
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands"
-import { oneDark } from "@codemirror/theme-one-dark"
-import { markdown } from "@codemirror/lang-markdown"
+// CodeMirror is loaded lazily on first mount to keep the initial JS bundle small.
 
 export const NoteEditorHook = {
-  mounted() {
+  async mounted() {
+    this._destroyed = false
     const body = atob(this.el.dataset.body || "")
     const noteId = this.el.dataset.noteId
     this._saved = false
     const self = this
 
-    const isDark = document.documentElement.dataset.theme === "dark"
+    const [
+      { EditorView, keymap, highlightActiveLine },
+      { EditorState },
+      { defaultKeymap, history, historyKeymap },
+      { makeThemeCompartment },
+      { makeTabSizeExtension, makeFontSizeExtension, makeVimExtension },
+      { syntaxHighlighting, defaultHighlightStyle },
+      { markdown },
+    ] = await Promise.all([
+      import("@codemirror/view"),
+      import("@codemirror/state"),
+      import("@codemirror/commands"),
+      import("../cm_theme"),
+      import("../cm_settings"),
+      import("@codemirror/language"),
+      import("@codemirror/lang-markdown"),
+    ])
+
+    const { extension: themeExtension, watch } = await makeThemeCompartment()
+    const { extension: tabExtension, watch: tabWatch } = await makeTabSizeExtension()
+    const { extension: fontExtension, watch: watchFont } = await makeFontSizeExtension()
+    const { extension: vimExtension, watch: watchVim } = await makeVimExtension()
 
     const saveKeymap = keymap.of([{
       key: "Mod-s",
@@ -39,12 +57,20 @@ export const NoteEditorHook = {
       saveKeymap,
       markdown(),
       EditorView.lineWrapping,
+      syntaxHighlighting(defaultHighlightStyle),
+      themeExtension,
+      tabExtension,
+      fontExtension,
+      vimExtension,
     ]
 
-    if (isDark) extensions.push(oneDark)
-
+    if (this._destroyed) return
     const state = EditorState.create({ doc: body, extensions })
     this._view = new EditorView({ state, parent: this.el })
+    this._cleanupTheme = watch(this._view)
+    this._cleanupTabSize = tabWatch(this._view)
+    this._cleanupFontSize = watchFont(this._view)
+    this._cleanupVim = watchVim(this._view)
 
     // Force the DaisyUI accordion open. LiveView does not re-set checked on
     // existing inputs after initial render, so we must do it imperatively.
@@ -55,12 +81,17 @@ export const NoteEditorHook = {
   },
 
   destroyed() {
+    this._destroyed = true
     // pushEvent from destroyed() is best-effort — it may not reach the server
     // if the socket is already torn down. The LiveView recovers on the next
     // user interaction (clicking Edit again or page reload).
     if (!this._saved) {
       try { this.pushEvent("note_edit_cancelled", { note_id: this.el.dataset.noteId }) } catch (_) {}
     }
+    if (this._cleanupTheme) this._cleanupTheme()
+    if (this._cleanupTabSize) this._cleanupTabSize()
+    if (this._cleanupFontSize) this._cleanupFontSize()
+    if (this._cleanupVim) this._cleanupVim()
     if (this._view) {
       this._view.destroy()
       this._view = null

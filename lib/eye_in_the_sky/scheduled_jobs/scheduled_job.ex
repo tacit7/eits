@@ -12,7 +12,7 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
     field :schedule_type, :string
     field :schedule_value, :string
     field :config, :string, default: "{}"
-    field :enabled, :integer, default: 1
+    field :enabled, :boolean, default: true
     field :last_run_at, :utc_datetime_usec
     field :next_run_at, :utc_datetime_usec
     field :run_count, :integer, default: 0
@@ -52,11 +52,27 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
       :timezone
     ])
     |> validate_required([:name, :job_type, :schedule_type, :schedule_value])
-    |> validate_inclusion(:job_type, ["spawn_agent", "shell_command", "mix_task", "daily_digest"])
+    |> validate_inclusion(:job_type, ["spawn_agent", "mix_task", "daily_digest", "workable_task"])
     |> validate_inclusion(:origin, ["system", "user"])
     |> validate_inclusion(:schedule_type, ["interval", "cron"])
+    |> validate_timezone()
     |> validate_job_config()
     |> unique_constraint(:prompt_id, name: :idx_scheduled_jobs_unique_prompt)
+  end
+
+  defp validate_timezone(changeset) do
+    case get_change(changeset, :timezone) do
+      nil ->
+        changeset
+
+      tz ->
+        probe = DateTime.from_naive!(~N[2000-01-01 00:00:00], "Etc/UTC")
+
+        case DateTime.shift_zone(probe, tz) do
+          {:ok, _} -> changeset
+          _ -> add_error(changeset, :timezone, "is not a valid timezone")
+        end
+    end
   end
 
   defp validate_job_config(changeset) do
@@ -69,15 +85,23 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
         _ -> %{}
       end
 
-    cond do
-      job_type == "shell_command" and (config["command"] || "") |> String.trim() == "" ->
-        add_error(changeset, :config, "command is required for shell jobs")
-
-      job_type == "mix_task" and (config["task"] || "") |> String.trim() == "" ->
-        add_error(changeset, :config, "task is required for mix jobs")
-
-      true ->
-        changeset
+    case job_type do
+      "mix_task" -> validate_mix_task_config(changeset, config)
+      "spawn_agent" -> validate_spawn_agent_config(changeset, config)
+      "daily_digest" -> validate_daily_digest_config(changeset, config)
+      _ -> changeset
     end
   end
+
+  defp validate_mix_task_config(changeset, config) do
+    if (config["task"] || "") |> String.trim() == "" do
+      add_error(changeset, :config, "task is required for mix jobs")
+    else
+      changeset
+    end
+  end
+
+  defp validate_spawn_agent_config(changeset, _config), do: changeset
+
+  defp validate_daily_digest_config(changeset, _config), do: changeset
 end

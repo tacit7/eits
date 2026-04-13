@@ -17,6 +17,9 @@ defmodule EyeInTheSky.Prompts.Prompt do
     field :created_by, :string
     field :created_at, :naive_datetime
     field :updated_at, :naive_datetime
+
+    has_many :scheduled_jobs, EyeInTheSky.ScheduledJobs.ScheduledJob,
+      foreign_key: :prompt_id
   end
 
   @doc false
@@ -42,5 +45,11 @@ defmodule EyeInTheSky.Prompts.Prompt do
     |> validate_length(:slug, min: 1, max: 100)
     |> unique_constraint(:slug, name: :idx_subagent_prompts_slug_global)
     |> unique_constraint([:slug, :project_id], name: :idx_subagent_prompts_slug_project)
+  end
+
+  def delete_changeset(prompt) do
+    prompt
+    |> cast(%{}, [])
+    |> no_assoc_constraint(:scheduled_jobs, message: "has active schedules")
   end
 end

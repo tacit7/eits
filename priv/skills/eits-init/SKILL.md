@@ -49,36 +49,14 @@ The startup/resume hooks inject these env vars automatically:
 
 ## Messaging Protocol
 
-Check `$CLAUDE_CODE_ENTRYPOINT` to determine how to send DMs and commands:
+All agents use the `eits` CLI script for DMs and commands:
 
-```bash
-echo "$CLAUDE_CODE_ENTRYPOINT"
-```
-
-| Entrypoint | Method | Reason |
-|------------|--------|--------|
-| `sdk-cli` | **EITS-CMD** | Spawned/headless agent — AgentWorker intercepts stdout, no HTTP needed |
-| `cli` | **eits script** | Interactive session — no worker intercepting, use REST API |
-
-**When `sdk-cli` (spawned agent) — output EITS-CMD lines in your text:**
-```
-EITS-CMD: dm --to <session_uuid> --message "your message"
-EITS-CMD: task create <title>
-EITS-CMD: task begin <title>
-EITS-CMD: task update <id> <state_id>
-EITS-CMD: task done <id>
-EITS-CMD: task annotate <id> <body>
-EITS-CMD: note <body>
-EITS-CMD: note task <id> <body>
-EITS-CMD: commit <hash>
-```
-The AgentWorker strips these from the visible stream and dispatches them in-process.
-
-**When `sdk-cli` (interactive session) — use the eits script:**
 ```bash
 eits dm --to <session_uuid> --message "your message"
-eits tasks update <id> --state 4
+eits tasks begin --title "<title>"
 eits tasks annotate <id> --body "..."
+eits tasks update <id> --state 4
+eits commits create --hash <hash>
 ```
 
 ## EITS Workflow

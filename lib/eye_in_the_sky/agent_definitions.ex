@@ -15,8 +15,8 @@ defmodule EyeInTheSky.AgentDefinitions do
 
   import Ecto.Query, warn: false
 
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.AgentDefinitions.AgentDefinition
+  alias EyeInTheSky.Repo
 
   @global_agents_dir Path.expand("~/.claude/agents")
 
@@ -131,36 +131,41 @@ defmodule EyeInTheSky.AgentDefinitions do
     Repo.transaction(fn ->
       # Advisory lock prevents concurrent syncs for the same scope/project from racing
       Repo.query!("SELECT pg_advisory_xact_lock($1)", [lock_key])
-
       now = DateTime.utc_now()
-
-      if File.dir?(dir) do
-        md_files =
-          dir
-          |> File.ls!()
-          |> Enum.filter(&String.ends_with?(&1, ".md"))
-          |> Enum.reject(&(&1 == "README.md"))
-
-        synced_slugs =
-          Enum.map(md_files, fn filename ->
-            slug = Path.rootname(filename)
-            file_path = Path.join(dir, filename)
-
-            case sync_one(file_path, slug, scope, project_id, now) do
-              {:ok, _defn} -> slug
-              {:error, _reason} -> nil
-            end
-          end)
-          |> Enum.reject(&is_nil/1)
-
-        mark_missing(scope, project_id, synced_slugs, now)
-        synced_slugs
-      else
-        # Directory absent — mark all existing definitions for this scope as missing
-        mark_missing(scope, project_id, [], now)
-        []
-      end
+      sync_directory_contents(dir, scope, project_id, now)
     end)
+  end
+
+  defp sync_directory_contents(dir, scope, project_id, now) do
+    if File.dir?(dir) do
+      md_files =
+        dir
+        |> File.ls!()
+        |> Enum.filter(&String.ends_with?(&1, ".md"))
+        |> Enum.reject(&(&1 == "README.md"))
+
+      ctx = %{scope: scope, project_id: project_id, now: now}
+
+      synced_slugs =
+        Enum.map(md_files, fn filename ->
+          sync_file(Path.join(dir, filename), Path.rootname(filename), ctx)
+        end)
+        |> Enum.reject(&is_nil/1)
+
+      mark_missing(scope, project_id, synced_slugs, now)
+      synced_slugs
+    else
+      # Directory absent — mark all existing definitions for this scope as missing
+      mark_missing(scope, project_id, [], now)
+      []
+    end
+  end
+
+  defp sync_file(file_path, slug, %{scope: _, project_id: _, now: _} = ctx) do
+    case sync_one(file_path, slug, ctx) do
+      {:ok, _defn} -> slug
+      {:error, _reason} -> nil
+    end
   end
 
   # Deterministic advisory lock key from scope + project_id.
@@ -169,7 +174,7 @@ defmodule EyeInTheSky.AgentDefinitions do
     :erlang.phash2({:agent_def_sync, scope, project_id})
   end
 
-  defp sync_one(file_path, slug, scope, project_id, now) do
+  defp sync_one(file_path, slug, %{scope: scope, project_id: project_id, now: now}) do
     content = File.read!(file_path)
     checksum = :crypto.hash(:sha256, content) |> Base.encode16(case: :lower)
 
@@ -261,7 +266,7 @@ defmodule EyeInTheSky.AgentDefinitions do
   def absolute_path(%AgentDefinition{scope: "project", path: path, project_id: project_id}) do
     case EyeInTheSky.Projects.get_project(project_id) do
       {:ok, project} -> Path.join(project.path, path)
-      _ -> path
+      {:error, :not_found} -> path
     end
   end
 
@@ -276,35 +281,12 @@ defmodule EyeInTheSky.AgentDefinitions do
       [_, yaml_block] ->
         lines = String.split(yaml_block, "\n")
 
-        {attrs, _current_key} =
+        {raw_attrs, _current_key} =
           Enum.reduce(lines, {%{}, nil}, fn line, {acc, current_key} ->
-            trimmed = String.trim(line)
-
-            case {Regex.run(~r/^(\w+):\s+(.+)$/, trimmed),
-                  Regex.run(~r/^(\w+):\s*$/, trimmed),
-                  Regex.run(~r/^-\s+(.+)$/, trimmed)} do
-              {[_, key, value], _, _} ->
-                # key: value (inline)
-                {Map.put(acc, key, clean_value(value)), key}
-
-              {nil, [_, key], _} ->
-                # key: (empty — YAML list follows)
-                {Map.put(acc, key, []), key}
-
-              {nil, nil, [_, value]} ->
-                # - value (YAML list item)
-                if current_key do
-                  existing = Map.get(acc, current_key, [])
-                  items = if is_list(existing), do: existing, else: []
-                  {Map.put(acc, current_key, items ++ [clean_value(value)]), current_key}
-                else
-                  {acc, current_key}
-                end
-
-              _ ->
-                {acc, current_key}
-            end
+            classify_yaml_line(String.trim(line), acc, current_key)
           end)
+
+        attrs = Map.new(raw_attrs, fn {k, v} -> {k, if(is_list(v), do: Enum.reverse(v), else: v)} end)
 
         %{
           display_name: attrs["name"],
@@ -316,6 +298,35 @@ defmodule EyeInTheSky.AgentDefinitions do
       _ ->
         %{display_name: nil, description: nil, model: nil, tools: []}
     end
+  end
+
+  defp classify_yaml_line(trimmed, acc, current_key) do
+    case {Regex.run(~r/^(\w+):\s+(.+)$/, trimmed),
+          Regex.run(~r/^(\w+):\s*$/, trimmed),
+          Regex.run(~r/^-\s+(.+)$/, trimmed)} do
+      {[_, key, value], _, _} ->
+        # key: value (inline)
+        {Map.put(acc, key, clean_value(value)), key}
+
+      {nil, [_, key], _} ->
+        # key: (empty — YAML list follows)
+        {Map.put(acc, key, []), key}
+
+      {nil, nil, [_, value]} ->
+        # - value (YAML list item; prepend for O(1), reversed after reduce)
+        {append_list_item(acc, current_key, value), current_key}
+
+      _ ->
+        {acc, current_key}
+    end
+  end
+
+  defp append_list_item(acc, nil, _value), do: acc
+
+  defp append_list_item(acc, current_key, value) do
+    existing = Map.get(acc, current_key, [])
+    items = if is_list(existing), do: existing, else: []
+    Map.put(acc, current_key, [clean_value(value) | items])
   end
 
   defp clean_value(value) do

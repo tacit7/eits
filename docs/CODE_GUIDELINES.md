@@ -507,6 +507,164 @@ query = Task |> maybe_where(“title”, “bug fix”) |> Repo.all()
 
 ## Module Architecture
 
+### Provider Strategy
+
+**ProviderStrategy** (`lib/eye_in_the_sky/claude/provider_strategy.ex`): Handles provider-polymorphic dispatch for Claude vs Codex. Extracted to allow clean separation of provider logic.
+
+Provider implementations:
+- `ProviderStrategy.Claude` — Claude SDK stream dispatch and avatar/label rendering
+- `ProviderStrategy.Codex` — Codex streaming pipeline via `CodexStreamAssembler`
+
+Use `ProviderStrategy` when branching on `provider` field. Do not inline `if provider == "claude"` checks in LiveViews.
+
+---
+
+### Context Extractions (Tasks)
+
+Contexts extracted from the monolithic `Tasks` context:
+
+| Module | Path | Responsibility |
+|--------|------|----------------|
+| `WorkflowStates` | `lib/eye_in_the_sky_web/workflow_states.ex` | Kanban state definitions and transitions |
+| `TaskTags` | `lib/eye_in_the_sky_web/task_tags.ex` | Tag CRUD and task-tag join table operations |
+| `ChecklistItems` | `lib/eye_in_the_sky_web/checklist_items.ex` | Checklist item CRUD scoped to tasks |
+
+These replace direct `Tasks.*` calls for tag/checklist/state operations in new code.
+
+---
+
+### SQL Extraction to Context Functions
+
+**Pattern:** When query logic appears inline in a module (e.g., `CmdDispatcher`), extract it to a context function for reusability and testability.
+
+**Examples:**
+- `Messages.list_inbound_dms/2` — Extracts DM query logic with proper sorting and pagination
+- `Teams.list_broadcast_targets/1` — Encapsulates team broadcast join logic
+
+**When to extract:**
+- Query is used in multiple places (DRY principle)
+- Query is complex enough to warrant unit testing
+- Query needs to be reused from different contexts (e.g., CmdDispatcher, LiveView, REST API)
+
+**Benefits:**
+- **Reusability:** One canonical implementation, not scattered duplicates
+- **Testability:** Query behavior isolated and independently testable
+- **Separation of concerns:** Query logic lives in context, not in dispatcher/controller code
+
+**Example pattern:**
+```elixir
+# ❌ Avoid: Inline Ecto.Query in module
+defmodule CmdDispatcher do
+  def dispatch(cmd, session_id) do
+    # Query embedded here
+    dms = Repo.all(
+      from m in Message,
+      where: m.recipient_id == ^session_id,
+      order_by: [desc: m.inserted_at, desc: m.id]
+    )
+    # ... use dms
+  end
+end
+
+# ✅ Prefer: Extract to context
+defmodule Messages do
+  def list_inbound_dms(session_id, opts \\ []) do
+    Repo.all(
+      from m in Message,
+      where: m.recipient_id == ^session_id,
+      order_by: [desc: m.inserted_at, desc: m.id],  # secondary sort for stability
+      limit: Keyword.get(opts, :limit, 50)
+    )
+  end
+end
+
+# Then in CmdDispatcher:
+defmodule CmdDispatcher do
+  def dispatch(cmd, session_id) do
+    dms = Messages.list_inbound_dms(session_id)
+    # ...
+  end
+end
+```
+
+**Secondary sort stability:** Always include a secondary sort column (e.g., `m.id`) when primary sort has potential collisions (e.g., timestamps). This ensures deterministic query results for testing.
+
+---
+
+### Scheduler and Context Separation
+
+**Problem:** Scheduler modules (e.g., `AgentStatusScheduler`) that contain direct `Repo` calls or inline `Ecto.Query` logic leak implementation details into job orchestration code. This makes schedulers harder to test, harder to reuse, and tightly coupled to schema internals.
+
+**Solution:** Move all query logic to context functions. Schedulers should only orchestrate (decide *when* and *what* to run), never *how* data is fetched or mutated.
+
+**Example:**
+
+```elixir
+# ❌ Before: Direct Repo/schema queries in scheduler
+defmodule AgentStatusScheduler do
+  def check_agents do
+    agents = Repo.all(
+      from a in Agent,
+      where: a.status == "working",
+      where: a.last_heartbeat_at < ago(5, "minute")
+    )
+
+    Enum.each(agents, fn agent ->
+      agent |> Ecto.Changeset.change(%{status: "idle"}) |> Repo.update()
+    end)
+  end
+end
+
+# ✅ After: Delegate to context functions
+defmodule AgentStatusScheduler do
+  def check_agents do
+    Agents.list_agents_pending_status_check()
+    |> Enum.each(&Agents.archive_agent(&1, "heartbeat_timeout"))
+  end
+end
+```
+
+**Context functions created in this refactor (commit 9a0bc21):**
+
+| Function | Context | Purpose |
+|----------|---------|---------|
+| `Agents.list_agents_pending_status_check/0` | Agents | Agents needing status review |
+| `Agents.archive_agent/2` | Agents | Archive agent with reason |
+| `Sessions.list_idle_sessions_older_than/1` | Sessions | Idle sessions past threshold |
+| `Tasks.active_task_count_for_session/1` | Tasks | Active task count for a session |
+
+**Removed:** `Agents.update_agent_status/2` (deprecated no-op).
+
+**Benefits:**
+- **Separation of concerns:** Schedulers orchestrate; contexts own data access
+- **Testability:** Context functions are independently testable without running the scheduler
+- **Reusability:** Same queries available to LiveViews, REST API, and other callers
+
+---
+
+### Chat Presenter
+
+**ChatPresenter** (`lib/eye_in_the_sky_web_web/live/chat_presenter.ex`): Extracted chat presentation logic from `ChatLive`. Handles message formatting, typing indicator state, and ambient message filtering.
+
+- Ambient channel messages no longer trigger agent responses — only `@direct` and `@all` mentions do
+- Message numbering is per-channel and sequential (with backfill migration)
+
+---
+
+### JobsHelpers
+
+**JobsHelpers** (`lib/eye_in_the_sky_web_web/live/shared/jobs_helpers.ex`): Unified job creation logic, replacing duplicate implementations in `OverviewLive.Jobs` and `ProjectLive.Jobs`.
+
+Key functions:
+- `create_with_claude/2` — spawns an agent to work on a job using selected model + effort level
+- `save_job/2` — persists a job with validated attributes
+
+**When to use:**
+- Call `JobsHelpers.create_with_claude/2` from any LiveView that needs to spawn an agent for a job
+- Do not duplicate the spawn logic inline in individual LiveViews
+
+---
+
 ### Agent Management Modules
 
 **AgentManager** (`lib/eye_in_the_sky_web/agents/agent_manager.ex`): Primary module for agent lifecycle management and spawning.
@@ -555,6 +713,17 @@ Use `ViewHelpers.model_display_name/1` to render human-readable model names in U
 # Renders: “Opus 4.6 (1M)”
 ```
 
+**Budget parsing (canonical implementation):**
+Use `ViewHelpers.parse_budget/1` as the single source of truth for parsing budget strings. This replaces duplicate implementations previously scattered across `ChatLive` and `AgentLive.Index`.
+
+```elixir
+# In any module
+budget_value = ViewHelpers.parse_budget(“p95”)
+# Returns: {:ok, 0.95} or {:error, reason}
+```
+
+**Why canonical:** Budget parsing logic is shared across multiple LiveViews and contexts. Maintaining a single implementation in `ViewHelpers` prevents inconsistencies and reduces code duplication. Always import and use this function rather than reimplementing budget logic locally.
+
 **Available forms with model + effort selection:**
 - DM page (session selector dropdown)
 - New Agent drawer
@@ -600,6 +769,53 @@ Use `ViewHelpers.model_display_name/1` to render human-readable model names in U
 
 ---
 
+## UI Component Patterns
+
+### Action Dropdown Menu (Session Row / Kanban Card)
+
+Session rows and kanban cards use a `...` dropdown menu for destructive/secondary actions (rename, delete, archive) instead of inline icon buttons.
+
+**Pattern:**
+- The row/card itself is a clickable navigation target
+- Secondary actions live in a `...` button that opens a dropdown
+- The dropdown must call `phx-capture-click` or `JS.stop_propagation()` so clicking a menu item does **not** also trigger row navigation
+
+**Click propagation guard (rename form):**
+
+When an inline rename form is open inside a clickable row, stop click propagation on the form to prevent the row's navigation handler from firing:
+
+```heex
+<form
+  phx-submit=”rename_session”
+  phx-capture-click=”noop”
+>
+  <input phx-change=”update_rename_input” ... />
+</form>
+```
+
+Using `phx-capture-click=”noop”` (or `JS.stop_propagation()`) ensures clicks inside the rename form don't bubble up to the row's `phx-click` handler.
+
+### stream_insert Re-render Behavior
+
+When using `stream_insert` to update a session row (e.g., after rename or status change), LiveView re-renders the entire stream item. This means:
+
+- Any open state (dropdowns, inline forms) in that stream item will close on re-render
+- Design flows to complete (submit or cancel) before a stream update arrives
+- Use `stream_insert(socket, :sessions, updated_session)` to push updates; do NOT reset the full stream on single-item updates
+
+---
+
+## Kanban Card Actions (Trello-style Dropdown)
+
+Kanban task cards use a `...` overflow menu for actions (copy, delete, move) instead of always-visible icon buttons.
+
+**UX pattern:**
+- Menu button appears on card hover (desktop) or is always visible on mobile
+- Opening the menu stops click propagation so the card click (navigate to task) doesn't fire
+- Consistent with the session row dropdown pattern above
+
+---
+
 ## “Gotchas” Checklist
 
 - If you see missing `current_scope`: fix routing/live_session + pass it to `<Layouts.app>`.
@@ -610,4 +826,462 @@ Use `ViewHelpers.model_display_name/1` to render human-readable model names in U
 - **Validate state transitions in contexts, not LiveViews** (not in UI layer).
 - **All DB writes through contexts with changesets** (not raw SQL from LiveView).
 - Run `mix precommit` before pushing.
+
+---
+
+## Chat Upload Helpers Extraction
+
+**Module:** `ChatLive.UploadHelpers` (`lib/eye_in_the_sky_web_web/live/chat_live/upload_helpers.ex`)
+
+Extracted from `ChatLive` to isolate file upload concerns. Handles the full upload lifecycle:
+
+- `cleanup_uploads/1` — Cancels and purges pending upload entries from the socket
+- `process_accepted_entries/2` — Consumes accepted upload entries and returns attachment structs
+- `process_rejected_entries/1` — Collects entries rejected by the accept filter with error reasons
+- `presign_attachment/3` — Generates presigned URLs for S3/storage backend attachment uploads
+
+**When to use:**
+- Always call `UploadHelpers.cleanup_uploads/1` in the `:on_error` path to avoid stale upload state
+- Use `process_accepted_entries/2` after `allow_upload` consumes entries — do not access `socket.assigns.uploads` directly
+- Presigning happens via `presign_attachment/3`, not inline in `handle_event`
+
+**Rule:** Upload lifecycle logic lives in `UploadHelpers`, not scattered across `ChatLive` event handlers.
+
+---
+
+## Kanban Accessibility — Column Checkbox Attribute
+
+Kanban select-all checkboxes use `data-column-index` (not `data-column-handle`) to identify which column the checkbox belongs to.
+
+**Why this matters:**
+- `data-column-handle` is the drag-and-drop handle attribute — repurposing it for checkbox identity caused selection and accessibility bugs
+- `data-column-index` is a dedicated, semantically correct attribute for column identification
+
+**Pattern:**
+
+```heex
+<!-- ✅ Correct -->
+<input type="checkbox" data-column-index={@column_index} phx-click="select_all" />
+
+<!-- ❌ Wrong — data-column-handle is reserved for drag handles -->
+<input type="checkbox" data-column-handle={@column_index} phx-click="select_all" />
+```
+
+**Rule:** Never reuse drag-and-drop attributes for non-drag purposes. Use dedicated `data-*` attributes for each concern.
+
+---
+
+## DateTime Helpers Consolidation
+
+`format_relative_time/1` in `ViewHelpers` handles both `DateTime` and `NaiveDateTime` via pattern matching — no separate functions needed.
+
+```elixir
+# Both work:
+format_relative_time(%DateTime{} = dt)
+format_relative_time(%NaiveDateTime{} = ndt)
+```
+
+**Implementation pattern:**
+
+```elixir
+def format_relative_time(%DateTime{} = dt) do
+  dt |> DateTime.to_naive() |> format_relative_time()
+end
+
+def format_relative_time(%NaiveDateTime{} = ndt) do
+  # ... relative formatting logic
+end
+```
+
+**Rule:** When a helper needs to accept multiple datetime types, use pattern-matched heads — do not add a separate `format_relative_time_naive/1`. Callers shouldn't have to know which type they have.
+
+---
+
+## Agent Task Status — Valid Enum Values
+
+`Task.Status` does **not** include `:error`. Use `:failed` for failed task states.
+
+**Valid statuses:**
+- `:pending`
+- `:running`
+- `:completed`
+- `:failed`
+
+**Common mistake:**
+
+```elixir
+# ❌ Wrong — :error is not a valid Task.Status
+task |> Task.changeset(%{status: :error}) |> Repo.update()
+
+# ✅ Correct
+task |> Task.changeset(%{status: :failed}) |> Repo.update()
+```
+
+**Rule:** Always use `:failed` when a task reaches an error terminal state. Using `:error` will fail changeset validation silently or raise on enum cast.
+
+---
+
+## Task Timestamp and UUID Injection (EITS-CMD)
+
+When `create_task` and `update_task` directives are processed via EITS-CMD, timestamps and UUIDs are injected by the directive handler — not generated in the caller.
+
+**Injected fields:**
+- `inserted_at` / `updated_at` — set from directive processing time
+- `uuid` — generated by the EITS-CMD processor if not provided
+
+**Why this matters:**
+- Directives may be batched or replayed; the processor owns canonical timestamps
+- Do not set `inserted_at` manually in task creation code that goes through `CmdDispatcher`
+- UUID is stable across retries — the directive processor ensures idempotency
+
+**Pattern:**
+
+```elixir
+# ❌ Don't manually set timestamps for EITS-CMD-driven task creation
+Tasks.create_task(%{title: "Fix bug", inserted_at: DateTime.utc_now()})
+
+# ✅ Let the directive handler inject timestamps
+# CmdDispatcher.handle("create_task", %{title: "Fix bug"})
+# → injects inserted_at, updated_at, uuid automatically
+```
+
+**Rule:** Task creation via `EITS-CMD: task begin` or `create_task` directives must not set timestamps or UUIDs externally. The processor is authoritative.
+
+---
+
+## Message Validation — Palette Commands via LiveView Socket
+
+Command palette actions that previously used `fetch()` to POST to `/api/v1` must use LiveView socket events instead.
+
+**Why:**
+- `fetch()` from client JS bypasses LiveView's session/auth context
+- Input validation should happen in the LiveView handler, not client-side
+- Per-user rate limiting and permission checks live in the socket's assigns
+
+**Pattern:**
+
+```javascript
+// ❌ Wrong — fetch bypasses LiveView session
+fetch("/api/v1/palette/run", {
+  method: "POST",
+  body: JSON.stringify({ command: input })
+})
+
+// ✅ Correct — push event through LiveView socket
+this.pushEvent("palette_command", { command: input })
+```
+
+```elixir
+# LiveView handler validates input before executing
+def handle_event("palette_command", %{"command" => command}, socket) do
+  case validate_palette_command(command) do
+    {:ok, cmd} -> execute_palette_command(cmd, socket)
+    {:error, reason} -> {:noreply, put_flash(socket, :error, reason)}
+  end
+end
+```
+
+**Rule:** All palette command execution goes through `pushEvent` + LiveView `handle_event`. No direct HTTP fetch from palette JS.
+
+---
+
+## Color System — Semantic Tailwind Classes
+
+Replace hardcoded `oklch(...)` and `hsl(...)` color values with semantic Tailwind utility classes.
+
+**Why:**
+- Hardcoded `oklch`/`hsl` values break theme switching (dark mode, custom themes)
+- Semantic classes (e.g., `text-primary`, `bg-base-200`, `border-base-300`) adapt automatically to the active daisyUI/Tailwind theme
+- Reduces diff noise when colors are adjusted globally
+
+**Migration pattern:**
+
+```heex
+<!-- ❌ Hardcoded oklch -->
+<div style="color: oklch(0.7 0.15 250); background: hsl(220 14% 10%)">
+
+<!-- ✅ Semantic Tailwind -->
+<div class="text-primary bg-base-100">
+```
+
+**Common mappings:**
+- `oklch(...)` accent colors → `text-primary`, `text-secondary`, `text-accent`
+- `hsl(220 14% ...)` dark backgrounds → `bg-base-100`, `bg-base-200`, `bg-base-300`
+- Border colors → `border-base-300`, `border-primary`
+
+**Rule:** No hardcoded color functions in class attributes or inline styles. Use semantic Tailwind/daisyUI classes. If a color has no semantic equivalent, add a CSS custom property via the theme, not inline.
+
+---
+
+## Command Palette — Agent Management and Session Flags
+
+> Commits 672f73e, d4c298a, 80f294d.
+
+### Comprehensive agent management commands
+
+The command palette includes a full set of agent lifecycle commands. When adding new agent actions, register them in the `CommandRegistry` under the `"Agent Management"` category:
+
+```javascript
+{
+  id: "agent-stop",
+  label: "Stop Agent",
+  icon: "hero-stop",
+  category: "Agent Management",
+  when: (state) => state.activeAgent !== null,
+  action: (state) => state.pushEvent("palette_command", { command: "stop_agent", agent_id: state.activeAgent.id })
+}
+```
+
+**Rule:** All agent management palette commands push events via LiveView socket (`pushEvent`), not direct `fetch()` calls. See "Message Validation — Palette Commands via LiveView Socket" above.
+
+### Server-side session flags from CLI flags
+
+Session flags passed via CLI (`--effort-level`, `--model`, `--worktree`, etc.) are now captured server-side and stored on the session record at spawn time. The palette can read these flags from `session.flags` without re-parsing CLI args on the client.
+
+**When adding new CLI flags for spawned agents:**
+1. Add the flag to `Claude.CLI.build_args/2` (or `Codex.CLI` equivalent)
+2. Parse it in `Sessions.extract_flags/1` and merge into `session.flags`
+3. The palette's session submenu will pick up the flag automatically
+
+**Do not** re-parse CLI flag strings on the client side; read from the session record's `flags` map.
+
+---
+
+## Query and Preload Patterns
+
+### Preload List Extraction
+
+When preload lists are repeated across multiple query functions in a context, extract them to module constants or private helper functions. This improves maintainability and ensures consistent association loading across the module.
+
+**Why:** 
+- Repeated preload lists make the code harder to maintain (DRY principle). Changing requirements means updating multiple locations.
+- Constants serve as documentation for what associations are loaded where.
+- Using a constant forces consistency across all queries that need the same associations.
+
+**Pattern:**
+
+#### Using a Module Constant
+
+When the same preload list appears in 3+ query functions, define it as a module constant:
+
+```elixir
+defmodule EyeInTheSky.Tasks do
+  @full_task_preloads [:state, :tags, :sessions, :checklist_items]
+
+  def list_tasks_for_agent(agent_id) do
+    Task
+    |> where([t], t.agent_id == ^agent_id)
+    |> preload(^@full_task_preloads)
+    |> Repo.all()
+  end
+
+  def get_task(id) do
+    case Task
+         |> preload(^@full_task_preloads)
+         |> Repo.get(id) do
+      nil -> {:error, :not_found}
+      task -> {:ok, task}
+    end
+  end
+
+  def get_task!(id) do
+    Task
+    |> preload(^@full_task_preloads)
+    |> Repo.get!(id)
+  end
+end
+```
+
+#### Using a Private Helper Function
+
+When preloads are more complex or need conditional logic, use a private helper:
+
+```elixir
+defmodule EyeInTheSky.Sessions do
+  def list_sessions_with_agent(opts \\ []) do
+    Session
+    |> with_agent_preload()
+    |> order_by([s], desc: s.started_at)
+    |> Repo.all()
+  end
+
+  def get_sessions_for_project(project_id) do
+    Session
+    |> where([s], s.project_id == ^project_id)
+    |> with_agent_preload()
+    |> Repo.all()
+  end
+
+  # Preload helpers
+  defp with_agent_preload(query) do
+    preload(query, agent: :agent_definition)
+  end
+end
+```
+
+**When to use constants vs helpers:**
+- **Constants:** Simple, static preload lists used in 3+ places. Good for searchability and documentation.
+- **Helpers:** Complex preloads, conditional logic, or nested associations. Cleaner than inline `preload/2` chains.
+
+**Example: `ApiPresenter.present_session_detail/2`**
+
+The presenter function uses preloaded associations without extracting them again:
+
+```elixir
+def present_session_detail(session, opts \\ []) do
+  # Assumes session was already loaded with tasks, notes, commits
+  tasks = Keyword.get(opts, :tasks, [])
+  recent_notes = Keyword.get(opts, :recent_notes, [])
+  
+  %{
+    id: session.id,
+    tasks: Enum.map(tasks, &present_session_task/1),
+    recent_notes: Enum.map(recent_notes, &present_session_note/1)
+  }
+end
+```
+
+The calling context (e.g., `Sessions.get_session_with_details/1`) handles the preload, not the presenter.
+
+**Rule:** Extract repeated preload lists to constants or helpers. Don't inline identical preload logic in multiple query functions.
+
+---
+
+## Tagged Tuple Returns for Context Lookups
+
+Context `get_*` functions return `{:ok, record}` or `{:error, :not_found}` instead of `record | nil`. This makes error handling explicit at call sites and eliminates silent nil propagation.
+
+**Why:** Bare `nil` returns force callers to add `if` guards and make it easy to forget a nil check, leading to `(FunctionClauseError) no function clause matching in ...` crashes downstream. Tagged tuples make the caller handle both paths via `case` or `with`, and the compiler/dialyzer can verify exhaustive matching.
+
+**Affected functions:**
+- `Accounts.get_user/1`
+- `Projects.get_project/1`
+- `Tasks.get_task/1`
+- `Notes.get_note/1`
+- `Teams.get_team/1`, `Teams.get_team_by_name/1`
+- `Prompts.get_prompt/1`
+- `ChecklistItems.get_checklist_item/1`
+
+### Before / After
+
+```elixir
+# Before: nil return
+def get_user(id) do
+  Repo.get(User, id)
+end
+
+# After: tagged tuple
+def get_user(id) do
+  case Repo.get(User, id) do
+    nil -> {:error, :not_found}
+    user -> {:ok, user}
+  end
+end
+```
+
+### Caller Changes
+
+```elixir
+# Before: nil check
+user = Accounts.get_user(id)
+if user do
+  # use user
+else
+  # handle missing
+end
+
+# After: pattern match
+case Accounts.get_user(id) do
+  {:ok, user} -> # use user
+  {:error, :not_found} -> # handle missing
+end
+```
+
+### LiveView Event Handlers
+
+```elixir
+def handle_event("select_project", %{"id" => id}, socket) do
+  case Projects.get_project(id) do
+    {:ok, project} ->
+      {:noreply, assign(socket, :project, project)}
+
+    {:error, :not_found} ->
+      {:noreply, put_flash(socket, :error, "Project not found")}
+  end
+end
+```
+
+### API Controllers
+
+```elixir
+def show(conn, %{"id" => id}) do
+  case Tasks.get_task(id) do
+    {:ok, task} ->
+      json(conn, %{data: task})
+
+    {:error, :not_found} ->
+      conn |> put_status(:not_found) |> json(%{error: "not found"})
+  end
+end
+```
+
+### With Chains
+
+Tagged tuples compose cleanly in `with` blocks:
+
+```elixir
+with {:ok, user} <- Accounts.get_user(user_id),
+     {:ok, project} <- Projects.get_project(project_id),
+     {:ok, task} <- Tasks.create_task(%{user_id: user.id, project_id: project.id}) do
+  {:ok, task}
+else
+  {:error, :not_found} -> {:error, "resource not found"}
+  {:error, changeset} -> {:error, changeset}
+end
+```
+
+### Bang Variants
+
+For internal code paths where the record must exist (preloaded associations, known IDs), bang variants like `get_project!/1` still raise on missing records. Use the tagged tuple version at boundaries (user input, API params, event handlers).
+
+**Rule:** New context `get_*` functions must return `{:ok, record} | {:error, :not_found}`. Reserve `get_*!/1` for internal paths where absence is a bug, not a user error.
+
+> Commits: 625655a, 96ce027, 2827d63, 0949e18, ee3e586
+
+### Deduplicated SQL fragments for task title queries
+
+Task title search fragments are defined once in the `Tasks` context and reused across the command palette's task search, the kanban filter, and the REST API. Do not inline `ILIKE` or `ts_query` fragments in palette-specific code.
+
+```elixir
+# ✅ Use the shared fragment
+Tasks.title_search_query(base_query, search_term)
+
+# ❌ Don't re-implement inline
+from t in Task, where: ilike(t.title, ^"%#{term}%")
+```
+
+The canonical implementation lives in `Tasks.title_search_query/2`. Adding a second `ILIKE` path causes desynced behavior when the search strategy changes (e.g., switching to prefix `tsquery`).
+
+---
+
+## CodeMirror User Settings (Tab Size, Font Size, Vim Mode)
+
+CodeMirror editor settings are user-configurable and persisted in `localStorage`.
+
+**Configurable settings:**
+- **Tab size** — number of spaces per tab (default: 2)
+- **Font size** — editor font size in px (default: 14)
+- **Vim mode** — enables vim keybindings (default: false)
+
+**Storage keys:**
+```javascript
+localStorage.getItem("codemirror_tab_size")   // "2" | "4" | "8"
+localStorage.getItem("codemirror_font_size")  // "12" | "14" | "16" | "18"
+localStorage.getItem("codemirror_vim_mode")   // "true" | "false"
+```
+
+**Hook integration:**
+Settings are read in the `CodeMirrorHook` mounted callback and applied to the editor instance. Changes from the settings UI push to `localStorage` and call `view.dispatch(reconfigure(...))` to apply live.
+
+**Rule:** Do not hardcode tab size, font size, or vim mode in the CodeMirror extension config. Always read from `localStorage` with a sensible default. Settings UI toggles must write to `localStorage` before dispatching the reconfiguration.
 

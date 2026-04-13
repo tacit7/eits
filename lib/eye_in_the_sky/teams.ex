@@ -1,7 +1,9 @@
 defmodule EyeInTheSky.Teams do
+  @moduledoc false
   import Ecto.Query, warn: false
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Teams.{Team, TeamMember}
+  alias EyeInTheSky.Utils.ToolHelpers
 
   defp broadcast(event, payload) do
     EyeInTheSky.Events.team_event(event, payload)
@@ -30,7 +32,12 @@ defmodule EyeInTheSky.Teams do
     Repo.all(query)
   end
 
-  def get_team(id), do: Repo.get(Team, id)
+  def get_team(id) do
+    case Repo.get(Team, id) do
+      nil -> {:error, :not_found}
+      team -> {:ok, team}
+    end
+  end
 
   def get_team!(id), do: Repo.get!(Team, id)
 
@@ -39,9 +46,19 @@ defmodule EyeInTheSky.Teams do
     Repo.preload(team, members: [session: [:agent]])
   end
 
-  def get_team_by_uuid(uuid), do: Repo.get_by(Team, uuid: uuid)
+  def get_team_by_uuid(uuid) do
+    case Repo.get_by(Team, uuid: uuid) do
+      nil -> {:error, :not_found}
+      team -> {:ok, team}
+    end
+  end
 
-  def get_team_by_name(name), do: Repo.get_by(Team, name: name)
+  def get_team_by_name(name) do
+    case Repo.get_by(Team, name: name) do
+      nil -> {:error, :not_found}
+      team -> {:ok, team}
+    end
+  end
 
   def create_team(attrs) do
     %Team{}
@@ -72,16 +89,39 @@ defmodule EyeInTheSky.Teams do
     |> Repo.all()
   end
 
-  def get_member(team_id, name) do
-    Repo.get_by(TeamMember, team_id: team_id, name: name)
+  def get_member(id) when is_integer(id) do
+    case Repo.get(TeamMember, id) do
+      nil -> {:error, :not_found}
+      member -> {:ok, member}
+    end
+  end
+
+  def get_member(id) when is_binary(id) do
+    case ToolHelpers.parse_int(id) do
+      nil -> {:error, :not_found}
+      int_id -> get_member(int_id)
+    end
+  end
+
+  def get_member_by_name(team_id, name) do
+    case Repo.get_by(TeamMember, team_id: team_id, name: name) do
+      nil -> {:error, :not_found}
+      member -> {:ok, member}
+    end
   end
 
   def get_member_by_agent_id(agent_id) do
-    TeamMember
-    |> where([m], m.agent_id == ^agent_id)
-    |> order_by([m], desc: m.joined_at)
-    |> limit(1)
-    |> Repo.one()
+    result =
+      TeamMember
+      |> where([m], m.agent_id == ^agent_id)
+      |> order_by([m], desc: m.joined_at)
+      |> limit(1)
+      |> Repo.one()
+
+    case result do
+      nil -> {:error, :not_found}
+      member -> {:ok, member}
+    end
   end
 
   def join_team(attrs) do
@@ -118,6 +158,25 @@ defmodule EyeInTheSky.Teams do
   def leave_team(%TeamMember{} = member) do
     Repo.delete(member)
     |> tap_broadcast(:member_left)
+  end
+
+  @doc """
+  Returns all team members in teams that `session_id` belongs to,
+  excluding the calling session itself.
+
+  Used by EITS-CMD `team broadcast` to fan-out a message to co-team members.
+  """
+  @spec list_broadcast_targets(integer()) :: [TeamMember.t()]
+  def list_broadcast_targets(session_id) when is_integer(session_id) do
+    TeamMember
+    |> join(:inner, [m], other in TeamMember,
+      on: other.team_id == m.team_id and other.session_id != ^session_id
+    )
+    |> where([m, _other], m.session_id == ^session_id)
+    |> where([_m, other], not is_nil(other.session_id))
+    |> select([_m, other], other)
+    |> Repo.all()
+    |> Enum.uniq_by(& &1.session_id)
   end
 
   # ── Helpers ────────────────────────────────────────────────

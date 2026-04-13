@@ -12,12 +12,13 @@ defmodule EyeInTheSky.Sessions do
   require Logger
 
   alias EyeInTheSky.Repo
-  alias EyeInTheSky.Sessions.Session
-  alias EyeInTheSky.Sessions.ModelInfo
-  alias EyeInTheSky.Tasks.WorkflowState
   alias EyeInTheSky.Scopes.Archivable
-  alias EyeInTheSky.QueryBuilder
-  alias EyeInTheSky.Search.PgSearch
+  alias EyeInTheSky.Sessions.Loader
+  alias EyeInTheSky.Sessions.ModelInfo
+  alias EyeInTheSky.Sessions.Queries
+  alias EyeInTheSky.Sessions.Session
+  alias EyeInTheSky.Tasks.WorkflowState
+  alias EyeInTheSky.Utils.ToolHelpers
 
   @doc """
   Returns the list of sessions, excluding archived by default.
@@ -39,6 +40,21 @@ defmodule EyeInTheSky.Sessions do
     |> where([s], s.agent_id == ^agent_id)
     |> order_by([s], desc: s.started_at)
     |> Archivable.include_archived(opts)
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns idle or waiting sessions that have not been archived and whose
+  last activity (or started_at as fallback) is older than the given cutoff.
+  Used by the scheduler to auto-archive dead idle sessions.
+  """
+  def list_idle_sessions_older_than(cutoff) do
+    from(s in Session,
+      where: s.status in ["idle", "waiting"],
+      where: is_nil(s.archived_at),
+      where: not is_nil(s.started_at),
+      where: fragment("coalesce(?, ?) < ?", s.last_activity_at, s.started_at, ^cutoff)
+    )
     |> Repo.all()
   end
 
@@ -69,6 +85,17 @@ defmodule EyeInTheSky.Sessions do
   """
   @spec get_session(integer()) :: {:ok, Session.t()} | {:error, :not_found}
   def get_session(id), do: get(id)
+
+  @doc """
+  Resolves a session from an integer ID or UUID string.
+  Returns {:ok, session} or {:error, :not_found}.
+  """
+  @spec resolve(integer() | String.t()) :: {:ok, Session.t()} | {:error, :not_found}
+  def resolve(id) when is_integer(id), do: get_session(id)
+
+  def resolve(ref) when is_binary(ref) do
+    if id = ToolHelpers.parse_int(ref), do: get_session(id), else: get_session_by_uuid(ref)
+  end
 
   @doc """
   Gets a single session with logs preloaded.
@@ -123,17 +150,9 @@ defmodule EyeInTheSky.Sessions do
   Ends a session by setting ended_at timestamp.
   """
   def end_session(%Session{} = session, opts \\ %{}) do
-    attrs =
-      %{ended_at: DateTime.utc_now()}
-      |> then(fn m ->
-        if opts[:summary], do: Map.put(m, :description, opts[:summary]), else: m
-      end)
-      |> then(fn m ->
-        if opts[:final_status],
-          do: Map.put(m, :status, opts[:final_status]),
-          else: m
-      end)
-
+    attrs = %{ended_at: DateTime.utc_now()}
+    attrs = if s = opts[:summary], do: Map.put(attrs, :description, s), else: attrs
+    attrs = if s = opts[:final_status], do: Map.put(attrs, :status, s), else: attrs
     update_session(session, attrs)
   end
 
@@ -179,13 +198,26 @@ defmodule EyeInTheSky.Sessions do
   end
 
   @doc """
+  Lists active sessions for a specific project, with :agent preloaded.
+  Excludes ended and archived sessions.
+  """
+  def list_active_sessions_for_project(project_id) do
+    Session
+    |> where([s], s.project_id == ^project_id and is_nil(s.ended_at))
+    |> order_by([s], desc: s.started_at)
+    |> Archivable.include_archived([])
+    |> preload(:agent)
+    |> Repo.all()
+  end
+
+  @doc """
   Lists all sessions with agent preloaded for the overview page.
   Returns sessions ordered by most recent first, excluding archived by default.
   Pass `include_archived: true` to include archived sessions.
   """
   def list_sessions_with_agent(opts \\ []) do
     Session
-    |> preload(agent: :agent_definition)
+    |> with_agent_preload()
     |> order_by([s], desc: s.started_at)
     |> Archivable.include_archived(opts)
     |> Repo.all()
@@ -194,18 +226,39 @@ defmodule EyeInTheSky.Sessions do
   @doc """
   Lists sessions for a single project with agents preloaded.
   Returns sessions ordered by most recent first, excluding archived by default.
-  Pass `include_archived: true` to include archived sessions.
+  Options:
+  - `include_archived: true` — include archived sessions
+  - `active_only: true` — only sessions where ended_at IS NULL
+  - `limit: n` — cap result count at the DB level
   """
   def list_project_sessions_with_agent(project_id, opts \\ []) do
-    sessions =
-      Session
-      |> where([s], s.project_id == ^project_id)
-      |> preload(agent: :agent_definition)
+    limit_val = Keyword.get(opts, :limit)
+    active_only = Keyword.get(opts, :active_only, false)
+
+    query =
+      project_sessions_base_query(project_id)
+      |> with_agent_preload()
       |> order_by([s], desc: s.started_at)
       |> Archivable.include_archived(opts)
+
+    query = if active_only, do: where(query, [s], is_nil(s.ended_at)), else: query
+    query = if limit_val, do: limit(query, ^limit_val), else: query
+
+    sessions = Repo.all(query)
+    attach_current_task_titles(sessions)
+  end
+
+  @doc """
+  Returns `{count, [id]}` for all sessions belonging to a project (including archived).
+  Lightweight — no preloads, no task title joins.
+  """
+  def count_and_ids_for_project(project_id) do
+    rows =
+      project_sessions_base_query(project_id)
+      |> select([s], s.id)
       |> Repo.all()
 
-    attach_current_task_titles(sessions)
+    {length(rows), rows}
   end
 
   defp attach_current_task_titles([]), do: []
@@ -230,250 +283,13 @@ defmodule EyeInTheSky.Sessions do
     end)
   end
 
-  @doc """
-  Lists sessions filtered by search query and status filter using PostgreSQL full-text search.
-  Excludes archived sessions by default. Pass `include_archived: true` to include archived sessions.
+  defdelegate list_sessions_filtered(opts \\ []), to: Queries
+  defdelegate list_session_overview_rows(opts \\ []), to: Queries
+  defdelegate get_session_overview_row(session_id), to: Queries
+  defdelegate count_session_overview_rows(opts \\ []), to: Queries
 
-  Options:
-  - `:search_query` - String to search across session name, description, project name, agent ID, agent description
-  - `:status_filter` - One of: "all", "active", "completed", "stale", "discovered"
-  - `:limit` - Maximum number of results (default: 100)
-  - `:offset` - Number of results to skip (default: 0)
-  - `:include_archived` - Include archived sessions (default: false)
-  """
-  def list_sessions_filtered(opts \\ []) do
-    search_query = Keyword.get(opts, :search_query, "")
-    status_filter = Keyword.get(opts, :status_filter, "active")
-    limit = Keyword.get(opts, :limit, 100)
-    offset = Keyword.get(opts, :offset, 0)
-
-    base_query =
-      from s in Session,
-        join: a in assoc(s, :agent),
-        left_join: ad in assoc(a, :agent_definition),
-        preload: [agent: {a, agent_definition: ad}],
-        order_by: [desc_nulls_last: s.last_activity_at, desc: s.started_at],
-        limit: ^limit,
-        offset: ^offset
-
-    base_query = Archivable.include_archived(base_query, opts)
-
-    # Apply full-text search filter
-    base_query =
-      if search_query != "" do
-        where(base_query, [s, a], ^PgSearch.fts_name_description_match(search_query))
-      else
-        base_query
-      end
-
-    # Apply status filter
-    base_query =
-      case status_filter do
-        "active" ->
-          where(base_query, [s, a], is_nil(s.ended_at) and a.status != "discovered")
-
-        "completed" ->
-          where(base_query, [s], not is_nil(s.ended_at))
-
-        "stale" ->
-          where(base_query, [s, a], is_nil(s.ended_at) and a.status == "stale")
-
-        "discovered" ->
-          where(base_query, [s, a], a.status == "discovered")
-
-        "all" ->
-          base_query
-
-        _ ->
-          base_query
-      end
-
-    Repo.all(base_query)
-  end
-
-  @doc """
-  Returns session overview rows for the sessions table.
-  Joins sessions with agents and projects to get complete information.
-  Excludes archived sessions by default. Pass `include_archived: true` to include archived sessions.
-
-  Options:
-  - `:limit` - Maximum number of results (default: 20)
-  - `:include_archived` - Include archived sessions (default: false)
-  - `:project_id` - Filter by project ID
-  - `:search_query` - PostgreSQL full-text search query across all searchable fields
-  """
-  def list_session_overview_rows(opts \\ []) do
-    limit = Keyword.get(opts, :limit, 20)
-
-    base_session_overview_query(opts)
-    |> order_by([s], desc: s.started_at)
-    |> limit(^limit)
-    |> QueryBuilder.maybe_offset(opts)
-    |> select([s, a, p], %{
-      id: s.id,
-      uuid: s.uuid,
-      name: s.name,
-      agent_id: a.id,
-      agent_uuid: a.uuid,
-      description: s.description,
-      project_name: p.name,
-      started_at: s.started_at,
-      ended_at: s.ended_at,
-      status: s.status,
-      intent: s.intent,
-      model_provider: s.model_provider,
-      model_name: s.model_name,
-      model_version: s.model_version,
-      last_activity_at: a.last_activity_at,
-      current_task_title:
-        fragment(
-          # 2 = WorkflowState.in_progress_id()
-          "(SELECT t.title FROM tasks t JOIN task_sessions ts ON ts.task_id = t.id WHERE ts.session_id = ? AND t.state_id = 2 AND t.archived = false ORDER BY t.updated_at DESC LIMIT 1)",
-          s.id
-        )
-    })
-    |> Repo.all()
-  end
-
-  @doc """
-  Counts sessions for overview (same filters as list_session_overview_rows, without limit/offset).
-  """
-  def count_session_overview_rows(opts \\ []) do
-    base_session_overview_query(opts)
-    |> Repo.aggregate(:count, :id)
-  end
-
-  defp base_session_overview_query(opts) do
-    project_id = Keyword.get(opts, :project_id, nil)
-    search_query = Keyword.get(opts, :search_query, "")
-
-    query =
-      from(s in Session,
-        join: a in assoc(s, :agent),
-        left_join: p in EyeInTheSky.Projects.Project,
-        on: p.id == a.project_id
-      )
-
-    query = Archivable.include_archived(query, opts)
-    query = if project_id, do: where(query, [s, a], a.project_id == ^project_id), else: query
-
-    if search_query != "" do
-      where(query, [s], ^PgSearch.fts_name_description_match(search_query))
-    else
-      query
-    end
-  end
-
-  @doc """
-  Loads associated data for a specific session detail view.
-
-  Intended for single-session detail pages only. Do NOT use for list views
-  or anywhere multiple sessions are rendered — it issues one query per
-  association.
-
-  ## Options
-
-    - `:tasks_limit` / `:tasks_offset` — paginate tasks
-    - `:commits_limit` / `:commits_offset` — paginate commits
-    - `:logs_limit` / `:logs_offset` — paginate logs
-    - `:notes_limit` / `:notes_offset` — paginate notes
-
-  ## Examples
-
-      iex> load_session_data("abc-123")
-      %{tasks: [...], commits: [...], ...}
-
-      iex> load_session_data("abc-123", tasks_limit: 20, logs_limit: 50, logs_offset: 50)
-      %{tasks: [...], ...}
-
-  """
-  def load_session_data(session_id, opts \\ []) do
-    alias EyeInTheSky.{Tasks, Commits, Logs, Contexts, Notes}
-
-    %{
-      tasks:
-        Tasks.list_tasks_for_session(session_id,
-          limit: Keyword.get(opts, :tasks_limit),
-          offset: Keyword.get(opts, :tasks_offset)
-        ),
-      commits:
-        Commits.list_commits_for_session(session_id,
-          limit: Keyword.get(opts, :commits_limit),
-          offset: Keyword.get(opts, :commits_offset)
-        ),
-      logs:
-        Logs.list_logs_for_session(session_id,
-          limit: Keyword.get(opts, :logs_limit),
-          offset: Keyword.get(opts, :logs_offset)
-        ),
-      notes:
-        Notes.list_notes_for_session(session_id,
-          limit: Keyword.get(opts, :notes_limit),
-          offset: Keyword.get(opts, :notes_offset)
-        ),
-      session_context: Contexts.get_session_context(session_id),
-      metrics: nil
-    }
-  end
-
-  @doc """
-  Gets counts for all tabs (cheap aggregate queries).
-  """
-  def get_session_counts(session_id) do
-    sql = """
-    SELECT
-      (SELECT COUNT(*) FROM task_sessions WHERE session_id = $1),
-      (SELECT COUNT(*) FROM commits WHERE session_id = $1),
-      (SELECT COUNT(*) FROM logs WHERE session_id = $1),
-      (SELECT COUNT(*) FROM notes WHERE parent_type IN ('session','sessions') AND parent_id = $1),
-      (SELECT COUNT(*) FROM messages WHERE session_id = $1)
-    """
-
-    case Repo.query(sql, [session_id]) do
-      {:ok, %{rows: [[tasks, commits, logs, notes, messages]]}} ->
-        %{tasks: tasks, commits: commits, logs: logs, notes: notes, messages: messages}
-
-      _ ->
-        %{tasks: 0, commits: 0, logs: 0, notes: 0, messages: 0}
-    end
-  end
-
-  @doc """
-  Lazy load: tasks only
-  """
-  def load_session_tasks(session_id) do
-    EyeInTheSky.Tasks.list_tasks_for_session(session_id)
-  end
-
-  @doc """
-  Lazy load: commits only
-  """
-  def load_session_commits(session_id, opts \\ []) do
-    limit = Keyword.get(opts, :limit, 50)
-    EyeInTheSky.Commits.list_commits_for_session(session_id, limit: limit)
-  end
-
-  @doc """
-  Lazy load: logs only
-  """
-  def load_session_logs(session_id, opts \\ []) do
-    limit = Keyword.get(opts, :limit, 100)
-    EyeInTheSky.Logs.list_logs_for_session(session_id, limit: limit)
-  end
-
-  @doc """
-  Lazy load: context only
-  """
-  def load_session_context(session_id) do
-    EyeInTheSky.Contexts.get_session_context(session_id)
-  end
-
-  @doc """
-  Lazy load: notes only
-  """
-  def load_session_notes(session_id) do
-    EyeInTheSky.Notes.list_notes_for_session(session_id)
-  end
+  defdelegate load_session_data(session_id, opts \\ []), to: Loader
+  defdelegate get_session_counts(session_id), to: Loader
 
   @doc """
   Extracts and validates model information from a nested model object.
@@ -482,6 +298,11 @@ defmodule EyeInTheSky.Sessions do
   """
   defdelegate extract_model_info(model_data), to: ModelInfo
 
+  # Preload helpers
+  defp with_agent_preload(query) do
+    preload(query, agent: :agent_definition)
+  end
+
   @doc """
   Gets model information for a session as a formatted string.
 
@@ -489,4 +310,122 @@ defmodule EyeInTheSky.Sessions do
   Returns "provider/name (version)" or "provider/name" if version not set.
   """
   defdelegate format_model_info(session), to: ModelInfo
+
+  # Deterministic UUIDs for the web UI identity — stable across restarts.
+  @web_agent_uuid "00000000-0000-0000-0000-000000000001"
+  @web_session_uuid "00000000-0000-0000-0000-000000000002"
+
+  @doc """
+  Finds or creates the deterministic web UI session used by ChatLive.
+  Returns the integer session ID.
+
+  Safe to call on every mount — returns the existing session immediately
+  if it was already bootstrapped.
+  """
+  @spec ensure_web_ui_session() :: integer()
+  def ensure_web_ui_session do
+    case get_session_by_uuid(@web_session_uuid) do
+      {:ok, session} ->
+        session.id
+
+      {:error, :not_found} ->
+        with {:ok, agent} <- find_or_create_web_agent(),
+             {:ok, session} <-
+               create_session(%{
+                 uuid: @web_session_uuid,
+                 agent_id: agent.id,
+                 name: "Web UI",
+                 started_at: DateTime.utc_now()
+               }) do
+          session.id
+        else
+          {:error, reason} ->
+            raise "ensure_web_ui_session bootstrap failed: #{inspect(reason)}"
+        end
+    end
+  end
+
+  defp find_or_create_web_agent do
+    case EyeInTheSky.Agents.get_agent_by_uuid(@web_agent_uuid) do
+      {:ok, agent} ->
+        {:ok, agent}
+
+      {:error, :not_found} ->
+        EyeInTheSky.Agents.create_agent(%{
+          uuid: @web_agent_uuid,
+          description: "Web UI User",
+          source: "web"
+        })
+    end
+  end
+
+  @doc """
+  Registers a new session from a SessionStart hook.
+
+  Takes the raw hook params map and an already-resolved project_id.
+  Finds or creates the agent, parses model info, then creates the session.
+  Fires `EyeInTheSky.Events.session_started/1` on success.
+
+  Returns `{:ok, %{session: session, agent: agent}}` or `{:error, changeset}`.
+  """
+  @spec register_from_hook(map(), integer() | nil) ::
+          {:ok, %{session: Session.t(), agent: struct()}}
+          | {:error, :agent | :session, Ecto.Changeset.t()}
+  def register_from_hook(params, project_id) do
+    session_uuid = params["session_id"]
+
+    agent_attrs = %{
+      uuid: params["agent_id"] || session_uuid,
+      description: params["agent_description"] || params["description"],
+      project_id: project_id,
+      project_name: params["project_name"],
+      git_worktree_path: params["worktree_path"],
+      source: "hook"
+    }
+
+    case EyeInTheSky.Agents.find_or_create_agent(agent_attrs) do
+      {:ok, agent} ->
+        {model_provider, model_name} = ModelInfo.parse_model_string(params["model"])
+
+        session_attrs = %{
+          uuid: session_uuid,
+          agent_id: agent.id,
+          name: params["name"],
+          description: params["description"],
+          status: "working",
+          started_at: DateTime.utc_now(),
+          provider: params["provider"] || "claude",
+          model: params["model"],
+          model_provider: model_provider,
+          model_name: model_name,
+          project_id: project_id,
+          git_worktree_path: params["worktree_path"],
+          entrypoint: params["entrypoint"]
+        }
+
+        result =
+          if model_name,
+            do: create_session_with_model(session_attrs),
+            else: create_session(session_attrs)
+
+        case result do
+          {:ok, session} ->
+            EyeInTheSky.Events.session_started(session)
+            {:ok, %{session: session, agent: agent}}
+
+          {:error, changeset} ->
+            {:error, :session, changeset}
+        end
+
+      {:error, changeset} ->
+        {:error, :agent, changeset}
+    end
+  end
+
+  defdelegate record_tool_event(session, type, params),
+    to: EyeInTheSky.Sessions.ToolEventRecorder
+
+  defp project_sessions_base_query(project_id) do
+    from(s in Session, where: s.project_id == ^project_id)
+  end
 end

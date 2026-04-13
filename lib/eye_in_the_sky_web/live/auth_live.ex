@@ -17,7 +17,7 @@ defmodule EyeInTheSkyWeb.AuthLive do
         |> assign(:token_valid, token_valid)
         |> assign(:error, nil)
 
-      {:ok, socket, layout: {EyeInTheSkyWeb.Layouts, :root}}
+      {:ok, socket, layout: false}
     end
   end
 
@@ -29,7 +29,7 @@ defmodule EyeInTheSkyWeb.AuthLive do
 
   def render(%{mode: :register, token_valid: false} = assigns) do
     ~H"""
-    <div class="min-h-[100dvh] flex items-center justify-center bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)]">
+    <div class="min-h-[100dvh] flex items-center justify-center bg-base-100">
       <div class="w-full max-w-sm px-6 text-center">
         <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-zinc-900 dark:bg-zinc-100 mb-4">
           <.icon name="hero-eye" class="w-6 h-6 text-white dark:text-zinc-900" />
@@ -51,7 +51,7 @@ defmodule EyeInTheSkyWeb.AuthLive do
 
   def render(%{mode: :register} = assigns) do
     ~H"""
-    <div class="min-h-[100dvh] flex items-center justify-center bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)]">
+    <div class="min-h-[100dvh] flex items-center justify-center bg-base-100">
       <div class="w-full max-w-sm px-6">
         <div class="mb-8 text-center">
           <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-zinc-900 dark:bg-zinc-100 mb-4">
@@ -98,7 +98,7 @@ defmodule EyeInTheSkyWeb.AuthLive do
 
   def render(%{mode: :login} = assigns) do
     ~H"""
-    <div class="min-h-[100dvh] flex items-center justify-center bg-[oklch(95%_0.005_80)] dark:bg-[hsl(30,3.3%,11.8%)]">
+    <div class="min-h-[100dvh] flex items-center justify-center bg-base-100">
       <div class="w-full max-w-sm px-6">
         <div class="mb-8 text-center">
           <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-zinc-900 dark:bg-zinc-100 mb-4">
@@ -125,7 +125,7 @@ defmodule EyeInTheSkyWeb.AuthLive do
               type="text"
               placeholder="your username"
               autocomplete="username"
-              class="w-full px-3 py-2.5 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-transparent text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+              class="w-full px-3 py-2.5 text-base rounded-lg border border-zinc-200 dark:border-zinc-700 bg-transparent text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
             />
           </div>
 

@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.KanbanBulkBar do
+  @moduledoc false
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
   import EyeInTheSkyWeb.Live.Shared.KanbanFilters, only: [state_dot_color: 1]
@@ -20,7 +21,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBulkBar do
           <button
             phx-click="bulk_move"
             phx-value-state_id={state.id}
-            class="btn btn-sm sm:btn-xs btn-ghost gap-1 min-h-[36px] sm:min-h-0"
+            class="btn btn-sm sm:btn-xs btn-ghost gap-1 min-h-[44px] sm:min-h-0"
           >
             <span
               class="w-1.5 h-1.5 rounded-full"
@@ -33,14 +34,14 @@ defmodule EyeInTheSkyWeb.Components.KanbanBulkBar do
         <span class="text-base-content/15 hidden sm:inline">|</span>
         <button
           phx-click="bulk_archive"
-          class="btn btn-sm sm:btn-xs btn-ghost text-warning gap-1 min-h-[36px] sm:min-h-0"
+          class="btn btn-sm sm:btn-xs btn-ghost text-warning gap-1 min-h-[44px] sm:min-h-0"
         >
           <.icon name="hero-archive-box-mini" class="w-3 h-3" /> Archive
         </button>
         <button
           phx-click="bulk_delete"
           phx-confirm={"Delete #{MapSet.size(@selected_tasks)} tasks?"}
-          class="btn btn-sm sm:btn-xs btn-ghost text-error gap-1 min-h-[36px] sm:min-h-0"
+          class="btn btn-sm sm:btn-xs btn-ghost text-error gap-1 min-h-[44px] sm:min-h-0"
         >
           <.icon name="hero-trash-mini" class="w-3 h-3" /> Delete
         </button>

@@ -1,9 +1,10 @@
 defmodule EyeInTheSkyWeb.NoteLive.Edit do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Notes
+  import EyeInTheSkyWeb.ControllerHelpers, only: [normalize_parent_type: 1, parse_int: 1]
+  import EyeInTheSkyWeb.NoteLive.Helpers, only: [safe_return_to: 1]
 
-  @valid_return_paths ["/notes", ~r|^/projects/\d+/notes$|]
+  alias EyeInTheSky.Notes
 
   @impl true
   def mount(_params, _session, socket) do
@@ -25,18 +26,16 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
       Process.cancel_timer(socket.assigns.saved_timer)
     end
 
-    case Integer.parse(id) do
-      {int_id, ""} ->
+    case parse_int(id) do
+      nil ->
+        {:noreply, socket |> put_flash(:error, "Invalid note ID.") |> push_navigate(to: "/notes")}
+
+      int_id ->
         case Notes.get_note(int_id) do
-          nil ->
-            socket =
-              socket
-              |> put_flash(:error, "Note not found.")
-              |> push_navigate(to: "/notes")
+          {:error, :not_found} ->
+            {:noreply, socket |> put_flash(:error, "Note not found.") |> push_navigate(to: "/notes")}
 
-            {:noreply, socket}
-
-          note ->
+          {:ok, note} ->
             return_to = safe_return_to(params["return_to"])
 
             socket =
@@ -49,14 +48,6 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
 
             {:noreply, socket}
         end
-
-      _ ->
-        socket =
-          socket
-          |> put_flash(:error, "Invalid note ID.")
-          |> push_navigate(to: "/notes")
-
-        {:noreply, socket}
     end
   end
 
@@ -129,7 +120,7 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
 
         <%= if @note.parent_type do %>
           <span class={[
-            "hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0",
+            "hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium flex-shrink-0",
             parent_type_class(@note.parent_type)
           ]}>
             <.icon name={parent_type_icon(@note.parent_type)} class="w-2.5 h-2.5" />
@@ -151,7 +142,7 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
           <%= if @saved do %>
             <.icon name="hero-check" class="w-3.5 h-3.5" /> Saved
           <% else %>
-            Save <kbd class="text-[9px] opacity-70 ml-0.5">⌘S</kbd>
+            Save <kbd class="text-xs opacity-70 ml-0.5">⌘S</kbd>
           <% end %>
         </button>
       </div>
@@ -170,7 +161,7 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
       </div>
 
       <%!-- Status bar --%>
-      <div class="flex items-center justify-between px-4 py-1 border-t border-base-content/8 bg-base-100 flex-shrink-0 text-[10px] text-base-content/35">
+      <div class="flex items-center justify-between px-4 py-1 border-t border-base-content/8 bg-base-100 flex-shrink-0 text-xs text-base-content/35">
         <div class="flex items-center gap-4">
           <span class="flex items-center gap-1">
             <span class="w-1.5 h-1.5 rounded-full bg-success inline-block"></span> Markdown
@@ -186,55 +177,41 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
     """
   end
 
-  defp safe_return_to(path) when is_binary(path) do
-    if String.starts_with?(path, "/") and
-         Enum.any?(@valid_return_paths, fn
-           p when is_binary(p) -> p == path
-           r -> Regex.match?(r, path)
-         end),
-       do: path,
-       else: "/notes"
-  end
-
-  defp safe_return_to(_), do: "/notes"
-
   defp context_suffix(note) do
-    case note.parent_type do
-      t when t in ["session", "sessions"] ->
-        " · #{String.slice(note.parent_id || "", 0, 8)}"
-
-      t when t in ["task", "tasks"] ->
-        " · ##{note.parent_id}"
-
-      _ ->
-        ""
+    case normalize_parent_type(note.parent_type) do
+      "session" -> " · #{String.slice(note.parent_id || "", 0, 8)}"
+      "task" -> " · ##{note.parent_id}"
+      _ -> ""
     end
   end
 
-  defp parent_type_label(type) when type in ["session", "sessions"], do: "Session"
-  defp parent_type_label(type) when type in ["agent", "agents"], do: "Agent"
-  defp parent_type_label(type) when type in ["project", "projects"], do: "Project"
-  defp parent_type_label(type) when type in ["task", "tasks"], do: "Task"
-  defp parent_type_label(type) when is_binary(type), do: String.capitalize(type)
-  defp parent_type_label(_), do: "Note"
+  defp parent_type_label(type) do
+    case normalize_parent_type(type) do
+      "session" -> "Session"
+      "agent" -> "Agent"
+      "project" -> "Project"
+      "task" -> "Task"
+      t when is_binary(t) -> String.capitalize(t)
+      _ -> "Note"
+    end
+  end
 
-  defp parent_type_icon(type) when type in ["session", "sessions"], do: "hero-clock-mini"
-  defp parent_type_icon(type) when type in ["agent", "agents"], do: "hero-cpu-chip-mini"
-  defp parent_type_icon(type) when type in ["project", "projects"], do: "hero-folder-mini"
+  defp parent_type_icon(type) do
+    case normalize_parent_type(type) do
+      "session" -> "hero-clock-mini"
+      "agent" -> "hero-cpu-chip-mini"
+      "project" -> "hero-folder-mini"
+      "task" -> "hero-clipboard-document-list-mini"
+      _ -> "hero-document-text-mini"
+    end
+  end
 
-  defp parent_type_icon(type) when type in ["task", "tasks"],
-    do: "hero-clipboard-document-list-mini"
-
-  defp parent_type_icon(_), do: "hero-document-text-mini"
-
-  defp parent_type_class(type) when type in ["session", "sessions"],
-    do: "bg-info/[0.08] text-info/70"
-
-  defp parent_type_class(type) when type in ["agent", "agents"],
-    do: "bg-secondary/[0.08] text-secondary/70"
-
-  defp parent_type_class(type) when type in ["project", "projects"],
-    do: "bg-primary/[0.08] text-primary/70"
-
-  defp parent_type_class(_), do: "bg-base-content/[0.06] text-base-content/50"
+  defp parent_type_class(type) do
+    case normalize_parent_type(type) do
+      "session" -> "bg-info/[0.08] text-info/70"
+      "agent" -> "bg-secondary/[0.08] text-secondary/70"
+      "project" -> "bg-primary/[0.08] text-primary/70"
+      _ -> "bg-base-content/[0.06] text-base-content/50"
+    end
+  end
 end

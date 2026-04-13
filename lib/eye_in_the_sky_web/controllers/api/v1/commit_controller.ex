@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
   import EyeInTheSkyWeb.ControllerHelpers
 
   alias EyeInTheSky.{Agents, Commits, Sessions}
+  alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @doc """
   GET /api/v1/commits - List commits for a session or agent.
@@ -21,9 +22,15 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
           end
 
         params["agent_id"] ->
-          case Sessions.get_session_by_uuid(params["agent_id"]) do
-            {:ok, session} -> Commits.list_recent_commits(session.id, limit)
-            _ -> []
+          case Agents.get_agent_by_uuid(params["agent_id"]) do
+            {:ok, agent} ->
+              case Sessions.list_sessions_for_agent(agent.id, limit: 1) do
+                [session | _] -> Commits.list_recent_commits(session.id, limit)
+                [] -> []
+              end
+
+            _ ->
+              []
           end
 
         true ->
@@ -32,10 +39,7 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
 
     json(conn, %{
       success: true,
-      commits:
-        Enum.map(commits, fn c ->
-          %{id: c.id, commit_hash: c.commit_hash, commit_message: c.commit_message}
-        end)
+      commits: Enum.map(commits, &ApiPresenter.present_commit/1)
     })
   end
 
@@ -54,51 +58,52 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
       is_nil(agent_uuid) or agent_uuid == "" ->
         conn |> put_status(:bad_request) |> json(%{error: "agent_id is required"})
 
+      not is_list(hashes) ->
+        conn |> put_status(:bad_request) |> json(%{error: "commit_hashes must be a list"})
+
       hashes == [] ->
         conn |> put_status(:bad_request) |> json(%{error: "commit_hashes is required"})
 
       true ->
-        with {:ok, agent} <- Agents.get_agent_by_uuid(agent_uuid),
-             [session | _] <- Sessions.list_sessions_for_agent(agent.id, limit: 1) do
-          results =
-            hashes
-            |> Enum.with_index()
-            |> Enum.map(fn {hash, idx} ->
-              Commits.create_commit(%{
-                session_id: session.id,
-                commit_hash: hash,
-                commit_message: Enum.at(messages, idx)
-              })
-            end)
+        do_create_commits(conn, agent_uuid, hashes, messages)
+    end
+  end
 
-          created =
-            results
-            |> Enum.filter(&match?({:ok, _}, &1))
-            |> Enum.map(fn {:ok, commit} ->
-              %{
-                id: commit.id,
-                commit_hash: commit.commit_hash,
-                commit_message: commit.commit_message
-              }
-            end)
+  defp do_create_commits(conn, agent_uuid, hashes, messages) do
+    with {:ok, agent} <- Agents.get_agent_by_uuid(agent_uuid),
+         [session | _] <- Sessions.list_sessions_for_agent(agent.id, limit: 1) do
+      results =
+        hashes
+        |> Enum.with_index()
+        |> Enum.map(fn {hash, idx} ->
+          Commits.create_commit(%{
+            session_id: session.id,
+            commit_hash: hash,
+            commit_message: Enum.at(messages, idx)
+          })
+        end)
 
-          errors =
-            results
-            |> Enum.filter(&match?({:error, _}, &1))
-            |> Enum.map(fn {:error, changeset} -> translate_errors(changeset) end)
+      created =
+        results
+        |> Enum.filter(&match?({:ok, _}, &1))
+        |> Enum.map(fn {:ok, commit} -> ApiPresenter.present_commit(commit) end)
 
-          status = if errors == [], do: :created, else: :multi_status
+      errors =
+        results
+        |> Enum.filter(&match?({:error, _}, &1))
+        |> Enum.map(fn {:error, changeset} -> translate_errors(changeset) end)
 
-          conn
-          |> put_status(status)
-          |> json(%{commits: created, errors: errors})
-        else
-          {:error, :not_found} ->
-            conn |> put_status(:not_found) |> json(%{error: "Agent not found"})
+      status = if errors == [], do: :created, else: :multi_status
 
-          [] ->
-            conn |> put_status(:not_found) |> json(%{error: "No session found for agent"})
-        end
+      conn
+      |> put_status(status)
+      |> json(%{commits: created, errors: errors})
+    else
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "Agent not found"})
+
+      [] ->
+        conn |> put_status(:not_found) |> json(%{error: "No session found for agent"})
     end
   end
 end

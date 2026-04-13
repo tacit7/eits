@@ -37,10 +37,10 @@ defmodule EyeInTheSkyWeb.Helpers.PubSubHelpers do
 
   Broadcast by `AgentWorker` on idle/active transitions.
 
-  | Payload                                        | Broadcaster     | Meaning                     |
-  |------------------------------------------------|-----------------|-----------------------------|
-  | `{:agent_working, session_uuid, session_id}`   | `AgentWorker`   | SDK started processing      |
-  | `{:agent_stopped, session_uuid, session_id}`   | `AgentWorker`   | SDK idle / error / done     |
+  | Payload                        | Broadcaster         | Meaning                 |
+  |--------------------------------|---------------------|-------------------------|
+  | `{:agent_working, %Session{}}` | `AgentWorkerEvents` | SDK started processing  |
+  | `{:agent_stopped, %Session{}}` | `AgentWorkerEvents` | SDK idle / error / done |
 
   Subscribers: `subscribe_agent_working/0` — `ChatLive`, `DMLive`.
 

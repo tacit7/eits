@@ -171,4 +171,65 @@ defmodule EyeInTheSky.MessagesTest do
       assert Messages.total_tokens_for_session(session.id) == 700
     end
   end
+
+  describe "message lifecycle transitions" do
+    defp create_pending_message(session_id) do
+      {:ok, msg} =
+        Messages.send_message(%{
+          session_id: session_id,
+          sender_role: "user",
+          recipient_role: "agent",
+          provider: "claude",
+          body: "test prompt #{uniq()}"
+        })
+
+      assert msg.status == "pending"
+      msg
+    end
+
+    test "mark_processing/1 transitions pending -> processing" do
+      session = create_session()
+      msg = create_pending_message(session.id)
+
+      assert :ok = Messages.mark_processing(msg.id)
+
+      updated = EyeInTheSky.Repo.get!(Messages.Message, msg.id)
+      assert updated.status == "processing"
+    end
+
+    test "mark_delivered/1 transitions processing -> delivered" do
+      session = create_session()
+      msg = create_pending_message(session.id)
+      Messages.mark_processing(msg.id)
+
+      assert :ok = Messages.mark_delivered(msg.id)
+
+      updated = EyeInTheSky.Repo.get!(Messages.Message, msg.id)
+      assert updated.status == "delivered"
+    end
+
+    test "mark_failed/2 sets status and failure_reason" do
+      session = create_session()
+      msg = create_pending_message(session.id)
+      Messages.mark_processing(msg.id)
+
+      assert :ok = Messages.mark_failed(msg.id, "billing_error")
+
+      updated = EyeInTheSky.Repo.get!(Messages.Message, msg.id)
+      assert updated.status == "failed"
+      assert updated.failure_reason == "billing_error"
+    end
+
+    test "mark_processing/1 with nil is a no-op" do
+      assert :ok = Messages.mark_processing(nil)
+    end
+
+    test "mark_delivered/1 with nil is a no-op" do
+      assert :ok = Messages.mark_delivered(nil)
+    end
+
+    test "mark_failed/2 with nil is a no-op" do
+      assert :ok = Messages.mark_failed(nil, "some_reason")
+    end
+  end
 end

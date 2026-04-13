@@ -3,6 +3,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
 
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
 
+  alias EyeInTheSkyWeb.Helpers.FileHelpers
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
+
   @user_agents_dir Path.expand("~/.claude/agents")
 
   @impl true
@@ -45,7 +48,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
     user_dir = socket.assigns.user_agents_dir
 
     allowed =
-      (project_dir && String.starts_with?(path, project_dir)) ||
+      (not is_nil(project_dir) && String.starts_with?(path, project_dir)) ||
         String.starts_with?(path, user_dir)
 
     if allowed do
@@ -58,7 +61,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
       relative = Path.basename(path)
 
       scope =
-        if project_dir && String.starts_with?(path, project_dir), do: :project, else: :user
+        if not is_nil(project_dir) && String.starts_with?(path, project_dir), do: :project, else: :user
 
       {:noreply,
        socket
@@ -88,12 +91,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
     user_dir = socket.assigns.user_agents_dir
 
     allowed =
-      path &&
-        ((project_dir && String.starts_with?(path, project_dir)) ||
+      not is_nil(path) &&
+        ((not is_nil(project_dir) && String.starts_with?(path, project_dir)) ||
            String.starts_with?(path, user_dir)) &&
         File.exists?(path)
 
-    if allowed, do: EyeInTheSkyWeb.Helpers.ViewHelpers.open_in_system(path)
+    if allowed, do: ViewHelpers.open_in_system(path)
 
     {:noreply, socket}
   end
@@ -120,22 +123,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
           |> Enum.filter(&String.ends_with?(&1, ".md"))
           |> Enum.reject(&(&1 == "README.md"))
           |> Enum.sort()
-          |> Enum.map(fn item ->
-            full = Path.join(agents_dir, item)
-
-            size =
-              case File.stat(full) do
-                {:ok, %{size: s}} -> s
-                _ -> 0
-              end
-
-            %{
-              name: Path.rootname(item),
-              filename: item,
-              path: full,
-              size: size
-            }
-          end)
+          |> Enum.map(&build_agent_entry(&1, agents_dir))
 
         _ ->
           []
@@ -145,9 +133,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
     end
   end
 
-  defp format_size(bytes) when is_integer(bytes) and bytes < 1024, do: "#{bytes} B"
-  defp format_size(bytes) when is_integer(bytes), do: "#{Float.round(bytes / 1024, 1)} KB"
-  defp format_size(_), do: ""
+  defp build_agent_entry(item, agents_dir) do
+    full = Path.join(agents_dir, item)
+    size = case File.stat(full) do
+      {:ok, %{size: s}} -> s
+      _ -> 0
+    end
+    %{name: Path.rootname(item), filename: item, path: full, size: size}
+  end
 
   defp has_any_agents?(project_agents, user_agents) do
     project_agents != [] || user_agents != []
@@ -160,7 +153,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
 
   defp agent_list(assigns) do
     ~H"""
-    <%= if length(@agents) > 0 do %>
+    <%= if @agents != [] do %>
       <div class="space-y-2">
         <%= for agent <- @agents do %>
           <button
@@ -173,7 +166,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                 <.icon name="hero-document-text" class="w-4 h-4 text-base-content/50 shrink-0" />
                 <code class="text-sm font-semibold text-base-content">{agent.name}</code>
                 <span class="text-xs text-base-content/40 ml-auto">
-                  {format_size(agent.size)}
+                  {FileHelpers.format_size(agent.size)}
                 </span>
               </div>
             </div>
@@ -247,12 +240,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                       <div class="flex items-center gap-1">
                         <button
                           phx-click="open_file"
-                          class="btn btn-ghost btn-xs"
+                          class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
                           title="Open in editor"
                         >
                           <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit
                         </button>
-                        <button phx-click="close_viewer" class="btn btn-ghost btn-xs btn-circle">
+                        <button phx-click="close_viewer" class="btn btn-ghost btn-xs btn-circle min-h-[44px] min-w-[44px]">
                           <.icon name="hero-x-mark" class="w-4 h-4" />
                         </button>
                       </div>
@@ -276,7 +269,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
             <.icon name="hero-user-circle" class="mx-auto h-12 w-12 text-base-content/40" />
             <h3 class="mt-2 text-sm font-medium text-base-content">No agents directory</h3>
             <p class="mt-1 text-sm text-base-content/60">
-              <%= if @project && @project.path do %>
+              <%= if not is_nil(@project) && not is_nil(@project.path) do %>
                 No .claude/agents directory found at {@project.path} or ~/.claude/agents
               <% else %>
                 Project path not configured

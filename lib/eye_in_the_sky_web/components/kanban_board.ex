@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.KanbanBoard do
+  @moduledoc false
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
   import EyeInTheSkyWeb.Components.TaskCard, only: [task_card: 1]
@@ -10,6 +11,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
   attr :selected_tasks, :any, required: true
   attr :quick_add_column, :any, required: true
   attr :working_session_ids, :any, required: true
+  attr :waiting_session_ids, :any, default: nil
 
   def kanban_board(assigns) do
     ~H"""
@@ -37,7 +39,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                 class="h-0.5 rounded-full mx-1 mb-2"
                 style={"background-color: #{state_dot_color(state.color)}"}
               />
-              <div class="flex items-center gap-2 px-3 py-1" data-column-handle>
+              <div class="flex items-center gap-2 px-3 py-1">
                 <%= if @bulk_mode do %>
                   <input
                     type="checkbox"
@@ -50,7 +52,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                     phx-value-state-id={state.id}
                   />
                 <% end %>
-                <div class="flex items-center gap-1.5 cursor-grab active:cursor-grabbing">
+                <div class="flex items-center gap-1.5 cursor-grab active:cursor-grabbing" data-column-handle>
                   <.icon
                     name="hero-bars-2"
                     class="w-3 h-3 text-base-content/20 hover:text-base-content/40"
@@ -72,7 +74,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                     phx-click="archive_column"
                     phx-value-state-id={state.id}
                     phx-confirm={"Archive all #{task_count} done tasks?"}
-                    class="p-1 rounded text-base-content/20 hover:text-warning hover:bg-warning/10 transition-colors"
+                    class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded text-base-content/20 hover:text-warning hover:bg-warning/10 transition-colors"
                     title="Archive all done tasks"
                   >
                     <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
@@ -116,6 +118,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                       on_delete="delete_task"
                       id={"kanban-task-#{task.id}"}
                       working_session_ids={@working_session_ids}
+                      waiting_session_ids={@waiting_session_ids}
                       workflow_states={@workflow_states}
                     />
                   </div>
@@ -133,7 +136,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                     autofocus
                     phx-keydown="hide_quick_add"
                     phx-key="Escape"
-                    class="input input-md sm:input-sm w-full bg-base-100 dark:bg-[hsl(60,2.1%,18.4%)] border-base-content/10 text-sm placeholder:text-base-content/25 focus:border-primary/30"
+                    class="input input-md sm:input-sm w-full bg-base-100 border-base-content/10 text-base placeholder:text-base-content/25 focus:border-primary/30"
                   />
                 </form>
               <% else %>

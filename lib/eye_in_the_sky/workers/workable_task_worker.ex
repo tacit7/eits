@@ -14,9 +14,9 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
 
   require Logger
 
-  alias EyeInTheSky.{Repo, ScheduledJobs, Tasks}
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Notifications
+  alias EyeInTheSky.{Projects, Repo, ScheduledJobs, Tasks}
   alias EyeInTheSky.Workers.SpeakWorker
 
   import Ecto.Query
@@ -31,23 +31,32 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
     job = ScheduledJobs.get_job!(job_id)
     {:ok, run} = ScheduledJobs.record_run_start(job)
 
-    case execute(job) do
-      {:ok, :no_work} ->
-        ScheduledJobs.record_run_complete(run, "completed", result: "No workable tasks")
-        broadcast()
-        :ok
+    try do
+      case execute(job) do
+        {:ok, :no_work} ->
+          ScheduledJobs.record_run_complete(run, "completed", result: "No workable tasks")
+          broadcast()
+          :ok
 
-      {:ok, output} ->
-        ScheduledJobs.record_run_complete(run, "completed", result: output)
-        broadcast()
-        notify(output)
-        :ok
+        {:ok, output} ->
+          ScheduledJobs.record_run_complete(run, "completed", result: output)
+          broadcast()
+          notify(output)
+          :ok
 
-      {:error, reason} ->
-        ScheduledJobs.record_run_complete(run, "failed", result: reason)
+        {:error, reason} ->
+          reason_str = if is_binary(reason), do: reason, else: inspect(reason)
+          ScheduledJobs.record_run_complete(run, "failed", result: reason_str)
+          broadcast()
+          notify_error(reason_str)
+          {:error, reason}
+      end
+    rescue
+      e ->
+        ScheduledJobs.record_run_complete(run, "failed", result: Exception.message(e))
         broadcast()
-        notify_error(reason)
-        {:error, reason}
+        notify_error(Exception.message(e))
+        reraise e, __STACKTRACE__
     end
   end
 
@@ -63,36 +72,38 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
     else
       available_slots = @max_active_agents - active_count
       limit = min(@batch_limit, available_slots)
-
       tasks = fetch_workable_tasks(tag_name, limit, job.project_id)
-
-      if tasks == [] do
-        {:ok, :no_work}
-      else
-        results =
-          Enum.map(tasks, fn task ->
-            mark_in_progress(task.id)
-            result = spawn_agent(task, model, job.project_id)
-
-            if match?({:error, _}, result) do
-              Logger.warning(
-                "WorkableTaskWorker: spawn failed for task ##{task.id}, rolling back to To Do"
-              )
-
-              reset_to_todo(task.id)
-            end
-
-            result
-          end)
-
-        spawned = Enum.count(results, &match?({:ok, _}, &1))
-        failed = Enum.count(results, &match?({:error, _}, &1))
-
-        {:ok, "Spawned #{spawned} agents for tag=#{tag_name} (#{failed} failed)"}
-      end
+      spawn_tasks(tasks, %{model: model, tag_name: tag_name, project_id: job.project_id})
     end
-  rescue
-    e -> {:error, Exception.message(e)}
+  end
+
+  defp spawn_tasks([], _config), do: {:ok, :no_work}
+
+  defp spawn_tasks(tasks, config) do
+    results = Enum.map(tasks, &process_task(&1, config.model, config.project_id))
+    spawned = Enum.count(results, &match?({:ok, _}, &1))
+    failed = Enum.count(results, &match?({:error, _}, &1))
+
+    if spawned == 0 and failed > 0 do
+      {:error, "All #{failed} spawn(s) failed for tag=#{config.tag_name}"}
+    else
+      {:ok, "Spawned #{spawned} agents for tag=#{config.tag_name} (#{failed} failed)"}
+    end
+  end
+
+  defp process_task(task, model, project_id) do
+    mark_in_progress(task.id)
+    result = spawn_agent(task, model, project_id)
+
+    case result do
+      {:error, _} ->
+        Logger.warning("WorkableTaskWorker: spawn failed for task ##{task.id}, rolling back to To Do")
+        reset_to_todo(task.id)
+        result
+
+      _ ->
+        result
+    end
   end
 
   defp count_active_agents do
@@ -114,7 +125,7 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
         on: tt.task_id == t.id,
         join: tg in "tags",
         on: tg.id == tt.tag_id,
-        where: tg.name == ^tag_name and t.state_id == ^state_todo,
+        where: tg.name == ^tag_name and t.state_id == ^state_todo and t.archived == false,
         order_by: [desc: t.priority, asc: t.id],
         limit: ^limit,
         select: %{
@@ -152,9 +163,13 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
     project_id = task.project_id || job_project_id
 
     project_path =
-      case project_id && Repo.get(EyeInTheSky.Projects.Project, project_id) do
-        %{path: path} when is_binary(path) -> path
-        _ -> File.cwd!()
+      if project_id do
+        case Projects.get_project(project_id) do
+          {:ok, %{path: path}} when is_binary(path) -> path
+          _ -> File.cwd!()
+        end
+      else
+        File.cwd!()
       end
 
     instructions = """
@@ -162,11 +177,9 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
 
     #{task.description}
 
-    When done, move the task to In Review. Use the appropriate method for your entrypoint:
-    - sdk-cli entrypoint: EITS-CMD: task annotate #{task.id} <summary>
-                          EITS-CMD: task done #{task.id}
-    - cli entrypoint:     eits tasks annotate #{task.id} --body "<summary>"
-                          eits tasks update #{task.id} --state 4
+    When done, move the task to In Review:
+      eits tasks annotate #{task.id} --body "<summary>"
+      eits tasks update #{task.id} --state 4
     """
 
     opts = [
@@ -177,13 +190,22 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
       instructions: instructions
     ]
 
-    case AgentManager.create_agent(opts) do
+    agent_manager = Application.get_env(:eye_in_the_sky, :agent_manager_module, AgentManager)
+
+    case agent_manager.create_agent(opts) do
       {:ok, %{session: session}} ->
         Logger.info(
           "WorkableTaskWorker: spawned agent for task ##{task.id} session=#{session.uuid} project_path=#{project_path}"
         )
 
-        Tasks.link_session_to_task(task.id, session.id)
+        try do
+          Tasks.link_session_to_task(task.id, session.id)
+        rescue
+          e ->
+            Logger.warning(
+              "WorkableTaskWorker: failed to link session #{session.id} to task ##{task.id} - #{Exception.message(e)}"
+            )
+        end
 
         {:ok, task.id}
 

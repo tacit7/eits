@@ -1,9 +1,10 @@
 defmodule EyeInTheSkyWeb.NoteLive.New do
   use EyeInTheSkyWeb, :live_view
 
+  import EyeInTheSkyWeb.NoteLive.Helpers, only: [safe_return_to: 1]
+
   alias EyeInTheSky.Notes
 
-  @valid_return_paths ["/notes", ~r|^/projects/\d+/notes$|]
   @valid_parent_types ["session", "task", "agent", "project", "system"]
 
   @impl true
@@ -90,7 +91,7 @@ defmodule EyeInTheSkyWeb.NoteLive.New do
           id="note-save-btn"
           class="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-all flex-shrink-0 bg-primary text-primary-content hover:bg-primary/80"
         >
-          Save <kbd class="text-[9px] opacity-70 ml-0.5">⌘S</kbd>
+          Save <kbd class="text-xs opacity-70 ml-0.5">⌘S</kbd>
         </button>
       </div>
 
@@ -108,7 +109,7 @@ defmodule EyeInTheSkyWeb.NoteLive.New do
       </div>
 
       <%!-- Status bar --%>
-      <div class="flex items-center justify-between px-4 py-1 border-t border-base-content/8 bg-base-100 flex-shrink-0 text-[10px] text-base-content/35">
+      <div class="flex items-center justify-between px-4 py-1 border-t border-base-content/8 bg-base-100 flex-shrink-0 text-xs text-base-content/35">
         <div class="flex items-center gap-4">
           <span class="flex items-center gap-1">
             <span class="w-1.5 h-1.5 rounded-full bg-success inline-block"></span> Markdown
@@ -124,15 +125,4 @@ defmodule EyeInTheSkyWeb.NoteLive.New do
     """
   end
 
-  defp safe_return_to(path) when is_binary(path) do
-    if String.starts_with?(path, "/") and
-         Enum.any?(@valid_return_paths, fn
-           p when is_binary(p) -> p == path
-           r -> Regex.match?(r, path)
-         end),
-       do: path,
-       else: "/notes"
-  end
-
-  defp safe_return_to(_), do: "/notes"
 end

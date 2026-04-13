@@ -12,9 +12,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
     statics: EyeInTheSkyWeb.static_paths()
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [push_navigate: 2, put_flash: 3]
+  import Phoenix.LiveView, only: [push_navigate: 2, put_flash: 3, stream_insert: 3]
 
+  alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Sessions
+  alias EyeInTheSkyWeb.ControllerHelpers
+  import EyeInTheSkyWeb.Helpers.AgentCreationHelpers, only: [build_opts: 2]
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Loader
 
   # ---------------------------------------------------------------------------
@@ -22,25 +25,19 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   # ---------------------------------------------------------------------------
 
   def create_new_session(params, socket) do
-    agent_type = params["agent_type"] || "claude"
-    model = params["model"]
-    effort_level = params["effort_level"]
     project = socket.assigns.project
     description = params["description"]
     agent_name = params["agent_name"] || String.slice(description || "", 0, 60)
 
-    opts = [
-      agent_type: agent_type,
-      model: model,
-      effort_level: effort_level,
-      project_id: project.id,
-      project_path: project.path,
-      description: agent_name,
-      instructions: description,
-      agent: params["agent"]
-    ]
+    opts =
+      build_opts(params,
+        project_path: project.path,
+        description: agent_name,
+        instructions: description
+      )
+      |> Keyword.put(:project_id, project.id)
 
-    case EyeInTheSky.Agents.AgentManager.create_agent(opts) do
+    case AgentManager.create_agent(opts) do
       {:ok, _result} ->
         socket =
           socket
@@ -61,7 +58,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
          {:ok, _} <- Sessions.archive_session(session) do
       {:noreply, socket |> Loader.load_agents() |> put_flash(:info, "Session archived")}
     else
-      {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to archive session")}
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Session not found")}
+
+      {:error, reason} ->
+        Logger.warning("archive_session failed for #{session_id}: #{inspect(reason)}")
+        {:noreply, put_flash(socket, :error, "Failed to archive session")}
     end
   end
 
@@ -70,7 +72,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
          {:ok, _} <- Sessions.unarchive_session(session) do
       {:noreply, socket |> Loader.load_agents() |> put_flash(:info, "Session unarchived")}
     else
-      {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to unarchive session")}
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Session not found")}
+
+      {:error, reason} ->
+        Logger.warning("unarchive_session failed for #{session_id}: #{inspect(reason)}")
+        {:noreply, put_flash(socket, :error, "Failed to unarchive session")}
     end
   end
 
@@ -79,7 +86,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
          {:ok, _} <- Sessions.delete_session(session) do
       {:noreply, socket |> Loader.load_agents() |> put_flash(:info, "Session deleted")}
     else
-      {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to delete session")}
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Session not found")}
+
+      {:error, reason} ->
+        Logger.warning("delete_session failed for #{session_id}: #{inspect(reason)}")
+        {:noreply, put_flash(socket, :error, "Failed to delete session")}
     end
   end
 
@@ -114,7 +126,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
              {:ok, _} <- Sessions.delete_session(session) do
           :ok
         else
-          _ -> :error
+          {:error, :not_found} ->
+            :error
+
+          {:error, reason} ->
+            Logger.warning("bulk delete: failed to delete session #{id}: #{inspect(reason)}")
+            :error
         end
       end)
 
@@ -139,7 +156,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   end
 
   def rename_session(%{"session_id" => session_id}, socket) do
-    {:noreply, assign(socket, :editing_session_id, String.to_integer(session_id))}
+    session_id_int = ControllerHelpers.parse_int(session_id)
+    socket = assign(socket, :editing_session_id, session_id_int)
+
+    socket =
+      case Enum.find(socket.assigns.agents, &(&1.id == session_id_int)) do
+        nil -> socket
+        session -> stream_insert(socket, :session_list, session)
+      end
+
+    {:noreply, socket}
   end
 
   def save_session_name(%{"session_id" => session_id, "name" => name}, socket) do
@@ -152,11 +178,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
       end
     end
 
-    {:noreply, assign(socket, :editing_session_id, nil)}
+    {:noreply, assign(socket, :editing_session_id, nil) |> Loader.load_agents()}
   end
 
   def cancel_rename(_params, socket) do
-    {:noreply, assign(socket, :editing_session_id, nil)}
+    editing_id = socket.assigns.editing_session_id
+    socket = assign(socket, :editing_session_id, nil)
+
+    socket =
+      case editing_id && Enum.find(socket.assigns.agents, &(&1.id == editing_id)) do
+        nil -> socket
+        session -> stream_insert(socket, :session_list, session)
+      end
+
+    {:noreply, socket}
   end
 
   def noop(_params, socket), do: {:noreply, socket}

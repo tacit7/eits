@@ -1,14 +1,6 @@
 const STORAGE_KEY = 'eye-in-the-sky-bookmarks'
 const FAB_RADIUS = 90  // px — radial distance from main button to agent buttons
 
-const STATUS_STYLES = {
-  working:   { dot: 'bg-success',          ping: true  },
-  compacting:{ dot: 'bg-warning',          ping: true  },
-  idle:      { dot: 'bg-base-content/20',  ping: false },
-  completed: { dot: 'bg-base-content/20',  ping: false },
-  default:   { dot: 'bg-base-content/20',  ping: false },
-}
-
 // Compute radial offsets for N buttons, arc from 90° (up) to 180° (left)
 function radialOffsets(n) {
   if (n === 0) return []
@@ -26,20 +18,16 @@ function radialOffsets(n) {
 
 export const FavoriteFab = {
   mounted() {
-    this._statuses = {}
     this._chatAgent = null
     this._chatMessages = []
     this._unreadCount = 0
     this._expanded = false
-    this._render()
 
-    this._onBookmarksUpdated = () => this._render()
+    // Push bookmarks to server so the LiveComponent can render them
+    this._syncBookmarks()
+
+    this._onBookmarksUpdated = () => this._syncBookmarks()
     window.addEventListener('bookmarks-updated', this._onBookmarksUpdated)
-
-    this.handleEvent('fab_status_update', ({ statuses }) => {
-      this._statuses = statuses || {}
-      this._render()
-    })
 
     this.handleEvent('fab_chat_history', ({ messages }) => {
       this._chatMessages = messages || []
@@ -62,16 +50,33 @@ export const FavoriteFab = {
       this._appendMessage(msg)
     })
 
-    // Allow any LiveView to open the FAB chat modal by pushing this event
     this.handleEvent('open_fab_chat', (detail) => {
       this._openChat(detail)
     })
 
-    this.pushEvent('fab_request_statuses', {})
+    // Event delegation — survives server-side re-renders
+    this.el.addEventListener('click', (e) => this._handleClick(e))
+
+    this._applyRadialOffsets()
+  },
+
+  updated() {
+    // Called after the LiveComponent re-renders (e.g. status update or new bookmarks).
+    // Re-apply positions and restore expand state.
+    this._applyRadialOffsets()
+    if (this._expanded) this._setExpanded(true)
+    this._updateUnreadBadge()
   },
 
   destroyed() {
     window.removeEventListener('bookmarks-updated', this._onBookmarksUpdated)
+  },
+
+  // --- bookmark sync ---
+
+  _syncBookmarks() {
+    const bookmarks = this._getBookmarks()
+    this.pushEvent('fab_set_bookmarks', { bookmarks })
   },
 
   _getBookmarks() {
@@ -83,16 +88,6 @@ export const FavoriteFab = {
     }
   },
 
-  _getStatusStyle(sessionId, fallbackStatus) {
-    const status = this._statuses[sessionId] || fallbackStatus || 'idle'
-    return STATUS_STYLES[status] || STATUS_STYLES.default
-  },
-
-  _getInitials(name) {
-    if (!name) return '?'
-    return name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()
-  },
-
   _removeBookmark(index) {
     const bookmarks = this._getBookmarks()
     if (!bookmarks[index]) return
@@ -101,8 +96,80 @@ export const FavoriteFab = {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks))
     } catch (e) { /* ignore */ }
     window.dispatchEvent(new CustomEvent('bookmarks-updated', { detail: { bookmarks } }))
-    this._render()
   },
+
+  // --- click handling (delegated) ---
+
+  _handleClick(e) {
+    const removeBtn = e.target.closest('.fab-remove-btn')
+    const agentBtn = e.target.closest('.fab-agent-btn')
+    const mainBtn = e.target.closest('[role="button"]')
+
+    if (removeBtn) {
+      e.preventDefault()
+      e.stopPropagation()
+      this._removeBookmark(parseInt(removeBtn.dataset.removeIndex, 10))
+    } else if (agentBtn) {
+      e.stopPropagation()
+      if (window.innerWidth >= 640) {
+        e.preventDefault()
+        const agent = {
+          session_id: agentBtn.dataset.sessionId,
+          name: agentBtn.dataset.agentName,
+          status: agentBtn.dataset.agentStatus,
+        }
+        this._openChat(agent)
+      }
+      // mobile: let <a href> navigate naturally
+    } else if (mainBtn) {
+      e.stopPropagation()
+      this._setExpanded(!this._expanded)
+    }
+  },
+
+  // --- radial layout ---
+
+  _applyRadialOffsets() {
+    const agentEls = Array.from(this.el.querySelectorAll('.fab-agent-btn'))
+    const offsets = radialOffsets(agentEls.length)
+    agentEls.forEach((el, i) => {
+      el._tx = offsets[i].x
+      el._ty = offsets[i].y
+    })
+  },
+
+  _setExpanded(val) {
+    this._expanded = val
+    this.el.querySelectorAll('.fab-agent-btn').forEach(el => {
+      if (val) {
+        el.style.opacity = '1'
+        el.style.pointerEvents = 'auto'
+        el.style.transform = `translate(${el._tx}px, ${el._ty}px) scale(1)`
+      } else {
+        el.style.opacity = '0'
+        el.style.pointerEvents = 'none'
+        el.style.transform = 'translate(0,0) scale(0.5)'
+      }
+    })
+  },
+
+  // --- unread badge (DOM-applied on top of server-rendered main button) ---
+
+  _updateUnreadBadge() {
+    const mainBtn = this.el.querySelector('[role="button"]')
+    if (!mainBtn) return
+    const existing = mainBtn.querySelector('span.absolute')
+    if (existing) existing.remove()
+    if (this._unreadCount > 0) {
+      mainBtn.insertAdjacentHTML('beforeend',
+        `<span class="absolute -top-1 -right-1 flex h-3 w-3">
+           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
+           <span class="relative inline-flex rounded-full h-3 w-3 bg-error ring-2 ring-base-100"></span>
+         </span>`)
+    }
+  },
+
+  // --- chat modal (client-side only, no server involvement for layout) ---
 
   _openChat(agent) {
     if (this._chatAgent && this._chatAgent.session_id !== agent.session_id) {
@@ -148,8 +215,8 @@ export const FavoriteFab = {
     if (existing) existing.remove()
 
     const agent = this._chatAgent
-    const style = this._getStatusStyle(agent.session_id, agent.status)
-    const statusLabel = this._statuses[agent.session_id] || agent.status || 'idle'
+    const statusLabel = agent.status || 'idle'
+    const isActive = ['working', 'compacting'].includes(statusLabel)
 
     const modal = document.createElement('div')
     modal.id = 'fab-chat-modal'
@@ -157,10 +224,10 @@ export const FavoriteFab = {
       <div class="fixed bottom-24 right-4 w-[520px] z-[1000] flex flex-col bg-base-100 border border-base-content/10 rounded-xl shadow-2xl max-h-[850px] overflow-hidden">
         <div class="flex items-center justify-between px-4 py-2.5 border-b border-base-content/5 bg-base-200/30">
           <div class="flex items-center gap-2">
-            <span class="font-bold text-xs bg-primary/10 text-primary rounded-full w-7 h-7 flex items-center justify-center">${this._getInitials(agent.name)}</span>
+            <span class="font-bold text-xs bg-primary/10 text-primary rounded-full w-7 h-7 flex items-center justify-center">${this._initials(agent.name)}</span>
             <div>
               <span class="text-xs font-semibold text-base-content/70">${this._escapeHtml(agent.name || 'Agent')}</span>
-              <span id="fab-chat-status" class="text-[10px] font-medium uppercase tracking-wider ml-1.5 ${style.ping ? 'text-success' : 'text-base-content/30'}">${statusLabel}</span>
+              <span id="fab-chat-status" class="text-xs font-medium uppercase tracking-wider ml-1.5 ${isActive ? 'text-success' : 'text-base-content/30'}">${statusLabel}</span>
             </div>
           </div>
           <div class="flex items-center gap-1">
@@ -190,7 +257,7 @@ export const FavoriteFab = {
               type="text"
               id="fab-chat-input"
               placeholder="Message ${this._escapeHtml(agent.name || 'agent')}..."
-              class="input input-sm flex-1 bg-base-200/50 border-base-content/8 text-sm placeholder:text-base-content/25"
+              class="input input-sm flex-1 bg-base-200/50 border-base-content/8 text-base placeholder:text-base-content/25"
               autocomplete="off"
             />
             <button id="fab-chat-send" class="btn btn-primary btn-sm btn-square">
@@ -251,18 +318,9 @@ export const FavoriteFab = {
     </div>`
   },
 
-  _updateUnreadBadge() {
-    const mainBtn = this.el.querySelector('[role="button"]')
-    if (!mainBtn) return
-    const existing = mainBtn.querySelector('span.absolute')
-    if (existing) existing.remove()
-    if (this._unreadCount > 0) {
-      mainBtn.insertAdjacentHTML('beforeend',
-        `<span class="absolute -top-1 -right-1 flex h-3 w-3">
-           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
-           <span class="relative inline-flex rounded-full h-3 w-3 bg-error ring-2 ring-base-100"></span>
-         </span>`)
-    }
+  _initials(name) {
+    if (!name) return '?'
+    return name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()
   },
 
   _escapeHtml(str) {
@@ -270,133 +328,4 @@ export const FavoriteFab = {
     div.textContent = str
     return div.innerHTML
   },
-
-  _setExpanded(val) {
-    this._expanded = val
-    this.el.querySelectorAll('.fab-agent-btn').forEach(el => {
-      if (val) {
-        el.style.opacity = '1'
-        el.style.pointerEvents = 'auto'
-        el.style.transform = `translate(${el._tx}px, ${el._ty}px) scale(1)`
-      } else {
-        el.style.opacity = '0'
-        el.style.pointerEvents = 'none'
-        el.style.transform = 'translate(0,0) scale(0.5)'
-      }
-    })
-  },
-
-  _render() {
-    const bookmarks = this._getBookmarks()
-    this._agentMap = bookmarks
-
-    if (bookmarks.length === 0) {
-      this.el.innerHTML = ''
-      this.el.classList.add('hidden')
-      return
-    }
-
-    this.el.classList.remove('hidden')
-
-    const unreadDot = this._unreadCount > 0
-      ? `<span class="absolute -top-1 -right-1 flex h-3 w-3">
-           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
-           <span class="relative inline-flex rounded-full h-3 w-3 bg-error ring-2 ring-base-100"></span>
-         </span>`
-      : ''
-
-    const mainBtn = `
-      <div tabindex="0" role="button"
-           style="position:absolute;bottom:0;right:0;z-index:2;pointer-events:auto"
-           class="btn btn-primary btn-circle shadow-lg outline-none">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
-          <path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clip-rule="evenodd" />
-        </svg>
-        ${unreadDot}
-      </div>`
-
-    const agentBtns = bookmarks.map((agent, index) => {
-      const style = this._getStatusStyle(agent.session_id, agent.status)
-      const initials = this._getInitials(agent.name)
-      const statusDot = style.ping
-        ? `<span class="absolute -bottom-0.5 -right-0.5 flex h-3 w-3">
-             <span class="animate-ping absolute inline-flex h-full w-full rounded-full ${style.dot} opacity-50"></span>
-             <span class="relative inline-flex rounded-full h-3 w-3 ${style.dot} ring-2 ring-base-100"></span>
-           </span>`
-        : `<span class="absolute -bottom-0.5 -right-0.5 inline-flex rounded-full h-3 w-3 ${style.dot} ring-2 ring-base-100"></span>`
-
-      return `
-        <a href="/dm/${agent.session_id}"
-           class="btn btn-circle bg-base-100 shadow-md hover:bg-base-200 border border-base-content/10 relative group fab-agent-btn"
-           style="position:absolute;bottom:0;right:0;opacity:0;transform:translate(0,0) scale(0.5);transition:opacity 0.18s,transform 0.18s;pointer-events:none"
-           title="${(agent.name || 'Agent').replace(/"/g, '&quot;')}"
-           data-agent-index="${index}">
-          <span class="font-bold text-xs text-base-content/70">${initials}</span>
-          ${statusDot}
-          <span class="fab-remove-btn absolute -top-1 -right-1 w-4 h-4 rounded-full bg-error text-error-content flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10 shadow-sm"
-                data-remove-index="${index}" style="pointer-events:auto">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-2.5 h-2.5">
-              <path d="M5.28 4.22a.75.75 0 0 0-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 1 0 1.06 1.06L8 9.06l2.72 2.72a.75.75 0 1 0 1.06-1.06L9.06 8l2.72-2.72a.75.75 0 0 0-1.06-1.06L8 6.94 5.28 4.22Z" />
-            </svg>
-          </span>
-          <span class="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-base-300 text-base-content text-xs rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-            ${(agent.name || 'Agent').replace(/</g, '&lt;')}
-          </span>
-        </a>`
-    }).join('')
-
-    this.el.innerHTML = mainBtn + agentBtns
-
-    Object.assign(this.el.style, {
-      position: 'fixed',
-      bottom: '1rem',
-      right: '1rem',
-      width: '200px',
-      height: '200px',
-      overflow: 'visible',
-      pointerEvents: 'none',
-    })
-
-    // Compute and store radial offsets on the elements
-    const offsets = radialOffsets(bookmarks.length)
-    const agentEls = Array.from(this.el.querySelectorAll('.fab-agent-btn'))
-    agentEls.forEach((el, i) => {
-      el._tx = offsets[i].x
-      el._ty = offsets[i].y
-    })
-
-    // Restore expanded state after re-render (e.g. from status update)
-    if (this._expanded) this._setExpanded(true)
-
-    // Main button: click toggles agent buttons
-    const mainBtnEl = this.el.querySelector('[role="button"]')
-    if (mainBtnEl) {
-      mainBtnEl.onclick = (e) => {
-        e.stopPropagation()
-        this._setExpanded(!this._expanded)
-      }
-    }
-
-    // Remove buttons
-    this.el.querySelectorAll('.fab-remove-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-        this._removeBookmark(parseInt(btn.dataset.removeIndex, 10))
-      })
-    })
-
-    // Agent links: open chat on desktop, navigate natively on mobile
-    agentEls.forEach(el => {
-      el.addEventListener('click', (e) => {
-        e.stopPropagation()
-        if (window.innerWidth >= 640) {
-          e.preventDefault()
-          const agent = this._agentMap[parseInt(el.dataset.agentIndex, 10)]
-          if (agent) this._openChat(agent)
-        }
-        // mobile: let <a href> navigate naturally
-      })
-    })
-  }
 }

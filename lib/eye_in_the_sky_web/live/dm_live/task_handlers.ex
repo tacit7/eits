@@ -9,9 +9,10 @@ defmodule EyeInTheSkyWeb.DmLive.TaskHandlers do
 
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [maybe_opt: 3]
 
-  alias EyeInTheSky.Tasks
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Tasks
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 
   @doc """
@@ -37,8 +38,8 @@ defmodule EyeInTheSkyWeb.DmLive.TaskHandlers do
 
     opts =
       [description: task.title, instructions: task_prompt, model: "sonnet"]
-      |> then(fn o -> if project_id, do: o ++ [project_id: project_id], else: o end)
-      |> then(fn o -> if project_path, do: o ++ [project_path: project_path], else: o end)
+      |> maybe_opt(:project_id, project_id)
+      |> maybe_opt(:project_path, project_path)
 
     case AgentManager.create_agent(opts) do
       {:ok, %{session: new_session}} ->

@@ -1,8 +1,8 @@
 defmodule EyeInTheSky.Claude.SessionImporterTest do
   use EyeInTheSky.DataCase, async: true
 
+  alias EyeInTheSky.{Agents, Messages, Sessions}
   alias EyeInTheSky.Claude.SessionImporter
-  alias EyeInTheSky.{Messages, Sessions, Agents}
 
   setup do
     {:ok, agent} =

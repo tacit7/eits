@@ -7,8 +7,8 @@ defmodule EyeInTheSkyWeb.FabHook do
   import Phoenix.LiveView
   import Phoenix.Component, only: [assign: 3]
 
-  alias EyeInTheSky.{Messages, Sessions}
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.{Messages, Sessions}
 
   require Logger
 
@@ -17,6 +17,7 @@ defmodule EyeInTheSkyWeb.FabHook do
   def on_mount(:default, _params, _session, socket) do
     if connected?(socket) do
       EyeInTheSky.Events.subscribe_notifications()
+      EyeInTheSky.Events.subscribe_projects()
     end
 
     socket =
@@ -25,10 +26,25 @@ defmodule EyeInTheSkyWeb.FabHook do
       |> assign(:fab_timer, nil)
       |> assign(:fab_active_session_id, nil)
       |> assign(:config_guide_active_session_id, nil)
+      |> assign(:fab_bookmarks, [])
+      |> assign(:fab_statuses, %{})
       |> attach_hook(:fab_events, :handle_event, &handle_fab_event/3)
       |> attach_hook(:fab_info, :handle_info, &handle_fab_info/2)
 
     {:cont, socket}
+  end
+
+  defp handle_fab_event("fab_set_bookmarks", %{"bookmarks" => bookmarks}, socket) do
+    statuses = fetch_bookmark_statuses()
+
+    socket =
+      socket
+      |> assign(:fab_bookmarks, bookmarks || [])
+      |> assign(:fab_statuses, statuses)
+      |> schedule_fab_refresh()
+
+    update_fab_component(socket)
+    {:halt, socket}
   end
 
   defp handle_fab_event("fab_request_statuses", _params, socket) do
@@ -36,15 +52,16 @@ defmodule EyeInTheSkyWeb.FabHook do
 
     socket =
       socket
-      |> push_event("fab_status_update", %{statuses: statuses})
+      |> assign(:fab_statuses, statuses)
       |> schedule_fab_refresh()
 
+    update_fab_component(socket)
     {:halt, socket}
   end
 
   defp handle_fab_event("fab_open_chat", %{"session_id" => session_id}, socket) do
     socket =
-      case resolve_session(session_id) do
+      case Sessions.resolve(session_id) do
         {:ok, session} ->
           socket = switch_active_session(socket, session.id)
 
@@ -78,7 +95,7 @@ defmodule EyeInTheSkyWeb.FabHook do
 
   defp handle_fab_event("config_guide_open_chat", %{"session_id" => session_id}, socket) do
     socket =
-      case resolve_session(session_id) do
+      case Sessions.resolve(session_id) do
         {:ok, session} ->
           socket = unsubscribe_config_guide_session(socket)
           EyeInTheSky.Events.subscribe_session(session.id)
@@ -133,9 +150,10 @@ defmodule EyeInTheSkyWeb.FabHook do
 
     socket =
       socket
-      |> push_event("fab_status_update", %{statuses: statuses})
+      |> assign(:fab_statuses, statuses)
       |> schedule_fab_refresh()
 
+    update_fab_component(socket)
     {:halt, socket}
   end
 
@@ -174,6 +192,15 @@ defmodule EyeInTheSkyWeb.FabHook do
     send_update(EyeInTheSkyWeb.Components.Sidebar,
       id: "app-sidebar",
       notification_count: :refresh
+    )
+
+    {:halt, socket}
+  end
+
+  defp handle_fab_info({:project_updated, _project}, socket) do
+    send_update(EyeInTheSkyWeb.Components.Sidebar,
+      id: "app-sidebar",
+      refresh_projects: true
     )
 
     {:halt, socket}
@@ -225,15 +252,21 @@ defmodule EyeInTheSkyWeb.FabHook do
     Sessions.list_sessions_with_agent(include_archived: false)
     |> Enum.reduce(%{}, fn s, acc ->
       status = s.status || "idle"
-
-      acc
-      |> Map.put(to_string(s.id), status)
-      |> then(fn a -> if s.uuid, do: Map.put(a, s.uuid, status), else: a end)
+      acc = Map.put(acc, to_string(s.id), status)
+      if s.uuid, do: Map.put(acc, s.uuid, status), else: acc
     end)
   end
 
+  defp update_fab_component(socket) do
+    send_update(EyeInTheSkyWeb.Components.FavoriteFabComponent,
+      id: "favorite-fab",
+      bookmarks: socket.assigns.fab_bookmarks,
+      statuses: socket.assigns.fab_statuses
+    )
+  end
+
   defp send_session_message(session_id, body) do
-    with {:ok, session} <- resolve_session(session_id),
+    with {:ok, session} <- Sessions.resolve(session_id),
          {:ok, _message} <-
            Messages.send_message(%{
              session_id: session.id,
@@ -251,10 +284,4 @@ defmodule EyeInTheSkyWeb.FabHook do
     end
   end
 
-  defp resolve_session(session_id) do
-    case Integer.parse(session_id) do
-      {id, ""} -> Sessions.get_session(id)
-      _ -> Sessions.get_session_by_uuid(session_id)
-    end
-  end
 end

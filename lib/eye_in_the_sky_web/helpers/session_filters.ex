@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
       "all" -> true
       "active" -> is_nil(session.ended_at) and session.status != "discovered"
       "completed" -> not is_nil(session.ended_at)
-      "stale" -> is_session_stale?(session, @stale_threshold_hours)
+      "stale" -> session_stale?(session, @stale_threshold_hours)
       "discovered" -> session.status == "discovered"
       _ -> true
     end
@@ -77,7 +77,7 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
         Enum.filter(sessions, &(&1.status == "completed" and is_nil(&1.archived_at)))
 
       "archived" ->
-        Enum.filter(sessions, &(!is_nil(&1.archived_at)))
+        Enum.filter(sessions, &(not is_nil(&1.archived_at)))
 
       _ ->
         sessions
@@ -99,13 +99,12 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
             s.uuid,
             s.id,
             s.name,
-            s.agent && s.agent.uuid,
-            s.agent && s.agent.id,
-            s.agent && s.agent.description,
-            s.agent && s.agent.project_name
+            if(s.agent, do: s.agent.uuid),
+            if(s.agent, do: s.agent.id),
+            if(s.agent, do: s.agent.description),
+            if(s.agent, do: s.agent.project_name)
           ]
-          |> Enum.map(&to_string_or_empty/1)
-          |> Enum.join(" ")
+          |> Enum.map_join(" ", &to_string_or_empty/1)
           |> String.downcase()
 
         String.contains?(haystack, q)
@@ -186,9 +185,9 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
   @doc """
   Returns true if the session is stale given a threshold in hours.
   """
-  def is_session_stale?(%{ended_at: ended_at}, _hours) when not is_nil(ended_at), do: false
+  def session_stale?(%{ended_at: ended_at}, _hours) when not is_nil(ended_at), do: false
 
-  def is_session_stale?(%{started_at: started_at}, hours) do
+  def session_stale?(%{started_at: started_at}, hours) do
     dt = VH.coerce_datetime(started_at)
     now = DateTime.utc_now()
     DateTime.diff(now, dt, :hour) > hours

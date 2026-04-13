@@ -15,6 +15,8 @@ defmodule EyeInTheSky.Codex.SessionReader do
   Codex stores sessions in: ~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<thread_id>.jsonl
   """
   @spec find_session_file(String.t()) :: {:ok, String.t()} | {:error, :not_found}
+  def find_session_file(nil), do: {:error, :not_found}
+
   def find_session_file(thread_id) when is_binary(thread_id) do
     home = System.get_env("HOME")
     sessions_dir = Path.join([home, ".codex", "sessions"])
@@ -54,20 +56,19 @@ defmodule EyeInTheSky.Codex.SessionReader do
       total_tokens =
         content
         |> String.split("\n", trim: true)
-        |> Enum.reduce(0, fn line, acc ->
-          case Jason.decode(line) do
-            {:ok, %{"type" => "event_msg", "payload" => %{"type" => "token_count"} = payload}} ->
-              total =
-                get_in(payload, ["info", "total_token_usage", "total_tokens"]) || acc
-
-              total
-
-            _ ->
-              acc
-          end
-        end)
+        |> Enum.reduce(0, &count_tokens_in_line/2)
 
       {:ok, total_tokens, 0.0}
+    end
+  end
+
+  defp count_tokens_in_line(line, acc) do
+    case Jason.decode(line) do
+      {:ok, %{"type" => "event_msg", "payload" => %{"type" => "token_count"} = payload}} ->
+        get_in(payload, ["info", "total_token_usage", "total_tokens"]) || acc
+
+      _ ->
+        acc
     end
   end
 

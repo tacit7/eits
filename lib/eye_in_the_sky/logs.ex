@@ -4,9 +4,9 @@ defmodule EyeInTheSky.Logs do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Logs.{Log, SessionLog}
   alias EyeInTheSky.QueryHelpers
+  alias EyeInTheSky.Repo
 
   # Log functions
 

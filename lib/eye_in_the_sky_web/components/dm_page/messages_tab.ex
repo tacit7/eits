@@ -3,14 +3,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   use EyeInTheSkyWeb, :html
 
+  alias EyeInTheSkyWeb.Components.DmHelpers
   alias EyeInTheSkyWeb.Components.DmPage.MessageToolWidget
+  import EyeInTheSkyWeb.Components.DmHelpers, only: [to_utc_string: 1]
 
   attr :messages, :list, default: []
   attr :has_more_messages, :boolean, default: false
-  attr :show_live_stream, :boolean, default: false
-  attr :stream_content, :string, default: ""
-  attr :stream_tool, :string, default: nil
-  attr :stream_thinking, :string, default: nil
+  attr :stream, :map, default: %{show: false, content: "", tool: nil, thinking: nil}
   attr :session, :map, default: nil
   attr :agent, :map, default: nil
   attr :message_search_query, :string, default: ""
@@ -33,7 +32,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                 {if @agent, do: @agent.name, else: "No messages yet"}
               </p>
               <p class="mt-1.5 text-xs text-base-content/25 max-w-xs">
-                <%= if @agent && @agent.git_worktree_path do %>
+                <%= if not is_nil(@agent) && not is_nil(@agent.git_worktree_path) do %>
                   <span class="font-mono">{Path.basename(@agent.git_worktree_path)}</span>
                   &nbsp;&mdash;
                   Send a message to start the conversation
@@ -60,7 +59,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             </div>
 
             <%!-- Live streaming bubble --%>
-            <%= if @show_live_stream && (@stream_content != "" || @stream_tool || @stream_thinking) do %>
+            <%= if @stream.show && (@stream.content != "" || @stream.tool || @stream.thinking) do %>
               <div class="py-3 px-2" id="live-stream-bubble">
                 <div class="flex items-start gap-2.5">
                   <.stream_provider_avatar session={@session} />
@@ -68,19 +67,19 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                     <span class="text-[13px] font-semibold text-primary/80">
                       {stream_provider_label(@session)}
                     </span>
-                    <%= if @stream_thinking do %>
+                    <%= if @stream.thinking do %>
                       <div class="text-xs text-base-content/30 italic font-mono mt-1 line-clamp-3">
-                        {String.slice(@stream_thinking, -200, 200)}
+                        {String.slice(@stream.thinking, -200, 200)}
                       </div>
                     <% end %>
-                    <%= if @stream_tool do %>
+                    <%= if @stream.tool do %>
                       <div class="text-xs text-base-content/40 font-mono mt-1">
-                        Using {@stream_tool}...
+                        Using {@stream.tool}...
                       </div>
                     <% end %>
-                    <%= if @stream_content != "" do %>
+                    <%= if @stream.content != "" do %>
                       <div class="mt-1 text-sm text-base-content/60 whitespace-pre-wrap">
-                        {@stream_content}
+                        {@stream.content}
                       </div>
                     <% end %>
                   </div>
@@ -128,6 +127,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             src={provider_icon(@message.provider)}
             class={"w-4 h-4 mt-1 flex-shrink-0 #{provider_icon_class(@message.provider)}"}
             alt={@message.provider || "Agent"}
+            width="16"
+            height="16"
+            loading="lazy"
           />
         <% end %>
 
@@ -143,7 +145,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             <%!-- DM badge --%>
             <span
               :if={@is_dm}
-              class="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/40 uppercase tracking-wide"
+              class="inline-flex items-center gap-1 text-xs font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/40 uppercase tracking-wide"
             >
               <.icon name="hero-envelope-mini" class="w-2.5 h-2.5" /> dm
             </span>
@@ -272,12 +274,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     ~H"""
     <div class="mt-1 space-y-1.5">
       <details
-        :if={@thinking && @thinking != ""}
-        class="group rounded border-l-2 border-purple-500/50 bg-zinc-950/50 overflow-hidden"
+        :if={not is_nil(@thinking) && @thinking != ""}
+        class="group rounded border-l-2 border-primary/50 bg-zinc-950/50 overflow-hidden"
       >
         <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
-          <.icon name="hero-sparkles" class="w-3.5 h-3.5 flex-shrink-0 text-purple-400/60" />
-          <span class="text-[11px] font-mono font-semibold text-purple-400/60 uppercase tracking-wide">
+          <.icon name="hero-sparkles" class="w-3.5 h-3.5 flex-shrink-0 text-primary/60" />
+          <span class="text-[11px] font-mono font-semibold text-primary/60 uppercase tracking-wide">
             Thinking
           </span>
           <.icon
@@ -285,7 +287,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             class="w-3 h-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
           />
         </summary>
-        <div class="px-2.5 pb-2 pt-1 border-t border-purple-500/10">
+        <div class="px-2.5 pb-2 pt-1 border-t border-primary/10">
           <pre class="font-mono text-xs text-base-content/40 whitespace-pre-wrap break-words leading-relaxed">{@thinking}</pre>
         </div>
       </details>
@@ -331,7 +333,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
         />
       </summary>
       <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-        <pre class="font-mono text-[10px] text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto">{@body}</pre>
+        <pre class="font-mono text-xs text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto">{@body}</pre>
       </div>
     </details>
     """
@@ -349,12 +351,18 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
         src="/images/openai.svg"
         class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
         alt="Codex"
+        width="16"
+        height="16"
+        loading="lazy"
       />
     <% else %>
       <img
         src="/images/claude.svg"
         class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
         alt="Claude"
+        width="16"
+        height="16"
+        loading="lazy"
       />
     <% end %>
     """
@@ -365,77 +373,18 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   defp stream_provider_label(%{provider: "openai"}), do: "Codex"
   defp stream_provider_label(_session), do: "Claude"
 
-  defp dm_message?(%{from_session_id: id}) when is_integer(id), do: true
-
-  defp dm_message?(%{metadata: %{"from_session_uuid" => uuid}})
-       when is_binary(uuid) and uuid != "",
-       do: true
-
-  defp dm_message?(_), do: false
-
-  defp message_sender_name(%{sender_role: "user"}), do: "You"
-
-  defp message_sender_name(%{metadata: %{"sender_name" => name}} = _msg)
-       when is_binary(name) and name != "" do
-    name
-  end
-
-  defp message_sender_name(%{from_session_id: id}) when is_integer(id) do
-    "session:#{id}"
-  end
-
-  defp message_sender_name(message), do: message.provider || "Agent"
-
-  defp strip_dm_prefix(body) when is_binary(body) do
-    case Regex.run(~r/^DM from:[^\(]+\(session:[^\)]+\) (.+)$/s, body) do
-      [_, content] -> content
-      _ -> body
-    end
-  end
-
-  defp strip_dm_prefix(body), do: body
-
-  defp provider_icon("openai"), do: "/images/openai.svg"
-  defp provider_icon("codex"), do: "/images/openai.svg"
-  defp provider_icon(_), do: "/images/claude.svg"
-
-  defp provider_icon_class("openai"), do: "dark:invert"
-  defp provider_icon_class("codex"), do: "dark:invert"
-  defp provider_icon_class(_), do: ""
-
-  defp message_model(%{metadata: %{"model_usage" => model_usage}}) when is_map(model_usage) do
-    case Map.keys(model_usage) do
-      [model_id | _] -> format_model_id(model_id)
-      _ -> nil
-    end
-  end
-
-  defp message_model(_), do: nil
-
-  defp message_cost(%{metadata: %{"total_cost_usd" => cost}}) when is_number(cost), do: cost
-  defp message_cost(_), do: nil
-
-  defp format_model_id(id) when is_binary(id) do
-    cond do
-      String.contains?(id, "opus") -> "opus"
-      String.contains?(id, "sonnet") -> "sonnet"
-      String.contains?(id, "haiku") -> "haiku"
-      true -> id |> String.split("-") |> Enum.take(2) |> Enum.join("-")
-    end
-  end
-
-  defp format_model_id(_), do: nil
+  defdelegate dm_message?(msg), to: DmHelpers
+  defdelegate message_sender_name(msg), to: DmHelpers
+  defdelegate strip_dm_prefix(body), to: DmHelpers
+  defdelegate provider_icon(provider), to: DmHelpers
+  defdelegate provider_icon_class(provider), to: DmHelpers
+  defdelegate message_model(msg), to: DmHelpers
+  defdelegate message_cost(msg), to: DmHelpers
 
   defp show_message_metrics?(message) do
     message.sender_role == "agent" and is_map(message.metadata) and
       not is_nil(message.metadata["total_cost_usd"])
   end
-
-  defp to_utc_string(nil), do: ""
-  defp to_utc_string(ts) when is_binary(ts), do: ts
-  defp to_utc_string(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
-  defp to_utc_string(%NaiveDateTime{} = dt), do: NaiveDateTime.to_iso8601(dt) <> "Z"
-  defp to_utc_string(_), do: ""
 
   defp parse_body_segments(nil), do: [{:text, ""}]
 

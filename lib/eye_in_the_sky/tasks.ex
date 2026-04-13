@@ -6,12 +6,15 @@ defmodule EyeInTheSky.Tasks do
   use EyeInTheSky.CrudHelpers, schema: EyeInTheSky.Tasks.Task
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
-  alias EyeInTheSky.Tasks.{Task, WorkflowState}
-  alias EyeInTheSky.QueryHelpers
+  alias EyeInTheSky.Notes.NoteQueries
   alias EyeInTheSky.QueryBuilder
+  alias EyeInTheSky.QueryHelpers
+  alias EyeInTheSky.Repo
   alias EyeInTheSky.Search.PgSearch
-  alias EyeInTheSky.Notes
+  alias EyeInTheSky.Tasks.{Task, WorkflowState}
+  alias EyeInTheSky.Utils.ToolHelpers
+
+  @full_task_preloads [:state, :tags, :sessions, :checklist_items]
 
   # Workflow state ID accessors — source of truth is WorkflowState
   defdelegate state_todo, to: WorkflowState, as: :todo_id
@@ -51,7 +54,7 @@ defmodule EyeInTheSky.Tasks do
     sort_by = Keyword.get(opts, :sort_by, "created_desc")
 
     base_tasks_query(opts)
-    |> preload([:state, :tags, :sessions, :checklist_items])
+    |> preload(^@full_task_preloads)
     |> task_order(sort_by)
     |> QueryBuilder.maybe_limit(opts)
     |> QueryBuilder.maybe_offset(opts)
@@ -84,7 +87,7 @@ defmodule EyeInTheSky.Tasks do
   def list_tasks_for_agent(agent_id) do
     Task
     |> where([t], t.agent_id == ^agent_id)
-    |> preload([:state, :tags, :sessions, :checklist_items])
+    |> preload(^@full_task_preloads)
     |> order_by([t],
       desc: fragment("CASE WHEN ? IS NULL THEN 0 ELSE 1 END", t.archived),
       desc: t.priority,
@@ -97,13 +100,19 @@ defmodule EyeInTheSky.Tasks do
   Returns the list of tasks for a specific session.
   """
   def list_tasks_for_session(session_id, opts \\ []) do
-    QueryHelpers.for_session_join(Task, session_id, "task_sessions",
-      preload: [:state, :tags],
-      order_by: [desc: :priority, asc: :created_at],
-      limit: Keyword.get(opts, :limit),
-      offset: Keyword.get(opts, :offset)
-    )
-    |> Notes.with_notes_count()
+    query =
+      QueryHelpers.for_session_join(Task, session_id, "task_sessions",
+        preload: [:state, :tags],
+        order_by: [desc: :priority, asc: :created_at],
+        limit: Keyword.get(opts, :limit),
+        offset: Keyword.get(opts, :offset)
+      )
+
+    if Keyword.get(opts, :notes_count, true) do
+      NoteQueries.with_notes_count(query)
+    else
+      query
+    end
   end
 
   @doc """
@@ -136,7 +145,7 @@ defmodule EyeInTheSky.Tasks do
       Enum.group_by(session_rows, fn {task_id, _} -> task_id end, fn {_, sid} -> sid end)
 
     Enum.map(tasks, fn t ->
-      Map.put(t, :session_ids, Map.get(sessions_by_task, t.id, []))
+      %{t | session_ids: Map.get(sessions_by_task, t.id, [])}
     end)
   end
 
@@ -164,13 +173,25 @@ defmodule EyeInTheSky.Tasks do
   end
 
   @doc """
+  Gets a single task. Returns `{:ok, task}` or `{:error, :not_found}`.
+  """
+  def get_task(id) do
+    case Task
+         |> preload(^@full_task_preloads)
+         |> Repo.get(id) do
+      nil -> {:error, :not_found}
+      task -> {:ok, task}
+    end
+  end
+
+  @doc """
   Gets a single task.
 
   Raises `Ecto.NoResultsError` if the Task does not exist.
   """
   def get_task!(id) do
     Task
-    |> preload([:state, :tags, :sessions, :checklist_items])
+    |> preload(^@full_task_preloads)
     |> Repo.get!(id)
   end
 
@@ -181,7 +202,7 @@ defmodule EyeInTheSky.Tasks do
   """
   def get_task_by_uuid!(uuid) do
     Task
-    |> preload([:state, :tags, :sessions, :checklist_items])
+    |> preload(^@full_task_preloads)
     |> Repo.get_by!(uuid: uuid)
   end
 
@@ -192,24 +213,62 @@ defmodule EyeInTheSky.Tasks do
   """
   def get_task_by_uuid_or_id!(id_str) do
     task =
-      case Repo.get_by(Task, uuid: id_str) do
-        nil ->
-          case Integer.parse(id_str) do
-            {int_id, ""} -> Repo.get!(Task, int_id)
-            _ -> raise Ecto.NoResultsError, queryable: Task
-          end
-
-        task ->
-          task
+      if int_id = ToolHelpers.parse_int(id_str) do
+        Repo.get!(Task, int_id)
+      else
+        case Repo.get_by(Task, uuid: id_str) do
+          nil -> raise Ecto.NoResultsError, queryable: Task
+          task -> task
+        end
       end
 
-    Repo.preload(task, [:state, :tags, :sessions, :checklist_items])
+    Repo.preload(task, @full_task_preloads)
+  end
+
+  @doc """
+  Returns `{:ok, {integer_id, uuid}}` for a task identified by an integer ID or UUID string,
+  or `{:error, :not_found}` if no task is found. No preloads.
+  """
+  def get_task_ids(id_str) do
+    id_str = to_string(id_str)
+
+    task =
+      if int_id = ToolHelpers.parse_int(id_str) do
+        Repo.get(Task, int_id)
+      else
+        Repo.get_by(Task, uuid: id_str)
+      end
+
+    case task do
+      nil -> {:error, :not_found}
+      t -> {:ok, {t.id, t.uuid}}
+    end
+  end
+
+  @doc """
+  Returns `{integer_id, uuid}` for a task identified by an integer ID or UUID string.
+  No preloads — use this when only the IDs are needed.
+  Raises `Ecto.NoResultsError` if nothing is found.
+  """
+  def get_task_ids!(id_str) do
+    case get_task_ids(id_str) do
+      {:ok, ids} -> ids
+      {:error, :not_found} -> raise Ecto.NoResultsError, queryable: Task
+    end
   end
 
   @doc """
   Creates a task.
   """
   def create_task(attrs \\ %{}) do
+    now = DateTime.utc_now()
+
+    attrs =
+      attrs
+      |> Map.put_new(:uuid, Ecto.UUID.generate())
+      |> Map.put_new(:created_at, now)
+      |> Map.put_new(:updated_at, now)
+
     result =
       %Task{}
       |> Task.changeset(attrs)
@@ -221,59 +280,6 @@ defmodule EyeInTheSky.Tasks do
     end
 
     result
-  end
-
-  @doc """
-  Creates a task from form params (LiveView event data).
-
-  Handles UUID generation, timestamp creation, tag parsing, and tag assignment.
-  Returns `{:ok, task}` or `{:error, changeset}`.
-
-  ## Options
-
-    * `:project_id` - required for project-scoped task creation
-    * `:session_id` - optional, links the task to a session after creation
-
-  """
-  def create_task_from_form(params, opts \\ []) do
-    project_id = opts[:project_id]
-    session_id = opts[:session_id]
-
-    title = params["title"]
-    description = params["description"]
-    state_id = parse_form_int(params["state_id"], 0)
-    priority = parse_form_int(params["priority"], 1)
-    tags_string = params["tags"] || ""
-
-    tag_names =
-      tags_string
-      |> String.split(",")
-      |> Enum.map(&String.trim/1)
-      |> Enum.reject(&(&1 == ""))
-
-    now = DateTime.utc_now()
-
-    attrs = %{
-      uuid: Ecto.UUID.generate(),
-      title: title,
-      description: description,
-      state_id: if(state_id > 0, do: state_id, else: WorkflowState.todo_id()),
-      priority: priority,
-      created_at: now,
-      updated_at: now
-    }
-
-    attrs = if project_id, do: Map.put(attrs, :project_id, project_id), else: attrs
-
-    case create_task(attrs) do
-      {:ok, task} ->
-        if tag_names != [], do: replace_task_tags(task.id, tag_names)
-        if session_id, do: link_session_to_task(task.id, session_id)
-        {:ok, Repo.preload(task, [:state, :tags, :sessions, :checklist_items])}
-
-      error ->
-        error
-    end
   end
 
   @doc """
@@ -294,22 +300,12 @@ defmodule EyeInTheSky.Tasks do
     })
   end
 
-  defp parse_form_int(nil, default), do: default
-
-  defp parse_form_int(val, default) when is_binary(val) do
-    case Integer.parse(val) do
-      {int, _} -> int
-      :error -> default
-    end
-  end
-
-  defp parse_form_int(val, _default) when is_integer(val), do: val
-  defp parse_form_int(_, default), do: default
-
   @doc """
   Updates a task.
   """
   def update_task(%Task{} = task, attrs) do
+    attrs = Map.put_new(attrs, :updated_at, DateTime.utc_now())
+
     result =
       task
       |> Task.changeset(attrs)
@@ -334,15 +330,7 @@ defmodule EyeInTheSky.Tasks do
   Archives a task (sets archived = true). Non-destructive.
   """
   def archive_task(%Task{} = task) do
-    result =
-      update_task(task, %{archived: true, updated_at: DateTime.utc_now()})
-
-    case result do
-      {:ok, updated} -> broadcast_change({:updated, updated})
-      _ -> :ok
-    end
-
-    result
+    update_task(task, %{archived: true, updated_at: DateTime.utc_now()})
   end
 
   @doc """
@@ -388,10 +376,24 @@ defmodule EyeInTheSky.Tasks do
   Returns {:ok, task} or {:error, reason}.
   """
   def delete_task_with_associations(%Task{} = task) do
-    Repo.delete_all(from(t in "task_tags", where: t.task_id == ^task.id))
-    Repo.delete_all(from(t in "task_sessions", where: t.task_id == ^task.id))
-    Repo.delete_all(from(t in "commit_tasks", where: t.task_id == ^task.id))
-    delete_task(task)
+    result =
+      Repo.transaction(fn ->
+        Repo.delete_all(from(t in "task_tags", where: t.task_id == ^task.id))
+        Repo.delete_all(from(t in "task_sessions", where: t.task_id == ^task.id))
+        Repo.delete_all(from(t in "commit_tasks", where: t.task_id == ^task.id))
+
+        case Repo.delete(task) do
+          {:ok, t} -> t
+          {:error, reason} -> Repo.rollback(reason)
+        end
+      end)
+
+    case result do
+      {:ok, deleted} -> broadcast_change({:deleted, deleted})
+      _ -> :ok
+    end
+
+    result
   end
 
   @doc """
@@ -416,7 +418,7 @@ defmodule EyeInTheSky.Tasks do
       sql_params: if(project_id, do: [project_id], else: []),
       extra_where: extra_where,
       order_by: [desc: :priority, desc: :created_at],
-      preload: [:state, :tags, :sessions, :checklist_items]
+      preload: @full_task_preloads
     )
   end
 
@@ -440,8 +442,6 @@ defmodule EyeInTheSky.Tasks do
   """
   def task_linked_to_session?(task_id, session_id)
       when is_integer(task_id) and is_integer(session_id) do
-    import Ecto.Query
-
     Repo.exists?(
       from ts in "task_sessions",
         where: ts.task_id == ^task_id and ts.session_id == ^session_id
@@ -465,9 +465,66 @@ defmodule EyeInTheSky.Tasks do
     {:ok, count}
   end
 
+  @doc """
+  Returns the count of active (not done, not archived) tasks linked to the given session.
+  Used by the scheduler to determine if an idle session can be auto-archived.
+  State ID 3 = Done.
+  """
+  def active_task_count_for_session(session_id) do
+    from(ts in "task_sessions",
+      join: t in Task,
+      on: t.id == ts.task_id,
+      where: ts.session_id == ^session_id,
+      where: t.state_id != 3 and t.archived == false,
+      select: count()
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Lists tasks for a project with optional filtering and pagination.
+
+  ## Options
+    - `:sort_by` - "created_asc", "priority", or default (position asc, created desc)
+    - `:state_id` - filter by workflow state
+    - `:include_archived` - include archived tasks (default: false)
+    - `:limit` / `:offset` - pagination
+  """
+  def list_tasks_for_project(project_id, opts \\ []) when is_integer(project_id) do
+    sort_by = Keyword.get(opts, :sort_by, "created_desc")
+
+    order =
+      case sort_by do
+        "created_asc" -> [asc: :created_at]
+        "priority" -> [desc: :priority, asc: :position]
+        _ -> [asc: :position, desc: :created_at]
+      end
+
+    base_project_tasks_query(project_id, opts)
+    |> order_by(^order)
+    |> QueryBuilder.maybe_limit(opts)
+    |> QueryBuilder.maybe_offset(opts)
+    |> preload(^@full_task_preloads)
+    |> Repo.all()
+  end
+
+  @doc "Counts tasks for a project with optional filtering."
+  def count_tasks_for_project(project_id, opts \\ []) when is_integer(project_id) do
+    base_project_tasks_query(project_id, opts)
+    |> Repo.aggregate(:count, :id)
+  end
+
+  defp base_project_tasks_query(project_id, opts) do
+    include_archived = Keyword.get(opts, :include_archived, false)
+
+    query = from(t in Task, where: t.project_id == ^project_id)
+    query = if include_archived, do: query, else: where(query, [t], t.archived == false)
+    QueryBuilder.maybe_where(query, opts, :state_id)
+  end
+
   # PubSub
 
-  defp broadcast_change({tag, task}) when tag in [:ok, :deleted] do
+  defp broadcast_change({tag, task}) when tag in [:ok, :deleted, :updated] do
     EyeInTheSky.Events.task_updated(task)
   end
 

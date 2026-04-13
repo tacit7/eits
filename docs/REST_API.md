@@ -87,6 +87,75 @@ curl -X PATCH localhost:5001/api/v1/sessions/abc-123 \
 
 ---
 
+### GET /sessions/:uuid
+
+Fetch session detail with related resources (tasks, notes, commits).
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `uuid` | string or integer | Session UUID or integer ID |
+
+**Response:** `200 OK`
+
+```json
+{
+  "id": 42,
+  "uuid": "session-uuid",
+  "session_id": "session-uuid",
+  "agent_id": "agent-uuid",
+  "agent_int_id": 10,
+  "project_id": 1,
+  "status": "working",
+  "name": "fix auth bug",
+  "description": "fixing the oauth flow",
+  "is_spawned": true,
+  "initialized": true,
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Add unit tests",
+      "state": "In Progress",
+      "state_id": 2
+    }
+  ],
+  "recent_notes": [
+    {
+      "id": 5,
+      "title": "Key finding",
+      "body": "Found the root cause in session_controller.ex...",
+      "starred": false,
+      "created_at": "2026-03-15T10:30:00Z"
+    }
+  ],
+  "recent_commits": [
+    {
+      "id": 1,
+      "commit_hash": "abc123def456",
+      "commit_message": "fix: add idle timeout to AgentWorker",
+      "inserted_at": "2026-03-15T10:25:00Z"
+    }
+  ]
+}
+```
+
+**Example:**
+
+```bash
+curl localhost:5001/api/v1/sessions/abc-123 \
+  -H 'Authorization: Bearer <token>'
+```
+
+Or with integer ID:
+
+```bash
+curl localhost:5001/api/v1/sessions/42 \
+  -H 'Authorization: Bearer <token>'
+```
+
+---
+
 ### POST /agents
 
 Spawn a new Claude Code agent. Creates an Agent + Session, starts an AgentWorker, and sends the initial instructions as the first message.
@@ -570,6 +639,78 @@ Send a message to a channel.
 ```bash
 eits channels send 1 --session 1179 --body "hello from CLI"
 ```
+
+---
+
+---
+
+### GET /api/browser/sessions
+
+List sessions for UI-internal reads (e.g. command palette "Go to Session..." submenu). Authenticates via **session cookie** instead of Bearer token, so browser `fetch()` calls work without needing an API key.
+
+**Why this exists:** `GET /api/v1/sessions` requires `Authorization: Bearer <token>`. Browser-side JavaScript (LiveView hooks) cannot attach a Bearer token — it only has the session cookie. This endpoint sits under a separate `browser_json` pipeline that validates the cookie via `SessionAuth` plug instead.
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `q` | string | no | Full-text search query |
+| `project_id` | integer | no | Filter to sessions belonging to this project |
+| `status` | string | no | Filter by status (e.g. `active`, `working`, `completed`) |
+| `limit` | integer | no | Max results to return (default 20) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Found 3 session(s)",
+  "results": [
+    {
+      "id": 42,
+      "uuid": "abc-123",
+      "name": "fix auth bug",
+      "description": "fixing the oauth flow",
+      "status": "working"
+    }
+  ]
+}
+```
+
+**Authentication:** Session cookie (set by Phoenix on browser login). No `Authorization` header needed.
+
+**Example (from browser JS):**
+
+```js
+const res = await fetch('/api/browser/sessions?project_id=1&limit=50');
+const { results } = await res.json();
+```
+
+**Note:** This endpoint is intentionally read-only and scoped to UI-internal use. For programmatic/agent access, use `GET /api/v1/sessions` with a Bearer token.
+
+---
+
+## EITS-CMD dm: numeric session ID support
+
+The `dm --to` directive (commit ee6cacc) accepts both a UUID and a numeric session ID as the target. Agents no longer need the full UUID — the simpler `EITS_SESSION_ID` integer env var works directly.
+
+**Both formats are equivalent:**
+
+```
+EITS-CMD: dm --to 16e6d223-14b8-4e21-8461-8b5c2303fa8c --message "done"
+EITS-CMD: dm --to 1804 --message "done"
+```
+
+The dispatcher resolves an integer string to a session UUID internally before routing the DM.
+
+**Typical agent usage:**
+
+```
+# Use EITS_SESSION_ID (integer) from the spawn context — simpler than EITS_SESSION_UUID
+EITS-CMD: dm --to $EITS_SESSION_ID --message "task complete"
+```
+
+This also applies to the REST API `POST /api/v1/dm` endpoint — `to_session_id` has accepted both formats since the same commit.
 
 ---
 

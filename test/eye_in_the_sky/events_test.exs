@@ -22,8 +22,8 @@ defmodule EyeInTheSky.EventsTest do
 
     test "subscribe_agent_working/0 subscribes to agent:working topic" do
       Events.subscribe_agent_working()
-      Events.agent_working("ref-1", 42)
-      assert_receive {:agent_working, "ref-1", 42}, 500
+      Events.agent_working(%{id: 42})
+      assert_receive {:agent_working, %{id: 42}}, 500
     end
 
     test "subscribe_tasks/0 subscribes to tasks topic" do
@@ -166,27 +166,11 @@ defmodule EyeInTheSky.EventsTest do
   # Agent working status
   # ---------------------------------------------------------------------------
 
-  describe "agent_working/2" do
-    test "broadcasts {:agent_working, ref, int_id} to agent:working topic" do
-      sub("agent:working")
-      Events.agent_working("uuid-ref", 99)
-      assert_receive {:agent_working, "uuid-ref", 99}, 500
-    end
-  end
-
   describe "agent_working/1" do
     test "broadcasts {:agent_working, session} to agent:working topic" do
       sub("agent:working")
       Events.agent_working(%{id: 5})
       assert_receive {:agent_working, %{id: 5}}, 500
-    end
-  end
-
-  describe "agent_stopped/2" do
-    test "broadcasts {:agent_stopped, ref, int_id} to agent:working topic" do
-      sub("agent:working")
-      Events.agent_stopped("uuid-ref", 99)
-      assert_receive {:agent_stopped, "uuid-ref", 99}, 500
     end
   end
 

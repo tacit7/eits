@@ -7,14 +7,15 @@ defmodule EyeInTheSky.Messages.JsonlStorage do
   """
 
   require Logger
+  alias EyeInTheSky.Claude.SessionFileLocator
   alias EyeInTheSky.Messages.Message
+  alias EyeInTheSky.Utils.ToolHelpers
 
   @doc """
   Gets the path to a session's JSONL file.
   """
   def get_session_file_path(project_id, session_id) do
-    claude_dir = Path.expand("~/.claude")
-    Path.join([claude_dir, "projects", project_id, "#{session_id}.jsonl"])
+    SessionFileLocator.locate_by_id(project_id, session_id)
   end
 
   @doc """
@@ -122,10 +123,7 @@ defmodule EyeInTheSky.Messages.JsonlStorage do
   defp parse_timestamp(_), do: nil
 
   defp parse_unix_timestamp(timestamp) when is_binary(timestamp) do
-    case Integer.parse(timestamp) do
-      {seconds, ""} -> DateTime.from_unix!(seconds)
-      _ -> nil
-    end
+    if s = ToolHelpers.parse_int(timestamp), do: DateTime.from_unix!(s)
   end
 
   defp parse_unix_timestamp(seconds) when is_integer(seconds) do
@@ -148,8 +146,7 @@ defmodule EyeInTheSky.Messages.JsonlStorage do
     jsonl_content =
       messages
       |> Enum.map(&message_to_json_data/1)
-      |> Enum.map(&Jason.encode!/1)
-      |> Enum.join("\n")
+      |> Enum.map_join("\n", &Jason.encode!/1)
 
     case File.write(file_path, jsonl_content <> "\n") do
       :ok ->

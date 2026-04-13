@@ -6,6 +6,8 @@ defmodule EyeInTheSkyWeb.Helpers.MobileNav do
   set the correct assigns for the mobile nav to highlight correctly.
   """
 
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+
   @type nav_tab :: :sessions | :tasks | :notes | :project | :none
 
   @doc """
@@ -14,7 +16,7 @@ defmodule EyeInTheSkyWeb.Helpers.MobileNav do
   ## Mapping
 
   - `/projects/:id` and all `/projects/:id/*` sub-routes → `:project`
-  - `/dm/:session_id` with no project context → `:none`
+  - `/dm/:session_id` → `:sessions` (highlights Sessions tab so users can navigate back)
   - `/tasks` → `:tasks`
   - `/notes` → `:notes`
   - `/`, `/sessions` → `:sessions`
@@ -29,6 +31,7 @@ defmodule EyeInTheSkyWeb.Helpers.MobileNav do
       path == "/tasks" -> :tasks
       path == "/notes" -> :notes
       path in ["/", "/sessions"] -> :sessions
+      String.starts_with?(path, "/dm/") -> :sessions
       true -> :none
     end
   end
@@ -52,14 +55,8 @@ defmodule EyeInTheSkyWeb.Helpers.MobileNav do
 
   def project_id_from_path(path) when is_binary(path) do
     case Regex.run(~r{^/projects/(\d+)(/.*)?$}, path) do
-      [_, id_str | _] ->
-        case Integer.parse(id_str) do
-          {id, ""} -> id
-          _ -> nil
-        end
-
-      _ ->
-        nil
+      [_, id_str | _] -> parse_int(id_str)
+      _ -> nil
     end
   end
 end

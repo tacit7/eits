@@ -4,9 +4,10 @@ defmodule EyeInTheSky.Prompts do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Prompts.Prompt
+  alias EyeInTheSky.Repo
   alias EyeInTheSky.Search.PgSearch
+  alias EyeInTheSky.Utils.ToolHelpers
 
   @doc """
   Returns the list of prompts with optional project filter.
@@ -42,8 +43,13 @@ defmodule EyeInTheSky.Prompts do
   """
   def get_prompt!(id), do: Repo.get!(Prompt, id)
 
-  @doc "Gets a single prompt by ID. Returns nil if not found."
-  def get_prompt(id), do: Repo.get(Prompt, id)
+  @doc "Gets a single prompt by ID. Returns `{:ok, prompt}` or `{:error, :not_found}`."
+  def get_prompt(id) do
+    case Repo.get(Prompt, id) do
+      nil -> {:error, :not_found}
+      prompt -> {:ok, prompt}
+    end
+  end
 
   @doc """
   Gets a single prompt by UUID.
@@ -52,9 +58,17 @@ defmodule EyeInTheSky.Prompts do
   """
   def get_prompt_by_uuid!(uuid), do: Repo.get_by!(Prompt, uuid: uuid)
 
+  @doc "Gets a single prompt by UUID. Returns `{:ok, prompt}` or `{:error, :not_found}`."
+  def get_prompt_by_uuid(uuid) do
+    case Repo.get_by(Prompt, uuid: uuid) do
+      nil -> {:error, :not_found}
+      prompt -> {:ok, prompt}
+    end
+  end
+
   @doc """
   Gets a single prompt by slug.
-  Returns nil if not found.
+  Returns `{:ok, prompt}` or `{:error, :not_found}`.
   """
   def get_prompt_by_slug(slug, project_id \\ nil) do
     query =
@@ -72,7 +86,35 @@ defmodule EyeInTheSky.Prompts do
             order_by: [desc: fragment("CASE WHEN ? IS NULL THEN 0 ELSE 1 END", p.project_id)]
       end
 
-    Repo.one(query)
+    case Repo.one(query) do
+      nil -> {:error, :not_found}
+      prompt -> {:ok, prompt}
+    end
+  end
+
+  @doc """
+  Resolves a prompt by integer ID, UUID, or slug (in that order).
+  Returns `{:ok, prompt}` or `{:error, :not_found}`.
+  The `project_id` param narrows slug lookups to a specific project.
+  """
+  def get_prompt_by_ref(ref, project_id \\ nil) do
+    cond do
+      id = ToolHelpers.parse_int(ref) ->
+        get_prompt(id)
+
+      Regex.match?(~r/^[0-9a-f-]{36}$/, ref) ->
+        get_prompt_by_uuid(ref)
+
+      true ->
+        if project_id do
+          case get_prompt_by_slug(ref, project_id) do
+            {:ok, prompt} -> {:ok, prompt}
+            {:error, :not_found} -> get_prompt_by_slug(ref, nil)
+          end
+        else
+          get_prompt_by_slug(ref, nil)
+        end
+    end
   end
 
   @doc """
@@ -110,15 +152,12 @@ defmodule EyeInTheSky.Prompts do
 
   @doc """
   Hard deletes a prompt.
-  Returns `{:error, :has_active_schedule}` if a scheduled job references this prompt.
+  Returns `{:error, changeset}` if a scheduled job references this prompt.
   """
   def delete_prompt(%Prompt{} = prompt) do
-    case Repo.delete(prompt) do
-      {:ok, p} -> {:ok, p}
-      {:error, %Ecto.Changeset{} = cs} -> {:error, cs}
-    end
-  rescue
-    Ecto.ConstraintError -> {:error, :has_active_schedule}
+    prompt
+    |> Prompt.delete_changeset()
+    |> Repo.delete()
   end
 
   @doc """

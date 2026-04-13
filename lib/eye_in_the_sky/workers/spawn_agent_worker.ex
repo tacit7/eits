@@ -1,10 +1,12 @@
 defmodule EyeInTheSky.Workers.SpawnAgentWorker do
+  @moduledoc false
   use Oban.Worker, queue: :jobs, max_attempts: 3
 
   require Logger
 
-  alias EyeInTheSky.ScheduledJobs
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.ScheduledJobs
+  alias EyeInTheSky.Utils.ToolHelpers
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"job_id" => job_id}}) do
@@ -31,7 +33,7 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
   defp execute(job) do
     config = ScheduledJobs.decode_config(job)
     session_uuid = Ecto.UUID.generate()
-    base_url = EyeInTheSkyWeb.Endpoint.url()
+    base_url = server_base_url()
     dm_link = "#{base_url}/dm/#{session_uuid}"
 
     base_instructions = config["instructions"] || "Scheduled agent task"
@@ -40,21 +42,7 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
       base_instructions <>
         "\n\nYour DM page link (include this in any notifications): #{dm_link}"
 
-    opts =
-      [
-        instructions: instructions,
-        model: config["model"],
-        project_path: config["project_path"],
-        description: config["description"] || "Scheduled agent",
-        project_id: job.project_id,
-        session_uuid: session_uuid
-      ]
-      |> maybe_put(:max_budget_usd, parse_float(config["max_budget_usd"]))
-      |> maybe_put(:max_turns, parse_int(config["max_turns"]))
-      |> maybe_put(:fallback_model, config["fallback_model"])
-      |> maybe_put(:allowed_tools, config["allowed_tools"])
-      |> maybe_put(:output_format, config["output_format"])
-      |> maybe_put(:skip_permissions, config["skip_permissions"])
+    opts = build_agent_opts(config, session_uuid, instructions, job)
 
     log_opts = Keyword.drop(opts, [:instructions])
 
@@ -71,6 +59,30 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
     end
   end
 
+  defp build_agent_opts(config, session_uuid, instructions, job) do
+    [
+      instructions: instructions,
+      model: config["model"],
+      project_path: config["project_path"],
+      description: config["description"] || "Scheduled agent",
+      project_id: job.project_id,
+      session_uuid: session_uuid
+    ]
+    |> maybe_put(:max_budget_usd, parse_float(config["max_budget_usd"]))
+    |> maybe_put(:max_turns, ToolHelpers.parse_int(config["max_turns"]))
+    |> maybe_put(:fallback_model, config["fallback_model"])
+    |> maybe_put(:allowed_tools, config["allowed_tools"])
+    |> maybe_put(:output_format, config["output_format"])
+    |> maybe_put(:skip_permissions, config["skip_permissions"])
+    |> maybe_put(:permission_mode, config["permission_mode"])
+    |> maybe_put(:add_dir, config["add_dir"])
+    |> maybe_put(:mcp_config, config["mcp_config"])
+    |> maybe_put(:plugin_dir, config["plugin_dir"])
+    |> maybe_put(:settings_file, config["settings_file"])
+    |> maybe_put(:chrome, config["chrome"])
+    |> maybe_put(:sandbox, config["sandbox"])
+  end
+
   defp maybe_put(opts, _key, nil), do: opts
   defp maybe_put(opts, _key, ""), do: opts
   defp maybe_put(opts, key, val), do: Keyword.put(opts, key, val)
@@ -80,26 +92,18 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
 
   defp parse_float(val) when is_binary(val) do
     case Float.parse(val) do
-      {f, _} -> f
+      {f, ""} -> f
       _ -> nil
     end
   end
 
   defp parse_float(val) when is_number(val), do: val
 
-  defp parse_int(nil), do: nil
-  defp parse_int(""), do: nil
-
-  defp parse_int(val) when is_binary(val) do
-    case Integer.parse(val) do
-      {n, _} -> n
-      _ -> nil
-    end
-  end
-
-  defp parse_int(val) when is_integer(val), do: val
-
   defp broadcast do
     EyeInTheSky.Events.jobs_updated()
+  end
+
+  defp server_base_url do
+    EyeInTheSkyWeb.Endpoint.url()
   end
 end

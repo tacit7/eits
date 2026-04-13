@@ -116,9 +116,7 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   # Number / size / time formatters
   # ---------------------------------------------------------------------------
 
-  def format_size(bytes) when bytes < 1024, do: "#{bytes} B"
-  def format_size(bytes) when bytes < 1_048_576, do: "#{Float.round(bytes / 1024, 1)} KB"
-  def format_size(bytes), do: "#{Float.round(bytes / 1_048_576, 1)} MB"
+  defdelegate format_size(bytes), to: EyeInTheSkyWeb.Helpers.FileHelpers
 
   def format_number(n) when is_integer(n) do
     n
@@ -142,8 +140,6 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
 
   def format_checkpoint_time(%DateTime{} = dt) do
     Calendar.strftime(dt, "%b %-d, %H:%M")
-  rescue
-    _ -> "—"
   end
 
   def format_checkpoint_time(_), do: "—"
@@ -213,9 +209,10 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
 
   def tool_widget_meta("Bash", rest) do
     command =
-      with {:ok, %{"command" => cmd}} <- Jason.decode(rest) do
-        cmd
-      else
+      case Jason.decode(rest) do
+        {:ok, %{"command" => cmd}} ->
+          cmd
+
         _ ->
           case Regex.run(~r/^`(.+?)`/s, rest, capture: :all_but_first) do
             [cmd] -> cmd
@@ -227,31 +224,45 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   end
 
   def tool_widget_meta("Read", rest) do
-    path = with {:ok, %{"file_path" => p}} <- Jason.decode(rest), do: p, else: (_ -> rest)
+    path = case Jason.decode(rest) do
+      {:ok, %{"file_path" => p}} -> p
+      _ -> rest
+    end
     {"hero-document-text", "Read", path}
   end
 
   def tool_widget_meta("Write", rest) do
-    path = with {:ok, %{"file_path" => p}} <- Jason.decode(rest), do: p, else: (_ -> rest)
+    path = case Jason.decode(rest) do
+      {:ok, %{"file_path" => p}} -> p
+      _ -> rest
+    end
     {"hero-pencil-square", "Write", path}
   end
 
   def tool_widget_meta("Edit", rest) do
-    path = with {:ok, %{"file_path" => p}} <- Jason.decode(rest), do: p, else: (_ -> rest)
+    path = case Jason.decode(rest) do
+      {:ok, %{"file_path" => p}} -> p
+      _ -> rest
+    end
     {"hero-pencil-square", "Edit", path}
   end
 
   def tool_widget_meta("Glob", rest) do
-    pat = with {:ok, %{"pattern" => p}} <- Jason.decode(rest), do: p, else: (_ -> rest)
+    pat = case Jason.decode(rest) do
+      {:ok, %{"pattern" => p}} -> p
+      _ -> rest
+    end
     {"hero-folder-open", "Glob", pat}
   end
 
   def tool_widget_meta("Task", rest) do
     prompt =
-      with {:ok, %{"prompt" => p}} <- Jason.decode(rest) do
-        String.slice(p, 0..80) <> if(String.length(p) > 81, do: "…", else: "")
-      else
-        _ -> rest
+      case Jason.decode(rest) do
+        {:ok, %{"prompt" => p}} ->
+          String.slice(p, 0..80) <> if(String.length(p) > 81, do: "…", else: "")
+
+        _ ->
+          rest
       end
 
     {"hero-cpu-chip", "Task", prompt}
@@ -277,7 +288,10 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   end
 
   def tool_widget_meta("WebSearch", rest) do
-    query = with {:ok, %{"query" => q}} <- Jason.decode(rest), do: q, else: (_ -> rest)
+    query = case Jason.decode(rest) do
+      {:ok, %{"query" => q}} -> q
+      _ -> rest
+    end
     {"hero-globe-alt", "WebSearch", query}
   end
 
@@ -305,8 +319,7 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
             |> Map.to_list()
             |> Enum.take(2)
             |> Enum.filter(fn {_k, v} -> is_binary(v) or is_number(v) or is_atom(v) end)
-            |> Enum.map(fn {k, v} -> "#{k}: #{String.slice(to_string(v), 0..40)}" end)
-            |> Enum.join(", ")
+            |> Enum.map_join(", ", fn {k, v} -> "#{k}: #{String.slice(to_string(v), 0..40)}" end)
 
           {"hero-puzzle-piece", if(summary == "", do: rest, else: summary)}
 

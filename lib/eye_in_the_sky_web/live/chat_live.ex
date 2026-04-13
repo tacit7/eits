@@ -1,21 +1,24 @@
 defmodule EyeInTheSkyWeb.ChatLive do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.{Agents, ChannelMessages, Channels, MessageReactions, Messages, Projects, Prompts, Sessions}
+  alias EyeInTheSky.{ChannelMessages, Channels, MessageReactions, Messages, Sessions}
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Claude.ChannelProtocol
-  alias EyeInTheSkyWeb.ChatPresenter
+  alias EyeInTheSkyWeb.ChatLive.ChannelActions
+  alias EyeInTheSkyWeb.ChatLive.ChannelDataLoader
   alias EyeInTheSkyWeb.ChatLive.ChannelHeader
+  alias EyeInTheSkyWeb.ChatLive.ChannelHelpers
+  alias EyeInTheSkyWeb.ChatPresenter
+  alias EyeInTheSkyWeb.Helpers.SlashItems
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
+  import EyeInTheSkyWeb.Helpers.ChannelRoutingHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
-
-  # Deterministic UUIDs for the web UI user
-  @web_agent_uuid "00000000-0000-0000-0000-000000000001"
-  @web_session_uuid "00000000-0000-0000-0000-000000000002"
+  import EyeInTheSkyWeb.Helpers.UploadHelpers
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1, parse_int: 2]
 
   @impl true
   def mount(_params, _session, socket) do
-    session_id = ensure_web_session()
+    session_id = Sessions.ensure_web_ui_session()
 
     if connected?(socket) do
       subscribe_agent_working()
@@ -37,56 +40,19 @@ defmodule EyeInTheSkyWeb.ChatLive do
     {:ok, socket}
   end
 
-  defp ensure_web_session do
-    alias EyeInTheSky.{Agents, Sessions}
-
-    case Sessions.get_session_by_uuid(@web_session_uuid) do
-      {:ok, session} ->
-        session.id
-
-      {:error, :not_found} ->
-        agent =
-          case Agents.get_agent_by_uuid(@web_agent_uuid) do
-            {:ok, a} ->
-              a
-
-            {:error, :not_found} ->
-              {:ok, a} =
-                Agents.create_agent(%{
-                  uuid: @web_agent_uuid,
-                  description: "Web UI User",
-                  source: "web"
-                })
-
-              a
-          end
-
-        {:ok, session} =
-          Sessions.create_session(%{
-            uuid: @web_session_uuid,
-            agent_id: agent.id,
-            name: "Web UI",
-            started_at: DateTime.utc_now()
-          })
-
-        session.id
-    end
-  end
-
   @impl true
   def handle_params(params, _uri, socket) do
     {:noreply, setup_channel(params, socket)}
   end
 
   defp setup_channel(params, socket) do
+    {project_id, channel_id, channels} = resolve_channel(params, socket)
+    load_channel_assigns(project_id, channel_id, channels, params, socket)
+  end
+
+  defp resolve_channel(params, socket) do
     project_id = get_project_id(params)
-
-    channels =
-      case Channels.list_channels_for_project(project_id) do
-        channels when is_list(channels) -> channels
-        _ -> []
-      end
-
+    channels = load_channels(project_id)
     channel_id = params["channel_id"] || get_default_channel_id(channels, project_id)
     {channel_id, channels} = ensure_default_channel(channel_id, channels, project_id, socket)
 
@@ -94,80 +60,44 @@ defmodule EyeInTheSkyWeb.ChatLive do
       subscribe_channel_messages(channel_id)
     end
 
-    messages =
-      if channel_id do
-        ChannelMessages.list_messages_for_channel(channel_id)
-        |> ChatPresenter.serialize_messages()
-      else
-        []
-      end
+    {project_id, channel_id, channels}
+  end
 
-    unread_counts = calculate_unread_counts(channels, get_session_id(socket))
-    active_thread = load_thread(params["thread_id"])
-
-    agent_status_counts =
-      case Agents.get_agent_status_counts(project_id) do
-        counts when is_map(counts) -> counts
-        _ -> %{}
-      end
-
-    prompts =
-      Prompts.list_prompts(project_id: project_id)
-      |> ChatPresenter.serialize_prompts()
-
-    agent_templates =
-      Agents.list_active_agents()
-      |> Enum.filter(fn a -> a.description && a.description != "" end)
-      |> Enum.take(50)
-      |> Enum.map(fn a -> %{id: a.id, description: a.description} end)
-
-    channel_members = load_channel_members(channel_id)
-    all_projects = Projects.list_projects()
-
-    active_sessions =
-      Sessions.list_active_sessions()
-      |> EyeInTheSky.Repo.preload(:agent)
-      |> Enum.map(fn session ->
-        %{
-          id: session.id,
-          uuid: session.uuid,
-          name: session.name,
-          description: session.description,
-          provider: session.provider || "claude",
-          model: session.model,
-          project_id: session.project_id,
-          agent_description:
-            if(Ecto.assoc_loaded?(session.agent) && session.agent,
-              do: session.agent.description,
-              else: nil
-            )
-        }
-      end)
-
-    session_search = socket.assigns[:session_search] || ""
-
-    sessions_by_project =
-      build_sessions_by_project(channel_members, all_projects, session_search)
+  defp load_channel_assigns(project_id, channel_id, channels, params, socket) do
+    data =
+      ChannelDataLoader.load(project_id, channel_id, %{
+        channels: channels,
+        session_id: get_session_id(socket),
+        session_search: socket.assigns[:session_search] || "",
+        thread_id: params["thread_id"]
+      })
 
     socket
     |> assign(:page_title, "Chat")
     |> assign(:project_id, project_id)
-    |> assign(:all_projects, all_projects)
+    |> assign(:all_projects, data.all_projects)
     |> assign(:channels, ChatPresenter.serialize_channels(channels))
     |> assign(:active_channel_id, channel_id)
-    |> assign(:messages, messages)
-    |> assign(:unread_counts, unread_counts)
-    |> assign(:active_thread, active_thread)
-    |> assign(:agent_status_counts, agent_status_counts)
-    |> assign(:prompts, prompts)
-    |> assign(:agent_templates, agent_templates)
-    |> assign(:active_agents, active_sessions)
-    |> assign(:channel_members, channel_members)
-    |> assign(:sessions_by_project, sessions_by_project)
+    |> assign(:messages, data.messages)
+    |> assign(:unread_counts, data.unread_counts)
+    |> assign(:active_thread, data.active_thread)
+    |> assign(:agent_status_counts, data.agent_status_counts)
+    |> assign(:prompts, data.prompts)
+    |> assign(:agent_templates, data.agent_templates)
+    |> assign(:active_agents, data.active_sessions)
+    |> assign(:channel_members, data.channel_members)
+    |> assign(:sessions_by_project, data.sessions_by_project)
     |> assign(:show_agent_drawer, false)
     |> assign(:show_members, false)
     |> assign_new(:session_search, fn -> "" end)
-    |> assign(:slash_items, EyeInTheSkyWeb.Helpers.SlashItems.build())
+    |> assign(:slash_items, SlashItems.build())
+  end
+
+  defp load_channels(project_id) do
+    case Channels.list_channels_for_project(project_id) do
+      channels when is_list(channels) -> channels
+      _ -> []
+    end
   end
 
   @impl true
@@ -179,6 +109,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
   def handle_event("send_channel_message", %{"channel_id" => channel_id, "body" => body}, socket) do
     require Logger
     session_id = get_session_id(socket)
+    content_blocks = consume_agent_images_as_content_blocks(socket)
 
     case ChannelMessages.send_channel_message(%{
            channel_id: channel_id,
@@ -191,47 +122,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
       {:ok, message} ->
         EyeInTheSky.Events.channel_message(channel_id, message)
         Channels.mark_as_read(channel_id, session_id)
-
-        {_mode, mentioned_ids, _mention_all} = ChannelProtocol.parse_routing(body, -1)
-
-        Enum.each(mentioned_ids, fn mid ->
-          unless Channels.is_member?(channel_id, mid) do
-            case Sessions.get_session(mid) do
-              {:ok, s} ->
-                Channels.add_member(channel_id, s.agent_id, mid)
-                Logger.info("Auto-added session=#{mid} to channel=#{channel_id}")
-
-              _ ->
-                :ok
-            end
-          end
-        end)
-
-        agent_members = Channels.list_members(channel_id)
-
-        Enum.each(agent_members, fn member ->
-          unless ChannelProtocol.skip?(member.session_id, session_id) do
-            {mode, _mentioned_ids, _mention_all} =
-              ChannelProtocol.parse_routing(body, member.session_id)
-
-            Messages.send_message(%{
-              session_id: member.session_id,
-              sender_role: "user",
-              recipient_role: "agent",
-              provider: "claude",
-              body: body
-            })
-
-            prompt = ChannelProtocol.build_prompt(mode, body)
-            Logger.info("Routing to session=#{member.session_id} mode=#{mode}")
-
-            AgentManager.send_message(member.session_id, prompt,
-              model: "sonnet",
-              channel_id: channel_id
-            )
-          end
-        end)
-
+        ChannelHelpers.route_to_members(channel_id, body, session_id, content_blocks)
         {:noreply, refresh_members_and_picker(socket)}
 
       {:error, _changeset} ->
@@ -245,103 +136,35 @@ defmodule EyeInTheSkyWeb.ChatLive do
         %{"session_id" => target_session_id_str, "body" => body} = params,
         socket
       ) do
-    require Logger
     session_id = get_session_id(socket)
     channel_id = params["channel_id"] || socket.assigns.active_channel_id
 
-    target_session_id =
-      case Integer.parse(to_string(target_session_id_str)) do
-        {n, ""} -> n
-        _ -> nil
-      end
+    target_session_id = parse_int(target_session_id_str)
 
-    case ChannelMessages.send_channel_message(%{
-           channel_id: channel_id,
-           session_id: session_id,
-           sender_role: "user",
-           recipient_role: "agent",
-           provider: "claude",
-           body: body
-         }) do
-      {:ok, message} ->
-        EyeInTheSky.Events.channel_message(channel_id, message)
-
+    case create_dm_channel_message(channel_id, body, session_id) do
+      {:ok, _message} ->
         if target_session_id do
           prompt = ChannelProtocol.build_prompt(:direct, body)
-          AgentManager.send_message(target_session_id, prompt, channel_id: channel_id)
+
+          AgentManager.send_message(target_session_id, prompt,
+            channel_id: channel_id
+          )
         end
 
         {:noreply, socket}
 
-      {:error, _changeset} ->
+      {:error, _} ->
         {:noreply, put_flash(socket, :error, "Failed to send message")}
     end
   end
 
   @impl true
-  def handle_event("add_agent_to_channel", %{"session_id" => session_id_str}, socket) do
-    require Logger
-    channel_id = socket.assigns.active_channel_id
-
-    with {session_id, ""} <- Integer.parse(session_id_str),
-         {:ok, session} <- Sessions.get_session(session_id) do
-      agent_id = session.agent_id
-
-      case Channels.add_member(channel_id, agent_id, session_id) do
-        {:ok, _member} ->
-          {:ok, sys_msg} =
-            ChannelMessages.send_channel_message(%{
-              channel_id: channel_id,
-              session_id: nil,
-              sender_role: "system",
-              recipient_role: "agent",
-              provider: "system",
-              body: "Agent @#{session_id} (#{session.name || "unnamed"}) joined the channel"
-            })
-
-          EyeInTheSky.Events.channel_message(channel_id, sys_msg)
-          Logger.info("Added agent session=#{session_id} to channel=#{channel_id}")
-
-          {:noreply, refresh_members_and_picker(socket)}
-
-        {:error, changeset} ->
-          Logger.warning("Failed to add member: #{inspect(changeset)}")
-          {:noreply, put_flash(socket, :error, "Agent already in channel or invalid")}
-      end
-    else
-      _ ->
-        {:noreply, put_flash(socket, :error, "Invalid session ID")}
-    end
-  end
+  def handle_event("add_agent_to_channel", params, socket),
+    do: ChannelActions.handle_add_agent(socket, params)
 
   @impl true
-  def handle_event("remove_agent_from_channel", %{"session_id" => session_id_str}, socket) do
-    require Logger
-    channel_id = socket.assigns.active_channel_id
-
-    with {session_id, ""} <- Integer.parse(session_id_str),
-         {:ok, session} <- Sessions.get_session(session_id) do
-      Channels.remove_member(channel_id, session_id)
-
-      {:ok, sys_msg} =
-        ChannelMessages.send_channel_message(%{
-          channel_id: channel_id,
-          session_id: nil,
-          sender_role: "system",
-          recipient_role: "agent",
-          provider: "system",
-          body: "Agent @#{session_id} (#{session.name || "unnamed"}) left the channel"
-        })
-
-      EyeInTheSky.Events.channel_message(channel_id, sys_msg)
-      Logger.info("Removed agent session=#{session_id} from channel=#{channel_id}")
-
-      {:noreply, refresh_members_and_picker(socket)}
-    else
-      _ ->
-        {:noreply, put_flash(socket, :error, "Invalid session ID")}
-    end
-  end
+  def handle_event("remove_agent_from_channel", params, socket),
+    do: ChannelActions.handle_remove_agent(socket, params)
 
   @impl true
   def handle_event("open_thread", %{"message_id" => message_id}, socket) do
@@ -375,7 +198,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
          }) do
       {:ok, message} ->
         EyeInTheSky.Events.channel_message(channel_id, message)
-        active_thread = load_thread(parent_id)
+        active_thread = ChannelDataLoader.load_thread(parent_id)
         {:noreply, assign(socket, :active_thread, active_thread)}
 
       {:error, _changeset} ->
@@ -389,11 +212,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
     case MessageReactions.toggle_reaction(message_id, session_id, emoji) do
       {:ok, _action} ->
-        messages =
-          ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)
-          |> ChatPresenter.serialize_messages()
-
-        {:noreply, assign(socket, :messages, messages)}
+        {:noreply, assign(socket, :messages, reload_messages(socket))}
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Failed to add reaction")}
@@ -402,21 +221,22 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   @impl true
   def handle_event("delete_message", %{"id" => id_str}, socket) do
-    {id, ""} = Integer.parse(id_str)
-    message = Messages.get_message!(id)
-    {:ok, _} = Messages.delete_message(message)
+    case parse_int(id_str) do
+      nil ->
+        {:noreply, socket}
 
-    messages =
-      ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)
-      |> ChatPresenter.serialize_messages()
+      id ->
+        message = Messages.get_message!(id)
+        {:ok, _} = Messages.delete_message(message)
 
-    {:noreply, assign(socket, :messages, messages)}
+        {:noreply, assign(socket, :messages, reload_messages(socket))}
+    end
   end
 
   @impl true
   def handle_event("search_sessions", %{"session_search" => query}, socket) do
     sessions_by_project =
-      build_sessions_by_project(
+      ChannelHelpers.build_sessions_by_project(
         socket.assigns.channel_members,
         socket.assigns.all_projects,
         query
@@ -449,96 +269,12 @@ defmodule EyeInTheSkyWeb.ChatLive do
   end
 
   @impl true
-  def handle_event("create_channel", _params, socket) do
-    {:noreply, put_flash(socket, :info, "Channel creation coming soon")}
-  end
+  def handle_event("create_channel", params, socket),
+    do: ChannelActions.handle_create_channel(socket, params)
 
   @impl true
-  def handle_event("create_agent", params, socket) do
-    model = params["model"] || "sonnet"
-    effort_level = params["effort_level"]
-    max_budget_usd = parse_budget(params["max_budget_usd"])
-    agent_name = params["agent_name"] || ""
-    description = params["description"] || ""
-    selected_project_id = params["project_id"]
-    channel_id = socket.assigns.active_channel_id
-
-    selected_project =
-      Enum.find(socket.assigns.all_projects, fn p ->
-        to_string(p.id) == to_string(selected_project_id)
-      end)
-
-    project_path = if selected_project, do: selected_project.path, else: File.cwd!()
-
-    agent_description =
-      if agent_name != "" do
-        agent_name
-      else
-        "Channel agent for #{channel_id}"
-      end
-
-    {:ok, _creating_msg} =
-      ChannelMessages.send_channel_message(%{
-        channel_id: channel_id,
-        session_id: nil,
-        sender_role: "system",
-        recipient_role: "agent",
-        provider: "system",
-        body:
-          "Creating new agent (#{model})#{if agent_name != "", do: " - #{agent_name}", else: ""}..."
-      })
-
-    base_instructions = if description != "", do: description, else: agent_description
-    uploaded_images = consume_agent_images(socket)
-    instructions = append_image_paths(base_instructions, uploaded_images)
-    agent_type = params["agent_type"] || "claude"
-
-    opts = [
-      agent_type: agent_type,
-      model: model,
-      effort_level: effort_level,
-      max_budget_usd: max_budget_usd,
-      project_id: selected_project_id,
-      project_path: project_path,
-      description: agent_description,
-      instructions: instructions,
-      agent: params["agent"]
-    ]
-
-    case AgentManager.create_agent(opts) do
-      {:ok, %{agent: agent, session: session}} ->
-        if channel_id do
-          case Channels.add_member(channel_id, agent.id, session.id) do
-            {:ok, _member} ->
-              {:ok, sys_msg} =
-                ChannelMessages.send_channel_message(%{
-                  channel_id: channel_id,
-                  session_id: nil,
-                  sender_role: "system",
-                  recipient_role: "agent",
-                  provider: "system",
-                  body: "Agent @#{session.id} (#{agent_description}) joined the channel"
-                })
-
-              EyeInTheSky.Events.channel_message(channel_id, sys_msg)
-
-            {:error, _} ->
-              :ok
-          end
-        end
-
-        {:noreply,
-         socket
-         |> assign(:show_agent_drawer, false)
-         |> refresh_members_and_picker()}
-
-      {:error, reason} ->
-        {:noreply,
-         socket
-         |> assign(:show_agent_drawer, false)
-         |> put_flash(:error, "Failed to create agent: #{inspect(reason)}")}
-    end
-  end
+  def handle_event("create_agent", params, socket),
+    do: ChannelActions.handle_create_agent(socket, params)
 
   @impl true
   def handle_info({:agent_working, msg}, socket) do
@@ -562,9 +298,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
       "📨 Received new_message broadcast for channel #{socket.assigns.active_channel_id}"
     )
 
-    messages =
-      ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)
-      |> ChatPresenter.serialize_messages()
+    messages = reload_messages(socket)
 
     Logger.info("📬 Loaded #{length(messages)} messages from DB")
 
@@ -574,7 +308,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
         _ -> []
       end
 
-    unread_counts = calculate_unread_counts(channels, get_session_id(socket))
+    unread_counts = ChannelHelpers.calculate_unread_counts(channels, get_session_id(socket))
 
     {:noreply,
      socket
@@ -663,24 +397,10 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   # Private helpers
 
+  @default_project_id 1
+
   defp get_project_id(params) do
-    case params["project_id"] do
-      nil ->
-        1
-
-      project_id when is_binary(project_id) ->
-        case Integer.parse(project_id) do
-          {int, ""} -> int
-          {_int, _rest} -> 1
-          :error -> 1
-        end
-
-      project_id when is_integer(project_id) ->
-        project_id
-
-      _project_id ->
-        1
-    end
+    parse_int(params["project_id"], @default_project_id)
   end
 
   defp get_default_channel_id(channels, _project_id) do
@@ -711,129 +431,21 @@ defmodule EyeInTheSkyWeb.ChatLive do
     socket.assigns[:session_id]
   end
 
-  defp load_thread(nil), do: nil
-
-  defp load_thread(message_id) do
-    parent_message = ChannelMessages.get_message_with_thread!(message_id)
-
-    %{
-      parent_message: ChatPresenter.serialize_message(parent_message),
-      replies: Enum.map(parent_message.thread_replies, &ChatPresenter.serialize_message/1)
-    }
-  end
-
-  defp calculate_unread_counts(channels, session_id) do
-    Enum.reduce(channels, %{}, fn channel, acc ->
-      count = Channels.count_unread_messages(channel.id, session_id)
-      Map.put(acc, channel.id, count)
-    end)
-  end
-
-  defp load_channel_members(nil), do: []
-
-  defp load_channel_members(channel_id) do
-    Channels.list_members(channel_id)
-    |> Enum.map(fn member ->
-      session_data =
-        case Sessions.get_session(member.session_id) do
-          {:ok, s} -> s
-          _ -> nil
-        end
-
-      %{
-        id: member.id,
-        session_id: member.session_id,
-        agent_id: member.agent_id,
-        role: member.role,
-        joined_at: member.joined_at,
-        session_name: session_data && session_data.name,
-        session_uuid: session_data && session_data.uuid
-      }
-    end)
-  end
-
   defp refresh_members_and_picker(socket) do
     channel_id = socket.assigns.active_channel_id
-    channel_members = load_channel_members(channel_id)
+    channel_members = ChannelHelpers.load_channel_members(channel_id)
     search = socket.assigns[:session_search] || ""
 
     sessions_by_project =
-      build_sessions_by_project(channel_members, socket.assigns.all_projects, search)
+      ChannelHelpers.build_sessions_by_project(channel_members, socket.assigns.all_projects, search)
 
     socket
     |> assign(:channel_members, channel_members)
     |> assign(:sessions_by_project, sessions_by_project)
   end
 
-  defp build_sessions_by_project(channel_members, all_projects, search) do
-    member_session_ids = channel_members |> Enum.map(& &1.session_id) |> MapSet.new()
-    projects_by_id = Enum.into(all_projects, %{}, fn p -> {p.id, p} end)
-
-    all_sessions =
-      Sessions.list_sessions_filtered(
-        status_filter: "all",
-        search_query: search,
-        limit: 100
-      )
-
-    all_sessions
-    |> Enum.reject(fn s -> MapSet.member?(member_session_ids, s.id) end)
-    |> Enum.group_by(fn s -> s.project_id end)
-    |> Enum.map(fn {pid, sessions} ->
-      project = Map.get(projects_by_id, pid)
-
-      %{
-        project_id: pid,
-        project_name: if(project, do: project.name, else: "Unassigned"),
-        sessions:
-          Enum.map(sessions, fn s ->
-            %{
-              id: s.id,
-              name: s.name,
-              model: s.model,
-              ended_at: s.ended_at,
-              agent_description:
-                if(Ecto.assoc_loaded?(s.agent) && s.agent,
-                  do: s.agent.description,
-                  else: nil
-                )
-            }
-          end)
-      }
-    end)
-    |> Enum.sort_by(fn g -> g.project_name end)
-  end
-
-  defp parse_budget(nil), do: nil
-  defp parse_budget(""), do: nil
-
-  defp parse_budget(v) when is_binary(v) do
-    case Float.parse(v) do
-      {f, _} when f > 0 -> f
-      _ -> nil
-    end
-  end
-
-  defp consume_agent_images(socket) do
-    consume_uploaded_entries(socket, :agent_images, fn %{path: temp_path}, entry ->
-      destination = agent_image_destination(entry.client_name)
-      File.mkdir_p!(Path.dirname(destination))
-      File.cp!(temp_path, destination)
-      {:ok, destination}
-    end)
-  end
-
-  defp agent_image_destination(client_name) do
-    base = Path.join([:code.priv_dir(:eye_in_the_sky), "static", "uploads", "agent"])
-    date_dir = Date.utc_today() |> Date.to_string()
-    filename = "#{Ecto.UUID.generate()}#{Path.extname(client_name)}"
-    Path.join([base, date_dir, filename])
-  end
-
-  defp append_image_paths(instructions, []), do: instructions
-
-  defp append_image_paths(instructions, image_paths) do
-    paths = Enum.map_join(image_paths, "\n", fn p -> "- #{p}" end)
-    "#{instructions}\n\nAttached images:\n#{paths}"
+  defp reload_messages(socket) do
+    ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)
+    |> ChatPresenter.serialize_messages()
   end
 end

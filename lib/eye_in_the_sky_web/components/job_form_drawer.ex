@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
 
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
-  import EyeInTheSkyWeb.Live.Shared.JobsHelpers, only: [cfg: 2]
+  import EyeInTheSkyWeb.Live.Shared.JobsFormatters, only: [cfg: 2]
 
   @common_timezones [
     "Etc/UTC",
@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 </p>
               <% end %>
             </div>
-            <button class="btn btn-ghost btn-sm btn-square" phx-click="cancel_form">
+            <button class="btn btn-ghost btn-square min-w-[44px] min-h-[44px]" phx-click="cancel_form">
               <span class="sr-only">Close job form</span>
               <.icon name="hero-x-mark" class="w-4 h-4" />
             </button>
@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 type="text"
                 name="job[name]"
                 value={@form[:name].value || ""}
-                class={["input input-bordered w-full", @form[:name].errors != [] && "input-error"]}
+                class={["input input-bordered w-full text-base", @form[:name].errors != [] && "input-error"]}
               />
               <p :for={err <- @form[:name].errors} class="mt-1 text-xs text-error">
                 {translate_error(err)}
@@ -95,7 +95,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 type="text"
                 name="job[description]"
                 value={@form[:description].value || ""}
-                class="input input-bordered w-full"
+                class="input input-bordered w-full text-base"
               />
             </div>
 
@@ -103,9 +103,6 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
               <div class="form-control">
                 <label class="label"><span class="label-text">Job Type</span></label>
                 <select name="job[job_type]" class="select select-bordered w-full">
-                  <option value="shell_command" selected={@form_job_type == "shell_command"}>
-                    Shell Command
-                  </option>
                   <option value="spawn_agent" selected={@form_job_type == "spawn_agent"}>
                     Spawn Agent
                   </option>
@@ -155,7 +152,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 value={@form[:schedule_value].value || ""}
                 placeholder={if @form_schedule_type == "interval", do: "60", else: "*/5 * * * *"}
                 class={[
-                  "input input-bordered w-full font-mono",
+                  "input input-bordered w-full font-mono text-base",
                   @form[:schedule_value].errors != [] && "input-error"
                 ]}
               />
@@ -180,34 +177,12 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
               </div>
             <% end %>
 
-            <%= if @form_job_type == "shell_command" do %>
-              <div class="form-control">
-                <label class="label"><span class="label-text">Command</span></label>
-                <input
-                  type="text"
-                  name="job[config_command]"
-                  value={cfg(@form_config, "command")}
-                  class="input input-bordered w-full font-mono"
-                  required
-                />
-              </div>
-              <div class="form-control">
-                <label class="label"><span class="label-text">Working Directory</span></label>
-                <input
-                  type="text"
-                  name="job[config_working_dir]"
-                  value={cfg(@form_config, "working_dir")}
-                  class="input input-bordered w-full"
-                />
-              </div>
-            <% end %>
-
             <%= if @form_job_type == "spawn_agent" do %>
               <div class="form-control">
                 <label class="label"><span class="label-text">Instructions</span></label>
                 <textarea
                   name="job[config_instructions]"
-                  class="textarea textarea-bordered w-full"
+                  class="textarea textarea-bordered w-full text-base"
                   rows="3"
                 ><%= cfg(@form_config, "instructions") %></textarea>
               </div>
@@ -232,7 +207,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                     type="text"
                     name="job[config_project_path]"
                     value={cfg(@form_config, "project_path")}
-                    class="input input-bordered w-full"
+                    class="input input-bordered w-full text-base"
                   />
                 </div>
               </div>
@@ -242,7 +217,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                   type="text"
                   name="job[config_description]"
                   value={cfg(@form_config, "description")}
-                  class="input input-bordered w-full"
+                  class="input input-bordered w-full text-base"
                 />
               </div>
             <% end %>
@@ -254,7 +229,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                   type="text"
                   name="job[config_task]"
                   value={cfg(@form_config, "task")}
-                  class="input input-bordered w-full font-mono"
+                  class="input input-bordered w-full font-mono text-base"
                   required
                 />
               </div>
@@ -266,7 +241,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                   type="text"
                   name="job[config_args]"
                   value={cfg(@form_config, "args")}
-                  class="input input-bordered w-full"
+                  class="input input-bordered w-full text-base"
                 />
               </div>
               <div class="form-control">
@@ -275,16 +250,16 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                   type="text"
                   name="job[config_project_path]"
                   value={cfg(@form_config, "project_path")}
-                  class="input input-bordered w-full"
+                  class="input input-bordered w-full text-base"
                 />
               </div>
             <% end %>
 
             <div class="sticky bottom-0 bg-base-100 pt-4 pb-1 flex justify-end gap-2">
-              <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_form">
+              <button type="button" class="btn btn-ghost btn-sm min-h-[44px]" phx-click="cancel_form">
                 Cancel
               </button>
-              <button type="submit" class="btn btn-primary btn-sm">Save</button>
+              <button type="submit" class="btn btn-primary btn-sm min-h-[44px]">Save</button>
             </div>
           </.form>
         </div>

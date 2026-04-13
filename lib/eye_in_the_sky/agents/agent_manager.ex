@@ -7,14 +7,11 @@ defmodule EyeInTheSky.Agents.AgentManager do
 
   require Logger
 
-  alias EyeInTheSky.Agents.{InstructionBuilder, RuntimeContext}
+  alias EyeInTheSky.{AgentDefinitions, Agents, Projects, Sessions, Teams}
+  alias EyeInTheSky.Agents.AgentManager.SessionBridge
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSky.Git.Worktrees
-  alias EyeInTheSky.{AgentDefinitions, Agents, Sessions}
-  alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
-
-  @registry EyeInTheSky.Claude.AgentRegistry
-  @supported_providers ["claude", "codex"]
+  alias EyeInTheSky.Utils.ToolHelpers
 
   @doc """
   Creates an agent + session and starts the AgentWorker with the initial message.
@@ -32,58 +29,67 @@ defmodule EyeInTheSky.Agents.AgentManager do
   """
   def create_agent(opts) do
     with {:ok, %{agent: agent, session: session}} <- create_records(opts) do
-      instructions = InstructionBuilder.build(opts)
+      instructions = EyeInTheSky.Agents.InstructionBuilder.build(opts)
 
       Logger.info("📤 create_agent: sending initial message to session.id=#{session.id}")
 
-      case send_message(session.id, instructions,
-             model: opts[:model],
-             effort_level: opts[:effort_level],
-             max_budget_usd: opts[:max_budget_usd],
-             worktree: opts[:worktree],
-             agent: opts[:agent],
-             eits_workflow: opts[:eits_workflow],
-             bypass_sandbox: opts[:bypass_sandbox]
-           ) do
+      # Forward all opts to send_message so RuntimeContext.build can pick up
+      # known keys (model, effort_level, etc.) and pass the rest as extra_cli_opts
+      # to CLI.build_args (permission_mode, add_dir, chrome, sandbox, etc.)
+      send_opts =
+        opts
+        |> Keyword.drop([:agent_type, :project_id, :project_path, :description, :instructions])
+
+      case send_message(session.id, instructions, send_opts) do
         {:ok, admission} ->
           # Only mark "running" when the SDK actually started. :retry_queued means
           # the spawn failed and was queued for retry — agent stays "pending".
-          status = if admission == :started, do: "running", else: "pending"
+          status = admission_to_status(admission)
 
           Logger.info(
             "✅ create_agent: admission=#{admission} for session.id=#{session.id}, setting status=#{status}"
           )
 
-          case Agents.update_agent(agent, %{status: status}) do
-            {:ok, updated_agent} ->
-              {:ok, %{agent: updated_agent, session: session}}
-
-            {:error, reason} ->
-              Logger.warning(
-                "create_agent: agent status update to '#{status}' failed for agent.id=#{agent.id} - #{inspect(reason)}"
-              )
-
-              # Non-fatal: dispatch succeeded, return original agent
-              {:ok, %{agent: agent, session: session}}
-          end
+          update_agent_after_send(agent, session, status)
 
         {:error, reason} ->
           Logger.error(
             "❌ create_agent: initial message failed for session.id=#{session.id} - #{inspect(reason)}"
           )
 
-          case Agents.update_agent(agent, %{status: "failed"}) do
-            {:ok, _} ->
-              :ok
-
-            {:error, update_err} ->
-              Logger.warning(
-                "create_agent: agent status update to 'failed' failed for agent.id=#{agent.id} - #{inspect(update_err)}"
-              )
-          end
-
+          mark_agent_failed(agent)
           {:error, {:send_failed, reason}}
       end
+    end
+  end
+
+  defp admission_to_status(:started), do: "running"
+  defp admission_to_status(_), do: "pending"
+
+  defp update_agent_after_send(agent, session, status) do
+    case Agents.update_agent(agent, %{status: status}) do
+      {:ok, updated_agent} ->
+        {:ok, %{agent: updated_agent, session: session}}
+
+      {:error, reason} ->
+        Logger.warning(
+          "create_agent: agent status update to '#{status}' failed for agent.id=#{agent.id} - #{inspect(reason)}"
+        )
+
+        # Non-fatal: dispatch succeeded, return original agent
+        {:ok, %{agent: agent, session: session}}
+    end
+  end
+
+  defp mark_agent_failed(agent) do
+    case Agents.update_agent(agent, %{status: "failed"}) do
+      {:ok, _} ->
+        :ok
+
+      {:error, update_err} ->
+        Logger.warning(
+          "create_agent: agent status update to 'failed' failed for agent.id=#{agent.id} - #{inspect(update_err)}"
+        )
     end
   end
 
@@ -130,23 +136,14 @@ defmodule EyeInTheSky.Agents.AgentManager do
   end
 
   defp resolve_project_id(opts) do
-    # Inherit project_id from parent session if not explicitly provided
-    case opts[:project_id] do
-      nil ->
-        case opts[:parent_session_id] do
-          nil ->
-            nil
-
-          parent_id ->
-            case Sessions.get_session(parent_id) do
-              {:ok, parent} -> parent.project_id
-              _ -> nil
-            end
-        end
-
-      id ->
-        id
-    end
+    opts[:project_id] ||
+      with parent_id when not is_nil(parent_id) <- opts[:parent_session_id],
+           {:ok, parent} <- Sessions.get_session(parent_id) do
+        parent.project_id
+      else
+        nil -> nil
+        {:error, _} -> nil
+      end
   end
 
   defp resolve_worktree_path(opts) do
@@ -161,10 +158,13 @@ defmodule EyeInTheSky.Agents.AgentManager do
           {:ok, _} = ok ->
             ok
 
-          {:error, reason} = err ->
-            Logger.error("create_agent: git worktree setup failed for #{wt}: #{inspect(reason)}")
-
+          {:error, :dirty_working_tree} = err ->
+            Logger.error("create_agent: git worktree setup failed for #{wt}: dirty working tree")
             err
+
+          {:error, reason} ->
+            Logger.error("create_agent: git worktree setup failed for #{wt}: #{inspect(reason)}")
+            {:error, {:worktree_setup_failed, reason}}
         end
     end
   end
@@ -221,6 +221,125 @@ defmodule EyeInTheSky.Agents.AgentManager do
   end
 
   @doc """
+  Orchestrates agent spawning from validated HTTP params.
+
+  Resolves project and team, applies team context to instructions,
+  creates the agent, and joins the team if applicable.
+
+  Returns `{:ok, %{agent: agent, session: session, team: team, member_name: member_name}}`
+  or `{:error, code, message}` for validation errors, or `{:error, reason}` for spawn failures.
+  """
+  def spawn_agent(params) do
+    with {:ok, project_id, project_name} <- Projects.resolve_project(params),
+         {:ok, team} <- resolve_spawn_team(params["team_name"]) do
+      params = Map.merge(params, %{"project_id" => project_id, "project_name" => project_name})
+      instructions = apply_team_context(params["instructions"], team, params["member_name"])
+      opts = build_spawn_opts(%{params | "instructions" => instructions}, team)
+
+      case create_agent(opts) do
+        {:ok, %{agent: agent, session: session}} ->
+          maybe_join_team(team, agent, session, params["member_name"])
+          {:ok, %{agent: agent, session: session, team: team, member_name: params["member_name"]}}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  defp resolve_spawn_team(nil), do: {:ok, nil}
+  defp resolve_spawn_team(""), do: {:ok, nil}
+
+  defp resolve_spawn_team(name) do
+    case Teams.get_team_by_name(name) do
+      {:error, :not_found} -> {:error, "team_not_found", "team not found: #{name}"}
+      {:ok, team} -> {:ok, team}
+    end
+  end
+
+  defp apply_team_context(instructions, nil, _member_name), do: instructions
+
+  defp apply_team_context(instructions, team, member_name) do
+    instructions <> "\n\n" <> build_team_context(team, member_name)
+  end
+
+  defp build_team_context(team, member_name) do
+    EyeInTheSky.Agents.InstructionTemplates.team_context(team, member_name)
+  end
+
+  # Name resolution priority:
+  # 1. Explicit "name" param (trimmed, non-empty)
+  # 2. "member_name @ team_name" when both present
+  # 3. "member_name" alone
+  # 4. First 250 chars of instructions (or "Agent session" fallback)
+  defp resolve_session_name(%{"name" => name} = params, team)
+       when is_binary(name) and name != "" do
+    case String.trim(name) do
+      "" -> resolve_session_name(Map.delete(params, "name"), team)
+      trimmed -> trimmed
+    end
+  end
+
+  defp resolve_session_name(params, %{name: team_name})
+       when is_binary(team_name) do
+    member = params["member_name"]
+    if member, do: "#{member} @ #{team_name}", else: String.slice(params["instructions"] || "Agent session", 0, 250)
+  end
+
+  defp resolve_session_name(%{"member_name" => member}, _team) when is_binary(member),
+    do: member
+
+  defp resolve_session_name(params, _team),
+    do: String.slice(params["instructions"] || "Agent session", 0, 250)
+
+  defp build_spawn_opts(params, team) do
+    name = resolve_session_name(params, team)
+
+    [
+      instructions: params["instructions"],
+      model: params["model"],
+      agent_type: params["provider"] || "claude",
+      project_id: params["project_id"],
+      project_name: params["project_name"],
+      project_path: params["project_path"],
+      name: name,
+      description: name,
+      worktree: params["worktree"],
+      effort_level: params["effort_level"],
+      parent_agent_id: params["parent_agent_id"],
+      parent_session_id: params["parent_session_id"],
+      agent: params["agent"],
+      bypass_sandbox: params["bypass_sandbox"] == true
+    ]
+  end
+
+  defp maybe_join_team(nil, _agent, _session, _name), do: :ok
+
+  defp maybe_join_team(team, agent, session, member_name) do
+    result =
+      Teams.join_team(%{
+        team_id: team.id,
+        agent_id: agent.id,
+        session_id: session.id,
+        name: member_name || agent.uuid,
+        role: member_name || "agent",
+        status: "active"
+      })
+
+    case result do
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning(
+          "Team join failed: agent_id=#{agent.id} team_id=#{team.id} reason=#{inspect(reason)}"
+        )
+
+        :ok
+    end
+  end
+
+  @doc """
   Continues an existing session with a new prompt.
   Looks up or starts an AgentWorker and sends the message.
   Automatically resumes the Claude session if prior messages exist.
@@ -243,26 +362,36 @@ defmodule EyeInTheSky.Agents.AgentManager do
       "send_message: session_id=#{session_id}, message_length=#{String.length(message)}"
     )
 
-    case lookup_or_start(session_id, opts) do
+    case SessionBridge.ensure_worker_running(session_id, opts) do
       {:ok, pid, provider} ->
         Logger.debug(
           "send_message: worker found/started for session_id=#{session_id}, pid=#{inspect(pid)}"
         )
 
-        context = RuntimeContext.build(session_id, provider, opts)
+        context = EyeInTheSky.Agents.RuntimeContext.build(session_id, provider, opts)
 
-        case GenServer.call(pid, {:submit_message, message, context}) do
-          {:ok, admission} ->
-            Logger.debug("send_message: #{admission} for session_id=#{session_id}")
+        try do
+          case GenServer.call(pid, {:submit_message, message, context}) do
+            {:ok, admission} ->
+              Logger.debug("send_message: #{admission} for session_id=#{session_id}")
 
-            {:ok, admission}
+              {:ok, admission}
 
-          {:error, reason} = error ->
-            Logger.warning(
-              "send_message: rejected for session_id=#{session_id} - #{inspect(reason)}"
-            )
+            {:error, reason} = error ->
+              Logger.warning(
+                "send_message: rejected for session_id=#{session_id} - #{inspect(reason)}"
+              )
 
-            error
+              error
+          end
+        catch
+          :exit, {:noproc, _} ->
+            Logger.warning("send_message: worker died before call for session_id=#{session_id}")
+            {:error, :worker_not_found}
+
+          :exit, reason ->
+            Logger.error("send_message: worker exit for session_id=#{session_id} - #{inspect(reason)}")
+            {:error, {:worker_exit, reason}}
         end
 
       {:error, reason} ->
@@ -279,133 +408,6 @@ defmodule EyeInTheSky.Agents.AgentManager do
     {:error, :invalid_message}
   end
 
-  defp lookup_or_start(session_id, extra_opts) do
-    # Invariant: exactly one AgentWorker per session, keyed by {:session, session_id}
-    case Registry.lookup(@registry, {:session, session_id}) do
-      [{pid, provider}] ->
-        if Process.alive?(pid) do
-          Logger.debug(
-            "lookup_or_start: found existing worker for session_id=#{session_id}, pid=#{inspect(pid)}, provider=#{provider}"
-          )
-
-          {:ok, pid, provider}
-        else
-          start_agent_worker(session_id, extra_opts)
-        end
-
-      [] ->
-        Logger.info(
-          "🔍 lookup_or_start: no worker found for session_id=#{session_id}, starting new worker"
-        )
-
-        start_agent_worker(session_id, extra_opts)
-    end
-  end
-
-  defp start_agent_worker(session_id, extra_opts) do
-    Logger.info("🚀 start_agent_worker: loading session.id=#{session_id}")
-
-    with {:ok, session} <- Sessions.get_session(session_id),
-         {:ok, agent} <- Agents.get_agent(session.agent_id),
-         provider when not is_nil(provider) <- normalize_provider(session.provider),
-         {:ok, session} <- ensure_session_uuid(session) do
-      project_path = resolve_project_path_with_fallback(session, agent)
-
-      Logger.info(
-        "✅ start_agent_worker: loaded session.uuid=#{session.uuid}, agent.id=#{agent.id}, project_path=#{project_path}"
-      )
-
-      spawn_worker(session, agent, provider, project_path, extra_opts)
-    else
-      nil ->
-        {:error, {:unsupported_provider, nil}}
-
-      {:error, reason} ->
-        Logger.error(
-          "❌ start_agent_worker: failed for session.id=#{session_id} - #{inspect(reason)}"
-        )
-
-        {:error, reason}
-    end
-  end
-
-  defp resolve_project_path_with_fallback(session, agent) do
-    case SessionHelpers.resolve_project_path(session, agent) do
-      {:ok, path} ->
-        path
-
-      {:error, :no_project_path} ->
-        fallback = File.cwd!()
-
-        Logger.error(
-          "resolve_project_path: no path for session.id=#{session.id}; " <>
-            "session.git_worktree_path=#{inspect(session.git_worktree_path)}, " <>
-            "agent.git_worktree_path=#{inspect(agent.git_worktree_path)}, " <>
-            "project.path=#{inspect(if agent.project, do: agent.project.path)} — falling back to cwd=#{fallback}"
-        )
-
-        fallback
-    end
-  end
-
-  defp ensure_session_uuid(session) do
-    if is_nil(session.uuid) or session.uuid == "" do
-      uuid = Ecto.UUID.generate()
-      Logger.info("ensure_session_uuid: generating UUID=#{uuid} for session.id=#{session.id}")
-
-      case Sessions.update_session(session, %{uuid: uuid}) do
-        {:ok, updated} -> {:ok, updated}
-        {:error, reason} -> {:error, {:session_update_failed, reason}}
-      end
-    else
-      {:ok, session}
-    end
-  end
-
-  defp spawn_worker(session, agent, provider, project_path, extra_opts) do
-    opts = [
-      session_id: session.id,
-      # eits_session_uuid: stable EITS session UUID, never changes after assignment.
-      # Used for EITS tracking, env vars, and hooks. Distinct from provider_conversation_id.
-      eits_session_uuid: session.uuid,
-      # provider_conversation_id: the provider's resume key.
-      #   Claude: pre-generated UUID matching Claude's --session-id flag
-      #   Codex:  same value initially, but gets overwritten by the Codex thread_id
-      #           when the thread.started event fires (via maybe_sync_provider_conversation_id)
-      provider_conversation_id: session.uuid,
-      agent_id: agent.id,
-      project_id: session.project_id,
-      project_path: project_path,
-      provider: provider,
-      worktree: extra_opts[:worktree]
-    ]
-
-    case DynamicSupervisor.start_child(
-           EyeInTheSky.Claude.AgentSupervisor,
-           {AgentWorker, opts}
-         ) do
-      {:ok, pid} ->
-        Logger.info("✅ spawn_worker: started for session.id=#{session.id}, pid=#{inspect(pid)}")
-
-        {:ok, pid, provider}
-
-      {:error, {:already_started, pid}} ->
-        Logger.info(
-          "spawn_worker: already started for session.id=#{session.id}, pid=#{inspect(pid)}"
-        )
-
-        {:ok, pid, provider}
-
-      {:error, reason} = error ->
-        Logger.error("❌ spawn_worker: failed for session.id=#{session.id} - #{inspect(reason)}")
-
-        error
-    end
-  end
-
-  defp normalize_provider(provider) when provider in @supported_providers, do: provider
-  defp normalize_provider(_provider), do: nil
-
   # ── Agent definition resolution ────────────────────────────────────────
 
   # Resolves an agent slug to a definition record. Returns a map with
@@ -415,7 +417,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
   defp resolve_agent_definition("", _project_id, _project_path), do: nil
 
   defp resolve_agent_definition(slug, project_id, project_path) do
-    project_id = coerce_project_id(project_id)
+    project_id = ToolHelpers.parse_int(project_id)
     case lookup_definition(slug, project_id) do
       {:ok, defn} ->
         %{agent_definition_id: defn.id, definition_checksum_at_spawn: defn.checksum}
@@ -440,15 +442,6 @@ defmodule EyeInTheSky.Agents.AgentManager do
       AgentDefinitions.resolve(slug, project_id)
     else
       AgentDefinitions.resolve_global(slug)
-    end
-  end
-
-  defp coerce_project_id(nil), do: nil
-  defp coerce_project_id(id) when is_integer(id), do: id
-  defp coerce_project_id(id) when is_binary(id) do
-    case Integer.parse(id) do
-      {int, ""} -> int
-      _ -> nil
     end
   end
 

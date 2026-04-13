@@ -1,12 +1,15 @@
 defmodule EyeInTheSkyWeb.Components.NotesList do
+  @moduledoc false
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [normalize_parent_type: 1]
 
   attr :notes, :list, required: true
   attr :starred_filter, :boolean, default: false
   attr :search_query, :string, default: ""
   attr :sort_by, :string, default: "newest"
+  attr :type_filter, :string, default: "all"
   attr :empty_id, :string, default: "notes-empty"
   attr :editing_note_id, :integer, default: nil
   attr :current_path, :string, default: "/notes"
@@ -14,8 +17,8 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
   def notes_list(assigns) do
     ~H"""
     <%!-- Search + Filter --%>
-    <div class="mb-5 flex items-center gap-3">
-      <form phx-change="search" class="flex-1 sm:max-w-sm">
+    <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+      <form phx-change="search" class="w-full sm:flex-1 sm:max-w-sm">
         <div class="relative">
           <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
@@ -27,36 +30,53 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
             id={"#{@empty_id}-search"}
             value={@search_query}
             placeholder="Search notes..."
-            class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
+            class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-base min-h-[44px]"
             autocomplete="off"
           />
         </div>
       </form>
-      <button
-        type="button"
-        phx-click="toggle_starred_filter"
-        class={"flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 " <>
-          if(@starred_filter,
-            do: "bg-warning/10 text-warning",
-            else: "text-base-content/35 hover:text-base-content/50 hover:bg-base-200/40"
-          )}
-      >
-        <.icon
-          name={if @starred_filter, do: "hero-star-solid", else: "hero-star"}
-          class="w-3.5 h-3.5"
-        /> Starred
-      </button>
-      <form phx-change="sort_notes">
-        <label for={"#{@empty_id}-sort"} class="sr-only">Sort notes</label>
-        <select
-          name="value"
-          id={"#{@empty_id}-sort"}
-          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-0 h-8 text-xs"
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          phx-click="toggle_starred_filter"
+          class={"flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 min-h-[44px] min-w-[44px] " <>
+            if(@starred_filter,
+              do: "bg-warning/10 text-warning",
+              else: "text-base-content/35 hover:text-base-content/50 hover:bg-base-200/40"
+            )}
         >
-          <option value="newest" selected={@sort_by == "newest"}>Newest</option>
-          <option value="oldest" selected={@sort_by == "oldest"}>Oldest</option>
-        </select>
-      </form>
+          <.icon
+            name={if @starred_filter, do: "hero-star-solid", else: "hero-star"}
+            class="w-3.5 h-3.5"
+          /> Starred
+        </button>
+        <form phx-change="filter_type">
+          <label for={"#{@empty_id}-type"} class="sr-only">Filter by type</label>
+          <select
+            name="value"
+            id={"#{@empty_id}-type"}
+            class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
+          >
+            <option value="all" selected={@type_filter == "all"}>All Types</option>
+            <option value="session" selected={@type_filter == "session"}>Session</option>
+            <option value="agent" selected={@type_filter == "agent"}>Agent</option>
+            <option value="project" selected={@type_filter == "project"}>Project</option>
+            <option value="task" selected={@type_filter == "task"}>Task</option>
+            <option value="system" selected={@type_filter == "system"}>System</option>
+          </select>
+        </form>
+        <form phx-change="sort_notes">
+          <label for={"#{@empty_id}-sort"} class="sr-only">Sort notes</label>
+          <select
+            name="value"
+            id={"#{@empty_id}-sort"}
+            class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
+          >
+            <option value="newest" selected={@sort_by == "newest"}>Newest</option>
+            <option value="oldest" selected={@sort_by == "oldest"}>Oldest</option>
+          </select>
+        </form>
+      </div>
     </div>
 
     <%!-- Notes count --%>
@@ -66,33 +86,48 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
       </span>
     </div>
 
-    <%= if length(@notes) > 0 do %>
-      <div class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-5">
+    <%= if @notes != [] do %>
+      <div class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5">
         <%= for note <- @notes do %>
-          <div class="py-1 flex items-start gap-1">
-            <%!-- Collapse: title + body --%>
-            <div class="collapse collapse-arrow flex-1 overflow-visible">
+          <div class="py-1 flex items-start gap-1 group">
+            <%!-- Collapse: chevron expands inline body --%>
+            <div class="collapse flex-1 overflow-visible">
               <input type="checkbox" class="min-h-0 p-0" checked={note.id == @editing_note_id} />
-              <div class="collapse-title py-2.5 px-0 min-h-0 flex flex-col gap-1">
-                <div class="flex items-center gap-2">
-                  <%= if note.starred == 1 do %>
-                    <.icon name="hero-star-solid" class="w-3.5 h-3.5 text-warning flex-shrink-0" />
+              <div class="collapse-title py-3 px-0 min-h-0 flex flex-col gap-1">
+                <%!-- Title — clicking navigates to full editor --%>
+                <div class="flex items-center gap-2 pr-6">
+                  <%= if starred?(note) do %>
+                    <.icon name="hero-star-solid" class="w-3 h-3 text-warning flex-shrink-0" />
                   <% end %>
-                  <span class="text-sm font-medium text-base-content/85 truncate">
+                  <.link
+                    navigate={"/notes/#{note.id}/edit?return_to=#{URI.encode_www_form(@current_path)}"}
+                    class="text-sm font-medium text-base-content/85 hover:text-base-content truncate"
+                  >
                     {note.title || extract_title(note.body)}
-                  </span>
+                  </.link>
                 </div>
-                <div class="flex items-center gap-1.5 text-xs text-base-content/40">
+                <%!-- Metadata: type badge • source ref • age --%>
+                <div class="flex items-center gap-1.5 text-[11px] text-base-content/40">
                   <span class={[
-                    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium",
+                    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium",
                     parent_type_class(note.parent_type)
                   ]}>
                     <.icon name={parent_type_icon(note.parent_type)} class="w-2.5 h-2.5" />
                     {parent_type_label(note.parent_type)}
                   </span>
+                  <%= if ref = format_parent_ref(note.parent_id) do %>
+                    <span class="text-base-content/20">&middot;</span>
+                    <span class="font-mono text-base-content/30">{ref}</span>
+                  <% end %>
                   <span class="text-base-content/20">&middot;</span>
                   <span class="tabular-nums">{relative_time(note.created_at)}</span>
                 </div>
+                <%!-- Snippet preview --%>
+                <%= if snippet = extract_snippet(note.body) do %>
+                  <p class="text-xs text-base-content/35 truncate leading-snug mt-0.5 pr-6">
+                    {snippet}
+                  </p>
+                <% end %>
               </div>
               <div class="collapse-content px-0 pb-2">
                 <%= if note.id == @editing_note_id do %>
@@ -126,47 +161,69 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                 <% end %>
               </div>
             </div>
-            <%!-- Action buttons outside collapse so they don't trigger open/close --%>
-            <div class="flex items-center gap-0.5 flex-shrink-0 pt-2.5">
+
+            <%!-- Right: star always visible, kebab on hover --%>
+            <div class="flex items-center gap-0.5 flex-shrink-0 pt-3">
               <button
                 type="button"
                 phx-click="toggle_star"
                 phx-value-note_id={note.id}
-                class="flex items-center gap-1 text-xs text-base-content/30 hover:text-warning transition-colors px-1 py-0.5"
-                aria-label={if note.starred == 1, do: "Unstar note", else: "Star note"}
-                aria-pressed={note.starred == 1}
+                class={"flex items-center justify-center min-h-[44px] min-w-[44px] px-1 py-1 rounded transition-colors " <>
+                  if(starred?(note),
+                    do: "text-warning",
+                    else: "text-base-content/20 hover:text-warning"
+                  )}
+                aria-label={if starred?(note), do: "Unstar note", else: "Star note"}
               >
                 <.icon
-                  name={if note.starred == 1, do: "hero-star-solid", else: "hero-star"}
-                  class={"w-3.5 h-3.5 #{if note.starred == 1, do: "text-warning", else: ""}"}
+                  name={if starred?(note), do: "hero-star-solid", else: "hero-star"}
+                  class="w-3.5 h-3.5"
                 />
               </button>
-              <button
-                type="button"
-                phx-click="edit_note"
-                phx-value-note_id={note.id}
-                class="flex items-center gap-1 text-xs text-base-content/30 hover:text-primary transition-colors px-1 py-0.5"
-                aria-label="Edit note"
-              >
-                <.icon name="hero-pencil-square" class="w-3.5 h-3.5" />
-              </button>
-              <.link
-                navigate={"/notes/#{note.id}/edit?return_to=#{URI.encode_www_form(@current_path)}"}
-                class="flex items-center gap-1 text-xs text-base-content/30 hover:text-secondary transition-colors px-1 py-0.5"
-                aria-label="Open full editor"
-              >
-                <.icon name="hero-arrows-pointing-out" class="w-3.5 h-3.5" />
-              </.link>
-              <button
-                type="button"
-                phx-click="delete_note"
-                phx-value-note_id={note.id}
-                data-confirm="Delete this note?"
-                class="flex items-center gap-1 text-xs text-base-content/30 hover:text-error transition-colors px-1 py-0.5"
-                aria-label="Delete note"
-              >
-                <.icon name="hero-trash" class="w-3.5 h-3.5" />
-              </button>
+              <div class="dropdown dropdown-end">
+                <button
+                  tabindex="0"
+                  role="button"
+                  class="flex items-center justify-center min-h-[44px] min-w-[44px] px-1 py-1 rounded text-base-content/20 hover:text-base-content/60 hover:bg-base-200/50 transition-colors sm:opacity-0 sm:group-hover:opacity-100"
+                  aria-label="More actions"
+                >
+                  <.icon name="hero-ellipsis-vertical" class="w-4 h-4" />
+                </button>
+                <ul
+                  tabindex="0"
+                  class="dropdown-content z-50 menu menu-xs p-1 shadow-lg bg-base-200 rounded-lg w-44 border border-base-content/8"
+                >
+                  <li>
+                    <button
+                      type="button"
+                      phx-click="edit_note"
+                      phx-value-note_id={note.id}
+                      class="flex items-center gap-2 text-xs"
+                    >
+                      <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit inline
+                    </button>
+                  </li>
+                  <li>
+                    <.link
+                      navigate={"/notes/#{note.id}/edit?return_to=#{URI.encode_www_form(@current_path)}"}
+                      class="flex items-center gap-2 text-xs"
+                    >
+                      <.icon name="hero-arrows-pointing-out" class="w-3.5 h-3.5" /> Open full editor
+                    </.link>
+                  </li>
+                  <li class="mt-1 border-t border-base-content/8 pt-1">
+                    <button
+                      type="button"
+                      phx-click="delete_note"
+                      phx-value-note_id={note.id}
+                      data-confirm="Delete this note?"
+                      class="flex items-center gap-2 text-xs text-error/70 hover:!text-error hover:!bg-error/10"
+                    >
+                      <.icon name="hero-trash" class="w-3.5 h-3.5" /> Delete
+                    </button>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         <% end %>
@@ -182,32 +239,47 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
     """
   end
 
-  defp parent_type_label(type) when type in ["session", "sessions"], do: "Session"
-  defp parent_type_label(type) when type in ["agent", "agents"], do: "Agent"
-  defp parent_type_label(type) when type in ["project", "projects"], do: "Project"
-  defp parent_type_label(type) when type in ["task", "tasks"], do: "Task"
-  defp parent_type_label(type) when is_binary(type), do: String.capitalize(type)
-  defp parent_type_label(_), do: "Note"
+  defp parent_type_label(type) do
+    case normalize_parent_type(type) do
+      "session" -> "Session"
+      "agent" -> "Agent"
+      "project" -> "Project"
+      "task" -> "Task"
+      t when is_binary(t) -> String.capitalize(t)
+      _ -> "Note"
+    end
+  end
 
-  defp parent_type_icon(type) when type in ["session", "sessions"], do: "hero-clock-mini"
-  defp parent_type_icon(type) when type in ["agent", "agents"], do: "hero-cpu-chip-mini"
-  defp parent_type_icon(type) when type in ["project", "projects"], do: "hero-folder-mini"
+  defp parent_type_icon(type) do
+    case normalize_parent_type(type) do
+      "session" -> "hero-clock-mini"
+      "agent" -> "hero-cpu-chip-mini"
+      "project" -> "hero-folder-mini"
+      "task" -> "hero-clipboard-document-list-mini"
+      _ -> "hero-document-text-mini"
+    end
+  end
 
-  defp parent_type_icon(type) when type in ["task", "tasks"],
-    do: "hero-clipboard-document-list-mini"
+  defp parent_type_class(type) do
+    case normalize_parent_type(type) do
+      "session" -> "bg-info/10 text-info/70"
+      "agent" -> "bg-primary/10 text-primary/70"
+      "project" -> "bg-success/10 text-success/70"
+      _ -> "bg-base-content/[0.06] text-base-content/50"
+    end
+  end
 
-  defp parent_type_icon(_), do: "hero-document-text-mini"
+  # UUID (36 chars) -> first 8 chars; integer string -> "#N"; nil/empty -> nil
+  defp format_parent_ref(nil), do: nil
+  defp format_parent_ref(""), do: nil
 
-  defp parent_type_class(type) when type in ["session", "sessions"],
-    do: "bg-info/10 text-info/70"
-
-  defp parent_type_class(type) when type in ["agent", "agents"],
-    do: "bg-primary/10 text-primary/70"
-
-  defp parent_type_class(type) when type in ["project", "projects"],
-    do: "bg-success/10 text-success/70"
-
-  defp parent_type_class(_), do: "bg-base-content/[0.06] text-base-content/50"
+  defp format_parent_ref(id) when is_binary(id) do
+    if String.length(id) == 36 and String.contains?(id, "-") do
+      String.slice(id, 0, 8)
+    else
+      "#" <> id
+    end
+  end
 
   def extract_title(nil), do: "Untitled"
 
@@ -223,39 +295,36 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
     end)
   end
 
-  def format_date(nil), do: ""
+  defp starred?(note), do: note.starred == true
 
-  def format_date(timestamp) when is_binary(timestamp) do
-    case NaiveDateTime.from_iso8601(timestamp) do
-      {:ok, ndt} ->
-        format_naive_date(ndt)
+  defp extract_snippet(nil), do: nil
 
-      _ ->
-        case String.split(timestamp, [" ", "T"], parts: 2) do
-          [date | _] -> date
-          _ -> timestamp
-        end
+  defp extract_snippet(body) when is_binary(body) do
+    body
+    |> String.trim()
+    |> String.split("\n")
+    |> Enum.drop(1)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(fn line ->
+      line == "" or String.starts_with?(line, "#") or String.starts_with?(line, "---")
+    end)
+    |> List.first()
+    |> case do
+      nil ->
+        nil
+
+      line ->
+        stripped =
+          line
+          |> String.replace(~r/^[-*+]\s+/, "")
+          |> String.replace(~r/^\d+\.\s+/, "")
+          |> String.replace(~r/\*\*(.+?)\*\*/, "\\1")
+          |> String.replace(~r/\*(.+?)\*/, "\\1")
+          |> String.replace(~r/`(.+?)`/, "\\1")
+          |> String.replace(~r/\[(.+?)\]\(.+?\)/, "\\1")
+
+        if String.length(stripped) > 0, do: String.slice(stripped, 0, 120), else: nil
     end
   end
 
-  def format_date(_), do: ""
-
-  defp format_naive_date(ndt) do
-    today = Date.utc_today()
-    date = NaiveDateTime.to_date(ndt)
-
-    cond do
-      Date.compare(date, today) == :eq ->
-        Calendar.strftime(ndt, "Today at %H:%M")
-
-      Date.compare(date, Date.add(today, -1)) == :eq ->
-        "Yesterday"
-
-      Date.diff(today, date) < 7 ->
-        Calendar.strftime(ndt, "%a %b %d")
-
-      true ->
-        Calendar.strftime(ndt, "%b %d, %Y")
-    end
-  end
 end

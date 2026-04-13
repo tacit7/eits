@@ -59,8 +59,8 @@ defmodule EyeInTheSkyWeb.Presenters.AgentPresenter do
         title: task.title,
         description: task.description,
         priority: task.priority,
-        state_name: task.state && task.state.name,
-        tags: task.tags && Enum.map(task.tags, &%{id: format_uuid(&1.id), name: &1.name}),
+        state_name: if(task.state, do: task.state.name),
+        tags: if(task.tags, do: Enum.map(task.tags, &%{id: format_uuid(&1.id), name: &1.name})),
         created_at: task.created_at
       }
     end)
@@ -128,19 +128,7 @@ defmodule EyeInTheSkyWeb.Presenters.AgentPresenter do
             {message.sender_role, message.body, message.inserted_at, message.provider}
 
           map when is_map(map) ->
-            role = map[:role] || map["role"]
-            content = map[:content] || map["content"]
-            timestamp = map[:timestamp] || map["timestamp"]
-            provider = map[:provider] || map["provider"] || "claude"
-
-            ui_role =
-              case role do
-                "assistant" -> "agent"
-                "user" -> "user"
-                other -> other
-              end
-
-            {ui_role, content, timestamp, provider}
+            serialize_map_message(map)
         end
 
       %{
@@ -153,6 +141,19 @@ defmodule EyeInTheSkyWeb.Presenters.AgentPresenter do
   end
 
   def serialize_claude_messages(_), do: []
+
+  defp serialize_map_message(map) do
+    role = map[:role] || map["role"]
+    content = map[:content] || map["content"]
+    timestamp = map[:timestamp] || map["timestamp"]
+    provider = map[:provider] || map["provider"] || "claude"
+    ui_role = map_role_to_ui(role)
+    {ui_role, content, timestamp, provider}
+  end
+
+  defp map_role_to_ui("assistant"), do: "agent"
+  defp map_role_to_ui("user"), do: "user"
+  defp map_role_to_ui(other), do: other
 
   @spec group_and_serialize_messages(list(map()) | any) :: list(map())
   def group_and_serialize_messages(messages) when is_list(messages) do
@@ -189,7 +190,7 @@ defmodule EyeInTheSkyWeb.Presenters.AgentPresenter do
     |> Enum.with_index()
     |> Enum.map(fn {group, idx} ->
       prev_date = if idx > 0, do: Enum.at(groups, idx - 1).date, else: nil
-      show_date = prev_date && group.date != prev_date
+      show_date = not is_nil(prev_date) && group.date != prev_date
       Map.put(group, :show_date_separator, show_date)
     end)
   end

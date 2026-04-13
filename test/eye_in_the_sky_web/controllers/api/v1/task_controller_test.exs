@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
 
       assert resp["success"] == true
       assert is_list(resp["tasks"])
-      assert length(resp["tasks"]) >= 1
+      assert resp["tasks"] != []
     end
 
     test "filters by state_id", %{conn: conn} do

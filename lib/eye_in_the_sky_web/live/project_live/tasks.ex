@@ -1,15 +1,14 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Projects
   alias EyeInTheSky.Tasks
-  alias EyeInTheSkyWeb.Components.TaskCard
   alias EyeInTheSkyWeb.Components.FilterSheet
-  import EyeInTheSkyWeb.Helpers.PubSubHelpers
+  alias EyeInTheSkyWeb.Components.TaskCard
+  alias EyeInTheSkyWeb.ControllerHelpers
+  alias EyeInTheSkyWeb.Live.Shared.TasksListHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
+  import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Live.Shared.TasksHelpers
-
-  @per_page 50
 
   @impl true
   def mount(%{"id" => _} = params, _session, socket) do
@@ -50,7 +49,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
 
   @impl true
   def handle_event("filter_status", %{"state_id" => state_id}, socket) do
-    state_id = if state_id == "", do: nil, else: String.to_integer(state_id)
+    state_id = if state_id == "", do: nil, else: ControllerHelpers.parse_int(state_id)
 
     {:noreply,
      socket
@@ -88,13 +87,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     do: handle_toggle_task_detail_drawer(params, socket)
 
   @impl true
-  def handle_event("keydown", %{"key" => "k", "ctrlKey" => true}, socket) do
-    {:noreply, assign(socket, :show_new_task_drawer, !socket.assigns.show_new_task_drawer)}
-  end
-
-  def handle_event("keydown", _params, socket), do: {:noreply, socket}
-
-  @impl true
   def handle_event("open_task_detail", params, socket),
     do: handle_open_task_detail(params, socket)
 
@@ -119,72 +111,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   def handle_info(:tasks_changed, socket),
     do: handle_tasks_changed(socket, &load_tasks/1)
 
-  # Resets to page 1, replaces the task list
   defp load_tasks(socket) do
     project_id = socket.assigns.project_id
-    query = socket.assigns.search_query
-    filter_state_id = socket.assigns.filter_state_id
-    sort_by = socket.assigns.sort_by
 
-    if query != "" and String.trim(query) != "" do
-      tasks = Tasks.search_tasks(query, project_id)
-
-      tasks =
-        if filter_state_id,
-          do: Enum.filter(tasks, &(&1.state_id == filter_state_id)),
-          else: tasks
-
-      socket
-      |> assign(:task_count, length(tasks))
-      |> assign(:page, 1)
-      |> assign(:has_more, false)
-      |> assign(:total_tasks, length(tasks))
-      |> stream(:tasks, tasks, reset: true)
-    else
-      total = Projects.count_project_tasks(project_id, state_id: filter_state_id)
-
-      tasks =
-        Projects.get_project_tasks(project_id,
-          state_id: filter_state_id,
-          sort_by: sort_by,
-          limit: @per_page,
-          offset: 0
-        )
-
-      socket
-      |> assign(:task_count, length(tasks))
-      |> assign(:page, 1)
-      |> assign(:has_more, length(tasks) < total)
-      |> assign(:total_tasks, total)
-      |> stream(:tasks, tasks, reset: true)
-    end
+    TasksListHelpers.load_tasks(
+      socket,
+      fn query -> Tasks.search_tasks(query, project_id) end,
+      fn opts -> Tasks.list_tasks_for_project(project_id, opts) end,
+      fn opts -> Tasks.count_tasks_for_project(project_id, opts) end
+    )
   end
 
-  # Appends the next page to the existing task list
   defp load_tasks_page(socket, page) do
     project_id = socket.assigns.project_id
-    filter_state_id = socket.assigns.filter_state_id
-    sort_by = socket.assigns.sort_by
-    offset = (page - 1) * @per_page
-    total = socket.assigns.total_tasks
-
-    new_tasks =
-      Projects.get_project_tasks(project_id,
-        state_id: filter_state_id,
-        sort_by: sort_by,
-        limit: @per_page,
-        offset: offset
-      )
-
-    socket =
-      socket
-      |> update(:task_count, &(&1 + length(new_tasks)))
-      |> assign(:page, page)
-      |> assign(:has_more, offset + length(new_tasks) < total)
-
-    Enum.reduce(new_tasks, socket, fn task, acc ->
-      stream_insert(acc, :tasks, task)
-    end)
+    TasksListHelpers.load_tasks_page(socket, page, fn opts -> Tasks.list_tasks_for_project(project_id, opts) end)
   end
 
   @impl true
@@ -206,7 +146,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
                 id="project-tasks-search"
                 value={@search_query}
                 placeholder="Search tasks..."
-                class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-sm"
+                class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-base min-h-[44px]"
                 autocomplete="off"
               />
             </div>
@@ -217,10 +157,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
             phx-click="open_filter_sheet"
             aria-label="Open filters"
             aria-haspopup="dialog"
-            class="sm:hidden relative btn btn-ghost btn-sm btn-square"
+            class="sm:hidden relative btn btn-ghost btn-sm btn-square h-11 w-11"
           >
             <.icon name="hero-funnel-mini" class="w-4 h-4" />
-            <%= if !is_nil(@filter_state_id) || @sort_by != "created_desc" do %>
+            <%= if not is_nil(@filter_state_id) || @sort_by != "created_desc" do %>
               <span
                 class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full"
                 aria-hidden="true"
@@ -231,7 +171,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
 
           <.link
             navigate={~p"/projects/#{@project.id}/kanban"}
-            class="btn btn-sm sm:btn-xs btn-ghost border border-base-content/10 gap-1 min-h-0 h-8 sm:h-7"
+            class="btn btn-sm sm:btn-xs btn-ghost border border-base-content/10 gap-1 min-h-0 h-11 sm:h-7"
             title="Kanban board"
           >
             <.icon name="hero-view-columns-mini" class="w-3.5 h-3.5" />
@@ -239,7 +179,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
           </.link>
           <button
             phx-click="toggle_new_task_drawer"
-            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-8 sm:h-7 text-xs"
+            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 sm:h-7 text-xs"
           >
             <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Task
           </button>
@@ -253,7 +193,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
             phx-value-state_id=""
             aria-pressed={is_nil(@filter_state_id)}
             class={[
-              "btn btn-xs gap-1 min-h-0 h-8",
+              "btn btn-xs gap-1 h-11 sm:h-8 sm:min-h-0",
               if(is_nil(@filter_state_id), do: "btn-neutral", else: "btn-ghost text-base-content/50")
             ]}
           >
@@ -265,7 +205,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
               phx-value-state_id={state.id}
               aria-pressed={@filter_state_id == state.id}
               class={[
-                "btn btn-xs gap-1 min-h-0 h-8",
+                "btn btn-xs gap-1 h-11 sm:h-8 sm:min-h-0",
                 if(@filter_state_id == state.id,
                   do: "btn-neutral",
                   else: "btn-ghost text-base-content/50"
@@ -284,7 +224,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
             <select
               name="value"
               id="project-tasks-sort"
-              class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-0 h-8 text-xs"
+              class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 h-11 sm:h-8 sm:min-h-0 text-xs"
             >
               <option value="created_desc" selected={@sort_by == "created_desc"}>Newest first</option>
               <option value="created_asc" selected={@sort_by == "created_asc"}>Oldest first</option>
@@ -319,7 +259,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
           <div
             id="project-tasks-list"
             phx-update="stream"
-            class="divide-y divide-base-content/5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl shadow-sm px-5"
+            class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5"
           >
             <div :for={{dom_id, task} <- @streams.tasks} id={dom_id}>
               <TaskCard.task_card

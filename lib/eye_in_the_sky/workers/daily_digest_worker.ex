@@ -11,7 +11,7 @@ defmodule EyeInTheSky.Workers.DailyDigestWorker do
 
   import Ecto.Query, warn: false
 
-  alias EyeInTheSky.{Repo, ScheduledJobs, Notes, Notifications, Tasks}
+  alias EyeInTheSky.{Notifications, Repo, ScheduledJobs, Tasks}
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"job_id" => job_id}}) do
@@ -33,6 +33,7 @@ defmodule EyeInTheSky.Workers.DailyDigestWorker do
 
       {:error, reason} ->
         ScheduledJobs.record_run_complete(run, "failed", result: inspect(reason))
+        broadcast()
         {:error, reason}
     end
   end
@@ -57,7 +58,9 @@ defmodule EyeInTheSky.Workers.DailyDigestWorker do
         Logger.error("DailyDigestWorker: failed to write to Desktop: #{inspect(reason)}")
     end
 
-    Notes.create_note(%{
+    notes_mod = Application.get_env(:eye_in_the_sky, :notes_module, EyeInTheSky.Notes)
+
+    notes_mod.create_note(%{
       title: "Daily Digest — #{date_label}",
       body: body,
       parent_type: "system",
@@ -100,7 +103,7 @@ defmodule EyeInTheSky.Workers.DailyDigestWorker do
       from c in "commits",
         left_join: s in "sessions",
         on: s.id == c.session_id,
-        where: fragment("?::text", c.created_at) >= ^since,
+        where: c.created_at >= ^since,
         select: %{
           hash: c.commit_hash,
           message: c.commit_message,

@@ -1,11 +1,12 @@
 defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
+  @moduledoc false
   require Logger
 
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 2]
 
-  alias EyeInTheSky.{Tasks, Notes}
+  alias EyeInTheSky.{Notes, Tasks}
 
   # ---------------------------------------------------------------------------
   # Event handlers with no dependency on per-LiveView private functions
@@ -175,12 +176,37 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
     project_id = socket.assigns[:project_id]
     session_id = socket.assigns[:session_id]
 
-    opts =
-      [project_id: project_id, session_id: session_id]
-      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+    title = params["title"]
+    description = params["description"]
+    state_id = parse_form_int(params["state_id"], 0)
+    priority = parse_form_int(params["priority"], 1)
+    tags_string = params["tags"] || ""
 
-    case Tasks.create_task_from_form(params, opts) do
-      {:ok, _task} ->
+    tag_names =
+      tags_string
+      |> String.split(",")
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+
+    now = DateTime.utc_now()
+
+    task_attrs = %{
+      uuid: Ecto.UUID.generate(),
+      title: title,
+      description: description,
+      state_id: if(state_id > 0, do: state_id, else: Tasks.WorkflowState.todo_id()),
+      priority: priority,
+      created_at: now,
+      updated_at: now
+    }
+
+    task_attrs = if project_id, do: Map.put(task_attrs, :project_id, project_id), else: task_attrs
+
+    case Tasks.create_task(task_attrs) do
+      {:ok, task} ->
+        if tag_names != [], do: Tasks.replace_task_tags(task.id, tag_names)
+        if session_id, do: Tasks.link_session_to_task(task.id, session_id)
+
         {:noreply,
          socket
          |> assign(:show_new_task_drawer, false)
@@ -224,33 +250,51 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
     target_project_id = parse_int(project_id_str, 0)
 
     if target_project_id > 0 and task do
-      now = DateTime.utc_now()
-      tag_names = Enum.map(task.tags || [], & &1.name)
-
-      case Tasks.create_task(%{
-             uuid: Ecto.UUID.generate(),
-             title: task.title,
-             description: task.description,
-             state_id: EyeInTheSky.Tasks.WorkflowState.todo_id(),
-             priority: task.priority || 0,
-             project_id: target_project_id,
-             created_at: now,
-             updated_at: now
-           }) do
-        {:ok, new_task} ->
-          if tag_names != [], do: Tasks.replace_task_tags(new_task.id, tag_names)
-          target = EyeInTheSky.Projects.get_project!(target_project_id)
-
-          {:noreply,
-           socket
-           |> assign(:show_task_detail_drawer, false)
-           |> put_flash(:info, "Task copied to #{target.name}")}
-
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to copy task")}
-      end
+      do_copy_task(task, target_project_id, socket)
     else
       {:noreply, socket}
     end
   end
+
+  defp do_copy_task(task, target_project_id, socket) do
+    now = DateTime.utc_now()
+    tag_names = Enum.map(task.tags || [], & &1.name)
+
+    case Tasks.create_task(%{
+           uuid: Ecto.UUID.generate(),
+           title: task.title,
+           description: task.description,
+           state_id: EyeInTheSky.Tasks.WorkflowState.todo_id(),
+           priority: task.priority || 0,
+           project_id: target_project_id,
+           created_at: now,
+           updated_at: now
+         }) do
+      {:ok, new_task} ->
+        if tag_names != [], do: Tasks.replace_task_tags(new_task.id, tag_names)
+        target = EyeInTheSky.Projects.get_project!(target_project_id)
+
+        {:noreply,
+         socket
+         |> assign(:show_task_detail_drawer, false)
+         |> put_flash(:info, "Task copied to #{target.name}")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to copy task")}
+    end
+  end
+
+  # Lenient integer parser for form params. Accepts trailing chars ("2 " → 2)
+  # unlike ControllerHelpers.parse_int which requires exact match ("2 " → default).
+  defp parse_form_int(nil, default), do: default
+  defp parse_form_int(val, _default) when is_integer(val), do: val
+
+  defp parse_form_int(val, default) when is_binary(val) do
+    case Integer.parse(val) do
+      {int, _} -> int
+      :error -> default
+    end
+  end
+
+  defp parse_form_int(_, default), do: default
 end

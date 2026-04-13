@@ -4,10 +4,14 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
   into the session_metrics table. All DB writes use raw SQL via Repo.query!/2.
   """
 
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Claude.SessionReader
   alias EyeInTheSky.Metrics.TokenParser
+  alias EyeInTheSky.Repo
   alias EyeInTheSky.Settings
+
+  defmodule Acc do
+    defstruct ingested: 0, skipped: 0, errors: 0
+  end
 
   @doc """
   Ingest token usage for all discovered sessions.
@@ -15,7 +19,7 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
   Options:
   - `:force` - re-process sessions that already have metrics (default: false)
 
-  Returns `{ingested, skipped, errors}` counts.
+  Returns a map with `:ingested`, `:skipped`, `:errors` counts.
   """
   def ingest_all(opts \\ []) do
     force = Keyword.get(opts, :force, false)
@@ -28,27 +32,11 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
         fetch_existing_metric_session_ids()
       end
 
-    sessions
-    |> Enum.reduce({0, 0, 0}, fn session_info, {ingested, skipped, errors} ->
-      session_uuid = session_info.session_id
+    acc =
+      sessions
+      |> Enum.reduce(%Acc{}, &process_session_entry(&1, existing_session_ids, &2))
 
-      case lookup_session_by_uuid(session_uuid) do
-        nil ->
-          {ingested, skipped + 1, errors}
-
-        %{id: session_id, agent_id: agent_id} ->
-          if MapSet.member?(existing_session_ids, session_id) do
-            {ingested, skipped + 1, errors}
-          else
-            file_path = build_file_path(session_info)
-
-            case ingest_one(file_path, session_id, agent_id) do
-              :ok -> {ingested + 1, skipped, errors}
-              {:error, _reason} -> {ingested, skipped, errors + 1}
-            end
-          end
-      end
-    end)
+    %{ingested: acc.ingested, skipped: acc.skipped, errors: acc.errors}
   end
 
   @doc """
@@ -57,41 +45,62 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
   Returns `:ok` or `{:error, reason}`.
   """
   def ingest_session(session_uuid) do
-    case lookup_session_by_uuid(session_uuid) do
-      nil ->
-        {:error, :session_not_found}
-
-      %{id: session_id, agent_id: agent_id} ->
-        sessions = SessionReader.discover_all_sessions()
-
-        case Enum.find(sessions, fn s -> s.session_id == session_uuid end) do
-          nil ->
-            {:error, :jsonl_not_found}
-
-          session_info ->
-            file_path = build_file_path(session_info)
-            ingest_one(file_path, session_id, agent_id)
-        end
+    with {:ok, db_session} <- fetch_db_session(session_uuid),
+         {:ok, session_info} <- find_session_info(session_uuid) do
+      file_path = build_file_path(session_info)
+      ingest_one(file_path, db_session.id, db_session.agent_id)
     end
   end
 
   # -- Private --
 
+  defp process_session_entry(session_info, existing_session_ids, %Acc{} = acc) do
+    case lookup_session_by_uuid(session_info.session_id) do
+      nil -> %{acc | skipped: acc.skipped + 1}
+      db_session -> process_found_session(session_info, db_session, existing_session_ids, acc)
+    end
+  end
+
+  defp process_found_session(session_info, db_session, existing_session_ids, %Acc{} = acc) do
+    if MapSet.member?(existing_session_ids, db_session.id) do
+      %{acc | skipped: acc.skipped + 1}
+    else
+      file_path = build_file_path(session_info)
+      case ingest_one(file_path, db_session.id, db_session.agent_id) do
+        :ok -> %{acc | ingested: acc.ingested + 1}
+        {:error, _} -> %{acc | errors: acc.errors + 1}
+      end
+    end
+  end
+
+  defp fetch_db_session(session_uuid) do
+    case lookup_session_by_uuid(session_uuid) do
+      nil -> {:error, :session_not_found}
+      db_session -> {:ok, db_session}
+    end
+  end
+
+  defp find_session_info(session_uuid) do
+    sessions = SessionReader.discover_all_sessions()
+    case Enum.find(sessions, fn s -> s.session_id == session_uuid end) do
+      nil -> {:error, :jsonl_not_found}
+      session_info -> {:ok, session_info}
+    end
+  end
+
   defp ingest_one(file_path, session_id, agent_id) do
     case TokenParser.parse_session(file_path) do
       {:ok, usage} ->
         primary_model = primary_model_name(usage.models)
-        cost = calculate_cost(usage, primary_model)
-        notes_json = Jason.encode!(%{models: usage.models})
 
-        upsert_metrics(
-          session_id,
-          agent_id,
-          usage,
-          cost,
-          primary_model,
-          notes_json
-        )
+        upsert_metrics(%{
+          session_id: session_id,
+          agent_id: agent_id,
+          usage: usage,
+          cost: calculate_cost(usage, primary_model),
+          model_name: primary_model,
+          notes_json: Jason.encode!(%{models: usage.models})
+        })
 
         :ok
 
@@ -100,7 +109,14 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
     end
   end
 
-  defp upsert_metrics(session_id, agent_id, usage, cost, model_name, notes_json) do
+  defp upsert_metrics(%{
+         session_id: session_id,
+         agent_id: agent_id,
+         usage: usage,
+         cost: cost,
+         model_name: model_name,
+         notes_json: notes_json
+       }) do
     sql = """
     INSERT INTO session_metrics (
       session_id, agent_id, tokens_used, tokens_budget, tokens_remaining,
@@ -157,7 +173,9 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
 
   defp build_file_path(session_info) do
     home = System.get_env("HOME")
-    escaped_path = SessionReader.escape_project_path(session_info.project_path)
+    # Use escaped_path directly (the real directory name on disk) rather than
+    # re-escaping the lossy project_path, which breaks for hyphenated paths.
+    escaped_path = session_info.escaped_path
     Path.join([home, ".claude", "projects", escaped_path, "#{session_info.session_id}.jsonl"])
   end
 
@@ -183,13 +201,10 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
     Float.round(input_cost + output_cost + cache_read_cost + cache_creation_cost, 6)
   end
 
+  @pricing_tiers ["opus", "haiku", "sonnet"]
+
   defp detect_pricing_tier(model_name) when is_binary(model_name) do
-    cond do
-      String.contains?(model_name, "opus") -> "opus"
-      String.contains?(model_name, "haiku") -> "haiku"
-      String.contains?(model_name, "sonnet") -> "sonnet"
-      true -> "sonnet"
-    end
+    Enum.find(@pricing_tiers, "sonnet", &String.contains?(model_name, &1))
   end
 
   defp detect_pricing_tier(_), do: "sonnet"

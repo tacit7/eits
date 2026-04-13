@@ -4,21 +4,43 @@ defmodule EyeInTheSkyWeb.NavHook do
   and sets deterministic mobile nav active-state assigns.
 
   Sets:
-  - `nav_path`       — the current request path (e.g. "/projects/3/kanban")
-  - `mobile_nav_tab` — one of :sessions | :tasks | :notes | :project | :none
+  - `nav_path`         — the current request path (e.g. "/projects/3/kanban")
+  - `mobile_nav_tab`   — one of :sessions | :tasks | :notes | :project | :none
+  - `palette_projects` — list of %{id, name} maps for the command palette
+
+  Palette events are delegated to PaletteHandlers and PaletteAgentHandlers.
   """
 
-  import Phoenix.LiveView
+  import Phoenix.LiveView, only: [attach_hook: 4]
   import Phoenix.Component, only: [assign: 3]
 
+  alias EyeInTheSky.Projects
+  alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.MobileNav
+  alias EyeInTheSkyWeb.NavHook.PaletteAgentHandlers
+  alias EyeInTheSkyWeb.NavHook.PaletteHandlers
 
   def on_mount(:default, _params, _session, socket) do
+    projects =
+      Projects.list_projects()
+      |> Enum.map(&%{id: &1.id, name: &1.name})
+
     socket =
       socket
       |> assign(:nav_path, nil)
       |> assign(:mobile_nav_tab, :sessions)
+      |> assign(:palette_projects, projects)
+      |> assign(:palette_shortcut, Settings.get("palette_shortcut") || "auto")
       |> attach_hook(:capture_nav_path, :handle_params, &capture_nav_path/3)
+      |> attach_hook(:palette_sessions, :handle_event, &PaletteHandlers.handle_palette_event/3)
+      |> attach_hook(:palette_create_task, :handle_event, &PaletteHandlers.handle_create_task_event/3)
+      |> attach_hook(:palette_create_note, :handle_event, &PaletteHandlers.handle_create_note_event/3)
+      |> attach_hook(:palette_create_chat, :handle_event, &PaletteHandlers.handle_create_chat_event/3)
+      |> attach_hook(:palette_create_agent, :handle_event, &PaletteAgentHandlers.handle_create_agent/3)
+      |> attach_hook(:palette_update_agent, :handle_event, &PaletteAgentHandlers.handle_update_agent/3)
+      |> attach_hook(:palette_list_agents, :handle_event, &PaletteAgentHandlers.handle_list_agents/3)
+      |> attach_hook(:palette_get_agent, :handle_event, &PaletteAgentHandlers.handle_get_agent/3)
+      |> attach_hook(:palette_delete_agent, :handle_event, &PaletteAgentHandlers.handle_delete_agent/3)
 
     {:cont, socket}
   end

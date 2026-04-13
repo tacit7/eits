@@ -1,6 +1,8 @@
 defmodule Mix.Tasks.Eits.Gen.ApiKey do
   use Mix.Task
 
+  alias EyeInTheSky.Accounts.ApiKey
+
   @shortdoc "Generate and store a new API key for the EITS REST API"
   @moduledoc """
   Generates a cryptographically random API key, hashes it, and inserts a row
@@ -53,7 +55,7 @@ defmodule Mix.Tasks.Eits.Gen.ApiKey do
 
     key = :crypto.strong_rand_bytes(32) |> Base.encode64(padding: false)
 
-    case EyeInTheSky.Accounts.ApiKey.create(key, label, valid_until) do
+    case ApiKey.create(key, label, valid_until) do
       {:ok, api_key} ->
         expiry_note =
           if api_key.valid_until,

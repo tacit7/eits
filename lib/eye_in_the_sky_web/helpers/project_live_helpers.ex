@@ -11,7 +11,6 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectLiveHelpers do
   import Phoenix.LiveView, only: [put_flash: 3]
 
   alias EyeInTheSky.Projects
-  alias EyeInTheSky.Repo
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_id: 1]
 
   @doc """
@@ -37,8 +36,11 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectLiveHelpers do
     preload = Keyword.get(opts, :preload, [])
 
     project_id = parse_id(id)
-    project = project_id && Projects.get_project(project_id)
-    project = if project && preload != [], do: Repo.preload(project, preload), else: project
+    project = if project_id, do: (case Projects.get_project(project_id) do
+      {:ok, p} -> p
+      {:error, :not_found} -> nil
+    end), else: nil
+    project = if not is_nil(project) && preload != [], do: Projects.preload_project(project, preload), else: project
 
     if project do
       socket

@@ -88,14 +88,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
       <!-- Header with back button -->
       <div class="mb-6">
         <.link navigate={~p"/prompts"} class="btn btn-ghost btn-sm gap-2">
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M10 19l-7-7m0 0l7-7m-7 7h18"
-            />
-          </svg>
+          <.icon name="hero-arrow-left" class="h-4 w-4" />
           Back to Prompts
         </.link>
       </div>
@@ -104,7 +97,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
       <div class="sm:flex sm:items-center sm:justify-between mb-6">
         <div class="sm:flex-auto">
           <div class="flex items-center gap-3">
-            <h1 class="text-2xl font-semibold leading-6 text-gray-900 dark:text-gray-100">
+            <h1 class="text-2xl font-semibold leading-6 text-base-content">
               {@prompt.name}
             </h1>
             <%= if is_nil(@prompt.project_id) do %>
@@ -116,7 +109,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
           </div>
 
           <%= if @prompt.description do %>
-            <p class="mt-2 text-sm text-gray-700 dark:text-gray-400">
+            <p class="mt-2 text-sm text-base-content/70">
               {@prompt.description}
             </p>
           <% end %>
@@ -125,22 +118,8 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
         <div class="mt-4 sm:mt-0 flex items-center gap-2">
           <label class="swap swap-rotate btn btn-ghost btn-sm btn-circle">
             <input type="checkbox" class="theme-controller" value="dark" />
-            <svg class="swap-on h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-              />
-            </svg>
-            <svg class="swap-off h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-              />
-            </svg>
+            <.icon name="hero-sun" class="swap-on h-5 w-5" />
+            <.icon name="hero-moon" class="swap-off h-5 w-5" />
           </label>
 
           <%= if @editing do %>
@@ -155,14 +134,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
               phx-click="edit"
               class="btn btn-primary btn-sm"
             >
-              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                />
-              </svg>
+              <.icon name="hero-pencil-square" class="h-4 w-4" />
               Edit
             </button>
             <button
@@ -170,14 +142,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
               class="btn btn-error btn-sm"
               data-confirm="Are you sure you want to deactivate this prompt?"
             >
-              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
+              <.icon name="hero-trash" class="h-4 w-4" />
               Deactivate
             </button>
           <% end %>
@@ -188,14 +153,14 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         <div class="card bg-base-200">
           <div class="card-body p-4">
-            <div class="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Slug</div>
+            <div class="text-xs text-base-content/50 uppercase font-semibold">Slug</div>
             <code class="text-sm font-mono mt-1">{@prompt.slug}</code>
           </div>
         </div>
 
         <div class="card bg-base-200">
           <div class="card-body p-4">
-            <div class="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">
+            <div class="text-xs text-base-content/50 uppercase font-semibold">
               Version
             </div>
             <div class="text-lg font-semibold mt-1">v{@prompt.version}</div>
@@ -204,7 +169,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
 
         <div class="card bg-base-200">
           <div class="card-body p-4">
-            <div class="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">
+            <div class="text-xs text-base-content/50 uppercase font-semibold">
               Created
             </div>
             <div class="text-sm mt-1" title={format_datetime_full(@prompt.created_at)}>
@@ -215,7 +180,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
 
         <div class="card bg-base-200">
           <div class="card-body p-4">
-            <div class="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">
+            <div class="text-xs text-base-content/50 uppercase font-semibold">
               Updated
             </div>
             <div class="text-sm mt-1" title={format_datetime_full(@prompt.updated_at)}>
@@ -292,14 +257,14 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
       <% end %>
       
     <!-- Additional Info (if available) -->
-      <%= if @prompt.tags || @prompt.created_by || @prompt.project_id do %>
+      <%= if not is_nil(@prompt.tags) || not is_nil(@prompt.created_by) || not is_nil(@prompt.project_id) do %>
         <div class="card bg-base-100 shadow-xl mt-6">
           <div class="card-body">
             <h2 class="card-title text-lg">Additional Information</h2>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 mt-4">
               <%= if @prompt.tags do %>
                 <div>
-                  <div class="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold mb-2">
+                  <div class="text-xs text-base-content/50 uppercase font-semibold mb-2">
                     Tags
                   </div>
                   <div class="text-sm">{@prompt.tags}</div>
@@ -308,7 +273,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
 
               <%= if @prompt.created_by do %>
                 <div>
-                  <div class="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold mb-2">
+                  <div class="text-xs text-base-content/50 uppercase font-semibold mb-2">
                     Created By
                   </div>
                   <div class="text-sm">{@prompt.created_by}</div>
@@ -317,7 +282,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
 
               <%= if @prompt.project_id do %>
                 <div>
-                  <div class="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold mb-2">
+                  <div class="text-xs text-base-content/50 uppercase font-semibold mb-2">
                     Project ID
                   </div>
                   <div class="text-sm font-mono">{@prompt.project_id}</div>

@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.Components.DatePickerModal do
       |> assign(:day_names, @day_names)
 
     ~H"""
-    <%= if @show && @task do %>
+    <%= if @show && not is_nil(@task) do %>
       <%!-- Backdrop --%>
       <div
         class="fixed inset-0 z-50 bg-black/40"
@@ -38,7 +38,7 @@ defmodule EyeInTheSkyWeb.Components.DatePickerModal do
       />
       <%!-- Modal panel --%>
       <div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-        <div class="pointer-events-auto w-72 rounded-2xl bg-base-200 dark:bg-[hsl(225,10%,22%)] shadow-2xl flex flex-col overflow-hidden">
+        <div class="pointer-events-auto w-72 rounded-2xl bg-base-200 shadow-2xl flex flex-col overflow-hidden">
           <%!-- Month navigation --%>
           <div class="flex items-center justify-between px-4 py-3 border-b border-base-content/10">
             <button
@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWeb.Components.DatePickerModal do
             <%!-- Day headers --%>
             <div class="grid grid-cols-7 mb-1">
               <%= for day <- @day_names do %>
-                <div class="text-center text-[10px] font-medium text-base-content/40 py-1">
+                <div class="text-center text-xs font-medium text-base-content/40 py-1">
                   {day}
                 </div>
               <% end %>
@@ -110,7 +110,7 @@ defmodule EyeInTheSkyWeb.Components.DatePickerModal do
                 type="date"
                 name="due_at"
                 value={@selected_date || ""}
-                class="input input-sm w-full bg-base-300 dark:bg-base-100/10 border-base-content/15 text-sm focus:border-primary/50"
+                class="input input-sm w-full bg-base-300 dark:bg-base-100/10 border-base-content/15 text-base focus:border-primary/50 min-h-[44px]"
               />
             </div>
             <div class="flex gap-2">

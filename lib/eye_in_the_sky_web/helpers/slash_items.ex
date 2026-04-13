@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
   """
 
   alias EyeInTheSky.{Agents, Prompts}
+  alias EyeInTheSkyWeb.DmLive.SlashCommands
 
   @doc """
   Returns a flat list of slash-completable items from all sources:
@@ -25,10 +26,28 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
     project_skills = load_project_skills(project_path)
     agents = load_agents()
     prompts = load_prompts()
+    flags = cli_flags()
 
-    (skills ++ plugin_skills ++ project_skills ++ agents ++ prompts)
+    (skills ++ plugin_skills ++ project_skills ++ agents ++ prompts ++ flags)
     |> Enum.uniq_by(& &1.slug)
   end
+
+  @doc """
+  Returns a list of CLI flag items derived from SlashCommands.command_metadata/0.
+  Each item has slug, type: "flag", description, and arg_type.
+  """
+  def cli_flags do
+    SlashCommands.command_metadata()
+    |> Enum.map(fn {slug, arg_type, description} ->
+      %{slug: slug, type: "flag", description: description, arg_type: encode_arg_type(arg_type)}
+    end)
+  end
+
+  defp encode_arg_type(:none),           do: "none"
+  defp encode_arg_type(:free_text),      do: "free_text"
+  defp encode_arg_type(:integer),        do: "integer"
+  defp encode_arg_type(:path),           do: "path"
+  defp encode_arg_type({:enum, values}), do: %{type: "enum", values: values}
 
   @doc false
   def load_skills(commands_dir, skills_dir) do
@@ -41,31 +60,33 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
     if File.dir?(commands_dir) do
       commands_dir
       |> File.ls!()
-      |> Enum.flat_map(fn entry ->
-        path = Path.join(commands_dir, entry)
-
-        cond do
-          String.ends_with?(entry, ".md") and File.regular?(path) ->
-            slug = String.replace_trailing(entry, ".md", "")
-            content = File.read!(path)
-            [%{slug: slug, type: "command", description: extract_description(content)}]
-
-          File.dir?(path) ->
-            path
-            |> File.ls!()
-            |> Enum.filter(&String.ends_with?(&1, ".md"))
-            |> Enum.map(fn filename ->
-              subslug = "#{entry}:#{String.replace_trailing(filename, ".md", "")}"
-              content = File.read!(Path.join(path, filename))
-              %{slug: subslug, type: "command", description: extract_description(content)}
-            end)
-
-          true ->
-            []
-        end
-      end)
+      |> Enum.flat_map(&load_command_entry(commands_dir, &1))
     else
       []
+    end
+  end
+
+  defp load_command_entry(commands_dir, entry) do
+    path = Path.join(commands_dir, entry)
+
+    cond do
+      String.ends_with?(entry, ".md") and File.regular?(path) ->
+        slug = String.replace_trailing(entry, ".md", "")
+        content = File.read!(path)
+        [%{slug: slug, type: "command", description: extract_description(content)}]
+
+      File.dir?(path) ->
+        path
+        |> File.ls!()
+        |> Enum.filter(&String.ends_with?(&1, ".md"))
+        |> Enum.map(fn filename ->
+          subslug = "#{entry}:#{String.replace_trailing(filename, ".md", "")}"
+          content = File.read!(Path.join(path, filename))
+          %{slug: subslug, type: "command", description: extract_description(content)}
+        end)
+
+      true ->
+        []
     end
   end
 
@@ -93,64 +114,74 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
       []
     else
       cache_dir = Path.join(plugins_dir, "cache")
+      load_enabled_plugin_skills(cache_dir, enabled)
+    end
+  end
 
-      if File.dir?(cache_dir) do
-        enabled
-        |> Enum.flat_map(fn {key, true} ->
-          # Key format: "plugin-name@registry-name"
-          case String.split(key, "@", parts: 2) do
-            [plugin_name, registry] ->
-              registry_dir = Path.join(cache_dir, registry)
-              plugin_dir = Path.join(registry_dir, plugin_name)
+  defp load_enabled_plugin_skills(cache_dir, enabled) do
+    if File.dir?(cache_dir) do
+      Enum.flat_map(enabled, fn {key, true} -> load_plugin_by_key(cache_dir, key) end)
+    else
+      []
+    end
+  end
 
-              if File.dir?(plugin_dir) do
-                # Find the first version dir that has skills
-                plugin_dir
-                |> File.ls!()
-                |> Enum.flat_map(fn version ->
-                  skills_dir = Path.join([plugin_dir, version, "skills"])
+  defp load_plugin_by_key(cache_dir, key) do
+    # Key format: "plugin-name@registry-name"
+    case String.split(key, "@", parts: 2) do
+      [plugin_name, registry] ->
+        plugin_dir = Path.join([cache_dir, registry, plugin_name])
 
-                  if File.dir?(skills_dir) do
-                    skills_dir
-                    |> File.ls!()
-                    |> Enum.filter(fn skill_name ->
-                      Path.join([skills_dir, skill_name, "SKILL.md"]) |> File.exists?()
-                    end)
-                    |> Enum.map(fn skill_name ->
-                      content = File.read!(Path.join([skills_dir, skill_name, "SKILL.md"]))
-                      slug = "#{plugin_name}:#{skill_name}"
+        if File.dir?(plugin_dir) do
+          load_plugin_versions(plugin_dir, plugin_name)
+        else
+          []
+        end
 
-                      %{slug: slug, type: "skill", description: extract_description(content)}
-                    end)
-                  else
-                    []
-                  end
-                end)
-                |> Enum.uniq_by(& &1.slug)
-              else
-                []
-              end
-
-            _ ->
-              []
-          end
-        end)
-      else
+      _ ->
         []
-      end
+    end
+  end
+
+  defp load_plugin_versions(plugin_dir, plugin_name) do
+    plugin_dir
+    |> File.ls!()
+    |> Enum.flat_map(fn version ->
+      skills_dir = Path.join([plugin_dir, version, "skills"])
+      load_skills_from_version_dir(skills_dir, plugin_name)
+    end)
+    |> Enum.uniq_by(& &1.slug)
+  end
+
+  defp load_skills_from_version_dir(skills_dir, plugin_name) do
+    if File.dir?(skills_dir) do
+      skills_dir
+      |> File.ls!()
+      |> Enum.filter(fn skill_name ->
+        Path.join([skills_dir, skill_name, "SKILL.md"]) |> File.exists?()
+      end)
+      |> Enum.map(fn skill_name ->
+        content = File.read!(Path.join([skills_dir, skill_name, "SKILL.md"]))
+        slug = "#{plugin_name}:#{skill_name}"
+
+        %{slug: slug, type: "skill", description: extract_description(content)}
+      end)
+    else
+      []
     end
   end
 
   defp read_enabled_plugins(settings_path) do
     case File.read(settings_path) do
-      {:ok, content} ->
-        case Jason.decode(content) do
-          {:ok, %{"enabledPlugins" => plugins}} when is_map(plugins) ->
-            plugins |> Enum.filter(fn {_k, v} -> v == true end) |> Map.new()
+      {:ok, content} -> parse_enabled_plugins(content)
+      _ -> %{}
+    end
+  end
 
-          _ ->
-            %{}
-        end
+  defp parse_enabled_plugins(content) do
+    case Jason.decode(content) do
+      {:ok, %{"enabledPlugins" => plugins}} when is_map(plugins) ->
+        plugins |> Enum.filter(fn {_k, v} -> v end) |> Map.new()
 
       _ ->
         %{}

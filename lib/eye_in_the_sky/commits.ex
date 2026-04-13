@@ -4,9 +4,9 @@ defmodule EyeInTheSky.Commits do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Commits.Commit
   alias EyeInTheSky.QueryHelpers
+  alias EyeInTheSky.Repo
 
   @doc """
   Returns the list of commits.
@@ -79,7 +79,10 @@ defmodule EyeInTheSky.Commits do
   Gets a commit by hash.
   """
   def get_commit_by_hash(hash) do
-    Repo.get_by(Commit, commit_hash: hash)
+    case Repo.get_by(Commit, commit_hash: hash) do
+      nil -> {:error, :not_found}
+      commit -> {:ok, commit}
+    end
   end
 
   @doc """

@@ -12,31 +12,31 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActions do
     if Map.has_key?(socket.assigns.diff_cache, hash) do
       {:noreply, socket}
     else
-      diff =
-        case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
-          {:ok, project_path} ->
-            case System.cmd("git", ["-C", project_path, "show", hash, "--unified=5"],
-                   stderr_to_stdout: false
-                 ) do
-              {output, 0} -> output
-              _ -> :error
-            end
-
-          _ ->
-            :error
-        end
-
+      diff = fetch_git_diff(hash, socket)
       cache = Map.put(socket.assigns.diff_cache, hash, diff)
       {:noreply, assign(socket, :diff_cache, cache)}
+    end
+  end
+
+  defp fetch_git_diff(hash, socket) do
+    case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+      {:ok, project_path} ->
+        case System.cmd("git", ["-C", project_path, "show", hash, "--unified=5"],
+               stderr_to_stdout: false
+             ) do
+          {output, 0} -> output
+          _ -> :error
+        end
+
+      _ ->
+        :error
     end
   end
 
   def handle_open_iterm(socket) do
     session_uuid = socket.assigns.session_uuid
 
-    unless Regex.match?(@uuid_pattern, session_uuid) do
-      {:noreply, put_flash(socket, :error, "Invalid session UUID")}
-    else
+    if Regex.match?(@uuid_pattern, session_uuid) do
       dir =
         case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
           {:ok, path} -> path
@@ -57,6 +57,8 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActions do
 
       System.cmd("osascript", ["-e", script], stderr_to_stdout: true)
       {:noreply, socket}
+    else
+      {:noreply, put_flash(socket, :error, "Invalid session UUID")}
     end
   end
 end

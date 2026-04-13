@@ -1,5 +1,7 @@
 import Config
 
+config :live_svelte, ssr_module: LiveSvelte.SSR.ViteJS
+
 # Configure your database
 #
 # The MIX_TEST_PARTITION environment variable can be used
@@ -39,7 +41,8 @@ config :phoenix_live_view,
 # Use mock CLI module for testing
 config :eye_in_the_sky,
   cli_module: EyeInTheSky.Claude.MockCLI,
-  codex_cli_module: EyeInTheSky.Claude.MockCLI
+  codex_cli_module: EyeInTheSky.Claude.MockCLI,
+  agent_manager_module: EyeInTheSky.Agents.MockAgentManager
 
 # Disable Oban queues in test (use Oban.Testing for manual testing)
 config :eye_in_the_sky, Oban, testing: :manual

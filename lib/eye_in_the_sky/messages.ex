@@ -4,10 +4,14 @@ defmodule EyeInTheSky.Messages do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
-  alias EyeInTheSky.Messages.Message
+  alias EyeInTheSky.Messages.Aggregations
+  alias EyeInTheSky.Messages.ChannelMessageNumbering
+  alias EyeInTheSky.Messages.Deduplicator
   alias EyeInTheSky.Messages.JsonlStorage
+  alias EyeInTheSky.Messages.Message
+  alias EyeInTheSky.Messages.StatusManager
   alias EyeInTheSky.QueryHelpers
+  alias EyeInTheSky.Repo
   require Logger
 
   @doc """
@@ -35,16 +39,13 @@ defmodule EyeInTheSky.Messages do
     Logger.debug("Loading messages from JSONL for session: #{session_id}, project: #{project_id}")
 
     case JsonlStorage.read_session_messages(project_id, session_id) do
-      messages when is_list(messages) and length(messages) > 0 ->
-        Logger.debug("Loaded #{length(messages)} messages from JSONL file")
-        messages
-
       [] ->
         Logger.debug("No messages found in JSONL file, falling back to database")
         list_messages_for_session_db(session_id)
 
-      nil ->
-        list_messages_for_session_db(session_id)
+      messages ->
+        Logger.debug("Loaded #{length(messages)} messages from JSONL file")
+        messages
     end
   end
 
@@ -141,7 +142,8 @@ defmodule EyeInTheSky.Messages do
   end
 
   @doc """
-  Creates a message.
+  Creates a message (plain insert without advisory lock).
+  For channel messages with sequential numbering, use create_channel_message/1.
   """
   @spec create_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def create_message(attrs \\ %{}) do
@@ -151,29 +153,30 @@ defmodule EyeInTheSky.Messages do
       %{inserted_at: now, updated_at: now}
       |> Map.merge(attrs)
 
-    # Auto-assign channel_message_number for channel messages
-    # Handles both atom and string key maps
-    cid = Map.get(attrs, :channel_id) || Map.get(attrs, "channel_id")
+    %Message{}
+    |> Message.changeset(attrs)
+    |> Repo.insert()
+  end
 
-    has_number =
-      Map.get(attrs, :channel_message_number) || Map.get(attrs, "channel_message_number")
+  @doc """
+  Creates a channel message with auto-assigned sequential numbering.
+  Uses an advisory lock to prevent duplicate channel_message_numbers under concurrent inserts.
+  """
+  @spec create_channel_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
+  def create_channel_message(attrs \\ %{}) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    if cid && is_nil(has_number) do
+    attrs =
+      %{inserted_at: now, updated_at: now}
+      |> Map.merge(attrs)
+
+    cid = Map.get(attrs, :channel_id)
+    has_number = Map.get(attrs, :channel_message_number)
+
+    if not is_nil(cid) && is_nil(has_number) do
       # Advisory lock on the channel prevents two concurrent inserts from reading
       # the same MAX and assigning duplicate channel_message_numbers.
-      Repo.transaction(fn ->
-        lock_key = :erlang.phash2(cid)
-        Repo.query!("SELECT pg_advisory_xact_lock($1)", [lock_key])
-
-        attrs = Map.put(attrs, :channel_message_number, next_channel_message_number(cid))
-
-        case %Message{}
-             |> Message.changeset(attrs)
-             |> Repo.insert() do
-          {:ok, message} -> message
-          {:error, changeset} -> Repo.rollback(changeset)
-        end
-      end)
+      ChannelMessageNumbering.create(cid, attrs)
     else
       %Message{}
       |> Message.changeset(attrs)
@@ -181,42 +184,17 @@ defmodule EyeInTheSky.Messages do
     end
   end
 
-  defp next_channel_message_number(channel_id) do
-    current_max =
-      from(m in Message,
-        where: m.channel_id == ^channel_id and not is_nil(m.channel_message_number),
-        select: max(m.channel_message_number)
-      )
-      |> Repo.one()
-
-    (current_max || 0) + 1
-  end
-
   @doc """
   Sends a message (creates an outbound message).
   """
   @spec send_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def send_message(attrs) do
-    result =
-      attrs
-      |> Map.put(:uuid, Ecto.UUID.generate())
-      |> Map.put(:direction, "outbound")
-      |> Map.put(:status, "pending")
-      |> create_message()
-
-    case result do
-      {:ok, message} ->
-        EyeInTheSky.Events.session_new_message(message.session_id, message)
-
-        if message.channel_id do
-          EyeInTheSky.Events.channel_message(message.channel_id, message)
-        end
-
-        {:ok, message}
-
-      error ->
-        error
-    end
+    attrs
+    |> Map.put(:uuid, Ecto.UUID.generate())
+    |> Map.put(:direction, "outbound")
+    |> Map.put(:status, "pending")
+    |> create_message()
+    |> broadcast_and_return()
   end
 
   @doc """
@@ -243,53 +221,8 @@ defmodule EyeInTheSky.Messages do
 
     attrs = if channel_id, do: Map.put(attrs, :channel_id, channel_id), else: attrs
 
-    result =
-      cond do
-        source_uuid && message_exists_by_source_uuid?(source_uuid) ->
-          # Already recorded by source_uuid — enrich with metadata if provided
-          # (session file sync imports messages without usage data; later calls
-          # may enrich with usage metadata using the same source_uuid)
-          existing = Repo.get_by!(Message, source_uuid: source_uuid)
-
-          if metadata && metadata != %{} do
-            update_message(existing, %{metadata: metadata})
-          else
-            {:ok, existing}
-          end
-
-        is_nil(source_uuid) ->
-          # No source_uuid — check for a recent message with same content to avoid
-          # duplicating a message already imported from the session file via periodic sync.
-          case find_recent_agent_message(session_id, body) do
-            nil ->
-              create_message(attrs)
-
-            existing ->
-              # Enrich existing message with metadata if available
-              if metadata && metadata != %{} do
-                update_message(existing, %{metadata: metadata})
-              else
-                {:ok, existing}
-              end
-          end
-
-        true ->
-          create_message(attrs)
-      end
-
-    case result do
-      {:ok, message} ->
-        EyeInTheSky.Events.session_new_message(message.session_id, message)
-
-        if message.channel_id do
-          EyeInTheSky.Events.channel_message(message.channel_id, message)
-        end
-
-        {:ok, message}
-
-      error ->
-        error
-    end
+    Deduplicator.find_or_create(attrs, metadata)
+    |> broadcast_and_return()
   end
 
   @doc """
@@ -336,30 +269,12 @@ defmodule EyeInTheSky.Messages do
   @doc """
   Returns the total cost in USD for all messages in a session.
   """
-  def total_cost_for_session(session_id) do
-    Message
-    |> where([m], m.session_id == ^session_id)
-    |> select(
-      [m],
-      fragment("COALESCE(SUM(CAST(COALESCE(metadata->>'total_cost_usd', '0') AS FLOAT)), 0.0)")
-    )
-    |> Repo.one() || 0.0
-  end
+  defdelegate total_cost_for_session(session_id), to: Aggregations
 
   @doc """
   Returns the total token count (input + output) for all messages in a session.
   """
-  def total_tokens_for_session(session_id) do
-    Message
-    |> where([m], m.session_id == ^session_id)
-    |> select(
-      [m],
-      fragment(
-        "COALESCE(SUM(CAST(COALESCE(metadata->'usage'->>'input_tokens', '0') AS INTEGER) + CAST(COALESCE(metadata->'usage'->>'output_tokens', '0') AS INTEGER)), 0)"
-      )
-    )
-    |> Repo.one() || 0
-  end
+  defdelegate total_tokens_for_session(session_id), to: Aggregations
 
   @doc """
   Returns recent messages for a session (default last 50).
@@ -369,11 +284,12 @@ defmodule EyeInTheSky.Messages do
   def list_recent_messages(session_id, limit) do
     Message
     |> where([m], m.session_id == ^session_id)
-    |> order_by([m], desc: m.inserted_at)
+    |> order_by([m], [desc: m.inserted_at, desc: m.id])
     |> limit(^limit)
     |> Repo.all()
+    |> Repo.preload(:attachments)
     |> Enum.reverse()
-    |> deduplicate_by_source_uuid()
+    |> Deduplicator.deduplicate_by_source_uuid()
   end
 
   @doc """
@@ -390,28 +306,12 @@ defmodule EyeInTheSky.Messages do
     |> order_by([m], asc: m.inserted_at)
     |> limit(100)
     |> Repo.all()
-    |> deduplicate_by_source_uuid()
+    |> Repo.preload(:attachments)
+    |> Deduplicator.deduplicate_by_source_uuid()
   end
 
   def search_messages_for_session(session_id, _query) do
     list_recent_messages(session_id)
-  end
-
-  # Remove duplicate messages by source_uuid, keeping the first occurrence
-  defp deduplicate_by_source_uuid(messages) do
-    messages
-    |> Enum.reduce({[], MapSet.new()}, fn msg, {acc, seen_uuids} ->
-      if msg.source_uuid && MapSet.member?(seen_uuids, msg.source_uuid) do
-        {acc, seen_uuids}
-      else
-        new_seen =
-          if msg.source_uuid, do: MapSet.put(seen_uuids, msg.source_uuid), else: seen_uuids
-
-        {[msg | acc], new_seen}
-      end
-    end)
-    |> elem(0)
-    |> Enum.reverse()
   end
 
   @doc """
@@ -472,47 +372,26 @@ defmodule EyeInTheSky.Messages do
   Returns {:ok, message} or :not_found.
   """
   def find_unlinked_message(session_id, sender_role, body) do
-    one_minute_ago =
-      DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
-
-    Message
-    |> where(
-      [m],
-      m.session_id == ^session_id and
-        m.sender_role == ^sender_role and
-        is_nil(m.source_uuid) and
-        m.body == ^body and
-        m.inserted_at >= ^one_minute_ago
-    )
-    |> order_by([m], desc: m.inserted_at)
-    |> limit(1)
-    |> Repo.one()
-    |> case do
+    case Deduplicator.find_recent_message(session_id, body,
+           sender_role: sender_role,
+           require_nil_source_uuid: true
+         ) do
       nil -> :not_found
       message -> {:ok, message}
     end
   end
 
-  # Finds the most recent agent message in the session matching the given body,
-  # within the last minute. Used to detect duplicates before creating a new record.
-  # Unlike find_unlinked_message, this does NOT filter on is_nil(source_uuid) because
-  # a concurrent sync may have already stamped the source_uuid on an existing message.
-  defp find_recent_agent_message(session_id, body) do
-    one_minute_ago =
-      DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
+  defp broadcast_and_return({:ok, message}) do
+    EyeInTheSky.Events.session_new_message(message.session_id, message)
 
-    Message
-    |> where(
-      [m],
-      m.session_id == ^session_id and
-        m.sender_role == "agent" and
-        m.body == ^body and
-        m.inserted_at >= ^one_minute_ago
-    )
-    |> order_by([m], desc: m.inserted_at)
-    |> limit(1)
-    |> Repo.one()
+    if message.channel_id do
+      EyeInTheSky.Events.channel_message(message.channel_id, message)
+    end
+
+    {:ok, message}
   end
+
+  defp broadcast_and_return(error), do: error
 
   @doc """
   Returns true when a session already has at least one inbound reply
@@ -542,6 +421,21 @@ defmodule EyeInTheSky.Messages do
   end
 
   @doc """
+  Returns the most recent inbound DMs received by a session, oldest-first.
+  Used by EITS-CMD `dm list` to inject recent context back into an agent.
+  """
+  @spec list_inbound_dms(integer(), pos_integer()) :: [Message.t()]
+  def list_inbound_dms(session_id, limit \\ 20) when is_integer(session_id) do
+    Message
+    |> where([m], m.to_session_id == ^session_id)
+    |> where([m], not is_nil(m.from_session_id))
+    |> order_by([m], [desc: m.inserted_at, desc: m.id])
+    |> limit(^limit)
+    |> Repo.all()
+    |> Enum.reverse()
+  end
+
+  @doc """
   Returns unread/pending messages for a session.
   """
   def list_pending_messages(session_id) do
@@ -550,5 +444,14 @@ defmodule EyeInTheSky.Messages do
     |> order_by([m], asc: m.inserted_at)
     |> Repo.all()
   end
+
+  @doc "Marks a message as processing. No-op if message_id is nil."
+  defdelegate mark_processing(message_id), to: StatusManager
+
+  @doc "Marks a message as delivered. No-op if message_id is nil."
+  defdelegate mark_delivered(message_id), to: StatusManager
+
+  @doc "Marks a message as failed with a reason. No-op if message_id is nil."
+  defdelegate mark_failed(message_id, reason), to: StatusManager
 
 end

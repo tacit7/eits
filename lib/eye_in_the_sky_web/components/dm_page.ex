@@ -3,12 +3,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
   use EyeInTheSkyWeb, :html
 
-  alias EyeInTheSkyWeb.Components.DmPage.MessagesTab
-  alias EyeInTheSkyWeb.Components.DmPage.TasksTab
+  alias EyeInTheSkyWeb.Components.DmPage.ActionMenu
   alias EyeInTheSkyWeb.Components.DmPage.CommitsTab
-  alias EyeInTheSkyWeb.Components.DmPage.NotesTab
-  alias EyeInTheSkyWeb.Components.DmPage.ContextTab
   alias EyeInTheSkyWeb.Components.DmPage.Composer
+  alias EyeInTheSkyWeb.Components.DmPage.ContextTab
+  alias EyeInTheSkyWeb.Components.DmPage.MessagesTab
+  alias EyeInTheSkyWeb.Components.DmPage.NotesTab
+  alias EyeInTheSkyWeb.Components.DmPage.TasksTab
 
   @tabs [
     {"messages", "hero-chat-bubble-left-right", "Messages"},
@@ -21,65 +22,49 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :agent, :map, required: true
   attr :session_uuid, :string, required: true
   attr :active_tab, :string, required: true
-  attr :messages, :list, default: []
-  attr :has_more_messages, :boolean, default: false
   attr :uploads, :map, required: true
-  attr :selected_model, :string, default: "opus"
-  attr :selected_effort, :string, default: "medium"
-  attr :show_effort_menu, :boolean, default: false
-  attr :show_model_menu, :boolean, default: false
-  attr :processing, :boolean, default: false
-  attr :tasks, :list, default: []
+  attr :stream, :map, default: %{show: false, content: "", tool: nil, thinking: nil}
+  attr :session_state, :map, required: true
   attr :commits, :list, default: []
   attr :diff_cache, :map, default: %{}
   attr :notes, :list, default: []
-  attr :show_live_stream, :boolean, default: true
-  attr :stream_content, :string, default: ""
-  attr :stream_tool, :string, default: nil
-  attr :stream_thinking, :string, default: nil
-  attr :session, :map, default: nil
   attr :slash_items, :list, default: []
-  attr :show_new_task_drawer, :boolean, default: false
-  attr :workflow_states, :list, default: []
-  attr :current_task, :map, default: nil
-  attr :total_tokens, :integer, default: 0
-  attr :total_cost, :float, default: 0.0
-  attr :queued_prompts, :list, default: []
-  attr :thinking_enabled, :boolean, default: false
-  attr :max_budget_usd, :any, default: nil
-  attr :compacting, :boolean, default: false
-  attr :context_used, :integer, default: 0
-  attr :context_window, :integer, default: 0
-  attr :message_search_query, :string, default: ""
   attr :session_context, :map, default: nil
-  attr :reloading, :boolean, default: false
   attr :agent_record, :map, default: nil
+  # Grouped maps replacing 10 individual attrs
+  attr :message_data, :map,
+    default: %{messages: [], has_more_messages: false, message_search_query: "", queued_prompts: []}
+
+  attr :task_data, :map, default: %{tasks: [], current_task: nil}
+
+  attr :overlay_data, :map,
+    default: %{active_overlay: nil, active_timer: nil, reloading: false}
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
 
     ~H"""
     <div
-      class="flex flex-col h-[100dvh] md:h-[calc(100dvh-2rem)] px-0 sm:px-4 lg:px-8 py-0 sm:py-4 relative"
+      class="flex flex-col h-[calc(100dvh-4.25rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-2rem)] px-0 sm:px-4 lg:px-8 py-0 sm:py-4 relative"
       id="dm-page"
       phx-drop-target={@uploads.files.ref}
       phx-hook="DragUpload"
     >
       <%!-- Reload confirm modal --%>
-      <dialog id="dm-reload-confirm-modal" class="modal" phx-hook="ReloadConfirmModal">
-        <div class="modal-box">
+      <dialog id="dm-reload-confirm-modal" class="modal modal-bottom sm:modal-middle" phx-hook="ReloadConfirmModal">
+        <div class="modal-box pb-[env(safe-area-inset-bottom)]">
           <h3 class="font-semibold text-base">Reload from file?</h3>
           <p class="py-3 text-sm text-base-content/70">
             This will delete all messages and re-import from the JSONL file.
           </p>
           <div class="form-control mb-4">
-            <label class="label cursor-pointer gap-2 justify-start">
+            <label class="label cursor-pointer gap-2 justify-start min-h-[44px] flex items-center">
               <input type="checkbox" data-reload-skip class="checkbox checkbox-sm" />
               <span class="label-text text-sm">Don't show this message again</span>
             </label>
           </div>
           <div class="modal-action">
-            <button data-reload-cancel class="btn btn-ghost btn-sm">Cancel</button>
-            <button data-reload-confirm class="btn btn-error btn-sm">Reload</button>
+            <button data-reload-cancel class="btn btn-ghost btn-sm min-h-[44px]">Cancel</button>
+            <button data-reload-confirm class="btn btn-error btn-sm min-h-[44px]">Reload</button>
           </div>
         </div>
         <form method="dialog" class="modal-backdrop">
@@ -87,9 +72,72 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         </form>
       </dialog>
 
+      <%!-- Schedule timer modal --%>
+      <%= if @overlay_data.active_overlay == :schedule_timer do %>
+        <div class="modal modal-open modal-bottom sm:modal-middle" id="schedule-timer-modal">
+          <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
+            <h3 class="font-semibold text-base mb-3">
+              {if @overlay_data.active_timer, do: "Edit Scheduled Message", else: "Schedule Message"}
+            </h3>
+
+            <form id="schedule-timer-form" phx-submit="schedule_timer">
+              <input type="hidden" name="mode" id="timer-mode-input" value="once" />
+              <input type="hidden" name="preset" id="timer-preset-input" value="15m" />
+
+              <div class="mb-4">
+                <label class="text-xs font-medium text-base-content/60 mb-1.5 block">Message</label>
+                <textarea
+                  name="message"
+                  rows="3"
+                  class="textarea textarea-bordered w-full text-base resize-none"
+                  placeholder="Message to send when timer fires..."
+                ><%= if @overlay_data.active_timer, do: @overlay_data.active_timer.message, else: EyeInTheSky.OrchestratorTimers.default_message() %></textarea>
+              </div>
+
+              <div class="mb-3">
+                <p class="text-xs font-medium text-base-content/60 mb-2">Once</p>
+                <div class="flex flex-wrap gap-1.5">
+                  <%= for preset <- ["5m", "10m", "15m", "30m", "1h"] do %>
+                    <button
+                      type="submit"
+                      phx-click={
+                        JS.set_attribute({"value", "once"}, to: "#timer-mode-input")
+                        |> JS.set_attribute({"value", preset}, to: "#timer-preset-input")
+                      }
+                      class="btn btn-sm btn-outline"
+                    >{preset}</button>
+                  <% end %>
+                </div>
+              </div>
+
+              <div class="mb-4">
+                <p class="text-xs font-medium text-base-content/60 mb-2">Repeating</p>
+                <div class="flex flex-wrap gap-1.5">
+                  <%= for preset <- ["5m", "10m", "15m", "30m", "1h"] do %>
+                    <button
+                      type="submit"
+                      phx-click={
+                        JS.set_attribute({"value", "repeating"}, to: "#timer-mode-input")
+                        |> JS.set_attribute({"value", preset}, to: "#timer-preset-input")
+                      }
+                      class="btn btn-sm btn-outline"
+                    >{preset}</button>
+                  <% end %>
+                </div>
+              </div>
+
+              <div class="modal-action">
+                <button type="button" phx-click="close_schedule_modal" class="btn btn-ghost btn-sm min-h-[44px]">Cancel</button>
+              </div>
+            </form>
+          </div>
+          <div class="modal-backdrop" phx-click="close_schedule_modal"></div>
+        </div>
+      <% end %>
+
       <%!-- Reload loading overlay --%>
       <div
-        :if={@reloading}
+        :if={@overlay_data.reloading}
         class="absolute inset-0 z-40 flex items-center justify-center bg-base-100/80 backdrop-blur-sm rounded-xl"
       >
         <div class="flex flex-col items-center gap-3">
@@ -115,18 +163,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       <div class="md:hidden sticky top-0 z-30 flex-shrink-0 flex items-center gap-1 px-2 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-base-100">
         <button
           phx-click={Phoenix.LiveView.JS.dispatch("sidebar:open", to: "#app-sidebar")}
-          class="btn btn-ghost btn-square w-10 h-10 text-base-content/60"
+          class="btn btn-ghost btn-square w-10 h-10 text-base-content/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
           aria-label="Open menu"
         >
           <.icon name="hero-bars-3" class="w-5 h-5" />
         </button>
         <div class="flex-1 flex items-center justify-center gap-1.5 min-w-0 px-1">
-          <div class={"w-1.5 h-1.5 rounded-full flex-shrink-0 " <> case @agent.status do
-            "working" -> "bg-success animate-pulse"
-            "waiting" -> "bg-warning animate-pulse"
-            "compacting" -> "bg-orange-500 animate-pulse"
-            _ -> "bg-base-content/20"
-          end} />
+          <.status_dot status={@agent.status} class="w-1.5 h-1.5" />
           <%= if @agent.entrypoint == "cli" do %>
             <.icon name="hero-command-line" class="w-3.5 h-3.5 text-base-content/40 flex-shrink-0" />
           <% end %>
@@ -138,59 +181,23 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               phx-blur="update_session_name"
               phx-keydown={JS.push("update_session_name") |> JS.focus(to: "#message-input")}
               phx-key="Enter"
-              class="text-sm font-semibold text-base-content/85 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 w-full text-center placeholder:text-base-content/20 transition-colors"
+              class="text-base font-semibold text-base-content/85 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 w-full text-center placeholder:text-base-content/20 transition-colors"
             />
             <%= if @agent_record && is_map(@agent_record.agent_definition) && not match?(%Ecto.Association.NotLoaded{}, @agent_record.agent_definition) && @agent_record.agent_definition.display_name do %>
-              <span class="text-[10px] text-base-content/35 truncate">{@agent_record.agent_definition.display_name}</span>
+              <span class="text-xs text-base-content/35 truncate">{@agent_record.agent_definition.display_name}</span>
             <% end %>
           </div>
         </div>
-        <div class="dropdown dropdown-end">
-          <button
-            tabindex="0"
-            class="btn btn-ghost btn-square w-10 h-10 text-base-content/60"
-            aria-label="More options"
-          >
-            <.icon name="hero-ellipsis-horizontal" class="w-5 h-5" />
-          </button>
-          <ul
-            tabindex="0"
-            class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-52 text-xs"
-          >
-            <%= for {tab, icon, label} <- @tabs do %>
-              <li>
-                <button
-                  phx-click="change_tab"
-                  phx-value-tab={tab}
-                  class={[
-                    "flex items-center gap-2 px-3 py-2 w-full text-left rounded",
-                    @active_tab == tab && "text-primary bg-primary/10",
-                    @active_tab != tab && "hover:bg-base-content/5"
-                  ]}
-                >
-                  <.icon name={icon} class="w-3.5 h-3.5" /> {label}
-                </button>
-              </li>
-            <% end %>
-            <li><hr class="border-base-content/10 my-1" /></li>
-            <li>
-              <button
-                phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
-                class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
-              >
-                <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Reload from file
-              </button>
-            </li>
-            <li>
-              <button
-                phx-click="export_markdown"
-                class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
-              >
-                <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Export as Markdown
-              </button>
-            </li>
-          </ul>
-        </div>
+        <ActionMenu.action_menu
+          button_class="btn btn-ghost btn-square w-10 h-10 text-base-content/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+          show_tabs={true}
+          tabs={@tabs}
+          active_tab={@active_tab}
+          reload_label="Reload from file"
+          active_timer={@overlay_data.active_timer}
+          schedule_btn_id="dm-schedule-timer-btn"
+          cancel_btn_id="dm-cancel-timer-btn"
+        />
       </div>
 
       <%!-- Header card (desktop only) --%>
@@ -201,12 +208,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <div class="px-4 sm:px-5 py-3" id="dm-header">
           <div class="flex items-center gap-2 min-w-0">
             <div class="flex items-start gap-2 min-w-0 flex-1">
-              <div class={"w-2 h-2 rounded-full flex-shrink-0 mt-[5px] " <> case @agent.status do
-                "working" -> "bg-success animate-pulse"
-                "waiting" -> "bg-warning animate-pulse"
-                "compacting" -> "bg-orange-500 animate-pulse"
-                _ -> "bg-base-content/20"
-              end} />
+              <.status_dot status={@agent.status} class="w-2 h-2 mt-[5px]" />
               <div class="flex flex-col min-w-0 flex-1">
                 <div class="flex items-center gap-2 min-w-0">
                   <%= if @agent.entrypoint == "cli" do %>
@@ -234,14 +236,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                     {if @session_uuid, do: String.slice(@session_uuid, 0..7), else: "—"}
                     <.icon name="hero-clipboard-document" class="w-3 h-3" />
                   </button>
-                  <button
-                    type="button"
-                    phx-click="open_iterm"
-                    title="Open in iTerm"
-                    class="hidden sm:flex items-center gap-1 text-[11px] text-base-content/30 bg-base-content/5 px-2 py-0.5 rounded hover:text-base-content/50 hover:bg-base-content/8 transition-colors cursor-pointer flex-shrink-0"
-                  >
-                    <.icon name="hero-command-line" class="w-3 h-3" />
-                  </button>
                 </div>
                 <input
                   type="text"
@@ -250,123 +244,66 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                   phx-blur="update_session_description"
                   phx-keydown="update_session_description"
                   phx-key="Enter"
-                  class="text-xs text-base-content/40 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 placeholder:text-base-content/20 transition-colors w-full"
+                  class="text-base text-base-content/40 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 placeholder:text-base-content/20 transition-colors w-full"
                 />
               </div>
             </div>
             <div class="flex items-center gap-1 flex-shrink-0">
-              <button
-                phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
-                class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
-                id="dm-reload-button"
-              >
-                <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Reload
-              </button>
-              <div class="hidden sm:block dropdown dropdown-end" id="dm-export-dropdown">
+              <%!-- Active timer badge --%>
+              <%= if @overlay_data.active_timer do %>
                 <button
-                  tabindex="0"
-                  class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+                  type="button"
+                  phx-click="open_schedule_timer"
+                  class="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-lg bg-warning/10 text-warning text-xs font-medium hover:bg-warning/20 transition-colors"
+                  title="Edit scheduled message"
                 >
-                  <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Export
+                  <.icon name="hero-clock" class="w-3.5 h-3.5" />
+                  <span>{if @overlay_data.active_timer.mode == :once, do: "Once", else: "Every"}</span>
+                  <span
+                    id="timer-countdown"
+                    phx-hook="TimerCountdown"
+                    data-fire-at={DateTime.to_iso8601(@overlay_data.active_timer.next_fire_at)}
+                  >--:--</span>
                 </button>
-                <ul
-                  tabindex="0"
-                  class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-44 text-xs"
-                >
-                  <li>
-                    <button
-                      phx-click="export_jsonl"
-                      class="px-3 py-2 hover:bg-base-content/5 rounded text-left w-full"
-                    >
-                      Export as JSONL
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      phx-click="export_markdown"
-                      class="px-3 py-2 hover:bg-base-content/5 rounded text-left w-full"
-                    >
-                      Export as Markdown
-                    </button>
-                  </li>
-                </ul>
-              </div>
-              <button
-                id="dm-push-setup-btn"
-                phx-hook="PushSetup"
-                phx-update="ignore"
-                data-push-state="disabled"
-                title="Enable push notifications"
-                class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors"
-              >
-                <.icon name="hero-bell" class="w-3.5 h-3.5" />
-                <span>Notify</span>
-              </button>
-              <div class="sm:hidden dropdown dropdown-end" id="dm-mobile-menu">
-                <button
-                  tabindex="0"
-                  class="flex items-center justify-center w-7 h-7 rounded-lg text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
-                  title="More options"
-                >
-                  <.icon name="hero-ellipsis-vertical" class="w-4 h-4" />
-                </button>
-                <ul
-                  tabindex="0"
-                  class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-52 text-xs"
-                >
-                  <li>
-                    <button
-                      phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
-                      class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
-                    >
-                      <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Reload from file
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      phx-click="export_jsonl"
-                      class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
-                    >
-                      <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Export as JSONL
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      phx-click="export_markdown"
-                      class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
-                    >
-                      <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Export as Markdown
-                    </button>
-                  </li>
-                  <li><hr class="border-base-content/10 my-1" /></li>
-                </ul>
-              </div>
+              <% end %>
+
+              <%!-- Unified hamburger menu (desktop + mobile) --%>
+              <ActionMenu.action_menu
+                wrapper_id="dm-actions-menu"
+                button_class="btn btn-ghost btn-square w-9 h-9 text-base-content/60"
+                show_jsonl_export={true}
+                show_push_setup={true}
+                show_iterm={true}
+                reload_label="Reload"
+                active_timer={@overlay_data.active_timer}
+                cancel_btn_id="dm-cancel-timer-btn-desktop"
+              />
             </div>
           </div>
         </div>
 
         <%!-- Current task strip --%>
-        <%= if @current_task do %>
+        <%= if @task_data.current_task do %>
           <div class="px-5 py-2 border-t border-base-content/5" id="dm-current-task">
             <div class="flex items-center gap-2">
-              <span class="text-[10px] font-semibold uppercase tracking-wider text-base-content/30 flex-shrink-0">
+              <span class="text-xs font-semibold uppercase tracking-wider text-base-content/30 flex-shrink-0">
                 Working on
               </span>
               <div class="flex items-center gap-1.5 min-w-0">
                 <div class="w-1.5 h-1.5 rounded-full bg-info animate-pulse flex-shrink-0" />
                 <span class="text-[12px] font-medium text-base-content/70 truncate">
-                  {@current_task.title}
+                  {@task_data.current_task.title}
                 </span>
               </div>
-              <span class="flex-shrink-0 text-[10px] text-base-content/25 font-mono">
-                {String.slice(to_string(@current_task.id), 0..7)}
+              <span class="flex-shrink-0 text-xs text-base-content/25 font-mono">
+                {String.slice(to_string(@task_data.current_task.id), 0..7)}
               </span>
             </div>
           </div>
         <% end %>
 
         <%!-- Compacting indicator --%>
-        <%= if @compacting do %>
+        <%= if @session_state.compacting do %>
           <div
             class="px-5 py-2 border-t border-orange-500/20 bg-orange-500/5"
             id="dm-compacting-strip"
@@ -407,13 +344,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 <input
                   type="text"
                   name="query"
-                  value={@message_search_query}
+                  value={@message_data.message_search_query}
                   placeholder="Search messages..."
                   autocomplete="off"
                   phx-debounce="300"
-                  class="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30 placeholder:text-base-content/25 text-base-content/70 transition-colors"
+                  class="w-full pl-8 pr-7 py-1.5 text-base rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30 placeholder:text-base-content/25 text-base-content/70 transition-colors"
                 />
-                <%= if @message_search_query != "" do %>
+                <%= if @message_data.message_search_query != "" do %>
                   <button
                     type="button"
                     phx-click="search_messages"
@@ -434,18 +371,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <%= case @active_tab do %>
           <% "messages" -> %>
             <MessagesTab.messages_tab
-              messages={@messages}
-              has_more_messages={@has_more_messages}
-              show_live_stream={@show_live_stream}
-              stream_content={@stream_content}
-              stream_tool={@stream_tool}
-              stream_thinking={@stream_thinking}
-              session={@session}
+              messages={@message_data.messages}
+              has_more_messages={@message_data.has_more_messages}
+              stream={@stream}
+              session={@agent}
               agent={@agent}
-              message_search_query={@message_search_query}
+              message_search_query={@message_data.message_search_query}
             />
           <% "tasks" -> %>
-            <TasksTab.tasks_tab tasks={@tasks} />
+            <TasksTab.tasks_tab tasks={@task_data.tasks} />
           <% "commits" -> %>
             <CommitsTab.commits_tab commits={@commits} diff_cache={@diff_cache} />
           <% "notes" -> %>
@@ -454,15 +388,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             <ContextTab.context_tab session_context={@session_context} />
           <% _ -> %>
             <MessagesTab.messages_tab
-              messages={@messages}
-              has_more_messages={@has_more_messages}
-              show_live_stream={@show_live_stream}
-              stream_content={@stream_content}
-              stream_tool={@stream_tool}
-              stream_thinking={@stream_thinking}
-              session={@session}
+              messages={@message_data.messages}
+              has_more_messages={@message_data.has_more_messages}
+              stream={@stream}
+              session={@agent}
               agent={@agent}
-              message_search_query={@message_search_query}
+              message_search_query={@message_data.message_search_query}
             />
         <% end %>
       </div>
@@ -473,29 +404,41 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           id="dm-page-composer"
           class="flex-shrink-0 max-w-4xl mx-auto w-full pt-2 safe-inset-bottom"
         >
-          <%= if @queued_prompts != [] do %>
-            <Composer.prompt_queue prompts={@queued_prompts} />
+          <%= if @message_data.queued_prompts != [] do %>
+            <Composer.prompt_queue prompts={@message_data.queued_prompts} />
           <% end %>
           <Composer.message_form
             uploads={@uploads}
-            selected_model={@selected_model}
-            selected_effort={@selected_effort}
-            show_effort_menu={@show_effort_menu}
-            show_model_menu={@show_model_menu}
-            processing={@processing}
+            selected_model={@session_state.model}
+            selected_effort={@session_state.effort}
+            active_overlay={@overlay_data.active_overlay}
+            processing={@session_state.processing}
             slash_items={@slash_items}
-            thinking_enabled={@thinking_enabled}
-            max_budget_usd={@max_budget_usd}
+            thinking_enabled={@session_state.thinking_enabled}
+            max_budget_usd={@session_state.max_budget_usd}
             provider={@agent.provider}
-            total_tokens={@total_tokens}
-            total_cost={@total_cost}
-            context_used={@context_used}
-            context_window={@context_window}
+            context_used={@session_state.context_used}
+            context_window={@session_state.context_window}
             display_name={if @agent_record && is_map(@agent_record.agent_definition) && not match?(%Ecto.Association.NotLoaded{}, @agent_record.agent_definition), do: @agent_record.agent_definition.display_name}
+            session_cli_opts={assigns[:session_cli_opts] || []}
           />
         </div>
       <% end %>
     </div>
     """
   end
+
+  attr :status, :string, required: true
+  attr :class, :string, default: "w-2 h-2"
+
+  defp status_dot(assigns) do
+    ~H"""
+    <div class={"rounded-full flex-shrink-0 #{@class} #{status_dot_class(@status)}"} />
+    """
+  end
+
+  defp status_dot_class("working"), do: "bg-success animate-pulse"
+  defp status_dot_class("waiting"), do: "bg-warning animate-pulse"
+  defp status_dot_class("compacting"), do: "bg-orange-500 animate-pulse"
+  defp status_dot_class(_), do: "bg-base-content/20"
 end

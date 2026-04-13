@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.TeamDetailComponent do
+  @moduledoc false
   use EyeInTheSkyWeb, :live_component
 
   import EyeInTheSkyWeb.Components.SessionCard, only: [session_row: 1]
@@ -92,7 +93,7 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
                 <.session_row
                   session={member.session}
                   click_event="select_agent"
-                  project_name={if member.role && member.role != "", do: member.role}
+                  project_name={if member.role not in [nil, ""], do: member.role}
                 />
               <% else %>
                 <%!-- Member without an associated session --%>
@@ -137,7 +138,7 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
                       <% end %>
                       <%= if task.state do %>
                         <span class={[
-                          "text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0",
+                          "text-xs font-medium px-1.5 py-0.5 rounded shrink-0",
                           task_state_chip(task.state_id)
                         ]}>
                           {task.state.name}
@@ -190,14 +191,14 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
                   <% end %>
                   <div class="flex items-center gap-1.5 shrink-0">
                     <%= if Map.get(task, :notes, []) != [] do %>
-                      <span class="flex items-center gap-1 text-[10px] text-base-content/40 font-mono">
+                      <span class="flex items-center gap-1 text-xs text-base-content/40 font-mono">
                         <.icon name="hero-chat-bubble-left-ellipsis" class="w-3 h-3" />
                         {length(task.notes)}
                       </span>
                     <% end %>
                     <%= if task.state do %>
                       <span class={[
-                        "text-[10px] font-medium px-1.5 py-0.5 rounded",
+                        "text-xs font-medium px-1.5 py-0.5 rounded",
                         task_state_chip(task.state_id)
                       ]}>
                         {task.state.name}
@@ -205,7 +206,7 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
                     <% end %>
                     <%!-- Assign to member picker — no phx-target, event handled by parent LiveView --%>
                     <select
-                      class="text-[10px] bg-base-300 border-0 rounded px-1.5 py-0.5 text-base-content/60 cursor-pointer focus:outline-none"
+                      class="text-xs bg-base-300 border-0 rounded px-1.5 py-0.5 text-base-content/60 cursor-pointer focus:outline-none"
                       phx-change="assign_task"
                       phx-value-task-id={task.id}
                       name="session-id"
@@ -222,7 +223,7 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
                     <%= for note <- task.notes do %>
                       <div class="text-xs text-base-content/50 pl-3 border-l-2 border-base-content/10">
                         <p class="whitespace-pre-wrap leading-relaxed">{note.body}</p>
-                        <span class="text-[10px] text-base-content/25 mt-1 block font-mono">
+                        <span class="text-xs text-base-content/25 mt-1 block font-mono">
                           {ViewHelpers.format_datetime_short_time(note.created_at)}
                         </span>
                       </div>

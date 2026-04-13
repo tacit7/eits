@@ -6,9 +6,9 @@ defmodule EyeInTheSky.Checkpoints do
   import Ecto.Query, warn: false
   require Logger
 
-  alias EyeInTheSky.Repo
+  alias EyeInTheSky.{Agents, Messages, Sessions}
   alias EyeInTheSky.Checkpoints.Checkpoint
-  alias EyeInTheSky.{Messages, Sessions, Agents}
+  alias EyeInTheSky.Repo
 
   @doc """
   Lists all checkpoints for a session, ordered oldest first.
@@ -61,30 +61,19 @@ defmodule EyeInTheSky.Checkpoints do
   Restores a session to a checkpoint by deleting messages created after
   checkpoint.message_index (keeping the N oldest).
 
-  If the checkpoint has a git_stash_ref, attempts to restore that stash
-  in the session's project directory.
+  If the checkpoint has a git_stash_ref, the stash is applied BEFORE
+  messages are truncated. If the stash apply fails, the restore is aborted
+  and `{:error, :stash_apply_failed}` is returned with no DB changes made.
 
   Returns `{:ok, deleted_count}` or `{:error, reason}`.
   """
   def restore_checkpoint(%Checkpoint{} = checkpoint) do
-    deleted =
-      Messages.truncate_messages_after_index(checkpoint.session_id, checkpoint.message_index)
+    with :ok <- maybe_apply_stash(checkpoint) do
+      deleted =
+        Messages.truncate_messages_after_index(checkpoint.session_id, checkpoint.message_index)
 
-    if checkpoint.git_stash_ref do
-      session = Repo.get(EyeInTheSky.Sessions.Session, checkpoint.session_id)
-
-      project_path =
-        cond do
-          session && session.git_worktree_path -> session.git_worktree_path
-          true -> nil
-        end
-
-      if project_path && File.dir?(project_path) do
-        pop_stash(project_path, checkpoint.git_stash_ref)
-      end
+      {:ok, deleted}
     end
-
-    {:ok, deleted}
   end
 
   @doc """
@@ -97,36 +86,12 @@ defmodule EyeInTheSky.Checkpoints do
   Returns `{:ok, new_session}` or `{:error, reason}`.
   """
   def fork_checkpoint(%Checkpoint{} = checkpoint, attrs \\ %{}) do
-    original_session =
-      case Sessions.get_session(checkpoint.session_id) do
-        {:ok, s} -> s
-        {:error, _} -> nil
-      end
-
-    unless original_session do
-      {:error, :session_not_found}
-    else
-      with {:ok, agent} <- get_or_create_fork_agent(original_session, attrs),
-           {:ok, new_session} <- create_fork_session(original_session, agent, checkpoint, attrs),
-           :ok <-
-             copy_messages_to_fork(
-               checkpoint.session_id,
-               new_session.id,
-               checkpoint.message_index
-             ) do
-        if checkpoint.git_stash_ref && original_session.git_worktree_path &&
-             File.dir?(original_session.git_worktree_path) do
-          branch_name = attrs[:branch_name] || "fork/session-#{new_session.id}"
-
-          create_branch_from_stash(
-            original_session.git_worktree_path,
-            checkpoint.git_stash_ref,
-            branch_name
-          )
-        end
-
-        {:ok, new_session}
-      end
+    with {:ok, session} <- Sessions.get_session(checkpoint.session_id),
+         {:ok, agent} <- get_or_create_fork_agent(session, attrs),
+         {:ok, new_session} <- create_fork_session(session, agent, checkpoint, attrs),
+         :ok <- copy_messages_to_fork(checkpoint.session_id, new_session.id, checkpoint.message_index) do
+      maybe_create_fork_branch(checkpoint, session, new_session, attrs)
+      {:ok, new_session}
     end
   end
 
@@ -149,6 +114,31 @@ defmodule EyeInTheSky.Checkpoints do
 
   # Private
 
+  # Apply stash before any DB changes so a failure leaves the session intact.
+  defp maybe_apply_stash(%Checkpoint{git_stash_ref: nil}), do: :ok
+
+  defp maybe_apply_stash(%Checkpoint{git_stash_ref: stash_ref, session_id: session_id}) do
+    project_path =
+      case Sessions.get_session(session_id) do
+        {:ok, session} -> session.git_worktree_path
+        _ -> nil
+      end
+
+    if project_path && File.dir?(project_path) do
+      pop_stash(project_path, stash_ref)
+    else
+      :ok
+    end
+  end
+
+  defp maybe_create_fork_branch(checkpoint, original_session, new_session, attrs) do
+    if not is_nil(checkpoint.git_stash_ref) && not is_nil(original_session.git_worktree_path) &&
+         File.dir?(original_session.git_worktree_path) do
+      branch_name = attrs[:branch_name] || "fork/session-#{new_session.id}"
+      create_branch_from_stash(original_session.git_worktree_path, checkpoint.git_stash_ref, branch_name)
+    end
+  end
+
   defp stash_session_state(project_path) do
     stash_message = "eits-checkpoint-#{System.system_time(:millisecond)}"
 
@@ -156,23 +146,10 @@ defmodule EyeInTheSky.Checkpoints do
            stderr_to_stdout: false
          ) do
       {output, 0} ->
-        # Parse the stash ref from output like "Saved working directory... stash@{0}"
-        ref =
-          case Regex.run(~r/stash@\{(\d+)\}/, output) do
-            [_, n] ->
-              # Resolve the stash ref to a commit hash for stable reference
-              case System.cmd("git", ["-C", project_path, "rev-parse", "stash@{#{n}}"],
-                     stderr_to_stdout: false
-                   ) do
-                {hash, 0} -> String.trim(hash)
-                _ -> "stash@{#{n}}"
-              end
-
-            _ ->
-              nil
-          end
-
-        ref
+        case Regex.run(~r/stash@\{(\d+)\}/, output) do
+          [_, n] -> resolve_stash_ref(project_path, n)
+          _ -> nil
+        end
 
       {reason, code} ->
         Logger.warning("git stash failed (exit #{code}): #{String.trim(reason)}")
@@ -180,14 +157,27 @@ defmodule EyeInTheSky.Checkpoints do
     end
   end
 
+  defp resolve_stash_ref(project_path, n) do
+    case System.cmd("git", ["-C", project_path, "rev-parse", "stash@{#{n}}"],
+           stderr_to_stdout: false
+         ) do
+      {hash, 0} -> String.trim(hash)
+      _ -> "stash@{#{n}}"
+    end
+  end
+
+  # Returns :ok on success, {:error, :stash_apply_failed} on failure.
   defp pop_stash(project_path, stash_ref) do
     {_output, code} =
       System.cmd("git", ["-C", project_path, "stash", "apply", stash_ref],
         stderr_to_stdout: false
       )
 
-    if code != 0 do
+    if code == 0 do
+      :ok
+    else
       Logger.warning("git stash apply #{stash_ref} failed with exit #{code}")
+      {:error, :stash_apply_failed}
     end
   end
 
@@ -238,28 +228,38 @@ defmodule EyeInTheSky.Checkpoints do
     })
   end
 
+  # Bug fix: was using list_recent_messages/2 (most recent N), which copies the
+  # wrong slice. Use get_conversation_thread/2 which fetches oldest-first with
+  # a limit, matching what message_index tracks.
+  #
+  # Bug fix: was using Enum.each which silently ignores insert errors. Now uses
+  # Enum.reduce_while and returns {:error, reason} on the first failure.
   defp copy_messages_to_fork(source_session_id, dest_session_id, message_index) do
     messages_to_copy =
-      Messages.list_recent_messages(source_session_id, message_index)
+      Messages.get_conversation_thread(source_session_id, limit: message_index, offset: 0)
 
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    Enum.each(messages_to_copy, fn msg ->
-      Messages.create_message(%{
-        uuid: Ecto.UUID.generate(),
-        session_id: dest_session_id,
-        sender_role: msg.sender_role,
-        recipient_role: msg.recipient_role,
-        direction: msg.direction || "inbound",
-        body: msg.body,
-        status: "delivered",
-        provider: msg.provider || "claude",
-        metadata: msg.metadata || %{},
-        inserted_at: msg.inserted_at || now,
-        updated_at: now
-      })
-    end)
+    result =
+      Enum.reduce_while(messages_to_copy, :ok, fn msg, _acc ->
+        case Messages.create_message(%{
+               uuid: Ecto.UUID.generate(),
+               session_id: dest_session_id,
+               sender_role: msg.sender_role,
+               recipient_role: msg.recipient_role,
+               direction: msg.direction || "inbound",
+               body: msg.body,
+               status: "delivered",
+               provider: msg.provider || "claude",
+               metadata: msg.metadata || %{},
+               inserted_at: msg.inserted_at || now,
+               updated_at: now
+             }) do
+          {:ok, _} -> {:cont, :ok}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
 
-    :ok
+    result
   end
 end

@@ -12,8 +12,8 @@ defmodule EyeInTheSky.Claude.ChatWorker do
   require Logger
 
   alias EyeInTheSky.Agents.AgentManager
-  alias EyeInTheSky.Claude.ChannelProtocol
   alias EyeInTheSky.Channels
+  alias EyeInTheSky.Claude.ChannelProtocol
 
   @registry EyeInTheSky.Claude.ChatRegistry
 
@@ -39,9 +39,9 @@ defmodule EyeInTheSky.Claude.ChatWorker do
     end
   end
 
-  def is_processing?(channel_id) do
+  def processing?(channel_id) do
     case Registry.lookup(@registry, {:channel, channel_id}) do
-      [{pid, _}] -> GenServer.call(pid, :is_processing?)
+      [{pid, _}] -> GenServer.call(pid, :processing?)
       [] -> false
     end
   end
@@ -64,7 +64,7 @@ defmodule EyeInTheSky.Claude.ChatWorker do
   end
 
   @impl true
-  def handle_call(:is_processing?, _from, state) do
+  def handle_call(:processing?, _from, state) do
     {:reply, state.processing, state}
   end
 
@@ -118,7 +118,7 @@ defmodule EyeInTheSky.Claude.ChatWorker do
   defp process_job(state, job) do
     worker = self()
 
-    Task.start(fn ->
+    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
       results = fanout(state.channel_id, job.message, job.sender_session_id, job.opts)
       send(worker, {:fanout_complete, results})
     end)
@@ -137,17 +137,7 @@ defmodule EyeInTheSky.Claude.ChatWorker do
 
       prompt = ChannelProtocol.build_prompt(mode, message)
 
-      result =
-        try do
-          AgentManager.send_message(member.session_id, prompt, opts)
-        rescue
-          e ->
-            Logger.error(
-              "ChatWorker: exception routing to session=#{member.session_id} - #{inspect(e)}"
-            )
-
-            {:error, {:exception, e}}
-        end
+      result = AgentManager.send_message(member.session_id, prompt, opts)
 
       case result do
         {:ok, admission} ->

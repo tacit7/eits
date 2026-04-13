@@ -25,7 +25,7 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
       assert opts[:allowedTools] == "Write"
     end
 
-    test "string \"true\"/\"false\" coerced to booleans" do
+    test ~s(string "true"/"false" coerced to booleans) do
       opts = CLI.normalize_opts(skip_permissions: "true", verbose: "false")
       assert opts[:skip_permissions] == true
       assert opts[:verbose] == false
@@ -146,7 +146,7 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
       assert "-p" in args
       assert "hello" in args
       assert "--model" in args
-      assert "sonnet" in args
+      assert "claude-sonnet-4-6" in args
     end
 
     test "DB model appears when caller doesn't specify model" do
@@ -155,16 +155,16 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
       args = CLI.build_args(prompt: "test")
 
       assert "--model" in args
-      assert "opus" in args
+      assert "claude-opus-4-6" in args
     end
 
-    test "caller model overrides DB model" do
+    test "caller model overrides DB model and gets normalized" do
       Settings.set_cli_defaults(%{"model" => "opus"})
 
       args = CLI.build_args(prompt: "test", model: "haiku")
 
       assert "--model" in args
-      assert "haiku" in args
+      assert "claude-haiku-4-5" in args
       refute "opus" in args
     end
 
@@ -174,7 +174,29 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
       args = CLI.build_args(prompt: "test", model: nil)
 
       assert "--model" in args
-      assert "opus" in args
+      assert "claude-opus-4-6" in args
+    end
+
+    test "model names are normalized to full Claude identifiers" do
+      test_cases = [
+        {"haiku", "claude-haiku-4-5"},
+        {"sonnet", "claude-sonnet-4-6"},
+        {"opus", "claude-opus-4-6"},
+        {"HAIKU", "claude-haiku-4-5"},  # case insensitive
+        {"custom-model", "custom-model"},  # passthrough for unknown models
+        {nil, nil}  # nil passthrough
+      ]
+
+      for {input, expected} <- test_cases do
+        args = CLI.build_args(prompt: "test", model: input)
+
+        if expected do
+          assert "--model" in args
+          assert expected in args
+        else
+          refute "--model" in args
+        end
+      end
     end
 
     test "prompt always present as -p <text>" do
@@ -246,6 +268,20 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
       idx = Enum.find_index(args, &(&1 == "--output-format"))
       assert idx != nil
       assert Enum.at(args, idx + 1) == "stream-json"
+    end
+
+    test "name produces --name <value>" do
+      args = CLI.build_args(prompt: "x", name: "My Agent")
+
+      idx = Enum.find_index(args, &(&1 == "--name"))
+      assert idx != nil
+      assert Enum.at(args, idx + 1) == "My Agent"
+    end
+
+    test "nil name omits --name flag" do
+      args = CLI.build_args(prompt: "x", name: nil)
+
+      refute "--name" in args
     end
   end
 
@@ -356,6 +392,159 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
       args = CLI.build_args(prompt: "x", output_format: "stream-json", verbose: false)
 
       assert "--verbose" in args
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Multimodal content blocks
+  # ---------------------------------------------------------------------------
+
+  describe "build_args with content_blocks" do
+    test "adds --input-format stream-json when content_blocks present" do
+      blocks = [%{"type" => "image", "source" => %{"type" => "base64", "media_type" => "image/png", "data" => "abc"}}]
+      args = CLI.build_args(prompt: "describe this", content_blocks: blocks)
+
+      assert "--input-format" in args
+      assert "stream-json" in args
+    end
+
+    test "does not add --input-format when content_blocks is empty" do
+      args = CLI.build_args(prompt: "hello", content_blocks: [])
+
+      # Should only have the output-format stream-json, not input-format
+      {_flag_indices, input_format_count} =
+        args
+        |> Enum.chunk_every(2, 1, :discard)
+        |> Enum.reduce({[], 0}, fn
+          ["--input-format", _], {acc, count} -> {acc, count + 1}
+          _, {acc, count} -> {acc, count}
+        end)
+
+      assert input_format_count == 0
+    end
+
+    test "does not add --input-format when no content_blocks key" do
+      args = CLI.build_args(prompt: "hello")
+
+      refute "--input-format" in args
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # build_args/1 advanced CLI flags (form-submitted)
+  # ---------------------------------------------------------------------------
+
+  describe "build_args/1 advanced CLI flags" do
+    test "chrome: true produces --chrome" do
+      args = CLI.build_args(prompt: "x", chrome: true)
+      assert "--chrome" in args
+      refute "--no-chrome" in args
+    end
+
+    test "chrome: false produces --no-chrome" do
+      args = CLI.build_args(prompt: "x", chrome: false)
+      assert "--no-chrome" in args
+      refute "--chrome" in args
+    end
+
+    test "chrome not set omits both --chrome and --no-chrome" do
+      args = CLI.build_args(prompt: "x")
+      refute "--chrome" in args
+      refute "--no-chrome" in args
+    end
+
+    test "sandbox: true produces --sandbox" do
+      args = CLI.build_args(prompt: "x", sandbox: true)
+      assert "--sandbox" in args
+    end
+
+    test "sandbox not set omits --sandbox" do
+      args = CLI.build_args(prompt: "x")
+      refute "--sandbox" in args
+    end
+
+    test "permission_mode produces --permission-mode <value>" do
+      args = CLI.build_args(prompt: "x", permission_mode: "plan")
+      idx = Enum.find_index(args, &(&1 == "--permission-mode"))
+      assert idx != nil
+      assert Enum.at(args, idx + 1) == "plan"
+    end
+
+    test "add_dir produces --add-dir <path>" do
+      args = CLI.build_args(prompt: "x", add_dir: "/some/path")
+      idx = Enum.find_index(args, &(&1 == "--add-dir"))
+      assert idx != nil
+      assert Enum.at(args, idx + 1) == "/some/path"
+    end
+
+    test "mcp_config produces --mcp-config <path>" do
+      args = CLI.build_args(prompt: "x", mcp_config: "./mcp.json")
+      idx = Enum.find_index(args, &(&1 == "--mcp-config"))
+      assert idx != nil
+      assert Enum.at(args, idx + 1) == "./mcp.json"
+    end
+
+    test "plugin_dir produces --plugin-dir <path>" do
+      args = CLI.build_args(prompt: "x", plugin_dir: "./plugins")
+      idx = Enum.find_index(args, &(&1 == "--plugin-dir"))
+      assert idx != nil
+      assert Enum.at(args, idx + 1) == "./plugins"
+    end
+
+    test "settings_file produces --settings <path>" do
+      args = CLI.build_args(prompt: "x", settings_file: "./settings.json")
+      idx = Enum.find_index(args, &(&1 == "--settings"))
+      assert idx != nil
+      assert Enum.at(args, idx + 1) == "./settings.json"
+    end
+
+    test "all advanced flags together" do
+      args =
+        CLI.build_args(
+          prompt: "x",
+          chrome: true,
+          sandbox: true,
+          permission_mode: "acceptEdits",
+          add_dir: "/lib",
+          mcp_config: "./mcp.json",
+          plugin_dir: "./plugins",
+          settings_file: "./settings.json",
+          max_turns: 10
+        )
+
+      assert "--chrome" in args
+      assert "--sandbox" in args
+      assert "--permission-mode" in args
+      assert "acceptEdits" in args
+      assert "--add-dir" in args
+      assert "/lib" in args
+      assert "--mcp-config" in args
+      assert "--plugin-dir" in args
+      assert "--settings" in args
+      assert "--max-turns" in args
+    end
+  end
+
+  describe "content_blocks_json/1" do
+    test "returns nil when no content_blocks" do
+      assert CLI.content_blocks_json(prompt: "hello") == nil
+    end
+
+    test "returns nil for empty content_blocks" do
+      assert CLI.content_blocks_json(prompt: "hello", content_blocks: []) == nil
+    end
+
+    test "returns JSON user message with text and image blocks" do
+      blocks = [%{"type" => "image", "source" => %{"type" => "base64", "media_type" => "image/png", "data" => "iVBOR"}}]
+      json = CLI.content_blocks_json(prompt: "describe this", content_blocks: blocks)
+
+      assert json != nil
+      decoded = Jason.decode!(json)
+      assert decoded["type"] == "user"
+      assert length(decoded["content"]) == 2
+      assert hd(decoded["content"])["type"] == "text"
+      assert hd(decoded["content"])["text"] == "describe this"
+      assert List.last(decoded["content"])["type"] == "image"
     end
   end
 end

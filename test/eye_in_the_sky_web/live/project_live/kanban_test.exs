@@ -273,6 +273,49 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
     end
   end
 
+  describe "priority filter" do
+    test "does not crash on non-integer priority value like checkbox 'on'", %{conn: conn} do
+      project = create_project()
+      _task = create_task(project, %{title: "Priority test task", priority: 2})
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
+
+      # Simulate the checkbox sending its native HTML value "on"
+      render_click(view, "update_filter", %{"field" => "priority", "value" => "on"})
+
+      # LiveView should still be alive and rendering
+      assert render(view) =~ "Priority test task"
+    end
+
+    test "filters tasks by valid priority value", %{conn: conn} do
+      project = create_project()
+      _high = create_task(project, %{title: "High priority task", priority: 3, state_id: 1})
+      _low = create_task(project, %{title: "Low priority task", priority: 1, state_id: 1})
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
+
+      render_click(view, "update_filter", %{"field" => "priority", "value" => "3"})
+
+      html = render(view)
+      assert html =~ "High priority task"
+      refute html =~ "Low priority task"
+    end
+
+    test "clears filter when empty string priority is sent", %{conn: conn} do
+      project = create_project()
+      _task = create_task(project, %{title: "Some task", priority: 1})
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
+
+      # Set filter then clear it
+      render_click(view, "update_filter", %{"field" => "priority", "value" => "1"})
+      render_click(view, "update_filter", %{"field" => "priority", "value" => ""})
+
+      # All tasks visible again
+      assert render(view) =~ "Some task"
+    end
+  end
+
   describe "search" do
     test "filters tasks by title when query >= 4 chars", %{conn: conn} do
       project = create_project()

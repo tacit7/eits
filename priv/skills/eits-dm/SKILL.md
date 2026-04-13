@@ -1,6 +1,6 @@
 ---
 name: eits-dm
-description: Send and respond to direct messages (DMs) between agents and sessions in EITS. Activates when a message starts with "DM from:" (incoming DM) or when an agent needs to DM another session/agent. Covers: parsing incoming DMs, replying, proactively sending messages, UUID requirements, and EITS-CMD directive for spawned agents.
+description: Send and respond to direct messages (DMs) between agents and sessions in EITS. Activates when a message starts with "DM from:" (incoming DM) or when an agent needs to DM another session/agent. Covers: parsing incoming DMs, replying, proactively sending messages, and UUID requirements.
 user-invocable: false
 ---
 
@@ -53,18 +53,6 @@ eits dm --to $TARGET_UUID --message "Status update: what is your progress?"
 eits dm --to $UUID_1 --message "..."
 eits dm --to $UUID_2 --message "..."
 ```
-
----
-
-## EITS-CMD (sdk-cli / spawned agents)
-
-When running as `sdk-cli`, output this directive in text instead of calling the CLI:
-
-```
-EITS-CMD: dm --to <session_uuid> --message "text"
-```
-
-AgentWorker intercepts it in-process — no HTTP round-trip needed.
 
 ---
 

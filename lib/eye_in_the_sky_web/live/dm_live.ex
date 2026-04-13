@@ -1,41 +1,45 @@
 defmodule EyeInTheSkyWeb.DmLive do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.{Sessions, Agents}
+  alias EyeInTheSky.{Agents, Sessions}
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSkyWeb.Components.DmPage
-  alias EyeInTheSkyWeb.DmLive.TaskHandlers
-  alias EyeInTheSkyWeb.DmLive.{MountState, MessageHandlers, AgentLifecycle, ExternalActions}
+  alias EyeInTheSkyWeb.DmLive.{AgentLifecycle, ExternalActions, MessageHandlers, MountState, SlashCommands}
   alias EyeInTheSkyWeb.DmLive.TabHelpers
+  alias EyeInTheSkyWeb.DmLive.TaskHandlers
+  alias EyeInTheSkyWeb.DmLive.TimerHandlers
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
   import EyeInTheSkyWeb.Live.Shared.TasksHelpers
   import EyeInTheSkyWeb.Live.Shared.DmExportHelpers
   import EyeInTheSkyWeb.Live.Shared.DmModelHelpers
   import EyeInTheSkyWeb.Live.Shared.DmSessionHelpers
   import EyeInTheSkyWeb.Live.Shared.DmStreamHelpers
+  import EyeInTheSkyWeb.Live.Shared.OverlayHelpers
 
   require Logger
 
-  @default_message_limit 20
+  @default_message_limit 50
   @message_page_size 20
 
   @impl true
   def mount(%{"session_id" => session_id_param} = params, _session, socket) do
-    session_result =
-      case Integer.parse(session_id_param) do
-        {id, ""} -> Sessions.get_session(id)
-        _ -> Sessions.get_session_by_uuid(session_id_param)
-      end
+    session_result = Sessions.resolve(session_id_param)
 
     with {:session, {:ok, session}} <- {:session, session_result},
          {:agent, {:ok, agent}} <- {:agent, Agents.get_agent(session.agent_id)} do
-      MountState.maybe_subscribe(socket, session.id)
+      MountState.maybe_subscribe(connected?(socket), session.id)
+
+      is_connected = connected?(socket)
 
       socket =
         socket
         |> MountState.assign_sidebar_context(params)
         |> MountState.assign_session_state(session, agent)
-        |> MountState.assign_defaults(session)
-        |> load_messages_on_mount()
+        |> MountState.assign_essential_defaults(session)
+        |> then(fn s ->
+          if is_connected, do: MountState.assign_connected_defaults(s, session), else: s
+        end)
+        |> MessageHandlers.load_messages_on_mount()
 
       {:ok, socket}
     else
@@ -51,6 +55,9 @@ defmodule EyeInTheSkyWeb.DmLive do
   # ---------------------------------------------------------------------------
   # Tab & UI toggles
   # ---------------------------------------------------------------------------
+
+  @impl true
+  def handle_event("keydown", _params, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("change_tab", %{"tab" => tab}, socket) do
@@ -70,26 +77,34 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("toggle_new_task_drawer", _params, socket) do
-    overlay = if socket.assigns.active_overlay == :task_drawer, do: nil, else: :task_drawer
-    {:noreply, assign(socket, :active_overlay, overlay)}
+    {:noreply, assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, :task_drawer))}
   end
 
   @impl true
   def handle_event("toggle_task_detail_drawer", _params, socket) do
-    overlay = if socket.assigns.active_overlay == :task_detail, do: nil, else: :task_detail
-    {:noreply, assign(socket, :active_overlay, overlay)}
+    {:noreply, assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, :task_detail))}
   end
+
+  @impl true
+  def handle_event("open_schedule_timer", _params, socket) do
+    {:noreply, assign(socket, :active_overlay, :schedule_timer)}
+  end
+
+  @impl true
+  def handle_event("close_schedule_modal", _params, socket) do
+    {:noreply, assign(socket, :active_overlay, nil)}
+  end
+
+  @impl true
+  def handle_event("schedule_timer", params, socket),
+    do: TimerHandlers.handle_schedule_timer(params, socket)
+
+  @impl true
+  def handle_event("cancel_timer", _params, socket),
+    do: TimerHandlers.handle_cancel_timer(socket)
 
   @impl true
   def handle_event("toggle_thinking", _params, socket), do: handle_toggle_thinking(socket)
-
-  @impl true
-  def handle_event("keydown", %{"key" => "k", "ctrlKey" => true}, socket) do
-    overlay = if socket.assigns.active_overlay == :task_drawer, do: nil, else: :task_drawer
-    {:noreply, assign(socket, :active_overlay, overlay)}
-  end
-
-  def handle_event("keydown", _params, socket), do: {:noreply, socket}
 
   # ---------------------------------------------------------------------------
   # Task CRUD — delegates to TasksHelpers; overlay close handled here
@@ -164,7 +179,17 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("send_message", %{"body" => body}, socket) when body != "" do
-    MessageHandlers.handle_send_message(body, socket)
+    {server_cmds, session_opts, clean_body} = SlashCommands.parse(body)
+    socket = SlashCommands.apply_server_commands(server_cmds, socket)
+    socket = SlashCommands.apply_session_opts(session_opts, socket)
+
+    trimmed = String.trim(clean_body)
+
+    if trimmed != "" do
+      MessageHandlers.handle_send_message(trimmed, socket)
+    else
+      {:noreply, push_event(socket, "clear-input", %{})}
+    end
   end
 
   @impl true
@@ -174,10 +199,7 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("remove_queued_prompt", %{"id" => id_str}, socket) do
-    case Integer.parse(id_str) do
-      {id, ""} -> AgentWorker.remove_queued_prompt(socket.assigns.session_id, id)
-      _ -> :ok
-    end
+    if id = parse_int(id_str), do: AgentWorker.remove_queued_prompt(socket.assigns.session_id, id)
 
     {:noreply, socket}
   end
@@ -189,7 +211,7 @@ defmodule EyeInTheSkyWeb.DmLive do
     socket =
       socket
       |> assign(:message_limit, new_limit)
-      |> TabHelpers.load_tab_data("messages", socket.assigns.session_id)
+      |> TabHelpers.force_reload_messages(socket.assigns.session_id)
 
     {:noreply, socket}
   end
@@ -198,10 +220,18 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_event("search_messages", %{"query" => query}, socket) do
     query = String.trim(query)
 
+    # When clearing search (blank query), force a fresh DB load — the cache
+    # holds the filtered result set and must not be reused for the full list.
     socket =
-      socket
-      |> assign(:message_search_query, query)
-      |> TabHelpers.load_tab_data("messages", socket.assigns.session_id)
+      if query == "" do
+        socket
+        |> assign(:message_search_query, query)
+        |> TabHelpers.force_reload_messages(socket.assigns.session_id)
+      else
+        socket
+        |> assign(:message_search_query, query)
+        |> TabHelpers.load_tab_data("messages", socket.assigns.session_id)
+      end
 
     {:noreply, socket}
   end
@@ -260,7 +290,7 @@ defmodule EyeInTheSkyWeb.DmLive do
     {_reply, new_socket} =
       handle_reload_from_session_file(
         socket,
-        &TabHelpers.load_tab_data(&1, "messages", &1.assigns.session_id)
+        &TabHelpers.force_reload_messages(&1, &1.assigns.session_id)
       )
 
     {:noreply, assign(new_socket, :reloading, false)}
@@ -300,19 +330,9 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_info({:agent_working, msg}, socket),
     do: AgentLifecycle.handle_agent_working(msg, socket)
 
-  # 3-tuple form from AgentWorkerEvents: {:agent_working, provider_conv_id, session_int_id}
-  @impl true
-  def handle_info({:agent_working, _ref, session_id}, socket),
-    do: AgentLifecycle.handle_agent_working(session_id, socket)
-
   @impl true
   def handle_info({:agent_stopped, msg}, socket),
     do: AgentLifecycle.handle_agent_stopped(msg, socket)
-
-  # 3-tuple form from AgentWorkerEvents: {:agent_stopped, provider_conv_id, session_int_id}
-  @impl true
-  def handle_info({:agent_stopped, _ref, session_id}, socket),
-    do: AgentLifecycle.handle_agent_stopped(session_id, socket)
 
   @impl true
   def handle_info({:agent_updated, updated_session}, socket),
@@ -354,10 +374,29 @@ defmodule EyeInTheSkyWeb.DmLive do
     do: handle_queue_updated(prompts, socket)
 
   @impl true
+  def handle_info({:timer_scheduled, timer}, socket) do
+    {:noreply, assign(socket, :active_timer, timer)}
+  end
+
+  @impl true
+  def handle_info(:timer_cancelled, socket) do
+    {:noreply, assign(socket, :active_timer, nil)}
+  end
+
+  @impl true
+  def handle_info({:timer_fired, timer_or_nil}, socket) do
+    {:noreply, assign(socket, :active_timer, timer_or_nil)}
+  end
+
+  @impl true
   def handle_info(msg, socket) do
     Logger.debug("Unhandled message in DM LiveView: #{inspect(msg)}")
     {:noreply, socket}
   end
+
+  # ---------------------------------------------------------------------------
+  # Private helpers
+  # ---------------------------------------------------------------------------
 
   # ---------------------------------------------------------------------------
   # Render
@@ -366,44 +405,41 @@ defmodule EyeInTheSkyWeb.DmLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id="dm-live-root" phx-hook="GlobalKeydown">
+    <div id="dm-live-root">
       <DmPage.dm_page
         agent={@session}
         agent_record={@agent}
         session_uuid={@session_uuid}
         active_tab={@active_tab}
-        messages={@messages}
-        has_more_messages={@has_more_messages}
         uploads={@uploads}
-        selected_model={@selected_model}
-        selected_effort={@selected_effort}
-        show_effort_menu={@active_overlay == :effort_menu}
-        show_model_menu={@active_overlay == :model_menu}
-        processing={@processing}
-        show_live_stream={@show_live_stream}
-        stream_content={@stream_content}
-        stream_tool={@stream_tool}
-        stream_thinking={@stream_thinking}
-        session={@session}
-        tasks={@tasks}
+        stream={%{show: @show_live_stream, content: @stream_content, tool: @stream_tool, thinking: @stream_thinking}}
+        session_state={%{
+          model: @selected_model,
+          effort: @selected_effort,
+          processing: @processing,
+          thinking_enabled: @thinking_enabled,
+          max_budget_usd: @max_budget_usd,
+          compacting: @compacting,
+          context_used: @context_used,
+          context_window: @context_window
+        }}
+        message_data={%{
+          messages: @messages,
+          has_more_messages: @has_more_messages,
+          message_search_query: @message_search_query,
+          queued_prompts: @queued_prompts
+        }}
+        task_data={%{tasks: @tasks, current_task: @current_task}}
+        overlay_data={%{
+          active_overlay: @active_overlay,
+          active_timer: @active_timer,
+          reloading: @reloading
+        }}
         commits={@commits}
         diff_cache={@diff_cache}
         notes={@notes}
         slash_items={@slash_items}
-        show_new_task_drawer={@active_overlay == :task_drawer}
-        workflow_states={@workflow_states}
-        current_task={@current_task}
-        total_tokens={@total_tokens}
-        total_cost={@total_cost}
-        queued_prompts={@queued_prompts}
-        thinking_enabled={@thinking_enabled}
-        max_budget_usd={@max_budget_usd}
-        compacting={@compacting}
-        context_used={@context_used}
-        context_window={@context_window}
-        message_search_query={@message_search_query}
         session_context={@session_context}
-        reloading={@reloading}
       />
 
       <EyeInTheSkyWeb.Components.NewTaskDrawer.new_task_drawer
@@ -428,22 +464,4 @@ defmodule EyeInTheSkyWeb.DmLive do
     """
   end
 
-  # ---------------------------------------------------------------------------
-  # Private
-  # ---------------------------------------------------------------------------
-
-  # On connected mount, sync messages from the session file into the DB first
-  # so navigating back after an agent run shows the full conversation (including
-  # tool blocks), not just the final text saved by on_result_received.
-  # Falls back to a plain DB query if no session file / project path found.
-  defp load_messages_on_mount(socket) do
-    if connected?(socket) do
-      case MessageHandlers.sync_messages_from_session_file(socket) do
-        {:ok, socket, _imported} -> socket
-        {:error, _reason} -> TabHelpers.load_tab_data(socket, "messages", socket.assigns.session_id)
-      end
-    else
-      TabHelpers.load_tab_data(socket, "messages", socket.assigns.session_id)
-    end
-  end
 end

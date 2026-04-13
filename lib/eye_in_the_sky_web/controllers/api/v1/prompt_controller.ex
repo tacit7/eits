@@ -33,7 +33,7 @@ defmodule EyeInTheSkyWeb.Api.V1.PromptController do
   Query params: project_id (for slug scope), include_text (default true)
   """
   def show(conn, %{"id" => id} = params) do
-    include_text = params["include_text"] != "false"
+    include_text = params["include_text"] not in ["false", false]
 
     case Prompts.get_prompt_by_ref(id, params["project_id"]) do
       {:error, :not_found} ->

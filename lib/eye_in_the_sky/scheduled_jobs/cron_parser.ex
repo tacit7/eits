@@ -25,6 +25,9 @@ defmodule EyeInTheSky.ScheduledJobs.CronParser do
 
       "cron" ->
         next_cron_run_at(schedule_value, utc_now, timezone)
+
+      _ ->
+        nil
     end
   end
 

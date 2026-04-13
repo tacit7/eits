@@ -6,6 +6,8 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
   """
   use EyeInTheSkyWeb, :html
 
+  import EyeInTheSkyWeb.Helpers.FileHelpers, only: [format_size: 1]
+
   attr :entry, :map, required: true
 
   def tree_item(assigns) do
@@ -274,8 +276,4 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
   def language_class(:toml), do: "toml"
   def language_class(_), do: "plaintext"
 
-  @doc "Formats a byte count as a human-readable string."
-  def format_size(bytes) when is_integer(bytes) and bytes < 1024, do: "#{bytes} B"
-  def format_size(bytes) when is_integer(bytes), do: "#{Float.round(bytes / 1024, 1)} KB"
-  def format_size(_), do: ""
 end

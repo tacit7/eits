@@ -53,7 +53,6 @@ import {ModalDialog} from "./hooks/modal_dialog"
 import {LiveStreamToggle} from "./hooks/live_stream_toggle"
 import {RefreshDot} from "./hooks/refresh_dot"
 import {Highlight} from "./hooks/highlight"
-import {GlobalKeydown} from "./hooks/global_keydown"
 import {LocalTime} from "./hooks/local_time"
 import {DragUpload} from "./hooks/drag_upload"
 import {SidebarState} from "./hooks/sidebar_state"
@@ -106,7 +105,6 @@ Hooks.ModalDialog = ModalDialog
 Hooks.LiveStreamToggle = LiveStreamToggle
 Hooks.RefreshDot = RefreshDot
 Hooks.Highlight = Highlight
-Hooks.GlobalKeydown = GlobalKeydown
 Hooks.LocalTime = LocalTime
 Hooks.DragUpload = DragUpload
 Hooks.SidebarState = SidebarState

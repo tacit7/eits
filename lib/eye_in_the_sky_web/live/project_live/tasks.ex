@@ -83,6 +83,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   end
 
   @impl true
+  def handle_event("keydown", _params, socket), do: {:noreply, socket}
+
+  @impl true
   def handle_event("toggle_task_detail_drawer", params, socket),
     do: handle_toggle_task_detail_drawer(params, socket)
 
@@ -130,7 +133,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="px-4 sm:px-6 lg:px-8 py-6" phx-hook="GlobalKeydown" id="project-tasks-page">
+    <div class="px-4 sm:px-6 lg:px-8 py-6" id="project-tasks-page">
       <div class="max-w-4xl mx-auto">
         <%!-- Search and New Task --%>
         <div class="mb-4 flex items-center gap-2 sm:gap-3">

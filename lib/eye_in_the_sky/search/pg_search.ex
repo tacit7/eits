@@ -268,7 +268,10 @@ defmodule EyeInTheSky.Search.PgSearch do
         "coalesce(#{alias_letter}.#{col}, '')"
       end)
 
-    effective_limit = limit || 50
+    effective_limit = if is_integer(limit) and limit > 0, do: limit, else: 50
+
+    # $1 = search query, trailing param = limit — never interpolated into SQL.
+    limit_placeholder = "$#{length(sql_params) + 2}"
 
     # CTE pre-computes the tsquery once; WHERE and ORDER BY reference it without re-evaluation.
     sql = """
@@ -278,10 +281,10 @@ defmodule EyeInTheSky.Search.PgSearch do
     WHERE to_tsvector('english', #{tsvector_expr}) @@ _q.tsq
     #{sql_filter}
     ORDER BY ts_rank(to_tsvector('english', #{tsvector_expr}), _q.tsq) DESC
-    LIMIT #{effective_limit}
+    LIMIT #{limit_placeholder}
     """
 
-    params = [query | sql_params]
+    params = [query | sql_params] ++ [effective_limit]
 
     case SQL.query(Repo, sql, params) do
       {:ok, %{rows: rows, columns: columns}} ->

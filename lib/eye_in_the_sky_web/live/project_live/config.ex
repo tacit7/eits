@@ -164,7 +164,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
               |> assign(:error, nil)
 
             {:file, full_path, file_rel_path} ->
-              read_file_for_display(socket, full_path, file_rel_path, claude_dir)
+              # Always clear the listing and set current_path regardless of success/error,
+              # matching the original pre-refactor behavior of this module.
+              socket
+              |> read_file_for_display(full_path, file_rel_path, claude_dir)
+              |> assign(:current_path, file_rel_path)
+              |> assign(:files, [])
 
             {:error, msg} ->
               assign(socket, :error, msg)

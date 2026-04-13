@@ -10,18 +10,19 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers do
   @max_file_size 1_048_576
 
   @doc """
-  Returns true when `path` is within `base_dir`.
+  Returns true when `path` is within `base_dir` (inclusive of `base_dir` itself).
 
   Resolves symlinks via `realpath` before comparing, preventing symlink-escape
-  attacks. Also uses a trailing-slash guard to avoid prefix-collision false
-  positives (e.g. `/tmp/foo_evil` must not match base `/tmp/foo`).
+  attacks. Uses a trailing-slash guard to avoid prefix-collision false positives
+  (e.g. `/tmp/foo_evil` must not match base `/tmp/foo`), while still allowing
+  `path == base_dir` for callers that navigate to the root directory.
 
   Returns `false` when either path cannot be resolved (e.g. does not exist yet).
   """
   def path_within?(path, base_dir) do
     with {:ok, real_base} <- safe_realpath(base_dir),
          {:ok, real_path} <- safe_realpath(path) do
-      String.starts_with?(real_path, real_base <> "/")
+      real_path == real_base or String.starts_with?(real_path, real_base <> "/")
     else
       {:error, _} -> false
     end

@@ -68,6 +68,14 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpersTest do
       refute ProjectFileBrowserHelpers.path_within?(outside_file, base)
     end
 
+    test "returns true when path equals base_dir (root directory navigation)" do
+      # Path.dirname of a top-level file (e.g. "hello.ex") returns ".".
+      # The Back link then navigates to ?path=. which resolves to the project
+      # root itself. path_within?(root, root) must be true so the listing loads.
+      base = tmp_dir()
+      assert ProjectFileBrowserHelpers.path_within?(base, base)
+    end
+
     test "returns false when base path does not exist" do
       fake_base = "/tmp/no_such_base_#{System.unique_integer([:positive])}"
       target = Path.join(fake_base, "file.txt")

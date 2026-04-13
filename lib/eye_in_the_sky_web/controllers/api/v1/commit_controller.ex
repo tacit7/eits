@@ -23,8 +23,14 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
 
         params["agent_id"] ->
           case Agents.get_agent_by_uuid(params["agent_id"]) do
-            {:ok, agent} -> Commits.list_commits_for_agent(agent.id) |> Enum.take(limit)
-            _ -> []
+            {:ok, agent} ->
+              case Sessions.list_sessions_for_agent(agent.id, limit: 1) do
+                [session | _] -> Commits.list_recent_commits(session.id, limit)
+                [] -> []
+              end
+
+            _ ->
+              []
           end
 
         true ->

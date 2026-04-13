@@ -14,6 +14,16 @@ export const CommandPalette = {
       ? navigator.userAgentData.platform === "macOS"
       : navigator.platform.toUpperCase().includes("MAC")
 
+    // "auto" = metaKey on Mac, ctrlKey elsewhere; "cmd" = always metaKey;
+    // "ctrl" = always ctrlKey; "alt" = always altKey
+    const shortcut = this.el.dataset.shortcut || "auto"
+    this._matchesModifier = (e) => {
+      if (shortcut === "cmd")  return e.metaKey
+      if (shortcut === "ctrl") return e.ctrlKey
+      if (shortcut === "alt")  return e.altKey
+      return this._isMac ? e.metaKey : e.ctrlKey  // auto
+    }
+
     this.handleEvent("palette:sessions-result", ({ sessions }) => {
       if (this._paletteSessionsResolve) {
         this._paletteSessionsResolve(sessions)
@@ -29,7 +39,7 @@ export const CommandPalette = {
     })
 
     this._globalKeyHandler = (e) => {
-      if ((this._isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "k") {
+      if (this._matchesModifier(e) && e.key.toLowerCase() === "k") {
         const inEditor = document.activeElement?.closest(".cm-editor, .monaco-editor, [data-palette-no-intercept]")
         if (inEditor) return
         e.preventDefault()

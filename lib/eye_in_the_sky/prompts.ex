@@ -58,6 +58,14 @@ defmodule EyeInTheSky.Prompts do
   """
   def get_prompt_by_uuid!(uuid), do: Repo.get_by!(Prompt, uuid: uuid)
 
+  @doc "Gets a single prompt by UUID. Returns `{:ok, prompt}` or `{:error, :not_found}`."
+  def get_prompt_by_uuid(uuid) do
+    case Repo.get_by(Prompt, uuid: uuid) do
+      nil -> {:error, :not_found}
+      prompt -> {:ok, prompt}
+    end
+  end
+
   @doc """
   Gets a single prompt by slug.
   Returns `{:ok, prompt}` or `{:error, :not_found}`.
@@ -95,7 +103,7 @@ defmodule EyeInTheSky.Prompts do
         get_prompt(id)
 
       Regex.match?(~r/^[0-9a-f-]{36}$/, ref) ->
-        get_prompt(ref)
+        get_prompt_by_uuid(ref)
 
       true ->
         if project_id do

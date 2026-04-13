@@ -16,7 +16,12 @@ defmodule EyeInTheSky.ScheduledJobs.CronParser do
     case schedule_type do
       "interval" ->
         seconds = ToolHelpers.parse_int(schedule_value) || 0
-        NaiveDateTime.add(utc_now, seconds) |> DateTime.from_naive!("Etc/UTC")
+
+        if seconds > 0 do
+          NaiveDateTime.add(utc_now, seconds) |> DateTime.from_naive!("Etc/UTC")
+        else
+          nil
+        end
 
       "cron" ->
         next_cron_run_at(schedule_value, utc_now, timezone)

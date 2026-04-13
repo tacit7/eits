@@ -22,9 +22,15 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
           end
 
         params["agent_id"] ->
-          case Sessions.get_session_by_uuid(params["agent_id"]) do
-            {:ok, session} -> Commits.list_recent_commits(session.id, limit)
-            _ -> []
+          case Agents.get_agent_by_uuid(params["agent_id"]) do
+            {:ok, agent} ->
+              case Sessions.list_sessions_for_agent(agent.id, limit: 1) do
+                [session | _] -> Commits.list_recent_commits(session.id, limit)
+                [] -> []
+              end
+
+            _ ->
+              []
           end
 
         true ->
@@ -51,6 +57,9 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
     cond do
       is_nil(agent_uuid) or agent_uuid == "" ->
         conn |> put_status(:bad_request) |> json(%{error: "agent_id is required"})
+
+      not is_list(hashes) ->
+        conn |> put_status(:bad_request) |> json(%{error: "commit_hashes must be a list"})
 
       hashes == [] ->
         conn |> put_status(:bad_request) |> json(%{error: "commit_hashes is required"})

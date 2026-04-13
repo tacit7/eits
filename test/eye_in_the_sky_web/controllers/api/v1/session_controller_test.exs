@@ -362,6 +362,26 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
       assert updated.entrypoint == "cli"
     end
 
+    test "clear_entrypoint string 'true' clears entrypoint" do
+      agent = create_agent()
+      session = create_session(agent, %{entrypoint: "cli"})
+
+      api_conn() |> patch(~p"/api/v1/sessions/#{session.uuid}", %{"clear_entrypoint" => "true"})
+
+      {:ok, updated} = Sessions.get_session_by_uuid(session.uuid)
+      assert updated.entrypoint == nil
+    end
+
+    test "clear_entrypoint string 'false' does not clear entrypoint" do
+      agent = create_agent()
+      session = create_session(agent, %{entrypoint: "cli"})
+
+      api_conn() |> patch(~p"/api/v1/sessions/#{session.uuid}", %{"clear_entrypoint" => "false"})
+
+      {:ok, updated} = Sessions.get_session_by_uuid(session.uuid)
+      assert updated.entrypoint == "cli"
+    end
+
     test "updates session name", %{conn: conn} do
       agent = create_agent()
       session = create_session(agent)

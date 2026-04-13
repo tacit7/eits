@@ -51,5 +51,47 @@ defmodule EyeInTheSkyWeb.ProjectLive.ConfigTest do
       assert render(view) =~ "Access denied"
       assert File.read!(secret) == "do not touch"
     end
+
+    test "handle_params rejects symlink escape via resolve_list_target", %{conn: conn} do
+      {project, dir, claude_dir} = create_project_with_claude_dir()
+
+      # Create a secret file outside .claude/
+      secret = Path.join(dir, "secret.txt")
+      File.write!(secret, "do not touch")
+
+      # Plant a symlink inside .claude/ that points outside
+      File.ln_s!(secret, Path.join(claude_dir, "escape.txt"))
+
+      {:ok, view, _html} =
+        live(conn, ~p"/projects/#{project.id}/config?mode=list&path=escape.txt")
+
+      assert render(view) =~ "Access denied"
+      assert File.read!(secret) == "do not touch"
+    end
+
+    test "read error in list mode clears the directory listing", %{conn: conn} do
+      # ProjectLive.Config (list mode) always clears :files when navigating to a
+      # file path, regardless of whether the read succeeds or fails. This test
+      # asserts that pre-refactor behavior is preserved.
+      {project, _dir, claude_dir} = create_project_with_claude_dir()
+
+      # Create a readable file first so the listing is populated
+      File.write!(Path.join(claude_dir, "settings.json"), "{}")
+      locked = Path.join(claude_dir, "locked.txt")
+      File.write!(locked, "content")
+      File.chmod!(locked, 0o000)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/projects/#{project.id}/config?mode=list&path=locked.txt")
+
+      html = render(view)
+      # Directory listing is cleared (file navigation clears :files in list mode)
+      refute html =~ "settings.json"
+      # Error is shown
+      assert html =~ "Failed to"
+
+      # Restore permissions for cleanup
+      File.chmod!(locked, 0o644)
+    end
   end
 end

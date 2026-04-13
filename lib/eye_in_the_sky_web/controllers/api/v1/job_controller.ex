@@ -44,7 +44,7 @@ defmodule EyeInTheSkyWeb.Api.V1.JobController do
       "schedule_type" => params["schedule_type"],
       "schedule_value" => params["schedule_value"],
       "config" => encode_config(params["config"]),
-      "enabled" => params["enabled"] || 1,
+      "enabled" => if(is_nil(params["enabled"]), do: true, else: params["enabled"]),
       "project_id" => params["project_id"]
     }
 

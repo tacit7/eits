@@ -118,7 +118,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       |> Helpers.maybe_put(:last_activity_at, DateTime.utc_now())
 
     attrs =
-      if params["clear_entrypoint"] do
+      if params["clear_entrypoint"] in [true, "true"] do
         Map.put(attrs, :entrypoint, nil)
       else
         attrs

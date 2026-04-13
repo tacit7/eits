@@ -252,18 +252,17 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               <%!-- Active timer badge --%>
               <%= if @overlay_data.active_timer do %>
                 <button
+                  id="timer-countdown-btn"
                   type="button"
                   phx-click="open_schedule_timer"
+                  phx-hook="TimerCountdown"
+                  data-fire-ms={DateTime.to_unix(@overlay_data.active_timer.next_fire_at, :millisecond)}
                   class="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-lg bg-warning/10 text-warning text-xs font-medium hover:bg-warning/20 transition-colors"
                   title="Edit scheduled message"
                 >
                   <.icon name="hero-clock" class="w-3.5 h-3.5" />
                   <span>{if @overlay_data.active_timer.mode == :once, do: "Once", else: "Every"}</span>
-                  <span
-                    id="timer-countdown"
-                    phx-hook="TimerCountdown"
-                    data-fire-at={DateTime.to_iso8601(@overlay_data.active_timer.next_fire_at)}
-                  >--:--</span>
+                  <span class="timer-countdown-text">--:--</span>
                 </button>
               <% end %>
 

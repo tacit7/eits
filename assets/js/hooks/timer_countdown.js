@@ -1,8 +1,10 @@
 /**
  * TimerCountdown hook
  *
- * Reads `data-fire-at` (ISO8601 UTC) and updates the element's text with a
- * live countdown (MM:SS or H:MM:SS) every second.
+ * Attach to the timer badge button. Reads `data-fire-ms` (epoch milliseconds)
+ * and updates the `.timer-countdown-text` child span with MM:SS or H:MM:SS.
+ *
+ * Using epoch ms avoids ISO 8601 microsecond parsing issues across browsers.
  */
 export const TimerCountdown = {
   mounted() {
@@ -31,16 +33,18 @@ export const TimerCountdown = {
   },
 
   _tick() {
-    const fireAt = this.el.dataset.fireAt
-    if (!fireAt) return
+    const fireMs = parseInt(this.el.dataset.fireMs, 10)
+    if (!fireMs || isNaN(fireMs)) return
 
-    const remaining = Math.max(0, Math.floor((new Date(fireAt).getTime() - Date.now()) / 1000))
+    const target = this.el.querySelector('.timer-countdown-text')
+    if (!target) return
 
+    const remaining = Math.max(0, Math.floor((fireMs - Date.now()) / 1000))
     const h = Math.floor(remaining / 3600)
     const m = Math.floor((remaining % 3600) / 60)
     const s = remaining % 60
 
-    this.el.textContent = h > 0
+    target.textContent = h > 0
       ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
       : `${m}:${String(s).padStart(2, '0')}`
   }

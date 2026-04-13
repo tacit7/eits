@@ -103,14 +103,6 @@ defmodule EyeInTheSkyWeb.DmLive do
   @impl true
   def handle_event("toggle_thinking", _params, socket), do: handle_toggle_thinking(socket)
 
-  @impl true
-  def handle_event("keydown", %{"key" => "k", "ctrlKey" => true}, socket) do
-    {:noreply, assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, :task_drawer))}
-  end
-
-  @impl true
-  def handle_event("keydown", _params, socket), do: {:noreply, socket}
-
   # ---------------------------------------------------------------------------
   # Task CRUD — delegates to TasksHelpers; overlay close handled here
   # ---------------------------------------------------------------------------

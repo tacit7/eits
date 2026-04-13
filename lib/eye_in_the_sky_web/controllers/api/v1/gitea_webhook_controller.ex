@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
   Registered at POST /api/v1/webhooks/gitea.
 
   Events handled:
-  - pull_request (action: opened) -> spawn codex agent to review the PR
+  - pull_request (action: opened | synchronize) -> spawn codex agent to review the PR
   - issue_comment (commenter: codex) -> DM the claude session that owns the PR
   - pull_request_comment (commenter: codex) -> same as above
   """
@@ -26,13 +26,29 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
     with :ok <- verify_signature(conn),
          {:ok, repo} <- require_repo(params),
          {:ok, project_path} <- require_project_path() do
-      event = get_req_header(conn, "x-gitea-event") |> List.first()
+      handle_pr_opened_event(conn, pr, repo, project_path)
+    else
+      {:error, :unauthorized} ->
+        unauthorized(conn)
 
-      if event in ["pull_request", "pull_request_sync"] do
-        handle_pr_opened_event(conn, pr, repo, project_path)
-      else
-        json(conn, %{success: true, message: "Ignored: #{event} #{params["action"]}"})
-      end
+      {:error, :missing_repo} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Missing repository.full_name in payload"})
+
+      {:error, :project_path_not_configured} ->
+        conn
+        |> put_status(:internal_server_error)
+        |> json(%{error: "Server misconfigured: project_path not set"})
+    end
+  end
+
+  # PR synchronized (push to open PR branch) -> spawn codex reviewer
+  def handle(conn, %{"action" => "synchronize", "pull_request" => pr} = params) do
+    with :ok <- verify_signature(conn),
+         {:ok, repo} <- require_repo(params),
+         {:ok, project_path} <- require_project_path() do
+      handle_pr_opened_event(conn, pr, repo, project_path)
     else
       {:error, :unauthorized} ->
         unauthorized(conn)
@@ -99,7 +115,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
     # head.ref is the plain branch name; head.label is "owner:branch"
     head_branch = WebhookSanitizer.sanitize_branch(get_in(pr, ["head", "ref"]) || "unknown")
 
-    Logger.info("Gitea webhook: PR ##{pr_number} opened - spawning codex reviewer")
+    Logger.info("Gitea webhook: PR ##{pr_number} - spawning codex reviewer")
 
     pr_context = %{
       number: pr_number,

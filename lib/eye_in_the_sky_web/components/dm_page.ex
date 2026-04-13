@@ -76,7 +76,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       <%= if @overlay_data.active_overlay == :schedule_timer do %>
         <div class="modal modal-open modal-bottom sm:modal-middle" id="schedule-timer-modal">
           <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
-            <h3 class="font-semibold text-base mb-3">Schedule Message</h3>
+            <h3 class="font-semibold text-base mb-3">
+              {if @overlay_data.active_timer, do: "Edit Scheduled Message", else: "Schedule Message"}
+            </h3>
 
             <form id="schedule-timer-form" phx-submit="schedule_timer">
               <input type="hidden" name="mode" id="timer-mode-input" value="once" />
@@ -89,7 +91,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                   rows="3"
                   class="textarea textarea-bordered w-full text-base resize-none"
                   placeholder="Message to send when timer fires..."
-                ><%= EyeInTheSky.OrchestratorTimers.default_message() %></textarea>
+                ><%= if @overlay_data.active_timer, do: @overlay_data.active_timer.message, else: EyeInTheSky.OrchestratorTimers.default_message() %></textarea>
               </div>
 
               <div class="mb-3">
@@ -249,10 +251,20 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             <div class="flex items-center gap-1 flex-shrink-0">
               <%!-- Active timer badge --%>
               <%= if @overlay_data.active_timer do %>
-                <div class="hidden sm:flex items-center gap-1 px-2 py-1 rounded-lg bg-warning/10 text-warning text-xs font-medium">
+                <button
+                  type="button"
+                  phx-click="open_schedule_timer"
+                  class="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-lg bg-warning/10 text-warning text-xs font-medium hover:bg-warning/20 transition-colors"
+                  title="Edit scheduled message"
+                >
                   <.icon name="hero-clock" class="w-3.5 h-3.5" />
-                  <span>{if @overlay_data.active_timer.mode == :once, do: "Once", else: "Repeating"}</span>
-                </div>
+                  <span>{if @overlay_data.active_timer.mode == :once, do: "Once", else: "Every"}</span>
+                  <span
+                    id="timer-countdown"
+                    phx-hook="TimerCountdown"
+                    data-fire-at={DateTime.to_iso8601(@overlay_data.active_timer.next_fire_at)}
+                  >--:--</span>
+                </button>
               <% end %>
 
               <%!-- Unified hamburger menu (desktop + mobile) --%>

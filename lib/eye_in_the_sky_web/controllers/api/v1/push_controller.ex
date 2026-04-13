@@ -26,7 +26,7 @@ defmodule EyeInTheSkyWeb.Api.V1.PushController do
       {:error, cs} ->
         conn
         |> put_status(:unprocessable_entity)
-        |> json(%{success: false, errors: translate_errors(cs)})
+        |> json(%{success: false, message: "Invalid subscription data", errors: translate_errors(cs)})
     end
   end
 

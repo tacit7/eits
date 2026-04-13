@@ -18,6 +18,9 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
   alias EyeInTheSky.Agents.WebhookSanitizer
   alias EyeInTheSky.{Messages, Sessions}
 
+  defp agent_manager,
+    do: Application.get_env(:eye_in_the_sky, :agent_manager_module, AgentManager)
+
   defp unauthorized(conn),
     do: conn |> put_status(:unauthorized) |> json(%{error: "Invalid signature"}) |> halt()
 
@@ -128,7 +131,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
 
     instructions = build_review_instructions(pr_context)
 
-    case AgentManager.create_agent(
+    case agent_manager().create_agent(
            agent_type: "codex",
            description: "PR Review: #{pr_title} (##{pr_number})",
            instructions: instructions,

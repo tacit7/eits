@@ -133,4 +133,40 @@ defmodule EyeInTheSkyWeb.OverviewLive.SettingsTest do
       assert html =~ "Custom Command"
     end
   end
+
+  describe "open_in_editor" do
+    test "rejects disallowed editor command", %{conn: conn} do
+      EyeInTheSky.Settings.put("preferred_editor", "malicious_cmd")
+      {:ok, lv, _html} = live(auth_conn(conn), ~p"/settings?tab=editor")
+      html = render_hook(lv, "open_in_editor", %{"path" => "/tmp"})
+      assert html =~ "not allowed"
+    end
+
+    test "returns error when path is missing", %{conn: conn} do
+      {:ok, lv, _html} = live(auth_conn(conn), ~p"/settings?tab=editor")
+      html = render_hook(lv, "open_in_editor", %{})
+      assert html =~ "No file path provided"
+    end
+
+    test "returns error for non-existent path with allowed editor", %{conn: conn} do
+      EyeInTheSky.Settings.put("preferred_editor", "code")
+      {:ok, lv, _html} = live(auth_conn(conn), ~p"/settings?tab=editor")
+      html = render_hook(lv, "open_in_editor", %{"path" => "/nonexistent/path/xyz"})
+      assert html =~ "does not exist"
+    end
+
+    test "opens file when editor is allowed and path exists", %{conn: conn} do
+      EyeInTheSky.Settings.put("preferred_editor", "code")
+      path = System.tmp_dir!() |> Path.join("eits_editor_test_#{System.unique_integer()}.txt")
+      File.write!(path, "test")
+
+      try do
+        {:ok, lv, _html} = live(auth_conn(conn), ~p"/settings?tab=editor")
+        html = render_hook(lv, "open_in_editor", %{"path" => path})
+        assert html =~ "Opening in code"
+      after
+        File.rm(path)
+      end
+    end
+  end
 end

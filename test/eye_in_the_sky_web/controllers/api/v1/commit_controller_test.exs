@@ -1,9 +1,17 @@
 defmodule EyeInTheSkyWeb.Api.V1.CommitControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
-  alias EyeInTheSky.{Agents, Commits, Sessions}
+  alias EyeInTheSky.Commits
+  alias EyeInTheSky.Accounts.ApiKey
 
   import EyeInTheSky.Factory
+
+  setup %{conn: _conn} do
+    token = "test_api_key_#{System.unique_integer([:positive])}"
+    {:ok, _} = ApiKey.create(token, "test")
+    conn = Phoenix.ConnTest.build_conn() |> Plug.Conn.put_req_header("authorization", "Bearer #{token}")
+    {:ok, conn: conn}
+  end
 
   defp create_commit(session, overrides \\ %{}) do
     {:ok, commit} =
@@ -47,16 +55,24 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitControllerTest do
       assert Enum.any?(resp["commits"], &(&1["id"] == commit.id))
     end
 
-    test "filters by agent_id (session uuid)", %{conn: conn} do
+    test "filters by agent_id", %{conn: conn} do
       agent = create_agent()
       session = create_session(agent)
       commit = create_commit(session)
 
-      conn = get(conn, ~p"/api/v1/commits?agent_id=#{session.uuid}")
+      conn = get(conn, ~p"/api/v1/commits?agent_id=#{agent.uuid}")
       resp = json_response(conn, 200)
 
       assert resp["success"] == true
       assert Enum.any?(resp["commits"], &(&1["id"] == commit.id))
+    end
+
+    test "returns empty list for unknown agent_id", %{conn: conn} do
+      conn = get(conn, ~p"/api/v1/commits?agent_id=#{Ecto.UUID.generate()}")
+      resp = json_response(conn, 200)
+
+      assert resp["success"] == true
+      assert resp["commits"] == []
     end
 
     test "returns empty list for unknown session_id", %{conn: conn} do
@@ -86,11 +102,11 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitControllerTest do
   describe "POST /api/v1/commits" do
     test "creates commits for a session", %{conn: conn} do
       agent = create_agent()
-      session = create_session(agent)
+      _session = create_session(agent)
 
       conn =
         post(conn, ~p"/api/v1/commits", %{
-          "agent_id" => session.uuid,
+          "agent_id" => agent.uuid,
           "commit_hashes" => ["abc123", "def456"],
           "commit_messages" => ["First commit", "Second commit"]
         })
@@ -104,16 +120,29 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitControllerTest do
 
     test "creates commits without messages", %{conn: conn} do
       agent = create_agent()
-      session = create_session(agent)
+      _session = create_session(agent)
 
       conn =
         post(conn, ~p"/api/v1/commits", %{
-          "agent_id" => session.uuid,
+          "agent_id" => agent.uuid,
           "commit_hashes" => ["abc999"]
         })
 
       resp = json_response(conn, 201)
       assert length(resp["commits"]) == 1
+    end
+
+    test "returns 400 when commit_hashes is not a list", %{conn: conn} do
+      agent = create_agent()
+      _session = create_session(agent)
+
+      conn =
+        post(conn, ~p"/api/v1/commits", %{
+          "agent_id" => agent.uuid,
+          "commit_hashes" => "not-a-list"
+        })
+
+      assert json_response(conn, 400)["error"] == "commit_hashes must be a list"
     end
 
     test "returns 400 when agent_id is missing", %{conn: conn} do

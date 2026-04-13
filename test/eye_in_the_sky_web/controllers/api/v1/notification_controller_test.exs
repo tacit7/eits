@@ -2,6 +2,8 @@ defmodule EyeInTheSkyWeb.Api.V1.NotificationControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
   alias EyeInTheSky.Accounts.ApiKey
+  alias EyeInTheSky.Notifications.Notification
+  alias EyeInTheSkyWeb.ControllerHelpers
 
   defp uniq, do: System.unique_integer([:positive])
 
@@ -32,28 +34,41 @@ defmodule EyeInTheSkyWeb.Api.V1.NotificationControllerTest do
       resp = json_response(conn, 400)
       assert resp["success"] == false
     end
+  end
 
-    test "changeset error response uses sanitized message, not raw inspect", %{conn: conn} do
-      # Force a changeset error — e.g. category too long (over DB varchar limit or validation)
-      # The controller must NOT expose inspect(cs.errors) in the response body
-      conn =
-        post(conn, ~p"/api/v1/notifications", %{
-          "title" => "Test #{uniq()}",
-          "category" => String.duplicate("a", 300)
-        })
+  # Unit tests for the changeset error sanitization fix.
+  #
+  # The controller's {:error, cs} branch cannot be reached via the HTTP API because
+  # Notifications.notify/2 normalizes invalid categories to "system" before the
+  # changeset runs, and the controller already guards against nil/empty titles.
+  # These tests verify the fix directly: translate_errors/1 is used instead of
+  # inspect(cs.errors), so no raw changeset internals are exposed.
+  describe "changeset error sanitization (unit)" do
+    test "translate_errors/1 returns a map, not a raw inspect string" do
+      # Force an invalid changeset: missing title + invalid category
+      cs = Notification.changeset(%Notification{}, %{title: nil, category: "invalid_cat"})
+      refute cs.valid?
 
-      body = response(conn, conn.status)
-      # Must never contain raw Elixir inspect output like [{:field, {"msg", []}}]
-      refute body =~ ~r/\[.*:\w+.*\{.*\}\]/
-      refute body =~ "#Ecto"
-      refute body =~ "Ecto.Changeset"
+      errors = ControllerHelpers.translate_errors(cs)
 
-      if conn.status == 422 do
-        resp = json_response(conn, 422)
-        assert resp["success"] == false
-        assert resp["message"] == "Invalid notification data"
-        assert is_map(resp["errors"])
-      end
+      assert is_map(errors)
+      # Must not contain inspect-style Elixir term output
+      errors_json = Jason.encode!(errors)
+      refute errors_json =~ ~r/\[\{.*,.*\{.*\}\}\]/
+      refute errors_json =~ "#Ecto"
+    end
+
+    test "translate_errors/1 returns human-readable field errors" do
+      cs = Notification.changeset(%Notification{}, %{title: nil, category: "invalid_cat"})
+      errors = ControllerHelpers.translate_errors(cs)
+
+      # Should have field-keyed entries
+      assert Map.has_key?(errors, :title) or Map.has_key?(errors, :category)
+      # Each value should be a list of strings
+      Enum.each(errors, fn {_field, messages} ->
+        assert is_list(messages)
+        assert Enum.all?(messages, &is_binary/1)
+      end)
     end
   end
 end

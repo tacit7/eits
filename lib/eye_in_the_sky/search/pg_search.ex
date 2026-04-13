@@ -238,7 +238,7 @@ defmodule EyeInTheSky.Search.PgSearch do
   defp safe_identifier?(value), do: Regex.match?(@safe_identifier, value)
 
   defp run_fallback(fallback_query, preloads, limit) do
-    effective_limit = limit || 50
+    effective_limit = if is_integer(limit) and limit > 0, do: limit, else: 50
 
     query_result = limit(fallback_query, ^effective_limit)
 

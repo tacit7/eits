@@ -14,6 +14,15 @@ fi
 LOG_FILE="${HOME}/.claude/hooks/eits.log"
 _log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [startup] $*" >> "$LOG_FILE" 2>/dev/null; }
 
+# --- Load EITS_API_KEY from .env (overrides stale key in settings.json) ---
+# The prod release .env is authoritative. If settings.json key drifts, this self-heals.
+_EITS_DOT_ENV="$(cd "$(dirname "$0")/../.." 2>/dev/null && pwd)/.env"
+if [ -f "$_EITS_DOT_ENV" ]; then
+  _DOT_ENV_KEY=$(grep '^EITS_API_KEY=' "$_EITS_DOT_ENV" | head -1 | cut -d= -f2-)
+  [ -n "$_DOT_ENV_KEY" ] && export EITS_API_KEY="$_DOT_ENV_KEY"
+fi
+unset _EITS_DOT_ENV _DOT_ENV_KEY
+
 INPUT=$(cat)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || echo "")
 MODEL=$(echo "$INPUT" | jq -r '.model // empty' 2>/dev/null || echo "")

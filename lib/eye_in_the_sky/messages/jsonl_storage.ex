@@ -33,7 +33,7 @@ defmodule EyeInTheSky.Messages.JsonlStorage do
         |> Stream.reject(&(&1 == ""))
         |> Stream.map(&parse_jsonl_line/1)
         |> Stream.filter(& &1)
-        |> Enum.sort_by(fn msg -> msg.inserted_at || DateTime.utc_now() end)
+        |> Enum.sort_by(fn msg -> msg.inserted_at || ~U[1970-01-01 00:00:00Z] end)
 
       false ->
         Logger.debug("Session file not found: #{file_path}")
@@ -123,11 +123,23 @@ defmodule EyeInTheSky.Messages.JsonlStorage do
   defp parse_timestamp(_), do: nil
 
   defp parse_unix_timestamp(timestamp) when is_binary(timestamp) do
-    if s = ToolHelpers.parse_int(timestamp), do: DateTime.from_unix!(s)
+    with s when not is_nil(s) <- ToolHelpers.parse_int(timestamp),
+         {:ok, dt} <- DateTime.from_unix(s) do
+      dt
+    else
+      _ ->
+        Logger.warning("Unparseable unix timestamp: #{inspect(timestamp)}")
+        nil
+    end
   end
 
   defp parse_unix_timestamp(seconds) when is_integer(seconds) do
-    DateTime.from_unix!(seconds)
+    case DateTime.from_unix(seconds) do
+      {:ok, dt} -> dt
+      {:error, reason} ->
+        Logger.warning("Out-of-range unix timestamp #{seconds}: #{inspect(reason)}")
+        nil
+    end
   end
 
   defp parse_unix_timestamp(_), do: nil

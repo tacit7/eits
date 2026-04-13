@@ -2,10 +2,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   use EyeInTheSkyWeb, :live_view
 
   import EyeInTheSkyWeb.Helpers.FileHelpers,
-    only: [detect_file_type: 1, language_class: 1, get_file_size: 1, build_file_tree: 2, binary_file?: 1]
+    only: [detect_file_type: 1, language_class: 1, build_file_tree: 2, binary_file?: 1]
 
   import EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers,
     only: [read_file_safe_detailed: 1, path_within?: 2]
+
+  import EyeInTheSkyWeb.Live.FileBrowserHelpers, only: [file_listing: 1]
 
   alias EyeInTheSky.Projects
 
@@ -215,11 +217,17 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
           |> Enum.map(fn file ->
             file_path = Path.join(dir, file)
 
+            size =
+              case File.stat(file_path) do
+                {:ok, %{size: s}} -> s
+                _ -> 0
+              end
+
             %{
               name: file,
               path: if(path_prefix == "", do: file, else: Path.join(path_prefix, file)),
               is_dir: File.dir?(file_path),
-              size: get_file_size(file_path)
+              size: size
             }
           end)
           |> Enum.sort_by(&{!&1.is_dir, &1.name})
@@ -414,57 +422,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
                 {@file_path || @project.name}
               </h2>
             </div>
-            <div class="md:hidden space-y-2">
-              <%= for file <- @files do %>
-                <.link
-                  patch={~p"/projects/#{@project.id}/files?path=#{file.path}"}
-                  class="flex items-center gap-3 rounded-lg border border-base-content/10 bg-base-100 px-3 py-2"
-                >
-                  <%= if file.is_dir do %>
-                    <.icon name="hero-folder-solid" class="w-4 h-4 text-primary shrink-0" />
-                  <% else %>
-                    <.icon name="hero-document" class="w-4 h-4 shrink-0" />
-                  <% end %>
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm">{file.name}</p>
-                    <p class="text-xs text-base-content/55">
-                      {if file.is_dir, do: "Directory", else: file.size}
-                    </p>
-                  </div>
-                </.link>
-              <% end %>
-            </div>
-
-            <div class="hidden md:block overflow-x-auto">
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th class="text-right">Size</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <%= for file <- @files do %>
-                    <tr class="hover">
-                      <td>
-                        <.link
-                          patch={~p"/projects/#{@project.id}/files?path=#{file.path}"}
-                          class="flex items-center gap-2"
-                        >
-                          <%= if file.is_dir do %>
-                            <.icon name="hero-folder-solid" class="w-4 h-4 text-primary" />
-                          <% else %>
-                            <.icon name="hero-document" class="w-4 h-4" />
-                          <% end %>
-                          {file.name}
-                        </.link>
-                      </td>
-                      <td class="text-right text-base-content/60">{file.size}</td>
-                    </tr>
-                  <% end %>
-                </tbody>
-              </table>
-            </div>
+            <.file_listing
+              files={@files}
+              patch_fn={fn path -> ~p"/projects/#{@project.id}/files?path=#{path}" end}
+            />
           <% else %>
             <!-- Empty State -->
             <div class="flex items-center justify-center h-[calc(100dvh-20rem)]">

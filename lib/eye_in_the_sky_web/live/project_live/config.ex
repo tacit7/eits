@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   import EyeInTheSkyWeb.Helpers.FileHelpers, only: [detect_file_type: 1]
   import EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers
   import EyeInTheSkyWeb.Components.ConfigBrowser
+  import EyeInTheSkyWeb.Live.FileBrowserHelpers, only: [read_file_for_display: 4]
 
   alias EyeInTheSky.Projects
 
@@ -171,20 +172,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
       end
     else
       assign(socket, :error, "No .claude directory found")
-    end
-  end
-
-  defp read_file_for_display(socket, full_path, rel_path, base_dir) do
-    case assign_file_read(socket, full_path, rel_path, base_dir) do
-      {:ok, socket} ->
-        socket
-        |> assign(:current_path, rel_path)
-        |> assign(:files, [])
-
-      {:error, socket} ->
-        socket
-        |> assign(:current_path, rel_path)
-        |> assign(:files, [])
     end
   end
 

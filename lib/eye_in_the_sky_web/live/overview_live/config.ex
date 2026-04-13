@@ -2,7 +2,12 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
   use EyeInTheSkyWeb, :live_view
 
   import EyeInTheSkyWeb.Helpers.FileHelpers,
-    only: [path_within?: 2, detect_file_type: 1, format_size: 1, language_class: 1]
+    only: [path_within?: 2, language_class: 1]
+
+  import EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers,
+    only: [resolve_list_target: 2, build_file_entry: 3]
+
+  import EyeInTheSkyWeb.Live.FileBrowserHelpers
 
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
 
@@ -147,7 +152,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
 
   defp load_list_path(socket, path) do
     if File.dir?(@claude_dir) do
-      case resolve_list_target(path) do
+      case resolve_list_target(path, @claude_dir) do
         {:error, msg} -> assign(socket, :error, msg)
         {:ok, full_path, rel_path} -> dispatch_path(socket, full_path, rel_path, path)
       end
@@ -156,19 +161,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
     end
   end
 
-  defp resolve_list_target(path) do
-    if not is_nil(path) && path != "" do
-      full = Path.join(@claude_dir, path)
-      if path_within?(full, @claude_dir), do: {:ok, full, path}, else: {:error, "Access denied"}
-    else
-      {:ok, @claude_dir, nil}
-    end
-  end
-
   defp dispatch_path(socket, full_path, rel_path, path) do
     cond do
       File.dir?(full_path) -> list_directory(socket, full_path, rel_path)
-      File.regular?(full_path) -> read_file_for_display(socket, full_path, rel_path)
+      File.regular?(full_path) -> read_file_for_display(socket, full_path, rel_path, @claude_dir)
       true -> assign(socket, :error, "Path not found: #{path}")
     end
   end
@@ -193,48 +189,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
 
       {:error, reason} ->
         assign(socket, :error, "Failed to read directory: #{reason}")
-    end
-  end
-
-  defp build_file_entry(item, full_path, rel_path) do
-    item_path = Path.join(full_path, item)
-    rel = if rel_path, do: Path.join(rel_path, item), else: item
-    size = case File.stat(item_path) do
-      {:ok, %{size: s}} -> s
-      _ -> 0
-    end
-    %{name: item, path: rel, is_dir: File.dir?(item_path), size: size}
-  end
-
-  defp read_file_for_display(socket, full_path, rel_path) do
-    case File.stat(full_path) do
-      {:ok, %{size: size}} when size > 1_048_576 ->
-        socket
-        |> assign(:current_path, rel_path)
-        |> assign(:file_content, nil)
-        |> assign(:files, [])
-        |> assign(:error, "File too large to display (over 1 MB)")
-
-      {:ok, _} ->
-        case File.read(full_path) do
-          {:ok, content} ->
-            file_type = detect_file_type(full_path)
-
-            socket
-            |> assign(:current_path, rel_path)
-            |> assign(:file_content, content)
-            |> assign(:selected_file, rel_path)
-            |> assign(:selected_file_path, full_path)
-            |> assign(:file_type, file_type)
-            |> assign(:files, [])
-            |> assign(:error, nil)
-
-          {:error, reason} ->
-            assign(socket, :error, "Failed to read file: #{reason}")
-        end
-
-      {:error, reason} ->
-        assign(socket, :error, "Failed to stat file: #{reason}")
     end
   end
 
@@ -385,61 +339,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
             <% end %>
 
             <%= if @files != [] do %>
-              <!-- Mobile list -->
-              <div class="md:hidden space-y-2">
-                <%= for file <- @files do %>
-                  <.link
-                    patch={~p"/config?path=#{file.path}"}
-                    class="flex items-center gap-3 rounded-lg border border-base-content/10 bg-base-100 px-3 py-2"
-                  >
-                    <%= if file.is_dir do %>
-                      <.icon name="hero-folder-solid" class="w-4 h-4 text-primary shrink-0" />
-                    <% else %>
-                      <.icon name="hero-document" class="w-4 h-4 shrink-0" />
-                    <% end %>
-                    <div class="min-w-0 flex-1">
-                      <p class="truncate text-sm">{file.name}</p>
-                      <p class="text-xs text-base-content/55">
-                        {if file.is_dir, do: "Directory", else: format_size(file.size)}
-                      </p>
-                    </div>
-                  </.link>
-                <% end %>
-              </div>
-
-              <!-- Desktop table -->
-              <div class="hidden md:block overflow-x-auto">
-                <table class="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th class="text-right">Size</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <%= for file <- @files do %>
-                      <tr class="hover">
-                        <td>
-                          <.link
-                            patch={~p"/config?path=#{file.path}"}
-                            class="flex items-center gap-2"
-                          >
-                            <%= if file.is_dir do %>
-                              <.icon name="hero-folder-solid" class="w-4 h-4 text-primary" />
-                            <% else %>
-                              <.icon name="hero-document" class="w-4 h-4" />
-                            <% end %>
-                            {file.name}
-                          </.link>
-                        </td>
-                        <td class="text-right text-base-content/60">
-                          {if file.is_dir, do: "", else: format_size(file.size)}
-                        </td>
-                      </tr>
-                    <% end %>
-                  </tbody>
-                </table>
-              </div>
+              <.file_listing
+                files={@files}
+                patch_fn={fn path -> ~p"/config?path=#{path}" end}
+              />
             <% else %>
               <div class="flex items-center justify-center h-[calc(100dvh-20rem)]">
                 <div class="text-center">

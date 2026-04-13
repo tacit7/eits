@@ -123,7 +123,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
           conn
           |> put_status(:internal_server_error)
-          |> json(%{error: "Failed to route message to agent", reason: inspect(reason)})
+          |> json(%{error: "Failed to deliver message"})
       end
     else
       {:from, {:error, :not_found}} ->

@@ -132,7 +132,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
 
         conn
         |> put_status(:internal_server_error)
-        |> json(%{error: "Failed to spawn reviewer: #{inspect(reason)}"})
+        |> json(%{error: "Failed to spawn reviewer"})
     end
   end
 

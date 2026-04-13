@@ -22,7 +22,8 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
          {:ok, parent_session_id} <-
            coerce_parent_id(params["parent_session_id"], "parent_session_id"),
          {:ok, _} <- validate_parent_agent(parent_agent_id),
-         {:ok, _} <- validate_parent_session(parent_session_id) do
+         {:ok, _} <- validate_parent_session(parent_session_id),
+         {:ok, _} <- validate_parent_relationship(parent_agent_id, parent_session_id) do
       {:ok,
        Map.merge(params, %{
          "instructions" => instructions,
@@ -104,6 +105,24 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
 
       {:error, :not_found} ->
         {:error, "parent_not_found", "parent_session_id #{id} does not exist"}
+    end
+  end
+
+  defp validate_parent_relationship(nil, _), do: {:ok, nil}
+  defp validate_parent_relationship(_, nil), do: {:ok, nil}
+
+  defp validate_parent_relationship(agent_id, session_id) do
+    case Sessions.get_session(session_id) do
+      {:ok, session} ->
+        if session.agent_id == agent_id do
+          {:ok, nil}
+        else
+          {:error, "parent_mismatch",
+           "parent_session_id #{session_id} does not belong to parent_agent_id #{agent_id}"}
+        end
+
+      {:error, :not_found} ->
+        {:ok, nil}
     end
   end
 end

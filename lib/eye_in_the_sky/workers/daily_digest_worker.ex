@@ -33,6 +33,7 @@ defmodule EyeInTheSky.Workers.DailyDigestWorker do
 
       {:error, reason} ->
         ScheduledJobs.record_run_complete(run, "failed", result: inspect(reason))
+        broadcast()
         {:error, reason}
     end
   end

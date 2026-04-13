@@ -2,6 +2,8 @@ defmodule EyeInTheSky.Workers.MixTaskWorker do
   @moduledoc false
   use Oban.Worker, queue: :jobs, max_attempts: 3
 
+  require Logger
+
   alias EyeInTheSky.ScheduledJobs
 
   @allowed_tasks ~w(test format deps.get assets.deploy ecto.migrate ecto.rollback help)
@@ -27,7 +29,19 @@ defmodule EyeInTheSky.Workers.MixTaskWorker do
   defp execute(job) do
     config = ScheduledJobs.decode_config(job)
     task = config["task"] || "help"
-    args = config["args"] || []
+
+    raw_args = config["args"] || []
+
+    args =
+      if is_list(raw_args) do
+        raw_args
+      else
+        Logger.warning(
+          "[MixTaskWorker] config[\"args\"] is not a list (got #{inspect(raw_args)}), coercing to []"
+        )
+
+        []
+      end
 
     if is_binary(task) && task in @allowed_tasks do
       project_path = blank_to_nil(config["project_path"]) || File.cwd!()

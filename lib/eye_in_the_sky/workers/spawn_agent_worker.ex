@@ -92,7 +92,7 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
 
   defp parse_float(val) when is_binary(val) do
     case Float.parse(val) do
-      {f, _} -> f
+      {f, ""} -> f
       _ -> nil
     end
   end
@@ -104,9 +104,6 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
   end
 
   defp server_base_url do
-    cfg = Application.get_env(:eye_in_the_sky, EyeInTheSkyWeb.Endpoint, [])
-    port = cfg |> Keyword.get(:http, []) |> Keyword.get(:port, 5001)
-    host = cfg |> Keyword.get(:url, []) |> Keyword.get(:host, "localhost")
-    "http://#{host}:#{port}"
+    EyeInTheSkyWeb.Endpoint.url()
   end
 end

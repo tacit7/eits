@@ -46,9 +46,8 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
     with {:ok, session} <- Sessions.get_session(session_id),
          {:ok, agent} <- Agents.get_agent(session.agent_id),
          provider when not is_nil(provider) <- normalize_provider(session.provider),
-         {:ok, session} <- ensure_session_uuid(session, provider) do
-      project_path = resolve_project_path_with_fallback(session, agent)
-
+         {:ok, session} <- ensure_session_uuid(session, provider),
+         {:ok, project_path} <- resolve_project_path(session, agent) do
       Logger.info(
         "✅ start_worker: loaded session.uuid=#{session.uuid}, agent.id=#{agent.id}, project_path=#{project_path}"
       )
@@ -70,28 +69,26 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
   defp normalize_provider(provider) when provider in @supported_providers, do: provider
   defp normalize_provider(_provider), do: nil
 
-  defp resolve_project_path_with_fallback(session, agent) do
+  defp resolve_project_path(session, agent) do
     cond do
       session.git_worktree_path ->
-        session.git_worktree_path
+        {:ok, session.git_worktree_path}
 
       agent.git_worktree_path ->
-        agent.git_worktree_path
+        {:ok, agent.git_worktree_path}
 
       agent.project && agent.project.path ->
-        agent.project.path
+        {:ok, agent.project.path}
 
       true ->
-        fallback = File.cwd!()
-
         Logger.error(
           "resolve_project_path: no path for session.id=#{session.id}; " <>
             "session.git_worktree_path=#{inspect(session.git_worktree_path)}, " <>
             "agent.git_worktree_path=#{inspect(agent.git_worktree_path)}, " <>
-            "project.path=#{inspect(if agent.project, do: agent.project.path)} — falling back to cwd=#{fallback}"
+            "project.path=#{inspect(if agent.project, do: agent.project.path)}"
         )
 
-        fallback
+        {:error, :missing_project_path}
     end
   end
 

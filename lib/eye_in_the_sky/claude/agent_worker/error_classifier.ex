@@ -15,6 +15,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
   def systemic?({:watchdog_timeout, _timeout_ms}), do: true
   def systemic?({:billing_error, _}), do: true
   def systemic?({:authentication_error, _}), do: true
+  def systemic?({:codex_error, _}), do: true
 
   # errors is a list of strings — scan each entry
   def systemic?({:claude_result_error, %{errors: errors}}) when is_list(errors) do

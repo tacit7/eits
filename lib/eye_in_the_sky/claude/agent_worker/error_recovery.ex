@@ -108,6 +108,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorRecovery do
 
   defp handle_systemic_error(state, reason) do
     WorkerEvents.on_current_job_failed(state.current_job, reason)
+    WorkerEvents.on_codex_error(state.session_id, reason)
 
     WorkerEvents.on_queue_drained(state, reason)
 

@@ -74,6 +74,13 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     end
   end
 
+  @doc "Codex returned a user-facing error (usage limit, auth, etc.) — record as a system message."
+  def on_codex_error(session_id, {:codex_error, msg}) when is_binary(msg) do
+    Messages.record_incoming_reply(session_id, "system", "[codex error] #{msg}")
+  end
+
+  def on_codex_error(_session_id, _reason), do: :ok
+
   @doc "SDK spawn failed — record system error message."
   def on_spawn_error(session_id, reason) do
     reason_str = inspect(reason)
@@ -107,6 +114,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
   defp classify_failure_reason({:billing_error, _}), do: "billing_error"
   defp classify_failure_reason({:authentication_error, _}), do: "authentication_error"
+  defp classify_failure_reason({:codex_error, msg}) when is_binary(msg), do: "codex_error: #{String.slice(msg, 0, 200)}"
   defp classify_failure_reason({:unknown_error, msg}) when is_binary(msg), do: "unknown_error: #{String.slice(msg, 0, 120)}"
   defp classify_failure_reason(:retry_exhausted), do: "retry_exhausted"
   defp classify_failure_reason({:watchdog_timeout, timeout_ms}), do: "watchdog_timeout: #{timeout_ms}ms"

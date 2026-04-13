@@ -73,12 +73,11 @@ defmodule EyeInTheSkyWeb.Router do
 
   # Browser-session JSON pipeline — for browser-facing JSON endpoints that use
   # cookie auth instead of Bearer tokens. No CSRF (fetch() API calls), but requires
-  # a valid authenticated session.
+  # a valid authenticated session. Returns JSON 401 (not redirect) on auth failure.
   pipeline :browser_json do
     plug :accepts, ["json"]
     plug :fetch_session
-    plug EyeInTheSkyWeb.Plugs.ValidateSession
-    plug EyeInTheSkyWeb.Plugs.SessionAuth
+    plug EyeInTheSkyWeb.Plugs.JsonSessionAuth
     plug EyeInTheSkyWeb.Plugs.RateLimit
   end
 

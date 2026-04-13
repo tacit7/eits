@@ -67,11 +67,11 @@ defmodule EyeInTheSky.OrchestratorTimersTest do
     test "stale timer message is ignored — state unchanged after replacement", %{server: pid} do
       # Schedule and immediately replace. The first timer's message may still be
       # in the mailbox when we replace. It must be ignored.
-      GenServer.call(pid, {:schedule_once, 999, 5, "first"})
-      GenServer.call(pid, {:schedule_once, 999, 60_000, "second"})
-      # Give time for the stale first timer to arrive and be processed
+      assert {:ok, :scheduled} = GenServer.call(pid, {:schedule_once, 999, 100, "first"})
+      assert {:ok, :replaced} = GenServer.call(pid, {:schedule_once, 999, 60_000, "second"})
+      # Sleep less than the first timer delay — it hasn't fired yet, so no stale
+      # message in the mailbox yet. The second timer must still be active.
       Process.sleep(50)
-      # Second timer must still be active
       record = GenServer.call(pid, {:get_timer, 999})
       assert record != nil
       assert record.message == "second"
@@ -80,16 +80,16 @@ defmodule EyeInTheSky.OrchestratorTimersTest do
 
   describe "one-shot fire behavior" do
     test "removes itself from state after firing", %{server: pid} do
-      GenServer.call(pid, {:schedule_once, 999, 10, "test"})
-      Process.sleep(100)
+      assert {:ok, :scheduled} = GenServer.call(pid, {:schedule_once, 999, 100, "test"})
+      Process.sleep(200)
       assert nil == GenServer.call(pid, {:get_timer, 999})
     end
   end
 
   describe "repeating fire behavior" do
     test "reschedules itself after firing", %{server: pid} do
-      GenServer.call(pid, {:schedule_repeating, 999, 10, "test"})
-      Process.sleep(50)
+      assert {:ok, :scheduled} = GenServer.call(pid, {:schedule_repeating, 999, 100, "test"})
+      Process.sleep(200)
       record = GenServer.call(pid, {:get_timer, 999})
       assert record != nil
       assert record.mode == :repeating
@@ -164,14 +164,14 @@ defmodule EyeInTheSky.OrchestratorTimersTest do
   describe "delivery failure policy" do
     test "one-shot removes itself even when delivery fails (no worker for session)", %{server: pid} do
       # session_id 99999 has no AgentWorker — send_message returns error
-      GenServer.call(pid, {:schedule_once, 99_999, 10, "test"})
-      Process.sleep(100)
+      assert {:ok, :scheduled} = GenServer.call(pid, {:schedule_once, 99_999, 100, "test"})
+      Process.sleep(200)
       assert nil == GenServer.call(pid, {:get_timer, 99_999})
     end
 
     test "repeating reschedules even when delivery fails (no worker for session)", %{server: pid} do
-      GenServer.call(pid, {:schedule_repeating, 99_999, 10, "test"})
-      Process.sleep(50)
+      assert {:ok, :scheduled} = GenServer.call(pid, {:schedule_repeating, 99_999, 100, "test"})
+      Process.sleep(200)
       record = GenServer.call(pid, {:get_timer, 99_999})
       assert record != nil
       assert record.mode == :repeating

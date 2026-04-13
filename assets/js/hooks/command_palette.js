@@ -14,10 +14,12 @@ export const CommandPalette = {
       ? navigator.userAgentData.platform === "macOS"
       : navigator.platform.toUpperCase().includes("MAC")
 
+    // Read shortcut from root layout div (data-palette-shortcut) on each keydown
+    // so live-navigation updates are picked up without remounting the hook.
     // "auto" = metaKey on Mac, ctrlKey elsewhere; "cmd" = always metaKey;
     // "ctrl" = always ctrlKey; "alt" = always altKey
-    const shortcut = this.el.dataset.shortcut || "auto"
     this._matchesModifier = (e) => {
+      const shortcut = document.querySelector("[data-palette-shortcut]")?.dataset?.paletteShortcut || "auto"
       if (shortcut === "cmd")  return e.metaKey
       if (shortcut === "ctrl") return e.ctrlKey
       if (shortcut === "alt")  return e.altKey

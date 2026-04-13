@@ -125,7 +125,7 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
         on: tt.task_id == t.id,
         join: tg in "tags",
         on: tg.id == tt.tag_id,
-        where: tg.name == ^tag_name and t.state_id == ^state_todo and is_nil(t.archived_at),
+        where: tg.name == ^tag_name and t.state_id == ^state_todo and t.archived == false,
         order_by: [desc: t.priority, asc: t.id],
         limit: ^limit,
         select: %{

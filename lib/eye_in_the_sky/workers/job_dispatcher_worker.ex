@@ -13,12 +13,14 @@ defmodule EyeInTheSky.Workers.JobDispatcherWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{}) do
-    for job <- ScheduledJobs.due_jobs() do
-      case ScheduledJobs.claim_job(job) do
-        :ok ->
-          case ScheduledJobs.enqueue_job(job) do
+    jobs_mod = Application.get_env(:eye_in_the_sky, :jobs_module, ScheduledJobs)
+
+    for job <- jobs_mod.due_jobs() do
+      case jobs_mod.claim_job(job) do
+        {:ok, sentinel} ->
+          case jobs_mod.enqueue_job(job) do
             {:ok, _} ->
-              case ScheduledJobs.mark_job_executed(job) do
+              case jobs_mod.mark_job_executed(job) do
                 {:ok, _} ->
                   :ok
 
@@ -28,7 +30,7 @@ defmodule EyeInTheSky.Workers.JobDispatcherWorker do
 
             {:error, reason} ->
               Logger.error("JobDispatcherWorker: failed to enqueue job #{job.id}: #{inspect(reason)}")
-              ScheduledJobs.release_claim(job, job.next_run_at)
+              jobs_mod.release_claim(job, sentinel, job.next_run_at)
           end
 
         {:error, :already_claimed} ->

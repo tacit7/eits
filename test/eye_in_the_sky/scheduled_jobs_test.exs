@@ -390,17 +390,18 @@ defmodule EyeInTheSky.ScheduledJobsTest do
   end
 
   describe "claim_job/1" do
-    test "returns :ok on first claim" do
+    test "returns {:ok, sentinel} on first claim" do
       {:ok, job} = ScheduledJobs.create_job(workable_attrs())
       {:ok, job} = ScheduledJobs.update_job(job, %{"next_run_at" => "2000-01-01T00:00:00Z"})
-      assert :ok = ScheduledJobs.claim_job(job)
+      assert {:ok, sentinel} = ScheduledJobs.claim_job(job)
+      assert %DateTime{} = sentinel
     end
 
     test "returns {:error, :already_claimed} when same struct is claimed twice" do
       {:ok, job} = ScheduledJobs.create_job(workable_attrs())
       {:ok, job} = ScheduledJobs.update_job(job, %{"next_run_at" => "2000-01-01T00:00:00Z"})
 
-      assert :ok = ScheduledJobs.claim_job(job)
+      assert {:ok, _sentinel} = ScheduledJobs.claim_job(job)
       # Second call with the same struct (stale next_run_at) must be rejected
       assert {:error, :already_claimed} = ScheduledJobs.claim_job(job)
     end
@@ -408,7 +409,7 @@ defmodule EyeInTheSky.ScheduledJobsTest do
     test "advances next_run_at into the future on successful claim" do
       {:ok, job} = ScheduledJobs.create_job(workable_attrs())
       {:ok, job} = ScheduledJobs.update_job(job, %{"next_run_at" => "2000-01-01T00:00:00Z"})
-      :ok = ScheduledJobs.claim_job(job)
+      {:ok, _sentinel} = ScheduledJobs.claim_job(job)
 
       {:ok, updated} = ScheduledJobs.get_job(job.id)
       assert DateTime.compare(updated.next_run_at, DateTime.utc_now()) == :gt
@@ -417,30 +418,54 @@ defmodule EyeInTheSky.ScheduledJobsTest do
     test "claimed job no longer appears in due_jobs" do
       {:ok, job} = ScheduledJobs.create_job(workable_attrs())
       {:ok, job} = ScheduledJobs.update_job(job, %{"next_run_at" => "2000-01-01T00:00:00Z"})
-      :ok = ScheduledJobs.claim_job(job)
+      {:ok, _sentinel} = ScheduledJobs.claim_job(job)
 
       due_ids = ScheduledJobs.due_jobs() |> Enum.map(& &1.id)
       refute job.id in due_ids
     end
+
+    test "rejects claim for a disabled job" do
+      {:ok, job} = ScheduledJobs.create_job(workable_attrs())
+      {:ok, job} = ScheduledJobs.update_job(job, %{"next_run_at" => "2000-01-01T00:00:00Z"})
+      {:ok, job} = ScheduledJobs.toggle_job(job)
+
+      assert {:error, :already_claimed} = ScheduledJobs.claim_job(job)
+    end
   end
 
   # ---------------------------------------------------------------------------
-  # release_claim/2
+  # release_claim/3
   # ---------------------------------------------------------------------------
 
-  describe "release_claim/2" do
+  describe "release_claim/3" do
     test "restores next_run_at so job reappears in due_jobs" do
       {:ok, job} = ScheduledJobs.create_job(workable_attrs())
       past = ~U[2000-01-01 00:00:00Z]
       {:ok, job} = ScheduledJobs.update_job(job, %{"next_run_at" => "2000-01-01T00:00:00Z"})
 
-      :ok = ScheduledJobs.claim_job(job)
+      {:ok, sentinel} = ScheduledJobs.claim_job(job)
       # Verify claimed (not due)
       refute job.id in (ScheduledJobs.due_jobs() |> Enum.map(& &1.id))
 
-      :ok = ScheduledJobs.release_claim(job, past)
+      :ok = ScheduledJobs.release_claim(job, sentinel, past)
       # Now due again
       assert job.id in (ScheduledJobs.due_jobs() |> Enum.map(& &1.id))
+    end
+
+    test "no-ops when sentinel no longer matches (mark_job_executed already ran)" do
+      {:ok, job} = ScheduledJobs.create_job(workable_attrs())
+      past = ~U[2000-01-01 00:00:00Z]
+      {:ok, job} = ScheduledJobs.update_job(job, %{"next_run_at" => "2000-01-01T00:00:00Z"})
+
+      {:ok, sentinel} = ScheduledJobs.claim_job(job)
+      # Simulate mark_job_executed by advancing next_run_at beyond the sentinel
+      {:ok, _} = ScheduledJobs.mark_job_executed(job)
+
+      # release_claim should be a no-op: sentinel no longer matches
+      :ok = ScheduledJobs.release_claim(job, sentinel, past)
+
+      # Job should NOT be due again — mark_job_executed already set next_run_at
+      refute job.id in (ScheduledJobs.due_jobs() |> Enum.map(& &1.id))
     end
   end
 

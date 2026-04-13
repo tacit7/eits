@@ -48,7 +48,7 @@ defmodule EyeInTheSky.Scheduler.JobEnqueuer do
   def handle_info(:check_jobs, state) do
     for job <- ScheduledJobs.due_jobs() do
       case ScheduledJobs.claim_job(job) do
-        :ok ->
+        {:ok, sentinel} ->
           case ScheduledJobs.enqueue_job(job) do
             {:ok, _} ->
               case ScheduledJobs.mark_job_executed(job) do
@@ -61,7 +61,7 @@ defmodule EyeInTheSky.Scheduler.JobEnqueuer do
 
             {:error, reason} ->
               Logger.error("Failed to enqueue job #{job.id}: #{inspect(reason)}")
-              ScheduledJobs.release_claim(job, job.next_run_at)
+              ScheduledJobs.release_claim(job, sentinel, job.next_run_at)
           end
 
         {:error, :already_claimed} ->

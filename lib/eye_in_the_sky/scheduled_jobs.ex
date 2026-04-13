@@ -30,7 +30,7 @@ defmodule EyeInTheSky.ScheduledJobs do
 
   defdelegate due_jobs(), to: JobScheduler
   defdelegate claim_job(job), to: JobScheduler
-  defdelegate release_claim(job, original_next_run_at), to: JobScheduler
+  defdelegate release_claim(job, sentinel, original_next_run_at), to: JobScheduler
   defdelegate mark_job_executed(job), to: JobScheduler
 
   # ---------------------------------------------------------------------------

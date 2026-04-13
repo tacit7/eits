@@ -184,26 +184,38 @@ defmodule EyeInTheSky.Workers.JobDispatcherWorkerTest do
 
       # Simulate two pollers fetching the same due job by calling claim_job twice
       # with the same stale struct
-      assert :ok = ScheduledJobs.claim_job(job)
+      assert {:ok, _sentinel} = ScheduledJobs.claim_job(job)
       assert {:error, :already_claimed} = ScheduledJobs.claim_job(job)
     end
   end
 
-  describe "enqueue failure — claim release" do
-    test "job reappears as due after enqueue failure releases the claim" do
+  describe "enqueue failure — claim release via perform" do
+    # Stub module that returns an error for enqueue_job while delegating
+    # everything else to the real ScheduledJobs.
+    defmodule FailingEnqueueJobs do
+      defdelegate due_jobs(), to: EyeInTheSky.ScheduledJobs
+      defdelegate claim_job(job), to: EyeInTheSky.ScheduledJobs
+      defdelegate release_claim(job, sentinel, original), to: EyeInTheSky.ScheduledJobs
+      defdelegate mark_job_executed(job), to: EyeInTheSky.ScheduledJobs
+      def enqueue_job(_job), do: {:error, :injected_failure}
+    end
+
+    test "perform releases the claim when enqueue_job fails, making job due again" do
       {:ok, job} = ScheduledJobs.create_job(workable_job_attrs())
       past = ~U[2000-01-01 00:00:00Z]
       {:ok, job} = ScheduledJobs.update_job(job, %{"next_run_at" => "2000-01-01T00:00:00Z"})
 
-      # Claim the job (as the dispatcher would)
-      :ok = ScheduledJobs.claim_job(job)
-      refute job.id in (ScheduledJobs.due_jobs() |> Enum.map(& &1.id))
+      Application.put_env(:eye_in_the_sky, :jobs_module, FailingEnqueueJobs)
 
-      # Simulate enqueue failure: release the claim with the original next_run_at
-      :ok = ScheduledJobs.release_claim(job, past)
+      try do
+        assert :ok = perform_job(JobDispatcherWorker, %{})
+      after
+        Application.delete_env(:eye_in_the_sky, :jobs_module)
+      end
 
-      # Job must reappear for the next poll cycle
-      assert job.id in (ScheduledJobs.due_jobs() |> Enum.map(& &1.id))
+      # Job must be due again — claim sentinel should have been released
+      {:ok, updated} = ScheduledJobs.get_job(job.id)
+      assert DateTime.compare(updated.next_run_at, past) == :eq
     end
   end
 end

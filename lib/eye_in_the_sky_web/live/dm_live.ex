@@ -18,7 +18,7 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   require Logger
 
-  @default_message_limit 20
+  @default_message_limit 50
   @message_page_size 20
 
   @impl true

@@ -12,7 +12,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
   alias EyeInTheSkyWeb.Helpers.SlashItems
   alias EyeInTheSky.OrchestratorTimers
 
-  @default_message_limit 20
+  @default_message_limit 50
 
   def maybe_subscribe(is_connected, session_id) do
     if is_connected, do: setup_subscriptions(session_id), else: :ok

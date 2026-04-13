@@ -9,7 +9,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
   require Logger
 
   @default_context_window 200_000
-  @default_message_limit 20
+  @default_message_limit 50
 
   def load_tab_data(socket, tab, session_id) do
     Logger.info("Loading DM tab data tab=#{tab} session_id=#{session_id}")

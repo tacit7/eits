@@ -5,16 +5,26 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers do
   """
 
   import Phoenix.Component, only: [assign: 3]
-  import EyeInTheSkyWeb.Helpers.FileHelpers, only: [detect_file_type: 1]
+  import EyeInTheSkyWeb.Helpers.FileHelpers, only: [detect_file_type: 1, safe_realpath: 1]
 
   @max_file_size 1_048_576
 
   @doc """
-  Returns true when `path` is within `base_dir` (after path expansion).
-  Prevents directory traversal attacks.
+  Returns true when `path` is within `base_dir`.
+
+  Resolves symlinks via `realpath` before comparing, preventing symlink-escape
+  attacks. Also uses a trailing-slash guard to avoid prefix-collision false
+  positives (e.g. `/tmp/foo_evil` must not match base `/tmp/foo`).
+
+  Returns `false` when either path cannot be resolved (e.g. does not exist yet).
   """
   def path_within?(path, base_dir) do
-    String.starts_with?(Path.expand(path), Path.expand(base_dir))
+    with {:ok, real_base} <- safe_realpath(base_dir),
+         {:ok, real_path} <- safe_realpath(path) do
+      String.starts_with?(real_path, real_base <> "/")
+    else
+      {:error, _} -> false
+    end
   end
 
   @doc """

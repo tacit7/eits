@@ -1,10 +1,14 @@
 defmodule EyeInTheSky.Workers.DailyDigestWorkerTest do
-  use EyeInTheSky.DataCase, async: true
+  use EyeInTheSky.DataCase, async: false
   use Oban.Testing, repo: EyeInTheSky.Repo
 
   alias EyeInTheSky.Events
   alias EyeInTheSky.ScheduledJobs
   alias EyeInTheSky.Workers.DailyDigestWorker
+
+  defmodule FailingNotes do
+    def create_note(_attrs), do: {:error, :forced_test_failure}
+  end
 
   defp create_digest_job do
     {:ok, job} =
@@ -38,9 +42,29 @@ defmodule EyeInTheSky.Workers.DailyDigestWorkerTest do
     end
   end
 
-  # NOTE: Testing the failure-path broadcast (lines 35-37 of the worker) requires
-  # mocking Notes.create_note/1 to return {:error, reason}. This project does not
-  # have Mox configured, so the failure-path broadcast is verified by code inspection:
-  # broadcast() is called immediately before {:error, reason} is returned.
-  # Adding Mox would be the correct next step to close this gap.
+  describe "perform/1 failure path" do
+    setup do
+      Application.put_env(:eye_in_the_sky, :notes_module, FailingNotes)
+      on_exit(fn -> Application.delete_env(:eye_in_the_sky, :notes_module) end)
+    end
+
+    test "broadcasts :jobs_updated even when generate_digest fails" do
+      Events.subscribe_scheduled_jobs()
+      job = create_digest_job()
+
+      assert {:error, :forced_test_failure} =
+               perform_job(DailyDigestWorker, %{"job_id" => job.id})
+
+      assert_receive :jobs_updated, 2000
+    end
+
+    test "records a failed run when generate_digest fails" do
+      job = create_digest_job()
+
+      perform_job(DailyDigestWorker, %{"job_id" => job.id})
+
+      runs = ScheduledJobs.list_runs_for_job(job.id)
+      assert Enum.any?(runs, &(&1.status == "failed"))
+    end
+  end
 end

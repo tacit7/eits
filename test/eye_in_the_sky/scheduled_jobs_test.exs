@@ -183,6 +183,44 @@ defmodule EyeInTheSky.ScheduledJobsTest do
 
       assert changeset.errors[:job_type] != nil
     end
+
+    test "accepts workable_task job_type" do
+      attrs = %{
+        "name" => "Workable Task Job",
+        "job_type" => "workable_task",
+        "schedule_type" => "interval",
+        "schedule_value" => "300"
+      }
+
+      assert {:ok, job} = ScheduledJobs.create_job(attrs)
+      assert job.job_type == "workable_task"
+    end
+
+    test "rejects invalid timezone on create" do
+      attrs = %{
+        "name" => "TZ Job",
+        "job_type" => "workable_task",
+        "schedule_type" => "interval",
+        "schedule_value" => "300",
+        "timezone" => "Not/AZone"
+      }
+
+      assert {:error, changeset} = ScheduledJobs.create_job(attrs)
+      assert changeset.errors[:timezone] != nil
+    end
+
+    test "accepts valid non-UTC timezone on create" do
+      attrs = %{
+        "name" => "TZ Job",
+        "job_type" => "workable_task",
+        "schedule_type" => "interval",
+        "schedule_value" => "300",
+        "timezone" => "America/New_York"
+      }
+
+      assert {:ok, job} = ScheduledJobs.create_job(attrs)
+      assert job.timezone == "America/New_York"
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -215,6 +253,31 @@ defmodule EyeInTheSky.ScheduledJobsTest do
       {:ok, job} = ScheduledJobs.create_job(job_attrs())
       {:ok, updated} = ScheduledJobs.update_job(job, %{"project_id" => project.id})
       assert updated.project_id == project.id
+    end
+
+    test "updating non-timezone fields does not re-validate persisted timezone" do
+      # Simulate a legacy row by inserting directly with an invalid timezone
+      attrs = %{
+        "name" => "TZ Job",
+        "job_type" => "workable_task",
+        "schedule_type" => "interval",
+        "schedule_value" => "300",
+        "timezone" => "America/Chicago"
+      }
+
+      {:ok, job} = ScheduledJobs.create_job(attrs)
+
+      # Patch the DB row directly to simulate a legacy invalid timezone value
+      EyeInTheSky.Repo.query!(
+        "UPDATE scheduled_jobs SET timezone = 'Legacy/Invalid' WHERE id = $1",
+        [job.id]
+      )
+
+      reloaded = EyeInTheSky.ScheduledJobs.get_job!(job.id)
+
+      # Updating an unrelated field must not fail due to persisted invalid timezone
+      assert {:ok, updated} = ScheduledJobs.update_job(reloaded, %{"name" => "Renamed"})
+      assert updated.name == "Renamed"
     end
   end
 

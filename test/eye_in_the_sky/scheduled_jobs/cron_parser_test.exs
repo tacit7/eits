@@ -44,5 +44,16 @@ defmodule EyeInTheSky.ScheduledJobs.CronParserTest do
       from = ~N[2026-01-01 00:00:00]
       assert CronParser.compute_next_run_at("cron", "not a cron", from) == nil
     end
+
+    test "returns nil for invalid timezone without raising" do
+      from = ~N[2026-01-01 00:00:00]
+      assert CronParser.compute_next_run_at("cron", "* * * * *", from, "Not/AZone") == nil
+    end
+
+    test "handles valid non-UTC timezone" do
+      from = ~N[2026-01-01 00:00:00]
+      result = CronParser.compute_next_run_at("cron", "* * * * *", from, "America/New_York")
+      assert %DateTime{} = result
+    end
   end
 end

@@ -61,17 +61,17 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
   end
 
   defp validate_timezone(changeset) do
-    tz = get_field(changeset, :timezone)
+    case get_change(changeset, :timezone) do
+      nil ->
+        changeset
 
-    if is_nil(tz) do
-      changeset
-    else
-      probe = DateTime.from_naive!(~N[2000-01-01 00:00:00], "Etc/UTC")
+      tz ->
+        probe = DateTime.from_naive!(~N[2000-01-01 00:00:00], "Etc/UTC")
 
-      case DateTime.shift_zone(probe, tz) do
-        {:ok, _} -> changeset
-        _ -> add_error(changeset, :timezone, "is not a valid timezone")
-      end
+        case DateTime.shift_zone(probe, tz) do
+          {:ok, _} -> changeset
+          _ -> add_error(changeset, :timezone, "is not a valid timezone")
+        end
     end
   end
 

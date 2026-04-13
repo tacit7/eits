@@ -41,8 +41,8 @@ defmodule EyeInTheSkyWeb.DmLive.TimerTest do
     assert render(view) =~ "Schedule Message"
 
     view
-    |> element("button[phx-click='schedule_timer'][phx-value-mode='once'][phx-value-preset='5m']")
-    |> render_click()
+    |> form("#schedule-timer-form", %{mode: "once", preset: "5m"})
+    |> render_submit()
 
     html = render(view)
     refute html =~ "modal-open"

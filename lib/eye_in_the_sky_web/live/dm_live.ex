@@ -57,6 +57,9 @@ defmodule EyeInTheSkyWeb.DmLive do
   # ---------------------------------------------------------------------------
 
   @impl true
+  def handle_event("keydown", _params, socket), do: {:noreply, socket}
+
+  @impl true
   def handle_event("change_tab", %{"tab" => tab}, socket) do
     socket =
       socket
@@ -402,7 +405,7 @@ defmodule EyeInTheSkyWeb.DmLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id="dm-live-root" phx-hook="GlobalKeydown">
+    <div id="dm-live-root">
       <DmPage.dm_page
         agent={@session}
         agent_record={@agent}

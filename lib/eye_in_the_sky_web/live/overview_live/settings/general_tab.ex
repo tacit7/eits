@@ -167,6 +167,52 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
           </div>
         </div>
       </section>
+
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+          Keyboard
+        </h2>
+        <div class="card bg-base-100 border border-base-300 shadow-sm">
+          <div class="card-body p-0">
+            <div class="flex items-center justify-between px-5 py-4">
+              <div>
+                <p class="text-sm font-medium text-base-content">Command Palette Shortcut</p>
+                <p class="text-xs text-base-content/50 mt-0.5">
+                  Modifier key used to open the command palette with K
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <form phx-change="save_setting">
+                  <input type="hidden" name="key" value="palette_shortcut" />
+                  <select class="select select-bordered select-sm w-48 min-h-[44px]" name="value">
+                    <option value="auto" selected={(@settings["palette_shortcut"] || "auto") == "auto"}>
+                      Auto (⌘K on Mac, Ctrl+K elsewhere)
+                    </option>
+                    <option value="ctrl" selected={@settings["palette_shortcut"] == "ctrl"}>
+                      Ctrl+K
+                    </option>
+                    <option value="cmd" selected={@settings["palette_shortcut"] == "cmd"}>
+                      ⌘K (Command)
+                    </option>
+                    <option value="alt" selected={@settings["palette_shortcut"] == "alt"}>
+                      Alt+K
+                    </option>
+                  </select>
+                </form>
+                <button
+                  :if={!default?(@settings, "palette_shortcut")}
+                  phx-click="reset_setting"
+                  phx-value-key="palette_shortcut"
+                  class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
+                  title="Reset to default"
+                >
+                  <.icon name="hero-arrow-uturn-left" class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
     """
   end

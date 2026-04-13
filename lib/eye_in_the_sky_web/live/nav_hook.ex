@@ -15,6 +15,7 @@ defmodule EyeInTheSkyWeb.NavHook do
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSky.Projects
+  alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.MobileNav
   alias EyeInTheSkyWeb.NavHook.PaletteAgentHandlers
   alias EyeInTheSkyWeb.NavHook.PaletteHandlers
@@ -29,6 +30,7 @@ defmodule EyeInTheSkyWeb.NavHook do
       |> assign(:nav_path, nil)
       |> assign(:mobile_nav_tab, :sessions)
       |> assign(:palette_projects, projects)
+      |> assign(:palette_shortcut, Settings.get("palette_shortcut") || "auto")
       |> attach_hook(:capture_nav_path, :handle_params, &capture_nav_path/3)
       |> attach_hook(:palette_sessions, :handle_event, &PaletteHandlers.handle_palette_event/3)
       |> attach_hook(:palette_create_task, :handle_event, &PaletteHandlers.handle_create_task_event/3)

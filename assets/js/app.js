@@ -53,7 +53,6 @@ import {ModalDialog} from "./hooks/modal_dialog"
 import {LiveStreamToggle} from "./hooks/live_stream_toggle"
 import {RefreshDot} from "./hooks/refresh_dot"
 import {Highlight} from "./hooks/highlight"
-import {GlobalKeydown} from "./hooks/global_keydown"
 import {LocalTime} from "./hooks/local_time"
 import {DragUpload} from "./hooks/drag_upload"
 import {SidebarState} from "./hooks/sidebar_state"
@@ -63,6 +62,7 @@ import {CommandPalette} from "./hooks/command_palette"
 import {FlashTimeout} from "./hooks/flash_timeout"
 import {ReloadConfirmModal} from "./hooks/reload_confirm_modal"
 import {ChatWindowHook} from "./hooks/chat_window_hook"
+import {TimerCountdown} from "./hooks/timer_countdown"
 import {showToast} from "./hooks/utils"
 import {getHooks} from "live_svelte"
 import "./theme"
@@ -106,7 +106,6 @@ Hooks.ModalDialog = ModalDialog
 Hooks.LiveStreamToggle = LiveStreamToggle
 Hooks.RefreshDot = RefreshDot
 Hooks.Highlight = Highlight
-Hooks.GlobalKeydown = GlobalKeydown
 Hooks.LocalTime = LocalTime
 Hooks.DragUpload = DragUpload
 Hooks.SidebarState = SidebarState
@@ -123,6 +122,7 @@ Hooks.CommandPalette = CommandPalette
 Hooks.FlashTimeout = FlashTimeout
 Hooks.ReloadConfirmModal = ReloadConfirmModal
 Hooks.ChatWindowHook = ChatWindowHook
+Hooks.TimerCountdown = TimerCountdown
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {

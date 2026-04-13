@@ -4,6 +4,14 @@
  * http://buunguyen.github.io/topbar
  * Copyright (c) 2024 Buu Nguyen
  */
+
+// Capture topbar at module scope so the ESM export is not affected by
+// Rollup/Vite CJS interop wrappers. The original UMD `typeof module` check
+// inside the IIFE would detect the CJS factory wrapper injected by the bundler
+// and call `module.exports = topbar` instead of `window.topbar = topbar`,
+// leaving `window.topbar` undefined and breaking `export default window.topbar`.
+let _topbar;
+
 (function (window, document) {
   "use strict";
 
@@ -126,15 +134,7 @@
       },
     };
 
-  if (typeof module === "object" && typeof module.exports === "object") {
-    module.exports = topbar;
-  } else if (typeof define === "function" && define.amd) {
-    define(function () {
-      return topbar;
-    });
-  } else {
-    window.topbar = topbar;
-  }
+  _topbar = topbar;
 }.call(window, window, document));
 
-export default window.topbar;
+export default _topbar;

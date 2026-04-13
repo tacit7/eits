@@ -43,6 +43,9 @@ defmodule EyeInTheSky.FileAttachments do
   @doc """
   Uploads a file and creates a file attachment record.
 
+  File is copied to disk only after validation passes. If the DB insert
+  fails the copied file is removed, preventing orphaned files on disk.
+
   ## Parameters
     - message_id: The message to attach the file to
     - upload: A map with :path and :filename keys
@@ -54,20 +57,24 @@ defmodule EyeInTheSky.FileAttachments do
   """
   def upload_file(message_id, upload, session_id) do
     with :ok <- validate_upload(upload),
-         {:ok, storage_path} <- save_file(upload) do
-      create_attachment(message_id, upload, storage_path, session_id)
+         {:ok, storage_path} <- save_file(upload),
+         {:ok, attachment} <- create_attachment(message_id, upload, storage_path, session_id) do
+      {:ok, attachment}
     end
   end
 
   @doc """
-  Deletes a file attachment and removes the file from storage.
+  Deletes a file attachment: removes the DB record first, then the file.
+
+  Deleting the DB record first ensures we never leave a dangling record
+  pointing at a missing file. A leftover orphaned file on disk is preferable
+  to a live record referencing a deleted file.
   """
   def delete_attachment(%FileAttachment{} = attachment) do
-    # Delete the file from storage
-    File.rm(attachment.storage_path)
-
-    # Delete the database record
-    Repo.delete(attachment)
+    with {:ok, deleted} <- Repo.delete(attachment) do
+      File.rm(deleted.storage_path)
+      {:ok, deleted}
+    end
   end
 
   @doc """
@@ -112,21 +119,16 @@ defmodule EyeInTheSky.FileAttachments do
   end
 
   defp save_file(upload) do
-    # Generate unique filename
     ext = Path.extname(upload.filename)
     unique_filename = "#{Ecto.UUID.generate()}#{ext}"
 
-    # Create date-based subdirectory
     date_dir = Date.utc_today() |> Date.to_string()
     full_dir = Path.join([@upload_dir, date_dir])
 
-    # Ensure directory exists
     File.mkdir_p!(full_dir)
 
-    # Build storage path
     storage_path = Path.join([full_dir, unique_filename])
 
-    # Copy file to storage
     case File.cp(upload.path, storage_path) do
       :ok -> {:ok, storage_path}
       {:error, reason} -> {:error, reason}
@@ -149,9 +151,17 @@ defmodule EyeInTheSky.FileAttachments do
       updated_at: now
     }
 
-    %FileAttachment{}
-    |> FileAttachment.changeset(attrs)
-    |> Repo.insert()
+    case %FileAttachment{}
+         |> FileAttachment.changeset(attrs)
+         |> Repo.insert() do
+      {:ok, _} = ok ->
+        ok
+
+      {:error, _} = err ->
+        # DB insert failed — clean up the copied file to prevent disk orphans.
+        File.rm(storage_path)
+        err
+    end
   end
 
   @doc """
@@ -175,9 +185,6 @@ defmodule EyeInTheSky.FileAttachments do
   Returns a public URL for accessing an uploaded file.
   """
   def get_public_url(%FileAttachment{} = attachment) do
-    # Convert storage path to public URL
-    # e.g., priv/static/uploads/attachments/2025-12-02/abc.pdf
-    #    -> /uploads/attachments/2025-12-02/abc.pdf
     path = String.replace(attachment.storage_path, "priv/static", "")
     path
   end

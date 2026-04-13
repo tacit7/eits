@@ -29,6 +29,9 @@ defmodule EyeInTheSky.Media.ImageProcessor do
   Processes a list of ContentBlock.Image structs, resizing and compressing
   as needed to fit within API limits. Returns the processed list.
 
+  Images that exceed the hard limit and cannot be processed (e.g. ImageMagick
+  unavailable) are dropped from the output rather than passed through oversized.
+
   Non-image blocks are passed through unchanged.
   """
   @spec process_blocks([ContentBlock.t()]) :: [ContentBlock.t()]
@@ -38,27 +41,35 @@ defmodule EyeInTheSky.Media.ImageProcessor do
     image_count = Enum.count(blocks, &ContentBlock.image?/1)
     max_dim = if image_count == 1, do: @single_image_max_dimension, else: @max_dimension
 
-    Enum.map(blocks, fn block ->
+    Enum.flat_map(blocks, fn block ->
       if ContentBlock.image?(block) do
-        process_image(block, max_dim)
+        case process_image(block, max_dim) do
+          {:ok, processed} -> [processed]
+          {:error, reason} ->
+            Logger.error("[ImageProcessor] Dropping image block: #{inspect(reason)}")
+            []
+        end
       else
-        block
+        [block]
       end
     end)
   end
 
   @doc """
-  Processes a single image block. Returns the block unchanged if already
-  within limits or if ImageMagick is not available. Gracefully handles
-  invalid base64 data by returning the block as-is.
+  Processes a single image block.
+
+  Returns `{:ok, block}` on success, `{:error, reason}` if the image cannot
+  be brought within limits (e.g. exceeds hard limit and ImageMagick is absent).
+  Gracefully handles invalid base64 data by returning the block as-is.
   """
-  @spec process_image(ContentBlock.Image.t(), pos_integer()) :: ContentBlock.Image.t()
+  @spec process_image(ContentBlock.Image.t(), pos_integer()) ::
+          {:ok, ContentBlock.Image.t()} | {:error, atom()}
   def process_image(%ContentBlock.Image{data: data, mime_type: mime_type} = block, max_dim \\ @max_dimension) do
     case Base.decode64(data) do
       {:ok, raw} -> process_decoded_image(raw, mime_type, max_dim, block)
       :error ->
         Logger.warning("[ImageProcessor] Invalid base64 data, passing through unchanged")
-        block
+        {:ok, block}
     end
   end
 
@@ -68,28 +79,44 @@ defmodule EyeInTheSky.Media.ImageProcessor do
     cond do
       raw_size > @hard_limit_bytes ->
         Logger.warning("[ImageProcessor] Image exceeds hard limit (#{raw_size} bytes), attempting resize")
-        resize_and_compress(raw, mime_type, max_dim)
+        case resize_and_compress(raw, mime_type, max_dim) do
+          {:ok, processed} -> {:ok, processed}
+          # Propagate hard-limit errors — do NOT fall back to the oversized original.
+          {:error, _} = err -> err
+        end
 
       raw_size > @target_bytes ->
         Logger.info("[ImageProcessor] Image above target (#{raw_size} bytes), compressing")
-        resize_and_compress(raw, mime_type, max_dim)
+        case resize_and_compress(raw, mime_type, max_dim) do
+          {:ok, processed} -> {:ok, processed}
+          # Above target but under hard limit: fall back to original if compress fails.
+          {:error, _} -> {:ok, block}
+        end
 
       true ->
         case auto_orient(raw, mime_type) do
-          {:ok, oriented} -> %ContentBlock.Image{data: Base.encode64(oriented), mime_type: mime_type}
-          :error -> block
+          {:ok, oriented} -> {:ok, %ContentBlock.Image{data: Base.encode64(oriented), mime_type: mime_type}}
+          :error -> {:ok, block}
         end
     end
   end
 
   defp resize_and_compress(raw, mime_type, max_dim) do
+    raw_size = byte_size(raw)
+
     case imagemagick_available?() do
+      false when raw_size > @hard_limit_bytes ->
+        # Cannot process and image violates hard limit — reject rather than
+        # silently pass an oversized image to the provider API.
+        Logger.error("[ImageProcessor] ImageMagick unavailable and image (#{raw_size} bytes) exceeds hard limit (#{@hard_limit_bytes} bytes); rejecting")
+        {:error, :exceeds_hard_limit}
+
       false ->
-        Logger.warning("[ImageProcessor] ImageMagick not available, passing through as-is")
-        %ContentBlock.Image{data: Base.encode64(raw), mime_type: mime_type}
+        Logger.warning("[ImageProcessor] ImageMagick not available, passing through as-is (#{raw_size} bytes)")
+        {:ok, %ContentBlock.Image{data: Base.encode64(raw), mime_type: mime_type}}
 
       true ->
-        do_resize_and_compress(raw, mime_type, max_dim)
+        {:ok, do_resize_and_compress(raw, mime_type, max_dim)}
     end
   end
 

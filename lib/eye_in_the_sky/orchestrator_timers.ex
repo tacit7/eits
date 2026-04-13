@@ -14,14 +14,24 @@ defmodule EyeInTheSky.OrchestratorTimers do
     "Please check in with your team members and report their current status and any blockers."
   end
 
+  @min_interval_ms 100
+
   @doc "Schedule a one-shot timer. Replaces any existing timer for the session."
   def schedule_once(session_id, delay_ms, message \\ default_message()) do
-    GenServer.call(Server, {:schedule_once, session_id, delay_ms, message})
+    if is_integer(delay_ms) and delay_ms >= @min_interval_ms do
+      GenServer.call(Server, {:schedule_once, session_id, delay_ms, message})
+    else
+      {:error, {:invalid_interval, "delay_ms must be an integer >= #{@min_interval_ms}, got #{inspect(delay_ms)}"}}
+    end
   end
 
   @doc "Schedule a repeating timer. Replaces any existing timer for the session."
   def schedule_repeating(session_id, interval_ms, message \\ default_message()) do
-    GenServer.call(Server, {:schedule_repeating, session_id, interval_ms, message})
+    if is_integer(interval_ms) and interval_ms >= @min_interval_ms do
+      GenServer.call(Server, {:schedule_repeating, session_id, interval_ms, message})
+    else
+      {:error, {:invalid_interval, "interval_ms must be an integer >= #{@min_interval_ms}, got #{inspect(interval_ms)}"}}
+    end
   end
 
   @doc "Cancel the active timer for a session. No-op if none active."

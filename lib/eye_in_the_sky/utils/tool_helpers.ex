@@ -5,12 +5,20 @@ defmodule EyeInTheSky.Utils.ToolHelpers do
 
   def resolve_session_int_id(nil), do: {:error, "session_id is required"}
 
-  def resolve_session_int_id(id) when is_integer(id), do: {:ok, id}
+  def resolve_session_int_id(id) when is_integer(id) do
+    case Sessions.get_session(id) do
+      {:ok, session} -> {:ok, session.id}
+      {:error, :not_found} -> {:error, "Session not found: #{id}"}
+    end
+  end
 
   def resolve_session_int_id(raw) when is_binary(raw) do
     case Integer.parse(raw) do
       {int_id, ""} ->
-        {:ok, int_id}
+        case Sessions.get_session(int_id) do
+          {:ok, session} -> {:ok, session.id}
+          {:error, :not_found} -> {:error, "Session not found: #{raw}"}
+        end
 
       _ ->
         case Sessions.get_session_by_uuid(raw) do

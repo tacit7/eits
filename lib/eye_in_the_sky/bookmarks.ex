@@ -112,6 +112,9 @@ defmodule EyeInTheSky.Bookmarks do
       "file" ->
         from(b in Bookmark, where: b.bookmark_type == "file" and b.file_path == ^identifier)
 
+      "url" ->
+        from(b in Bookmark, where: b.bookmark_type == "url" and b.url == ^identifier)
+
       type when type in ["note", "agent", "session", "task"] ->
         from(b in Bookmark, where: b.bookmark_type == ^type and b.bookmark_id == ^identifier)
 

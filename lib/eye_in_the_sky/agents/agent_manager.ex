@@ -7,10 +7,12 @@ defmodule EyeInTheSky.Agents.AgentManager do
 
   require Logger
 
-  alias EyeInTheSky.{AgentDefinitions, Agents, Projects, Sessions, Teams}
+  alias EyeInTheSky.{AgentDefinitions, Agents, Projects, Repo, Sessions, Teams}
+  alias EyeInTheSky.Agents.Agent
   alias EyeInTheSky.Agents.AgentManager.SessionBridge
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSky.Git.Worktrees
+  alias EyeInTheSky.Sessions.Session
   alias EyeInTheSky.Utils.ToolHelpers
 
   @doc """
@@ -179,42 +181,54 @@ defmodule EyeInTheSky.Agents.AgentManager do
          definition_info: definition_info,
          opts: opts
        }) do
-    with {:ok, agent} <-
-           Agents.create_agent(
-             %{
-               uuid: agent_uuid,
-               agent_type: opts[:agent_type] || "claude",
-               project_id: project_id,
-               project_name: opts[:project_name],
-               status: "pending",
-               description: description,
-               git_worktree_path: worktree_path,
-               parent_agent_id: opts[:parent_agent_id],
-               parent_session_id: opts[:parent_session_id]
-             }
-             |> maybe_put_definition(definition_info)
-           ),
-         {:ok, session} <-
-           Sessions.create_session(%{
-             uuid: session_uuid,
-             agent_id: agent.id,
-             name: description,
-             description: "agent-id #{agent_uuid}",
-             model: opts[:model],
-             provider: provider,
-             project_id: project_id,
-             git_worktree_path: worktree_path,
-             started_at: DateTime.utc_now(),
-             parent_agent_id: opts[:parent_agent_id],
-             parent_session_id: opts[:parent_session_id]
-           }) do
-      Logger.info(
-        "✅ create_agent: DB records created - agent.id=#{agent.id}, session.id=#{session.id}, session_uuid=#{session.uuid}"
-      )
+    agent_attrs =
+      %{
+        uuid: agent_uuid,
+        agent_type: opts[:agent_type] || "claude",
+        project_id: project_id,
+        project_name: opts[:project_name],
+        status: "pending",
+        description: description,
+        git_worktree_path: worktree_path,
+        parent_agent_id: opts[:parent_agent_id],
+        parent_session_id: opts[:parent_session_id]
+      }
+      |> maybe_put_definition(definition_info)
 
-      {:ok, %{agent: agent, session: session}}
-    else
-      {:error, reason} ->
+    agent_changeset = Agent.changeset(%Agent{}, agent_attrs)
+
+    session_opts = %{
+      uuid: session_uuid,
+      name: description,
+      description: "agent-id #{agent_uuid}",
+      model: opts[:model],
+      provider: provider,
+      project_id: project_id,
+      git_worktree_path: worktree_path,
+      started_at: DateTime.utc_now(),
+      parent_agent_id: opts[:parent_agent_id],
+      parent_session_id: opts[:parent_session_id]
+    }
+
+    result =
+      Ecto.Multi.new()
+      |> Ecto.Multi.insert(:agent, agent_changeset)
+      |> Ecto.Multi.run(:session, fn _repo, %{agent: agent} ->
+        Repo.insert(Session.changeset(%Session{}, Map.put(session_opts, :agent_id, agent.id)))
+      end)
+      |> Repo.transaction()
+
+    case result do
+      {:ok, %{agent: agent, session: session}} ->
+        EyeInTheSky.Events.agent_created(agent)
+
+        Logger.info(
+          "✅ create_agent: DB records created - agent.id=#{agent.id}, session.id=#{session.id}, session_uuid=#{session.uuid}"
+        )
+
+        {:ok, %{agent: agent, session: session}}
+
+      {:error, _step, reason, _changes_so_far} ->
         Logger.error("❌ create_agent: DB record creation failed - #{inspect(reason)}")
         {:error, reason}
     end
@@ -238,8 +252,16 @@ defmodule EyeInTheSky.Agents.AgentManager do
 
       case create_agent(opts) do
         {:ok, %{agent: agent, session: session}} ->
-          maybe_join_team(team, agent, session, params["member_name"])
-          {:ok, %{agent: agent, session: session, team: team, member_name: params["member_name"]}}
+          case maybe_join_team(team, agent, session, params["member_name"]) do
+            :ok ->
+              {:ok, %{agent: agent, session: session, team: team, member_name: params["member_name"]}}
+
+            {:ok, _member} ->
+              {:ok, %{agent: agent, session: session, team: team, member_name: params["member_name"]}}
+
+            {:error, reason} ->
+              {:error, reason}
+          end
 
         error ->
           error
@@ -316,26 +338,23 @@ defmodule EyeInTheSky.Agents.AgentManager do
   defp maybe_join_team(nil, _agent, _session, _name), do: :ok
 
   defp maybe_join_team(team, agent, session, member_name) do
-    result =
-      Teams.join_team(%{
-        team_id: team.id,
-        agent_id: agent.id,
-        session_id: session.id,
-        name: member_name || agent.uuid,
-        role: member_name || "agent",
-        status: "active"
-      })
-
-    case result do
-      {:ok, _} ->
-        :ok
+    case Teams.join_team(%{
+           team_id: team.id,
+           agent_id: agent.id,
+           session_id: session.id,
+           name: member_name || agent.uuid,
+           role: member_name || "agent",
+           status: "active"
+         }) do
+      {:ok, member} ->
+        {:ok, member}
 
       {:error, reason} ->
         Logger.warning(
-          "Team join failed: agent_id=#{agent.id} team_id=#{team.id} reason=#{inspect(reason)}"
+          "Team join failed: agent_id=#{agent.id} session_id=#{session.id} team_id=#{team.id} member_name=#{inspect(member_name)} reason=#{inspect(reason)}"
         )
 
-        :ok
+        {:error, {:team_join_failed, reason}}
     end
   end
 

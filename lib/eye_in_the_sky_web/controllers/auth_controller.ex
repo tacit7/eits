@@ -275,7 +275,16 @@ defmodule EyeInTheSkyWeb.AuthController do
   end
 
   defp decode_b64url(nil), do: {:error, :missing_field}
-  defp decode_b64url(str), do: Base.url_decode64(str, padding: false)
+
+  defp decode_b64url(str) do
+    case Base.url_decode64(str, padding: false) do
+      {:ok, binary} -> {:ok, binary}
+      # Base.url_decode64 returns bare :error on invalid input; normalize it so
+      # callers always see {:ok, _} | {:error, _} and the with-chain else
+      # clause can match it uniformly.
+      :error -> {:error, :invalid_encoding}
+    end
+  end
 
   # Builds Wax options for the current request. If the request Origin header
   # matches an allowed extra origin, overrides origin/rp_id for that call.

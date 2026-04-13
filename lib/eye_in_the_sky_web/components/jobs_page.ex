@@ -126,9 +126,9 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   # update/2 relay branch.
   # ---------------------------------------------------------------------------
 
-  defp dispatch_event("new_job", %{"scope" => scope}, socket) do
-    default_type =
-      "spawn_agent"
+  defp dispatch_event("new_job", params, socket) do
+    scope =
+      params["scope"] || if(socket.assigns[:project_id], do: "project", else: "global")
 
     {:noreply,
      socket
@@ -136,24 +136,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
      |> assign(:editing_job, nil)
      |> assign(:form_scope, scope)
      |> assign(:form, to_form(ScheduledJobs.change_job(%ScheduledJob{})))
-     |> assign(:form_job_type, default_type)
-     |> assign(:form_schedule_type, "interval")
-     |> assign(:form_config, %{})}
-  end
-
-  defp dispatch_event("new_job", _params, socket) do
-    default_type =
-      "spawn_agent"
-
-    default_scope = if socket.assigns.project_id, do: "project", else: "global"
-
-    {:noreply,
-     socket
-     |> assign(:show_form, true)
-     |> assign(:editing_job, nil)
-     |> assign(:form_scope, default_scope)
-     |> assign(:form, to_form(ScheduledJobs.change_job(%ScheduledJob{})))
-     |> assign(:form_job_type, default_type)
+     |> assign(:form_job_type, "spawn_agent")
      |> assign(:form_schedule_type, "interval")
      |> assign(:form_config, %{})}
   end

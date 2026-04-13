@@ -125,7 +125,7 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
         on: tt.task_id == t.id,
         join: tg in "tags",
         on: tg.id == tt.tag_id,
-        where: tg.name == ^tag_name and t.state_id == ^state_todo,
+        where: tg.name == ^tag_name and t.state_id == ^state_todo and t.archived == false,
         order_by: [desc: t.priority, asc: t.id],
         limit: ^limit,
         select: %{
@@ -198,7 +198,14 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
           "WorkableTaskWorker: spawned agent for task ##{task.id} session=#{session.uuid} project_path=#{project_path}"
         )
 
-        Tasks.link_session_to_task(task.id, session.id)
+        try do
+          Tasks.link_session_to_task(task.id, session.id)
+        rescue
+          e ->
+            Logger.warning(
+              "WorkableTaskWorker: failed to link session #{session.id} to task ##{task.id} - #{Exception.message(e)}"
+            )
+        end
 
         {:ok, task.id}
 

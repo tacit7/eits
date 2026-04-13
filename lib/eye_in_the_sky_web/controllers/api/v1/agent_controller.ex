@@ -75,6 +75,13 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
         {:error, code, message} when is_binary(code) ->
           conn |> put_status(:bad_request) |> json(%{error_code: code, message: message})
 
+        {:error, {:worktree_setup_failed, reason}} ->
+          msg = if is_binary(reason), do: String.trim(reason), else: inspect(reason)
+
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error_code: "worktree_setup_failed", message: "Git worktree setup failed: #{msg}"})
+
         {:error, reason} ->
           Logger.error("Agent spawn failed: #{inspect(reason)}")
 

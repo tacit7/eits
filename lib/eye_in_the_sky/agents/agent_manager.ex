@@ -158,10 +158,13 @@ defmodule EyeInTheSky.Agents.AgentManager do
           {:ok, _} = ok ->
             ok
 
-          {:error, reason} = err ->
-            Logger.error("create_agent: git worktree setup failed for #{wt}: #{inspect(reason)}")
-
+          {:error, :dirty_working_tree} = err ->
+            Logger.error("create_agent: git worktree setup failed for #{wt}: dirty working tree")
             err
+
+          {:error, reason} ->
+            Logger.error("create_agent: git worktree setup failed for #{wt}: #{inspect(reason)}")
+            {:error, {:worktree_setup_failed, reason}}
         end
     end
   end

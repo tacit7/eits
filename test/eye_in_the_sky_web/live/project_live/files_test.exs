@@ -72,6 +72,22 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
       assert File.read!(secret) == "do not touch"
     end
 
+    test "navigating to path=. (Back from top-level file) shows root listing", %{conn: conn} do
+      # When viewing a top-level file like "hello.ex", the Back link computes
+      # Path.dirname("hello.ex") = "." and patches to ?path=.
+      # path_within?(project_root, project_root) must be true so we get the listing.
+      {project, dir} = create_project_with_dir()
+      File.write!(Path.join(dir, "hello.ex"), "# hello")
+      File.write!(Path.join(dir, "world.ex"), "# world")
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/files?path=.")
+
+      html = render(view)
+      # Root directory listing should load — no Access denied
+      refute html =~ "Access denied"
+      assert html =~ "hello.ex"
+    end
+
     test "returns error flash on write failure", %{conn: conn} do
       {project, dir} = create_project_with_dir()
       file_path = Path.join(dir, "readonly.ex")

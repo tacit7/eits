@@ -42,6 +42,20 @@ defmodule EyeInTheSky.ScheduledJobs.JobScheduler do
     if count == 1, do: :ok, else: {:error, :already_claimed}
   end
 
+  @doc """
+  Reverts next_run_at to the original value, releasing a previously set claim
+  sentinel. Call this when enqueueing fails after a successful claim so the job
+  becomes due again on the next poll cycle instead of waiting out the sentinel.
+  """
+  def release_claim(%ScheduledJob{id: id}, original_next_run_at) do
+    Repo.update_all(
+      from(j in ScheduledJob, where: j.id == ^id),
+      set: [next_run_at: original_next_run_at]
+    )
+
+    :ok
+  end
+
   def mark_job_executed(job) do
     now = NaiveDateTime.utc_now()
 

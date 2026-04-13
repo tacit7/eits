@@ -374,6 +374,77 @@ defmodule EyeInTheSky.ScheduledJobsTest do
   end
 
   # ---------------------------------------------------------------------------
+  # claim_job/1
+  # ---------------------------------------------------------------------------
+
+  defp workable_attrs(overrides \\ %{}) do
+    Map.merge(
+      %{
+        "name" => "Claim Test Job",
+        "job_type" => "workable_task",
+        "schedule_type" => "interval",
+        "schedule_value" => "60"
+      },
+      overrides
+    )
+  end
+
+  describe "claim_job/1" do
+    test "returns :ok on first claim" do
+      {:ok, job} = ScheduledJobs.create_job(workable_attrs())
+      {:ok, job} = ScheduledJobs.update_job(job, %{"next_run_at" => "2000-01-01T00:00:00Z"})
+      assert :ok = ScheduledJobs.claim_job(job)
+    end
+
+    test "returns {:error, :already_claimed} when same struct is claimed twice" do
+      {:ok, job} = ScheduledJobs.create_job(workable_attrs())
+      {:ok, job} = ScheduledJobs.update_job(job, %{"next_run_at" => "2000-01-01T00:00:00Z"})
+
+      assert :ok = ScheduledJobs.claim_job(job)
+      # Second call with the same struct (stale next_run_at) must be rejected
+      assert {:error, :already_claimed} = ScheduledJobs.claim_job(job)
+    end
+
+    test "advances next_run_at into the future on successful claim" do
+      {:ok, job} = ScheduledJobs.create_job(workable_attrs())
+      {:ok, job} = ScheduledJobs.update_job(job, %{"next_run_at" => "2000-01-01T00:00:00Z"})
+      :ok = ScheduledJobs.claim_job(job)
+
+      {:ok, updated} = ScheduledJobs.get_job(job.id)
+      assert DateTime.compare(updated.next_run_at, DateTime.utc_now()) == :gt
+    end
+
+    test "claimed job no longer appears in due_jobs" do
+      {:ok, job} = ScheduledJobs.create_job(workable_attrs())
+      {:ok, job} = ScheduledJobs.update_job(job, %{"next_run_at" => "2000-01-01T00:00:00Z"})
+      :ok = ScheduledJobs.claim_job(job)
+
+      due_ids = ScheduledJobs.due_jobs() |> Enum.map(& &1.id)
+      refute job.id in due_ids
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # release_claim/2
+  # ---------------------------------------------------------------------------
+
+  describe "release_claim/2" do
+    test "restores next_run_at so job reappears in due_jobs" do
+      {:ok, job} = ScheduledJobs.create_job(workable_attrs())
+      past = ~U[2000-01-01 00:00:00Z]
+      {:ok, job} = ScheduledJobs.update_job(job, %{"next_run_at" => "2000-01-01T00:00:00Z"})
+
+      :ok = ScheduledJobs.claim_job(job)
+      # Verify claimed (not due)
+      refute job.id in (ScheduledJobs.due_jobs() |> Enum.map(& &1.id))
+
+      :ok = ScheduledJobs.release_claim(job, past)
+      # Now due again
+      assert job.id in (ScheduledJobs.due_jobs() |> Enum.map(& &1.id))
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # mark_job_executed/1
   # ---------------------------------------------------------------------------
 

@@ -33,9 +33,11 @@ defmodule EyeInTheSky.Agents do
 
   @doc """
   Returns the list of active agents.
+  Active agents are those whose status is not "completed" or "failed".
   """
   def list_active_agents do
     Agent
+    |> where([a], a.status not in ["completed", "failed"])
     |> preload([:project])
     |> order_by([a], desc: a.created_at)
     |> Repo.all()

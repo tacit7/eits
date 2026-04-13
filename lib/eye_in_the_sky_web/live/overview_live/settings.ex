@@ -82,15 +82,15 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   def handle_event("open_in_editor", %{"path" => path}, socket) when byte_size(path) > 0 do
     editor = Settings.get("preferred_editor") || "code"
 
-    unless editor in @known_editors do
-      require Logger
-      Logger.warning("open_in_editor: unrecognized editor command #{inspect(editor)}")
-    end
+    if editor in @known_editors do
+      Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+        System.cmd(editor, [path], stderr_to_stdout: true)
+      end)
 
-    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
-      System.cmd(editor, [path], stderr_to_stdout: true)
-    end)
-    {:noreply, put_flash(socket, :info, "Opening in #{editor}...")}
+      {:noreply, put_flash(socket, :info, "Opening in #{editor}...")}
+    else
+      {:noreply, put_flash(socket, :error, "Editor #{inspect(editor)} is not allowed")}
+    end
   end
 
   @impl true

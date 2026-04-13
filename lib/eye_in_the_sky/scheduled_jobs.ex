@@ -2,6 +2,8 @@ defmodule EyeInTheSky.ScheduledJobs do
   @moduledoc false
   import Ecto.Query, warn: false
 
+  require Logger
+
   alias EyeInTheSky.Repo
   alias EyeInTheSky.ScheduledJobs.ScheduledJob
   alias EyeInTheSky.ScheduledJobs.CronParser
@@ -27,6 +29,8 @@ defmodule EyeInTheSky.ScheduledJobs do
     to: CronParser
 
   defdelegate due_jobs(), to: JobScheduler
+  defdelegate claim_job(job), to: JobScheduler
+  defdelegate release_claim(job, sentinel, original_next_run_at), to: JobScheduler
   defdelegate mark_job_executed(job), to: JobScheduler
 
   # ---------------------------------------------------------------------------
@@ -176,7 +180,11 @@ defmodule EyeInTheSky.ScheduledJobs do
   defp run_authorized_job(job) do
     case enqueue_job(job) do
       {:ok, _} = result ->
-        JobScheduler.mark_job_executed(job)
+        case JobScheduler.mark_job_executed(job) do
+          {:ok, _} -> :ok
+          {:error, reason} -> Logger.warning("run_now: mark_job_executed failed for job #{job.id}: #{inspect(reason)}")
+        end
+
         result
 
       error ->

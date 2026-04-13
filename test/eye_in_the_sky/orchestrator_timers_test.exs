@@ -96,6 +96,71 @@ defmodule EyeInTheSky.OrchestratorTimersTest do
     end
   end
 
+  describe "minimum interval guard — Server" do
+    test "rejects interval_ms of 0", %{server: pid} do
+      assert {:error, {:invalid_interval, _}} =
+               GenServer.call(pid, {:schedule_once, 999, 0, "test"})
+
+      assert nil == GenServer.call(pid, {:get_timer, 999})
+    end
+
+    test "rejects negative interval_ms", %{server: pid} do
+      assert {:error, {:invalid_interval, _}} =
+               GenServer.call(pid, {:schedule_repeating, 999, -1, "test"})
+
+      assert nil == GenServer.call(pid, {:get_timer, 999})
+    end
+
+    test "rejects non-integer interval_ms string", %{server: pid} do
+      assert {:error, {:invalid_interval, _}} =
+               GenServer.call(pid, {:schedule_once, 999, "100", "test"})
+
+      assert nil == GenServer.call(pid, {:get_timer, 999})
+    end
+
+    test "rejects non-integer interval_ms float", %{server: pid} do
+      assert {:error, {:invalid_interval, _}} =
+               GenServer.call(pid, {:schedule_once, 999, 1000.0, "test"})
+
+      assert nil == GenServer.call(pid, {:get_timer, 999})
+    end
+
+    test "accepts exactly the minimum interval", %{server: pid} do
+      assert {:ok, :scheduled} = GenServer.call(pid, {:schedule_once, 999, 100, "test"})
+    end
+  end
+
+  describe "minimum interval guard — public API" do
+    test "schedule_once returns error for 0 delay without calling server" do
+      assert {:error, {:invalid_interval, msg}} =
+               EyeInTheSky.OrchestratorTimers.schedule_once(999, 0)
+
+      assert msg =~ "delay_ms"
+    end
+
+    test "schedule_once returns error for negative delay" do
+      assert {:error, {:invalid_interval, _}} =
+               EyeInTheSky.OrchestratorTimers.schedule_once(999, -500)
+    end
+
+    test "schedule_once returns error for non-integer delay" do
+      assert {:error, {:invalid_interval, _}} =
+               EyeInTheSky.OrchestratorTimers.schedule_once(999, "fast")
+    end
+
+    test "schedule_repeating returns error for 0 interval" do
+      assert {:error, {:invalid_interval, msg}} =
+               EyeInTheSky.OrchestratorTimers.schedule_repeating(999, 0)
+
+      assert msg =~ "interval_ms"
+    end
+
+    test "schedule_repeating returns error for non-integer interval" do
+      assert {:error, {:invalid_interval, _}} =
+               EyeInTheSky.OrchestratorTimers.schedule_repeating(999, 50.5)
+    end
+  end
+
   describe "delivery failure policy" do
     test "one-shot removes itself even when delivery fails (no worker for session)", %{server: pid} do
       # session_id 99999 has no AgentWorker — send_message returns error

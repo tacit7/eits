@@ -83,8 +83,8 @@ defmodule EyeInTheSky.OrchestratorTimers.Server do
   @min_interval_ms 100
 
   defp build_and_store_timer(_session_id, _mode, interval_ms, _message, state)
-       when interval_ms < @min_interval_ms do
-    {{:error, {:invalid_interval, "interval_ms must be >= #{@min_interval_ms}, got #{interval_ms}"}}, state}
+       when not is_integer(interval_ms) or interval_ms < @min_interval_ms do
+    {{:error, {:invalid_interval, "interval_ms must be an integer >= #{@min_interval_ms}, got #{inspect(interval_ms)}"}}, state}
   end
 
   defp build_and_store_timer(session_id, mode, interval_ms, message, state) do

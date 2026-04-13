@@ -56,4 +56,21 @@ defmodule EyeInTheSky.ScheduledJobs.CronParserTest do
       assert %DateTime{} = result
     end
   end
+
+  describe "compute_next_run_at/4 — unknown schedule_type" do
+    test "returns nil for an unrecognized schedule_type atom" do
+      from = ~N[2026-01-01 00:00:00]
+      assert CronParser.compute_next_run_at(:unknown, "60", from) == nil
+    end
+
+    test "returns nil for an unrecognized schedule_type string" do
+      from = ~N[2026-01-01 00:00:00]
+      assert CronParser.compute_next_run_at("monthly", "1", from) == nil
+    end
+
+    test "returns nil for nil schedule_type" do
+      from = ~N[2026-01-01 00:00:00]
+      assert CronParser.compute_next_run_at(nil, "60", from) == nil
+    end
+  end
 end

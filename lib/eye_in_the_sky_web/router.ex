@@ -71,6 +71,16 @@ defmodule EyeInTheSkyWeb.Router do
     plug EyeInTheSkyWeb.Plugs.RateLimit
   end
 
+  # Browser-session JSON pipeline — for browser-facing JSON endpoints that use
+  # cookie auth instead of Bearer tokens. No CSRF (fetch() API calls), but requires
+  # a valid authenticated session. Returns JSON 401 (not redirect) on auth failure.
+  pipeline :browser_json do
+    plug :accepts, ["json"]
+    plug :fetch_session
+    plug EyeInTheSkyWeb.Plugs.JsonSessionAuth
+    plug EyeInTheSkyWeb.Plugs.RateLimit
+  end
+
   # Auth LiveView pages (HTML, with CSRF)
   scope "/auth", EyeInTheSkyWeb do
     pipe_through :browser
@@ -88,6 +98,15 @@ defmodule EyeInTheSkyWeb.Router do
     post "/register/complete", AuthController, :register_complete
     post "/login/challenge", AuthController, :login_challenge
     post "/login/complete", AuthController, :login_complete
+  end
+
+  # Push notification endpoints — browser-session auth, no Bearer token required
+  scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
+    pipe_through :browser_json
+
+    get "/push/vapid-public-key", PushController, :vapid_public_key
+    post "/push/subscribe", PushController, :subscribe
+    delete "/push/subscribe", PushController, :unsubscribe
   end
 
   scope "/", EyeInTheSkyWeb do
@@ -196,11 +215,6 @@ defmodule EyeInTheSkyWeb.Router do
     get "/agents", AgentController, :index
     post "/agents", AgentController, :create
     get "/agents/:id", AgentController, :show
-
-    # Push notifications
-    get "/push/vapid-public-key", PushController, :vapid_public_key
-    post "/push/subscribe", PushController, :subscribe
-    delete "/push/subscribe", PushController, :unsubscribe
 
     # Messaging
     post "/dm", MessagingController, :dm

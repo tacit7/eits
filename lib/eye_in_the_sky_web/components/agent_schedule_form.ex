@@ -65,20 +65,8 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
       |> assign(:schedule_type, (if assigns.job, do: assigns.job.schedule_type) || "cron")
       |> assign(:schedule_value, (if assigns.job, do: assigns.job.schedule_value) || "")
       |> assign(:model, Map.get(config, "model", "sonnet"))
-      |> assign(:max_budget_usd, Map.get(config, "max_budget_usd", ""))
-      |> assign(:max_turns, Map.get(config, "max_turns", ""))
-      |> assign(:fallback_model, Map.get(config, "fallback_model", ""))
-      |> assign(:allowed_tools, Map.get(config, "allowed_tools", ""))
-      |> assign(:skip_permissions, Map.get(config, "skip_permissions", true))
-      |> assign(:output_format, Map.get(config, "output_format", ""))
       |> assign(:timezone, (if assigns.job, do: assigns.job.timezone) || system_timezone())
-      |> assign(:permission_mode, Map.get(config, "permission_mode", ""))
-      |> assign(:add_dir, Map.get(config, "add_dir", ""))
-      |> assign(:mcp_config, Map.get(config, "mcp_config", ""))
-      |> assign(:plugin_dir, Map.get(config, "plugin_dir", ""))
-      |> assign(:settings_file, Map.get(config, "settings_file", ""))
-      |> assign(:chrome, Map.get(config, "chrome", false))
-      |> assign(:sandbox, Map.get(config, "sandbox", false))
+      |> assign(:config, config)
 
     ~H"""
     <div class="flex items-start justify-between mb-4">
@@ -134,21 +122,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
         </select>
       </div>
 
-      <.advanced_cli_flags
-        max_budget_usd={@max_budget_usd}
-        max_turns={@max_turns}
-        fallback_model={@fallback_model}
-        output_format={@output_format}
-        permission_mode={@permission_mode}
-        allowed_tools={@allowed_tools}
-        add_dir={@add_dir}
-        mcp_config={@mcp_config}
-        plugin_dir={@plugin_dir}
-        settings_file={@settings_file}
-        skip_permissions={@skip_permissions}
-        chrome={@chrome}
-        sandbox={@sandbox}
-      />
+      <.advanced_cli_flags config={@config} />
 
       <div class="flex justify-end gap-2 pt-2">
         <button type="button" class="btn btn-ghost btn-sm min-h-[44px]" phx-click="cancel_schedule">Cancel</button>
@@ -303,21 +277,58 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     """
   end
 
-  attr :max_budget_usd, :any, required: true
-  attr :max_turns, :any, required: true
-  attr :fallback_model, :string, required: true
-  attr :output_format, :string, required: true
-  attr :permission_mode, :string, required: true
-  attr :allowed_tools, :string, required: true
-  attr :add_dir, :string, required: true
-  attr :mcp_config, :string, required: true
-  attr :plugin_dir, :string, required: true
-  attr :settings_file, :string, required: true
-  attr :skip_permissions, :boolean, required: true
-  attr :chrome, :boolean, required: true
-  attr :sandbox, :boolean, required: true
+  attr :config, :map, required: true
 
   defp advanced_cli_flags(assigns) do
+    %{
+      "max_budget_usd" => max_budget_usd,
+      "max_turns" => max_turns,
+      "fallback_model" => fallback_model,
+      "output_format" => output_format,
+      "permission_mode" => permission_mode,
+      "allowed_tools" => allowed_tools,
+      "add_dir" => add_dir,
+      "mcp_config" => mcp_config,
+      "plugin_dir" => plugin_dir,
+      "settings_file" => settings_file,
+      "skip_permissions" => skip_permissions,
+      "chrome" => chrome,
+      "sandbox" => sandbox
+    } = Map.merge(
+      %{
+        "max_budget_usd" => "",
+        "max_turns" => "",
+        "fallback_model" => "",
+        "output_format" => "",
+        "permission_mode" => "",
+        "allowed_tools" => "",
+        "add_dir" => "",
+        "mcp_config" => "",
+        "plugin_dir" => "",
+        "settings_file" => "",
+        "skip_permissions" => true,
+        "chrome" => false,
+        "sandbox" => false
+      },
+      assigns.config
+    )
+
+    assigns =
+      assigns
+      |> assign(:max_budget_usd, max_budget_usd)
+      |> assign(:max_turns, max_turns)
+      |> assign(:fallback_model, fallback_model)
+      |> assign(:output_format, output_format)
+      |> assign(:permission_mode, permission_mode)
+      |> assign(:allowed_tools, allowed_tools)
+      |> assign(:add_dir, add_dir)
+      |> assign(:mcp_config, mcp_config)
+      |> assign(:plugin_dir, plugin_dir)
+      |> assign(:settings_file, settings_file)
+      |> assign(:skip_permissions, skip_permissions)
+      |> assign(:chrome, chrome)
+      |> assign(:sandbox, sandbox)
+
     ~H"""
     <div class="collapse collapse-arrow bg-base-200 rounded-lg">
       <input type="checkbox" class="min-h-0" />

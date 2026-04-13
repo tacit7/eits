@@ -1,5 +1,20 @@
 # Documentation Update Suggestions
 
+## 2026-04-12
+**Commits reviewed**: ca015ef..cf8107bf
+
+- **DM_FEATURES.md** — Document async session file sync on DmLive mount (commit 622f567f): defers expensive DB/file operations to connected phase to prevent DB connection timeouts during mount; applies :mounted callback guard pattern documented in elm-like LiveView patterns; prevents "connection timeout" errors on slow systems
+- **DM_FEATURES.md** — Document message cache bypass on forced reload (commits 58ca02fb–42607612): message_cache now bypassed when `force_reload_messages` flag set (search clear, manual reload); includes regression test coverage for cache skip paths; explains when cache is safe vs. must be bypassed
+- **MOBILE.md** — Document modal bottom-sheet styling pattern (commits fdb7305a–5fe1c364): new_session_modal + agent_list modals now use CSS-driven bottom-sheet layout on mobile; prevents iOS keyboard overlap; coordinates with dm_page responsive height adjustments
+- **CODE_GUIDELINES.md** — Document component extraction refactoring (commits 122c0538–09644874): split 340L agent_schedule_form into sub-components; extracted usage_table as generic reusable component (replaced 5 duplicates); extracted sidebar all_projects_section; shows pattern for identifying extraction candidates (>150L template, repeated pattern, mixed concerns)
+- **CODE_GUIDELINES.md** — Document MobileNav route mapping (commit 557a0f34): /dm/* routes now map to :sessions controller internally; explains route alias pattern for mobile nav documentation and test alignment
+- **PERFORMANCE.md (new file)** — Document lazy-loading strategy (commits f93cc940–57b975c1): sortablejs and marked imports now lazy-loaded via dynamic import; 73% main bundle reduction achieved; explains when to apply lazy-load pattern and event-driven import triggers
+- **CODE_GUIDELINES.md** — Document WebSocket origin check pattern (commit 7c6eda4a): allow eits.dev origin via check_origin/1 callback; explain handling of non-same-site WebSocket requests
+- **CODE_GUIDELINES.md** — Document Vite module deduplication gotcha (commit 38e75331): Vite __vite_preload deduplicates live_socket.js module between assets and body, causing double init; prevent via explicit script scoping or dynamic import ordering
+- **REST_API.md** — Document /api/browser/sessions endpoint (update from 2026-04-02): clarify browser-auth (session cookie) vs. Bearer token usage; when to use /api/browser/sessions for frontend fetch vs. /api/v1/sessions for API clients
+- **CODE_GUIDELINES.md** — Document query preload helper pattern (extends 2026-04-10 entry): systematize module-level constants like SESSION_DETAIL_PRELOADS across contexts for DRY preload lists; reference ApiPresenter for consistent applied-everywhere pattern
+- **DM_FEATURES.md** — Document full-text search on message bodies (commits 5f14bbb6–973cf0ae): session search now includes message content via FTS; explain search_messages query pattern and sender_role filtering (assistant, user, agent roles supported in FTS scope)
+
 ## 2026-04-10
 **Commits reviewed**: ca015ef..4cf15dc
 

@@ -87,13 +87,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     do: handle_toggle_task_detail_drawer(params, socket)
 
   @impl true
-  def handle_event("keydown", %{"key" => "k", "ctrlKey" => true}, socket) do
-    {:noreply, assign(socket, :show_new_task_drawer, !socket.assigns.show_new_task_drawer)}
-  end
-
-  def handle_event("keydown", _params, socket), do: {:noreply, socket}
-
-  @impl true
   def handle_event("open_task_detail", params, socket),
     do: handle_open_task_detail(params, socket)
 

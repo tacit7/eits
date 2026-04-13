@@ -18,6 +18,30 @@ defmodule EyeInTheSky.ScheduledJobs.JobScheduler do
     |> Repo.all()
   end
 
+  @doc """
+  Atomically claims a due job by advancing its next_run_at to a future sentinel.
+
+  Uses the job's current next_run_at as an optimistic lock: the UPDATE only
+  matches if no other poller has already claimed (and thus updated) the row.
+  Returns :ok when claimed, {:error, :already_claimed} when another process got
+  there first or the job was already advanced.
+  """
+  def claim_job(%ScheduledJob{id: id, next_run_at: next_run_at}) do
+    # Push next_run_at one hour forward as a "claimed" sentinel so the job does
+    # not re-appear as due even if mark_job_executed is delayed or fails.
+    sentinel = DateTime.add(DateTime.utc_now(), 3600, :second)
+
+    {count, _} =
+      Repo.update_all(
+        from(j in ScheduledJob,
+          where: j.id == ^id and j.next_run_at == ^next_run_at
+        ),
+        set: [next_run_at: sentinel]
+      )
+
+    if count == 1, do: :ok, else: {:error, :already_claimed}
+  end
+
   def mark_job_executed(job) do
     now = NaiveDateTime.utc_now()
 

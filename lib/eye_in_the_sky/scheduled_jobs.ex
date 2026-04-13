@@ -27,6 +27,7 @@ defmodule EyeInTheSky.ScheduledJobs do
     to: CronParser
 
   defdelegate due_jobs(), to: JobScheduler
+  defdelegate claim_job(job), to: JobScheduler
   defdelegate mark_job_executed(job), to: JobScheduler
 
   # ---------------------------------------------------------------------------

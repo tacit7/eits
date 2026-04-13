@@ -284,7 +284,7 @@ defmodule EyeInTheSky.Messages do
   def list_recent_messages(session_id, limit) do
     Message
     |> where([m], m.session_id == ^session_id)
-    |> order_by([m], desc: m.inserted_at)
+    |> order_by([m], [desc: m.inserted_at, desc: m.id])
     |> limit(^limit)
     |> Repo.all()
     |> Repo.preload(:attachments)

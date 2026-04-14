@@ -462,7 +462,6 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
     end
   end
 
-
   describe "PATCH /api/v1/tasks/:id - state aliases" do
     test "state: in-review moves to In Review", %{conn: conn} do
       task = create_task()

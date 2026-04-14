@@ -7,7 +7,6 @@ defmodule EyeInTheSky.Notes do
   alias EyeInTheSky.Notes.Note
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Search.PgSearch
-  alias EyeInTheSky.Agents
   alias EyeInTheSky.Notes.NoteQueries
   alias EyeInTheSky.Sessions
   alias EyeInTheSky.Tasks
@@ -70,25 +69,6 @@ defmodule EyeInTheSky.Notes do
     end
   end
 
-  @doc """
-  Returns notes for a specific agent.
-  """
-  def list_notes_for_agent(agent_id) do
-    with {:ok, agent} <- Agents.get_agent(agent_id) do
-      agent_int_str = to_string(agent.id)
-
-      Note
-      |> where(
-        [n],
-        n.parent_type == "agent" and
-          (n.parent_id == ^agent_int_str or n.parent_id == ^agent.uuid)
-      )
-      |> order_by([n], desc: n.created_at)
-      |> Repo.all()
-    else
-      {:error, _} -> []
-    end
-  end
 
   @doc """
   Returns notes for a specific task.

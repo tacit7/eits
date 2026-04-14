@@ -252,10 +252,8 @@ defmodule EyeInTheSky.CLI.Port do
         :ok
     end
 
-    try do
+    if Port.info(port) != nil do
       Elixir.Port.close(port)
-    rescue
-      ArgumentError -> :ok
     end
 
     :ok

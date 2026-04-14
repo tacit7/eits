@@ -34,7 +34,7 @@ test.describe('Config Guide chat button', () => {
     // Modal should appear
     await expect(page.locator('#config-guide-chat-modal')).toBeVisible({ timeout: 5000 })
     // Loading skeleton appears while waiting for history
-    await expect(page.locator('#config-guide-loading')).toBeVisible()
+    await expect(page.locator('#config-guide-chat-modal-loading')).toBeVisible()
   })
 
   test('double-clicking button does not create two modals', async ({ page }) => {
@@ -53,7 +53,7 @@ test.describe('Config Guide chat button', () => {
     await page.click('#config-guide-chat-btn')
     await expect(page.locator('#config-guide-chat-modal')).toBeVisible({ timeout: 5000 })
 
-    await page.click('#config-guide-close')
+    await page.click('#config-guide-chat-modal-close')
 
     await expect(page.locator('#config-guide-chat-modal')).not.toBeVisible()
     await expect(page.locator('#config-guide-chat-btn')).toBeEnabled()
@@ -64,7 +64,7 @@ test.describe('Config Guide chat button', () => {
 
     await page.click('#config-guide-chat-btn')
     await expect(page.locator('#config-guide-chat-modal')).toBeVisible({ timeout: 5000 })
-    await page.click('#config-guide-close')
+    await page.click('#config-guide-chat-modal-close')
     await expect(page.locator('#config-guide-chat-modal')).not.toBeVisible()
 
     await page.click('#config-guide-chat-btn')

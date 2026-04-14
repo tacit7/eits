@@ -24,12 +24,11 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
   defp unauthorized(conn),
     do: conn |> put_status(:unauthorized) |> json(%{error: "Invalid signature"}) |> halt()
 
-  # PR opened -> spawn codex reviewer
-  def handle(conn, %{"action" => "opened", "pull_request" => pr} = params) do
+  defp with_verified_webhook(conn, params, fun) do
     with :ok <- verify_signature(conn),
          {:ok, repo} <- require_repo(params),
          {:ok, project_path} <- require_project_path() do
-      handle_pr_opened_event(conn, pr, repo, project_path)
+      fun.(repo, project_path)
     else
       {:error, :unauthorized} ->
         unauthorized(conn)
@@ -44,34 +43,40 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
         |> put_status(:internal_server_error)
         |> json(%{error: "Server misconfigured: project_path not set"})
     end
+  end
+
+  defp with_verified_repo(conn, params, fun) do
+    with :ok <- verify_signature(conn),
+         {:ok, repo} <- require_repo(params) do
+      fun.(repo)
+    else
+      {:error, :unauthorized} ->
+        unauthorized(conn)
+
+      {:error, :missing_repo} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Missing repository.full_name in payload"})
+    end
+  end
+
+  # PR opened -> spawn codex reviewer
+  def handle(conn, %{"action" => "opened", "pull_request" => pr} = params) do
+    with_verified_webhook(conn, params, fn repo, project_path ->
+      handle_pr_opened_event(conn, pr, repo, project_path)
+    end)
   end
 
   # PR synchronized (push to open PR branch) -> spawn codex reviewer
   def handle(conn, %{"action" => "synchronize", "pull_request" => pr} = params) do
-    with :ok <- verify_signature(conn),
-         {:ok, repo} <- require_repo(params),
-         {:ok, project_path} <- require_project_path() do
+    with_verified_webhook(conn, params, fn repo, project_path ->
       handle_pr_opened_event(conn, pr, repo, project_path)
-    else
-      {:error, :unauthorized} ->
-        unauthorized(conn)
-
-      {:error, :missing_repo} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "Missing repository.full_name in payload"})
-
-      {:error, :project_path_not_configured} ->
-        conn
-        |> put_status(:internal_server_error)
-        |> json(%{error: "Server misconfigured: project_path not set"})
-    end
+    end)
   end
 
   # PR comment by codex -> DM the claude session
   def handle(conn, %{"action" => "created", "comment" => comment, "issue" => issue} = params) do
-    with :ok <- verify_signature(conn),
-         {:ok, repo} <- require_repo(params) do
+    with_verified_repo(conn, params, fn repo ->
       event = get_req_header(conn, "x-gitea-event") |> List.first()
       commenter = get_in(comment, ["user", "login"]) || ""
       pr_number = issue["number"]
@@ -86,15 +91,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
       else
         json(conn, %{success: true, message: "Ignored: #{event} by #{commenter}"})
       end
-    else
-      {:error, :unauthorized} ->
-        unauthorized(conn)
-
-      {:error, :missing_repo} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "Missing repository.full_name in payload"})
-    end
+    end)
   end
 
   def handle(conn, params) do

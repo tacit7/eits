@@ -140,10 +140,11 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   defp do_update_task(conn, task, params) do
     result =
-      case params["state"] do
-        "done" -> move_to_state(task, "Done")
-        "start" -> move_to_state(task, "In Progress")
-        _ -> update_attrs(task, params)
+      case WorkflowState.resolve_alias(params["state"]) do
+        {:ok, state_name}        -> move_to_state(task, state_name)
+        {:error, :no_alias}      -> update_attrs(task, params)
+        {:error, :invalid_alias} ->
+          {:error, {:bad_alias, "Unknown state alias '#{params["state"]}'. Valid aliases: done, start, in-review, review, todo"}}
       end
 
     case result do
@@ -157,6 +158,11 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
           message: "Task updated",
           task: ApiPresenter.present_task(updated)
         })
+
+      {:error, {:bad_alias, message}} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{success: false, error: message})
 
       {:error, changeset} ->
         conn

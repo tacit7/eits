@@ -1,3 +1,5 @@
+import { ChatModal } from './chat_modal.js'
+
 const STORAGE_KEY = 'eye-in-the-sky-bookmarks'
 const FAB_RADIUS = 90  // px — radial distance from main button to agent buttons
 
@@ -22,6 +24,7 @@ export const FavoriteFab = {
     this._chatMessages = []
     this._unreadCount = 0
     this._expanded = false
+    this._modal = null
 
     // Push bookmarks to server so the LiveComponent can render them
     this._syncBookmarks()
@@ -31,13 +34,13 @@ export const FavoriteFab = {
 
     this.handleEvent('fab_chat_history', ({ messages }) => {
       this._chatMessages = messages || []
-      this._refreshMessages()
+      this._modal?.setMessages(this._chatMessages, 'No messages yet')
     })
 
     this.handleEvent('fab_chat_message', ({ body, sender_role }) => {
       const msg = { body, sender_role, ts: new Date().toISOString() }
       this._chatMessages.push(msg)
-      this._appendMessage(msg)
+      this._modal?.appendMessage(msg)
       if (!this._chatAgent) {
         this._unreadCount++
         this._updateUnreadBadge()
@@ -47,7 +50,7 @@ export const FavoriteFab = {
     this.handleEvent('fab_chat_error', ({ error }) => {
       const msg = { body: error, sender_role: 'error', ts: new Date().toISOString() }
       this._chatMessages.push(msg)
-      this._appendMessage(msg)
+      this._modal?.appendMessage(msg)
     })
 
     this.handleEvent('open_fab_chat', (detail) => {
@@ -179,153 +182,47 @@ export const FavoriteFab = {
     this._chatMessages = []
     this._unreadCount = 0
     this._updateUnreadBadge()
-    this._createChatModal()
+
+    this._modal?.destroy()
+    const statusLabel = agent.status || 'idle'
+    const isActive = ['working', 'compacting'].includes(statusLabel)
+    this._modal = new ChatModal({
+      id: 'fab-chat-modal',
+      title: agent.name || 'Agent',
+      initials: this._initials(agent.name),
+      subtitle: statusLabel,
+      subtitleClass: isActive ? 'text-success' : 'text-base-content/30',
+      placeholder: `Message ${agent.name || 'agent'}...`,
+      dmHref: `/dm/${agent.session_id}`,
+      onSend: (body) => this._onSend(body),
+      onClose: () => this._closeChat(),
+    }).create()
+
     this.pushEvent('fab_open_chat', { session_id: agent.session_id })
-    document.getElementById('fab-chat-input')?.focus()
+    this._modal.focusInput()
   },
 
   _closeChat(notify = true) {
     this._chatAgent = null
     this._chatMessages = []
-    const modal = document.getElementById('fab-chat-modal')
-    if (modal) modal.remove()
+    this._modal?.destroy()
+    this._modal = null
     if (notify) this.pushEvent('fab_close_chat', {})
   },
 
-  _sendMessage() {
-    const input = document.getElementById('fab-chat-input')
-    if (!input || !input.value.trim() || !this._chatAgent) return
-
-    const body = input.value.trim()
+  _onSend(body) {
+    if (!this._chatAgent) return
     const msg = { body, sender_role: 'user', ts: new Date().toISOString() }
     this._chatMessages.push(msg)
-    this._appendMessage(msg)
-
+    this._modal?.appendMessage(msg)
     this.pushEvent('fab_send_message', {
       session_id: this._chatAgent.session_id,
-      body
+      body,
     })
-
-    input.value = ''
-    input.focus()
-  },
-
-  _createChatModal() {
-    const existing = document.getElementById('fab-chat-modal')
-    if (existing) existing.remove()
-
-    const agent = this._chatAgent
-    const statusLabel = agent.status || 'idle'
-    const isActive = ['working', 'compacting'].includes(statusLabel)
-
-    const modal = document.createElement('div')
-    modal.id = 'fab-chat-modal'
-    modal.innerHTML = `
-      <div class="fixed bottom-24 right-4 w-[520px] z-[1000] flex flex-col bg-base-100 border border-base-content/10 rounded-xl shadow-2xl max-h-[850px] overflow-hidden">
-        <div class="flex items-center justify-between px-4 py-2.5 border-b border-base-content/5 bg-base-200/30">
-          <div class="flex items-center gap-2">
-            <span class="font-bold text-xs bg-primary/10 text-primary rounded-full w-7 h-7 flex items-center justify-center">${this._initials(agent.name)}</span>
-            <div>
-              <span class="text-xs font-semibold text-base-content/70">${this._escapeHtml(agent.name || 'Agent')}</span>
-              <span id="fab-chat-status" class="text-xs font-medium uppercase tracking-wider ml-1.5 ${isActive ? 'text-success' : 'text-base-content/30'}">${statusLabel}</span>
-            </div>
-          </div>
-          <div class="flex items-center gap-1">
-            <a href="/dm/${agent.session_id}" class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-primary" title="Open full DM">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
-                <path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd" />
-                <path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd" />
-              </svg>
-            </a>
-            <button id="fab-chat-close" class="btn btn-ghost btn-xs btn-square text-base-content/30" title="Close">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
-                <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <div id="fab-chat-messages" class="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-[400px] max-h-[720px]">
-          <div id="fab-chat-empty" class="text-center text-base-content/25 text-xs py-10">
-            Loading messages...
-          </div>
-        </div>
-
-        <div class="px-3 py-2.5 border-t border-base-content/5">
-          <div class="flex gap-2">
-            <input
-              type="text"
-              id="fab-chat-input"
-              placeholder="Message ${this._escapeHtml(agent.name || 'agent')}..."
-              class="input input-sm flex-1 bg-base-200/50 border-base-content/8 text-base placeholder:text-base-content/25"
-              autocomplete="off"
-            />
-            <button id="fab-chat-send" class="btn btn-primary btn-sm btn-square">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
-                <path d="M3.105 2.288a.75.75 0 0 0-.826.95l1.414 4.926A1.5 1.5 0 0 0 5.135 9.25h6.115a.75.75 0 0 1 0 1.5H5.135a1.5 1.5 0 0 0-1.442 1.086l-1.414 4.926a.75.75 0 0 0 .826.95 28.897 28.897 0 0 0 15.293-7.154.75.75 0 0 0 0-1.115A28.897 28.897 0 0 0 3.105 2.289Z" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>`
-
-    document.body.appendChild(modal)
-
-    document.getElementById('fab-chat-close')?.addEventListener('click', () => this._closeChat())
-    document.getElementById('fab-chat-send')?.addEventListener('click', () => this._sendMessage())
-    const input = document.getElementById('fab-chat-input')
-    if (input) {
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault()
-          this._sendMessage()
-        }
-      })
-    }
-  },
-
-  _refreshMessages() {
-    const container = document.getElementById('fab-chat-messages')
-    if (!container) return
-    if (this._chatMessages.length === 0) {
-      container.innerHTML = `<div id="fab-chat-empty" class="text-center text-base-content/25 text-xs py-10">No messages yet</div>`
-    } else {
-      container.innerHTML = this._chatMessages.map(m => this._messageHtml(m)).join('')
-    }
-    container.scrollTop = container.scrollHeight
-  },
-
-  _appendMessage(msg) {
-    const container = document.getElementById('fab-chat-messages')
-    if (!container) return
-    const empty = document.getElementById('fab-chat-empty')
-    if (empty) empty.remove()
-    const div = document.createElement('div')
-    div.innerHTML = this._messageHtml(msg)
-    container.appendChild(div.firstChild)
-    container.scrollTop = container.scrollHeight
-  },
-
-  _messageHtml(m) {
-    if (m.sender_role === 'error') {
-      return `<div class="flex justify-start">
-        <div class="bg-error/10 text-error rounded-xl px-3 py-2 text-sm max-w-[80%]">${this._escapeHtml(m.body)}</div>
-      </div>`
-    }
-    const isUser = m.sender_role === 'user'
-    return `<div class="flex ${isUser ? 'justify-end' : 'justify-start'}">
-      <div class="${isUser ? 'bg-primary/90 text-primary-content rounded-xl rounded-br-sm' : 'bg-base-200/60 rounded-xl rounded-bl-sm'} px-3 py-2 text-sm max-w-[80%] whitespace-pre-wrap">${this._escapeHtml(m.body)}</div>
-    </div>`
   },
 
   _initials(name) {
     if (!name) return '?'
     return name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()
-  },
-
-  _escapeHtml(str) {
-    const div = document.createElement('div')
-    div.textContent = str
-    return div.innerHTML
   },
 }

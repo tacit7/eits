@@ -421,6 +421,47 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
     end
   end
 
+  describe "POST /api/v1/tasks/:id/complete" do
+    setup %{conn: conn} do
+      {:ok, project} = EyeInTheSky.Projects.create_project(%{name: "CompleteTest#{uniq()}", path: "/tmp/complete_#{uniq()}"})
+      {:ok, task} = Tasks.create_task(%{title: "Complete me", project_id: project.id, state_id: 1, uuid: Ecto.UUID.generate(), created_at: DateTime.utc_now()})
+      %{conn: conn, task: task}
+    end
+
+    test "marks task done and creates annotation", %{conn: conn, task: task} do
+      conn = post(conn, ~p"/api/v1/tasks/#{task.id}/complete", %{
+        "message" => "All done"
+      })
+      assert %{"success" => true} = json_response(conn, 200)
+      {:ok, updated} = Tasks.get_task(task.id)
+      assert updated.state_id == WorkflowState.done_id()
+
+      note = Repo.one(
+        from n in EyeInTheSky.Notes.Note,
+          where: n.parent_type == "task" and n.parent_id == ^to_string(task.id) and n.body == "All done"
+      )
+      assert note != nil
+    end
+
+    test "returns 404 for missing task", %{conn: conn} do
+      conn = post(conn, ~p"/api/v1/tasks/999999/complete", %{"message" => "done"})
+      assert json_response(conn, 404)
+    end
+
+    test "requires message", %{conn: conn, task: task} do
+      conn = post(conn, ~p"/api/v1/tasks/#{task.id}/complete", %{})
+      assert %{"success" => false} = json_response(conn, 422)
+    end
+
+    test "calling complete twice is idempotent — task stays Done", %{conn: conn, task: task} do
+      post(conn, ~p"/api/v1/tasks/#{task.id}/complete", %{"message" => "first"})
+      conn2 = post(conn, ~p"/api/v1/tasks/#{task.id}/complete", %{"message" => "second"})
+      assert %{"success" => true} = json_response(conn2, 200)
+      {:ok, updated} = Tasks.get_task(task.id)
+      assert updated.state_id == WorkflowState.done_id()
+    end
+  end
+
   describe "PATCH /api/v1/tasks/:id - state aliases" do
     test "state: in-review moves to In Review", %{conn: conn} do
       task = create_task()

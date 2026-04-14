@@ -216,6 +216,40 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   end
 
   @doc """
+  POST /api/v1/tasks/:id/complete - Atomically annotate and move task to Done.
+  Body: message (required)
+  """
+  def complete(conn, %{"id" => id} = params) do
+    message = params["message"]
+
+    if is_nil(message) or message == "" do
+      conn
+      |> put_status(:unprocessable_entity)
+      |> json(%{success: false, error: "message is required"})
+    else
+      case Tasks.get_task(id) do
+        {:error, :not_found} ->
+          conn |> put_status(:not_found) |> json(%{error: "Task not found"})
+
+        {:ok, task} ->
+          case Tasks.complete_task(task, message) do
+            {:ok, %{task: updated}} ->
+              json(conn, %{
+                success: true,
+                message: "Task completed",
+                task: ApiPresenter.present_task(updated)
+              })
+
+            {:error, changeset} ->
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{success: false, errors: translate_errors(changeset)})
+          end
+      end
+    end
+  end
+
+  @doc """
   POST /api/v1/tasks/:id/sessions - Link a session to a task.
   """
   def link_session(conn, %{"id" => task_id} = params) do

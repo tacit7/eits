@@ -85,12 +85,53 @@ defmodule EyeInTheSky.Codex.SDK do
   """
   @spec start(String.t(), opts()) :: {:ok, ref(), pid()} | {:error, term()}
   def start(prompt, opts \\ []) do
-    to = Keyword.fetch!(opts, :to)
     sdk_ref = make_ref()
+    Logger.info("[telemetry] codex.sdk.start session_id=#{opts[:session_id]} model=#{opts[:model]}")
+    run_codex_session(sdk_ref, prompt, opts, fn cli, p, o -> cli.spawn_new_session(p, o) end)
+  end
+
+  @doc """
+  Resume an existing Codex session.
+
+  Same as `start/2` but resumes a conversation by thread/session ID.
+  """
+  @spec resume(String.t(), String.t(), opts()) :: {:ok, ref(), pid()} | {:error, term()}
+  def resume(session_id, prompt, opts \\ []) do
+    sdk_ref = make_ref()
+    Logger.info("[telemetry] codex.sdk.resume session_id=#{session_id} model=#{opts[:model]}")
+    run_codex_session(sdk_ref, prompt, opts, fn cli, p, o -> cli.resume_session(session_id, p, o) end)
+  end
+
+  @doc """
+  Cancel a running Codex session.
+  """
+  @spec cancel(ref()) :: :ok | {:error, :not_found}
+  def cancel(ref) do
+    cli = Utils.codex_cli_module()
+
+    case Registry.lookup(ref) do
+      nil ->
+        {:error, :not_found}
+
+      port when is_port(port) ->
+        cli.cancel(port)
+        :ok
+
+      pid when is_pid(pid) ->
+        send(pid, :cancel)
+        :ok
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Private helpers
+  # ---------------------------------------------------------------------------
+
+  defp run_codex_session(sdk_ref, prompt, opts, cli_fn) do
+    to = Keyword.fetch!(opts, :to)
     meta = %{session_id: opts[:session_id], model: opts[:model]}
 
     :telemetry.execute([:eits, :codex, :sdk, :start], %{system_time: System.system_time()}, meta)
-    Logger.info("[telemetry] codex.sdk.start session_id=#{meta.session_id} model=#{meta.model}")
 
     cli = Keyword.get(opts, :cli_module) || Utils.codex_cli_module()
     task_supervisor = Keyword.get(opts, :task_supervisor, EyeInTheSky.TaskSupervisor)
@@ -103,7 +144,7 @@ defmodule EyeInTheSky.Codex.SDK do
           |> Keyword.delete(:to)
           |> Keyword.delete(:cli_module)
 
-        case cli.spawn_new_session(prompt, cli_opts) do
+        case cli_fn.(cli, prompt, cli_opts) do
           {:ok, port, _cli_ref} ->
             Registry.register(sdk_ref, port)
             send(handler_pid, {:start_handling, sdk_ref})
@@ -133,88 +174,11 @@ defmodule EyeInTheSky.Codex.SDK do
     end
   end
 
-  @doc """
-  Resume an existing Codex session.
-
-  Same as `start/2` but resumes a conversation by thread/session ID.
-  """
-  @spec resume(String.t(), String.t(), opts()) :: {:ok, ref(), pid()} | {:error, term()}
-  def resume(session_id, prompt, opts \\ []) do
-    to = Keyword.fetch!(opts, :to)
-    sdk_ref = make_ref()
-    meta = %{session_id: session_id, model: opts[:model]}
-
-    :telemetry.execute([:eits, :codex, :sdk, :start], %{system_time: System.system_time()}, meta)
-
-    Logger.info("[telemetry] codex.sdk.resume session_id=#{session_id} model=#{meta.model}")
-
-    cli = Keyword.get(opts, :cli_module) || Utils.codex_cli_module()
-    task_supervisor = Keyword.get(opts, :task_supervisor, EyeInTheSky.TaskSupervisor)
-
-    case spawn_handler_process(sdk_ref, to, opts[:session_id], task_supervisor) do
-      {:ok, handler_pid} ->
-        cli_opts =
-          opts
-          |> Keyword.put(:caller, handler_pid)
-          |> Keyword.delete(:to)
-          |> Keyword.delete(:cli_module)
-
-        case cli.resume_session(session_id, prompt, cli_opts) do
-          {:ok, port, _cli_ref} ->
-            Registry.register(sdk_ref, port)
-            send(handler_pid, {:start_handling, sdk_ref})
-            {:ok, sdk_ref, handler_pid}
-
-          {:error, reason} ->
-            :telemetry.execute(
-              [:eits, :codex, :sdk, :error],
-              %{system_time: System.system_time()},
-              Map.put(meta, :reason, reason)
-            )
-
-            Logger.error(
-              "[telemetry] codex.sdk.error session_id=#{session_id} reason=#{inspect(reason)}"
-            )
-
-            Process.exit(handler_pid, :kill)
-            {:error, reason}
-        end
-
-      {:error, reason} ->
-        Logger.error(
-          "[telemetry] codex.sdk.error session_id=#{session_id} reason=handler_start_failed #{inspect(reason)}"
-        )
-
-        {:error, {:handler_start_failed, reason}}
-    end
-  end
-
-  @doc """
-  Cancel a running Codex session.
-  """
-  @spec cancel(ref()) :: :ok | {:error, :not_found}
-  def cancel(ref) do
-    cli = Utils.codex_cli_module()
-
-    case Registry.lookup(ref) do
-      nil ->
-        {:error, :not_found}
-
-      port when is_port(port) ->
-        cli.cancel(port)
-        :ok
-
-      pid when is_pid(pid) ->
-        send(pid, :cancel)
-        :ok
-    end
-  end
-
   # ---------------------------------------------------------------------------
   # Handler process
   # ---------------------------------------------------------------------------
 
-  defp spawn_handler_process(sdk_ref, caller_pid, fallback_session_id, supervisor) do
+  defp spawn_handler_process(sdk_ref, caller_pid, eits_session_id, supervisor) do
     Task.Supervisor.start_child(
       supervisor,
       fn ->
@@ -233,7 +197,7 @@ defmodule EyeInTheSky.Codex.SDK do
               caller_pid: caller_pid,
               session_id: nil,
               accumulated_text: "",
-              fallback_session_id: fallback_session_id
+              eits_session_id: eits_session_id
             }
 
             MessageHandler.run_loop(__MODULE__, state, @loop_opts)
@@ -323,6 +287,6 @@ defmodule EyeInTheSky.Codex.SDK do
 
   @impl MessageHandler
   def resolve_exit_session_id(state) do
-    state[:session_id] || state[:fallback_session_id] || ""
+    state[:session_id] || state[:eits_session_id] || ""
   end
 end

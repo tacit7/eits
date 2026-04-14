@@ -56,31 +56,21 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   end
 
   @impl true
-  def handle_params(%{"path" => path} = params, _uri, socket) do
-    mode = parse_mode(params)
-    socket = assign(socket, :view_mode, mode)
-    project = socket.assigns.project
-
-    if project.path do
-      full_path = Path.join(project.path, path)
-      handle_full_path(socket, full_path, path, project.path)
-    else
-      {:noreply, socket |> assign(:error, "Project path not configured") |> assign(:file_content, nil)}
-    end
-  end
-
   def handle_params(params, _uri, socket) do
     mode = parse_mode(params)
     socket = assign(socket, :view_mode, mode)
     project = socket.assigns.project
 
-    if not is_nil(project.path) && mode == :list do
-      case build_file_listing(project.path, "", ignore_hidden: true, ignored_dirs: @ignored_dirs) do
-        {:ok, file_list} -> {:noreply, assign(socket, :files, file_list)}
-        {:error, _reason} -> {:noreply, socket}
-      end
-    else
-      {:noreply, socket}
+    case {Map.get(params, "path"), project.path} do
+      {path, proj_path} when is_binary(path) and is_binary(proj_path) ->
+        full_path = Path.join(proj_path, path)
+        handle_full_path(socket, full_path, path, proj_path)
+
+      {path, nil} when is_binary(path) ->
+        {:noreply, socket |> assign(:error, "Project path not configured") |> assign(:file_content, nil)}
+
+      {nil, _} ->
+        load_root_listing(socket, mode)
     end
   end
 
@@ -90,6 +80,21 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       _ -> :list
     end
   end
+
+  defp load_root_listing(socket, :list) do
+    project = socket.assigns.project
+
+    if not is_nil(project.path) do
+      case build_file_listing(project.path, "", ignore_hidden: true, ignored_dirs: @ignored_dirs) do
+        {:ok, file_list} -> {:noreply, assign(socket, :files, file_list)}
+        {:error, _reason} -> {:noreply, socket}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp load_root_listing(socket, _mode), do: {:noreply, socket}
 
   defp handle_full_path(socket, full_path, path, project_path) do
     if not path_within?(full_path, project_path) do
@@ -104,10 +109,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   end
 
   defp dispatch_path(socket, full_path, path) do
-    cond do
-      File.dir?(full_path) -> handle_directory(socket, full_path, path)
-      File.regular?(full_path) -> handle_file(socket, full_path, path)
-      true ->
+    case File.stat(full_path) do
+      {:ok, %File.Stat{type: :directory}} ->
+        handle_directory(socket, full_path, path)
+
+      {:ok, %File.Stat{type: :regular}} ->
+        handle_file(socket, full_path, path)
+
+      _ ->
         {:noreply,
          socket
          |> assign(:error, "File not found: #{path}")
@@ -145,7 +154,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
          |> assign(:files, [])
          |> assign(:error, nil)}
 
-      {:too_large} ->
+      {:error, :too_large} ->
         {:noreply,
          socket
          |> assign(:file_path, path)
@@ -154,13 +163,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
          |> assign(:files, [])
          |> assign(:error, "File too large to display (over 1 MB)")}
 
-      {:stat_error, reason} ->
+      {:error, {:stat_error, reason}} ->
         {:noreply,
          socket
          |> assign(:error, "Failed to stat file: #{reason}")
          |> assign(:file_content, nil)}
 
-      {:read_error, reason} ->
+      {:error, {:read_error, reason}} ->
         {:noreply,
          socket
          |> assign(:error, "Failed to read file: #{reason}")
@@ -187,6 +196,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   @impl true
   def handle_info(_msg, socket), do: {:noreply, socket}
 
+  @type file_entry :: %{
+    name: String.t(),
+    path: String.t(),
+    is_dir: boolean(),
+    size: non_neg_integer()
+  }
+
   # Builds a flat file listing for `dir`, with each entry's `:path` set to
   # `Path.join(path_prefix, filename)`. When `path_prefix` is `""` the path
   # is just the filename, matching root-level listing behaviour.
@@ -194,6 +210,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   # Options:
   #   :ignore_hidden   - when true, skip dotfiles (except .claude and .git)
   #   :ignored_dirs    - list of directory names to exclude entirely
+  @spec build_file_listing(String.t(), String.t(), keyword()) :: {:ok, [file_entry()]} | {:error, term()}
   defp build_file_listing(dir, path_prefix, opts \\ []) do
     ignore_hidden = Keyword.get(opts, :ignore_hidden, false)
     ignored_dirs = Keyword.get(opts, :ignored_dirs, [])

@@ -233,11 +233,12 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
         {:ok, task} ->
           case Tasks.complete_task(task, message) do
-            {:ok, %{task: updated}} ->
+            {:ok, %{task: updated, note: note}} ->
               json(conn, %{
                 success: true,
                 message: "Task completed",
-                task: ApiPresenter.present_task(updated)
+                task: ApiPresenter.present_task(updated),
+                note_id: note.id
               })
 
             {:error, %Ecto.Changeset{} = changeset} ->

@@ -71,28 +71,35 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
 
   defp spawn_tasks(tasks, config) do
     results = Enum.map(tasks, &process_task(&1, config.model, config.project_id))
-    spawned = Enum.count(results, &match?({:ok, _}, &1))
+    spawned = Enum.count(results, &match?({:ok, id} when is_integer(id), &1))
+    skipped = Enum.count(results, &match?({:ok, :skipped}, &1))
     failed = Enum.count(results, &match?({:error, _}, &1))
 
-    if spawned == 0 and failed > 0 do
+    if spawned == 0 and skipped == 0 and failed > 0 do
       {:error, "All #{failed} spawn(s) failed for tag=#{config.tag_name}"}
     else
-      {:ok, "Spawned #{spawned} agents for tag=#{config.tag_name} (#{failed} failed)"}
+      {:ok, "Spawned #{spawned} agents for tag=#{config.tag_name} (#{skipped} skipped, #{failed} failed)"}
     end
   end
 
   defp process_task(task, model, project_id) do
-    mark_in_progress(task.id)
-    result = spawn_agent(task, model, project_id)
+    case claim_task(task.id) do
+      {:ok, :claimed} ->
+        result = spawn_agent(task, model, project_id)
 
-    case result do
-      {:error, _} ->
-        Logger.warning("WorkableTaskWorker: spawn failed for task ##{task.id}, rolling back to To Do")
-        reset_to_todo(task.id)
-        result
+        case result do
+          {:error, _} ->
+            Logger.warning("WorkableTaskWorker: spawn failed for task ##{task.id}, rolling back to To Do")
+            reset_to_todo(task.id)
+            result
 
-      _ ->
-        result
+          _ ->
+            result
+        end
+
+      {:ok, :already_claimed} ->
+        Logger.info("WorkableTaskWorker: task ##{task.id} already claimed by another worker, skipping")
+        {:ok, :skipped}
     end
   end
 
@@ -125,16 +132,26 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
     Repo.all(query)
   end
 
-  defp mark_in_progress(task_id) do
-    Repo.update_all(
-      from(t in "tasks", where: t.id == ^task_id),
-      set: [state_id: Tasks.state_in_progress()]
-    )
+  # Atomic claim: only transitions the task from To Do → In Progress.
+  # If another worker already claimed it, update_all returns {0, _} and we skip.
+  defp claim_task(task_id) do
+    {count, _} =
+      Repo.update_all(
+        from(t in "tasks",
+          where: t.id == ^task_id and t.state_id == ^Tasks.state_todo()
+        ),
+        set: [state_id: Tasks.state_in_progress()]
+      )
+
+    if count > 0, do: {:ok, :claimed}, else: {:ok, :already_claimed}
   end
 
+  # Only roll back if still In Progress — avoids stomping a manual state transition.
   defp reset_to_todo(task_id) do
     Repo.update_all(
-      from(t in "tasks", where: t.id == ^task_id),
+      from(t in "tasks",
+        where: t.id == ^task_id and t.state_id == ^Tasks.state_in_progress()
+      ),
       set: [state_id: Tasks.state_todo()]
     )
   end

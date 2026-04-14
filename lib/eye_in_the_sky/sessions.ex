@@ -98,15 +98,6 @@ defmodule EyeInTheSky.Sessions do
   end
 
   @doc """
-  Gets a single session with logs preloaded.
-  """
-  def get_session_with_logs!(id) do
-    Session
-    |> preload(:logs)
-    |> Repo.get!(id)
-  end
-
-  @doc """
   Creates a session.
   """
   @spec create_session(map()) :: {:ok, Session.t()} | {:error, Ecto.Changeset.t()}

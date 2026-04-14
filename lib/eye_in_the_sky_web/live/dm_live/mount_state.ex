@@ -26,6 +26,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     PubSubHelpers.subscribe_dm_queue(session_id)
     PubSubHelpers.subscribe_tasks()
     Events.subscribe_session_timer(session_id)
+    Events.subscribe_codex_raw(session_id)
   end
 
   def assign_sidebar_context(socket, %{"from" => "project", "project_id" => project_id_str}) do
@@ -94,6 +95,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:session_context, nil)
     |> assign(:reloading, false)
     |> assign(:active_timer, nil)
+    |> assign(:codex_raw_lines, [])
     |> allow_upload(:files,
       accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
       max_entries: 10,

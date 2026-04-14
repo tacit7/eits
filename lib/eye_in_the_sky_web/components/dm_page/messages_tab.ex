@@ -13,6 +13,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   attr :session, :map, default: nil
   attr :agent, :map, default: nil
   attr :message_search_query, :string, default: ""
+  attr :codex_raw_lines, :list, default: []
 
   def messages_tab(assigns) do
     ~H"""
@@ -91,6 +92,26 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           <% end %>
         </div>
       </div>
+      <%!-- Codex raw JSONL stream panel — only visible for codex sessions with data --%>
+      <%= if @codex_raw_lines != [] do %>
+        <details class="border-t border-base-300 shrink-0" id="codex-raw-panel">
+          <summary class="px-4 py-1.5 text-[10px] font-mono text-base-content/30 cursor-pointer select-none hover:text-base-content/50 flex items-center gap-1.5">
+            <.icon name="hero-code-bracket" class="w-3 h-3" />
+            raw stream ({length(@codex_raw_lines)} lines)
+          </summary>
+          <div
+            class="h-40 overflow-y-auto bg-base-300/30 px-3 py-2"
+            id="codex-raw-lines"
+            phx-hook="AutoScroll"
+          >
+            <%= for line <- Enum.reverse(@codex_raw_lines) do %>
+              <div class="font-mono text-[10px] text-base-content/40 leading-relaxed truncate">
+                {line}
+              </div>
+            <% end %>
+          </div>
+        </details>
+      <% end %>
     </div>
     """
   end

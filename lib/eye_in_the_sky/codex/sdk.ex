@@ -33,7 +33,8 @@ defmodule EyeInTheSky.Codex.SDK do
     parser: Parser,
     telemetry_prefix: [:eits, :codex, :sdk],
     log_raw_key: "log_codex_raw",
-    log_raw_prefix: "codex.raw"
+    log_raw_prefix: "codex.raw",
+    forward_raw_lines: true
   ]
 
   @doc """
@@ -58,6 +59,9 @@ defmodule EyeInTheSky.Codex.SDK do
       eits tasks update <id> --state 4
       eits dm --to <session_uuid> --message "<text>"
       eits commits create --hash <hash>
+
+    To spawn a child agent, always pass --provider codex:
+      eits agents spawn --provider codex --instructions "<text>" [--model <model>]
 
     You MUST claim a task before editing files:
       eits tasks begin --title "<title of your work>"

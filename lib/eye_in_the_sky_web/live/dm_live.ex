@@ -29,15 +29,13 @@ defmodule EyeInTheSkyWeb.DmLive do
          {:agent, {:ok, agent}} <- {:agent, Agents.get_agent(session.agent_id)} do
       MountState.maybe_subscribe(connected?(socket), session.id)
 
-      is_connected = connected?(socket)
-
       socket =
         socket
         |> MountState.assign_sidebar_context(params)
         |> MountState.assign_session_state(session, agent)
         |> MountState.assign_essential_defaults(session)
         |> then(fn s ->
-          if is_connected, do: MountState.assign_connected_defaults(s, session), else: s
+          if connected?(socket), do: MountState.assign_connected_defaults(s, session), else: s
         end)
         |> MessageHandlers.load_messages_on_mount()
 

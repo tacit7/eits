@@ -23,6 +23,35 @@ defmodule EyeInTheSky.Tasks.WorkflowState do
     field :updated_at, :utc_datetime
   end
 
+  @aliases %{
+    "done"      => "Done",
+    "start"     => "In Progress",
+    "in-review" => "In Review",
+    "review"    => "In Review",
+    "todo"      => "To Do"
+  }
+
+  @doc """
+  Resolves a string alias to a canonical workflow state name.
+
+  Returns `{:ok, state_name}` on match, `{:error, :no_alias}` for nil/numeric
+  input, and `{:error, :invalid_alias}` for unrecognized non-numeric strings.
+  """
+  @spec resolve_alias(String.t() | nil) :: {:ok, String.t()} | {:error, :no_alias | :invalid_alias}
+  def resolve_alias(nil), do: {:error, :no_alias}
+
+  def resolve_alias(input) when is_binary(input) do
+    case Integer.parse(input) do
+      {_, ""} ->
+        {:error, :no_alias}
+      _ ->
+        case Map.get(@aliases, String.downcase(input)) do
+          nil  -> {:error, :invalid_alias}
+          name -> {:ok, name}
+        end
+    end
+  end
+
   @doc false
   def changeset(workflow_state, attrs) do
     workflow_state

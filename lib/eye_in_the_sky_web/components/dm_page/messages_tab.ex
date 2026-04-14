@@ -119,9 +119,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   attr :message, :map, required: true
 
   defp message_item(assigns) do
-    is_user = assigns.message.sender_role == "user"
+    role = if assigns.message.sender_role == "user", do: :user, else: :agent
     is_dm = dm_message?(assigns.message)
-    assigns = assign(assigns, :is_user, is_user) |> assign(:is_dm, is_dm)
+    assigns = assign(assigns, :role, role) |> assign(:is_dm, is_dm)
 
     ~H"""
     <div
@@ -139,7 +139,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     >
       <div class="flex items-start gap-2.5">
         <%!-- Sender icon --%>
-        <%= if @is_user do %>
+        <%= if @role == :user do %>
           <div class="w-4 h-4 rounded-full mt-1 flex-shrink-0 bg-success/20 flex items-center justify-center">
             <div class="w-1.5 h-1.5 rounded-full bg-success" />
           </div>
@@ -158,8 +158,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <span class={[
               "text-[13px] font-semibold",
-              !@is_user && "text-primary/80",
-              @is_user && "text-base-content/70"
+              @role == :agent && "text-primary/80",
+              @role == :user && "text-base-content/70"
             ]}>
               {message_sender_name(@message)}
             </span>
@@ -171,13 +171,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               <.icon name="hero-envelope-mini" class="w-2.5 h-2.5" /> dm
             </span>
             <span
-              :if={!@is_user && message_model(@message)}
+              :if={@role == :agent && message_model(@message)}
               class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/35"
             >
               {message_model(@message)}
             </span>
             <span
-              :if={!@is_user && message_cost(@message)}
+              :if={@role == :agent && message_cost(@message)}
               class="text-[11px] font-mono text-base-content/30"
             >
               ${:erlang.float_to_binary(message_cost(@message) * 1.0, decimals: 4)}
@@ -360,14 +360,17 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     """
   end
 
+  defp normalize_provider("codex"), do: :codex
+  defp normalize_provider(_), do: :claude
+
   attr :session, :map, default: nil
 
   defp stream_provider_avatar(assigns) do
     provider = if assigns.session, do: assigns.session.provider, else: "claude"
-    assigns = assign(assigns, :provider, provider)
+    assigns = assign(assigns, :provider, normalize_provider(provider))
 
     ~H"""
-    <%= if @provider == "codex" do %>
+    <%= if @provider == :codex do %>
       <img
         src="/images/openai.svg"
         class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
@@ -419,19 +422,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   defp parse_body_segment(text) do
     trimmed = String.trim(text)
 
-    cond do
-      # session_reader format: > `ToolName` args...
-      match = Regex.run(~r/^> `([^`]+)` ?(.*)/s, trimmed, capture: :all_but_first) ->
-        [name, rest] = match
-        {:tool_call, name, String.trim(rest)}
-
-      # Tool: ToolName\n{json} format
-      match = Regex.run(~r/^Tool: ([^\n]+)\n(.*)/s, trimmed, capture: :all_but_first) ->
-        [name, json_rest] = match
-        {:tool_call, String.trim(name), String.trim(json_rest)}
-
-      true ->
-        {:text, text}
+    with nil <- Regex.run(~r/^> `([^`]+)` ?(.*)/s, trimmed, capture: :all_but_first),
+         nil <- Regex.run(~r/^Tool: ([^\n]+)\n(.*)/s, trimmed, capture: :all_but_first) do
+      {:text, text}
+    else
+      [name, rest] -> {:tool_call, String.trim(name), String.trim(rest)}
     end
   end
 end

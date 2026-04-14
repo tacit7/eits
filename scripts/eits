@@ -416,7 +416,7 @@ cmd_agents() {
       #   [--project-id <n>] [--project-path <path>] [--worktree <branch>]
       #   [--effort-level <level>] [--parent-session-id <n>] [--parent-agent-id <n>]
       #   [--team-name <name>] [--member-name <alias>] [--agent <name>] [--name <n>] [--yolo]
-      local instructions="" model="" provider="" project_id="" project_path=""
+      local instructions="" model="" provider="" project_id="${EITS_PROJECT_ID:-}" project_path="${PWD:-}"
       local worktree="" effort_level="" parent_session_id="" parent_agent_id=""
       local team_name="" member_name="" agent_name="" session_name="" bypass_sandbox="false"
       while [[ $# -gt 0 ]]; do

@@ -117,16 +117,31 @@ defmodule EyeInTheSky.Git.Worktrees do
         {:error, "deps directory not found at #{deps_source}"}
 
       true ->
-        relative_target = Path.relative_to(deps_source, wt_path)
-        # Guard against Path.relative_to returning the absolute path unchanged
-        if Path.type(relative_target) == :absolute do
-          {:error, "cannot compute relative path from #{wt_path} to #{deps_source}"}
-        else
-          case File.ln_s(relative_target, deps_link) do
-            :ok              -> :ok
-            {:error, reason} -> {:error, "symlink failed: #{:file.format_error(reason)}"}
-          end
+        relative_target = relative_path(deps_source, wt_path)
+        case File.ln_s(relative_target, deps_link) do
+          :ok              -> :ok
+          {:error, reason} -> {:error, "symlink failed: #{:file.format_error(reason)}"}
         end
     end
+  end
+
+  # Computes a relative traversal path from `from_dir` to `target`.
+  # Unlike Path.relative_to/2 (which only strips a common prefix), this builds
+  # the correct "../../../..." traversal when the paths diverge above their
+  # common ancestor — e.g. from ".claude/worktrees/foo" to "deps".
+  defp relative_path(target, from_dir) do
+    target_parts = Path.split(target)
+    from_parts   = Path.split(from_dir)
+
+    common_len =
+      target_parts
+      |> Enum.zip(from_parts)
+      |> Enum.take_while(fn {a, b} -> a == b end)
+      |> length()
+
+    ups       = length(from_parts) - common_len
+    remaining = Enum.drop(target_parts, common_len)
+
+    (List.duplicate("..", ups) ++ remaining) |> Path.join()
   end
 end

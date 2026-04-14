@@ -59,6 +59,7 @@ defmodule EyeInTheSky.Claude.CLI.Env do
   defp sanitize_value("PATH", value), do: sanitize_path(value)
   defp sanitize_value(_key, value), do: value
 
+  # Unix-only: PATH entries are colon-separated. This project runs on macOS/Linux only.
   defp sanitize_path(path) do
     path
     |> String.split(":")

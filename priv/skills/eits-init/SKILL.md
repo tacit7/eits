@@ -64,14 +64,12 @@ eits commits create --hash <hash>
 **You MUST have a task `in_progress` before editing any files.**
 
 ```bash
-# Two-command lifecycle (preferred)
-eits tasks create --title "Task name" --description "Details"
-eits tasks claim <task_id>
-# claim: transitions → in-progress, self-assigns, links session, sets team status → working
+# Canonical lifecycle (1-command start)
+eits tasks begin --title "Task name"
+# begin: creates + transitions → in-progress + links session atomically
 
-# Finish
+# Finish (atomic server-side transaction: annotate + mark done)
 eits tasks complete <task_id> --message "What was done"
-# complete: annotates, marks done, sets team status → done, DMs team lead
 ```
 
 ```bash
@@ -102,12 +100,11 @@ psql -d eits_dev -c "INSERT INTO task_tags (task_id, tag_id) VALUES (<task_id>, 
 | Update session | `eits sessions update <uuid> [--status <s>] [--intent <text>] [--entrypoint <e>]` |
 | End session | `eits sessions end $EITS_SESSION_UUID` |
 | Get session context | `eits sessions context $EITS_SESSION_UUID` |
-| Create task | `eits tasks create --title <t> --description <d> [--team <id>]` |
-| Claim task (preferred) | `eits tasks claim <id>` |
-| Complete task (preferred) | `eits tasks complete <id> --message <text>` |
-| Start task (legacy) | `eits tasks start <id>` |
-| Move to In Review (legacy) | `eits tasks update <id> --state 4` |
-| Done task | `eits tasks done <id>` |
+| Create + start task | `eits tasks begin --title <t>` |
+| Complete task | `eits tasks complete <id> --message <text>` |
+| Update state by alias | `eits tasks update <id> --state done` (also: `start`, `in-review`, `review`, `todo`) |
+| Update state by ID | `eits tasks update <id> --state 3` |
+| Annotate task | `eits tasks annotate <id> --body <text>` |
 | Annotate task | `eits tasks annotate <id> --body <text>` |
 | Add note | `eits notes create --parent-type session --parent-id $EITS_SESSION_UUID --body <text>` |
 | Log commits | `eits commits create --hash <h1> [--hash <h2>]` |

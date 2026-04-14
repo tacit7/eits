@@ -75,12 +75,11 @@ digraph eits_superpowers {
 Every piece of work starts with an EITS task. No exceptions.
 
 ```bash
-# Create and claim atomically
-eits tasks create --title "Feature: <name>" --description "<what and why>"
-eits tasks claim <task_id>
+# Create and start atomically (canonical)
+eits tasks begin --title "Feature: <name>"
 ```
 
-The claim command transitions to in-progress, self-assigns, links your session, and sets team member status. The pre-tool-use hook will block file edits until this is done.
+`begin` creates the task, transitions it to in-progress, self-assigns, and links your session atomically. The pre-tool-use hook will block file edits until this is done.
 
 ---
 
@@ -172,16 +171,12 @@ Write the implementation plan following the standard writing-plans structure, bu
 For work you will do yourself:
 
 ```bash
-# Create tasks for each plan chunk
-eits tasks create --title "Task 1: <component>" --description "Files: ... Steps: ..."
-eits tasks create --title "Task 2: <component>" --description "Files: ... Steps: ..."
-
-# Claim and work them sequentially
-eits tasks claim <task_1_id>
+# Start and work tasks sequentially
+eits tasks begin --title "Task 1: <component>"
 # ... implement ...
 eits tasks complete <task_1_id> --message "Implemented <component>, tests passing"
 
-eits tasks claim <task_2_id>
+eits tasks begin --title "Task 2: <component>"
 # ... implement ...
 eits tasks complete <task_2_id> --message "Implemented <component>, tests passing"
 ```
@@ -287,15 +282,19 @@ This skill wraps and extends these superpowers skills:
 
 ```bash
 # Task lifecycle
-eits tasks create --title "..." --description "..."
-eits tasks claim <id>
-eits tasks complete <id> --message "..."
+eits tasks begin --title "..."                       # create + start atomically
+eits tasks complete <id> --message "..."             # annotate + done (server transaction)
+eits tasks update <id> --state in-review             # aliases: done, start, in-review, review, todo
 
 # Notes
 eits notes create --parent-type session --parent-id $EITS_SESSION_UUID --body "..."
 
 # Commits
 eits commits create --hash $(git rev-parse HEAD)
+
+# Worktrees (EITS Elixir projects only)
+eits worktree create <branch> [--project-path <path>]
+eits worktree remove <branch> [--project-path <path>]
 
 # Teams (see references/team-execution.md)
 eits teams create --name "..." --description "..."

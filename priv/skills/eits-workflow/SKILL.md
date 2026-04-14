@@ -12,11 +12,11 @@ argument-hint: "[task|commit|note|dm]"
 
 ```bash
 # Task lifecycle
-eits tasks begin --title "Task name"          # create + start in one shot
-eits tasks claim <id>                          # in-progress, self-assign, link session
-eits tasks complete <id> --message "Summary"  # annotate + done + team status update
+eits tasks begin --title "Task name"          # create + start in one shot (canonical)
+eits tasks complete <id> --message "Summary"  # annotate + done atomically (server transaction)
 eits tasks annotate <id> --body "..."
-eits tasks update <id> --state 4              # 4 = In Review
+eits tasks update <id> --state done           # named alias: done, start, in-review, review, todo
+eits tasks update <id> --state 4              # numeric state ID also works
 
 # Commits
 eits commits create --hash <hash1> [--hash <hash2>]
@@ -27,35 +27,39 @@ eits notes create --parent-type task --parent-id <id> --body "..."
 
 # DMs
 eits dm --to <session_uuid> --message "text"
+
+# Worktrees (EITS Elixir projects only)
+eits worktree create <branch> [--project-path <path>]  # create, symlink deps, verify compile
+eits worktree remove <branch> [--project-path <path>]  # remove worktree + branch
 ```
 
 ---
 
 ## Task Lifecycle
 
-### Preferred (2-command)
+### Canonical (1-command start)
 ```bash
-eits tasks create --title "..." --description "..."
-eits tasks claim <task_id>
+eits tasks begin --title "..."
 # ... do work ...
 eits tasks complete <task_id> --message "What was done"
 ```
 
-### Legacy fallback
+### Manual fallback
 ```bash
-eits tasks start <id>
-# ... do work ...
 eits tasks annotate <id> --body "Summary"
-eits tasks update <id> --state 4
+eits tasks update <id> --state done   # or numeric: --state 3
 ```
 
 ### Workflow states
-| ID | Name |
-|----|------|
-| 1 | To Do |
-| 2 | In Progress |
-| 4 | In Review |
-| 3 | Done |
+
+| ID | Name | Alias |
+|----|------|-------|
+| 1 | To Do | `todo` |
+| 2 | In Progress | `start` |
+| 4 | In Review | `in-review`, `review` |
+| 3 | Done | `done` |
+
+Aliases are case-insensitive. Numeric IDs still work. Unknown aliases return 422.
 
 ---
 

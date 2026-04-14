@@ -6,6 +6,7 @@ defmodule EyeInTheSky.Tasks do
   use EyeInTheSky.CrudHelpers, schema: EyeInTheSky.Tasks.Task
 
   import Ecto.Query, warn: false
+  alias EyeInTheSky.Notes
   alias EyeInTheSky.Notes.NoteQueries
   alias EyeInTheSky.QueryBuilder
   alias EyeInTheSky.QueryHelpers
@@ -336,17 +337,16 @@ defmodule EyeInTheSky.Tasks do
   def complete_task(%Task{} = task, message) when is_binary(message) and message != "" do
     done_state_id = WorkflowState.done_id()
 
-    Ecto.Multi.new()
-    |> Ecto.Multi.run(:note, fn repo, _changes ->
-      %EyeInTheSky.Notes.Note{}
-      |> EyeInTheSky.Notes.Note.changeset(%{
+    note_changeset =
+      Notes.note_changeset(%{
         title: "Task completed",
         body: message,
         parent_type: "task",
         parent_id: to_string(task.id)
       })
-      |> repo.insert()
-    end)
+
+    Ecto.Multi.new()
+    |> Ecto.Multi.insert(:note, note_changeset)
     |> Ecto.Multi.run(:task, fn _repo, _changes ->
       update_task_state(task, done_state_id)
     end)

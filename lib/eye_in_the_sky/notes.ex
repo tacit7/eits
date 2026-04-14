@@ -189,6 +189,14 @@ defmodule EyeInTheSky.Notes do
   end
 
   @doc """
+  Builds a Note changeset without inserting. Use when composing Ecto.Multi transactions
+  that need to insert a note as part of a larger transaction (e.g., complete_task).
+  """
+  def note_changeset(attrs \\ %{}) do
+    Note.changeset(%Note{}, attrs)
+  end
+
+  @doc """
   Creates a note.
   """
   def create_note(attrs \\ %{}) do

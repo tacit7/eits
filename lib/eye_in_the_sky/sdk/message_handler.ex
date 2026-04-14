@@ -151,10 +151,12 @@ defmodule EyeInTheSky.SDK.MessageHandler do
     tel_prefix = Keyword.get(opts, :telemetry_prefix, [:eits, :sdk])
     log_raw_key = Keyword.get(opts, :log_raw_key, "log_claude_raw")
     log_raw_prefix = Keyword.get(opts, :log_raw_prefix, "claude.raw")
+    forward_raw_lines = Keyword.get(opts, :forward_raw_lines, false)
 
     receive do
       {:claude_output, _cli_ref, line} ->
         maybe_log_raw_line(session_id, line, log_raw_key, log_raw_prefix)
+        if forward_raw_lines, do: send(caller_pid, {:codex_raw_line, sdk_ref, line})
 
         :telemetry.execute(tel_prefix ++ [:output], %{byte_size: byte_size(line)}, %{
           session_id: session_id

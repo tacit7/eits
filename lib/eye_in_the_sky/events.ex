@@ -66,6 +66,13 @@ defmodule EyeInTheSky.Events do
   @doc "Subscribe to queued-prompt updates for a session."
   def subscribe_dm_queue(session_id), do: sub("dm:#{session_id}:queue")
 
+  @doc "Subscribe to raw Codex JSONL stream lines for a session."
+  def subscribe_codex_raw(session_id), do: sub("codex:#{session_id}:raw")
+
+  @doc "Broadcast a raw Codex JSONL line for a session."
+  def broadcast_codex_raw(session_id, line),
+    do: broadcast("codex:#{session_id}:raw", {:codex_raw_line, line})
+
   @doc "Subscribe to new messages on a channel."
   def subscribe_channel_messages(channel_id), do: sub("channel:#{channel_id}:messages")
 

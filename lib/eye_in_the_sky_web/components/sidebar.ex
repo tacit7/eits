@@ -273,11 +273,6 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
           "border-t border-base-content/5 p-2 flex gap-2",
           if(@collapsed, do: "flex-col items-center", else: "flex-row items-center")
         ]}>
-          <%= if !@collapsed do %>
-            <div class="flex-1">
-              <.theme_toggle />
-            </div>
-          <% end %>
           <.link
             href="/auth/logout"
             method="delete"

@@ -416,6 +416,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       <%= if @files != [] && !@file_content do %>
         <!-- Directory Listing -->
         <div class="p-6">
+          <%= if @error do %>
+            <div class="alert alert-error mb-4">
+              <.icon name="hero-x-circle" class="shrink-0 h-6 w-6" />
+              <span>{@error}</span>
+            </div>
+          <% end %>
           <div class="mb-4">
             <%= if @file_path && @file_path != "." do %>
               <.link

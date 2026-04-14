@@ -25,14 +25,21 @@ defmodule EyeInTheSky.Workers.JobDispatcherWorker do
     :ok
   end
 
+  # Enqueue then mark executed. The two error paths have different semantics:
+  # - enqueue failure: release the claim so the next tick can retry
+  # - mark_executed failure: job already enqueued, do NOT release (would cause re-enqueue)
   defp dispatch_job(jobs_mod, job, sentinel) do
-    with {:ok, _} <- jobs_mod.enqueue_job(job),
-         {:ok, _} <- jobs_mod.mark_job_executed(job) do
+    with {:enqueue, {:ok, _}} <- {:enqueue, jobs_mod.enqueue_job(job)},
+         {:mark, {:ok, _}} <- {:mark, jobs_mod.mark_job_executed(job)} do
       :ok
     else
-      {:error, reason} ->
-        Logger.error("JobDispatcherWorker: failed for job #{job.id}: #{inspect(reason)}")
+      {:enqueue, {:error, reason}} ->
+        Logger.error("JobDispatcherWorker: failed to enqueue job #{job.id}: #{inspect(reason)}")
         jobs_mod.release_claim(job, sentinel, job.next_run_at)
+        :error
+
+      {:mark, {:error, reason}} ->
+        Logger.error("JobDispatcherWorker: mark_job_executed failed for job #{job.id}: #{inspect(reason)}")
         :error
     end
   end

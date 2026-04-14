@@ -250,6 +250,20 @@ cmd_tasks() {
       local session_id="${1:-}"; need session_id
       _delete "/tasks/$id/sessions/$session_id"
       ;;
+    complete)
+      # eits tasks complete <id> --message <text>
+      # Delegates to POST /tasks/:id/complete — atomic annotate+done via server transaction.
+      local id="${1:-}"; need id; shift
+      local message=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --message) message="$2"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need message
+      _post "/tasks/$id/complete" "$(json message "$message")"
+      ;;
     begin|quick)
       # eits tasks quick --title <t> [--description <d>] [--project <id>] [--priority <p>]
       # Creates a task, links the current session, and starts it — all in one command.
@@ -287,7 +301,7 @@ cmd_tasks() {
       echo "{\"success\":true,\"task_id\":\"$task_id\",\"tag_id\":\"$tag_id\"}"
       ;;
     *)
-      echo "usage: eits tasks <list|get|create|update|done|begin|start|delete|annotate|link-session|unlink-session|tag>"
+      echo "usage: eits tasks <list|get|create|update|done|begin|start|complete|delete|annotate|link-session|unlink-session|tag>"
       ;;
   esac
 }

@@ -15,6 +15,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Helpers.UploadHelpers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1, parse_int: 2]
+  require Logger
 
   @impl true
   def mount(_params, _session, socket) do
@@ -107,7 +108,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   @impl true
   def handle_event("send_channel_message", %{"channel_id" => channel_id, "body" => body}, socket) do
-    require Logger
     session_id = get_session_id(socket)
     content_blocks = consume_agent_images_as_content_blocks(socket)
 
@@ -292,8 +292,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   @impl true
   def handle_info({:new_message, _message}, socket) do
-    require Logger
-
     Logger.info(
       "📨 Received new_message broadcast for channel #{socket.assigns.active_channel_id}"
     )

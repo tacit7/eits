@@ -1,4 +1,6 @@
 defmodule EyeInTheSkyWeb.TelemetryDispatch do
+  require Logger
+
   @moduledoc """
   Stable MFA target for telemetry_poller.
 
@@ -16,7 +18,6 @@ defmodule EyeInTheSkyWeb.TelemetryDispatch do
       :ok
 
     e ->
-      require Logger
       Logger.warning("[TelemetryDispatch] unexpected error in dispatch_measurements: #{Exception.message(e)}")
       :ok
   end

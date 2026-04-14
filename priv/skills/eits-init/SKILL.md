@@ -105,7 +105,6 @@ psql -d eits_dev -c "INSERT INTO task_tags (task_id, tag_id) VALUES (<task_id>, 
 | Update state by alias | `eits tasks update <id> --state done` (also: `start`, `in-review`, `review`, `todo`) |
 | Update state by ID | `eits tasks update <id> --state 3` |
 | Annotate task | `eits tasks annotate <id> --body <text>` |
-| Annotate task | `eits tasks annotate <id> --body <text>` |
 | Add note | `eits notes create --parent-type session --parent-id $EITS_SESSION_UUID --body <text>` |
 | Log commits | `eits commits create --hash <h1> [--hash <h2>]` |
 | Link task (after-the-fact) | `eits tasks link-session <task_id>` |

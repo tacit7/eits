@@ -298,17 +298,6 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   @impl true
   def handle_info({:codex_session_id, _ref, _thread_id}, state), do: {:noreply, state}
 
-  # Raw Codex JSONL line - broadcast to subscribers for live display
-  @impl true
-  def handle_info({:codex_raw_line, ref, line}, %__MODULE__{sdk_ref: ref} = state) do
-    EyeInTheSky.Events.broadcast_codex_raw(state.session_id, line)
-    {:noreply, state}
-  end
-
-  # Stale codex_raw_line from old sdk ref - ignore
-  @impl true
-  def handle_info({:codex_raw_line, _ref, _line}, state), do: {:noreply, state}
-
   # SDK completion - process next queued job
   @impl true
   def handle_info({:claude_complete, ref, session_id}, %__MODULE__{sdk_ref: ref} = state) do

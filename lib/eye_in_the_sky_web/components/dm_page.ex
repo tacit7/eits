@@ -183,7 +183,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               phx-key="Enter"
               class="text-base font-semibold text-base-content/85 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 w-full text-center placeholder:text-base-content/20 transition-colors"
             />
-            <%= if @agent_record && Ecto.assoc_loaded?(@agent_record.agent_definition) && @agent_record.agent_definition.display_name do %>
+            <%= if @agent_record && Ecto.assoc_loaded?(@agent_record.agent_definition) && @agent_record.agent_definition && @agent_record.agent_definition.display_name do %>
               <span class="text-xs text-base-content/35 truncate">{@agent_record.agent_definition.display_name}</span>
             <% end %>
           </div>
@@ -419,7 +419,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             provider={@agent.provider}
             context_used={@session_state.context_used}
             context_window={@session_state.context_window}
-            display_name={if @agent_record && Ecto.assoc_loaded?(@agent_record.agent_definition), do: @agent_record.agent_definition.display_name}
+            display_name={if @agent_record && Ecto.assoc_loaded?(@agent_record.agent_definition) && @agent_record.agent_definition, do: @agent_record.agent_definition.display_name}
             session_cli_opts={assigns[:session_cli_opts] || []}
           />
         </div>

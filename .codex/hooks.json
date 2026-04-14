@@ -1,0 +1,23 @@
+{
+  "hooks": [
+    {
+      "event": "UserPromptSubmit",
+      "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-prompt-working.sh",
+      "timeout": 10,
+      "statusMessage": "Updating EITS session status..."
+    },
+    {
+      "event": "PostToolUse",
+      "matcher": "Bash",
+      "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-post-commit.sh",
+      "timeout": 15,
+      "statusMessage": "Logging commit to EITS..."
+    },
+    {
+      "event": "Stop",
+      "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-session-stop.sh",
+      "timeout": 30,
+      "statusMessage": "Updating EITS session status..."
+    }
+  ]
+}

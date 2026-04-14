@@ -28,8 +28,7 @@ defmodule EyeInTheSkyWeb.DmLive.UploadHelpers do
   def build_message_body(body, uploaded_files) do
     file_list =
       Enum.map_join(uploaded_files, "\n", fn file_data ->
-        relative = relative_upload_path(file_data.storage_path)
-        "- #{relative} (#{file_data.original_filename})"
+        "- #{file_data.storage_path} (#{file_data.original_filename})"
       end)
 
     "#{body}\n\nAttached files:\n#{file_list}"
@@ -54,15 +53,6 @@ defmodule EyeInTheSkyWeb.DmLive.UploadHelpers do
     date_dir = Date.utc_today() |> Date.to_string()
     filename = "#{Ecto.UUID.generate()}#{Path.extname(client_name)}"
     Path.join([base_upload_dir, date_dir, filename])
-  end
-
-  defp relative_upload_path(abs_path) do
-    priv_static = Path.join(:code.priv_dir(:eye_in_the_sky), "static")
-
-    case String.split(abs_path, priv_static, parts: 2) do
-      [_, relative] -> relative
-      _ -> Path.basename(abs_path)
-    end
   end
 
   def mime_from_ext(filename), do: MIME.from_path(filename)

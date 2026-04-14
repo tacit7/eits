@@ -240,10 +240,15 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
                 task: ApiPresenter.present_task(updated)
               })
 
-            {:error, changeset} ->
+            {:error, %Ecto.Changeset{} = changeset} ->
               conn
               |> put_status(:unprocessable_entity)
               |> json(%{success: false, errors: translate_errors(changeset)})
+
+            {:error, _reason} ->
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{success: false, error: "Failed to complete task"})
           end
       end
     end

@@ -90,4 +90,43 @@ defmodule EyeInTheSky.Git.Worktrees do
       {err, code} -> {:error, {code, err}}
     end
   end
+
+  @doc """
+  Creates a `deps` symlink inside `wt_path` pointing to `project_path/deps`.
+
+  Uses a relative path computed from the actual directory structure so the symlink
+  is portable. If a `deps` symlink or directory already exists, it is left in place.
+
+  Returns `:ok` or `{:error, reason}`.
+  """
+  @spec symlink_deps(String.t(), String.t()) :: :ok | {:error, String.t()}
+  def symlink_deps(project_path, wt_path) do
+    deps_source = Path.join(project_path, "deps")
+    deps_link   = Path.join(wt_path, "deps")
+
+    cond do
+      match?({:ok, %{type: :symlink}}, File.lstat(deps_link)) ->
+        # Symlink already exists (live or dangling). Leave it in place.
+        :ok
+
+      File.dir?(deps_link) ->
+        # A real deps/ directory already exists. Leave it in place.
+        :ok
+
+      not File.dir?(deps_source) ->
+        {:error, "deps directory not found at #{deps_source}"}
+
+      true ->
+        relative_target = Path.relative_to(deps_source, wt_path)
+        # Guard against Path.relative_to returning the absolute path unchanged
+        if Path.type(relative_target) == :absolute do
+          {:error, "cannot compute relative path from #{wt_path} to #{deps_source}"}
+        else
+          case File.ln_s(relative_target, deps_link) do
+            :ok              -> :ok
+            {:error, reason} -> {:error, "symlink failed: #{:file.format_error(reason)}"}
+          end
+        end
+    end
+  end
 end

@@ -21,7 +21,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
     socket =
       if project_id do
         project =
-          Projects.get_project_with_agents!(project_id)
+          Projects.get_project!(project_id)
 
         claude_dir = if project.path, do: Path.join(project.path, ".claude"), else: nil
 

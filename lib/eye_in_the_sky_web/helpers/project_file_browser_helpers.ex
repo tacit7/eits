@@ -53,7 +53,7 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers do
 
   @doc """
   Reads a file with a size guard, preserving error source distinction.
-  Returns {:ok, content} | {:too_large} | {:read_error, reason} | {:stat_error, reason}.
+  Returns {:ok, content} | {:error, :too_large} | {:error, {:read_error, reason}} | {:error, {:stat_error, reason}}.
 
   Callers that need "Failed to stat file" vs "Failed to read file" error message
   parity should use this variant instead of read_file_safe/1.
@@ -61,16 +61,16 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers do
   def read_file_safe_detailed(full_path) do
     case File.stat(full_path) do
       {:ok, %{size: size}} when size > @max_file_size ->
-        {:too_large}
+        {:error, :too_large}
 
       {:ok, _stat} ->
         case File.read(full_path) do
           {:ok, content} -> {:ok, content}
-          {:error, reason} -> {:read_error, reason}
+          {:error, reason} -> {:error, {:read_error, reason}}
         end
 
       {:error, reason} ->
-        {:stat_error, reason}
+        {:error, {:stat_error, reason}}
     end
   end
 
@@ -102,13 +102,13 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers do
 
           {:ok, socket}
 
-        {:too_large} ->
+        {:error, :too_large} ->
           {:error, assign(socket, :error, "File too large to display (over 1 MB)")}
 
-        {:read_error, reason} ->
+        {:error, {:read_error, reason}} ->
           {:error, assign(socket, :error, "Failed to read file: #{reason}")}
 
-        {:stat_error, reason} ->
+        {:error, {:stat_error, reason}} ->
           {:error, assign(socket, :error, "Failed to stat file: #{reason}")}
       end
     else

@@ -156,7 +156,9 @@ defmodule EyeInTheSky.SDK.MessageHandler do
     receive do
       {:claude_output, _cli_ref, line} ->
         maybe_log_raw_line(session_id, line, log_raw_key, log_raw_prefix)
-        if forward_raw_lines, do: send(caller_pid, {:codex_raw_line, sdk_ref, line})
+        if forward_raw_lines do
+          EyeInTheSky.Events.broadcast_codex_raw(session_id, line)
+        end
 
         :telemetry.execute(tel_prefix ++ [:output], %{byte_size: byte_size(line)}, %{
           session_id: session_id

@@ -1,11 +1,7 @@
-// highlight.js is loaded lazily so it stays out of the main bundle.
-// Both this hook and markdown.js use dynamic imports, which lets Vite
-// create one standalone hljs chunk with no app.js re-import side-effects.
-let _hljs = null
-async function getHljs() {
-  if (!_hljs) _hljs = (await import('highlight.js')).default
-  return _hljs
-}
+// Uses the shared core-only hljs instance from hljs_instance.js.
+// Core build + explicit language registration keeps the syntax chunk ~80KB
+// instead of the ~1MB full build that ships all 384 languages.
+import { getHljs } from '../hljs_instance.js'
 
 export const Highlight = {
   async mounted() {

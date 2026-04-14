@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import { formatDateTime, shortId } from '../../utils/datetime.js'
   import { formatUUID, copyToClipboard } from '../../utils/clipboard.js'
+  import { getHljs } from '../../../js/hljs_instance.js'
 
   // Heroicons
   import ClockSvg from 'heroicons/24/outline/clock.svg'
@@ -10,15 +11,15 @@
 
   export let notes = []
 
-  // marked and hljs are loaded lazily in onMount; renderReady triggers re-render
-  // when both are available. Until then renderMarkdown returns raw text safely.
+  // marked is loaded lazily in onMount; hljs comes from shared hljs_instance.js
+  // (core-only build, 6 languages). renderReady triggers re-render when ready.
   let markedParse = null
   let renderReady = false
 
   onMount(async () => {
-    const [{ marked }, { default: hljs }] = await Promise.all([
+    const [{ marked }, hljs] = await Promise.all([
       import('marked'),
-      import('highlight.js'),
+      getHljs(),
     ])
 
     marked.use({

@@ -56,16 +56,19 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     config =
       case Jason.decode((if assigns.job, do: assigns.job.config) || "{}") do
         {:ok, m} -> m
-        _ -> %{}
+        {:error, reason} ->
+          require Logger
+          Logger.warning("[AgentScheduleForm] Failed to decode job config: #{inspect(reason)}")
+          %{}
       end
 
     assigns =
       assigns
       |> assign(:editing, not is_nil(assigns.job))
-      |> assign(:schedule_type, (if assigns.job, do: assigns.job.schedule_type) || "cron")
-      |> assign(:schedule_value, (if assigns.job, do: assigns.job.schedule_value) || "")
+      |> assign(:schedule_type, job_field(assigns.job, :schedule_type, "cron"))
+      |> assign(:schedule_value, job_field(assigns.job, :schedule_value, ""))
       |> assign(:model, Map.get(config, "model", "sonnet"))
-      |> assign(:timezone, (if assigns.job, do: assigns.job.timezone) || system_timezone())
+      |> assign(:timezone, job_field(assigns.job, :timezone, system_timezone()))
       |> assign(:config, config)
 
     ~H"""
@@ -544,4 +547,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     </div>
     """
   end
+
+  defp job_field(nil, _field, default), do: default
+  defp job_field(job, field, default), do: Map.get(job, field) || default
 end

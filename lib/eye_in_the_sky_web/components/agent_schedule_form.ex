@@ -280,54 +280,27 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
   attr :config, :map, required: true
 
   defp advanced_cli_flags(assigns) do
-    %{
-      "max_budget_usd" => max_budget_usd,
-      "max_turns" => max_turns,
-      "fallback_model" => fallback_model,
-      "output_format" => output_format,
-      "permission_mode" => permission_mode,
-      "allowed_tools" => allowed_tools,
-      "add_dir" => add_dir,
-      "mcp_config" => mcp_config,
-      "plugin_dir" => plugin_dir,
-      "settings_file" => settings_file,
-      "skip_permissions" => skip_permissions,
-      "chrome" => chrome,
-      "sandbox" => sandbox
-    } = Map.merge(
-      %{
-        "max_budget_usd" => "",
-        "max_turns" => "",
-        "fallback_model" => "",
-        "output_format" => "",
-        "permission_mode" => "",
-        "allowed_tools" => "",
-        "add_dir" => "",
-        "mcp_config" => "",
-        "plugin_dir" => "",
-        "settings_file" => "",
-        "skip_permissions" => true,
-        "chrome" => false,
-        "sandbox" => false
-      },
-      assigns.config
-    )
+    config =
+      Map.merge(
+        %{
+          "max_budget_usd" => "",
+          "max_turns" => "",
+          "fallback_model" => "",
+          "output_format" => "",
+          "permission_mode" => "",
+          "allowed_tools" => "",
+          "add_dir" => "",
+          "mcp_config" => "",
+          "plugin_dir" => "",
+          "settings_file" => "",
+          "skip_permissions" => true,
+          "chrome" => false,
+          "sandbox" => false
+        },
+        assigns.config
+      )
 
-    assigns =
-      assigns
-      |> assign(:max_budget_usd, max_budget_usd)
-      |> assign(:max_turns, max_turns)
-      |> assign(:fallback_model, fallback_model)
-      |> assign(:output_format, output_format)
-      |> assign(:permission_mode, permission_mode)
-      |> assign(:allowed_tools, allowed_tools)
-      |> assign(:add_dir, add_dir)
-      |> assign(:mcp_config, mcp_config)
-      |> assign(:plugin_dir, plugin_dir)
-      |> assign(:settings_file, settings_file)
-      |> assign(:skip_permissions, skip_permissions)
-      |> assign(:chrome, chrome)
-      |> assign(:sandbox, sandbox)
+    assigns = assign(assigns, :config, config)
 
     ~H"""
     <div class="collapse collapse-arrow bg-base-200 rounded-lg">
@@ -336,185 +309,238 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
         <.icon name="hero-adjustments-horizontal" class="w-3.5 h-3.5" /> Advanced CLI Flags
       </div>
       <div class="collapse-content px-3 pb-3 space-y-3">
-
-        <div class="grid grid-cols-2 gap-3">
-          <div class="form-control">
-            <label class="label"><span class="label-text text-xs">Max Budget (USD)</span></label>
-            <input
-              type="number"
-              name="schedule[max_budget_usd]"
-              value={@max_budget_usd}
-              placeholder="e.g. 5.00"
-              step="0.01"
-              min="0"
-              class="input input-bordered input-sm w-full font-mono min-h-[44px]"
-            />
-          </div>
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text text-xs">Max Turns</span>
-              <span class="label-text-alt text-base-content/40 font-mono text-xs">--max-turns</span>
-            </label>
-            <input
-              type="number"
-              name="schedule[max_turns]"
-              value={@max_turns}
-              placeholder="e.g. 25"
-              min="1"
-              class="input input-bordered input-sm w-full font-mono min-h-[44px]"
-            />
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div class="form-control">
-            <label class="label"><span class="label-text text-xs">Fallback Model</span></label>
-            <select name="schedule[fallback_model]" class="select select-bordered select-sm w-full">
-              <option value="" selected={@fallback_model == ""}>None</option>
-              <%= for {value, label} <- claude_models() do %>
-                <option value={value} selected={@fallback_model == value}>{label}</option>
-              <% end %>
-            </select>
-          </div>
-          <div class="form-control">
-            <label class="label"><span class="label-text text-xs">Output Format</span></label>
-            <select name="schedule[output_format]" class="select select-bordered select-sm w-full">
-              <option value="" selected={@output_format == ""}>Default</option>
-              <option value="text" selected={@output_format == "text"}>Text</option>
-              <option value="json" selected={@output_format == "json"}>JSON</option>
-              <option value="stream-json" selected={@output_format == "stream-json"}>Stream JSON</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text text-xs">Permission Mode</span>
-            <span class="label-text-alt text-base-content/40 font-mono text-xs">--permission-mode</span>
-          </label>
-          <select name="schedule[permission_mode]" class="select select-bordered select-sm w-full">
-            <option value="" selected={@permission_mode == ""}>Default</option>
-            <option value="acceptEdits" selected={@permission_mode == "acceptEdits"}>acceptEdits — auto-accept file edits</option>
-            <option value="bypassPermissions" selected={@permission_mode == "bypassPermissions"}>bypassPermissions — skip all prompts</option>
-            <option value="dontAsk" selected={@permission_mode == "dontAsk"}>dontAsk — never ask</option>
-            <option value="plan" selected={@permission_mode == "plan"}>plan — read-only</option>
-          </select>
-        </div>
-
-        <div class="form-control">
-          <label class="label"><span class="label-text text-xs">Allowed Tools</span></label>
-          <input
-            type="text"
-            name="schedule[allowed_tools]"
-            value={@allowed_tools}
-            placeholder="e.g. Bash,Read,Edit,Write,Grep,Glob"
-            class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-          />
-          <label class="label">
-            <span class="label-text-alt text-base-content/40">Comma-separated. Supports wildcards: Bash(git *)</span>
-          </label>
-        </div>
-
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text text-xs">Add Directory</span>
-            <span class="label-text-alt text-base-content/40 font-mono text-xs">--add-dir</span>
-          </label>
-          <input
-            type="text"
-            name="schedule[add_dir]"
-            value={@add_dir}
-            placeholder="/path/to/shared-lib"
-            class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-          />
-        </div>
-
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text text-xs">MCP Config File</span>
-            <span class="label-text-alt text-base-content/40 font-mono text-xs">--mcp-config</span>
-          </label>
-          <input
-            type="text"
-            name="schedule[mcp_config]"
-            value={@mcp_config}
-            placeholder="./mcp-servers.json"
-            class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-          />
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text text-xs">Plugin Directory</span>
-              <span class="label-text-alt text-base-content/40 font-mono text-xs">--plugin-dir</span>
-            </label>
-            <input
-              type="text"
-              name="schedule[plugin_dir]"
-              value={@plugin_dir}
-              placeholder="./my-plugins"
-              class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-            />
-          </div>
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text text-xs">Settings File</span>
-              <span class="label-text-alt text-base-content/40 font-mono text-xs">--settings</span>
-            </label>
-            <input
-              type="text"
-              name="schedule[settings_file]"
-              value={@settings_file}
-              placeholder="./settings.json"
-              class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-            />
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-1 pt-1">
-          <label class="label cursor-pointer justify-start gap-2 py-1">
-            <input
-              type="checkbox"
-              name="schedule[skip_permissions]"
-              value="true"
-              checked={@skip_permissions}
-              class="checkbox checkbox-sm checkbox-primary"
-            />
-            <span class="label-text text-xs">
-              Skip permissions
-              <span class="font-mono text-base-content/40 text-xs ml-1">--dangerously-skip-permissions</span>
-            </span>
-          </label>
-          <label class="label cursor-pointer justify-start gap-2 py-1">
-            <input
-              type="checkbox"
-              name="schedule[chrome]"
-              value="true"
-              checked={@chrome}
-              class="checkbox checkbox-sm checkbox-primary"
-            />
-            <span class="label-text text-xs">
-              Chrome integration
-              <span class="font-mono text-base-content/40 text-xs ml-1">--chrome</span>
-            </span>
-          </label>
-          <label class="label cursor-pointer justify-start gap-2 py-1">
-            <input
-              type="checkbox"
-              name="schedule[sandbox]"
-              value="true"
-              checked={@sandbox}
-              class="checkbox checkbox-sm checkbox-primary"
-            />
-            <span class="label-text text-xs">
-              OS sandbox isolation
-              <span class="font-mono text-base-content/40 text-xs ml-1">--sandbox</span>
-            </span>
-          </label>
-        </div>
-
+        <.budget_and_turns_row
+          max_budget_usd={@config["max_budget_usd"]}
+          max_turns={@config["max_turns"]}
+        />
+        <.permission_fields
+          fallback_model={@config["fallback_model"]}
+          output_format={@config["output_format"]}
+          permission_mode={@config["permission_mode"]}
+          allowed_tools={@config["allowed_tools"]}
+        />
+        <.path_fields
+          add_dir={@config["add_dir"]}
+          mcp_config={@config["mcp_config"]}
+          plugin_dir={@config["plugin_dir"]}
+          settings_file={@config["settings_file"]}
+        />
+        <.boolean_flags
+          skip_permissions={@config["skip_permissions"]}
+          chrome={@config["chrome"]}
+          sandbox={@config["sandbox"]}
+        />
       </div>
+    </div>
+    """
+  end
+
+  attr :max_budget_usd, :any, required: true
+  attr :max_turns, :any, required: true
+
+  defp budget_and_turns_row(assigns) do
+    ~H"""
+    <div class="grid grid-cols-2 gap-3">
+      <div class="form-control">
+        <label class="label"><span class="label-text text-xs">Max Budget (USD)</span></label>
+        <input
+          type="number"
+          name="schedule[max_budget_usd]"
+          value={@max_budget_usd}
+          placeholder="e.g. 5.00"
+          step="0.01"
+          min="0"
+          class="input input-bordered input-sm w-full font-mono min-h-[44px]"
+        />
+      </div>
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text text-xs">Max Turns</span>
+          <span class="label-text-alt text-base-content/40 font-mono text-xs">--max-turns</span>
+        </label>
+        <input
+          type="number"
+          name="schedule[max_turns]"
+          value={@max_turns}
+          placeholder="e.g. 25"
+          min="1"
+          class="input input-bordered input-sm w-full font-mono min-h-[44px]"
+        />
+      </div>
+    </div>
+    """
+  end
+
+  attr :fallback_model, :string, required: true
+  attr :output_format, :string, required: true
+  attr :permission_mode, :string, required: true
+  attr :allowed_tools, :string, required: true
+
+  defp permission_fields(assigns) do
+    ~H"""
+    <div class="grid grid-cols-2 gap-3">
+      <div class="form-control">
+        <label class="label"><span class="label-text text-xs">Fallback Model</span></label>
+        <select name="schedule[fallback_model]" class="select select-bordered select-sm w-full">
+          <option value="" selected={@fallback_model == ""}>None</option>
+          <%= for {value, label} <- claude_models() do %>
+            <option value={value} selected={@fallback_model == value}>{label}</option>
+          <% end %>
+        </select>
+      </div>
+      <div class="form-control">
+        <label class="label"><span class="label-text text-xs">Output Format</span></label>
+        <select name="schedule[output_format]" class="select select-bordered select-sm w-full">
+          <option value="" selected={@output_format == ""}>Default</option>
+          <option value="text" selected={@output_format == "text"}>Text</option>
+          <option value="json" selected={@output_format == "json"}>JSON</option>
+          <option value="stream-json" selected={@output_format == "stream-json"}>Stream JSON</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Permission Mode</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--permission-mode</span>
+      </label>
+      <select name="schedule[permission_mode]" class="select select-bordered select-sm w-full">
+        <option value="" selected={@permission_mode == ""}>Default</option>
+        <option value="acceptEdits" selected={@permission_mode == "acceptEdits"}>acceptEdits — auto-accept file edits</option>
+        <option value="bypassPermissions" selected={@permission_mode == "bypassPermissions"}>bypassPermissions — skip all prompts</option>
+        <option value="dontAsk" selected={@permission_mode == "dontAsk"}>dontAsk — never ask</option>
+        <option value="plan" selected={@permission_mode == "plan"}>plan — read-only</option>
+      </select>
+    </div>
+
+    <div class="form-control">
+      <label class="label"><span class="label-text text-xs">Allowed Tools</span></label>
+      <input
+        type="text"
+        name="schedule[allowed_tools]"
+        value={@allowed_tools}
+        placeholder="e.g. Bash,Read,Edit,Write,Grep,Glob"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+      />
+      <label class="label">
+        <span class="label-text-alt text-base-content/40">Comma-separated. Supports wildcards: Bash(git *)</span>
+      </label>
+    </div>
+    """
+  end
+
+  attr :add_dir, :string, required: true
+  attr :mcp_config, :string, required: true
+  attr :plugin_dir, :string, required: true
+  attr :settings_file, :string, required: true
+
+  defp path_fields(assigns) do
+    ~H"""
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Add Directory</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--add-dir</span>
+      </label>
+      <input
+        type="text"
+        name="schedule[add_dir]"
+        value={@add_dir}
+        placeholder="/path/to/shared-lib"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+      />
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">MCP Config File</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--mcp-config</span>
+      </label>
+      <input
+        type="text"
+        name="schedule[mcp_config]"
+        value={@mcp_config}
+        placeholder="./mcp-servers.json"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+      />
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text text-xs">Plugin Directory</span>
+          <span class="label-text-alt text-base-content/40 font-mono text-xs">--plugin-dir</span>
+        </label>
+        <input
+          type="text"
+          name="schedule[plugin_dir]"
+          value={@plugin_dir}
+          placeholder="./my-plugins"
+          class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+        />
+      </div>
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text text-xs">Settings File</span>
+          <span class="label-text-alt text-base-content/40 font-mono text-xs">--settings</span>
+        </label>
+        <input
+          type="text"
+          name="schedule[settings_file]"
+          value={@settings_file}
+          placeholder="./settings.json"
+          class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+        />
+      </div>
+    </div>
+    """
+  end
+
+  attr :skip_permissions, :boolean, required: true
+  attr :chrome, :boolean, required: true
+  attr :sandbox, :boolean, required: true
+
+  defp boolean_flags(assigns) do
+    ~H"""
+    <div class="flex flex-col gap-1 pt-1">
+      <label class="label cursor-pointer justify-start gap-2 py-1">
+        <input
+          type="checkbox"
+          name="schedule[skip_permissions]"
+          value="true"
+          checked={@skip_permissions}
+          class="checkbox checkbox-sm checkbox-primary"
+        />
+        <span class="label-text text-xs">
+          Skip permissions
+          <span class="font-mono text-base-content/40 text-xs ml-1">--dangerously-skip-permissions</span>
+        </span>
+      </label>
+      <label class="label cursor-pointer justify-start gap-2 py-1">
+        <input
+          type="checkbox"
+          name="schedule[chrome]"
+          value="true"
+          checked={@chrome}
+          class="checkbox checkbox-sm checkbox-primary"
+        />
+        <span class="label-text text-xs">
+          Chrome integration
+          <span class="font-mono text-base-content/40 text-xs ml-1">--chrome</span>
+        </span>
+      </label>
+      <label class="label cursor-pointer justify-start gap-2 py-1">
+        <input
+          type="checkbox"
+          name="schedule[sandbox]"
+          value="true"
+          checked={@sandbox}
+          class="checkbox checkbox-sm checkbox-primary"
+        />
+        <span class="label-text text-xs">
+          OS sandbox isolation
+          <span class="font-mono text-base-content/40 text-xs ml-1">--sandbox</span>
+        </span>
+      </label>
     </div>
     """
   end

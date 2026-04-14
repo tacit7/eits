@@ -260,7 +260,7 @@ defmodule EyeInTheSky.Channels do
       {:error, :not_found} -> nil
     end
 
-    if not is_nil(member) && member.last_read_at do
+    if member && member.last_read_at do
       from(m in Message,
         where: m.channel_id == ^channel_id and m.inserted_at > ^member.last_read_at
       )

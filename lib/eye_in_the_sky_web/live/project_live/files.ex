@@ -28,7 +28,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     case Integer.parse(id) do
       {project_id, ""} ->
         project =
-          Projects.get_project_with_agents!(project_id)
+          Projects.get_project!(project_id)
 
         file_tree =
           if project.path do

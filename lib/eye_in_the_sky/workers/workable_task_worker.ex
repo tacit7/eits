@@ -23,8 +23,6 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
 
   # Max tasks to spawn per run (prevents API concurrency overload)
   @batch_limit 3
-  # Skip spawning if this many agents are already active
-  @max_active_agents 8
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"job_id" => job_id}}) do
@@ -65,16 +63,8 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
     tag_name = config["tag"] || "workable"
     model = config["model"] || "haiku"
 
-    active_count = count_active_agents()
-
-    if active_count >= @max_active_agents do
-      {:ok, :no_work}
-    else
-      available_slots = @max_active_agents - active_count
-      limit = min(@batch_limit, available_slots)
-      tasks = fetch_workable_tasks(tag_name, limit, job.project_id)
-      spawn_tasks(tasks, %{model: model, tag_name: tag_name, project_id: job.project_id})
-    end
+    tasks = fetch_workable_tasks(tag_name, @batch_limit, job.project_id)
+    spawn_tasks(tasks, %{model: model, tag_name: tag_name, project_id: job.project_id})
   end
 
   defp spawn_tasks([], _config), do: {:ok, :no_work}
@@ -111,16 +101,6 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
         Logger.info("WorkableTaskWorker: task ##{task.id} already claimed by another worker, skipping")
         {:ok, :skipped}
     end
-  end
-
-  defp count_active_agents do
-    Repo.one(
-      from s in "sessions",
-        join: a in "agents",
-        on: a.id == s.agent_id,
-        where: a.status == "working",
-        select: count(s.id)
-    ) || 0
   end
 
   defp fetch_workable_tasks(tag_name, limit, project_id) do

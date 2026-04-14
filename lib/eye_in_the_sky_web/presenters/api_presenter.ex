@@ -4,13 +4,16 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
   Consolidates all format_*/1 and inline map formatting from API controllers.
   """
 
+  alias EyeInTheSky.{Agents, Teams}
+  alias EyeInTheSky.ScheduledJobs
+
   def present_task(task) do
     %{
       id: task.id,
       title: task.title,
       description: task.description,
       priority: task.priority,
-      state: if(Ecto.assoc_loaded?(task.state) && task.state, do: task.state.name),
+      state: loaded_field(task.state, :name),
       state_id: task.state_id,
       due_at: task.due_at
     }
@@ -43,8 +46,7 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       number: msg.channel_message_number,
       uuid: msg.uuid,
       session_id: msg.session_id,
-      session_name:
-        if(Ecto.assoc_loaded?(msg.session) && msg.session, do: msg.session.name, else: nil),
+      session_name: loaded_field(msg.session, :name),
       sender_role: msg.sender_role,
       provider: msg.provider,
       body: msg.body,
@@ -145,7 +147,7 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
     %{
       id: task.id,
       title: task.title,
-      state: if(Ecto.assoc_loaded?(task.state) && task.state, do: task.state.name),
+      state: loaded_field(task.state, :name),
       state_id: task.state_id
     }
   end
@@ -175,8 +177,6 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
   Performs DB queries via Agents + Teams — call from controller layer only.
   """
   def resolve_session_sender_name(session) do
-    alias EyeInTheSky.{Agents, Teams}
-
     case session.agent_id do
       nil ->
         session.name || "agent"
@@ -217,8 +217,6 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
   end
 
   def present_job(job) do
-    alias EyeInTheSky.ScheduledJobs
-
     %{
       id: job.id,
       name: job.name,
@@ -243,12 +241,15 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       role: m.role,
       status: m.status,
       agent_id: m.agent_id,
-      agent_uuid: if(Ecto.assoc_loaded?(m.agent) && m.agent, do: m.agent.uuid),
+      agent_uuid: loaded_field(m.agent, :uuid),
       session_id: m.session_id,
-      session_uuid: if(Ecto.assoc_loaded?(m.session) && m.session, do: m.session.uuid),
-      session_status: if(Ecto.assoc_loaded?(m.session) && m.session, do: m.session.status),
+      session_uuid: loaded_field(m.session, :uuid),
+      session_status: loaded_field(m.session, :status),
       joined_at: if(m.joined_at, do: to_string(m.joined_at)),
       last_activity_at: if(m.last_activity_at, do: to_string(m.last_activity_at))
     }
   end
+
+  defp loaded_field(assoc, field) when is_struct(assoc), do: Map.get(assoc, field)
+  defp loaded_field(_, _), do: nil
 end

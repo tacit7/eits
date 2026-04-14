@@ -239,6 +239,62 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     end
   end
 
+  attr :error, :string, default: nil
+  attr :file_content, :string, default: nil
+  attr :file_type, :string, default: nil
+  attr :file_path, :string, default: nil
+  attr :project, :map, required: true
+  attr :show_back_button, :boolean, default: false
+  attr :empty_label, :string, default: "Select a file"
+  attr :empty_description, :string, default: "Choose a file from the tree to view its contents"
+
+  defp file_content_pane(assigns) do
+    ~H"""
+    <%= if @error do %>
+      <div class="p-4">
+        <div class="alert alert-error">
+          <.icon name="hero-x-circle" class="shrink-0 h-6 w-6" />
+          <span>{@error}</span>
+        </div>
+      </div>
+    <% end %>
+    <%= if @file_content do %>
+      <div class="p-6">
+        <%= if @show_back_button do %>
+          <div class="flex items-center gap-2 mb-4">
+            <%= if @file_path && @file_path != "." do %>
+              <.link
+                patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
+                class="btn btn-sm btn-ghost"
+              >
+                <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
+              </.link>
+            <% end %>
+            <div>
+              <h2 class="text-lg font-semibold text-base-content">{Path.basename(@file_path)}</h2>
+              <p class="text-sm text-base-content/60">{@file_path}</p>
+            </div>
+          </div>
+        <% else %>
+          <div class="mb-4">
+            <h2 class="text-lg font-semibold text-base-content">{Path.basename(@file_path)}</h2>
+            <p class="text-sm text-base-content/60">{@file_path}</p>
+          </div>
+        <% end %>
+        <.file_content_viewer file_content={@file_content} file_type={@file_type} />
+      </div>
+    <% else %>
+      <div class="flex items-center justify-center h-full">
+        <div class="text-center">
+          <.icon name="hero-document-text" class="w-16 h-16 mx-auto text-base-content/20 mb-4" />
+          <h3 class="text-lg font-semibold text-base-content/60 mb-2">{@empty_label}</h3>
+          <p class="text-sm text-base-content/40">{@empty_description}</p>
+        </div>
+      </div>
+    <% end %>
+    """
+  end
+
   attr :file_content, :string, required: true
   attr :file_type, :string, default: nil
 
@@ -338,37 +394,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
       <!-- File Content Viewer -->
       <div class="flex-1 min-h-0 overflow-y-auto">
-        <%= if @error do %>
-          <!-- Error Message -->
-          <div class="p-4">
-            <div class="alert alert-error">
-              <.icon name="hero-x-circle" class="shrink-0 h-6 w-6" />
-              <span>{@error}</span>
-            </div>
-          </div>
-        <% end %>
-
-        <%= if @file_content do %>
-          <!-- File Content -->
-          <div class="p-6">
-            <div class="mb-4">
-              <h2 class="text-lg font-semibold text-base-content">{Path.basename(@file_path)}</h2>
-              <p class="text-sm text-base-content/60">{@file_path}</p>
-            </div>
-            <.file_content_viewer file_content={@file_content} file_type={@file_type} />
-          </div>
-        <% else %>
-          <!-- Empty State -->
-          <div class="flex items-center justify-center h-full">
-            <div class="text-center">
-              <.icon name="hero-document-text" class="w-16 h-16 mx-auto text-base-content/20 mb-4" />
-              <h3 class="text-lg font-semibold text-base-content/60 mb-2">Select a file</h3>
-              <p class="text-sm text-base-content/40">
-                Choose a file from the tree to view its contents
-              </p>
-            </div>
-          </div>
-        <% end %>
+        <.file_content_pane
+          error={@error}
+          file_content={@file_content}
+          file_type={@file_type}
+          file_path={@file_path}
+          project={@project}
+          show_back_button={false}
+          empty_label="Select a file"
+          empty_description="Choose a file from the tree to view its contents"
+        />
       </div>
     </div>
     """
@@ -378,69 +413,45 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     ~H"""
     <!-- List View -->
     <div class="h-[calc(100dvh-10rem)]">
-      <div class="p-6">
-        <%= if @error do %>
-          <!-- Error Message -->
-          <div class="alert alert-error mb-4">
-            <.icon name="hero-x-circle" class="shrink-0 h-6 w-6" />
-            <span>{@error}</span>
-          </div>
-        <% end %>
-
-        <%= if @file_content do %>
-          <!-- File Content -->
-          <div class="mb-4">
-            <div class="flex items-center gap-2 mb-4">
-              <%= if @file_path && @file_path != "." do %>
-                <.link
-                  patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
-                  class="btn btn-sm btn-ghost"
-                >
-                  <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
-                </.link>
-              <% end %>
-              <div>
-                <h2 class="text-lg font-semibold text-base-content">{Path.basename(@file_path)}</h2>
-                <p class="text-sm text-base-content/60">{@file_path}</p>
-              </div>
-            </div>
-            <.file_content_viewer file_content={@file_content} file_type={@file_type} />
-          </div>
-        <% else %>
-          <!-- Directory Listing -->
-          <%= if @files != [] do %>
-            <div class="mb-4">
-              <%= if @file_path && @file_path != "." do %>
-                <.link
-                  patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
-                  class="btn btn-sm btn-ghost mb-4"
-                >
-                  <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
-                </.link>
-              <% end %>
-              <h2 class="text-lg font-semibold text-base-content mb-2">
-                {@file_path || @project.name}
-              </h2>
-            </div>
-            <.file_listing
-              files={@files}
-              patch_fn={fn path -> ~p"/projects/#{@project.id}/files?path=#{path}" end}
-            />
-          <% else %>
-            <!-- Empty State -->
-            <div class="flex items-center justify-center h-[calc(100dvh-20rem)]">
-              <div class="text-center">
-                <.icon
-                  name="hero-document-text"
-                  class="w-16 h-16 mx-auto text-base-content/20 mb-4"
-                />
-                <h3 class="text-lg font-semibold text-base-content/60 mb-2">No files</h3>
-                <p class="text-sm text-base-content/40">This directory is empty</p>
-              </div>
+      <%= if @files != [] && !@file_content do %>
+        <!-- Directory Listing -->
+        <div class="p-6">
+          <%= if @error do %>
+            <div class="alert alert-error mb-4">
+              <.icon name="hero-x-circle" class="shrink-0 h-6 w-6" />
+              <span>{@error}</span>
             </div>
           <% end %>
-        <% end %>
-      </div>
+          <div class="mb-4">
+            <%= if @file_path && @file_path != "." do %>
+              <.link
+                patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
+                class="btn btn-sm btn-ghost mb-4"
+              >
+                <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
+              </.link>
+            <% end %>
+            <h2 class="text-lg font-semibold text-base-content mb-2">
+              {@file_path || @project.name}
+            </h2>
+          </div>
+          <.file_listing
+            files={@files}
+            patch_fn={fn path -> ~p"/projects/#{@project.id}/files?path=#{path}" end}
+          />
+        </div>
+      <% else %>
+        <.file_content_pane
+          error={@error}
+          file_content={@file_content}
+          file_type={@file_type}
+          file_path={@file_path}
+          project={@project}
+          show_back_button={true}
+          empty_label="No files"
+          empty_description="This directory is empty"
+        />
+      <% end %>
     </div>
     """
   end

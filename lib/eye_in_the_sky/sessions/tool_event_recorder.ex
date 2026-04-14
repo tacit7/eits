@@ -5,6 +5,8 @@ defmodule EyeInTheSky.Sessions.ToolEventRecorder do
   session lifecycle management.
   """
 
+  require Logger
+
   alias EyeInTheSky.Messages
   alias EyeInTheSky.Events
 
@@ -45,7 +47,6 @@ defmodule EyeInTheSky.Sessions.ToolEventRecorder do
             :ok
 
           {:error, reason} ->
-            require Logger
             Logger.warning("tool_event_recorder: failed to insert pre-event for #{tool_name}: #{inspect(reason)}")
         end
 
@@ -72,7 +73,6 @@ defmodule EyeInTheSky.Sessions.ToolEventRecorder do
             :ok
 
           {:error, reason} ->
-            require Logger
             Logger.warning("tool_event_recorder: failed to insert post-event for #{tool_name}: #{inspect(reason)}")
         end
 

@@ -249,3 +249,17 @@
   - Fix bare `_ -> catch-alls` in `with/else` clauses to `{:error, _}` for explicit error handling
   - Simplify `{:ok, x}` pattern matches with direct value assignment when error path irrelevant
 - **WORKERS.md or SESSION_MANAGER.md** — Document AgentWorker idle timeout (commit d74450ce): new IdleTimer module tracks worker idleness, auto-terminates stale workers after timeout to prevent max_children exhaustion under load; includes error recovery integration
+
+## 2026-04-13
+**Commits reviewed**: cf8107bf..472a2dff
+
+- **DM_FEATURES.md** — Document DM timer countdown UI enhancements: timer display in DM schedule modal, countdown timer component (timer_countdown.js hook), pre-fill feature for schedule editing, and new timer settings in general tab
+- **COMMAND_PALETTE.md** — Document command palette improvements: shortcut modifier key configuration (Settings > General), keyboard navigation optimizations (arrow-key optimizations), c-k reassignment from tasks to palette
+- **SECURITY.md or AUTH.md** — Document auth_controller hardening against 4 security bugs: decode_b64url crash protection, challenge reuse validation, sign_count validation, and session matching error handling; include test patterns from auth_controller_test.exs
+- **REFACTORING_PATTERNS.md or COMPONENT_ARCHITECTURE.md** — Document FileBrowserHelpers helper extraction pattern: consolidate duplicate file-browser logic from 3 LiveViews (overview/config, project/config, project/files) into shared module; include test patterns for helper-extracted modules
+- **CODE_PATTERNS.md** — Document form component refactoring pattern from advanced_cli_flags: replace multi-attribute prop drilling (13+ attrs) with config map, reduces component complexity and improves maintainability
+- **WORKERS.md** — Update worker error handling documentation: atomic job claiming patterns, type validation for args (MixTaskWorker, SpawnAgentWorker), strict float parsing, endpoint URL validation in SpawnAgentWorker
+- **REST_API.md** — Update push subscription API documentation: authentication requirement (JSON 401 on unauthenticated requests), routes in browser-session pipeline, broadcast patterns for push_subscriptions
+- **API_LIMITS.md or DM_FEATURES.md** — Document DM message limit increase: raised from default to 50 messages per fetch, includes id tiebreaker sort for pagination stability
+- **WEBHOOK_HANDLING.md** — Document Gitea webhook controller support for pull_request synchronize action (in addition to opened action)
+- **PATH_VALIDATION.md** — Document path_within? security improvements: safe_realpath usage, trailing-slash guard, sibling-prefix validation, and test coverage patterns

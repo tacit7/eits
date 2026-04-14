@@ -327,6 +327,37 @@ defmodule EyeInTheSky.Tasks do
   end
 
   @doc """
+  Completes a task in a single transaction:
+    1. Creates an annotation note with the given message
+    2. Moves the task to Done state
+
+  Returns `{:ok, %{task: task, note: note}}` or `{:error, step, changeset, changes}`.
+  """
+  def complete_task(%Task{} = task, message) when is_binary(message) and message != "" do
+    done_state_id = WorkflowState.done_id()
+
+    Ecto.Multi.new()
+    |> Ecto.Multi.run(:note, fn repo, _changes ->
+      %EyeInTheSky.Notes.Note{}
+      |> EyeInTheSky.Notes.Note.changeset(%{
+        title: "Task completed",
+        body: message,
+        parent_type: "task",
+        parent_id: to_string(task.id)
+      })
+      |> repo.insert()
+    end)
+    |> Ecto.Multi.run(:task, fn _repo, _changes ->
+      update_task_state(task, done_state_id)
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, changes} -> {:ok, changes}
+      {:error, _step, reason, _changes} -> {:error, reason}
+    end
+  end
+
+  @doc """
   Archives a task (sets archived = true). Non-destructive.
   """
   def archive_task(%Task{} = task) do

@@ -195,6 +195,7 @@ defmodule EyeInTheSkyWeb.Router do
     patch "/tasks/:id", TaskController, :update
     delete "/tasks/:id", TaskController, :delete
     post "/tasks/:id/annotations", TaskController, :annotate
+    post "/tasks/:id/complete",    TaskController, :complete
     post "/tasks/:id/sessions", TaskController, :link_session
     delete "/tasks/:id/sessions/:uuid", TaskController, :unlink_session
 

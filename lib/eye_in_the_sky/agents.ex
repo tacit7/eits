@@ -59,6 +59,28 @@ defmodule EyeInTheSky.Agents do
   end
 
   @doc """
+  Returns `{total_count, working_count}` for agents in a project.
+  Single aggregate query — use instead of loading all agents just to count them.
+  """
+  def count_agents_for_project(project_id) do
+    result =
+      Repo.one(
+        from a in Agent,
+          where: a.project_id == ^project_id,
+          select: {
+            count(a.id),
+            sum(fragment("CASE WHEN ? = 'working' THEN 1 ELSE 0 END", a.status))
+          }
+      )
+
+    case result do
+      {total, nil} -> {total, 0}
+      {total, working} -> {total, working}
+      nil -> {0, 0}
+    end
+  end
+
+  @doc """
   Gets a single agent.
 
   Raises `Ecto.NoResultsError` if the Agent does not exist.

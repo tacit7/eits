@@ -258,7 +258,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                   title="Edit scheduled message"
                 >
                   <.icon name="hero-clock" class="w-3.5 h-3.5" />
-                  <span>{if @overlay_data.active_timer.mode == :once, do: "Once", else: "Every"}</span>
+                  <span>{if @overlay_data.active_timer.mode == :once, do: "Once"}</span>
                   <span
                     id="timer-countdown"
                     phx-hook="TimerCountdown"

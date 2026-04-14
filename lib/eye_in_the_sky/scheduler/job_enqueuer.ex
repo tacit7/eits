@@ -22,7 +22,11 @@ defmodule EyeInTheSky.Scheduler.JobEnqueuer do
       {:ok, job} ->
         case ScheduledJobs.enqueue_job(job) do
           {:ok, _} = result ->
-            ScheduledJobs.mark_job_executed(job)
+            case ScheduledJobs.mark_job_executed(job) do
+              {:ok, _} -> :ok
+              {:error, reason} -> Logger.error("run_now: mark_job_executed failed for job #{job.id}: #{inspect(reason)}")
+            end
+
             result
 
           error ->
@@ -43,9 +47,25 @@ defmodule EyeInTheSky.Scheduler.JobEnqueuer do
   @impl GenServer
   def handle_info(:check_jobs, state) do
     for job <- ScheduledJobs.due_jobs() do
-      case ScheduledJobs.enqueue_job(job) do
-        {:ok, _} -> ScheduledJobs.mark_job_executed(job)
-        {:error, reason} -> Logger.error("Failed to enqueue job #{job.id}: #{inspect(reason)}")
+      case ScheduledJobs.claim_job(job) do
+        {:ok, sentinel} ->
+          case ScheduledJobs.enqueue_job(job) do
+            {:ok, _} ->
+              case ScheduledJobs.mark_job_executed(job) do
+                {:ok, _} ->
+                  :ok
+
+                {:error, reason} ->
+                  Logger.error("Failed to mark job #{job.id} executed: #{inspect(reason)}")
+              end
+
+            {:error, reason} ->
+              Logger.error("Failed to enqueue job #{job.id}: #{inspect(reason)}")
+              ScheduledJobs.release_claim(job, sentinel, job.next_run_at)
+          end
+
+        {:error, :already_claimed} ->
+          :ok
       end
     end
 

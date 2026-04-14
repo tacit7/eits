@@ -152,8 +152,10 @@ defmodule EyeInTheSky.Accounts do
     case Repo.get_by(UserSession, session_token: token) do
       nil -> :ok
       session ->
-        Repo.delete(session)
-        :ok
+        case Repo.delete(session) do
+          {:ok, _} -> :ok
+          {:error, _} -> :ok
+        end
     end
   end
 

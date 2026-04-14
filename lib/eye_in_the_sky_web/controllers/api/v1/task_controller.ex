@@ -222,35 +222,32 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   def complete(conn, %{"id" => id} = params) do
     message = params["message"]
 
-    if is_nil(message) or message == "" do
-      conn
-      |> put_status(:unprocessable_entity)
-      |> json(%{success: false, error: "message is required"})
+    with false <- is_nil(message) or message == "",
+         {:ok, task} <- Tasks.get_task(id),
+         {:ok, %{task: updated}} <- Tasks.complete_task(task, message) do
+      json(conn, %{
+        success: true,
+        message: "Task completed",
+        task: ApiPresenter.present_task(updated)
+      })
     else
-      case Tasks.get_task(id) do
-        {:error, :not_found} ->
-          conn |> put_status(:not_found) |> json(%{error: "Task not found"})
+      true ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{success: false, error: "message is required"})
 
-        {:ok, task} ->
-          case Tasks.complete_task(task, message) do
-            {:ok, %{task: updated}} ->
-              json(conn, %{
-                success: true,
-                message: "Task completed",
-                task: ApiPresenter.present_task(updated)
-              })
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "Task not found"})
 
-            {:error, %Ecto.Changeset{} = changeset} ->
-              conn
-              |> put_status(:unprocessable_entity)
-              |> json(%{success: false, errors: translate_errors(changeset)})
+      {:error, %Ecto.Changeset{} = changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{success: false, errors: translate_errors(changeset)})
 
-            {:error, _reason} ->
-              conn
-              |> put_status(:unprocessable_entity)
-              |> json(%{success: false, error: "Failed to complete task"})
-          end
-      end
+      {:error, _reason} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{success: false, error: "Failed to complete task"})
     end
   end
 

@@ -17,27 +17,23 @@ defmodule EyeInTheSky.Workers.JobDispatcherWorker do
 
     for job <- jobs_mod.due_jobs() do
       case jobs_mod.claim_job(job) do
-        {:ok, sentinel} ->
-          case jobs_mod.enqueue_job(job) do
-            {:ok, _} ->
-              case jobs_mod.mark_job_executed(job) do
-                {:ok, _} ->
-                  :ok
-
-                {:error, reason} ->
-                  Logger.error("JobDispatcherWorker: mark_job_executed failed for job #{job.id}: #{inspect(reason)}")
-              end
-
-            {:error, reason} ->
-              Logger.error("JobDispatcherWorker: failed to enqueue job #{job.id}: #{inspect(reason)}")
-              jobs_mod.release_claim(job, sentinel, job.next_run_at)
-          end
-
-        {:error, :already_claimed} ->
-          :ok
+        {:ok, sentinel} -> dispatch_job(jobs_mod, job, sentinel)
+        {:error, :already_claimed} -> :ok
       end
     end
 
     :ok
+  end
+
+  defp dispatch_job(jobs_mod, job, sentinel) do
+    with {:ok, _} <- jobs_mod.enqueue_job(job),
+         {:ok, _} <- jobs_mod.mark_job_executed(job) do
+      :ok
+    else
+      {:error, reason} ->
+        Logger.error("JobDispatcherWorker: failed for job #{job.id}: #{inspect(reason)}")
+        jobs_mod.release_claim(job, sentinel, job.next_run_at)
+        :error
+    end
   end
 end

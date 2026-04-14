@@ -377,6 +377,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               session={@agent}
               agent={@agent}
               message_search_query={@message_data.message_search_query}
+              codex_raw_lines={@codex_raw_lines}
             />
           <% "tasks" -> %>
             <TasksTab.tasks_tab tasks={@task_data.tasks} />
@@ -394,6 +395,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               session={@agent}
               agent={@agent}
               message_search_query={@message_data.message_search_query}
+              codex_raw_lines={@codex_raw_lines}
             />
         <% end %>
       </div>

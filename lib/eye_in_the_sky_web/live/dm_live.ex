@@ -388,6 +388,13 @@ defmodule EyeInTheSkyWeb.DmLive do
     {:noreply, assign(socket, :active_timer, timer_or_nil)}
   end
 
+  # Raw Codex JSONL line — prepend, cap at 100
+  @impl true
+  def handle_info({:codex_raw_line, line}, socket) do
+    lines = [line | socket.assigns.codex_raw_lines] |> Enum.take(100)
+    {:noreply, assign(socket, :codex_raw_lines, lines)}
+  end
+
   @impl true
   def handle_info(msg, socket) do
     Logger.debug("Unhandled message in DM LiveView: #{inspect(msg)}")

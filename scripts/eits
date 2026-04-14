@@ -206,7 +206,7 @@ cmd_tasks() {
       local id="${1:-}"; need id
       _patch "/tasks/$id" '{"state":"done"}'
       ;;
-    start)
+    start|claim)
       local id="${1:-}"; need id
       # Auto-link current session atomically with the state transition
       local _sess="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
@@ -301,7 +301,7 @@ cmd_tasks() {
       echo "{\"success\":true,\"task_id\":\"$task_id\",\"tag_id\":\"$tag_id\"}"
       ;;
     *)
-      echo "usage: eits tasks <list|get|create|update|done|begin|start|complete|delete|annotate|link-session|unlink-session|tag>"
+      echo "usage: eits tasks <list|get|create|update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|tag>"
       ;;
   esac
 }
@@ -854,7 +854,7 @@ Base URL: ${BASE_URL}  (override: EITS_URL=<url>)
 
 Commands:
   sessions  list|get|create|update|end|context
-  tasks     list|get|create|update|done|start|delete|annotate|link-session|unlink-session
+  tasks     list|get|create|update|done|start|claim|delete|annotate|link-session|unlink-session
   notes     list|get|create|update
   projects  list|get|create
   agents    list|get

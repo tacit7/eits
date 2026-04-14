@@ -756,6 +756,95 @@ cmd_teams() {
   esac
 }
 
+# ── worktree ──────────────────────────────────────────────────────────────────
+# NOTE: Scoped to EITS Elixir projects (.claude/worktrees/ layout, mix compile).
+
+cmd_worktree() {
+  local subcmd="${1:-}"; shift || true
+  case "$subcmd" in
+    create)
+      local branch="${1:-}"; need branch; shift || true
+      local project_path="${EITS_PROJECT_PATH:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --project-path) project_path="$2"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+
+      local wt_path="$project_path/.claude/worktrees/$branch"
+
+      if [[ -d "$wt_path" ]] && [[ -e "$wt_path/.git" ]]; then
+        echo "Worktree already exists at $wt_path — reusing"
+      else
+        echo "Creating worktree: $wt_path (branch: $branch)"
+        git -C "$project_path" worktree add "$wt_path" -b "$branch" 2>&1 \
+          || die "git worktree add failed. If branch exists: git branch -D $branch"
+      fi
+
+      if [[ ! -e "$wt_path/deps" ]]; then
+        local deps_source="$project_path/deps"
+        [[ -d "$deps_source" ]] || die "deps not found at $deps_source — run mix deps.get first"
+        ln -s ../../../deps "$wt_path/deps" \
+          || echo "warning: could not symlink deps (may already exist)"
+      fi
+
+      echo "Verifying compile..."
+      local clean_path
+      clean_path=$(echo "$PATH" | tr ':' '\n' | grep -Ev '_build/prod/rel|/erts-' | tr '\n' ':' | sed 's/:$//')
+
+      local output exit_code
+      output=$(cd "$wt_path" && PATH="$clean_path" mix compile 2>&1) && exit_code=0 || exit_code=$?
+
+      if [[ $exit_code -ne 0 ]]; then
+        echo "Compile failed:"
+        echo "$output" | tail -20
+        die "Worktree setup failed — fix compile errors before proceeding"
+      fi
+
+      echo ""
+      echo "Worktree ready:"
+      echo "  Path:   $wt_path"
+      echo "  Branch: $branch"
+      echo ""
+      echo "Usage:"
+      echo "  cd $wt_path"
+      echo "  export PATH=\$(echo \"\$PATH\" | tr ':' '\n' | grep -Ev '_build/prod/rel|/erts-' | tr '\n' ':' | sed 's/:\$//')"
+      ;;
+
+    remove)
+      local branch="${1:-}"; need branch; shift || true
+      local project_path="${EITS_PROJECT_PATH:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --project-path) project_path="$2"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+
+      local wt_path="$project_path/.claude/worktrees/$branch"
+
+      if [[ -L "$wt_path/deps" ]]; then
+        unlink "$wt_path/deps" 2>/dev/null || true
+      fi
+
+      if [[ -d "$wt_path" ]]; then
+        git -C "$project_path" worktree remove "$wt_path" --force 2>/dev/null || true
+      fi
+
+      git -C "$project_path" branch -D "$branch" 2>/dev/null || true
+
+      echo "Removed: $branch"
+      ;;
+
+    *)
+      echo "usage: eits worktree <create|remove>"
+      echo ""
+      echo "NOTE: scoped to EITS Elixir projects (.claude/worktrees/ layout, mix compile verification)"
+      ;;
+  esac
+}
+
 # ── help ──────────────────────────────────────────────────────────────────────
 
 usage() {
@@ -775,6 +864,7 @@ Commands:
   channels  list|send|messages
   prompts   list|get
   teams     list|get|create|delete|members|join|status|update-member|leave|my-teams
+  worktree  create|remove   (EITS Elixir projects only)
 
 Requires: curl, jq
 EOF
@@ -795,6 +885,7 @@ case "$cmd" in
   channels)  cmd_channels  "$@" ;;
   prompts)   cmd_prompts   "$@" ;;
   teams)     cmd_teams     "$@" ;;
+  worktree)  cmd_worktree "$@" ;;
   help|--help|-h) usage ;;
   "") usage; exit 0 ;;
   *) die "unknown command: $cmd" ;;

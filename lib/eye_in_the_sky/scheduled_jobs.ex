@@ -25,8 +25,13 @@ defmodule EyeInTheSky.ScheduledJobs do
   # Scheduling math — delegated to JobScheduler
   # ---------------------------------------------------------------------------
 
-  defdelegate compute_next_run_at(schedule_type, schedule_value, from \\ nil, timezone \\ "Etc/UTC"),
-    to: CronParser
+  defdelegate compute_next_run_at(
+                schedule_type,
+                schedule_value,
+                from \\ nil,
+                timezone \\ "Etc/UTC"
+              ),
+              to: CronParser
 
   defdelegate due_jobs(), to: JobScheduler
   defdelegate claim_job(job), to: JobScheduler
@@ -181,8 +186,13 @@ defmodule EyeInTheSky.ScheduledJobs do
     case enqueue_job(job) do
       {:ok, _} = result ->
         case JobScheduler.mark_job_executed(job) do
-          {:ok, _} -> :ok
-          {:error, reason} -> Logger.warning("run_now: mark_job_executed failed for job #{job.id}: #{inspect(reason)}")
+          {:ok, _} ->
+            :ok
+
+          {:error, reason} ->
+            Logger.warning(
+              "run_now: mark_job_executed failed for job #{job.id}: #{inspect(reason)}"
+            )
         end
 
         result
@@ -249,7 +259,9 @@ defmodule EyeInTheSky.ScheduledJobs do
       end
 
     %{"job_id" => job.id}
-    |> worker.new(unique: [period: 30, fields: [:args, :worker], states: [:available, :scheduled, :executing]])
+    |> worker.new(
+      unique: [period: 30, fields: [:args, :worker], states: [:available, :scheduled, :executing]]
+    )
     |> Oban.insert()
   end
 

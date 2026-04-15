@@ -29,7 +29,7 @@ defmodule EyeInTheSky.AgentDefinitions do
     AgentDefinition
     |> where([d], is_nil(d.missing_at))
     |> maybe_filter_project(project_id)
-    |> order_by([d], [desc: d.scope, asc: d.slug])
+    |> order_by([d], desc: d.scope, asc: d.slug)
     |> Repo.all()
   end
 
@@ -41,7 +41,7 @@ defmodule EyeInTheSky.AgentDefinitions do
     AgentDefinition
     |> where([d], is_nil(d.missing_at))
     |> where([d], d.project_id == ^project_id or d.scope == "global")
-    |> order_by([d], [desc: d.scope, asc: d.slug])
+    |> order_by([d], desc: d.scope, asc: d.slug)
     |> Repo.all()
   end
 
@@ -286,7 +286,8 @@ defmodule EyeInTheSky.AgentDefinitions do
             classify_yaml_line(String.trim(line), acc, current_key)
           end)
 
-        attrs = Map.new(raw_attrs, fn {k, v} -> {k, if(is_list(v), do: Enum.reverse(v), else: v)} end)
+        attrs =
+          Map.new(raw_attrs, fn {k, v} -> {k, if(is_list(v), do: Enum.reverse(v), else: v)} end)
 
         %{
           display_name: attrs["name"],
@@ -301,8 +302,7 @@ defmodule EyeInTheSky.AgentDefinitions do
   end
 
   defp classify_yaml_line(trimmed, acc, current_key) do
-    case {Regex.run(~r/^(\w+):\s+(.+)$/, trimmed),
-          Regex.run(~r/^(\w+):\s*$/, trimmed),
+    case {Regex.run(~r/^(\w+):\s+(.+)$/, trimmed), Regex.run(~r/^(\w+):\s*$/, trimmed),
           Regex.run(~r/^-\s+(.+)$/, trimmed)} do
       {[_, key, value], _, _} ->
         # key: value (inline)

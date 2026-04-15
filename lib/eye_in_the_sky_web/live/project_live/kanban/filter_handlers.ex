@@ -37,7 +37,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.FilterHandlers do
     filter = if current == new_val, do: nil, else: new_val
 
     {:noreply,
-     socket |> assign(:filter_due_date, filter) |> KanbanFilters.apply_filters() |> assign_filter_count()}
+     socket
+     |> assign(:filter_due_date, filter)
+     |> KanbanFilters.apply_filters()
+     |> assign_filter_count()}
   end
 
   def handle_update_filter(%{"field" => "activity", "value" => value}, socket) do
@@ -46,7 +49,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.FilterHandlers do
     filter = if current == new_val, do: nil, else: new_val
 
     {:noreply,
-     socket |> assign(:filter_activity, filter) |> KanbanFilters.apply_filters() |> assign_filter_count()}
+     socket
+     |> assign(:filter_activity, filter)
+     |> KanbanFilters.apply_filters()
+     |> assign_filter_count()}
   end
 
   def handle_update_filter(%{"field" => "priority", "value" => priority}, socket) do
@@ -70,7 +76,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.FilterHandlers do
         else: MapSet.put(current_tags, tag)
 
     {:noreply,
-     socket |> assign(:filter_tags, updated_tags) |> KanbanFilters.apply_filters() |> assign_filter_count()}
+     socket
+     |> assign(:filter_tags, updated_tags)
+     |> KanbanFilters.apply_filters()
+     |> assign_filter_count()}
   end
 
   def handle_update_filter(%{"field" => "tag_mode", "value" => mode}, socket) do
@@ -91,7 +100,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.FilterHandlers do
 
   def handle_toggle_show_completed(socket) do
     {:noreply,
-     socket |> assign(:show_completed, !socket.assigns.show_completed) |> KanbanFilters.load_tasks()}
+     socket
+     |> assign(:show_completed, !socket.assigns.show_completed)
+     |> KanbanFilters.load_tasks()}
   end
 
   def handle_toggle_show_archived(socket) do

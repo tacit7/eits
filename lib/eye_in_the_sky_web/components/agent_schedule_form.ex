@@ -54,8 +54,10 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
 
   defp form_body(assigns) do
     config =
-      case Jason.decode((if assigns.job, do: assigns.job.config) || "{}") do
-        {:ok, m} -> m
+      case Jason.decode(if(assigns.job, do: assigns.job.config) || "{}") do
+        {:ok, m} ->
+          m
+
         {:error, reason} ->
           require Logger
           Logger.warning("[AgentScheduleForm] Failed to decode job config: #{inspect(reason)}")
@@ -128,7 +130,9 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
       <.advanced_cli_flags config={@config} />
 
       <div class="flex justify-end gap-2 pt-2">
-        <button type="button" class="btn btn-ghost btn-sm min-h-[44px]" phx-click="cancel_schedule">Cancel</button>
+        <button type="button" class="btn btn-ghost btn-sm min-h-[44px]" phx-click="cancel_schedule">
+          Cancel
+        </button>
         <button type="submit" class="btn btn-primary btn-sm min-h-[44px]">Save Schedule</button>
       </div>
     </form>
@@ -409,8 +413,12 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
       </label>
       <select name="schedule[permission_mode]" class="select select-bordered select-sm w-full">
         <option value="" selected={@permission_mode == ""}>Default</option>
-        <option value="acceptEdits" selected={@permission_mode == "acceptEdits"}>acceptEdits — auto-accept file edits</option>
-        <option value="bypassPermissions" selected={@permission_mode == "bypassPermissions"}>bypassPermissions — skip all prompts</option>
+        <option value="acceptEdits" selected={@permission_mode == "acceptEdits"}>
+          acceptEdits — auto-accept file edits
+        </option>
+        <option value="bypassPermissions" selected={@permission_mode == "bypassPermissions"}>
+          bypassPermissions — skip all prompts
+        </option>
         <option value="dontAsk" selected={@permission_mode == "dontAsk"}>dontAsk — never ask</option>
         <option value="plan" selected={@permission_mode == "plan"}>plan — read-only</option>
       </select>
@@ -426,7 +434,9 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
         class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
       />
       <label class="label">
-        <span class="label-text-alt text-base-content/40">Comma-separated. Supports wildcards: Bash(git *)</span>
+        <span class="label-text-alt text-base-content/40">
+          Comma-separated. Supports wildcards: Bash(git *)
+        </span>
       </label>
     </div>
     """
@@ -515,7 +525,9 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
         />
         <span class="label-text text-xs">
           Skip permissions
-          <span class="font-mono text-base-content/40 text-xs ml-1">--dangerously-skip-permissions</span>
+          <span class="font-mono text-base-content/40 text-xs ml-1">
+            --dangerously-skip-permissions
+          </span>
         </span>
       </label>
       <label class="label cursor-pointer justify-start gap-2 py-1">
@@ -527,8 +539,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
           class="checkbox checkbox-sm checkbox-primary"
         />
         <span class="label-text text-xs">
-          Chrome integration
-          <span class="font-mono text-base-content/40 text-xs ml-1">--chrome</span>
+          Chrome integration <span class="font-mono text-base-content/40 text-xs ml-1">--chrome</span>
         </span>
       </label>
       <label class="label cursor-pointer justify-start gap-2 py-1">

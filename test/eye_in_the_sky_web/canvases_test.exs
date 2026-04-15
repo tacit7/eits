@@ -6,16 +6,20 @@ defmodule EyeInTheSkyWeb.CanvasesTest do
   defp uniq, do: System.unique_integer([:positive])
 
   defp create_session do
-    {:ok, agent} = EyeInTheSky.Agents.create_agent(%{
-      name: "canvas-test-#{uniq()}",
-      status: "active"
-    })
-    {:ok, session} = EyeInTheSky.Sessions.create_session(%{
-      name: "canvas-session-#{uniq()}",
-      agent_id: agent.id,
-      started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-      status: "stopped"
-    })
+    {:ok, agent} =
+      EyeInTheSky.Agents.create_agent(%{
+        name: "canvas-test-#{uniq()}",
+        status: "active"
+      })
+
+    {:ok, session} =
+      EyeInTheSky.Sessions.create_session(%{
+        name: "canvas-session-#{uniq()}",
+        agent_id: agent.id,
+        started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+        status: "stopped"
+      })
+
     session
   end
 
@@ -70,7 +74,15 @@ defmodule EyeInTheSkyWeb.CanvasesTest do
     {:ok, canvas} = Canvases.create_canvas(%{name: "F-#{uniq()}"})
     session = create_session()
     {:ok, cs} = Canvases.add_session(canvas.id, session.id)
-    assert {:ok, updated} = Canvases.update_window_layout(cs.id, %{pos_x: 100, pos_y: 200, width: 400, height: 300})
+
+    assert {:ok, updated} =
+             Canvases.update_window_layout(cs.id, %{
+               pos_x: 100,
+               pos_y: 200,
+               width: 400,
+               height: 300
+             })
+
     assert updated.pos_x == 100
     assert updated.width == 400
   end

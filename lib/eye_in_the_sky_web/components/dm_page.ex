@@ -28,17 +28,23 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :commits, :list, default: []
   attr :diff_cache, :map, default: %{}
   attr :notes, :list, default: []
+  attr :codex_raw_lines, :list, default: []
   attr :slash_items, :list, default: []
   attr :session_context, :map, default: nil
   attr :agent_record, :map, default: nil
   # Grouped maps replacing 10 individual attrs
   attr :message_data, :map,
-    default: %{messages: [], has_more_messages: false, message_search_query: "", queued_prompts: []}
+    default: %{
+      messages: [],
+      has_more_messages: false,
+      message_search_query: "",
+      queued_prompts: []
+    }
 
   attr :task_data, :map, default: %{tasks: [], current_task: nil}
 
-  attr :overlay_data, :map,
-    default: %{active_overlay: nil, active_timer: nil, reloading: false}
+  attr :overlay_data, :map, default: %{active_overlay: nil, active_timer: nil, reloading: false}
+
   def dm_page(assigns) do
     assigns = assign(assigns, :tabs, @tabs)
 
@@ -50,7 +56,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       phx-hook="DragUpload"
     >
       <%!-- Reload confirm modal --%>
-      <dialog id="dm-reload-confirm-modal" class="modal modal-bottom sm:modal-middle" phx-hook="ReloadConfirmModal">
+      <dialog
+        id="dm-reload-confirm-modal"
+        class="modal modal-bottom sm:modal-middle"
+        phx-hook="ReloadConfirmModal"
+      >
         <div class="modal-box pb-[env(safe-area-inset-bottom)]">
           <h3 class="font-semibold text-base">Reload from file?</h3>
           <p class="py-3 text-sm text-base-content/70">
@@ -105,7 +115,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                         |> JS.set_attribute({"value", preset}, to: "#timer-preset-input")
                       }
                       class="btn btn-sm btn-outline"
-                    >{preset}</button>
+                    >
+                      {preset}
+                    </button>
                   <% end %>
                 </div>
               </div>
@@ -121,13 +133,21 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                         |> JS.set_attribute({"value", preset}, to: "#timer-preset-input")
                       }
                       class="btn btn-sm btn-outline"
-                    >{preset}</button>
+                    >
+                      {preset}
+                    </button>
                   <% end %>
                 </div>
               </div>
 
               <div class="modal-action">
-                <button type="button" phx-click="close_schedule_modal" class="btn btn-ghost btn-sm min-h-[44px]">Cancel</button>
+                <button
+                  type="button"
+                  phx-click="close_schedule_modal"
+                  class="btn btn-ghost btn-sm min-h-[44px]"
+                >
+                  Cancel
+                </button>
               </div>
             </form>
           </div>
@@ -184,7 +204,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               class="text-base font-semibold text-base-content/85 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 w-full text-center placeholder:text-base-content/20 transition-colors"
             />
             <%= if @agent_record && Ecto.assoc_loaded?(@agent_record.agent_definition) && @agent_record.agent_definition && @agent_record.agent_definition.display_name do %>
-              <span class="text-xs text-base-content/35 truncate">{@agent_record.agent_definition.display_name}</span>
+              <span class="text-xs text-base-content/35 truncate">
+                {@agent_record.agent_definition.display_name}
+              </span>
             <% end %>
           </div>
         </div>
@@ -263,7 +285,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                     id="timer-countdown"
                     phx-hook="TimerCountdown"
                     data-fire-at={DateTime.to_iso8601(@overlay_data.active_timer.next_fire_at)}
-                  >--:--</span>
+                  >
+                    --:--
+                  </span>
                 </button>
               <% end %>
 
@@ -421,7 +445,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             provider={@agent.provider}
             context_used={@session_state.context_used}
             context_window={@session_state.context_window}
-            display_name={if @agent_record && Ecto.assoc_loaded?(@agent_record.agent_definition) && @agent_record.agent_definition, do: @agent_record.agent_definition.display_name}
+            display_name={
+              if @agent_record && Ecto.assoc_loaded?(@agent_record.agent_definition) &&
+                   @agent_record.agent_definition,
+                 do: @agent_record.agent_definition.display_name
+            }
             session_cli_opts={assigns[:session_cli_opts] || []}
           />
         </div>

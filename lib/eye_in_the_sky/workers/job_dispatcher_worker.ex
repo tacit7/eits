@@ -39,7 +39,10 @@ defmodule EyeInTheSky.Workers.JobDispatcherWorker do
         :error
 
       {:mark, {:error, reason}} ->
-        Logger.error("JobDispatcherWorker: mark_job_executed failed for job #{job.id}: #{inspect(reason)}")
+        Logger.error(
+          "JobDispatcherWorker: mark_job_executed failed for job #{job.id}: #{inspect(reason)}"
+        )
+
         :error
     end
   end

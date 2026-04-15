@@ -1215,7 +1215,14 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
       {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
       {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
 
-      reason = {:claude_result_error, %{errors: %{"type" => "billing_error", "message" => "No credits"}, result: nil, session_id: session.uuid}}
+      reason =
+        {:claude_result_error,
+         %{
+           errors: %{"type" => "billing_error", "message" => "No credits"},
+           result: nil,
+           session_id: session.uuid
+         }}
+
       send(worker_pid, {:claude_error, sdk_ref, reason})
 
       Process.sleep(200)
@@ -1229,7 +1236,14 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
       {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
       {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
 
-      reason = {:claude_result_error, %{errors: %{"type" => "authentication_error", "message" => "Bad key"}, result: nil, session_id: session.uuid}}
+      reason =
+        {:claude_result_error,
+         %{
+           errors: %{"type" => "authentication_error", "message" => "Bad key"},
+           result: nil,
+           session_id: session.uuid
+         }}
+
       send(worker_pid, {:claude_error, sdk_ref, reason})
 
       Process.sleep(200)
@@ -1243,7 +1257,10 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
       {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
       {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
 
-      reason = {:claude_result_error, %{errors: "billing_error: no credits", result: nil, session_id: session.uuid}}
+      reason =
+        {:claude_result_error,
+         %{errors: "billing_error: no credits", result: nil, session_id: session.uuid}}
+
       send(worker_pid, {:claude_error, sdk_ref, reason})
 
       Process.sleep(200)
@@ -1325,7 +1342,11 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
 
       # Simulate that kill-and-retry already happened by setting kill_retry: true in job context
       :sys.replace_state(worker_pid, fn state ->
-        updated_job = %{state.current_job | context: Map.put(state.current_job.context, :kill_retry, true)}
+        updated_job = %{
+          state.current_job
+          | context: Map.put(state.current_job.context, :kill_retry, true)
+        }
+
         %{state | current_job: updated_job}
       end)
 
@@ -1348,7 +1369,8 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
 
   describe "watchdog timer" do
     @tag :watchdog
-    test "force-transitions worker to :failed and marks message failed when :claude_complete never arrives", ctx do
+    test "force-transitions worker to :failed and marks message failed when :claude_complete never arrives",
+         ctx do
       Application.put_env(:eye_in_the_sky, :watchdog_timeout_ms, 50)
       on_exit(fn -> Application.delete_env(:eye_in_the_sky, :watchdog_timeout_ms) end)
 

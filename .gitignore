@@ -84,6 +84,9 @@ priv/cert/
 
 # Local env vars (use .env.example as template)
 .env
+.env.*
+.env_*
+!.env.example
 deps
 assets/node_modules
 

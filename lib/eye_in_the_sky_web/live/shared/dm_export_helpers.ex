@@ -83,13 +83,17 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
         Messages.delete_session_messages(session_id)
         imported = CodexImporter.import_messages(messages, session_id)
         socket = load_messages_fn.(socket)
-        {:noreply, put_flash(socket, :info, "Reloaded #{imported} messages from Codex session file")}
+
+        {:noreply,
+         put_flash(socket, :info, "Reloaded #{imported} messages from Codex session file")}
 
       {:error, :not_found} ->
-        {:noreply, put_flash(socket, :error, "No Codex session file found for thread #{thread_id}")}
+        {:noreply,
+         put_flash(socket, :error, "No Codex session file found for thread #{thread_id}")}
 
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to reload Codex session: #{inspect(reason)}")}
+        {:noreply,
+         put_flash(socket, :error, "Failed to reload Codex session: #{inspect(reason)}")}
     end
   end
 end

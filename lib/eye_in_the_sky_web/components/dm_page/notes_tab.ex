@@ -94,5 +94,4 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
     <% end %>
     """
   end
-
 end

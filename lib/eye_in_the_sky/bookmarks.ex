@@ -89,7 +89,9 @@ defmodule EyeInTheSky.Bookmarks do
   """
   def get_bookmark_by(bookmark_type, identifier) do
     case build_bookmark_query(bookmark_type, identifier) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       query ->
         case Repo.one(query) do
           nil -> {:error, :not_found}

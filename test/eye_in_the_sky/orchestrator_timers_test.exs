@@ -162,7 +162,9 @@ defmodule EyeInTheSky.OrchestratorTimersTest do
   end
 
   describe "delivery failure policy" do
-    test "one-shot removes itself even when delivery fails (no worker for session)", %{server: pid} do
+    test "one-shot removes itself even when delivery fails (no worker for session)", %{
+      server: pid
+    } do
       # session_id 99999 has no AgentWorker — send_message returns error
       assert {:ok, :scheduled} = GenServer.call(pid, {:schedule_once, 99_999, 100, "test"})
       Process.sleep(200)

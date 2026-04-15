@@ -59,7 +59,9 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.TaskDialog do
             />
           </div>
           <div class="flex justify-end gap-2 pt-1">
-            <button data-qct-cancel type="button" class="btn btn-ghost btn-sm min-h-[44px]">Cancel</button>
+            <button data-qct-cancel type="button" class="btn btn-ghost btn-sm min-h-[44px]">
+              Cancel
+            </button>
             <button type="submit" class="btn btn-primary btn-sm min-h-[44px]">Create Task</button>
           </div>
         </form>

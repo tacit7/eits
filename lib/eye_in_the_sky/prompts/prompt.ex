@@ -18,8 +18,7 @@ defmodule EyeInTheSky.Prompts.Prompt do
     field :created_at, :naive_datetime
     field :updated_at, :naive_datetime
 
-    has_many :scheduled_jobs, EyeInTheSky.ScheduledJobs.ScheduledJob,
-      foreign_key: :prompt_id
+    has_many :scheduled_jobs, EyeInTheSky.ScheduledJobs.ScheduledJob, foreign_key: :prompt_id
   end
 
   @doc false

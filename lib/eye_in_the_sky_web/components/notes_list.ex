@@ -326,5 +326,4 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
         if String.length(stripped) > 0, do: String.slice(stripped, 0, 120), else: nil
     end
   end
-
 end

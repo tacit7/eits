@@ -403,7 +403,8 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       Map.has_key?(assigns.input, "content")
   end
 
-  defp speak_body?(assigns), do: String.ends_with?(assigns.name, "i-speak") and assigns.detail != ""
+  defp speak_body?(assigns),
+    do: String.ends_with?(assigns.name, "i-speak") and assigns.detail != ""
 
   defp json_body?(assigns) do
     is_map(assigns.input) and map_size(assigns.input) > 0 and

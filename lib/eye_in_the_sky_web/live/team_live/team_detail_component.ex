@@ -48,11 +48,21 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
 
       <%!-- Stats row --%>
       <div class="flex items-center gap-3 text-[11px] text-base-content/40">
-        <span><span class="font-mono font-semibold text-base-content/70">{length(@team.members)}</span> members</span>
+        <span>
+          <span class="font-mono font-semibold text-base-content/70">{length(@team.members)}</span>
+          members
+        </span>
         <span class="text-base-content/20">·</span>
-        <span><span class="font-mono font-semibold text-success">{@active_members}</span> active</span>
+        <span>
+          <span class="font-mono font-semibold text-success">{@active_members}</span> active
+        </span>
         <span class="text-base-content/20">·</span>
-        <span><span class="font-mono font-semibold text-base-content/70">{@done_tasks}/{@total_tasks}</span> tasks done</span>
+        <span>
+          <span class="font-mono font-semibold text-base-content/70">
+            {@done_tasks}/{@total_tasks}
+          </span>
+          tasks done
+        </span>
       </div>
 
       <%!-- Task progress bar --%>

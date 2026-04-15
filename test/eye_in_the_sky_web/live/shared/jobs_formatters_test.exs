@@ -9,27 +9,39 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsFormattersTest do
 
   describe "format_schedule/1" do
     test "interval in hours" do
-      assert "Every 2h" == JobsFormatters.format_schedule(%{schedule_type: "interval", schedule_value: "7200"})
+      assert "Every 2h" ==
+               JobsFormatters.format_schedule(%{
+                 schedule_type: "interval",
+                 schedule_value: "7200"
+               })
     end
 
     test "interval in minutes" do
-      assert "Every 15m" == JobsFormatters.format_schedule(%{schedule_type: "interval", schedule_value: "900"})
+      assert "Every 15m" ==
+               JobsFormatters.format_schedule(%{schedule_type: "interval", schedule_value: "900"})
     end
 
     test "interval in seconds" do
-      assert "Every 30s" == JobsFormatters.format_schedule(%{schedule_type: "interval", schedule_value: "30"})
+      assert "Every 30s" ==
+               JobsFormatters.format_schedule(%{schedule_type: "interval", schedule_value: "30"})
     end
 
     test "interval with non-numeric value returns raw" do
-      assert "bad" == JobsFormatters.format_schedule(%{schedule_type: "interval", schedule_value: "bad"})
+      assert "bad" ==
+               JobsFormatters.format_schedule(%{schedule_type: "interval", schedule_value: "bad"})
     end
 
     test "cron delegates to describe_cron" do
-      assert "Daily at 3 AM" == JobsFormatters.format_schedule(%{schedule_type: "cron", schedule_value: "0 3 * * *"})
+      assert "Daily at 3 AM" ==
+               JobsFormatters.format_schedule(%{
+                 schedule_type: "cron",
+                 schedule_value: "0 3 * * *"
+               })
     end
 
     test "unknown schedule type" do
-      assert "?" == JobsFormatters.format_schedule(%{schedule_type: "unknown", schedule_value: "x"})
+      assert "?" ==
+               JobsFormatters.format_schedule(%{schedule_type: "unknown", schedule_value: "x"})
     end
 
     test "nil input" do

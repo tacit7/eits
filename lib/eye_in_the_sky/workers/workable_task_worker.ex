@@ -78,7 +78,8 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
     if spawned == 0 and skipped == 0 and failed > 0 do
       {:error, "All #{failed} spawn(s) failed for tag=#{config.tag_name}"}
     else
-      {:ok, "Spawned #{spawned} agents for tag=#{config.tag_name} (#{skipped} skipped, #{failed} failed)"}
+      {:ok,
+       "Spawned #{spawned} agents for tag=#{config.tag_name} (#{skipped} skipped, #{failed} failed)"}
     end
   end
 
@@ -89,7 +90,10 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
 
         case result do
           {:error, _} ->
-            Logger.warning("WorkableTaskWorker: spawn failed for task ##{task.id}, rolling back to To Do")
+            Logger.warning(
+              "WorkableTaskWorker: spawn failed for task ##{task.id}, rolling back to To Do"
+            )
+
             reset_to_todo(task.id)
             result
 
@@ -98,7 +102,10 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
         end
 
       {:ok, :already_claimed} ->
-        Logger.info("WorkableTaskWorker: task ##{task.id} already claimed by another worker, skipping")
+        Logger.info(
+          "WorkableTaskWorker: task ##{task.id} already claimed by another worker, skipping"
+        )
+
         {:ok, :skipped}
     end
   end

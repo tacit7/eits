@@ -30,15 +30,15 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.GridCard do
           </div>
           <.priority_badge priority={@task.priority} />
         </div>
-
-        <!-- Description -->
+        
+    <!-- Description -->
         <%= if @task.description do %>
           <p class="text-sm text-base-content/60 line-clamp-3 mb-3">
             {@task.description}
           </p>
         <% end %>
-
-        <!-- Task Metadata -->
+        
+    <!-- Task Metadata -->
         <div class="flex flex-wrap items-center gap-2 mt-auto pt-3 border-t border-base-300">
           <%= if @task.uuid do %>
             <span class="badge badge-ghost badge-sm font-mono text-xs">

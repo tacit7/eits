@@ -61,7 +61,10 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
 
   def bulk_action_bar(assigns) do
     ~H"""
-    <div :if={@session_filter == "archived" && @agents != []} class="mt-2 flex items-center gap-3 px-2 py-1.5">
+    <div
+      :if={@session_filter == "archived" && @agents != []}
+      class="mt-2 flex items-center gap-3 px-2 py-1.5"
+    >
       <input
         type="checkbox"
         checked={MapSet.size(@selected_ids) == length(@agents)}
@@ -101,8 +104,10 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
             target="_blank"
             class="flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors"
           >
-            <.icon name="hero-arrow-top-right-on-square-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
-            Open in new tab
+            <.icon
+              name="hero-arrow-top-right-on-square-mini"
+              class="w-4 h-4 text-base-content/60 flex-shrink-0"
+            /> Open in new tab
           </a>
         <% end %>
         <button
@@ -115,7 +120,11 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
           Rename
         </button>
         <%!-- Canvas submenu --%>
-        <.canvas_submenu agent={@agent} canvases={@canvases} show_new_canvas_for={@show_new_canvas_for} />
+        <.canvas_submenu
+          agent={@agent}
+          canvases={@canvases}
+          show_new_canvas_for={@show_new_canvas_for}
+        />
         <%= if not is_nil(@agent.agent) && not is_nil(@agent.agent.uuid) && not is_nil(@agent.uuid) do %>
           <button
             id={"bookmark-btn-#{@agent.uuid}"}
@@ -141,8 +150,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
               phx-value-session_id={@agent.id}
               class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-info hover:bg-base-content/10 transition-colors text-left"
             >
-              <.icon name="hero-arrow-up-tray-mini" class="w-4 h-4 flex-shrink-0" />
-              Unarchive
+              <.icon name="hero-arrow-up-tray-mini" class="w-4 h-4 flex-shrink-0" /> Unarchive
             </button>
             <button
               type="button"
@@ -150,8 +158,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
               phx-value-session_id={@agent.id}
               class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-error hover:bg-base-content/10 transition-colors text-left"
             >
-              <.icon name="hero-trash-mini" class="w-4 h-4 flex-shrink-0" />
-              Delete
+              <.icon name="hero-trash-mini" class="w-4 h-4 flex-shrink-0" /> Delete
             </button>
           <% else %>
             <button
@@ -160,8 +167,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
               phx-value-session_id={@agent.id}
               class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-warning hover:bg-base-content/10 transition-colors text-left"
             >
-              <.icon name="hero-archive-box-mini" class="w-4 h-4 flex-shrink-0" />
-              Archive
+              <.icon name="hero-archive-box-mini" class="w-4 h-4 flex-shrink-0" /> Archive
             </button>
           <% end %>
         <% end %>
@@ -179,11 +185,17 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
       <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
         <h3 class="text-lg font-bold">Delete sessions</h3>
         <p class="py-4 text-sm text-base-content/70">
-          Permanently delete {MapSet.size(@selected_ids)} selected session{if MapSet.size(@selected_ids) != 1, do: "s"}? This cannot be undone.
+          Permanently delete {MapSet.size(@selected_ids)} selected session{if MapSet.size(
+                                                                                @selected_ids
+                                                                              ) != 1, do: "s"}? This cannot be undone.
         </p>
         <div class="modal-action">
-          <button phx-click="cancel_delete_selected" class="btn btn-sm btn-ghost min-h-[44px]">Cancel</button>
-          <button phx-click="delete_selected" class="btn btn-sm btn-error min-h-[44px]">Delete</button>
+          <button phx-click="cancel_delete_selected" class="btn btn-sm btn-ghost min-h-[44px]">
+            Cancel
+          </button>
+          <button phx-click="delete_selected" class="btn btn-sm btn-error min-h-[44px]">
+            Delete
+          </button>
         </div>
       </div>
       <form method="dialog" class="modal-backdrop">
@@ -220,11 +232,19 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
             phx-click="show_new_canvas_form"
             phx-value-agent-id={@agent.id}
             class="w-full flex items-center gap-2 px-3 py-3 rounded-lg text-sm text-secondary hover:bg-base-content/10 transition-colors text-left"
-          >+ New canvas</button>
+          >
+            + New canvas
+          </button>
         <% else %>
           <form phx-submit="add_to_new_canvas" class="flex flex-col gap-1 p-1">
             <input type="hidden" name="session_id" value={@agent.id} />
-            <input type="text" name="canvas_name" class="input input-xs w-full text-base" placeholder="Canvas name..." autocomplete="off" />
+            <input
+              type="text"
+              name="canvas_name"
+              class="input input-xs w-full text-base"
+              placeholder="Canvas name..."
+              autocomplete="off"
+            />
             <button type="submit" class="btn btn-primary btn-xs w-full">Create &amp; Add</button>
           </form>
         <% end %>

@@ -112,8 +112,15 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
     session_uuid = params["session_uuid"]
 
     case Ecto.UUID.cast(session_uuid) do
-      {:ok, _} -> do_create_chat(session_uuid, params, socket)
-      :error -> {:halt, push_event(socket, "palette:create-chat-result", %{ok: false, error: "Invalid session UUID"})}
+      {:ok, _} ->
+        do_create_chat(session_uuid, params, socket)
+
+      :error ->
+        {:halt,
+         push_event(socket, "palette:create-chat-result", %{
+           ok: false,
+           error: "Invalid session UUID"
+         })}
     end
   end
 
@@ -140,7 +147,8 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
              status: "stopped",
              started_at: DateTime.utc_now()
            },
-           {:session, {:ok, session}} <- {:session, Sessions.create_session_with_model(session_attrs)} do
+           {:session, {:ok, session}} <-
+             {:session, Sessions.create_session_with_model(session_attrs)} do
         %{ok: true, session_uuid: session.uuid}
       else
         {:agent, {:error, reason}} ->

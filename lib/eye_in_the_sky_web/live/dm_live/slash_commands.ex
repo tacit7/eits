@@ -20,23 +20,37 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
 
   @commands [
     # {slug, arg_type, description}
-    {"plan",        :none,                                                          "Force plan-only mode, no file changes"},
-    {"sandbox",     :none,                                                          "Enable OS-level sandbox isolation"},
-    {"no-sandbox",  :none,                                                          "Disable sandbox"},
-    {"chrome",      :none,                                                          "Enable browser automation"},
-    {"no-chrome",   :none,                                                          "Disable browser automation"},
-    {"permissions", {:enum, ["default", "acceptEdits", "bypassPermissions", "dontAsk", "plan", "auto"]}, "Set permission mode"},
-    {"effort",      {:enum, ["low", "medium", "high", "max"]},                      "Set effort level"},
-    {"model",       {:enum, ["opus", "opus[1m]", "sonnet", "sonnet[1m]", "haiku",
-                             "gpt-5.4", "gpt-5.3-codex", "gpt-5.2-codex",
-                             "gpt-5.2", "gpt-5.1-codex-max", "gpt-5.1-codex-mini"]}, "Set model"},
-    {"max-turns",   :integer,                                                       "Limit agentic steps"},
-    {"add-dir",     :path,                                                          "Add extra working directory"},
-    {"mcp",         :path,                                                          "Load MCP config file"},
-    {"plugin",      :path,                                                          "Load plugins from directory"},
-    {"config",      :path,                                                          "Load settings from file"},
-    {"agents",      :free_text,                                                     "Run as named subagent"},
-    {"rename",      :free_text,                                                     "Rename this session"},
+    {"plan", :none, "Force plan-only mode, no file changes"},
+    {"sandbox", :none, "Enable OS-level sandbox isolation"},
+    {"no-sandbox", :none, "Disable sandbox"},
+    {"chrome", :none, "Enable browser automation"},
+    {"no-chrome", :none, "Disable browser automation"},
+    {"permissions",
+     {:enum, ["default", "acceptEdits", "bypassPermissions", "dontAsk", "plan", "auto"]},
+     "Set permission mode"},
+    {"effort", {:enum, ["low", "medium", "high", "max"]}, "Set effort level"},
+    {"model",
+     {:enum,
+      [
+        "opus",
+        "opus[1m]",
+        "sonnet",
+        "sonnet[1m]",
+        "haiku",
+        "gpt-5.4",
+        "gpt-5.3-codex",
+        "gpt-5.2-codex",
+        "gpt-5.2",
+        "gpt-5.1-codex-max",
+        "gpt-5.1-codex-mini"
+      ]}, "Set model"},
+    {"max-turns", :integer, "Limit agentic steps"},
+    {"add-dir", :path, "Add extra working directory"},
+    {"mcp", :path, "Load MCP config file"},
+    {"plugin", :path, "Load plugins from directory"},
+    {"config", :path, "Load settings from file"},
+    {"agents", :free_text, "Run as named subagent"},
+    {"rename", :free_text, "Rename this session"}
   ]
 
   @doc "Returns the canonical command metadata list."
@@ -45,15 +59,15 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
   @doc "Maps CLI option keys (string) to slash slugs."
   def opt_key_to_slug do
     %{
-      "chrome"          => "chrome",
+      "chrome" => "chrome",
       "permission_mode" => "permissions",
-      "sandbox"         => "sandbox",
-      "mcp_config"      => "mcp",
-      "add_dir"         => "add-dir",
-      "plugin_dir"      => "plugin",
-      "settings_file"   => "config",
-      "agent"           => "agents",
-      "max_turns"       => "max-turns",
+      "sandbox" => "sandbox",
+      "mcp_config" => "mcp",
+      "add_dir" => "add-dir",
+      "plugin_dir" => "plugin",
+      "settings_file" => "config",
+      "agent" => "agents",
+      "max_turns" => "max-turns"
     }
   end
 

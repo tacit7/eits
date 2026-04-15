@@ -45,7 +45,9 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ChatSection do
             navigate={~p"/chat?channel_id=#{channel.id}"}
             class={[
               "flex items-center pl-3 pr-3 py-0.5 min-h-[44px] text-sm transition-colors",
-              if(not is_nil(@active_channel_id) && to_string(@active_channel_id) == to_string(channel.id),
+              if(
+                not is_nil(@active_channel_id) &&
+                  to_string(@active_channel_id) == to_string(channel.id),
                 do: "text-primary font-medium bg-primary/5",
                 else: "text-base-content/50 hover:text-base-content/75 hover:bg-base-content/5"
               )

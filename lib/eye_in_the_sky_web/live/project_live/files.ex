@@ -67,7 +67,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         handle_full_path(socket, full_path, path, proj_path)
 
       {path, nil} when is_binary(path) ->
-        {:noreply, socket |> assign(:error, "Project path not configured") |> assign(:file_content, nil)}
+        {:noreply,
+         socket |> assign(:error, "Project path not configured") |> assign(:file_content, nil)}
 
       {nil, _} ->
         load_root_listing(socket, mode)
@@ -197,11 +198,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   def handle_info(_msg, socket), do: {:noreply, socket}
 
   @type file_entry :: %{
-    name: String.t(),
-    path: String.t(),
-    is_dir: boolean(),
-    size: non_neg_integer()
-  }
+          name: String.t(),
+          path: String.t(),
+          is_dir: boolean(),
+          size: non_neg_integer()
+        }
 
   # Builds a flat file listing for `dir`, with each entry's `:path` set to
   # `Path.join(path_prefix, filename)`. When `path_prefix` is `""` the path
@@ -210,7 +211,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   # Options:
   #   :ignore_hidden   - when true, skip dotfiles (except .claude and .git)
   #   :ignored_dirs    - list of directory names to exclude entirely
-  @spec build_file_listing(String.t(), String.t(), keyword()) :: {:ok, [file_entry()]} | {:error, term()}
+  @spec build_file_listing(String.t(), String.t(), keyword()) ::
+          {:ok, [file_entry()]} | {:error, term()}
   defp build_file_listing(dir, path_prefix, opts \\ []) do
     ignore_hidden = Keyword.get(opts, :ignore_hidden, false)
     ignored_dirs = Keyword.get(opts, :ignored_dirs, [])
@@ -408,8 +410,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
           </ul>
         </div>
       </div>
-
-      <!-- File Content Viewer -->
+      
+    <!-- File Content Viewer -->
       <div class="flex-1 min-h-0 overflow-y-auto">
         <.file_content_pane
           error={@error}

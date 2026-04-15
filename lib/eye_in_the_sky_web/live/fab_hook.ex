@@ -283,5 +283,4 @@ defmodule EyeInTheSkyWeb.FabHook do
         {:error, to_string(reason)}
     end
   end
-
 end

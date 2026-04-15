@@ -227,8 +227,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
           </button>
         </div>
       </div>
-
-      <!-- List View -->
+      
+    <!-- List View -->
       <div class="h-[calc(100dvh-10rem)]">
         <div class="p-6">
           <%= if @error do %>
@@ -316,8 +316,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
                 <.icon name="hero-plus" class="w-4 h-4" /> Folder
               </button>
             </div>
-
-            <!-- Inline create form -->
+            
+    <!-- Inline create form -->
             <%= if @creating do %>
               <form phx-submit="create_entry" class="flex items-center gap-2 mb-4">
                 <.icon

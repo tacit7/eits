@@ -123,8 +123,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
                         onclick="this.blur()"
                         class="flex items-center gap-2"
                       >
-                        <.icon name="hero-pencil-square-mini" class="w-3.5 h-3.5" />
-                        Rename
+                        <.icon name="hero-pencil-square-mini" class="w-3.5 h-3.5" /> Rename
                       </button>
                     </li>
                     <%= if not is_nil(agent.agent) && not is_nil(agent.agent.uuid) && not is_nil(agent.uuid) do %>
@@ -155,8 +154,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
                             onclick="this.blur()"
                             class="flex items-center gap-2 text-info"
                           >
-                            <.icon name="hero-arrow-up-tray-mini" class="w-3.5 h-3.5" />
-                            Unarchive
+                            <.icon name="hero-arrow-up-tray-mini" class="w-3.5 h-3.5" /> Unarchive
                           </button>
                         </li>
                         <li>
@@ -167,8 +165,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
                             onclick="this.blur()"
                             class="flex items-center gap-2 text-error"
                           >
-                            <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
-                            Delete
+                            <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
                           </button>
                         </li>
                       <% else %>
@@ -180,8 +177,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
                             onclick="this.blur()"
                             class="flex items-center gap-2 text-warning"
                           >
-                            <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
-                            Archive
+                            <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" /> Archive
                           </button>
                         </li>
                       <% end %>

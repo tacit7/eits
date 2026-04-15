@@ -82,7 +82,10 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 type="text"
                 name="job[name]"
                 value={@form[:name].value || ""}
-                class={["input input-bordered w-full text-base", @form[:name].errors != [] && "input-error"]}
+                class={[
+                  "input input-bordered w-full text-base",
+                  @form[:name].errors != [] && "input-error"
+                ]}
               />
               <p :for={err <- @form[:name].errors} class="mt-1 text-xs text-error">
                 {translate_error(err)}

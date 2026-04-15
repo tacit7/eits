@@ -115,7 +115,9 @@ defmodule EyeInTheSky.Claude.SessionReader do
         |> Enum.map(&parse_line/1)
         |> Enum.filter(&conversation_message?/1)
 
-      result = if after_uuid, do: drop_messages_before(all_messages, after_uuid), else: all_messages
+      result =
+        if after_uuid, do: drop_messages_before(all_messages, after_uuid), else: all_messages
+
       {:ok, result}
     end)
   end
@@ -189,7 +191,8 @@ defmodule EyeInTheSky.Claude.SessionReader do
       {tokens, cost} =
         Enum.reduce(lines, {0, 0.0}, fn line, {tok_acc, cost_acc} ->
           case Jason.decode(line) do
-            {:ok, %{"type" => "assistant", "message" => %{"usage" => usage}}} when is_map(usage) ->
+            {:ok, %{"type" => "assistant", "message" => %{"usage" => usage}}}
+            when is_map(usage) ->
               input = Map.get(usage, "input_tokens") || 0
               output = Map.get(usage, "output_tokens") || 0
               {tok_acc + input + output, cost_acc}

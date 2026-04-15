@@ -109,7 +109,8 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
       Logger.info("Auto-archived #{archived_count} dead idle session(s)")
     end
   rescue
-    DBConnection.ConnectionError -> Logger.warning("archive_dead_idle_sessions: DB unavailable, skipping")
+    DBConnection.ConnectionError ->
+      Logger.warning("archive_dead_idle_sessions: DB unavailable, skipping")
   end
 
   # Returns true when a session has no linked tasks, or all linked tasks are done/archived.

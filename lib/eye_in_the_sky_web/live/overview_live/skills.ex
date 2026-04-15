@@ -208,7 +208,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                       <code class="text-sm font-semibold text-base-content">
                         /{@selected_skill.slug}
                       </code>
-                      <button phx-click="close_viewer" class="btn btn-ghost btn-xs btn-circle min-h-[44px] min-w-[44px]">
+                      <button
+                        phx-click="close_viewer"
+                        class="btn btn-ghost btn-xs btn-circle min-h-[44px] min-w-[44px]"
+                      >
                         <.icon name="hero-x-mark" class="w-4 h-4" />
                       </button>
                     </div>
@@ -238,5 +241,4 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
     </div>
     """
   end
-
 end

@@ -69,7 +69,6 @@ defmodule EyeInTheSky.Notes do
     end
   end
 
-
   @doc """
   Returns notes for a specific task.
   Accepts either an integer task ID or a UUID string.

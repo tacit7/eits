@@ -39,7 +39,14 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
         socket = TabHelpers.force_reload_messages(socket, session_id)
 
-        base_opts = SessionHelpers.continue_session_opts(model, effort_level, thinking_enabled, max_budget_usd)
+        base_opts =
+          SessionHelpers.continue_session_opts(
+            model,
+            effort_level,
+            thinking_enabled,
+            max_budget_usd
+          )
+
         cli_opts = Keyword.merge(base_opts, extra_cli_opts) ++ [message_id: message.id]
 
         case AgentManager.continue_session(session_id, full_body, cli_opts) do
@@ -53,7 +60,10 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
              |> push_event("clear-input", %{})}
 
           {:error, :queue_full} ->
-            Logger.warning("Queue full for session=#{session_id}, deleting orphaned message id=#{message.id}")
+            Logger.warning(
+              "Queue full for session=#{session_id}, deleting orphaned message id=#{message.id}"
+            )
+
             cleanup_rejected_message(message, uploaded_files)
 
             {:noreply,

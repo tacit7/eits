@@ -80,7 +80,10 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                     >
                       <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit
                     </button>
-                    <button phx-click="close_viewer" class="btn btn-ghost btn-sm btn-circle min-h-[44px] min-w-[44px]">
+                    <button
+                      phx-click="close_viewer"
+                      class="btn btn-ghost btn-sm btn-circle min-h-[44px] min-w-[44px]"
+                    >
                       <.icon name="hero-x-mark" class="w-4 h-4" />
                     </button>
                   </div>
@@ -275,5 +278,4 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
   def language_class(:yaml), do: "yaml"
   def language_class(:toml), do: "toml"
   def language_class(_), do: "plaintext"
-
 end

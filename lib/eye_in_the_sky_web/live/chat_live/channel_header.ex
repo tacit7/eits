@@ -103,9 +103,8 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
                 @{member.session_id}
                 <%= if member.session_name do %>
                   <span class="text-base-content/35">
-                    {String.slice(member.session_name, 0, 15)}{if String.length(
-                                                                    member.session_name
-                                                                  ) > 15, do: "…"}
+                    {String.slice(member.session_name, 0, 15)}{if String.length(member.session_name) >
+                                                                    15, do: "…"}
                   </span>
                 <% end %>
               </a>
@@ -158,8 +157,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
                       class="inline-flex items-center gap-1 font-mono text-[11px] px-2 py-0.5 min-h-[44px] rounded bg-base-content/[0.03] text-base-content/40 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
                       title={"Add @#{session.id} to channel"}
                     >
-                      <.icon name="hero-plus-mini" class="w-2.5 h-2.5 opacity-50" />
-                      @{session.id}
+                      <.icon name="hero-plus-mini" class="w-2.5 h-2.5 opacity-50" /> @{session.id}
                       <span class="text-base-content/25">
                         {String.slice(session.name || session.agent_description || "", 0, 20)}{if String.length(
                                                                                                     session.name ||

@@ -4,7 +4,15 @@ defmodule EyeInTheSkyWeb.DmLive do
   alias EyeInTheSky.{Agents, Sessions}
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSkyWeb.Components.DmPage
-  alias EyeInTheSkyWeb.DmLive.{AgentLifecycle, ExternalActions, MessageHandlers, MountState, SlashCommands}
+
+  alias EyeInTheSkyWeb.DmLive.{
+    AgentLifecycle,
+    ExternalActions,
+    MessageHandlers,
+    MountState,
+    SlashCommands
+  }
+
   alias EyeInTheSkyWeb.DmLive.TabHelpers
   alias EyeInTheSkyWeb.DmLive.TaskHandlers
   alias EyeInTheSkyWeb.DmLive.TimerHandlers
@@ -75,12 +83,14 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("toggle_new_task_drawer", _params, socket) do
-    {:noreply, assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, :task_drawer))}
+    {:noreply,
+     assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, :task_drawer))}
   end
 
   @impl true
   def handle_event("toggle_task_detail_drawer", _params, socket) do
-    {:noreply, assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, :task_detail))}
+    {:noreply,
+     assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, :task_detail))}
   end
 
   @impl true
@@ -274,7 +284,12 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("toggle_star", params, socket),
-    do: handle_toggle_star(params, socket, &TabHelpers.load_tab_data(&1, "notes", &1.assigns.session_id))
+    do:
+      handle_toggle_star(
+        params,
+        socket,
+        &TabHelpers.load_tab_data(&1, "notes", &1.assigns.session_id)
+      )
 
   @impl true
   def handle_event("kill_session", _params, socket), do: handle_kill_session(socket)
@@ -417,32 +432,46 @@ defmodule EyeInTheSkyWeb.DmLive do
         session_uuid={@session_uuid}
         active_tab={@active_tab}
         uploads={@uploads}
-        stream={%{show: @show_live_stream, content: @stream_content, tool: @stream_tool, thinking: @stream_thinking}}
-        session_state={%{
-          model: @selected_model,
-          effort: @selected_effort,
-          processing: @processing,
-          thinking_enabled: @thinking_enabled,
-          max_budget_usd: @max_budget_usd,
-          compacting: @compacting,
-          context_used: @context_used,
-          context_window: @context_window
-        }}
-        message_data={%{
-          messages: @messages,
-          has_more_messages: @has_more_messages,
-          message_search_query: @message_search_query,
-          queued_prompts: @queued_prompts
-        }}
+        stream={
+          %{
+            show: @show_live_stream,
+            content: @stream_content,
+            tool: @stream_tool,
+            thinking: @stream_thinking
+          }
+        }
+        session_state={
+          %{
+            model: @selected_model,
+            effort: @selected_effort,
+            processing: @processing,
+            thinking_enabled: @thinking_enabled,
+            max_budget_usd: @max_budget_usd,
+            compacting: @compacting,
+            context_used: @context_used,
+            context_window: @context_window
+          }
+        }
+        message_data={
+          %{
+            messages: @messages,
+            has_more_messages: @has_more_messages,
+            message_search_query: @message_search_query,
+            queued_prompts: @queued_prompts
+          }
+        }
         task_data={%{tasks: @tasks, current_task: @current_task}}
-        overlay_data={%{
-          active_overlay: @active_overlay,
-          active_timer: @active_timer,
-          reloading: @reloading
-        }}
+        overlay_data={
+          %{
+            active_overlay: @active_overlay,
+            active_timer: @active_timer,
+            reloading: @reloading
+          }
+        }
         commits={@commits}
         diff_cache={@diff_cache}
         notes={@notes}
+        codex_raw_lines={@codex_raw_lines}
         slash_items={@slash_items}
         session_context={@session_context}
       />
@@ -468,5 +497,4 @@ defmodule EyeInTheSkyWeb.DmLive do
     </div>
     """
   end
-
 end

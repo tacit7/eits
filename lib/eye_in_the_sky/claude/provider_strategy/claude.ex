@@ -16,12 +16,18 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
 
   @impl true
   def format_content(%ContentBlock.Image{data: data, mime_type: mime_type}) do
-    %{"type" => "image", "source" => %{"type" => "base64", "media_type" => mime_type, "data" => data}}
+    %{
+      "type" => "image",
+      "source" => %{"type" => "base64", "media_type" => mime_type, "data" => data}
+    }
   end
 
   @impl true
   def format_content(%ContentBlock.Document{source: source}) do
-    %{"type" => "document", "source" => %{"type" => "base64", "media_type" => source.media_type, "data" => source.data}}
+    %{
+      "type" => "document",
+      "source" => %{"type" => "base64", "media_type" => source.media_type, "data" => source.data}
+    }
   end
 
   @doc """

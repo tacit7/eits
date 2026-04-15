@@ -39,7 +39,9 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
   end
 
   @impl true
-  def update(%{notification_count: :refresh} = _assigns, socket), do: refresh_notification_count(socket)
+  def update(%{notification_count: :refresh} = _assigns, socket),
+    do: refresh_notification_count(socket)
+
   def update(%{refresh_projects: true} = _assigns, socket), do: refresh_projects(socket)
   def update(assigns, socket), do: update_sidebar_state(assigns, socket)
 
@@ -71,7 +73,6 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
      |> assign(:expanded_projects, Map.get(socket.assigns, :expanded_projects, true))
      |> assign(:expanded_system, Map.get(socket.assigns, :expanded_system, true))}
   end
-
 
   # --- UI toggles ---
 
@@ -211,7 +212,14 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
         <%!-- Branding --%>
         <div class="flex items-center gap-2 px-3 py-3 border-b border-base-content/5">
           <.link navigate="/" class="flex items-center gap-2 min-w-0 flex-1 min-h-[44px]">
-            <img src="/images/logo.svg" class="w-7 h-7 flex-shrink-0" alt="Eye in the Sky" width="28" height="28" loading="eager" />
+            <img
+              src="/images/logo.svg"
+              class="w-7 h-7 flex-shrink-0"
+              alt="Eye in the Sky"
+              width="28"
+              height="28"
+              loading="eager"
+            />
             <span class={[
               "text-sm font-semibold text-base-content/80 truncate",
               if(@collapsed, do: "hidden")
@@ -301,5 +309,4 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
     </div>
     """
   end
-
 end

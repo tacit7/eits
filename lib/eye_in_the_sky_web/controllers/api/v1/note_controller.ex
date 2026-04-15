@@ -128,5 +128,4 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
         end
     end
   end
-
 end

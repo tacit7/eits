@@ -26,12 +26,12 @@ defmodule EyeInTheSky.Search.PgSearchTest do
       for _ <- 1..10, do: create_note(tag)
 
       results =
-        PgSearch.search_for(tag, [
+        PgSearch.search_for(tag,
           schema: Note,
           table: "notes",
           search_columns: ["body"],
           limit: 3
-        ])
+        )
 
       assert length(results) <= 3
     end
@@ -42,11 +42,11 @@ defmodule EyeInTheSky.Search.PgSearchTest do
       create_note(tag)
 
       results =
-        PgSearch.search_for(tag, [
+        PgSearch.search_for(tag,
           schema: Note,
           table: "notes",
           search_columns: ["body"]
-        ])
+        )
 
       assert is_list(results)
     end
@@ -56,12 +56,12 @@ defmodule EyeInTheSky.Search.PgSearchTest do
       create_note(tag)
 
       results =
-        PgSearch.search_for(tag, [
+        PgSearch.search_for(tag,
           schema: Note,
           table: "notes",
           search_columns: ["body"],
           limit: 0
-        ])
+        )
 
       assert is_list(results)
     end
@@ -101,12 +101,12 @@ defmodule EyeInTheSky.Search.PgSearchTest do
       for _ <- 1..5, do: create_note(tag)
 
       results =
-        PgSearch.search_for(tag, [
+        PgSearch.search_for(tag,
           schema: Note,
           table: "notes",
           search_columns: ["body"],
           limit: 2
-        ])
+        )
 
       assert length(results) <= 2
     end

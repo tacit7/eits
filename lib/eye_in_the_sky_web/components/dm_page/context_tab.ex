@@ -94,5 +94,4 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ContextTab do
       line -> line |> String.replace(~r/^#+\s*/, "") |> String.trim()
     end
   end
-
 end

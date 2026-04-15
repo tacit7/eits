@@ -43,7 +43,14 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     case Sessions.update_session(session, update_attrs) do
       {:ok, updated} ->
         EyeInTheSky.Events.session_updated(updated)
-        json(conn, %{id: updated.id, uuid: updated.uuid, agent_id: nil, agent_uuid: nil, status: updated.status})
+
+        json(conn, %{
+          id: updated.id,
+          uuid: updated.uuid,
+          agent_id: nil,
+          agent_uuid: nil,
+          status: updated.status
+        })
 
       {:error, changeset} ->
         conn

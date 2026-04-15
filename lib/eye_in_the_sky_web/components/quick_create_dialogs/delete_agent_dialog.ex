@@ -39,7 +39,9 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.DeleteAgentDialog do
             <span>Warning: This action cannot be undone. The agent will be permanently deleted.</span>
           </div>
           <div class="flex justify-end gap-2 pt-1">
-            <button data-qda-cancel type="button" class="btn btn-ghost btn-sm min-h-[44px]">Cancel</button>
+            <button data-qda-cancel type="button" class="btn btn-ghost btn-sm min-h-[44px]">
+              Cancel
+            </button>
             <button type="submit" class="btn btn-error btn-sm min-h-[44px]">Delete Agent</button>
           </div>
         </form>

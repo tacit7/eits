@@ -6,7 +6,11 @@ defmodule EyeInTheSky.ProjectsBookmarksTest do
 
   defp create_project(name) do
     {:ok, project} =
-      Projects.create_project(%{name: name, path: "/tmp/#{name}-#{System.unique_integer([:positive])}"})
+      Projects.create_project(%{
+        name: name,
+        path: "/tmp/#{name}-#{System.unique_integer([:positive])}"
+      })
+
     project
   end
 
@@ -33,6 +37,7 @@ defmodule EyeInTheSky.ProjectsBookmarksTest do
           path: "/tmp/beta-#{System.unique_integer([:positive])}",
           bookmarked: true
         })
+
       assert {:ok, updated} = Projects.set_bookmarked(project.id, false)
       assert updated.bookmarked == false
     end
@@ -56,9 +61,26 @@ defmodule EyeInTheSky.ProjectsBookmarksTest do
     end
 
     test "multiple bookmarked projects are name-sorted among themselves (case-insensitive)" do
-      {:ok, c} = Projects.create_project(%{name: "Cucumber", path: "/tmp/c-#{System.unique_integer([:positive])}", bookmarked: true})
-      {:ok, a} = Projects.create_project(%{name: "apple", path: "/tmp/a-#{System.unique_integer([:positive])}", bookmarked: true})
-      {:ok, b} = Projects.create_project(%{name: "Banana", path: "/tmp/b-#{System.unique_integer([:positive])}", bookmarked: true})
+      {:ok, c} =
+        Projects.create_project(%{
+          name: "Cucumber",
+          path: "/tmp/c-#{System.unique_integer([:positive])}",
+          bookmarked: true
+        })
+
+      {:ok, a} =
+        Projects.create_project(%{
+          name: "apple",
+          path: "/tmp/a-#{System.unique_integer([:positive])}",
+          bookmarked: true
+        })
+
+      {:ok, b} =
+        Projects.create_project(%{
+          name: "Banana",
+          path: "/tmp/b-#{System.unique_integer([:positive])}",
+          bookmarked: true
+        })
 
       bookmarked_ids =
         Projects.list_projects_for_sidebar()
@@ -78,7 +100,12 @@ defmodule EyeInTheSky.ProjectsBookmarksTest do
     end
 
     test "inactive projects are excluded" do
-      Projects.create_project(%{name: "hidden", path: "/tmp/h-#{System.unique_integer([:positive])}", active: false})
+      Projects.create_project(%{
+        name: "hidden",
+        path: "/tmp/h-#{System.unique_integer([:positive])}",
+        active: false
+      })
+
       _active = create_project("visible")
 
       names = Projects.list_projects_for_sidebar() |> Enum.map(& &1.name)

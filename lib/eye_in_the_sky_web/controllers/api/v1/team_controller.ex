@@ -121,7 +121,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
           name: params["name"],
           role: params["role"] || "member",
           agent_id: params["agent_id"],
-          session_id: resolve_id(params["session_id"], &EyeInTheSky.Sessions.get_session_by_uuid/1)
+          session_id:
+            resolve_id(params["session_id"], &EyeInTheSky.Sessions.get_session_by_uuid/1)
         }
 
         case Teams.join_team(attrs) do
@@ -152,8 +153,11 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
       {:ok, _team} ->
         case Teams.get_member(member_id) do
-          {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "Member not found"})
-          {:ok, member} -> do_update_member(conn, member, params)
+          {:error, :not_found} ->
+            conn |> put_status(:not_found) |> json(%{error: "Member not found"})
+
+          {:ok, member} ->
+            do_update_member(conn, member, params)
         end
     end
   end
@@ -166,8 +170,11 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
       {:ok, _team} ->
         case Teams.get_member(member_id) do
-          {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "Member not found"})
-          {:ok, member} -> do_leave_team(conn, member)
+          {:error, :not_found} ->
+            conn |> put_status(:not_found) |> json(%{error: "Member not found"})
+
+          {:ok, member} ->
+            do_leave_team(conn, member)
         end
     end
   end

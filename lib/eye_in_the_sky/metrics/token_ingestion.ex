@@ -66,6 +66,7 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
       %{acc | skipped: acc.skipped + 1}
     else
       file_path = build_file_path(session_info)
+
       case ingest_one(file_path, db_session.id, db_session.agent_id) do
         :ok -> %{acc | ingested: acc.ingested + 1}
         {:error, _} -> %{acc | errors: acc.errors + 1}
@@ -82,6 +83,7 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
 
   defp find_session_info(session_uuid) do
     sessions = SessionReader.discover_all_sessions()
+
     case Enum.find(sessions, fn s -> s.session_id == session_uuid end) do
       nil -> {:error, :jsonl_not_found}
       session_info -> {:ok, session_info}

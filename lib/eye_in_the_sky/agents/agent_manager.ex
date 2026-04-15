@@ -254,10 +254,12 @@ defmodule EyeInTheSky.Agents.AgentManager do
         {:ok, %{agent: agent, session: session}} ->
           case maybe_join_team(team, agent, session, params["member_name"]) do
             :ok ->
-              {:ok, %{agent: agent, session: session, team: team, member_name: params["member_name"]}}
+              {:ok,
+               %{agent: agent, session: session, team: team, member_name: params["member_name"]}}
 
             {:ok, _member} ->
-              {:ok, %{agent: agent, session: session, team: team, member_name: params["member_name"]}}
+              {:ok,
+               %{agent: agent, session: session, team: team, member_name: params["member_name"]}}
 
             {:error, reason} ->
               {:error, reason}
@@ -305,7 +307,10 @@ defmodule EyeInTheSky.Agents.AgentManager do
   defp resolve_session_name(params, %{name: team_name})
        when is_binary(team_name) do
     member = params["member_name"]
-    if member, do: "#{member} @ #{team_name}", else: String.slice(params["instructions"] || "Agent session", 0, 250)
+
+    if member,
+      do: "#{member} @ #{team_name}",
+      else: String.slice(params["instructions"] || "Agent session", 0, 250)
   end
 
   defp resolve_session_name(%{"member_name" => member}, _team) when is_binary(member),
@@ -409,7 +414,10 @@ defmodule EyeInTheSky.Agents.AgentManager do
             {:error, :worker_not_found}
 
           :exit, reason ->
-            Logger.error("send_message: worker exit for session_id=#{session_id} - #{inspect(reason)}")
+            Logger.error(
+              "send_message: worker exit for session_id=#{session_id} - #{inspect(reason)}"
+            )
+
             {:error, {:worker_exit, reason}}
         end
 
@@ -437,6 +445,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
 
   defp resolve_agent_definition(slug, project_id, project_path) do
     project_id = ToolHelpers.parse_int(project_id)
+
     case lookup_definition(slug, project_id) do
       {:ok, defn} ->
         %{agent_definition_id: defn.id, definition_checksum_at_spawn: defn.checksum}

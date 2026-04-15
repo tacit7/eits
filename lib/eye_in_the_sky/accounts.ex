@@ -150,7 +150,9 @@ defmodule EyeInTheSky.Accounts do
 
   def delete_user_session(token) when is_binary(token) do
     case Repo.get_by(UserSession, session_token: token) do
-      nil -> :ok
+      nil ->
+        :ok
+
       session ->
         case Repo.delete(session) do
           {:ok, _} -> :ok

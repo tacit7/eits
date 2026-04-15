@@ -224,34 +224,42 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   end
 
   def tool_widget_meta("Read", rest) do
-    path = case Jason.decode(rest) do
-      {:ok, %{"file_path" => p}} -> p
-      _ -> rest
-    end
+    path =
+      case Jason.decode(rest) do
+        {:ok, %{"file_path" => p}} -> p
+        _ -> rest
+      end
+
     {"hero-document-text", "Read", path}
   end
 
   def tool_widget_meta("Write", rest) do
-    path = case Jason.decode(rest) do
-      {:ok, %{"file_path" => p}} -> p
-      _ -> rest
-    end
+    path =
+      case Jason.decode(rest) do
+        {:ok, %{"file_path" => p}} -> p
+        _ -> rest
+      end
+
     {"hero-pencil-square", "Write", path}
   end
 
   def tool_widget_meta("Edit", rest) do
-    path = case Jason.decode(rest) do
-      {:ok, %{"file_path" => p}} -> p
-      _ -> rest
-    end
+    path =
+      case Jason.decode(rest) do
+        {:ok, %{"file_path" => p}} -> p
+        _ -> rest
+      end
+
     {"hero-pencil-square", "Edit", path}
   end
 
   def tool_widget_meta("Glob", rest) do
-    pat = case Jason.decode(rest) do
-      {:ok, %{"pattern" => p}} -> p
-      _ -> rest
-    end
+    pat =
+      case Jason.decode(rest) do
+        {:ok, %{"pattern" => p}} -> p
+        _ -> rest
+      end
+
     {"hero-folder-open", "Glob", pat}
   end
 
@@ -288,10 +296,12 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   end
 
   def tool_widget_meta("WebSearch", rest) do
-    query = case Jason.decode(rest) do
-      {:ok, %{"query" => q}} -> q
-      _ -> rest
-    end
+    query =
+      case Jason.decode(rest) do
+        {:ok, %{"query" => q}} -> q
+        _ -> rest
+      end
+
     {"hero-globe-alt", "WebSearch", query}
   end
 

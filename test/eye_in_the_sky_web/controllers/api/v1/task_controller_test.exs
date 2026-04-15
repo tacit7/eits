@@ -423,23 +423,42 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
 
   describe "POST /api/v1/tasks/:id/complete" do
     setup %{conn: conn} do
-      {:ok, project} = EyeInTheSky.Projects.create_project(%{name: "CompleteTest#{uniq()}", path: "/tmp/complete_#{uniq()}"})
-      {:ok, task} = Tasks.create_task(%{title: "Complete me", project_id: project.id, state_id: 1, uuid: Ecto.UUID.generate(), created_at: DateTime.utc_now()})
+      {:ok, project} =
+        EyeInTheSky.Projects.create_project(%{
+          name: "CompleteTest#{uniq()}",
+          path: "/tmp/complete_#{uniq()}"
+        })
+
+      {:ok, task} =
+        Tasks.create_task(%{
+          title: "Complete me",
+          project_id: project.id,
+          state_id: 1,
+          uuid: Ecto.UUID.generate(),
+          created_at: DateTime.utc_now()
+        })
+
       %{conn: conn, task: task}
     end
 
     test "marks task done and creates annotation", %{conn: conn, task: task} do
-      conn = post(conn, ~p"/api/v1/tasks/#{task.id}/complete", %{
-        "message" => "All done"
-      })
+      conn =
+        post(conn, ~p"/api/v1/tasks/#{task.id}/complete", %{
+          "message" => "All done"
+        })
+
       assert %{"success" => true} = json_response(conn, 200)
       {:ok, updated} = Tasks.get_task(task.id)
       assert updated.state_id == WorkflowState.done_id()
 
-      note = Repo.one(
-        from n in EyeInTheSky.Notes.Note,
-          where: n.parent_type == "task" and n.parent_id == ^to_string(task.id) and n.body == "All done"
-      )
+      note =
+        Repo.one(
+          from n in EyeInTheSky.Notes.Note,
+            where:
+              n.parent_type == "task" and n.parent_id == ^to_string(task.id) and
+                n.body == "All done"
+        )
+
       assert note != nil
     end
 

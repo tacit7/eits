@@ -20,7 +20,10 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
   use EyeInTheSkyWeb, :live_component
 
   import EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers
-  import EyeInTheSkyWeb.Live.Shared.JobsHelpers, only: [handle_run_now: 2, handle_delete_job: 4, parse_job_id: 1]
+
+  import EyeInTheSkyWeb.Live.Shared.JobsHelpers,
+    only: [handle_run_now: 2, handle_delete_job: 4, parse_job_id: 1]
+
   import EyeInTheSkyWeb.Components.AgentScheduleForm
 
   alias EyeInTheSky.ScheduledJobs
@@ -73,7 +76,9 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
     # Load schedule data when switching to agent_schedules tab OR when project_id
     # changes while already on the agent_schedules tab (avoids stale data).
     tab_switched = new_tab == :agent_schedules and prev_tab != :agent_schedules
-    project_changed = initialized and new_tab == :agent_schedules and assigns.project_id != prev_project_id
+
+    project_changed =
+      initialized and new_tab == :agent_schedules and assigns.project_id != prev_project_id
 
     socket =
       if tab_switched or project_changed do
@@ -115,8 +120,11 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
         handle_run_now(params, socket)
       end
     else
-      :error -> {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Invalid job ID")}
-      {:error, :not_found} -> {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Job not found")}
+      :error ->
+        {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Invalid job ID")}
+
+      {:error, :not_found} ->
+        {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Job not found")}
     end
   end
 

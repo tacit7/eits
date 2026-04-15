@@ -284,7 +284,7 @@ defmodule EyeInTheSky.Messages do
   def list_recent_messages(session_id, limit) do
     Message
     |> where([m], m.session_id == ^session_id)
-    |> order_by([m], [desc: m.inserted_at, desc: m.id])
+    |> order_by([m], desc: m.inserted_at, desc: m.id)
     |> limit(^limit)
     |> Repo.all()
     |> Repo.preload(:attachments)
@@ -429,7 +429,7 @@ defmodule EyeInTheSky.Messages do
     Message
     |> where([m], m.to_session_id == ^session_id)
     |> where([m], not is_nil(m.from_session_id))
-    |> order_by([m], [desc: m.inserted_at, desc: m.id])
+    |> order_by([m], desc: m.inserted_at, desc: m.id)
     |> limit(^limit)
     |> Repo.all()
     |> Enum.reverse()
@@ -453,5 +453,4 @@ defmodule EyeInTheSky.Messages do
 
   @doc "Marks a message as failed with a reason. No-op if message_id is nil."
   defdelegate mark_failed(message_id, reason), to: StatusManager
-
 end

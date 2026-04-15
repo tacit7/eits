@@ -8,8 +8,10 @@ defmodule EyeInTheSkyWeb.Components.ProjectsSectionTest do
 
   defp build_project(name \\ nil) do
     name = name || "proj-#{System.unique_integer([:positive])}"
+
     {:ok, project} =
       Projects.create_project(%{name: name, path: "/tmp/#{name}", slug: name})
+
     project
   end
 

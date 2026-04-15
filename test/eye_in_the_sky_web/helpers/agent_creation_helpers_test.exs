@@ -20,7 +20,9 @@ defmodule EyeInTheSkyWeb.Helpers.AgentCreationHelpersTest do
     end
 
     test "overrides are merged into base opts" do
-      opts = AgentCreationHelpers.build_opts(%{}, project_path: "/some/path", description: "My Agent")
+      opts =
+        AgentCreationHelpers.build_opts(%{}, project_path: "/some/path", description: "My Agent")
+
       assert opts[:project_path] == "/some/path"
       assert opts[:description] == "My Agent"
     end
@@ -134,7 +136,9 @@ defmodule EyeInTheSkyWeb.Helpers.AgentCreationHelpersTest do
     # Keyword.put(:name, agent_name) produces the key expected by CLI.build_args.
 
     test "agent_name placed into opts as :name reaches the keyword list" do
-      base_opts = AgentCreationHelpers.build_opts(%{"agent_name" => "My Agent"}, description: "My Agent")
+      base_opts =
+        AgentCreationHelpers.build_opts(%{"agent_name" => "My Agent"}, description: "My Agent")
+
       opts = Keyword.put(base_opts, :name, "My Agent")
 
       assert opts[:name] == "My Agent"

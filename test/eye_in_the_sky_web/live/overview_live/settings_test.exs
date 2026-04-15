@@ -81,9 +81,11 @@ defmodule EyeInTheSkyWeb.OverviewLive.SettingsTest do
       {:ok, _lv, html} = live(auth_conn(conn), ~p"/settings")
       assert html =~ "Appearance"
       assert html =~ "Theme"
+
       for label <- ~w(Dark Light Latte Mocha Macchiato) do
         assert html =~ label
       end
+
       assert html =~ "Frappé"
     end
 

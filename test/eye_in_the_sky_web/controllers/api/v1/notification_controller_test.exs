@@ -10,7 +10,11 @@ defmodule EyeInTheSkyWeb.Api.V1.NotificationControllerTest do
   setup %{conn: _conn} do
     token = "test_api_key_#{uniq()}"
     {:ok, _} = ApiKey.create(token, "test")
-    conn = Phoenix.ConnTest.build_conn() |> Plug.Conn.put_req_header("authorization", "Bearer #{token}")
+
+    conn =
+      Phoenix.ConnTest.build_conn()
+      |> Plug.Conn.put_req_header("authorization", "Bearer #{token}")
+
     {:ok, conn: conn}
   end
 

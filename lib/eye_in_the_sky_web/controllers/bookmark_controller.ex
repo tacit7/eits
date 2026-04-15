@@ -98,6 +98,7 @@ defmodule EyeInTheSkyWeb.BookmarkController do
   """
   def check(conn, %{"type" => type, "id" => identifier}) do
     is_bookmarked = Bookmarks.check_if_bookmarked(type, identifier)
+
     bookmark =
       case Bookmarks.get_bookmark_by(type, identifier) do
         {:ok, b} -> b
@@ -109,5 +110,4 @@ defmodule EyeInTheSkyWeb.BookmarkController do
       bookmark: if(bookmark, do: ApiPresenter.present_bookmark(bookmark), else: nil)
     })
   end
-
 end

@@ -163,7 +163,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
               </form>
 
               <%!-- Checklist (rendered via slot — TaskChecklistComponent from parent LiveView) --%>
-              <%= render_slot(@checklist) %>
+              {render_slot(@checklist)}
 
               <%!-- Annotations --%>
               <%= if not is_nil(@notes) && @notes != [] do %>

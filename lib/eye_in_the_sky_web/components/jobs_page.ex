@@ -230,21 +230,33 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
       socket
       |> assign(:all_project_jobs, all_project)
       |> assign(:all_global_jobs, all_global)
-      |> assign(:project_jobs, if(apply_filters, do: apply_job_filters(all_project, socket.assigns), else: all_project))
-      |> assign(:global_jobs, if(apply_filters, do: apply_job_filters(all_global, socket.assigns), else: all_global))
+      |> assign(
+        :project_jobs,
+        if(apply_filters, do: apply_job_filters(all_project, socket.assigns), else: all_project)
+      )
+      |> assign(
+        :global_jobs,
+        if(apply_filters, do: apply_job_filters(all_global, socket.assigns), else: all_global)
+      )
       |> assign(:last_failed_runs, load_last_failed_runs(all_project ++ all_global))
     else
       all_jobs = ScheduledJobs.list_jobs()
 
       socket
       |> assign(:all_jobs, all_jobs)
-      |> assign(:jobs, if(apply_filters, do: apply_job_filters(all_jobs, socket.assigns), else: all_jobs))
+      |> assign(
+        :jobs,
+        if(apply_filters, do: apply_job_filters(all_jobs, socket.assigns), else: all_jobs)
+      )
       |> assign(:last_failed_runs, load_last_failed_runs(all_jobs))
     end
   end
 
   defp check_job_access(_job, nil), do: :ok
-  defp check_job_access(%{project_id: job_project_id}, project_id) when job_project_id != project_id, do: {:error, :access_denied}
+
+  defp check_job_access(%{project_id: job_project_id}, project_id)
+       when job_project_id != project_id, do: {:error, :access_denied}
+
   defp check_job_access(_job, _project_id), do: :ok
 
   # ---------------------------------------------------------------------------

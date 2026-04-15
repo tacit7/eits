@@ -20,7 +20,10 @@ defmodule EyeInTheSkyWeb.DmLive.TimerTest do
     refute html =~ "Cancel Schedule"
   end
 
-  test "Cancel Schedule appears when active timer exists on mount", %{conn: conn, session: session} do
+  test "Cancel Schedule appears when active timer exists on mount", %{
+    conn: conn,
+    session: session
+  } do
     OrchestratorTimers.schedule_once(session.id, 60_000)
     {:ok, _view, html} = live(conn, "/dm/#{session.uuid}")
     assert html =~ "Cancel Schedule"
@@ -34,7 +37,10 @@ defmodule EyeInTheSkyWeb.DmLive.TimerTest do
     refute html =~ "Cancel Schedule"
   end
 
-  test "schedule_timer event closes modal and activates timer badge", %{conn: conn, session: session} do
+  test "schedule_timer event closes modal and activates timer badge", %{
+    conn: conn,
+    session: session
+  } do
     {:ok, view, _html} = live(conn, "/dm/#{session.uuid}")
 
     view |> element("#dm-actions-menu button[phx-click='open_schedule_timer']") |> render_click()

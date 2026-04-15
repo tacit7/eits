@@ -61,7 +61,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
       relative = Path.basename(path)
 
       scope =
-        if not is_nil(project_dir) && String.starts_with?(path, project_dir), do: :project, else: :user
+        if not is_nil(project_dir) && String.starts_with?(path, project_dir),
+          do: :project,
+          else: :user
 
       {:noreply,
        socket
@@ -135,10 +137,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
 
   defp build_agent_entry(item, agents_dir) do
     full = Path.join(agents_dir, item)
-    size = case File.stat(full) do
-      {:ok, %{size: s}} -> s
-      _ -> 0
-    end
+
+    size =
+      case File.stat(full) do
+        {:ok, %{size: s}} -> s
+        _ -> 0
+      end
+
     %{name: Path.rootname(item), filename: item, path: full, size: size}
   end
 
@@ -245,7 +250,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                         >
                           <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit
                         </button>
-                        <button phx-click="close_viewer" class="btn btn-ghost btn-xs btn-circle min-h-[44px] min-w-[44px]">
+                        <button
+                          phx-click="close_viewer"
+                          class="btn btn-ghost btn-xs btn-circle min-h-[44px] min-w-[44px]"
+                        >
                           <.icon name="hero-x-mark" class="w-4 h-4" />
                         </button>
                       </div>

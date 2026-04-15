@@ -211,7 +211,6 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommandsTest do
       assert result.assigns.page_title == "new name"
       assert result.assigns.session.name == "new name"
     end
-
   end
 
   describe "apply_session_opts/2" do

@@ -27,27 +27,43 @@ defmodule EyeInTheSky.NotesTaskLookupTest do
   end
 
   describe "list_notes_for_task/1" do
-    test "finds notes stored with integer parent_id when given integer id", %{task: task, note_by_id: note} do
+    test "finds notes stored with integer parent_id when given integer id", %{
+      task: task,
+      note_by_id: note
+    } do
       results = Notes.list_notes_for_task(task.id)
       assert Enum.any?(results, &(&1.id == note.id))
     end
 
-    test "finds notes stored with integer parent_id when given stringified id", %{task: task, note_by_id: note} do
+    test "finds notes stored with integer parent_id when given stringified id", %{
+      task: task,
+      note_by_id: note
+    } do
       results = Notes.list_notes_for_task(to_string(task.id))
       assert Enum.any?(results, &(&1.id == note.id))
     end
 
-    test "finds notes stored with uuid parent_id when given integer id", %{task: task, note_by_uuid: note} do
+    test "finds notes stored with uuid parent_id when given integer id", %{
+      task: task,
+      note_by_uuid: note
+    } do
       results = Notes.list_notes_for_task(task.id)
       assert Enum.any?(results, &(&1.id == note.id))
     end
 
-    test "finds notes stored with uuid parent_id when given task UUID", %{task: task, note_by_uuid: note} do
+    test "finds notes stored with uuid parent_id when given task UUID", %{
+      task: task,
+      note_by_uuid: note
+    } do
       results = Notes.list_notes_for_task(task.uuid)
       assert Enum.any?(results, &(&1.id == note.id))
     end
 
-    test "finds both note styles when looking up by integer id", %{task: task, note_by_id: n1, note_by_uuid: n2} do
+    test "finds both note styles when looking up by integer id", %{
+      task: task,
+      note_by_id: n1,
+      note_by_uuid: n2
+    } do
       results = Notes.list_notes_for_task(task.id)
       ids = Enum.map(results, & &1.id)
       assert n1.id in ids

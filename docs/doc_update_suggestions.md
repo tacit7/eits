@@ -1,5 +1,23 @@
 # Documentation Update Suggestions
 
+## 2026-04-14
+**Commits reviewed**: cf8107bf..ca2f33b7
+
+- **CODEX_SDK.md** — Document Codex SDK refactoring (commits 75850e7b, 9ddd866d, 1e460048): extract shared `run_codex_session/4` private helper from duplicated start/resume setup; consolidate CLI execution into single closure pattern; clarify `eits_session_id` (EITS session UUID) vs `thread_id` (Codex thread ID) naming; normalize error tuples to consistent `{:error, {type, reason}}` shape across provider handlers
+- **REST_API.md** — Document POST `/tasks/:id/complete` endpoint (commit 1d754936): atomic transactional combine of annotate + state update to done; returns task JSON; `eits tasks complete <id>` CLI delegates to this endpoint; enables single-request task finalization in agents
+- **CODE_GUIDELINES.md** — Document WorkflowState alias centralization (commit 91503780): extract state alias resolution (`in-review`, `todo`, `review` aliases) into dedicated WorkflowState module function; replaces inline matches in task_controller; enables consistent state-name mapping across API and CLI
+- **DM_FEATURES.md** — Document Codex JSONL stream rendering (commit 442b6771): DM messages tab now surfaces raw Codex event stream in collapsible panel (last 100 lines); populated via `Events.broadcast_codex_raw` and `MessageHandler.forward_raw_lines` option; enables real-time debugging of Codex agent execution
+- **PERFORMANCE.md** — Document hljs bundle size optimization (commit 1efe9252): switch from full highlight.js (1,014kB) to core-only build registering 6 languages (markdown, json, elixir, bash, yaml, ini/toml); shared `hljs_instance.js` prevents double-import from NotesTab + markdown.js; reduces syntax chunk to 78kB (93% reduction)
+- **CODEX_SDK.md** — Document Codex.Models module (commit f2ff4520): new constant map with context_window and max_output_tokens specs per Codex model; enables context budgeting logic and output token prediction in agent handlers
+- **CODE_GUIDELINES.md** — Document component extraction patterns (commits c5059ef4, 55bd1808, 8802072e, 273e8776, 8839dff1): extract shared ChatModal from favorite_fab and config_chat_guide; extract file_content_pane shared component; extract GiteaWebhookController with_verified_webhook helper; split advanced_cli_flags into sub-components; update Playwright selectors for dynamic ChatModal-generated IDs; apply pattern when component/helper used 2+ times
+- **CODE_GUIDELINES.md** — Document explicit Repo.delete result handling (commit 5b24d576): pattern match on Repo.delete result instead of ignoring; handle both success and error cases explicitly; guard-based Port.close in CLI/port module (catch false clause)
+- **CODE_GUIDELINES.md** — Document nil-guard refactoring (commit 1689e86e): replace `condition && nil` with explicit `if condition do nil else value end`; improves readability and prevents missing variable bindings in rescue clauses
+- **CODE_GUIDELINES.md** — Document dead code removal (commits a020c835, 70bb7a6e): systematically grep for unused functions before removal; commits 822cf3b and 70bb7a6e removed 12+ unused functions (Accounts, Sessions, Notes, Channels contexts) and AgentPresenter module; validate removal via grep + test suite
+- **CODE_GUIDELINES.md** — Document performance index additions (commit 26e93d80): add database indexes on frequently-filtered/joined columns (tasks.agent_id, tasks.archived); measure query impact via ExPlain before/after
+- **CODE_GUIDELINES.md** — Document require Logger placement (commit 35692353): move `require Logger` to module scope (above defmodule) instead of inline; enables macro expansion at compile time; applied across chat_live, telemetry_dispatch, cron_parser
+- **EITS_CLI.md** — Document worktree CLI commands (commit 22fc1381): new `eits worktree create <name>` and `eits worktree remove` commands; creates isolated git worktree with dynamic deps symlink (../../../) for multi-branch development; documented in CLAUDE.md worktree section
+- **CODE_GUIDELINES.md** — Document anti-pattern fixes for Elixir (commits 3d5052af, d621b874, 01436e22): dead module removal (unused .ex files); nested case consolidation (combine cascading case/case into single pattern match); redundant with clause removal (unused :ok clause in with expressions)
+
 ## 2026-04-12
 **Commits reviewed**: ca015ef..cf8107bf
 

@@ -21,15 +21,17 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     if is_nil(session_uuid) or session_uuid == "" do
       conn |> put_status(:bad_request) |> json(%{error: "session_id is required"})
     else
-      project_id =
-        case Projects.resolve_project(params) do
-          {:ok, id, _name} -> id
-          {:error, _, _} -> nil
-        end
+      case Projects.resolve_project(params) do
+        {:ok, project_id, _name} ->
+          case Sessions.get_session_by_uuid(session_uuid) do
+            {:ok, existing} -> handle_session_resume(conn, existing, params)
+            {:error, :not_found} -> handle_new_session(conn, params, project_id)
+          end
 
-      case Sessions.get_session_by_uuid(session_uuid) do
-        {:ok, existing} -> handle_session_resume(conn, existing, params)
-        {:error, :not_found} -> handle_new_session(conn, params, project_id)
+        {:error, code, message} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: message, code: code})
       end
     end
   end

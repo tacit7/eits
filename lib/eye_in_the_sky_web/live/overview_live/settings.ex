@@ -3,7 +3,15 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Settings
-  alias EyeInTheSkyWeb.OverviewLive.Settings.{AuthTab, EditorTab, GeneralTab, PricingTab, SystemTab, WorkflowTab}
+
+  alias EyeInTheSkyWeb.OverviewLive.Settings.{
+    AuthTab,
+    EditorTab,
+    GeneralTab,
+    PricingTab,
+    SystemTab,
+    WorkflowTab
+  }
 
   @models [
     {"haiku", "Haiku"},
@@ -36,6 +44,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     if settings["theme"] == "" do
       Settings.put("theme", "dark")
     end
+
     settings = if settings["theme"] == "", do: Map.put(settings, "theme", "dark"), else: settings
     db_info = load_db_info()
 
@@ -128,10 +137,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       cond do
         key == "theme" ->
           push_event(socket, "apply_theme", %{theme: value})
+
         key == "cm_font_size" ->
           push_event(socket, "apply_cm_settings", %{cm_font_size: value})
+
         key == "palette_shortcut" ->
           assign(socket, :palette_shortcut, value)
+
         true ->
           socket
       end
@@ -150,6 +162,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   def handle_event("set_theme", %{"theme" => theme}, socket) do
     Settings.put("theme", theme)
     settings = Settings.all()
+
     socket =
       socket
       |> assign(:settings, settings)

@@ -87,7 +87,12 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
       is_codex = commenter == "codex"
 
       if event in ["issue_comment", "pull_request_comment"] and is_pr and is_codex do
-        handle_codex_comment(conn, %{pr_body: pr_body, pr_number: pr_number, comment_body: comment_body, repo: repo})
+        handle_codex_comment(conn, %{
+          pr_body: pr_body,
+          pr_number: pr_number,
+          comment_body: comment_body,
+          repo: repo
+        })
       else
         json(conn, %{success: true, message: "Ignored: #{event} by #{commenter}"})
       end
@@ -158,7 +163,12 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
 
     case extract_session_uuid(pr_body) do
       {:ok, session_uuid} ->
-        dm_session(conn, %{session_uuid: session_uuid, pr_number: pr_number, comment_body: comment_body, repo: repo})
+        dm_session(conn, %{
+          session_uuid: session_uuid,
+          pr_number: pr_number,
+          comment_body: comment_body,
+          repo: repo
+        })
 
       :not_found ->
         Logger.warning("No Session-ID found in PR ##{pr_number} body; cannot notify session")
@@ -262,7 +272,9 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
   end
 
   defp dm_session(conn, event) do
-    %{session_uuid: session_uuid, pr_number: pr_number, comment_body: comment_body, repo: repo} = event
+    %{session_uuid: session_uuid, pr_number: pr_number, comment_body: comment_body, repo: repo} =
+      event
+
     {owner, repo_name} = split_repo(repo)
 
     case Sessions.get_session_by_uuid(session_uuid) do

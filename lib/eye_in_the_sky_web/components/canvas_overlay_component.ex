@@ -41,7 +41,10 @@ defmodule EyeInTheSkyWeb.Components.CanvasOverlayComponent do
       {:ok,
        socket
        |> assign(:canvas_sessions, Enum.reject(socket.assigns.canvas_sessions, &(&1.id == cs_id)))
-       |> assign(:subscribed_session_ids, Enum.reject(socket.assigns.subscribed_session_ids, &(&1 == cs.session_id)))}
+       |> assign(
+         :subscribed_session_ids,
+         Enum.reject(socket.assigns.subscribed_session_ids, &(&1 == cs.session_id))
+       )}
     else
       {:ok, socket}
     end
@@ -65,7 +68,14 @@ defmodule EyeInTheSkyWeb.Components.CanvasOverlayComponent do
 
   def handle_info({:session_status, session_id, _status}, socket) do
     cs = Enum.find(socket.assigns.canvas_sessions, &(&1.session_id == session_id))
-    if cs, do: send_update(EyeInTheSkyWeb.Components.ChatWindowComponent, id: "chat-window-#{cs.id}", canvas_session: cs)
+
+    if cs,
+      do:
+        send_update(EyeInTheSkyWeb.Components.ChatWindowComponent,
+          id: "chat-window-#{cs.id}",
+          canvas_session: cs
+        )
+
     {:noreply, socket}
   end
 
@@ -76,8 +86,11 @@ defmodule EyeInTheSkyWeb.Components.CanvasOverlayComponent do
 
   def handle_event("open", %{"canvas-id" => id_str}, socket) do
     case parse_int(id_str) do
-      nil -> {:noreply, socket}
-      canvas_id -> {:noreply, socket |> assign(:open, true) |> load_canvases() |> activate_canvas(canvas_id)}
+      nil ->
+        {:noreply, socket}
+
+      canvas_id ->
+        {:noreply, socket |> assign(:open, true) |> load_canvases() |> activate_canvas(canvas_id)}
     end
   end
 
@@ -125,55 +138,68 @@ defmodule EyeInTheSkyWeb.Components.CanvasOverlayComponent do
   def render(assigns) do
     ~H"""
     <div id="canvas-overlay">
-    <%= if @open do %>
-      <div style="position: fixed; inset: 0; z-index: 60;" class="bg-base-100/80 backdrop-blur-md flex flex-col">
-        <div class="flex items-center justify-between px-4 py-2 border-b border-base-300 bg-base-200/70 shrink-0">
-          <div class="flex items-center gap-3">
-            <span class="text-secondary font-semibold text-sm">Canvas</span>
-            <div class="tabs tabs-boxed tabs-xs bg-base-300">
-              <%= for canvas <- @canvases do %>
-                <a
-                  class={["tab tab-xs", if(@active_canvas_id == canvas.id, do: "tab-active")]}
-                  phx-click="switch_tab"
-                  phx-value-canvas-id={canvas.id}
-                  phx-target={@myself}
-                >
-                  <%= canvas.name %>
-                </a>
-              <% end %>
-              <%= if @creating_canvas do %>
-                <form phx-submit="create_canvas" phx-target={@myself} class="flex gap-1 ml-1">
-                  <input type="text" name="name" class="input input-xs w-28 text-base" placeholder="Canvas name" autofocus />
-                  <button type="submit" class="btn btn-primary btn-sm min-h-[44px]">+</button>
-                </form>
-              <% else %>
-                <a
-                  class="tab tab-xs text-base-content/40"
-                  phx-click="start_new_canvas"
-                  phx-target={@myself}
-                >+ New</a>
-              <% end %>
+      <%= if @open do %>
+        <div
+          style="position: fixed; inset: 0; z-index: 60;"
+          class="bg-base-100/80 backdrop-blur-md flex flex-col"
+        >
+          <div class="flex items-center justify-between px-4 py-2 border-b border-base-300 bg-base-200/70 shrink-0">
+            <div class="flex items-center gap-3">
+              <span class="text-secondary font-semibold text-sm">Canvas</span>
+              <div class="tabs tabs-boxed tabs-xs bg-base-300">
+                <%= for canvas <- @canvases do %>
+                  <a
+                    class={["tab tab-xs", if(@active_canvas_id == canvas.id, do: "tab-active")]}
+                    phx-click="switch_tab"
+                    phx-value-canvas-id={canvas.id}
+                    phx-target={@myself}
+                  >
+                    {canvas.name}
+                  </a>
+                <% end %>
+                <%= if @creating_canvas do %>
+                  <form phx-submit="create_canvas" phx-target={@myself} class="flex gap-1 ml-1">
+                    <input
+                      type="text"
+                      name="name"
+                      class="input input-xs w-28 text-base"
+                      placeholder="Canvas name"
+                      autofocus
+                    />
+                    <button type="submit" class="btn btn-primary btn-sm min-h-[44px]">+</button>
+                  </form>
+                <% else %>
+                  <a
+                    class="tab tab-xs text-base-content/40"
+                    phx-click="start_new_canvas"
+                    phx-target={@myself}
+                  >
+                    + New
+                  </a>
+                <% end %>
+              </div>
             </div>
+            <button class="btn btn-ghost btn-sm min-h-[44px]" phx-click="toggle" phx-target={@myself}>
+              Close
+            </button>
           </div>
-          <button class="btn btn-ghost btn-sm min-h-[44px]" phx-click="toggle" phx-target={@myself}>Close</button>
-        </div>
 
-        <div class="relative flex-1 overflow-hidden">
-          <%= for cs <- @canvas_sessions do %>
-            <.live_component
-              module={ChatWindowComponent}
-              id={"chat-window-#{cs.id}"}
-              canvas_session={cs}
-            />
-          <% end %>
-          <%= if @canvas_sessions == [] and not is_nil(@active_canvas_id) do %>
-            <div class="flex items-center justify-center h-full text-base-content/30 text-sm select-none">
-              No sessions -- use "Add to Canvas" on a session card.
-            </div>
-          <% end %>
+          <div class="relative flex-1 overflow-hidden">
+            <%= for cs <- @canvas_sessions do %>
+              <.live_component
+                module={ChatWindowComponent}
+                id={"chat-window-#{cs.id}"}
+                canvas_session={cs}
+              />
+            <% end %>
+            <%= if @canvas_sessions == [] and not is_nil(@active_canvas_id) do %>
+              <div class="flex items-center justify-center h-full text-base-content/30 text-sm select-none">
+                No sessions -- use "Add to Canvas" on a session card.
+              </div>
+            <% end %>
+          </div>
         </div>
-      </div>
-    <% end %>
+      <% end %>
     </div>
     """
   end
@@ -186,6 +212,7 @@ defmodule EyeInTheSkyWeb.Components.CanvasOverlayComponent do
       socket |> assign(:open, false) |> assign(:subscribed_session_ids, [])
     else
       socket = socket |> load_canvases() |> assign(:open, true)
+
       case socket.assigns.canvases do
         [first | _] -> activate_canvas(socket, first.id)
         [] -> socket
@@ -233,7 +260,14 @@ defmodule EyeInTheSkyWeb.Components.CanvasOverlayComponent do
 
   defp refresh_window(socket, session_id) do
     cs = Enum.find(socket.assigns.canvas_sessions, &(&1.session_id == session_id))
-    if cs, do: send_update(EyeInTheSkyWeb.Components.ChatWindowComponent, id: "chat-window-#{cs.id}", canvas_session: cs)
+
+    if cs,
+      do:
+        send_update(EyeInTheSkyWeb.Components.ChatWindowComponent,
+          id: "chat-window-#{cs.id}",
+          canvas_session: cs
+        )
+
     socket
   end
 end

@@ -124,7 +124,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
 
   defp load_tasks_page(socket, page) do
     project_id = socket.assigns.project_id
-    TasksListHelpers.load_tasks_page(socket, page, fn opts -> Tasks.list_tasks_for_project(project_id, opts) end)
+
+    TasksListHelpers.load_tasks_page(socket, page, fn opts ->
+      Tasks.list_tasks_for_project(project_id, opts)
+    end)
   end
 
   @impl true

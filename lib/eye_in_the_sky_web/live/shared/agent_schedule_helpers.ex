@@ -68,7 +68,14 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
 
     with {:ok, prompt} <- resolve_prompt(prompt_id_raw),
          {:ok, path} <- resolve_project_path(params, prompt, socket) do
-      config = build_schedule_config(%{prompt: prompt, params: params, path: path, prompt_source: prompt_source, prompt_id_raw: prompt_id_raw})
+      config =
+        build_schedule_config(%{
+          prompt: prompt,
+          params: params,
+          path: path,
+          prompt_source: prompt_source,
+          prompt_id_raw: prompt_id_raw
+        })
 
       job_attrs =
         %{
@@ -78,7 +85,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
           "schedule_type" => params["schedule_type"],
           "schedule_value" => params["schedule_value"],
           "config" => config,
-          "prompt_id" => if(prompt_source == :filesystem, do: nil, else: parse_int(prompt_id_raw)),
+          "prompt_id" =>
+            if(prompt_source == :filesystem, do: nil, else: parse_int(prompt_id_raw)),
           "enabled" => 1
         }
         |> put_if_present("timezone", params["timezone"])
@@ -87,8 +95,12 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
       result = save_or_update_job(params["job_id"], job_attrs, caller_project_id, socket)
       handle_schedule_result(result, socket)
     else
-      {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Agent not found")}
-      {:error, :no_project} -> {:noreply, put_flash(socket, :error, "Could not resolve project path. Select a project override.")}
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Agent not found")}
+
+      {:error, :no_project} ->
+        {:noreply,
+         put_flash(socket, :error, "Could not resolve project path. Select a project override.")}
     end
   end
 
@@ -250,7 +262,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
     end
   end
 
-  defp build_schedule_config(%{prompt: prompt, params: params, path: path, prompt_source: prompt_source, prompt_id_raw: prompt_id_raw}) do
+  defp build_schedule_config(%{
+         prompt: prompt,
+         params: params,
+         path: path,
+         prompt_source: prompt_source,
+         prompt_id_raw: prompt_id_raw
+       }) do
     %{
       "instructions" => prompt.prompt_text,
       "model" => params["model"] || "sonnet",
@@ -283,8 +301,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
     end
   end
 
-  defp save_or_update_job(job_id, job_attrs, caller_project_id, _socket) when job_id in [nil, ""] do
-    attrs = if caller_project_id, do: Map.put(job_attrs, "project_id", caller_project_id), else: job_attrs
+  defp save_or_update_job(job_id, job_attrs, caller_project_id, _socket)
+       when job_id in [nil, ""] do
+    attrs =
+      if caller_project_id,
+        do: Map.put(job_attrs, "project_id", caller_project_id),
+        else: job_attrs
+
     ScheduledJobs.create_job(attrs)
   end
 

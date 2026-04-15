@@ -268,7 +268,10 @@ defmodule EyeInTheSky.SessionsTest do
       end
 
       for i <- 1..2 do
-        Commits.create_commit(%{session_id: session.id, commit_hash: "hash#{i}_#{System.unique_integer([:positive])}"})
+        Commits.create_commit(%{
+          session_id: session.id,
+          commit_hash: "hash#{i}_#{System.unique_integer([:positive])}"
+        })
       end
 
       counts = Sessions.get_session_counts(session.id)

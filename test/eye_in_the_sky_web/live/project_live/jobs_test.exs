@@ -100,7 +100,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
       })
       |> render_submit()
 
-      jobs = ScheduledJobs.list_jobs_for_project(project.id)
+      jobs = ScheduledJobs.list_jobs(project_id: project.id)
       assert length(jobs) == 1
       assert hd(jobs).name == "New Job"
       assert hd(jobs).project_id == project.id

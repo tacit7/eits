@@ -17,7 +17,10 @@ defmodule EyeInTheSky.Claude.ContentBlockTest do
 
     test "new_document/2 creates a Document block with base64 source" do
       block = ContentBlock.new_document("application/pdf", "JVBERi0...")
-      assert %Document{source: %{type: "base64", media_type: "application/pdf", data: "JVBERi0..."}} = block
+
+      assert %Document{
+               source: %{type: "base64", media_type: "application/pdf", data: "JVBERi0..."}
+             } = block
     end
   end
 
@@ -35,7 +38,10 @@ defmodule EyeInTheSky.Claude.ContentBlockTest do
     end
 
     test "document?/1 returns true for Document blocks" do
-      assert ContentBlock.document?(%Document{source: %{type: "base64", media_type: "application/pdf", data: "x"}})
+      assert ContentBlock.document?(%Document{
+               source: %{type: "base64", media_type: "application/pdf", data: "x"}
+             })
+
       refute ContentBlock.document?(%Text{text: "hello"})
       refute ContentBlock.document?(42)
     end

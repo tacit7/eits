@@ -33,7 +33,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
     >
       <%= if @display_name do %>
         <div class="flex justify-end px-4 pt-2">
-          <span class="text-[11px] text-base-content/35 bg-base-content/5 px-2 py-0.5 rounded">{@display_name}</span>
+          <span class="text-[11px] text-base-content/35 bg-base-content/5 px-2 py-0.5 rounded">
+            {@display_name}
+          </span>
         </div>
       <% end %>
       <%!-- Upload previews --%>

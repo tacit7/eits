@@ -112,7 +112,9 @@ defmodule EyeInTheSky.Search.PgSearch do
 
     # Extract everything after "WHERE" in the generated SQL.
     # Ecto generates: SELECT ... FROM "table" AS n0 WHERE n0."col" = $1 ...
-    case Regex.run(~r/\bWHERE\b(.+?)(?:\s*ORDER\s+BY|\s*LIMIT|\s*$)/si, sql, capture: :all_but_first) do
+    case Regex.run(~r/\bWHERE\b(.+?)(?:\s*ORDER\s+BY|\s*LIMIT|\s*$)/si, sql,
+           capture: :all_but_first
+         ) do
       [where_clause] ->
         # Replace Ecto's "n0" alias with the FTS alias (first letter of table name).
         # The FTS query uses `String.first(table)` as its alias, so "notes" → "n".
@@ -121,9 +123,10 @@ defmodule EyeInTheSky.Search.PgSearch do
 
         # Ecto numbers its params starting at $1; we need to offset by 1 since
         # the FTS CTE already uses $1 for the search term.
-        shifted_clause = Regex.replace(~r/\$(\d+)/, aliased_clause, fn _, n ->
-          "$#{String.to_integer(n) + 1}"
-        end)
+        shifted_clause =
+          Regex.replace(~r/\$(\d+)/, aliased_clause, fn _, n ->
+            "$#{String.to_integer(n) + 1}"
+          end)
 
         {"AND (#{shifted_clause})", params}
 

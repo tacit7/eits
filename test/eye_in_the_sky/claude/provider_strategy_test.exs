@@ -19,12 +19,21 @@ defmodule EyeInTheSky.Claude.ProviderStrategyTest do
   describe "format_content_default/1" do
     test "formats Text block" do
       block = ContentBlock.new_text("hello")
-      assert ProviderStrategy.format_content_default(block) == %{"type" => "text", "text" => "hello"}
+
+      assert ProviderStrategy.format_content_default(block) == %{
+               "type" => "text",
+               "text" => "hello"
+             }
     end
 
     test "formats Image block" do
       block = ContentBlock.new_image("iVBOR...", "image/png")
-      assert ProviderStrategy.format_content_default(block) == %{"type" => "image", "data" => "iVBOR...", "mime_type" => "image/png"}
+
+      assert ProviderStrategy.format_content_default(block) == %{
+               "type" => "image",
+               "data" => "iVBOR...",
+               "mime_type" => "image/png"
+             }
     end
 
     test "formats Document block" do
@@ -48,7 +57,11 @@ defmodule EyeInTheSky.Claude.ProviderStrategyTest do
 
       assert Claude.format_content(block) == %{
                "type" => "image",
-               "source" => %{"type" => "base64", "media_type" => "image/png", "data" => "iVBOR..."}
+               "source" => %{
+                 "type" => "base64",
+                 "media_type" => "image/png",
+                 "data" => "iVBOR..."
+               }
              }
     end
 
@@ -57,7 +70,11 @@ defmodule EyeInTheSky.Claude.ProviderStrategyTest do
 
       assert Claude.format_content(block) == %{
                "type" => "document",
-               "source" => %{"type" => "base64", "media_type" => "application/pdf", "data" => "JVBERi0..."}
+               "source" => %{
+                 "type" => "base64",
+                 "media_type" => "application/pdf",
+                 "data" => "JVBERi0..."
+               }
              }
     end
   end
@@ -69,7 +86,10 @@ defmodule EyeInTheSky.Claude.ProviderStrategyTest do
 
       assert [
                %{"type" => "text", "text" => "describe this"},
-               %{"type" => "image", "source" => %{"type" => "base64", "media_type" => "image/jpeg", "data" => "abc"}}
+               %{
+                 "type" => "image",
+                 "source" => %{"type" => "base64", "media_type" => "image/jpeg", "data" => "abc"}
+               }
              ] = result
     end
 

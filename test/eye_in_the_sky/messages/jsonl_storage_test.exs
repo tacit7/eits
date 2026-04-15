@@ -25,11 +25,12 @@ defmodule EyeInTheSky.Messages.JsonlStorageTest do
       session_id = tmp_session_id()
 
       # Year ~5138 — exceeds DateTime.from_unix!/1 max range
-      line = Jason.encode!(%{
-        "id" => "abc123",
-        "body" => "hello",
-        "inserted_at" => 99_999_999_999_999
-      })
+      line =
+        Jason.encode!(%{
+          "id" => "abc123",
+          "body" => "hello",
+          "inserted_at" => 99_999_999_999_999
+        })
 
       write_jsonl(project_id, session_id, [line])
 
@@ -43,11 +44,12 @@ defmodule EyeInTheSky.Messages.JsonlStorageTest do
       project_id = tmp_project_id()
       session_id = tmp_session_id()
 
-      line = Jason.encode!(%{
-        "id" => "abc456",
-        "body" => "world",
-        "inserted_at" => "not-a-timestamp"
-      })
+      line =
+        Jason.encode!(%{
+          "id" => "abc456",
+          "body" => "world",
+          "inserted_at" => "not-a-timestamp"
+        })
 
       write_jsonl(project_id, session_id, [line])
 
@@ -61,11 +63,12 @@ defmodule EyeInTheSky.Messages.JsonlStorageTest do
       project_id = tmp_project_id()
       session_id = tmp_session_id()
 
-      line = Jason.encode!(%{
-        "id" => "abc789",
-        "body" => "negative",
-        "inserted_at" => -99_999_999_999_999
-      })
+      line =
+        Jason.encode!(%{
+          "id" => "abc789",
+          "body" => "negative",
+          "inserted_at" => -99_999_999_999_999
+        })
 
       write_jsonl(project_id, session_id, [line])
 

@@ -88,8 +88,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
       <!-- Header with back button -->
       <div class="mb-6">
         <.link navigate={~p"/prompts"} class="btn btn-ghost btn-sm gap-2">
-          <.icon name="hero-arrow-left" class="h-4 w-4" />
-          Back to Prompts
+          <.icon name="hero-arrow-left" class="h-4 w-4" /> Back to Prompts
         </.link>
       </div>
       
@@ -134,16 +133,14 @@ defmodule EyeInTheSkyWeb.PromptLive.Show do
               phx-click="edit"
               class="btn btn-primary btn-sm"
             >
-              <.icon name="hero-pencil-square" class="h-4 w-4" />
-              Edit
+              <.icon name="hero-pencil-square" class="h-4 w-4" /> Edit
             </button>
             <button
               phx-click="delete"
               class="btn btn-error btn-sm"
               data-confirm="Are you sure you want to deactivate this prompt?"
             >
-              <.icon name="hero-trash" class="h-4 w-4" />
-              Deactivate
+              <.icon name="hero-trash" class="h-4 w-4" /> Deactivate
             </button>
           <% end %>
         </div>

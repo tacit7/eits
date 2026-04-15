@@ -18,7 +18,10 @@ defmodule EyeInTheSkyWeb.TelemetryDispatch do
       :ok
 
     e ->
-      Logger.warning("[TelemetryDispatch] unexpected error in dispatch_measurements: #{Exception.message(e)}")
+      Logger.warning(
+        "[TelemetryDispatch] unexpected error in dispatch_measurements: #{Exception.message(e)}"
+      )
+
       :ok
   end
 end

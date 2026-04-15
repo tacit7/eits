@@ -201,10 +201,11 @@ defmodule EyeInTheSky.Channels do
   def count_unread_messages(channel_id, session_id) do
     alias EyeInTheSky.Messages.Message
 
-    member = case get_member(channel_id, session_id) do
-      {:ok, m} -> m
-      {:error, :not_found} -> nil
-    end
+    member =
+      case get_member(channel_id, session_id) do
+        {:ok, m} -> m
+        {:error, :not_found} -> nil
+      end
 
     if member && member.last_read_at do
       from(m in Message,

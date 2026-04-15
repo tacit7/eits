@@ -89,7 +89,8 @@ defmodule EyeInTheSky.Checkpoints do
     with {:ok, session} <- Sessions.get_session(checkpoint.session_id),
          {:ok, agent} <- get_or_create_fork_agent(session, attrs),
          {:ok, new_session} <- create_fork_session(session, agent, checkpoint, attrs),
-         :ok <- copy_messages_to_fork(checkpoint.session_id, new_session.id, checkpoint.message_index) do
+         :ok <-
+           copy_messages_to_fork(checkpoint.session_id, new_session.id, checkpoint.message_index) do
       maybe_create_fork_branch(checkpoint, session, new_session, attrs)
       {:ok, new_session}
     end
@@ -135,7 +136,12 @@ defmodule EyeInTheSky.Checkpoints do
     if not is_nil(checkpoint.git_stash_ref) && not is_nil(original_session.git_worktree_path) &&
          File.dir?(original_session.git_worktree_path) do
       branch_name = attrs[:branch_name] || "fork/session-#{new_session.id}"
-      create_branch_from_stash(original_session.git_worktree_path, checkpoint.git_stash_ref, branch_name)
+
+      create_branch_from_stash(
+        original_session.git_worktree_path,
+        checkpoint.git_stash_ref,
+        branch_name
+      )
     end
   end
 

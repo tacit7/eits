@@ -277,7 +277,9 @@ defmodule EyeInTheSky.SDK.MessageHandler do
     })
 
     if status == 0 do
-      Logger.info("[telemetry] #{tel_label(tel_prefix)}.exit session_id=#{session_id} exit_code=0")
+      Logger.info(
+        "[telemetry] #{tel_label(tel_prefix)}.exit session_id=#{session_id} exit_code=0"
+      )
     else
       Logger.error(
         "[telemetry] #{tel_label(tel_prefix)}.exit session_id=#{session_id} exit_code=#{exit_code} status=#{inspect(status)}"

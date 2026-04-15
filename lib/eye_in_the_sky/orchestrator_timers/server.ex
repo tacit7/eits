@@ -35,7 +35,9 @@ defmodule EyeInTheSky.OrchestratorTimers.Server do
 
   @impl GenServer
   def handle_call({:schedule_repeating, session_id, interval_ms, message}, _from, state) do
-    {result, new_state} = build_and_store_timer(session_id, :repeating, interval_ms, message, state)
+    {result, new_state} =
+      build_and_store_timer(session_id, :repeating, interval_ms, message, state)
+
     {:reply, result, new_state}
   end
 
@@ -84,7 +86,10 @@ defmodule EyeInTheSky.OrchestratorTimers.Server do
 
   defp build_and_store_timer(_session_id, _mode, interval_ms, _message, state)
        when not is_integer(interval_ms) or interval_ms < @min_interval_ms do
-    {{:error, {:invalid_interval, "interval_ms must be an integer >= #{@min_interval_ms}, got #{inspect(interval_ms)}"}}, state}
+    {{:error,
+      {:invalid_interval,
+       "interval_ms must be an integer >= #{@min_interval_ms}, got #{inspect(interval_ms)}"}},
+     state}
   end
 
   defp build_and_store_timer(session_id, mode, interval_ms, message, state) do
@@ -106,7 +111,10 @@ defmodule EyeInTheSky.OrchestratorTimers.Server do
     }
 
     label = if result == {:ok, :replaced}, do: "replaced", else: "scheduled"
-    Logger.info("[OrchestratorTimers] #{label} #{mode} session=#{session_id} interval_ms=#{interval_ms} next_fire_at=#{record.next_fire_at}")
+
+    Logger.info(
+      "[OrchestratorTimers] #{label} #{mode} session=#{session_id} interval_ms=#{interval_ms} next_fire_at=#{record.next_fire_at}"
+    )
 
     Events.timer_scheduled(session_id, record)
     {result, Map.put(state, session_id, record)}
@@ -120,7 +128,9 @@ defmodule EyeInTheSky.OrchestratorTimers.Server do
         Logger.debug("[OrchestratorTimers] delivery succeeded session=#{session_id}")
 
       {:error, reason} ->
-        Logger.warning("[OrchestratorTimers] delivery failed session=#{session_id} reason=#{inspect(reason)}")
+        Logger.warning(
+          "[OrchestratorTimers] delivery failed session=#{session_id} reason=#{inspect(reason)}"
+        )
     end
 
     case record.mode do
@@ -130,7 +140,10 @@ defmodule EyeInTheSky.OrchestratorTimers.Server do
 
       :repeating ->
         token = make_ref()
-        timer_ref = Process.send_after(self(), {:fire_timer, session_id, token}, record.interval_ms)
+
+        timer_ref =
+          Process.send_after(self(), {:fire_timer, session_id, token}, record.interval_ms)
+
         now = DateTime.utc_now()
 
         new_record = %Timer{

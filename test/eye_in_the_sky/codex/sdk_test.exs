@@ -225,6 +225,75 @@ defmodule EyeInTheSky.Codex.SDKTest do
 
       assert_receive {:claude_complete, ^ref, _session_id}, 5_000
     end
+
+    test "result includes summarized complete tool calls" do
+      {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
+      mock_port = Registry.lookup(ref)
+
+      send(
+        mock_port,
+        {:send_output,
+         Jason.encode!(%{
+           "type" => "thread.started",
+           "thread_id" => "thread-tools"
+         })}
+      )
+
+      send(
+        mock_port,
+        {:send_output,
+         Jason.encode!(%{
+           "type" => "item.started",
+           "item" => %{"type" => "command_execution", "command" => "mix test"}
+         })}
+      )
+
+      assert_receive {:claude_message, ^ref,
+                      %Message{type: :tool_use, metadata: %{partial: true}}},
+                     5_000
+
+      send(
+        mock_port,
+        {:send_output,
+         Jason.encode!(%{
+           "type" => "item.completed",
+           "item" => %{
+             "type" => "command_execution",
+             "command" => "mix test",
+             "exit_code" => 0,
+             "output" => "ok"
+           }
+         })}
+      )
+
+      assert_receive {:claude_message, ^ref, %Message{type: :tool_use}}, 5_000
+
+      send(
+        mock_port,
+        {:send_output,
+         Jason.encode!(%{
+           "type" => "item.completed",
+           "item" => %{"type" => "agent_message", "text" => "All tests passed."}
+         })}
+      )
+
+      assert_receive {:claude_message, ^ref, %Message{type: :text}}, 5_000
+
+      send(
+        mock_port,
+        {:send_output,
+         Jason.encode!(%{
+           "type" => "turn.completed",
+           "thread_id" => "thread-tools",
+           "usage" => %{"input_tokens" => 10, "output_tokens" => 5}
+         })}
+      )
+
+      assert_receive {:claude_message, ^ref, %Message{type: :result, content: result_text}}, 5_000
+      assert result_text =~ "> `Bash` mix test"
+      assert result_text =~ "All tests passed."
+      assert_receive {:claude_complete, ^ref, "thread-tools"}, 5_000
+    end
   end
 
   # ---------------------------------------------------------------------------

@@ -27,11 +27,11 @@ defmodule EyeInTheSky.Projects do
   def list_projects_for_sidebar do
     Project
     |> where([p], p.active == true)
-    |> order_by([p], [
+    |> order_by([p],
       asc: not p.bookmarked,
       asc: fragment("lower(?)", p.name),
       asc: p.id
-    ])
+    )
     |> Repo.all()
   end
 
@@ -125,8 +125,11 @@ defmodule EyeInTheSky.Projects do
     cond do
       project_id != nil ->
         case get_project(project_id) do
-          {:error, :not_found} -> {:error, "project_not_found", "project_id #{project_id} does not exist"}
-          {:ok, project} -> {:ok, project.id, project.name}
+          {:error, :not_found} ->
+            {:error, "project_not_found", "project_id #{project_id} does not exist"}
+
+          {:ok, project} ->
+            {:ok, project.id, project.name}
         end
 
       project_path not in [nil, ""] ->
@@ -161,8 +164,11 @@ defmodule EyeInTheSky.Projects do
       {:error, _changeset} ->
         # Race condition: try lookup again
         case get_project_by_path(path) do
-          {:error, :not_found} -> {:error, "project_creation_failed", "failed to create project for path: #{path}"}
-          {:ok, project} -> {:ok, project.id, project.name}
+          {:error, :not_found} ->
+            {:error, "project_creation_failed", "failed to create project for path: #{path}"}
+
+          {:ok, project} ->
+            {:ok, project.id, project.name}
         end
     end
   end

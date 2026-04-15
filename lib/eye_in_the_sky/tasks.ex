@@ -63,7 +63,10 @@ defmodule EyeInTheSky.Tasks do
   end
 
   defp task_order(query, "created_asc"), do: order_by(query, [t], asc: t.created_at)
-  defp task_order(query, "priority"), do: order_by(query, [t], desc: t.priority, desc: t.created_at)
+
+  defp task_order(query, "priority"),
+    do: order_by(query, [t], desc: t.priority, desc: t.created_at)
+
   defp task_order(query, _), do: order_by(query, [t], desc: t.created_at)
 
   @doc """

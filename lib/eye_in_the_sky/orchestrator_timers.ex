@@ -21,7 +21,9 @@ defmodule EyeInTheSky.OrchestratorTimers do
     if is_integer(delay_ms) and delay_ms >= @min_interval_ms do
       GenServer.call(Server, {:schedule_once, session_id, delay_ms, message})
     else
-      {:error, {:invalid_interval, "delay_ms must be an integer >= #{@min_interval_ms}, got #{inspect(delay_ms)}"}}
+      {:error,
+       {:invalid_interval,
+        "delay_ms must be an integer >= #{@min_interval_ms}, got #{inspect(delay_ms)}"}}
     end
   end
 
@@ -30,7 +32,9 @@ defmodule EyeInTheSky.OrchestratorTimers do
     if is_integer(interval_ms) and interval_ms >= @min_interval_ms do
       GenServer.call(Server, {:schedule_repeating, session_id, interval_ms, message})
     else
-      {:error, {:invalid_interval, "interval_ms must be an integer >= #{@min_interval_ms}, got #{inspect(interval_ms)}"}}
+      {:error,
+       {:invalid_interval,
+        "interval_ms must be an integer >= #{@min_interval_ms}, got #{inspect(interval_ms)}"}}
     end
   end
 

@@ -69,6 +69,7 @@ defmodule EyeInTheSky.Claude.CLI.Env do
 
   defp poisoned_path_entry?(entry) do
     trimmed = String.trim(entry)
+
     trimmed == "" or
       String.contains?(trimmed, "_build/prod/rel") or
       String.contains?(trimmed, "/erts-")

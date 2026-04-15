@@ -14,7 +14,10 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
 
   def projects_section(assigns) do
     ~H"""
-    <div class={["flex items-center", if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1")]}>
+    <div class={[
+      "flex items-center",
+      if(@collapsed, do: "px-4 py-1 justify-center", else: "px-3 py-1")
+    ]}>
       <button
         phx-click="toggle_projects"
         phx-target={@myself}
@@ -24,7 +27,9 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
       >
         <%= if !@collapsed do %>
           <.icon
-            name={if @expanded_projects, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"}
+            name={
+              if @expanded_projects, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"
+            }
             class="w-3.5 h-3.5 flex-shrink-0"
           />
         <% end %>
@@ -128,7 +133,11 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
               >
                 <.icon
                   name={if is_selected, do: "hero-folder-open", else: "hero-folder"}
-                  class={if is_selected, do: "w-4 h-4 flex-shrink-0 text-primary", else: "w-4 h-4 flex-shrink-0"}
+                  class={
+                    if is_selected,
+                      do: "w-4 h-4 flex-shrink-0 text-primary",
+                      else: "w-4 h-4 flex-shrink-0"
+                  }
                 />
                 <span class={["truncate", if(@collapsed, do: "hidden")]}>{project.name}</span>
               </button>
@@ -166,7 +175,9 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                         class="flex items-center gap-2 text-sm"
                       >
                         <.icon
-                          name={if project.bookmarked, do: "hero-bookmark-solid", else: "hero-bookmark"}
+                          name={
+                            if project.bookmarked, do: "hero-bookmark-solid", else: "hero-bookmark"
+                          }
                           class="w-3.5 h-3.5"
                         />
                         {if project.bookmarked, do: "Unbookmark", else: "Bookmark"}
@@ -271,7 +282,8 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
         "flex items-center gap-1.5 pl-2.5 pr-2 py-1 min-h-[44px] text-xs border-l-2 transition-colors",
         if(@active,
           do: "text-primary bg-primary/10 border-primary font-medium",
-          else: "text-base-content/50 hover:text-base-content/75 hover:bg-primary/5 border-transparent"
+          else:
+            "text-base-content/50 hover:text-base-content/75 hover:bg-primary/5 border-transparent"
         )
       ]}
     >

@@ -63,7 +63,9 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
   @impl true
   def handle_event("select_team", %{"id" => id}, socket) do
     case parse_int(id) do
-      nil -> {:noreply, socket}
+      nil ->
+        {:noreply, socket}
+
       team_id ->
         team = Teams.get_team!(team_id) |> load_team_detail()
         {:noreply, socket |> assign(:agent_session_id, nil) |> show_team_detail(team_id, team)}
@@ -120,8 +122,12 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
   @impl true
   def handle_event("assign_task", %{"task-id" => task_id, "session-id" => session_id}, socket) do
     case {parse_int(task_id), parse_int(session_id)} do
-      {nil, _} -> {:noreply, socket}
-      {_, nil} -> {:noreply, socket}
+      {nil, _} ->
+        {:noreply, socket}
+
+      {_, nil} ->
+        {:noreply, socket}
+
       {task_id_int, session_id_int} ->
         Tasks.link_session_to_task(task_id_int, session_id_int)
         team = Teams.get_team!(socket.assigns.selected_team_id) |> load_team_detail()
@@ -329,7 +335,9 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
 
   defp maybe_open_fab_chat(socket, member) do
     session_id =
-      if member.session, do: to_string(member.session.uuid || member.session_id), else: to_string(member.session_id)
+      if member.session,
+        do: to_string(member.session.uuid || member.session_id),
+        else: to_string(member.session_id)
 
     push_event(socket, "open_fab_chat", %{
       session_id: session_id,
@@ -366,5 +374,4 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
       socket
     end
   end
-
 end

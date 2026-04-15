@@ -90,7 +90,9 @@ defmodule EyeInTheSky.AgentDefinitionsTest do
 
   describe "sync_global/0" do
     setup do
-      dir = System.tmp_dir!() |> Path.join("eits_test_agents_#{System.unique_integer([:positive])}")
+      dir =
+        System.tmp_dir!() |> Path.join("eits_test_agents_#{System.unique_integer([:positive])}")
+
       on_exit(fn -> File.rm_rf!(dir) end)
       {:ok, dir: dir}
     end
@@ -135,7 +137,9 @@ defmodule EyeInTheSky.AgentDefinitionsTest do
 
       AgentDefinitions.sync_directory_for_test(dir, "global", nil)
 
-      temp_defn = Repo.one(from d in AgentDefinition, where: d.slug == "temp" and d.scope == "global")
+      temp_defn =
+        Repo.one(from d in AgentDefinition, where: d.slug == "temp" and d.scope == "global")
+
       assert temp_defn
       assert is_nil(temp_defn.missing_at)
 
@@ -161,7 +165,9 @@ defmodule EyeInTheSky.AgentDefinitionsTest do
 
       AgentDefinitions.sync_directory_for_test(dir, "project", project.id)
 
-      defn = Repo.one(from d in AgentDefinition, where: d.slug == "linter" and d.scope == "project")
+      defn =
+        Repo.one(from d in AgentDefinition, where: d.slug == "linter" and d.scope == "project")
+
       assert defn
       assert defn.project_id == project.id
     end
@@ -216,7 +222,10 @@ defmodule EyeInTheSky.AgentDefinitionsTest do
       {:ok, project: project, global: global, project_scoped: project_scoped}
     end
 
-    test "returns project-scoped definition when both exist", %{project: project, project_scoped: ps} do
+    test "returns project-scoped definition when both exist", %{
+      project: project,
+      project_scoped: ps
+    } do
       assert {:ok, defn} = AgentDefinitions.resolve("shared", project.id)
       assert defn.id == ps.id
       assert defn.scope == "project"

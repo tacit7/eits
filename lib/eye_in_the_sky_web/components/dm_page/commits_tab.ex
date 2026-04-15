@@ -30,11 +30,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
             id={"dm-commit-#{commit.id}"}
             phx-hook="DiffCollapse"
             data-hash={hash}
-            data-loaded={cond do
-              is_nil(diff) -> "false"
-              diff == :error -> "error"
-              true -> "true"
-            end}
+            data-loaded={
+              cond do
+                is_nil(diff) -> "false"
+                diff == :error -> "error"
+                true -> "true"
+              end
+            }
           >
             <input type="checkbox" />
             <div class="collapse-title py-3 px-4">
@@ -58,7 +60,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
                     <span
                       class="loading loading-spinner loading-xs hidden"
                       data-role="diff-spinner"
-                    ></span>
+                    >
+                    </span>
                   </div>
                 </div>
               </div>
@@ -85,5 +88,4 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
     <% end %>
     """
   end
-
 end

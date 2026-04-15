@@ -22,13 +22,32 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
   alias EyeInTheSky.Tasks.WorkflowState
   alias EyeInTheSky.Utils.ToolHelpers
 
-  import Helpers, only: [notify_success: 2, notify_error: 3, get_session_or_nil: 1, session_field: 2, with_task: 4]
+  import Helpers,
+    only: [
+      notify_success: 2,
+      notify_error: 3,
+      get_session_or_nil: 1,
+      session_field: 2,
+      with_task: 4
+    ]
 
   def dispatch("create " <> title, from_session_id),
-    do: create_and_link_task(String.trim(title), WorkflowState.todo_id(), "created", from_session_id)
+    do:
+      create_and_link_task(
+        String.trim(title),
+        WorkflowState.todo_id(),
+        "created",
+        from_session_id
+      )
 
   def dispatch("begin " <> title, from_session_id),
-    do: create_and_link_task(String.trim(title), WorkflowState.in_progress_id(), "begun", from_session_id)
+    do:
+      create_and_link_task(
+        String.trim(title),
+        WorkflowState.in_progress_id(),
+        "begun",
+        from_session_id
+      )
 
   def dispatch("start " <> id_str, from_session_id) do
     with_task(id_str, from_session_id, "task start", fn id, task ->
@@ -45,7 +64,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
     case String.split(rest, " ", parts: 2) do
       [id_str, state_str] ->
         with id when not is_nil(id) <- id_str |> String.trim() |> ToolHelpers.parse_int(),
-             state_id when not is_nil(state_id) <- state_str |> String.trim() |> ToolHelpers.parse_int(),
+             state_id when not is_nil(state_id) <-
+               state_str |> String.trim() |> ToolHelpers.parse_int(),
              true <- Tasks.task_linked_to_session?(id, from_session_id),
              {:ok, task} <- Tasks.get_task(id) do
           case Tasks.update_task_state(task, state_id) do
@@ -112,7 +132,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
     case String.split(rest, " ", parts: 2) do
       [id_str, tag_id_str] ->
         with id when not is_nil(id) <- id_str |> String.trim() |> ToolHelpers.parse_int(),
-             tag_id when not is_nil(tag_id) <- tag_id_str |> String.trim() |> ToolHelpers.parse_int(),
+             tag_id when not is_nil(tag_id) <-
+               tag_id_str |> String.trim() |> ToolHelpers.parse_int(),
              true <- Tasks.task_linked_to_session?(id, from_session_id),
              {:ok, _task} <- Tasks.get_task(id) do
           Tasks.link_tag_to_task(id, tag_id)
@@ -134,7 +155,11 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
   defp create_and_link_task(title, state_id, verb, from_session_id) do
     session = get_session_or_nil(from_session_id)
 
-    case Tasks.create_task(%{title: title, state_id: state_id, project_id: session_field(session, :project_id)}) do
+    case Tasks.create_task(%{
+           title: title,
+           state_id: state_id,
+           project_id: session_field(session, :project_id)
+         }) do
       {:ok, task} ->
         Tasks.link_session_to_task(task.id, from_session_id)
         notify_success(from_session_id, "task #{verb} id=#{task.id} title=#{title}")

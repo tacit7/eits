@@ -11,10 +11,10 @@ defmodule EyeInTheSkyWeb.Api.V1.JobController do
     jobs =
       cond do
         params["project_id"] ->
-          ScheduledJobs.list_jobs_for_project(parse_int(params["project_id"]))
+          ScheduledJobs.list_jobs(project_id: parse_int(params["project_id"]))
 
         params["global"] == "true" ->
-          ScheduledJobs.list_global_jobs()
+          ScheduledJobs.list_jobs(global_only: true)
 
         true ->
           ScheduledJobs.list_jobs()

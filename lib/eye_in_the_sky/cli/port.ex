@@ -37,7 +37,14 @@ defmodule EyeInTheSky.CLI.Port do
       exceeded the buffer is flushed to prevent memory growth. `nil` disables
       the guard (default).
   """
-  @spec handle_port_output(port(), reference(), pid(), binary(), pos_integer() | :infinity, keyword()) :: :ok
+  @spec handle_port_output(
+          port(),
+          reference(),
+          pid(),
+          binary(),
+          pos_integer() | :infinity,
+          keyword()
+        ) :: :ok
   def handle_port_output(port, session_ref, caller, buffer, idle_timeout_ms, opts \\ []) do
     config = %{
       port: port,

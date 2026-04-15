@@ -31,13 +31,17 @@ defmodule EyeInTheSky.ProjectFiles do
     relative = Path.relative_to(full, base_dir)
 
     if File.dir?(full) do
-      children = if depth < @max_tree_depth, do: scan_directory(base_dir, full, depth + 1), else: []
+      children =
+        if depth < @max_tree_depth, do: scan_directory(base_dir, full, depth + 1), else: []
+
       %{name: item, path: full, relative: relative, is_dir: true, children: children}
     else
-      size = case File.stat(full) do
-        {:ok, %{size: s}} -> s
-        _ -> 0
-      end
+      size =
+        case File.stat(full) do
+          {:ok, %{size: s}} -> s
+          _ -> 0
+        end
+
       %{name: item, path: full, relative: relative, is_dir: false, size: size}
     end
   end
@@ -69,10 +73,13 @@ defmodule EyeInTheSky.ProjectFiles do
   defp build_dir_entry(full_path, rel_path, item) do
     item_path = Path.join(full_path, item)
     rel = if rel_path, do: Path.join(rel_path, item), else: item
-    size = case File.stat(item_path) do
-      {:ok, %{size: s}} -> s
-      _ -> 0
-    end
+
+    size =
+      case File.stat(item_path) do
+        {:ok, %{size: s}} -> s
+        _ -> 0
+      end
+
     %{name: item, path: rel, is_dir: File.dir?(item_path), size: size}
   end
 

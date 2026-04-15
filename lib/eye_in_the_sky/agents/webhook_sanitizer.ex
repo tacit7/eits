@@ -13,7 +13,10 @@ defmodule EyeInTheSky.Agents.WebhookSanitizer do
 
   @doc "Sanitizes a text field: nil-safe, strips null bytes, truncates to 2000 chars."
   def sanitize_text(nil), do: ""
-  def sanitize_text(s) when is_binary(s), do: s |> String.slice(0, 2000) |> String.replace("\0", "")
+
+  def sanitize_text(s) when is_binary(s),
+    do: s |> String.slice(0, 2000) |> String.replace("\0", "")
+
   def sanitize_text(s) when is_number(s) or is_atom(s), do: sanitize_text(to_string(s))
   def sanitize_text(_), do: ""
 end

@@ -162,7 +162,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                             {String.slice(session.uuid || to_string(session.id), 0..7)}
                           </code>
                           <span class="text-sm text-base-content/80 truncate">
-                            {session.name || truncate_text(if session.agent, do: session.agent.description) ||
+                            {session.name ||
+                              truncate_text(if session.agent, do: session.agent.description) ||
                               "Unnamed"}
                           </span>
                         </div>
@@ -310,10 +311,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
     rel = ".claude/#{name}"
 
     if File.dir?(full) do
-      count = case File.ls(full) do
-        {:ok, entries} -> length(entries)
-        _ -> 0
-      end
+      count =
+        case File.ls(full) do
+          {:ok, entries} -> length(entries)
+          _ -> 0
+        end
+
       %{rel_path: rel, type: :dir, detail: "#{count} #{if count == 1, do: "item", else: "items"}"}
     else
       %{rel_path: rel, type: :file, detail: file_size_label(full)}
@@ -327,5 +330,4 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
       _ -> ""
     end
   end
-
 end

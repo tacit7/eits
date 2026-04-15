@@ -33,7 +33,8 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
       int_id ->
         case Notes.get_note(int_id) do
           {:error, :not_found} ->
-            {:noreply, socket |> put_flash(:error, "Note not found.") |> push_navigate(to: "/notes")}
+            {:noreply,
+             socket |> put_flash(:error, "Note not found.") |> push_navigate(to: "/notes")}
 
           {:ok, note} ->
             return_to = safe_return_to(params["return_to"])

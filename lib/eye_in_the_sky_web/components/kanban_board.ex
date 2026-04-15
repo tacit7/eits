@@ -52,7 +52,10 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                     phx-value-state-id={state.id}
                   />
                 <% end %>
-                <div class="flex items-center gap-1.5 cursor-grab active:cursor-grabbing" data-column-handle>
+                <div
+                  class="flex items-center gap-1.5 cursor-grab active:cursor-grabbing"
+                  data-column-handle
+                >
                   <.icon
                     name="hero-bars-2"
                     class="w-3 h-3 text-base-content/20 hover:text-base-content/40"

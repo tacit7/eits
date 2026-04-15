@@ -19,7 +19,14 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
   alias EyeInTheSky.{Sessions, Teams}
   alias EyeInTheSky.Utils.ToolHelpers
 
-  import Helpers, only: [notify_success: 2, notify_error: 3, extract_flag: 2, get_session_or_nil: 1, session_field: 2]
+  import Helpers,
+    only: [
+      notify_success: 2,
+      notify_error: 3,
+      extract_flag: 2,
+      get_session_or_nil: 1,
+      session_field: 2
+    ]
 
   # ---------------------------------------------------------------------------
   # teams (plural)
@@ -30,7 +37,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
       [team_id_str | tail] ->
         args = List.first(tail, "")
 
-        with team_id when not is_nil(team_id) <- team_id_str |> String.trim() |> ToolHelpers.parse_int(),
+        with team_id when not is_nil(team_id) <-
+               team_id_str |> String.trim() |> ToolHelpers.parse_int(),
              {:ok, name} <- extract_flag(args, "--name") do
           session = get_session_or_nil(from_session_id)
           role = extract_role(args)
@@ -76,15 +84,24 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
       [_team_id_str, member_id_str | tail] ->
         args = List.first(tail, "")
 
-        with member_id when not is_nil(member_id) <- member_id_str |> String.trim() |> ToolHelpers.parse_int(),
+        with member_id when not is_nil(member_id) <-
+               member_id_str |> String.trim() |> ToolHelpers.parse_int(),
              {:ok, status} <- extract_flag(args, "--status") do
           do_update_member(member_id, status, from_session_id)
         else
           nil ->
-            notify_error(from_session_id, "teams update-member", :invalid_member_id_or_missing_status)
+            notify_error(
+              from_session_id,
+              "teams update-member",
+              :invalid_member_id_or_missing_status
+            )
 
           {:error, _} ->
-            notify_error(from_session_id, "teams update-member", :invalid_member_id_or_missing_status)
+            notify_error(
+              from_session_id,
+              "teams update-member",
+              :invalid_member_id_or_missing_status
+            )
         end
 
       _ ->

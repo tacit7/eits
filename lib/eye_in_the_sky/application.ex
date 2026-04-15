@@ -16,42 +16,44 @@ defmodule EyeInTheSky.Application do
         []
       end
 
-    children = children ++ [
-      EyeInTheSkyWeb.Telemetry,
-      EyeInTheSky.Repo,
-      {Ecto.Migrator,
-       repos: Application.fetch_env!(:eye_in_the_sky, :ecto_repos), skip: skip_migrations?()},
-      {DNSCluster,
-       query: Application.get_env(:eye_in_the_sky, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: EyeInTheSky.PubSub},
-      # Task supervisor for fire-and-forget async work
-      {Task.Supervisor, name: EyeInTheSky.TaskSupervisor},
-      # Unique registry for agent worker naming (:via requires unique keys)
-      {Registry, keys: :unique, name: EyeInTheSky.Claude.AgentRegistry},
-      # Unique registry for chat worker naming (one per channel)
-      {Registry, keys: :unique, name: EyeInTheSky.Claude.ChatRegistry},
-      # SDK registry for tracking running Claude CLI processes
-      EyeInTheSky.Claude.SDK.Registry,
-      # DynamicSupervisor for persistent agent workers
-      {DynamicSupervisor,
-       name: EyeInTheSky.Claude.AgentSupervisor, strategy: :one_for_one, max_children: 50},
-      # DynamicSupervisor for per-channel chat workers
-      {DynamicSupervisor, name: EyeInTheSky.Claude.ChatSupervisor, strategy: :one_for_one},
-      # Oban job processing (includes Cron plugin for JobDispatcherWorker)
-      {Oban, Application.fetch_env!(:eye_in_the_sky, Oban)},
-      # React to session lifecycle events and update team member state
-      EyeInTheSky.Teams.Subscriber,
-      # Poll for external task changes from spawned agents
-      EyeInTheSky.Tasks.Poller,
-      # Poll for external message writes from spawned agents
-      EyeInTheSky.Messages.Broadcaster,
-      # Rate limiter ETS backend for auth endpoint throttling
-      EyeInTheSky.RateLimiter,
-      # In-memory timer registry for orchestrator sessions
-      EyeInTheSky.OrchestratorTimers.Server,
-      # Start to serve requests, typically the last entry
-      EyeInTheSkyWeb.Endpoint
-    ]
+    children =
+      children ++
+        [
+          EyeInTheSkyWeb.Telemetry,
+          EyeInTheSky.Repo,
+          {Ecto.Migrator,
+           repos: Application.fetch_env!(:eye_in_the_sky, :ecto_repos), skip: skip_migrations?()},
+          {DNSCluster,
+           query: Application.get_env(:eye_in_the_sky, :dns_cluster_query) || :ignore},
+          {Phoenix.PubSub, name: EyeInTheSky.PubSub},
+          # Task supervisor for fire-and-forget async work
+          {Task.Supervisor, name: EyeInTheSky.TaskSupervisor},
+          # Unique registry for agent worker naming (:via requires unique keys)
+          {Registry, keys: :unique, name: EyeInTheSky.Claude.AgentRegistry},
+          # Unique registry for chat worker naming (one per channel)
+          {Registry, keys: :unique, name: EyeInTheSky.Claude.ChatRegistry},
+          # SDK registry for tracking running Claude CLI processes
+          EyeInTheSky.Claude.SDK.Registry,
+          # DynamicSupervisor for persistent agent workers
+          {DynamicSupervisor,
+           name: EyeInTheSky.Claude.AgentSupervisor, strategy: :one_for_one, max_children: 50},
+          # DynamicSupervisor for per-channel chat workers
+          {DynamicSupervisor, name: EyeInTheSky.Claude.ChatSupervisor, strategy: :one_for_one},
+          # Oban job processing (includes Cron plugin for JobDispatcherWorker)
+          {Oban, Application.fetch_env!(:eye_in_the_sky, Oban)},
+          # React to session lifecycle events and update team member state
+          EyeInTheSky.Teams.Subscriber,
+          # Poll for external task changes from spawned agents
+          EyeInTheSky.Tasks.Poller,
+          # Poll for external message writes from spawned agents
+          EyeInTheSky.Messages.Broadcaster,
+          # Rate limiter ETS backend for auth endpoint throttling
+          EyeInTheSky.RateLimiter,
+          # In-memory timer registry for orchestrator sessions
+          EyeInTheSky.OrchestratorTimers.Server,
+          # Start to serve requests, typically the last entry
+          EyeInTheSkyWeb.Endpoint
+        ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options

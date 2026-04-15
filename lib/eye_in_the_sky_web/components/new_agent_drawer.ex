@@ -4,7 +4,10 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
   """
 
   use Phoenix.LiveComponent
-  import EyeInTheSkyWeb.CoreComponents, only: [form_actions: 1, form_field: 1, icon: 1, modal_header: 1]
+
+  import EyeInTheSkyWeb.CoreComponents,
+    only: [form_actions: 1, form_field: 1, icon: 1, modal_header: 1]
+
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [claude_models: 0, codex_models: 0]
 
   @impl true
@@ -121,8 +124,8 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                 <span class="label-text-alt text-base-content/40">Branch: worktree-&lt;name&gt;</span>
               </label>
             </.form_field>
-
-            <!-- Advanced CLI Flags -->
+            
+    <!-- Advanced CLI Flags -->
             <div class="collapse collapse-arrow bg-base-200 rounded-lg">
               <input type="checkbox" class="min-h-0" />
               <div class="collapse-title min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-xs font-medium text-base-content/60">
@@ -143,7 +146,9 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                 <div class="form-control">
                   <label class="label">
                     <span class="label-text text-xs">Max Turns</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--max-turns</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">
+                      --max-turns
+                    </span>
                   </label>
                   <input
                     type="number"
@@ -157,7 +162,9 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                 <div class="form-control">
                   <label class="label">
                     <span class="label-text text-xs">Add Directory</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--add-dir</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">
+                      --add-dir
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -170,7 +177,9 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                 <div class="form-control">
                   <label class="label">
                     <span class="label-text text-xs">MCP Config File</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--mcp-config</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">
+                      --mcp-config
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -183,7 +192,9 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                 <div class="form-control">
                   <label class="label">
                     <span class="label-text text-xs">Plugin Directory</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--plugin-dir</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">
+                      --plugin-dir
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -196,7 +207,9 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                 <div class="form-control">
                   <label class="label">
                     <span class="label-text text-xs">Settings File</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--settings</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">
+                      --settings
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -234,8 +247,8 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                 </div>
               </div>
             </div>
-
-            <!-- Actions -->
+            
+    <!-- Actions -->
             <.form_actions submit_text="Create Agent" cancel_event={@toggle_event} class="mt-4" />
           </form>
         </div>

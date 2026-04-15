@@ -11,18 +11,19 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenterTest do
       agent = struct(Agent, id: 42, uuid: "agent-uuid-abc")
       session = struct(Session, id: 7, uuid: "session-uuid-xyz", status: "working")
 
-      member = struct(TeamMember,
-        id: 1,
-        name: "agent-alpha",
-        role: "member",
-        status: "active",
-        agent_id: 42,
-        agent: agent,
-        session_id: 7,
-        session: session,
-        joined_at: ~N[2024-01-01 00:00:00],
-        last_activity_at: ~N[2024-01-02 12:00:00]
-      )
+      member =
+        struct(TeamMember,
+          id: 1,
+          name: "agent-alpha",
+          role: "member",
+          status: "active",
+          agent_id: 42,
+          agent: agent,
+          session_id: 7,
+          session: session,
+          joined_at: ~N[2024-01-01 00:00:00],
+          last_activity_at: ~N[2024-01-02 12:00:00]
+        )
 
       result = ApiPresenter.present_member(member)
 
@@ -40,18 +41,19 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenterTest do
     end
 
     test "handles nil agent and session" do
-      member = struct(TeamMember,
-        id: 2,
-        name: "bare-member",
-        role: "observer",
-        status: nil,
-        agent_id: nil,
-        agent: nil,
-        session_id: nil,
-        session: nil,
-        joined_at: nil,
-        last_activity_at: nil
-      )
+      member =
+        struct(TeamMember,
+          id: 2,
+          name: "bare-member",
+          role: "observer",
+          status: nil,
+          agent_id: nil,
+          agent: nil,
+          session_id: nil,
+          session: nil,
+          joined_at: nil,
+          last_activity_at: nil
+        )
 
       result = ApiPresenter.present_member(member)
 
@@ -70,24 +72,26 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenterTest do
         __owner__: TeamMember,
         __cardinality__: :one
       }
+
       not_loaded_session = %Ecto.Association.NotLoaded{
         __field__: :session,
         __owner__: TeamMember,
         __cardinality__: :one
       }
 
-      member = struct(TeamMember,
-        id: 3,
-        name: "linked-member",
-        role: "member",
-        status: "idle",
-        agent_id: 10,
-        agent: not_loaded_agent,
-        session_id: 5,
-        session: not_loaded_session,
-        joined_at: nil,
-        last_activity_at: nil
-      )
+      member =
+        struct(TeamMember,
+          id: 3,
+          name: "linked-member",
+          role: "member",
+          status: "idle",
+          agent_id: 10,
+          agent: not_loaded_agent,
+          session_id: 5,
+          session: not_loaded_session,
+          joined_at: nil,
+          last_activity_at: nil
+        )
 
       result = ApiPresenter.present_member(member)
 

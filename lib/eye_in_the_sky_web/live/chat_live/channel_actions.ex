@@ -88,7 +88,9 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
   def handle_create_agent(socket, params) do
     channel_id = socket.assigns.active_channel_id
     agent_name = params["agent_name"] || ""
-    agent_description = if agent_name != "", do: agent_name, else: "Channel agent for #{channel_id}"
+
+    agent_description =
+      if agent_name != "", do: agent_name, else: "Channel agent for #{channel_id}"
 
     {:ok, _creating_msg} =
       EyeInTheSky.ChannelMessages.send_channel_message(%{
@@ -97,7 +99,8 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
         sender_role: "system",
         recipient_role: "agent",
         provider: "system",
-        body: "Creating new agent (#{params["model"] || "sonnet"})#{if agent_name != "", do: " - #{agent_name}", else: ""}..."
+        body:
+          "Creating new agent (#{params["model"] || "sonnet"})#{if agent_name != "", do: " - #{agent_name}", else: ""}..."
       })
 
     description = params["description"] || ""
@@ -161,7 +164,10 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
   defp join_agent_to_channel(channel_id, agent, session, description) do
     case Channels.add_member(channel_id, agent.id, session.id) do
       {:ok, _} ->
-        broadcast_system_event(channel_id, "Agent @#{session.id} (#{description}) joined the channel")
+        broadcast_system_event(
+          channel_id,
+          "Agent @#{session.id} (#{description}) joined the channel"
+        )
 
       {:error, _} ->
         :ok

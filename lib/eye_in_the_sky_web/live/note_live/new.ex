@@ -124,5 +124,4 @@ defmodule EyeInTheSkyWeb.NoteLive.New do
     </div>
     """
   end
-
 end

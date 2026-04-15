@@ -63,7 +63,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
     project_path =
       case parse_int(project_id_str) do
-        nil -> nil
+        nil ->
+          nil
+
         id ->
           project = Enum.find(projects, fn p -> p.id == id end)
           if(project, do: project.path)
@@ -85,7 +87,12 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   def render(assigns) do
     ~H"""
     <div>
-      <div :if={@show} class="modal modal-open modal-bottom sm:modal-middle" phx-window-keydown={@toggle_event} phx-key="Escape">
+      <div
+        :if={@show}
+        class="modal modal-open modal-bottom sm:modal-middle"
+        phx-window-keydown={@toggle_event}
+        phx-key="Escape"
+      >
         <div class="modal-box w-full sm:max-w-md pb-[env(safe-area-inset-bottom)]">
           <.modal_header title={assigns[:title] || "New Agent"} toggle_event={@toggle_event} />
 
@@ -326,7 +333,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
                 <div class="form-control">
                   <label class="label">
                     <span class="label-text text-xs">Max Turns</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--max-turns</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">
+                      --max-turns
+                    </span>
                   </label>
                   <input
                     type="number"
@@ -340,7 +349,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
                 <div class="form-control">
                   <label class="label">
                     <span class="label-text text-xs">Add Directory</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--add-dir</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">
+                      --add-dir
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -353,7 +364,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
                 <div class="form-control">
                   <label class="label">
                     <span class="label-text text-xs">MCP Config File</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--mcp-config</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">
+                      --mcp-config
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -366,7 +379,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
                 <div class="form-control">
                   <label class="label">
                     <span class="label-text text-xs">Plugin Directory</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--plugin-dir</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">
+                      --plugin-dir
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -379,7 +394,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
                 <div class="form-control">
                   <label class="label">
                     <span class="label-text text-xs">Settings File</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--settings</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">
+                      --settings
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -391,14 +408,24 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
                 <div class="flex flex-col gap-1 pt-1">
                   <label class="label cursor-pointer justify-start gap-2 py-1">
-                    <input type="checkbox" name="chrome" value="true" class="checkbox checkbox-sm checkbox-primary" />
+                    <input
+                      type="checkbox"
+                      name="chrome"
+                      value="true"
+                      class="checkbox checkbox-sm checkbox-primary"
+                    />
                     <span class="label-text text-xs">
                       Chrome integration
                       <span class="font-mono text-base-content/40 text-xs ml-1">--chrome</span>
                     </span>
                   </label>
                   <label class="label cursor-pointer justify-start gap-2 py-1">
-                    <input type="checkbox" name="sandbox" value="true" class="checkbox checkbox-sm checkbox-primary" />
+                    <input
+                      type="checkbox"
+                      name="sandbox"
+                      value="true"
+                      class="checkbox checkbox-sm checkbox-primary"
+                    />
                     <span class="label-text text-xs">
                       OS sandbox isolation
                       <span class="font-mono text-base-content/40 text-xs ml-1">--sandbox</span>

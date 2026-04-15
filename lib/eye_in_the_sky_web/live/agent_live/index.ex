@@ -161,7 +161,9 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   @impl true
   def handle_info(_msg, socket), do: {:noreply, socket}
 
-  defp extract_stopped_status(%{status: status}) when is_binary(status) and status != "", do: status
+  defp extract_stopped_status(%{status: status}) when is_binary(status) and status != "",
+    do: status
+
   defp extract_stopped_status(%{status: _}), do: "completed"
   defp extract_stopped_status(_), do: "idle"
 
@@ -232,7 +234,11 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
         </div>
 
         <.search_bar search_query={@search_query} session_filter={@session_filter} />
-        <.bulk_action_bar session_filter={@session_filter} agents={@agents} selected_ids={@selected_ids} />
+        <.bulk_action_bar
+          session_filter={@session_filter}
+          agents={@agents}
+          selected_ids={@selected_ids}
+        />
 
         <div class="mt-2 divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-4">
           <%= if @agents == [] do %>
@@ -251,7 +257,11 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
                 editing_session_id={@editing_session_id}
               >
                 <:actions>
-                  <.agent_row_menu agent={agent} canvases={@canvases} show_new_canvas_for={@show_new_canvas_for} />
+                  <.agent_row_menu
+                    agent={agent}
+                    canvases={@canvases}
+                    show_new_canvas_for={@show_new_canvas_for}
+                  />
                 </:actions>
               </.session_row>
             </div>

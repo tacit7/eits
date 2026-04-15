@@ -50,7 +50,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksListHelpers do
     offset = (page - 1) * @per_page
     total = socket.assigns.total_tasks
 
-    new_tasks = list_fn.(limit: @per_page, offset: offset, state_id: filter_state_id, sort_by: sort_by)
+    new_tasks =
+      list_fn.(limit: @per_page, offset: offset, state_id: filter_state_id, sort_by: sort_by)
 
     socket =
       socket

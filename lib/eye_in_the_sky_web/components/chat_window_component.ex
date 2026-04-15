@@ -9,10 +9,12 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
 
   @impl true
   def update(%{canvas_session: cs} = assigns, socket) do
-    session = case Sessions.get_session(cs.session_id) do
-      {:ok, s} -> s
-      {:error, _} -> nil
-    end
+    session =
+      case Sessions.get_session(cs.session_id) do
+        {:ok, s} -> s
+        {:error, _} -> nil
+      end
+
     messages = if session, do: Messages.list_recent_messages(cs.session_id, 50), else: []
 
     {:ok,
@@ -38,8 +40,9 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
         class="flex items-center justify-between px-3 py-2 bg-base-200 border-b border-base-300 rounded-t-xl cursor-move select-none shrink-0"
       >
         <div class="flex items-center gap-2 min-w-0">
-          <span class={["w-2 h-2 rounded-full inline-block shrink-0", status_dot_class(@session)]}></span>
-          <span class="text-xs font-medium truncate"><%= session_label(@session) %></span>
+          <span class={["w-2 h-2 rounded-full inline-block shrink-0", status_dot_class(@session)]}>
+          </span>
+          <span class="text-xs font-medium truncate">{session_label(@session)}</span>
         </div>
         <button
           class="w-3 h-3 rounded-full bg-error/70 hover:bg-error transition-colors shrink-0"
@@ -47,14 +50,18 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
           phx-value-cs-id={@canvas_session.id}
           phx-target={@myself}
           title="Remove from canvas"
-        ></button>
+        >
+        </button>
       </div>
 
       <div class="flex-1 overflow-y-auto p-2 space-y-1.5 text-xs min-h-0">
         <%= for msg <- @messages do %>
           <div class={if msg.sender_role == "user", do: "chat chat-end", else: "chat chat-start"}>
-            <div class={["chat-bubble text-xs py-1 px-2", if(msg.sender_role == "user", do: "chat-bubble-primary", else: "bg-base-200")]}>
-              <%= msg.body %>
+            <div class={[
+              "chat-bubble text-xs py-1 px-2",
+              if(msg.sender_role == "user", do: "chat-bubble-primary", else: "bg-base-200")
+            ]}>
+              {msg.body}
             </div>
           </div>
         <% end %>
@@ -81,15 +88,15 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
 
   def handle_event("send_message", %{"body" => body}, socket) do
     session_id = socket.assigns.canvas_session.session_id
-    provider = (if socket.assigns.session, do: socket.assigns.session.provider) || "claude"
+    provider = if(socket.assigns.session, do: socket.assigns.session.provider) || "claude"
 
     case Messages.send_message(%{
-      session_id: session_id,
-      sender_role: "user",
-      recipient_role: "agent",
-      provider: provider,
-      body: body
-    }) do
+           session_id: session_id,
+           sender_role: "user",
+           recipient_role: "agent",
+           provider: provider,
+           body: body
+         }) do
       {:ok, _} ->
         AgentManager.continue_session(session_id, body, [])
         {:noreply, socket}
@@ -107,16 +114,21 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
         canvas_session_id: id
       )
     end
+
     {:noreply, socket}
   end
 
   def handle_event("window_moved", %{"id" => cs_id, "x" => x, "y" => y}, socket) do
-    if id = parse_int(cs_id), do: EyeInTheSky.Canvases.update_window_layout(id, %{pos_x: x, pos_y: y})
+    if id = parse_int(cs_id),
+      do: EyeInTheSky.Canvases.update_window_layout(id, %{pos_x: x, pos_y: y})
+
     {:noreply, socket}
   end
 
   def handle_event("window_resized", %{"id" => cs_id, "w" => w, "h" => h}, socket) do
-    if id = parse_int(cs_id), do: EyeInTheSky.Canvases.update_window_layout(id, %{width: w, height: h})
+    if id = parse_int(cs_id),
+      do: EyeInTheSky.Canvases.update_window_layout(id, %{width: w, height: h})
+
     {:noreply, socket}
   end
 

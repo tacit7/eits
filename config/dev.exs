@@ -3,7 +3,7 @@ import Config
 # Gitea webhook HMAC secret — set this in Gitea webhook settings and here
 config :eye_in_the_sky, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SECRET", "")
 config :eye_in_the_sky, :env, :dev
-config :eye_in_the_sky, :bypass_auth, true
+config :eye_in_the_sky, :bypass_auth, System.get_env("BYPASS_AUTH", "true") in ~w(true 1)
 # Allow unsigned webhooks in dev when no secret is set (never enable in prod)
 config :eye_in_the_sky, :allow_unsigned_webhooks, true
 
@@ -65,17 +65,17 @@ config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
 config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
   live_reload:
     (if System.get_env("LIVE_RELOAD") in ["0", "false"] do
-      []
-    else
-      [
-        web_console_logger: true,
-        patterns: [
-          ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
-          ~r"priv/gettext/.*(po)$",
-          ~r"lib/eye_in_the_sky/(?:controllers|live|components|router)/?.*\.(ex|heex)$"
-        ]
-      ]
-    end)
+       []
+     else
+       [
+         web_console_logger: true,
+         patterns: [
+           ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
+           ~r"priv/gettext/.*(po)$",
+           ~r"lib/eye_in_the_sky/(?:controllers|live|components|router)/?.*\.(ex|heex)$"
+         ]
+       ]
+     end)
 
 # LiveSvelte SSR via Vite dev server in development
 config :live_svelte,

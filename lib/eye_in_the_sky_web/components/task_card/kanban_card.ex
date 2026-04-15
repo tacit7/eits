@@ -27,9 +27,18 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
       |> assign(:task_id, task_id)
 
     ~H"""
-    <div class={["group/card card bg-base-200 hover:bg-base-300 border border-base-content/8 transition-all cursor-pointer", @aging && elem(@aging, 0)]} {@rest}>
+    <div
+      class={[
+        "group/card card bg-base-200 hover:bg-base-300 border border-base-content/8 transition-all cursor-pointer",
+        @aging && elem(@aging, 0)
+      ]}
+      {@rest}
+    >
       <%= if Map.get(@task, :priority, 0) > 0 do %>
-        <div class="h-0.5 w-full rounded-t" style={"background-color: #{priority_bar_color(Map.get(@task, :priority))}"} />
+        <div
+          class="h-0.5 w-full rounded-t"
+          style={"background-color: #{priority_bar_color(Map.get(@task, :priority))}"}
+        />
       <% end %>
       <div class="card-body p-2">
         <.kanban_card_content
@@ -91,7 +100,13 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
       >
         {@task.title}
       </h4>
-      <.kanban_context_menu task={@task} task_id={@task_id} on_click={@on_click} on_delete={@on_delete} workflow_states={@workflow_states} />
+      <.kanban_context_menu
+        task={@task}
+        task_id={@task_id}
+        on_click={@on_click}
+        on_delete={@on_delete}
+        workflow_states={@workflow_states}
+      />
     </div>
 
     <%!-- Tags --%>
@@ -108,7 +123,13 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
       </div>
     <% end %>
 
-    <.kanban_card_footer task={@task} aging={@aging} dm_session={@dm_session} working_session_ids={@working_session_ids} waiting_session_ids={@waiting_session_ids} />
+    <.kanban_card_footer
+      task={@task}
+      aging={@aging}
+      dm_session={@dm_session}
+      working_session_ids={@working_session_ids}
+      waiting_session_ids={@waiting_session_ids}
+    />
     """
   end
 
@@ -127,8 +148,10 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             phx-value-task_id={@task_id}
             class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
           >
-            <.icon name="hero-rectangle-stack-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
-            Open card
+            <.icon
+              name="hero-rectangle-stack-mini"
+              class="w-4 h-4 text-base-content/60 flex-shrink-0"
+            /> Open card
           </button>
           <%!-- Edit labels --%>
           <button
@@ -168,7 +191,10 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             <div class="border-t border-base-content/10 my-0.5" />
             <details class="group/move">
               <summary class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors cursor-pointer list-none">
-                <.icon name="hero-arrow-right-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+                <.icon
+                  name="hero-arrow-right-mini"
+                  class="w-4 h-4 text-base-content/60 flex-shrink-0"
+                />
                 <span class="flex-1">Move</span>
                 <.icon name="hero-chevron-right-mini" class="w-3 h-3 text-base-content/40" />
               </summary>
@@ -211,8 +237,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
               phx-confirm="Delete this task?"
               class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-error hover:bg-error/10 transition-colors text-left"
             >
-              <.icon name="hero-trash-mini" class="w-4 h-4 flex-shrink-0" />
-              Delete
+              <.icon name="hero-trash-mini" class="w-4 h-4 flex-shrink-0" /> Delete
             </button>
           <% end %>
         </div>
@@ -279,18 +304,23 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
           </span>
         <% end %>
         <%= if @dm_session do %>
-          <% is_working = not is_nil(@working_session_ids) && MapSet.member?(@working_session_ids, @dm_session.id) %>
-          <% is_waiting = not is_working && not is_nil(@waiting_session_ids) && MapSet.member?(@waiting_session_ids, @dm_session.id) %>
+          <% is_working =
+            not is_nil(@working_session_ids) && MapSet.member?(@working_session_ids, @dm_session.id) %>
+          <% is_waiting =
+            not is_working && not is_nil(@waiting_session_ids) &&
+              MapSet.member?(@waiting_session_ids, @dm_session.id) %>
           <a
             href={"/dm/#{@dm_session.uuid}"}
             target="_blank"
             class="ml-auto flex-shrink-0 text-base-content/30 hover:text-primary transition-colors"
             onclick="event.stopPropagation();"
-            title={cond do
-              is_working -> "Agent is working"
-              is_waiting -> "Agent is waiting"
-              true -> "Open agent DM"
-            end}
+            title={
+              cond do
+                is_working -> "Agent is working"
+                is_waiting -> "Agent is waiting"
+                true -> "Open agent DM"
+              end
+            }
           >
             <span class="relative inline-flex">
               <.icon

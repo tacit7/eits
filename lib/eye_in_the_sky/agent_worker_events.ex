@@ -94,7 +94,12 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
     Enum.each(queue, fn job ->
       Messages.mark_failed(job.context[:message_id], reason_str)
-      Events.stream_error(session_id, pcid, "Queued job dropped due to systemic error: #{reason_str}")
+
+      Events.stream_error(
+        session_id,
+        pcid,
+        "Queued job dropped due to systemic error: #{reason_str}"
+      )
     end)
   end
 
@@ -107,15 +112,27 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
   defp classify_failure_reason({:billing_error, _}), do: "billing_error"
   defp classify_failure_reason({:authentication_error, _}), do: "authentication_error"
-  defp classify_failure_reason({:unknown_error, msg}) when is_binary(msg), do: "unknown_error: #{String.slice(msg, 0, 120)}"
+
+  defp classify_failure_reason({:unknown_error, msg}) when is_binary(msg),
+    do: "unknown_error: #{String.slice(msg, 0, 120)}"
+
   defp classify_failure_reason(:retry_exhausted), do: "retry_exhausted"
-  defp classify_failure_reason({:watchdog_timeout, timeout_ms}), do: "watchdog_timeout: #{timeout_ms}ms"
+
+  defp classify_failure_reason({:watchdog_timeout, timeout_ms}),
+    do: "watchdog_timeout: #{timeout_ms}ms"
+
   defp classify_failure_reason(reason), do: inspect(reason) |> String.slice(0, 120)
 
   # --- Data Events ---
 
   @doc "Result received from SDK — save to DB."
-  def on_result_received(session_id, %{provider: provider, text: text, metadata: metadata, channel_id: channel_id}) when is_binary(text) do
+  def on_result_received(session_id, %{
+        provider: provider,
+        text: text,
+        metadata: metadata,
+        channel_id: channel_id
+      })
+      when is_binary(text) do
     Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
       if String.trim(text) in ["", "[NO_RESPONSE]"] do
         Logger.info("[#{session_id}] Skipping DB save — empty or suppressed response")
@@ -144,9 +161,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
         end
 
       {:error, reason} ->
-        Logger.warning(
-          "[#{session_id}] Failed to load session for uuid sync: #{inspect(reason)}"
-        )
+        Logger.warning("[#{session_id}] Failed to load session for uuid sync: #{inspect(reason)}")
     end
   end
 
@@ -187,7 +202,11 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   # Returns {:ok, updated_session} or :error.
   defp update_session_status(session_id, status) do
     idle_like? = status in ["idle", "waiting"]
-    attrs = if idle_like?, do: %{status: status, last_activity_at: DateTime.utc_now()}, else: %{status: status}
+
+    attrs =
+      if idle_like?,
+        do: %{status: status, last_activity_at: DateTime.utc_now()},
+        else: %{status: status}
 
     case Sessions.get_session(session_id) do
       {:ok, session} -> apply_session_update(session, attrs, session_id, idle_like?)

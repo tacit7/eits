@@ -36,7 +36,16 @@ defmodule EyeInTheSky.AgentDefinitions.AgentDefinition do
   end
 
   @required_fields [:slug, :scope, :path]
-  @optional_fields [:display_name, :project_id, :description, :model, :tools, :checksum, :last_synced_at, :missing_at]
+  @optional_fields [
+    :display_name,
+    :project_id,
+    :description,
+    :model,
+    :tools,
+    :checksum,
+    :last_synced_at,
+    :missing_at
+  ]
 
   def changeset(definition, attrs) do
     definition

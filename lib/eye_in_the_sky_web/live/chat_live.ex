@@ -146,9 +146,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
         if target_session_id do
           prompt = ChannelProtocol.build_prompt(:direct, body)
 
-          AgentManager.send_message(target_session_id, prompt,
-            channel_id: channel_id
-          )
+          AgentManager.send_message(target_session_id, prompt, channel_id: channel_id)
         end
 
         {:noreply, socket}
@@ -435,7 +433,11 @@ defmodule EyeInTheSkyWeb.ChatLive do
     search = socket.assigns[:session_search] || ""
 
     sessions_by_project =
-      ChannelHelpers.build_sessions_by_project(channel_members, socket.assigns.all_projects, search)
+      ChannelHelpers.build_sessions_by_project(
+        channel_members,
+        socket.assigns.all_projects,
+        search
+      )
 
     socket
     |> assign(:channel_members, channel_members)

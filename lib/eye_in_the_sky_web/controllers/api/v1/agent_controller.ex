@@ -80,7 +80,10 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
 
           conn
           |> put_status(:unprocessable_entity)
-          |> json(%{error_code: "worktree_setup_failed", message: "Git worktree setup failed: #{msg}"})
+          |> json(%{
+            error_code: "worktree_setup_failed",
+            message: "Git worktree setup failed: #{msg}"
+          })
 
         {:error, reason} ->
           Logger.error("Agent spawn failed: #{inspect(reason)}")

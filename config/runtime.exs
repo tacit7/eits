@@ -1,8 +1,10 @@
 import Config
 import Dotenvy
 
-# Load .env file if present (dev/local overrides)
-source!([".env", System.get_env()])
+# Load env files with local overrides:
+# .env.local > .env, and explicit shell env overrides both.
+runtime_env = source!([".env", ".env.local", System.get_env()])
+get_env = fn key -> runtime_env[key] end
 
 # config/runtime.exs is executed for all environments, including
 # during releases. It is executed after compilation and before the
@@ -20,18 +22,18 @@ source!([".env", System.get_env()])
 #
 # Alternatively, you can use `mix phx.gen.release` to generate a `bin/server`
 # script that automatically sets the env var above.
-if System.get_env("PHX_SERVER") do
+if get_env.("PHX_SERVER") in ~w(true 1) do
   config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint, server: true
 end
 
 # Gitea webhook HMAC secret — required for signature verification in all envs
-config :eye_in_the_sky, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SECRET", "")
+config :eye_in_the_sky, :gitea_webhook_secret, get_env.("GITEA_WEBHOOK_SECRET") || ""
 
 # VAPID keys — loaded from env vars. Required in prod, optional in dev.
-if vapid_private = System.get_env("VAPID_PRIVATE_KEY") do
+if vapid_private = get_env.("VAPID_PRIVATE_KEY") do
   config :web_push_encryption, :vapid_details,
     subject: "mailto:admin@eits.dev",
-    public_key: System.get_env("VAPID_PUBLIC_KEY"),
+    public_key: get_env.("VAPID_PUBLIC_KEY"),
     private_key: vapid_private
 else
   if config_env() == :prod do
@@ -43,22 +45,17 @@ end
 # Leave unset to disable auth (dev default).
 # Generate with: mix eits.gen.api_key
 if config_env() != :test do
-  config :eye_in_the_sky, :api_key, System.get_env("EITS_API_KEY")
+  config :eye_in_the_sky, :api_key, get_env.("EITS_API_KEY")
 end
 
 # Disable passkey auth — set DISABLE_AUTH=true to skip LiveView session auth (dev only)
 if config_env() != :prod do
-  config :eye_in_the_sky, :disable_auth, System.get_env("DISABLE_AUTH") in ~w(true 1)
+  config :eye_in_the_sky, :disable_auth, get_env.("DISABLE_AUTH") in ~w(true 1)
 end
 
-# WebAuthn — extra allowed origins (comma-separated). Read directly from
-# parsed .env to work around dotenvy not setting new system env vars.
+# WebAuthn — extra allowed origins (comma-separated).
 webauthn_extra_raw =
-  System.get_env("WEBAUTHN_EXTRA_ORIGINS") ||
-    case Dotenvy.source([".env"]) do
-      {:ok, env} -> env["WEBAUTHN_EXTRA_ORIGINS"]
-      _ -> nil
-    end
+  get_env.("WEBAUTHN_EXTRA_ORIGINS")
 
 if webauthn_extra_raw do
   origins =
@@ -74,7 +71,7 @@ end
 
 # WebAuthn primary origin — configurable via WEBAUTHN_ORIGIN. Required in prod.
 # Dev/test falls back to the compile-time default in config.exs ("https://eits.dev").
-if webauthn_origin = System.get_env("WEBAUTHN_ORIGIN") do
+if webauthn_origin = get_env.("WEBAUTHN_ORIGIN") do
   config :wax_, origin: webauthn_origin
 else
   if config_env() == :prod do
@@ -87,7 +84,7 @@ end
 
 # WebAuthn RP ID — configurable via WEBAUTHN_RP_ID. Required in prod.
 # Dev/test falls back to the compile-time default in config.exs ("eits.dev").
-if webauthn_rp_id = System.get_env("WEBAUTHN_RP_ID") do
+if webauthn_rp_id = get_env.("WEBAUTHN_RP_ID") do
   config :wax_, rp_id: webauthn_rp_id
 else
   if config_env() == :prod do
@@ -98,20 +95,48 @@ else
   end
 end
 
+database_url = get_env.("DATABASE_URL")
+
+if config_env() == :dev && database_url do
+  dev_repo_opts = [
+    url: database_url,
+    pool_size: String.to_integer(get_env.("POOL_SIZE") || "5"),
+    prepare: :unnamed
+  ]
+
+  # Supabase connections require SSL; local Postgres typically does not.
+  dev_repo_opts =
+    case URI.parse(database_url) do
+      %URI{host: host} when is_binary(host) ->
+        if String.contains?(host, "supabase.com") do
+          Keyword.put(dev_repo_opts, :ssl, verify: :verify_none)
+        else
+          dev_repo_opts
+        end
+
+      _ ->
+        dev_repo_opts
+    end
+
+  config :eye_in_the_sky, EyeInTheSky.Repo, dev_repo_opts
+end
+
 if config_env() == :prod do
   database_url =
-    System.get_env("DATABASE_URL") ||
+    database_url ||
       raise """
       environment variable DATABASE_URL is missing.
       For example: ecto://USER:PASS@HOST/DATABASE
       """
 
-  maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
+  maybe_ipv6 = if get_env.("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
   config :eye_in_the_sky, EyeInTheSky.Repo,
     url: database_url,
-    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
-    socket_options: maybe_ipv6
+    pool_size: String.to_integer(get_env.("POOL_SIZE") || "10"),
+    socket_options: maybe_ipv6,
+    ssl: [verify: :verify_none],
+    prepare: :unnamed
 
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you
@@ -119,16 +144,16 @@ if config_env() == :prod do
   # to check this value into version control, so we use an environment
   # variable instead.
   secret_key_base =
-    System.get_env("SECRET_KEY_BASE") ||
+    get_env.("SECRET_KEY_BASE") ||
       raise """
       environment variable SECRET_KEY_BASE is missing.
       You can generate one by calling: mix phx.gen.secret
       """
 
-  host = System.get_env("PHX_HOST") || "eits.dev"
-  port = String.to_integer(System.get_env("PORT") || "4000")
+  host = get_env.("PHX_HOST") || "eits.dev"
+  port = String.to_integer(get_env.("PORT") || "4000")
 
-  config :eye_in_the_sky, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+  config :eye_in_the_sky, :dns_cluster_query, get_env.("DNS_CLUSTER_QUERY")
 
   # Build check_origin list from PHX_HOST + any WEBAUTHN_EXTRA_ORIGINS.
   # Use "//host" format (scheme-agnostic) so it works correctly behind

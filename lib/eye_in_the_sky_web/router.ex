@@ -100,6 +100,11 @@ defmodule EyeInTheSkyWeb.Router do
     post "/login/complete", AuthController, :login_complete
   end
 
+  scope "/.well-known", EyeInTheSkyWeb do
+    pipe_through :browser
+    get "/webauthn", WellKnownController, :webauthn
+  end
+
   # Push notification endpoints — browser-session auth, no Bearer token required
   scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
     pipe_through :browser_json
@@ -195,7 +200,7 @@ defmodule EyeInTheSkyWeb.Router do
     patch "/tasks/:id", TaskController, :update
     delete "/tasks/:id", TaskController, :delete
     post "/tasks/:id/annotations", TaskController, :annotate
-    post "/tasks/:id/complete",    TaskController, :complete
+    post "/tasks/:id/complete", TaskController, :complete
     post "/tasks/:id/sessions", TaskController, :link_session
     delete "/tasks/:id/sessions/:uuid", TaskController, :unlink_session
 

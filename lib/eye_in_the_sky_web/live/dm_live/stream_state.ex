@@ -22,8 +22,9 @@ defmodule EyeInTheSkyWeb.DmLive.StreamState do
   end
 
   def handle_stream_delta(:tool_use, name, socket) do
+    display = stream_tool_label(name)
     Logger.info("[DmLive] stream_delta tool_use=#{name}, show=#{socket.assigns.show_live_stream}")
-    {:noreply, assign(socket, :stream_tool, name)}
+    {:noreply, assign(socket, :stream_tool, display)}
   end
 
   def handle_stream_delta(:thinking, _content, socket) do
@@ -63,16 +64,51 @@ defmodule EyeInTheSkyWeb.DmLive.StreamState do
     {:noreply, socket}
   end
 
-  def handle_stream_tool_input(name, _input, socket) do
+  def handle_stream_tool_input(name, input, socket) do
+    display = stream_tool_input_label(name, input)
     Logger.info("[DmLive] stream_tool_input tool=#{name}")
-    {:noreply, assign(socket, :stream_tool, name)}
+    {:noreply, assign(socket, :stream_tool, display)}
   end
 
   def handle_tool_use(tool_name, socket) do
-    {:noreply, assign(socket, :stream_tool, tool_name)}
+    {:noreply, assign(socket, :stream_tool, stream_tool_label(tool_name))}
   end
 
   def handle_queue_updated(prompts, socket) do
     {:noreply, assign(socket, :queued_prompts, prompts)}
   end
+
+  defp stream_tool_label("command_execution"), do: "Bash"
+  defp stream_tool_label("web_search"), do: "WebSearch"
+  defp stream_tool_label("web_searches"), do: "WebSearch"
+  defp stream_tool_label("mcp_tool_call"), do: "MCP Tool"
+  defp stream_tool_label("mcp_tool_calls"), do: "MCP Tool"
+  defp stream_tool_label(name) when is_binary(name), do: name
+  defp stream_tool_label(_), do: "Tool"
+
+  defp stream_tool_input_label(name, input) do
+    base = stream_tool_label(name)
+
+    case {name, input} do
+      {"command_execution", %{} = map} ->
+        command = get_input_field(map, "command") || ""
+        if command == "", do: base, else: "#{base}: #{command}"
+
+      {_, _} ->
+        base
+    end
+  end
+
+  defp get_input_field(map, key) when is_map(map) and is_binary(key) do
+    Map.get(map, key) ||
+      Enum.find_value(map, fn
+        {k, v} when is_atom(k) ->
+          if Atom.to_string(k) == key, do: v, else: nil
+
+        _ ->
+          nil
+      end)
+  end
+
+  defp get_input_field(_map, _key), do: nil
 end

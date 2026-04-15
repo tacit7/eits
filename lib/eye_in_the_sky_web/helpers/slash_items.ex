@@ -43,10 +43,10 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
     end)
   end
 
-  defp encode_arg_type(:none),           do: "none"
-  defp encode_arg_type(:free_text),      do: "free_text"
-  defp encode_arg_type(:integer),        do: "integer"
-  defp encode_arg_type(:path),           do: "path"
+  defp encode_arg_type(:none), do: "none"
+  defp encode_arg_type(:free_text), do: "free_text"
+  defp encode_arg_type(:integer), do: "integer"
+  defp encode_arg_type(:path), do: "path"
   defp encode_arg_type({:enum, values}), do: %{type: "enum", values: values}
 
   @doc false

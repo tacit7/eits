@@ -35,7 +35,11 @@ defmodule EyeInTheSkyWeb.Api.V1.NotificationController do
         {:error, cs} ->
           conn
           |> put_status(:unprocessable_entity)
-          |> json(%{success: false, message: "Invalid notification data", errors: translate_errors(cs)})
+          |> json(%{
+            success: false,
+            message: "Invalid notification data",
+            errors: translate_errors(cs)
+          })
       end
     end
   end

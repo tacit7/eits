@@ -41,7 +41,11 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
           All time
         </button>
       </div>
-      <button phx-click="recalculate" disabled={@recalculating} class="btn btn-sm min-h-[44px] btn-outline">
+      <button
+        phx-click="recalculate"
+        disabled={@recalculating}
+        class="btn btn-sm min-h-[44px] btn-outline"
+      >
         <.icon
           name="hero-arrow-path"
           class={if @recalculating, do: "size-4 animate-spin", else: "size-4"}
@@ -313,9 +317,19 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
         link_key: :uuid,
         link_prefix: "/dm/"
       },
-      %{label: "Project", key: :project, format: :plain, class: "text-base-content/60 whitespace-nowrap"},
+      %{
+        label: "Project",
+        key: :project,
+        format: :plain,
+        class: "text-base-content/60 whitespace-nowrap"
+      },
       %{label: "Model", key: :model, format: :short_model, class: "whitespace-nowrap"},
-      %{label: "Date", key: :started_at, format: :date, class: "text-base-content/60 whitespace-nowrap"},
+      %{
+        label: "Date",
+        key: :started_at,
+        format: :date,
+        class: "text-base-content/60 whitespace-nowrap"
+      },
       %{label: "Input", key: :input_tokens, format: :number, class: "text-right"},
       %{label: "Output", key: :output_tokens, format: :number, class: "text-right"},
       %{label: "Cache Read", key: :cache_read, format: :number, class: "text-right"},

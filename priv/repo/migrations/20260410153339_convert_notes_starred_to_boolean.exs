@@ -9,7 +9,11 @@ defmodule EyeInTheSky.Repo.Migrations.ConvertNotesStarredToBoolean do
 
   def down do
     execute("ALTER TABLE notes ALTER COLUMN starred DROP DEFAULT")
-    execute("ALTER TABLE notes ALTER COLUMN starred TYPE integer USING (CASE WHEN starred THEN 1 ELSE 0 END)")
+
+    execute(
+      "ALTER TABLE notes ALTER COLUMN starred TYPE integer USING (CASE WHEN starred THEN 1 ELSE 0 END)"
+    )
+
     execute("ALTER TABLE notes ALTER COLUMN starred SET DEFAULT 0")
   end
 end

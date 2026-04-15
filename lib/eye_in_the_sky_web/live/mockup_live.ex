@@ -13,8 +13,7 @@ defmodule EyeInTheSkyWeb.MockupLive do
     {:ok,
      socket
      |> assign(:html, html)
-     |> assign(:mtime, mtime),
-     layout: false}
+     |> assign(:mtime, mtime), layout: false}
   end
 
   @impl true
@@ -68,7 +67,8 @@ defmodule EyeInTheSkyWeb.MockupLive do
       srcdoc={@html}
       style="width:100vw;height:100vh;border:none;display:block;"
       sandbox="allow-scripts allow-same-origin"
-    ></iframe>
+    >
+    </iframe>
     """
   end
 end

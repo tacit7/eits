@@ -25,6 +25,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers do
 
   def handle_agent_working_if_match(socket, msg, session_assign_key, callback) do
     session_id = msg.id
+
     if session_id == socket.assigns[session_assign_key] do
       {:noreply, callback.(socket, session_id)}
     else
@@ -34,6 +35,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers do
 
   def handle_agent_stopped_if_match(socket, msg, session_assign_key, callback) do
     session_id = msg.id
+
     if session_id == socket.assigns[session_assign_key] do
       {:noreply, callback.(socket, session_id)}
     else

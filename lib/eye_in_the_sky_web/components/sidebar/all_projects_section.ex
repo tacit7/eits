@@ -11,7 +11,9 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.AllProjectsSection do
 
   def all_projects_section(assigns) do
     ~H"""
-    <% overview_active = @sidebar_tab in [:sessions, :tasks, :prompts, :notes, :skills, :teams, :notifications, :usage] && is_nil(@sidebar_project) %>
+    <% overview_active =
+      @sidebar_tab in [:sessions, :tasks, :prompts, :notes, :skills, :teams, :notifications, :usage] &&
+        is_nil(@sidebar_project) %>
     <button
       phx-click="toggle_all_projects"
       phx-target={@myself}
@@ -28,7 +30,9 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.AllProjectsSection do
     >
       <%= if !@collapsed do %>
         <.icon
-          name={if @expanded_all_projects, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"}
+          name={
+            if @expanded_all_projects, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"
+          }
           class="w-3.5 h-3.5 flex-shrink-0"
         />
       <% end %>

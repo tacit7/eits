@@ -102,7 +102,7 @@ defmodule EyeInTheSky.Git.Worktrees do
   @spec symlink_deps(String.t(), String.t()) :: :ok | {:error, String.t()}
   def symlink_deps(project_path, wt_path) do
     deps_source = Path.join(project_path, "deps")
-    deps_link   = Path.join(wt_path, "deps")
+    deps_link = Path.join(wt_path, "deps")
 
     cond do
       match?({:ok, %{type: :symlink}}, File.lstat(deps_link)) ->
@@ -118,8 +118,9 @@ defmodule EyeInTheSky.Git.Worktrees do
 
       true ->
         relative_target = relative_path(deps_source, wt_path)
+
         case File.ln_s(relative_target, deps_link) do
-          :ok              -> :ok
+          :ok -> :ok
           {:error, reason} -> {:error, "symlink failed: #{:file.format_error(reason)}"}
         end
     end
@@ -131,7 +132,7 @@ defmodule EyeInTheSky.Git.Worktrees do
   # common ancestor — e.g. from ".claude/worktrees/foo" to "deps".
   defp relative_path(target, from_dir) do
     target_parts = Path.split(target)
-    from_parts   = Path.split(from_dir)
+    from_parts = Path.split(from_dir)
 
     common_len =
       target_parts
@@ -139,7 +140,7 @@ defmodule EyeInTheSky.Git.Worktrees do
       |> Enum.take_while(fn {a, b} -> a == b end)
       |> length()
 
-    ups       = length(from_parts) - common_len
+    ups = length(from_parts) - common_len
     remaining = Enum.drop(target_parts, common_len)
 
     (List.duplicate("..", ups) ++ remaining) |> Path.join()

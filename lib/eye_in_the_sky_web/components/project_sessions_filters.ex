@@ -85,7 +85,10 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
         >
           <.icon name="hero-funnel-mini" class="w-4 h-4" />
           <%= if @session_filter != "all" || @sort_by != "last_message" do %>
-            <span class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full" aria-hidden="true">
+            <span
+              class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full"
+              aria-hidden="true"
+            >
             </span>
           <% end %>
         </button>

@@ -385,7 +385,9 @@ defmodule EyeInTheSky.Claude.SessionReaderTest do
             "type" => "assistant",
             "message" => %{
               "role" => "assistant",
-              "content" => [%{"type" => "tool_use", "id" => "t1", "name" => "Read", "input" => %{}}]
+              "content" => [
+                %{"type" => "tool_use", "id" => "t1", "name" => "Read", "input" => %{}}
+              ]
             }
           }),
           "this is garbage"

@@ -60,7 +60,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   end
 
   defp fetch_tasks_by_filter(%{"project_id" => project_id}, limit) do
-    Tasks.list_tasks_for_project(parse_int(project_id, nil)) |> Enum.take(limit)
+    case parse_int(project_id, nil) do
+      nil -> []
+      project_int_id -> Tasks.list_tasks_for_project(project_int_id) |> Enum.take(limit)
+    end
   end
 
   defp fetch_tasks_by_filter(_params, limit) do
@@ -141,10 +144,16 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   defp do_update_task(conn, task, params) do
     result =
       case WorkflowState.resolve_alias(params["state"]) do
-        {:ok, state_name}        -> move_to_state(task, state_name)
-        {:error, :no_alias}      -> update_attrs(task, params)
+        {:ok, state_name} ->
+          move_to_state(task, state_name)
+
+        {:error, :no_alias} ->
+          update_attrs(task, params)
+
         {:error, :invalid_alias} ->
-          {:error, {:bad_alias, "Unknown state alias '#{params["state"]}'. Valid aliases: done, start, in-review, review, todo"}}
+          {:error,
+           {:bad_alias,
+            "Unknown state alias '#{params["state"]}'. Valid aliases: done, start, in-review, review, todo"}}
       end
 
     case result do
@@ -260,8 +269,14 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
         conn |> put_status(:bad_request) |> json(%{error: "session_id is required"})
 
       session_id ->
-        maybe_link_session(task_id, session_id)
-        json(conn, %{success: true, message: "Session linked to task #{task_id}"})
+        case Tasks.get_task(task_id) do
+          {:ok, _task} ->
+            maybe_link_session(task_id, session_id)
+            json(conn, %{success: true, message: "Session linked to task #{task_id}"})
+
+          {:error, :not_found} ->
+            conn |> put_status(:bad_request) |> json(%{error: "Invalid task ID"})
+        end
     end
   end
 
@@ -269,14 +284,19 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   DELETE /api/v1/tasks/:id/sessions/:uuid - Unlink a session from a task.
   """
   def unlink_session(conn, %{"id" => task_id, "uuid" => session_uuid}) do
-    int_id = resolve_session_int_id(session_uuid)
-    task_int_id = parse_task_id(task_id)
+    case Tasks.get_task(task_id) do
+      {:error, :not_found} ->
+        conn |> put_status(:bad_request) |> json(%{error: "Invalid task ID"})
 
-    if int_id do
-      Tasks.unlink_session_from_task(task_int_id, int_id)
-      json(conn, %{success: true, message: "Session unlinked from task #{task_id}"})
-    else
-      conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+      {:ok, task} ->
+        int_id = resolve_session_int_id(session_uuid)
+
+        if int_id do
+          Tasks.unlink_session_from_task(task.id, int_id)
+          json(conn, %{success: true, message: "Session unlinked from task #{task_id}"})
+        else
+          conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+        end
     end
   end
 
@@ -304,13 +324,18 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   defp maybe_link_session(task_id, session_id) when is_binary(session_id) do
     int_id = resolve_session_int_id(session_id)
-    task_int_id = parse_task_id(task_id)
 
-    if int_id do
-      Tasks.link_session_to_task(task_int_id, int_id)
+    case parse_task_id(task_id) do
+      nil ->
+        :ok
+
+      task_int_id ->
+        if int_id do
+          Tasks.link_session_to_task(task_int_id, int_id)
+        end
+
+        :ok
     end
-
-    :ok
   end
 
   defp resolve_agent_int_id(uuid), do: resolve_id(uuid, &Agents.get_agent_by_uuid/1)

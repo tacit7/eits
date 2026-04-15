@@ -224,8 +224,8 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
     project_id = socket.assigns.project_id
 
     if project_id do
-      all_project = ScheduledJobs.list_jobs_for_project(project_id)
-      all_global = ScheduledJobs.list_global_jobs()
+      all_project = ScheduledJobs.list_jobs(project_id: project_id)
+      all_global = ScheduledJobs.list_jobs(global_only: true)
 
       socket
       |> assign(:all_project_jobs, all_project)

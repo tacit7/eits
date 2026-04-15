@@ -100,10 +100,10 @@ defmodule EyeInTheSky.ScheduledJobsTest do
   end
 
   # ---------------------------------------------------------------------------
-  # list_jobs_for_project/1
+  # list_jobs/1 with project_id filter
   # ---------------------------------------------------------------------------
 
-  describe "list_jobs_for_project/1" do
+  describe "list_jobs/1 with project_id filter" do
     test "returns only jobs scoped to the given project" do
       project_a = create_project("project-a")
       project_b = create_project("project-b")
@@ -116,21 +116,21 @@ defmodule EyeInTheSky.ScheduledJobsTest do
 
       {:ok, _global} = ScheduledJobs.create_job(job_attrs(%{"name" => "Global"}))
 
-      jobs = ScheduledJobs.list_jobs_for_project(project_a.id)
+      jobs = ScheduledJobs.list_jobs(project_id: project_a.id)
       assert length(jobs) == 1
       assert hd(jobs).id == job_a.id
     end
 
     test "returns empty list when project has no jobs" do
       project = create_project()
-      assert ScheduledJobs.list_jobs_for_project(project.id) == []
+      assert ScheduledJobs.list_jobs(project_id: project.id) == []
     end
 
     test "does not return global jobs (null project_id)" do
       project = create_project()
       {:ok, _global} = ScheduledJobs.create_job(job_attrs(%{"name" => "Global"}))
 
-      assert ScheduledJobs.list_jobs_for_project(project.id) == []
+      assert ScheduledJobs.list_jobs(project_id: project.id) == []
     end
   end
 

@@ -245,4 +245,67 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
     extension = path |> Path.extname() |> String.downcase()
     Enum.member?(binary_extensions, extension)
   end
+
+  @type file_entry :: %{
+          name: String.t(),
+          path: String.t(),
+          is_dir: boolean(),
+          size: non_neg_integer()
+        }
+
+  @doc """
+  Builds a flat file listing for `dir`, with each entry's `:path` set to
+  `Path.join(path_prefix, filename)`. When `path_prefix` is `""` the path
+  is just the filename, matching root-level listing behaviour.
+
+  ## Options
+    * `:ignore_hidden` - when true, skip dotfiles (except .claude and .git)
+    * `:ignored_dirs` - list of directory names to exclude entirely
+  """
+  @spec build_file_listing(String.t(), String.t(), keyword()) ::
+          {:ok, [file_entry()]} | {:error, term()}
+  def build_file_listing(dir, path_prefix, opts \\ []) do
+    ignore_hidden = Keyword.get(opts, :ignore_hidden, false)
+    ignored_dirs = Keyword.get(opts, :ignored_dirs, [])
+
+    case File.ls(dir) do
+      {:ok, files} ->
+        file_list =
+          files
+          |> Enum.filter(fn file ->
+            file_path = Path.join(dir, file)
+
+            hidden_ok =
+              !ignore_hidden or
+                !String.starts_with?(file, ".") or
+                file in [".claude", ".git"]
+
+            hidden_ok and
+              file not in ignored_dirs and
+              (File.dir?(file_path) or !binary_file?(file_path))
+          end)
+          |> Enum.map(fn file ->
+            file_path = Path.join(dir, file)
+
+            size =
+              case File.stat(file_path) do
+                {:ok, %{size: s}} -> s
+                _ -> 0
+              end
+
+            %{
+              name: file,
+              path: if(path_prefix == "", do: file, else: Path.join(path_prefix, file)),
+              is_dir: File.dir?(file_path),
+              size: size
+            }
+          end)
+          |> Enum.sort_by(&{!&1.is_dir, &1.name})
+
+        {:ok, file_list}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
 end

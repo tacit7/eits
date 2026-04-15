@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   use EyeInTheSkyWeb, :live_view
 
   import EyeInTheSkyWeb.Helpers.FileHelpers,
-    only: [detect_file_type: 1, language_class: 1, build_file_tree: 2, binary_file?: 1]
+    only: [detect_file_type: 1, language_class: 1, build_file_tree: 2, build_file_listing: 2, build_file_listing: 3]
 
   import EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers,
     only: [read_file_safe_detailed: 1, path_within?: 2]
@@ -196,67 +196,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   @impl true
   def handle_info(_msg, socket), do: {:noreply, socket}
-
-  @type file_entry :: %{
-          name: String.t(),
-          path: String.t(),
-          is_dir: boolean(),
-          size: non_neg_integer()
-        }
-
-  # Builds a flat file listing for `dir`, with each entry's `:path` set to
-  # `Path.join(path_prefix, filename)`. When `path_prefix` is `""` the path
-  # is just the filename, matching root-level listing behaviour.
-  #
-  # Options:
-  #   :ignore_hidden   - when true, skip dotfiles (except .claude and .git)
-  #   :ignored_dirs    - list of directory names to exclude entirely
-  @spec build_file_listing(String.t(), String.t(), keyword()) ::
-          {:ok, [file_entry()]} | {:error, term()}
-  defp build_file_listing(dir, path_prefix, opts \\ []) do
-    ignore_hidden = Keyword.get(opts, :ignore_hidden, false)
-    ignored_dirs = Keyword.get(opts, :ignored_dirs, [])
-
-    case File.ls(dir) do
-      {:ok, files} ->
-        file_list =
-          files
-          |> Enum.filter(fn file ->
-            file_path = Path.join(dir, file)
-
-            hidden_ok =
-              !ignore_hidden or
-                !String.starts_with?(file, ".") or
-                file in [".claude", ".git"]
-
-            hidden_ok and
-              file not in ignored_dirs and
-              (File.dir?(file_path) or !binary_file?(file_path))
-          end)
-          |> Enum.map(fn file ->
-            file_path = Path.join(dir, file)
-
-            size =
-              case File.stat(file_path) do
-                {:ok, %{size: s}} -> s
-                _ -> 0
-              end
-
-            %{
-              name: file,
-              path: if(path_prefix == "", do: file, else: Path.join(path_prefix, file)),
-              is_dir: File.dir?(file_path),
-              size: size
-            }
-          end)
-          |> Enum.sort_by(&{!&1.is_dir, &1.name})
-
-        {:ok, file_list}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
 
   attr :error, :string, default: nil
   attr :file_content, :string, default: nil

@@ -229,7 +229,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   """
   def end_session(conn, %{"uuid" => uuid} = params) do
     with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
-      status = params["final_status"] || "waiting"
+      status = params["final_status"] || "completed"
 
       attrs =
         if status in ["completed", "failed"] do

@@ -79,7 +79,8 @@ defmodule EyeInTheSky.MixProject do
       {:remote_ip, "~> 1.2"},
       {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
       {:sobelow, "~> 0.13", only: [:dev], runtime: false},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:elixirkit, github: "livebook-dev/elixirkit"}
     ]
   end
 

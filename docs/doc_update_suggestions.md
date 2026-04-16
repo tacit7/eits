@@ -1,5 +1,17 @@
 # Documentation Update Suggestions
 
+## 2026-04-15
+**Commits reviewed**: ca2f33b7..3e55ea6a
+
+- **REST_API.md** — Document task controller input validation fixes (commits 13e29d3f, 84326f34): GET /api/v1/tasks with invalid project_id now returns empty list (200) instead of FunctionClauseError; POST /api/v1/tasks/:id/sessions and DELETE /api/v1/tasks/:id/sessions/:uuid now return 400 "Invalid task ID" for non-existent tasks instead of foreign key crash; Tasks.get_task/1 validates existence before DB operations
+- **REST_API.md** — Document session controller error handling improvement (commit b7b6dd5d): POST /api/v1/sessions now returns 422 with detailed error when Projects.resolve_project fails instead of silently setting project_id to nil; prevents invalid sessions from being created with unresolved projects
+- **SESSION_MANAGER.md** — Document session status lifecycle change (commit 3e55ea6a): /api/v1/sessions/:id/end endpoint now sets default status to 'completed' instead of 'waiting'; clarify that /end is explicit termination (not hook transition), so completed is correct semantics; waiting status reserved for hook-driven paused states
+- **PRODUCTION.md** — Document major infrastructure updates (commit 1231c244): EITS/Codex config migration to runtime.exs with environment-specific settings; UTC timestamp migration (all tables converted to :utc_datetime_usec); agent definitions auto-sync system; Codex SDK enhancements (comprehensive test coverage in codex_sdk_test.exs); note migration 20260321080000-080200 for timestamp normalization
+- **CODE_GUIDELINES.md** — Document image processor refactoring (commit 1231c244): ImageProcessor module expanded (61+ lines) with media handling improvements; EXIF stripping, resize optimization, and compression logic centralized; applied across multimodal content processing pipeline
+- **ARCHITECTURE.md or CLAUDE.md** — Document agent definitions tracking (commit 1231c244): AgentDefinition schema auto-scans `.claude/agents/` YAML files; on agent spawn, definition lookup checks DB; if not found, triggers auto-sync of agent definition and cached metadata; scope/project_id constraints prevent collisions; advisory locks coordinate sync race conditions
+- **CODE_GUIDELINES.md** — Document LiveView component refactoring patterns (commit 1231c244): dm_page component split into sub-modules (dm_page/commits_tab, dm_page/context_tab, dm_page/notes_tab, dm_page/composer); agent_schedule_form extracted into multiple sub-components; component lifecycle improvements with proper attr drilling and event dispatch; pattern: extract sub-concerns when template >200L or reused across 2+ parents
+- **REST_API.md or SECURITY.md** — Document .well_known controller addition (commit 1231c244): new StandardController with /.well-known/* endpoint support for RFC 5785 metadata (e.g., /.well-known/security.txt); enables standards-compliant security/contact information exposure
+
 ## 2026-04-14
 **Commits reviewed**: cf8107bf..ca2f33b7
 

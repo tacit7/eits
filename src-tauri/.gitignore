@@ -1,2 +1,5 @@
 /target/
 /gen/schemas/
+
+# Un-ignore icon PNGs (root .gitignore ignores *.png broadly)
+!icons/*.png

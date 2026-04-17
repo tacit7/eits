@@ -47,4 +47,19 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   def valid_model_slugs(provider) do
     provider |> models_for_provider() |> Enum.map(&elem(&1, 0))
   end
+
+  @doc """
+  Normalizes a model alias to its full API name.
+  Settings stores short aliases (opus, sonnet, haiku) but form options use full names.
+  """
+  def normalize_model_alias(model) when is_binary(model) do
+    case String.downcase(model) do
+      "haiku" -> "claude-haiku-4-5-20251001"
+      "sonnet" -> "claude-sonnet-4-6"
+      "opus" -> "claude-opus-4-7"
+      _ -> model
+    end
+  end
+
+  def normalize_model_alias(nil), do: "claude-sonnet-4-6"
 end

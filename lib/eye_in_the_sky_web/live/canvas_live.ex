@@ -95,6 +95,8 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     end
   end
 
+  def handle_event(_event, _params, socket), do: {:noreply, socket}
+
   @impl true
   def handle_info({:new_dm, message}, socket) do
     {:noreply, refresh_window(socket, message.session_id)}

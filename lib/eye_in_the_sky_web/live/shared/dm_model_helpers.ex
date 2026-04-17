@@ -46,7 +46,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmModelHelpers do
           put_flash(socket, :error, "Failed to save model selection")
       end
 
-    effort = if effort == "" and model == "opus", do: "medium", else: effort
+    effort = if effort == "" and String.contains?(model, "opus"), do: "medium", else: effort
 
     socket =
       socket

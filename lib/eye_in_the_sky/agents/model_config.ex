@@ -8,7 +8,19 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   Returns the list of Claude model slugs.
   """
   def claude_models do
-    ["sonnet", "opus", "sonnet[1m]", "opus[1m]", "haiku"]
+    [
+      "claude-opus-4-7",
+      "claude-opus-4-6",
+      "claude-opus-4-5-20251101",
+      "claude-opus-4-1-20250805",
+      "claude-sonnet-4-6",
+      "claude-sonnet-4-5-20250929",
+      "claude-haiku-4-5-20251001",
+      # short aliases kept for backward compat with stored sessions
+      "opus",
+      "sonnet",
+      "haiku"
+    ]
   end
 
   @doc """

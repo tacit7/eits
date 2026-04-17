@@ -213,7 +213,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
         <span class="flex-1">Add to Canvas</span>
         <.icon name="hero-chevron-right-mini" class="w-3 h-3 text-base-content/40" />
       </div>
-      <div class="invisible group-hover/canvas:visible absolute right-full top-0 mr-1 w-48 rounded-xl bg-base-300 dark:bg-[hsl(220,13%,18%)] shadow-xl p-1.5 flex flex-col gap-0.5 z-[60]">
+      <div class="invisible group-hover/canvas:visible absolute left-full top-0 ml-1 w-48 rounded-xl bg-base-300 dark:bg-[hsl(220,13%,18%)] shadow-xl p-1.5 flex flex-col gap-0.5 z-[60]">
         <%= for canvas <- @canvases do %>
           <button
             type="button"

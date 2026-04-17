@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycle do
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [push_event: 3]
 
+  alias EyeInTheSky.Desktop
   alias EyeInTheSky.Tasks
   alias EyeInTheSkyWeb.DmLive.MessageHandlers
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
@@ -62,6 +63,8 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycle do
       msg,
       :session_id,
       fn socket, _session_id ->
+        maybe_notify_desktop_on_stop(socket)
+
         socket
         |> assign(:compacting, false)
         |> assign(:processing, false)
@@ -69,6 +72,24 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycle do
         |> push_event("focus-input", %{})
       end
     )
+  end
+
+  defp maybe_notify_desktop_on_stop(socket) do
+    notify? = Map.get(socket.assigns, :notify_on_stop, false)
+    desktop? = Desktop.desktop_mode?()
+
+    Logger.info(
+      "agent_stopped notify check: notify_on_stop=#{notify?} desktop_mode?=#{desktop?}"
+    )
+
+    if notify? && desktop? do
+      session = socket.assigns[:session]
+      title = (session && session.name) || "EITS"
+      Logger.info("Firing Desktop.notify(\"Session stopped\", #{inspect(title)})")
+      Desktop.notify("Session stopped", title)
+    end
+
+    :ok
   end
 
   def handle_agent_updated(%{id: session_id} = updated_session, socket) do

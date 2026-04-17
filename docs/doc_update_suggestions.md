@@ -1,5 +1,13 @@
 # Documentation Update Suggestions
 
+## 2026-04-16
+**Commits reviewed**: ca2f33b7..e474c794
+
+- **DESKTOP_APP.md (new file)** — Document Tauri desktop app POC (commits d4a1fd60, e3d41708, a13e0a63, b411239a, 0be1a185, 033d34a3, e474c794): ElixirKit facade at lib/eye_in_the_sky/desktop.ex; Tauri 2 + Phoenix integration running on port 5050; file structure (src-tauri/ root with Cargo.toml, tauri.conf.json, capabilities/default.json); system tray with Show/Quit menu items; left-click tray icon shows and focuses window; close button hides to tray instead of quitting; window position/size persists across restarts via tauri-plugin-window-state; build commands and deep-link support; configuration in config/dev.exs (application supervisor updates, vite config changes)
+- **ARCHITECTURE.md** — Document TaskSessions context extraction (commit 85e5b51d): new lib/eye_in_the_sky/task_sessions.ex module extracted from Tasks context; encapsulates session-to-task relationships; follows Sessions context pattern for CRUD operations; schema_preloads and list_task_sessions/2 for querying
+- **CODE_GUIDELINES.md** — Document browser-only UI hiding pattern (commit e474c794): use data-env flag in CSS to conditionally hide browser-specific UI when running inside Tauri shell; pattern: `.hidden-in-tauri { @apply hidden; }` + `data-env="tauri"` attribute on root element; enables single codebase for web and desktop
+- **CODE_GUIDELINES.md** — Document system tray implementation pattern (commits 033d34a3, 0be1a185): tauri-plugin-window-state for persistence; TrayIcon setup in lib.rs with menu items; window hide-on-close vs tray show; capability permission: `window-state:default`
+
 ## 2026-04-15
 **Commits reviewed**: ca2f33b7..3e55ea6a
 

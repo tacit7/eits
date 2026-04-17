@@ -2,7 +2,9 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
   import Phoenix.Component, only: [assign: 3]
 
-  alias EyeInTheSky.Sessions
+  alias EyeInTheSky.{Desktop, Sessions}
+
+  require Logger
 
   @moduledoc """
   Single source of truth for CLI slash-command metadata and parsing.
@@ -50,7 +52,8 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
     {"plugin", :path, "Load plugins from directory"},
     {"config", :path, "Load settings from file"},
     {"agents", :free_text, "Run as named subagent"},
-    {"rename", :free_text, "Rename this session"}
+    {"rename", :free_text, "Rename this session"},
+    {"test-notify", :none, "Fire a test desktop notification (Tauri shell only)"}
   ]
 
   @doc "Returns the canonical command metadata list."
@@ -119,6 +122,7 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
   def route("rename", name) when is_binary(name), do: {:server, {:rename, name}}
   def route("model", model) when is_binary(model), do: {:server, {:model, model}}
   def route("effort", level) when is_binary(level), do: {:server, {:effort, level}}
+  def route("test-notify", _), do: {:server, {:test_notify, nil}}
 
   # Session-level CLI flags: stored in session_cli_opts and applied to every message
   def route("plan", _), do: {:session, {:plan, true}}
@@ -173,6 +177,13 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
 
   def apply_server_commands([{:effort, level} | rest], socket) do
     apply_server_commands(rest, assign(socket, :selected_effort, level))
+  end
+
+  def apply_server_commands([{:test_notify, _} | rest], socket) do
+    desktop? = Desktop.desktop_mode?()
+    Logger.info("/test-notify invoked (desktop_mode?=#{desktop?})")
+    Desktop.notify("EITS Test", "Notification bridge is alive")
+    apply_server_commands(rest, socket)
   end
 
   def apply_server_commands([_ | rest], socket), do: apply_server_commands(rest, socket)

@@ -15,6 +15,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
   attr :active_timer, :any, default: nil
   attr :schedule_btn_id, :string, default: nil
   attr :cancel_btn_id, :string, required: true
+  attr :notify_on_stop, :boolean, default: false
 
   def action_menu(assigns) do
     ~H"""
@@ -81,7 +82,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
               phx-hook="PushSetup"
               phx-update="ignore"
               data-push-state="disabled"
-              title="Enable push notifications"
+              data-notify-on-stop={if @notify_on_stop, do: "true", else: "false"}
+              title="Enable notifications"
               class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
             >
               <.icon name="hero-bell" class="w-3.5 h-3.5" /> Notify

@@ -86,15 +86,26 @@ export const PushSetup = {
     const permission = await currentPermission()
     const subscribed = await isSubscribed()
     this._updateEl(permission, subscribed)
+    // Sync server-side notify_on_stop with current browser state
+    this._notifyServer(subscribed && permission === "granted")
   },
   async _toggle() {
     const subscribed = await isSubscribed()
     if (subscribed) {
       await unsubscribe()
       this._updateEl(await currentPermission(), false)
+      this._notifyServer(false)
     } else {
       const result = await subscribe()
       this._updateEl(await currentPermission(), result.ok)
+      this._notifyServer(result.ok)
+    }
+  },
+  _notifyServer(enabled) {
+    try {
+      this.pushEvent("set_notify_on_stop", { enabled })
+    } catch (_err) {
+      // No-op: handler may not be defined in every LiveView that mounts this hook
     }
   },
   _updateEl(permission, subscribed) {

@@ -90,6 +90,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:reloading, false)
     |> assign(:active_timer, nil)
     |> assign(:codex_raw_lines, [])
+    |> assign(:notify_on_stop, false)
   end
 
   defp assign_stream_defaults(socket) do

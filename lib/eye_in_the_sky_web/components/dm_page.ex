@@ -32,6 +32,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :slash_items, :list, default: []
   attr :session_context, :map, default: nil
   attr :agent_record, :map, default: nil
+  attr :notify_on_stop, :boolean, default: false
   # Grouped maps replacing 10 individual attrs
   attr :message_data, :map,
     default: %{
@@ -301,6 +302,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 reload_label="Reload"
                 active_timer={@overlay_data.active_timer}
                 cancel_btn_id="dm-cancel-timer-btn-desktop"
+                notify_on_stop={@notify_on_stop}
               />
             </div>
           </div>

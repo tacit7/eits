@@ -16,9 +16,11 @@ defmodule EyeInTheSky.Agents.ModelConfig do
       "claude-sonnet-4-6",
       "claude-sonnet-4-5-20250929",
       "claude-haiku-4-5-20251001",
-      # short aliases kept for backward compat with stored sessions
+      # short aliases and [1m] variants kept for backward compat with stored sessions
       "opus",
+      "opus[1m]",
       "sonnet",
+      "sonnet[1m]",
       "haiku"
     ]
   end

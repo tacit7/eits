@@ -98,7 +98,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
               class="w-16 bg-transparent border-0 outline-none focus:ring-0 text-xs placeholder:text-base-content/20 font-mono p-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
-          <%= if String.contains?(@selected_model, "opus") do %>
+          <%= if String.starts_with?(@selected_model, "claude-opus") or @selected_model in ["opus", "opus[1m]"] do %>
             <div
               class="dropdown dropdown-top"
               phx-click="toggle_effort_menu"

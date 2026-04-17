@@ -269,7 +269,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
             </div>
 
             <%!-- Effort (Claude Opus only) --%>
-            <%= if @selected_provider == "claude" and String.contains?(@selected_model, "opus") do %>
+            <%= if @selected_provider == "claude" and (String.starts_with?(@selected_model, "claude-opus") or @selected_model in ["opus", "opus[1m]"]) do %>
               <div>
                 <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Effort</label>
                 <select name="effort_level" class="select select-bordered w-full">

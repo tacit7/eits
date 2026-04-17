@@ -48,10 +48,11 @@ if config_env() != :test do
   config :eye_in_the_sky, :api_key, get_env.("EITS_API_KEY")
 end
 
-# Disable passkey auth — set DISABLE_AUTH=true to skip LiveView session auth (dev only)
-if config_env() != :prod do
-  config :eye_in_the_sky, :disable_auth, get_env.("DISABLE_AUTH") in ~w(true 1)
-end
+# Disable passkey auth — set DISABLE_AUTH=true to skip LiveView session auth.
+# NOTE: Tauri POC — prod guard removed so the bundled desktop app can bypass
+# auth. DO NOT set DISABLE_AUTH=true in any deployment where the app is
+# network-reachable.
+config :eye_in_the_sky, :disable_auth, get_env.("DISABLE_AUTH") in ~w(true 1)
 
 # WebAuthn — extra allowed origins (comma-separated).
 webauthn_extra_raw =
@@ -178,7 +179,13 @@ if config_env() == :prod do
       port: port
     ],
     secret_key_base: secret_key_base,
-    force_ssl: [hsts: true, rewrite_on: [:x_forwarded_proto]]
+    # PHX_DISABLE_FORCE_SSL=1 turns off HSTS + HTTPS redirect. Needed for the
+    # Tauri bundle serving over http://localhost:5050 inside a WebView.
+    force_ssl:
+      if(get_env.("PHX_DISABLE_FORCE_SSL") == "1",
+        do: nil,
+        else: [hsts: true, rewrite_on: [:x_forwarded_proto]]
+      )
 
   # ## SSL Support
   #

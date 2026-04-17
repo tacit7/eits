@@ -7,5 +7,13 @@
     "urls": ["http://127.0.0.1:*/*", "http://localhost:*/*"]
   },
   "local": true,
-  "permissions": ["core:default", "opener:default", "window-state:default"]
+  "permissions": [
+    "core:default",
+    "opener:default",
+    "window-state:default",
+    "notification:default",
+    "global-shortcut:default",
+    "clipboard-manager:default",
+    "dialog:default"
+  ]
 }

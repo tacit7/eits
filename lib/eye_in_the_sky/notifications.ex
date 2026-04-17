@@ -116,6 +116,11 @@ defmodule EyeInTheSky.Notifications do
 
   defp broadcast(event, payload \\ nil) do
     EyeInTheSky.Events.notification(event, payload)
+    sync_dock_badge()
+  end
+
+  defp sync_dock_badge do
+    EyeInTheSky.Desktop.set_badge(unread_count())
   end
 
   defp maybe_push(%{category: "agent"} = notification) do

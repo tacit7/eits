@@ -1,5 +1,5 @@
 use tauri::Manager;
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -71,6 +71,63 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // --- App menu bar (macOS) ---
+            let app_menu = Submenu::with_items(app, "Eye in the Sky", true, &[
+                &PredefinedMenuItem::about(app, Some("About Eye in the Sky"), None)?,
+                &PredefinedMenuItem::separator(app)?,
+                &MenuItem::with_id(app, "menu_settings", "Settings...", true, Some("CmdOrCtrl+,"))?,
+                &PredefinedMenuItem::separator(app)?,
+                &PredefinedMenuItem::hide(app, None)?,
+                &PredefinedMenuItem::hide_others(app, None)?,
+                &PredefinedMenuItem::show_all(app, None)?,
+                &PredefinedMenuItem::separator(app)?,
+                &PredefinedMenuItem::quit(app, None)?,
+            ])?;
+            let edit_menu = Submenu::with_items(app, "Edit", true, &[
+                &PredefinedMenuItem::undo(app, None)?,
+                &PredefinedMenuItem::redo(app, None)?,
+                &PredefinedMenuItem::separator(app)?,
+                &PredefinedMenuItem::cut(app, None)?,
+                &PredefinedMenuItem::copy(app, None)?,
+                &PredefinedMenuItem::paste(app, None)?,
+                &PredefinedMenuItem::select_all(app, None)?,
+            ])?;
+            let view_menu = Submenu::with_items(app, "View", true, &[
+                &MenuItem::with_id(app, "menu_dashboard", "Dashboard", true, Some("CmdOrCtrl+1"))?,
+                &MenuItem::with_id(app, "menu_sessions", "Sessions", true, Some("CmdOrCtrl+2"))?,
+                &MenuItem::with_id(app, "menu_tasks", "Tasks", true, Some("CmdOrCtrl+3"))?,
+                &MenuItem::with_id(app, "menu_teams", "Teams", true, Some("CmdOrCtrl+4"))?,
+                &PredefinedMenuItem::separator(app)?,
+                &MenuItem::with_id(app, "menu_reload", "Reload", true, Some("CmdOrCtrl+R"))?,
+            ])?;
+            let window_menu = Submenu::with_items(app, "Window", true, &[
+                &PredefinedMenuItem::minimize(app, None)?,
+                &PredefinedMenuItem::maximize(app, None)?,
+                &PredefinedMenuItem::separator(app)?,
+                &PredefinedMenuItem::close_window(app, None)?,
+            ])?;
+            let menubar = Menu::with_items(app, &[
+                &app_menu, &edit_menu, &view_menu, &window_menu,
+            ])?;
+            app.set_menu(menubar)?;
+            app.on_menu_event(|app, event| match event.id.as_ref() {
+                "menu_settings" => navigate_to(app, "/settings"),
+                "menu_dashboard" => navigate_to(app, "/"),
+                "menu_sessions" => navigate_to(app, "/sessions"),
+                "menu_tasks" => navigate_to(app, "/tasks"),
+                "menu_teams" => navigate_to(app, "/teams"),
+                "menu_reload" => {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
+                        let url = format!("http://127.0.0.1:{}", port);
+                        if let Ok(parsed) = url.parse::<tauri::Url>() {
+                            let _ = window.navigate(parsed);
+                        }
+                    }
+                }
+                _ => {}
+            });
 
             // --- Global shortcut: Cmd+Shift+E to show/focus window ---
             let shortcut = "CmdOrCtrl+Shift+E".parse::<Shortcut>()?;
@@ -159,9 +216,24 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                let _ = window.hide();
-                api.prevent_close();
+            match event {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    let _ = window.hide();
+                    api.prevent_close();
+                }
+                tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
+                    let paths_json: Vec<String> = paths.iter()
+                        .filter_map(|p| p.to_str().map(|s| format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))))
+                        .collect();
+                    let js = format!(
+                        "window.dispatchEvent(new CustomEvent('tauri:file-drop', {{ detail: {{ paths: [{}] }} }}))",
+                        paths_json.join(",")
+                    );
+                    if let Some(wv) = window.app_handle().get_webview_window("main") {
+                        let _ = wv.eval(&js);
+                    }
+                }
+                _ => {}
             }
         })
         .run(tauri::generate_context!())

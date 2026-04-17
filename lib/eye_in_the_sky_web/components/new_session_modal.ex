@@ -10,12 +10,15 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Claude.AgentFileScanner
+  alias EyeInTheSky.Settings
 
   @impl true
   def mount(socket) do
+    default_model = Settings.get("default_model") || "claude-sonnet-4-6"
+
     {:ok,
      assign(socket,
-       selected_model: "sonnet",
+       selected_model: default_model,
        selected_provider: "claude",
        selected_prompt_id: nil,
        prefill_text: "",
@@ -46,7 +49,11 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   @impl true
   def handle_event("provider_changed", %{"agent_type" => provider}, socket) do
-    default_model = if provider == "codex", do: "gpt-5.3-codex", else: "sonnet"
+    default_model =
+      if provider == "codex",
+        do: "gpt-5.3-codex",
+        else: Settings.get("default_model") || "claude-sonnet-4-6"
+
     {:noreply, assign(socket, selected_provider: provider, selected_model: default_model)}
   end
 

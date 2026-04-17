@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   use Phoenix.LiveComponent
   import EyeInTheSkyWeb.CoreComponents, only: [icon: 1, modal_header: 1]
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [models_for_provider: 1]
+  import EyeInTheSkyWeb.Helpers.ModelHelpers, only: [normalize_model_alias: 1]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Claude.AgentFileScanner
@@ -14,11 +15,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   @impl true
   def mount(socket) do
-    default_model = Settings.get("default_model") || "claude-sonnet-4-6"
-
     {:ok,
      assign(socket,
-       selected_model: default_model,
+       selected_model: default_claude_model(),
        selected_provider: "claude",
        selected_prompt_id: nil,
        prefill_text: "",
@@ -49,11 +48,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   @impl true
   def handle_event("provider_changed", %{"agent_type" => provider}, socket) do
-    default_model =
-      if provider == "codex",
-        do: "gpt-5.3-codex",
-        else: Settings.get("default_model") || "claude-sonnet-4-6"
-
+    default_model = if provider == "codex", do: "gpt-5.3-codex", else: default_claude_model()
     {:noreply, assign(socket, selected_provider: provider, selected_model: default_model)}
   end
 
@@ -452,6 +447,10 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       </div>
     </div>
     """
+  end
+
+  defp default_claude_model do
+    Settings.get("default_model") |> normalize_model_alias()
   end
 
   defp list_agents(project_path) do

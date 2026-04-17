@@ -12,11 +12,13 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def claude_models do
     [
-      {"sonnet", "Sonnet 4.5"},
-      {"opus", "Opus 4.6"},
-      {"sonnet[1m]", "Sonnet 4.5 (1M)"},
-      {"opus[1m]", "Opus 4.6 (1M)"},
-      {"haiku", "Haiku 4.5"}
+      {"claude-opus-4-7", "Opus 4.7"},
+      {"claude-opus-4-6", "Opus 4.6"},
+      {"claude-opus-4-5-20251101", "Opus 4.5"},
+      {"claude-opus-4-1-20250805", "Opus 4.1"},
+      {"claude-sonnet-4-6", "Sonnet 4.6"},
+      {"claude-sonnet-4-5-20250929", "Sonnet 4.5"},
+      {"claude-haiku-4-5-20251001", "Haiku 4.5"}
     ]
   end
 

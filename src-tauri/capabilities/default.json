@@ -7,5 +7,5 @@
     "urls": ["http://127.0.0.1:*/*", "http://localhost:*/*"]
   },
   "local": true,
-  "permissions": ["core:default", "opener:default"]
+  "permissions": ["core:default", "opener:default", "window-state:default"]
 }

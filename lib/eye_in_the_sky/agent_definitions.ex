@@ -52,23 +52,17 @@ defmodule EyeInTheSky.AgentDefinitions do
   """
   def resolve(slug, project_id) do
     result =
-      AgentDefinition
-      |> where([d], d.slug == ^slug and is_nil(d.missing_at))
-      |> where([d], d.project_id == ^project_id and d.scope == "project")
-      |> Repo.one()
+      Repo.one(
+        from d in AgentDefinition,
+          where: d.slug == ^slug and is_nil(d.missing_at),
+          where: (d.project_id == ^project_id and d.scope == "project") or d.scope == "global",
+          order_by: [desc: d.scope],
+          limit: 1
+      )
 
     case result do
-      %AgentDefinition{} = defn ->
-        {:ok, defn}
-
-      nil ->
-        case Repo.one(
-               from d in AgentDefinition,
-                 where: d.slug == ^slug and d.scope == "global" and is_nil(d.missing_at)
-             ) do
-          %AgentDefinition{} = defn -> {:ok, defn}
-          nil -> {:error, :not_found}
-        end
+      %AgentDefinition{} = defn -> {:ok, defn}
+      nil -> {:error, :not_found}
     end
   end
 

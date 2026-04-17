@@ -25,9 +25,26 @@ defmodule EyeInTheSky.IAM.Builtin.BlockRmRfTest do
     refute BlockRmRf.matches?(policy(), ctx("rm -rf ./build"))
   end
 
-  test "allowPaths escapes the deny" do
+  test "allowPaths escapes the deny for exact match" do
     p = policy(%{"allowPaths" => ["/tmp/scratch"]})
     refute BlockRmRf.matches?(p, ctx("rm -rf /tmp/scratch"))
+  end
+
+  test "allowPaths escapes for child of allow dir" do
+    p = policy(%{"allowPaths" => ["/tmp/scratch"]})
+    refute BlockRmRf.matches?(p, ctx("rm -rf /tmp/scratch/build"))
+  end
+
+  test "allowPaths does not permit sibling by substring (boundary check)" do
+    p = policy(%{"allowPaths" => ["/tmp/scratch"]})
+    # The target /tmp/scratch-evil must NOT be allowed even though
+    # "/tmp/scratch" is a substring of it. However this is also not a
+    # dangerous_targets match, so matches? stays false for a different
+    # reason; use /etc to get there.
+    # Use a case where the allowPath is a prefix string of a dangerous
+    # target: allow /etc/foo, deny rm -rf /etc/foobar
+    p2 = policy(%{"allowPaths" => ["/etc/foo"]})
+    assert BlockRmRf.matches?(p2, ctx("rm -rf /etc/foobar"))
   end
 
   test "requires both -r and -f flags" do

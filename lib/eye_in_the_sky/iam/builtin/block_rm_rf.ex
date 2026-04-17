@@ -36,12 +36,35 @@ defmodule EyeInTheSky.IAM.Builtin.BlockRmRf do
   end
 
   defp in_allow_paths?(cmd, %Policy{condition: %{} = cond}) do
-    paths = Map.get(cond, "allowPaths") || Map.get(cond, :allowPaths) || []
+    allow = Map.get(cond, "allowPaths") || Map.get(cond, :allowPaths) || []
+    targets = extract_rm_targets(cmd)
 
-    Enum.any?(paths, fn p when is_binary(p) ->
-      String.contains?(cmd, p)
-    end)
+    targets != [] and Enum.all?(targets, &path_allowed?(&1, allow))
   end
 
   defp in_allow_paths?(_, _), do: false
+
+  # Extract non-flag arguments to `rm`. Stops at shell separators to keep
+  # scope limited to the current command.
+  defp extract_rm_targets(cmd) do
+    case Regex.run(~r/\brm\b(.*?)(?:$|;|&&|\|\|)/s, cmd, capture: :all_but_first) do
+      [args] ->
+        args
+        |> String.split(~r/\s+/, trim: true)
+        |> Enum.reject(&String.starts_with?(&1, "-"))
+        |> Enum.map(&String.trim(&1, "\""))
+        |> Enum.map(&String.trim(&1, "'"))
+
+      _ ->
+        []
+    end
+  end
+
+  # Anchor with a directory boundary so an allowPath of `/tmp/scratch`
+  # does not also allow `/tmp/scratch-evil`.
+  defp path_allowed?(target, allow) do
+    Enum.any?(allow, fn p when is_binary(p) ->
+      target == p or String.starts_with?(target, p <> "/")
+    end)
+  end
 end

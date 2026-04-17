@@ -59,9 +59,11 @@ defmodule EyeInTheSky.Application do
           EyeInTheSky.OrchestratorTimers.Server,
           # IAM policy cache (ETS-backed, single-node)
           EyeInTheSky.IAM.PolicyCache,
-          # Seed built-in IAM policies (idempotent; skips existing system_keys)
+          # Seed built-in IAM policies (idempotent; skips existing system_keys).
+          # `:transient` so a crash propagates to the supervisor rather than
+          # being silently swallowed.
           Supervisor.child_spec({Task, fn -> EyeInTheSky.IAM.Seeds.run() end},
-            id: :iam_seeds_task, restart: :temporary),
+            id: :iam_seeds_task, restart: :transient),
           # Start to serve requests, typically the last entry
           EyeInTheSkyWeb.Endpoint,
           # Signal the Tauri wrapper (if present) that the endpoint is up so it

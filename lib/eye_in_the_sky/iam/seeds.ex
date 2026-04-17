@@ -11,6 +11,8 @@ defmodule EyeInTheSky.IAM.Seeds do
   `run/0` is safe to call on every boot; existing rows are not modified.
   """
 
+  require Logger
+
   alias EyeInTheSky.IAM
 
   @editable ~w(enabled priority condition message)
@@ -106,9 +108,19 @@ defmodule EyeInTheSky.IAM.Seeds do
   @spec run() :: :ok
   def run do
     Enum.each(@policies, fn attrs ->
-      attrs
-      |> Map.put(:editable_fields, @editable)
-      |> IAM.seed_builtin()
+      attrs_with_editable = Map.put(attrs, :editable_fields, @editable)
+
+      case IAM.seed_builtin(attrs_with_editable) do
+        {:ok, _policy} ->
+          :ok
+
+        {:error, changeset} ->
+          Logger.error(
+            "IAM built-in seed failed",
+            system_key: attrs[:system_key],
+            errors: inspect(changeset.errors)
+          )
+      end
     end)
 
     :ok

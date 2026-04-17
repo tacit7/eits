@@ -57,6 +57,8 @@ defmodule EyeInTheSky.Application do
           EyeInTheSky.RateLimiter,
           # In-memory timer registry for orchestrator sessions
           EyeInTheSky.OrchestratorTimers.Server,
+          # IAM policy cache (ETS-backed, single-node)
+          EyeInTheSky.IAM.PolicyCache,
           # Start to serve requests, typically the last entry
           EyeInTheSkyWeb.Endpoint,
           # Signal the Tauri wrapper (if present) that the endpoint is up so it

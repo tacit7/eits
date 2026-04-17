@@ -97,7 +97,7 @@ defmodule EyeInTheSky.IAM do
     result
   end
 
-  # ── cache hook (stub until Phase 2) ─────────────────────────────────────────
+  # ── cache hook ──────────────────────────────────────────────────────────────
 
   defp maybe_invalidate_cache({:ok, _} = result) do
     invalidate_cache()
@@ -106,8 +106,5 @@ defmodule EyeInTheSky.IAM do
 
   defp maybe_invalidate_cache(other), do: other
 
-  # Placeholder: Phase 2 replaces this with a real ETS invalidation call.
-  # Kept here so every mutation path already goes through a single invalidation
-  # hook and wiring up the cache later does not require touching call sites.
-  defp invalidate_cache, do: :ok
+  defp invalidate_cache, do: EyeInTheSky.IAM.PolicyCache.invalidate()
 end

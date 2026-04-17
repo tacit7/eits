@@ -33,10 +33,15 @@ config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
   code_reloader: true,
   debug_errors: true,
   secret_key_base: "N/iElaaIGg/5yCN4JOKd13aAXziMbsBDWfTjQFgjjLY32KpeZ7hBDnQEx1AcpSLO",
-  watchers: [
-    vite: {PhoenixVite.Npm, :run, [:vite, ~w(dev)]},
-    tailwind: {Tailwind, :install_and_run, [:eye_in_the_sky, ~w(--watch)]}
-  ]
+  watchers:
+    (if System.get_env("SKIP_WATCHERS") in ["1", "true"] do
+       []
+     else
+       [
+         vite: {PhoenixVite.Npm, :run, [:vite, ~w(dev)]},
+         tailwind: {Tailwind, :install_and_run, [:eye_in_the_sky, ~w(--watch)]}
+       ]
+     end)
 
 # ## SSL Support
 #
@@ -80,9 +85,9 @@ config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
 # LiveSvelte SSR via Vite dev server in development
 config :live_svelte,
   ssr_module: LiveSvelte.SSR.ViteJS,
-  vite_host: "http://localhost:#{System.get_env("VITE_PORT", "5173")}"
+  vite_host: "http://127.0.0.1:#{System.get_env("VITE_PORT", "5173")}"
 
-config :eye_in_the_sky, :vite_host, "http://localhost:#{System.get_env("VITE_PORT", "5173")}"
+config :eye_in_the_sky, :vite_host, "http://127.0.0.1:#{System.get_env("VITE_PORT", "5173")}"
 
 # Enable dev routes for dashboard and mailbox
 config :eye_in_the_sky, dev_routes: true

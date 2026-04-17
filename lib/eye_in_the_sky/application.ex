@@ -9,6 +9,10 @@ defmodule EyeInTheSky.Application do
   def start(_type, _args) do
     Oban.Telemetry.attach_default_logger(:info)
 
+    # Tauri integration: if launched by the Tauri wrapper, ELIXIRKIT_PUBSUB
+    # will be set to the Rust-side PubSub URL. Otherwise run in standalone mode.
+    elixirkit_pubsub = System.get_env("ELIXIRKIT_PUBSUB")
+
     children =
       if Application.get_env(:live_svelte, :ssr_module) != LiveSvelte.SSR.ViteJS do
         [{NodeJS.Supervisor, [path: LiveSvelte.SSR.NodeJS.server_path(), pool_size: 4]}]
@@ -19,6 +23,8 @@ defmodule EyeInTheSky.Application do
     children =
       children ++
         [
+          {ElixirKit.PubSub,
+           connect: elixirkit_pubsub || :ignore, on_exit: fn -> System.stop() end},
           EyeInTheSkyWeb.Telemetry,
           EyeInTheSky.Repo,
           {Ecto.Migrator,
@@ -52,7 +58,15 @@ defmodule EyeInTheSky.Application do
           # In-memory timer registry for orchestrator sessions
           EyeInTheSky.OrchestratorTimers.Server,
           # Start to serve requests, typically the last entry
-          EyeInTheSkyWeb.Endpoint
+          EyeInTheSkyWeb.Endpoint,
+          # Signal the Tauri wrapper (if present) that the endpoint is up so it
+          # can open the webview. No-op when ELIXIRKIT_PUBSUB is unset.
+          {Task,
+           fn ->
+             if elixirkit_pubsub do
+               ElixirKit.PubSub.broadcast("messages", "ready")
+             end
+           end}
         ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

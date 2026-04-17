@@ -41,12 +41,7 @@ defmodule EyeInTheSky.IAM.BuiltinMatcher.Registry do
 
   @doc "Look up the module for a key."
   @spec fetch(String.t()) :: {:ok, module()} | :error
-  def fetch(key) when is_binary(key) do
-    case Map.fetch(@matchers, key) do
-      {:ok, module} -> {:ok, module}
-      :error -> :error
-    end
-  end
+  def fetch(key) when is_binary(key), do: Map.fetch(@matchers, key)
 
   @doc "`true` when the key is registered."
   @spec known?(String.t()) :: boolean()

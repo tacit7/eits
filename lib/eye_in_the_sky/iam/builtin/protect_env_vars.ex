@@ -23,11 +23,7 @@ defmodule EyeInTheSky.IAM.Builtin.ProtectEnvVars do
       when is_binary(cmd) do
     sensitive = sensitive_pattern(p)
 
-    cond do
-      Regex.match?(@dump_re, cmd) -> true
-      echoes_sensitive?(cmd, sensitive) -> true
-      true -> false
-    end
+    Regex.match?(@dump_re, cmd) or echoes_sensitive?(cmd, sensitive)
   end
 
   def matches?(_, _), do: false

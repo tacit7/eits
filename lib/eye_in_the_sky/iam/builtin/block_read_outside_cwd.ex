@@ -83,18 +83,18 @@ defmodule EyeInTheSky.IAM.Builtin.BlockReadOutsideCwd do
   end
 
   defp deepest_existing(path, acc) do
-    case File.exists?(path) or File.lstat(path) != {:error, :enoent} do
-      true ->
-        {path, acc}
+    if path_exists?(path) do
+      {path, acc}
+    else
+      parent = Path.dirname(path)
 
-      false ->
-        parent = Path.dirname(path)
-
-        if parent == path do
-          {path, acc}
-        else
-          deepest_existing(parent, [Path.basename(path) | acc])
-        end
+      if parent == path,
+        do: {path, acc},
+        else: deepest_existing(parent, [Path.basename(path) | acc])
     end
+  end
+
+  defp path_exists?(path) do
+    File.exists?(path) or File.lstat(path) != {:error, :enoent}
   end
 end

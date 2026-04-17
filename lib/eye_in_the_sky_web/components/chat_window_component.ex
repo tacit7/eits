@@ -108,11 +108,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
 
   def handle_event("remove_window", %{"cs-id" => cs_id}, socket) do
     if id = parse_int(cs_id) do
-      send_update(EyeInTheSkyWeb.Components.CanvasOverlayComponent,
-        id: "canvas-overlay",
-        action: :remove_window,
-        canvas_session_id: id
-      )
+      send(self(), {:remove_canvas_window, id})
     end
 
     {:noreply, socket}

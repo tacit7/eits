@@ -152,6 +152,8 @@ defmodule EyeInTheSkyWeb.Router do
       live "/dm/:session_id", DmLive, :show
       live "/notes/new", NoteLive.New, :new
       live "/notes/:id/edit", NoteLive.Edit, :edit
+      live "/canvases", CanvasLive, :index
+      live "/canvases/:id", CanvasLive, :show
     end
   end
 

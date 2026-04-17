@@ -1,7 +1,6 @@
 defmodule EyeInTheSkyWeb.AgentLive.Index do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Canvases
   alias EyeInTheSkyWeb.AgentLive.CanvasHandlers
   alias EyeInTheSkyWeb.AgentLive.IndexActions
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
@@ -37,7 +36,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
       |> assign(:selected_ids, MapSet.new())
       |> assign(:show_delete_confirm, false)
       |> assign(:editing_session_id, nil)
-      |> assign(:canvases, Canvases.list_canvases())
+      |> assign(:canvases, EyeInTheSky.Canvases.list_canvases())
       |> assign(:show_new_canvas_for, nil)
       |> IndexActions.load_agents()
       |> schedule_refresh()

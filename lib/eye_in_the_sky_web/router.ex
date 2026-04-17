@@ -237,6 +237,9 @@ defmodule EyeInTheSkyWeb.Router do
     post "/teams/:team_id/members", TeamController, :join
     patch "/teams/:team_id/members/:member_id", TeamController, :update_member
     delete "/teams/:team_id/members/:member_id", TeamController, :leave
+
+    # IAM
+    post "/iam/decide", IAMController, :decide
   end
 
   # Gitea webhooks — no Bearer auth; controller validates HMAC signature from Gitea

@@ -1,4 +1,6 @@
 use tauri::Manager;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
 const PORT: &str = "5050";
 
@@ -8,7 +10,43 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .setup(move |app| {
+            let show_item = MenuItem::with_id(app, "show", "Show EITS", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+
+            TrayIconBuilder::new()
+                .icon(app.default_window_icon().cloned().unwrap())
+                .tooltip("Eye in the Sky")
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+
             let app_handle = app.handle().clone();
 
             // Wait for Phoenix to broadcast "ready" before opening the webview.
@@ -38,18 +76,32 @@ pub fn run() {
 
             Ok(())
         })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let _ = window.hide();
+                api.prevent_close();
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
 
 fn create_window(app_handle: &tauri::AppHandle) {
     let url = format!("http://127.0.0.1:{}", PORT);
-    let url = tauri::WebviewUrl::External(url.parse().unwrap());
-    tauri::WebviewWindowBuilder::new(app_handle, "main", url)
-        .title("Eye in the Sky")
-        .inner_size(1200.0, 800.0)
-        .build()
-        .unwrap();
+    let parsed_url: tauri::Url = url.parse().unwrap();
+
+    let window = tauri::WebviewWindowBuilder::new(
+        app_handle,
+        "main",
+        tauri::WebviewUrl::External(parsed_url),
+    )
+    .title("Eye in the Sky")
+    .inner_size(1280.0, 800.0)
+    .visible(false)
+    .build()
+    .unwrap();
+
+    let _ = window.show();
 }
 
 fn elixir_command(rel_dir: &std::path::Path) -> std::process::Command {

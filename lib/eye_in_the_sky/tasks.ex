@@ -381,18 +381,21 @@ defmodule EyeInTheSky.Tasks do
   def reorder_tasks([]), do: :ok
 
   def reorder_tasks(ordered_uuids) when is_list(ordered_uuids) do
+    now = DateTime.utc_now()
+
     {placeholders, params, _} =
       ordered_uuids
       |> Enum.with_index(1)
       |> Enum.reduce({[], [], 1}, fn {uuid, pos}, {ph, p, n} ->
-        {["($#{n}::uuid, $#{n + 1}::int)" | ph], [pos, uuid | p], n + 2}
+        {["($#{n}, $#{n + 1}::int)" | ph], [pos, uuid | p], n + 2}
       end)
 
     values = placeholders |> Enum.reverse() |> Enum.join(", ")
+    n = length(params) + 1
 
     Repo.query!(
-      "UPDATE tasks SET position = v.pos, updated_at = NOW() FROM (VALUES #{values}) AS v(uuid, pos) WHERE tasks.uuid = v.uuid",
-      Enum.reverse(params)
+      "UPDATE tasks SET position = v.pos, updated_at = $#{n} FROM (VALUES #{values}) AS v(uuid, pos) WHERE tasks.uuid::text = v.uuid",
+      Enum.reverse(params) ++ [now]
     )
 
     :ok

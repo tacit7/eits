@@ -2,14 +2,23 @@ use tauri::Manager;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri_plugin_clipboard_manager::ClipboardExt;
+use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
-
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let pubsub = elixirkit::PubSub::listen("tcp://127.0.0.1:0").expect("failed to listen");
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            show_window(app);
+            for arg in argv.iter().skip(1) {
+                if arg.starts_with("eits://") {
+                    route_deep_link(app, arg);
+                }
+            }
+        }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_notification::init())
@@ -71,6 +80,19 @@ pub fn run() {
                     show_window(&app_handle_shortcut);
                 }
             })?;
+
+            // --- Deep links: eits://... URLs routed into the main webview ---
+            let app_handle_dl = app.handle().clone();
+            app.deep_link().on_open_url(move |event| {
+                for url in event.urls() {
+                    route_deep_link(&app_handle_dl, url.as_str());
+                }
+            });
+            if let Ok(Some(urls)) = app.deep_link().get_current() {
+                for url in urls {
+                    route_deep_link(app.handle(), url.as_str());
+                }
+            }
 
             // --- ElixirKit PubSub: message dispatch ---
             let app_handle = app.handle().clone();
@@ -171,6 +193,29 @@ fn create_window(app_handle: &tauri::AppHandle) {
     .unwrap();
 
     let _ = window.show();
+}
+
+/// Map an `eits://...` deep-link URL to a Phoenix route and navigate.
+fn route_deep_link(app_handle: &tauri::AppHandle, url_str: &str) {
+    let url = match url_str.parse::<tauri::Url>() {
+        Ok(u) => u,
+        Err(_) => return,
+    };
+    if url.scheme() != "eits" {
+        return;
+    }
+    let host = url.host_str().unwrap_or("");
+    let tail = url.path().trim_start_matches('/');
+    let path = match (host, tail.is_empty()) {
+        ("sessions", false) => format!("/dm/{}", tail),
+        ("dm", false) => format!("/dm/{}", tail),
+        ("sessions", true) => "/sessions".to_string(),
+        ("tasks", _) => "/tasks".to_string(),
+        ("projects", false) => format!("/projects/{}", tail),
+        ("", false) => format!("/{}", tail),
+        _ => "/".to_string(),
+    };
+    navigate_to(app_handle, &path);
 }
 
 /// Navigate the main webview to a path (e.g., "/sessions", "/tasks")

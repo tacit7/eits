@@ -26,5 +26,12 @@
     "resources": {
       "target/rel": "rel"
     }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["eits"]
+      }
+    }
   }
 }

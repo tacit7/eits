@@ -31,11 +31,19 @@ defmodule EyeInTheSky.Messages do
   end
 
   @doc """
-  Returns the list of messages for a specific session from JSONL file or database.
-  If project_id is provided, loads from JSONL file (~/.claude/projects/{projectId}/{sessionId}.jsonl).
-  Otherwise, falls back to database query.
+  Returns messages for a session.
+
+  Two storage backends are supported:
+  - JSONL: used when `project_id` is a binary string (reads from
+    `~/.claude/projects/{project_id}/{session_id}.jsonl`, falls back to DB if empty).
+  - Database: used when `project_id` is nil or any non-binary value.
   """
-  def list_messages_for_session(session_id, project_id) when is_binary(project_id) do
+  def list_messages_for_session(session_id, project_id) do
+    load_messages(session_id, project_id)
+  end
+
+  # Reads from JSONL storage; falls back to DB when the file is empty.
+  defp load_messages(session_id, project_id) when is_binary(project_id) do
     Logger.debug("Loading messages from JSONL for session: #{session_id}, project: #{project_id}")
 
     case JsonlStorage.read_session_messages(project_id, session_id) do
@@ -49,11 +57,8 @@ defmodule EyeInTheSky.Messages do
     end
   end
 
-  def list_messages_for_session(session_id, nil) do
-    list_messages_for_session_db(session_id)
-  end
+  defp load_messages(session_id, _), do: list_messages_for_session_db(session_id)
 
-  # Internal function: Returns the list of messages for a specific session from database.
   defp list_messages_for_session_db(session_id) do
     QueryHelpers.for_session_direct(Message, session_id, order_by: [asc: :inserted_at])
   end

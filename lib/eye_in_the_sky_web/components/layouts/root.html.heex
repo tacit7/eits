@@ -70,6 +70,11 @@
       // Restore vim mode from localStorage
       const savedVim = localStorage.getItem("cm_vim");
       if (savedVim !== null) document.documentElement.setAttribute("data-cm-vim", savedVim);
+      // Mark <html> as running inside the Tauri shell so CSS and templates can
+      // hide "Open in Desktop App" entry points (they're useless in-app).
+      if (/Tauri/i.test(navigator.userAgent) || window.__TAURI_INTERNALS__) {
+        document.documentElement.setAttribute("data-env", "tauri");
+      }
     </script>
   </head>
   <body class="bg-base-100 min-h-[100dvh] overflow-hidden">

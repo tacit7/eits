@@ -79,8 +79,52 @@ defmodule EyeInTheSky.IAM.Evaluator do
     agent_matches?(p, ctx) and
       action_matches?(p, ctx) and
       project_matches?(p, ctx) and
-      resource_matches?(p, ctx) and
-      ConditionEval.matches?(p.condition, ctx, p.id)
+      specialized_matches?(p, ctx)
+  end
+
+  # System policies with `builtin_matcher` bypass declarative resource_glob
+  # and ConditionEval — they own their match logic in an Elixir module.
+  defp specialized_matches?(%Policy{builtin_matcher: key} = p, %Context{} = ctx)
+       when is_binary(key) do
+    case EyeInTheSky.IAM.BuiltinMatcher.Registry.fetch(key) do
+      {:ok, module} ->
+        safe_builtin_match(module, p, ctx)
+
+      :error ->
+        :telemetry.execute(
+          [:eye_in_the_sky, :iam, :builtin_matcher, :unknown_key],
+          %{count: 1},
+          %{policy_id: p.id, key: key}
+        )
+
+        false
+    end
+  end
+
+  defp specialized_matches?(%Policy{} = p, %Context{} = ctx) do
+    resource_matches?(p, ctx) and ConditionEval.matches?(p.condition, ctx, p.id)
+  end
+
+  defp safe_builtin_match(module, %Policy{} = p, %Context{} = ctx) do
+    module.matches?(p, ctx)
+  rescue
+    e ->
+      :telemetry.execute(
+        [:eye_in_the_sky, :iam, :builtin_matcher, :error],
+        %{count: 1},
+        %{policy_id: p.id, module: module, kind: :error, reason: Exception.message(e)}
+      )
+
+      false
+  catch
+    kind, reason ->
+      :telemetry.execute(
+        [:eye_in_the_sky, :iam, :builtin_matcher, :error],
+        %{count: 1},
+        %{policy_id: p.id, module: module, kind: kind, reason: inspect(reason)}
+      )
+
+      false
   end
 
   defp agent_matches?(%Policy{agent_type: "*"}, _ctx), do: true

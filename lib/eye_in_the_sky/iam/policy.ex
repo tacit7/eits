@@ -47,7 +47,8 @@ defmodule EyeInTheSky.IAM.Policy do
           priority: integer(),
           enabled: boolean(),
           message: String.t() | nil,
-          editable_fields: [String.t()]
+          editable_fields: [String.t()],
+          builtin_matcher: String.t() | nil
         }
 
   schema "iam_policies" do
@@ -63,6 +64,7 @@ defmodule EyeInTheSky.IAM.Policy do
     field :enabled, :boolean, default: true
     field :message, :string
     field :editable_fields, {:array, :string}, default: []
+    field :builtin_matcher, :string
 
     belongs_to :project, Project
 
@@ -72,6 +74,7 @@ defmodule EyeInTheSky.IAM.Policy do
   @create_fields ~w(
     system_key name effect agent_type project_id project_path action
     resource_glob condition priority enabled message editable_fields
+    builtin_matcher
   )a
 
   @required_fields ~w(name effect)a
@@ -86,6 +89,7 @@ defmodule EyeInTheSky.IAM.Policy do
     |> validate_glob_or_wildcard(:project_path)
     |> validate_glob_or_wildcard(:resource_glob)
     |> validate_condition()
+    |> validate_builtin_matcher()
     |> foreign_key_constraint(:project_id)
     |> unique_constraint(:system_key, name: :iam_policies_system_key_unique_index)
   end
@@ -103,6 +107,7 @@ defmodule EyeInTheSky.IAM.Policy do
     |> validate_glob_or_wildcard(:project_path)
     |> validate_glob_or_wildcard(:resource_glob)
     |> validate_condition()
+    |> validate_builtin_matcher()
     |> enforce_locked_fields(policy)
     |> foreign_key_constraint(:project_id)
     |> unique_constraint(:system_key, name: :iam_policies_system_key_unique_index)
@@ -195,6 +200,26 @@ defmodule EyeInTheSky.IAM.Policy do
 
   defp time_string?(str) do
     Regex.match?(~r/\A([01]\d|2[0-3]):[0-5]\d\z/, str)
+  end
+
+  defp validate_builtin_matcher(changeset) do
+    system_key = get_field(changeset, :system_key)
+    matcher = get_field(changeset, :builtin_matcher)
+
+    cond do
+      is_nil(matcher) ->
+        changeset
+
+      is_nil(system_key) ->
+        add_error(changeset, :builtin_matcher,
+          "is restricted to system policies (system_key must be set)")
+
+      not EyeInTheSky.IAM.BuiltinMatcher.Registry.known?(matcher) ->
+        add_error(changeset, :builtin_matcher, "is not a registered builtin matcher key")
+
+      true ->
+        changeset
+    end
   end
 
   defp enforce_locked_fields(changeset, %__MODULE__{system_key: nil}), do: changeset

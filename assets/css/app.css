@@ -532,3 +532,43 @@ code.hljs { padding: 3px 5px; }
 [data-theme="light"] .dm-markdown hr { border-top: 1px solid #d0d7de; }
 [data-theme="light"] .dm-markdown th, [data-theme="light"] .dm-markdown td { border: 1px solid #d0d7de; }
 [data-theme="light"] .dm-markdown th { background: #f6f8fa; }
+
+/* Hide elements that only make sense in a browser (not inside the Tauri shell).
+   The `data-env="tauri"` flag is set by an inline script in root.html.heex. */
+html[data-env="tauri"] [data-tauri-hide] { display: none !important; }
+
+/* --- Tauri chrome polish ---
+   Paired with src-tauri/src/lib.rs `create_window`, which uses titleBarStyle
+   Overlay + hidden_title. Transparent windows + NSVisualEffectView vibrancy
+   were removed because the combo broke webview hit-testing on macOS — clicks
+   were passing through the window entirely. Everything below is gated on
+   html[data-env="tauri"] so the browser build renders unchanged. */
+
+/* Traffic lights float at roughly (x: 12-68px, y: 10-28px). Push the sidebar
+   titlebar strip right so anything inside it clears them, and give a touch
+   more vertical room so the row matches the titlebar height. */
+html[data-env="tauri"] .app-titlebar {
+  padding-left: 72px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+/* wry's drag handler matches `data-tauri-drag-region` via `closest()`, so
+   any descendant of an annotated element starts a drag on mousedown —
+   including links and buttons. We keep the attribute ONLY on the dedicated
+   spacer in the sidebar titlebar strip so clickable elements still receive
+   their clicks. The `no-drag` declarations below are a belt-and-suspenders
+   guard in case a future titlebar-child gains the attribute. */
+html[data-env="tauri"] .app-titlebar a,
+html[data-env="tauri"] .app-titlebar button,
+html[data-env="tauri"] .app-titlebar input {
+  -webkit-app-region: no-drag;
+}
+
+/* Give the drag spacer a grab cursor so the zone is discoverable. */
+html[data-env="tauri"] [data-tauri-drag-region] {
+  cursor: grab;
+}
+html[data-env="tauri"] [data-tauri-drag-region]:active {
+  cursor: grabbing;
+}

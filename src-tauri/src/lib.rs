@@ -3,7 +3,7 @@ use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
-use tauri_plugin_notification::NotificationExt;
+
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -87,11 +87,7 @@ pub fn run() {
                     let parts: Vec<&str> = payload.splitn(2, '|').collect();
                     let title = parts.first().unwrap_or(&"EITS").to_string();
                     let body = parts.get(1).unwrap_or(&"").to_string();
-                    let _ = app_handle.notification()
-                        .builder()
-                        .title(title)
-                        .body(body)
-                        .show();
+                    send_notification(&title, &body);
                 } else if msg.starts_with(b"badge:") {
                     // Format: badge:<count> (0 to clear)
                     let count_str = String::from_utf8_lossy(&msg[6..]);
@@ -200,6 +196,40 @@ async fn save_file_dialog(app_handle: &tauri::AppHandle, filename: &str, content
 
     if let Some(path) = file_path {
         let _ = std::fs::write(path.as_path().unwrap(), content);
+    }
+}
+
+/// Send a native macOS notification. In dev mode the app binary lacks a proper
+/// .app bundle so macOS Notification Center silently drops Tauri plugin
+/// notifications. Fall back to osascript which always works.
+fn send_notification(title: &str, body: &str) {
+    if cfg!(debug_assertions) {
+        let script = format!(
+            "display notification \"{}\" with title \"{}\"",
+            body.replace('\\', "\\\\").replace('"', "\\\""),
+            title.replace('\\', "\\\\").replace('"', "\\\""),
+        );
+        match std::process::Command::new("osascript")
+            .arg("-e")
+            .arg(&script)
+            .output()
+        {
+            Ok(out) if out.status.success() => {}
+            Ok(out) => eprintln!("[eits-tauri] osascript failed: {}", String::from_utf8_lossy(&out.stderr)),
+            Err(e) => eprintln!("[eits-tauri] osascript spawn failed: {}", e),
+        }
+    } else {
+        // Prod builds have a proper .app bundle; Tauri plugin works.
+        // This branch can't use app_handle — notifications go through osascript too for simplicity.
+        let script = format!(
+            "display notification \"{}\" with title \"{}\"",
+            body.replace('\\', "\\\\").replace('"', "\\\""),
+            title.replace('\\', "\\\\").replace('"', "\\\""),
+        );
+        let _ = std::process::Command::new("osascript")
+            .arg("-e")
+            .arg(&script)
+            .output();
     }
 }
 

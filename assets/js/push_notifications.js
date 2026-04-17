@@ -79,8 +79,29 @@ window.PushNotifications = { subscribe, unsubscribe, currentPermission, isSubscr
 // PushSetup hook: attach to a button to enable/disable notifications
 export const PushSetup = {
   async mounted() {
+    // Tauri shell: WKWebView lacks service workers / PushManager. Skip the
+    // Web Push path and toggle the server-side notify_on_stop flag directly —
+    // the Rust side turns it into a native macOS notification.
+    if (document.documentElement.dataset.env === "tauri") {
+      this._setTauriState(false)
+      this.el.addEventListener("click", () => {
+        const enabled = this.el.dataset.pushState !== "enabled"
+        this._setTauriState(enabled)
+        this._notifyServer(enabled)
+      })
+      return
+    }
+
     await this._sync()
     this.el.addEventListener("click", () => this._toggle())
+  },
+  _setTauriState(enabled) {
+    const on = ["text-primary", "bg-primary/10", "hover:bg-primary/15"]
+    const off = ["text-base-content/40", "hover:text-base-content/70", "hover:bg-base-content/5"]
+    this.el.classList.remove(...on, ...off)
+    this.el.classList.add(...(enabled ? on : off))
+    this.el.title = enabled ? "Desktop notifications enabled — tap to disable" : "Enable desktop notifications"
+    this.el.dataset.pushState = enabled ? "enabled" : "disabled"
   },
   async _sync() {
     const permission = await currentPermission()

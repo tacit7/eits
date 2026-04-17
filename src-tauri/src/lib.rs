@@ -158,7 +158,7 @@ fn show_window(app_handle: &tauri::AppHandle) {
 }
 
 fn create_window(app_handle: &tauri::AppHandle) {
-    let port = std::env::var("PORT").unwrap_or_else(|_| "5001".to_string());
+    let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
     let url = format!("http://127.0.0.1:{}", port);
     let parsed_url: tauri::Url = url.parse().unwrap();
 
@@ -182,7 +182,7 @@ fn navigate_to(app_handle: &tauri::AppHandle, path: &str) {
     if let Some(window) = app_handle.get_webview_window("main") {
         let _ = window.show();
         let _ = window.set_focus();
-        let port = std::env::var("PORT").unwrap_or_else(|_| "5001".to_string());
+        let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
         let url = format!("http://127.0.0.1:{}{}", port, path);
         if let Ok(parsed) = url.parse::<tauri::Url>() {
             let _ = window.navigate(parsed);
@@ -208,6 +208,7 @@ fn elixir_command(rel_dir: &std::path::Path) -> std::process::Command {
         // Dev mode: run mix phx.server from the project root (one dir up from src-tauri)
         let mut command = elixirkit::mix("phx.server", &[]);
         command.current_dir("..");
+        command.env("PORT", "5050");
         command.env("DISABLE_AUTH", "true");
         // Skip Vite/Tailwind watchers — Vite's config loader picks up main's
         // node_modules across the worktree boundary and fails. Phoenix serves
@@ -219,6 +220,7 @@ fn elixir_command(rel_dir: &std::path::Path) -> std::process::Command {
         let mut command = elixirkit::release(rel_dir, "eye_in_the_sky");
         command.env("PHX_SERVER", "true");
         command.env("PHX_HOST", "127.0.0.1");
+        command.env("PORT", "5050");
         command.env("DISABLE_AUTH", "true");
         command.env("BYPASS_AUTH", "true");
         command

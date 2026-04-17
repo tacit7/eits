@@ -118,6 +118,25 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     {:noreply, socket}
   end
 
+  def handle_info({:remove_canvas_window, cs_id}, socket) do
+    cs = Enum.find(socket.assigns.canvas_sessions, &(&1.id == cs_id))
+
+    if cs do
+      Canvases.remove_session(socket.assigns.active_canvas_id, cs.session_id)
+      unsubscribe_session(cs.session_id)
+
+      {:noreply,
+       socket
+       |> assign(:canvas_sessions, Enum.reject(socket.assigns.canvas_sessions, &(&1.id == cs_id)))
+       |> assign(
+         :subscribed_session_ids,
+         Enum.reject(socket.assigns.subscribed_session_ids, &(&1 == cs.session_id))
+       )}
+    else
+      {:noreply, socket}
+    end
+  end
+
   def handle_info(_, socket), do: {:noreply, socket}
 
   @impl true

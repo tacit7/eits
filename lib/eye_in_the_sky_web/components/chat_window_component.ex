@@ -3,9 +3,12 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
   use EyeInTheSkyWeb, :live_component
 
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+  import EyeInTheSkyWeb.Components.DmHelpers, only: [to_utc_string: 1]
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.{Messages, Sessions}
+  alias EyeInTheSkyWeb.Components.DmHelpers
+  alias EyeInTheSkyWeb.Components.DmPage.MessageToolWidget
 
   @impl true
   def update(%{canvas_session: cs} = assigns, socket) do
@@ -54,15 +57,21 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
         </button>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-2 space-y-1.5 text-xs min-h-0">
-        <%= for msg <- @messages do %>
-          <div class={if msg.sender_role == "user", do: "chat chat-end", else: "chat chat-start"}>
-            <div class={[
-              "chat-bubble text-xs py-1 px-2",
-              if(msg.sender_role == "user", do: "chat-bubble-primary", else: "bg-base-200")
-            ]}>
-              {msg.body}
-            </div>
+      <div
+        class="flex-1 overflow-y-auto px-2 py-2 min-h-0"
+        id={"chat-messages-#{@canvas_session.id}"}
+        phx-hook="AutoScroll"
+        style="scrollbar-width: none; -ms-overflow-style: none;"
+      >
+        <%= if @messages == [] do %>
+          <div class="flex items-center justify-center h-full text-xs text-base-content/30">
+            No messages yet
+          </div>
+        <% else %>
+          <div class="space-y-2">
+            <%= for message <- @messages do %>
+              <.message_item message={message} cs_id={@canvas_session.id} />
+            <% end %>
           </div>
         <% end %>
       </div>
@@ -130,6 +139,153 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
       do: EyeInTheSky.Canvases.update_window_layout(id, %{width: w, height: h})
 
     {:noreply, socket}
+  end
+
+  attr :message, :map, required: true
+  attr :cs_id, :integer, required: true
+
+  defp message_item(assigns) do
+    role = if assigns.message.sender_role == "user", do: :user, else: :agent
+    is_dm = DmHelpers.dm_message?(assigns.message)
+    assigns = assign(assigns, :role, role) |> assign(:is_dm, is_dm)
+
+    ~H"""
+    <div
+      class={[
+        "py-2 px-1.5 -mx-1.5 rounded-lg",
+        @is_dm && "border-l-2 border-primary/30 pl-2 bg-primary/[0.03]"
+      ]}
+      id={"chat-msg-#{@cs_id}-#{@message.id}"}
+    >
+      <div class="flex items-start gap-2">
+        <%= if @role == :user do %>
+          <div class="w-3.5 h-3.5 rounded-full mt-0.5 flex-shrink-0 bg-success/20 flex items-center justify-center">
+            <div class="w-1 h-1 rounded-full bg-success" />
+          </div>
+        <% else %>
+          <img
+            src={DmHelpers.provider_icon(@message.provider)}
+            class={"w-3.5 h-3.5 mt-0.5 flex-shrink-0 #{DmHelpers.provider_icon_class(@message.provider)}"}
+            alt={@message.provider || "Agent"}
+            width="14"
+            height="14"
+            loading="lazy"
+          />
+        <% end %>
+
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+            <span class={[
+              "text-[11px] font-semibold",
+              @role == :agent && "text-primary/80",
+              @role == :user && "text-base-content/70"
+            ]}>
+              {DmHelpers.message_sender_name(@message)}
+            </span>
+            <span
+              :if={@role == :agent && DmHelpers.message_model(@message)}
+              class="text-[10px] font-mono px-1 py-0 rounded bg-base-content/[0.05] text-base-content/35"
+            >
+              {DmHelpers.message_model(@message)}
+            </span>
+            <time
+              id={"msg-time-#{@message.id}"}
+              class="text-[10px] text-base-content/25"
+              data-utc={to_utc_string(@message.inserted_at)}
+              phx-hook="LocalTime"
+            />
+          </div>
+          <.chat_message_body message={@message} />
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  attr :message, :map, required: true
+
+  defp chat_message_body(assigns) do
+    body =
+      if DmHelpers.dm_message?(assigns.message),
+        do: DmHelpers.strip_dm_prefix(assigns.message.body),
+        else: assigns.message.body
+
+    segments = DmHelpers.parse_body_segments(body)
+    thinking = get_in(assigns.message.metadata || %{}, ["thinking"])
+    stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
+
+    assigns =
+      assigns
+      |> assign(:segments, segments)
+      |> assign(:thinking, thinking)
+      |> assign(:stream_type, stream_type)
+      |> assign(:body, body)
+
+    ~H"""
+    <div class="mt-0.5 space-y-1">
+      <details
+        :if={not is_nil(@thinking) && @thinking != ""}
+        class="group rounded border-l-2 border-primary/50 bg-zinc-950/50 overflow-hidden"
+      >
+        <summary class="flex items-center gap-1.5 px-2 py-1 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
+          <.icon name="hero-sparkles" class="w-3 h-3 flex-shrink-0 text-primary/60" />
+          <span class="text-[10px] font-mono font-semibold text-primary/60 uppercase tracking-wide">
+            Thinking
+          </span>
+          <.icon
+            name="hero-chevron-right"
+            class="w-2.5 h-2.5 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
+          />
+        </summary>
+        <div class="px-2 pb-1.5 pt-1 border-t border-primary/10">
+          <pre class="font-mono text-[10px] text-base-content/40 whitespace-pre-wrap break-words leading-relaxed">{@thinking}</pre>
+        </div>
+      </details>
+      <%= if @stream_type == "tool_result" do %>
+        <.chat_tool_result_body body={@body} />
+      <% else %>
+        <%= for {segment, idx} <- Enum.with_index(@segments) do %>
+          <%= case segment do %>
+            <% {:tool_call, name, rest} -> %>
+              <MessageToolWidget.tool_widget name={name} rest={rest} />
+            <% {:text, text} when text != "" -> %>
+              <div
+                id={"msg-body-#{@message.id}-#{idx}"}
+                class="dm-markdown text-xs leading-relaxed text-base-content/85"
+                phx-hook="MarkdownMessage"
+                data-raw-body={text}
+              />
+            <% _ -> %>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+    """
+  end
+
+  attr :body, :string, default: ""
+
+  defp chat_tool_result_body(assigns) do
+    ~H"""
+    <details
+      open
+      class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden"
+    >
+      <summary class="flex items-center gap-1.5 px-2 py-1 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
+        <.icon name="hero-code-bracket" class="w-3 h-3 flex-shrink-0 text-base-content/30" />
+        <span class="text-[10px] font-mono font-semibold text-base-content/40 uppercase tracking-wide flex-shrink-0">
+          Output
+        </span>
+        <.icon
+          name="hero-chevron-right"
+          class="w-2.5 h-2.5 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
+        />
+      </summary>
+      <div class="px-2 pb-1.5 pt-1 border-t border-base-content/5">
+        <pre class="font-mono text-[10px] text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto">{@body}</pre>
+      </div>
+    </details>
+    """
   end
 
   defp status_dot_class(nil), do: "bg-base-content/20"

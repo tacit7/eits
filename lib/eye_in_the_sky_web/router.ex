@@ -237,6 +237,7 @@ defmodule EyeInTheSkyWeb.Router do
     post "/teams/:team_id/members", TeamController, :join
     patch "/teams/:team_id/members/:member_id", TeamController, :update_member
     delete "/teams/:team_id/members/:member_id", TeamController, :leave
+
   end
 
   # Gitea webhooks — no Bearer auth; controller validates HMAC signature from Gitea
@@ -244,6 +245,13 @@ defmodule EyeInTheSkyWeb.Router do
     pipe_through [:accepts_json]
 
     post "/webhooks/gitea", GiteaWebhookController, :handle
+  end
+
+  # IAM hook endpoint — unauthenticated (hooks run in Claude CLI process with no user session)
+  scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
+    pipe_through [:accepts_json]
+
+    post "/iam/decide", IAMController, :decide
   end
 
   # Unauthenticated settings reads (read-only, no sensitive data)

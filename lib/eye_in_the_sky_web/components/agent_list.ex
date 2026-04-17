@@ -207,13 +207,13 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
 
   def canvas_submenu(assigns) do
     ~H"""
-    <details class="group/canvas">
-      <summary class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors cursor-pointer list-none">
+    <div class="group/canvas relative">
+      <div class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors cursor-default select-none">
         <.icon name="hero-squares-2x2-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
-        <span class="flex-1">Canvas</span>
+        <span class="flex-1">Add to Canvas</span>
         <.icon name="hero-chevron-right-mini" class="w-3 h-3 text-base-content/40" />
-      </summary>
-      <div class="mt-0.5 ml-3 flex flex-col gap-0.5">
+      </div>
+      <div class="invisible group-hover/canvas:visible absolute right-full top-0 mr-1 w-48 rounded-xl bg-base-300 dark:bg-[hsl(220,13%,18%)] shadow-xl p-1.5 flex flex-col gap-0.5 z-[60]">
         <%= for canvas <- @canvases do %>
           <button
             type="button"
@@ -249,7 +249,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
           </form>
         <% end %>
       </div>
-    </details>
+    </div>
     """
   end
 end

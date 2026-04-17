@@ -378,17 +378,22 @@ defmodule EyeInTheSky.Tasks do
   Bulk-updates position for a list of tasks within a column.
   `ordered_uuids` is a list of task UUIDs in the desired order (index = position).
   """
-  def reorder_tasks(ordered_uuids) when is_list(ordered_uuids) do
-    now = DateTime.utc_now()
+  def reorder_tasks([]), do: :ok
 
-    ordered_uuids
-    |> Enum.with_index(1)
-    |> Enum.each(fn {uuid, position} ->
-      Repo.update_all(
-        from(t in Task, where: t.uuid == ^uuid),
-        set: [position: position, updated_at: now]
-      )
-    end)
+  def reorder_tasks(ordered_uuids) when is_list(ordered_uuids) do
+    {placeholders, params, _} =
+      ordered_uuids
+      |> Enum.with_index(1)
+      |> Enum.reduce({[], [], 1}, fn {uuid, pos}, {ph, p, n} ->
+        {["($#{n}::uuid, $#{n + 1}::int)" | ph], [pos, uuid | p], n + 2}
+      end)
+
+    values = placeholders |> Enum.reverse() |> Enum.join(", ")
+
+    Repo.query!(
+      "UPDATE tasks SET position = v.pos, updated_at = NOW() FROM (VALUES #{values}) AS v(uuid, pos) WHERE tasks.uuid = v.uuid",
+      Enum.reverse(params)
+    )
 
     :ok
   end

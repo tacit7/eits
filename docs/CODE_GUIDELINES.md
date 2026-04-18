@@ -649,6 +649,60 @@ end
 - Ambient channel messages no longer trigger agent responses — only `@direct` and `@all` mentions do
 - Message numbering is per-channel and sequential (with backfill migration)
 
+### Codex.ToolMapper Extraction
+
+**ToolMapper** (`lib/eye_in_the_sky/codex/tool_mapper.ex`): Extracted from `Codex.SDK` to encapsulate tool description mapping logic. Enables reuse and isolated testing of tool description transformation.
+
+**Pattern (commit 499b70b6):**
+
+```elixir
+# Before: Tool mapping logic embedded in Codex.SDK
+defmodule Codex.SDK do
+  def start_session(context) do
+    tools = Enum.map(context.tools, fn tool ->
+      %{
+        name: tool.name,
+        description: "#{tool.description}\n\nUsage: #{tool.usage}",
+        input_schema: tool.schema
+      }
+    end)
+    # ... rest of session start
+  end
+end
+
+# After: Extract to ToolMapper
+defmodule Codex.ToolMapper do
+  def map_tool_descriptions(tools) do
+    Enum.map(tools, fn tool ->
+      %{
+        name: tool.name,
+        description: "#{tool.description}\n\nUsage: #{tool.usage}",
+        input_schema: tool.schema
+      }
+    end)
+  end
+end
+
+# Codex.SDK now delegates
+defmodule Codex.SDK do
+  def start_session(context) do
+    tools = ToolMapper.map_tool_descriptions(context.tools)
+    # ... rest of session start
+  end
+end
+```
+
+**Why this pattern:**
+- **Single Responsibility:** ToolMapper owns the tool-to-description transformation logic
+- **Testability:** Tool mapping behavior can be unit-tested independently without starting a full Codex session
+- **Reusability:** Multiple SDK implementations (stream, resumption, initialization) can reuse the same tool mapping
+- **Clarity:** The mapping strategy is explicit, not buried in SDK initialization code
+
+**When to use:** Extract domain logic (data transformation, mapping, validation) from orchestration modules (SDK, dispatcher, worker) when the logic is:
+1. Used in multiple places (DRY)
+2. Complex enough to warrant isolated tests
+3. Logically separate from orchestration concerns
+
 ---
 
 ### JobsHelpers
@@ -730,6 +784,50 @@ budget_value = ViewHelpers.parse_budget(“p95”)
 - New Session modal
 - Overview Jobs page
 - Project Jobs page
+
+### Active Models in Agent Forms
+
+Users can select from a list of configured active models when creating agents or selecting a model for DM messages.
+
+**Pattern (commit 830e2db3):**
+
+**Backend (context module):**
+```elixir
+# In Agents context
+def get_active_models do
+  config_file = Application.get_env(:eye_in_the_sky, :config_file)
+  {:ok, config} = YamlConfig.load(config_file)
+  config.active_models  # Returns list of model strings: ["opus[1m]", "sonnet"]
+end
+```
+
+**LiveView assignment:**
+```elixir
+def mount(_params, _session, socket) do
+  active_models = Agents.get_active_models()
+  {:ok, assign(socket, active_models: active_models)}
+end
+```
+
+**Template (form with model selector):**
+```heex
+<.input
+  field={@form[:model]}
+  type="select"
+  label="Model"
+  options={Enum.map(@active_models, &{ViewHelpers.model_display_name(&1), &1})}
+/>
+```
+
+**Affects:**
+- New Agent form (`agent_live/index.ex`) — model selector dropdown
+- DM page model selector (`chat_live/index.ex`) — model picker for DM composition
+- Any form that needs to constrain model selection to configured/active models
+
+**Why this pattern:**
+- Models are sourced from config, not hardcoded in the UI
+- Users see only the models their instance supports
+- Adding new models to config automatically surfaces them in the UI (no code change)
 
 ---
 
@@ -813,6 +911,44 @@ Kanban task cards use a `...` overflow menu for actions (copy, delete, move) ins
 - Menu button appears on card hover (desktop) or is always visible on mobile
 - Opening the menu stops click propagation so the card click (navigate to task) doesn't fire
 - Consistent with the session row dropdown pattern above
+
+---
+
+## Canvas Submenu UI Pattern (DaisyUI Dropdown-Hover)
+
+Submenu UI appears to the right of a parent menu item on hover, using DaisyUI's `dropdown-hover` class with `menu-dropdown` and `dropdown-content` styling.
+
+**Pattern (commits 2c68ae39, a80c2f40, d6a541e5):**
+
+```heex
+<ul class="menu menu-dropdown">
+  <li>
+    <details class="dropdown-hover">
+      <summary class="flex items-center justify-between">
+        Canvas
+        <.icon name="hero-chevron-right" class="w-4 h-4" />
+      </summary>
+      <ul class="dropdown-content menu menu-compact">
+        <li><a phx-click="navigate_canvas">Create Board</a></li>
+        <li><a phx-click="navigate_canvas_gallery">Gallery</a></li>
+        <li><a phx-click="navigate_canvas_templates">Templates</a></li>
+      </ul>
+    </details>
+  </li>
+</ul>
+```
+
+**Styling (CSS):**
+- `.dropdown-hover` — triggers on parent hover (no click needed)
+- `.dropdown-content` — positioned absolutely to the right
+- `.menu-dropdown` — applies menu styling to submenu container
+- Submenu appears to the right of parent item (not below)
+
+**Why this pattern:**
+- Seamless hover experience without JavaScript event handlers
+- DaisyUI handles positioning and z-stacking automatically
+- Keyboard accessible via `<details>` semantics
+- Mobile: Submenu is tappable (opens on first tap, closes on second)
 
 ---
 

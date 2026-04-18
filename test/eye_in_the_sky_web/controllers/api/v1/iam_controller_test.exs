@@ -25,6 +25,18 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
     )
   end
 
+  defp stop_event_payload(overrides \\ %{}) do
+    Map.merge(
+      %{
+        "hook_event_name" => "Stop",
+        "session_id" => Ecto.UUID.generate(),
+        "reason" => "user_requested",
+        "cwd" => "/tmp/test-project"
+      },
+      overrides
+    )
+  end
+
   setup do
     {:ok, conn: api_conn()}
   end
@@ -229,5 +241,123 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
       additional = get_in(body, ["hookSpecificOutput", "additionalContext"]) || ""
       refute String.contains?(additional, "[REDACTED:anthropic]")
     end
+  end
+
+  # ── Stop event ──────────────────────────────────────────────────────────────
+
+  test "returns continue: true for Stop allow (no instructions)", %{conn: conn} do
+    payload = stop_event_payload()
+    conn = post(conn, "/api/v1/iam/decide", payload)
+
+    assert conn.status == 200
+    body = json_response(conn, 200)
+    assert body["continue"] == true
+    refute Map.has_key?(body, "hookSpecificOutput")
+  end
+
+  test "returns continue: false (stopReason) for Stop deny", %{conn: conn} do
+    {:ok, project} =
+      Repo.insert(%EyeInTheSky.Projects.Project{
+        id: System.unique_integer([:positive, :monotonic]),
+        name: "iam-test-stop-#{System.unique_integer()}",
+        path: "/tmp/iam-test-stop-#{System.unique_integer()}"
+      })
+
+    {:ok, _policy} =
+      Repo.insert(%EyeInTheSky.IAM.Policy{
+        name: "deny-stop",
+        effect: "deny",
+        event: "Stop",
+        agent_type: "*",
+        action: "*",
+        project_id: project.id,
+        priority: 100,
+        enabled: true,
+        message: "Stop denied",
+        condition: %{}
+      })
+
+    EyeInTheSky.IAM.PolicyCache.invalidate()
+
+    payload =
+      stop_event_payload(%{
+        "cwd" => project.path
+      })
+
+    conn = post(conn, "/api/v1/iam/decide", payload)
+    body = json_response(conn, 200)
+
+    assert body["continue"] == false
+    assert body["stopReason"] =~ "Stop denied"
+  end
+
+  test "returns additionalContext for Stop instruct", %{conn: conn} do
+    {:ok, project} =
+      Repo.insert(%EyeInTheSky.Projects.Project{
+        id: System.unique_integer([:positive, :monotonic]),
+        name: "iam-test-instruct-#{System.unique_integer()}",
+        path: "/tmp/iam-test-instruct-#{System.unique_integer()}"
+      })
+
+    {:ok, _policy} =
+      Repo.insert(%EyeInTheSky.IAM.Policy{
+        name: "instruct-stop",
+        effect: "instruct",
+        event: "Stop",
+        agent_type: "*",
+        action: "*",
+        project_id: project.id,
+        priority: 100,
+        enabled: true,
+        message: "Session ended cleanly.",
+        condition: %{}
+      })
+
+    EyeInTheSky.IAM.PolicyCache.invalidate()
+
+    payload =
+      stop_event_payload(%{
+        "cwd" => project.path
+      })
+
+    conn = post(conn, "/api/v1/iam/decide", payload)
+    body = json_response(conn, 200)
+
+    assert body["continue"] == true
+    assert body["suppressOutput"] == true
+    assert get_in(body, ["hookSpecificOutput", "hookEventName"]) == "Stop"
+    assert String.contains?(
+      get_in(body, ["hookSpecificOutput", "additionalContext"]) || "",
+      "Session ended cleanly"
+    )
+  end
+
+  test "Stop event inserted in iam_decisions audit row", %{conn: conn} do
+    session_uuid = Ecto.UUID.generate()
+    payload = stop_event_payload(%{"session_id" => session_uuid})
+
+    before_count = Repo.one(from d in "iam_decisions", select: count(d.id))
+
+    conn = post(conn, "/api/v1/iam/decide", payload)
+    assert conn.status == 200
+
+    :timer.sleep(200)
+
+    after_count = Repo.one(from d in "iam_decisions", select: count(d.id))
+    assert after_count == before_count + 1
+
+    session_uuid_bin = Ecto.UUID.dump!(session_uuid)
+
+    row =
+      Repo.one(
+        from d in "iam_decisions",
+          where: d.session_uuid == ^session_uuid_bin,
+          order_by: [desc: d.inserted_at],
+          limit: 1,
+          select: %{event: d.event, permission: d.permission}
+      )
+
+    assert row.event == "stop"
+    assert row.permission == "allow"
   end
 end

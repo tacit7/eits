@@ -59,13 +59,14 @@ json() {
 
 cmd_sessions() {
   local sub="${1:-}"; shift || true
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|search|get|create|update|end|context|tasks|notes>"; return 0; }
   case "$sub" in
     list)
       # eits sessions list [--search <q>] [--status <s>] [--project <id>] [--limit <n>]
       local qs=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --search)  qs="${qs}&q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$2")"; shift 2 ;;
+          --search)  qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --status)  qs="${qs}&status=$2";     shift 2 ;;
           --project) qs="${qs}&project_id=$2"; shift 2 ;;
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;
@@ -77,7 +78,7 @@ cmd_sessions() {
     search)
       # eits sessions search <query>
       local query="${1:-}"; need query
-      _curl "$BASE_URL/sessions?q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$query")" | jq .
+      _curl "$BASE_URL/sessions?q=$(printf '%s' "$query" | jq -Rr @uri)" | jq .
       ;;
     tasks)
       # eits sessions tasks <uuid>
@@ -144,6 +145,7 @@ cmd_sessions() {
 
 cmd_tasks() {
   local sub="${1:-}"; shift || true
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session>"; return 0; }
   case "$sub" in
     list)
       # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--state <id>] [--limit <n>]
@@ -153,7 +155,7 @@ cmd_tasks() {
           --project) qs="${qs}&project_id=$2"; shift 2 ;;
           --session) qs="${qs}&session_id=$2"; shift 2 ;;
           --agent)   qs="${qs}&agent_id=$2";   shift 2 ;;
-          --q)       qs="${qs}&q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$2")"; shift 2 ;;
+          --q)       qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --state)   qs="${qs}&state_id=$2";   shift 2 ;;
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;
           *) die "unknown flag: $1" ;;
@@ -321,12 +323,13 @@ cmd_tasks() {
 
 cmd_notes() {
   local sub="${1:-}"; shift || true
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits notes <list|search|get|create|update>"; return 0; }
   case "$sub" in
     list)
       local qs=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --q)       qs="${qs}&q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$2")"; shift 2 ;;
+          --q)       qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --session) qs="${qs}&session_id=$2"; shift 2 ;;
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;
           *) die "unknown flag: $1" ;;
@@ -371,7 +374,7 @@ cmd_notes() {
     search)
       # eits notes search <query>
       local query="${1:-}"; need query
-      _curl "$BASE_URL/notes?q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$query")" | jq .
+      _curl "$BASE_URL/notes?q=$(printf '%s' "$query" | jq -Rr @uri)" | jq .
       ;;
     *)
       echo "usage: eits notes <list|search|get|create|update>"
@@ -416,6 +419,7 @@ cmd_projects() {
 
 cmd_agents() {
   local sub="${1:-}"; shift || true
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits agents <list|get|spawn>"; return 0; }
   case "$sub" in
     list) _get "/agents" ;;
     get)
@@ -492,6 +496,7 @@ cmd_agents() {
 
 cmd_commits() {
   local sub="${1:-}"; shift || true
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits commits <list|create>"; return 0; }
   case "$sub" in
     list)
       # eits commits list [--session <uuid>]
@@ -661,6 +666,7 @@ USAGE
 
 cmd_channels() {
   local sub="${1:-}"; shift || true
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits channels <list|send|messages>"; return 0; }
   case "$sub" in
     list)
       local project_id=""
@@ -742,6 +748,7 @@ cmd_prompts() {
 
 cmd_teams() {
   local sub="${1:-}"; shift || true
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits teams <list|get|create|delete|members|join|status|update-member|leave|broadcast|my-teams>"; return 0; }
   case "$sub" in
     list)
       local project_id="" status=""
@@ -1000,7 +1007,7 @@ Base URL: ${BASE_URL}  (override: EITS_URL=<url>)
 
 Commands:
   sessions  list|get|create|update|end|context
-  tasks     list|get|create|update|done|start|claim|delete|annotate|link-session|unlink-session
+  tasks     list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session
   notes     list|get|create|update
   projects  list|get|create
   agents    list|get
@@ -1013,6 +1020,12 @@ Commands:
   timer     show|set|cancel   (default session: self / \$EITS_SESSION_UUID)
   worktree  create|remove   (EITS Elixir projects only)
   me        Print current session/agent/project context and verify server-side
+
+Env vars (injected by EITS hooks):
+  EITS_SESSION_UUID  current session UUID (default --session / --from)
+  EITS_AGENT_UUID    current agent UUID   (default --agent)
+  EITS_PROJECT_ID    current project ID   (default --project)
+  EITS_URL           API base URL         (default: http://localhost:5001/api/v1)
 
 Requires: curl, jq
 EOF

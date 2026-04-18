@@ -37,8 +37,8 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       is_nil(to_raw) or to_raw == "" ->
         conn |> put_status(:bad_request) |> json(%{error: "to_session_id is required"})
 
-      is_nil(params["message"]) or params["message"] == "" ->
-        conn |> put_status(:bad_request) |> json(%{error: "message is required"})
+      not is_binary(params["message"]) or params["message"] == "" ->
+        conn |> put_status(:bad_request) |> json(%{error: "message must be a non-empty string"})
 
       true ->
         {limit, scale} = @dm_rate_limit
@@ -166,8 +166,8 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       is_nil(params["session_id"]) or params["session_id"] == "" ->
         conn |> put_status(:bad_request) |> json(%{error: "session_id is required"})
 
-      is_nil(params["body"]) or params["body"] == "" ->
-        conn |> put_status(:bad_request) |> json(%{error: "body is required"})
+      not is_binary(params["body"]) or params["body"] == "" ->
+        conn |> put_status(:bad_request) |> json(%{error: "body must be a non-empty string"})
 
       true ->
         case ToolHelpers.resolve_session_int_id(params["session_id"]) do

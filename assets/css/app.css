@@ -410,6 +410,30 @@ code.hljs { padding: 3px 5px; }
   color: inherit;
 }
 
+.code-copy-btn {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.25rem;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, background-color 0.15s;
+  background-color: oklch(var(--b3) / 0.8);
+  color: oklch(var(--bc) / 0.5);
+}
+
+.dm-markdown pre:hover .code-copy-btn,
+pre:hover .code-copy-btn { opacity: 1; }
+
+.code-copy-btn:hover { color: oklch(var(--bc) / 0.9); background-color: oklch(var(--b3)); }
+.code-copy-btn--copied { opacity: 1 !important; color: oklch(var(--su)); }
+
 /* Prevent theme-level code background from bleeding into pre code blocks */
 [data-theme="dark"] .dm-markdown pre code { background: none; }
 [data-theme="light"] .dm-markdown pre code { background: none; }

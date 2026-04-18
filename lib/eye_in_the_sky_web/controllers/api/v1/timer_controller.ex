@@ -20,7 +20,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TimerController do
   Returns the active timer for a session, or 404 if none.
   """
   def show(conn, %{"session_id" => session_id}) do
-    with {:ok, int_id} <- ToolHelpers.resolve_session_int_id(session_id) do
+    with {:ok, int_id} <- resolve_session(session_id) do
       case OrchestratorTimers.get_timer(int_id) do
         nil ->
           conn |> put_status(:not_found) |> json(%{error: "no active timer for this session"})
@@ -46,13 +46,19 @@ defmodule EyeInTheSkyWeb.Api.V1.TimerController do
   delay_ms takes precedence over preset if both are supplied.
   """
   def schedule(conn, %{"session_id" => session_id} = params) do
-    with {:ok, int_id} <- ToolHelpers.resolve_session_int_id(session_id),
+    with {:ok, int_id} <- resolve_session(session_id),
          {:ok, delay_ms} <- resolve_delay(params),
          {:ok, mode} <- resolve_mode(params) do
       message =
         case params["message"] do
-          m when is_binary(m) and m != "" -> String.trim(m)
-          _ -> OrchestratorTimers.default_message()
+          m when is_binary(m) ->
+            case String.trim(m) do
+              "" -> OrchestratorTimers.default_message()
+              trimmed -> trimmed
+            end
+
+          _ ->
+            OrchestratorTimers.default_message()
         end
 
       result =
@@ -88,7 +94,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TimerController do
   Cancel the active timer for a session. No-op (200) if none active.
   """
   def cancel(conn, %{"session_id" => session_id}) do
-    with {:ok, int_id} <- ToolHelpers.resolve_session_int_id(session_id) do
+    with {:ok, int_id} <- resolve_session(session_id) do
       case OrchestratorTimers.cancel(int_id) do
         {:ok, :cancelled} -> json(conn, %{success: true, message: "timer cancelled"})
         {:ok, :noop} -> json(conn, %{success: true, message: "no active timer"})
@@ -97,6 +103,15 @@ defmodule EyeInTheSkyWeb.Api.V1.TimerController do
   end
 
   # --- helpers ---
+
+  # Wraps ToolHelpers.resolve_session_int_id and maps its bare string errors to
+  # proper {:error, :not_found, msg} tuples so FallbackController returns 404.
+  defp resolve_session(session_id) do
+    case ToolHelpers.resolve_session_int_id(session_id) do
+      {:ok, int_id} -> {:ok, int_id}
+      {:error, msg} when is_binary(msg) -> {:error, :not_found, msg}
+    end
+  end
 
   defp resolve_delay(%{"delay_ms" => raw}) when is_integer(raw), do: validate_delay(raw)
 

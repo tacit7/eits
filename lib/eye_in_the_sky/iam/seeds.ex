@@ -111,6 +111,30 @@ defmodule EyeInTheSky.IAM.Seeds do
       builtin_matcher: "sanitize_api_keys",
       priority: 100,
       message: "Tool output has been scanned and secrets redacted."
+    },
+    %{
+      system_key: "builtin.workflow_business_hours_only",
+      name: "Enforce business hours workflow",
+      effect: "deny",
+      action: "*",
+      agent_type: "*",
+      event: "PreToolUse",
+      builtin_matcher: "workflow_business_hours_only",
+      priority: 50,
+      enabled: false,
+      message: "Action denied outside business hours (09:00–17:00 UTC).",
+      condition: %{"time_between" => ["09:00", "17:00"]}
+    },
+    %{
+      system_key: "builtin.workflow_stop_gate",
+      name: "Session end gate (example)",
+      effect: "instruct",
+      action: "*",
+      agent_type: "*",
+      event: "Stop",
+      priority: 50,
+      enabled: false,
+      message: "Session ended."
     }
   ]
 

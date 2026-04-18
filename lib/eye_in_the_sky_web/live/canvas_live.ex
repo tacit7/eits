@@ -139,7 +139,18 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
             socket =
               if socket.assigns.active_canvas_id == canvas_id do
-                redirect_to_first_or_stay(socket)
+                case canvases do
+                  [] ->
+                    unsubscribe_all(socket.assigns.subscribed_session_ids)
+
+                    socket
+                    |> assign(:active_canvas_id, nil)
+                    |> assign(:canvas_sessions, [])
+                    |> assign(:subscribed_session_ids, [])
+
+                  _ ->
+                    redirect_to_first_or_stay(socket)
+                end
               else
                 socket
               end

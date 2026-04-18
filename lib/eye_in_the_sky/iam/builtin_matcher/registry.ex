@@ -32,7 +32,8 @@ defmodule EyeInTheSky.IAM.BuiltinMatcher.Registry do
     "block_push_master" => Builtin.BlockPushMaster,
     "block_curl_pipe_sh" => Builtin.BlockCurlPipeSh,
     "block_work_on_main" => Builtin.BlockWorkOnMain,
-    "warn_destructive_sql" => Builtin.WarnDestructiveSql
+    "warn_destructive_sql" => Builtin.WarnDestructiveSql,
+    "sanitize_api_keys" => Builtin.SanitizeApiKeys
   }
 
   @doc "Return all known registry keys."

@@ -38,6 +38,7 @@ defmodule EyeInTheSky.IAM.Normalizer do
       resource_path: resource_path,
       resource_content: resource_content,
       raw_tool_input: tool_input,
+      tool_response: Map.get(payload, "tool_response") || Map.get(payload, :tool_response),
       session_uuid: Map.get(payload, "session_id") || Map.get(payload, :session_uuid),
       metadata: Map.get(payload, "metadata") || %{}
     })

@@ -38,6 +38,7 @@ defmodule EyeInTheSky.IAM.Context do
           resource_path: String.t() | nil,
           resource_content: String.t() | nil,
           raw_tool_input: map(),
+          tool_response: String.t() | nil,
           session_uuid: String.t() | nil,
           metadata: map()
         }
@@ -51,6 +52,7 @@ defmodule EyeInTheSky.IAM.Context do
             resource_path: nil,
             resource_content: nil,
             raw_tool_input: %{},
+            tool_response: nil,
             session_uuid: nil,
             metadata: %{}
 

@@ -92,6 +92,7 @@ defmodule EyeInTheSky.IAM.Evaluator do
           :ok | {:miss, atom()}
   def trace_policy(%Policy{} = p, %Context{} = ctx, opts \\ []) do
     cond do
+      not event_matches?(p, ctx) -> {:miss, :event}
       not agent_matches?(p, ctx) -> {:miss, :agent_type}
       not action_matches?(p, ctx) -> {:miss, :action}
       not project_matches?(p, ctx) -> {:miss, :project}
@@ -161,6 +162,14 @@ defmodule EyeInTheSky.IAM.Evaluator do
 
       :error
   end
+
+  defp event_matches?(%Policy{event: nil}, _ctx), do: true
+  defp event_matches?(%Policy{event: pe}, %Context{event: ce}), do: pe == ctx_event_name(ce)
+
+  defp ctx_event_name(:pre_tool_use), do: "PreToolUse"
+  defp ctx_event_name(:post_tool_use), do: "PostToolUse"
+  defp ctx_event_name(:stop), do: "Stop"
+  defp ctx_event_name(_), do: "PreToolUse"
 
   defp agent_matches?(%Policy{agent_type: "*"}, _ctx), do: true
   defp agent_matches?(%Policy{agent_type: at}, %Context{agent_type: at}), do: true

@@ -507,7 +507,13 @@ cmd_commits() {
         esac
       done
       [[ -n "$agent_id" ]] || die "agent_id is required (or set EITS_AGENT_UUID)"
-      [[ ${#hashes[@]} -gt 0 ]] || die "at least one --hash is required"
+      if [[ ${#hashes[@]} -eq 0 ]]; then
+        local auto_hash auto_msg
+        auto_hash=$(git rev-parse HEAD 2>/dev/null) || die "not in a git repo; use --hash"
+        auto_msg=$(git log -1 --format=%s 2>/dev/null || echo "")
+        hashes=("$auto_hash")
+        [[ -n "$auto_msg" ]] && messages=("$auto_msg")
+      fi
       local hashes_json; hashes_json=$(printf '%s\n' "${hashes[@]}" | jq -R . | jq -s .)
       local payload
       if [[ ${#messages[@]} -gt 0 ]]; then
@@ -892,6 +898,21 @@ cmd_worktree() {
   esac
 }
 
+# ── me / whoami ───────────────────────────────────────────────────────────────
+
+cmd_me() {
+  local uuid="${EITS_SESSION_UUID:-}"
+  echo "Session UUID:  ${EITS_SESSION_UUID:-(not set)}"
+  echo "Agent UUID:    ${EITS_AGENT_UUID:-(not set)}"
+  echo "Project ID:    ${EITS_PROJECT_ID:-(not set)}"
+  echo "API URL:       ${BASE_URL}"
+  if [[ -n "$uuid" ]]; then
+    echo ""
+    echo "Server-side session:"
+    _get "/sessions/$uuid" 2>/dev/null || echo "(session not found on server)"
+  fi
+}
+
 # ── help ──────────────────────────────────────────────────────────────────────
 
 usage() {
@@ -912,6 +933,7 @@ Commands:
   prompts   list|get
   teams     list|get|create|delete|members|join|status|update-member|leave|broadcast|my-teams
   worktree  create|remove   (EITS Elixir projects only)
+  me        Print current session/agent/project context and verify server-side
 
 Requires: curl, jq
 EOF
@@ -933,6 +955,7 @@ case "$cmd" in
   prompts)   cmd_prompts   "$@" ;;
   teams)     cmd_teams     "$@" ;;
   worktree)  cmd_worktree "$@" ;;
+  me|whoami) cmd_me ;;
   help|--help|-h) usage ;;
   "") usage; exit 0 ;;
   *) die "unknown command: $cmd" ;;

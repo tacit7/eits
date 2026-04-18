@@ -319,6 +319,7 @@ defmodule EyeInTheSkyWeb.DmLive do
     {:noreply,
      socket
      |> assign(:reload_timer, nil)
+     |> assign(:stream_content, "")
      |> MessageHandlers.maybe_reload_messages()}
   end
 

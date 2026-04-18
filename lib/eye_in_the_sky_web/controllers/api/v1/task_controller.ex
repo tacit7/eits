@@ -76,8 +76,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   def create(conn, params) do
     attrs = %{
       uuid: Ecto.UUID.generate(),
-      title: params["title"],
-      description: params["description"],
+      title: params["title"] && String.trim(params["title"]),
+      description: params["description"] && String.trim(params["description"]),
       priority: params["priority"],
       state_id: params["state_id"] || WorkflowState.todo_id(),
       project_id: params["project_id"],
@@ -227,9 +227,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   Body: message (required)
   """
   def complete(conn, %{"id" => id} = params) do
-    message = params["message"]
+    message = String.trim(params["message"] || "")
 
-    with false <- is_nil(message) or message == "",
+    with false <- message == "",
          {:ok, task} <- Tasks.get_task(id),
          {:ok, %{task: updated}} <- Tasks.complete_task(task, message) do
       json(conn, %{
@@ -312,7 +312,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       %{}
       |> Helpers.maybe_put(:state_id, params["state_id"])
       |> Helpers.maybe_put(:priority, params["priority"])
-      |> Helpers.maybe_put(:description, params["description"])
+      |> Helpers.maybe_put(:description, params["description"] && String.trim(params["description"]))
       |> Helpers.maybe_put(:due_at, params["due_at"])
 
     Tasks.update_task(task, attrs)

@@ -66,8 +66,8 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
     attrs = %{
       parent_type: parent_type,
       parent_id: to_string(params["parent_id"]),
-      title: params["title"],
-      body: params["body"],
+      title: params["title"] && String.trim(params["title"]),
+      body: params["body"] && String.trim(params["body"]),
       starred: params["starred"] || false
     }
 
@@ -102,8 +102,8 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
       {:ok, note} ->
         attrs =
           %{}
-          |> Helpers.maybe_put(:body, params["body"])
-          |> Helpers.maybe_put(:title, params["title"])
+          |> Helpers.maybe_put(:body, params["body"] && String.trim(params["body"]))
+          |> Helpers.maybe_put(:title, params["title"] && String.trim(params["title"]))
 
         attrs =
           case parse_starred(params["starred"]) do

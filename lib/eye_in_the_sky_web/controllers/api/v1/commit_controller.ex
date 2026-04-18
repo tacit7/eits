@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.Api.V1.CommitController do
   use EyeInTheSkyWeb, :controller
 
+  action_fallback EyeInTheSkyWeb.Api.V1.FallbackController
+
   import EyeInTheSkyWeb.ControllerHelpers
 
   alias EyeInTheSky.{Agents, Commits, Sessions}
@@ -56,13 +58,13 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
 
     cond do
       is_nil(agent_uuid) or agent_uuid == "" ->
-        conn |> put_status(:bad_request) |> json(%{error: "agent_id is required"})
+        {:error, :bad_request, "agent_id is required"}
 
       not is_list(hashes) ->
-        conn |> put_status(:bad_request) |> json(%{error: "commit_hashes must be a list"})
+        {:error, :bad_request, "commit_hashes must be a list"}
 
       hashes == [] ->
-        conn |> put_status(:bad_request) |> json(%{error: "commit_hashes is required"})
+        {:error, :bad_request, "commit_hashes is required"}
 
       true ->
         do_create_commits(conn, agent_uuid, hashes, messages)
@@ -100,10 +102,10 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
       |> json(%{commits: created, errors: errors})
     else
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Agent not found"})
+        {:error, :not_found, "Agent not found"}
 
       [] ->
-        conn |> put_status(:not_found) |> json(%{error: "No session found for agent"})
+        {:error, :not_found, "No session found for agent"}
     end
   end
 end

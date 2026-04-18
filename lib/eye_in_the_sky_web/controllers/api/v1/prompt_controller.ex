@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.Api.V1.PromptController do
   use EyeInTheSkyWeb, :controller
 
+  action_fallback EyeInTheSkyWeb.Api.V1.FallbackController
+
   import EyeInTheSkyWeb.ControllerHelpers
 
   alias EyeInTheSky.Prompts
@@ -37,7 +39,7 @@ defmodule EyeInTheSkyWeb.Api.V1.PromptController do
 
     case Prompts.get_prompt_by_ref(id, params["project_id"]) do
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Prompt not found"})
+        {:error, :not_found, "Prompt not found"}
 
       {:ok, prompt} ->
         base = %{success: true, prompt: ApiPresenter.present_prompt(prompt)}

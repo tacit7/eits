@@ -21,4 +21,16 @@ defmodule EyeInTheSkyWeb.Api.V1.FallbackController do
     |> put_status(:unprocessable_entity)
     |> json(%{error: reason})
   end
+
+  def call(conn, {:error, status, reason}) when is_atom(status) and is_binary(reason) do
+    conn
+    |> put_status(status)
+    |> json(%{error: reason})
+  end
+
+  def call(conn, {:error, status}) when is_atom(status) do
+    conn
+    |> put_status(status)
+    |> json(%{error: to_string(status)})
+  end
 end

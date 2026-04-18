@@ -93,7 +93,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       sender_name = ApiPresenter.resolve_session_sender_name(from_session)
 
       dm_body =
-        "DM from:#{sender_name} (session:#{from_session.uuid}) #{params["message"]}"
+        "DM from:#{sender_name} (session:#{from_session.uuid}) #{trim_param(params["message"])}"
 
       attrs = %{
         uuid: Ecto.UUID.generate(),
@@ -181,7 +181,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     attrs = %{
       channel_id: channel_id,
       session_id: int_id,
-      body: params["body"],
+      body: trim_param(params["body"]),
       sender_role: params["sender_role"] || "agent",
       recipient_role: params["recipient_role"] || "user",
       provider: params["provider"] || "claude",

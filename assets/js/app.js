@@ -63,6 +63,7 @@ import {FlashTimeout} from "./hooks/flash_timeout"
 import {ReloadConfirmModal} from "./hooks/reload_confirm_modal"
 import {ChatWindowHook} from "./hooks/chat_window_hook"
 import {TimerCountdown} from "./hooks/timer_countdown"
+import {SessionsDropdownGuard} from "./hooks/sessions_dropdown_guard"
 import {showToast} from "./hooks/utils"
 import {getHooks} from "live_svelte"
 import "./theme"
@@ -123,6 +124,7 @@ Hooks.FlashTimeout = FlashTimeout
 Hooks.ReloadConfirmModal = ReloadConfirmModal
 Hooks.ChatWindowHook = ChatWindowHook
 Hooks.TimerCountdown = TimerCountdown
+Hooks.SessionsDropdownGuard = SessionsDropdownGuard
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {

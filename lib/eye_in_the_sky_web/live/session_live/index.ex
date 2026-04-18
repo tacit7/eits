@@ -262,6 +262,7 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
           <div
             id="sessions-list"
             phx-update="stream"
+            phx-hook="SessionsDropdownGuard"
             class="divide-y divide-base-content/5 bg-base-100 rounded-xl px-4"
           >
             <div :for={{dom_id, session} <- @streams.sessions} id={dom_id}>

@@ -74,11 +74,16 @@ function escapeHtml(str) {
 /**
  * Render markdown with syntax highlighting.
  * Returns a Promise<string>. All deps are loaded lazily on first call.
+ * Output is sanitized with DOMPurify to prevent XSS from agent-generated content.
  */
 export async function renderMarkdown(markdown) {
   if (!markdown) return '';
-  const marked = await ensureReady();
-  return marked.parse(preprocessEitsCmds(stripFrontmatter(markdown)));
+  const [marked, { default: DOMPurify }] = await Promise.all([
+    ensureReady(),
+    import('dompurify'),
+  ]);
+  const raw = marked.parse(preprocessEitsCmds(stripFrontmatter(markdown)));
+  return DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } });
 }
 
 export default renderMarkdown;

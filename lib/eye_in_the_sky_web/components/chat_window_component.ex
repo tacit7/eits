@@ -189,13 +189,13 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
               {DmHelpers.message_model(@message)}
             </span>
             <time
-              id={"msg-time-#{@message.id}"}
+              id={"msg-time-#{@cs_id}-#{@message.id}"}
               class="text-[10px] text-base-content/25"
               data-utc={to_utc_string(@message.inserted_at)}
               phx-hook="LocalTime"
             />
           </div>
-          <.chat_message_body message={@message} />
+          <.chat_message_body message={@message} cs_id={@cs_id} />
         </div>
       </div>
     </div>
@@ -203,6 +203,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
   end
 
   attr :message, :map, required: true
+  attr :cs_id, :integer, required: true
 
   defp chat_message_body(assigns) do
     body =
@@ -250,7 +251,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
               <MessageToolWidget.tool_widget name={name} rest={rest} />
             <% {:text, text} when text != "" -> %>
               <div
-                id={"msg-body-#{@message.id}-#{idx}"}
+                id={"msg-body-#{@cs_id}-#{@message.id}-#{idx}"}
                 class="dm-markdown text-xs leading-relaxed text-base-content/85"
                 phx-hook="MarkdownMessage"
                 data-raw-body={text}

@@ -80,7 +80,7 @@ export const ChatWindowHook = {
           let x = parseInt(this.el.style.left, 10) || 0
           let y = parseInt(this.el.style.top, 10)  || 0
 
-          if (snap) {
+          if (snap && !this._minimized) {
             x = snap.left
             y = snap.top
             this.el.style.left   = `${x}px`
@@ -90,6 +90,11 @@ export const ChatWindowHook = {
             this.pushEventTo(this.el, "window_resized", {
               id: this.el.dataset.csId, w: snap.width, h: snap.height
             })
+          } else if (snap && this._minimized) {
+            x = snap.left
+            y = snap.top
+            this.el.style.left = `${x}px`
+            this.el.style.top  = `${y}px`
           }
 
           this.pushEventTo(this.el, "window_moved", {

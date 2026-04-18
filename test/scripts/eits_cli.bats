@@ -297,11 +297,26 @@ _agent_uuid() { cat "$BATS_FILE_TMPDIR/agent_uuid"; }
   [[ "$output" =~ "unknown flag" ]]
 }
 
-@test "commits create: requires at least one --hash" {
+@test "commits create: auto-captures HEAD when --hash omitted (inside git repo)" {
   export EITS_AGENT_UUID="$(_agent_uuid)"
-  run "$EITS" commits create 2>&1
+  # Run from a real git repo so git rev-parse HEAD succeeds; server may reject unknown hash
+  run bash -c "cd '$BATS_TEST_DIRNAME' && EITS_AGENT_UUID='$(_agent_uuid)' '$EITS' commits create 2>&1; true"
+  [ "$status" -eq 0 ]
+  [[ ! "$output" =~ "use --hash" ]]
+}
+
+@test "commits create: auto-capture preserves explicit --message" {
+  export EITS_AGENT_UUID="$(_agent_uuid)"
+  run bash -c "cd '$BATS_TEST_DIRNAME' && EITS_AGENT_UUID='$(_agent_uuid)' '$EITS' commits create --message 'my custom message' 2>&1; true"
+  [ "$status" -eq 0 ]
+  [[ ! "$output" =~ "use --hash" ]]
+}
+
+@test "commits create: fails outside git repo when --hash omitted" {
+  export EITS_AGENT_UUID="$(_agent_uuid)"
+  run bash -c "cd /tmp && EITS_AGENT_UUID='$(_agent_uuid)' '$EITS' commits create 2>&1"
   [ "$status" -ne 0 ]
-  [[ "$output" =~ "--hash" ]]
+  [[ "$output" =~ "git repo" ]]
 }
 
 @test "commits create: fails without agent (no env, no flag)" {
@@ -479,4 +494,24 @@ teardown_teams() {
   run env -u EITS_URL "$EITS" sessions get "$TEST_SESSION"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.session_id' >/dev/null
+}
+
+# ── me / whoami ───────────────────────────────────────────────────────────────
+
+@test "me: prints session context fields" {
+  run env EITS_SESSION_UUID="test-uuid" EITS_AGENT_UUID="agent-uuid" EITS_PROJECT_ID="1" "$EITS" me 2>&1; true
+  [[ "$output" =~ "Session UUID:" ]]
+  [[ "$output" =~ "Agent UUID:" ]]
+  [[ "$output" =~ "Project ID:" ]]
+  [[ "$output" =~ "API URL:" ]]
+}
+
+@test "whoami: is an alias for me" {
+  run env EITS_SESSION_UUID="test-uuid" "$EITS" whoami 2>&1; true
+  [[ "$output" =~ "Session UUID:" ]]
+}
+
+@test "me: shows (not set) when env vars missing" {
+  run env -u EITS_SESSION_UUID -u EITS_AGENT_UUID -u EITS_PROJECT_ID "$EITS" me 2>&1; true
+  [[ "$output" =~ "(not set)" ]]
 }

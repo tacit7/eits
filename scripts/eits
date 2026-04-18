@@ -508,11 +508,14 @@ cmd_commits() {
       done
       [[ -n "$agent_id" ]] || die "agent_id is required (or set EITS_AGENT_UUID)"
       if [[ ${#hashes[@]} -eq 0 ]]; then
-        local auto_hash auto_msg
+        local auto_hash
         auto_hash=$(git rev-parse HEAD 2>/dev/null) || die "not in a git repo; use --hash"
-        auto_msg=$(git log -1 --format=%s 2>/dev/null || echo "")
         hashes=("$auto_hash")
-        [[ -n "$auto_msg" ]] && messages=("$auto_msg")
+        if [[ ${#messages[@]} -eq 0 ]]; then
+          local auto_msg
+          auto_msg=$(git log -1 --format=%s 2>/dev/null || echo "")
+          [[ -n "$auto_msg" ]] && messages=("$auto_msg")
+        fi
       fi
       local hashes_json; hashes_json=$(printf '%s\n' "${hashes[@]}" | jq -R . | jq -s .)
       local payload

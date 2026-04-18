@@ -149,7 +149,6 @@ export const ChatWindowHook = {
         this._minimized = !this._minimized
         const body = this.el.querySelector("[data-chat-body]")
         const footer = this.el.querySelector("[data-chat-footer]")
-        const handle = this.el.querySelector("[data-drag-handle]")
         if (this._minimized) {
           this.el.dataset.savedHeight = this.el.offsetHeight + "px"
           this.el.dataset.windowMinimized = "true"
@@ -164,9 +163,54 @@ export const ChatWindowHook = {
             this.el.style.height = this.el.dataset.savedHeight
           }
           if (this._resizeObserver) this._resizeObserver.observe(this.el)
+          const unreadDot = this.el.querySelector("[data-unread-dot]")
+          if (unreadDot) unreadDot.remove()
         }
       })
     }
+
+    const maximizeBtn = this.el.querySelector("[data-maximize-btn]")
+    if (maximizeBtn) {
+      this._maximized = false
+      maximizeBtn.addEventListener("click", (e) => {
+        e.stopPropagation()
+        this._maximized = !this._maximized
+        const canvas = this.el.closest("[data-canvas-area]")
+        if (this._maximized && canvas) {
+          this.el.dataset.savedLeft = this.el.style.left
+          this.el.dataset.savedTop = this.el.style.top
+          this.el.dataset.savedWidth = this.el.style.width
+          this.el.dataset.savedMaxHeight = this.el.style.height
+          this.el.style.left = "0px"
+          this.el.style.top = "0px"
+          this.el.style.width = canvas.offsetWidth + "px"
+          this.el.style.height = canvas.offsetHeight + "px"
+          this.el.style.resize = "none"
+          this.el.style.zIndex = "20"
+        } else {
+          this.el.style.left = this.el.dataset.savedLeft || "0px"
+          this.el.style.top = this.el.dataset.savedTop || "0px"
+          this.el.style.width = this.el.dataset.savedWidth || ""
+          this.el.style.height = this.el.dataset.savedMaxHeight || ""
+          this.el.style.resize = "both"
+          this.el.style.zIndex = "1"
+        }
+      })
+    }
+
+    this.handleEvent("messages-updated-" + this.el.dataset.csId, () => {
+      if (this._minimized) {
+        const handle = this.el.querySelector("[data-drag-handle]")
+        if (handle && !handle.querySelector("[data-unread-dot]")) {
+          const dot = document.createElement("span")
+          dot.dataset.unreadDot = ""
+          dot.className = "w-2 h-2 rounded-full bg-error animate-pulse flex-shrink-0 ml-1"
+          const nameSpan = handle.querySelector("span.truncate") || handle.querySelector("span")
+          if (nameSpan) nameSpan.after(dot)
+          else handle.appendChild(dot)
+        }
+      }
+    })
 
   },
 

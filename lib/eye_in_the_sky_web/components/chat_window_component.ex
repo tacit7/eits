@@ -24,7 +24,8 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
      socket
      |> assign(assigns)
      |> assign(:session, session)
-     |> assign(:messages, messages)}
+     |> assign(:messages, messages)
+     |> push_event("messages-updated-" <> to_string(cs.id), %{})}
   end
 
   @impl true
@@ -52,6 +53,11 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
             data-minimize-btn
             class="w-3 h-3 rounded-full bg-warning/70 hover:bg-warning transition-colors shrink-0"
             title="Minimize"
+          />
+          <button
+            data-maximize-btn
+            class="w-3 h-3 rounded-full bg-success/70 hover:bg-success transition-colors shrink-0"
+            title="Maximize"
           />
           <button
             class="w-3 h-3 rounded-full bg-error/70 hover:bg-error transition-colors shrink-0"

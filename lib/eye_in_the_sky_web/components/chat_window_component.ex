@@ -297,7 +297,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
   end
 
   defp status_dot_class(nil), do: "bg-base-content/20"
-  defp status_dot_class(%{status: "working"}), do: "bg-success"
+  defp status_dot_class(%{status: "working"}), do: "bg-success animate-pulse"
   defp status_dot_class(%{status: "waiting"}), do: "bg-warning"
   defp status_dot_class(_), do: "bg-base-content/30"
 

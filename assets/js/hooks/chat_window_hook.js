@@ -80,7 +80,7 @@ export const ChatWindowHook = {
           let x = parseInt(this.el.style.left, 10) || 0
           let y = parseInt(this.el.style.top, 10)  || 0
 
-          if (snap) {
+          if (snap && !this._minimized) {
             x = snap.left
             y = snap.top
             this.el.style.left   = `${x}px`
@@ -90,6 +90,11 @@ export const ChatWindowHook = {
             this.pushEventTo(this.el, "window_resized", {
               id: this.el.dataset.csId, w: snap.width, h: snap.height
             })
+          } else if (snap && this._minimized) {
+            x = snap.left
+            y = snap.top
+            this.el.style.left = `${x}px`
+            this.el.style.top  = `${y}px`
           }
 
           this.pushEventTo(this.el, "window_moved", {
@@ -131,6 +136,55 @@ export const ChatWindowHook = {
     observer.observe(this.el)
     this._resizeObserver = observer
 
+    const minimizeBtn = this.el.querySelector("[data-minimize-btn]")
+    if (minimizeBtn) {
+      this._minimized = this.el.dataset.windowMinimized === "true"
+      if (this._minimized) this._applyMinimized()
+      minimizeBtn.addEventListener("mousedown", (e) => {
+        e.stopPropagation()
+        e.preventDefault()
+      })
+      minimizeBtn.addEventListener("click", (e) => {
+        e.stopPropagation()
+        this._minimized = !this._minimized
+        const body = this.el.querySelector("[data-chat-body]")
+        const footer = this.el.querySelector("[data-chat-footer]")
+        const handle = this.el.querySelector("[data-drag-handle]")
+        if (this._minimized) {
+          this.el.dataset.savedHeight = this.el.offsetHeight + "px"
+          this.el.dataset.windowMinimized = "true"
+          this._applyMinimized()
+        } else {
+          delete this.el.dataset.windowMinimized
+          if (body) body.style.display = ""
+          if (footer) footer.style.display = ""
+          this.el.style.resize = "both"
+          this.el.style.overflow = "auto"
+          if (this.el.dataset.savedHeight) {
+            this.el.style.height = this.el.dataset.savedHeight
+          }
+          if (this._resizeObserver) this._resizeObserver.observe(this.el)
+        }
+      })
+    }
+
+  },
+
+  _applyMinimized() {
+    const body = this.el.querySelector("[data-chat-body]")
+    const footer = this.el.querySelector("[data-chat-footer]")
+    const handle = this.el.querySelector("[data-drag-handle]")
+    if (body) body.style.display = "none"
+    if (footer) footer.style.display = "none"
+    this.el.style.resize = "none"
+    this.el.style.overflow = "hidden"
+    const headerH = handle ? handle.offsetHeight : 40
+    if (this._resizeObserver) this._resizeObserver.disconnect()
+    this.el.style.height = headerH + "px"
+  },
+
+  updated() {
+    if (this._minimized) this._applyMinimized()
   },
 
   destroyed() {

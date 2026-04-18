@@ -47,17 +47,25 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
           </span>
           <span class="text-xs font-medium truncate">{session_label(@session)}</span>
         </div>
-        <button
-          class="w-3 h-3 rounded-full bg-error/70 hover:bg-error transition-colors shrink-0"
-          phx-click="remove_window"
-          phx-value-cs-id={@canvas_session.id}
-          phx-target={@myself}
-          title="Remove from canvas"
-        >
-        </button>
+        <div class="flex items-center gap-1.5">
+          <button
+            data-minimize-btn
+            class="w-3 h-3 rounded-full bg-warning/70 hover:bg-warning transition-colors shrink-0"
+            title="Minimize"
+          />
+          <button
+            class="w-3 h-3 rounded-full bg-error/70 hover:bg-error transition-colors shrink-0"
+            phx-click="remove_window"
+            phx-value-cs-id={@canvas_session.id}
+            phx-target={@myself}
+            title="Remove from canvas"
+          >
+          </button>
+        </div>
       </div>
 
       <div
+        data-chat-body
         class="flex-1 overflow-y-auto px-2 py-2 min-h-0"
         id={"chat-messages-#{@canvas_session.id}"}
         phx-hook="AutoScroll"
@@ -76,7 +84,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
         <% end %>
       </div>
 
-      <div class="shrink-0 border-t border-base-300">
+      <div data-chat-footer class="shrink-0 border-t border-base-300">
         <.form for={%{}} phx-submit="send_message" phx-target={@myself} class="flex gap-1 p-1.5">
           <input
             type="text"

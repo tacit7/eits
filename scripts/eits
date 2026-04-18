@@ -19,7 +19,17 @@ command -v jq   &>/dev/null || { echo "error: jq is required" >&2; exit 1; }
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
-_curl() { curl -sfk ${AUTH_HEADER:+-H "$AUTH_HEADER"} "$@"; }
+_curl() {
+  local _body _status
+  _body=$(curl -sk --write-out '\n%{http_code}' ${AUTH_HEADER:+-H "$AUTH_HEADER"} "$@")
+  _status="${_body##*$'\n'}"
+  _body="${_body%$'\n'*}"
+  if [[ "$_status" -ge 400 ]]; then
+    printf '%s\n' "$_body" >&2
+    return 1
+  fi
+  printf '%s\n' "$_body"
+}
 
 _get()    { _curl "$BASE_URL$1" | jq .; }
 _post()   { _curl -X POST  -H "Content-Type: application/json" -d "$2" "$BASE_URL$1" | jq .; }
@@ -185,23 +195,23 @@ cmd_tasks() {
     update)
       # eits tasks update <id> [--state <id>] [--state-name <done|start>] [--priority <p>] [--description <d>]
       local id="${1:-}"; need id; shift
-      local body=""
+      local updates="{}"
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --state)
             if [[ "$2" =~ ^[0-9]+$ ]]; then
-              body="$(json state_id "$2")"
+              updates=$(echo "$updates" | jq --argjson v "$2" '. + {state_id: $v}')
             else
-              body="$(json state "$2")"
+              updates=$(echo "$updates" | jq --arg v "$2" '. + {state: $v}')
             fi
             shift 2 ;;
-          --state-name)  body="$(json state "$2")";       shift 2 ;;  # kept for back-compat
-          --priority)    body="$(json priority "$2")";    shift 2 ;;
-          --description) body="$(json description "$2")"; shift 2 ;;
+          --state-name)  updates=$(echo "$updates" | jq --arg v "$2" '. + {state: $v}');       shift 2 ;;
+          --priority)    updates=$(echo "$updates" | jq --arg v "$2" '. + {priority: $v}');    shift 2 ;;
+          --description) updates=$(echo "$updates" | jq --arg v "$2" '. + {description: $v}'); shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      _patch "/tasks/$id" "${body:-{\}}"
+      _patch "/tasks/$id" "${updates}"
       ;;
     done)
       local id="${1:-}"; need id
@@ -347,16 +357,16 @@ cmd_notes() {
     update)
       # eits notes update <id> [--body <text>] [--title <t>] [--starred]
       local id="${1:-}"; need id; shift
-      local body=""
+      local updates="{}"
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --body)    body="$(json body "$2")";   shift 2 ;;
-          --title)   body="$(json title "$2")";  shift 2 ;;
-          --starred) body='{"starred":1}';       shift ;;
+          --body)    updates=$(echo "$updates" | jq --arg v "$2" '. + {body: $v}');    shift 2 ;;
+          --title)   updates=$(echo "$updates" | jq --arg v "$2" '. + {title: $v}');   shift 2 ;;
+          --starred) updates=$(echo "$updates" | jq '. + {starred: 1}');                   shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      _patch "/notes/$id" "${body:-{\}}"
+      _patch "/notes/$id" "${updates}"
       ;;
     search)
       # eits notes search <query>

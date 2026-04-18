@@ -31,7 +31,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
       fun.(repo, project_path)
     else
       {:error, :unauthorized} ->
-        {:error, :unauthorized}
+        {:error, :unauthorized, "Invalid signature"}
 
       {:error, :missing_repo} ->
         {:error, :bad_request, "Missing repository.full_name in payload"}
@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
       fun.(repo)
     else
       {:error, :unauthorized} ->
-        {:error, :unauthorized}
+        {:error, :unauthorized, "Invalid signature"}
 
       {:error, :missing_repo} ->
         {:error, :bad_request, "Missing repository.full_name in payload"}
@@ -102,7 +102,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
         json(conn, %{success: true, message: "Ignored"})
 
       {:error, :unauthorized} ->
-        {:error, :unauthorized}
+        {:error, :unauthorized, "Invalid signature"}
     end
   end
 

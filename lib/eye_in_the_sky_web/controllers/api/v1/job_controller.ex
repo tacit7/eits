@@ -92,7 +92,7 @@ defmodule EyeInTheSkyWeb.Api.V1.JobController do
             json(conn, %{success: true})
 
           {:error, :system_job} ->
-            {:error, :forbidden}
+            {:error, :forbidden, "Cannot delete system jobs"}
         end
 
       {:error, :not_found} ->

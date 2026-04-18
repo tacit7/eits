@@ -28,6 +28,8 @@ defmodule EyeInTheSky.Utils.ToolHelpers do
     end
   end
 
+  def resolve_session_int_id(_), do: {:error, "session_id must be a string or integer"}
+
   @doc "Parse a string or integer to an integer. Returns nil for invalid or nil input."
   def parse_int(nil), do: nil
   def parse_int(val) when is_integer(val), do: val

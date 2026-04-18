@@ -15,6 +15,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   import Phoenix.LiveView, only: [push_navigate: 2, put_flash: 3, stream_insert: 3]
 
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Canvases
   alias EyeInTheSky.Sessions
   alias EyeInTheSkyWeb.ControllerHelpers
   import EyeInTheSkyWeb.Helpers.AgentCreationHelpers, only: [build_opts: 2]
@@ -195,4 +196,54 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   end
 
   def noop(_params, socket), do: {:noreply, socket}
+
+  # ---------------------------------------------------------------------------
+  # Canvas actions
+  # ---------------------------------------------------------------------------
+
+  def show_new_canvas_form(%{"agent-id" => id}, socket) do
+    {:noreply, assign(socket, :show_new_canvas_for, id)}
+  end
+
+  def add_to_canvas(%{"canvas-id" => cid, "session-id" => sid}, socket) do
+    with canvas_id when not is_nil(canvas_id) <- ControllerHelpers.parse_int(cid),
+         session_id when not is_nil(session_id) <- ControllerHelpers.parse_int(sid),
+         {:ok, canvas} <- Canvases.get_canvas(canvas_id) do
+      Canvases.add_session(canvas_id, session_id)
+
+      {:noreply,
+       socket
+       |> put_flash(:info, "Added to #{canvas.name}")
+       |> push_navigate(to: "/canvases/#{canvas_id}")}
+    else
+      nil -> {:noreply, put_flash(socket, :error, "Invalid canvas or session ID")}
+      {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Canvas not found")}
+    end
+  end
+
+  def add_to_new_canvas(%{"session_id" => sid, "canvas_name" => name}, socket) do
+    case ControllerHelpers.parse_int(sid) do
+      nil ->
+        {:noreply, socket}
+
+      session_id ->
+        canvas_name =
+          if not is_nil(name) && String.trim(name) != "",
+            do: String.trim(name),
+            else: "Canvas #{:os.system_time(:second)}"
+
+        case Canvases.create_canvas(%{name: canvas_name}) do
+          {:ok, canvas} ->
+            Canvases.add_session(canvas.id, session_id)
+
+            {:noreply,
+             socket
+             |> put_flash(:info, "Added to #{canvas.name}")
+             |> push_navigate(to: "/canvases/#{canvas.id}")}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Failed to create canvas")}
+        end
+    end
+  end
 end

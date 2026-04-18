@@ -1,6 +1,9 @@
 const SNAP_THRESHOLD = 80
 
 function getSnapZone(cursorX, cursorY, canvasW, canvasH) {
+  canvasW = Math.round(canvasW)
+  canvasH = Math.round(canvasH)
+
   const nearLeft   = cursorX < SNAP_THRESHOLD
   const nearRight  = cursorX > canvasW - SNAP_THRESHOLD
   const nearTop    = cursorY < SNAP_THRESHOLD

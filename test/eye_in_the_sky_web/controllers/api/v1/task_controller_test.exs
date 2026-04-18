@@ -110,7 +110,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
       conn = post(conn, ~p"/api/v1/tasks", %{"description" => "no title"})
       resp = json_response(conn, 422)
 
-      assert resp["error"] == "Failed to create task"
+      assert resp["error"] == "Validation failed"
     end
 
     test "links session on create", %{conn: conn} do

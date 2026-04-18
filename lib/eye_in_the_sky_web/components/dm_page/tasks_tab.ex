@@ -130,7 +130,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
                             {note.title}
                           </div>
                         <% end %>
-                        <pre class="whitespace-pre-wrap text-xs text-base-content/55 font-mono leading-relaxed">{note.body}</pre>
+                        <pre class="whitespace-pre-wrap text-xs text-base-content/55 font-mono leading-relaxed">{String.trim(note.body || "")}</pre>
                       </div>
                     <% end %>
                   </div>

@@ -184,7 +184,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                             {note.title}
                           </div>
                         <% end %>
-                        <pre class="whitespace-pre-wrap text-xs text-base-content/60 font-mono leading-relaxed">{note.body}</pre>
+                        <pre class="whitespace-pre-wrap text-xs text-base-content/60 font-mono leading-relaxed">{String.trim(note.body || "")}</pre>
                         <div class="mt-1.5 text-[11px] text-base-content/25">
                           {relative_time(note.created_at)}
                         </div>

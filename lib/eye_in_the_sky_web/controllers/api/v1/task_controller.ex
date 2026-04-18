@@ -207,7 +207,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     case Notes.create_note(%{
            parent_id: task_id,
            parent_type: "task",
-           body: params["body"] || "",
+           body: String.trim(params["body"] || ""),
            title: params["title"]
          }) do
       {:ok, note} ->

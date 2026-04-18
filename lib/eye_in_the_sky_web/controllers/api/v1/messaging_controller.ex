@@ -86,8 +86,12 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       else: Sessions.get_session_by_uuid(raw)
   end
 
+  @terminated_statuses ~w(completed failed)
+
   defp do_dm(conn, params, from_raw, to_raw) do
     with {:from, {:ok, from_session}} <- {:from, resolve_from_session(from_raw)},
+         {:from_active, false} <-
+           {:from_active, from_session.status in @terminated_statuses},
          {:to, {:ok, to_session}} <- {:to, resolve_to_session(to_raw)} do
       response_required = params["response_required"] in [true, "true", "1", 1]
       sender_name = ApiPresenter.resolve_session_sender_name(from_session)
@@ -125,6 +129,9 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     else
       {:from, {:error, :not_found}} ->
         {:error, :not_found, "Sender session not found"}
+
+      {:from_active, true} ->
+        {:error, :unprocessable_entity, "Sender session is terminated and cannot send DMs"}
 
       {:to, {:error, :not_found}} ->
         {:error, :not_found, "Target session not found"}

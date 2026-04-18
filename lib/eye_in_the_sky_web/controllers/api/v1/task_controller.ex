@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Agents, Notes, Sessions, Tasks}
+  alias EyeInTheSky.{Agents, Notes, Tasks}
   alias EyeInTheSky.Tasks.WorkflowState
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
@@ -287,7 +287,11 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
         conn |> put_status(:bad_request) |> json(%{error: "Invalid task ID"})
 
       {:ok, task} ->
-        int_id = resolve_session_int_id(session_uuid)
+        int_id =
+          case Helpers.resolve_session_int_id(session_uuid) do
+            {:ok, id} -> id
+            _ -> nil
+          end
 
         if int_id do
           Tasks.unlink_session_from_task(task.id, int_id)
@@ -321,7 +325,11 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   defp maybe_link_session(_task_id, nil), do: :ok
 
   defp maybe_link_session(task_id, session_id) when is_binary(session_id) do
-    int_id = resolve_session_int_id(session_id)
+    int_id =
+      case Helpers.resolve_session_int_id(session_id) do
+        {:ok, id} -> id
+        _ -> nil
+      end
 
     case parse_task_id(task_id) do
       nil ->
@@ -337,10 +345,6 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   end
 
   defp resolve_agent_int_id(uuid), do: resolve_id(uuid, &Agents.get_agent_by_uuid/1)
-
-  defp resolve_session_int_id(raw) do
-    resolve_id(raw, &Sessions.get_session_by_uuid/1)
-  end
 
   defp parse_task_id(id) when is_binary(id), do: Helpers.parse_int(id) || id
   defp parse_task_id(id), do: id

@@ -163,8 +163,8 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   """
   def send_channel_message(conn, %{"channel_id" => channel_id} = params) do
     cond do
-      is_nil(params["session_id"]) or params["session_id"] == "" ->
-        conn |> put_status(:bad_request) |> json(%{error: "session_id is required"})
+      not valid_session_param?(params["session_id"]) ->
+        conn |> put_status(:bad_request) |> json(%{error: "session_id must be a non-empty string or integer"})
 
       not is_binary(params["body"]) or params["body"] == "" ->
         conn |> put_status(:bad_request) |> json(%{error: "body must be a non-empty string"})

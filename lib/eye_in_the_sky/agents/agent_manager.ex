@@ -7,9 +7,11 @@ defmodule EyeInTheSky.Agents.AgentManager do
 
   require Logger
 
-  alias EyeInTheSky.{Agents, Projects, Teams}
+  alias EyeInTheSky.{Agents, Projects}
   alias EyeInTheSky.Agents.AgentManager.RecordBuilder
   alias EyeInTheSky.Agents.AgentManager.SessionBridge
+  alias EyeInTheSky.Agents.AgentManager.SpawnParams
+  alias EyeInTheSky.Agents.AgentManager.SpawnTeamContext
   alias EyeInTheSky.Claude.AgentWorker
 
   @doc """
@@ -103,14 +105,14 @@ defmodule EyeInTheSky.Agents.AgentManager do
   """
   def spawn_agent(params) do
     with {:ok, project_id, project_name} <- Projects.resolve_project(params),
-         {:ok, team} <- resolve_spawn_team(params["team_name"]) do
+         {:ok, team} <- SpawnTeamContext.resolve_team(params["team_name"]) do
       params = Map.merge(params, %{"project_id" => project_id, "project_name" => project_name})
-      instructions = apply_team_context(params["instructions"], team, params["member_name"])
-      opts = build_spawn_opts(%{params | "instructions" => instructions}, team)
+      instructions = SpawnTeamContext.apply_context(params["instructions"], team, params["member_name"])
+      opts = SpawnParams.build(%{params | "instructions" => instructions}, team)
 
       case create_agent(opts) do
         {:ok, %{agent: agent, session: session}} ->
-          case maybe_join_team(team, agent, session, params["member_name"]) do
+          case SpawnTeamContext.maybe_join(team, agent, session, params["member_name"]) do
             :ok ->
               {:ok,
                %{agent: agent, session: session, team: team, member_name: params["member_name"]}}
@@ -126,98 +128,6 @@ defmodule EyeInTheSky.Agents.AgentManager do
         error ->
           error
       end
-    end
-  end
-
-  defp resolve_spawn_team(nil), do: {:ok, nil}
-  defp resolve_spawn_team(""), do: {:ok, nil}
-
-  defp resolve_spawn_team(name) do
-    case Teams.get_team_by_name(name) do
-      {:error, :not_found} -> {:error, "team_not_found", "team not found: #{name}"}
-      {:ok, team} -> {:ok, team}
-    end
-  end
-
-  defp apply_team_context(instructions, nil, _member_name), do: instructions
-
-  defp apply_team_context(instructions, team, member_name) do
-    instructions <> "\n\n" <> build_team_context(team, member_name)
-  end
-
-  defp build_team_context(team, member_name) do
-    EyeInTheSky.Agents.InstructionTemplates.team_context(team, member_name)
-  end
-
-  # Name resolution priority:
-  # 1. Explicit "name" param (trimmed, non-empty)
-  # 2. "member_name @ team_name" when both present
-  # 3. "member_name" alone
-  # 4. First 250 chars of instructions (or "Agent session" fallback)
-  defp resolve_session_name(%{"name" => name} = params, team)
-       when is_binary(name) and name != "" do
-    case String.trim(name) do
-      "" -> resolve_session_name(Map.delete(params, "name"), team)
-      trimmed -> trimmed
-    end
-  end
-
-  defp resolve_session_name(params, %{name: team_name})
-       when is_binary(team_name) do
-    member = params["member_name"]
-
-    if member,
-      do: "#{member} @ #{team_name}",
-      else: String.slice(params["instructions"] || "Agent session", 0, 250)
-  end
-
-  defp resolve_session_name(%{"member_name" => member}, _team) when is_binary(member),
-    do: member
-
-  defp resolve_session_name(params, _team),
-    do: String.slice(params["instructions"] || "Agent session", 0, 250)
-
-  defp build_spawn_opts(params, team) do
-    name = resolve_session_name(params, team)
-
-    [
-      instructions: params["instructions"],
-      model: params["model"],
-      agent_type: params["provider"] || "claude",
-      project_id: params["project_id"],
-      project_name: params["project_name"],
-      project_path: params["project_path"],
-      name: name,
-      description: name,
-      worktree: params["worktree"],
-      effort_level: params["effort_level"],
-      parent_agent_id: params["parent_agent_id"],
-      parent_session_id: params["parent_session_id"],
-      agent: params["agent"],
-      bypass_sandbox: params["bypass_sandbox"] == true
-    ]
-  end
-
-  defp maybe_join_team(nil, _agent, _session, _name), do: :ok
-
-  defp maybe_join_team(team, agent, session, member_name) do
-    case Teams.join_team(%{
-           team_id: team.id,
-           agent_id: agent.id,
-           session_id: session.id,
-           name: member_name || agent.uuid,
-           role: member_name || "agent",
-           status: "active"
-         }) do
-      {:ok, member} ->
-        {:ok, member}
-
-      {:error, reason} ->
-        Logger.warning(
-          "Team join failed: agent_id=#{agent.id} session_id=#{session.id} team_id=#{team.id} member_name=#{inspect(member_name)} reason=#{inspect(reason)}"
-        )
-
-        {:error, {:team_join_failed, reason}}
     end
   end
 

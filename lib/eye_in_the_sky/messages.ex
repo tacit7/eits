@@ -152,11 +152,7 @@ defmodule EyeInTheSky.Messages do
   """
   @spec create_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def create_message(attrs \\ %{}) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
-
-    attrs =
-      %{inserted_at: now, updated_at: now}
-      |> Map.merge(attrs)
+    attrs = with_timestamps(attrs)
 
     %Message{}
     |> Message.changeset(attrs)
@@ -169,11 +165,7 @@ defmodule EyeInTheSky.Messages do
   """
   @spec create_channel_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def create_channel_message(attrs \\ %{}) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
-
-    attrs =
-      %{inserted_at: now, updated_at: now}
-      |> Map.merge(attrs)
+    attrs = with_timestamps(attrs)
 
     cid = Map.get(attrs, :channel_id)
     has_number = Map.get(attrs, :channel_message_number)
@@ -384,6 +376,11 @@ defmodule EyeInTheSky.Messages do
       nil -> :not_found
       message -> {:ok, message}
     end
+  end
+
+  defp with_timestamps(attrs) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    %{inserted_at: now, updated_at: now} |> Map.merge(attrs)
   end
 
   defp broadcast_and_return({:ok, message}) do

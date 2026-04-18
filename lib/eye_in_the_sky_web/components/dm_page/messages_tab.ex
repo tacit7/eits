@@ -133,7 +133,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     <div
       class={[
         "px-2 -mx-2 rounded-lg",
-        @is_tool_result && "py-0 -mt-2",
+        @is_tool_result && "py-0 -mt-3",
         !@is_tool_result && "py-3",
         @is_dm && "border-l-2 border-primary/30 pl-3 bg-primary/[0.03]"
       ]}

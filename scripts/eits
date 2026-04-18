@@ -583,6 +583,71 @@ cmd_dm() {
   _post "/dm" "$payload"
 }
 
+# ── timer ─────────────────────────────────────────────────────────────────────
+
+cmd_timer() {
+  local sub="${1:-}"; shift || true
+  case "$sub" in
+    show|get)
+      local session="self"
+      if [[ $# -gt 0 && "$1" != --* ]]; then session="$1"; shift; fi
+      [[ "$session" == "self" ]] && session="${EITS_SESSION_UUID:-}"
+      need session
+      _get "/sessions/$session/timer"
+      ;;
+    set|schedule)
+      local session="self"
+      if [[ $# -gt 0 && "$1" != --* ]]; then session="$1"; shift; fi
+      [[ "$session" == "self" ]] && session="${EITS_SESSION_UUID:-}"
+      need session
+      local preset="" delay_ms="" mode="" message=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --preset)     preset="$2";    shift 2 ;;
+          --delay-ms|--delay) delay_ms="$2"; shift 2 ;;
+          --mode)       mode="$2";      shift 2 ;;
+          --message|-m) message="$2";   shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      [[ -n "$preset" || -n "$delay_ms" ]] || die "--preset or --delay-ms is required"
+      local body="{}"
+      [[ -n "$preset" ]]   && body=$(echo "$body" | jq --arg v "$preset"   '. + {preset: $v}')
+      [[ -n "$delay_ms" ]] && body=$(echo "$body" | jq --argjson v "$delay_ms" '. + {delay_ms: $v}')
+      [[ -n "$mode" ]]     && body=$(echo "$body" | jq --arg v "$mode"     '. + {mode: $v}')
+      [[ -n "$message" ]]  && body=$(echo "$body" | jq --arg v "$message"  '. + {message: $v}')
+      _post "/sessions/$session/timer" "$body"
+      ;;
+    cancel)
+      local session="self"
+      if [[ $# -gt 0 && "$1" != --* ]]; then session="$1"; shift; fi
+      [[ "$session" == "self" ]] && session="${EITS_SESSION_UUID:-}"
+      need session
+      _delete "/sessions/$session/timer"
+      ;;
+    *)
+      cat <<USAGE
+usage: eits timer <show|set|cancel> [<session_id>] [options]
+
+session_id defaults to self (\$EITS_SESSION_UUID) when omitted.
+
+Subcommands:
+  show   [<session_id>]                                Show active timer (404 if none)
+  set    [<session_id>] --preset <5m|10m|15m|30m|1h>  Schedule one-shot timer
+  set    [<session_id>] --delay-ms <N> [--mode once|repeating] [--message <text>]
+  cancel [<session_id>]                                Cancel active timer
+
+Examples:
+  eits timer set --preset 15m            # wake self up in 15 min
+  eits timer set --preset 30m --mode repeating
+  eits timer set 1234 --delay-ms 300000 --message "check in"
+  eits timer show
+  eits timer cancel
+USAGE
+      ;;
+  esac
+}
+
 # ── channels ──────────────────────────────────────────────────────────────────
 
 cmd_channels() {
@@ -921,6 +986,7 @@ Commands:
   channels  list|send|messages
   prompts   list|get
   teams     list|get|create|delete|members|join|status|update-member|leave|broadcast|my-teams
+  timer     show|set|cancel   (default session: self / \$EITS_SESSION_UUID)
   worktree  create|remove   (EITS Elixir projects only)
 
 Requires: curl, jq
@@ -942,6 +1008,7 @@ case "$cmd" in
   channels)  cmd_channels  "$@" ;;
   prompts)   cmd_prompts   "$@" ;;
   teams)     cmd_teams     "$@" ;;
+  timer)     cmd_timer     "$@" ;;
   worktree)  cmd_worktree "$@" ;;
   help|--help|-h) usage ;;
   "") usage; exit 0 ;;

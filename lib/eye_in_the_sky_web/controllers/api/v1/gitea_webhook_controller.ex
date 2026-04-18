@@ -12,6 +12,8 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
 
   use EyeInTheSkyWeb, :controller
 
+  action_fallback EyeInTheSkyWeb.Api.V1.FallbackController
+
   require Logger
 
   alias EyeInTheSky.Agents.AgentManager
@@ -22,9 +24,6 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
   defp agent_manager,
     do: Application.get_env(:eye_in_the_sky, :agent_manager_module, AgentManager)
 
-  defp unauthorized(conn),
-    do: conn |> put_status(:unauthorized) |> json(%{error: "Invalid signature"}) |> halt()
-
   defp with_verified_webhook(conn, params, fun) do
     with :ok <- verify_signature(conn),
          {:ok, repo} <- require_repo(params),
@@ -32,17 +31,13 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
       fun.(repo, project_path)
     else
       {:error, :unauthorized} ->
-        unauthorized(conn)
+        {:error, :unauthorized, "Invalid signature"}
 
       {:error, :missing_repo} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "Missing repository.full_name in payload"})
+        {:error, :bad_request, "Missing repository.full_name in payload"}
 
       {:error, :project_path_not_configured} ->
-        conn
-        |> put_status(:internal_server_error)
-        |> json(%{error: "Server misconfigured: project_path not set"})
+        {:error, :internal_server_error, "Server misconfigured: project_path not set"}
     end
   end
 
@@ -52,12 +47,10 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
       fun.(repo)
     else
       {:error, :unauthorized} ->
-        unauthorized(conn)
+        {:error, :unauthorized, "Invalid signature"}
 
       {:error, :missing_repo} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "Missing repository.full_name in payload"})
+        {:error, :bad_request, "Missing repository.full_name in payload"}
     end
   end
 
@@ -109,7 +102,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
         json(conn, %{success: true, message: "Ignored"})
 
       {:error, :unauthorized} ->
-        unauthorized(conn)
+        {:error, :unauthorized, "Invalid signature"}
     end
   end
 
@@ -151,10 +144,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
 
       {:error, reason} ->
         Logger.error("Failed to spawn codex for PR ##{pr_number}: #{inspect(reason)}")
-
-        conn
-        |> put_status(:internal_server_error)
-        |> json(%{error: "Failed to spawn reviewer"})
+        {:error, :internal_server_error, "Failed to spawn reviewer"}
     end
   end
 
@@ -278,10 +268,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
 
           {:error, cs} ->
             Logger.error("Failed to DM session #{session_uuid}: #{inspect(cs)}")
-
-            conn
-            |> put_status(:internal_server_error)
-            |> json(%{error: "Failed to deliver notification"})
+            {:error, :internal_server_error, "Failed to deliver notification"}
         end
 
       {:error, :not_found} ->

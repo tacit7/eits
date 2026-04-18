@@ -225,7 +225,7 @@ defmodule EyeInTheSky.IAM.Policy do
   defp enforce_locked_fields(changeset, %__MODULE__{system_key: nil}), do: changeset
 
   defp enforce_locked_fields(changeset, %__MODULE__{editable_fields: editable}) do
-    locked = Enum.map(@create_fields, &Atom.to_string/1) -- (editable ++ ["editable_fields"])
+    locked = Enum.map(@create_fields, &Atom.to_string/1) -- editable
 
     Enum.reduce(locked, changeset, fn field_str, cs ->
       field = String.to_existing_atom(field_str)

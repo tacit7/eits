@@ -153,6 +153,75 @@ Or filter by your session UUID to see only your calls.
 
 ---
 
+## Phase 4a: Policy Evaluation with Built-in Matchers
+
+Starting with Phase 4a, system policies can use `builtin_matcher` for specialized detection
+beyond regex conditions. When a policy has a builtin matcher set:
+
+1. **Conditions are evaluated first** (AND logic)
+2. **If conditions match, builtin_matcher is dispatched**
+   - Dispatched via `safe_builtin_match/2` with rescue/catch protection
+   - Error in matcher → returns false (fail closed, does not match)
+   - Builtin matcher returns true/false
+3. **Both conditions AND builtin_matcher must match** for policy to apply
+
+### Builtin Matcher Keys
+
+System policies can set `builtin_matcher` to one of these registered keys:
+
+```json
+[
+  "block_sudo",
+  "block_rm_rf",
+  "protect_env_vars",
+  "block_env_files",
+  "block_read_outside_cwd",
+  "block_push_master",
+  "block_curl_pipe_sh",
+  "block_work_on_main",
+  "warn_destructive_sql"
+]
+```
+
+Each key corresponds to a specialized Elixir module that can:
+- Parse command arguments
+- Resolve file paths
+- Inspect git state
+- Analyze SQL statements
+- Access environment variables
+
+### Example Policy with Builtin Matcher
+
+```json
+{
+  "name": "Block rm -rf",
+  "description": "Prevent destructive rm -rf commands",
+  "action": "deny",
+  "system_key": "builtin.block_rm_rf",
+  "builtin_matcher": "block_rm_rf",
+  "conditions": [
+    {
+      "kind": "tool_name_match",
+      "value": "Bash"
+    }
+  ]
+}
+```
+
+When Claude Code runs a Bash command:
+1. Condition `tool_name_match: "Bash"` is evaluated
+2. If matched, `builtin_matcher: "block_rm_rf"` is dispatched
+3. The BlockRmRf module parses the command and detects `rm -rf` patterns
+4. If detected, policy action `"deny"` blocks the call
+
+### Important: Command/Content Regex
+
+Only **system policies with registered builtin matchers** can use command/content parsing and 
+git-state inspection. User-authored policies in v1 cannot set `builtin_matcher` and are 
+restricted to declarative conditions (regex only).
+
+---
+
 ## How the response adapter works
 
 The EITS endpoint calls `EITS.IAM.HookResponse.to_json/2`, which maps the `Decision`

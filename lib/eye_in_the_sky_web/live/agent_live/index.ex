@@ -115,6 +115,11 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
     do: IndexActions.handle_create_new_session(params, socket)
 
   @impl true
+  def handle_event("set_notify_on_stop", %{"enabled" => enabled}, socket) do
+    {:noreply, assign(socket, :notify_on_stop, !!enabled)}
+  end
+
+  @impl true
   def handle_event("noop", params, socket),
     do: IndexActions.handle_noop(params, socket)
 

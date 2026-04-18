@@ -107,6 +107,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
   @impl true
   def handle_event("noop", params, socket), do: Actions.noop(params, socket)
 
+  @impl true
+  def handle_event("set_notify_on_stop", %{"enabled" => enabled}, socket) do
+    {:noreply, assign(socket, :notify_on_stop, !!enabled)}
+  end
+
   # ---------------------------------------------------------------------------
   # PubSub
   # ---------------------------------------------------------------------------

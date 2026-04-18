@@ -157,6 +157,9 @@ defmodule EyeInTheSkyWeb.Router do
       live "/canvases", CanvasLive, :index
       live "/canvases/:id", CanvasLive, :show
       live "/iam/simulator", IAMLive.Simulator, :index
+      live "/iam/policies", IAMLive.Policies, :index
+      live "/iam/policies/new", IAMLive.PolicyNew, :new
+      live "/iam/policies/:id/edit", IAMLive.PolicyEdit, :edit
     end
   end
 

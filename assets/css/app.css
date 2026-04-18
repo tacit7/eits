@@ -434,6 +434,26 @@ pre:hover .code-copy-btn { opacity: 1; }
 .code-copy-btn:hover { color: oklch(var(--bc) / 0.9); background-color: oklch(var(--b3)); }
 .code-copy-btn--copied { opacity: 1 !important; color: oklch(var(--su)); }
 
+/* Copy button in tool call / output <details> summary rows */
+.tool-copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.1rem;
+  border-radius: 0.2rem;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  background: transparent;
+  color: oklch(var(--bc) / 0.3);
+}
+
+details:hover .tool-copy-btn,
+details[open] .tool-copy-btn { opacity: 1; }
+.tool-copy-btn:hover { color: oklch(var(--bc) / 0.7); }
+.tool-copy-btn[data-copied] { color: oklch(var(--su)); opacity: 1; }
+
 /* Prevent theme-level code background from bleeding into pre code blocks */
 [data-theme="dark"] .dm-markdown pre code { background: none; }
 [data-theme="light"] .dm-markdown pre code { background: none; }

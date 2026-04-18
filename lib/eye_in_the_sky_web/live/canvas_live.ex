@@ -179,7 +179,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         </div>
       </div>
 
-      <div class="relative flex-1 overflow-hidden">
+      <div data-canvas-area class="relative flex-1 overflow-hidden">
         <%= for cs <- @canvas_sessions do %>
           <.live_component
             module={ChatWindowComponent}
@@ -224,7 +224,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
       sessions
       |> Enum.with_index()
       |> Enum.map(fn {cs, i} ->
-        if cs.pos_x == 0 and cs.pos_y == 0,
+        if cs.pos_x == 0 and cs.pos_y == 0 and cs.width == 320 and cs.height == 260,
           do: %{cs | pos_x: 24 + i * 32, pos_y: 16 + i * 32},
           else: cs
       end)

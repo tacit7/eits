@@ -116,7 +116,8 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
          }) do
       {:ok, _} ->
         AgentManager.continue_session(session_id, body, [])
-        {:noreply, socket}
+        messages = Messages.list_recent_messages(session_id, 50)
+        {:noreply, assign(socket, :messages, messages)}
 
       {:error, _} ->
         {:noreply, socket}

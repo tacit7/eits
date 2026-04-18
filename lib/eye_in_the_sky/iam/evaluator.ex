@@ -58,7 +58,7 @@ defmodule EyeInTheSky.IAM.Evaluator do
     instructions =
       instructs
       |> Enum.sort_by(&rank/1)
-      |> Enum.map(fn p -> %{policy: p, message: message_for(p)} end)
+      |> Enum.map(fn p -> %{policy: p, message: instruct_message(p, ctx)} end)
 
     decision = %Decision{
       permission: permission,
@@ -226,6 +226,18 @@ defmodule EyeInTheSky.IAM.Evaluator do
   # Rank tuple: lower is better. `-priority` sorts high priority first; `id`
   # sorts lower id first as the tie-break.
   defp rank(%Policy{priority: priority, id: id}), do: {-priority, id || 0}
+
+  defp instruct_message(%Policy{builtin_matcher: key} = p, ctx) when is_binary(key) do
+    with {:ok, mod} <- EyeInTheSky.IAM.BuiltinMatcher.Registry.fetch(key),
+         true <- function_exported?(mod, :instruction_message, 2),
+         msg when is_binary(msg) <- mod.instruction_message(p, ctx) do
+      msg
+    else
+      _ -> message_for(p)
+    end
+  end
+
+  defp instruct_message(p, _ctx), do: message_for(p)
 
   defp message_for(%Policy{message: nil, name: name, effect: effect}),
     do: "#{effect}: #{name}"

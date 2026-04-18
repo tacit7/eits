@@ -31,6 +31,15 @@ defmodule EyeInTheSky.IAM.Builtin.SanitizeApiKeys do
 
   def matches?(_, _), do: false
 
+  @impl true
+  def instruction_message(%Policy{}, %Context{tool_response: response})
+      when is_binary(response) do
+    {sanitized, _count, summary} = redact(response)
+    "#{summary}\n\n#{sanitized}"
+  end
+
+  def instruction_message(_, _), do: nil
+
   @doc """
   Redact secrets from the given text. Returns `{sanitized, count, summary}`.
   `summary` is nil when nothing was redacted.

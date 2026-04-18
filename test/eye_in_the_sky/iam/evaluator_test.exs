@@ -166,4 +166,41 @@ defmodule EyeInTheSky.IAM.EvaluatorTest do
 
     %Decision{reason: "deny: no-msg"} = Evaluator.decide(ctx(), policies: policies)
   end
+
+  describe "event filtering" do
+    test "PreToolUse policy matches PreToolUse context" do
+      policies = [pol(effect: "allow", event: "PreToolUse", name: "pre")]
+
+      %Decision{permission: :allow, default?: false} =
+        Evaluator.decide(ctx(event: :pre_tool_use), policies: policies)
+    end
+
+    test "PostToolUse policy does not match PreToolUse context" do
+      policies = [pol(effect: "allow", event: "PostToolUse", name: "post")]
+
+      %Decision{permission: :allow, default?: true} =
+        Evaluator.decide(ctx(event: :pre_tool_use), policies: policies)
+    end
+
+    test "PostToolUse policy matches PostToolUse context" do
+      policies = [pol(effect: "allow", event: "PostToolUse", name: "post")]
+
+      %Decision{permission: :allow, default?: false} =
+        Evaluator.decide(ctx(event: :post_tool_use), policies: policies)
+    end
+
+    test "Stop policy matches Stop context" do
+      policies = [pol(effect: "allow", event: "Stop", name: "stop")]
+
+      %Decision{permission: :allow, default?: false} =
+        Evaluator.decide(ctx(event: :stop), policies: policies)
+    end
+
+    test "Stop policy does not match PostToolUse context" do
+      policies = [pol(effect: "deny", event: "Stop", name: "stop")]
+
+      %Decision{permission: :allow, default?: true} =
+        Evaluator.decide(ctx(event: :post_tool_use), policies: policies)
+    end
+  end
 end

@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.Api.V1.PushController do
   use EyeInTheSkyWeb, :controller
 
+  action_fallback EyeInTheSkyWeb.Api.V1.FallbackController
+
   import EyeInTheSkyWeb.ControllerHelpers, only: [translate_errors: 1]
 
   alias EyeInTheSky.PushSubscriptions

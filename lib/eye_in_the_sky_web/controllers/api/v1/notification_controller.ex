@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.Api.V1.NotificationController do
   use EyeInTheSkyWeb, :controller
 
+  action_fallback EyeInTheSkyWeb.Api.V1.FallbackController
+
   import EyeInTheSkyWeb.ControllerHelpers, only: [maybe_opt: 3, translate_errors: 1]
 
   alias EyeInTheSky.Notifications

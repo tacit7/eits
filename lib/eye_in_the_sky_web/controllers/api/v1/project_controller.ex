@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.Api.V1.ProjectController do
   use EyeInTheSkyWeb, :controller
 
+  action_fallback EyeInTheSkyWeb.Api.V1.FallbackController
+
   import EyeInTheSkyWeb.ControllerHelpers
 
   alias EyeInTheSky.Projects
@@ -24,7 +26,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectController do
   def show(conn, %{"id" => id}) do
     case Projects.get_project(id) do
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Project not found"})
+        {:error, :not_found, "Project not found"}
 
       {:ok, project} ->
         json(conn, %{success: true, project: ApiPresenter.present_project(project)})

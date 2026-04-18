@@ -105,17 +105,17 @@ if config_env() == :dev && database_url do
     prepare: :unnamed
   ]
 
-  # Supabase connections require SSL; local Postgres typically does not.
+  # SSL: explicit DATABASE_SSL=false disables it; Supabase requires it; local skips it.
   dev_repo_opts =
-    case URI.parse(database_url) do
-      %URI{host: host} when is_binary(host) ->
-        if String.contains?(host, "supabase.com") do
-          Keyword.put(dev_repo_opts, :ssl, verify: :verify_none)
-        else
-          dev_repo_opts
-        end
+    cond do
+      get_env.("DATABASE_SSL") == "false" ->
+        Keyword.put(dev_repo_opts, :ssl, false)
 
-      _ ->
+      match?(%URI{host: host} when is_binary(host), URI.parse(database_url)) &&
+          String.contains?(URI.parse(database_url).host, "supabase.com") ->
+        Keyword.put(dev_repo_opts, :ssl, verify: :verify_none)
+
+      true ->
         dev_repo_opts
     end
 

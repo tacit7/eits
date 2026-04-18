@@ -89,6 +89,31 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEditTest do
     end
   end
 
+  describe "save — privileged param injection" do
+    test "forged system_key/editable_fields/builtin_matcher are stripped on user policy edit", %{conn: conn} do
+      p = user_policy!(%{name: "plain"})
+
+      {:ok, view, _html} = live(conn, ~p"/iam/policies/#{p.id}/edit")
+
+      # Bypass the form helper — simulate a crafted submission with extra fields.
+      render_submit(view, "save", %{
+        "policy" => %{
+          "name" => "plain",
+          "effect" => "allow",
+          "system_key" => "injected.key",
+          "editable_fields" => ["name"],
+          "builtin_matcher" => "block_rm_rf"
+        },
+        "condition_text" => "{}"
+      })
+
+      {:ok, reloaded} = IAM.get_policy(p.id)
+      assert reloaded.system_key == nil
+      assert reloaded.editable_fields == []
+      assert reloaded.builtin_matcher == nil
+    end
+  end
+
   describe "save — system policy locked fields" do
     test "locked fields render as disabled inputs in the UI", %{conn: conn} do
       p = system_policy!()

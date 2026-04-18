@@ -66,6 +66,31 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNewTest do
       assert IAM.list_policies() == []
     end
 
+    test "forged privileged params (system_key/editable_fields/builtin_matcher) are stripped and ignored on create", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/iam/policies/new")
+
+      # Bypass the form helper and submit raw params simulating a forged POST.
+      render_submit(view, "save", %{
+        "policy" => %{
+          "name" => "forged policy",
+          "effect" => "allow",
+          "system_key" => "injected.key",
+          "editable_fields" => ["name"],
+          "builtin_matcher" => "block_rm_rf"
+        },
+        "condition_text" => "{}"
+      })
+
+      # If the policy was persisted, privileged fields must be nil/empty.
+      case IAM.list_policies() do
+        [] -> :ok
+        [p] ->
+          assert p.system_key == nil
+          assert p.editable_fields == []
+          assert p.builtin_matcher == nil
+      end
+    end
+
     test "rejects invalid JSON in the condition textarea", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/iam/policies/new")
 

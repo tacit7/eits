@@ -66,6 +66,90 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNewTest do
       assert IAM.list_policies() == []
     end
 
+    test "global scope clears both project_id and project_path", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/iam/policies/new")
+
+      view
+      |> form("#iam-policy-form", %{
+        "policy" => %{
+          "name" => "Global deny",
+          "effect" => "deny",
+          "priority" => "10",
+          "enabled" => "true"
+        },
+        "scope" => "global",
+        "condition_text" => "{}"
+      })
+      |> render_submit()
+
+      assert [p] = IAM.list_policies()
+      assert p.project_id == nil
+      assert p.project_path == "*"
+    end
+
+    test "project scope persists project_id and leaves project_path wildcard", %{conn: conn} do
+      project = EyeInTheSky.Repo.insert!(%EyeInTheSky.Projects.Project{name: "scope-test", active: true})
+
+      {:ok, view, _html} = live(conn, ~p"/iam/policies/new")
+
+      # Switch scope first so the conditional project_id select renders.
+      view
+      |> form("#iam-policy-form", %{
+        "policy" => %{"name" => "x", "effect" => "deny"},
+        "scope" => "project",
+        "condition_text" => "{}"
+      })
+      |> render_change()
+
+      view
+      |> form("#iam-policy-form", %{
+        "policy" => %{
+          "name" => "Project deny",
+          "effect" => "deny",
+          "project_id" => Integer.to_string(project.id),
+          "priority" => "10",
+          "enabled" => "true"
+        },
+        "scope" => "project",
+        "condition_text" => "{}"
+      })
+      |> render_submit()
+
+      assert [p] = IAM.list_policies()
+      assert p.project_id == project.id
+      assert p.project_path == "*"
+    end
+
+    test "path scope persists project_path and leaves project_id nil", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/iam/policies/new")
+
+      view
+      |> form("#iam-policy-form", %{
+        "policy" => %{"name" => "x", "effect" => "deny"},
+        "scope" => "path",
+        "condition_text" => "{}"
+      })
+      |> render_change()
+
+      view
+      |> form("#iam-policy-form", %{
+        "policy" => %{
+          "name" => "Path deny",
+          "effect" => "deny",
+          "project_path" => "/Users/me/projects/*",
+          "priority" => "10",
+          "enabled" => "true"
+        },
+        "scope" => "path",
+        "condition_text" => "{}"
+      })
+      |> render_submit()
+
+      assert [p] = IAM.list_policies()
+      assert p.project_id == nil
+      assert p.project_path == "/Users/me/projects/*"
+    end
+
     test "rejects invalid JSON in the condition textarea", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/iam/policies/new")
 

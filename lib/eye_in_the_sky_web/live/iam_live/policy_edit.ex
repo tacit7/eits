@@ -7,11 +7,16 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
   whitelist are writable — every other input is rendered `disabled` and the
   server-side `enforce_locked_fields` guard in the changeset catches any
   attempt to mutate locked fields anyway.
+
+  The UI exposes a Scope radio — Global / Project / Path glob — that drives
+  which of `project_id`/`project_path` is shown. Initial scope is inferred
+  from the existing policy values.
   """
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.Policy
+  alias EyeInTheSky.Projects
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -30,7 +35,9 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
              |> assign(:system?, not is_nil(policy.system_key))
              |> assign(:editable_fields, MapSet.new(policy.editable_fields || []))
              |> assign(:form, to_form(changeset))
-             |> assign(:condition_text, encode_condition(policy.condition))}
+             |> assign(:condition_text, encode_condition(policy.condition))
+             |> assign(:scope, infer_scope(policy))
+             |> assign(:projects, Projects.list_projects())}
 
           {:error, :not_found} ->
             {:ok,
@@ -50,7 +57,8 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
   @impl true
   def handle_event("validate", %{"policy" => raw_params} = event_params, socket) do
     condition_text = Map.get(event_params, "condition_text", socket.assigns.condition_text)
-    params = scrub_empty(raw_params)
+    scope = Map.get(event_params, "scope", socket.assigns.scope)
+    params = raw_params |> apply_scope(scope) |> scrub_empty()
     {attrs, condition_error} = merge_condition(params, condition_text)
 
     changeset =
@@ -62,12 +70,14 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
     {:noreply,
      socket
      |> assign(:form, to_form(changeset))
-     |> assign(:condition_text, condition_text)}
+     |> assign(:condition_text, condition_text)
+     |> assign(:scope, scope)}
   end
 
   def handle_event("save", %{"policy" => raw_params} = event_params, socket) do
     condition_text = Map.get(event_params, "condition_text", socket.assigns.condition_text)
-    params = scrub_empty(raw_params)
+    scope = Map.get(event_params, "scope", socket.assigns.scope)
+    params = raw_params |> apply_scope(scope) |> scrub_empty()
 
     case merge_condition(params, condition_text) do
       {attrs, nil} ->
@@ -82,7 +92,8 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
             {:noreply,
              socket
              |> assign(:form, to_form(Map.put(cs, :action, :update)))
-             |> assign(:condition_text, condition_text)}
+             |> assign(:condition_text, condition_text)
+             |> assign(:scope, scope)}
         end
 
       {_attrs, error} ->
@@ -95,11 +106,36 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
         {:noreply,
          socket
          |> assign(:form, to_form(cs))
-         |> assign(:condition_text, condition_text)}
+         |> assign(:condition_text, condition_text)
+         |> assign(:scope, scope)}
     end
   end
 
   # ── helpers ───────────────────────────────────────────────────────────────
+
+  # Initial scope is inferred from the persisted policy:
+  #   project_id set        → :project
+  #   project_path != "*"   → :path
+  #   otherwise             → :global
+  defp infer_scope(%Policy{project_id: pid}) when not is_nil(pid), do: "project"
+  defp infer_scope(%Policy{project_path: path}) when path not in [nil, "", "*"], do: "path"
+  defp infer_scope(_), do: "global"
+
+  defp apply_scope(params, "global") do
+    params
+    |> Map.put("project_id", "")
+    |> Map.put("project_path", "*")
+  end
+
+  defp apply_scope(params, "project") do
+    Map.put(params, "project_path", "*")
+  end
+
+  defp apply_scope(params, "path") do
+    Map.put(params, "project_id", "")
+  end
+
+  defp apply_scope(params, _), do: params
 
   defp merge_condition(params, condition_text) do
     trimmed = String.trim(condition_text || "")
@@ -148,6 +184,10 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
 
   defp locked?(%{system?: true, editable_fields: editable}, field) do
     not MapSet.member?(editable, to_string(field))
+  end
+
+  defp project_options(projects) do
+    [{"-- select a project --", ""} | Enum.map(projects, &{&1.name, &1.id})]
   end
 
   # ── rendering ─────────────────────────────────────────────────────────────
@@ -221,20 +261,6 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
             />
 
             <.input
-              field={@form[:project_id]}
-              type="number"
-              label="Project ID (optional)"
-              disabled={locked?(assigns, :project_id)}
-            />
-
-            <.input
-              field={@form[:project_path]}
-              type="text"
-              label="Project path glob"
-              disabled={locked?(assigns, :project_path)}
-            />
-
-            <.input
               field={@form[:resource_glob]}
               type="text"
               label="Resource glob"
@@ -269,6 +295,78 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
                 label="Builtin matcher key"
                 disabled={locked?(assigns, :builtin_matcher)}
               />
+            <% end %>
+          </div>
+        </section>
+
+        <section class="card bg-base-200">
+          <div class="card-body p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <h2 class="font-semibold flex items-center gap-2">
+                <.icon name="hero-funnel" class="w-5 h-5" /> Scope
+              </h2>
+              <span class="text-xs text-base-content/60">
+                Controls which hook contexts this policy matches.
+              </span>
+            </div>
+
+            <div class="flex flex-wrap gap-4">
+              <label class="label cursor-pointer gap-2">
+                <input
+                  type="radio"
+                  name="scope"
+                  value="global"
+                  checked={@scope == "global"}
+                  class="radio radio-sm"
+                  disabled={locked?(assigns, :project_id) or locked?(assigns, :project_path)}
+                />
+                <span class="label-text">Global <span class="text-xs opacity-60">— every project</span></span>
+              </label>
+              <label class="label cursor-pointer gap-2">
+                <input
+                  type="radio"
+                  name="scope"
+                  value="project"
+                  checked={@scope == "project"}
+                  class="radio radio-sm"
+                  disabled={locked?(assigns, :project_id) or locked?(assigns, :project_path)}
+                />
+                <span class="label-text">Project <span class="text-xs opacity-60">— pick one</span></span>
+              </label>
+              <label class="label cursor-pointer gap-2">
+                <input
+                  type="radio"
+                  name="scope"
+                  value="path"
+                  checked={@scope == "path"}
+                  class="radio radio-sm"
+                  disabled={locked?(assigns, :project_id) or locked?(assigns, :project_path)}
+                />
+                <span class="label-text">Path glob <span class="text-xs opacity-60">— match by filesystem path</span></span>
+              </label>
+            </div>
+
+            <%= cond do %>
+              <% @scope == "project" -> %>
+                <.input
+                  field={@form[:project_id]}
+                  type="select"
+                  label="Project"
+                  options={project_options(@projects)}
+                  disabled={locked?(assigns, :project_id)}
+                />
+              <% @scope == "path" -> %>
+                <.input
+                  field={@form[:project_path]}
+                  type="text"
+                  label="Project path glob"
+                  placeholder="/Users/me/projects/*"
+                  disabled={locked?(assigns, :project_path)}
+                />
+              <% true -> %>
+                <p class="text-xs text-base-content/60">
+                  This policy will apply to every project.
+                </p>
             <% end %>
           </div>
         </section>

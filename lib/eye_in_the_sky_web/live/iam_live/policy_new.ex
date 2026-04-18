@@ -6,6 +6,11 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
   text — we decode on submit and surface JSON-parse failures as a changeset
   error before hitting `IAM.create_policy/1`.
 
+  The UI exposes a three-option **Scope** radio — Global / Project / Path
+  glob — that drives which of `project_id`/`project_path` the operator sees.
+  The underlying schema is unchanged: Global clears both, Project sets
+  `project_id`, Path glob sets `project_path`.
+
   System policies are seeded via migrations (not this form) — `system_key`,
   `editable_fields`, and `builtin_matcher` are deliberately omitted here.
   """
@@ -13,6 +18,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
 
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.Policy
+  alias EyeInTheSky.Projects
 
   @impl true
   def mount(_params, _session, socket) do
@@ -24,13 +30,16 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
      |> assign(:sidebar_tab, :iam)
      |> assign(:sidebar_project, nil)
      |> assign(:form, to_form(changeset))
-     |> assign(:condition_text, "{}")}
+     |> assign(:condition_text, "{}")
+     |> assign(:scope, "global")
+     |> assign(:projects, Projects.list_projects())}
   end
 
   @impl true
   def handle_event("validate", %{"policy" => raw_params} = event_params, socket) do
     condition_text = Map.get(event_params, "condition_text", "{}")
-    params = scrub_empty(raw_params)
+    scope = Map.get(event_params, "scope", socket.assigns.scope)
+    params = raw_params |> apply_scope(scope) |> scrub_empty()
     {attrs, condition_error} = merge_condition(params, condition_text)
 
     changeset =
@@ -42,12 +51,14 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
     {:noreply,
      socket
      |> assign(:form, to_form(changeset))
-     |> assign(:condition_text, condition_text)}
+     |> assign(:condition_text, condition_text)
+     |> assign(:scope, scope)}
   end
 
   def handle_event("save", %{"policy" => raw_params} = event_params, socket) do
     condition_text = Map.get(event_params, "condition_text", "{}")
-    params = scrub_empty(raw_params)
+    scope = Map.get(event_params, "scope", socket.assigns.scope)
+    params = raw_params |> apply_scope(scope) |> scrub_empty()
 
     case merge_condition(params, condition_text) do
       {attrs, nil} ->
@@ -62,7 +73,8 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
             {:noreply,
              socket
              |> assign(:form, to_form(Map.put(cs, :action, :insert)))
-             |> assign(:condition_text, condition_text)}
+             |> assign(:condition_text, condition_text)
+             |> assign(:scope, scope)}
         end
 
       {_attrs, error} ->
@@ -75,11 +87,31 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
         {:noreply,
          socket
          |> assign(:form, to_form(cs))
-         |> assign(:condition_text, condition_text)}
+         |> assign(:condition_text, condition_text)
+         |> assign(:scope, scope)}
     end
   end
 
   # ── helpers ───────────────────────────────────────────────────────────────
+
+  # Translate the Scope radio into underlying fields. Switching scope always
+  # clears the fields belonging to the other scopes so stale values never
+  # leak across a scope change.
+  defp apply_scope(params, "global") do
+    params
+    |> Map.put("project_id", "")
+    |> Map.put("project_path", "*")
+  end
+
+  defp apply_scope(params, "project") do
+    Map.put(params, "project_path", "*")
+  end
+
+  defp apply_scope(params, "path") do
+    Map.put(params, "project_id", "")
+  end
+
+  defp apply_scope(params, _), do: params
 
   defp merge_condition(params, condition_text) do
     trimmed = String.trim(condition_text || "")
@@ -129,6 +161,10 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
     end)
   end
 
+  defp project_options(projects) do
+    [{"-- select a project --", ""} | Enum.map(projects, &{&1.name, &1.id})]
+  end
+
   # ── rendering ─────────────────────────────────────────────────────────────
 
   @impl true
@@ -162,10 +198,6 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
 
             <.input field={@form[:action]} type="text" label="Action (tool)" placeholder="* or e.g. Bash" />
 
-            <.input field={@form[:project_id]} type="number" label="Project ID (optional)" placeholder="integer" />
-
-            <.input field={@form[:project_path]} type="text" label="Project path glob" placeholder="* or /Users/me/projects/*" />
-
             <.input field={@form[:resource_glob]} type="text" label="Resource glob" placeholder="e.g. /etc/*" />
 
             <.input field={@form[:priority]} type="number" label="Priority" />
@@ -173,6 +205,55 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
             <.input field={@form[:message]} type="text" label="Message (optional)" placeholder="Shown when this policy wins" />
 
             <.input field={@form[:enabled]} type="checkbox" label="Enabled" />
+          </div>
+        </section>
+
+        <section class="card bg-base-200">
+          <div class="card-body p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <h2 class="font-semibold flex items-center gap-2">
+                <.icon name="hero-funnel" class="w-5 h-5" /> Scope
+              </h2>
+              <span class="text-xs text-base-content/60">
+                Controls which hook contexts this policy matches.
+              </span>
+            </div>
+
+            <div class="flex flex-wrap gap-4">
+              <label class="label cursor-pointer gap-2">
+                <input type="radio" name="scope" value="global" checked={@scope == "global"} class="radio radio-sm" />
+                <span class="label-text">Global <span class="text-xs opacity-60">— every project</span></span>
+              </label>
+              <label class="label cursor-pointer gap-2">
+                <input type="radio" name="scope" value="project" checked={@scope == "project"} class="radio radio-sm" />
+                <span class="label-text">Project <span class="text-xs opacity-60">— pick one</span></span>
+              </label>
+              <label class="label cursor-pointer gap-2">
+                <input type="radio" name="scope" value="path" checked={@scope == "path"} class="radio radio-sm" />
+                <span class="label-text">Path glob <span class="text-xs opacity-60">— match by filesystem path</span></span>
+              </label>
+            </div>
+
+            <%= cond do %>
+              <% @scope == "project" -> %>
+                <.input
+                  field={@form[:project_id]}
+                  type="select"
+                  label="Project"
+                  options={project_options(@projects)}
+                />
+              <% @scope == "path" -> %>
+                <.input
+                  field={@form[:project_path]}
+                  type="text"
+                  label="Project path glob"
+                  placeholder="/Users/me/projects/*"
+                />
+              <% true -> %>
+                <p class="text-xs text-base-content/60">
+                  This policy will apply to every project.
+                </p>
+            <% end %>
           </div>
         </section>
 

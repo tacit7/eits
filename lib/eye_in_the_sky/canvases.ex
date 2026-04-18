@@ -74,4 +74,10 @@ defmodule EyeInTheSky.Canvases do
       cs -> cs |> CanvasSession.changeset(attrs) |> Repo.update()
     end
   end
+
+  def count_sessions_per_canvas do
+    from(cs in CanvasSession, group_by: cs.canvas_id, select: {cs.canvas_id, count(cs.id)})
+    |> Repo.all()
+    |> Enum.into(%{})
+  end
 end

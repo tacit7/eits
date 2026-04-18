@@ -18,7 +18,8 @@ defmodule EyeInTheSkyWeb.CanvasLive do
      |> assign(:canvas_sessions, [])
      |> assign(:subscribed_session_ids, [])
      |> assign(:creating_canvas, false)
-     |> assign(:renaming_canvas_id, nil)}
+     |> assign(:renaming_canvas_id, nil)
+     |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())}
   end
 
   @impl true
@@ -55,6 +56,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
          socket
          |> assign(:canvases, socket.assigns.canvases ++ [canvas])
          |> assign(:creating_canvas, false)
+         |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
          |> push_patch(to: ~p"/canvases/#{canvas.id}")}
 
       {:error, _} ->
@@ -120,7 +122,8 @@ defmodule EyeInTheSkyWeb.CanvasLive do
        |> assign(
          :subscribed_session_ids,
          Enum.reject(socket.assigns.subscribed_session_ids, &(&1 == cs.session_id))
-       )}
+       )
+       |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())}
     else
       {:noreply, socket}
     end
@@ -202,7 +205,8 @@ defmodule EyeInTheSkyWeb.CanvasLive do
        |> assign(
          :subscribed_session_ids,
          Enum.reject(socket.assigns.subscribed_session_ids, &(&1 == cs.session_id))
-       )}
+       )
+       |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())}
     else
       {:noreply, socket}
     end
@@ -245,6 +249,10 @@ defmodule EyeInTheSkyWeb.CanvasLive do
               phx-value-canvas-id={canvas.id}
             >
               {canvas.name}
+              <span
+                :if={Map.get(@canvas_session_counts, canvas.id, 0) > 0}
+                class="badge badge-xs badge-ghost ml-1"
+              >{Map.get(@canvas_session_counts, canvas.id, 0)}</span>
               <button
                 :if={@active_canvas_id == canvas.id}
                 type="button"
@@ -334,6 +342,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     |> assign(:active_canvas_id, canvas_id)
     |> assign(:canvas_sessions, sessions)
     |> assign(:subscribed_session_ids, session_ids)
+    |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
   end
 
   defp subscribe_all(ids) do

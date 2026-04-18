@@ -162,7 +162,9 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
       id={"chat-msg-#{@cs_id}-#{@message.id}"}
     >
       <%= if @is_tool_result do %>
-        <.chat_message_body message={@message} cs_id={@cs_id} />
+        <div class="pl-[22px]">
+          <.chat_message_body message={@message} cs_id={@cs_id} />
+        </div>
       <% else %>
         <div class="flex items-start gap-2">
           <%= if @role == :user do %>

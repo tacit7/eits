@@ -267,7 +267,7 @@ defmodule EyeInTheSky.AgentDefinitions do
 
   # ── Frontmatter parsing ────────────────────────────────────────────────
 
-  defp parse_frontmatter(content), do: FrontmatterParser.parse_frontmatter(content)
+  def parse_frontmatter(content), do: FrontmatterParser.parse_frontmatter(content)
 
   # ── Helpers ─────────────────────────────────────────────────────────────
 

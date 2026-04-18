@@ -108,6 +108,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
   def handle_event("noop", params, socket), do: Actions.noop(params, socket)
 
   @impl true
+  def handle_event("show_new_canvas_form", params, socket),
+    do: Actions.show_new_canvas_form(params, socket)
+
+  @impl true
+  def handle_event("add_to_canvas", params, socket),
+    do: Actions.add_to_canvas(params, socket)
+
+  @impl true
+  def handle_event("add_to_new_canvas", params, socket),
+    do: Actions.add_to_new_canvas(params, socket)
+
+  @impl true
   def handle_event("set_notify_on_stop", %{"enabled" => enabled}, socket) do
     {:noreply, assign(socket, :notify_on_stop, !!enabled)}
   end
@@ -159,6 +171,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
       selected_ids={@selected_ids}
       editing_session_id={@editing_session_id}
       project={@project}
+      canvases={@canvases}
+      show_new_canvas_for={@show_new_canvas_for}
     />
     """
   end

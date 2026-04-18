@@ -207,7 +207,7 @@ cmd_tasks() {
       local id="${1:-}"; need id
       _patch "/tasks/$id" '{"state":"done"}'
       ;;
-    start)
+    start|claim)
       local id="${1:-}"; need id
       # Auto-link current session atomically with the state transition
       local _sess="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
@@ -302,7 +302,7 @@ cmd_tasks() {
       echo "{\"success\":true,\"task_id\":\"$task_id\",\"tag_id\":\"$tag_id\"}"
       ;;
     *)
-      echo "usage: eits tasks <list|get|create|update|done|begin|start|complete|delete|annotate|link-session|unlink-session|tag>"
+      echo "usage: eits tasks <list|get|create|update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|tag>"
       ;;
   esac
 }
@@ -417,7 +417,7 @@ cmd_agents() {
       #   [--project-id <n>] [--project-path <path>] [--worktree <branch>]
       #   [--effort-level <level>] [--parent-session-id <n>] [--parent-agent-id <n>]
       #   [--team-name <name>] [--member-name <alias>] [--agent <name>] [--name <n>] [--yolo]
-      local instructions="" model="" provider="" project_id="" project_path=""
+      local instructions="" model="" provider="" project_id="${EITS_PROJECT_ID:-}" project_path="${PWD:-}"
       local worktree="" effort_level="" parent_session_id="" parent_agent_id=""
       local team_name="" member_name="" agent_name="" session_name="" bypass_sandbox="false"
       while [[ $# -gt 0 ]]; do
@@ -901,7 +901,7 @@ Base URL: ${BASE_URL}  (override: EITS_URL=<url>)
 
 Commands:
   sessions  list|get|create|update|end|context
-  tasks     list|get|create|update|done|start|delete|annotate|link-session|unlink-session
+  tasks     list|get|create|update|done|start|claim|delete|annotate|link-session|unlink-session
   notes     list|get|create|update
   projects  list|get|create
   agents    list|get

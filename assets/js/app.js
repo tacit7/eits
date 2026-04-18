@@ -26,7 +26,7 @@ import topbar from "../vendor/topbar"
 import {CopyToClipboard} from "./hooks/copy_to_clipboard"
 import {CopySessionId} from "./hooks/copy_session_id"
 import {BookmarkAgent} from "./hooks/bookmark_agent"
-import {FavoriteFab} from "./hooks/favorite_fab"
+import {FloatingChat} from "./hooks/floating_chat"
 import {ScrollToBottom} from "./hooks/scroll_to_bottom"
 import {AutoScroll} from "./hooks/auto_scroll"
 import {MarkdownMessage} from "./hooks/markdown_message"
@@ -83,7 +83,7 @@ let Hooks = getHooks(components)
 Hooks.CopyToClipboard = CopyToClipboard
 Hooks.CopySessionId = CopySessionId
 Hooks.BookmarkAgent = BookmarkAgent
-Hooks.FavoriteFab = FavoriteFab
+Hooks.FloatingChat = FloatingChat
 Hooks.ScrollToBottom = ScrollToBottom
 Hooks.AutoScroll = AutoScroll
 Hooks.CommandHistory = CommandHistory

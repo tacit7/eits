@@ -131,6 +131,30 @@ export const ChatWindowHook = {
     observer.observe(this.el)
     this._resizeObserver = observer
 
+    const minimizeBtn = this.el.querySelector("[data-minimize-btn]")
+    if (minimizeBtn) {
+      this._minimized = false
+      minimizeBtn.addEventListener("click", (e) => {
+        e.stopPropagation()
+        this._minimized = !this._minimized
+        const body = this.el.querySelector("[data-chat-body]")
+        const footer = this.el.querySelector("[data-chat-footer]")
+        if (this._minimized) {
+          this.el.dataset.savedHeight = this.el.offsetHeight + "px"
+          if (body) body.style.display = "none"
+          if (footer) footer.style.display = "none"
+          this.el.style.resize = "none"
+        } else {
+          if (body) body.style.display = ""
+          if (footer) footer.style.display = ""
+          this.el.style.resize = "both"
+          if (this.el.dataset.savedHeight) {
+            this.el.style.height = this.el.dataset.savedHeight
+          }
+        }
+      })
+    }
+
   },
 
   destroyed() {

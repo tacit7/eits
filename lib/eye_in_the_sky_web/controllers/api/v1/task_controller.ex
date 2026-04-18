@@ -96,9 +96,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
         |> json(%{success: true, message: "Task created", task_id: to_string(task.id)})
 
       {:error, changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Failed to create task", details: translate_errors(changeset)})
+        {:error, changeset}
     end
   end
 
@@ -108,7 +106,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   def show(conn, %{"id" => id}) do
     case Tasks.get_task(id) do
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Task not found"})
+        {:error, :not_found, "Task not found"}
 
       {:ok, task} ->
         annotations = Notes.list_notes_for_task(id)
@@ -134,7 +132,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   """
   def update(conn, %{"id" => id} = params) do
     case Tasks.get_task(id) do
-      {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "Task not found"})
+      {:error, :not_found} -> {:error, :not_found, "Task not found"}
       {:ok, task} -> do_update_task(conn, task, params)
     end
   end
@@ -167,14 +165,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
         })
 
       {:error, {:bad_alias, message}} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{success: false, error: message})
+        {:error, message}
 
       {:error, changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Failed to update task", details: translate_errors(changeset)})
+        {:error, changeset}
     end
   end
 
@@ -184,7 +178,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   def delete(conn, %{"id" => id}) do
     case Tasks.get_task(id) do
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Task not found"})
+        {:error, :not_found, "Task not found"}
 
       {:ok, task} ->
         case Tasks.delete_task(task) do
@@ -192,9 +186,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
             json(conn, %{success: true, message: "Task deleted"})
 
           {:error, changeset} ->
-            conn
-            |> put_status(:unprocessable_entity)
-            |> json(%{error: "Failed to delete task", details: translate_errors(changeset)})
+            {:error, changeset}
         end
     end
   end
@@ -216,9 +208,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
         |> json(%{success: true, message: "Annotation added", note_id: note.id})
 
       {:error, cs} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Failed", details: translate_errors(cs)})
+        {:error, cs}
     end
   end
 
@@ -239,22 +229,16 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       })
     else
       true ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{success: false, error: "message is required"})
+        {:error, "message is required"}
 
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Task not found"})
+        {:error, :not_found, "Task not found"}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{success: false, errors: translate_errors(changeset)})
+        {:error, changeset}
 
       {:error, _reason} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{success: false, error: "Failed to complete task"})
+        {:error, "Failed to complete task"}
     end
   end
 
@@ -264,7 +248,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   def link_session(conn, %{"id" => task_id} = params) do
     case params["session_id"] do
       nil ->
-        conn |> put_status(:bad_request) |> json(%{error: "session_id is required"})
+        {:error, :bad_request, "session_id is required"}
 
       session_id ->
         case Tasks.get_task(task_id) do
@@ -273,7 +257,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
             json(conn, %{success: true, message: "Session linked to task #{task_id}"})
 
           {:error, :not_found} ->
-            conn |> put_status(:bad_request) |> json(%{error: "Invalid task ID"})
+            {:error, :bad_request, "Invalid task ID"}
         end
     end
   end
@@ -284,7 +268,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   def unlink_session(conn, %{"id" => task_id, "uuid" => session_uuid}) do
     case Tasks.get_task(task_id) do
       {:error, :not_found} ->
-        conn |> put_status(:bad_request) |> json(%{error: "Invalid task ID"})
+        {:error, :bad_request, "Invalid task ID"}
 
       {:ok, task} ->
         int_id =
@@ -297,7 +281,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
           Tasks.unlink_session_from_task(task.id, int_id)
           json(conn, %{success: true, message: "Session unlinked from task #{task_id}"})
         else
-          conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+          {:error, :not_found, "Session not found"}
         end
     end
   end

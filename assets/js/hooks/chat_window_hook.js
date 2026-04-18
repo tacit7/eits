@@ -139,15 +139,20 @@ export const ChatWindowHook = {
         this._minimized = !this._minimized
         const body = this.el.querySelector("[data-chat-body]")
         const footer = this.el.querySelector("[data-chat-footer]")
+        const handle = this.el.querySelector("[data-drag-handle]")
         if (this._minimized) {
           this.el.dataset.savedHeight = this.el.offsetHeight + "px"
           if (body) body.style.display = "none"
           if (footer) footer.style.display = "none"
           this.el.style.resize = "none"
+          const headerH = handle ? handle.offsetHeight : 40
+          this.el.style.height = headerH + "px"
+          this.el.style.overflow = "hidden"
         } else {
           if (body) body.style.display = ""
           if (footer) footer.style.display = ""
           this.el.style.resize = "both"
+          this.el.style.overflow = "auto"
           if (this.el.dataset.savedHeight) {
             this.el.style.height = this.el.dataset.savedHeight
           }

@@ -80,6 +80,12 @@ defmodule EyeInTheSkyWeb.CanvasLive do
           canvases = Enum.map(socket.assigns.canvases, fn c ->
             if c.id == id, do: updated, else: c
           end)
+          socket =
+            if socket.assigns.active_canvas_id == id do
+              assign(socket, :page_title, updated.name <> " — Canvas")
+            else
+              socket
+            end
           {:noreply, socket |> assign(:canvases, canvases) |> assign(:renaming_canvas_id, nil)}
 
         {:error, _} ->
@@ -147,6 +153,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
                     unsubscribe_all(socket.assigns.subscribed_session_ids)
 
                     socket
+                    |> assign(:page_title, "Canvas")
                     |> assign(:active_canvas_id, nil)
                     |> assign(:canvas_sessions, [])
                     |> assign(:subscribed_session_ids, [])
@@ -210,6 +217,32 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     else
       {:noreply, socket}
     end
+  end
+
+  def handle_info({:canvas_session_added, _payload}, socket) do
+    new_sessions = Canvases.list_canvas_sessions(socket.assigns.active_canvas_id || -1)
+    existing_ids = Enum.map(socket.assigns.canvas_sessions, & &1.id)
+
+    added =
+      Enum.reject(new_sessions, &(&1.id in existing_ids))
+      |> Enum.with_index(length(socket.assigns.canvas_sessions))
+      |> Enum.map(fn {cs, i} ->
+        if cs.pos_x == 0 and cs.pos_y == 0 and cs.width == 320 and cs.height == 260,
+          do: %{cs | pos_x: 24 + i * 32, pos_y: 16 + i * 32},
+          else: cs
+      end)
+
+    new_session_ids = Enum.map(added, & &1.session_id)
+    subscribe_all(new_session_ids)
+
+    {:noreply,
+     socket
+     |> assign(:canvas_sessions, socket.assigns.canvas_sessions ++ added)
+     |> assign(
+       :subscribed_session_ids,
+       socket.assigns.subscribed_session_ids ++ new_session_ids
+     )
+     |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())}
   end
 
   def handle_info(_, socket), do: {:noreply, socket}
@@ -324,10 +357,18 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   end
 
   defp activate_canvas(socket, canvas_id) do
+    if prev = socket.assigns.active_canvas_id, do: Events.unsubscribe_canvas(prev)
     unsubscribe_all(socket.assigns.subscribed_session_ids)
     sessions = Canvases.list_canvas_sessions(canvas_id)
     session_ids = Enum.map(sessions, & &1.session_id)
     subscribe_all(session_ids)
+    Events.subscribe_canvas(canvas_id)
+
+    canvas_name =
+      case Canvases.get_canvas(canvas_id) do
+        {:ok, c} -> c.name
+        _ -> "Canvas"
+      end
 
     sessions =
       sessions
@@ -339,6 +380,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
       end)
 
     socket
+    |> assign(:page_title, canvas_name <> " — Canvas")
     |> assign(:active_canvas_id, canvas_id)
     |> assign(:canvas_sessions, sessions)
     |> assign(:subscribed_session_ids, session_ids)

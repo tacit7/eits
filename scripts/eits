@@ -756,23 +756,26 @@ cmd_teams() {
         || die "failed to fetch members for team $team_id"
 
       local targets
-      targets=$(echo "$members_resp" | jq -r --arg self "$from" --argjson skip_self "$([[ "$include_self" == "true" ]] && echo false || echo true)" \
-        '.members[] | select(.session_uuid != null) | select($skip_self | not or .session_uuid != $self) | .session_uuid')
+      local skip_self; skip_self="$([[ "$include_self" == "true" ]] && echo false || echo true)"
+      targets=$(echo "$members_resp" | jq -r --arg self "$from" --argjson skip_self "$skip_self" \
+        '.members[] | select(.session_uuid != null) | select(($skip_self | not) or (.session_uuid != $self)) | .session_uuid')
 
       [[ -z "$targets" ]] && die "no recipients found in team $team_id"
 
       local sent=0 failed=0 results="[]"
       while IFS= read -r to; do
         [[ -z "$to" ]] && continue
-        local payload result
+        local payload result dm_exit
         payload=$(jq -n --arg f "$from" --arg t "$to" --arg m "$message" --argjson r "$response_required" \
           '{from_session_id: $f, to_session_id: $t, message: $m, response_required: $r}')
-        if result=$(_curl -X POST -H "Content-Type: application/json" -d "$payload" "$BASE_URL/dm" 2>/dev/null); then
+        result=$(_curl -X POST -H "Content-Type: application/json" -d "$payload" "$BASE_URL/dm" 2>&1); dm_exit=$?
+        if [[ $dm_exit -eq 0 ]]; then
           sent=$((sent+1))
           results=$(jq -n --argjson base "$results" --arg to "$to" --argjson r "$result" '$base + [{to: $to, ok: true, result: $r}]')
         else
           failed=$((failed+1))
-          results=$(jq -n --argjson base "$results" --arg to "$to" '$base + [{to: $to, ok: false}]')
+          results=$(jq -n --argjson base "$results" --arg to "$to" --argjson code "$dm_exit" --arg err "$result" \
+            '$base + [{to: $to, ok: false, exit_code: $code, error: $err}]')
         fi
       done <<< "$targets"
 

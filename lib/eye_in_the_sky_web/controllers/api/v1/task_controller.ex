@@ -165,7 +165,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
         })
 
       {:error, {:bad_alias, message}} ->
-        {:error, message}
+        conn |> put_status(:unprocessable_entity) |> json(%{success: false, error: message})
 
       {:error, changeset} ->
         {:error, changeset}
@@ -229,16 +229,16 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       })
     else
       true ->
-        {:error, "message is required"}
+        conn |> put_status(:unprocessable_entity) |> json(%{success: false, error: "message is required"})
 
       {:error, :not_found} ->
         {:error, :not_found, "Task not found"}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        {:error, changeset}
+        conn |> put_status(:unprocessable_entity) |> json(%{success: false, errors: translate_errors(changeset)})
 
       {:error, _reason} ->
-        {:error, "Failed to complete task"}
+        conn |> put_status(:unprocessable_entity) |> json(%{success: false, error: "Failed to complete task"})
     end
   end
 

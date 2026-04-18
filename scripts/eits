@@ -517,7 +517,16 @@ cmd_commits() {
         esac
       done
       [[ -n "$agent_id" ]] || die "agent_id is required (or set EITS_AGENT_UUID)"
-      [[ ${#hashes[@]} -gt 0 ]] || die "at least one --hash is required"
+      if [[ ${#hashes[@]} -eq 0 ]]; then
+        local auto_hash
+        auto_hash=$(git rev-parse HEAD 2>/dev/null) || die "not in a git repo; use --hash"
+        hashes=("$auto_hash")
+        if [[ ${#messages[@]} -eq 0 ]]; then
+          local auto_msg
+          auto_msg=$(git log -1 --format=%s 2>/dev/null || echo "")
+          [[ -n "$auto_msg" ]] && messages=("$auto_msg")
+        fi
+      fi
       local hashes_json; hashes_json=$(printf '%s\n' "${hashes[@]}" | jq -R . | jq -s .)
       local payload
       if [[ ${#messages[@]} -gt 0 ]]; then
@@ -967,6 +976,21 @@ cmd_worktree() {
   esac
 }
 
+# ── me / whoami ───────────────────────────────────────────────────────────────
+
+cmd_me() {
+  local uuid="${EITS_SESSION_UUID:-}"
+  echo "Session UUID:  ${EITS_SESSION_UUID:-(not set)}"
+  echo "Agent UUID:    ${EITS_AGENT_UUID:-(not set)}"
+  echo "Project ID:    ${EITS_PROJECT_ID:-(not set)}"
+  echo "API URL:       ${BASE_URL}"
+  if [[ -n "$uuid" ]]; then
+    echo ""
+    echo "Server-side session:"
+    _get "/sessions/$uuid" 2>/dev/null || echo "(session not found on server)"
+  fi
+}
+
 # ── help ──────────────────────────────────────────────────────────────────────
 
 usage() {
@@ -988,6 +1012,7 @@ Commands:
   teams     list|get|create|delete|members|join|status|update-member|leave|broadcast|my-teams
   timer     show|set|cancel   (default session: self / \$EITS_SESSION_UUID)
   worktree  create|remove   (EITS Elixir projects only)
+  me        Print current session/agent/project context and verify server-side
 
 Requires: curl, jq
 EOF
@@ -1010,6 +1035,7 @@ case "$cmd" in
   teams)     cmd_teams     "$@" ;;
   timer)     cmd_timer     "$@" ;;
   worktree)  cmd_worktree "$@" ;;
+  me|whoami) cmd_me ;;
   help|--help|-h) usage ;;
   "") usage; exit 0 ;;
   *) die "unknown command: $cmd" ;;

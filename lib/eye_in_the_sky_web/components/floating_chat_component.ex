@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Components.FavoriteFabComponent do
+defmodule EyeInTheSkyWeb.Components.FloatingChatComponent do
   @moduledoc """
   Server-side LiveComponent for the floating action button (FAB) radial menu.
 
@@ -29,7 +29,7 @@ defmodule EyeInTheSkyWeb.Components.FavoriteFabComponent do
     ~H"""
     <div
       id={@id}
-      phx-hook="FavoriteFab"
+      phx-hook="FloatingChat"
       class={["fab fab-flower", if(Enum.empty?(@bookmarks), do: "hidden", else: "")]}
       style="position:fixed;bottom:1rem;right:1rem;width:200px;height:200px;overflow:visible;pointer-events:none"
     >

@@ -11,14 +11,14 @@ defmodule EyeInTheSky.Events do
   |--------------------------------|-----------------------------------|
   | `"agents"`                     | Sidebar, DMLive, session pages    |
   | `"agent:working"`              | ChatLive, DMLive                  |
-  | `"session:<id>"`               | DMLive, FabHook                   |
+  | `"session:<id>"`               | DMLive, FloatingChatLive          |
   | `"session:<id>:status"`        | DMLive                            |
   | `"dm:<id>:stream"`             | DMLive                            |
   | `"dm:<id>:queue"`              | DMLive                            |
   | `"channel:<id>:messages"`      | ChatLive                          |
   | `"tasks"`                      | Overview, DMLive                  |
   | `"tasks:<project_id>"`         | Kanban                            |
-  | `"notifications"`              | FabHook                           |
+  | `"notifications"`              | FloatingChatLive                  |
   | `"teams"`                      | TeamLive                          |
   | `"settings"`                   | OverviewSettings                  |
   | `"scheduled_jobs"`             | JobsLive                          |

@@ -75,38 +75,73 @@ defmodule EyeInTheSky.IAM.Evaluator do
 
   # ── matching ────────────────────────────────────────────────────────────────
 
+  @doc """
+  Trace why a policy matched or missed against a context. Returns `:ok` on a
+  full match, or `{:miss, axis}` where axis is one of
+  `:agent_type | :action | :project | :resource | :condition | :builtin_matcher | :builtin_error`.
+
+  Used by the evaluator for matching and by `EyeInTheSky.IAM.Simulator` for
+  per-policy dry-run traces. Callers that only need a boolean can compare the
+  result to `:ok`.
+
+  The `:skip_builtins` option bypasses built-in matcher dispatch (useful for
+  simulation to avoid shelling out). When skipped, a built-in policy passes as
+  long as the coarse axes match.
+  """
+  @spec trace_policy(Policy.t(), Context.t(), keyword()) ::
+          :ok | {:miss, atom()}
+  def trace_policy(%Policy{} = p, %Context{} = ctx, opts \\ []) do
+    cond do
+      not agent_matches?(p, ctx) -> {:miss, :agent_type}
+      not action_matches?(p, ctx) -> {:miss, :action}
+      not project_matches?(p, ctx) -> {:miss, :project}
+      true -> specialized_trace(p, ctx, opts)
+    end
+  end
+
   defp matches?(%Policy{} = p, %Context{} = ctx) do
-    agent_matches?(p, ctx) and
-      action_matches?(p, ctx) and
-      project_matches?(p, ctx) and
-      specialized_matches?(p, ctx)
+    trace_policy(p, ctx) == :ok
   end
 
   # System policies with `builtin_matcher` bypass declarative resource_glob
   # and ConditionEval — they own their match logic in an Elixir module.
-  defp specialized_matches?(%Policy{builtin_matcher: key} = p, %Context{} = ctx)
+  defp specialized_trace(%Policy{builtin_matcher: key} = p, %Context{} = ctx, opts)
        when is_binary(key) do
-    case EyeInTheSky.IAM.BuiltinMatcher.Registry.fetch(key) do
-      {:ok, module} ->
-        safe_builtin_match(module, p, ctx)
+    cond do
+      Keyword.get(opts, :skip_builtins, false) ->
+        :ok
 
-      :error ->
-        :telemetry.execute(
-          [:eye_in_the_sky, :iam, :builtin_matcher, :unknown_key],
-          %{count: 1},
-          %{policy_id: p.id, key: key}
-        )
+      true ->
+        case EyeInTheSky.IAM.BuiltinMatcher.Registry.fetch(key) do
+          {:ok, module} ->
+            case safe_builtin_trace(module, p, ctx) do
+              :match -> :ok
+              :no_match -> {:miss, :builtin_matcher}
+              :error -> {:miss, :builtin_error}
+            end
 
-        false
+          :error ->
+            :telemetry.execute(
+              [:eye_in_the_sky, :iam, :builtin_matcher, :unknown_key],
+              %{count: 1},
+              %{policy_id: p.id, key: key}
+            )
+
+            {:miss, :builtin_matcher}
+        end
     end
   end
 
-  defp specialized_matches?(%Policy{} = p, %Context{} = ctx) do
-    resource_matches?(p, ctx) and ConditionEval.matches?(p.condition, ctx, p.id)
+  defp specialized_trace(%Policy{} = p, %Context{} = ctx, _opts) do
+    cond do
+      not resource_matches?(p, ctx) -> {:miss, :resource}
+      not ConditionEval.matches?(p.condition, ctx, p.id) -> {:miss, :condition}
+      true -> :ok
+    end
   end
 
-  defp safe_builtin_match(module, %Policy{} = p, %Context{} = ctx) do
-    module.matches?(p, ctx)
+  defp safe_builtin_trace(module, %Policy{} = p, %Context{} = ctx) do
+    if module.matches?(p, ctx), do: :match, else: :no_match
   rescue
     e ->
       :telemetry.execute(
@@ -115,7 +150,7 @@ defmodule EyeInTheSky.IAM.Evaluator do
         %{policy_id: p.id, module: module, kind: :error, reason: Exception.message(e)}
       )
 
-      false
+      :error
   catch
     kind, reason ->
       :telemetry.execute(
@@ -124,7 +159,7 @@ defmodule EyeInTheSky.IAM.Evaluator do
         %{policy_id: p.id, module: module, kind: kind, reason: inspect(reason)}
       )
 
-      false
+      :error
   end
 
   defp agent_matches?(%Policy{agent_type: "*"}, _ctx), do: true

@@ -80,12 +80,12 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
   end
 
   def handle_event("update_form", %{"form" => params}, socket) do
-    form = Map.merge(socket.assigns.form, params)
+    form = Map.merge(socket.assigns.form, normalize_checkbox_params(params))
     {:noreply, assign(socket, :form, form)}
   end
 
   def handle_event("simulate", %{"form" => params}, socket) do
-    form = Map.merge(socket.assigns.form, params)
+    form = Map.merge(socket.assigns.form, normalize_checkbox_params(params))
     ctx = build_context(form)
 
     opts = [
@@ -104,6 +104,14 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
 
   def handle_event("reset", _params, socket) do
     {:noreply, socket |> assign(:form, @default_form) |> assign(:result, nil)}
+  end
+
+  # ── helpers ───────────────────────────────────────────────────────────────
+
+  # Unchecked checkboxes are absent from form params entirely; explicitly
+  # default them to "false" so merge never preserves a stale "true".
+  defp normalize_checkbox_params(params) do
+    Map.put_new(params, "skip_builtins", "false")
   end
 
   # ── context building ──────────────────────────────────────────────────────

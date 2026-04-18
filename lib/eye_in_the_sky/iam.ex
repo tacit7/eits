@@ -25,6 +25,27 @@ defmodule EyeInTheSky.IAM do
     |> Repo.all()
   end
 
+  @doc """
+  List policies filtered by any of `:agent_type`, `:action`, `:effect`, or
+  `:enabled`. A `nil` or empty-string filter is a no-op; other values are
+  exact-match.
+  """
+  @spec list_policies(map() | keyword()) :: [Policy.t()]
+  def list_policies(filters) when is_list(filters) or is_map(filters) do
+    filters
+    |> Enum.reduce(Policy, fn
+      {_key, nil}, q -> q
+      {_key, ""}, q -> q
+      {:agent_type, v}, q -> where(q, [p], p.agent_type == ^v)
+      {:action, v}, q -> where(q, [p], p.action == ^v)
+      {:effect, v}, q -> where(q, [p], p.effect == ^v)
+      {:enabled, v}, q when is_boolean(v) -> where(q, [p], p.enabled == ^v)
+      {_, _}, q -> q
+    end)
+    |> order_by([p], desc: p.priority, asc: p.id)
+    |> Repo.all()
+  end
+
   @doc "Fetch a policy by id."
   @spec get_policy(integer()) :: {:ok, Policy.t()} | {:error, :not_found}
   def get_policy(id) do

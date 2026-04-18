@@ -25,6 +25,7 @@ defmodule EyeInTheSky.Events do
   | `"session_lifecycle"`          | Teams.Subscriber                  |
   | `"projects"`                   | Sidebar                           |
   | `"session:<id>:timer"`         | DMLive                            |
+  | `"canvas:<id>"`                | CanvasLive                        |
 
   ## Payload shape for `agent:working`
 
@@ -289,6 +290,20 @@ defmodule EyeInTheSky.Events do
 
   @doc "Unsubscribe from session status events."
   def unsubscribe_session_status(session_id), do: unsub("session:#{session_id}:status")
+
+  # ---------------------------------------------------------------------------
+  # Canvas events — topic: "canvas:<canvas_id>"
+  # ---------------------------------------------------------------------------
+
+  @doc "Subscribe to canvas-scoped events (session added, etc.)."
+  def subscribe_canvas(canvas_id), do: sub("canvas:#{canvas_id}")
+
+  @doc "Unsubscribe from canvas-scoped events."
+  def unsubscribe_canvas(canvas_id), do: unsub("canvas:#{canvas_id}")
+
+  @doc "A session was added to a canvas."
+  def canvas_session_added(canvas_id),
+    do: broadcast("canvas:#{canvas_id}", {:canvas_session_added, %{canvas_id: canvas_id}})
 
   # ---------------------------------------------------------------------------
   # Orchestrator timer events — topic: "session:<session_id>:timer"

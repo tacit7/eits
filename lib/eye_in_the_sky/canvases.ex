@@ -42,13 +42,20 @@ defmodule EyeInTheSky.Canvases do
   # on_conflict: {:replace, [:updated_at]} ensures the returned struct always
   # has a real id (not nil), even when the row already exists.
   def add_session(canvas_id, session_id) do
-    %CanvasSession{}
-    |> CanvasSession.changeset(%{canvas_id: canvas_id, session_id: session_id})
-    |> Repo.insert(
-      on_conflict: {:replace, [:updated_at]},
-      conflict_target: [:canvas_id, :session_id],
-      returning: true
-    )
+    result =
+      %CanvasSession{}
+      |> CanvasSession.changeset(%{canvas_id: canvas_id, session_id: session_id})
+      |> Repo.insert(
+        on_conflict: {:replace, [:updated_at]},
+        conflict_target: [:canvas_id, :session_id],
+        returning: true
+      )
+
+    if match?({:ok, _}, result) do
+      EyeInTheSky.Events.canvas_session_added(canvas_id)
+    end
+
+    result
   end
 
   def remove_session(canvas_id, session_id) do

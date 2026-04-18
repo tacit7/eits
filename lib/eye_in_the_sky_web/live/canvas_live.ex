@@ -17,7 +17,8 @@ defmodule EyeInTheSkyWeb.CanvasLive do
      |> assign(:active_canvas_id, nil)
      |> assign(:canvas_sessions, [])
      |> assign(:subscribed_session_ids, [])
-     |> assign(:creating_canvas, false)}
+     |> assign(:creating_canvas, false)
+     |> assign(:renaming_canvas_id, nil)}
   end
 
   @impl true
@@ -63,6 +64,36 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
   def handle_event("create_canvas", _params, socket) do
     {:noreply, assign(socket, :creating_canvas, false)}
+  end
+
+  def handle_event("start_rename", %{"canvas-id" => id_str}, socket) do
+    {:noreply, assign(socket, :renaming_canvas_id, parse_int(id_str))}
+  end
+
+  def handle_event("rename_canvas", %{"canvas-id" => id_str, "name" => name}, socket)
+      when name != "" do
+    if id = parse_int(id_str) do
+      case Canvases.rename_canvas(id, name) do
+        {:ok, updated} ->
+          canvases = Enum.map(socket.assigns.canvases, fn c ->
+            if c.id == id, do: updated, else: c
+          end)
+          {:noreply, socket |> assign(:canvases, canvases) |> assign(:renaming_canvas_id, nil)}
+
+        {:error, _} ->
+          {:noreply, assign(socket, :renaming_canvas_id, nil)}
+      end
+    else
+      {:noreply, assign(socket, :renaming_canvas_id, nil)}
+    end
+  end
+
+  def handle_event("rename_canvas", _params, socket) do
+    {:noreply, assign(socket, :renaming_canvas_id, nil)}
+  end
+
+  def handle_event("cancel_rename", _params, socket) do
+    {:noreply, assign(socket, :renaming_canvas_id, nil)}
   end
 
   def handle_event("window_moved", %{"id" => cs_id, "x" => x, "y" => y}, socket) do
@@ -147,14 +178,37 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     <div class="flex flex-col h-full bg-base-100">
       <div role="tablist" class="tabs tabs-border px-2 border-b border-base-300 bg-base-200/70 shrink-0">
         <%= for canvas <- @canvases do %>
-          <a
-            role="tab"
-            class={["tab tab-sm", if(@active_canvas_id == canvas.id, do: "tab-active")]}
-            phx-click="switch_tab"
-            phx-value-canvas-id={canvas.id}
-          >
-            {canvas.name}
-          </a>
+          <%= if @renaming_canvas_id == canvas.id do %>
+            <form
+              id={"rename-canvas-form-#{canvas.id}"}
+              phx-submit="rename_canvas"
+              phx-value-canvas-id={canvas.id}
+              class="flex items-center px-1"
+            >
+              <input
+                type="text"
+                name="name"
+                value={canvas.name}
+                class="input input-xs w-28 text-base"
+                phx-keydown="cancel_rename"
+                phx-key="Escape"
+                phx-blur={JS.dispatch("submit", to: "#rename-canvas-form-#{canvas.id}")}
+                autofocus
+              />
+            </form>
+          <% else %>
+            <a
+              role="tab"
+              id={"canvas-tab-#{canvas.id}"}
+              data-canvas-id={canvas.id}
+              phx-hook="CanvasTabHook"
+              class={["tab tab-sm", if(@active_canvas_id == canvas.id, do: "tab-active")]}
+              phx-click="switch_tab"
+              phx-value-canvas-id={canvas.id}
+            >
+              {canvas.name}
+            </a>
+          <% end %>
         <% end %>
         <%= if @creating_canvas do %>
           <form phx-submit="create_canvas" class="flex items-center gap-1 px-2">

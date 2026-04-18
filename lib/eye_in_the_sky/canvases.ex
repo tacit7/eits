@@ -61,6 +61,13 @@ defmodule EyeInTheSky.Canvases do
     :ok
   end
 
+  def rename_canvas(canvas_id, name) do
+    case Repo.get(Canvas, canvas_id) do
+      nil -> {:error, :not_found}
+      canvas -> canvas |> Canvas.changeset(%{name: name}) |> Repo.update()
+    end
+  end
+
   def update_window_layout(canvas_session_id, attrs) do
     case Repo.get(CanvasSession, canvas_session_id) do
       nil -> {:error, :not_found}

@@ -62,6 +62,7 @@ import {CommandPalette} from "./hooks/command_palette"
 import {FlashTimeout} from "./hooks/flash_timeout"
 import {ReloadConfirmModal} from "./hooks/reload_confirm_modal"
 import {ChatWindowHook} from "./hooks/chat_window_hook"
+import {CanvasTabHook} from "./hooks/canvas_tab_hook"
 import {TimerCountdown} from "./hooks/timer_countdown"
 import {SessionsDropdownGuard} from "./hooks/sessions_dropdown_guard"
 import {showToast} from "./hooks/utils"
@@ -123,6 +124,7 @@ Hooks.CommandPalette = CommandPalette
 Hooks.FlashTimeout = FlashTimeout
 Hooks.ReloadConfirmModal = ReloadConfirmModal
 Hooks.ChatWindowHook = ChatWindowHook
+Hooks.CanvasTabHook = CanvasTabHook
 Hooks.TimerCountdown = TimerCountdown
 Hooks.SessionsDropdownGuard = SessionsDropdownGuard
 

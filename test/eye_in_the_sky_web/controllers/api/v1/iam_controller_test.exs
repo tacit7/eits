@@ -152,10 +152,6 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
   # ── sanitize_api_keys PostToolUse ───────────────────────────────────────────
 
   describe "sanitize_api_keys builtin on PostToolUse" do
-    test "describe block is reachable", _ctx do
-      assert true
-    end
-
     setup do
       {:ok, _} =
         EyeInTheSky.IAM.seed_builtin(%{

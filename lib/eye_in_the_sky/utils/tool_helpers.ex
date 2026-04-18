@@ -41,7 +41,15 @@ defmodule EyeInTheSky.Utils.ToolHelpers do
 
   def parse_int(_), do: nil
 
-  @doc "Parse a string or integer to an integer. Returns `default` for invalid or nil input."
+  @doc """
+  Parse a string or integer to an integer with a fallback default.
+
+  Returns `default` for nil, non-integer strings, or any other type.
+  The catch-all clause is intentional and consistent with `parse_int/1` returning nil
+  for unexpected types. The prior ControllerHelpers.parse_int/2 lacked a catch-all
+  (FunctionClauseError on unexpected types), which was an oversight — all callers
+  pass HTTP params (string | integer | nil).
+  """
   def parse_int(nil, default), do: default
   def parse_int(val, _default) when is_integer(val), do: val
 

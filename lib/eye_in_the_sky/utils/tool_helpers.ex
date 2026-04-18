@@ -41,6 +41,19 @@ defmodule EyeInTheSky.Utils.ToolHelpers do
 
   def parse_int(_), do: nil
 
+  @doc "Parse a string or integer to an integer. Returns `default` for invalid or nil input."
+  def parse_int(nil, default), do: default
+  def parse_int(val, _default) when is_integer(val), do: val
+
+  def parse_int(val, default) when is_binary(val) do
+    case Integer.parse(val) do
+      {n, ""} -> n
+      _ -> default
+    end
+  end
+
+  def parse_int(_, default), do: default
+
   def maybe_put(map, _key, nil), do: map
   def maybe_put(map, key, value), do: Map.put(map, key, value)
 

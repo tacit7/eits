@@ -82,6 +82,18 @@ defmodule EyeInTheSky.Canvases do
     end
   end
 
+  def reset_canvas_layout(canvas_id) do
+    sessions = list_canvas_sessions(canvas_id)
+
+    sessions
+    |> Enum.with_index()
+    |> Enum.each(fn {cs, i} ->
+      update_window_layout(cs.id, %{pos_x: 24 + i * 40, pos_y: 24 + i * 40, width: 320, height: 260})
+    end)
+
+    :ok
+  end
+
   def count_sessions_per_canvas do
     from(cs in CanvasSession, group_by: cs.canvas_id, select: {cs.canvas_id, count(cs.id)})
     |> Repo.all()

@@ -174,6 +174,21 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     end
   end
 
+  def handle_event("tidy_layout", _params, socket) do
+    canvas_id = socket.assigns.active_canvas_id
+    Canvases.reset_canvas_layout(canvas_id)
+    sessions = Canvases.list_canvas_sessions(canvas_id)
+
+    sessions =
+      sessions
+      |> Enum.with_index()
+      |> Enum.map(fn {cs, i} ->
+        %{cs | pos_x: 24 + i * 40, pos_y: 24 + i * 40, width: 320, height: 260}
+      end)
+
+    {:noreply, assign(socket, :canvas_sessions, sessions)}
+  end
+
   def handle_event(_event, _params, socket), do: {:noreply, socket}
 
   @impl true
@@ -319,6 +334,14 @@ defmodule EyeInTheSkyWeb.CanvasLive do
             + New
           </a>
         <% end %>
+        <button
+          :if={@canvas_sessions != [] and not is_nil(@active_canvas_id)}
+          phx-click="tidy_layout"
+          class="ml-auto mr-2 btn btn-ghost btn-xs text-base-content/40 hover:text-base-content flex items-center gap-1"
+          title="Tidy windows"
+        >
+          <.icon name="hero-squares-2x2-mini" class="w-3.5 h-3.5" />
+        </button>
       </div>
 
       <div data-canvas-area class="relative flex-1 overflow-hidden">

@@ -126,9 +126,14 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
 
   # Connected-only — runs DB queries and GenServer calls after WebSocket upgrade.
   def assign_connected_defaults(socket, session) do
+    stream_content =
+      if session.status == "working",
+        do: AgentWorker.get_stream_state(session.id),
+        else: ""
+
     socket
     |> assign(:processing, initial_processing?(session))
-    |> assign(:stream_content, AgentWorker.get_stream_state(session.id))
+    |> assign(:stream_content, stream_content)
     |> assign(:workflow_states, Tasks.list_workflow_states())
     |> assign(:current_task, Tasks.get_current_task_for_session(session.id))
     |> assign(:queued_prompts, AgentWorker.get_queue(session.id))

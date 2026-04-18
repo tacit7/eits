@@ -1,4 +1,4 @@
-import { ChatModal } from './chat_modal.js'
+import { FloatingChatModal } from './floating_chat_modal.js'
 
 const STORAGE_KEY = 'eye-in-the-sky-bookmarks'
 const FAB_RADIUS = 90  // px — radial distance from main button to agent buttons
@@ -18,7 +18,7 @@ function radialOffsets(n) {
   })
 }
 
-export const FavoriteFab = {
+export const FloatingChat = {
   mounted() {
     this._chatAgent = null
     this._chatMessages = []
@@ -186,7 +186,7 @@ export const FavoriteFab = {
     this._modal?.destroy()
     const statusLabel = agent.status || 'idle'
     const isActive = ['working', 'compacting'].includes(statusLabel)
-    this._modal = new ChatModal({
+    this._modal = new FloatingChatModal({
       id: 'fab-chat-modal',
       title: agent.name || 'Agent',
       initials: this._initials(agent.name),

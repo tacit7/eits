@@ -1,4 +1,4 @@
-import { ChatModal } from './chat_modal.js'
+import { FloatingChatModal } from './floating_chat_modal.js'
 
 const MODAL_ID = 'config-guide-chat-modal'
 const OPEN_TIMEOUT_MS = 10_000
@@ -64,7 +64,7 @@ export const ConfigChatGuide = {
       })
       .then(data => {
         this._sessionUuid = data.session_uuid
-        this._modal = new ChatModal({
+        this._modal = new FloatingChatModal({
           id: MODAL_ID,
           title: 'Config Guide',
           initials: 'CG',

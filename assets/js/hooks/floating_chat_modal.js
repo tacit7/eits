@@ -13,7 +13,7 @@
  *   onSend          {fn(body)} — called with trimmed body when user sends
  *   onClose         {fn()}     — called when the close button is clicked
  */
-export class ChatModal {
+export class FloatingChatModal {
   constructor(config) {
     this._id = config.id
     this._cfg = config
@@ -85,11 +85,11 @@ export class ChatModal {
     const { title, initials, subtitle, subtitleClass, placeholder, dmHref } = this._cfg
 
     const subtitleHtml = subtitle != null
-      ? `<span id="${this._id}-subtitle" class="text-xs font-medium uppercase tracking-wider ml-1.5 ${subtitleClass || ''}">${ChatModal.escape(subtitle)}</span>`
+      ? `<span id="${this._id}-subtitle" class="text-xs font-medium uppercase tracking-wider ml-1.5 ${subtitleClass || ''}">${FloatingChatModal.escape(subtitle)}</span>`
       : ''
 
     const dmLinkHtml = dmHref
-      ? `<a href="${ChatModal.escape(dmHref)}" class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-primary" title="Open full DM">
+      ? `<a href="${FloatingChatModal.escape(dmHref)}" class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-primary" title="Open full DM">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
             <path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd" />
             <path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd" />
@@ -101,9 +101,9 @@ export class ChatModal {
       <div class="fixed bottom-24 right-4 w-[520px] z-[1000] flex flex-col bg-base-100 border border-base-content/10 rounded-xl shadow-2xl max-h-[850px] overflow-hidden">
         <div class="flex items-center justify-between px-4 py-2.5 border-b border-base-content/5 bg-base-200/30">
           <div class="flex items-center gap-2">
-            <span class="font-bold text-xs bg-primary/10 text-primary rounded-full w-7 h-7 flex items-center justify-center">${ChatModal.escape(initials)}</span>
+            <span class="font-bold text-xs bg-primary/10 text-primary rounded-full w-7 h-7 flex items-center justify-center">${FloatingChatModal.escape(initials)}</span>
             <div>
-              <span class="text-xs font-semibold text-base-content/70">${ChatModal.escape(title)}</span>
+              <span class="text-xs font-semibold text-base-content/70">${FloatingChatModal.escape(title)}</span>
               ${subtitleHtml}
             </div>
           </div>
@@ -128,7 +128,7 @@ export class ChatModal {
             <input
               type="text"
               id="${this._id}-input"
-              placeholder="${ChatModal.escape(placeholder || '')}"
+              placeholder="${FloatingChatModal.escape(placeholder || '')}"
               class="input input-sm flex-1 bg-base-200/50 border-base-content/8 text-base placeholder:text-base-content/25"
               autocomplete="off"
             />
@@ -149,14 +149,14 @@ export class ChatModal {
         : ''
       return `<div class="flex justify-start">
         <div class="bg-error/10 text-error rounded-xl px-3 py-2 text-sm max-w-[80%]">
-          <p>${ChatModal.escape(m.body)}</p>
+          <p>${FloatingChatModal.escape(m.body)}</p>
           ${closeBtn}
         </div>
       </div>`
     }
     const isUser = m.sender_role === 'user'
     return `<div class="flex ${isUser ? 'justify-end' : 'justify-start'}">
-      <div class="${isUser ? 'bg-primary/90 text-primary-content rounded-xl rounded-br-sm' : 'bg-base-200/60 rounded-xl rounded-bl-sm'} px-3 py-2 text-sm max-w-[80%] whitespace-pre-wrap">${ChatModal.escape(m.body)}</div>
+      <div class="${isUser ? 'bg-primary/90 text-primary-content rounded-xl rounded-br-sm' : 'bg-base-200/60 rounded-xl rounded-bl-sm'} px-3 py-2 text-sm max-w-[80%] whitespace-pre-wrap">${FloatingChatModal.escape(m.body)}</div>
     </div>`
   }
 

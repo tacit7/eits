@@ -55,7 +55,7 @@ defmodule EyeInTheSkyWeb.Helpers.PubSubHelpers do
   | `{:claude_response, session_ref, parsed}`     | `AgentWorker`          | Claude CLI output chunk  |
   | `{:claude_complete, session_ref, exit_code}`  | `AgentWorker`          | Claude CLI process exited |
 
-  Subscribers: `subscribe_session/1` — `DMLive`, `FabHook`.
+  Subscribers: `subscribe_session/1` — `DMLive`, `FloatingChatLive`.
 
   ### `"session:<session_id>:status"`
 
@@ -115,7 +115,7 @@ defmodule EyeInTheSkyWeb.Helpers.PubSubHelpers do
   | `{:notification_read, notif}`       | Notification marked read |
   | `{:notifications_updated, payload}` | Bulk update              |
 
-  Subscribers: `FabHook` (subscribes directly, not via helper).
+  Subscribers: `FloatingChatLive` (subscribes directly, not via helper).
 
   ### `"teams"`
 

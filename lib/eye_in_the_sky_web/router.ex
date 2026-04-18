@@ -122,7 +122,7 @@ defmodule EyeInTheSkyWeb.Router do
     live_session :app,
       on_mount: [
         EyeInTheSkyWeb.AuthHook,
-        EyeInTheSkyWeb.FabHook,
+        EyeInTheSkyWeb.FloatingChatLive,
         EyeInTheSkyWeb.NavHook
       ] do
       live "/", AgentLive.Index, :index

@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.FabHook do
+defmodule EyeInTheSkyWeb.FloatingChatLive do
   @moduledoc """
   LiveView on_mount hook that handles FAB favorite agents status requests
   and inline chat with bookmarked agents.
@@ -258,7 +258,7 @@ defmodule EyeInTheSkyWeb.FabHook do
   end
 
   defp update_fab_component(socket) do
-    send_update(EyeInTheSkyWeb.Components.FavoriteFabComponent,
+    send_update(EyeInTheSkyWeb.Components.FloatingChatComponent,
       id: "favorite-fab",
       bookmarks: socket.assigns.fab_bookmarks,
       statuses: socket.assigns.fab_statuses

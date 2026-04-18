@@ -146,14 +146,10 @@ export const ChatWindowHook = {
         const handle = this.el.querySelector("[data-drag-handle]")
         if (this._minimized) {
           this.el.dataset.savedHeight = this.el.offsetHeight + "px"
-          if (body) body.style.display = "none"
-          if (footer) footer.style.display = "none"
-          this.el.style.resize = "none"
-          const headerH = handle ? handle.offsetHeight : 40
-          if (this._resizeObserver) this._resizeObserver.disconnect()
-          this.el.style.height = headerH + "px"
-          this.el.style.overflow = "hidden"
+          this.el.dataset.windowMinimized = "true"
+          this._applyMinimized()
         } else {
+          delete this.el.dataset.windowMinimized
           if (body) body.style.display = ""
           if (footer) footer.style.display = ""
           this.el.style.resize = "both"
@@ -166,6 +162,23 @@ export const ChatWindowHook = {
       })
     }
 
+  },
+
+  _applyMinimized() {
+    const body = this.el.querySelector("[data-chat-body]")
+    const footer = this.el.querySelector("[data-chat-footer]")
+    const handle = this.el.querySelector("[data-drag-handle]")
+    if (body) body.style.display = "none"
+    if (footer) footer.style.display = "none"
+    this.el.style.resize = "none"
+    this.el.style.overflow = "hidden"
+    const headerH = handle ? handle.offsetHeight : 40
+    if (this._resizeObserver) this._resizeObserver.disconnect()
+    this.el.style.height = headerH + "px"
+  },
+
+  updated() {
+    if (this._minimized) this._applyMinimized()
   },
 
   destroyed() {

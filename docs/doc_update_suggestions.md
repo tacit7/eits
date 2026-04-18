@@ -1,5 +1,17 @@
 # Documentation Update Suggestions
 
+## 2026-04-17
+**Commits reviewed**: ca2f33b7..eb1b17ed
+
+- **IAM_POLICY.md** — Document IAM Phase 4a builtin matchers (commit af3020d8): new BuiltinMatcher behaviour with Registry of 9 stable matcher keys; system policies can dispatch to specialized Elixir modules for detection requiring command parsing, path resolution, or git-state inspection; safe_builtin_match with rescue/catch and telemetry on error (fail closed); includes 9 detectors: block_sudo, block_rm_rf, protect_env_vars, block_env_files, block_read_outside_cwd, block_push_master, block_curl_pipe_sh, block_work_on_main, warn_destructive_sql
+- **IAM_POLICY.md** — Document IAM seeds system (commit af3020d8): new Seeds module with boot-time idempotent seeding task; seeds 9 builtin policies on application start; uses Ecto migrations for schema updates (migration 20260407230411); documents idempotent seeding pattern and transient task error handling
+- **IAM_HOOK_INSTALL.md** — Update to include Phase 4a Policy evaluation flow (commit af3020d8): clarify that hook decisions now dispatch through specialized_matches?/2 for builtin policies; include example policy JSON with builtin_matcher field; note that command/content regex power reserved for registered built-ins (not user-authored policies in v1)
+- **ARCHITECTURE.md or CANVAS.md** — Document Canvas page refactoring (commit eb1b17ed): promoted CanvasOverlayComponent to dedicated CanvasLive page; moved from app.html.heex mount to dedicated route; canvas routes added to router.ex; removed overlay from agent layout; impacts: agent_list, chat_window, sidebar all_projects_section components updated for new canvas route; suggests documenting new canvas route structure and state management
+- **CODE_GUIDELINES.md** — Document canvas submenu UI pattern (commits a80c2f40, 2c68ae39, d6a541e5): DaisyUI dropdown-hover for side-triggered submenu; submenu appears to the right of parent menu item; hover triggers side navigation; CSS positioning: menu-dropdown and dropdown-content classes; applicable to other multi-level menu structures
+- **AGENTS.md or CODE_GUIDELINES.md** — Document active Claude models in agent forms (commit 830e2db3): new active_models feature added to new agent form and DM selector; models fetched from config settings; enables users to select from configured active models instead of hardcoded list; impacts: agent form, DM page model selector
+- **CODE_GUIDELINES.md** — Document Codex.ToolMapper extraction (commit 499b70b6): new separate module extracted from Codex.SDK; encapsulates tool description mapping logic; follows single-responsibility refactoring pattern; enables testing and reuse across SDK implementations
+- **DATABASE.md or ARCHITECTURE.md** — Document migration 20260407230411 (commit af3020d8): adds builtin_matcher column to iam_policies; stores registered BuiltinMatcher key; partial index on (project_id, system_key) for system policy lookup performance; schema validates builtin_matcher against Registry
+
 ## 2026-04-16
 **Commits reviewed**: ca2f33b7..e474c794
 

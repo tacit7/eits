@@ -135,9 +135,28 @@ export const ChatWindowHook = {
     })
     observer.observe(this.el)
     this._resizeObserver = observer
+
+    // --- Clamp on canvas resize (browser window resize) ---
+    const canvasEl = this.el.closest("[data-canvas-area]")
+    if (canvasEl) {
+      const canvasObserver = new ResizeObserver(() => {
+        const rect = canvasEl.getBoundingClientRect()
+        const maxLeft = rect.width  - this.el.offsetWidth
+        const maxTop  = rect.height - this.el.offsetHeight
+        const curLeft = parseInt(this.el.style.left, 10) || 0
+        const curTop  = parseInt(this.el.style.top,  10) || 0
+        const cl = Math.max(0, Math.min(curLeft, maxLeft))
+        const ct = Math.max(0, Math.min(curTop,  maxTop))
+        if (cl !== curLeft) this.el.style.left = `${cl}px`
+        if (ct !== curTop)  this.el.style.top  = `${ct}px`
+      })
+      canvasObserver.observe(canvasEl)
+      this._canvasObserver = canvasObserver
+    }
   },
 
   destroyed() {
     if (this._resizeObserver) this._resizeObserver.disconnect()
+    if (this._canvasObserver) this._canvasObserver.disconnect()
   }
 }

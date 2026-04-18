@@ -145,38 +145,37 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   def render(assigns) do
     ~H"""
     <div class="flex flex-col h-full bg-base-100">
-      <div class="flex items-center gap-3 px-4 py-2 border-b border-base-300 bg-base-200/70 shrink-0">
-        <span class="text-secondary font-semibold text-sm">Canvas</span>
-        <div class="tabs tabs-boxed tabs-xs bg-base-300">
-          <%= for canvas <- @canvases do %>
-            <a
-              class={["tab tab-xs", if(@active_canvas_id == canvas.id, do: "tab-active")]}
-              phx-click="switch_tab"
-              phx-value-canvas-id={canvas.id}
-            >
-              {canvas.name}
-            </a>
-          <% end %>
-          <%= if @creating_canvas do %>
-            <form phx-submit="create_canvas" class="flex gap-1 ml-1">
-              <input
-                type="text"
-                name="name"
-                class="input input-xs w-28 text-base"
-                placeholder="Canvas name"
-                autofocus
-              />
-              <button type="submit" class="btn btn-primary btn-sm min-h-[44px]">+</button>
-            </form>
-          <% else %>
-            <a
-              class="tab tab-xs text-base-content/40"
-              phx-click="start_new_canvas"
-            >
-              + New
-            </a>
-          <% end %>
-        </div>
+      <div role="tablist" class="tabs tabs-border px-2 border-b border-base-300 bg-base-200/70 shrink-0">
+        <%= for canvas <- @canvases do %>
+          <a
+            role="tab"
+            class={["tab tab-sm", if(@active_canvas_id == canvas.id, do: "tab-active")]}
+            phx-click="switch_tab"
+            phx-value-canvas-id={canvas.id}
+          >
+            {canvas.name}
+          </a>
+        <% end %>
+        <%= if @creating_canvas do %>
+          <form phx-submit="create_canvas" class="flex items-center gap-1 px-2">
+            <input
+              type="text"
+              name="name"
+              class="input input-xs w-28 text-base"
+              placeholder="Canvas name"
+              autofocus
+            />
+            <button type="submit" class="btn btn-primary btn-xs min-h-[44px]">+</button>
+          </form>
+        <% else %>
+          <a
+            role="tab"
+            class="tab tab-sm text-base-content/40"
+            phx-click="start_new_canvas"
+          >
+            + New
+          </a>
+        <% end %>
       </div>
 
       <div data-canvas-area class="relative flex-1 overflow-hidden">

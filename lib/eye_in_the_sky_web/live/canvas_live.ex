@@ -126,6 +126,44 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     end
   end
 
+  def handle_event("delete_canvas", %{"canvas-id" => id_str}, socket) do
+    case parse_int(id_str) do
+      nil ->
+        {:noreply, socket}
+
+      canvas_id ->
+        case Canvases.delete_canvas(canvas_id) do
+          {:ok, _} ->
+            canvases = Enum.reject(socket.assigns.canvases, &(&1.id == canvas_id))
+            socket = assign(socket, :canvases, canvases)
+
+            socket =
+              if socket.assigns.active_canvas_id == canvas_id do
+                case canvases do
+                  [] ->
+                    unsubscribe_all(socket.assigns.subscribed_session_ids)
+
+                    socket
+                    |> assign(:active_canvas_id, nil)
+                    |> assign(:canvas_sessions, [])
+                    |> assign(:subscribed_session_ids, [])
+                    |> push_patch(to: ~p"/canvases")
+
+                  _ ->
+                    redirect_to_first_or_stay(socket)
+                end
+              else
+                socket
+              end
+
+            {:noreply, socket}
+
+          {:error, _} ->
+            {:noreply, socket}
+        end
+    end
+  end
+
   def handle_event(_event, _params, socket), do: {:noreply, socket}
 
   @impl true
@@ -207,6 +245,16 @@ defmodule EyeInTheSkyWeb.CanvasLive do
               phx-value-canvas-id={canvas.id}
             >
               {canvas.name}
+              <button
+                :if={@active_canvas_id == canvas.id}
+                type="button"
+                phx-click.stop="delete_canvas"
+                phx-value-canvas-id={canvas.id}
+                phx-confirm="Delete canvas and all its windows?"
+                class="ml-1 opacity-50 hover:opacity-100"
+              >
+                <.icon name="hero-trash-mini" class="w-3 h-3" />
+              </button>
             </a>
           <% end %>
         <% end %>

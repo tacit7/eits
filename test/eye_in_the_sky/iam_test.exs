@@ -86,6 +86,21 @@ defmodule EyeInTheSky.IAMTest do
     end
   end
 
+  describe "delete_policy/1" do
+    test "deletes a user policy" do
+      {:ok, p} = IAM.create_policy(%{name: "temp", effect: "allow"})
+      assert {:ok, _} = IAM.delete_policy(p)
+      assert {:error, :not_found} = IAM.get_policy(p.id)
+    end
+
+    test "refuses to delete a system policy" do
+      sk = "t_del_guard_#{System.unique_integer([:positive])}"
+      {:ok, p} = IAM.create_policy(%{name: "sys", effect: "deny", system_key: sk, editable_fields: ["enabled"]})
+      assert {:error, :system_policy} = IAM.delete_policy(p)
+      assert {:ok, _} = IAM.get_policy(p.id)
+    end
+  end
+
   describe "bulk_toggle_enabled/2" do
     test "toggles enabled for the given ids" do
       {:ok, a} = IAM.create_policy(%{name: "a", effect: "allow"})

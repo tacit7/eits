@@ -85,8 +85,15 @@ defmodule EyeInTheSky.IAM do
     |> maybe_invalidate_cache()
   end
 
-  @doc "Delete a policy by struct."
-  @spec delete_policy(Policy.t()) :: {:ok, Policy.t()} | {:error, Ecto.Changeset.t()}
+  @doc """
+  Delete a user policy by struct. System policies (non-nil `system_key`) are
+  refused — returns `{:error, :system_policy}`.
+  """
+  @spec delete_policy(Policy.t()) ::
+          {:ok, Policy.t()} | {:error, :system_policy} | {:error, Ecto.Changeset.t()}
+  def delete_policy(%Policy{system_key: key}) when is_binary(key),
+    do: {:error, :system_policy}
+
   def delete_policy(%Policy{} = policy) do
     policy
     |> Repo.delete()

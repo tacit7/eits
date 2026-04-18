@@ -50,7 +50,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
   @impl true
   def handle_event("validate", %{"policy" => raw_params} = event_params, socket) do
     condition_text = Map.get(event_params, "condition_text", socket.assigns.condition_text)
-    params = scrub_empty(raw_params)
+    params = raw_params |> strip_privileged() |> scrub_empty()
     {attrs, condition_error} = merge_condition(params, condition_text)
 
     changeset =
@@ -67,7 +67,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
 
   def handle_event("save", %{"policy" => raw_params} = event_params, socket) do
     condition_text = Map.get(event_params, "condition_text", socket.assigns.condition_text)
-    params = scrub_empty(raw_params)
+    params = raw_params |> strip_privileged() |> scrub_empty()
 
     case merge_condition(params, condition_text) do
       {attrs, nil} ->
@@ -127,6 +127,12 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
 
   defp apply_condition_error(changeset, message) do
     Ecto.Changeset.add_error(changeset, :condition, message)
+  end
+
+  @privileged_fields ~w(system_key editable_fields builtin_matcher)
+
+  defp strip_privileged(params) when is_map(params) do
+    Map.drop(params, @privileged_fields)
   end
 
   @scrub_when_empty ~w(project_id agent_type project_path action resource_glob)

@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
   @impl true
   def handle_event("validate", %{"policy" => raw_params} = event_params, socket) do
     condition_text = Map.get(event_params, "condition_text", "{}")
-    params = scrub_empty(raw_params)
+    params = raw_params |> strip_privileged() |> scrub_empty()
     {attrs, condition_error} = merge_condition(params, condition_text)
 
     changeset =
@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
 
   def handle_event("save", %{"policy" => raw_params} = event_params, socket) do
     condition_text = Map.get(event_params, "condition_text", "{}")
-    params = scrub_empty(raw_params)
+    params = raw_params |> strip_privileged() |> scrub_empty()
 
     case merge_condition(params, condition_text) do
       {attrs, nil} ->
@@ -118,6 +118,14 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
   #
   # Required string fields (`name`, `effect`) are intentionally preserved so
   # `validate_required` surfaces a `"can't be blank"` error in the form.
+  # Fields that operators must never be able to forge via form params.
+  # system_key/editable_fields are seeder-only; builtin_matcher is seeder-only.
+  @privileged_fields ~w(system_key editable_fields builtin_matcher)
+
+  defp strip_privileged(params) when is_map(params) do
+    Map.drop(params, @privileged_fields)
+  end
+
   @scrub_when_empty ~w(project_id agent_type project_path action resource_glob)
 
   defp scrub_empty(params) when is_map(params) do

@@ -262,7 +262,6 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
           <div
             id="sessions-list"
             phx-update="stream"
-            phx-hook="SessionsDropdownGuard"
             class="divide-y divide-base-content/5 bg-base-100 rounded-xl px-4"
           >
             <div :for={{dom_id, session} <- @streams.sessions} id={dom_id}>
@@ -273,7 +272,11 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
                 editing_session_id={@editing_session_id}
               >
                 <:actions>
-                  <div class="relative dropdown dropdown-end transition-all md:opacity-0 md:group-hover:opacity-100">
+                  <div
+                    id={"session-actions-#{session.id}"}
+                    phx-update="ignore"
+                    class="relative dropdown dropdown-end transition-all md:opacity-0 md:group-hover:opacity-100"
+                  >
                     <button
                       tabindex="0"
                       type="button"

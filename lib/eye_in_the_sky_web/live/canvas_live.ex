@@ -147,6 +147,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
                     |> assign(:active_canvas_id, nil)
                     |> assign(:canvas_sessions, [])
                     |> assign(:subscribed_session_ids, [])
+                    |> push_patch(to: ~p"/canvases")
 
                   _ ->
                     redirect_to_first_or_stay(socket)

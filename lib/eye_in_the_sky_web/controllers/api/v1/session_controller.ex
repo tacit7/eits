@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     session_uuid = params["session_id"]
 
     if is_nil(session_uuid) or session_uuid == "" do
-      conn |> put_status(:bad_request) |> json(%{error: "session_id is required"})
+      {:error, :bad_request, "session_id is required"}
     else
       case Projects.resolve_project(params) do
         {:ok, project_id, _name} ->
@@ -28,10 +28,8 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
             {:error, :not_found} -> handle_new_session(conn, params, project_id)
           end
 
-        {:error, code, message} ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> json(%{error: message, code: code})
+        {:error, _code, message} ->
+          {:error, message}
       end
     end
   end
@@ -54,10 +52,8 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
           status: updated.status
         })
 
-      {:error, changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Failed to update session", details: translate_errors(changeset)})
+      {:error, _changeset} ->
+        {:error, "Failed to update session"}
     end
   end
 
@@ -74,15 +70,11 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
           status: session.status
         })
 
-      {:error, :agent, changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Failed to create agent", details: translate_errors(changeset)})
+      {:error, :agent, _changeset} ->
+        {:error, "Failed to create agent"}
 
-      {:error, :session, changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Failed to create session", details: translate_errors(changeset)})
+      {:error, :session, _changeset} ->
+        {:error, "Failed to create session"}
     end
   end
 
@@ -104,13 +96,11 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
             ended_at: updated.ended_at
           })
 
-        {:error, changeset} ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> json(%{error: "Failed to update session", details: translate_errors(changeset)})
+        {:error, _changeset} ->
+          {:error, "Failed to update session"}
       end
     else
-      {:error, :not_found} -> session_not_found(conn)
+      {:error, :not_found} -> {:error, :not_found, "Session not found"}
     end
   end
 
@@ -150,14 +140,14 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     tool_name = params["tool_name"]
 
     if is_nil(tool_name) or tool_name == "" do
-      conn |> put_status(:bad_request) |> json(%{error: "tool_name is required"})
+      {:error, :bad_request, "tool_name is required"}
     else
       with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
         Sessions.update_session(session, %{last_activity_at: DateTime.utc_now()})
         Sessions.record_tool_event(session, params["type"], params)
         json(conn, %{success: true})
       else
-        {:error, :not_found} -> session_not_found(conn)
+        {:error, :not_found} -> {:error, :not_found, "Session not found"}
       end
     end
   end
@@ -218,7 +208,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
         )
       )
     else
-      {:error, :not_found} -> session_not_found(conn)
+      {:error, :not_found} -> {:error, :not_found, "Session not found"}
     end
   end
 
@@ -245,13 +235,11 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
           handle_terminal_status(updated, status)
           json(conn, %{success: true, message: "Session ended", status: updated.status})
 
-        {:error, cs} ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> json(%{error: "Failed", details: translate_errors(cs)})
+        {:error, _cs} ->
+          {:error, "Failed"}
       end
     else
-      {:error, :not_found} -> session_not_found(conn)
+      {:error, :not_found} -> {:error, :not_found, "Session not found"}
     end
   end
 
@@ -262,7 +250,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
       case Contexts.get_session_context(session.id) do
         {:error, :not_found} ->
-          conn |> put_status(:not_found) |> json(%{error: "No context found"})
+          {:error, :not_found, "No context found"}
 
         {:ok, ctx} ->
           json(conn, %{
@@ -272,7 +260,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
           })
       end
     else
-      {:error, :not_found} -> session_not_found(conn)
+      {:error, :not_found} -> {:error, :not_found, "Session not found"}
     end
   end
 
@@ -283,12 +271,12 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     context = params["context"]
 
     if is_nil(context) or context == "" do
-      conn |> put_status(:bad_request) |> json(%{error: "context is required"})
+      {:error, :bad_request, "context is required"}
     else
       with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
         do_upsert_context(conn, session, context)
       else
-        {:error, :not_found} -> session_not_found(conn)
+        {:error, :not_found} -> {:error, :not_found, "Session not found"}
       end
     end
   end
@@ -300,10 +288,8 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       {:ok, sc} ->
         json(conn, %{success: true, context: sc.context})
 
-      {:error, cs} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Failed", details: translate_errors(cs)})
+      {:error, _cs} ->
+        {:error, "Failed"}
     end
   end
 
@@ -328,7 +314,4 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     EyeInTheSky.Teams.mark_member_done_by_session(session.id, member_status)
   end
 
-  defp session_not_found(conn) do
-    conn |> put_status(:not_found) |> json(%{error: "Session not found"})
-  end
 end

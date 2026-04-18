@@ -41,16 +41,23 @@ export const ChatWindowHook = {
       let dragPersistTimer = null
       let activeSnap = null
       let canvas = null
+      let canvasRect = null
       let snapPreview = null
 
       const onMouseMove = (e) => {
         const dx = e.clientX - startX
         const dy = e.clientY - startY
-        this.el.style.left = `${startLeft + dx}px`
-        this.el.style.top  = `${startTop  + dy}px`
 
-        if (canvas && snapPreview) {
-          const rect = canvas.getBoundingClientRect()
+        const maxLeft = canvasRect ? canvasRect.width  - this.el.offsetWidth  : Infinity
+        const maxTop  = canvasRect ? canvasRect.height - this.el.offsetHeight : Infinity
+        const newLeft = Math.max(0, Math.min(startLeft + dx, maxLeft))
+        const newTop  = Math.max(0, Math.min(startTop  + dy, maxTop))
+
+        this.el.style.left = `${newLeft}px`
+        this.el.style.top  = `${newTop}px`
+
+        if (canvas && snapPreview && canvasRect) {
+          const rect = canvasRect
           activeSnap = getSnapZone(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height)
           if (activeSnap) {
             snapPreview.style.display = "block"
@@ -103,6 +110,7 @@ export const ChatWindowHook = {
         startTop  = parseInt(this.el.style.top, 10)  || 0
 
         canvas      = this.el.closest("[data-canvas-area]")
+        canvasRect  = canvas ? canvas.getBoundingClientRect() : null
         snapPreview = canvas ? getOrCreateSnapPreview(canvas) : null
 
         document.querySelectorAll("[data-chat-window]").forEach(w => { w.style.zIndex = "1" })

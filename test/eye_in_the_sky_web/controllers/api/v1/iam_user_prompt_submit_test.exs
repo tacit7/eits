@@ -47,12 +47,11 @@ defmodule EyeInTheSkyWeb.Controllers.Api.V1.IamUserPromptSubmitTest do
         String.contains?(i.message, "Redacted:")
       end)
 
-      # Check response structure
-      assert response["continue"] == true
-      assert response["suppressOutput"] == true
+      # Check response structure — UserPromptSubmit must replace the prompt, not append context
+      assert response["suppressUserPrompt"] == true
       assert response["hookSpecificOutput"]["hookEventName"] == "UserPromptSubmit"
-      assert response["hookSpecificOutput"]["additionalContext"] != nil
-      assert String.contains?(response["hookSpecificOutput"]["additionalContext"], "[REDACTED:anthropic]")
+      assert response["hookSpecificOutput"]["userPrompt"] != nil
+      assert String.contains?(response["hookSpecificOutput"]["userPrompt"], "[REDACTED:anthropic]")
     end
 
     test "passes through benign prompts without redaction instructions" do
@@ -84,13 +83,11 @@ defmodule EyeInTheSkyWeb.Controllers.Api.V1.IamUserPromptSubmitTest do
       decision = Evaluator.decide(ctx)
       response = HookResponse.from_decision(decision, ctx.event)
 
-      # For UserPromptSubmit with instructions, response should have hookSpecificOutput
-      # (similar to PostToolUse pattern)
-      assert response["continue"] == true
-      assert response["suppressOutput"] == true
+      # UserPromptSubmit replaces prompt via suppressUserPrompt + userPrompt, not additionalContext
+      assert response["suppressUserPrompt"] == true
       assert response["hookSpecificOutput"]["hookEventName"] == "UserPromptSubmit"
-      assert response["hookSpecificOutput"]["additionalContext"] != nil
-      assert String.contains?(response["hookSpecificOutput"]["additionalContext"], "[REDACTED:aws]")
+      assert response["hookSpecificOutput"]["userPrompt"] != nil
+      assert String.contains?(response["hookSpecificOutput"]["userPrompt"], "[REDACTED:aws]")
     end
 
     test "normalizer extracts prompt from UserPromptSubmit payload" do

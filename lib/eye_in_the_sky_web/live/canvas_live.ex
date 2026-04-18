@@ -342,6 +342,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     |> assign(:active_canvas_id, canvas_id)
     |> assign(:canvas_sessions, sessions)
     |> assign(:subscribed_session_ids, session_ids)
+    |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
   end
 
   defp subscribe_all(ids) do

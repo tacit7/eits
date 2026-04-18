@@ -31,11 +31,11 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     to_raw = params["to_session_id"] || params["target_session_id"]
 
     cond do
-      is_nil(from_raw) or from_raw == "" ->
-        conn |> put_status(:bad_request) |> json(%{error: "from_session_id is required"})
+      not valid_session_param?(from_raw) ->
+        conn |> put_status(:bad_request) |> json(%{error: "from_session_id must be a non-empty string or integer"})
 
-      is_nil(to_raw) or to_raw == "" ->
-        conn |> put_status(:bad_request) |> json(%{error: "to_session_id is required"})
+      not valid_session_param?(to_raw) ->
+        conn |> put_status(:bad_request) |> json(%{error: "to_session_id must be a non-empty string or integer"})
 
       not is_binary(params["message"]) or params["message"] == "" ->
         conn |> put_status(:bad_request) |> json(%{error: "message must be a non-empty string"})
@@ -249,6 +249,8 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   defp agent_manager_mod do
     Application.get_env(:eye_in_the_sky, :agent_manager_module, AgentManager)
   end
+
+  defp valid_session_param?(v), do: (is_binary(v) and v != "") or is_integer(v)
 
   # Resolve a readable name from the sender session.
   # Priority: team member name > session name > agent description > "agent"

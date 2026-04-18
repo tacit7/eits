@@ -1,7 +1,7 @@
 #!/bin/bash
 # eits-task-gate.sh
 # Stop hook: blocks agent from stopping if it has in-progress EITS tasks.
-# Fires on every Stop event. Reads EITS_SESSION_UUID from env.
+# Fires on every Stop event. Reads EITS_AGENT_UUID from env.
 
 INPUT=$(cat)
 
@@ -11,13 +11,15 @@ if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
   exit 0
 fi
 
-# Only applies to EITS sessions
-if [ -z "$EITS_SESSION_UUID" ]; then
+# Only applies to EITS agents
+if [ -z "$EITS_AGENT_UUID" ]; then
   exit 0
 fi
 
-# Query in-progress tasks linked to this session via eits CLI
-response=$(eits tasks list --session "$EITS_SESSION_UUID" --state 2 2>/dev/null) || response=""
+# Query in-progress tasks owned by this agent (agent_id FK, set on task creation).
+# Using --agent instead of --session so we only see tasks this agent explicitly claimed,
+# not historical session-task links that may reference unrelated sessions.
+response=$(eits tasks list --agent "$EITS_AGENT_UUID" --state 2 2>/dev/null) || response=""
 
 if [ -z "$response" ]; then
   exit 0

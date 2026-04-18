@@ -136,12 +136,13 @@ cmd_tasks() {
   local sub="${1:-}"; shift || true
   case "$sub" in
     list)
-      # eits tasks list [--project <id>] [--session <uuid>] [--q <query>] [--state <id>] [--limit <n>]
+      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--state <id>] [--limit <n>]
       local qs=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --project) qs="${qs}&project_id=$2"; shift 2 ;;
           --session) qs="${qs}&session_id=$2"; shift 2 ;;
+          --agent)   qs="${qs}&agent_id=$2";   shift 2 ;;
           --q)       qs="${qs}&q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$2")"; shift 2 ;;
           --state)   qs="${qs}&state_id=$2";   shift 2 ;;
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;

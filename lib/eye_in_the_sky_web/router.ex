@@ -183,6 +183,11 @@ defmodule EyeInTheSkyWeb.Router do
     get "/sessions/:uuid/context", SessionController, :get_context
     patch "/sessions/:uuid/context", SessionController, :update_context
 
+    # Timers
+    get "/sessions/:session_id/timer", TimerController, :show
+    post "/sessions/:session_id/timer", TimerController, :schedule
+    delete "/sessions/:session_id/timer", TimerController, :cancel
+
     # Commits
     get "/commits", CommitController, :index
     post "/commits", CommitController, :create

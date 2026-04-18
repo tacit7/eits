@@ -95,37 +95,23 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
         <input type="hidden" name="schedule[job_id]" value={@job.id} />
       <% end %>
 
-      <.schedule_type_fields
-        schedule_type={@schedule_type}
-        schedule_value={@schedule_value}
-        model={@model}
-      />
+      <div class="grid grid-cols-2 gap-3">
+        <.schedule_type_tabs schedule_type={@schedule_type} />
+        <.model_selector model={@model} />
+      </div>
 
       <%= if @schedule_type == "cron" do %>
-        <.cron_reference />
-        <.timezone_picker timezone={@timezone} />
+        <.cron_fields schedule_value={@schedule_value} />
+        <.timezone_selector timezone={@timezone} />
+      <% else %>
+        <.interval_fields schedule_value={@schedule_value} />
       <% end %>
 
-      <div class="form-control">
-        <label class="label">
-          <span class="label-text text-xs">Project (optional override)</span>
-        </label>
-        <select name="schedule[project_override_id]" class="select select-bordered select-sm w-full">
-          <option value="">— use prompt default —</option>
-          <%= for p <- @projects do %>
-            <option
-              value={p.id}
-              selected={
-                is_nil(@prompt.project_id) &&
-                  not is_nil(@context_project_id) &&
-                  @context_project_id == p.id
-              }
-            >
-              {p.name}
-            </option>
-          <% end %>
-        </select>
-      </div>
+      <.project_selector
+        projects={@projects}
+        prompt={@prompt}
+        context_project_id={@context_project_id}
+      />
 
       <.advanced_cli_flags config={@config} />
 
@@ -144,43 +130,141 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
   # ---------------------------------------------------------------------------
 
   attr :schedule_type, :string, required: true
-  attr :schedule_value, :string, required: true
+
+  defp schedule_type_tabs(assigns) do
+    ~H"""
+    <div class="form-control">
+      <label class="label"><span class="label-text text-xs">Schedule Type</span></label>
+      <select name="schedule[schedule_type]" class="select select-bordered select-sm w-full">
+        <option value="cron" selected={@schedule_type == "cron"}>Cron</option>
+        <option value="interval" selected={@schedule_type == "interval"}>Interval</option>
+      </select>
+    </div>
+    """
+  end
+
   attr :model, :string, required: true
 
-  defp schedule_type_fields(assigns) do
+  defp model_selector(assigns) do
     ~H"""
-    <div class="grid grid-cols-2 gap-3">
-      <div class="form-control">
-        <label class="label"><span class="label-text text-xs">Schedule Type</span></label>
-        <select name="schedule[schedule_type]" class="select select-bordered select-sm w-full">
-          <option value="cron" selected={@schedule_type == "cron"}>Cron</option>
-          <option value="interval" selected={@schedule_type == "interval"}>Interval</option>
-        </select>
-      </div>
-      <div class="form-control">
-        <label class="label"><span class="label-text text-xs">Model</span></label>
-        <select name="schedule[model]" class="select select-bordered select-sm w-full">
-          <%= for {value, label} <- claude_models() do %>
-            <option value={value} selected={@model == value}>{label}</option>
-          <% end %>
-        </select>
-      </div>
+    <div class="form-control">
+      <label class="label"><span class="label-text text-xs">Model</span></label>
+      <select name="schedule[model]" class="select select-bordered select-sm w-full">
+        <%= for {value, label} <- claude_models() do %>
+          <option value={value} selected={@model == value}>{label}</option>
+        <% end %>
+      </select>
     </div>
+    """
+  end
 
+  attr :schedule_value, :string, required: true
+
+  defp cron_fields(assigns) do
+    ~H"""
     <div class="form-control">
       <label class="label">
-        <span class="label-text text-xs">
-          {if @schedule_type == "cron", do: "Cron Expression", else: "Interval (seconds)"}
-        </span>
+        <span class="label-text text-xs">Cron Expression</span>
       </label>
       <input
         type="text"
         name="schedule[schedule_value]"
         value={@schedule_value}
-        placeholder={if @schedule_type == "cron", do: "0 9 * * *", else: "3600"}
+        placeholder="0 9 * * *"
         class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
         required
       />
+    </div>
+    <.cron_reference />
+    """
+  end
+
+  attr :schedule_value, :string, required: true
+
+  defp interval_fields(assigns) do
+
+    ~H"""
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Interval (seconds)</span>
+      </label>
+      <input
+        type="text"
+        name="schedule[schedule_value]"
+        value={@schedule_value}
+        placeholder="3600"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+        required
+      />
+    </div>
+    """
+  end
+
+  @common_timezones [
+    "Etc/UTC",
+    "US/Eastern",
+    "US/Central",
+    "US/Mountain",
+    "US/Pacific",
+    "US/Hawaii",
+    "Europe/London",
+    "Europe/Paris",
+    "Europe/Berlin",
+    "Asia/Tokyo",
+    "Asia/Shanghai",
+    "Asia/Kolkata",
+    "Australia/Sydney",
+    "America/Sao_Paulo",
+    "America/Mexico_City"
+  ]
+
+  attr :timezone, :string, required: true
+
+  defp timezone_selector(assigns) do
+    all =
+      if assigns.timezone in @common_timezones,
+        do: @common_timezones,
+        else: [assigns.timezone | @common_timezones]
+
+    assigns = assign(assigns, :timezones, all)
+
+    ~H"""
+    <div class="form-control">
+      <label class="label"><span class="label-text text-xs">Timezone</span></label>
+      <select name="schedule[timezone]" class="select select-bordered select-sm w-full">
+        <%= for tz <- @timezones do %>
+          <option value={tz} selected={tz == @timezone}>{tz}</option>
+        <% end %>
+      </select>
+    </div>
+    """
+  end
+
+  attr :projects, :list, required: true
+  attr :prompt, :any, required: true
+  attr :context_project_id, :any, required: true
+
+  defp project_selector(assigns) do
+    ~H"""
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Project (optional override)</span>
+      </label>
+      <select name="schedule[project_override_id]" class="select select-bordered select-sm w-full">
+        <option value="">— use prompt default —</option>
+        <%= for p <- @projects do %>
+          <option
+            value={p.id}
+            selected={
+              is_nil(@prompt.project_id) &&
+                not is_nil(@context_project_id) &&
+                @context_project_id == p.id
+            }
+          >
+            {p.name}
+          </option>
+        <% end %>
+      </select>
     </div>
     """
   end
@@ -240,46 +324,6 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
           <code class="font-mono text-primary">0 8-17 * * *</code><span class="text-base-content/50">Hourly, 8 AM - 5 PM</span>
         </div>
       </div>
-    </div>
-    """
-  end
-
-  @common_timezones [
-    "Etc/UTC",
-    "US/Eastern",
-    "US/Central",
-    "US/Mountain",
-    "US/Pacific",
-    "US/Hawaii",
-    "Europe/London",
-    "Europe/Paris",
-    "Europe/Berlin",
-    "Asia/Tokyo",
-    "Asia/Shanghai",
-    "Asia/Kolkata",
-    "Australia/Sydney",
-    "America/Sao_Paulo",
-    "America/Mexico_City"
-  ]
-
-  attr :timezone, :string, required: true
-
-  defp timezone_picker(assigns) do
-    all =
-      if assigns.timezone in @common_timezones,
-        do: @common_timezones,
-        else: [assigns.timezone | @common_timezones]
-
-    assigns = assign(assigns, :timezones, all)
-
-    ~H"""
-    <div class="form-control">
-      <label class="label"><span class="label-text text-xs">Timezone</span></label>
-      <select name="schedule[timezone]" class="select select-bordered select-sm w-full">
-        <%= for tz <- @timezones do %>
-          <option value={tz} selected={tz == @timezone}>{tz}</option>
-        <% end %>
-      </select>
     </div>
     """
   end

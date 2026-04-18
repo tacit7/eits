@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.{Messages, Sessions}
   alias EyeInTheSkyWeb.Components.DmHelpers
-  alias EyeInTheSkyWeb.Components.DmPage.MessageToolWidget
+  alias EyeInTheSkyWeb.Components.DmMessageComponents
 
   @impl true
   def update(%{canvas_session: cs} = assigns, socket) do
@@ -186,7 +186,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
     >
       <%= if @is_tool_result do %>
         <div class="pl-[22px]">
-          <.chat_message_body message={@message} cs_id={@cs_id} />
+          <DmMessageComponents.message_body message={@message} compact={true} extra_id={@cs_id} />
         </div>
       <% else %>
         <div class="flex items-start gap-2">
@@ -227,103 +227,11 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
                 phx-hook="LocalTime"
               />
             </div>
-            <.chat_message_body message={@message} cs_id={@cs_id} />
+            <DmMessageComponents.message_body message={@message} compact={true} extra_id={@cs_id} />
           </div>
         </div>
       <% end %>
     </div>
-    """
-  end
-
-  attr :message, :map, required: true
-  attr :cs_id, :integer, required: true
-
-  defp chat_message_body(assigns) do
-    body =
-      if DmHelpers.dm_message?(assigns.message),
-        do: DmHelpers.strip_dm_prefix(assigns.message.body),
-        else: assigns.message.body
-
-    segments = DmHelpers.parse_body_segments(body)
-    thinking = get_in(assigns.message.metadata || %{}, ["thinking"])
-    stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
-
-    assigns =
-      assigns
-      |> assign(:segments, segments)
-      |> assign(:thinking, thinking)
-      |> assign(:stream_type, stream_type)
-      |> assign(:body, body)
-
-    ~H"""
-    <div class={["space-y-1", @stream_type != "tool_result" && "mt-0.5"]}>
-      <details
-        :if={not is_nil(@thinking) && @thinking != ""}
-        class="group rounded border-l-2 border-primary/50 bg-zinc-950/50 overflow-hidden"
-      >
-        <summary class="flex items-center gap-1.5 px-2 py-1 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
-          <.icon name="hero-sparkles" class="w-3 h-3 flex-shrink-0 text-primary/60" />
-          <span class="text-[10px] font-mono font-semibold text-primary/60 uppercase tracking-wide">
-            Thinking
-          </span>
-          <.icon
-            name="hero-chevron-right"
-            class="w-2.5 h-2.5 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
-          />
-        </summary>
-        <div class="px-2 pb-1.5 pt-1 border-t border-primary/10">
-          <pre class="font-mono text-[10px] text-base-content/40 whitespace-pre-wrap break-words leading-relaxed">{@thinking}</pre>
-        </div>
-      </details>
-      <%= if @stream_type == "tool_result" do %>
-        <.chat_tool_result_body body={@body} />
-      <% else %>
-        <%= for {segment, idx} <- Enum.with_index(@segments) do %>
-          <%= case segment do %>
-            <% {:tool_call, name, rest} -> %>
-              <MessageToolWidget.tool_widget name={name} rest={rest} />
-            <% {:text, text} when text != "" -> %>
-              <div
-                id={"msg-body-#{@cs_id}-#{@message.id}-#{idx}"}
-                class="dm-markdown text-xs leading-relaxed text-base-content/85"
-                phx-hook="MarkdownMessage"
-                data-raw-body={text}
-              />
-            <% _ -> %>
-          <% end %>
-        <% end %>
-      <% end %>
-    </div>
-    """
-  end
-
-  attr :body, :string, default: ""
-
-  defp chat_tool_result_body(assigns) do
-    ~H"""
-    <details class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden">
-      <summary class="flex items-center gap-1.5 px-2 py-1 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
-        <.icon name="hero-code-bracket" class="w-3 h-3 flex-shrink-0 text-base-content/30" />
-        <span class="text-[10px] font-mono font-semibold text-base-content/40 uppercase tracking-wide flex-shrink-0">
-          Output
-        </span>
-        <button
-          class="tool-copy-btn ml-auto mr-1 shrink-0"
-          data-copy-btn
-          data-copy-text={@body}
-          title="Copy output"
-        >
-          <.icon name="hero-clipboard-document" class="w-3 h-3" />
-        </button>
-        <.icon
-          name="hero-chevron-right"
-          class="w-2.5 h-2.5 text-base-content/20 shrink-0 transition-transform group-open:rotate-90"
-        />
-      </summary>
-      <div class="px-2 pb-1.5 pt-1 border-t border-base-content/5">
-        <pre class="font-mono text-[10px] text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto">{@body}</pre>
-      </div>
-    </details>
     """
   end
 

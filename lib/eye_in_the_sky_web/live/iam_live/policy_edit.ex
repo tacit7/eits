@@ -13,29 +13,36 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.Policy
 
-  @always_editable ["editable_fields"]
-
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    case IAM.get_policy(String.to_integer(id)) do
-      {:ok, %Policy{} = policy} ->
-        changeset = Policy.update_changeset(policy, %{})
+    case Integer.parse(id) do
+      {int_id, ""} ->
+        case IAM.get_policy(int_id) do
+          {:ok, %Policy{} = policy} ->
+            changeset = Policy.update_changeset(policy, %{})
 
+            {:ok,
+             socket
+             |> assign(:page_title, "Edit: #{policy.name}")
+             |> assign(:sidebar_tab, :iam)
+             |> assign(:sidebar_project, nil)
+             |> assign(:policy, policy)
+             |> assign(:system?, not is_nil(policy.system_key))
+             |> assign(:editable_fields, MapSet.new(policy.editable_fields || []))
+             |> assign(:form, to_form(changeset))
+             |> assign(:condition_text, encode_condition(policy.condition))}
+
+          {:error, :not_found} ->
+            {:ok,
+             socket
+             |> put_flash(:error, "Policy not found.")
+             |> push_navigate(to: ~p"/iam/policies")}
+        end
+
+      _ ->
         {:ok,
          socket
-         |> assign(:page_title, "Edit: #{policy.name}")
-         |> assign(:sidebar_tab, :iam)
-         |> assign(:sidebar_project, nil)
-         |> assign(:policy, policy)
-         |> assign(:system?, not is_nil(policy.system_key))
-         |> assign(:editable_fields, MapSet.new(policy.editable_fields || []))
-         |> assign(:form, to_form(changeset))
-         |> assign(:condition_text, encode_condition(policy.condition))}
-
-      {:error, :not_found} ->
-        {:ok,
-         socket
-         |> put_flash(:error, "Policy not found.")
+         |> put_flash(:error, "Invalid policy ID.")
          |> push_navigate(to: ~p"/iam/policies")}
     end
   end
@@ -140,8 +147,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
   defp locked?(%{system?: false}, _field), do: false
 
   defp locked?(%{system?: true, editable_fields: editable}, field) do
-    field_str = to_string(field)
-    not (field_str in @always_editable or MapSet.member?(editable, field_str))
+    not MapSet.member?(editable, to_string(field))
   end
 
   # ── rendering ─────────────────────────────────────────────────────────────

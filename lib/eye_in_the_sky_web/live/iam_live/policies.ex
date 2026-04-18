@@ -48,19 +48,24 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
   end
 
   def handle_event("toggle", %{"id" => id, "enabled" => enabled}, socket) do
-    id_int = String.to_integer(id)
-    desired = enabled in ["true", "on", true]
+    case Integer.parse(id) do
+      {id_int, ""} ->
+        desired = enabled in ["true", "on", true]
+        {_count, _} = IAM.bulk_toggle_enabled([id_int], desired)
 
-    {_count, _} = IAM.bulk_toggle_enabled([id_int], desired)
+        {:noreply,
+         socket
+         |> put_flash(:info, "Policy #{if desired, do: "enabled", else: "disabled"}.")
+         |> assign_policies()}
 
-    {:noreply,
-     socket
-     |> put_flash(:info, "Policy #{if desired, do: "enabled", else: "disabled"}.")
-     |> assign_policies()}
+      _ ->
+        {:noreply, put_flash(socket, :error, "Invalid policy ID.")}
+    end
   end
 
   def handle_event("delete", %{"id" => id}, socket) do
-    with {:ok, %Policy{} = policy} <- IAM.get_policy(String.to_integer(id)),
+    with {int_id, ""} <- Integer.parse(id),
+         {:ok, %Policy{} = policy} <- IAM.get_policy(int_id),
          :ok <- refuse_system_delete(policy),
          {:ok, _} <- IAM.delete_policy(policy) do
       {:noreply,
@@ -76,6 +81,9 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
 
       {:error, %Ecto.Changeset{} = cs} ->
         {:noreply, put_flash(socket, :error, "Delete failed: #{inspect(cs.errors)}")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Invalid policy ID.")}
     end
   end
 

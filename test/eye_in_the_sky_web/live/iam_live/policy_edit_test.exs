@@ -122,6 +122,19 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEditTest do
       assert reloaded.agent_type == p.agent_type
     end
 
+    test "editable_fields itself is locked on system policies", %{conn: _conn} do
+      p = system_policy!()
+
+      assert {:error, %Ecto.Changeset{} = cs} =
+               IAM.update_policy(p, %{"editable_fields" => ["name", "effect", "agent_type"]})
+
+      assert {"is locked on this system policy", _} =
+               Keyword.get(cs.errors, :editable_fields)
+
+      {:ok, reloaded} = IAM.get_policy(p.id)
+      assert reloaded.editable_fields == p.editable_fields
+    end
+
     test "editing only whitelisted fields succeeds for a system policy", %{conn: conn} do
       p = system_policy!()
 

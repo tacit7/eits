@@ -157,6 +157,20 @@ window.addEventListener("phx:copy_to_clipboard", (e) => {
   })
 })
 
+// Copy button handler for tool call / tool result blocks (data-copy-btn attribute).
+// Uses capture phase so we can stop propagation before <summary> toggles the <details>.
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-copy-btn]")
+  if (!btn) return
+  e.stopPropagation()
+  e.preventDefault()
+  const text = btn.dataset.copyText ?? ""
+  navigator.clipboard?.writeText(text).then(() => {
+    btn.dataset.copied = "1"
+    setTimeout(() => delete btn.dataset.copied, 2000)
+  })
+}, true)
+
 // Persist sidebar collapse state on toggle
 window.addEventListener("click", (e) => {
   const btn = e.target.closest("[phx-click='toggle_collapsed']")

@@ -20,11 +20,20 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
 
     messages = if session, do: Messages.list_recent_messages(cs.session_id, 50), else: []
 
-    {:ok,
-     socket
-     |> assign(assigns)
-     |> assign(:session, session)
-     |> assign(:messages, messages)}
+    prev_count = length(socket.assigns[:messages] || [])
+    prev_last_id = socket.assigns[:messages] |> List.last() |> then(& &1 && &1.id)
+    new_last_id = List.last(messages) |> then(& &1 && &1.id)
+    messages_changed = length(messages) != prev_count || new_last_id != prev_last_id
+
+    socket =
+      socket
+      |> assign(assigns)
+      |> assign(:session, session)
+      |> assign(:messages, messages)
+
+    socket = if messages_changed, do: push_event(socket, "messages-updated-" <> to_string(cs.id), %{}), else: socket
+
+    {:ok, socket}
   end
 
   @impl true
@@ -52,6 +61,11 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
             data-minimize-btn
             class="w-3 h-3 rounded-full bg-warning/70 hover:bg-warning transition-colors shrink-0"
             title="Minimize"
+          />
+          <button
+            data-maximize-btn
+            class="w-3 h-3 rounded-full bg-success/70 hover:bg-success transition-colors shrink-0"
+            title="Maximize"
           />
           <button
             class="w-3 h-3 rounded-full bg-error/70 hover:bg-error transition-colors shrink-0"
@@ -293,9 +307,17 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
         <span class="text-[10px] font-mono font-semibold text-base-content/40 uppercase tracking-wide flex-shrink-0">
           Output
         </span>
+        <button
+          class="tool-copy-btn ml-auto mr-1 shrink-0"
+          data-copy-btn
+          data-copy-text={@body}
+          title="Copy output"
+        >
+          <.icon name="hero-clipboard-document" class="w-3 h-3" />
+        </button>
         <.icon
           name="hero-chevron-right"
-          class="w-2.5 h-2.5 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
+          class="w-2.5 h-2.5 text-base-content/20 shrink-0 transition-transform group-open:rotate-90"
         />
       </summary>
       <div class="px-2 pb-1.5 pt-1 border-t border-base-content/5">

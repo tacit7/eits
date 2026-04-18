@@ -48,7 +48,8 @@ defmodule EyeInTheSky.IAM.Policy do
           enabled: boolean(),
           message: String.t() | nil,
           editable_fields: [String.t()],
-          builtin_matcher: String.t() | nil
+          builtin_matcher: String.t() | nil,
+          event: String.t()
         }
 
   schema "iam_policies" do
@@ -65,16 +66,19 @@ defmodule EyeInTheSky.IAM.Policy do
     field :message, :string
     field :editable_fields, {:array, :string}, default: []
     field :builtin_matcher, :string
+    field :event, :string, default: "PreToolUse"
 
     belongs_to :project, Project
 
     timestamps(type: :utc_datetime_usec)
   end
 
+  @supported_events ~w(PreToolUse PostToolUse Stop)
+
   @create_fields ~w(
     system_key name effect agent_type project_id project_path action
     resource_glob condition priority enabled message editable_fields
-    builtin_matcher
+    builtin_matcher event
   )a
 
   @required_fields ~w(name effect)a
@@ -90,6 +94,7 @@ defmodule EyeInTheSky.IAM.Policy do
     |> validate_glob_or_wildcard(:resource_glob)
     |> validate_condition()
     |> validate_builtin_matcher()
+    |> validate_event()
     |> foreign_key_constraint(:project_id)
     |> unique_constraint(:system_key, name: :iam_policies_system_key_unique_index)
   end
@@ -108,6 +113,7 @@ defmodule EyeInTheSky.IAM.Policy do
     |> validate_glob_or_wildcard(:resource_glob)
     |> validate_condition()
     |> validate_builtin_matcher()
+    |> validate_event()
     |> enforce_locked_fields(policy)
     |> foreign_key_constraint(:project_id)
     |> unique_constraint(:system_key, name: :iam_policies_system_key_unique_index)
@@ -117,6 +123,14 @@ defmodule EyeInTheSky.IAM.Policy do
 
   @doc false
   def supported_condition_predicates, do: @supported_condition_predicates
+
+  defp validate_event(changeset) do
+    case get_field(changeset, :event) do
+      nil -> put_change(changeset, :event, "PreToolUse")
+      event when event in @supported_events -> changeset
+      _ -> add_error(changeset, :event, "must be one of: #{Enum.join(@supported_events, ", ")}")
+    end
+  end
 
   defp validate_glob_or_wildcard(changeset, field) do
     case get_field(changeset, field) do

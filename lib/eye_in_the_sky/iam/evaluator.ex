@@ -58,7 +58,7 @@ defmodule EyeInTheSky.IAM.Evaluator do
     instructions =
       instructs
       |> Enum.sort_by(&rank/1)
-      |> Enum.map(fn p -> %{policy: p, message: message_for(p)} end)
+      |> Enum.map(fn p -> %{policy: p, message: instruct_message(p, ctx)} end)
 
     decision = %Decision{
       permission: permission,
@@ -92,6 +92,7 @@ defmodule EyeInTheSky.IAM.Evaluator do
           :ok | {:miss, atom()}
   def trace_policy(%Policy{} = p, %Context{} = ctx, opts \\ []) do
     cond do
+      not event_matches?(p, ctx) -> {:miss, :event}
       not agent_matches?(p, ctx) -> {:miss, :agent_type}
       not action_matches?(p, ctx) -> {:miss, :action}
       not project_matches?(p, ctx) -> {:miss, :project}
@@ -162,6 +163,14 @@ defmodule EyeInTheSky.IAM.Evaluator do
       :error
   end
 
+  defp event_matches?(%Policy{event: nil}, _ctx), do: true
+  defp event_matches?(%Policy{event: pe}, %Context{event: ce}), do: pe == ctx_event_name(ce)
+
+  defp ctx_event_name(:pre_tool_use), do: "PreToolUse"
+  defp ctx_event_name(:post_tool_use), do: "PostToolUse"
+  defp ctx_event_name(:stop), do: "Stop"
+  defp ctx_event_name(_), do: "PreToolUse"
+
   defp agent_matches?(%Policy{agent_type: "*"}, _ctx), do: true
   defp agent_matches?(%Policy{agent_type: at}, %Context{agent_type: at}), do: true
   defp agent_matches?(_, _), do: false
@@ -217,6 +226,18 @@ defmodule EyeInTheSky.IAM.Evaluator do
   # Rank tuple: lower is better. `-priority` sorts high priority first; `id`
   # sorts lower id first as the tie-break.
   defp rank(%Policy{priority: priority, id: id}), do: {-priority, id || 0}
+
+  defp instruct_message(%Policy{builtin_matcher: key} = p, ctx) when is_binary(key) do
+    with {:ok, mod} <- EyeInTheSky.IAM.BuiltinMatcher.Registry.fetch(key),
+         true <- function_exported?(mod, :instruction_message, 2),
+         msg when is_binary(msg) <- mod.instruction_message(p, ctx) do
+      msg
+    else
+      _ -> message_for(p)
+    end
+  end
+
+  defp instruct_message(p, _ctx), do: message_for(p)
 
   defp message_for(%Policy{message: nil, name: name, effect: effect}),
     do: "#{effect}: #{name}"

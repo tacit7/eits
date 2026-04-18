@@ -101,6 +101,16 @@ defmodule EyeInTheSky.IAM.Seeds do
       priority: 50,
       message:
         "Destructive SQL detected (DROP/TRUNCATE/DELETE without WHERE). Confirm intent and take a backup first."
+    },
+    %{
+      system_key: "builtin.sanitize_api_keys",
+      name: "Sanitize API keys in output",
+      effect: "instruct",
+      action: "*",
+      event: "PostToolUse",
+      builtin_matcher: "sanitize_api_keys",
+      priority: 100,
+      message: "Tool output has been scanned and secrets redacted."
     }
   ]
 

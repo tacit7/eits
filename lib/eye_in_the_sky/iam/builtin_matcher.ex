@@ -29,4 +29,12 @@ defmodule EyeInTheSky.IAM.BuiltinMatcher do
   alias EyeInTheSky.IAM.Policy
 
   @callback matches?(Policy.t(), Context.t()) :: boolean()
+
+  @doc """
+  Optional callback for matchers that produce a dynamic instruction message
+  based on context (e.g., including redacted content). Returns `nil` to fall
+  back to the policy's static `message` field.
+  """
+  @callback instruction_message(Policy.t(), Context.t()) :: String.t() | nil
+  @optional_callbacks [instruction_message: 2]
 end

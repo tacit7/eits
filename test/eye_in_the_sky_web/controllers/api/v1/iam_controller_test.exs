@@ -148,4 +148,86 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
     assert body["continue"] == true
     refute Map.has_key?(body, "hookSpecificOutput")
   end
+
+  # ── sanitize_api_keys PostToolUse ───────────────────────────────────────────
+
+  describe "sanitize_api_keys builtin on PostToolUse" do
+    setup do
+      {:ok, _} =
+        EyeInTheSky.IAM.seed_builtin(%{
+          system_key: "builtin.sanitize_api_keys",
+          name: "Sanitize API keys in output",
+          effect: "instruct",
+          action: "*",
+          event: "PostToolUse",
+          builtin_matcher: "sanitize_api_keys",
+          priority: 100,
+          message: "Tool output has been scanned and secrets redacted.",
+          editable_fields: ["enabled"]
+        })
+
+      EyeInTheSky.IAM.PolicyCache.invalidate()
+      :ok
+    end
+
+    test "redacts Anthropic key in tool_response and returns sanitized additionalContext",
+         %{conn: conn} do
+      payload = %{
+        "hook_event_name" => "PostToolUse",
+        "tool_name" => "Bash",
+        "tool_input" => %{"command" => "cat secrets.txt"},
+        "tool_response" => "my key is sk-ant-abcdefghij1234567890 done",
+        "session_id" => Ecto.UUID.generate(),
+        "cwd" => "/tmp"
+      }
+
+      conn = post(conn, "/api/v1/iam/decide", payload)
+      body = json_response(conn, 200)
+
+      assert body["continue"] == true
+      assert body["suppressOutput"] == true
+      assert get_in(body, ["hookSpecificOutput", "hookEventName"]) == "PostToolUse"
+
+      ctx = get_in(body, ["hookSpecificOutput", "additionalContext"])
+      assert is_binary(ctx)
+      assert String.contains?(ctx, "[REDACTED:anthropic]")
+      refute String.contains?(ctx, "sk-ant-")
+    end
+
+    test "PostToolUse without secrets continues without hookSpecificOutput", %{conn: conn} do
+      payload = %{
+        "hook_event_name" => "PostToolUse",
+        "tool_name" => "Bash",
+        "tool_input" => %{"command" => "echo hi"},
+        "tool_response" => "hi",
+        "session_id" => Ecto.UUID.generate(),
+        "cwd" => "/tmp"
+      }
+
+      conn = post(conn, "/api/v1/iam/decide", payload)
+      body = json_response(conn, 200)
+
+      assert body["continue"] == true
+      refute Map.has_key?(body, "hookSpecificOutput")
+    end
+
+    test "sanitize_api_keys policy does not fire on PreToolUse events", %{conn: conn} do
+      payload = %{
+        "hook_event_name" => "PreToolUse",
+        "tool_name" => "Bash",
+        "tool_input" => %{"command" => "echo sk-ant-abcdefghij1234567890"},
+        "session_id" => Ecto.UUID.generate(),
+        "cwd" => "/tmp"
+      }
+
+      conn = post(conn, "/api/v1/iam/decide", payload)
+      body = json_response(conn, 200)
+
+      # Should return PreToolUse shape — the sanitize policy did not match
+      assert body["continue"] == true
+      assert get_in(body, ["hookSpecificOutput", "hookEventName"]) == "PreToolUse"
+      additional = get_in(body, ["hookSpecificOutput", "additionalContext"]) || ""
+      refute String.contains?(additional, "[REDACTED:anthropic]")
+    end
+  end
 end

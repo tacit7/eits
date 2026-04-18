@@ -63,7 +63,7 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
       max_budget_usd: opts[:max_budget_usd],
       agent: opts[:agent],
       eits_workflow: opts[:eits_workflow],
-      bypass_sandbox: opts[:bypass_sandbox] || false,
+      bypass_sandbox: opts[:bypass_sandbox] || provider == "codex",
       content_blocks: ModelCapabilities.filter_blocks(opts[:content_blocks] || [], opts[:model]),
       message_id: opts[:message_id],
       extra_cli_opts: extra

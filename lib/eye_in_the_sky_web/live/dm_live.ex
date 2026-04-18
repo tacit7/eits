@@ -316,6 +316,16 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_info(:do_message_reload, socket) do
+    socket =
+      if !socket.assigns.processing && socket.assigns.stream_content != "" do
+        socket
+        |> assign(:stream_content, "")
+        |> assign(:stream_tool, nil)
+        |> assign(:stream_thinking, nil)
+      else
+        socket
+      end
+
     {:noreply,
      socket
      |> assign(:reload_timer, nil)

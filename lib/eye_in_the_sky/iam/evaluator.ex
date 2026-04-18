@@ -169,6 +169,7 @@ defmodule EyeInTheSky.IAM.Evaluator do
   defp ctx_event_name(:pre_tool_use), do: "PreToolUse"
   defp ctx_event_name(:post_tool_use), do: "PostToolUse"
   defp ctx_event_name(:stop), do: "Stop"
+  defp ctx_event_name(:user_prompt_submit), do: "UserPromptSubmit"
   defp ctx_event_name(_), do: "PreToolUse"
 
   defp agent_matches?(%Policy{agent_type: "*"}, _ctx), do: true

@@ -25,7 +25,7 @@ defmodule EyeInTheSky.IAM.Context do
       user-authored policies in v1.
   """
 
-  @type event :: :pre_tool_use | :post_tool_use | :stop
+  @type event :: :pre_tool_use | :post_tool_use | :stop | :user_prompt_submit
   @type resource_type :: :command | :file | :url | :unknown
 
   @type t :: %__MODULE__{
@@ -39,6 +39,7 @@ defmodule EyeInTheSky.IAM.Context do
           resource_content: String.t() | nil,
           raw_tool_input: map(),
           tool_response: String.t() | nil,
+          prompt: String.t() | nil,
           session_uuid: String.t() | nil,
           metadata: map()
         }
@@ -53,6 +54,7 @@ defmodule EyeInTheSky.IAM.Context do
             resource_content: nil,
             raw_tool_input: %{},
             tool_response: nil,
+            prompt: nil,
             session_uuid: nil,
             metadata: %{}
 

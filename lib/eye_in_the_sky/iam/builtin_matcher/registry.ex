@@ -34,6 +34,7 @@ defmodule EyeInTheSky.IAM.BuiltinMatcher.Registry do
     "block_work_on_main" => Builtin.BlockWorkOnMain,
     "warn_destructive_sql" => Builtin.WarnDestructiveSql,
     "sanitize_api_keys" => Builtin.SanitizeApiKeys,
+    "sanitize_prompt_api_keys" => Builtin.SanitizePromptApiKeys,
     "workflow_business_hours_only" => Builtin.WorkflowBusinessHoursOnly
   }
 

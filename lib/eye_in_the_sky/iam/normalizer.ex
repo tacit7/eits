@@ -39,6 +39,7 @@ defmodule EyeInTheSky.IAM.Normalizer do
       resource_content: resource_content,
       raw_tool_input: tool_input,
       tool_response: Map.get(payload, "tool_response") || Map.get(payload, :tool_response),
+      prompt: Map.get(payload, "prompt") || Map.get(payload, :prompt),
       session_uuid: Map.get(payload, "session_id") || Map.get(payload, :session_uuid),
       metadata: Map.get(payload, "metadata") || %{}
     })
@@ -105,9 +106,11 @@ defmodule EyeInTheSky.IAM.Normalizer do
       "PreToolUse" -> :pre_tool_use
       "PostToolUse" -> :post_tool_use
       "Stop" -> :stop
+      "UserPromptSubmit" -> :user_prompt_submit
       :pre_tool_use -> :pre_tool_use
       :post_tool_use -> :post_tool_use
       :stop -> :stop
+      :user_prompt_submit -> :user_prompt_submit
       _ -> :pre_tool_use
     end
   end

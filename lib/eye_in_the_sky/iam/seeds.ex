@@ -113,6 +113,18 @@ defmodule EyeInTheSky.IAM.Seeds do
       message: "Tool output has been scanned and secrets redacted."
     },
     %{
+      system_key: "builtin.sanitize_prompt_api_keys",
+      name: "Sanitize API keys in user prompts",
+      effect: "instruct",
+      action: "*",
+      agent_type: "*",
+      event: "UserPromptSubmit",
+      builtin_matcher: "sanitize_prompt_api_keys",
+      priority: 100,
+      enabled: true,
+      message: "User prompt has been scanned and secrets redacted."
+    },
+    %{
       system_key: "builtin.workflow_business_hours_only",
       name: "Enforce business hours workflow",
       effect: "deny",

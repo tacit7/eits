@@ -52,7 +52,7 @@ defmodule EyeInTheSky.IAM.HookResponse do
 
   alias EyeInTheSky.IAM.Decision
 
-  @type event :: :pre_tool_use | :post_tool_use | :stop
+  @type event :: :pre_tool_use | :post_tool_use | :stop | :user_prompt_submit
   @type hook_json :: map()
 
   @doc "Build the hook JSON response for the given decision and hook event."
@@ -126,5 +126,6 @@ defmodule EyeInTheSky.IAM.HookResponse do
   defp event_name(:pre_tool_use), do: "PreToolUse"
   defp event_name(:post_tool_use), do: "PostToolUse"
   defp event_name(:stop), do: "Stop"
+  defp event_name(:user_prompt_submit), do: "UserPromptSubmit"
   defp event_name(_), do: "Unknown"
 end

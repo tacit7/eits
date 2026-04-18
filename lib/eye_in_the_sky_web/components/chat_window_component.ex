@@ -293,9 +293,17 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
         <span class="text-[10px] font-mono font-semibold text-base-content/40 uppercase tracking-wide flex-shrink-0">
           Output
         </span>
+        <button
+          class="tool-copy-btn ml-auto mr-1 shrink-0"
+          data-copy-btn
+          data-copy-text={@body}
+          title="Copy output"
+        >
+          <.icon name="hero-clipboard-document" class="w-3 h-3" />
+        </button>
         <.icon
           name="hero-chevron-right"
-          class="w-2.5 h-2.5 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
+          class="w-2.5 h-2.5 text-base-content/20 shrink-0 transition-transform group-open:rotate-90"
         />
       </summary>
       <div class="px-2 pb-1.5 pt-1 border-t border-base-content/5">

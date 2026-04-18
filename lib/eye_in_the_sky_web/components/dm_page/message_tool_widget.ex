@@ -41,9 +41,17 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageToolWidget do
         >
           {@detail}
         </span>
+        <button
+          class="tool-copy-btn ml-auto mr-1 shrink-0"
+          data-copy-btn
+          data-copy-text={@rest}
+          title="Copy input"
+        >
+          <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" />
+        </button>
         <.icon
           name="hero-chevron-right"
-          class="w-3 h-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
+          class="w-3 h-3 text-base-content/20 shrink-0 transition-transform group-open:rotate-90"
         />
       </summary>
       <.tool_widget_body name={@name} rest={@rest} detail={@detail} input={@input} />

@@ -146,6 +146,7 @@ export const ChatWindowHook = {
           if (footer) footer.style.display = "none"
           this.el.style.resize = "none"
           const headerH = handle ? handle.offsetHeight : 40
+          if (this._resizeObserver) this._resizeObserver.disconnect()
           this.el.style.height = headerH + "px"
           this.el.style.overflow = "hidden"
         } else {
@@ -156,6 +157,7 @@ export const ChatWindowHook = {
           if (this.el.dataset.savedHeight) {
             this.el.style.height = this.el.dataset.savedHeight
           }
+          if (this._resizeObserver) this._resizeObserver.observe(this.el)
         }
       })
     }

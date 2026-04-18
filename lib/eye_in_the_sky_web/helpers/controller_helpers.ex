@@ -13,6 +13,10 @@ defmodule EyeInTheSkyWeb.ControllerHelpers do
     end
   end
 
+  @doc "Trim a param value only when it is a binary; pass through nil and non-string types unchanged."
+  def trim_param(v) when is_binary(v), do: String.trim(v)
+  def trim_param(v), do: v
+
   def translate_errors(%Ecto.Changeset{} = changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
       Enum.reduce(opts, msg, fn {key, value}, acc ->

@@ -76,8 +76,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   def create(conn, params) do
     attrs = %{
       uuid: Ecto.UUID.generate(),
-      title: params["title"] && String.trim(params["title"]),
-      description: params["description"] && String.trim(params["description"]),
+      title: trim_param(params["title"]),
+      description: trim_param(params["description"]),
       priority: params["priority"],
       state_id: params["state_id"] || WorkflowState.todo_id(),
       project_id: params["project_id"],
@@ -207,8 +207,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     case Notes.create_note(%{
            parent_id: task_id,
            parent_type: "task",
-           body: String.trim(params["body"] || ""),
-           title: params["title"]
+           body: trim_param(params["body"] || ""),
+           title: trim_param(params["title"])
          }) do
       {:ok, note} ->
         conn
@@ -227,7 +227,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   Body: message (required)
   """
   def complete(conn, %{"id" => id} = params) do
-    message = String.trim(params["message"] || "")
+    message = trim_param(params["message"] || "")
 
     with false <- message == "",
          {:ok, task} <- Tasks.get_task(id),
@@ -312,7 +312,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       %{}
       |> Helpers.maybe_put(:state_id, params["state_id"])
       |> Helpers.maybe_put(:priority, params["priority"])
-      |> Helpers.maybe_put(:description, params["description"] && String.trim(params["description"]))
+      |> Helpers.maybe_put(:description, trim_param(params["description"]))
       |> Helpers.maybe_put(:due_at, params["due_at"])
 
     Tasks.update_task(task, attrs)

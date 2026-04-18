@@ -579,13 +579,15 @@ cmd_timer() {
   local sub="${1:-}"; shift || true
   case "$sub" in
     show|get)
-      local session="${1:-self}"; shift || true
+      local session="self"
+      if [[ $# -gt 0 && "$1" != --* ]]; then session="$1"; shift; fi
       [[ "$session" == "self" ]] && session="${EITS_SESSION_UUID:-}"
       need session
       _get "/sessions/$session/timer"
       ;;
     set|schedule)
-      local session="${1:-self}"; shift || true
+      local session="self"
+      if [[ $# -gt 0 && "$1" != --* ]]; then session="$1"; shift; fi
       [[ "$session" == "self" ]] && session="${EITS_SESSION_UUID:-}"
       need session
       local preset="" delay_ms="" mode="" message=""
@@ -607,7 +609,8 @@ cmd_timer() {
       _post "/sessions/$session/timer" "$body"
       ;;
     cancel)
-      local session="${1:-self}"; shift || true
+      local session="self"
+      if [[ $# -gt 0 && "$1" != --* ]]; then session="$1"; shift; fi
       [[ "$session" == "self" ]] && session="${EITS_SESSION_UUID:-}"
       need session
       _delete "/sessions/$session/timer"

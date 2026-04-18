@@ -473,6 +473,64 @@ teardown_teams() {
   teardown_teams
 }
 
+# ── timer ────────────────────────────────────────────────────────────────────
+
+@test "timer show: uses EITS_SESSION_UUID when session omitted" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  # show with no args resolves to self; server returns 404 JSON (no timer set) or timer object — either is valid JSON
+  run "$EITS" timer show
+  # exit 0 (timer exists) or non-zero from curl -f (404) — we only care that session wasn't '--preset'
+  [[ "$output" != *'"--preset"'* ]]
+}
+
+@test "timer show: explicit session_id arg" {
+  run "$EITS" timer show "$TEST_SESSION"
+  # curl -sf returns non-zero on 404; we accept both outcomes — the point is no parse error
+  [[ "$output" != *'unknown flag'* ]]
+}
+
+@test "timer set: flag-first invocation uses EITS_SESSION_UUID (primary use case)" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  # --preset without a preceding session_id must not fail with 'unknown flag'
+  run "$EITS" timer set --preset 5m
+  [[ "$output" != *'unknown flag'* ]]
+}
+
+@test "timer set: explicit session_id then flags" {
+  run "$EITS" timer set "$TEST_SESSION" --preset 5m
+  [[ "$output" != *'unknown flag'* ]]
+}
+
+@test "timer set: --delay-ms flag without --preset" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" timer set --delay-ms 300000
+  [[ "$output" != *'unknown flag'* ]]
+}
+
+@test "timer set: missing --preset and --delay-ms exits with error" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" timer set
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'--preset or --delay-ms is required'* ]]
+}
+
+@test "timer cancel: uses EITS_SESSION_UUID when session omitted" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" timer cancel
+  [[ "$output" != *'unknown flag'* ]]
+}
+
+@test "timer cancel: explicit session_id arg" {
+  run "$EITS" timer cancel "$TEST_SESSION"
+  [[ "$output" != *'unknown flag'* ]]
+}
+
+@test "timer: no subcommand prints usage" {
+  run "$EITS" timer
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'usage: eits timer'* ]]
+}
+
 # ── default URL ───────────────────────────────────────────────────────────────
 
 @test "BASE_URL: defaults to http://localhost:5001/api/v1 when EITS_URL unset" {

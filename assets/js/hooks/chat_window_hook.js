@@ -172,6 +172,10 @@ export const ChatWindowHook = {
     const maximizeBtn = this.el.querySelector("[data-maximize-btn]")
     if (maximizeBtn) {
       this._maximized = false
+      maximizeBtn.addEventListener("mousedown", (e) => {
+        e.stopPropagation()
+        e.preventDefault()
+      })
       maximizeBtn.addEventListener("click", (e) => {
         e.stopPropagation()
         this._maximized = !this._maximized

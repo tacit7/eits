@@ -20,12 +20,20 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
 
     messages = if session, do: Messages.list_recent_messages(cs.session_id, 50), else: []
 
-    {:ok,
-     socket
-     |> assign(assigns)
-     |> assign(:session, session)
-     |> assign(:messages, messages)
-     |> push_event("messages-updated-" <> to_string(cs.id), %{})}
+    prev_count = length(socket.assigns[:messages] || [])
+    prev_last_id = socket.assigns[:messages] |> List.last() |> then(& &1 && &1.id)
+    new_last_id = List.last(messages) |> then(& &1 && &1.id)
+    messages_changed = length(messages) != prev_count || new_last_id != prev_last_id
+
+    socket =
+      socket
+      |> assign(assigns)
+      |> assign(:session, session)
+      |> assign(:messages, messages)
+
+    socket = if messages_changed, do: push_event(socket, "messages-updated-" <> to_string(cs.id), %{}), else: socket
+
+    {:ok, socket}
   end
 
   @impl true

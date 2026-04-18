@@ -179,7 +179,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         </div>
       </div>
 
-      <div class="relative flex-1 overflow-hidden">
+      <div data-canvas-area class="relative flex-1 overflow-hidden">
         <%= for cs <- @canvas_sessions do %>
           <.live_component
             module={ChatWindowComponent}

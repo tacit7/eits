@@ -116,7 +116,7 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("set_notify_on_stop", %{"enabled" => enabled}, socket) do
-    {:noreply, assign(socket, :notify_on_stop, !!enabled)}
+    {:noreply, assign(socket, :notify_on_stop, enabled in [true, "true", "on", 1, "1"])}
   end
 
   # ---------------------------------------------------------------------------

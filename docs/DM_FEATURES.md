@@ -442,6 +442,40 @@ PNG images with transparency are not converted to JPEG. If ImageMagick is unavai
 
 ---
 
+## Message Deduplication
+
+**Commit:** `f5cc825f`
+
+The `Deduplicator` module guards DM and broadcast endpoints against duplicate delivery, making retries safe to issue.
+
+**Behavior:**
+- 30-second idempotency window keyed by message hash (sender + target + body)
+- Secondary lookup scans the last 24 hours for matching unlinked messages missing a `link_id`
+- Endpoints return `409 Conflict` when a duplicate is detected inside the window
+- Callers can safely retry a failed DM/broadcast without producing double-delivery
+
+**Use case:** Hook scripts and CLI commands that retry on transient network failures no longer risk posting the same message twice.
+
+---
+
+## Copy-to-Clipboard
+
+**Commits:** `d04b7f63`, `10d75ff3`
+
+DM messages and tool call/output blocks expose a clipboard icon on hover for one-click copy.
+
+**Coverage:**
+- DM message bodies (rendered markdown)
+- Tool call widgets: BASH, Edit, Write
+- Tool output blocks
+
+**Implementation:**
+- `MarkdownMessage` hook injects the clipboard icon after markdown renders
+- A global capture-phase click listener intercepts the icon click before it reaches the surrounding `<details>` element, preventing accidental expand/collapse toggling
+- Copy uses the Clipboard API with a transient "copied" state on the icon
+
+---
+
 ## Performance Considerations
 
 **Streaming:**

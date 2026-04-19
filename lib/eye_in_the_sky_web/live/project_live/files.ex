@@ -37,15 +37,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
           |> assign(:sidebar_project, project)
 
         socket =
-          cond do
-            connected?(socket) && project.path ->
-              start_async(socket, :load_file_tree, fn ->
-                build_file_tree(project.path, project.path)
-              end)
-            project.path ->
-              assign(socket, :file_tree, build_file_tree(project.path, project.path))
-            true ->
-              socket
+          if connected?(socket) && project.path do
+            start_async(socket, :load_file_tree, fn ->
+              build_file_tree(project.path, project.path)
+            end)
+          else
+            socket
           end
 
         {:ok, socket}
@@ -378,7 +375,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       <div
         id="file-tree-sidebar"
         class="w-full md:w-80 md:flex-shrink-0 border-b md:border-b-0 md:border-r border-base-300 bg-base-100 overflow-y-auto max-h-64 md:max-h-none"
-        phx-update="ignore"
       >
         <div class="p-4">
           <h2 class="text-sm font-semibold text-base-content/80 mb-2">Files</h2>

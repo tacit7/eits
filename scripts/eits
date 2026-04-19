@@ -926,15 +926,58 @@ cmd_notifications() {
 
 cmd_prompts() {
   local sub="${1:-}"; shift || true
-  [[ "${sub:-}" == "--help" || "${sub:-}" == "-h" ]] && { echo "usage: eits prompts <list|get>"; return 0; }
+  [[ "${sub:-}" == "--help" || "${sub:-}" == "-h" ]] && { echo "usage: eits prompts <list|get|create>"; return 0; }
   case "$sub" in
-    list) _get "/prompts" ;;
+    list)
+      # eits prompts list [--query <q>] [--project <id>]
+      local qs=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --query|-q)  qs="${qs}&query=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --project)   qs="${qs}&project_id=$2"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      _curl "$BASE_URL/prompts?${qs#&}" | jq .
+      ;;
     get)
-      local id="${1:-}"; need id
-      _get "/prompts/$id"
+      # eits prompts get <id> [--project <id>] [--no-text]
+      local id="${1:-}"; need id; shift
+      local qs=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --project) qs="${qs}&project_id=$2"; shift 2 ;;
+          --no-text) qs="${qs}&include_text=false"; shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      _curl "$BASE_URL/prompts/$id?${qs#&}" | jq .
+      ;;
+    create)
+      # eits prompts create --name <n> --slug <s> --prompt-text <t> [--description <d>] [--project <id>] [--tags <json>] [--created-by <name>]
+      local name="" slug="" prompt_text="" description="" project_id="" tags="" created_by=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --name)        name="$2";        shift 2 ;;
+          --slug)        slug="$2";        shift 2 ;;
+          --prompt-text) prompt_text="$2"; shift 2 ;;
+          --description) description="$2"; shift 2 ;;
+          --project)     project_id="$2";  shift 2 ;;
+          --tags)        tags="$2";        shift 2 ;;
+          --created-by)  created_by="$2";  shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need name; need slug; need prompt_text
+      local body
+      body="$(json name "$name" slug "$slug" prompt_text "$prompt_text" description "$description" project_id "$project_id" created_by "$created_by")"
+      if [[ -n "$tags" ]]; then
+        body=$(echo "$body" | jq --argjson t "$tags" '. + {tags: $t}')
+      fi
+      _post "/prompts" "$body"
       ;;
     *)
-      echo "usage: eits prompts <list|get>"
+      echo "usage: eits prompts <list|get|create>"
       ;;
   esac
 }

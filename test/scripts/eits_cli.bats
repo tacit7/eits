@@ -892,6 +892,13 @@ teardown_teams() {
   [[ "$output" == *"mutually exclusive"* ]]
 }
 
+@test "sessions list --agent + --mine: mutually exclusive (reverse order)" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" sessions list --agent $(_agent_uuid) --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
 @test "sessions list --mine + --status: mutually exclusive" {
   export EITS_SESSION_UUID="$TEST_SESSION"
   run "$EITS" sessions list --mine --status working 2>&1
@@ -952,6 +959,13 @@ teardown_teams() {
 @test "commits list --agent + --mine: mutually exclusive" {
   export EITS_SESSION_UUID="$TEST_SESSION"
   run "$EITS" commits list --agent $(_agent_uuid) --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "commits list --mine + --agent: mutually exclusive (reverse order)" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" commits list --mine --agent $(_agent_uuid) 2>&1
   [ "$status" -ne 0 ]
   [[ "$output" == *"mutually exclusive"* ]]
 }

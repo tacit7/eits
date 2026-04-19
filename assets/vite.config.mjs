@@ -56,6 +56,6 @@ export default defineConfig({
     phoenixVitePlugin({ pattern: /\.(ex|heex)$/ }),
   ],
   ssr: {
-    noExternal: process.env.NODE_ENV === "production" ? true : undefined,
+    noExternal: process.env.NODE_ENV === "production" ? true : ["svelte-codemirror-editor"],
   },
 })

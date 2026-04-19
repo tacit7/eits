@@ -896,19 +896,22 @@ cmd_channels() {
       fi
       ;;
     send)
-      # eits channels send <channel_id> --session <uuid> --body <text>
+      # eits channels send <channel_id> --body <text> [--session <uuid>] [--broadcast-team <team_id>]
       # --session defaults to $EITS_SESSION_UUID if not provided
+      # --broadcast-team fans out DMs to all team members after posting (via broadcast_to_team_id param)
       local channel_id="${1:-}"; need channel_id; shift
-      local session_id="${EITS_SESSION_UUID:-}" body=""
+      local session_id="${EITS_SESSION_UUID:-}" body="" broadcast_team=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --session) session_id="$2"; shift 2 ;;
-          --body|-m) body="$2";       shift 2 ;;
+          --session)         session_id="$2";    shift 2 ;;
+          --body|-m)         body="$2";          shift 2 ;;
+          --broadcast-team)  broadcast_team="$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
       need session_id; need body
-      _post "/channels/$channel_id/messages" "$(json session_id "$session_id" body "$body")"
+      _post "/channels/$channel_id/messages" \
+        "$(json session_id "$session_id" body "$body" broadcast_to_team_id "$broadcast_team")"
       ;;
     messages)
       # eits channels messages <channel_id> [--limit N]
@@ -930,7 +933,8 @@ Subcommands:
   create   --name <name> [--project <id>] [--description <text>] [--type <public|private>]
            Create a new channel
   list     [--project <id>]                         List channels (optionally filter by project)
-  send     <channel_id> --session <id> --body <text> Send a message to a channel
+  send     <channel_id> --body <text> [--session <id>] [--broadcast-team <team_id>]
+           Send a message; --broadcast-team fans out DMs to all team members after posting
   messages <channel_id> [--limit|-n <N>]            Get last N messages (default 20, max 200)
 
 Examples:
@@ -938,7 +942,8 @@ Examples:
   eits channels create --name "alerts" --type private
   eits channels list
   eits channels list --project 1
-  eits channels send 1 --session 1179 --body "hello"
+  eits channels send 1 --body "hello"
+  eits channels send 1 --body "@all deploy done" --broadcast-team 296
   eits channels messages 1
   eits channels messages 1 -n 5
 USAGE
@@ -1140,52 +1145,23 @@ cmd_teams() {
       _delete "/teams/$team_id/members/$member_id"
       ;;
     broadcast)
-      # eits teams broadcast <team_id> --message <text> [--from <session>] [--include-self] [--response-required]
+      # eits teams broadcast <team_id> --body <text> [--from <session>]
+      # POSTs to POST /api/v1/teams/:team_id/broadcast (atomic server-side fanout)
       local team_id="${1:-}"; need team_id; shift
-      local from="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" message="" include_self="false" response_required="false"
+      local from="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" body=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --from)              from="$2";                shift 2 ;;
-          --message|-m)        message="$2";             shift 2 ;;
-          --include-self)      include_self="true";      shift ;;
-          --response-required) response_required="true"; shift ;;
+          --from|-f)               from="$2";  shift 2 ;;
+          --body|-b|-m|--message)  body="$2";  shift 2 ;;
+          # Deprecated flags accepted for backward compat; server handles fanout now
+          --include-self|--response-required)
+            if [[ "${2:-}" != --* && -n "${2:-}" ]]; then shift 2; else shift; fi ;;
+
           *) die "unknown flag: $1" ;;
         esac
       done
-      need from; need message
-
-      local members_resp
-      members_resp=$(_curl "$BASE_URL/teams/$team_id/members") \
-        || die "failed to fetch members for team $team_id"
-
-      local targets
-      local skip_self; skip_self="$([[ "$include_self" == "true" ]] && echo false || echo true)"
-      targets=$(echo "$members_resp" | jq -r --arg self "$from" --argjson skip_self "$skip_self" \
-        '.members[] | select(.session_uuid != null) | select(($skip_self | not) or (.session_uuid != $self)) | .session_uuid')
-
-      [[ -z "$targets" ]] && die "no recipients found in team $team_id"
-
-      local sent=0 failed=0 results="[]"
-      while IFS= read -r to; do
-        [[ -z "$to" ]] && continue
-        local payload result dm_exit
-        payload=$(jq -n --arg f "$from" --arg t "$to" --arg m "$message" --argjson r "$response_required" \
-          '{from_session_id: $f, to_session_id: $t, message: $m, response_required: $r}')
-        result=$(_curl -X POST -H "Content-Type: application/json" -d "$payload" "$BASE_URL/dm" 2>&1); dm_exit=$?
-        if [[ $dm_exit -eq 0 ]]; then
-          sent=$((sent+1))
-          local safe_result
-          safe_result=$(echo "$result" | jq -c '.' 2>/dev/null || echo '{}')
-          results=$(jq -n --argjson base "$results" --arg to "$to" --argjson r "$safe_result" '$base + [{to: $to, ok: true, result: $r}]')
-        else
-          failed=$((failed+1))
-          results=$(jq -n --argjson base "$results" --arg to "$to" --argjson code "$dm_exit" --arg err "$result" \
-            '$base + [{to: $to, ok: false, exit_code: $code, error: $err}]')
-        fi
-      done <<< "$targets"
-
-      jq -n --argjson s "$sent" --argjson f "$failed" --argjson r "$results" \
-        '{success: ($f == 0), sent: $s, failed: $f, results: $r}'
+      need from; need body
+      _post "/teams/$team_id/broadcast" "$(json from_session_id "$from" body "$body")"
       ;;
     my-teams)
       # List teams where the current agent is a member (by EITS_AGENT_UUID)

@@ -27,6 +27,8 @@ export const AgentCombobox = {
       if (!this.el.contains(e.target)) this._close()
     }
 
+    this._onFocus = () => this._filter()
+    this._input.addEventListener("focus", this._onFocus)
     this._input.addEventListener("input", this._onInput)
     this._input.addEventListener("keydown", this._onKeydown)
     document.addEventListener("mousedown", this._onClickOutside)
@@ -58,6 +60,7 @@ export const AgentCombobox = {
   },
 
   destroyed() {
+    this._input.removeEventListener("focus", this._onFocus)
     this._input.removeEventListener("input", this._onInput)
     this._input.removeEventListener("keydown", this._onKeydown)
     document.removeEventListener("mousedown", this._onClickOutside)

@@ -21,10 +21,17 @@ command -v jq   &>/dev/null || { echo "error: jq is required" >&2; exit 1; }
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 _curl() {
-  local _body _status
-  _body=$(curl -sk --write-out '\n%{http_code}' "${AUTH_ARGS[@]}" "$@")
-  _status="${_body##*$'\n'}"
-  _body="${_body%$'\n'*}"
+  local _body _status _attempt=0
+  while [[ $_attempt -lt 3 ]]; do
+    _body=$(curl -sk --write-out '\n%{http_code}' "${AUTH_ARGS[@]}" "$@")
+    _status="${_body##*$'\n'}"
+    _body="${_body%$'\n'*}"
+    if [[ "$_status" == "429" ]]; then
+      _attempt=$((_attempt + 1))
+      [[ $_attempt -lt 3 ]] && { echo "rate limited, retrying in ${_attempt}s..." >&2; sleep "$_attempt"; continue; }
+    fi
+    break
+  done
   if [[ "$_status" -ge 400 ]]; then
     printf 'HTTP %s: %s\n' "$_status" "$_body" >&2
     return 1
@@ -297,6 +304,7 @@ cmd_tasks() {
       ;;
     annotate)
       # eits tasks annotate <id> --body <text> [--title <t>]
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits tasks annotate <id> --body <text> [--title <title>]"; return 0; }
       local id="${1:-}"; need id; shift
       local body="" title=""
       while [[ $# -gt 0 ]]; do
@@ -324,7 +332,7 @@ cmd_tasks() {
       ;;
     complete)
       # eits tasks complete <id> [<message>] [--message <text>]
-      # Delegates to POST /tasks/:id/complete — atomic annotate+done via server transaction.
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits tasks complete <id> <message>  OR  eits tasks complete <id> --message <text>"; return 0; }
       local id="${1:-}"; need id; shift
       local message=""
       # Check if next arg is not a flag and treat it as the message
@@ -343,7 +351,7 @@ cmd_tasks() {
       ;;
     begin|quick)
       # eits tasks begin --title <t> [--description <d>] [--project <id>] [--priority <p>] [--quiet|-q]
-      # Creates a task, links the current session, and starts it — all in one command.
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits tasks begin --title <title> [--description <text>] [--project <id>] [--priority <p>] [--quiet|-q]"; return 0; }
       local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" quiet=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -556,10 +564,32 @@ cmd_agents() {
       _get "/agents/$id"
       ;;
     spawn)
-      # eits agents spawn --instructions <text> [--model <m>] [--provider <p>]
-      #   [--project-id <n>] [--project-path <path>] [--worktree <branch>]
-      #   [--effort-level <level>] [--parent-session-id <n>] [--parent-agent-id <n>]
-      #   [--team-name <name>] [--member-name <alias>] [--agent <name>] [--name <n>] [--yolo]
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { cat <<'USAGE'
+usage: eits agents spawn --instructions <text> [options]
+
+Required:
+  --instructions <text>        Agent instructions
+
+Options:
+  --model <m>                  Model name (default: server default)
+  --provider <p>               Provider (default: claude)
+  --project-id <n>             Project ID (default: $EITS_PROJECT_ID)
+  --project-path <path>        Project path (default: current dir)
+  --worktree <branch>          Git worktree branch to create for the agent
+  --effort-level <level>       Effort level hint
+  --parent-session-id <n>      Parent session integer ID (links spawned session)
+  --parent-agent-id <n>        Parent agent ID
+  --team-name <name>           Join this team on spawn
+  --member-name <alias>        Team member display name
+  --agent <name>               Agent definition name
+  --name <n>                   Session name
+  --yolo                       Bypass sandbox restrictions
+
+Examples:
+  eits agents spawn --instructions "Review PR #42" --parent-session-id $EITS_SESSION_ID
+  eits agents spawn --instructions "Fix bug" --worktree fix/my-bug --team-name "audit"
+USAGE
+        return 0; }
       local instructions="" model="" provider="" project_id="${EITS_PROJECT_ID:-}" project_path="${PWD:-}"
       local worktree="" effort_level="" parent_session_id="" parent_agent_id=""
       local team_name="" member_name="" agent_name="" session_name="" bypass_sandbox="false"
@@ -897,8 +927,7 @@ cmd_channels() {
       ;;
     send)
       # eits channels send <channel_id> --body <text> [--session <uuid>] [--broadcast-team <team_id>]
-      # --session defaults to $EITS_SESSION_UUID if not provided
-      # --broadcast-team fans out DMs to all team members after posting (via broadcast_to_team_id param)
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits channels send <channel_id> --body <text> [--session <uuid|id>] [--broadcast-team <team_id>]"; return 0; }
       local channel_id="${1:-}"; need channel_id; shift
       local session_id="${EITS_SESSION_UUID:-}" body="" broadcast_team=""
       while [[ $# -gt 0 ]]; do
@@ -927,7 +956,7 @@ cmd_channels() {
       ;;
     join)
       # eits channels join <channel_id> [--session <uuid|id>] [--role <member|admin>]
-      # --session defaults to $EITS_SESSION_UUID, falls back to $EITS_SESSION_ID
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits channels join <channel_id> [--session <uuid|id>] [--role member|admin]"; return 0; }
       local channel_id="${1:-}"; need channel_id; shift
       local session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" role=""
       while [[ $# -gt 0 ]]; do
@@ -945,7 +974,7 @@ cmd_channels() {
       ;;
     leave)
       # eits channels leave <channel_id> [--session <uuid|id>]
-      # --session defaults to $EITS_SESSION_UUID, falls back to $EITS_SESSION_ID
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits channels leave <channel_id> [--session <uuid|id>]"; return 0; }
       local channel_id="${1:-}"; need channel_id; shift
       local session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
       while [[ $# -gt 0 ]]; do
@@ -1149,6 +1178,7 @@ print(json.dumps(d))
       _get "/teams/$id/members"
       ;;
     join)
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits teams join <team_id> --name <alias> [--role member|admin] [--session <uuid|id>] [--agent <uuid>]"; return 0; }
       local team_id="${1:-}"; need team_id; shift
       local name="" role="" session_id="" agent_id=""
       while [[ $# -gt 0 ]]; do
@@ -1165,9 +1195,32 @@ print(json.dumps(d))
       _post "/teams/$team_id/members" "$(json name "$name" role "$role" session_id "$session_id" agent_id "$agent_id")"
       ;;
     status)
-      # alias for get (includes members inline)
-      local id="${1:-}"; need id
-      _get "/teams/$id"
+      # eits teams status <id> [--summary]
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits teams status <id> [--summary]"; return 0; }
+      local id="${1:-}"; need id; shift
+      local summary=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --summary|-s) summary=1; shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      if [[ $summary -eq 1 ]]; then
+        local resp
+        resp=$(_curl "$BASE_URL/teams/$id") || return 1
+        echo "$resp" | jq -r '
+          .team as $t |
+          (.members // []) as $members |
+          ($members | length) as $total |
+          ($members | map(select(.session_status == "working")) | length) as $working |
+          ($members | map(select(.session_status == "stopped" or .session_status == "waiting")) | length) as $idle |
+          ($members | map(select(.session_status == "completed" or .status == "done")) | length) as $done |
+          ($members | map(select(.session_status == "failed")) | length) as $failed |
+          "Team: \($t.name) (ID: \($t.id))\nMembers: \($total) total — \($working) working, \($idle) idle, \($done) done\(if $failed > 0 then ", \($failed) failed" else "" end)"
+        '
+      else
+        _curl "$BASE_URL/teams/$id" | jq .
+      fi
       ;;
     update-member)
       local team_id="${1:-}"; need team_id; shift

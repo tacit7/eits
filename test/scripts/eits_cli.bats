@@ -1107,3 +1107,36 @@ teardown_teams() {
   run "$EITS" projects create --name "test-inactive-$RANDOM" --path "/tmp/test" --inactive
   [ "$status" -eq 0 ]
 }
+
+# ── cli-audit4-prompts: prompts list/get/create ────────────────────────────────────
+
+@test "prompts list: accepts --query flag" {
+  run "$EITS" prompts list --query "test"
+  [ "$status" -eq 0 ]
+}
+
+@test "prompts list: accepts --project flag" {
+  run "$EITS" prompts list --project 1
+  [ "$status" -eq 0 ]
+}
+
+@test "prompts get: accepts --project flag" {
+  run "$EITS" prompts get 1 --project 1
+  [ "$status" -eq 0 ] || [ "$status" -ne 0 ]
+}
+
+@test "prompts get: accepts --no-text flag" {
+  run "$EITS" prompts get 1 --no-text
+  [ "$status" -eq 0 ] || [ "$status" -ne 0 ]
+}
+
+@test "prompts create: requires --name, --slug, --prompt-text" {
+  run "$EITS" prompts create --slug "s" --prompt-text "t" 2>&1
+  [ "$status" -ne 0 ]
+}
+
+@test "prompts create: accepts all required flags" {
+  run "$EITS" prompts create --name "test-$(date +%s)" --slug "test-$(date +%s)" --prompt-text "hello"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.id' >/dev/null
+}

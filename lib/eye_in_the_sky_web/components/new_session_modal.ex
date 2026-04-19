@@ -22,6 +22,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
        selected_prompt_id: nil,
        prefill_text: "",
        available_agents: [],
+       agent_search: "",
        file_uploads: nil
      )}
   end
@@ -43,7 +44,10 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       project_path = if assigns[:current_project], do: assigns[:current_project].path
       available_agents = Map.get_lazy(assigns, :available_agents, fn -> list_agents(project_path) end)
 
-      {:ok, assign(socket, Map.put(assigns, :available_agents, available_agents))}
+      {:ok,
+       socket
+       |> assign(Map.put(assigns, :available_agents, available_agents))
+       |> assign(:agent_search, Map.get(assigns, :agent_search, ""))}
     end
   end
 
@@ -61,6 +65,10 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     {:noreply, assign(socket, selected_prompt_id: nil, prefill_text: "")}
   end
 
+  def handle_event("agent_search_changed", %{"agent_search" => query}, socket) do
+    {:noreply, assign(socket, :agent_search, query)}
+  end
+
   def handle_event("project_changed", %{"project_id" => project_id_str}, socket) do
     projects = socket.assigns[:projects] || []
 
@@ -74,7 +82,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
           if(project, do: project.path)
       end
 
-    {:noreply, assign(socket, :available_agents, list_agents(project_path))}
+    {:noreply, assign(socket, available_agents: list_agents(project_path), agent_search: "")}
   end
 
   def handle_event("prompt_selected", %{"prompt_id" => prompt_id}, socket) do
@@ -116,21 +124,33 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
             <%!-- Agent --%>
             <%= if @available_agents != [] do %>
+              <% filtered = filter_agents(@available_agents, @agent_search) %>
               <div>
                 <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Agent</label>
                 <input
                   type="text"
-                  name="agent"
-                  list="agent-options"
-                  placeholder="Search agents..."
+                  name="agent_search"
+                  value={@agent_search}
+                  placeholder="Filter agents..."
                   autocomplete="off"
-                  class="input input-bordered w-full text-base"
+                  phx-change="agent_search_changed"
+                  phx-target={@myself}
+                  class="input input-bordered w-full text-base mb-1.5"
                 />
-                <datalist id="agent-options">
-                  <%= for {slug, name, scope} <- @available_agents do %>
-                    <option value={slug}>{name}{if scope == :project, do: " (project)"}</option>
-                  <% end %>
-                </datalist>
+                <%= if filtered == [] do %>
+                  <p class="text-sm text-base-content/40 px-1">
+                    No agents match <span class="font-mono">{@agent_search}</span>
+                  </p>
+                <% else %>
+                  <select name="agent" class="select select-bordered w-full">
+                    <option value="">-- None --</option>
+                    <%= for {slug, name, scope} <- filtered do %>
+                      <option value={slug}>
+                        {name}{if scope == :project, do: " (project)"}
+                      </option>
+                    <% end %>
+                  </select>
+                <% end %>
               </div>
             <% end %>
 
@@ -464,5 +484,16 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   defp list_agents(project_path) do
     AgentFileScanner.scan(project_path)
     |> Enum.map(fn agent -> {agent.slug, agent.name, agent.source} end)
+  end
+
+  defp filter_agents(agents, ""), do: agents
+
+  defp filter_agents(agents, query) do
+    q = String.downcase(query)
+
+    Enum.filter(agents, fn {slug, name, _scope} ->
+      String.contains?(String.downcase(slug), q) or
+        String.contains?(String.downcase(name), q)
+    end)
   end
 end

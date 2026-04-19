@@ -142,7 +142,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     if is_nil(tool_name) or tool_name == "" do
       {:error, :bad_request, "tool_name is required"}
     else
-      with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
+      with {:ok, session} <- resolve_session(uuid) do
         Sessions.update_session(session, %{last_activity_at: DateTime.utc_now()})
         Sessions.record_tool_event(session, params["type"], params)
         json(conn, %{success: true})
@@ -258,7 +258,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   POST /api/v1/sessions/:uuid/end - End a session with optional summary and final status.
   """
   def end_session(conn, %{"uuid" => uuid} = params) do
-    with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
+    with {:ok, session} <- resolve_session(uuid) do
       status = params["final_status"] || "completed"
 
       attrs =
@@ -287,7 +287,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   GET /api/v1/sessions/:uuid/context - Load session context.
   """
   def get_context(conn, %{"uuid" => uuid}) do
-    with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
+    with {:ok, session} <- resolve_session(uuid) do
       case Contexts.get_session_context(session.id) do
         {:error, :not_found} ->
           {:error, :not_found, "No context found"}
@@ -316,7 +316,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     else
       metadata = normalize_metadata(params["metadata"])
 
-      with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
+      with {:ok, session} <- resolve_session(uuid) do
         do_upsert_context(conn, session, context, metadata)
       else
         {:error, :not_found} -> {:error, :not_found, "Session not found"}

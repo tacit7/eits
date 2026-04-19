@@ -45,7 +45,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
       data-chat-window
       data-cs-id={@canvas_session.id}
       phx-hook="ChatWindowHook"
-      style={"position: absolute; left: #{@canvas_session.pos_x}px; top: #{@canvas_session.pos_y}px; width: #{@canvas_session.width}px; height: #{@canvas_session.height}px; resize: both; overflow: auto; z-index: 1;"}
+      style={"position: absolute; left: #{@canvas_session.pos_x}px; top: #{@canvas_session.pos_y}px; width: #{@canvas_session.width}px; height: #{@canvas_session.height}px; resize: both; overflow: auto;"}
       class="bg-base-100 rounded-xl shadow-2xl border border-base-300 flex flex-col"
     >
       <div

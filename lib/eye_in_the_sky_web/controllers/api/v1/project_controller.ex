@@ -11,8 +11,13 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectController do
   @doc """
   GET /api/v1/projects - List all projects.
   """
-  def index(conn, _params) do
-    projects = Projects.list_projects()
+  def index(conn, params) do
+    projects =
+      if path = params["path"] do
+        Projects.list_projects_by_path(path)
+      else
+        Projects.list_projects()
+      end
 
     json(conn, %{
       success: true,

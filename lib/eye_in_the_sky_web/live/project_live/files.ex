@@ -307,6 +307,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     <.svelte
       id={@editor_id}
       name="FileEditor"
+      ssr={false}
       props={%{
         content: @file_content,
         lang: language_class(@file_type),

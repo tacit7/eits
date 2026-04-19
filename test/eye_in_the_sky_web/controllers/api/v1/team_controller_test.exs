@@ -1,9 +1,20 @@
 defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
+  alias EyeInTheSky.Accounts.ApiKey
   alias EyeInTheSky.{Agents, Sessions, Teams}
 
   import EyeInTheSky.Factory
+
+  defp api_conn do
+    token = "test_api_key_#{System.unique_integer([:positive])}"
+    {:ok, _} = ApiKey.create(token, "test")
+    Phoenix.ConnTest.build_conn() |> Plug.Conn.put_req_header("authorization", "Bearer #{token}")
+  end
+
+  setup do
+    {:ok, conn: api_conn()}
+  end
 
   defp create_team(overrides \\ %{}) do
     {:ok, team} =
@@ -298,6 +309,118 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       team = create_team()
       conn = delete(conn, ~p"/api/v1/teams/#{team.id}/members/9999999")
       assert json_response(conn, 404)["error"] == "Member not found"
+    end
+  end
+
+  # ── POST /api/v1/teams/:team_id/broadcast ────────────────────────────────
+
+  describe "POST /api/v1/teams/:team_id/broadcast" do
+    test "returns 400 when body is missing", %{conn: conn} do
+      team = create_team()
+      agent = create_agent()
+      session = create_session(agent)
+      join_team(team, %{name: "sender", session_id: session.id})
+
+      conn =
+        post(conn, ~p"/api/v1/teams/#{team.id}/broadcast", %{
+          "from_session_id" => session.uuid
+        })
+
+      assert json_response(conn, 400)["error"] =~ "body is required"
+    end
+
+    test "returns 400 when from_session_id is missing", %{conn: conn} do
+      team = create_team()
+
+      conn =
+        post(conn, ~p"/api/v1/teams/#{team.id}/broadcast", %{
+          "body" => "hello"
+        })
+
+      assert json_response(conn, 400)["error"] =~ "from_session_id is required"
+    end
+
+    test "returns 404 for unknown team", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+
+      conn =
+        post(conn, ~p"/api/v1/teams/9999999/broadcast", %{
+          "from_session_id" => session.uuid,
+          "body" => "hello"
+        })
+
+      assert json_response(conn, 404)["error"] =~ "Team not found"
+    end
+
+    test "returns 404 for unknown sender session", %{conn: conn} do
+      team = create_team()
+
+      conn =
+        post(conn, ~p"/api/v1/teams/#{team.id}/broadcast", %{
+          "from_session_id" => Ecto.UUID.generate(),
+          "body" => "hello"
+        })
+
+      assert json_response(conn, 404)["error"] =~ "Sender session not found"
+    end
+
+    test "returns 403 when sender is not a team member", %{conn: conn} do
+      team = create_team()
+      agent = create_agent()
+      session = create_session(agent)
+
+      conn =
+        post(conn, ~p"/api/v1/teams/#{team.id}/broadcast", %{
+          "from_session_id" => session.uuid,
+          "body" => "hello"
+        })
+
+      assert json_response(conn, 403)["error"] =~ "not a member"
+    end
+
+    test "returns sent_count=0 when no other active members exist", %{conn: conn} do
+      team = create_team()
+      agent = create_agent()
+      session = create_session(agent)
+      join_team(team, %{name: "only-member", session_id: session.id})
+
+      conn =
+        post(conn, ~p"/api/v1/teams/#{team.id}/broadcast", %{
+          "from_session_id" => session.uuid,
+          "body" => "hello"
+        })
+
+      resp = json_response(conn, 200)
+      assert resp["success"] == true
+      assert resp["sent_count"] == 0
+    end
+
+    test "skips completed and failed sessions", %{conn: conn} do
+      team = create_team()
+
+      sender_agent = create_agent()
+      sender = create_session(sender_agent)
+      join_team(team, %{name: "sender", session_id: sender.id})
+
+      done_agent = create_agent()
+      done_session = create_session(done_agent, %{status: "completed"})
+      join_team(team, %{name: "done-member", session_id: done_session.id})
+
+      failed_agent = create_agent()
+      failed_session = create_session(failed_agent, %{status: "failed"})
+      join_team(team, %{name: "failed-member", session_id: failed_session.id})
+
+      conn =
+        post(conn, ~p"/api/v1/teams/#{team.id}/broadcast", %{
+          "from_session_id" => sender.uuid,
+          "body" => "test broadcast"
+        })
+
+      resp = json_response(conn, 200)
+      assert resp["success"] == true
+      # Both targets are terminated — nothing should be sent
+      assert resp["sent_count"] == 0
     end
   end
 end

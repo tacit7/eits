@@ -341,21 +341,35 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     end
   end
 
-  # Fan out DMs to all team members when broadcast_to_team_id is supplied on channel send.
-  # Targets members with a session_id, excluding the sender.
+  # Fan out DMs to all active team members when broadcast_to_team_id is supplied on channel send.
+  # Requires sender to be a member of the team. Skips completed/failed sessions.
   # Failures are logged and do not affect the channel message response.
   defp broadcast_to_team(channel_id, sender_session_id, team_id, body) do
     case Teams.get_team(team_id) do
       {:ok, team} ->
-        sender_label = get_sender_name(sender_session_id)
+        members = Teams.list_members(team_id)
 
-        dm_body =
-          "Broadcast from #{sender_label} [team:#{team.name}] [channel:#{channel_id}] #{body}"
+        unless Enum.any?(members, &(&1.session_id == sender_session_id)) do
+          Logger.warning(
+            "broadcast_to_team: session #{sender_session_id} is not a member of team #{team_id}, skipping"
+          )
 
-        team_id
-        |> Teams.list_members()
-        |> Enum.filter(&(&1.session_id && &1.session_id != sender_session_id))
-        |> Enum.each(&deliver_team_dm(&1.session_id, sender_session_id, dm_body, channel_id))
+          :ok
+        else
+          sender_label = get_sender_name(sender_session_id)
+
+          dm_body =
+            "Broadcast from #{sender_label} [team:#{team.name}] [channel:#{channel_id}] #{body}"
+
+          members
+          |> Enum.filter(fn m ->
+            m.session_id &&
+              m.session_id != sender_session_id &&
+              m.session &&
+              m.session.status not in @terminated_statuses
+          end)
+          |> Enum.each(&deliver_team_dm(&1.session_id, sender_session_id, dm_body, channel_id))
+        end
 
       _ ->
         Logger.warning("broadcast_to_team: team #{team_id} not found, skipping fanout")

@@ -9,6 +9,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
+  @terminated_statuses ~w(completed failed)
+
   # GET /api/v1/teams
   def index(conn, params) do
     opts =
@@ -224,12 +226,17 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   end
 
   defp do_broadcast(conn, team, from_raw, body) do
-    with {:ok, from_session} <- resolve_broadcast_sender(from_raw) do
-      members = Teams.list_members(team.id)
+    members = Teams.list_members(team.id)
 
+    with {:ok, from_session} <- resolve_broadcast_sender(from_raw),
+         {:member, true} <-
+           {:member, Enum.any?(members, &(&1.session_id == from_session.id))} do
       targets =
         Enum.filter(members, fn m ->
-          not is_nil(m.session_id) and m.session_id != from_session.id
+          not is_nil(m.session_id) and
+            m.session_id != from_session.id and
+            not is_nil(m.session) and
+            m.session.status not in @terminated_statuses
         end)
 
       sender_name = from_session.name || "agent"
@@ -251,6 +258,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
       })
     else
       {:error, :not_found} -> {:error, :not_found, "Sender session not found"}
+      {:member, false} -> {:error, :forbidden, "Sender is not a member of this team"}
     end
   end
 

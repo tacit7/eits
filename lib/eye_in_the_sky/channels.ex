@@ -207,12 +207,17 @@ defmodule EyeInTheSky.Channels do
   Only returns members with `notifications = "all"` and a non-nil `session_id`.
   """
   def list_members_for_notification(channel_id, exclude_session_id) do
+    terminated = ~w(completed failed)
+
     from(m in ChannelMember,
+      join: s in EyeInTheSky.Sessions.Session,
+      on: s.id == m.session_id,
       where:
         m.channel_id == ^channel_id and
           m.notifications == "all" and
           not is_nil(m.session_id) and
-          m.session_id != ^exclude_session_id,
+          m.session_id != ^exclude_session_id and
+          s.status not in ^terminated,
       order_by: [asc: m.joined_at]
     )
     |> Repo.all()

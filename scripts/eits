@@ -896,19 +896,22 @@ cmd_channels() {
       fi
       ;;
     send)
-      # eits channels send <channel_id> --session <uuid> --body <text>
+      # eits channels send <channel_id> --body <text> [--session <uuid>] [--broadcast-team <team_id>]
       # --session defaults to $EITS_SESSION_UUID if not provided
+      # --broadcast-team fans out DMs to all team members after posting (via broadcast_to_team_id param)
       local channel_id="${1:-}"; need channel_id; shift
-      local session_id="${EITS_SESSION_UUID:-}" body=""
+      local session_id="${EITS_SESSION_UUID:-}" body="" broadcast_team=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --session) session_id="$2"; shift 2 ;;
-          --body|-m) body="$2";       shift 2 ;;
+          --session)         session_id="$2";    shift 2 ;;
+          --body|-m)         body="$2";          shift 2 ;;
+          --broadcast-team)  broadcast_team="$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
       need session_id; need body
-      _post "/channels/$channel_id/messages" "$(json session_id "$session_id" body "$body")"
+      _post "/channels/$channel_id/messages" \
+        "$(json session_id "$session_id" body "$body" broadcast_to_team_id "$broadcast_team")"
       ;;
     messages)
       # eits channels messages <channel_id> [--limit N]
@@ -930,7 +933,8 @@ Subcommands:
   create   --name <name> [--project <id>] [--description <text>] [--type <public|private>]
            Create a new channel
   list     [--project <id>]                         List channels (optionally filter by project)
-  send     <channel_id> --session <id> --body <text> Send a message to a channel
+  send     <channel_id> --body <text> [--session <id>] [--broadcast-team <team_id>]
+           Send a message; --broadcast-team fans out DMs to all team members after posting
   messages <channel_id> [--limit|-n <N>]            Get last N messages (default 20, max 200)
 
 Examples:
@@ -938,7 +942,8 @@ Examples:
   eits channels create --name "alerts" --type private
   eits channels list
   eits channels list --project 1
-  eits channels send 1 --session 1179 --body "hello"
+  eits channels send 1 --body "hello"
+  eits channels send 1 --body "@all deploy done" --broadcast-team 296
   eits channels messages 1
   eits channels messages 1 -n 5
 USAGE

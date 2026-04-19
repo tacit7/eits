@@ -773,22 +773,22 @@ USAGE
 
 cmd_notifications() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits notifications <create>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits notifications create --title <t> [--body <b>] [--category agent|job|system]"; return 0; }
   case "$sub" in
     create)
-      # eits notifications create --title <t> --body <b> [--session <uuid>] [--type <type>]
-      local title="" body="" session="${EITS_SESSION_UUID:-}" notif_type=""
+      # eits notifications create --title <t> [--body <b>] [--category <agent|job|system>]
+      # --category maps to the API's category field (agent, job, system; default: system)
+      local title="" body="" category=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --title)   title="$2";   shift 2 ;;
-          --body)    body="$2";    shift 2 ;;
-          --session) session="$2"; shift 2 ;;
-          --type)    notif_type="$2"; shift 2 ;;
+          --title)    title="$2";    shift 2 ;;
+          --body)     body="$2";     shift 2 ;;
+          --category) category="$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      need title; need body
-      _post "/notifications" "$(json title "$title" body "$body" category "$notif_type")"
+      need title
+      _post "/notifications" "$(json title "$title" body "$body" category "$category")"
       ;;
     *)
       echo "usage: eits notifications <create>"

@@ -5,7 +5,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.Teams
+  alias EyeInTheSky.{Messages, Sessions, Teams}
+  alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   # GET /api/v1/teams
@@ -173,6 +174,29 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     end
   end
 
+  # POST /api/v1/teams/:team_id/broadcast
+  def broadcast(conn, %{"team_id" => id} = params) do
+    body = params["body"]
+    from_raw = params["from_session_id"]
+
+    cond do
+      is_nil(body) or String.trim(body) == "" ->
+        {:error, :bad_request, "body is required"}
+
+      is_nil(from_raw) or from_raw == "" ->
+        {:error, :bad_request, "from_session_id is required"}
+
+      true ->
+        case resolve_team(id) do
+          {:error, :not_found} ->
+            {:error, :not_found, "Team not found"}
+
+          {:ok, team} ->
+            do_broadcast(conn, team, from_raw, String.trim(body))
+        end
+    end
+  end
+
   # ── helpers ──────────────────────────────────────────────────────────────────
 
   defp resolve_team(id) do
@@ -196,6 +220,80 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
       {:error, changeset} ->
         {:error, changeset}
+    end
+  end
+
+  defp do_broadcast(conn, team, from_raw, body) do
+    with {:ok, from_session} <- resolve_broadcast_sender(from_raw) do
+      members = Teams.list_members(team.id)
+
+      targets =
+        Enum.filter(members, fn m ->
+          not is_nil(m.session_id) and m.session_id != from_session.id
+        end)
+
+      sender_name = from_session.name || "agent"
+
+      dm_body =
+        "Broadcast from #{sender_name} (session:#{from_session.uuid}) [team:#{team.name}] #{body}"
+
+      results = Enum.map(targets, &deliver_broadcast_dm(&1, from_session, dm_body))
+
+      sent = Enum.count(results, &match?(:ok, &1))
+      failed = Enum.count(results, &match?({:error, _}, &1))
+
+      json(conn, %{
+        success: true,
+        message: "Broadcast sent to #{sent} member(s)",
+        team_id: team.id,
+        sent_count: sent,
+        failed: failed
+      })
+    else
+      {:error, :not_found} -> {:error, :not_found, "Sender session not found"}
+    end
+  end
+
+  defp resolve_broadcast_sender(raw) do
+    if int_id = parse_int(raw) do
+      Sessions.get_session(int_id)
+    else
+      Sessions.get_session_by_uuid(raw)
+    end
+  end
+
+  defp deliver_broadcast_dm(member, from_session, dm_body) do
+    case AgentManager.send_message(member.session_id, dm_body) do
+      result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
+        attrs = %{
+          uuid: Ecto.UUID.generate(),
+          session_id: member.session_id,
+          from_session_id: from_session.id,
+          to_session_id: member.session_id,
+          body: dm_body,
+          sender_role: "agent",
+          recipient_role: "agent",
+          direction: "inbound",
+          status: "sent",
+          provider: "claude",
+          metadata: %{
+            from_session_uuid: from_session.uuid,
+            to_session_id: member.session_id,
+            broadcast: true
+          }
+        }
+
+        case Messages.create_message(attrs) do
+          {:ok, msg} ->
+            EyeInTheSky.Events.session_new_dm(member.session_id, msg)
+            :ok
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 end

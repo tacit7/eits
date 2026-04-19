@@ -258,6 +258,7 @@ defmodule EyeInTheSkyWeb.Router do
     post "/teams/:team_id/members", TeamController, :join
     patch "/teams/:team_id/members/:member_id", TeamController, :update_member
     delete "/teams/:team_id/members/:member_id", TeamController, :leave
+    post "/teams/:team_id/broadcast", TeamController, :broadcast
 
   end
 

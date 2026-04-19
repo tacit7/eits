@@ -119,6 +119,13 @@ defmodule EyeInTheSkyWeb.Router do
   scope "/", EyeInTheSkyWeb do
     pipe_through [:browser]
 
+    live_session :canvas,
+      layout: {EyeInTheSkyWeb.Layouts, :canvas},
+      on_mount: [EyeInTheSkyWeb.AuthHook, EyeInTheSkyWeb.NavHook] do
+      live "/canvases", CanvasLive, :index
+      live "/canvases/:id", CanvasLive, :show
+    end
+
     live_session :app,
       on_mount: [
         EyeInTheSkyWeb.AuthHook,
@@ -154,8 +161,6 @@ defmodule EyeInTheSkyWeb.Router do
       live "/dm/:session_id", DmLive, :show
       live "/notes/new", NoteLive.New, :new
       live "/notes/:id/edit", NoteLive.Edit, :edit
-      live "/canvases", CanvasLive, :index
-      live "/canvases/:id", CanvasLive, :show
       live "/iam/simulator", IAMLive.Simulator, :index
       live "/iam/policies", IAMLive.Policies, :index
       live "/iam/policies/new", IAMLive.PolicyNew, :new

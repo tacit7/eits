@@ -43,6 +43,7 @@ export const CodeMirrorHook = {
     this._destroyed = false
     const content = atob(this.el.dataset.content || "")
     const lang = this.el.dataset.lang || "text"
+    const readonly = this.el.dataset.readonly === "true"
     const self = this
 
     const [
@@ -71,26 +72,30 @@ export const CodeMirrorHook = {
     const saveKeymap = keymap.of([{
       key: "Mod-s",
       run(view) {
-        self.pushEvent("file_changed", { content: view.state.doc.toString() })
+        if (!readonly) self.pushEvent("file_changed", { content: view.state.doc.toString() })
         return true
       }
     }])
 
+    const extensions = [
+      lineNumbers(),
+      highlightActiveLine(),
+      syntaxHighlighting(defaultHighlightStyle),
+      themeExtension,
+      tabExtension,
+      fontExtension,
+      langExtension,
+    ]
+
+    if (readonly) {
+      extensions.push(EditorState.readOnly.of(true))
+    } else {
+      extensions.push(history(), keymap.of([...defaultKeymap, ...historyKeymap]), saveKeymap, vimExtension)
+    }
+
     const state = EditorState.create({
       doc: content,
-      extensions: [
-        lineNumbers(),
-        highlightActiveLine(),
-        history(),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
-        saveKeymap,
-        syntaxHighlighting(defaultHighlightStyle),
-        themeExtension,
-        tabExtension,
-        fontExtension,
-        vimExtension,
-        langExtension,
-      ]
+      extensions,
     })
 
     if (this._destroyed) return

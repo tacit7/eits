@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   use EyeInTheSkyWeb, :live_view
 
   import EyeInTheSkyWeb.Helpers.FileHelpers,
-    only: [detect_file_type: 1, language_class: 1, build_file_tree: 2, build_file_listing: 2, build_file_listing: 3]
+    only: [detect_file_type: 1, language_class: 1, binary_file?: 1, build_file_tree: 2, build_file_listing: 2, build_file_listing: 3]
 
   import EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers,
     only: [read_file_safe_detailed: 1, path_within?: 2]
@@ -220,29 +220,24 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       </div>
     <% end %>
     <%= if @file_content do %>
-      <div class="p-6">
-        <%= if @show_back_button do %>
-          <div class="flex items-center gap-2 mb-4">
-            <%= if @file_path && @file_path != "." do %>
-              <.link
-                patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
-                class="btn btn-sm btn-ghost"
-              >
-                <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
-              </.link>
-            <% end %>
-            <div>
-              <h2 class="text-lg font-semibold text-base-content">{Path.basename(@file_path)}</h2>
-              <p class="text-sm text-base-content/60">{@file_path}</p>
-            </div>
+      <div class="flex flex-col h-full">
+        <div class="px-4 py-3 border-b border-base-300 shrink-0 flex items-center gap-2">
+          <%= if @show_back_button && @file_path && @file_path != "." do %>
+            <.link
+              patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
+              class="btn btn-sm btn-ghost btn-square"
+            >
+              <.icon name="hero-arrow-left" class="w-4 h-4" />
+            </.link>
+          <% end %>
+          <div>
+            <h2 class="text-sm font-semibold text-base-content">{Path.basename(@file_path)}</h2>
+            <p class="text-xs text-base-content/50">{@file_path}</p>
           </div>
-        <% else %>
-          <div class="mb-4">
-            <h2 class="text-lg font-semibold text-base-content">{Path.basename(@file_path)}</h2>
-            <p class="text-sm text-base-content/60">{@file_path}</p>
-          </div>
-        <% end %>
-        <.file_content_viewer file_content={@file_content} file_type={@file_type} />
+        </div>
+        <div class="flex-1 min-h-0 overflow-hidden">
+          <.file_content_viewer file_content={@file_content} file_type={@file_type} />
+        </div>
       </div>
     <% else %>
       <div class="flex items-center justify-center h-full">
@@ -261,8 +256,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   defp file_content_viewer(assigns) do
     ~H"""
-    <div class="bg-base-200 rounded-lg overflow-x-auto">
-      <pre class="text-sm"><code id="code-viewer" class={"language-#{language_class(@file_type)}"} phx-hook="Highlight"><%= @file_content %></code></pre>
+    <div
+      id="codemirror-file-viewer"
+      phx-hook="CodeMirror"
+      data-content={Base.encode64(@file_content)}
+      data-lang={language_class(@file_type)}
+      data-readonly="true"
+      class="h-full"
+    >
     </div>
     """
   end
@@ -290,13 +291,21 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       :file ->
         ~H"""
         <li>
-          <.link patch={~p"/projects/#{@project_id}/files?path=#{@item.path}"}>
-            <.icon name="hero-document" class="w-4 h-4" />
-            {@item.name}
-            <%= if @item.size do %>
-              <span class="badge badge-ghost badge-xs ml-auto">{@item.size}</span>
-            <% end %>
-          </.link>
+          <%= if binary_file?(@item.name) do %>
+            <span class="opacity-40 cursor-not-allowed pointer-events-none" title="Binary file — cannot preview">
+              <.icon name="hero-no-symbol" class="w-4 h-4" />
+              {@item.name}
+              <span class="badge badge-ghost badge-xs ml-auto font-mono">bin</span>
+            </span>
+          <% else %>
+            <.link patch={~p"/projects/#{@project_id}/files?path=#{@item.path}"}>
+              <.icon name="hero-document" class="w-4 h-4" />
+              {@item.name}
+              <%= if @item.size do %>
+                <span class="badge badge-ghost badge-xs ml-auto">{@item.size}</span>
+              <% end %>
+            </.link>
+          <% end %>
         </li>
         """
     end

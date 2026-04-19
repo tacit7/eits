@@ -26,6 +26,20 @@ function onKeydown(e) {
   }
 }
 
+const WS_BADGE_ID = "canvas-ws-badge"
+
+// Attached to the tablist container — always in the DOM, so disconnect/reconnect
+// fires reliably regardless of how many canvas tabs are open (including zero).
+export const CanvasStatusHook = {
+  disconnected() {
+    document.getElementById(WS_BADGE_ID)?.classList.remove("hidden")
+  },
+
+  reconnected() {
+    document.getElementById(WS_BADGE_ID)?.classList.add("hidden")
+  }
+}
+
 export const CanvasTabHook = {
   mounted() {
     this.el.addEventListener("dblclick", () => {

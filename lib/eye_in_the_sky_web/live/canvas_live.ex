@@ -266,7 +266,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   def render(assigns) do
     ~H"""
     <div class="flex flex-col h-full bg-base-100">
-      <div role="tablist" class="tabs tabs-border px-2 border-b border-base-300 bg-base-200/70 shrink-0">
+      <div id="canvas-tablist" role="tablist" phx-hook="CanvasStatusHook" class="tabs tabs-border px-2 border-b border-base-300 bg-base-200/70 shrink-0">
         <%= for canvas <- @canvases do %>
           <%= if @renaming_canvas_id == canvas.id do %>
             <form
@@ -334,6 +334,9 @@ defmodule EyeInTheSkyWeb.CanvasLive do
             + New
           </a>
         <% end %>
+        <span id="canvas-ws-badge" class="badge badge-warning badge-sm gap-1 self-center mx-2 hidden">
+          <span class="loading loading-spinner loading-xs"></span> Reconnecting...
+        </span>
         <button
           :if={@canvas_sessions != [] and not is_nil(@active_canvas_id)}
           phx-click="tidy_layout"

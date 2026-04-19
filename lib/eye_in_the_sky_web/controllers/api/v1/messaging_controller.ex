@@ -150,24 +150,10 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   def create_channel(conn, params) do
     name = String.trim(params["name"] || "")
 
-    if name == "" do
-      {:error, :bad_request, "name is required"}
-    else
-      project_id = parse_int(params["project_id"])
+    with :ok <- validate_name(name),
+         {:ok, project_id} <- resolve_project_id(params["project_id"]),
+         {:ok, creator_session_id} <- resolve_creator_session(params["session_id"]) do
       channel_type = params["channel_type"] || "public"
-
-      creator_session_id =
-        case params["session_id"] do
-          nil ->
-            nil
-
-          raw ->
-            case ToolHelpers.resolve_session_int_id(raw) do
-              {:ok, int_id} -> int_id
-              _ -> nil
-            end
-        end
-
       channel_id = EyeInTheSky.Channels.Channel.generate_id(project_id, name)
 
       attrs =
@@ -177,7 +163,8 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
           name: name,
           channel_type: channel_type,
           project_id: project_id,
-          created_by_session_id: creator_session_id
+          # created_by_session_id is a :string field in the schema
+          created_by_session_id: if(creator_session_id, do: to_string(creator_session_id))
         }
         |> then(fn m ->
           case params["description"] do
@@ -196,16 +183,33 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
             channel: ApiPresenter.present_channel(channel)
           })
 
+        # Let FallbackController render via its {:error, %Ecto.Changeset{}} clause
         {:error, %Ecto.Changeset{} = cs} ->
-          errors =
-            Ecto.Changeset.traverse_errors(cs, fn {msg, opts} ->
-              Enum.reduce(opts, msg, fn {key, value}, acc ->
-                String.replace(acc, "%{#{key}}", to_string(value))
-              end)
-            end)
-
-          {:error, :unprocessable_entity, errors}
+          {:error, cs}
       end
+    end
+  end
+
+  defp validate_name(""), do: {:error, :bad_request, "name is required"}
+  defp validate_name(_), do: :ok
+
+  # nil → ok (global channel); non-nil but non-integer → 400
+  defp resolve_project_id(nil), do: {:ok, nil}
+
+  defp resolve_project_id(raw) do
+    case parse_int(raw) do
+      nil -> {:error, :bad_request, "project_id must be an integer"}
+      id -> {:ok, id}
+    end
+  end
+
+  # nil → ok (no creator); provided but unresolvable → 404
+  defp resolve_creator_session(nil), do: {:ok, nil}
+
+  defp resolve_creator_session(raw) do
+    case ToolHelpers.resolve_session_int_id(raw) do
+      {:ok, int_id} -> {:ok, int_id}
+      _ -> {:error, :not_found, "session_id not found"}
     end
   end
 

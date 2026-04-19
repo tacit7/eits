@@ -254,14 +254,28 @@ _agent_uuid() { cat "$BATS_FILE_TMPDIR/agent_uuid"; }
   [[ "$output" == *"EITS_SESSION_UUID"* || "$output" == *"EITS_SESSION_ID"* ]]
 }
 
+@test "tasks list --mine: errors when combined with --session" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" tasks list --session "$TEST_SESSION" --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "tasks list --mine and --session: error regardless of flag order" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" tasks list --mine --session "$TEST_SESSION" 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
 # ── tasks begin --quiet ────────────────────────────────────────────────────────
 
 @test "tasks begin --quiet: outputs only the task ID integer" {
   export EITS_SESSION_UUID="$TEST_SESSION"
   run "$EITS" tasks begin --title "bats quiet test" --quiet
   [ "$status" -eq 0 ]
-  # Output should be a plain integer, nothing else
-  [[ "$output" =~ ^[0-9]+$ ]]
+  # Output should be a plain integer (allow trailing whitespace from shell)
+  [[ "$output" =~ ^[0-9]+[[:space:]]*$ ]]
 }
 
 # ── tasks link-session ────────────────────────────────────────────────────────

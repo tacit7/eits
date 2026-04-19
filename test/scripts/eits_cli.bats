@@ -1055,3 +1055,28 @@ teardown_teams() {
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.commits | type == "array"' >/dev/null
 }
+
+# ── CLI audit3: due-at and search alias ────────────────────────────────────────
+
+@test "tasks create: accepts --due-at flag" {
+  run "$EITS" tasks create --title "test-due-at" --due-at "2026-12-31T00:00:00Z"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.task_id' >/dev/null
+}
+
+@test "tasks update: accepts --due-at flag" {
+  task_id=$("$EITS" tasks create --title "test-update-due-at" | jq -r '.task_id')
+  run "$EITS" tasks update "$task_id" --due-at "2026-12-31T00:00:00Z"
+  [ "$status" -eq 0 ]
+}
+
+@test "notes list: --search is an alias for --q" {
+  unique="bats-search-alias-$(date +%s)"
+  "$EITS" notes create \
+    --parent-type session \
+    --parent-id "$TEST_SESSION" \
+    --body "$unique" >/dev/null
+  run "$EITS" notes list --search "$unique"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e 'length > 0' >/dev/null
+}

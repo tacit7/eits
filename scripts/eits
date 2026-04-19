@@ -67,15 +67,17 @@ cmd_sessions() {
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|end|context|tasks|notes>"; return 0; }
   case "$sub" in
     list)
-      # eits sessions list [--search <q>] [--status <s>] [--project <id>] [--agent <uuid>] [--limit <n>]
-      # --agent is mutually exclusive with --search, --status, and --project
-      local qs="" _agent_flag=0 _other_flag=0
+      # eits sessions list [--search <q>] [--status <s>] [--project <id>] [--agent <uuid>] [--limit <n>] [--mine]
+      # --agent is mutually exclusive with --search, --status, --project, and --mine
+      # --mine is mutually exclusive with --agent, --search, --status, and --project
+      local qs="" _agent_flag=0 _other_flag=0 _mine_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --search)  [[ $_agent_flag -eq 1 ]] && die "--agent and --search are mutually exclusive"; _other_flag=1; qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
-          --status)  [[ $_agent_flag -eq 1 ]] && die "--agent and --status are mutually exclusive"; _other_flag=1; qs="${qs}&status=$2";     shift 2 ;;
-          --project) [[ $_agent_flag -eq 1 ]] && die "--agent and --project are mutually exclusive"; _other_flag=1; qs="${qs}&project_id=$2"; shift 2 ;;
-          --agent)   [[ $_other_flag -eq 1 ]] && die "--agent is mutually exclusive with --search, --status, and --project"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
+          --search)  [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--search cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --status)  [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--status cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&status=$2";     shift 2 ;;
+          --project) [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--project cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&project_id=$2"; shift 2 ;;
+          --agent)   [[ $_other_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--agent is mutually exclusive with --search, --status, --project, and --mine"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
+          --mine)    [[ $_agent_flag -eq 1 || $_other_flag -eq 1 ]] && die "--mine cannot combine with --agent, --search, --status, and --project"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
@@ -117,6 +119,7 @@ cmd_sessions() {
     update)
       # eits sessions update <uuid> [--status <status>] [--intent <text>] [--entrypoint <e>] [--name <name>] [--description <desc>]
       local uuid="${1:-}"; need uuid; shift
+      [[ "$uuid" == "self" ]] && { uuid="${EITS_SESSION_UUID:-}"; [[ -n "$uuid" ]] || die "EITS_SESSION_UUID is not set"; }
       local status="" intent="" entrypoint="" name="" description=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -174,14 +177,14 @@ cmd_tasks() {
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session> [--mine] [--quiet]"; return 0; }
   case "$sub" in
     list)
-      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--state <id>] [--state-name <name>] [--limit <n>] [--mine]
+      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--search <query>] [--state <id>] [--state-name <name>] [--limit <n>] [--mine]
       local qs="" _session_flag=0 _mine_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --project) qs="${qs}&project_id=$2"; shift 2 ;;
           --session) [[ $_mine_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
           --agent)   qs="${qs}&agent_id=$2";   shift 2 ;;
-          --q)       qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --q|--search) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --state)   qs="${qs}&state_id=$2";   shift 2 ;;
           --state-name)
             case "$2" in
@@ -371,11 +374,14 @@ cmd_notes() {
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits notes <list|search|get|create|update|add>"; return 0; }
   case "$sub" in
     list)
-      local qs=""
+      # eits notes list [--q <query>] [--session <uuid>] [--limit <n>] [--mine]
+      # --mine is mutually exclusive with --session
+      local qs="" _session_flag=0 _mine_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --q)       qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
-          --session) qs="${qs}&session_id=$2"; shift 2 ;;
+          --session) [[ $_mine_flag -eq 1 ]] && die "--session and --mine are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
+          --mine)    [[ $_session_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
@@ -572,12 +578,14 @@ cmd_commits() {
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits commits <list|create>"; return 0; }
   case "$sub" in
     list)
-      # eits commits list [--session <uuid>] [--mine]
-      local qs="" _session_flag=0 _mine_flag=0
+      # eits commits list [--session <uuid>] [--agent <uuid>] [--mine]
+      # --mine, --session, and --agent are mutually exclusive
+      local qs="" _session_flag=0 _mine_flag=0 _agent_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --session) [[ $_mine_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
-          --mine) [[ $_session_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID"; qs="${qs}&session_id=$_mine"; shift ;;
+          --session) [[ $_mine_flag -eq 1 || $_agent_flag -eq 1 ]] && die "--session is mutually exclusive with --mine and --agent"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
+          --agent)   [[ $_mine_flag -eq 1 || $_session_flag -eq 1 ]] && die "--agent is mutually exclusive with --mine and --session"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
+          --mine)    [[ $_session_flag -eq 1 || $_agent_flag -eq 1 ]] && die "--mine is mutually exclusive with --session and --agent"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID"; qs="${qs}&session_id=$_mine"; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -867,22 +875,25 @@ USAGE
 
 cmd_notifications() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits notifications create --title <t> [--body <b>] [--category agent|job|system]"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits notifications create --title <t> [--body <b>] [--category agent|job|system] [--resource-type <type>] [--resource-id <id>]"; return 0; }
   case "$sub" in
     create)
-      # eits notifications create --title <t> [--body <b>] [--category <agent|job|system>]
+      # eits notifications create --title <t> [--body <b>] [--category <agent|job|system>] [--resource-type <type>] [--resource-id <id>]
       # --category maps to the API's category field (agent, job, system; default: system)
-      local title="" body="" category=""
+      # --resource-type and --resource-id link the notification to a resource
+      local title="" body="" category="" resource_type="" resource_id=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --title)    title="$2";    shift 2 ;;
-          --body)     body="$2";     shift 2 ;;
-          --category) category="$2"; shift 2 ;;
+          --title)         title="$2";         shift 2 ;;
+          --body)          body="$2";          shift 2 ;;
+          --category)      category="$2";      shift 2 ;;
+          --resource-type) resource_type="$2"; shift 2 ;;
+          --resource-id)   resource_id="$2";   shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
       need title
-      _post "/notifications" "$(json title "$title" body "$body" category "$category")"
+      _post "/notifications" "$(json title "$title" body "$body" category "$category" resource_type "$resource_type" resource_id "$resource_id")"
       ;;
     *)
       echo "usage: eits notifications <create>"

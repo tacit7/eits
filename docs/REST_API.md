@@ -493,6 +493,12 @@ Example: `DM from:Developer (session:abc-123) Can you check the test output?`
 
 This allows agents to reply to the correct session via `eits dm` command.
 
+**Duplicate detection (idempotency):**
+
+If an identical DM body was already delivered to the same recipient session within the last 30 seconds, the endpoint returns `201 Created` with the **original** message's `message_id` and `message_uuid` instead of inserting a duplicate. This improves broadcast/DM reliability under retries — callers can safely re-POST without creating duplicate messages.
+
+No new row is written and no PubSub event is re-broadcast on duplicate hits. The 24-hour unlinked-message search (`Messages.find_unlinked_message/3`) uses the same deduplicator with a wider window for linking inbound replies.
+
 **Rate limiting:**
 
 - 30 requests per minute per `from_session_id`

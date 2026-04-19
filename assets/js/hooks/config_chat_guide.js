@@ -14,6 +14,7 @@ export const ConfigChatGuide = {
     this.el.addEventListener('click', () => this._handleClick())
 
     this.handleEvent('config_guide_agent_started', ({ session_uuid }) => {
+      this._isOpening = false
       this._sessionUuid = session_uuid
       this._modal = new FloatingChatModal({
         id: MODAL_ID,

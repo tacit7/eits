@@ -100,7 +100,11 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
 
   def session_row_menu(assigns) do
     ~H"""
-    <details class="md:opacity-0 md:group-hover:opacity-100 relative dropdown dropdown-end transition-all">
+    <details
+      id={"session-menu-#{@agent.id}"}
+      phx-update="ignore"
+      class="md:opacity-0 md:group-hover:opacity-100 relative dropdown dropdown-end transition-all"
+    >
       <summary
         class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/35 hover:text-base-content/70 hover:bg-base-content/5 transition-colors cursor-pointer list-none"
         aria-label="More options"

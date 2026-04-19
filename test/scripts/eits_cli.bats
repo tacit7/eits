@@ -573,3 +573,65 @@ teardown_teams() {
   run env -u EITS_SESSION_UUID -u EITS_AGENT_UUID -u EITS_PROJECT_ID "$EITS" me 2>&1; true
   [[ "$output" =~ "(not set)" ]]
 }
+
+# ── jobs ──────────────────────────────────────────────────────────────────────
+
+@test "jobs list: returns jobs array" {
+  run "$EITS" jobs list
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.jobs | type == "array"' >/dev/null
+}
+
+@test "jobs create: requires --name" {
+  run "$EITS" jobs create --job-type scheduled --schedule-type cron --schedule-value "0 * * * *" 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"name"* ]]
+}
+
+@test "jobs create: requires --job-type" {
+  run "$EITS" jobs create --name "test-job" --schedule-type cron --schedule-value "0 * * * *" 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"job_type"* ]]
+}
+
+@test "jobs create: requires --schedule-type" {
+  run "$EITS" jobs create --name "test-job" --job-type scheduled --schedule-value "0 * * * *" 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"schedule_type"* ]]
+}
+
+@test "jobs create: requires --schedule-value" {
+  run "$EITS" jobs create --name "test-job" --job-type scheduled --schedule-type cron 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"schedule_value"* ]]
+}
+
+@test "jobs create: rejects unknown flags" {
+  run "$EITS" jobs create --bogus foo 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"unknown flag"* ]]
+}
+
+@test "jobs update: requires id argument" {
+  run "$EITS" jobs update 2>&1
+  [ "$status" -ne 0 ]
+}
+
+@test "jobs update: rejects unknown flags" {
+  run "$EITS" jobs update 999 --bogus foo 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"unknown flag"* ]]
+}
+
+@test "jobs: no subcommand prints usage" {
+  run "$EITS" jobs
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"usage: eits jobs"* ]]
+}
+
+@test "jobs help: --help prints usage" {
+  run "$EITS" jobs --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"create"* ]]
+  [[ "$output" == *"update"* ]]
+}

@@ -1093,7 +1093,7 @@ Commands:
   projects  list|get|create
   agents    list|get|spawn
   commits   list|create
-  jobs      list|get|run|delete
+  jobs      list|get|create|update|run|delete
   dm        [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
   channels  list|send|messages
   prompts   list|get

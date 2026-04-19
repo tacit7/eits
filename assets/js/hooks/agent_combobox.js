@@ -96,16 +96,24 @@ export const AgentCombobox = {
     this._setActive(0)
   },
 
+  _scopeIcon(scope) {
+    if (scope === "global") {
+      // Globe icon — heroicons outline globe-alt
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4 shrink-0 text-base-content/70" aria-label="global"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.038 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.038-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418"/></svg>`
+    }
+    // Document icon — heroicons outline document-text (project scope)
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4 shrink-0 text-base-content/70" aria-label="project"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>`
+  },
+
   _render(matches, q) {
-    this._list.innerHTML = matches.map(([slug, name, scope], i) => {
-      const labelHtml = this._highlight(name, q) + ` <span class="text-base-content/40 text-xs">${this._esc(scope)}</span>`
+    this._list.innerHTML = matches.map(([slug, name, scope]) => {
       return `<li
         data-slug="${this._esc(slug)}"
         data-label="${this._esc(name)}"
         role="option"
         class="px-3 py-2 cursor-pointer text-sm flex items-center gap-2 hover:bg-base-300 aria-selected:bg-base-300"
         aria-selected="false"
-      ><span class="font-mono text-xs text-base-content/50 w-32 truncate">${this._highlight(slug, q)}</span><span class="flex-1">${labelHtml}</span></li>`
+      >${this._scopeIcon(scope)}<span class="flex-1">${this._highlight(name, q)}</span></li>`
     }).join("")
     this._list.classList.remove("hidden")
     this._input.setAttribute("aria-expanded", "true")

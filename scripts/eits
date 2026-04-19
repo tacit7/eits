@@ -137,8 +137,31 @@ cmd_sessions() {
       _post "/sessions/$uuid/end" '{}'
       ;;
     context)
-      local uuid="${1:-}"; need uuid
-      _get "/sessions/$uuid/context"
+      # eits sessions context <uuid>                                    (GET)
+      # eits sessions context <uuid> --text <text> [--metadata <json>]  (PATCH)
+      # eits sessions context <uuid> --from-stdin [--metadata <json>]   (PATCH; body from stdin)
+      local uuid="${1:-}"; need uuid; shift || true
+      local text="" from_stdin=0 metadata=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --text)       text="$2"; shift 2 ;;
+          --from-stdin) from_stdin=1; shift ;;
+          --metadata)   metadata="$2"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      if [[ $from_stdin -eq 1 ]]; then
+        text="$(cat)"
+      fi
+      if [[ -n "$text" ]]; then
+        if [[ -n "$metadata" ]]; then
+          _patch "/sessions/$uuid/context" "$(jq -n --arg c "$text" --argjson m "$metadata" '{context: $c, metadata: $m}')"
+        else
+          _patch "/sessions/$uuid/context" "$(jq -n --arg c "$text" '{context: $c}')"
+        fi
+      else
+        _get "/sessions/$uuid/context"
+      fi
       ;;
     *)
       echo "usage: eits sessions <list|search|get|create|update|end|context|tasks|notes>"

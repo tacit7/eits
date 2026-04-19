@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
   alias EyeInTheSky.Canvases
   alias EyeInTheSky.Events
+  alias EyeInTheSky.Sessions
   alias EyeInTheSkyWeb.Components.ChatWindowComponent
 
   @impl true
@@ -19,7 +20,10 @@ defmodule EyeInTheSkyWeb.CanvasLive do
      |> assign(:subscribed_session_ids, [])
      |> assign(:creating_canvas, false)
      |> assign(:renaming_canvas_id, nil)
-     |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())}
+     |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
+     |> assign(:show_session_picker, false)
+     |> assign(:session_search, "")
+     |> assign(:filtered_sessions, [])}
   end
 
   @impl true
@@ -189,6 +193,48 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     {:noreply, assign(socket, :canvas_sessions, sessions)}
   end
 
+  def handle_event("open_session_picker", _params, socket) do
+    canvas_session_ids = Enum.map(socket.assigns.canvas_sessions, & &1.session_id)
+    all = Sessions.list_sessions()
+    filtered = Enum.reject(all, &(&1.id in canvas_session_ids))
+
+    {:noreply,
+     socket
+     |> assign(:show_session_picker, true)
+     |> assign(:session_search, "")
+     |> assign(:filtered_sessions, filtered)}
+  end
+
+  def handle_event("close_session_picker", _params, socket) do
+    {:noreply, assign(socket, :show_session_picker, false)}
+  end
+
+  def handle_event("search_sessions", %{"query" => q}, socket) do
+    canvas_session_ids = Enum.map(socket.assigns.canvas_sessions, & &1.session_id)
+    q_down = String.downcase(q)
+
+    filtered =
+      Sessions.list_sessions()
+      |> Enum.reject(&(&1.id in canvas_session_ids))
+      |> Enum.filter(&String.contains?(String.downcase(&1.name || ""), q_down))
+
+    {:noreply,
+     socket
+     |> assign(:session_search, q)
+     |> assign(:filtered_sessions, filtered)}
+  end
+
+  def handle_event("pick_session", %{"session-id" => sid_str}, socket) do
+    case parse_int(sid_str) do
+      nil ->
+        {:noreply, socket}
+
+      session_id ->
+        Canvases.add_session(socket.assigns.active_canvas_id, session_id)
+        {:noreply, assign(socket, :show_session_picker, false)}
+    end
+  end
+
   def handle_event(_event, _params, socket), do: {:noreply, socket}
 
   @impl true
@@ -338,9 +384,17 @@ defmodule EyeInTheSkyWeb.CanvasLive do
           <span class="loading loading-spinner loading-xs"></span> Reconnecting...
         </span>
         <button
+          :if={not is_nil(@active_canvas_id)}
+          phx-click="open_session_picker"
+          class="ml-auto btn btn-ghost btn-xs text-base-content/40 hover:text-base-content flex items-center gap-1"
+          title="Add session to canvas"
+        >
+          <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+        </button>
+        <button
           :if={@canvas_sessions != [] and not is_nil(@active_canvas_id)}
           phx-click="tidy_layout"
-          class="ml-auto mr-2 btn btn-ghost btn-xs text-base-content/40 hover:text-base-content flex items-center gap-1"
+          class="mr-2 btn btn-ghost btn-xs text-base-content/40 hover:text-base-content flex items-center gap-1"
           title="Tidy windows"
         >
           <.icon name="hero-squares-2x2-mini" class="w-3.5 h-3.5" />
@@ -370,6 +424,48 @@ defmodule EyeInTheSkyWeb.CanvasLive do
           </div>
         <% end %>
       </div>
+
+      <%= if @show_session_picker do %>
+        <div class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-base-300/60" phx-click="close_session_picker"></div>
+          <div class="relative z-10 card bg-base-100 shadow-xl w-96 max-h-[70vh] flex flex-col">
+            <div class="card-body p-4 flex flex-col gap-3 min-h-0">
+              <div class="flex items-center justify-between shrink-0">
+                <h3 class="font-semibold text-sm">Add Session to Canvas</h3>
+                <button type="button" phx-click="close_session_picker" class="btn btn-ghost btn-xs btn-circle">
+                  <.icon name="hero-x-mark-mini" class="w-4 h-4" />
+                </button>
+              </div>
+              <input
+                type="text"
+                placeholder="Search sessions..."
+                value={@session_search}
+                phx-change="search_sessions"
+                phx-debounce="200"
+                name="query"
+                class="input input-sm w-full shrink-0"
+                autofocus
+              />
+              <div class="overflow-y-auto flex flex-col gap-0.5 min-h-0">
+                <%= for s <- @filtered_sessions do %>
+                  <button
+                    type="button"
+                    phx-click="pick_session"
+                    phx-value-session-id={s.id}
+                    class="btn btn-ghost btn-sm justify-start gap-2 text-left w-full"
+                  >
+                    <span class="truncate flex-1 text-left">{s.name || "Session #{s.id}"}</span>
+                    <span class={["badge badge-xs shrink-0", session_status_class(s.status)]}>{s.status}</span>
+                  </button>
+                <% end %>
+                <%= if @filtered_sessions == [] do %>
+                  <p class="text-center text-base-content/40 text-xs py-4">No sessions found</p>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% end %>
     </div>
     """
   end
@@ -414,6 +510,9 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     |> assign(:canvas_sessions, sessions)
     |> assign(:subscribed_session_ids, session_ids)
     |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
+    |> assign(:show_session_picker, false)
+    |> assign(:filtered_sessions, [])
+    |> assign(:session_search, "")
   end
 
   defp subscribe_all(ids) do
@@ -442,4 +541,10 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
     socket
   end
+
+  defp session_status_class("working"), do: "badge-primary"
+  defp session_status_class("waiting"), do: "badge-warning"
+  defp session_status_class("completed"), do: "badge-success"
+  defp session_status_class("failed"), do: "badge-error"
+  defp session_status_class(_), do: "badge-ghost"
 end

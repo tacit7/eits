@@ -23,7 +23,8 @@ defmodule EyeInTheSkyWeb.CanvasLive do
      |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
      |> assign(:show_session_picker, false)
      |> assign(:session_search, "")
-     |> assign(:filtered_sessions, [])}
+     |> assign(:filtered_sessions, [])
+     |> assign(:all_sessions, [])}
   end
 
   @impl true
@@ -120,23 +121,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
   def handle_event("remove_window", %{"canvas-session-id" => cs_id_str}, socket) do
     cs_id = parse_int(cs_id_str)
-    cs = cs_id && Enum.find(socket.assigns.canvas_sessions, &(&1.id == cs_id))
-
-    if cs do
-      Canvases.remove_session(socket.assigns.active_canvas_id, cs.session_id)
-      unsubscribe_session(cs.session_id)
-
-      {:noreply,
-       socket
-       |> assign(:canvas_sessions, Enum.reject(socket.assigns.canvas_sessions, &(&1.id == cs_id)))
-       |> assign(
-         :subscribed_session_ids,
-         Enum.reject(socket.assigns.subscribed_session_ids, &(&1 == cs.session_id))
-       )
-       |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())}
-    else
-      {:noreply, socket}
-    end
+    {:noreply, do_remove_window(socket, cs_id)}
   end
 
   def handle_event("delete_canvas", %{"canvas-id" => id_str}, socket) do
@@ -202,6 +187,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
      socket
      |> assign(:show_session_picker, true)
      |> assign(:session_search, "")
+     |> assign(:all_sessions, filtered)
      |> assign(:filtered_sessions, filtered)}
   end
 
@@ -210,12 +196,10 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   end
 
   def handle_event("search_sessions", %{"query" => q}, socket) do
-    canvas_session_ids = Enum.map(socket.assigns.canvas_sessions, & &1.session_id)
     q_down = String.downcase(q)
 
     filtered =
-      Sessions.list_sessions()
-      |> Enum.reject(&(&1.id in canvas_session_ids))
+      socket.assigns.all_sessions
       |> Enum.filter(&String.contains?(String.downcase(&1.name || ""), q_down))
 
     {:noreply,
@@ -261,23 +245,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   end
 
   def handle_info({:remove_canvas_window, cs_id}, socket) do
-    cs = Enum.find(socket.assigns.canvas_sessions, &(&1.id == cs_id))
-
-    if cs do
-      Canvases.remove_session(socket.assigns.active_canvas_id, cs.session_id)
-      unsubscribe_session(cs.session_id)
-
-      {:noreply,
-       socket
-       |> assign(:canvas_sessions, Enum.reject(socket.assigns.canvas_sessions, &(&1.id == cs_id)))
-       |> assign(
-         :subscribed_session_ids,
-         Enum.reject(socket.assigns.subscribed_session_ids, &(&1 == cs.session_id))
-       )
-       |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())}
-    else
-      {:noreply, socket}
-    end
+    {:noreply, do_remove_window(socket, cs_id)}
   end
 
   def handle_info({:canvas_session_added, _payload}, socket) do
@@ -287,11 +255,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     added =
       Enum.reject(new_sessions, &(&1.id in existing_ids))
       |> Enum.with_index(length(socket.assigns.canvas_sessions))
-      |> Enum.map(fn {cs, i} ->
-        if cs.pos_x == 0 and cs.pos_y == 0 and cs.width == 320 and cs.height == 260,
-          do: %{cs | pos_x: 24 + i * 32, pos_y: 16 + i * 32},
-          else: cs
-      end)
+      |> Enum.map(fn {cs, i} -> maybe_apply_default_position(cs, i) end)
 
     new_session_ids = Enum.map(added, & &1.session_id)
     subscribe_all(new_session_ids)
@@ -529,11 +493,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     sessions =
       sessions
       |> Enum.with_index()
-      |> Enum.map(fn {cs, i} ->
-        if cs.pos_x == 0 and cs.pos_y == 0 and cs.width == 320 and cs.height == 260,
-          do: %{cs | pos_x: 24 + i * 32, pos_y: 16 + i * 32},
-          else: cs
-      end)
+      |> Enum.map(fn {cs, i} -> maybe_apply_default_position(cs, i) end)
 
     socket
     |> assign(:page_title, canvas_name <> " — Canvas")
@@ -544,6 +504,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     |> assign(:show_session_picker, false)
     |> assign(:filtered_sessions, [])
     |> assign(:session_search, "")
+    |> assign(:all_sessions, [])
   end
 
   defp subscribe_all(ids) do
@@ -571,6 +532,33 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     end
 
     socket
+  end
+
+  defp do_remove_window(socket, cs_id) do
+    cs = cs_id && Enum.find(socket.assigns.canvas_sessions, &(&1.id == cs_id))
+
+    if cs do
+      Canvases.remove_session(socket.assigns.active_canvas_id, cs.session_id)
+      unsubscribe_session(cs.session_id)
+
+      socket
+      |> assign(:canvas_sessions, Enum.reject(socket.assigns.canvas_sessions, &(&1.id == cs_id)))
+      |> assign(
+        :subscribed_session_ids,
+        Enum.reject(socket.assigns.subscribed_session_ids, &(&1 == cs.session_id))
+      )
+      |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
+    else
+      socket
+    end
+  end
+
+  defp maybe_apply_default_position(cs, index) do
+    if cs.pos_x == 0 and cs.pos_y == 0 and cs.width == 320 and cs.height == 260 do
+      %{cs | pos_x: 24 + index * 32, pos_y: 16 + index * 32}
+    else
+      cs
+    end
   end
 
   defp session_status_class("working"), do: "badge-primary"

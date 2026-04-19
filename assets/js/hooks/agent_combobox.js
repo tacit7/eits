@@ -98,7 +98,7 @@ export const AgentCombobox = {
 
   _render(matches, q) {
     this._list.innerHTML = matches.map(([slug, name, scope], i) => {
-      const labelHtml = this._highlight(name, q) + ` <span class="text-base-content/40 text-xs">${scope}</span>`
+      const labelHtml = this._highlight(name, q) + ` <span class="text-base-content/40 text-xs">${this._esc(scope)}</span>`
       return `<li
         data-slug="${this._esc(slug)}"
         data-label="${this._esc(name)}"
@@ -108,14 +108,14 @@ export const AgentCombobox = {
       ><span class="font-mono text-xs text-base-content/50 w-32 truncate">${this._highlight(slug, q)}</span><span class="flex-1">${labelHtml}</span></li>`
     }).join("")
     this._list.classList.remove("hidden")
-    this._list.setAttribute("aria-expanded", "true")
+    this._input.setAttribute("aria-expanded", "true")
   },
 
   _close() {
     this._open = false
     this._activeIndex = -1
     this._list.classList.add("hidden")
-    this._list.setAttribute("aria-expanded", "false")
+    this._input.setAttribute("aria-expanded", "false")
     this._list.innerHTML = ""
     this._input.removeAttribute("aria-activedescendant")
   },

@@ -859,7 +859,7 @@ USAGE
 
 cmd_channels() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits channels <create|list|send|messages>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits channels <create|list|send|messages|join|leave>"; return 0; }
   case "$sub" in
     create)
       # eits channels create --name <name> [--project <id>] [--description <text>] [--type <public|private>]
@@ -925,6 +925,38 @@ cmd_channels() {
       done
       _curl "$BASE_URL/channels/$channel_id/messages?limit=$limit" | jq .
       ;;
+    join)
+      # eits channels join <channel_id> [--session <uuid|id>] [--role <member|admin>]
+      # --session defaults to $EITS_SESSION_UUID
+      local channel_id="${1:-}"; need channel_id; shift
+      local session_id="${EITS_SESSION_UUID:-}" role=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --session) session_id="$2"; shift 2 ;;
+          --role)    role="$2";       shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need session_id
+      local payload
+      payload="$(json session_id "$session_id")"
+      [[ -n "$role" ]] && payload="$(echo "$payload" | jq --arg v "$role" '. + {role: $v}')"
+      _post "/channels/$channel_id/members" "$payload"
+      ;;
+    leave)
+      # eits channels leave <channel_id> [--session <uuid|id>]
+      # --session defaults to $EITS_SESSION_UUID
+      local channel_id="${1:-}"; need channel_id; shift
+      local session_id="${EITS_SESSION_UUID:-}"
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --session) session_id="$2"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need session_id
+      _delete "/channels/$channel_id/members/$session_id"
+      ;;
     *)
       cat <<USAGE
 usage: eits channels <subcommand>
@@ -936,6 +968,10 @@ Subcommands:
   send     <channel_id> --body <text> [--session <id>] [--broadcast-team <team_id>]
            Send a message; --broadcast-team fans out DMs to all team members after posting
   messages <channel_id> [--limit|-n <N>]            Get last N messages (default 20, max 200)
+  join     <channel_id> [--session <uuid|id>] [--role <member|admin>]
+           Join a channel (defaults to current session)
+  leave    <channel_id> [--session <uuid|id>]
+           Leave a channel (defaults to current session)
 
 Examples:
   eits channels create --name "ops" --project 1 --description "Ops team channel"
@@ -946,6 +982,9 @@ Examples:
   eits channels send 1 --body "@all deploy done" --broadcast-team 296
   eits channels messages 1
   eits channels messages 1 -n 5
+  eits channels join 1
+  eits channels join 1 --role admin
+  eits channels leave 1
 USAGE
       ;;
   esac

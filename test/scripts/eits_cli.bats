@@ -214,6 +214,56 @@ _agent_uuid() { cat "$BATS_FILE_TMPDIR/agent_uuid"; }
   echo "$output" | jq -e '.note_id' >/dev/null
 }
 
+# ── tasks update --title ──────────────────────────────────────────────────────
+
+@test "tasks update --title: renames the task" {
+  task_id=$("$EITS" tasks create --title "bats title original" | jq -r '.task_id')
+  run "$EITS" tasks update "$task_id" --title "bats title updated"
+  [ "$status" -eq 0 ]
+  new_title=$("$EITS" tasks get "$task_id" | jq -r '.task.title')
+  [ "$new_title" = "bats title updated" ]
+}
+
+@test "tasks update --title: leaves other fields unchanged" {
+  task_id=$("$EITS" tasks create --title "bats title stable" --description "keep me" | jq -r '.task_id')
+  "$EITS" tasks update "$task_id" --title "bats title stable renamed" >/dev/null
+  desc=$("$EITS" tasks get "$task_id" | jq -r '.task.description')
+  [ "$desc" = "keep me" ]
+}
+
+# ── tasks list --mine ──────────────────────────────────────────────────────────
+
+@test "tasks list --mine: filters by EITS_SESSION_UUID" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" tasks list --mine
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.tasks | type == "array"' >/dev/null
+}
+
+@test "tasks list --mine: falls back to EITS_SESSION_ID when EITS_SESSION_UUID unset" {
+  local int_id
+  int_id=$("$EITS" sessions get "$TEST_SESSION" | jq -r '.id')
+  run env -u EITS_SESSION_UUID EITS_SESSION_ID="$int_id" "$EITS" tasks list --mine
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.tasks | type == "array"' >/dev/null
+}
+
+@test "tasks list --mine: errors when neither session env var is set" {
+  run env -u EITS_SESSION_UUID -u EITS_SESSION_ID "$EITS" tasks list --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"EITS_SESSION_UUID"* || "$output" == *"EITS_SESSION_ID"* ]]
+}
+
+# ── tasks begin --quiet ────────────────────────────────────────────────────────
+
+@test "tasks begin --quiet: outputs only the task ID integer" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" tasks begin --title "bats quiet test" --quiet
+  [ "$status" -eq 0 ]
+  # Output should be a plain integer, nothing else
+  [[ "$output" =~ ^[0-9]+$ ]]
+}
+
 # ── tasks link-session ────────────────────────────────────────────────────────
 
 @test "tasks link-session: links with explicit session UUID" {

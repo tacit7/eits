@@ -592,12 +592,59 @@ cmd_commits() {
 
 cmd_jobs() {
   local sub="${1:-}"; shift || true
-  [[ "${sub:-}" == "--help" || "${sub:-}" == "-h" ]] && { echo "usage: eits jobs <list|get|run|delete>"; return 0; }
+  [[ "${sub:-}" == "--help" || "${sub:-}" == "-h" ]] && { echo "usage: eits jobs <list|get|create|update|run|delete>"; return 0; }
   case "$sub" in
     list) _get "/jobs" ;;
     get)
       local id="${1:-}"; need id
       _get "/jobs/$id"
+      ;;
+    create)
+      # eits jobs create --name <n> --job-type <type> --schedule-type <type> --schedule-value <val> [--description <d>] [--config <json>] [--enabled] [--project <id>]
+      local name="" description="" job_type="" schedule_type="" schedule_value="" config="" enabled="" project_id=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --name)           name="$2";           shift 2 ;;
+          --description)    description="$2";    shift 2 ;;
+          --job-type)       job_type="$2";       shift 2 ;;
+          --schedule-type)  schedule_type="$2";  shift 2 ;;
+          --schedule-value) schedule_value="$2"; shift 2 ;;
+          --config)         config="$2";         shift 2 ;;
+          --enabled)        enabled="true";      shift ;;
+          --project)        project_id="$2";     shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need name
+      need job_type
+      need schedule_type
+      need schedule_value
+      local body
+      body="$(json name "$name" description "$description" job_type "$job_type" schedule_type "$schedule_type" schedule_value "$schedule_value" enabled "$enabled" project_id "$project_id")"
+      if [[ -n "$config" ]]; then
+        body=$(echo "$body" | jq --argjson c "$config" '. + {config: $c}')
+      fi
+      _post "/jobs" "$body"
+      ;;
+    update)
+      # eits jobs update <id> [--name <n>] [--description <d>] [--job-type <type>] [--schedule-type <type>] [--schedule-value <val>] [--config <json>] [--enabled|--disabled] [--project <id>]
+      local id="${1:-}"; need id; shift
+      local updates="{}"
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --name)           updates=$(echo "$updates" | jq --arg v "$2" '. + {name: $v}');            shift 2 ;;
+          --description)    updates=$(echo "$updates" | jq --arg v "$2" '. + {description: $v}');    shift 2 ;;
+          --job-type)       updates=$(echo "$updates" | jq --arg v "$2" '. + {job_type: $v}');       shift 2 ;;
+          --schedule-type)  updates=$(echo "$updates" | jq --arg v "$2" '. + {schedule_type: $v}');  shift 2 ;;
+          --schedule-value) updates=$(echo "$updates" | jq --arg v "$2" '. + {schedule_value: $v}'); shift 2 ;;
+          --config)         updates=$(echo "$updates" | jq --argjson v "$2" '. + {config: $v}');     shift 2 ;;
+          --enabled)        updates=$(echo "$updates" | jq '. + {enabled: true}');                   shift ;;
+          --disabled)       updates=$(echo "$updates" | jq '. + {enabled: false}');                  shift ;;
+          --project)        updates=$(echo "$updates" | jq --arg v "$2" '. + {project_id: $v}');     shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      _patch "/jobs/$id" "$updates"
       ;;
     run)
       local id="${1:-}"; need id
@@ -608,7 +655,7 @@ cmd_jobs() {
       _delete "/jobs/$id"
       ;;
     *)
-      echo "usage: eits jobs <list|get|run|delete>"
+      echo "usage: eits jobs <list|get|create|update|run|delete>"
       ;;
   esac
 }
@@ -1103,7 +1150,7 @@ Commands:
   projects      list|get|create
   agents        list|get|spawn
   commits       list|create
-  jobs          list|get|run|delete
+  jobs          list|get|create|update|run|delete
   dm            [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
   channels      list|send|messages
   notifications create

@@ -393,7 +393,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         </span>
         <button
           :if={not is_nil(@active_canvas_id)}
-          phx-click={JS.dispatch("palette:open", to: "#command-palette")}
+          phx-click={JS.dispatch("palette:open-command", to: "#command-palette", detail: %{commandId: "canvas-add-session"})}
           class="ml-auto btn btn-ghost btn-xs text-base-content/40 hover:text-base-content flex items-center gap-1"
           title="Add session to canvas"
         >

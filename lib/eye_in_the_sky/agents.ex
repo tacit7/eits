@@ -44,6 +44,16 @@ defmodule EyeInTheSky.Agents do
     |> Enum.map(&populate_project_name/1)
   end
 
+  def list_agent_templates(limit \\ 50) do
+    Agent
+    |> where([a], a.status not in ["completed", "failed"])
+    |> where([a], not is_nil(a.description) and a.description != "")
+    |> order_by([a], desc: a.created_at)
+    |> limit(^limit)
+    |> select([a], %{id: a.id, description: a.description})
+    |> Repo.all()
+  end
+
   @doc """
   Returns the total agent count, optionally scoped to a project.
   """

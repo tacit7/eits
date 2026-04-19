@@ -26,7 +26,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
 
     results =
       Enum.map(sessions, fn s ->
-        %{uuid: s.uuid, name: s.name, description: s.description, status: s.status}
+        %{id: s.id, uuid: s.uuid, name: s.name, description: s.description, status: s.status}
       end)
 
     {:halt, push_event(socket, "palette:sessions-result", %{sessions: results})}

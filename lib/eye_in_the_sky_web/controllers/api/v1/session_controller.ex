@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   PATCH /api/v1/sessions/:uuid - Update session status (SessionEnd, Stop, Compact hooks).
   """
   def update(conn, %{"uuid" => uuid} = params) do
-    with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
+    with {:ok, session} <- resolve_session(uuid) do
       attrs = build_update_attrs(params)
 
       case Sessions.update_session(session, attrs) do
@@ -142,7 +142,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     if is_nil(tool_name) or tool_name == "" do
       {:error, :bad_request, "tool_name is required"}
     else
-      with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
+      with {:ok, session} <- resolve_session(uuid) do
         Sessions.update_session(session, %{last_activity_at: DateTime.utc_now()})
         Sessions.record_tool_event(session, params["type"], params)
         json(conn, %{success: true})
@@ -170,12 +170,52 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     opts =
       if params["status"], do: Keyword.put(opts, :status_filter, params["status"]), else: opts
 
+    opts =
+      if params["agent_id"] do
+        agent_int_id = resolve_agent_int_id(params["agent_id"])
+        if agent_int_id, do: Keyword.put(opts, :agent_id, agent_int_id), else: opts
+      else
+        opts
+      end
+
+    opts =
+      if params["include_archived"] in ["true", "1", true],
+        do: Keyword.put(opts, :include_archived, true),
+        else: opts
+
+    opts =
+      if params["name"] && params["name"] != "",
+        do: Keyword.put(opts, :name_filter, params["name"]),
+        else: opts
+
     results = Sessions.list_sessions_filtered(opts) |> Enum.take(limit)
+
+    with_tasks = params["with_tasks"] in ["true", "1", true]
+
+    sessions_data =
+      if with_tasks do
+        session_ids = Enum.map(results, & &1.id)
+        tasks_by_session = Tasks.list_tasks_for_sessions(session_ids)
+
+        Enum.map(results, fn s ->
+          task_list =
+            tasks_by_session
+            |> Map.get(s.id, [])
+            |> Enum.map(fn t ->
+              %{id: t.id, title: t.title, state_id: t.state_id,
+                state: if(t.state, do: t.state.name, else: nil)}
+            end)
+
+          Map.put(ApiPresenter.present_session(s), :tasks, task_list)
+        end)
+      else
+        Enum.map(results, &ApiPresenter.present_session/1)
+      end
 
     json(conn, %{
       success: true,
       message: "Found #{length(results)} session(s)",
-      results: Enum.map(results, &ApiPresenter.present_session/1)
+      results: sessions_data
     })
   end
 
@@ -218,7 +258,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   POST /api/v1/sessions/:uuid/end - End a session with optional summary and final status.
   """
   def end_session(conn, %{"uuid" => uuid} = params) do
-    with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
+    with {:ok, session} <- resolve_session(uuid) do
       status = params["final_status"] || "completed"
 
       attrs =
@@ -247,7 +287,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   GET /api/v1/sessions/:uuid/context - Load session context.
   """
   def get_context(conn, %{"uuid" => uuid}) do
-    with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
+    with {:ok, session} <- resolve_session(uuid) do
       case Contexts.get_session_context(session.id) do
         {:error, :not_found} ->
           {:error, :not_found, "No context found"}
@@ -276,7 +316,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     else
       metadata = normalize_metadata(params["metadata"])
 
-      with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
+      with {:ok, session} <- resolve_session(uuid) do
         do_upsert_context(conn, session, context, metadata)
       else
         {:error, :not_found} -> {:error, :not_found, "Session not found"}
@@ -326,5 +366,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     member_status = if status == "failed", do: "failed", else: "done"
     EyeInTheSky.Teams.mark_member_done_by_session(session.id, member_status)
   end
+
+  defp resolve_agent_int_id(uuid), do: resolve_id(uuid, &Agents.get_agent_by_uuid/1)
 
 end

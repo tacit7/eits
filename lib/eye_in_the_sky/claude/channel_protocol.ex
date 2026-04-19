@@ -53,12 +53,39 @@ defmodule EyeInTheSky.Claude.ChannelProtocol do
   end
 
   @doc """
-  Builds the prompt to send to an agent based on routing mode and the original message.
+  Builds the prompt to send to an agent based on routing mode, the original message,
+  and the channel context (id + name).
   """
-  @spec build_prompt(routing_mode(), String.t()) :: String.t()
-  def build_prompt(:direct, body), do: @direct_instruction <> "\n\nMessage: #{body}"
-  def build_prompt(:broadcast, body), do: @broadcast_instruction <> "\n\nMessage: #{body}"
-  def build_prompt(:ambient, body), do: @ambient_instruction <> "\n\nMessage: #{body}"
+  @spec build_prompt(routing_mode(), String.t(), %{id: integer(), name: String.t()}) :: String.t()
+  def build_prompt(:direct, body, %{id: channel_id, name: channel_name}) do
+    channel_ctx = """
+    You are in channel ##{channel_name} (ID: #{channel_id}).
+    Your response to this message will be automatically posted to this channel. This IS the group conversation.
+    Do NOT use eits dm to communicate with other channel members — reply here in the channel.
+    """
+
+    channel_ctx <> @direct_instruction <> "\n\nMessage: #{body}"
+  end
+
+  def build_prompt(:broadcast, body, %{id: channel_id, name: channel_name}) do
+    channel_ctx = """
+    You are in channel ##{channel_name} (ID: #{channel_id}).
+    Your response to this message will be automatically posted to this channel. This IS the group conversation.
+    Do NOT use eits dm to communicate with other channel members — reply here in the channel.
+    """
+
+    channel_ctx <> @broadcast_instruction <> "\n\nMessage: #{body}"
+  end
+
+  def build_prompt(:ambient, body, %{id: channel_id, name: channel_name}) do
+    channel_ctx = """
+    You are in channel ##{channel_name} (ID: #{channel_id}).
+    Your response to this message will be automatically posted to this channel. This IS the group conversation.
+    Do NOT use eits dm to communicate with other channel members — reply here in the channel.
+    """
+
+    channel_ctx <> @ambient_instruction <> "\n\nMessage: #{body}"
+  end
 
   @doc """
   Returns true if this member should be skipped (i.e., they are the sender).

@@ -67,14 +67,22 @@ cmd_sessions() {
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|end|context|tasks|notes>"; return 0; }
   case "$sub" in
     list)
-      # eits sessions list [--search <q>] [--status <s>] [--project <id>] [--limit <n>]
-      local qs=""
+      # eits sessions list [--search <q>] [--name <partial>] [--status <s>] [--project <id>] [--agent <uuid>] [--limit <n>] [--mine] [--include-archived] [--with-tasks]
+      # --agent is mutually exclusive with --search, --status, --project, and --mine
+      # --mine is mutually exclusive with --agent, --search, --status, and --project
+      # --name cannot combine with --agent or --mine
+      local qs="" _agent_flag=0 _other_flag=0 _mine_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --search)  qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
-          --status)  qs="${qs}&status=$2";     shift 2 ;;
-          --project) qs="${qs}&project_id=$2"; shift 2 ;;
-          --limit)   qs="${qs}&limit=$2";      shift 2 ;;
+          --search)     [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--search cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --name)       [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--name cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&name=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --status)     [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--status cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&status=$2";     shift 2 ;;
+          --project)    [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--project cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&project_id=$2"; shift 2 ;;
+          --agent)      [[ $_other_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--agent is mutually exclusive with --search, --status, --project, and --mine"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
+          --mine)       [[ $_agent_flag -eq 1 || $_other_flag -eq 1 ]] && die "--mine cannot combine with --agent, --search, --status, and --project"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
+          --limit)      qs="${qs}&limit=$2";      shift 2 ;;
+          --include-archived) qs="${qs}&include_archived=true"; shift ;;
+          --with-tasks) qs="${qs}&with_tasks=true"; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -92,6 +100,7 @@ cmd_sessions() {
       ;;
     get)
       local uuid="${1:-}"; need uuid
+      [[ "$uuid" == "self" ]] && { uuid="${EITS_SESSION_UUID:-}"; [[ -n "$uuid" ]] || die "EITS_SESSION_UUID is not set"; }
       _get "/sessions/$uuid"
       ;;
     create)
@@ -112,9 +121,10 @@ cmd_sessions() {
       _post "/sessions" "$(json session_id "$session_id" name "$name" description "$description" project_name "$project_name" model "$model" entrypoint "$entrypoint")"
       ;;
     update)
-      # eits sessions update <uuid> [--status <status>] [--intent <text>] [--entrypoint <e>] [--name <name>] [--description <desc>]
+      # eits sessions update <uuid> [--status <status>] [--intent <text>] [--entrypoint <e>] [--name <name>] [--description <desc>] [--clear-entrypoint] [--ended-at <ISO8601>]
       local uuid="${1:-}"; need uuid; shift
-      local status="" intent="" entrypoint="" name="" description=""
+      [[ "$uuid" == "self" ]] && { uuid="${EITS_SESSION_UUID:-}"; [[ -n "$uuid" ]] || die "EITS_SESSION_UUID is not set"; }
+      local status="" intent="" entrypoint="" name="" description="" clear_entrypoint="" ended_at=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --status)      status="$2";      shift 2 ;;
@@ -122,14 +132,28 @@ cmd_sessions() {
           --entrypoint)  entrypoint="$2";  shift 2 ;;
           --name)        name="$2";        shift 2 ;;
           --description) description="$2"; shift 2 ;;
+          --clear-entrypoint) clear_entrypoint="true"; shift ;;
+          --ended-at)    ended_at="$2";    shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      _patch "/sessions/$uuid" "$(json status "$status" intent "$intent" entrypoint "$entrypoint" name "$name" description "$description")"
+      _patch "/sessions/$uuid" "$(json status "$status" intent "$intent" entrypoint "$entrypoint" name "$name" description "$description" clear_entrypoint "$clear_entrypoint" ended_at "$ended_at")"
       ;;
     end)
-      local uuid="${1:-}"; need uuid
-      _post "/sessions/$uuid/end" '{}'
+      # eits sessions end <uuid> [--final-status <completed|failed|waiting>]
+      local uuid="${1:-}"; need uuid; shift
+      local final_status=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --final-status) final_status="$2"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      if [[ -n "$final_status" ]]; then
+        _post "/sessions/$uuid/end" "$(json final_status "$final_status")"
+      else
+        _post "/sessions/$uuid/end" '{}'
+      fi
       ;;
     context)
       # eits sessions context <uuid>                                    (GET)
@@ -168,18 +192,26 @@ cmd_sessions() {
 
 cmd_tasks() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session> [--mine] [--quiet]"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session|search|sessions> [--mine] [--quiet]"; return 0; }
   case "$sub" in
     list)
-      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--state <id>] [--limit <n>] [--mine]
+      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--search <query>] [--state <id>] [--state-name <name>] [--limit <n>] [--mine]
       local qs="" _session_flag=0 _mine_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --project) qs="${qs}&project_id=$2"; shift 2 ;;
           --session) [[ $_mine_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
           --agent)   qs="${qs}&agent_id=$2";   shift 2 ;;
-          --q)       qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --q|--search) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --state)   qs="${qs}&state_id=$2";   shift 2 ;;
+          --state-name)
+            case "$2" in
+              todo)          qs="${qs}&state_id=1"; shift 2 ;;
+              in-progress|start) qs="${qs}&state_id=2"; shift 2 ;;
+              done)          qs="${qs}&state_id=3"; shift 2 ;;
+              in-review|review) qs="${qs}&state_id=4"; shift 2 ;;
+              *) die "unknown state name: $2" ;;
+            esac ;;
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;
           --mine)    [[ $_session_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
           *) die "unknown flag: $1" ;;
@@ -192,9 +224,9 @@ cmd_tasks() {
       _get "/tasks/$id"
       ;;
     create)
-      # eits tasks create --title <t> [--description <d>] [--project <id>] [--priority <p>] [--session <uuid>] [--agent <uuid>] [--tags <id1,id2,...>] [--team <id>]
+      # eits tasks create --title <t> [--description <d>] [--project <id>] [--priority <p>] [--session <uuid>] [--agent <uuid>] [--tags <id1,id2,...>] [--team <id>] [--due-at <ISO8601>]
       # Defaults: --agent from $EITS_AGENT_UUID, --project from $EITS_PROJECT_ID, --session from $EITS_SESSION_UUID (falls back to $EITS_SESSION_ID)
-      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" agent_id="${EITS_AGENT_UUID:-}" tags="" team_id=""
+      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" agent_id="${EITS_AGENT_UUID:-}" tags="" team_id="" due_at=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --title)       title="$2";       shift 2 ;;
@@ -205,12 +237,13 @@ cmd_tasks() {
           --agent)       agent_id="$2";    shift 2 ;;
           --tags)        tags="$2";        shift 2 ;;
           --team)        team_id="$2";     shift 2 ;;
+          --due-at)      due_at="$2";      shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
       need title
       local body
-      body="$(json title "$title" description "$description" project_id "$project_id" priority "$priority" session_id "$session_id" agent_id "$agent_id" team_id "$team_id")"
+      body="$(json title "$title" description "$description" project_id "$project_id" priority "$priority" session_id "$session_id" agent_id "$agent_id" team_id "$team_id" due_at "$due_at")"
       if [[ -n "$tags" ]]; then
         local tag_array
         tag_array=$(echo "$tags" | jq -R 'split(",") | map(tonumber)')
@@ -219,7 +252,7 @@ cmd_tasks() {
       _post "/tasks" "$body"
       ;;
     update)
-      # eits tasks update <id> [--state <id>] [--state-name <done|start>] [--priority <p>] [--description <d>] [--title <t>]
+      # eits tasks update <id> [--state <id>] [--state-name <done|start>] [--priority <p>] [--description <d>] [--title <t>] [--due-at <ISO8601>]
       local id="${1:-}"; need id; shift
       local updates="{}"
       while [[ $# -gt 0 ]]; do
@@ -235,6 +268,7 @@ cmd_tasks() {
           --priority)    updates=$(echo "$updates" | jq --arg v "$2" '. + {priority: $v}');    shift 2 ;;
           --description) updates=$(echo "$updates" | jq --arg v "$2" '. + {description: $v}'); shift 2 ;;
           --title)       updates=$(echo "$updates" | jq --arg v "$2" '. + {title: $v}');       shift 2 ;;
+          --due-at)      updates=$(echo "$updates" | jq --arg v "$2" '. + {due_at: $v}');      shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -289,10 +323,15 @@ cmd_tasks() {
       _delete "/tasks/$id/sessions/$session_id"
       ;;
     complete)
-      # eits tasks complete <id> --message <text>
+      # eits tasks complete <id> [<message>] [--message <text>]
       # Delegates to POST /tasks/:id/complete — atomic annotate+done via server transaction.
       local id="${1:-}"; need id; shift
       local message=""
+      # Check if next arg is not a flag and treat it as the message
+      if [[ $# -gt 0 && "$1" != --* ]]; then
+        message="$1"
+        shift
+      fi
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --message) message="$2"; shift 2 ;;
@@ -336,6 +375,31 @@ cmd_tasks() {
           "$BASE_URL/tasks/$task_id/sessions" >/dev/null 2>&1 || true
       fi
       ;;
+    search)
+      # eits tasks search <query> [--project <id>] [--limit <n>] [--state <id>]
+      local query="${1:-}"; [[ -n "$query" ]] || die "query is required"
+      shift
+      local qs="q=$(printf '%s' "$query" | jq -Rr @uri)"
+      local project_id="${EITS_PROJECT_ID:-}"
+      local limit="" state_id=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --project)  project_id="$2"; shift 2 ;;
+          --limit)    limit="$2";      shift 2 ;;
+          --state)    state_id="$2";   shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      [[ -n "$project_id" ]] && qs="${qs}&project_id=$project_id"
+      [[ -n "$limit" ]]      && qs="${qs}&limit=$limit"
+      [[ -n "$state_id" ]]   && qs="${qs}&state_id=$state_id"
+      _get "/tasks?${qs}"
+      ;;
+    sessions)
+      # eits tasks sessions <id> — list sessions linked to a task
+      local id="${1:-}"; need id
+      _get "/tasks/$id/sessions"
+      ;;
     tag)
       # eits tasks tag <task_id> <tag_id>
       local task_id="${1:-}"; need task_id; shift
@@ -343,7 +407,7 @@ cmd_tasks() {
       _post "/tasks/$task_id/tags" "$(json tag_id "$tag_id")"
       ;;
     *)
-      echo "usage: eits tasks <list|get|create|update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|tag> [--mine] [--title] [--quiet]"
+      echo "usage: eits tasks <list|get|create|update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|search|sessions|tag> [--mine] [--title] [--quiet]"
       ;;
   esac
 }
@@ -355,11 +419,14 @@ cmd_notes() {
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits notes <list|search|get|create|update|add>"; return 0; }
   case "$sub" in
     list)
-      local qs=""
+      # eits notes list [--q <query>] [--search <query>] [--session <uuid>] [--limit <n>] [--mine]
+      # --mine is mutually exclusive with --session
+      local qs="" _session_flag=0 _mine_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --q)       qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
-          --session) qs="${qs}&session_id=$2"; shift 2 ;;
+          --q|--search) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --session) [[ $_mine_flag -eq 1 ]] && die "--session and --mine are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
+          --mine)    [[ $_session_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
@@ -440,19 +507,24 @@ cmd_projects() {
       _get "/projects/$id"
       ;;
     create)
-      # eits projects create --name <n> --path <p> [--slug <s>] [--remote <url>]
-      local name="" path="" slug="" remote_url=""
+      # eits projects create --name <n> --path <p> [--slug <s>] [--remote <url>] [--git-remote <url>] [--repo-url <url>] [--branch <b>] [--active|--inactive]
+      local name="" path="" slug="" remote_url="" git_remote="" repo_url="" branch="" active=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --name)   name="$2";       shift 2 ;;
-          --path)   path="$2";       shift 2 ;;
-          --slug)   slug="$2";       shift 2 ;;
-          --remote) remote_url="$2"; shift 2 ;;
+          --name)       name="$2";       shift 2 ;;
+          --path)       path="$2";       shift 2 ;;
+          --slug)       slug="$2";       shift 2 ;;
+          --remote)     remote_url="$2"; shift 2 ;;
+          --git-remote) git_remote="$2"; shift 2 ;;
+          --repo-url)   repo_url="$2";   shift 2 ;;
+          --branch)     branch="$2";     shift 2 ;;
+          --active)     active="true";   shift ;;
+          --inactive)   active="false";  shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
       need name; need path
-      _post "/projects" "$(json name "$name" path "$path" slug "$slug" remote_url "$remote_url")"
+      _post "/projects" "$(json name "$name" path "$path" slug "$slug" remote_url "$remote_url" git_remote "$git_remote" repo_url "$repo_url" branch "$branch" active "$active")"
       ;;
     *)
       echo "usage: eits projects <list|get|create>"
@@ -466,7 +538,19 @@ cmd_agents() {
   local sub="${1:-}"; shift || true
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits agents <list|get|spawn>"; return 0; }
   case "$sub" in
-    list) _get "/agents" ;;
+    list)
+      # eits agents list [--project <id>] [--status <status>] [--limit <n>]
+      local qs=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --project) qs="${qs}&project_id=$2"; shift 2 ;;
+          --status)  qs="${qs}&status=$2";     shift 2 ;;
+          --limit)   qs="${qs}&limit=$2";      shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      _curl "$BASE_URL/agents?${qs#&}" | jq .
+      ;;
     get)
       local id="${1:-}"; need id
       _get "/agents/$id"
@@ -544,11 +628,15 @@ cmd_commits() {
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits commits <list|create>"; return 0; }
   case "$sub" in
     list)
-      # eits commits list [--session <uuid>]
-      local qs=""
+      # eits commits list [--session <uuid>] [--agent <uuid>] [--mine] [--limit <n>]
+      # --mine, --session, and --agent are mutually exclusive
+      local qs="" _session_flag=0 _mine_flag=0 _agent_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --session) qs="${qs}&session_id=$2"; shift 2 ;;
+          --session) [[ $_mine_flag -eq 1 || $_agent_flag -eq 1 ]] && die "--session is mutually exclusive with --mine and --agent"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
+          --agent)   [[ $_mine_flag -eq 1 || $_session_flag -eq 1 ]] && die "--agent is mutually exclusive with --mine and --session"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
+          --mine)    [[ $_session_flag -eq 1 || $_agent_flag -eq 1 ]] && die "--mine is mutually exclusive with --session and --agent"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID"; qs="${qs}&session_id=$_mine"; shift ;;
+          --limit)   qs="${qs}&limit=$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -601,7 +689,18 @@ cmd_jobs() {
   local sub="${1:-}"; shift || true
   [[ "${sub:-}" == "--help" || "${sub:-}" == "-h" ]] && { echo "usage: eits jobs <list|get|create|update|run|delete>"; return 0; }
   case "$sub" in
-    list) _get "/jobs" ;;
+    list)
+      # eits jobs list [--project <id>] [--global]
+      local qs=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --project) qs="${qs}&project_id=$2"; shift 2 ;;
+          --global)  qs="${qs}&global=true";   shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      _curl "$BASE_URL/jobs?${qs#&}" | jq .
+      ;;
     get)
       local id="${1:-}"; need id
       _get "/jobs/$id"
@@ -760,8 +859,28 @@ USAGE
 
 cmd_channels() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits channels <list|send|messages>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits channels <create|list|send|messages|join|leave>"; return 0; }
   case "$sub" in
+    create)
+      # eits channels create --name <name> [--project <id>] [--description <text>] [--type <public|private>]
+      local name="" project_id="" description="" channel_type="public" session_id="${EITS_SESSION_UUID:-}"
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --name)        name="$2";         shift 2 ;;
+          --project)     project_id="$2";   shift 2 ;;
+          --description) description="$2";  shift 2 ;;
+          --type)        channel_type="$2"; shift 2 ;;
+          --session)     session_id="$2";   shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need name
+      local payload
+      payload="$(json name "$name" channel_type "$channel_type" session_id "$session_id")"
+      [[ -n "$project_id"   ]] && payload="$(echo "$payload" | jq --arg v "$project_id"   '. + {project_id: ($v | tonumber)}')"
+      [[ -n "$description"  ]] && payload="$(echo "$payload" | jq --arg v "$description"  '. + {description: $v}')"
+      _post "/channels" "$payload"
+      ;;
     list)
       local project_id=""
       while [[ $# -gt 0 ]]; do
@@ -777,19 +896,22 @@ cmd_channels() {
       fi
       ;;
     send)
-      # eits channels send <channel_id> --session <uuid> --body <text>
+      # eits channels send <channel_id> --body <text> [--session <uuid>] [--broadcast-team <team_id>]
       # --session defaults to $EITS_SESSION_UUID if not provided
+      # --broadcast-team fans out DMs to all team members after posting (via broadcast_to_team_id param)
       local channel_id="${1:-}"; need channel_id; shift
-      local session_id="${EITS_SESSION_UUID:-}" body=""
+      local session_id="${EITS_SESSION_UUID:-}" body="" broadcast_team=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --session) session_id="$2"; shift 2 ;;
-          --body|-m) body="$2";       shift 2 ;;
+          --session)         session_id="$2";    shift 2 ;;
+          --body|-m)         body="$2";          shift 2 ;;
+          --broadcast-team)  broadcast_team="$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
       need session_id; need body
-      _post "/channels/$channel_id/messages" "$(json session_id "$session_id" body "$body")"
+      _post "/channels/$channel_id/messages" \
+        "$(json session_id "$session_id" body "$body" broadcast_to_team_id "$broadcast_team")"
       ;;
     messages)
       # eits channels messages <channel_id> [--limit N]
@@ -803,21 +925,66 @@ cmd_channels() {
       done
       _curl "$BASE_URL/channels/$channel_id/messages?limit=$limit" | jq .
       ;;
+    join)
+      # eits channels join <channel_id> [--session <uuid|id>] [--role <member|admin>]
+      # --session defaults to $EITS_SESSION_UUID, falls back to $EITS_SESSION_ID
+      local channel_id="${1:-}"; need channel_id; shift
+      local session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" role=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --session) session_id="$2"; shift 2 ;;
+          --role)    role="$2";       shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need session_id
+      local payload
+      payload="$(json session_id "$session_id")"
+      [[ -n "$role" ]] && payload="$(echo "$payload" | jq --arg v "$role" '. + {role: $v}')"
+      _post "/channels/$channel_id/members" "$payload"
+      ;;
+    leave)
+      # eits channels leave <channel_id> [--session <uuid|id>]
+      # --session defaults to $EITS_SESSION_UUID, falls back to $EITS_SESSION_ID
+      local channel_id="${1:-}"; need channel_id; shift
+      local session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --session) session_id="$2"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need session_id
+      _delete "/channels/$channel_id/members/$session_id"
+      ;;
     *)
       cat <<USAGE
 usage: eits channels <subcommand>
 
 Subcommands:
+  create   --name <name> [--project <id>] [--description <text>] [--type <public|private>]
+           Create a new channel
   list     [--project <id>]                         List channels (optionally filter by project)
-  send     <channel_id> --session <id> --body <text> Send a message to a channel
+  send     <channel_id> --body <text> [--session <id>] [--broadcast-team <team_id>]
+           Send a message; --broadcast-team fans out DMs to all team members after posting
   messages <channel_id> [--limit|-n <N>]            Get last N messages (default 20, max 200)
+  join     <channel_id> [--session <uuid|id>] [--role <member|admin>]
+           Join a channel (defaults to current session)
+  leave    <channel_id> [--session <uuid|id>]
+           Leave a channel (defaults to current session)
 
 Examples:
+  eits channels create --name "ops" --project 1 --description "Ops team channel"
+  eits channels create --name "alerts" --type private
   eits channels list
   eits channels list --project 1
-  eits channels send 1 --session 1179 --body "hello"
+  eits channels send 1 --body "hello"
+  eits channels send 1 --body "@all deploy done" --broadcast-team 296
   eits channels messages 1
   eits channels messages 1 -n 5
+  eits channels join 1
+  eits channels join 1 --role admin
+  eits channels leave 1
 USAGE
       ;;
   esac
@@ -827,22 +994,25 @@ USAGE
 
 cmd_notifications() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits notifications create --title <t> [--body <b>] [--category agent|job|system]"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits notifications create --title <t> [--body <b>] [--category agent|job|system] [--resource-type <type>] [--resource-id <id>]"; return 0; }
   case "$sub" in
     create)
-      # eits notifications create --title <t> [--body <b>] [--category <agent|job|system>]
+      # eits notifications create --title <t> [--body <b>] [--category <agent|job|system>] [--resource-type <type>] [--resource-id <id>]
       # --category maps to the API's category field (agent, job, system; default: system)
-      local title="" body="" category=""
+      # --resource-type and --resource-id link the notification to a resource
+      local title="" body="" category="" resource_type="" resource_id=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --title)    title="$2";    shift 2 ;;
-          --body)     body="$2";     shift 2 ;;
-          --category) category="$2"; shift 2 ;;
+          --title)         title="$2";         shift 2 ;;
+          --body)          body="$2";          shift 2 ;;
+          --category)      category="$2";      shift 2 ;;
+          --resource-type) resource_type="$2"; shift 2 ;;
+          --resource-id)   resource_id="$2";   shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
       need title
-      _post "/notifications" "$(json title "$title" body "$body" category "$category")"
+      _post "/notifications" "$(json title "$title" body "$body" category "$category" resource_type "$resource_type" resource_id "$resource_id")"
       ;;
     *)
       echo "usage: eits notifications <create>"
@@ -854,15 +1024,58 @@ cmd_notifications() {
 
 cmd_prompts() {
   local sub="${1:-}"; shift || true
-  [[ "${sub:-}" == "--help" || "${sub:-}" == "-h" ]] && { echo "usage: eits prompts <list|get>"; return 0; }
+  [[ "${sub:-}" == "--help" || "${sub:-}" == "-h" ]] && { echo "usage: eits prompts <list|get|create>"; return 0; }
   case "$sub" in
-    list) _get "/prompts" ;;
+    list)
+      # eits prompts list [--query <q>] [--project <id>]
+      local qs=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --query|-q)  qs="${qs}&query=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --project)   qs="${qs}&project_id=$2"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      _curl "$BASE_URL/prompts?${qs#&}" | jq .
+      ;;
     get)
-      local id="${1:-}"; need id
-      _get "/prompts/$id"
+      # eits prompts get <id> [--project <id>] [--no-text]
+      local id="${1:-}"; need id; shift
+      local qs=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --project) qs="${qs}&project_id=$2"; shift 2 ;;
+          --no-text) qs="${qs}&include_text=false"; shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      _curl "$BASE_URL/prompts/$id?${qs#&}" | jq .
+      ;;
+    create)
+      # eits prompts create --name <n> --slug <s> --prompt-text <t> [--description <d>] [--project <id>] [--tags <json>] [--created-by <name>]
+      local name="" slug="" prompt_text="" description="" project_id="" tags="" created_by=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --name)        name="$2";        shift 2 ;;
+          --slug)        slug="$2";        shift 2 ;;
+          --prompt-text) prompt_text="$2"; shift 2 ;;
+          --description) description="$2"; shift 2 ;;
+          --project)     project_id="$2";  shift 2 ;;
+          --tags)        tags="$2";        shift 2 ;;
+          --created-by)  created_by="$2";  shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need name; need slug; need prompt_text
+      local body
+      body="$(json name "$name" slug "$slug" prompt_text "$prompt_text" description "$description" project_id "$project_id" created_by "$created_by")"
+      if [[ -n "$tags" ]]; then
+        body=$(echo "$body" | jq --argjson t "$tags" '. + {tags: $t}')
+      fi
+      _post "/prompts" "$body"
       ;;
     *)
-      echo "usage: eits prompts <list|get>"
+      echo "usage: eits prompts <list|get|create>"
       ;;
   esac
 }
@@ -871,7 +1084,7 @@ cmd_prompts() {
 
 cmd_teams() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits teams <list|get|create|delete|members|join|status|update-member|done-self|leave|broadcast|my-teams>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits teams <list|get|create|update|delete|members|join|status|update-member|done-self|leave|broadcast|my-teams>"; return 0; }
   case "$sub" in
     list)
       local project_id="" status=""
@@ -907,6 +1120,29 @@ cmd_teams() {
     delete)
       local id="${1:-}"; need id
       _delete "/teams/$id"
+      ;;
+    update)
+      # eits teams update <id> [--name <name>] [--description <desc>]
+      local id="${1:-}"; need id; shift
+      local name="" description=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --name)        name="${2:-}";        shift 2 ;;
+          --description) description="${2:-}"; shift 2 ;;
+          *) shift ;;
+        esac
+      done
+      [[ -n "$name" || -n "$description" ]] || die "at least --name or --description required"
+      local payload
+      payload=$(python3 -c "
+import json, sys
+d = {}
+name = sys.argv[1]; desc = sys.argv[2]
+if name: d['name'] = name
+if desc:  d['description'] = desc
+print(json.dumps(d))
+" "$name" "$description")
+      _patch "/teams/$id" "$payload"
       ;;
     members)
       local id="${1:-}"; need id
@@ -971,52 +1207,23 @@ cmd_teams() {
       _delete "/teams/$team_id/members/$member_id"
       ;;
     broadcast)
-      # eits teams broadcast <team_id> --message <text> [--from <session>] [--include-self] [--response-required]
+      # eits teams broadcast <team_id> --body <text> [--from <session>]
+      # POSTs to POST /api/v1/teams/:team_id/broadcast (atomic server-side fanout)
       local team_id="${1:-}"; need team_id; shift
-      local from="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" message="" include_self="false" response_required="false"
+      local from="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" body=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --from)              from="$2";                shift 2 ;;
-          --message|-m)        message="$2";             shift 2 ;;
-          --include-self)      include_self="true";      shift ;;
-          --response-required) response_required="true"; shift ;;
+          --from|-f)               from="$2";  shift 2 ;;
+          --body|-b|-m|--message)  body="$2";  shift 2 ;;
+          # Deprecated flags accepted for backward compat; server handles fanout now
+          --include-self|--response-required)
+            if [[ "${2:-}" != --* && -n "${2:-}" ]]; then shift 2; else shift; fi ;;
+
           *) die "unknown flag: $1" ;;
         esac
       done
-      need from; need message
-
-      local members_resp
-      members_resp=$(_curl "$BASE_URL/teams/$team_id/members") \
-        || die "failed to fetch members for team $team_id"
-
-      local targets
-      local skip_self; skip_self="$([[ "$include_self" == "true" ]] && echo false || echo true)"
-      targets=$(echo "$members_resp" | jq -r --arg self "$from" --argjson skip_self "$skip_self" \
-        '.members[] | select(.session_uuid != null) | select(($skip_self | not) or (.session_uuid != $self)) | .session_uuid')
-
-      [[ -z "$targets" ]] && die "no recipients found in team $team_id"
-
-      local sent=0 failed=0 results="[]"
-      while IFS= read -r to; do
-        [[ -z "$to" ]] && continue
-        local payload result dm_exit
-        payload=$(jq -n --arg f "$from" --arg t "$to" --arg m "$message" --argjson r "$response_required" \
-          '{from_session_id: $f, to_session_id: $t, message: $m, response_required: $r}')
-        result=$(_curl -X POST -H "Content-Type: application/json" -d "$payload" "$BASE_URL/dm" 2>&1); dm_exit=$?
-        if [[ $dm_exit -eq 0 ]]; then
-          sent=$((sent+1))
-          local safe_result
-          safe_result=$(echo "$result" | jq -c '.' 2>/dev/null || echo '{}')
-          results=$(jq -n --argjson base "$results" --arg to "$to" --argjson r "$safe_result" '$base + [{to: $to, ok: true, result: $r}]')
-        else
-          failed=$((failed+1))
-          results=$(jq -n --argjson base "$results" --arg to "$to" --argjson code "$dm_exit" --arg err "$result" \
-            '$base + [{to: $to, ok: false, exit_code: $code, error: $err}]')
-        fi
-      done <<< "$targets"
-
-      jq -n --argjson s "$sent" --argjson f "$failed" --argjson r "$results" \
-        '{success: ($f == 0), sent: $s, failed: $f, results: $r}'
+      need from; need body
+      _post "/teams/$team_id/broadcast" "$(json from_session_id "$from" body "$body")"
       ;;
     my-teams)
       # List teams where the current agent is a member (by EITS_AGENT_UUID)
@@ -1033,7 +1240,7 @@ cmd_teams() {
       done
       ;;
     *)
-      echo "usage: eits teams <list|get|create|delete|members|join|status|update-member|done-self|leave|broadcast|my-teams>"
+      echo "usage: eits teams <list|get|create|update|delete|members|join|status|update-member|done-self|leave|broadcast|my-teams>"
       ;;
   esac
 }
@@ -1133,6 +1340,7 @@ cmd_worktree() {
 cmd_me() {
   local uuid="${EITS_SESSION_UUID:-}"
   echo "Session UUID:  ${EITS_SESSION_UUID:-(not set)}"
+  echo "Session ID:    ${EITS_SESSION_ID:-(not set)}"
   echo "Agent UUID:    ${EITS_AGENT_UUID:-(not set)}"
   echo "Project ID:    ${EITS_PROJECT_ID:-(not set)}"
   echo "API URL:       ${BASE_URL}"
@@ -1163,7 +1371,7 @@ Commands:
   channels      list|send|messages
   notifications create
   prompts       list|get
-  teams         list|get|create|delete|members|join|status|update-member|leave|broadcast|my-teams
+  teams         list|get|create|update|delete|members|join|status|update-member|leave|broadcast|my-teams
   timer         show|set|cancel   (default session: self / $EITS_SESSION_UUID)
   worktree      create|remove   (EITS Elixir projects only)
   me            Print current session/agent/project context and verify server-side

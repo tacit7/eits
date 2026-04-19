@@ -27,6 +27,7 @@ defmodule EyeInTheSky.Sessions.Queries do
   - `:search_query` - String to search across session name, description, project name, agent ID, agent description
   - `:status_filter` - One of: "all", "active", "completed", "stale", "discovered"
   - `:project_id` - Filter by project ID
+  - `:agent_id` - Filter by agent ID (integer)
   - `:limit` - Maximum number of results (default: 100)
   - `:offset` - Number of results to skip (default: 0)
   - `:include_archived` - Include archived sessions (default: false)
@@ -37,6 +38,7 @@ defmodule EyeInTheSky.Sessions.Queries do
     limit = Keyword.get(opts, :limit, 100)
     offset = Keyword.get(opts, :offset, 0)
     project_id = Keyword.get(opts, :project_id, nil)
+    agent_id = Keyword.get(opts, :agent_id, nil)
 
     base_query =
       from s in Session,
@@ -52,6 +54,23 @@ defmodule EyeInTheSky.Sessions.Queries do
     base_query =
       if project_id do
         where(base_query, [s, a], s.project_id == ^project_id or a.project_id == ^project_id)
+      else
+        base_query
+      end
+
+    base_query =
+      if agent_id do
+        where(base_query, [s], s.agent_id == ^agent_id)
+      else
+        base_query
+      end
+
+    name_filter = Keyword.get(opts, :name_filter, nil)
+
+    base_query =
+      if name_filter && name_filter != "" do
+        pattern = "%#{name_filter}%"
+        where(base_query, [s], ilike(s.name, ^pattern))
       else
         base_query
       end

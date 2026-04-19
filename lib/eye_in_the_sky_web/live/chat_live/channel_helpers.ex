@@ -47,31 +47,38 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
 
     Enum.each(mentioned_ids, &maybe_auto_add_member(channel_id, &1))
 
-    agent_members = Channels.list_members(channel_id)
+    case Channels.get_channel(channel_id) do
+      nil ->
+        Logger.error("ChannelHelpers: channel=#{channel_id} not found, skipping fanout")
 
-    Enum.each(agent_members, fn member ->
-      unless ChannelProtocol.skip?(member.session_id, sender_session_id) do
-        {mode, _mentioned_ids, _mention_all} =
-          ChannelProtocol.parse_routing(body, member.session_id)
+      channel ->
+        channel_ctx = %{id: channel.id, name: channel.name}
+        agent_members = Channels.list_members(channel_id)
 
-        Messages.send_message(%{
-          session_id: member.session_id,
-          sender_role: "user",
-          recipient_role: "agent",
-          provider: "claude",
-          body: body
-        })
+        Enum.each(agent_members, fn member ->
+          unless ChannelProtocol.skip?(member.session_id, sender_session_id) do
+            {mode, _mentioned_ids, _mention_all} =
+              ChannelProtocol.parse_routing(body, member.session_id)
 
-        prompt = ChannelProtocol.build_prompt(mode, body)
-        Logger.info("Routing to session=#{member.session_id} mode=#{mode}")
+            Messages.send_message(%{
+              session_id: member.session_id,
+              sender_role: "user",
+              recipient_role: "agent",
+              provider: "claude",
+              body: body
+            })
 
-        AgentManager.send_message(member.session_id, prompt,
-          model: "sonnet",
-          channel_id: channel_id,
-          content_blocks: content_blocks
-        )
-      end
-    end)
+            prompt = ChannelProtocol.build_prompt(mode, body, channel_ctx)
+            Logger.info("Routing to session=#{member.session_id} mode=#{mode}")
+
+            AgentManager.send_message(member.session_id, prompt,
+              model: "sonnet",
+              channel_id: channel_id,
+              content_blocks: content_blocks
+            )
+          end
+        end)
+    end
   end
 
   defp maybe_auto_add_member(channel_id, mid) do

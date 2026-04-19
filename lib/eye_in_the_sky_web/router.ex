@@ -220,6 +220,7 @@ defmodule EyeInTheSkyWeb.Router do
     post "/tasks/:id/annotations", TaskController, :annotate
     post "/tasks/:id/complete", TaskController, :complete
     post "/tasks/:id/sessions", TaskController, :link_session
+    get "/tasks/:id/sessions", TaskController, :list_sessions
     delete "/tasks/:id/sessions/:uuid", TaskController, :unlink_session
     post "/tasks/:id/tags", TaskController, :add_tag
 
@@ -244,18 +245,23 @@ defmodule EyeInTheSkyWeb.Router do
     # Messaging
     post "/dm", MessagingController, :dm
     get "/channels", MessagingController, :list_channels
+    post "/channels", MessagingController, :create_channel
     get "/channels/:channel_id/messages", MessagingController, :list_channel_messages
     post "/channels/:channel_id/messages", MessagingController, :send_channel_message
+    post "/channels/:channel_id/members", MessagingController, :join_channel
+    delete "/channels/:channel_id/members/:session_id", MessagingController, :leave_channel
 
     # Teams
     get "/teams", TeamController, :index
     post "/teams", TeamController, :create
     get "/teams/:id", TeamController, :show
+    patch "/teams/:id", TeamController, :update
     delete "/teams/:id", TeamController, :delete
     get "/teams/:team_id/members", TeamController, :list_members
     post "/teams/:team_id/members", TeamController, :join
     patch "/teams/:team_id/members/:member_id", TeamController, :update_member
     delete "/teams/:team_id/members/:member_id", TeamController, :leave
+    post "/teams/:team_id/broadcast", TeamController, :broadcast
 
   end
 

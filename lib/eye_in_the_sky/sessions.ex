@@ -158,10 +158,7 @@ defmodule EyeInTheSky.Sessions do
   Unarchives a session.
   """
   def unarchive_session(%Session{} = session) do
-    Logger.info("unarchive_session id=#{session.id} archived_at=#{inspect(session.archived_at)}")
-    result = update_session(session, %{archived_at: nil})
-    Logger.info("unarchive_session result=#{inspect(result)}")
-    result
+    update_session(session, %{archived_at: nil})
   end
 
   @doc """

@@ -21,8 +21,26 @@ defmodule EyeInTheSky.Teams.Team do
     |> cast(attrs, [:uuid, :name, :description, :status, :project_id, :created_at, :archived_at])
     |> maybe_generate_uuid()
     |> validate_required([:name])
+    |> validate_length(:name, min: 1)
     |> unique_constraint(:name)
     |> unique_constraint(:uuid)
+  end
+
+  def update_changeset(team, attrs) do
+    team
+    |> cast(attrs, [:name, :description])
+    |> validate_name_if_present()
+    |> unique_constraint(:name)
+  end
+
+  defp validate_name_if_present(changeset) do
+    if Map.has_key?(changeset.changes, :name) do
+      changeset
+      |> validate_required([:name])
+      |> validate_length(:name, min: 1)
+    else
+      changeset
+    end
   end
 
   defp maybe_generate_uuid(changeset) do

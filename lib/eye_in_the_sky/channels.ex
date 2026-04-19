@@ -8,6 +8,11 @@ defmodule EyeInTheSky.Channels do
   alias EyeInTheSky.Repo
 
   @doc """
+  Gets a single channel by ID. Returns nil if not found.
+  """
+  def get_channel(id), do: Repo.get(Channel, id)
+
+  @doc """
   Returns all channels (no project filter).
   """
   def list_channels(opts \\ []) do
@@ -193,6 +198,29 @@ defmodule EyeInTheSky.Channels do
       nil -> {:error, :not_found}
       channel -> {:ok, channel}
     end
+  end
+
+  @doc """
+  Returns channel members with notifications enabled, excluding a given sender session.
+
+  Used to fan out DMs when a channel message is posted.
+  Only returns members with `notifications = "all"` and a non-nil `session_id`.
+  """
+  def list_members_for_notification(channel_id, exclude_session_id) do
+    terminated = ~w(completed failed)
+
+    from(m in ChannelMember,
+      join: s in EyeInTheSky.Sessions.Session,
+      on: s.id == m.session_id,
+      where:
+        m.channel_id == ^channel_id and
+          m.notifications == "all" and
+          not is_nil(m.session_id) and
+          m.session_id != ^exclude_session_id and
+          s.status not in ^terminated,
+      order_by: [asc: m.joined_at]
+    )
+    |> Repo.all()
   end
 
   @doc """

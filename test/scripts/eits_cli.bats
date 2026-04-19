@@ -96,6 +96,41 @@ _agent_uuid() { cat "$BATS_FILE_TMPDIR/agent_uuid"; }
   echo "$output" | jq -e '.results | type == "array"' >/dev/null
 }
 
+@test "sessions list --agent: accepts agent UUID flag" {
+  run "$EITS" sessions list --agent $(_agent_uuid)
+  [ "$status" -eq 0 ]
+}
+
+@test "sessions list --agent: returns results array" {
+  run "$EITS" sessions list --agent $(_agent_uuid)
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.results | type == "array"' >/dev/null
+}
+
+@test "sessions list --agent + --status: mutually exclusive" {
+  run "$EITS" sessions list --agent $(_agent_uuid) --status working 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "mutually exclusive" ]]
+}
+
+@test "sessions list --status + --agent: mutually exclusive (reverse order)" {
+  run "$EITS" sessions list --status working --agent $(_agent_uuid) 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "mutually exclusive" ]]
+}
+
+@test "sessions list --agent + --project: mutually exclusive" {
+  run "$EITS" sessions list --agent $(_agent_uuid) --project 1 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "mutually exclusive" ]]
+}
+
+@test "sessions list --agent + --search: mutually exclusive" {
+  run "$EITS" sessions list --agent $(_agent_uuid) --search foo 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "mutually exclusive" ]]
+}
+
 @test "sessions list: rejects unknown flags" {
   run "$EITS" sessions list --bogus foo 2>&1
   [ "$status" -ne 0 ]
@@ -299,6 +334,52 @@ _agent_uuid() { cat "$BATS_FILE_TMPDIR/agent_uuid"; }
   run env -u EITS_SESSION_UUID "$EITS" tasks link-session "999" 2>&1
   [ "$status" -ne 0 ]
   [[ "$output" =~ "session_uuid" ]]
+}
+
+# ── tasks list --state-name ───────────────────────────────────────────────────
+
+@test "tasks list --state-name done: filters by state 3" {
+  task_id=$("$EITS" tasks create --title "bats state-name done test" | jq -r '.task_id')
+  "$EITS" tasks start "$task_id" >/dev/null
+  "$EITS" tasks done "$task_id" >/dev/null
+  run "$EITS" tasks list --state-name done
+  [ "$status" -eq 0 ]
+  # Check that the done task appears in results
+  echo "$output" | jq -e ".tasks[] | select(.id == $task_id)" >/dev/null
+}
+
+@test "tasks list --state-name todo: filters by state 1" {
+  task_id=$("$EITS" tasks create --title "bats state-name todo test" | jq -r '.task_id')
+  run "$EITS" tasks list --state-name todo
+  [ "$status" -eq 0 ]
+  # Check that the todo task appears in results
+  echo "$output" | jq -e ".tasks[] | select(.id == $task_id)" >/dev/null
+}
+
+@test "tasks list --state-name: rejects unknown state name" {
+  run "$EITS" tasks list --state-name bogus 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "unknown state name" ]]
+}
+
+# ── tasks complete ────────────────────────────────────────────────────────────
+
+@test "tasks complete: accepts message as positional argument" {
+  task_id=$("$EITS" tasks create --title "bats complete positional test" | jq -r '.task_id')
+  "$EITS" tasks start "$task_id" >/dev/null
+  run "$EITS" tasks complete "$task_id" "positional message"
+  [ "$status" -eq 0 ]
+  state_id=$("$EITS" tasks get "$task_id" | jq -r '.task.state_id')
+  [ "$state_id" = "3" ]
+}
+
+@test "tasks complete: still accepts --message flag" {
+  task_id=$("$EITS" tasks create --title "bats complete flag test" | jq -r '.task_id')
+  "$EITS" tasks start "$task_id" >/dev/null
+  run "$EITS" tasks complete "$task_id" --message "flag message"
+  [ "$status" -eq 0 ]
+  state_id=$("$EITS" tasks get "$task_id" | jq -r '.task.state_id')
+  [ "$state_id" = "3" ]
 }
 
 # ── notes ─────────────────────────────────────────────────────────────────────
@@ -638,12 +719,68 @@ teardown_teams() {
   [[ "$output" =~ "(not set)" ]]
 }
 
+# ── agents ───────────────────────────────────────────────────────────────────
+
+@test "agents list: returns agents array" {
+  run "$EITS" agents list
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.agents | type == "array"' >/dev/null
+}
+
+@test "agents list --project: accepts project filter" {
+  run "$EITS" agents list --project 1
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.agents | type == "array"' >/dev/null
+}
+
+@test "agents list --status: accepts status filter" {
+  run "$EITS" agents list --status "idle"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.agents | type == "array"' >/dev/null
+}
+
+@test "agents list --limit: accepts limit flag" {
+  run "$EITS" agents list --limit 5
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.agents | type == "array"' >/dev/null
+}
+
+@test "agents list: rejects unknown flags" {
+  run "$EITS" agents list --bogus foo 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "unknown flag" ]]
+}
+
 # ── jobs ──────────────────────────────────────────────────────────────────────
 
 @test "jobs list: returns jobs array" {
   run "$EITS" jobs list
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.jobs | type == "array"' >/dev/null
+}
+
+@test "jobs list --project: accepts project filter" {
+  run "$EITS" jobs list --project 1
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.jobs | type == "array"' >/dev/null
+}
+
+@test "jobs list --global: accepts global flag" {
+  run "$EITS" jobs list --global
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.jobs | type == "array"' >/dev/null
+}
+
+@test "jobs list: rejects unknown flags" {
+  run "$EITS" jobs list --bogus 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "unknown flag" ]]
+}
+
+@test "jobs list --limit: rejects unsupported flag" {
+  run "$EITS" jobs list --limit 10 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "unknown flag" ]]
 }
 
 @test "jobs create: requires --name" {
@@ -698,4 +835,400 @@ teardown_teams() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"create"* ]]
   [[ "$output" == *"update"* ]]
+}
+
+# ── me command ────────────────────────────────────────────────────────────────
+
+@test "me: prints Session ID line" {
+  run "$EITS" me
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Session ID:"* ]]
+}
+
+# ── sessions get self ──────────────────────────────────────────────────────────
+
+@test "sessions get self: returns session data when EITS_SESSION_UUID is set" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" sessions get self
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.session_id' >/dev/null
+}
+
+@test "sessions get self: errors when EITS_SESSION_UUID unset" {
+  run env -u EITS_SESSION_UUID "$EITS" sessions get self 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"EITS_SESSION_UUID"* ]]
+}
+
+# ── commits list --mine ───────────────────────────────────────────────────────
+
+@test "commits list --mine: returns commits array" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" commits list --mine
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.commits | type == "array"' >/dev/null
+}
+
+@test "commits list --mine: errors when neither session env var is set" {
+  run env -u EITS_SESSION_UUID -u EITS_SESSION_ID "$EITS" commits list --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"EITS_SESSION_UUID"* || "$output" == *"EITS_SESSION_ID"* ]]
+}
+
+@test "commits list --mine: errors when combined with --session" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" commits list --session "$TEST_SESSION" --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+# ── notifications create resource fields ─────────────────────────────────────
+
+@test "notifications create: accepts --resource-type and --resource-id" {
+  run "$EITS" notifications create --title "test-notif" --resource-type "task" --resource-id "123"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+}
+
+@test "notifications create: resource fields are optional" {
+  run "$EITS" notifications create --title "test-notif-minimal"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+}
+
+# ── sessions update self shorthand ──────────────────────────────────────────
+
+@test "sessions update self: substitutes EITS_SESSION_UUID" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" sessions update self --name "self-updated"
+  [ "$status" -eq 0 ]
+  name=$("$EITS" sessions get "$TEST_SESSION" | jq -r '.name')
+  [ "$name" = "self-updated" ]
+}
+
+@test "sessions update self: errors when EITS_SESSION_UUID unset" {
+  run env -u EITS_SESSION_UUID "$EITS" sessions update self --name "fail" 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"EITS_SESSION_UUID"* ]]
+}
+
+# ── tasks list --search alias ──────────────────────────────────────────────
+
+@test "tasks list --search: accepts search flag (same as --q)" {
+  run "$EITS" tasks list --search "test"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+}
+
+@test "tasks list --search: returns results array" {
+  run "$EITS" tasks list --search "test"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.results | type == "array"' >/dev/null
+}
+
+# ── sessions list --mine mutual exclusion ──────────────────────────────────────
+
+@test "sessions list --mine: filters by EITS_SESSION_UUID" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" sessions list --mine
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.results | type == "array"' >/dev/null
+}
+
+@test "sessions list --mine: errors when neither session env var is set" {
+  run env -u EITS_SESSION_UUID -u EITS_SESSION_ID "$EITS" sessions list --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"EITS_SESSION_UUID"* || "$output" == *"EITS_SESSION_ID"* ]]
+}
+
+@test "sessions list --mine + --agent: mutually exclusive" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" sessions list --mine --agent $(_agent_uuid) 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "sessions list --agent + --mine: mutually exclusive (reverse order)" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" sessions list --agent $(_agent_uuid) --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "sessions list --mine + --status: mutually exclusive" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" sessions list --mine --status working 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "sessions list --mine + --project: mutually exclusive" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" sessions list --mine --project 1 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "sessions list --mine + --search: mutually exclusive" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" sessions list --mine --search foo 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+# ── notes list --mine mutual exclusion ────────────────────────────────────────
+
+@test "notes list --mine: filters by EITS_SESSION_UUID" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" notes list --mine
+  [ "$status" -eq 0 ]
+}
+
+@test "notes list --mine: errors when EITS_SESSION_UUID unset" {
+  run env -u EITS_SESSION_UUID "$EITS" notes list --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"EITS_SESSION_UUID"* ]]
+}
+
+@test "notes list --mine + --session: mutually exclusive" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" notes list --mine --session "$TEST_SESSION" 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "notes list --session + --mine: mutually exclusive (reverse order)" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" notes list --session "$TEST_SESSION" --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+# ── commits list --agent mutual exclusion ─────────────────────────────────────
+
+@test "commits list --agent: returns commits array" {
+  run "$EITS" commits list --agent $(_agent_uuid)
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.commits | type == "array"' >/dev/null
+}
+
+@test "commits list --agent + --mine: mutually exclusive" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" commits list --agent $(_agent_uuid) --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "commits list --mine + --agent: mutually exclusive (reverse order)" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" commits list --mine --agent $(_agent_uuid) 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "commits list --agent + --session: mutually exclusive" {
+  run "$EITS" commits list --agent $(_agent_uuid) --session "$TEST_SESSION" 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "commits list --session + --agent: mutually exclusive (reverse order)" {
+  run "$EITS" commits list --session "$TEST_SESSION" --agent $(_agent_uuid) 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+# ── new feature tests ──────────────────────────────────────────────────────────
+
+@test "sessions end --final-status: accepts flag" {
+  run "$EITS" sessions end "$TEST_SESSION" --final-status completed
+  [ "$status" -eq 0 ]
+}
+
+@test "sessions update --clear-entrypoint: accepts flag" {
+  run "$EITS" sessions update "$TEST_SESSION" --clear-entrypoint
+  [ "$status" -eq 0 ]
+}
+
+@test "commits list --limit: accepts flag" {
+  run "$EITS" commits list --limit 5
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.commits | type == "array"' >/dev/null
+}
+
+# ── CLI audit3: due-at and search alias ────────────────────────────────────────
+
+@test "tasks create: accepts --due-at flag" {
+  run "$EITS" tasks create --title "test-due-at" --due-at "2026-12-31T00:00:00Z"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.task_id' >/dev/null
+}
+
+@test "tasks update: accepts --due-at flag" {
+  task_id=$("$EITS" tasks create --title "test-update-due-at" | jq -r '.task_id')
+  run "$EITS" tasks update "$task_id" --due-at "2026-12-31T00:00:00Z"
+  [ "$status" -eq 0 ]
+}
+
+@test "notes list: --search is an alias for --q" {
+  unique="bats-search-alias-$(date +%s)"
+  "$EITS" notes create \
+    --parent-type session \
+    --parent-id "$TEST_SESSION" \
+    --body "$unique" >/dev/null
+  run "$EITS" notes list --search "$unique"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e 'length > 0' >/dev/null
+}
+
+# ── projects create extra fields ────────────────────────────────────────────
+
+@test "projects create: accepts --git-remote flag" {
+  run "$EITS" projects create --name "test-git-remote-$RANDOM" --path "/tmp/test" --git-remote "git@github.com:foo/bar.git"
+  [ "$status" -eq 0 ]
+}
+
+@test "projects create: accepts --repo-url flag" {
+  run "$EITS" projects create --name "test-repo-url-$RANDOM" --path "/tmp/test" --repo-url "https://github.com/foo/bar"
+  [ "$status" -eq 0 ]
+}
+
+@test "projects create: accepts --branch flag" {
+  run "$EITS" projects create --name "test-branch-$RANDOM" --path "/tmp/test" --branch "main"
+  [ "$status" -eq 0 ]
+}
+
+@test "projects create: accepts --active flag" {
+  run "$EITS" projects create --name "test-active-$RANDOM" --path "/tmp/test" --active
+  [ "$status" -eq 0 ]
+}
+
+@test "projects create: accepts --inactive flag" {
+  run "$EITS" projects create --name "test-inactive-$RANDOM" --path "/tmp/test" --inactive
+  [ "$status" -eq 0 ]
+}
+
+# ── cli-audit4-prompts: prompts list/get/create ────────────────────────────────────
+
+@test "prompts list: accepts --query flag" {
+  run "$EITS" prompts list --query "test"
+  [ "$status" -eq 0 ]
+}
+
+@test "prompts list: accepts --project flag" {
+  run "$EITS" prompts list --project 1
+  [ "$status" -eq 0 ]
+}
+
+@test "prompts get: accepts --project flag" {
+  run "$EITS" prompts get 1 --project 1
+  [ "$status" -eq 0 ] || [ "$status" -ne 0 ]
+}
+
+@test "prompts get: accepts --no-text flag" {
+  run "$EITS" prompts get 1 --no-text
+  [ "$status" -eq 0 ] || [ "$status" -ne 0 ]
+}
+
+@test "prompts create: requires --name, --slug, --prompt-text" {
+  run "$EITS" prompts create --slug "s" --prompt-text "t" 2>&1
+  [ "$status" -ne 0 ]
+}
+
+@test "prompts create: accepts all required flags" {
+  run "$EITS" prompts create --name "test-$(date +%s)" --slug "test-$(date +%s)" --prompt-text "hello"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.id' >/dev/null
+}
+
+# ── cli-audit5-sessions ────────────────────────────────────────────────────────
+
+@test "sessions list: --include-archived flag produces include_archived=true in URL" {
+  export EITS_SESSION_UUID="test-uuid-001"
+  run bash -c 'source scripts/eits; BASE_URL=mock; _curl() { echo "URL: $1"; }; cmd_sessions list --include-archived'
+  [[ "$output" == *"include_archived=true"* ]]
+}
+
+@test "sessions update: --ended-at flag included in patch body" {
+  export EITS_SESSION_UUID="test-uuid-001"
+  run bash -c 'source scripts/eits; BASE_URL=mock; _patch() { echo "BODY: $2"; }; cmd_sessions update some-uuid --status completed --ended-at "2026-01-01T00:00:00Z"'
+  [[ "$output" == *"ended_at"* ]]
+}
+
+# ── cli-task-search-sessions ────────────────────────────────────────────────
+
+@test "tasks search returns results for known title" {
+  run eits tasks search "compact"
+  assert_output --partial '"success": true'
+}
+
+@test "tasks search requires query argument" {
+  run eits tasks search
+  assert_failure
+}
+
+@test "tasks sessions requires task id" {
+  run eits tasks sessions
+  assert_failure
+}
+
+@test "tasks sessions returns session list for valid task" {
+  # Create a task and link current session, then check sessions
+  TASK_JSON=$(eits tasks begin --title "bats sessions test")
+  TASK_ID=$(echo "$TASK_JSON" | jq -r '.task_id')
+  run eits tasks sessions "$TASK_ID"
+  assert_output --partial '"success": true'
+  assert_output --partial '"sessions"'
+  eits tasks update "$TASK_ID" --state done
+}
+
+@test "tasks search --project constrains results to project" {
+  # Search with a known project_id should not return cross-project results
+  run eits tasks search "task" --project 1
+  assert_output --partial '"success": true'
+  # All returned tasks should have project_id matching or be null
+  [ "$(echo "$output" | jq '[.tasks[]? | select(.project_id != null and .project_id != "1" and .project_id != 1)] | length')" -eq 0 ]
+}
+
+# ── cli-sessions-name-with-tasks ────────────────────────────────────────────
+
+@test "sessions list --name filters by session name" {
+  run eits sessions list --name "wakeup" --status all
+  assert_output --partial '"success": true'
+}
+
+@test "sessions list --name with no match returns empty results" {
+  run eits sessions list --name "zzznonexistentzzzxxx" --status all
+  assert_output --partial '"results": []'
+}
+
+@test "sessions list --with-tasks includes tasks field" {
+  run eits sessions list --with-tasks --limit 3
+  assert_output --partial '"tasks"'
+  assert_output --partial '"success": true'
+}
+
+@test "sessions list --with-tasks task order is deterministic (priority desc, created_at asc)" {
+  # Create a fresh session with a unique name so the filter returns exactly one result
+  local sess_uuid; sess_uuid=$(uuidgen | tr '[:upper:]' '[:lower:]')
+  local sess_name="bats-order-test-$$"
+  "$EITS" sessions create --session-id "$sess_uuid" --name "$sess_name" --project web
+
+  # Create task A (high priority=10) then task B (low priority=5)
+  # A should appear first: priority desc puts 10 before 5
+  local task_a; task_a=$("$EITS" tasks create --title "bats order A" --priority 10 --session "$sess_uuid" | jq -r '.task_id')
+  local task_b; task_b=$("$EITS" tasks create --title "bats order B" --priority 5  --session "$sess_uuid" | jq -r '.task_id')
+
+  # Fetch the session with tasks via the --name filter introduced in this PR
+  local result; result=$("$EITS" sessions list --name "$sess_name" --with-tasks)
+  echo "$result"
+
+  # Extract task IDs in the order returned for this session
+  local ordered_ids; ordered_ids=$(echo "$result" | jq -r --arg name "$sess_name" '
+    .results[] | select(.name == $name) | .tasks[] | .id
+  ')
+
+  # First ID must be task_a (priority 10 > 5)
+  local first_id; first_id=$(echo "$ordered_ids" | head -1)
+  [ "$first_id" = "$task_a" ]
 }

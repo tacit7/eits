@@ -24,14 +24,10 @@ Rules: always respond; 1-3 sentences max.
 ## Sending a DM
 
 ```bash
-eits dm --to <session_uuid> --message "text"
+eits dm --to <session_uuid_or_integer_id> --message "text"
 ```
 
-`--to` requires UUID. Resolve from integer ID:
-```bash
-UUID=$(psql -d eits_dev -tAq -c "SELECT uuid FROM sessions WHERE id = <id>;")
-eits dm --to $UUID --message "..."
-```
+`--to` accepts both UUID and integer session ID. Use `$EITS_SESSION_UUID` or `$EITS_SESSION_ID` — both work.
 
 **Send sequentially — never in parallel Bash calls.** One error cancels sibling calls.
 
@@ -41,5 +37,5 @@ eits dm --to $UUID --message "..."
 
 | Variable | Value |
 |----------|-------|
-| `EITS_SESSION_UUID` | Your session UUID (default `--from`) |
+| `EITS_SESSION_UUID` | Your session UUID (default `--from`); `--to` also accepts `$EITS_SESSION_ID` |
 | `EITS_AGENT_UUID` | Your agent UUID |

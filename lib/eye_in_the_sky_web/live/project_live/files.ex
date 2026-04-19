@@ -9,6 +9,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   import EyeInTheSkyWeb.Live.FileBrowserHelpers, only: [file_listing: 1]
 
+  require Logger
+
   alias EyeInTheSky.{Events, Projects}
 
   @ignored_dirs ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
@@ -96,6 +98,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     end
   end
 
+  # If the user explicitly sets a mode, honour it.
+  # If there's no mode param but we're already in tree mode and navigating to a
+  # file, preserve tree mode — this means tree view works even when sidebar links
+  # don't carry mode=tree (e.g. stale DOM from phx-update="ignore").
   defp parse_mode(params, current_mode) do
     case Map.get(params, "mode") do
       "tree" -> :tree
@@ -303,7 +309,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   end
 
   @impl true
-  def handle_info(_msg, socket), do: {:noreply, socket}
+  def handle_info(msg, socket) do
+    Logger.warning("#{__MODULE__} unhandled handle_info: #{inspect(msg)}")
+    {:noreply, socket}
+  end
 
   attr :error, :string, default: nil
   attr :file_content, :string, default: nil

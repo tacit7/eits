@@ -45,7 +45,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
       data-chat-window
       data-cs-id={@canvas_session.id}
       phx-hook="ChatWindowHook"
-      style={"position: absolute; left: #{@canvas_session.pos_x}px; top: #{@canvas_session.pos_y}px; width: #{@canvas_session.width}px; height: #{@canvas_session.height}px; resize: both; overflow: auto; z-index: 1;"}
+      style={"position: absolute; left: #{@canvas_session.pos_x}px; top: #{@canvas_session.pos_y}px; width: #{@canvas_session.width}px; height: #{@canvas_session.height}px; resize: both; overflow: auto;"}
       class="bg-base-100 rounded-xl shadow-2xl border border-base-300 flex flex-col"
     >
       <div
@@ -93,7 +93,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
           <% else %>
             <div class="space-y-2">
               <%= for message <- @messages do %>
-                <.message_item message={message} cs_id={@canvas_session.id} />
+                <.message_item message={message} cs_id={@canvas_session.id} agent_name={session_label(@session)} />
               <% end %>
             </div>
           <% end %>
@@ -185,6 +185,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
 
   attr :message, :map, required: true
   attr :cs_id, :integer, required: true
+  attr :agent_name, :string, required: true
 
   defp message_item(assigns) do
     role = if assigns.message.sender_role == "user", do: :user, else: :agent
@@ -230,25 +231,19 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
 
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-              <span class={[
-                "text-[11px] font-semibold",
-                @role == :agent && "text-primary/80",
-                @role == :user && "text-base-content/70"
-              ]}>
-                {DmHelpers.message_sender_name(@message)}
-              </span>
-              <span
-                :if={@role == :agent && DmHelpers.message_model(@message)}
-                class="text-[10px] font-mono px-1 py-0 rounded bg-base-content/[0.05] text-base-content/35"
-              >
-                {DmHelpers.message_model(@message)}
-              </span>
               <time
                 id={"msg-time-#{@cs_id}-#{@message.id}"}
                 class="text-[10px] text-base-content/25"
                 data-utc={to_utc_string(@message.inserted_at)}
                 phx-hook="LocalTime"
               />
+              <span class={[
+                "text-[11px] font-semibold",
+                @role == :agent && "text-primary/80",
+                @role == :user && "text-base-content/70"
+              ]}>
+                {if @role == :user, do: "You", else: @agent_name}
+              </span>
             </div>
             <DmMessageComponents.message_body message={@message} compact={true} extra_id={@cs_id} />
           </div>

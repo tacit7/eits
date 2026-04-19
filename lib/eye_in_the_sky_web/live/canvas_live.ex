@@ -313,6 +313,14 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     ~H"""
     <div class="flex flex-col h-full bg-base-100">
       <div id="canvas-tablist" role="tablist" phx-hook="CanvasStatusHook" class="tabs tabs-border px-2 border-b border-base-300 bg-base-200/70 shrink-0">
+        <button
+          onclick="history.length > 1 ? history.back() : window.location.href = '/'"
+          class="btn btn-ghost btn-xs px-1.5 self-center mr-1 text-base-content/50 hover:text-base-content"
+          aria-label="Go back"
+          title="Go back"
+        >
+          <.icon name="hero-arrow-left" class="w-4 h-4" />
+        </button>
         <%= for canvas <- @canvases do %>
           <%= if @renaming_canvas_id == canvas.id do %>
             <form
@@ -385,7 +393,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         </span>
         <button
           :if={not is_nil(@active_canvas_id)}
-          phx-click="open_session_picker"
+          phx-click={JS.dispatch("palette:open-command", to: "#command-palette", detail: %{commandId: "canvas-add-session"})}
           class="ml-auto btn btn-ghost btn-xs text-base-content/40 hover:text-base-content flex items-center gap-1"
           title="Add session to canvas"
         >

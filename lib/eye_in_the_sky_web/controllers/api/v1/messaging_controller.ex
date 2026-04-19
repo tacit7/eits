@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   require Logger
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Agents, ChannelMessages, Channels, Messages, Sessions}
+  alias EyeInTheSky.{Agents, ChannelMessages, Channels, Messages, Sessions, Teams}
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
@@ -139,6 +139,81 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   end
 
   @doc """
+  POST /api/v1/channels - Create a new channel.
+  Body:
+    - name (required): channel name
+    - project_id (optional): integer project ID; nil for global channels
+    - channel_type (optional): "public" | "private", defaults to "public"
+    - description (optional): human-readable description
+    - session_id (optional): UUID or integer session ID of the creator
+  """
+  def create_channel(conn, params) do
+    name = String.trim(params["name"] || "")
+
+    with :ok <- validate_name(name),
+         {:ok, project_id} <- resolve_project_id(params["project_id"]),
+         {:ok, creator_session_id} <- resolve_creator_session(params["session_id"]) do
+      channel_type = params["channel_type"] || "public"
+      channel_id = EyeInTheSky.Channels.Channel.generate_id(project_id, name)
+
+      attrs =
+        %{
+          id: channel_id,
+          uuid: Ecto.UUID.generate(),
+          name: name,
+          channel_type: channel_type,
+          project_id: project_id,
+          # created_by_session_id is a :string field in the schema
+          created_by_session_id: if(creator_session_id, do: to_string(creator_session_id))
+        }
+        |> then(fn m ->
+          case params["description"] do
+            nil -> m
+            desc -> Map.put(m, :description, desc)
+          end
+        end)
+
+      case Channels.create_channel(attrs) do
+        {:ok, channel} ->
+          conn
+          |> put_status(:created)
+          |> json(%{
+            success: true,
+            message: "Channel created",
+            channel: ApiPresenter.present_channel(channel)
+          })
+
+        # Let FallbackController render via its {:error, %Ecto.Changeset{}} clause
+        {:error, %Ecto.Changeset{} = cs} ->
+          {:error, cs}
+      end
+    end
+  end
+
+  defp validate_name(""), do: {:error, :bad_request, "name is required"}
+  defp validate_name(_), do: :ok
+
+  # nil → ok (global channel); non-nil but non-integer → 400
+  defp resolve_project_id(nil), do: {:ok, nil}
+
+  defp resolve_project_id(raw) do
+    case parse_int(raw) do
+      nil -> {:error, :bad_request, "project_id must be an integer"}
+      id -> {:ok, id}
+    end
+  end
+
+  # nil → ok (no creator); provided but unresolvable → 404
+  defp resolve_creator_session(nil), do: {:ok, nil}
+
+  defp resolve_creator_session(raw) do
+    case ToolHelpers.resolve_session_int_id(raw) do
+      {:ok, int_id} -> {:ok, int_id}
+      _ -> {:error, :not_found, "session_id not found"}
+    end
+  end
+
+  @doc """
   GET /api/v1/channels - List available chat channels.
   Query params: project_id (optional)
   """
@@ -163,7 +238,8 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
   @doc """
   POST /api/v1/channels/:channel_id/messages - Send a message to a channel.
-  Body: session_id, body, sender_role (optional), recipient_role (optional)
+  Body: session_id, body, sender_role (optional), recipient_role (optional),
+        broadcast_to_team_id (optional) - if present, DMs all team members after posting.
   """
   def send_channel_message(conn, %{"channel_id" => channel_id} = params) do
     cond do
@@ -182,10 +258,12 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   end
 
   defp do_send_channel_message(conn, channel_id, int_id, params) do
+    body = trim_param(params["body"])
+
     attrs = %{
       channel_id: channel_id,
       session_id: int_id,
-      body: trim_param(params["body"]),
+      body: body,
       sender_role: params["sender_role"] || "agent",
       recipient_role: params["recipient_role"] || "user",
       provider: params["provider"] || "claude",
@@ -196,6 +274,11 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     case ChannelMessages.create_channel_message(attrs) do
       {:ok, msg} ->
         EyeInTheSky.Events.channel_message(channel_id, msg)
+        notify_channel_members(channel_id, int_id, body)
+
+        if team_id = parse_int(params["broadcast_to_team_id"]) do
+          broadcast_to_team(channel_id, int_id, team_id, body)
+        end
 
         conn
         |> put_status(:created)
@@ -203,6 +286,173 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
       {:error, _cs} ->
         {:error, "Failed to send message"}
+    end
+  end
+
+  # Fan out DMs to channel members with notifications="all", excluding the sender.
+  # Failures are logged but do not affect the channel message response.
+  defp notify_channel_members(channel_id, sender_session_id, body) do
+    members =
+      EyeInTheSky.Channels.list_members_for_notification(channel_id, sender_session_id)
+
+    sender_label = get_sender_name(sender_session_id)
+
+    for member <- members do
+      dm_body = "Channel notification [channel:#{channel_id}] from #{sender_label}: #{body}"
+
+      case agent_manager_mod().send_message(member.session_id, dm_body) do
+        result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
+          attrs = %{
+            uuid: Ecto.UUID.generate(),
+            session_id: member.session_id,
+            from_session_id: sender_session_id,
+            to_session_id: member.session_id,
+            body: dm_body,
+            sender_role: "agent",
+            recipient_role: "agent",
+            direction: "inbound",
+            status: "sent",
+            provider: "claude",
+            metadata: %{channel_id: channel_id, channel_notification: true}
+          }
+
+          case Messages.create_message(attrs) do
+            {:ok, msg} ->
+              EyeInTheSky.Events.session_new_dm(member.session_id, msg)
+
+            {:error, err} ->
+              Logger.warning("channel notify persist failed for session #{member.session_id}: #{inspect(err)}")
+          end
+
+        {:error, reason} ->
+          Logger.warning(
+            "channel notify delivery failed for session #{member.session_id}: #{inspect(reason)}"
+          )
+      end
+    end
+
+    :ok
+  end
+
+  defp get_sender_name(session_id) do
+    case Sessions.get_session(session_id) do
+      {:ok, session} -> session.name || "session:#{session_id}"
+      _ -> "session:#{session_id}"
+    end
+  end
+
+  # Fan out DMs to all active team members when broadcast_to_team_id is supplied on channel send.
+  # Requires sender to be a member of the team. Skips completed/failed sessions.
+  # Failures are logged and do not affect the channel message response.
+  defp broadcast_to_team(channel_id, sender_session_id, team_id, body) do
+    case Teams.get_team(team_id) do
+      {:ok, team} ->
+        members = Teams.list_members(team_id)
+
+        if Enum.any?(members, &(&1.session_id == sender_session_id)) do
+          sender_label = get_sender_name(sender_session_id)
+
+          dm_body =
+            "Broadcast from #{sender_label} [team:#{team.name}] [channel:#{channel_id}] #{body}"
+
+          members
+          |> Enum.filter(fn m ->
+            m.session_id &&
+              m.session_id != sender_session_id &&
+              m.session &&
+              m.session.status not in @terminated_statuses
+          end)
+          |> Enum.each(&deliver_team_dm(&1.session_id, sender_session_id, dm_body, channel_id))
+        else
+          Logger.warning(
+            "broadcast_to_team: session #{sender_session_id} is not a member of team #{team_id}, skipping"
+          )
+
+          :ok
+        end
+
+      _ ->
+        Logger.warning("broadcast_to_team: team #{team_id} not found, skipping fanout")
+    end
+  end
+
+  defp deliver_team_dm(target_session_id, from_session_id, dm_body, channel_id) do
+    case agent_manager_mod().send_message(target_session_id, dm_body) do
+      result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
+        attrs = %{
+          uuid: Ecto.UUID.generate(),
+          session_id: target_session_id,
+          from_session_id: from_session_id,
+          to_session_id: target_session_id,
+          body: dm_body,
+          sender_role: "agent",
+          recipient_role: "agent",
+          direction: "inbound",
+          status: "sent",
+          provider: "claude",
+          metadata: %{channel_id: channel_id, broadcast: true}
+        }
+
+        case Messages.create_message(attrs) do
+          {:ok, msg} ->
+            EyeInTheSky.Events.session_new_dm(target_session_id, msg)
+
+          {:error, err} ->
+            Logger.warning("team broadcast persist failed for session #{target_session_id}: #{inspect(err)}")
+        end
+
+      {:error, reason} ->
+        Logger.warning(
+          "team broadcast delivery failed for session #{target_session_id}: #{inspect(reason)}"
+        )
+    end
+  end
+
+  @doc """
+  POST /api/v1/channels/:channel_id/members - Add a session to a channel.
+  Body: session_id (required), role (optional, default "member")
+  """
+  def join_channel(conn, %{"channel_id" => channel_id} = params) do
+    with {:channel, channel} when not is_nil(channel) <- {:channel, Channels.get_channel(channel_id)},
+         {:session_raw, raw} when not is_nil(raw) and raw != "" <- {:session_raw, params["session_id"]},
+         {:session, {:ok, int_id}} <- {:session, ToolHelpers.resolve_session_int_id(raw)},
+         {:session_record, {:ok, session}} <- {:session_record, Sessions.get_session(int_id)},
+         {:agent_id, agent_id} when not is_nil(agent_id) <- {:agent_id, session.agent_id} do
+      role = params["role"] || "member"
+
+      case Channels.add_member(channel.id, agent_id, session.id, role) do
+        {:ok, member} ->
+          conn
+          |> put_status(:created)
+          |> json(%{
+            success: true,
+            message: "Joined channel #{channel.name}",
+            member: ApiPresenter.present_channel_member(member)
+          })
+
+        {:error, %Ecto.Changeset{} = cs} ->
+          {:error, cs}
+      end
+    else
+      {:channel, nil} -> {:error, :not_found, "Channel not found"}
+      {:session_raw, _} -> {:error, :bad_request, "session_id is required"}
+      {:session, _} -> {:error, :not_found, "Session not found"}
+      {:session_record, _} -> {:error, :not_found, "Session not found"}
+      {:agent_id, nil} -> {:error, :unprocessable_entity, "Session has no registered agent"}
+    end
+  end
+
+  @doc """
+  DELETE /api/v1/channels/:channel_id/members/:session_id - Remove a session from a channel.
+  """
+  def leave_channel(conn, %{"channel_id" => channel_id, "session_id" => session_id_param}) do
+    with {:channel, channel} when not is_nil(channel) <- {:channel, Channels.get_channel(channel_id)},
+         {:session, {:ok, int_id}} <- {:session, ToolHelpers.resolve_session_int_id(session_id_param)} do
+      Channels.remove_member(channel.id, int_id)
+      json(conn, %{success: true, message: "Left channel #{channel.name}"})
+    else
+      {:channel, nil} -> {:error, :not_found, "Channel not found"}
+      {:session, _} -> {:error, :not_found, "Session not found"}
     end
   end
 

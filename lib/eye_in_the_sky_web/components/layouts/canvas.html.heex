@@ -2,14 +2,6 @@
   class="relative flex h-[var(--app-viewport-height)] bg-base-100"
   data-palette-shortcut={@palette_shortcut}
 >
-  <button
-    onclick="history.length > 1 ? history.back() : window.location.href = '/'"
-    class="btn btn-ghost btn-sm fixed top-3 left-3 z-50"
-    aria-label="Go back"
-  >
-    <.icon name="hero-chevron-left" class="w-4 h-4" /> Back
-  </button>
-
   <main id="main-content" class="flex-1 flex flex-col min-w-0 overflow-hidden">
     <.flash_group flash={@flash} />
     {@inner_content}

@@ -1,9 +1,25 @@
+defmodule EyeInTheSkyWeb.Api.V1.MockSucceedingAgentManagerForTeam do
+  @moduledoc "Test double — always succeeds send_message."
+  def send_message(_session_id, _message, _opts \\ []), do: :ok
+end
+
 defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
+  alias EyeInTheSky.Accounts.ApiKey
   alias EyeInTheSky.{Agents, Sessions, Teams}
 
   import EyeInTheSky.Factory
+
+  defp api_conn do
+    token = "test_api_key_#{System.unique_integer([:positive])}"
+    {:ok, _} = ApiKey.create(token, "test")
+    Phoenix.ConnTest.build_conn() |> Plug.Conn.put_req_header("authorization", "Bearer #{token}")
+  end
+
+  setup do
+    {:ok, conn: api_conn()}
+  end
 
   defp create_team(overrides \\ %{}) do
     {:ok, team} =
@@ -123,7 +139,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       conn = post(conn, ~p"/api/v1/teams", %{"description" => "no name"})
       resp = json_response(conn, 422)
 
-      assert resp["error"] == "Failed to create team"
+      assert resp["error"] == "Validation failed"
     end
 
     test "returns 422 for duplicate name", %{conn: conn} do
@@ -132,7 +148,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       conn = post(conn, ~p"/api/v1/teams", %{"name" => team.name})
       resp = json_response(conn, 422)
 
-      assert resp["error"] == "Failed to create team"
+      assert resp["error"] == "Validation failed"
     end
   end
 
@@ -147,7 +163,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       assert resp["success"] == true
       assert resp["id"] == team.id
 
-      updated = Teams.get_team(team.id)
+      {:ok, updated} = Teams.get_team(team.id)
       assert updated.status == "archived"
     end
 
@@ -227,13 +243,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       conn =
         post(conn, ~p"/api/v1/teams/#{team.id}/members", %{"name" => "epsilon"})
 
-      assert json_response(conn, 422)["error"] == "Failed to join team"
+      assert json_response(conn, 422)["error"] == "Validation failed"
     end
 
     test "returns 422 when name is missing", %{conn: conn} do
       team = create_team()
       conn = post(conn, ~p"/api/v1/teams/#{team.id}/members", %{})
-      assert json_response(conn, 422)["error"] == "Failed to join team"
+      assert json_response(conn, 422)["error"] == "Validation failed"
     end
 
     test "returns 404 for missing team", %{conn: conn} do
@@ -298,6 +314,245 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       team = create_team()
       conn = delete(conn, ~p"/api/v1/teams/#{team.id}/members/9999999")
       assert json_response(conn, 404)["error"] == "Member not found"
+    end
+  end
+
+  # ── POST /api/v1/teams/:team_id/broadcast ────────────────────────────────
+
+  describe "POST /api/v1/teams/:team_id/broadcast" do
+    test "returns 400 when body is missing", %{conn: conn} do
+      team = create_team()
+      agent = create_agent()
+      session = create_session(agent)
+      join_team(team, %{name: "sender", session_id: session.id})
+
+      conn =
+        post(conn, ~p"/api/v1/teams/#{team.id}/broadcast", %{
+          "from_session_id" => session.uuid
+        })
+
+      assert json_response(conn, 400)["error"] =~ "body is required"
+    end
+
+    test "returns 400 when from_session_id is missing", %{conn: conn} do
+      team = create_team()
+
+      conn =
+        post(conn, ~p"/api/v1/teams/#{team.id}/broadcast", %{
+          "body" => "hello"
+        })
+
+      assert json_response(conn, 400)["error"] =~ "from_session_id is required"
+    end
+
+    test "returns 404 for unknown team", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+
+      conn =
+        post(conn, ~p"/api/v1/teams/9999999/broadcast", %{
+          "from_session_id" => session.uuid,
+          "body" => "hello"
+        })
+
+      assert json_response(conn, 404)["error"] =~ "Team not found"
+    end
+
+    test "returns 404 for unknown sender session", %{conn: conn} do
+      team = create_team()
+
+      conn =
+        post(conn, ~p"/api/v1/teams/#{team.id}/broadcast", %{
+          "from_session_id" => Ecto.UUID.generate(),
+          "body" => "hello"
+        })
+
+      assert json_response(conn, 404)["error"] =~ "Sender session not found"
+    end
+
+    test "returns 403 when sender is not a team member", %{conn: conn} do
+      team = create_team()
+      agent = create_agent()
+      session = create_session(agent)
+
+      conn =
+        post(conn, ~p"/api/v1/teams/#{team.id}/broadcast", %{
+          "from_session_id" => session.uuid,
+          "body" => "hello"
+        })
+
+      assert json_response(conn, 403)["error"] =~ "not a member"
+    end
+
+    test "returns sent_count=0 when no other active members exist", %{conn: conn} do
+      team = create_team()
+      agent = create_agent()
+      session = create_session(agent)
+      join_team(team, %{name: "only-member", session_id: session.id})
+
+      conn =
+        post(conn, ~p"/api/v1/teams/#{team.id}/broadcast", %{
+          "from_session_id" => session.uuid,
+          "body" => "hello"
+        })
+
+      resp = json_response(conn, 200)
+      assert resp["success"] == true
+      assert resp["sent_count"] == 0
+    end
+
+    test "rejects broadcast from terminated sender session", %{conn: conn} do
+      team = create_team()
+      agent = create_agent()
+      dead_session = create_session(agent, %{status: "completed"})
+      join_team(team, %{name: "dead-sender", session_id: dead_session.id})
+
+      conn =
+        post(conn, ~p"/api/v1/teams/#{team.id}/broadcast", %{
+          "from_session_id" => dead_session.uuid,
+          "body" => "ghost broadcast"
+        })
+
+      assert json_response(conn, 422)["error"] =~ "terminated"
+    end
+
+    test "skips completed and failed sessions", %{conn: conn} do
+      team = create_team()
+
+      sender_agent = create_agent()
+      sender = create_session(sender_agent)
+      join_team(team, %{name: "sender", session_id: sender.id})
+
+      done_agent = create_agent()
+      done_session = create_session(done_agent, %{status: "completed"})
+      join_team(team, %{name: "done-member", session_id: done_session.id})
+
+      failed_agent = create_agent()
+      failed_session = create_session(failed_agent, %{status: "failed"})
+      join_team(team, %{name: "failed-member", session_id: failed_session.id})
+
+      conn =
+        post(conn, ~p"/api/v1/teams/#{team.id}/broadcast", %{
+          "from_session_id" => sender.uuid,
+          "body" => "test broadcast"
+        })
+
+      resp = json_response(conn, 200)
+      assert resp["success"] == true
+      # Both targets are terminated — nothing should be sent
+      assert resp["sent_count"] == 0
+    end
+
+    test "delivers to active members and returns correct sent_count", %{conn: conn} do
+      Application.put_env(
+        :eye_in_the_sky,
+        :agent_manager_module,
+        EyeInTheSkyWeb.Api.V1.MockSucceedingAgentManagerForTeam
+      )
+
+      on_exit(fn -> Application.delete_env(:eye_in_the_sky, :agent_manager_module) end)
+
+      team = create_team()
+
+      sender_agent = create_agent()
+      sender = create_session(sender_agent)
+      join_team(team, %{name: "sender", session_id: sender.id})
+
+      r1_agent = create_agent()
+      r1 = create_session(r1_agent)
+      join_team(team, %{name: "recv-1", session_id: r1.id})
+
+      r2_agent = create_agent()
+      r2 = create_session(r2_agent)
+      join_team(team, %{name: "recv-2", session_id: r2.id})
+
+      conn =
+        post(conn, ~p"/api/v1/teams/#{team.id}/broadcast", %{
+          "from_session_id" => sender.uuid,
+          "body" => "ping"
+        })
+
+      resp = json_response(conn, 200)
+      assert resp["success"] == true
+      assert resp["sent_count"] == 2
+      assert resp["failed"] == 0
+    end
+  end
+
+  # ── PATCH /api/v1/teams/:id ───────────────────────────────────────────────
+
+  describe "PATCH /api/v1/teams/:id" do
+    test "updates team name", %{conn: conn} do
+      team = create_team(%{name: "old-name"})
+      conn = patch(conn, ~p"/api/v1/teams/#{team.id}", %{"name" => "new-name"})
+      resp = json_response(conn, 200)
+
+      assert resp["success"] == true
+      assert resp["name"] == "new-name"
+      assert resp["id"] == team.id
+    end
+
+    test "updates team description", %{conn: conn} do
+      team = create_team()
+      conn = patch(conn, ~p"/api/v1/teams/#{team.id}", %{"description" => "updated desc"})
+      resp = json_response(conn, 200)
+
+      assert resp["success"] == true
+      assert resp["description"] == "updated desc"
+    end
+
+    test "updates name and description together", %{conn: conn} do
+      team = create_team(%{name: "before", description: "old"})
+
+      conn =
+        patch(conn, ~p"/api/v1/teams/#{team.id}", %{
+          "name" => "after",
+          "description" => "new"
+        })
+
+      resp = json_response(conn, 200)
+      assert resp["name"] == "after"
+      assert resp["description"] == "new"
+    end
+
+    test "returns 404 for unknown team", %{conn: conn} do
+      conn = patch(conn, ~p"/api/v1/teams/999999", %{"name" => "whatever"})
+      assert json_response(conn, 404)
+    end
+
+    test "persists change to database", %{conn: conn} do
+      team = create_team(%{name: "persist-me"})
+      patch(conn, ~p"/api/v1/teams/#{team.id}", %{"name" => "persisted"})
+      {:ok, reloaded} = Teams.get_team(team.id)
+      assert reloaded.name == "persisted"
+    end
+
+    test "returns 422 for empty name string", %{conn: conn} do
+      team = create_team()
+      conn = patch(conn, ~p"/api/v1/teams/#{team.id}", %{"name" => ""})
+      assert conn.status in [422, 400]
+    end
+
+    test "returns 400 when no updateable fields given", %{conn: conn} do
+      team = create_team()
+      conn = patch(conn, ~p"/api/v1/teams/#{team.id}", %{})
+      assert json_response(conn, 400)
+    end
+
+    test "ignores injected fields like status and uuid", %{conn: conn} do
+      team = create_team(%{name: "safe-name"})
+
+      conn =
+        patch(conn, ~p"/api/v1/teams/#{team.id}", %{
+          "name" => "ok-name",
+          "status" => "archived",
+          "uuid" => "00000000-0000-0000-0000-000000000000"
+        })
+
+      resp = json_response(conn, 200)
+      assert resp["name"] == "ok-name"
+      assert resp["status"] != "archived"
+      assert resp["uuid"] != "00000000-0000-0000-0000-000000000000"
     end
   end
 end

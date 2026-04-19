@@ -58,7 +58,15 @@ defmodule EyeInTheSkyWeb.ChatLive do
     {channel_id, channels} = ensure_default_channel(channel_id, channels, project_id, socket)
 
     if connected?(socket) && channel_id do
-      subscribe_channel_messages(channel_id)
+      prev_channel_id = socket.assigns[:active_channel_id]
+
+      if prev_channel_id && to_string(prev_channel_id) != to_string(channel_id) do
+        unsubscribe_channel_messages(prev_channel_id)
+      end
+
+      unless prev_channel_id && to_string(prev_channel_id) == to_string(channel_id) do
+        subscribe_channel_messages(channel_id)
+      end
     end
 
     {project_id, channel_id, channels}
@@ -99,6 +107,11 @@ defmodule EyeInTheSkyWeb.ChatLive do
       channels when is_list(channels) -> channels
       _ -> []
     end
+  end
+
+  @impl true
+  def handle_event("set_notify_on_stop", %{"enabled" => enabled}, socket) do
+    {:noreply, assign(socket, :notify_on_stop, enabled in [true, "true", "on", 1, "1"])}
   end
 
   @impl true
@@ -144,9 +157,15 @@ defmodule EyeInTheSkyWeb.ChatLive do
     case create_dm_channel_message(channel_id, body, session_id) do
       {:ok, _message} ->
         if target_session_id do
-          prompt = ChannelProtocol.build_prompt(:direct, body)
+          case Channels.get_channel(channel_id) do
+            nil ->
+              :ok
 
-          AgentManager.send_message(target_session_id, prompt, channel_id: channel_id)
+            channel ->
+              channel_ctx = %{id: channel.id, name: channel.name}
+              prompt = ChannelProtocol.build_prompt(:direct, body, channel_ctx)
+              AgentManager.send_message(target_session_id, prompt, channel_id: channel_id)
+          end
         end
 
         {:noreply, socket}
@@ -358,6 +377,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
     <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full overflow-hidden">
       <.svelte
         name="AgentMessagesPanel"
+        ssr={false}
         props={
           %{
             activeChannelId: @active_channel_id,

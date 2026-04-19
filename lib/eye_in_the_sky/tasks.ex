@@ -44,6 +44,7 @@ defmodule EyeInTheSky.Tasks do
   defdelegate count_tasks(opts \\ []), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_for_agent(agent_id), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_for_session(session_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
+  defdelegate list_tasks_for_sessions(session_ids), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_for_team(team_id), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_for_team_with_sessions(team_id), to: EyeInTheSky.Tasks.Queries
   defdelegate get_current_task_for_session(session_id), to: EyeInTheSky.Tasks.Queries

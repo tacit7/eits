@@ -35,8 +35,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     end
   end
 
-  defp fetch_tasks_by_filter(%{"q" => q}, limit) when is_binary(q) and q != "" do
-    Tasks.search_tasks(q) |> Enum.take(limit)
+  defp fetch_tasks_by_filter(%{"q" => q} = params, limit) when is_binary(q) and q != "" do
+    project_id = parse_int(params["project_id"], nil)
+    Tasks.search_tasks(q, project_id) |> Enum.take(limit)
   end
 
   defp fetch_tasks_by_filter(%{"session_id" => session_id}, limit) do
@@ -287,6 +288,29 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   end
 
   @doc """
+  GET /api/v1/tasks/:id/sessions - List sessions linked to a task.
+  """
+  def list_sessions(conn, %{"id" => id}) do
+    case Tasks.get_task(id) do
+      {:error, :not_found} ->
+        {:error, :not_found, "Task not found"}
+
+      {:ok, task} ->
+        sessions =
+          Enum.map(task.sessions, fn s ->
+            %{id: s.id, uuid: s.uuid, name: s.name, status: s.status, description: s.description}
+          end)
+
+        json(conn, %{
+          success: true,
+          task_id: task.id,
+          task_title: task.title,
+          sessions: sessions
+        })
+    end
+  end
+
+  @doc """
   POST /api/v1/tasks/:id/tags
   Body: {tag_id: integer}
   """
@@ -359,23 +383,18 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   defp parse_task_id(id) when is_binary(id), do: Helpers.parse_int(id) || id
   defp parse_task_id(id), do: id
 
-  defp parse_task_id_int(raw) when is_binary(raw) do
-    case Integer.parse(raw) do
-      {n, ""} -> {:ok, n}
-      _ -> {:error, :bad_request, "invalid task_id"}
-    end
-  end
-
-  defp parse_task_id_int(n) when is_integer(n), do: {:ok, n}
+  defp parse_task_id_int(raw), do: parse_int_param(raw, "invalid task_id")
 
   defp parse_tag_id(n) when is_integer(n), do: {:ok, n}
+  defp parse_tag_id(raw) when is_binary(raw), do: parse_int_param(raw, "tag_id must be an integer")
+  defp parse_tag_id(_), do: {:error, :bad_request, "tag_id is required"}
 
-  defp parse_tag_id(raw) when is_binary(raw) do
+  defp parse_int_param(n, _msg) when is_integer(n), do: {:ok, n}
+
+  defp parse_int_param(raw, msg) when is_binary(raw) do
     case Integer.parse(raw) do
       {n, ""} -> {:ok, n}
-      _ -> {:error, :bad_request, "tag_id must be an integer"}
+      _ -> {:error, :bad_request, msg}
     end
   end
-
-  defp parse_tag_id(_), do: {:error, :bad_request, "tag_id is required"}
 end

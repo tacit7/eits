@@ -40,11 +40,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelDataLoader do
       |> then(&Prompts.list_prompts(project_id: &1))
       |> ChatPresenter.serialize_prompts()
 
-    agent_templates =
-      Agents.list_active_agents()
-      |> Enum.filter(fn a -> a.description not in [nil, ""] end)
-      |> Enum.take(50)
-      |> Enum.map(&agent_template_option/1)
+    agent_templates = Agents.list_agent_templates()
 
     channel_members = ChannelHelpers.load_channel_members(channel_id)
     all_projects = Projects.list_projects()
@@ -99,6 +95,4 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelDataLoader do
         )
     }
   end
-
-  defp agent_template_option(agent), do: %{id: agent.id, description: agent.description}
 end

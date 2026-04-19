@@ -41,7 +41,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       end
     else
       project_path = if assigns[:current_project], do: assigns[:current_project].path
-      available_agents = list_agents(project_path)
+      available_agents = Map.get_lazy(assigns, :available_agents, fn -> list_agents(project_path) end)
+
       {:ok, assign(socket, Map.put(assigns, :available_agents, available_agents))}
     end
   end
@@ -113,16 +114,35 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
               </select>
             </div>
 
-            <%!-- Agent --%>
+            <%!-- Agent combobox — JS-driven, filters client-side from data-agents JSON --%>
             <%= if @available_agents != [] do %>
-              <div>
+              <div
+                id="agent-combobox"
+                phx-hook="AgentCombobox"
+                data-agents={Jason.encode!(Enum.map(@available_agents, fn {slug, name, scope} -> [slug, name, to_string(scope)] end))}
+                class="relative"
+              >
                 <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Agent</label>
-                <select name="agent" class="select select-bordered w-full">
-                  <option value="">-- None --</option>
-                  <%= for {slug, name, scope} <- @available_agents do %>
-                    <option value={slug}>{name}{if scope == :project, do: " (project)"}</option>
-                  <% end %>
-                </select>
+                <%!-- Hidden field carries the selected slug to the form submit --%>
+                <input type="hidden" name="agent" data-combobox-value />
+                <%!-- Visible search input — not submitted, value used only for display --%>
+                <input
+                  type="text"
+                  data-combobox-input
+                  placeholder="Search agents..."
+                  autocomplete="off"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-controls="agent-combobox-list"
+                  aria-expanded="false"
+                  class="input input-bordered w-full text-base"
+                />
+                <ul
+                  id="agent-combobox-list"
+                  data-combobox-list
+                  role="listbox"
+                  class="hidden absolute z-20 mt-1 w-full bg-base-200 border border-base-300 rounded-box shadow-lg max-h-60 overflow-y-auto"
+                ></ul>
               </div>
             <% end %>
 

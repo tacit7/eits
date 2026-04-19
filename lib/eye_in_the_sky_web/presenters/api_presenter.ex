@@ -40,6 +40,18 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
     }
   end
 
+  def present_channel_member(m) do
+    %{
+      id: m.id,
+      channel_id: m.channel_id,
+      agent_id: m.agent_id,
+      session_id: m.session_id,
+      role: m.role,
+      notifications: m.notifications,
+      joined_at: if(m.joined_at, do: to_string(m.joined_at))
+    }
+  end
+
   def present_channel_message(msg) do
     %{
       id: msg.id,

@@ -27,23 +27,28 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
     case Integer.parse(id) do
       {project_id, ""} ->
-        project =
-          Projects.get_project!(project_id)
+        project = Projects.get_project!(project_id)
 
-        file_tree =
-          if project.path do
-            build_file_tree(project.path, project.path)
-          else
-            []
+        socket =
+          socket
+          |> assign(:page_title, "Files - #{project.name}")
+          |> assign(:project, project)
+          |> assign(:sidebar_tab, :files)
+          |> assign(:sidebar_project, project)
+
+        socket =
+          cond do
+            connected?(socket) && project.path ->
+              start_async(socket, :load_file_tree, fn ->
+                build_file_tree(project.path, project.path)
+              end)
+            project.path ->
+              assign(socket, :file_tree, build_file_tree(project.path, project.path))
+            true ->
+              socket
           end
 
-        {:ok,
-         socket
-         |> assign(:page_title, "Files - #{project.name}")
-         |> assign(:project, project)
-         |> assign(:sidebar_tab, :files)
-         |> assign(:sidebar_project, project)
-         |> assign(:file_tree, file_tree)}
+        {:ok, socket}
 
       _ ->
         {:ok,
@@ -208,6 +213,15 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   def handle_event("set_notify_on_stop", _params, socket), do: {:noreply, socket}
 
   @impl true
+  def handle_async(:load_file_tree, {:ok, tree}, socket) do
+    {:noreply, assign(socket, :file_tree, tree)}
+  end
+
+  def handle_async(:load_file_tree, {:exit, _reason}, socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_info(_msg, socket), do: {:noreply, socket}
 
   attr :error, :string, default: nil
@@ -265,10 +279,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   attr :file_type, :string, default: nil
 
   defp file_content_viewer(assigns) do
+    assigns = assign(assigns, :viewer_id, "codemirror-#{:erlang.phash2(assigns.file_content)}")
     ~H"""
     <div
-      id="codemirror-file-viewer"
+      id={@viewer_id}
       phx-hook="CodeMirror"
+      phx-update="ignore"
       data-content={Base.encode64(@file_content)}
       data-lang={language_class(@file_type)}
       data-readonly="true"

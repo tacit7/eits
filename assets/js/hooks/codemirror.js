@@ -40,7 +40,9 @@ async function loadLanguage(lang) {
 
 export const CodeMirrorHook = {
   async mounted() {
-    this._destroyed = false
+    this._teardown()
+    this._gen = (this._gen || 0) + 1
+    const gen = this._gen
     const content = atob(this.el.dataset.content || "")
     const lang = this.el.dataset.lang || "text"
     const readonly = this.el.dataset.readonly === "true"
@@ -65,10 +67,14 @@ export const CodeMirrorHook = {
       loadLanguage(lang),
     ])
 
+    if (gen !== this._gen) return
+
     const { extension: themeExtension, watch } = await makeThemeCompartment()
     const { extension: tabExtension, watch: tabWatch } = await makeTabSizeExtension()
     const { extension: fontExtension, watch: watchFont } = await makeFontSizeExtension()
     const { extension: vimExtension, watch: watchVim } = await makeVimExtension()
+
+    if (gen !== this._gen) return
 
     const saveKeymap = keymap.of([{
       key: "Mod-s",
@@ -100,12 +106,9 @@ export const CodeMirrorHook = {
       extensions.push(history(), keymap.of([...defaultKeymap, ...historyKeymap]), saveKeymap, vimExtension)
     }
 
-    const state = EditorState.create({
-      doc: content,
-      extensions,
-    })
+    const state = EditorState.create({ doc: content, extensions })
 
-    if (this._destroyed) return
+    if (gen !== this._gen) return
     this._view = new EditorView({ state, parent: this.el })
     this._cleanupTheme = watch(this._view)
     this._cleanupTabSize = tabWatch(this._view)
@@ -114,15 +117,31 @@ export const CodeMirrorHook = {
     } catch(e) { console.error("[CodeMirror] mount error", e) }
   },
 
-  destroyed() {
-    this._destroyed = true
-    if (this._cleanupTheme) this._cleanupTheme()
-    if (this._cleanupTabSize) this._cleanupTabSize()
-    if (this._cleanupFontSize) this._cleanupFontSize()
-    if (this._cleanupVim) this._cleanupVim()
-    if (this._view) {
-      this._view.destroy()
-      this._view = null
+  updated() {
+    if (!this._view) {
+      // imports were still in-flight when update arrived — let them finish
+      return
     }
-  }
+    const content = atob(this.el.dataset.content || "")
+    const current = this._view.state.doc.toString()
+    if (content !== current) {
+      this._view.dispatch({
+        changes: { from: 0, to: current.length, insert: content },
+      })
+    }
+  },
+
+  destroyed() {
+    this._teardown()
+  },
+
+  _teardown() {
+    // bump generation so any in-flight mount aborts
+    this._gen = (this._gen || 0) + 1
+    if (this._cleanupTheme) { this._cleanupTheme(); this._cleanupTheme = null }
+    if (this._cleanupTabSize) { this._cleanupTabSize(); this._cleanupTabSize = null }
+    if (this._cleanupFontSize) { this._cleanupFontSize(); this._cleanupFontSize = null }
+    if (this._cleanupVim) { this._cleanupVim(); this._cleanupVim = null }
+    if (this._view) { this._view.destroy(); this._view = null }
+  },
 }

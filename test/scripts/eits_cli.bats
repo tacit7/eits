@@ -869,3 +869,101 @@ teardown_teams() {
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.results | type == "array"' >/dev/null
 }
+
+# ── sessions list --mine mutual exclusion ──────────────────────────────────────
+
+@test "sessions list --mine: filters by EITS_SESSION_UUID" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" sessions list --mine
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.results | type == "array"' >/dev/null
+}
+
+@test "sessions list --mine: errors when neither session env var is set" {
+  run env -u EITS_SESSION_UUID -u EITS_SESSION_ID "$EITS" sessions list --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"EITS_SESSION_UUID"* || "$output" == *"EITS_SESSION_ID"* ]]
+}
+
+@test "sessions list --mine + --agent: mutually exclusive" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" sessions list --mine --agent $(_agent_uuid) 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "sessions list --mine + --status: mutually exclusive" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" sessions list --mine --status working 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "sessions list --mine + --project: mutually exclusive" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" sessions list --mine --project 1 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "sessions list --mine + --search: mutually exclusive" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" sessions list --mine --search foo 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+# ── notes list --mine mutual exclusion ────────────────────────────────────────
+
+@test "notes list --mine: filters by EITS_SESSION_UUID" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" notes list --mine
+  [ "$status" -eq 0 ]
+}
+
+@test "notes list --mine: errors when EITS_SESSION_UUID unset" {
+  run env -u EITS_SESSION_UUID "$EITS" notes list --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"EITS_SESSION_UUID"* ]]
+}
+
+@test "notes list --mine + --session: mutually exclusive" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" notes list --mine --session "$TEST_SESSION" 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "notes list --session + --mine: mutually exclusive (reverse order)" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" notes list --session "$TEST_SESSION" --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+# ── commits list --agent mutual exclusion ─────────────────────────────────────
+
+@test "commits list --agent: returns commits array" {
+  run "$EITS" commits list --agent $(_agent_uuid)
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.commits | type == "array"' >/dev/null
+}
+
+@test "commits list --agent + --mine: mutually exclusive" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" commits list --agent $(_agent_uuid) --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "commits list --agent + --session: mutually exclusive" {
+  run "$EITS" commits list --agent $(_agent_uuid) --session "$TEST_SESSION" 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "commits list --session + --agent: mutually exclusive (reverse order)" {
+  run "$EITS" commits list --session "$TEST_SESSION" --agent $(_agent_uuid) 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}

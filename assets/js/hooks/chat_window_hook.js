@@ -119,6 +119,10 @@ export const ChatWindowHook = {
         startY    = e.clientY
         startLeft = parseInt(this.el.style.left, 10) || 0
         startTop  = parseInt(this.el.style.top, 10)  || 0
+        // Initialize to current position so updated() never writes undefinedpx
+        // if a LiveView patch fires before the first mousemove event.
+        this._dragLeft = startLeft
+        this._dragTop  = startTop
 
         canvas      = this.el.closest("[data-canvas-area]")
         snapPreview = canvas ? getOrCreateSnapPreview(canvas) : null
@@ -200,6 +204,8 @@ export const ChatWindowHook = {
           this.el.style.height = canvas.offsetHeight + "px"
           this.el.style.resize = "none"
           this.el.style.zIndex = "20"
+          this._zIndex = "20"
+          this.el.dataset.savedZIndex = "20"
         } else {
           this.el.style.left = this.el.dataset.savedLeft || "0px"
           this.el.style.top = this.el.dataset.savedTop || "0px"
@@ -207,6 +213,8 @@ export const ChatWindowHook = {
           this.el.style.height = this.el.dataset.savedMaxHeight || ""
           this.el.style.resize = "both"
           this.el.style.zIndex = "1"
+          this._zIndex = "1"
+          this.el.dataset.savedZIndex = "1"
         }
       })
     }

@@ -301,6 +301,52 @@ _agent_uuid() { cat "$BATS_FILE_TMPDIR/agent_uuid"; }
   [[ "$output" =~ "session_uuid" ]]
 }
 
+# ── tasks list --state-name ───────────────────────────────────────────────────
+
+@test "tasks list --state-name done: filters by state 3" {
+  task_id=$("$EITS" tasks create --title "bats state-name done test" | jq -r '.task_id')
+  "$EITS" tasks start "$task_id" >/dev/null
+  "$EITS" tasks done "$task_id" >/dev/null
+  run "$EITS" tasks list --state-name done
+  [ "$status" -eq 0 ]
+  # Check that the done task appears in results
+  echo "$output" | jq -e ".tasks[] | select(.id == $task_id)" >/dev/null
+}
+
+@test "tasks list --state-name todo: filters by state 1" {
+  task_id=$("$EITS" tasks create --title "bats state-name todo test" | jq -r '.task_id')
+  run "$EITS" tasks list --state-name todo
+  [ "$status" -eq 0 ]
+  # Check that the todo task appears in results
+  echo "$output" | jq -e ".tasks[] | select(.id == $task_id)" >/dev/null
+}
+
+@test "tasks list --state-name: rejects unknown state name" {
+  run "$EITS" tasks list --state-name bogus 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "unknown state name" ]]
+}
+
+# ── tasks complete ────────────────────────────────────────────────────────────
+
+@test "tasks complete: accepts message as positional argument" {
+  task_id=$("$EITS" tasks create --title "bats complete positional test" | jq -r '.task_id')
+  "$EITS" tasks start "$task_id" >/dev/null
+  run "$EITS" tasks complete "$task_id" "positional message"
+  [ "$status" -eq 0 ]
+  state_id=$("$EITS" tasks get "$task_id" | jq -r '.task.state_id')
+  [ "$state_id" = "3" ]
+}
+
+@test "tasks complete: still accepts --message flag" {
+  task_id=$("$EITS" tasks create --title "bats complete flag test" | jq -r '.task_id')
+  "$EITS" tasks start "$task_id" >/dev/null
+  run "$EITS" tasks complete "$task_id" --message "flag message"
+  [ "$status" -eq 0 ]
+  state_id=$("$EITS" tasks get "$task_id" | jq -r '.task.state_id')
+  [ "$state_id" = "3" ]
+}
+
 # ── notes ─────────────────────────────────────────────────────────────────────
 
 @test "notes create: returns id" {

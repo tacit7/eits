@@ -9,7 +9,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   import EyeInTheSkyWeb.Live.FileBrowserHelpers, only: [file_listing: 1]
 
-  alias EyeInTheSky.Projects
+  alias EyeInTheSky.{Events, Projects}
 
   @ignored_dirs ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
   @tree_cache_ttl 300
@@ -26,6 +26,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       |> assign(:files, [])
       |> assign(:view_mode, :list)
       |> assign(:error, nil)
+      |> assign(:subscribed_editor_id, nil)
 
     case Integer.parse(id) do
       {project_id, ""} ->
@@ -160,6 +161,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       {:ok, file_list} ->
         {:noreply,
          socket
+         |> unsubscribe_editor()
          |> assign(:file_path, path)
          |> assign(:file_full_path, nil)
          |> assign(:file_content, nil)
@@ -169,6 +171,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       {:error, reason} ->
         {:noreply,
          socket
+         |> unsubscribe_editor()
          |> assign(:file_full_path, nil)
          |> assign(:error, "Failed to read directory: #{reason}")
          |> assign(:files, [])}
@@ -179,6 +182,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     if binary_file?(path) do
       {:noreply,
        socket
+       |> unsubscribe_editor()
        |> assign(:file_path, path)
        |> assign(:file_full_path, nil)
        |> assign(:file_content, nil)
@@ -190,6 +194,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         {:ok, content} ->
           {:noreply,
            socket
+           |> subscribe_editor(path)
            |> assign(:file_path, path)
            |> assign(:file_full_path, full_path)
            |> assign(:file_content, content)
@@ -200,6 +205,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         {:error, :too_large} ->
           {:noreply,
            socket
+           |> unsubscribe_editor()
            |> assign(:file_path, path)
            |> assign(:file_full_path, nil)
            |> assign(:file_content, nil)
@@ -210,6 +216,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         {:error, {:stat_error, reason}} ->
           {:noreply,
            socket
+           |> unsubscribe_editor()
            |> assign(:file_full_path, nil)
            |> assign(:error, "Failed to stat file: #{reason}")
            |> assign(:file_content, nil)}
@@ -217,10 +224,30 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         {:error, {:read_error, reason}} ->
           {:noreply,
            socket
+           |> unsubscribe_editor()
            |> assign(:file_full_path, nil)
            |> assign(:error, "Failed to read file: #{reason}")
            |> assign(:file_content, nil)}
       end
+    end
+  end
+
+  defp subscribe_editor(socket, path) do
+    if socket.assigns.subscribed_editor_id != path do
+      unsubscribe_editor(socket)
+      Events.subscribe_editor(path)
+      assign(socket, :subscribed_editor_id, path)
+    else
+      socket
+    end
+  end
+
+  defp unsubscribe_editor(socket) do
+    case socket.assigns[:subscribed_editor_id] do
+      nil -> socket
+      id ->
+        Events.unsubscribe_editor(id)
+        assign(socket, :subscribed_editor_id, nil)
     end
   end
 
@@ -269,6 +296,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   @impl true
   def handle_event("set_notify_on_stop", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_info({:editor_push, op, payload}, socket) do
+    {:noreply, push_event(socket, "cm:#{op}", payload)}
+  end
 
   @impl true
   def handle_info(_msg, socket), do: {:noreply, socket}

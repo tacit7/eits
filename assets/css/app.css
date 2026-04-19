@@ -45,6 +45,9 @@ body .phx-click-loading,
 body .phx-submit-loading,
 body .phx-change-loading { opacity: 1 !important; }
 
+/* Agent-driven CodeMirror range highlight */
+.cm-agent-highlight { background: rgba(255, 200, 0, 0.3); border-radius: 2px; }
+
 /* Force agent detail to stay visible */
 .agent-detail-wrapper,
 .agent-detail-wrapper > *,

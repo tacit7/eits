@@ -8,6 +8,11 @@ defmodule EyeInTheSky.Channels do
   alias EyeInTheSky.Repo
 
   @doc """
+  Gets a single channel by ID. Returns nil if not found.
+  """
+  def get_channel(id), do: Repo.get(Channel, id)
+
+  @doc """
   Returns all channels (no project filter).
   """
   def list_channels(opts \\ []) do

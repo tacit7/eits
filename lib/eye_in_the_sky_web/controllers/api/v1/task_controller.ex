@@ -323,6 +323,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   defp update_attrs(task, params) do
     attrs =
       %{}
+      |> Helpers.maybe_put(:title, trim_param(params["title"]))
       |> Helpers.maybe_put(:state_id, params["state_id"])
       |> Helpers.maybe_put(:priority, params["priority"])
       |> Helpers.maybe_put(:description, trim_param(params["description"]))

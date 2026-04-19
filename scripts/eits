@@ -168,19 +168,20 @@ cmd_sessions() {
 
 cmd_tasks() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session> [--mine] [--quiet]"; return 0; }
   case "$sub" in
     list)
-      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--state <id>] [--limit <n>]
-      local qs=""
+      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--state <id>] [--limit <n>] [--mine]
+      local qs="" _session_flag=0 _mine_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --project) qs="${qs}&project_id=$2"; shift 2 ;;
-          --session) qs="${qs}&session_id=$2"; shift 2 ;;
+          --session) [[ $_mine_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
           --agent)   qs="${qs}&agent_id=$2";   shift 2 ;;
           --q)       qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --state)   qs="${qs}&state_id=$2";   shift 2 ;;
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;
+          --mine)    [[ $_session_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -218,7 +219,7 @@ cmd_tasks() {
       _post "/tasks" "$body"
       ;;
     update)
-      # eits tasks update <id> [--state <id>] [--state-name <done|start>] [--priority <p>] [--description <d>]
+      # eits tasks update <id> [--state <id>] [--state-name <done|start>] [--priority <p>] [--description <d>] [--title <t>]
       local id="${1:-}"; need id; shift
       local updates="{}"
       while [[ $# -gt 0 ]]; do
@@ -233,6 +234,7 @@ cmd_tasks() {
           --state-name)  updates=$(echo "$updates" | jq --arg v "$2" '. + {state: $v}');       shift 2 ;;
           --priority)    updates=$(echo "$updates" | jq --arg v "$2" '. + {priority: $v}');    shift 2 ;;
           --description) updates=$(echo "$updates" | jq --arg v "$2" '. + {description: $v}'); shift 2 ;;
+          --title)       updates=$(echo "$updates" | jq --arg v "$2" '. + {title: $v}');       shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -301,15 +303,16 @@ cmd_tasks() {
       _post "/tasks/$id/complete" "$(json message "$message")"
       ;;
     begin|quick)
-      # eits tasks quick --title <t> [--description <d>] [--project <id>] [--priority <p>]
+      # eits tasks begin --title <t> [--description <d>] [--project <id>] [--priority <p>] [--quiet|-q]
       # Creates a task, links the current session, and starts it — all in one command.
-      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority=""
+      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" quiet=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --title)       title="$2";       shift 2 ;;
           --description) description="$2"; shift 2 ;;
           --project)     project_id="$2";  shift 2 ;;
           --priority)    priority="$2";    shift 2 ;;
+          --quiet|-q)    quiet=1;          shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -319,9 +322,13 @@ cmd_tasks() {
       body="$(json title "$title" description "$description" project_id "$project_id" priority "$priority" session_id "$_sess")"
       local create_resp task_id
       create_resp=$(_post "/tasks" "$body")
-      echo "$create_resp"
       task_id=$(echo "$create_resp" | jq -r '.task_id // empty')
       [[ -n "$task_id" ]] || die "task creation failed"
+      if [[ $quiet -eq 0 ]]; then
+        echo "$create_resp"
+      else
+        echo "$task_id"
+      fi
       _patch "/tasks/$task_id" "$(json state "start" session_id "$_sess")" > /dev/null
       if [[ -n "$_sess" ]]; then
         _curl -sf -X POST -H "Content-Type: application/json" \
@@ -336,7 +343,7 @@ cmd_tasks() {
       _post "/tasks/$task_id/tags" "$(json tag_id "$tag_id")"
       ;;
     *)
-      echo "usage: eits tasks <list|get|create|update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|tag>"
+      echo "usage: eits tasks <list|get|create|update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|tag> [--mine] [--title] [--quiet]"
       ;;
   esac
 }
@@ -1146,6 +1153,7 @@ Base URL: ${BASE_URL}  (override: EITS_URL=<url>)
 Commands:
   sessions      list|get|create|update|end|context
   tasks         list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session
+                list --mine, update --title, begin --quiet
   notes         list|get|create|update|add
   projects      list|get|create
   agents        list|get|spawn
@@ -1156,7 +1164,7 @@ Commands:
   notifications create
   prompts       list|get
   teams         list|get|create|delete|members|join|status|update-member|leave|broadcast|my-teams
-  timer         show|set|cancel   (default session: self / \$EITS_SESSION_UUID)
+  timer         show|set|cancel   (default session: self / $EITS_SESSION_UUID)
   worktree      create|remove   (EITS Elixir projects only)
   me            Print current session/agent/project context and verify server-side
 

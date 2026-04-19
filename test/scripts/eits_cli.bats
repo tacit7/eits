@@ -1080,3 +1080,30 @@ teardown_teams() {
   [ "$status" -eq 0 ]
   echo "$output" | jq -e 'length > 0' >/dev/null
 }
+
+# ── projects create extra fields ────────────────────────────────────────────
+
+@test "projects create: accepts --git-remote flag" {
+  run "$EITS" projects create --name "test-git-remote-$RANDOM" --path "/tmp/test" --git-remote "git@github.com:foo/bar.git"
+  [ "$status" -eq 0 ]
+}
+
+@test "projects create: accepts --repo-url flag" {
+  run "$EITS" projects create --name "test-repo-url-$RANDOM" --path "/tmp/test" --repo-url "https://github.com/foo/bar"
+  [ "$status" -eq 0 ]
+}
+
+@test "projects create: accepts --branch flag" {
+  run "$EITS" projects create --name "test-branch-$RANDOM" --path "/tmp/test" --branch "main"
+  [ "$status" -eq 0 ]
+}
+
+@test "projects create: accepts --active flag" {
+  run "$EITS" projects create --name "test-active-$RANDOM" --path "/tmp/test" --active
+  [ "$status" -eq 0 ]
+}
+
+@test "projects create: accepts --inactive flag" {
+  run "$EITS" projects create --name "test-inactive-$RANDOM" --path "/tmp/test" --inactive
+  [ "$status" -eq 0 ]
+}

@@ -477,19 +477,24 @@ cmd_projects() {
       _get "/projects/$id"
       ;;
     create)
-      # eits projects create --name <n> --path <p> [--slug <s>] [--remote <url>]
-      local name="" path="" slug="" remote_url=""
+      # eits projects create --name <n> --path <p> [--slug <s>] [--remote <url>] [--git-remote <url>] [--repo-url <url>] [--branch <b>] [--active|--inactive]
+      local name="" path="" slug="" remote_url="" git_remote="" repo_url="" branch="" active=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --name)   name="$2";       shift 2 ;;
-          --path)   path="$2";       shift 2 ;;
-          --slug)   slug="$2";       shift 2 ;;
-          --remote) remote_url="$2"; shift 2 ;;
+          --name)       name="$2";       shift 2 ;;
+          --path)       path="$2";       shift 2 ;;
+          --slug)       slug="$2";       shift 2 ;;
+          --remote)     remote_url="$2"; shift 2 ;;
+          --git-remote) git_remote="$2"; shift 2 ;;
+          --repo-url)   repo_url="$2";   shift 2 ;;
+          --branch)     branch="$2";     shift 2 ;;
+          --active)     active="true";   shift ;;
+          --inactive)   active="false";  shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
       need name; need path
-      _post "/projects" "$(json name "$name" path "$path" slug "$slug" remote_url "$remote_url")"
+      _post "/projects" "$(json name "$name" path "$path" slug "$slug" remote_url "$remote_url" git_remote "$git_remote" repo_url "$repo_url" branch "$branch" active "$active")"
       ;;
     *)
       echo "usage: eits projects <list|get|create>"

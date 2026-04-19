@@ -286,6 +286,28 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     end
   end
 
+  @doc """
+  POST /api/v1/tasks/:id/tags
+  Body: {tag_id: integer}
+  """
+  def add_tag(conn, %{"id" => task_id, "tag_id" => tag_id_raw}) do
+    with {:ok, task_id_int} <- parse_task_id_int(task_id),
+         {:ok, tag_id_int} <- parse_tag_id(tag_id_raw) do
+      case EyeInTheSky.Repo.query(
+             "INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+             [task_id_int, tag_id_int]
+           ) do
+        {:ok, _} ->
+          json(conn, %{success: true, task_id: task_id_int, tag_id: tag_id_int})
+
+        {:error, reason} ->
+          {:error, :internal_server_error, inspect(reason)}
+      end
+    end
+  end
+
+  def add_tag(_conn, _params), do: {:error, :bad_request, "tag_id is required"}
+
   # Helpers
 
   defp move_to_state(task, state_name) do
@@ -332,4 +354,24 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   defp parse_task_id(id) when is_binary(id), do: Helpers.parse_int(id) || id
   defp parse_task_id(id), do: id
+
+  defp parse_task_id_int(raw) when is_binary(raw) do
+    case Integer.parse(raw) do
+      {n, ""} -> {:ok, n}
+      _ -> {:error, :bad_request, "invalid task_id"}
+    end
+  end
+
+  defp parse_task_id_int(n) when is_integer(n), do: {:ok, n}
+
+  defp parse_tag_id(n) when is_integer(n), do: {:ok, n}
+
+  defp parse_tag_id(raw) when is_binary(raw) do
+    case Integer.parse(raw) do
+      {n, ""} -> {:ok, n}
+      _ -> {:error, :bad_request, "tag_id must be an integer"}
+    end
+  end
+
+  defp parse_tag_id(_), do: {:error, :bad_request, "tag_id is required"}
 end

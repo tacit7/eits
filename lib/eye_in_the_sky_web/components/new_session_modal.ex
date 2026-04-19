@@ -116,6 +116,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
             <%!-- Agent --%>
             <%= if @available_agents != [] do %>
+              <% visible_agents = Enum.take(@available_agents, 10) %>
+              <% overflow = length(@available_agents) - length(visible_agents) %>
               <div>
                 <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Agent</label>
                 <input
@@ -127,10 +129,16 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
                   class="input input-bordered w-full text-base"
                 />
                 <datalist id="agent-options">
-                  <%= for {slug, name, scope} <- @available_agents do %>
+                  <%= for {slug, name, scope} <- visible_agents do %>
                     <option value={slug}>{name}{if scope == :project, do: " (project)"}</option>
                   <% end %>
                 </datalist>
+                <%= if overflow > 0 do %>
+                  <p class="flex items-center gap-1 text-xs text-base-content/40 mt-1 px-1">
+                    <.icon name="hero-ellipsis-horizontal" class="w-3.5 h-3.5" />
+                    {overflow} more — start typing to narrow
+                  </p>
+                <% end %>
               </div>
             <% end %>
 

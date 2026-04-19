@@ -109,6 +109,8 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
       use_script: true,
       eits_session_id: state.provider_conversation_id,
       eits_agent_id: state.agent_id,
+      eits_agent_uuid: state.agent_id,
+      eits_project_id: state.project_id,
       eits_workflow: eits_workflow,
       worktree: state.worktree,
       agent: context[:agent]

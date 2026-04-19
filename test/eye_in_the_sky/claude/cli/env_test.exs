@@ -127,6 +127,16 @@ defmodule EyeInTheSky.Claude.CLI.EnvTest do
       assert env_get(env, "EITS_WORKFLOW") == "0"
     end
 
+    test "injects EITS_AGENT_UUID when provided" do
+      env = Env.build_from_map(%{}, eits_agent_uuid: "agent-uuid-abc")
+      assert env_get(env, "EITS_AGENT_UUID") == "agent-uuid-abc"
+    end
+
+    test "injects EITS_PROJECT_ID when provided" do
+      env = Env.build_from_map(%{}, eits_project_id: "42")
+      assert env_get(env, "EITS_PROJECT_ID") == "42"
+    end
+
     test "blocked vars and injected vars coexist correctly" do
       env =
         Env.build_from_map(

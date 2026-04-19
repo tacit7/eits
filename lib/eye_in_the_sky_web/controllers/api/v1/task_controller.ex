@@ -300,8 +300,11 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
         {:ok, _} ->
           json(conn, %{success: true, task_id: task_id_int, tag_id: tag_id_int})
 
-        {:error, reason} ->
-          {:error, :internal_server_error, inspect(reason)}
+        {:error, %{postgres: %{code: :foreign_key_violation}}} ->
+          {:error, :not_found, "task or tag not found"}
+
+        {:error, _} ->
+          {:error, :internal_server_error, "failed to add tag"}
       end
     end
   end

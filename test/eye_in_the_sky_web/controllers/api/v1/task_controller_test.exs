@@ -559,4 +559,63 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
       assert resp["task_id"] != nil
     end
   end
+
+  # ---- POST /api/v1/tasks/:id/tags ----
+
+  describe "POST /api/v1/tasks/:id/tags" do
+    defp create_tag do
+      {:ok, %{rows: [[id]]}} =
+        EyeInTheSky.Repo.query(
+          "INSERT INTO tags (name) VALUES ($1) RETURNING id",
+          ["tag-#{System.unique_integer([:positive])}"]
+        )
+
+      id
+    end
+
+    test "adds a tag to a task", %{conn: conn} do
+      task = create_task()
+      tag_id = create_tag()
+
+      conn = post(conn, ~p"/api/v1/tasks/#{task.id}/tags", %{"tag_id" => tag_id})
+      resp = json_response(conn, 200)
+
+      assert resp["success"] == true
+      assert resp["task_id"] == task.id
+      assert resp["tag_id"] == tag_id
+    end
+
+    test "duplicate insert is idempotent", %{conn: conn} do
+      task = create_task()
+      tag_id = create_tag()
+
+      post(conn, ~p"/api/v1/tasks/#{task.id}/tags", %{"tag_id" => tag_id})
+      conn2 = post(conn, ~p"/api/v1/tasks/#{task.id}/tags", %{"tag_id" => tag_id})
+      assert %{"success" => true} = json_response(conn2, 200)
+    end
+
+    test "returns 404 for non-existent task", %{conn: conn} do
+      tag_id = create_tag()
+      conn = post(conn, ~p"/api/v1/tasks/9999999/tags", %{"tag_id" => tag_id})
+      assert json_response(conn, 404)
+    end
+
+    test "returns 404 for non-existent tag", %{conn: conn} do
+      task = create_task()
+      conn = post(conn, ~p"/api/v1/tasks/#{task.id}/tags", %{"tag_id" => 9999999})
+      assert json_response(conn, 404)
+    end
+
+    test "returns 400 for non-integer tag_id", %{conn: conn} do
+      task = create_task()
+      conn = post(conn, ~p"/api/v1/tasks/#{task.id}/tags", %{"tag_id" => "not-a-number"})
+      assert json_response(conn, 400)
+    end
+
+    test "returns 400 when tag_id is missing", %{conn: conn} do
+      task = create_task()
+      conn = post(conn, ~p"/api/v1/tasks/#{task.id}/tags", %{})
+      assert json_response(conn, 400)
+    end
+  end
 end

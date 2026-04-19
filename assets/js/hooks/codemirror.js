@@ -46,6 +46,7 @@ export const CodeMirrorHook = {
     const readonly = this.el.dataset.readonly === "true"
     const self = this
 
+    try {
     const [
       { EditorView, keymap, lineNumbers, highlightActiveLine },
       { EditorState },
@@ -77,6 +78,11 @@ export const CodeMirrorHook = {
       }
     }])
 
+    const heightTheme = EditorView.theme({
+      "&": { height: "100%" },
+      ".cm-scroller": { overflow: "auto" },
+    })
+
     const extensions = [
       lineNumbers(),
       highlightActiveLine(),
@@ -85,6 +91,7 @@ export const CodeMirrorHook = {
       tabExtension,
       fontExtension,
       langExtension,
+      heightTheme,
     ]
 
     if (readonly) {
@@ -104,6 +111,7 @@ export const CodeMirrorHook = {
     this._cleanupTabSize = tabWatch(this._view)
     this._cleanupFontSize = watchFont(this._view)
     this._cleanupVim = watchVim(this._view)
+    } catch(e) { console.error("[CodeMirror] mount error", e) }
   },
 
   destroyed() {

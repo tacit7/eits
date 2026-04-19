@@ -145,6 +145,15 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   end
 
   defp handle_file(socket, full_path, path) do
+    if binary_file?(path) do
+      {:noreply,
+       socket
+       |> assign(:file_path, path)
+       |> assign(:file_content, nil)
+       |> assign(:file_type, nil)
+       |> assign(:files, [])
+       |> assign(:error, "Binary file — cannot preview")}
+    else
     case read_file_safe_detailed(full_path) do
       {:ok, content} ->
         {:noreply,
@@ -175,6 +184,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
          socket
          |> assign(:error, "Failed to read file: #{reason}")
          |> assign(:file_content, nil)}
+    end
     end
   end
 
@@ -363,7 +373,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       </div>
       
     <!-- File Content Viewer -->
-      <div class="flex-1 min-h-0 overflow-y-auto">
+      <div class="flex-1 min-h-0 overflow-hidden">
         <.file_content_pane
           error={@error}
           file_content={@file_content}

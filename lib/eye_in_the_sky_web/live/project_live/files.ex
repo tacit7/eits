@@ -39,19 +39,22 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
           |> assign(:sidebar_project, project)
 
         socket =
-          if connected?(socket) && project.path do
+          if project.path do
             cache_key = {__MODULE__, :file_tree, project.id}
             now = System.os_time(:second)
 
-            case :persistent_term.get(cache_key, nil) do
-              {tree, built_at} when now - built_at < @tree_cache_ttl ->
-                assign(socket, :file_tree, tree)
+            tree =
+              case :persistent_term.get(cache_key, nil) do
+                {cached_tree, built_at} when now - built_at < @tree_cache_ttl ->
+                  cached_tree
 
-              _ ->
-                start_async(socket, :load_file_tree, fn ->
-                  build_file_tree(project.path, project.path)
-                end)
-            end
+                _ ->
+                  t = build_file_tree(project.path, project.path)
+                  :persistent_term.put(cache_key, {t, now})
+                  t
+              end
+
+            assign(socket, :file_tree, tree)
           else
             socket
           end
@@ -257,17 +260,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   def handle_event("set_notify_on_stop", _params, socket), do: {:noreply, socket}
 
   @impl true
-  def handle_async(:load_file_tree, {:ok, tree}, socket) do
-    cache_key = {__MODULE__, :file_tree, socket.assigns.project.id}
-    :persistent_term.put(cache_key, {tree, System.os_time(:second)})
-    {:noreply, assign(socket, :file_tree, tree)}
-  end
-
-  def handle_async(:load_file_tree, {:exit, _reason}, socket) do
-    {:noreply, socket}
-  end
-
-  @impl true
   def handle_info(_msg, socket), do: {:noreply, socket}
 
   attr :error, :string, default: nil
@@ -385,44 +377,46 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   @impl true
   def render(assigns) do
     ~H"""
-    <!-- View Mode Toggle -->
-    <div class="bg-base-100 border-b border-base-300">
-      <div class="px-4 sm:px-6 lg:px-8 py-2">
-        <div class="btn-group btn-group-sm">
-          <button
-            class={"btn btn-sm" <> if @view_mode == :list, do: " btn-active", else: ""}
-            phx-click="toggle_view_mode"
-            phx-value-mode="list"
-          >
-            <.icon name="hero-bars-3" class="w-4 h-4" /> List
-          </button>
-          <button
-            class={"btn btn-sm" <> if @view_mode == :tree, do: " btn-active", else: ""}
-            phx-click="toggle_view_mode"
-            phx-value-mode="tree"
-          >
-            <.icon name="hero-folder" class="w-4 h-4" /> Explore
-          </button>
+    <div class="flex flex-col h-full">
+      <!-- View Mode Toggle -->
+      <div class="flex-shrink-0 bg-base-100 border-b border-base-300">
+        <div class="px-4 sm:px-6 lg:px-8 py-2">
+          <div class="btn-group btn-group-sm">
+            <button
+              class={"btn btn-sm" <> if @view_mode == :list, do: " btn-active", else: ""}
+              phx-click="toggle_view_mode"
+              phx-value-mode="list"
+            >
+              <.icon name="hero-bars-3" class="w-4 h-4" /> List
+            </button>
+            <button
+              class={"btn btn-sm" <> if @view_mode == :tree, do: " btn-active", else: ""}
+              phx-click="toggle_view_mode"
+              phx-value-mode="tree"
+            >
+              <.icon name="hero-folder" class="w-4 h-4" /> Explore
+            </button>
+          </div>
         </div>
       </div>
-    </div>
 
-    <%= if @view_mode == :tree do %>
-      <.file_tree_view {assigns} />
-    <% else %>
-      <.file_list_view {assigns} />
-    <% end %>
+      <%= if @view_mode == :tree do %>
+        <.file_tree_view {assigns} />
+      <% else %>
+        <.file_list_view {assigns} />
+      <% end %>
+    </div>
     """
   end
 
   defp file_tree_view(assigns) do
     ~H"""
     <!-- Tree View -->
-    <div class="h-[calc(100dvh-10rem)] flex flex-col md:flex-row overflow-hidden">
+    <div class="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
       <!-- File Tree Sidebar -->
       <div
         id="file-tree-sidebar"
-        class="w-full md:w-80 md:flex-shrink-0 border-b md:border-b-0 md:border-r border-base-300 bg-base-100 overflow-y-auto max-h-64 md:max-h-none"
+        class="w-full md:w-80 md:flex-shrink-0 border-b md:border-b-0 md:border-r border-base-300 bg-base-100 overflow-y-auto max-h-64 md:max-h-none md:h-full"
         phx-update="ignore"
       >
         <div class="p-4">
@@ -453,7 +447,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   defp file_list_view(assigns) do
     ~H"""
     <!-- List View -->
-    <div class="h-[calc(100dvh-10rem)]">
+    <div class="flex-1 min-h-0 overflow-auto">
       <%= if @files != [] && !@file_content do %>
         <!-- Directory Listing -->
         <div class="p-6">

@@ -28,107 +28,50 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
     )
   end
 
-  # -------------------------------------------------------------------------
-  # Filter logic (pure unit tests — no DB needed but ConnCase provides sandbox)
-  # -------------------------------------------------------------------------
-
-  describe "agent filtering logic" do
-    test "empty query returns all agents" do
-      assert filter_agents(@agents, "") == @agents
-    end
-
-    test "matches on slug substring" do
-      result = filter_agents(@agents, "eits")
-      slugs = Enum.map(result, &elem(&1, 0))
-      assert slugs == ["eits-superpowers", "eits-workflow"]
-    end
-
-    test "matches on name substring case-insensitively" do
-      result = filter_agents(@agents, "code")
-      slugs = Enum.map(result, &elem(&1, 0))
-      assert slugs == ["code-reviewer"]
-    end
-
-    test "returns empty list when nothing matches" do
-      assert filter_agents(@agents, "zzznomatch") == []
-    end
-
-    test "case-insensitive slug match" do
-      assert filter_agents(@agents, "EITS") |> length() == 2
-    end
-
-    test "case-insensitive name match" do
-      result = filter_agents(@agents, "BUG")
-      assert Enum.map(result, &elem(&1, 0)) == ["bugfix"]
-    end
-  end
-
-  # -------------------------------------------------------------------------
-  # Component rendering — verifies HTML structure and phx-change wiring
-  # -------------------------------------------------------------------------
-
-  describe "component rendering" do
-    test "renders filter input with correct phx-change attribute when agents present" do
+  describe "datalist agent field" do
+    test "renders datalist with all agents when agents present" do
       html = render_component(NewSessionModal, base_assigns())
 
-      assert html =~ ~s(phx-change="agent_search_changed")
-      assert html =~ ~s(name="agent_search")
-      assert html =~ "Filter agents..."
+      assert html =~ ~s(<datalist id="agent-options">)
+      assert html =~ ~s(value="eits-superpowers")
+      assert html =~ "EITS Superpowers"
+      assert html =~ ~s(value="bugfix")
+      assert html =~ "Bug Fixer"
     end
 
-    test "does not render filter input when no agents available" do
+    test "renders input linked to datalist" do
+      html = render_component(NewSessionModal, base_assigns())
+
+      assert html =~ ~s(list="agent-options")
+      assert html =~ ~s(name="agent")
+      assert html =~ "Search agents..."
+    end
+
+    test "does not render agent field when no agents available" do
       html = render_component(NewSessionModal, base_assigns(%{available_agents: []}))
 
-      refute html =~ ~s(name="agent_search")
-      refute html =~ "Filter agents..."
+      refute html =~ ~s(list="agent-options")
+      refute html =~ ~s(<datalist)
     end
 
-    test "renders all agents in select when agent_search is empty" do
-      html = render_component(NewSessionModal, base_assigns(%{agent_search: ""}))
+    test "marks project-scoped agents with (project) suffix" do
+      html = render_component(NewSessionModal, base_assigns())
 
-      assert html =~ "EITS Superpowers"
-      assert html =~ "EITS Workflow"
-      assert html =~ "Bug Fixer"
-      assert html =~ "Code Reviewer"
+      assert html =~ "Code Reviewer (project)"
     end
 
-    test "renders only matching agents when agent_search filters by slug" do
-      html = render_component(NewSessionModal, base_assigns(%{agent_search: "eits"}))
+    test "global agents have no scope suffix" do
+      html = render_component(NewSessionModal, base_assigns())
 
-      assert html =~ "EITS Superpowers"
-      assert html =~ "EITS Workflow"
-      refute html =~ "Bug Fixer"
-      refute html =~ "Code Reviewer"
-    end
-
-    test "renders empty-state message when no agents match the search" do
-      html = render_component(NewSessionModal, base_assigns(%{agent_search: "zzznomatch"}))
-
-      assert html =~ ~s(No agents match)
-      assert html =~ "zzznomatch"
-    end
-
-    test "does not render empty-state message when agents match" do
-      html = render_component(NewSessionModal, base_assigns(%{agent_search: "eits"}))
-
-      refute html =~ "No agents match"
+      assert html =~ ">EITS Superpowers<"
+      refute html =~ "EITS Superpowers (global)"
     end
   end
 
-  # -------------------------------------------------------------------------
-  # Mirrors the inline filtering in render/1 — stays in sync with the component
-  # -------------------------------------------------------------------------
-
-  defp filter_agents(agents, "") do
-    agents
-  end
-
-  defp filter_agents(agents, query) do
-    q = String.downcase(query)
-
-    Enum.filter(agents, fn {slug, name, _scope} ->
-      String.contains?(String.downcase(slug), q) or
-        String.contains?(String.downcase(name), q)
-    end)
+  describe "module exports" do
+    test "NewSessionModal is compiled and exports render/1" do
+      assert Code.ensure_loaded?(NewSessionModal)
+      assert function_exported?(NewSessionModal, :render, 1)
+    end
   end
 end

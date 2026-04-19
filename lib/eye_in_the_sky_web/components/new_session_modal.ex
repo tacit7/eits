@@ -22,7 +22,6 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
        selected_prompt_id: nil,
        prefill_text: "",
        available_agents: [],
-       agent_search: "",
        file_uploads: nil
      )}
   end
@@ -32,8 +31,6 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     # When the form is open, skip parent re-renders entirely to prevent DOM patches from
     # disrupting the modal (e.g. PubSub-driven list updates closing the form). Only update
     # uploads when they actually change so image previews stay current.
-    opening = !socket.assigns[:show] && assigns[:show]
-
     if socket.assigns[:show] && assigns[:show] do
       new_uploads = Map.get(assigns, :file_uploads)
 
@@ -46,16 +43,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       project_path = if assigns[:current_project], do: assigns[:current_project].path
       available_agents = Map.get_lazy(assigns, :available_agents, fn -> list_agents(project_path) end)
 
-      socket =
-        socket
-        |> assign(Map.put(assigns, :available_agents, available_agents))
-        |> then(fn s ->
-          if opening && !Map.has_key?(assigns, :agent_search),
-            do: assign(s, :agent_search, ""),
-            else: s
-        end)
-
-      {:ok, socket}
+      {:ok, assign(socket, Map.put(assigns, :available_agents, available_agents))}
     end
   end
 
@@ -86,7 +74,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
           if(project, do: project.path)
       end
 
-    {:noreply, assign(socket, available_agents: list_agents(project_path), agent_search: "")}
+    {:noreply, assign(socket, :available_agents, list_agents(project_path))}
   end
 
   def handle_event("prompt_selected", %{"prompt_id" => prompt_id}, socket) do
@@ -96,10 +84,6 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     prefill = if prompt, do: prompt.prompt_text || "", else: ""
 
     {:noreply, assign(socket, selected_prompt_id: prompt_id, prefill_text: prefill)}
-  end
-
-  def handle_event("agent_search_changed", %{"agent_search" => query}, socket) do
-    {:noreply, assign(socket, :agent_search, query)}
   end
 
   @impl true
@@ -132,39 +116,21 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
             <%!-- Agent --%>
             <%= if @available_agents != [] do %>
-              <% filtered_agents =
-                if @agent_search == "" do
-                  @available_agents
-                else
-                  q = String.downcase(@agent_search)
-
-                  Enum.filter(@available_agents, fn {slug, name, _scope} ->
-                    String.contains?(String.downcase(slug), q) or
-                      String.contains?(String.downcase(name), q)
-                  end)
-                end %>
               <div>
                 <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Agent</label>
                 <input
                   type="text"
-                  name="agent_search"
-                  value={@agent_search}
-                  placeholder="Filter agents..."
+                  name="agent"
+                  list="agent-options"
+                  placeholder="Search agents..."
                   autocomplete="off"
-                  phx-change="agent_search_changed"
-                  phx-target={@myself}
-                  phx-debounce="100"
-                  class="input input-bordered input-sm w-full mb-1.5 text-base"
+                  class="input input-bordered w-full text-base"
                 />
-                <select name="agent" class="select select-bordered w-full">
-                  <option value="">-- None --</option>
-                  <%= for {slug, name, scope} <- filtered_agents do %>
+                <datalist id="agent-options">
+                  <%= for {slug, name, scope} <- @available_agents do %>
                     <option value={slug}>{name}{if scope == :project, do: " (project)"}</option>
                   <% end %>
-                </select>
-                <%= if filtered_agents == [] do %>
-                  <p class="text-xs text-base-content/40 mt-1">No agents match "{@agent_search}"</p>
-                <% end %>
+                </datalist>
               </div>
             <% end %>
 

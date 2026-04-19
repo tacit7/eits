@@ -229,6 +229,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     members = Teams.list_members(team.id)
 
     with {:ok, from_session} <- resolve_broadcast_sender(from_raw),
+         {:from_active, false} <-
+           {:from_active, from_session.status in @terminated_statuses},
          {:member, true} <-
            {:member, Enum.any?(members, &(&1.session_id == from_session.id))} do
       targets =
@@ -258,6 +260,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
       })
     else
       {:error, :not_found} -> {:error, :not_found, "Sender session not found"}
+      {:from_active, true} -> {:error, :unprocessable_entity, "Sender session is terminated and cannot broadcast"}
       {:member, false} -> {:error, :forbidden, "Sender is not a member of this team"}
     end
   end

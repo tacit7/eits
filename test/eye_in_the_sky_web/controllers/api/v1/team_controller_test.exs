@@ -396,6 +396,21 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       assert resp["sent_count"] == 0
     end
 
+    test "rejects broadcast from terminated sender session", %{conn: conn} do
+      team = create_team()
+      agent = create_agent()
+      dead_session = create_session(agent, %{status: "completed"})
+      join_team(team, %{name: "dead-sender", session_id: dead_session.id})
+
+      conn =
+        post(conn, ~p"/api/v1/teams/#{team.id}/broadcast", %{
+          "from_session_id" => dead_session.uuid,
+          "body" => "ghost broadcast"
+        })
+
+      assert json_response(conn, 422)["error"] =~ "terminated"
+    end
+
     test "skips completed and failed sessions", %{conn: conn} do
       team = create_team()
 

@@ -290,7 +290,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       :file ->
         ~H"""
         <li>
-          <.link patch={~p"/projects/#{@project_id}/files?path=#{@item.path}"}>
+          <.link patch={~p"/projects/#{@project_id}/files?path=#{@item.path}&mode=tree"}>
             <.icon name="hero-document" class="w-4 h-4" />
             {@item.name}
             <%= if @item.size do %>
@@ -338,7 +338,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   defp file_tree_view(assigns) do
     ~H"""
     <!-- Tree View -->
-    <div class="h-[calc(100dvh-10rem)] flex flex-col md:flex-row">
+    <div class="h-[calc(100dvh-10rem)] flex flex-col md:flex-row overflow-hidden">
       <!-- File Tree Sidebar -->
       <div
         id="file-tree-sidebar"

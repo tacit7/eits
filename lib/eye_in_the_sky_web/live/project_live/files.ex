@@ -18,6 +18,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     socket =
       socket
       |> assign(:file_path, nil)
+      |> assign(:file_full_path, nil)
       |> assign(:file_content, nil)
       |> assign(:file_type, nil)
       |> assign(:file_tree, [])
@@ -161,6 +162,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         {:noreply,
          socket
          |> assign(:file_path, path)
+         |> assign(:file_full_path, full_path)
          |> assign(:file_content, content)
          |> assign(:file_type, detect_file_type(path))
          |> assign(:files, [])
@@ -207,6 +209,33 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   end
 
   @impl true
+  def handle_event("file_save", %{"content" => content}, socket) do
+    project = socket.assigns.project
+    full_path = socket.assigns.file_full_path
+
+    cond do
+      is_nil(full_path) ->
+        {:reply, %{error: "No file open"}, socket}
+
+      not path_within?(full_path, project.path) ->
+        {:reply, %{error: "Access denied"}, socket}
+
+      true ->
+        case File.write(full_path, content) do
+          :ok ->
+            {:reply, %{ok: true},
+             socket
+             |> assign(:file_content, content)
+             |> put_flash(:info, "Saved")}
+
+          {:error, reason} ->
+            {:reply, %{error: "Write failed: #{reason}"},
+             socket |> put_flash(:error, "Save failed: #{reason}")}
+        end
+    end
+  end
+
+  @impl true
   def handle_event("set_notify_on_stop", _params, socket), do: {:noreply, socket}
 
   @impl true
@@ -242,22 +271,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     <% end %>
     <%= if @file_content do %>
       <div class="flex flex-col h-full">
-        <div class="px-4 py-3 border-b border-base-300 shrink-0 flex items-center gap-2">
-          <%= if @show_back_button && @file_path && @file_path != "." do %>
+        <%= if @show_back_button && @file_path && @file_path != "." do %>
+          <div class="px-4 py-2 border-b border-base-300 shrink-0">
             <.link
               patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
               class="btn btn-sm btn-ghost btn-square"
             >
               <.icon name="hero-arrow-left" class="w-4 h-4" />
             </.link>
-          <% end %>
-          <div>
-            <h2 class="text-sm font-semibold text-base-content">{Path.basename(@file_path)}</h2>
-            <p class="text-xs text-base-content/50">{@file_path}</p>
           </div>
-        </div>
+        <% end %>
         <div class="flex-1 min-h-0 overflow-hidden">
-          <.file_content_viewer file_content={@file_content} file_type={@file_type} />
+          <.file_content_viewer file_content={@file_content} file_type={@file_type} file_path={@file_path} />
         </div>
       </div>
     <% else %>
@@ -274,20 +299,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   attr :file_content, :string, required: true
   attr :file_type, :string, default: nil
+  attr :file_path, :string, default: nil
 
   defp file_content_viewer(assigns) do
-    assigns = assign(assigns, :viewer_id, "codemirror-#{:erlang.phash2(assigns.file_content)}")
     ~H"""
-    <div
-      id={@viewer_id}
-      phx-hook="CodeMirror"
-      phx-update="ignore"
-      data-content={Base.encode64(@file_content)}
-      data-lang={language_class(@file_type)}
-      data-readonly="true"
+    <.svelte
+      name="FileEditor"
+      props={%{
+        content: @file_content,
+        lang: language_class(@file_type),
+        filePath: @file_path || "",
+        readonly: false
+      }}
       class="h-full"
-    >
-    </div>
+    />
     """
   end
 

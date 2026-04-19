@@ -79,24 +79,31 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
         </div>
       </div>
 
-      <div
-        data-chat-body
-        class="flex-1 overflow-y-auto px-2 py-2 min-h-0"
-        id={"chat-messages-#{@canvas_session.id}"}
-        phx-hook="AutoScroll"
-        style="scrollbar-width: none; -ms-overflow-style: none;"
-      >
-        <%= if @messages == [] do %>
-          <div class="flex items-center justify-center h-full text-xs text-base-content/30">
-            No messages yet
-          </div>
-        <% else %>
-          <div class="space-y-2">
-            <%= for message <- @messages do %>
-              <.message_item message={message} cs_id={@canvas_session.id} />
-            <% end %>
-          </div>
-        <% end %>
+      <div class="flex-1 relative min-h-0">
+        <div
+          data-chat-body
+          class="absolute inset-0 overflow-y-auto px-2 py-2"
+          id={"chat-messages-#{@canvas_session.id}"}
+          style="scrollbar-width: none; -ms-overflow-style: none;"
+        >
+          <%= if @messages == [] do %>
+            <div class="flex items-center justify-center h-full text-xs text-base-content/30">
+              No messages yet
+            </div>
+          <% else %>
+            <div class="space-y-2">
+              <%= for message <- @messages do %>
+                <.message_item message={message} cs_id={@canvas_session.id} />
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+        <div
+          data-new-msg-pill
+          class="hidden absolute bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-primary text-primary-content text-[10px] font-medium px-2 py-0.5 rounded-full cursor-pointer shadow-md z-10"
+        >
+          &darr; new messages
+        </div>
       </div>
 
       <div data-chat-footer class="shrink-0 border-t border-base-300">
@@ -108,6 +115,14 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
             placeholder="Message..."
             autocomplete="off"
           />
+          <button
+            data-autoscroll-btn
+            type="button"
+            title="Auto-scroll"
+            class="btn btn-ghost btn-xs px-1 text-base-content/30 hover:text-base-content"
+          >
+            <.icon name="hero-arrow-down-mini" class="w-3.5 h-3.5" />
+          </button>
           <button type="submit" class="btn btn-primary btn-xs px-2">&#8593;</button>
         </.form>
       </div>

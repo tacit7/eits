@@ -53,12 +53,6 @@
 
   async function loadTheme(appTheme) {
     switch (appTheme) {
-      case 'dark':
-      case 'mocha':
-      case 'macchiato': {
-        const { oneDark } = await import('@codemirror/theme-one-dark')
-        return oneDark
-      }
       case 'dracula': {
         const { dracula } = await import('@uiw/codemirror-theme-dracula')
         return dracula
@@ -67,12 +61,16 @@
         const { tokyoNight } = await import('@uiw/codemirror-theme-tokyo-night')
         return tokyoNight
       }
-      case 'light':
-      case 'latte': {
+      case 'light': {
         const { eclipse } = await import('@uiw/codemirror-theme-eclipse')
         return eclipse
       }
+      case 'autumn': {
+        const { bespin } = await import('@uiw/codemirror-theme-bespin')
+        return bespin
+      }
       default: {
+        // dark
         const { oneDark } = await import('@codemirror/theme-one-dark')
         return oneDark
       }

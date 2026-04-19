@@ -12,6 +12,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   alias EyeInTheSky.Projects
 
   @ignored_dirs ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
+  @tree_cache_ttl 300
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -39,9 +40,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
         socket =
           if connected?(socket) && project.path do
-            start_async(socket, :load_file_tree, fn ->
-              build_file_tree(project.path, project.path)
-            end)
+            cache_key = {__MODULE__, :file_tree, project.id}
+            now = System.os_time(:second)
+
+            case :persistent_term.get(cache_key, nil) do
+              {tree, built_at} when now - built_at < @tree_cache_ttl ->
+                assign(socket, :file_tree, tree)
+
+              _ ->
+                start_async(socket, :load_file_tree, fn ->
+                  build_file_tree(project.path, project.path)
+                end)
+            end
           else
             socket
           end
@@ -60,7 +70,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    mode = parse_mode(params)
+    current_mode = socket.assigns[:view_mode] || :list
+    mode = parse_mode(params, current_mode)
     socket = assign(socket, :view_mode, mode)
     project = socket.assigns.project
 
@@ -78,9 +89,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     end
   end
 
-  defp parse_mode(params) do
+  defp parse_mode(params, current_mode) do
     case Map.get(params, "mode") do
       "tree" -> :tree
+      "list" -> :list
+      nil ->
+        if current_mode == :tree and is_binary(Map.get(params, "path")) do
+          :tree
+        else
+          :list
+        end
       _ -> :list
     end
   end
@@ -240,6 +258,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   @impl true
   def handle_async(:load_file_tree, {:ok, tree}, socket) do
+    cache_key = {__MODULE__, :file_tree, socket.assigns.project.id}
+    :persistent_term.put(cache_key, {tree, System.os_time(:second)})
     {:noreply, assign(socket, :file_tree, tree)}
   end
 
@@ -349,7 +369,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
               <span class="badge badge-ghost badge-xs ml-auto font-mono">bin</span>
             </span>
           <% else %>
-            <.link patch={~p"/projects/#{@project_id}/files?path=#{@item.path}"}>
+            <.link patch={~p"/projects/#{@project_id}/files?path=#{@item.path}&mode=tree"}>
               <.icon name="hero-document" class="w-4 h-4" />
               {@item.name}
               <%= if @item.size do %>

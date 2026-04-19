@@ -121,10 +121,10 @@ cmd_sessions() {
       _post "/sessions" "$(json session_id "$session_id" name "$name" description "$description" project_name "$project_name" model "$model" entrypoint "$entrypoint")"
       ;;
     update)
-      # eits sessions update <uuid> [--status <status>] [--intent <text>] [--entrypoint <e>] [--name <name>] [--description <desc>] [--clear-entrypoint] [--ended-at <ISO8601>]
+      # eits sessions update <uuid> [--status <status>] [--intent <text>] [--entrypoint <e>] [--name <name>] [--description <desc>] [--project-id <id>] [--clear-entrypoint] [--ended-at <ISO8601>]
       local uuid="${1:-}"; need uuid; shift
       [[ "$uuid" == "self" ]] && { uuid="${EITS_SESSION_UUID:-}"; [[ -n "$uuid" ]] || die "EITS_SESSION_UUID is not set"; }
-      local status="" intent="" entrypoint="" name="" description="" clear_entrypoint="" ended_at=""
+      local status="" intent="" entrypoint="" name="" description="" project_id="" clear_entrypoint="" ended_at=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --status)      status="$2";      shift 2 ;;
@@ -132,12 +132,13 @@ cmd_sessions() {
           --entrypoint)  entrypoint="$2";  shift 2 ;;
           --name)        name="$2";        shift 2 ;;
           --description) description="$2"; shift 2 ;;
+          --project-id)  project_id="$2";  shift 2 ;;
           --clear-entrypoint) clear_entrypoint="true"; shift ;;
           --ended-at)    ended_at="$2";    shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      _patch "/sessions/$uuid" "$(json status "$status" intent "$intent" entrypoint "$entrypoint" name "$name" description "$description" clear_entrypoint "$clear_entrypoint" ended_at "$ended_at")"
+      _patch "/sessions/$uuid" "$(json status "$status" intent "$intent" entrypoint "$entrypoint" name "$name" description "$description" project_id "$project_id" clear_entrypoint "$clear_entrypoint" ended_at "$ended_at")"
       ;;
     end)
       # eits sessions end <uuid> [--final-status <completed|failed|waiting>]

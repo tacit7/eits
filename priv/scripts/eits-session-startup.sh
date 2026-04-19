@@ -94,8 +94,12 @@ if [ -n "$GIT_DIR" ]; then
   _log "wrote git files"
 fi
 
-# Mark session as working
+# Mark session as working and persist resolved project_id to the session record.
+# project_id may be null if the session was pre-registered without a path (e.g. manual
+# `eits sessions create --project <name>` where name lookup failed). Patching here
+# ensures the DB record stays consistent with what the hook resolved from the path.
 eits sessions update "$SESSION_ID" --status "working" >/dev/null 2>&1 &
+[ -n "$PROJECT_ID" ] && eits sessions update "$SESSION_ID" --project-id "$PROJECT_ID" >/dev/null 2>&1 &
 
 # Build project type string
 if [ -f "$PROJECT_DIR/mix.exs" ]; then

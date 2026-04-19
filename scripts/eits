@@ -859,8 +859,28 @@ USAGE
 
 cmd_channels() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits channels <list|send|messages>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits channels <create|list|send|messages>"; return 0; }
   case "$sub" in
+    create)
+      # eits channels create --name <name> [--project <id>] [--description <text>] [--type <public|private>]
+      local name="" project_id="" description="" channel_type="public" session_id="${EITS_SESSION_UUID:-}"
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --name)        name="$2";         shift 2 ;;
+          --project)     project_id="$2";   shift 2 ;;
+          --description) description="$2";  shift 2 ;;
+          --type)        channel_type="$2"; shift 2 ;;
+          --session)     session_id="$2";   shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need name
+      local payload
+      payload="$(json name "$name" channel_type "$channel_type" session_id "$session_id")"
+      [[ -n "$project_id"   ]] && payload="$(echo "$payload" | jq --arg v "$project_id"   '. + {project_id: ($v | tonumber)}')"
+      [[ -n "$description"  ]] && payload="$(echo "$payload" | jq --arg v "$description"  '. + {description: $v}')"
+      _post "/channels" "$payload"
+      ;;
     list)
       local project_id=""
       while [[ $# -gt 0 ]]; do
@@ -907,11 +927,15 @@ cmd_channels() {
 usage: eits channels <subcommand>
 
 Subcommands:
+  create   --name <name> [--project <id>] [--description <text>] [--type <public|private>]
+           Create a new channel
   list     [--project <id>]                         List channels (optionally filter by project)
   send     <channel_id> --session <id> --body <text> Send a message to a channel
   messages <channel_id> [--limit|-n <N>]            Get last N messages (default 20, max 200)
 
 Examples:
+  eits channels create --name "ops" --project 1 --description "Ops team channel"
+  eits channels create --name "alerts" --type private
   eits channels list
   eits channels list --project 1
   eits channels send 1 --session 1179 --body "hello"

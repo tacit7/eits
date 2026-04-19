@@ -139,6 +139,77 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   end
 
   @doc """
+  POST /api/v1/channels - Create a new channel.
+  Body:
+    - name (required): channel name
+    - project_id (optional): integer project ID; nil for global channels
+    - channel_type (optional): "public" | "private", defaults to "public"
+    - description (optional): human-readable description
+    - session_id (optional): UUID or integer session ID of the creator
+  """
+  def create_channel(conn, params) do
+    name = String.trim(params["name"] || "")
+
+    if name == "" do
+      {:error, :bad_request, "name is required"}
+    else
+      project_id = parse_int(params["project_id"])
+      channel_type = params["channel_type"] || "public"
+
+      creator_session_id =
+        case params["session_id"] do
+          nil ->
+            nil
+
+          raw ->
+            case ToolHelpers.resolve_session_int_id(raw) do
+              {:ok, int_id} -> int_id
+              _ -> nil
+            end
+        end
+
+      channel_id = EyeInTheSky.Channels.Channel.generate_id(project_id, name)
+
+      attrs =
+        %{
+          id: channel_id,
+          uuid: Ecto.UUID.generate(),
+          name: name,
+          channel_type: channel_type,
+          project_id: project_id,
+          created_by_session_id: creator_session_id
+        }
+        |> then(fn m ->
+          case params["description"] do
+            nil -> m
+            desc -> Map.put(m, :description, desc)
+          end
+        end)
+
+      case Channels.create_channel(attrs) do
+        {:ok, channel} ->
+          conn
+          |> put_status(:created)
+          |> json(%{
+            success: true,
+            message: "Channel created",
+            channel: ApiPresenter.present_channel(channel)
+          })
+
+        {:error, %Ecto.Changeset{} = cs} ->
+          errors =
+            Ecto.Changeset.traverse_errors(cs, fn {msg, opts} ->
+              Enum.reduce(opts, msg, fn {key, value}, acc ->
+                String.replace(acc, "%{#{key}}", to_string(value))
+              end)
+            end)
+
+          {:error, :unprocessable_entity, errors}
+      end
+    end
+  end
+
+  @doc """
   GET /api/v1/channels - List available chat channels.
   Query params: project_id (optional)
   """

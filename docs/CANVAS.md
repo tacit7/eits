@@ -67,11 +67,13 @@ def handle_params(_params, _url, socket)
 - **`switch_tab`** — User clicks canvas tab; routes to `/canvases/:id` via `push_patch`
 - **`start_new_canvas`** — Toggles `:creating_canvas` flag to show name input form
 - **`create_canvas`** — Validates name, creates canvas, appends to list, routes to new canvas
+- **`tidy_canvas`** — Tidy button in the canvas header cascades all windows into a clean layout via `Canvases.tidy/1`, which resets positions and applies consistent spacing
 
 #### Window Management
 - **`window_moved`** — Records x/y position delta; calls `Canvases.update_window_layout/2`
 - **`window_resized`** — Records width/height delta; calls `Canvases.update_window_layout/2`
 - **`remove_window`** — Removes session from canvas and unsubscribes from PubSub
+- **`raise_window`** — Clicking any canvas window raises it to the front by updating z-order state in `CanvasLive` (commit 10d75ff3)
 
 ### PubSub Integration
 
@@ -96,8 +98,9 @@ When events arrive, the handler calls `send_update/3` to update the `ChatWindowC
 - **Located:** `lib/eye_in_the_sky_web/components/chat_window_component.ex`
 - **Role:** Renders draggable, resizable windows for each canvas session
 - **Props:** `canvas_session` (struct with pos_x, pos_y, width, height, session_id)
-- **Events:** Emits `window_moved`, `window_resized`, `remove_window` to parent `CanvasLive`
+- **Events:** Emits `window_moved`, `window_resized`, `remove_window`, `raise_window` to parent `CanvasLive`
 - **Updates:** Receives `send_update` calls from PubSub event handlers to re-render with latest message
+- **Message rendering:** Delegates to shared `DmMessageComponents.message_body/1` and `tool_result_body/1` with `compact` and `extra_id` attrs so the same components render both the DM page (default sizing) and canvas chat window (compact). Private duplicates in `MessagesTab` and `ChatWindowComponent` were removed in commit 10d75ff3.
 
 ### AgentList Integration
 - **File:** `lib/eye_in_the_sky_web/components/agent_list.ex`

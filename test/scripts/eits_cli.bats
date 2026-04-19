@@ -1154,3 +1154,21 @@ teardown_teams() {
   run bash -c 'source scripts/eits; BASE_URL=mock; _patch() { echo "BODY: $2"; }; cmd_sessions update some-uuid --status completed --ended-at "2026-01-01T00:00:00Z"'
   [[ "$output" == *"ended_at"* ]]
 }
+
+# ── cli-sessions-name-with-tasks ────────────────────────────────────────────
+
+@test "sessions list --name filters by session name" {
+  run eits sessions list --name "wakeup" --status all
+  assert_output --partial '"success": true'
+}
+
+@test "sessions list --name with no match returns empty results" {
+  run eits sessions list --name "zzznonexistentzzzxxx" --status all
+  assert_output --partial '"results": []'
+}
+
+@test "sessions list --with-tasks includes tasks field" {
+  run eits sessions list --with-tasks --limit 3
+  assert_output --partial '"tasks"'
+  assert_output --partial '"success": true'
+}

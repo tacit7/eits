@@ -183,12 +183,33 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
         do: Keyword.put(opts, :include_archived, true),
         else: opts
 
+    opts =
+      if params["name"] && params["name"] != "",
+        do: Keyword.put(opts, :name_filter, params["name"]),
+        else: opts
+
     results = Sessions.list_sessions_filtered(opts) |> Enum.take(limit)
+
+    with_tasks = params["with_tasks"] in ["true", "1", true]
+
+    sessions_data =
+      if with_tasks do
+        Enum.map(results, fn s ->
+          tasks = Tasks.list_tasks_for_session(s.id)
+          task_list = Enum.map(tasks, fn t ->
+            %{id: t.id, title: t.title, state_id: t.state_id,
+              state: if(t.state, do: t.state.name, else: nil)}
+          end)
+          Map.put(ApiPresenter.present_session(s), :tasks, task_list)
+        end)
+      else
+        Enum.map(results, &ApiPresenter.present_session/1)
+      end
 
     json(conn, %{
       success: true,
       message: "Found #{length(results)} session(s)",
-      results: Enum.map(results, &ApiPresenter.present_session/1)
+      results: sessions_data
     })
   end
 

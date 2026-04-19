@@ -134,7 +134,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       conn = post(conn, ~p"/api/v1/teams", %{"description" => "no name"})
       resp = json_response(conn, 422)
 
-      assert resp["error"] == "Failed to create team"
+      assert resp["error"] == "Validation failed"
     end
 
     test "returns 422 for duplicate name", %{conn: conn} do
@@ -143,7 +143,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       conn = post(conn, ~p"/api/v1/teams", %{"name" => team.name})
       resp = json_response(conn, 422)
 
-      assert resp["error"] == "Failed to create team"
+      assert resp["error"] == "Validation failed"
     end
   end
 
@@ -158,7 +158,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       assert resp["success"] == true
       assert resp["id"] == team.id
 
-      updated = Teams.get_team(team.id)
+      {:ok, updated} = Teams.get_team(team.id)
       assert updated.status == "archived"
     end
 
@@ -238,13 +238,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       conn =
         post(conn, ~p"/api/v1/teams/#{team.id}/members", %{"name" => "epsilon"})
 
-      assert json_response(conn, 422)["error"] == "Failed to join team"
+      assert json_response(conn, 422)["error"] == "Validation failed"
     end
 
     test "returns 422 when name is missing", %{conn: conn} do
       team = create_team()
       conn = post(conn, ~p"/api/v1/teams/#{team.id}/members", %{})
-      assert json_response(conn, 422)["error"] == "Failed to join team"
+      assert json_response(conn, 422)["error"] == "Validation failed"
     end
 
     test "returns 404 for missing team", %{conn: conn} do

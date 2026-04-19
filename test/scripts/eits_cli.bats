@@ -719,12 +719,68 @@ teardown_teams() {
   [[ "$output" =~ "(not set)" ]]
 }
 
+# ── agents ───────────────────────────────────────────────────────────────────
+
+@test "agents list: returns agents array" {
+  run "$EITS" agents list
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.agents | type == "array"' >/dev/null
+}
+
+@test "agents list --project: accepts project filter" {
+  run "$EITS" agents list --project 1
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.agents | type == "array"' >/dev/null
+}
+
+@test "agents list --status: accepts status filter" {
+  run "$EITS" agents list --status "idle"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.agents | type == "array"' >/dev/null
+}
+
+@test "agents list --limit: accepts limit flag" {
+  run "$EITS" agents list --limit 5
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.agents | type == "array"' >/dev/null
+}
+
+@test "agents list: rejects unknown flags" {
+  run "$EITS" agents list --bogus foo 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "unknown flag" ]]
+}
+
 # ── jobs ──────────────────────────────────────────────────────────────────────
 
 @test "jobs list: returns jobs array" {
   run "$EITS" jobs list
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.jobs | type == "array"' >/dev/null
+}
+
+@test "jobs list --project: accepts project filter" {
+  run "$EITS" jobs list --project 1
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.jobs | type == "array"' >/dev/null
+}
+
+@test "jobs list --global: accepts global flag" {
+  run "$EITS" jobs list --global
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.jobs | type == "array"' >/dev/null
+}
+
+@test "jobs list --limit: accepts limit flag" {
+  run "$EITS" jobs list --limit 10
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.jobs | type == "array"' >/dev/null
+}
+
+@test "jobs list: rejects unknown flags" {
+  run "$EITS" jobs list --bogus foo 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "unknown flag" ]]
 }
 
 @test "jobs create: requires --name" {

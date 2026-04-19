@@ -147,7 +147,14 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
       {:ok, _} ->
         AgentManager.continue_session(session_id, body, [])
         messages = Messages.list_recent_messages(session_id, 50)
-        {:noreply, assign(socket, :messages, messages)}
+        cs_id = socket.assigns.canvas_session.id
+
+        socket =
+          socket
+          |> assign(:messages, messages)
+          |> push_event("messages-updated-" <> to_string(cs_id), %{})
+
+        {:noreply, socket}
 
       {:error, _} ->
         {:noreply, socket}

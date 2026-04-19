@@ -262,6 +262,17 @@ export const ChatWindowHook = {
       })
     }
 
+    // When the user sends a message, always scroll to bottom regardless of
+    // where they were scrolled. The _autoScroll flag may be stale if they
+    // scrolled up at any point while reading — reset it on submit.
+    const chatForm = this.el.querySelector("[data-chat-footer] form")
+    if (chatForm) {
+      chatForm.addEventListener("submit", () => {
+        setAutoScroll(true)
+        requestAnimationFrame(() => scrollToBottom())
+      })
+    }
+
     this.handleEvent("messages-updated-" + this.el.dataset.csId, () => {
       if (this._minimized) {
         const handle = this.el.querySelector("[data-drag-handle]")

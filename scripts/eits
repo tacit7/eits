@@ -189,7 +189,7 @@ cmd_sessions() {
 
 cmd_tasks() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session> [--mine] [--quiet]"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session|search|sessions> [--mine] [--quiet]"; return 0; }
   case "$sub" in
     list)
       # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--search <query>] [--state <id>] [--state-name <name>] [--limit <n>] [--mine]
@@ -372,6 +372,31 @@ cmd_tasks() {
           "$BASE_URL/tasks/$task_id/sessions" >/dev/null 2>&1 || true
       fi
       ;;
+    search)
+      # eits tasks search <query> [--project <id>] [--limit <n>] [--state <id>]
+      local query="${1:-}"; [[ -n "$query" ]] || die "query is required"
+      shift
+      local qs="q=$(printf '%s' "$query" | jq -Rr @uri)"
+      local project_id="${EITS_PROJECT_ID:-}"
+      local limit="" state_id=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --project)  project_id="$2"; shift 2 ;;
+          --limit)    limit="$2";      shift 2 ;;
+          --state)    state_id="$2";   shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      [[ -n "$project_id" ]] && qs="${qs}&project_id=$project_id"
+      [[ -n "$limit" ]]      && qs="${qs}&limit=$limit"
+      [[ -n "$state_id" ]]   && qs="${qs}&state_id=$state_id"
+      _get "/tasks?${qs}"
+      ;;
+    sessions)
+      # eits tasks sessions <id> — list sessions linked to a task
+      local id="${1:-}"; need id
+      _get "/tasks/$id/sessions"
+      ;;
     tag)
       # eits tasks tag <task_id> <tag_id>
       local task_id="${1:-}"; need task_id; shift
@@ -379,7 +404,7 @@ cmd_tasks() {
       _post "/tasks/$task_id/tags" "$(json tag_id "$tag_id")"
       ;;
     *)
-      echo "usage: eits tasks <list|get|create|update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|tag> [--mine] [--title] [--quiet]"
+      echo "usage: eits tasks <list|get|create|update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|search|sessions|tag> [--mine] [--title] [--quiet]"
       ;;
   esac
 }

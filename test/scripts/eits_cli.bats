@@ -1154,3 +1154,38 @@ teardown_teams() {
   run bash -c 'source scripts/eits; BASE_URL=mock; _patch() { echo "BODY: $2"; }; cmd_sessions update some-uuid --status completed --ended-at "2026-01-01T00:00:00Z"'
   [[ "$output" == *"ended_at"* ]]
 }
+
+# ── cli-task-search-sessions ────────────────────────────────────────────────
+
+@test "tasks search returns results for known title" {
+  run eits tasks search "compact"
+  assert_output --partial '"success": true'
+}
+
+@test "tasks search requires query argument" {
+  run eits tasks search
+  assert_failure
+}
+
+@test "tasks sessions requires task id" {
+  run eits tasks sessions
+  assert_failure
+}
+
+@test "tasks sessions returns session list for valid task" {
+  # Create a task and link current session, then check sessions
+  TASK_JSON=$(eits tasks begin --title "bats sessions test")
+  TASK_ID=$(echo "$TASK_JSON" | jq -r '.task_id')
+  run eits tasks sessions "$TASK_ID"
+  assert_output --partial '"success": true'
+  assert_output --partial '"sessions"'
+  eits tasks update "$TASK_ID" --state done
+}
+
+@test "tasks search --project constrains results to project" {
+  # Search with a known project_id should not return cross-project results
+  run eits tasks search "task" --project 1
+  assert_output --partial '"success": true'
+  # All returned tasks should have project_id matching or be null
+  [ "$(echo "$output" | jq '[.tasks[]? | select(.project_id != null and .project_id != "1" and .project_id != 1)] | length')" -eq 0 ]
+}

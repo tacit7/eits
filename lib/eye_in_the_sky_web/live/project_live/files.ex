@@ -85,7 +85,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
       {path, nil} when is_binary(path) ->
         {:noreply,
-         socket |> assign(:error, "Project path not configured") |> assign(:file_content, nil)}
+         socket
+         |> assign(:file_full_path, nil)
+         |> assign(:error, "Project path not configured")
+         |> assign(:file_content, nil)}
 
       {nil, _} ->
         load_root_listing(socket, mode)
@@ -125,6 +128,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     if not path_within?(full_path, project_path) do
       {:noreply,
        socket
+       |> assign(:file_full_path, nil)
        |> assign(:error, "Access denied: path outside project directory")
        |> assign(:file_content, nil)
        |> assign(:files, [])}
@@ -144,6 +148,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       _ ->
         {:noreply,
          socket
+         |> assign(:file_full_path, nil)
          |> assign(:error, "File not found: #{path}")
          |> assign(:file_content, nil)
          |> assign(:files, [])}

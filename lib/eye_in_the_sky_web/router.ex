@@ -245,6 +245,7 @@ defmodule EyeInTheSkyWeb.Router do
     # Messaging
     post "/dm", MessagingController, :dm
     get "/channels", MessagingController, :list_channels
+    post "/channels", MessagingController, :create_channel
     get "/channels/:channel_id/messages", MessagingController, :list_channel_messages
     post "/channels/:channel_id/messages", MessagingController, :send_channel_message
 

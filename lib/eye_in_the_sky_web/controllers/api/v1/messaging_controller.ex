@@ -139,6 +139,81 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   end
 
   @doc """
+  POST /api/v1/channels - Create a new channel.
+  Body:
+    - name (required): channel name
+    - project_id (optional): integer project ID; nil for global channels
+    - channel_type (optional): "public" | "private", defaults to "public"
+    - description (optional): human-readable description
+    - session_id (optional): UUID or integer session ID of the creator
+  """
+  def create_channel(conn, params) do
+    name = String.trim(params["name"] || "")
+
+    with :ok <- validate_name(name),
+         {:ok, project_id} <- resolve_project_id(params["project_id"]),
+         {:ok, creator_session_id} <- resolve_creator_session(params["session_id"]) do
+      channel_type = params["channel_type"] || "public"
+      channel_id = EyeInTheSky.Channels.Channel.generate_id(project_id, name)
+
+      attrs =
+        %{
+          id: channel_id,
+          uuid: Ecto.UUID.generate(),
+          name: name,
+          channel_type: channel_type,
+          project_id: project_id,
+          # created_by_session_id is a :string field in the schema
+          created_by_session_id: if(creator_session_id, do: to_string(creator_session_id))
+        }
+        |> then(fn m ->
+          case params["description"] do
+            nil -> m
+            desc -> Map.put(m, :description, desc)
+          end
+        end)
+
+      case Channels.create_channel(attrs) do
+        {:ok, channel} ->
+          conn
+          |> put_status(:created)
+          |> json(%{
+            success: true,
+            message: "Channel created",
+            channel: ApiPresenter.present_channel(channel)
+          })
+
+        # Let FallbackController render via its {:error, %Ecto.Changeset{}} clause
+        {:error, %Ecto.Changeset{} = cs} ->
+          {:error, cs}
+      end
+    end
+  end
+
+  defp validate_name(""), do: {:error, :bad_request, "name is required"}
+  defp validate_name(_), do: :ok
+
+  # nil → ok (global channel); non-nil but non-integer → 400
+  defp resolve_project_id(nil), do: {:ok, nil}
+
+  defp resolve_project_id(raw) do
+    case parse_int(raw) do
+      nil -> {:error, :bad_request, "project_id must be an integer"}
+      id -> {:ok, id}
+    end
+  end
+
+  # nil → ok (no creator); provided but unresolvable → 404
+  defp resolve_creator_session(nil), do: {:ok, nil}
+
+  defp resolve_creator_session(raw) do
+    case ToolHelpers.resolve_session_int_id(raw) do
+      {:ok, int_id} -> {:ok, int_id}
+      _ -> {:error, :not_found, "session_id not found"}
+    end
+  end
+
+  @doc """
   GET /api/v1/channels - List available chat channels.
   Query params: project_id (optional)
   """

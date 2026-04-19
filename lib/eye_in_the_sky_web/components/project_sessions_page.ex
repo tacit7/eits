@@ -20,6 +20,8 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
   attr :selected_ids, :any, required: true
   attr :editing_session_id, :any, required: true
   attr :project, :any, required: true
+  attr :canvases, :list, default: []
+  attr :show_new_canvas_for, :any, default: nil
 
   def page(assigns) do
     ~H"""
@@ -66,6 +68,8 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
           selected_ids={@selected_ids}
           editing_session_id={@editing_session_id}
           search_query={@search_query}
+          canvases={@canvases}
+          show_new_canvas_for={@show_new_canvas_for}
         />
 
         <div

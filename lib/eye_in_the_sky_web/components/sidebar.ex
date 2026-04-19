@@ -39,7 +39,9 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
   end
 
   @impl true
-  def update(%{notification_count: :refresh} = _assigns, socket), do: refresh_notification_count(socket)
+  def update(%{notification_count: :refresh} = _assigns, socket),
+    do: refresh_notification_count(socket)
+
   def update(%{refresh_projects: true} = _assigns, socket), do: refresh_projects(socket)
   def update(assigns, socket), do: update_sidebar_state(assigns, socket)
 
@@ -71,12 +73,6 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
      |> assign(:expanded_projects, Map.get(socket.assigns, :expanded_projects, true))
      |> assign(:expanded_system, Map.get(socket.assigns, :expanded_system, true))}
   end
-
-  # --- Navigation ---
-
-  @impl true
-  def handle_event("new_chat", _params, socket),
-    do: {:noreply, push_navigate(socket, to: "/?new=1")}
 
   # --- UI toggles ---
 
@@ -216,7 +212,14 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
         <%!-- Branding --%>
         <div class="flex items-center gap-2 px-3 py-3 border-b border-base-content/5">
           <.link navigate="/" class="flex items-center gap-2 min-w-0 flex-1 min-h-[44px]">
-            <img src="/images/logo.svg" class="w-7 h-7 flex-shrink-0" alt="Eye in the Sky" width="28" height="28" loading="eager" />
+            <img
+              src="/images/logo.svg"
+              class="w-7 h-7 flex-shrink-0"
+              alt="Eye in the Sky"
+              width="28"
+              height="28"
+              loading="eager"
+            />
             <span class={[
               "text-sm font-semibold text-base-content/80 truncate",
               if(@collapsed, do: "hidden")
@@ -224,17 +227,6 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
               Eye in the Sky
             </span>
           </.link>
-          <button
-            phx-click="new_chat"
-            phx-target={@myself}
-            class={[
-              "btn btn-ghost btn-sm btn-square min-h-[44px] min-w-[44px] text-base-content/40 hover:text-primary hover:bg-primary/10 transition-colors",
-              if(@mobile_open, do: "hidden")
-            ]}
-            title="New Chat"
-          >
-            <.icon name="hero-pencil-square" class="w-4 h-4" />
-          </button>
           <button
             :if={@mobile_open}
             phx-click="close_mobile"
@@ -285,12 +277,10 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
         </nav>
 
         <%!-- Bottom controls --%>
-        <div class="border-t border-base-content/5 p-2 flex items-center gap-2">
-          <%= if !@collapsed do %>
-            <div class="flex-1">
-              <.theme_toggle />
-            </div>
-          <% end %>
+        <div class={[
+          "border-t border-base-content/5 p-2 flex gap-2",
+          if(@collapsed, do: "flex-col items-center", else: "flex-row items-center")
+        ]}>
           <.link
             href="/auth/logout"
             method="delete"
@@ -316,37 +306,6 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
           </button>
         </div>
       </aside>
-    </div>
-    """
-  end
-
-  defp theme_toggle(assigns) do
-    ~H"""
-    <div class="flex items-center gap-0.5 rounded-full bg-base-content/5 p-0.5">
-      <button
-        class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-base-content/10 transition-colors"
-        phx-click={Phoenix.LiveView.JS.dispatch("phx:set-theme")}
-        data-phx-theme="system"
-        title="System theme"
-      >
-        <.icon name="hero-computer-desktop-micro" class="w-3.5 h-3.5 text-base-content/40" />
-      </button>
-      <button
-        class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-base-content/10 transition-colors"
-        phx-click={Phoenix.LiveView.JS.dispatch("phx:set-theme")}
-        data-phx-theme="light"
-        title="Light theme"
-      >
-        <.icon name="hero-sun-micro" class="w-3.5 h-3.5 text-base-content/40" />
-      </button>
-      <button
-        class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-base-content/10 transition-colors"
-        phx-click={Phoenix.LiveView.JS.dispatch("phx:set-theme")}
-        data-phx-theme="dark"
-        title="Dark theme"
-      >
-        <.icon name="hero-moon-micro" class="w-3.5 h-3.5 text-base-content/40" />
-      </button>
     </div>
     """
   end

@@ -47,25 +47,6 @@ defmodule EyeInTheSky.Channels do
   end
 
   @doc """
-  Gets a single channel.
-
-  Raises `Ecto.NoResultsError` if the Channel does not exist.
-  """
-  def get_channel!(id) do
-    Repo.get!(Channel, id)
-  end
-
-  @doc """
-  Gets a channel by ID, returns {:ok, channel} or {:error, :not_found}.
-  """
-  def get_channel(id) do
-    case Repo.get(Channel, id) do
-      nil -> {:error, :not_found}
-      channel -> {:ok, channel}
-    end
-  end
-
-  @doc """
   Creates a channel.
   """
   def create_channel(attrs \\ %{}) do
@@ -106,28 +87,6 @@ defmodule EyeInTheSky.Channels do
     channel
     |> Channel.changeset(attrs)
     |> Repo.update()
-  end
-
-  @doc """
-  Archives a channel (soft delete).
-  """
-  def archive_channel(%Channel{} = channel) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
-    update_channel(channel, %{archived_at: now})
-  end
-
-  @doc """
-  Unarchives a channel.
-  """
-  def unarchive_channel(%Channel{} = channel) do
-    update_channel(channel, %{archived_at: nil})
-  end
-
-  @doc """
-  Deletes a channel (hard delete).
-  """
-  def delete_channel(%Channel{} = channel) do
-    Repo.delete(channel)
   end
 
   @doc """
@@ -220,19 +179,6 @@ defmodule EyeInTheSky.Channels do
   end
 
   @doc """
-  Lists all channels that a session is a member of.
-  """
-  def list_channels_for_session(session_id) do
-    from(c in Channel,
-      join: m in ChannelMember,
-      on: m.channel_id == c.id,
-      where: m.session_id == ^session_id and is_nil(c.archived_at),
-      order_by: [asc: c.inserted_at]
-    )
-    |> Repo.all()
-  end
-
-  @doc """
   Finds the global (#global) channel for a session, scoped to the session's project if set.
 
   Returns `{:ok, channel}` or `{:error, :not_found}`.
@@ -255,12 +201,13 @@ defmodule EyeInTheSky.Channels do
   def count_unread_messages(channel_id, session_id) do
     alias EyeInTheSky.Messages.Message
 
-    member = case get_member(channel_id, session_id) do
-      {:ok, m} -> m
-      {:error, :not_found} -> nil
-    end
+    member =
+      case get_member(channel_id, session_id) do
+        {:ok, m} -> m
+        {:error, :not_found} -> nil
+      end
 
-    if not is_nil(member) && member.last_read_at do
+    if member && member.last_read_at do
       from(m in Message,
         where: m.channel_id == ^channel_id and m.inserted_at > ^member.last_read_at
       )

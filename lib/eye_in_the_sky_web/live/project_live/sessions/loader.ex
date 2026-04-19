@@ -80,7 +80,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
   @doc "Update a single session's status in-memory and re-render the view."
   def update_agent_status_in_list(socket, session_id, new_status) do
     now = DateTime.utc_now()
-    updated = Enum.map(socket.assigns.all_agents, &AgentStatusHelpers.apply_agent_status(&1, session_id, new_status, now))
+
+    updated =
+      Enum.map(
+        socket.assigns.all_agents,
+        &AgentStatusHelpers.apply_agent_status(&1, session_id, new_status, now)
+      )
 
     socket
     |> assign(:all_agents, updated)

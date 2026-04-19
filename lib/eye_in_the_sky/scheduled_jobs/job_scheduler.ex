@@ -6,8 +6,13 @@ defmodule EyeInTheSky.ScheduledJobs.JobScheduler do
   alias EyeInTheSky.ScheduledJobs.CronParser
   alias EyeInTheSky.ScheduledJobs.ScheduledJob
 
-  defdelegate compute_next_run_at(schedule_type, schedule_value, from \\ nil, timezone \\ "Etc/UTC"),
-    to: CronParser
+  defdelegate compute_next_run_at(
+                schedule_type,
+                schedule_value,
+                from \\ nil,
+                timezone \\ "Etc/UTC"
+              ),
+              to: CronParser
 
   def due_jobs do
     now = DateTime.utc_now()
@@ -80,5 +85,4 @@ defmodule EyeInTheSky.ScheduledJobs.JobScheduler do
 
     job |> ScheduledJob.changeset(fields) |> Repo.update()
   end
-
 end

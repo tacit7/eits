@@ -4,7 +4,15 @@ defmodule EyeInTheSkyWeb.DmLive do
   alias EyeInTheSky.{Agents, Sessions}
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSkyWeb.Components.DmPage
-  alias EyeInTheSkyWeb.DmLive.{AgentLifecycle, ExternalActions, MessageHandlers, MountState, SlashCommands}
+
+  alias EyeInTheSkyWeb.DmLive.{
+    AgentLifecycle,
+    ExternalActions,
+    MessageHandlers,
+    MountState,
+    SlashCommands
+  }
+
   alias EyeInTheSkyWeb.DmLive.TabHelpers
   alias EyeInTheSkyWeb.DmLive.TaskHandlers
   alias EyeInTheSkyWeb.DmLive.TimerHandlers
@@ -29,15 +37,13 @@ defmodule EyeInTheSkyWeb.DmLive do
          {:agent, {:ok, agent}} <- {:agent, Agents.get_agent(session.agent_id)} do
       MountState.maybe_subscribe(connected?(socket), session.id)
 
-      is_connected = connected?(socket)
-
       socket =
         socket
         |> MountState.assign_sidebar_context(params)
         |> MountState.assign_session_state(session, agent)
         |> MountState.assign_essential_defaults(session)
         |> then(fn s ->
-          if is_connected, do: MountState.assign_connected_defaults(s, session), else: s
+          if connected?(socket), do: MountState.assign_connected_defaults(s, session), else: s
         end)
         |> MessageHandlers.load_messages_on_mount()
 
@@ -77,12 +83,14 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("toggle_new_task_drawer", _params, socket) do
-    {:noreply, assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, :task_drawer))}
+    {:noreply,
+     assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, :task_drawer))}
   end
 
   @impl true
   def handle_event("toggle_task_detail_drawer", _params, socket) do
-    {:noreply, assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, :task_detail))}
+    {:noreply,
+     assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, :task_detail))}
   end
 
   @impl true
@@ -105,6 +113,11 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("toggle_thinking", _params, socket), do: handle_toggle_thinking(socket)
+
+  @impl true
+  def handle_event("set_notify_on_stop", %{"enabled" => enabled}, socket) do
+    {:noreply, assign(socket, :notify_on_stop, !!enabled)}
+  end
 
   # ---------------------------------------------------------------------------
   # Task CRUD — delegates to TasksHelpers; overlay close handled here
@@ -276,7 +289,12 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("toggle_star", params, socket),
-    do: handle_toggle_star(params, socket, &TabHelpers.load_tab_data(&1, "notes", &1.assigns.session_id))
+    do:
+      handle_toggle_star(
+        params,
+        socket,
+        &TabHelpers.load_tab_data(&1, "notes", &1.assigns.session_id)
+      )
 
   @impl true
   def handle_event("kill_session", _params, socket), do: handle_kill_session(socket)
@@ -301,6 +319,7 @@ defmodule EyeInTheSkyWeb.DmLive do
     {:noreply,
      socket
      |> assign(:reload_timer, nil)
+     |> assign(:stream_content, "")
      |> MessageHandlers.maybe_reload_messages()}
   end
 
@@ -388,6 +407,13 @@ defmodule EyeInTheSkyWeb.DmLive do
     {:noreply, assign(socket, :active_timer, timer_or_nil)}
   end
 
+  # Raw Codex JSONL line — prepend, cap at 100
+  @impl true
+  def handle_info({:codex_raw_line, line}, socket) do
+    lines = [line | socket.assigns.codex_raw_lines] |> Enum.take(100)
+    {:noreply, assign(socket, :codex_raw_lines, lines)}
+  end
+
   @impl true
   def handle_info(msg, socket) do
     Logger.debug("Unhandled message in DM LiveView: #{inspect(msg)}")
@@ -412,34 +438,49 @@ defmodule EyeInTheSkyWeb.DmLive do
         session_uuid={@session_uuid}
         active_tab={@active_tab}
         uploads={@uploads}
-        stream={%{show: @show_live_stream, content: @stream_content, tool: @stream_tool, thinking: @stream_thinking}}
-        session_state={%{
-          model: @selected_model,
-          effort: @selected_effort,
-          processing: @processing,
-          thinking_enabled: @thinking_enabled,
-          max_budget_usd: @max_budget_usd,
-          compacting: @compacting,
-          context_used: @context_used,
-          context_window: @context_window
-        }}
-        message_data={%{
-          messages: @messages,
-          has_more_messages: @has_more_messages,
-          message_search_query: @message_search_query,
-          queued_prompts: @queued_prompts
-        }}
+        stream={
+          %{
+            show: @show_live_stream,
+            content: @stream_content,
+            tool: @stream_tool,
+            thinking: @stream_thinking
+          }
+        }
+        session_state={
+          %{
+            model: @selected_model,
+            effort: @selected_effort,
+            processing: @processing,
+            thinking_enabled: @thinking_enabled,
+            max_budget_usd: @max_budget_usd,
+            compacting: @compacting,
+            context_used: @context_used,
+            context_window: @context_window
+          }
+        }
+        message_data={
+          %{
+            messages: @messages,
+            has_more_messages: @has_more_messages,
+            message_search_query: @message_search_query,
+            queued_prompts: @queued_prompts
+          }
+        }
         task_data={%{tasks: @tasks, current_task: @current_task}}
-        overlay_data={%{
-          active_overlay: @active_overlay,
-          active_timer: @active_timer,
-          reloading: @reloading
-        }}
+        overlay_data={
+          %{
+            active_overlay: @active_overlay,
+            active_timer: @active_timer,
+            reloading: @reloading
+          }
+        }
         commits={@commits}
         diff_cache={@diff_cache}
         notes={@notes}
+        codex_raw_lines={@codex_raw_lines}
         slash_items={@slash_items}
         session_context={@session_context}
+        notify_on_stop={@notify_on_stop}
       />
 
       <EyeInTheSkyWeb.Components.NewTaskDrawer.new_task_drawer
@@ -463,5 +504,4 @@ defmodule EyeInTheSkyWeb.DmLive do
     </div>
     """
   end
-
 end

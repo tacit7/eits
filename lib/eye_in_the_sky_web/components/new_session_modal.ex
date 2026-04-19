@@ -7,15 +7,17 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   use Phoenix.LiveComponent
   import EyeInTheSkyWeb.CoreComponents, only: [icon: 1, modal_header: 1]
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [models_for_provider: 1]
+  import EyeInTheSkyWeb.Helpers.ModelHelpers, only: [normalize_model_alias: 1]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Claude.AgentFileScanner
+  alias EyeInTheSky.Settings
 
   @impl true
   def mount(socket) do
     {:ok,
      assign(socket,
-       selected_model: "sonnet",
+       selected_model: default_claude_model(),
        selected_provider: "claude",
        selected_prompt_id: nil,
        prefill_text: "",
@@ -46,7 +48,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   @impl true
   def handle_event("provider_changed", %{"agent_type" => provider}, socket) do
-    default_model = if provider == "codex", do: "gpt-5.3-codex", else: "sonnet"
+    default_model = if provider == "codex", do: "gpt-5.3-codex", else: default_claude_model()
     {:noreply, assign(socket, selected_provider: provider, selected_model: default_model)}
   end
 
@@ -63,7 +65,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
     project_path =
       case parse_int(project_id_str) do
-        nil -> nil
+        nil ->
+          nil
+
         id ->
           project = Enum.find(projects, fn p -> p.id == id end)
           if(project, do: project.path)
@@ -85,7 +89,12 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   def render(assigns) do
     ~H"""
     <div>
-      <div :if={@show} class="modal modal-open modal-bottom sm:modal-middle" phx-window-keydown={@toggle_event} phx-key="Escape">
+      <div
+        :if={@show}
+        class="modal modal-open modal-bottom sm:modal-middle"
+        phx-window-keydown={@toggle_event}
+        phx-key="Escape"
+      >
         <div class="modal-box w-full sm:max-w-md pb-[env(safe-area-inset-bottom)]">
           <.modal_header title={assigns[:title] || "New Agent"} toggle_event={@toggle_event} />
 
@@ -262,7 +271,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
             </div>
 
             <%!-- Effort (Claude Opus only) --%>
-            <%= if @selected_provider == "claude" and @selected_model == "opus" do %>
+            <%= if @selected_provider == "claude" and (String.starts_with?(@selected_model, "claude-opus") or @selected_model in ["opus", "opus[1m]"]) do %>
               <div>
                 <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Effort</label>
                 <select name="effort_level" class="select select-bordered w-full">
@@ -326,7 +335,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
                 <div class="form-control">
                   <label class="label">
                     <span class="label-text text-xs">Max Turns</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--max-turns</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">
+                      --max-turns
+                    </span>
                   </label>
                   <input
                     type="number"
@@ -340,7 +351,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
                 <div class="form-control">
                   <label class="label">
                     <span class="label-text text-xs">Add Directory</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--add-dir</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">
+                      --add-dir
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -353,7 +366,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
                 <div class="form-control">
                   <label class="label">
                     <span class="label-text text-xs">MCP Config File</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--mcp-config</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">
+                      --mcp-config
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -366,7 +381,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
                 <div class="form-control">
                   <label class="label">
                     <span class="label-text text-xs">Plugin Directory</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--plugin-dir</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">
+                      --plugin-dir
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -379,7 +396,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
                 <div class="form-control">
                   <label class="label">
                     <span class="label-text text-xs">Settings File</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--settings</span>
+                    <span class="label-text-alt text-base-content/40 font-mono text-xs">
+                      --settings
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -391,14 +410,24 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
                 <div class="flex flex-col gap-1 pt-1">
                   <label class="label cursor-pointer justify-start gap-2 py-1">
-                    <input type="checkbox" name="chrome" value="true" class="checkbox checkbox-sm checkbox-primary" />
+                    <input
+                      type="checkbox"
+                      name="chrome"
+                      value="true"
+                      class="checkbox checkbox-sm checkbox-primary"
+                    />
                     <span class="label-text text-xs">
                       Chrome integration
                       <span class="font-mono text-base-content/40 text-xs ml-1">--chrome</span>
                     </span>
                   </label>
                   <label class="label cursor-pointer justify-start gap-2 py-1">
-                    <input type="checkbox" name="sandbox" value="true" class="checkbox checkbox-sm checkbox-primary" />
+                    <input
+                      type="checkbox"
+                      name="sandbox"
+                      value="true"
+                      class="checkbox checkbox-sm checkbox-primary"
+                    />
                     <span class="label-text text-xs">
                       OS sandbox isolation
                       <span class="font-mono text-base-content/40 text-xs ml-1">--sandbox</span>
@@ -418,6 +447,10 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       </div>
     </div>
     """
+  end
+
+  defp default_claude_model do
+    Settings.get("default_model") |> normalize_model_alias()
   end
 
   defp list_agents(project_path) do

@@ -37,7 +37,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
   def show(conn, %{"id" => note_id}) do
     case Notes.get_note(note_id) do
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Note not found"})
+        {:error, :not_found, "Note not found"}
 
       {:ok, note} ->
         json(conn, %{
@@ -66,8 +66,8 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
     attrs = %{
       parent_type: parent_type,
       parent_id: to_string(params["parent_id"]),
-      title: params["title"],
-      body: params["body"],
+      title: trim_param(params["title"]),
+      body: trim_param(params["body"]),
       starred: params["starred"] || false
     }
 
@@ -97,13 +97,13 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
   def update(conn, %{"id" => note_id} = params) do
     case Notes.get_note(note_id) do
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Note not found"})
+        {:error, :not_found, "Note not found"}
 
       {:ok, note} ->
         attrs =
           %{}
-          |> Helpers.maybe_put(:body, params["body"])
-          |> Helpers.maybe_put(:title, params["title"])
+          |> Helpers.maybe_put(:body, trim_param(params["body"]))
+          |> Helpers.maybe_put(:title, trim_param(params["title"]))
 
         attrs =
           case parse_starred(params["starred"]) do
@@ -128,5 +128,4 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
         end
     end
   end
-
 end

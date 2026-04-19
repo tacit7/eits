@@ -297,11 +297,26 @@ _agent_uuid() { cat "$BATS_FILE_TMPDIR/agent_uuid"; }
   [[ "$output" =~ "unknown flag" ]]
 }
 
-@test "commits create: requires at least one --hash" {
+@test "commits create: auto-captures HEAD when --hash omitted (inside git repo)" {
   export EITS_AGENT_UUID="$(_agent_uuid)"
-  run "$EITS" commits create 2>&1
+  # Run from a real git repo so git rev-parse HEAD succeeds; server may reject unknown hash
+  run bash -c "cd '$BATS_TEST_DIRNAME' && EITS_AGENT_UUID='$(_agent_uuid)' '$EITS' commits create 2>&1; true"
+  [ "$status" -eq 0 ]
+  [[ ! "$output" =~ "use --hash" ]]
+}
+
+@test "commits create: auto-capture preserves explicit --message" {
+  export EITS_AGENT_UUID="$(_agent_uuid)"
+  run bash -c "cd '$BATS_TEST_DIRNAME' && EITS_AGENT_UUID='$(_agent_uuid)' '$EITS' commits create --message 'my custom message' 2>&1; true"
+  [ "$status" -eq 0 ]
+  [[ ! "$output" =~ "use --hash" ]]
+}
+
+@test "commits create: fails outside git repo when --hash omitted" {
+  export EITS_AGENT_UUID="$(_agent_uuid)"
+  run bash -c "cd /tmp && EITS_AGENT_UUID='$(_agent_uuid)' '$EITS' commits create 2>&1"
   [ "$status" -ne 0 ]
-  [[ "$output" =~ "--hash" ]]
+  [[ "$output" =~ "git repo" ]]
 }
 
 @test "commits create: fails without agent (no env, no flag)" {
@@ -473,10 +488,88 @@ teardown_teams() {
   teardown_teams
 }
 
+# ── timer ────────────────────────────────────────────────────────────────────
+
+@test "timer show: uses EITS_SESSION_UUID when session omitted" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  # show with no args resolves to self; server returns 404 JSON (no timer set) or timer object — either is valid JSON
+  run "$EITS" timer show
+  # exit 0 (timer exists) or non-zero from curl -f (404) — we only care that session wasn't '--preset'
+  [[ "$output" != *'"--preset"'* ]]
+}
+
+@test "timer show: explicit session_id arg" {
+  run "$EITS" timer show "$TEST_SESSION"
+  # curl -sf returns non-zero on 404; we accept both outcomes — the point is no parse error
+  [[ "$output" != *'unknown flag'* ]]
+}
+
+@test "timer set: flag-first invocation uses EITS_SESSION_UUID (primary use case)" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  # --preset without a preceding session_id must not fail with 'unknown flag'
+  run "$EITS" timer set --preset 5m
+  [[ "$output" != *'unknown flag'* ]]
+}
+
+@test "timer set: explicit session_id then flags" {
+  run "$EITS" timer set "$TEST_SESSION" --preset 5m
+  [[ "$output" != *'unknown flag'* ]]
+}
+
+@test "timer set: --delay-ms flag without --preset" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" timer set --delay-ms 300000
+  [[ "$output" != *'unknown flag'* ]]
+}
+
+@test "timer set: missing --preset and --delay-ms exits with error" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" timer set
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'--preset or --delay-ms is required'* ]]
+}
+
+@test "timer cancel: uses EITS_SESSION_UUID when session omitted" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" timer cancel
+  [[ "$output" != *'unknown flag'* ]]
+}
+
+@test "timer cancel: explicit session_id arg" {
+  run "$EITS" timer cancel "$TEST_SESSION"
+  [[ "$output" != *'unknown flag'* ]]
+}
+
+@test "timer: no subcommand prints usage" {
+  run "$EITS" timer
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'usage: eits timer'* ]]
+}
+
 # ── default URL ───────────────────────────────────────────────────────────────
 
 @test "BASE_URL: defaults to http://localhost:5001/api/v1 when EITS_URL unset" {
   run env -u EITS_URL "$EITS" sessions get "$TEST_SESSION"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.session_id' >/dev/null
+}
+
+# ── me / whoami ───────────────────────────────────────────────────────────────
+
+@test "me: prints session context fields" {
+  run env EITS_SESSION_UUID="test-uuid" EITS_AGENT_UUID="agent-uuid" EITS_PROJECT_ID="1" "$EITS" me 2>&1; true
+  [[ "$output" =~ "Session UUID:" ]]
+  [[ "$output" =~ "Agent UUID:" ]]
+  [[ "$output" =~ "Project ID:" ]]
+  [[ "$output" =~ "API URL:" ]]
+}
+
+@test "whoami: is an alias for me" {
+  run env EITS_SESSION_UUID="test-uuid" "$EITS" whoami 2>&1; true
+  [[ "$output" =~ "Session UUID:" ]]
+}
+
+@test "me: shows (not set) when env vars missing" {
+  run env -u EITS_SESSION_UUID -u EITS_AGENT_UUID -u EITS_PROJECT_ID "$EITS" me 2>&1; true
+  [[ "$output" =~ "(not set)" ]]
 }

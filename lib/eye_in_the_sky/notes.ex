@@ -7,7 +7,6 @@ defmodule EyeInTheSky.Notes do
   alias EyeInTheSky.Notes.Note
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Search.PgSearch
-  alias EyeInTheSky.Agents
   alias EyeInTheSky.Notes.NoteQueries
   alias EyeInTheSky.Sessions
   alias EyeInTheSky.Tasks
@@ -67,26 +66,6 @@ defmodule EyeInTheSky.Notes do
       |> Repo.aggregate(:count, :id)
     else
       {:error, _} -> 0
-    end
-  end
-
-  @doc """
-  Returns notes for a specific agent.
-  """
-  def list_notes_for_agent(agent_id) do
-    with {:ok, agent} <- Agents.get_agent(agent_id) do
-      agent_int_str = to_string(agent.id)
-
-      Note
-      |> where(
-        [n],
-        n.parent_type == "agent" and
-          (n.parent_id == ^agent_int_str or n.parent_id == ^agent.uuid)
-      )
-      |> order_by([n], desc: n.created_at)
-      |> Repo.all()
-    else
-      {:error, _} -> []
     end
   end
 
@@ -186,6 +165,14 @@ defmodule EyeInTheSky.Notes do
   """
   def get_note!(id) do
     Repo.get!(Note, id)
+  end
+
+  @doc """
+  Builds a Note changeset without inserting. Use when composing Ecto.Multi transactions
+  that need to insert a note as part of a larger transaction (e.g., complete_task).
+  """
+  def note_changeset(attrs \\ %{}) do
+    Note.changeset(%Note{}, attrs)
   end
 
   @doc """

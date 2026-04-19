@@ -9,7 +9,11 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitControllerTest do
   setup %{conn: _conn} do
     token = "test_api_key_#{System.unique_integer([:positive])}"
     {:ok, _} = ApiKey.create(token, "test")
-    conn = Phoenix.ConnTest.build_conn() |> Plug.Conn.put_req_header("authorization", "Bearer #{token}")
+
+    conn =
+      Phoenix.ConnTest.build_conn()
+      |> Plug.Conn.put_req_header("authorization", "Bearer #{token}")
+
     {:ok, conn: conn}
   end
 

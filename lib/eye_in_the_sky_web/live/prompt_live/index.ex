@@ -171,7 +171,9 @@ defmodule EyeInTheSkyWeb.PromptLive.Index do
                 <td colspan="7" class="text-center py-8">
                   <div class="flex flex-col items-center gap-2">
                     <.icon name="hero-document-text" class="h-12 w-12 text-base-content/30" />
-                    <p class="text-sm text-base-content/60">No prompts found matching your criteria.</p>
+                    <p class="text-sm text-base-content/60">
+                      No prompts found matching your criteria.
+                    </p>
                   </div>
                 </td>
               </tr>

@@ -90,4 +90,59 @@ defmodule EyeInTheSky.Git.Worktrees do
       {err, code} -> {:error, {code, err}}
     end
   end
+
+  @doc """
+  Creates a `deps` symlink inside `wt_path` pointing to `project_path/deps`.
+
+  Uses a relative path computed from the actual directory structure so the symlink
+  is portable. If a `deps` symlink or directory already exists, it is left in place.
+
+  Returns `:ok` or `{:error, reason}`.
+  """
+  @spec symlink_deps(String.t(), String.t()) :: :ok | {:error, String.t()}
+  def symlink_deps(project_path, wt_path) do
+    deps_source = Path.join(project_path, "deps")
+    deps_link = Path.join(wt_path, "deps")
+
+    cond do
+      match?({:ok, %{type: :symlink}}, File.lstat(deps_link)) ->
+        # Symlink already exists (live or dangling). Leave it in place.
+        :ok
+
+      File.dir?(deps_link) ->
+        # A real deps/ directory already exists. Leave it in place.
+        :ok
+
+      not File.dir?(deps_source) ->
+        {:error, "deps directory not found at #{deps_source}"}
+
+      true ->
+        relative_target = relative_path(deps_source, wt_path)
+
+        case File.ln_s(relative_target, deps_link) do
+          :ok -> :ok
+          {:error, reason} -> {:error, "symlink failed: #{:file.format_error(reason)}"}
+        end
+    end
+  end
+
+  # Computes a relative traversal path from `from_dir` to `target`.
+  # Unlike Path.relative_to/2 (which only strips a common prefix), this builds
+  # the correct "../../../..." traversal when the paths diverge above their
+  # common ancestor — e.g. from ".claude/worktrees/foo" to "deps".
+  defp relative_path(target, from_dir) do
+    target_parts = Path.split(target)
+    from_parts = Path.split(from_dir)
+
+    common_len =
+      target_parts
+      |> Enum.zip(from_parts)
+      |> Enum.take_while(fn {a, b} -> a == b end)
+      |> length()
+
+    ups = length(from_parts) - common_len
+    remaining = Enum.drop(target_parts, common_len)
+
+    (List.duplicate("..", ups) ++ remaining) |> Path.join()
+  end
 end

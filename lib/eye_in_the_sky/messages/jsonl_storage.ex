@@ -135,7 +135,9 @@ defmodule EyeInTheSky.Messages.JsonlStorage do
 
   defp parse_unix_timestamp(seconds) when is_integer(seconds) do
     case DateTime.from_unix(seconds) do
-      {:ok, dt} -> dt
+      {:ok, dt} ->
+        dt
+
       {:error, reason} ->
         Logger.warning("Out-of-range unix timestamp #{seconds}: #{inspect(reason)}")
         nil

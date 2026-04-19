@@ -272,7 +272,11 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
                 editing_session_id={@editing_session_id}
               >
                 <:actions>
-                  <div class="relative dropdown dropdown-end transition-all md:opacity-0 md:group-hover:opacity-100">
+                  <div
+                    id={"session-actions-#{session.id}"}
+                    phx-update="ignore"
+                    class="relative dropdown dropdown-end transition-all md:opacity-0 md:group-hover:opacity-100"
+                  >
                     <button
                       tabindex="0"
                       type="button"
@@ -288,7 +292,11 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
                     >
                       <%= if session.id do %>
                         <li>
-                          <a href={~p"/dm/#{session.id}"} target="_blank" class="flex items-center gap-2">
+                          <a
+                            href={~p"/dm/#{session.id}"}
+                            target="_blank"
+                            class="flex items-center gap-2"
+                          >
                             <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
                             Open in new tab
                           </a>
@@ -301,8 +309,7 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
                           phx-value-session_id={session.id}
                           class="flex items-center gap-2"
                         >
-                          <.icon name="hero-pencil-square-mini" class="w-3.5 h-3.5" />
-                          Rename
+                          <.icon name="hero-pencil-square-mini" class="w-3.5 h-3.5" /> Rename
                         </button>
                       </li>
                       <li>
@@ -312,8 +319,7 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
                           phx-value-session_id={session.id}
                           class="flex items-center gap-2 text-warning"
                         >
-                          <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
-                          Archive
+                          <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" /> Archive
                         </button>
                       </li>
                     </ul>

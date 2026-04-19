@@ -93,9 +93,17 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   # Display name formatters
   # ---------------------------------------------------------------------------
 
-  def model_display_name("opus"), do: "Opus 4.6"
+  def model_display_name("claude-opus-4-7"), do: "Opus 4.7"
+  def model_display_name("claude-opus-4-6"), do: "Opus 4.6"
+  def model_display_name("claude-opus-4-5-20251101"), do: "Opus 4.5"
+  def model_display_name("claude-opus-4-1-20250805"), do: "Opus 4.1"
+  def model_display_name("claude-sonnet-4-6"), do: "Sonnet 4.6"
+  def model_display_name("claude-sonnet-4-5-20250929"), do: "Sonnet 4.5"
+  def model_display_name("claude-haiku-4-5-20251001"), do: "Haiku 4.5"
+  # backward compat for sessions storing old slugs
+  def model_display_name("opus"), do: "Opus 4.7"
   def model_display_name("opus[1m]"), do: "Opus 4.6 (1M)"
-  def model_display_name("sonnet"), do: "Sonnet 4.5"
+  def model_display_name("sonnet"), do: "Sonnet 4.6"
   def model_display_name("sonnet[1m]"), do: "Sonnet 4.5 (1M)"
   def model_display_name("haiku"), do: "Haiku 4.5"
   def model_display_name("gpt-5.4"), do: "gpt-5.4"
@@ -224,34 +232,42 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   end
 
   def tool_widget_meta("Read", rest) do
-    path = case Jason.decode(rest) do
-      {:ok, %{"file_path" => p}} -> p
-      _ -> rest
-    end
+    path =
+      case Jason.decode(rest) do
+        {:ok, %{"file_path" => p}} -> p
+        _ -> rest
+      end
+
     {"hero-document-text", "Read", path}
   end
 
   def tool_widget_meta("Write", rest) do
-    path = case Jason.decode(rest) do
-      {:ok, %{"file_path" => p}} -> p
-      _ -> rest
-    end
+    path =
+      case Jason.decode(rest) do
+        {:ok, %{"file_path" => p}} -> p
+        _ -> rest
+      end
+
     {"hero-pencil-square", "Write", path}
   end
 
   def tool_widget_meta("Edit", rest) do
-    path = case Jason.decode(rest) do
-      {:ok, %{"file_path" => p}} -> p
-      _ -> rest
-    end
+    path =
+      case Jason.decode(rest) do
+        {:ok, %{"file_path" => p}} -> p
+        _ -> rest
+      end
+
     {"hero-pencil-square", "Edit", path}
   end
 
   def tool_widget_meta("Glob", rest) do
-    pat = case Jason.decode(rest) do
-      {:ok, %{"pattern" => p}} -> p
-      _ -> rest
-    end
+    pat =
+      case Jason.decode(rest) do
+        {:ok, %{"pattern" => p}} -> p
+        _ -> rest
+      end
+
     {"hero-folder-open", "Glob", pat}
   end
 
@@ -288,10 +304,12 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   end
 
   def tool_widget_meta("WebSearch", rest) do
-    query = case Jason.decode(rest) do
-      {:ok, %{"query" => q}} -> q
-      _ -> rest
-    end
+    query =
+      case Jason.decode(rest) do
+        {:ok, %{"query" => q}} -> q
+        _ -> rest
+      end
+
     {"hero-globe-alt", "WebSearch", query}
   end
 

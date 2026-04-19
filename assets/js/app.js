@@ -26,7 +26,7 @@ import topbar from "../vendor/topbar"
 import {CopyToClipboard} from "./hooks/copy_to_clipboard"
 import {CopySessionId} from "./hooks/copy_session_id"
 import {BookmarkAgent} from "./hooks/bookmark_agent"
-import {FavoriteFab} from "./hooks/favorite_fab"
+import {FloatingChat} from "./hooks/floating_chat"
 import {ScrollToBottom} from "./hooks/scroll_to_bottom"
 import {AutoScroll} from "./hooks/auto_scroll"
 import {MarkdownMessage} from "./hooks/markdown_message"
@@ -62,7 +62,9 @@ import {CommandPalette} from "./hooks/command_palette"
 import {FlashTimeout} from "./hooks/flash_timeout"
 import {ReloadConfirmModal} from "./hooks/reload_confirm_modal"
 import {ChatWindowHook} from "./hooks/chat_window_hook"
+import {CanvasTabHook} from "./hooks/canvas_tab_hook"
 import {TimerCountdown} from "./hooks/timer_countdown"
+import {SessionsDropdownGuard} from "./hooks/sessions_dropdown_guard"
 import {showToast} from "./hooks/utils"
 import {getHooks} from "live_svelte"
 import "./theme"
@@ -81,7 +83,7 @@ let Hooks = getHooks(components)
 Hooks.CopyToClipboard = CopyToClipboard
 Hooks.CopySessionId = CopySessionId
 Hooks.BookmarkAgent = BookmarkAgent
-Hooks.FavoriteFab = FavoriteFab
+Hooks.FloatingChat = FloatingChat
 Hooks.ScrollToBottom = ScrollToBottom
 Hooks.AutoScroll = AutoScroll
 Hooks.CommandHistory = CommandHistory
@@ -122,7 +124,9 @@ Hooks.CommandPalette = CommandPalette
 Hooks.FlashTimeout = FlashTimeout
 Hooks.ReloadConfirmModal = ReloadConfirmModal
 Hooks.ChatWindowHook = ChatWindowHook
+Hooks.CanvasTabHook = CanvasTabHook
 Hooks.TimerCountdown = TimerCountdown
+Hooks.SessionsDropdownGuard = SessionsDropdownGuard
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
@@ -152,6 +156,20 @@ window.addEventListener("phx:copy_to_clipboard", (e) => {
     showToast("Failed to copy")
   })
 })
+
+// Copy button handler for tool call / tool result blocks (data-copy-btn attribute).
+// Uses capture phase so we can stop propagation before <summary> toggles the <details>.
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-copy-btn]")
+  if (!btn) return
+  e.stopPropagation()
+  e.preventDefault()
+  const text = btn.dataset.copyText ?? ""
+  navigator.clipboard?.writeText(text).then(() => {
+    btn.dataset.copied = "1"
+    setTimeout(() => delete btn.dataset.copied, 2000)
+  })
+}, true)
 
 // Persist sidebar collapse state on toggle
 window.addEventListener("click", (e) => {

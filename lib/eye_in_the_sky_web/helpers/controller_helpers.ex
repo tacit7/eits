@@ -2,16 +2,11 @@ defmodule EyeInTheSkyWeb.ControllerHelpers do
   @moduledoc "Shared helpers for API controllers and LiveViews."
 
   def parse_int(val), do: EyeInTheSky.Utils.ToolHelpers.parse_int(val)
+  def parse_int(val, default), do: EyeInTheSky.Utils.ToolHelpers.parse_int(val, default)
 
-  def parse_int(nil, default), do: default
-  def parse_int(val, _default) when is_integer(val), do: val
-
-  def parse_int(val, default) when is_binary(val) do
-    case Integer.parse(val) do
-      {n, ""} -> n
-      _ -> default
-    end
-  end
+  @doc "Trim a param value only when it is a binary; pass through nil and non-string types unchanged."
+  def trim_param(v) when is_binary(v), do: String.trim(v)
+  def trim_param(v), do: v
 
   def translate_errors(%Ecto.Changeset{} = changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->

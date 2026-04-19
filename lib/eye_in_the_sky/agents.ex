@@ -59,6 +59,28 @@ defmodule EyeInTheSky.Agents do
   end
 
   @doc """
+  Returns `{total_count, working_count}` for agents in a project.
+  Single aggregate query — use instead of loading all agents just to count them.
+  """
+  def count_agents_for_project(project_id) do
+    result =
+      Repo.one(
+        from a in Agent,
+          where: a.project_id == ^project_id,
+          select: {
+            count(a.id),
+            sum(fragment("CASE WHEN ? = 'working' THEN 1 ELSE 0 END", a.status))
+          }
+      )
+
+    case result do
+      {total, nil} -> {total, 0}
+      {total, working} -> {total, working}
+      nil -> {0, 0}
+    end
+  end
+
+  @doc """
   Gets a single agent.
 
   Raises `Ecto.NoResultsError` if the Agent does not exist.
@@ -82,16 +104,6 @@ defmodule EyeInTheSky.Agents do
       nil -> {:error, :not_found}
       agent -> {:ok, populate_project_name(agent)}
     end
-  end
-
-  @doc """
-  Gets a single agent with all associations preloaded.
-  """
-  def get_agent_with_associations!(id) do
-    Agent
-    |> preload([:sessions, :tasks, :project])
-    |> Repo.get!(id)
-    |> populate_project_name()
   end
 
   @doc """
@@ -215,18 +227,6 @@ defmodule EyeInTheSky.Agents do
   end
 
   @doc """
-  Lists bookmarked agents.
-  """
-  def list_bookmarked_agents do
-    Agent
-    |> where([a], a.bookmarked)
-    |> preload([:project])
-    |> order_by([a], desc: a.created_at)
-    |> Repo.all()
-    |> Enum.map(&populate_project_name/1)
-  end
-
-  @doc """
   Gets a single agent by UUID.
 
   Raises `Ecto.NoResultsError` if the Agent does not exist.
@@ -250,53 +250,6 @@ defmodule EyeInTheSky.Agents do
       nil -> {:error, :not_found}
       agent -> {:ok, populate_project_name(agent)}
     end
-  end
-
-  @doc """
-  Gets a single agent by UUID with all associations preloaded.
-  """
-  def get_agent_with_associations_by_uuid!(uuid) do
-    Agent
-    |> preload([:sessions, :tasks, :project])
-    |> Repo.get_by!(uuid: uuid)
-    |> populate_project_name()
-  end
-
-  @doc """
-  Gets complete dashboard data for an agent.
-  Returns agent, sessions, and active session.
-  """
-  def get_agent_dashboard_data(agent_id) do
-    alias EyeInTheSky.Sessions
-
-    agent = get_agent_with_associations!(agent_id)
-    sessions = Sessions.list_sessions_for_agent(agent_id)
-    # Most recent session
-    active_session = List.first(sessions)
-
-    %{
-      agent: agent,
-      sessions: sessions,
-      active_session: active_session
-    }
-  end
-
-  @doc """
-  Gets complete dashboard data for an agent by UUID.
-  Returns agent, sessions, and active session.
-  """
-  def get_agent_dashboard_data_by_uuid(uuid) do
-    alias EyeInTheSky.Sessions
-
-    agent = get_agent_with_associations_by_uuid!(uuid)
-    sessions = Sessions.list_sessions_for_agent(agent.id)
-    active_session = List.first(sessions)
-
-    %{
-      agent: agent,
-      sessions: sessions,
-      active_session: active_session
-    }
   end
 
   @doc "Preloads associations onto an agent struct. Defaults to [:sessions, :project]."

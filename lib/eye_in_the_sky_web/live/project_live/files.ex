@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   use EyeInTheSkyWeb, :live_view
 
   import EyeInTheSkyWeb.Helpers.FileHelpers,
-    only: [detect_file_type: 1, language_class: 1, build_file_tree: 2, binary_file?: 1]
+    only: [detect_file_type: 1, language_class: 1, build_file_tree: 2, build_file_listing: 2, build_file_listing: 3]
 
   import EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers,
     only: [read_file_safe_detailed: 1, path_within?: 2]
@@ -28,7 +28,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     case Integer.parse(id) do
       {project_id, ""} ->
         project =
-          Projects.get_project_with_agents!(project_id)
+          Projects.get_project!(project_id)
 
         file_tree =
           if project.path do
@@ -56,31 +56,22 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   end
 
   @impl true
-  def handle_params(%{"path" => path} = params, _uri, socket) do
-    mode = parse_mode(params)
-    socket = assign(socket, :view_mode, mode)
-    project = socket.assigns.project
-
-    if project.path do
-      full_path = Path.join(project.path, path)
-      handle_full_path(socket, full_path, path, project.path)
-    else
-      {:noreply, socket |> assign(:error, "Project path not configured") |> assign(:file_content, nil)}
-    end
-  end
-
   def handle_params(params, _uri, socket) do
     mode = parse_mode(params)
     socket = assign(socket, :view_mode, mode)
     project = socket.assigns.project
 
-    if not is_nil(project.path) && mode == :list do
-      case build_file_listing(project.path, "", ignore_hidden: true, ignored_dirs: @ignored_dirs) do
-        {:ok, file_list} -> {:noreply, assign(socket, :files, file_list)}
-        {:error, _reason} -> {:noreply, socket}
-      end
-    else
-      {:noreply, socket}
+    case {Map.get(params, "path"), project.path} do
+      {path, proj_path} when is_binary(path) and is_binary(proj_path) ->
+        full_path = Path.join(proj_path, path)
+        handle_full_path(socket, full_path, path, proj_path)
+
+      {path, nil} when is_binary(path) ->
+        {:noreply,
+         socket |> assign(:error, "Project path not configured") |> assign(:file_content, nil)}
+
+      {nil, _} ->
+        load_root_listing(socket, mode)
     end
   end
 
@@ -90,6 +81,21 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       _ -> :list
     end
   end
+
+  defp load_root_listing(socket, :list) do
+    project = socket.assigns.project
+
+    if not is_nil(project.path) do
+      case build_file_listing(project.path, "", ignore_hidden: true, ignored_dirs: @ignored_dirs) do
+        {:ok, file_list} -> {:noreply, assign(socket, :files, file_list)}
+        {:error, _reason} -> {:noreply, socket}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp load_root_listing(socket, _mode), do: {:noreply, socket}
 
   defp handle_full_path(socket, full_path, path, project_path) do
     if not path_within?(full_path, project_path) do
@@ -104,10 +110,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   end
 
   defp dispatch_path(socket, full_path, path) do
-    cond do
-      File.dir?(full_path) -> handle_directory(socket, full_path, path)
-      File.regular?(full_path) -> handle_file(socket, full_path, path)
-      true ->
+    case File.stat(full_path) do
+      {:ok, %File.Stat{type: :directory}} ->
+        handle_directory(socket, full_path, path)
+
+      {:ok, %File.Stat{type: :regular}} ->
+        handle_file(socket, full_path, path)
+
+      _ ->
         {:noreply,
          socket
          |> assign(:error, "File not found: #{path}")
@@ -145,7 +155,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
          |> assign(:files, [])
          |> assign(:error, nil)}
 
-      {:too_large} ->
+      {:error, :too_large} ->
         {:noreply,
          socket
          |> assign(:file_path, path)
@@ -154,13 +164,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
          |> assign(:files, [])
          |> assign(:error, "File too large to display (over 1 MB)")}
 
-      {:stat_error, reason} ->
+      {:error, {:stat_error, reason}} ->
         {:noreply,
          socket
          |> assign(:error, "Failed to stat file: #{reason}")
          |> assign(:file_content, nil)}
 
-      {:read_error, reason} ->
+      {:error, {:read_error, reason}} ->
         {:noreply,
          socket
          |> assign(:error, "Failed to read file: #{reason}")
@@ -187,56 +197,60 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   @impl true
   def handle_info(_msg, socket), do: {:noreply, socket}
 
-  # Builds a flat file listing for `dir`, with each entry's `:path` set to
-  # `Path.join(path_prefix, filename)`. When `path_prefix` is `""` the path
-  # is just the filename, matching root-level listing behaviour.
-  #
-  # Options:
-  #   :ignore_hidden   - when true, skip dotfiles (except .claude and .git)
-  #   :ignored_dirs    - list of directory names to exclude entirely
-  defp build_file_listing(dir, path_prefix, opts \\ []) do
-    ignore_hidden = Keyword.get(opts, :ignore_hidden, false)
-    ignored_dirs = Keyword.get(opts, :ignored_dirs, [])
+  attr :error, :string, default: nil
+  attr :file_content, :string, default: nil
+  attr :file_type, :string, default: nil
+  attr :file_path, :string, default: nil
+  attr :project, :map, required: true
+  attr :show_back_button, :boolean, default: false
+  attr :empty_label, :string, default: "Select a file"
+  attr :empty_description, :string, default: "Choose a file from the tree to view its contents"
 
-    case File.ls(dir) do
-      {:ok, files} ->
-        file_list =
-          files
-          |> Enum.filter(fn file ->
-            file_path = Path.join(dir, file)
-
-            hidden_ok =
-              !ignore_hidden or
-                !String.starts_with?(file, ".") or
-                file in [".claude", ".git"]
-
-            hidden_ok and
-              file not in ignored_dirs and
-              (File.dir?(file_path) or !binary_file?(file_path))
-          end)
-          |> Enum.map(fn file ->
-            file_path = Path.join(dir, file)
-
-            size =
-              case File.stat(file_path) do
-                {:ok, %{size: s}} -> s
-                _ -> 0
-              end
-
-            %{
-              name: file,
-              path: if(path_prefix == "", do: file, else: Path.join(path_prefix, file)),
-              is_dir: File.dir?(file_path),
-              size: size
-            }
-          end)
-          |> Enum.sort_by(&{!&1.is_dir, &1.name})
-
-        {:ok, file_list}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
+  defp file_content_pane(assigns) do
+    ~H"""
+    <%= if @error do %>
+      <div class="p-4">
+        <div class="alert alert-error">
+          <.icon name="hero-x-circle" class="shrink-0 h-6 w-6" />
+          <span>{@error}</span>
+        </div>
+      </div>
+    <% end %>
+    <%= if @file_content do %>
+      <div class="p-6">
+        <%= if @show_back_button do %>
+          <div class="flex items-center gap-2 mb-4">
+            <%= if @file_path && @file_path != "." do %>
+              <.link
+                patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
+                class="btn btn-sm btn-ghost"
+              >
+                <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
+              </.link>
+            <% end %>
+            <div>
+              <h2 class="text-lg font-semibold text-base-content">{Path.basename(@file_path)}</h2>
+              <p class="text-sm text-base-content/60">{@file_path}</p>
+            </div>
+          </div>
+        <% else %>
+          <div class="mb-4">
+            <h2 class="text-lg font-semibold text-base-content">{Path.basename(@file_path)}</h2>
+            <p class="text-sm text-base-content/60">{@file_path}</p>
+          </div>
+        <% end %>
+        <.file_content_viewer file_content={@file_content} file_type={@file_type} />
+      </div>
+    <% else %>
+      <div class="flex items-center justify-center h-full">
+        <div class="text-center">
+          <.icon name="hero-document-text" class="w-16 h-16 mx-auto text-base-content/20 mb-4" />
+          <h3 class="text-lg font-semibold text-base-content/60 mb-2">{@empty_label}</h3>
+          <p class="text-sm text-base-content/40">{@empty_description}</p>
+        </div>
+      </div>
+    <% end %>
+    """
   end
 
   attr :file_content, :string, required: true
@@ -335,40 +349,19 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
           </ul>
         </div>
       </div>
-
-      <!-- File Content Viewer -->
+      
+    <!-- File Content Viewer -->
       <div class="flex-1 min-h-0 overflow-y-auto">
-        <%= if @error do %>
-          <!-- Error Message -->
-          <div class="p-4">
-            <div class="alert alert-error">
-              <.icon name="hero-x-circle" class="shrink-0 h-6 w-6" />
-              <span>{@error}</span>
-            </div>
-          </div>
-        <% end %>
-
-        <%= if @file_content do %>
-          <!-- File Content -->
-          <div class="p-6">
-            <div class="mb-4">
-              <h2 class="text-lg font-semibold text-base-content">{Path.basename(@file_path)}</h2>
-              <p class="text-sm text-base-content/60">{@file_path}</p>
-            </div>
-            <.file_content_viewer file_content={@file_content} file_type={@file_type} />
-          </div>
-        <% else %>
-          <!-- Empty State -->
-          <div class="flex items-center justify-center h-full">
-            <div class="text-center">
-              <.icon name="hero-document-text" class="w-16 h-16 mx-auto text-base-content/20 mb-4" />
-              <h3 class="text-lg font-semibold text-base-content/60 mb-2">Select a file</h3>
-              <p class="text-sm text-base-content/40">
-                Choose a file from the tree to view its contents
-              </p>
-            </div>
-          </div>
-        <% end %>
+        <.file_content_pane
+          error={@error}
+          file_content={@file_content}
+          file_type={@file_type}
+          file_path={@file_path}
+          project={@project}
+          show_back_button={false}
+          empty_label="Select a file"
+          empty_description="Choose a file from the tree to view its contents"
+        />
       </div>
     </div>
     """
@@ -378,69 +371,45 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     ~H"""
     <!-- List View -->
     <div class="h-[calc(100dvh-10rem)]">
-      <div class="p-6">
-        <%= if @error do %>
-          <!-- Error Message -->
-          <div class="alert alert-error mb-4">
-            <.icon name="hero-x-circle" class="shrink-0 h-6 w-6" />
-            <span>{@error}</span>
-          </div>
-        <% end %>
-
-        <%= if @file_content do %>
-          <!-- File Content -->
-          <div class="mb-4">
-            <div class="flex items-center gap-2 mb-4">
-              <%= if @file_path && @file_path != "." do %>
-                <.link
-                  patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
-                  class="btn btn-sm btn-ghost"
-                >
-                  <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
-                </.link>
-              <% end %>
-              <div>
-                <h2 class="text-lg font-semibold text-base-content">{Path.basename(@file_path)}</h2>
-                <p class="text-sm text-base-content/60">{@file_path}</p>
-              </div>
-            </div>
-            <.file_content_viewer file_content={@file_content} file_type={@file_type} />
-          </div>
-        <% else %>
-          <!-- Directory Listing -->
-          <%= if @files != [] do %>
-            <div class="mb-4">
-              <%= if @file_path && @file_path != "." do %>
-                <.link
-                  patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
-                  class="btn btn-sm btn-ghost mb-4"
-                >
-                  <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
-                </.link>
-              <% end %>
-              <h2 class="text-lg font-semibold text-base-content mb-2">
-                {@file_path || @project.name}
-              </h2>
-            </div>
-            <.file_listing
-              files={@files}
-              patch_fn={fn path -> ~p"/projects/#{@project.id}/files?path=#{path}" end}
-            />
-          <% else %>
-            <!-- Empty State -->
-            <div class="flex items-center justify-center h-[calc(100dvh-20rem)]">
-              <div class="text-center">
-                <.icon
-                  name="hero-document-text"
-                  class="w-16 h-16 mx-auto text-base-content/20 mb-4"
-                />
-                <h3 class="text-lg font-semibold text-base-content/60 mb-2">No files</h3>
-                <p class="text-sm text-base-content/40">This directory is empty</p>
-              </div>
+      <%= if @files != [] && !@file_content do %>
+        <!-- Directory Listing -->
+        <div class="p-6">
+          <%= if @error do %>
+            <div class="alert alert-error mb-4">
+              <.icon name="hero-x-circle" class="shrink-0 h-6 w-6" />
+              <span>{@error}</span>
             </div>
           <% end %>
-        <% end %>
-      </div>
+          <div class="mb-4">
+            <%= if @file_path && @file_path != "." do %>
+              <.link
+                patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
+                class="btn btn-sm btn-ghost mb-4"
+              >
+                <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
+              </.link>
+            <% end %>
+            <h2 class="text-lg font-semibold text-base-content mb-2">
+              {@file_path || @project.name}
+            </h2>
+          </div>
+          <.file_listing
+            files={@files}
+            patch_fn={fn path -> ~p"/projects/#{@project.id}/files?path=#{path}" end}
+          />
+        </div>
+      <% else %>
+        <.file_content_pane
+          error={@error}
+          file_content={@file_content}
+          file_type={@file_type}
+          file_path={@file_path}
+          project={@project}
+          show_back_button={true}
+          empty_label="No files"
+          empty_description="This directory is empty"
+        />
+      <% end %>
     </div>
     """
   end

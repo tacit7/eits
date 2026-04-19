@@ -47,7 +47,11 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
       <div class="flex-shrink-0">
         <.icon
           name={if @task.completed_at, do: "hero-check-circle-mini", else: "hero-circle-mini"}
-          class={if @task.completed_at, do: "w-3.5 h-3.5 text-success/60", else: "w-3.5 h-3.5 text-base-content/20"}
+          class={
+            if @task.completed_at,
+              do: "w-3.5 h-3.5 text-success/60",
+              else: "w-3.5 h-3.5 text-base-content/20"
+          }
         />
       </div>
 

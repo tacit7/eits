@@ -185,7 +185,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                 <form phx-change="save_setting">
                   <input type="hidden" name="key" value="palette_shortcut" />
                   <select class="select select-bordered select-sm w-48 min-h-[44px]" name="value">
-                    <option value="auto" selected={(@settings["palette_shortcut"] || "auto") == "auto"}>
+                    <option
+                      value="auto"
+                      selected={(@settings["palette_shortcut"] || "auto") == "auto"}
+                    >
                       Auto (⌘K + Ctrl+K on Mac, Ctrl+K elsewhere)
                     </option>
                     <option value="ctrl" selected={@settings["palette_shortcut"] == "ctrl"}>

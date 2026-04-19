@@ -63,12 +63,16 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
   def handle_run_now(%{"id" => id}, socket) do
     caller_project_id = Map.get(socket.assigns, :project_id)
 
-    with {:ok, int_id} <- parse_job_id(id),
-         result <- ScheduledJobs.run_now(int_id, caller_project_id) do
-      case result do
-        {:ok, _} -> {:noreply, put_flash(socket, :info, "Job triggered")}
-        {:error, :unauthorized} -> {:noreply, put_flash(socket, :error, "Access denied")}
-        {:error, reason} -> {:noreply, put_flash(socket, :error, "Failed to trigger job: #{inspect(reason)}")}
+    with {:ok, int_id} <- parse_job_id(id) do
+      case ScheduledJobs.run_now(int_id, caller_project_id) do
+        {:ok, _} ->
+          {:noreply, put_flash(socket, :info, "Job triggered")}
+
+        {:error, :unauthorized} ->
+          {:noreply, put_flash(socket, :error, "Access denied")}
+
+        {:error, reason} ->
+          {:noreply, put_flash(socket, :error, "Failed to trigger job: #{inspect(reason)}")}
       end
     else
       :error -> {:noreply, put_flash(socket, :error, "Invalid job ID")}
@@ -152,7 +156,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
   defp filter_jobs_by_type(jobs, type), do: Enum.filter(jobs, &(&1.job_type == type))
 
   defp filter_jobs_by_status(jobs, "all"), do: jobs
-  defp filter_jobs_by_status(jobs, "enabled"), do: Enum.filter(jobs, &(&1.enabled))
+  defp filter_jobs_by_status(jobs, "enabled"), do: Enum.filter(jobs, & &1.enabled)
   defp filter_jobs_by_status(jobs, "disabled"), do: Enum.filter(jobs, &(not &1.enabled))
   defp filter_jobs_by_status(jobs, _), do: jobs
 

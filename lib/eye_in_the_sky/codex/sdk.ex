@@ -21,7 +21,7 @@ defmodule EyeInTheSky.Codex.SDK do
 
   alias EyeInTheSky.Claude.{Message, Utils}
   alias EyeInTheSky.Claude.SDK.Registry
-  alias EyeInTheSky.Codex.Parser
+  alias EyeInTheSky.Codex.{Parser, ToolMapper}
   alias EyeInTheSky.SDK.MessageHandler
 
   require Logger
@@ -33,7 +33,8 @@ defmodule EyeInTheSky.Codex.SDK do
     parser: Parser,
     telemetry_prefix: [:eits, :codex, :sdk],
     log_raw_key: "log_codex_raw",
-    log_raw_prefix: "codex.raw"
+    log_raw_prefix: "codex.raw",
+    forward_raw_lines: true
   ]
 
   @doc """
@@ -59,6 +60,9 @@ defmodule EyeInTheSky.Codex.SDK do
       eits dm --to <session_uuid> --message "<text>"
       eits commits create --hash <hash>
 
+    To spawn a child agent, always pass --provider codex:
+      eits agents spawn --provider codex --instructions "<text>" [--model <model>]
+
     You MUST claim a task before editing files:
       eits tasks begin --title "<title of your work>"
 
@@ -81,12 +85,60 @@ defmodule EyeInTheSky.Codex.SDK do
   """
   @spec start(String.t(), opts()) :: {:ok, ref(), pid()} | {:error, term()}
   def start(prompt, opts \\ []) do
-    to = Keyword.fetch!(opts, :to)
     sdk_ref = make_ref()
+
+    Logger.info(
+      "[telemetry] codex.sdk.start session_id=#{opts[:session_id]} model=#{opts[:model]}"
+    )
+
+    run_codex_session(sdk_ref, prompt, opts, fn cli, p, o -> cli.spawn_new_session(p, o) end)
+  end
+
+  @doc """
+  Resume an existing Codex session.
+
+  Same as `start/2` but resumes a conversation by thread/session ID.
+  """
+  @spec resume(String.t(), String.t(), opts()) :: {:ok, ref(), pid()} | {:error, term()}
+  def resume(session_id, prompt, opts \\ []) do
+    sdk_ref = make_ref()
+    Logger.info("[telemetry] codex.sdk.resume session_id=#{session_id} model=#{opts[:model]}")
+
+    run_codex_session(sdk_ref, prompt, opts, fn cli, p, o ->
+      cli.resume_session(session_id, p, o)
+    end)
+  end
+
+  @doc """
+  Cancel a running Codex session.
+  """
+  @spec cancel(ref()) :: :ok | {:error, :not_found}
+  def cancel(ref) do
+    cli = Utils.codex_cli_module()
+
+    case Registry.lookup(ref) do
+      nil ->
+        {:error, :not_found}
+
+      port when is_port(port) ->
+        cli.cancel(port)
+        :ok
+
+      pid when is_pid(pid) ->
+        send(pid, :cancel)
+        :ok
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Private helpers
+  # ---------------------------------------------------------------------------
+
+  defp run_codex_session(sdk_ref, prompt, opts, cli_fn) do
+    to = Keyword.fetch!(opts, :to)
     meta = %{session_id: opts[:session_id], model: opts[:model]}
 
     :telemetry.execute([:eits, :codex, :sdk, :start], %{system_time: System.system_time()}, meta)
-    Logger.info("[telemetry] codex.sdk.start session_id=#{meta.session_id} model=#{meta.model}")
 
     cli = Keyword.get(opts, :cli_module) || Utils.codex_cli_module()
     task_supervisor = Keyword.get(opts, :task_supervisor, EyeInTheSky.TaskSupervisor)
@@ -99,7 +151,7 @@ defmodule EyeInTheSky.Codex.SDK do
           |> Keyword.delete(:to)
           |> Keyword.delete(:cli_module)
 
-        case cli.spawn_new_session(prompt, cli_opts) do
+        case cli_fn.(cli, prompt, cli_opts) do
           {:ok, port, _cli_ref} ->
             Registry.register(sdk_ref, port)
             send(handler_pid, {:start_handling, sdk_ref})
@@ -129,88 +181,11 @@ defmodule EyeInTheSky.Codex.SDK do
     end
   end
 
-  @doc """
-  Resume an existing Codex session.
-
-  Same as `start/2` but resumes a conversation by thread/session ID.
-  """
-  @spec resume(String.t(), String.t(), opts()) :: {:ok, ref(), pid()} | {:error, term()}
-  def resume(session_id, prompt, opts \\ []) do
-    to = Keyword.fetch!(opts, :to)
-    sdk_ref = make_ref()
-    meta = %{session_id: session_id, model: opts[:model]}
-
-    :telemetry.execute([:eits, :codex, :sdk, :start], %{system_time: System.system_time()}, meta)
-
-    Logger.info("[telemetry] codex.sdk.resume session_id=#{session_id} model=#{meta.model}")
-
-    cli = Keyword.get(opts, :cli_module) || Utils.codex_cli_module()
-    task_supervisor = Keyword.get(opts, :task_supervisor, EyeInTheSky.TaskSupervisor)
-
-    case spawn_handler_process(sdk_ref, to, opts[:session_id], task_supervisor) do
-      {:ok, handler_pid} ->
-        cli_opts =
-          opts
-          |> Keyword.put(:caller, handler_pid)
-          |> Keyword.delete(:to)
-          |> Keyword.delete(:cli_module)
-
-        case cli.resume_session(session_id, prompt, cli_opts) do
-          {:ok, port, _cli_ref} ->
-            Registry.register(sdk_ref, port)
-            send(handler_pid, {:start_handling, sdk_ref})
-            {:ok, sdk_ref, handler_pid}
-
-          {:error, reason} ->
-            :telemetry.execute(
-              [:eits, :codex, :sdk, :error],
-              %{system_time: System.system_time()},
-              Map.put(meta, :reason, reason)
-            )
-
-            Logger.error(
-              "[telemetry] codex.sdk.error session_id=#{session_id} reason=#{inspect(reason)}"
-            )
-
-            Process.exit(handler_pid, :kill)
-            {:error, reason}
-        end
-
-      {:error, reason} ->
-        Logger.error(
-          "[telemetry] codex.sdk.error session_id=#{session_id} reason=handler_start_failed #{inspect(reason)}"
-        )
-
-        {:error, {:handler_start_failed, reason}}
-    end
-  end
-
-  @doc """
-  Cancel a running Codex session.
-  """
-  @spec cancel(ref()) :: :ok | {:error, :not_found}
-  def cancel(ref) do
-    cli = Utils.codex_cli_module()
-
-    case Registry.lookup(ref) do
-      nil ->
-        {:error, :not_found}
-
-      port when is_port(port) ->
-        cli.cancel(port)
-        :ok
-
-      pid when is_pid(pid) ->
-        send(pid, :cancel)
-        :ok
-    end
-  end
-
   # ---------------------------------------------------------------------------
   # Handler process
   # ---------------------------------------------------------------------------
 
-  defp spawn_handler_process(sdk_ref, caller_pid, fallback_session_id, supervisor) do
+  defp spawn_handler_process(sdk_ref, caller_pid, eits_session_id, supervisor) do
     Task.Supervisor.start_child(
       supervisor,
       fn ->
@@ -229,7 +204,8 @@ defmodule EyeInTheSky.Codex.SDK do
               caller_pid: caller_pid,
               session_id: nil,
               accumulated_text: "",
-              fallback_session_id: fallback_session_id
+              accumulated_parts: [],
+              eits_session_id: eits_session_id
             }
 
             MessageHandler.run_loop(__MODULE__, state, @loop_opts)
@@ -252,9 +228,38 @@ defmodule EyeInTheSky.Codex.SDK do
   @impl MessageHandler
   def handle_message(%Message{type: :text} = message, state) do
     %{sdk_ref: sdk_ref, caller_pid: caller_pid, accumulated_text: acc} = state
-    new_acc = acc <> (message.content || "")
+    text = message.content || ""
+    new_acc = acc <> text
+
+    new_parts =
+      if text == "", do: state.accumulated_parts, else: state.accumulated_parts ++ [{:text, text}]
+
     send(caller_pid, {:claude_message, sdk_ref, message})
-    {:continue, %{state | accumulated_text: new_acc}}
+    {:continue, %{state | accumulated_text: new_acc, accumulated_parts: new_parts}}
+  end
+
+  def handle_message(
+        %Message{
+          type: :tool_use,
+          content: %{name: name, input: input},
+          metadata: metadata
+        } = message,
+        state
+      ) do
+    send(state.caller_pid, {:claude_message, state.sdk_ref, message})
+
+    if Map.get(metadata || %{}, :partial, false) do
+      {:continue, state}
+    else
+      summary = format_codex_tool_summary(name, input)
+
+      new_parts =
+        if summary == "",
+          do: state.accumulated_parts,
+          else: state.accumulated_parts ++ [{:tool, summary}]
+
+      {:continue, %{state | accumulated_parts: new_parts}}
+    end
   end
 
   def handle_message(message, state) do
@@ -267,7 +272,25 @@ defmodule EyeInTheSky.Codex.SDK do
     %{sdk_ref: sdk_ref, caller_pid: caller_pid, accumulated_text: acc} = state
 
     final_session_id = data[:session_id] || state[:session_id]
-    result_text = if acc != "", do: acc, else: nil
+
+    parts_text =
+      state.accumulated_parts
+      |> Enum.reduce("", fn
+        {:text, text}, acc ->
+          acc <> text
+
+        {:tool, summary}, acc ->
+          prefix = if acc == "" or String.ends_with?(acc, "\n\n"), do: "", else: "\n\n"
+          acc <> prefix <> summary <> "\n\n"
+      end)
+      |> String.trim()
+
+    result_text =
+      cond do
+        parts_text != "" -> parts_text
+        acc != "" -> acc
+        true -> nil
+      end
 
     metadata = %{
       session_id: final_session_id,
@@ -319,6 +342,10 @@ defmodule EyeInTheSky.Codex.SDK do
 
   @impl MessageHandler
   def resolve_exit_session_id(state) do
-    state[:session_id] || state[:fallback_session_id] || ""
+    state[:session_id] || state[:eits_session_id] || ""
+  end
+
+  defp format_codex_tool_summary(name, input) do
+    ToolMapper.format_codex_tool_summary(name, input)
   end
 end

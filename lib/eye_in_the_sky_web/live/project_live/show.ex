@@ -17,8 +17,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
     # Load project only if ID is valid
     socket =
       if project_id do
-        project =
-          Projects.get_project_with_agents!(project_id)
+        project = Projects.get_project!(project_id)
 
         # Load tasks manually due to type mismatch (projects.id is INT, tasks.project_id is TEXT)
         tasks = Tasks.list_tasks_for_project(project_id)
@@ -30,8 +29,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
         # Load recent notes for this project (max 5)
         recent_notes = Notes.list_notes_for_project(project_id, limit: 5)
 
-        # Load agents for this project
-        project_agents = Agents.list_agents_by_project(project_id)
+        # Agent counts — aggregate query, no need to load full structs
+        {agent_count, working_agent_count} = Agents.count_agents_for_project(project_id)
 
         # Lightweight count + IDs for display and commits query (no preloads)
         {session_count, session_ids} = Sessions.count_and_ids_for_project(project_id)
@@ -53,7 +52,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
         |> assign(:tasks, tasks)
         |> assign(:active_sessions, active_sessions)
         |> assign(:recent_notes, recent_notes)
-        |> assign(:project_agents, project_agents)
+        |> assign(:agent_count, agent_count)
+        |> assign(:working_agent_count, working_agent_count)
         |> assign(:session_count, session_count)
         |> assign(:recent_commits, recent_commits)
         |> assign(:open_tasks, open_tasks)
@@ -95,9 +95,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           <div class="card bg-base-100 shadow-sm">
             <div class="card-body p-3">
               <p class="text-xs text-base-content/50 uppercase tracking-wider">Agents</p>
-              <p class="text-2xl font-semibold text-base-content">{length(@project_agents)}</p>
+              <p class="text-2xl font-semibold text-base-content">{@agent_count}</p>
               <p class="text-xs text-base-content/40">
-                {Enum.count(@project_agents, &(&1.status == "working"))} running
+                {@working_agent_count} running
               </p>
             </div>
           </div>
@@ -162,7 +162,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                             {String.slice(session.uuid || to_string(session.id), 0..7)}
                           </code>
                           <span class="text-sm text-base-content/80 truncate">
-                            {session.name || truncate_text(if session.agent, do: session.agent.description) ||
+                            {session.name ||
+                              truncate_text(if session.agent, do: session.agent.description) ||
                               "Unnamed"}
                           </span>
                         </div>
@@ -310,10 +311,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
     rel = ".claude/#{name}"
 
     if File.dir?(full) do
-      count = case File.ls(full) do
-        {:ok, entries} -> length(entries)
-        _ -> 0
-      end
+      count =
+        case File.ls(full) do
+          {:ok, entries} -> length(entries)
+          _ -> 0
+        end
+
       %{rel_path: rel, type: :dir, detail: "#{count} #{if count == 1, do: "item", else: "items"}"}
     else
       %{rel_path: rel, type: :file, detail: file_size_label(full)}
@@ -327,5 +330,4 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
       _ -> ""
     end
   end
-
 end

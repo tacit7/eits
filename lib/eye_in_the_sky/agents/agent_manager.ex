@@ -7,13 +7,12 @@ defmodule EyeInTheSky.Agents.AgentManager do
 
   require Logger
 
-  alias EyeInTheSky.{AgentDefinitions, Agents, Projects, Repo, Sessions, Teams}
-  alias EyeInTheSky.Agents.Agent
+  alias EyeInTheSky.{Agents, Projects}
+  alias EyeInTheSky.Agents.AgentManager.RecordBuilder
   alias EyeInTheSky.Agents.AgentManager.SessionBridge
+  alias EyeInTheSky.Agents.AgentManager.SpawnParams
+  alias EyeInTheSky.Agents.AgentManager.SpawnTeamContext
   alias EyeInTheSky.Claude.AgentWorker
-  alias EyeInTheSky.Git.Worktrees
-  alias EyeInTheSky.Sessions.Session
-  alias EyeInTheSky.Utils.ToolHelpers
 
   @doc """
   Creates an agent + session and starts the AgentWorker with the initial message.
@@ -30,7 +29,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
   Returns `{:ok, %{agent: agent, session: session}}` or `{:error, reason}`.
   """
   def create_agent(opts) do
-    with {:ok, %{agent: agent, session: session}} <- create_records(opts) do
+    with {:ok, %{agent: agent, session: session}} <- RecordBuilder.create_records(opts) do
       instructions = EyeInTheSky.Agents.InstructionBuilder.build(opts)
 
       Logger.info("📤 create_agent: sending initial message to session.id=#{session.id}")
@@ -95,145 +94,6 @@ defmodule EyeInTheSky.Agents.AgentManager do
     end
   end
 
-  defp create_records(opts) do
-    agent_uuid = Ecto.UUID.generate()
-    provider = resolve_provider(opts)
-    session_uuid = resolve_session_uuid(provider, opts)
-    description = resolve_description(opts)
-    project_id = resolve_project_id(opts)
-
-    Logger.info(
-      "📝 create_agent: agent_uuid=#{agent_uuid}, session_uuid=#{inspect(session_uuid)}, model=#{opts[:model]}, project_id=#{project_id}"
-    )
-
-    definition_info = resolve_agent_definition(opts[:agent], project_id, opts[:project_path])
-
-    with {:ok, worktree_path} <- resolve_worktree_path(opts) do
-      insert_agent_and_session(%{
-        agent_uuid: agent_uuid,
-        provider: provider,
-        session_uuid: session_uuid,
-        description: description,
-        project_id: project_id,
-        worktree_path: worktree_path,
-        definition_info: definition_info,
-        opts: opts
-      })
-    end
-  end
-
-  defp resolve_provider(opts) do
-    if opts[:agent_type] == "codex", do: "codex", else: "claude"
-  end
-
-  defp resolve_session_uuid(provider, opts) do
-    # For codex sessions, leave uuid null — Codex thread_id arrives via thread.started event
-    # and gets synced to the session via maybe_sync_provider_conversation_id.
-    # For claude sessions, pre-generate so the worker can reference it immediately.
-    if provider == "codex", do: nil, else: opts[:session_uuid] || Ecto.UUID.generate()
-  end
-
-  defp resolve_description(opts) do
-    opts[:description] || "Agent session"
-  end
-
-  defp resolve_project_id(opts) do
-    opts[:project_id] ||
-      with parent_id when not is_nil(parent_id) <- opts[:parent_session_id],
-           {:ok, parent} <- Sessions.get_session(parent_id) do
-        parent.project_id
-      else
-        nil -> nil
-        {:error, _} -> nil
-      end
-  end
-
-  defp resolve_worktree_path(opts) do
-    # When a worktree name is given, create the git worktree before DB records.
-    # If creation fails, return an error — do NOT silently fall back to the main project path.
-    case opts[:worktree] do
-      nil ->
-        {:ok, opts[:project_path]}
-
-      wt ->
-        case Worktrees.prepare_session_worktree(opts[:project_path], wt) do
-          {:ok, _} = ok ->
-            ok
-
-          {:error, :dirty_working_tree} = err ->
-            Logger.error("create_agent: git worktree setup failed for #{wt}: dirty working tree")
-            err
-
-          {:error, reason} ->
-            Logger.error("create_agent: git worktree setup failed for #{wt}: #{inspect(reason)}")
-            {:error, {:worktree_setup_failed, reason}}
-        end
-    end
-  end
-
-  defp insert_agent_and_session(%{
-         agent_uuid: agent_uuid,
-         provider: provider,
-         session_uuid: session_uuid,
-         description: description,
-         project_id: project_id,
-         worktree_path: worktree_path,
-         definition_info: definition_info,
-         opts: opts
-       }) do
-    agent_attrs =
-      %{
-        uuid: agent_uuid,
-        agent_type: opts[:agent_type] || "claude",
-        project_id: project_id,
-        project_name: opts[:project_name],
-        status: "pending",
-        description: description,
-        git_worktree_path: worktree_path,
-        parent_agent_id: opts[:parent_agent_id],
-        parent_session_id: opts[:parent_session_id]
-      }
-      |> maybe_put_definition(definition_info)
-
-    agent_changeset = Agent.changeset(%Agent{}, agent_attrs)
-
-    session_opts = %{
-      uuid: session_uuid,
-      name: description,
-      description: "agent-id #{agent_uuid}",
-      model: opts[:model],
-      provider: provider,
-      project_id: project_id,
-      git_worktree_path: worktree_path,
-      started_at: DateTime.utc_now(),
-      parent_agent_id: opts[:parent_agent_id],
-      parent_session_id: opts[:parent_session_id]
-    }
-
-    result =
-      Ecto.Multi.new()
-      |> Ecto.Multi.insert(:agent, agent_changeset)
-      |> Ecto.Multi.run(:session, fn _repo, %{agent: agent} ->
-        Repo.insert(Session.changeset(%Session{}, Map.put(session_opts, :agent_id, agent.id)))
-      end)
-      |> Repo.transaction()
-
-    case result do
-      {:ok, %{agent: agent, session: session}} ->
-        EyeInTheSky.Events.agent_created(agent)
-
-        Logger.info(
-          "✅ create_agent: DB records created - agent.id=#{agent.id}, session.id=#{session.id}, session_uuid=#{session.uuid}"
-        )
-
-        {:ok, %{agent: agent, session: session}}
-
-      {:error, _step, reason, _changes_so_far} ->
-        Logger.error("❌ create_agent: DB record creation failed - #{inspect(reason)}")
-        {:error, reason}
-    end
-  end
-
   @doc """
   Orchestrates agent spawning from validated HTTP params.
 
@@ -245,19 +105,21 @@ defmodule EyeInTheSky.Agents.AgentManager do
   """
   def spawn_agent(params) do
     with {:ok, project_id, project_name} <- Projects.resolve_project(params),
-         {:ok, team} <- resolve_spawn_team(params["team_name"]) do
+         {:ok, team} <- SpawnTeamContext.resolve_team(params["team_name"]) do
       params = Map.merge(params, %{"project_id" => project_id, "project_name" => project_name})
-      instructions = apply_team_context(params["instructions"], team, params["member_name"])
-      opts = build_spawn_opts(%{params | "instructions" => instructions}, team)
+      instructions = SpawnTeamContext.apply_context(params["instructions"], team, params["member_name"])
+      opts = SpawnParams.build(%{params | "instructions" => instructions}, team)
 
       case create_agent(opts) do
         {:ok, %{agent: agent, session: session}} ->
-          case maybe_join_team(team, agent, session, params["member_name"]) do
+          case SpawnTeamContext.maybe_join(team, agent, session, params["member_name"]) do
             :ok ->
-              {:ok, %{agent: agent, session: session, team: team, member_name: params["member_name"]}}
+              {:ok,
+               %{agent: agent, session: session, team: team, member_name: params["member_name"]}}
 
             {:ok, _member} ->
-              {:ok, %{agent: agent, session: session, team: team, member_name: params["member_name"]}}
+              {:ok,
+               %{agent: agent, session: session, team: team, member_name: params["member_name"]}}
 
             {:error, reason} ->
               {:error, reason}
@@ -266,95 +128,6 @@ defmodule EyeInTheSky.Agents.AgentManager do
         error ->
           error
       end
-    end
-  end
-
-  defp resolve_spawn_team(nil), do: {:ok, nil}
-  defp resolve_spawn_team(""), do: {:ok, nil}
-
-  defp resolve_spawn_team(name) do
-    case Teams.get_team_by_name(name) do
-      {:error, :not_found} -> {:error, "team_not_found", "team not found: #{name}"}
-      {:ok, team} -> {:ok, team}
-    end
-  end
-
-  defp apply_team_context(instructions, nil, _member_name), do: instructions
-
-  defp apply_team_context(instructions, team, member_name) do
-    instructions <> "\n\n" <> build_team_context(team, member_name)
-  end
-
-  defp build_team_context(team, member_name) do
-    EyeInTheSky.Agents.InstructionTemplates.team_context(team, member_name)
-  end
-
-  # Name resolution priority:
-  # 1. Explicit "name" param (trimmed, non-empty)
-  # 2. "member_name @ team_name" when both present
-  # 3. "member_name" alone
-  # 4. First 250 chars of instructions (or "Agent session" fallback)
-  defp resolve_session_name(%{"name" => name} = params, team)
-       when is_binary(name) and name != "" do
-    case String.trim(name) do
-      "" -> resolve_session_name(Map.delete(params, "name"), team)
-      trimmed -> trimmed
-    end
-  end
-
-  defp resolve_session_name(params, %{name: team_name})
-       when is_binary(team_name) do
-    member = params["member_name"]
-    if member, do: "#{member} @ #{team_name}", else: String.slice(params["instructions"] || "Agent session", 0, 250)
-  end
-
-  defp resolve_session_name(%{"member_name" => member}, _team) when is_binary(member),
-    do: member
-
-  defp resolve_session_name(params, _team),
-    do: String.slice(params["instructions"] || "Agent session", 0, 250)
-
-  defp build_spawn_opts(params, team) do
-    name = resolve_session_name(params, team)
-
-    [
-      instructions: params["instructions"],
-      model: params["model"],
-      agent_type: params["provider"] || "claude",
-      project_id: params["project_id"],
-      project_name: params["project_name"],
-      project_path: params["project_path"],
-      name: name,
-      description: name,
-      worktree: params["worktree"],
-      effort_level: params["effort_level"],
-      parent_agent_id: params["parent_agent_id"],
-      parent_session_id: params["parent_session_id"],
-      agent: params["agent"],
-      bypass_sandbox: params["bypass_sandbox"] == true
-    ]
-  end
-
-  defp maybe_join_team(nil, _agent, _session, _name), do: :ok
-
-  defp maybe_join_team(team, agent, session, member_name) do
-    case Teams.join_team(%{
-           team_id: team.id,
-           agent_id: agent.id,
-           session_id: session.id,
-           name: member_name || agent.uuid,
-           role: member_name || "agent",
-           status: "active"
-         }) do
-      {:ok, member} ->
-        {:ok, member}
-
-      {:error, reason} ->
-        Logger.warning(
-          "Team join failed: agent_id=#{agent.id} session_id=#{session.id} team_id=#{team.id} member_name=#{inspect(member_name)} reason=#{inspect(reason)}"
-        )
-
-        {:error, {:team_join_failed, reason}}
     end
   end
 
@@ -409,7 +182,10 @@ defmodule EyeInTheSky.Agents.AgentManager do
             {:error, :worker_not_found}
 
           :exit, reason ->
-            Logger.error("send_message: worker exit for session_id=#{session_id} - #{inspect(reason)}")
+            Logger.error(
+              "send_message: worker exit for session_id=#{session_id} - #{inspect(reason)}"
+            )
+
             {:error, {:worker_exit, reason}}
         end
 
@@ -427,56 +203,4 @@ defmodule EyeInTheSky.Agents.AgentManager do
     {:error, :invalid_message}
   end
 
-  # ── Agent definition resolution ────────────────────────────────────────
-
-  # Resolves an agent slug to a definition record. Returns a map with
-  # :agent_definition_id and :definition_checksum_at_spawn, or nil.
-  # If the slug is not found in the DB, syncs the relevant directory first and retries.
-  defp resolve_agent_definition(nil, _project_id, _project_path), do: nil
-  defp resolve_agent_definition("", _project_id, _project_path), do: nil
-
-  defp resolve_agent_definition(slug, project_id, project_path) do
-    project_id = ToolHelpers.parse_int(project_id)
-    case lookup_definition(slug, project_id) do
-      {:ok, defn} ->
-        %{agent_definition_id: defn.id, definition_checksum_at_spawn: defn.checksum}
-
-      {:error, :not_found} ->
-        Logger.debug("resolve_agent_definition: slug=#{slug} not in DB, syncing and retrying")
-        sync_for_spawn(project_id, project_path)
-
-        case lookup_definition(slug, project_id) do
-          {:ok, defn} ->
-            %{agent_definition_id: defn.id, definition_checksum_at_spawn: defn.checksum}
-
-          {:error, :not_found} ->
-            Logger.debug("resolve_agent_definition: slug=#{slug} not found after sync")
-            nil
-        end
-    end
-  end
-
-  defp lookup_definition(slug, project_id) do
-    if project_id do
-      AgentDefinitions.resolve(slug, project_id)
-    else
-      AgentDefinitions.resolve_global(slug)
-    end
-  end
-
-  defp sync_for_spawn(nil, _project_path), do: AgentDefinitions.sync_global()
-
-  defp sync_for_spawn(project_id, project_path) do
-    AgentDefinitions.sync_global()
-
-    if project_path do
-      AgentDefinitions.sync_project(project_id, project_path)
-    end
-  end
-
-  defp maybe_put_definition(attrs, nil), do: attrs
-
-  defp maybe_put_definition(attrs, definition_info) do
-    Map.merge(attrs, definition_info)
-  end
 end

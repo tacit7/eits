@@ -12,6 +12,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   alias EyeInTheSky.Agents.CmdDispatcher
   alias EyeInTheSky.AgentWorkerEvents, as: WorkerEvents
+
   alias EyeInTheSky.Claude.AgentWorker.{
     ErrorRecovery,
     IdleTimer,
@@ -20,6 +21,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     SdkLifecycle,
     WatchdogTimer
   }
+
   alias EyeInTheSky.Claude.{Job, Message, StreamAssembler}
   alias EyeInTheSky.Claude.StreamAssemblerProtocol
   alias EyeInTheSky.Codex.StreamAssembler, as: CodexStreamAssembler
@@ -246,7 +248,13 @@ defmodule EyeInTheSky.Claude.AgentWorker do
         %__MODULE__{sdk_ref: ref} = state
       ) do
     channel_id = if state.current_job, do: state.current_job.context[:channel_id], else: nil
-    WorkerEvents.on_result_received(state.session_id, %{provider: state.provider, text: text, metadata: metadata, channel_id: channel_id})
+
+    WorkerEvents.on_result_received(state.session_id, %{
+      provider: state.provider,
+      text: text,
+      metadata: metadata,
+      channel_id: channel_id
+    })
 
     result_len = if(is_binary(text), do: String.length(text), else: 0)
     emit([:eits, :agent, :result, :saved], %{text_length: result_len}, state)
@@ -309,7 +317,12 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
     emit([:eits, :agent, :sdk, :complete], %{system_time: System.system_time()}, state)
 
-    WorkerEvents.on_sdk_completed(state.session_id, state.provider_conversation_id, state.provider)
+    WorkerEvents.on_sdk_completed(
+      state.session_id,
+      state.provider_conversation_id,
+      state.provider
+    )
+
     Messages.mark_delivered(if state.current_job, do: state.current_job.context[:message_id])
 
     state = WatchdogTimer.cancel_watchdog(state)
@@ -489,8 +502,12 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     state = IdleTimer.cancel(state)
     queue_len = length(state.queue)
 
-    emit([:eits, :agent, :job, :received], %{system_time: System.system_time()},
-      %{queue_length: queue_len, has_messages: context.has_messages}, state)
+    emit(
+      [:eits, :agent, :job, :received],
+      %{system_time: System.system_time()},
+      %{queue_length: queue_len, has_messages: context.has_messages},
+      state
+    )
 
     job = Job.new(message, context, context[:content_blocks] || [])
 
@@ -510,7 +527,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   defp maybe_dispatch_commands(%Message{type: :text, content: content} = msg, state)
        when is_binary(content) do
     case CmdDispatcher.extract_commands(content) do
-      {[], _} -> msg
+      {[], _} ->
+        msg
+
       {cmds, clean} ->
         CmdDispatcher.dispatch_all(cmds, state.session_id)
         %{msg | content: clean}
@@ -543,5 +562,4 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   defp emit(event, measurements, extra_meta, state) do
     :telemetry.execute(event, measurements, Map.put(extra_meta, :session_id, state.session_id))
   end
-
 end

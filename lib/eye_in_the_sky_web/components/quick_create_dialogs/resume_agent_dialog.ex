@@ -49,7 +49,9 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ResumeAgentDialog do
             <span>This will spawn a new Claude session for the existing agent.</span>
           </div>
           <div class="flex justify-end gap-2 pt-1">
-            <button data-qra-cancel type="button" class="btn btn-ghost btn-sm min-h-[44px]">Cancel</button>
+            <button data-qra-cancel type="button" class="btn btn-ghost btn-sm min-h-[44px]">
+              Cancel
+            </button>
             <button type="submit" class="btn btn-primary btn-sm min-h-[44px]">Resume Agent</button>
           </div>
         </form>

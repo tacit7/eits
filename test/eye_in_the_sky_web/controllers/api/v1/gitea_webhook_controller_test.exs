@@ -10,11 +10,13 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookControllerTest do
     Application.put_env(:eye_in_the_sky, :allow_unsigned_webhooks, true)
     Application.put_env(:eye_in_the_sky, :gitea_webhook_secret, "")
     Application.put_env(:eye_in_the_sky, :project_path, "/tmp/test-project")
+
     on_exit(fn ->
       Application.delete_env(:eye_in_the_sky, :allow_unsigned_webhooks)
       Application.delete_env(:eye_in_the_sky, :gitea_webhook_secret)
       Application.delete_env(:eye_in_the_sky, :project_path)
     end)
+
     :ok
   end
 

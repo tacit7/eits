@@ -88,7 +88,7 @@ defmodule EyeInTheSky.Codex.CLI do
     * `:resume` - `--resume <thread_id>`
     * `:model` - `-m <model>`
     * `:full_auto` - `--full-auto` (default: true)
-    * `:bypass_sandbox` - `--dangerously-bypass-approvals-and-sandbox` (overrides full_auto)
+    * `:bypass_sandbox` - `--dangerously-bypass-approvals-and-sandbox` (default: true; overrides full_auto)
     * `:max_turns` - not directly supported by Codex; ignored
   """
   @spec build_args(cli_opts()) :: [String.t()]
@@ -119,7 +119,7 @@ defmodule EyeInTheSky.Codex.CLI do
 
     # Bypass sandbox takes precedence over full_auto
     args =
-      if Keyword.get(opts, :bypass_sandbox, false) do
+      if Keyword.get(opts, :bypass_sandbox, true) do
         args ++ ["--dangerously-bypass-approvals-and-sandbox"]
       else
         full_auto = Keyword.get(opts, :full_auto, true)

@@ -226,7 +226,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
       [channel_id_str | tail] ->
         args = List.first(tail, "")
 
-        with channel_id when not is_nil(channel_id) <- ToolHelpers.parse_int(String.trim(channel_id_str)),
+        with channel_id when not is_nil(channel_id) <-
+               ToolHelpers.parse_int(String.trim(channel_id_str)),
              {:ok, body} <- extract_flag(args, "--body") do
           session = get_session_or_nil(from_session_id)
 

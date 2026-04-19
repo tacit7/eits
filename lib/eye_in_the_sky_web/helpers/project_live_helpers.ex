@@ -36,11 +36,20 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectLiveHelpers do
     preload = Keyword.get(opts, :preload, [])
 
     project_id = parse_id(id)
-    project = if project_id, do: (case Projects.get_project(project_id) do
-      {:ok, p} -> p
-      {:error, :not_found} -> nil
-    end), else: nil
-    project = if not is_nil(project) && preload != [], do: Projects.preload_project(project, preload), else: project
+
+    project =
+      if project_id,
+        do:
+          (case Projects.get_project(project_id) do
+             {:ok, p} -> p
+             {:error, :not_found} -> nil
+           end),
+        else: nil
+
+    project =
+      if not is_nil(project) && preload != [],
+        do: Projects.preload_project(project, preload),
+        else: project
 
     if project do
       socket

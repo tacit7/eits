@@ -22,10 +22,16 @@ defmodule EyeInTheSkyWeb.Repo.Migrations.CreateAgentDefinitions do
     create constraint(:agent_definitions, :scope_check, check: "scope IN ('global', 'project')")
 
     # Partial unique index: one slug per global scope
-    create unique_index(:agent_definitions, [:slug], where: "scope = 'global'", name: :agent_definitions_global_slug)
+    create unique_index(:agent_definitions, [:slug],
+             where: "scope = 'global'",
+             name: :agent_definitions_global_slug
+           )
 
     # Partial unique index: one slug per project
-    create unique_index(:agent_definitions, [:project_id, :slug], where: "scope = 'project'", name: :agent_definitions_project_slug)
+    create unique_index(:agent_definitions, [:project_id, :slug],
+             where: "scope = 'project'",
+             name: :agent_definitions_project_slug
+           )
 
     create index(:agent_definitions, [:project_id])
     create index(:agent_definitions, [:scope])

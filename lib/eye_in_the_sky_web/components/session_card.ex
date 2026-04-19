@@ -28,7 +28,9 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
 
   def session_row(assigns) do
     display_status = derive_display_status(assigns.session)
-    %{label: status_label, border: status_border, class: status_class} = session_status_display(display_status)
+
+    %{label: status_label, border: status_border, class: status_class} =
+      session_status_display(display_status)
 
     assigns =
       assigns
@@ -151,12 +153,23 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
 
   defp session_status_display(status) do
     case status do
-      "working" -> %{label: "Working", border: "border-success", class: "text-success"}
-      "waiting" -> %{label: "Waiting", border: "border-warning", class: "text-warning"}
-      "compacting" -> %{label: "Compacting", border: "border-orange-500", class: "text-orange-500"}
-      "stopped" -> %{label: "Stopped", border: "border-warning", class: "text-warning"}
-      "completed" -> %{label: "Done", border: "border-transparent", class: "text-base-content/50"}
-      _ -> %{label: "Idle", border: "border-transparent", class: "text-base-content/55"}
+      "working" ->
+        %{label: "Working", border: "border-success", class: "text-success"}
+
+      "waiting" ->
+        %{label: "Waiting", border: "border-warning", class: "text-warning"}
+
+      "compacting" ->
+        %{label: "Compacting", border: "border-orange-500", class: "text-orange-500"}
+
+      "stopped" ->
+        %{label: "Stopped", border: "border-warning", class: "text-warning"}
+
+      "completed" ->
+        %{label: "Done", border: "border-transparent", class: "text-base-content/50"}
+
+      _ ->
+        %{label: "Idle", border: "border-transparent", class: "text-base-content/55"}
     end
   end
 end

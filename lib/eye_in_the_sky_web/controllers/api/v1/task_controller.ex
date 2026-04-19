@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Agents, Notes, Sessions, Tasks}
+  alias EyeInTheSky.{Agents, Notes, Tasks}
   alias EyeInTheSky.Tasks.WorkflowState
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
@@ -60,7 +60,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   end
 
   defp fetch_tasks_by_filter(%{"project_id" => project_id}, limit) do
-    Tasks.list_tasks_for_project(parse_int(project_id, nil)) |> Enum.take(limit)
+    case parse_int(project_id, nil) do
+      nil -> []
+      project_int_id -> Tasks.list_tasks_for_project(project_int_id) |> Enum.take(limit)
+    end
   end
 
   defp fetch_tasks_by_filter(_params, limit) do
@@ -73,8 +76,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   def create(conn, params) do
     attrs = %{
       uuid: Ecto.UUID.generate(),
-      title: params["title"],
-      description: params["description"],
+      title: trim_param(params["title"]),
+      description: trim_param(params["description"]),
       priority: params["priority"],
       state_id: params["state_id"] || WorkflowState.todo_id(),
       project_id: params["project_id"],
@@ -86,18 +89,14 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
     case Tasks.create_task(attrs) do
       {:ok, task} ->
-        maybe_add_tags(task, params["tags"])
-        maybe_add_tag_ids(task, params["tag_ids"])
-        maybe_link_session(task.id, params["session_id"])
+        Tasks.associate_task(task, params)
 
         conn
         |> put_status(:created)
         |> json(%{success: true, message: "Task created", task_id: to_string(task.id)})
 
       {:error, changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Failed to create task", details: translate_errors(changeset)})
+        {:error, changeset}
     end
   end
 
@@ -107,7 +106,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   def show(conn, %{"id" => id}) do
     case Tasks.get_task(id) do
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Task not found"})
+        {:error, :not_found, "Task not found"}
 
       {:ok, task} ->
         annotations = Notes.list_notes_for_task(id)
@@ -133,17 +132,24 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   """
   def update(conn, %{"id" => id} = params) do
     case Tasks.get_task(id) do
-      {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "Task not found"})
+      {:error, :not_found} -> {:error, :not_found, "Task not found"}
       {:ok, task} -> do_update_task(conn, task, params)
     end
   end
 
   defp do_update_task(conn, task, params) do
     result =
-      case params["state"] do
-        "done" -> move_to_state(task, "Done")
-        "start" -> move_to_state(task, "In Progress")
-        _ -> update_attrs(task, params)
+      case WorkflowState.resolve_alias(params["state"]) do
+        {:ok, state_name} ->
+          move_to_state(task, state_name)
+
+        {:error, :no_alias} ->
+          update_attrs(task, params)
+
+        {:error, :invalid_alias} ->
+          {:error,
+           {:bad_alias,
+            "Unknown state alias '#{params["state"]}'. Valid aliases: done, start, in-review, review, todo"}}
       end
 
     case result do
@@ -158,10 +164,11 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
           task: ApiPresenter.present_task(updated)
         })
 
+      {:error, {:bad_alias, message}} ->
+        {:error, message}
+
       {:error, changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Failed to update task", details: translate_errors(changeset)})
+        {:error, changeset}
     end
   end
 
@@ -171,7 +178,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   def delete(conn, %{"id" => id}) do
     case Tasks.get_task(id) do
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Task not found"})
+        {:error, :not_found, "Task not found"}
 
       {:ok, task} ->
         case Tasks.delete_task(task) do
@@ -179,9 +186,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
             json(conn, %{success: true, message: "Task deleted"})
 
           {:error, changeset} ->
-            conn
-            |> put_status(:unprocessable_entity)
-            |> json(%{error: "Failed to delete task", details: translate_errors(changeset)})
+            {:error, changeset}
         end
     end
   end
@@ -194,8 +199,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     case Notes.create_note(%{
            parent_id: task_id,
            parent_type: "task",
-           body: params["body"] || "",
-           title: params["title"]
+           body: trim_param(params["body"] || ""),
+           title: trim_param(params["title"])
          }) do
       {:ok, note} ->
         conn
@@ -203,9 +208,37 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
         |> json(%{success: true, message: "Annotation added", note_id: note.id})
 
       {:error, cs} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Failed", details: translate_errors(cs)})
+        {:error, cs}
+    end
+  end
+
+  @doc """
+  POST /api/v1/tasks/:id/complete - Atomically annotate and move task to Done.
+  Body: message (required)
+  """
+  def complete(conn, %{"id" => id} = params) do
+    message = trim_param(params["message"] || "")
+
+    with false <- message == "",
+         {:ok, task} <- Tasks.get_task(id),
+         {:ok, %{task: updated}} <- Tasks.complete_task(task, message) do
+      json(conn, %{
+        success: true,
+        message: "Task completed",
+        task: ApiPresenter.present_task(updated)
+      })
+    else
+      true ->
+        {:error, "message is required"}
+
+      {:error, :not_found} ->
+        {:error, :not_found, "Task not found"}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:error, changeset}
+
+      {:error, _reason} ->
+        {:error, "Failed to complete task"}
     end
   end
 
@@ -215,11 +248,17 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   def link_session(conn, %{"id" => task_id} = params) do
     case params["session_id"] do
       nil ->
-        conn |> put_status(:bad_request) |> json(%{error: "session_id is required"})
+        {:error, :bad_request, "session_id is required"}
 
       session_id ->
-        maybe_link_session(task_id, session_id)
-        json(conn, %{success: true, message: "Session linked to task #{task_id}"})
+        case Tasks.get_task(task_id) do
+          {:ok, _task} ->
+            maybe_link_session(task_id, session_id)
+            json(conn, %{success: true, message: "Session linked to task #{task_id}"})
+
+          {:error, :not_found} ->
+            {:error, :bad_request, "Invalid task ID"}
+        end
     end
   end
 
@@ -227,14 +266,23 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   DELETE /api/v1/tasks/:id/sessions/:uuid - Unlink a session from a task.
   """
   def unlink_session(conn, %{"id" => task_id, "uuid" => session_uuid}) do
-    int_id = resolve_session_int_id(session_uuid)
-    task_int_id = parse_task_id(task_id)
+    case Tasks.get_task(task_id) do
+      {:error, :not_found} ->
+        {:error, :bad_request, "Invalid task ID"}
 
-    if int_id do
-      Tasks.unlink_session_from_task(task_int_id, int_id)
-      json(conn, %{success: true, message: "Session unlinked from task #{task_id}"})
-    else
-      conn |> put_status(:not_found) |> json(%{error: "Session not found"})
+      {:ok, task} ->
+        int_id =
+          case Helpers.resolve_session_int_id(session_uuid) do
+            {:ok, id} -> id
+            _ -> nil
+          end
+
+        if int_id do
+          Tasks.unlink_session_from_task(task.id, int_id)
+          json(conn, %{success: true, message: "Session unlinked from task #{task_id}"})
+        else
+          {:error, :not_found, "Session not found"}
+        end
     end
   end
 
@@ -252,7 +300,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       %{}
       |> Helpers.maybe_put(:state_id, params["state_id"])
       |> Helpers.maybe_put(:priority, params["priority"])
-      |> Helpers.maybe_put(:description, params["description"])
+      |> Helpers.maybe_put(:description, trim_param(params["description"]))
       |> Helpers.maybe_put(:due_at, params["due_at"])
 
     Tasks.update_task(task, attrs)
@@ -261,40 +309,26 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   defp maybe_link_session(_task_id, nil), do: :ok
 
   defp maybe_link_session(task_id, session_id) when is_binary(session_id) do
-    int_id = resolve_session_int_id(session_id)
-    task_int_id = parse_task_id(task_id)
+    int_id =
+      case Helpers.resolve_session_int_id(session_id) do
+        {:ok, id} -> id
+        _ -> nil
+      end
 
-    if int_id do
-      Tasks.link_session_to_task(task_int_id, int_id)
+    case parse_task_id(task_id) do
+      nil ->
+        :ok
+
+      task_int_id ->
+        if int_id do
+          Tasks.link_session_to_task(task_int_id, int_id)
+        end
+
+        :ok
     end
-
-    :ok
   end
 
   defp resolve_agent_int_id(uuid), do: resolve_id(uuid, &Agents.get_agent_by_uuid/1)
-
-  defp maybe_add_tags(_task, nil), do: :ok
-  defp maybe_add_tags(_task, []), do: :ok
-
-  defp maybe_add_tags(task, tags) when is_list(tags) do
-    Tasks.replace_task_tags(task.id, tags)
-  end
-
-  defp maybe_add_tag_ids(_task, nil), do: :ok
-  defp maybe_add_tag_ids(_task, []), do: :ok
-
-  defp maybe_add_tag_ids(task, tag_ids) when is_list(tag_ids) do
-    Enum.each(tag_ids, fn tag_id ->
-      case parse_int(tag_id) do
-        nil -> :ok
-        id -> Tasks.link_tag_to_task(task.id, id)
-      end
-    end)
-  end
-
-  defp resolve_session_int_id(raw) do
-    resolve_id(raw, &Sessions.get_session_by_uuid/1)
-  end
 
   defp parse_task_id(id) when is_binary(id), do: Helpers.parse_int(id) || id
   defp parse_task_id(id), do: id

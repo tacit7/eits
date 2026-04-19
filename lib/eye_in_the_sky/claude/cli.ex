@@ -312,7 +312,9 @@ defmodule EyeInTheSky.Claude.CLI do
 
   defp maybe_pipe_content_blocks(port, opts) do
     case Args.content_blocks_json(opts) do
-      nil -> :ok
+      nil ->
+        :ok
+
       json ->
         Port.command(port, json <> "\n")
         Logger.info("[CLI] Piped multimodal content blocks to stdin (#{byte_size(json)} bytes)")

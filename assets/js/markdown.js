@@ -1,17 +1,17 @@
-// marked, marked-highlight, and highlight.js are all loaded lazily.
-// Both this module and hooks/highlight.js use dynamic imports for hljs,
-// so Vite creates one standalone hljs chunk — no static import means
-// no re-export stub that would re-load app.js without the ?vsn=d cache-buster.
+// marked and marked-highlight are loaded lazily.
+// hljs comes from hljs_instance.js — core build + explicit language list.
+// This keeps the syntax chunk ~80KB instead of the ~1MB full highlight.js build.
+import { getHljs } from './hljs_instance.js';
 
 let _ready = null;
 
 async function ensureReady() {
   if (!_ready) {
     _ready = (async () => {
-      const [{ marked }, { markedHighlight }, { default: hljs }] = await Promise.all([
+      const [{ marked }, { markedHighlight }, hljs] = await Promise.all([
         import('marked'),
         import('marked-highlight'),
-        import('highlight.js'),
+        getHljs(),
       ]);
 
       marked.use(
@@ -74,11 +74,16 @@ function escapeHtml(str) {
 /**
  * Render markdown with syntax highlighting.
  * Returns a Promise<string>. All deps are loaded lazily on first call.
+ * Output is sanitized with DOMPurify to prevent XSS from agent-generated content.
  */
 export async function renderMarkdown(markdown) {
   if (!markdown) return '';
-  const marked = await ensureReady();
-  return marked.parse(preprocessEitsCmds(stripFrontmatter(markdown)));
+  const [marked, { default: DOMPurify }] = await Promise.all([
+    ensureReady(),
+    import('dompurify'),
+  ]);
+  const raw = marked.parse(preprocessEitsCmds(stripFrontmatter(markdown)));
+  return DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } });
 }
 
 export default renderMarkdown;

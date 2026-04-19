@@ -5,19 +5,18 @@ defmodule EyeInTheSkyWeb.AuthHook do
 
   alias EyeInTheSky.Accounts
 
-  # :env is set only in compile-time configs (config/dev.exs, config/test.exs);
-  # resolve it once at compile time rather than on every mount.
-  @env Application.compile_env(:eye_in_the_sky, :env, :prod)
-
   def on_mount(:default, params, session, socket),
     do: on_mount(:require_auth, params, session, socket)
 
   def on_mount(:require_auth, _params, session, socket) do
     # :disable_auth is configured in runtime.exs via DISABLE_AUTH env var;
     # must remain Application.get_env (resolved at startup, not compile time).
+    # NOTE: Tauri POC — prod guard on @env dropped so the bundled desktop app
+    # (which runs as a prod release) can bypass auth entirely. DO NOT set
+    # DISABLE_AUTH=true in any deployment where the app is network-reachable.
     disable_auth = Application.get_env(:eye_in_the_sky, :disable_auth, false)
 
-    if disable_auth and @env != :prod do
+    if disable_auth do
       {:cont, assign(socket, :current_user, nil)}
     else
       authenticate_from_session(session, socket)

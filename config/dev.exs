@@ -3,7 +3,7 @@ import Config
 # Gitea webhook HMAC secret — set this in Gitea webhook settings and here
 config :eye_in_the_sky, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SECRET", "")
 config :eye_in_the_sky, :env, :dev
-config :eye_in_the_sky, :bypass_auth, true
+config :eye_in_the_sky, :bypass_auth, System.get_env("BYPASS_AUTH", "true") in ~w(true 1)
 # Allow unsigned webhooks in dev when no secret is set (never enable in prod)
 config :eye_in_the_sky, :allow_unsigned_webhooks, true
 
@@ -33,10 +33,15 @@ config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
   code_reloader: true,
   debug_errors: true,
   secret_key_base: "N/iElaaIGg/5yCN4JOKd13aAXziMbsBDWfTjQFgjjLY32KpeZ7hBDnQEx1AcpSLO",
-  watchers: [
-    vite: {PhoenixVite.Npm, :run, [:vite, ~w(dev)]},
-    tailwind: {Tailwind, :install_and_run, [:eye_in_the_sky, ~w(--watch)]}
-  ]
+  watchers:
+    (if System.get_env("SKIP_WATCHERS") in ["1", "true"] do
+       []
+     else
+       [
+         vite: {PhoenixVite.Npm, :run, [:vite, ~w(dev)]},
+         tailwind: {Tailwind, :install_and_run, [:eye_in_the_sky, ~w(--watch)]}
+       ]
+     end)
 
 # ## SSL Support
 #
@@ -65,24 +70,24 @@ config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
 config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
   live_reload:
     (if System.get_env("LIVE_RELOAD") in ["0", "false"] do
-      []
-    else
-      [
-        web_console_logger: true,
-        patterns: [
-          ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
-          ~r"priv/gettext/.*(po)$",
-          ~r"lib/eye_in_the_sky/(?:controllers|live|components|router)/?.*\.(ex|heex)$"
-        ]
-      ]
-    end)
+       []
+     else
+       [
+         web_console_logger: true,
+         patterns: [
+           ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
+           ~r"priv/gettext/.*(po)$",
+           ~r"lib/eye_in_the_sky/(?:controllers|live|components|router)/?.*\.(ex|heex)$"
+         ]
+       ]
+     end)
 
 # LiveSvelte SSR via Vite dev server in development
 config :live_svelte,
   ssr_module: LiveSvelte.SSR.ViteJS,
-  vite_host: "http://localhost:#{System.get_env("VITE_PORT", "5173")}"
+  vite_host: "http://127.0.0.1:#{System.get_env("VITE_PORT", "5173")}"
 
-config :eye_in_the_sky, :vite_host, "http://localhost:#{System.get_env("VITE_PORT", "5173")}"
+config :eye_in_the_sky, :vite_host, "http://127.0.0.1:#{System.get_env("VITE_PORT", "5173")}"
 
 # Enable dev routes for dashboard and mailbox
 config :eye_in_the_sky, dev_routes: true

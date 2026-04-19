@@ -15,6 +15,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Helpers.UploadHelpers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1, parse_int: 2]
+  require Logger
 
   @impl true
   def mount(_params, _session, socket) do
@@ -107,7 +108,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   @impl true
   def handle_event("send_channel_message", %{"channel_id" => channel_id, "body" => body}, socket) do
-    require Logger
     session_id = get_session_id(socket)
     content_blocks = consume_agent_images_as_content_blocks(socket)
 
@@ -146,9 +146,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
         if target_session_id do
           prompt = ChannelProtocol.build_prompt(:direct, body)
 
-          AgentManager.send_message(target_session_id, prompt,
-            channel_id: channel_id
-          )
+          AgentManager.send_message(target_session_id, prompt, channel_id: channel_id)
         end
 
         {:noreply, socket}
@@ -292,8 +290,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   @impl true
   def handle_info({:new_message, _message}, socket) do
-    require Logger
-
     Logger.info(
       "📨 Received new_message broadcast for channel #{socket.assigns.active_channel_id}"
     )
@@ -437,7 +433,11 @@ defmodule EyeInTheSkyWeb.ChatLive do
     search = socket.assigns[:session_search] || ""
 
     sessions_by_project =
-      ChannelHelpers.build_sessions_by_project(channel_members, socket.assigns.all_projects, search)
+      ChannelHelpers.build_sessions_by_project(
+        channel_members,
+        socket.assigns.all_projects,
+        search
+      )
 
     socket
     |> assign(:channel_members, channel_members)

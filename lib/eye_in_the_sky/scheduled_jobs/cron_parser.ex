@@ -1,6 +1,8 @@
 defmodule EyeInTheSky.ScheduledJobs.CronParser do
   @moduledoc false
 
+  require Logger
+
   alias Crontab.CronExpression.Parser
   alias EyeInTheSky.Utils.ToolHelpers
 
@@ -41,8 +43,10 @@ defmodule EyeInTheSky.ScheduledJobs.CronParser do
           next_utc
         else
           {:error, :time_zone_not_found} ->
-            require Logger
-            Logger.warning("CronParser: invalid timezone #{inspect(timezone)}, skipping next_run_at")
+            Logger.warning(
+              "CronParser: invalid timezone #{inspect(timezone)}, skipping next_run_at"
+            )
+
             nil
 
           _ ->

@@ -52,6 +52,10 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
     commit
   end
 
+  setup do
+    {:ok, conn: api_conn()}
+  end
+
   # ---- GET /api/v1/sessions ----
 
   describe "GET /api/v1/sessions" do
@@ -124,6 +128,19 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
       assert json_response(conn, 201)["uuid"] == uuid
     end
 
+    test "returns 422 when project_id is invalid", %{conn: conn} do
+      uuid = Ecto.UUID.generate()
+
+      conn =
+        post(conn, ~p"/api/v1/sessions", %{
+          "session_id" => uuid,
+          "name" => "Invalid project test",
+          "project_id" => 999999
+        })
+
+      assert json_response(conn, 422)["error"] != nil
+    end
+
     test "persists name on fresh session create", %{conn: conn} do
       uuid = Ecto.UUID.generate()
 
@@ -136,11 +153,11 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
       assert session.name == "fresh session name"
     end
 
-    test "sets name when session already exists (pre-registered)", %{conn: _conn} do
+    test "sets name when session already exists (pre-registered)", %{conn: conn} do
       agent = create_agent()
       pre_registered = create_session(agent, %{name: nil})
 
-      post(build_conn(), ~p"/api/v1/sessions", %{
+      post(conn, ~p"/api/v1/sessions", %{
         "session_id" => pre_registered.uuid,
         "name" => "assigned after pre-register"
       })
@@ -174,11 +191,11 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
       assert session.description == "doing important work"
     end
 
-    test "sets description when session already exists", %{conn: _conn} do
+    test "sets description when session already exists", %{conn: conn} do
       agent = create_agent()
       pre_registered = create_session(agent, %{description: nil})
 
-      post(build_conn(), ~p"/api/v1/sessions", %{
+      post(conn, ~p"/api/v1/sessions", %{
         "session_id" => pre_registered.uuid,
         "name" => "named",
         "description" => "added after pre-register"
@@ -547,7 +564,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
       patch(conn, ~p"/api/v1/sessions/#{session.uuid}/context", %{"context" => "first"})
 
       conn2 =
-        patch(build_conn(), ~p"/api/v1/sessions/#{session.uuid}/context", %{
+        patch(conn, ~p"/api/v1/sessions/#{session.uuid}/context", %{
           "context" => "second"
         })
 

@@ -27,7 +27,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   def show(conn, %{"id" => id}) do
     case resolve_team(id) do
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Team not found"})
+        {:error, :not_found, "Team not found"}
 
       {:ok, team} ->
         members = Teams.list_members(team.id)
@@ -67,9 +67,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         })
 
       {:error, changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Failed to create team", details: translate_errors(changeset)})
+        {:error, changeset}
     end
   end
 
@@ -77,7 +75,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   def delete(conn, %{"id" => id}) do
     case resolve_team(id) do
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Team not found"})
+        {:error, :not_found, "Team not found"}
 
       {:ok, team} ->
         case Teams.delete_team(team) do
@@ -85,9 +83,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
             json(conn, %{success: true, message: "Team archived", id: team.id})
 
           {:error, changeset} ->
-            conn
-            |> put_status(:unprocessable_entity)
-            |> json(%{error: "Failed", details: translate_errors(changeset)})
+            {:error, changeset}
         end
     end
   end
@@ -96,7 +92,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   def list_members(conn, %{"team_id" => id}) do
     case resolve_team(id) do
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Team not found"})
+        {:error, :not_found, "Team not found"}
 
       {:ok, team} ->
         members = Teams.list_members(team.id)
@@ -113,7 +109,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   def join(conn, %{"team_id" => id} = params) do
     case resolve_team(id) do
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Team not found"})
+        {:error, :not_found, "Team not found"}
 
       {:ok, team} ->
         attrs = %{
@@ -121,7 +117,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
           name: params["name"],
           role: params["role"] || "member",
           agent_id: params["agent_id"],
-          session_id: resolve_id(params["session_id"], &EyeInTheSky.Sessions.get_session_by_uuid/1)
+          session_id:
+            resolve_id(params["session_id"], &EyeInTheSky.Sessions.get_session_by_uuid/1)
         }
 
         case Teams.join_team(attrs) do
@@ -137,9 +134,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
             })
 
           {:error, changeset} ->
-            conn
-            |> put_status(:unprocessable_entity)
-            |> json(%{error: "Failed to join team", details: translate_errors(changeset)})
+            {:error, changeset}
         end
     end
   end
@@ -148,12 +143,15 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   def update_member(conn, %{"team_id" => team_id, "member_id" => member_id} = params) do
     case resolve_team(team_id) do
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Team not found"})
+        {:error, :not_found, "Team not found"}
 
       {:ok, _team} ->
         case Teams.get_member(member_id) do
-          {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "Member not found"})
-          {:ok, member} -> do_update_member(conn, member, params)
+          {:error, :not_found} ->
+            {:error, :not_found, "Member not found"}
+
+          {:ok, member} ->
+            do_update_member(conn, member, params)
         end
     end
   end
@@ -162,12 +160,15 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   def leave(conn, %{"team_id" => team_id, "member_id" => member_id}) do
     case resolve_team(team_id) do
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Team not found"})
+        {:error, :not_found, "Team not found"}
 
       {:ok, _team} ->
         case Teams.get_member(member_id) do
-          {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "Member not found"})
-          {:ok, member} -> do_leave_team(conn, member)
+          {:error, :not_found} ->
+            {:error, :not_found, "Member not found"}
+
+          {:ok, member} ->
+            do_leave_team(conn, member)
         end
     end
   end
@@ -184,9 +185,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         json(conn, %{success: true, member_id: updated.id, status: updated.status})
 
       {:error, changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Failed to update member", details: translate_errors(changeset)})
+        {:error, changeset}
     end
   end
 
@@ -196,9 +195,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         json(conn, %{success: true, message: "Left team", member_id: member.id})
 
       {:error, changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Failed to leave team", details: translate_errors(changeset)})
+        {:error, changeset}
     end
   end
 end

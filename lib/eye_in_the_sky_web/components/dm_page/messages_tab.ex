@@ -4,8 +4,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   use EyeInTheSkyWeb, :html
 
   alias EyeInTheSkyWeb.Components.DmHelpers
-  alias EyeInTheSkyWeb.Components.DmPage.MessageToolWidget
   import EyeInTheSkyWeb.Components.DmHelpers, only: [to_utc_string: 1]
+  import EyeInTheSkyWeb.Components.DmMessageComponents,
+    only: [message_body: 1, message_metrics: 1, message_attachments: 1]
 
   attr :messages, :list, default: []
   attr :has_more_messages, :boolean, default: false
@@ -13,6 +14,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   attr :session, :map, default: nil
   attr :agent, :map, default: nil
   attr :message_search_query, :string, default: ""
+  attr :codex_raw_lines, :list, default: []
 
   def messages_tab(assigns) do
     ~H"""
@@ -77,9 +79,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                         Using {@stream.tool}...
                       </div>
                     <% end %>
-                    <%= if @stream.content != "" do %>
+                    <%= if @stream.content not in [nil, ""] do %>
                       <div class="mt-1 text-sm text-base-content/60 whitespace-pre-wrap">
-                        {@stream.content}
+                        {String.trim_leading(@stream.content)}
                       </div>
                     <% end %>
                   </div>
@@ -91,6 +93,26 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           <% end %>
         </div>
       </div>
+      <%!-- Codex raw JSONL stream panel — only visible for codex sessions with data --%>
+      <%= if @codex_raw_lines != [] do %>
+        <details class="border-t border-base-300 shrink-0" id="codex-raw-panel">
+          <summary class="px-4 py-1.5 text-[10px] font-mono text-base-content/30 cursor-pointer select-none hover:text-base-content/50 flex items-center gap-1.5">
+            <.icon name="hero-code-bracket" class="w-3 h-3" />
+            raw stream ({length(@codex_raw_lines)} lines)
+          </summary>
+          <div
+            class="h-40 overflow-y-auto bg-base-300/30 px-3 py-2"
+            id="codex-raw-lines"
+            phx-hook="AutoScroll"
+          >
+            <%= for line <- Enum.reverse(@codex_raw_lines) do %>
+              <div class="font-mono text-[10px] text-base-content/40 leading-relaxed truncate">
+                {line}
+              </div>
+            <% end %>
+          </div>
+        </details>
+      <% end %>
     </div>
     """
   end
@@ -98,14 +120,22 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   attr :message, :map, required: true
 
   defp message_item(assigns) do
-    is_user = assigns.message.sender_role == "user"
+    role = if assigns.message.sender_role == "user", do: :user, else: :agent
     is_dm = dm_message?(assigns.message)
-    assigns = assign(assigns, :is_user, is_user) |> assign(:is_dm, is_dm)
+    stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
+    is_tool_result = stream_type == "tool_result"
+
+    assigns =
+      assign(assigns, :role, role)
+      |> assign(:is_dm, is_dm)
+      |> assign(:is_tool_result, is_tool_result)
 
     ~H"""
     <div
       class={[
-        "py-3 px-2 -mx-2 rounded-lg",
+        "px-2 -mx-2 rounded-lg",
+        @is_tool_result && "py-0 -mt-3",
+        !@is_tool_result && "py-3",
         @is_dm && "border-l-2 border-primary/30 pl-3 bg-primary/[0.03]"
       ]}
       id={"dm-message-#{@message.id}"}
@@ -116,237 +146,87 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
         )
       }
     >
-      <div class="flex items-start gap-2.5">
-        <%!-- Sender icon --%>
-        <%= if @is_user do %>
-          <div class="w-4 h-4 rounded-full mt-1 flex-shrink-0 bg-success/20 flex items-center justify-center">
-            <div class="w-1.5 h-1.5 rounded-full bg-success" />
-          </div>
-        <% else %>
-          <img
-            src={provider_icon(@message.provider)}
-            class={"w-4 h-4 mt-1 flex-shrink-0 #{provider_icon_class(@message.provider)}"}
-            alt={@message.provider || "Agent"}
-            width="16"
-            height="16"
-            loading="lazy"
-          />
-        <% end %>
-
-        <div class="min-w-0 flex-1">
-          <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span class={[
-              "text-[13px] font-semibold",
-              !@is_user && "text-primary/80",
-              @is_user && "text-base-content/70"
-            ]}>
-              {message_sender_name(@message)}
-            </span>
-            <%!-- DM badge --%>
-            <span
-              :if={@is_dm}
-              class="inline-flex items-center gap-1 text-xs font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/40 uppercase tracking-wide"
-            >
-              <.icon name="hero-envelope-mini" class="w-2.5 h-2.5" /> dm
-            </span>
-            <span
-              :if={!@is_user && message_model(@message)}
-              class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/35"
-            >
-              {message_model(@message)}
-            </span>
-            <span
-              :if={!@is_user && message_cost(@message)}
-              class="text-[11px] font-mono text-base-content/30"
-            >
-              ${:erlang.float_to_binary(message_cost(@message) * 1.0, decimals: 4)}
-            </span>
-            <time
-              id={"msg-time-#{@message.id}"}
-              class="text-[11px] text-base-content/25"
-              data-utc={to_utc_string(@message.inserted_at)}
-              phx-hook="LocalTime"
-            >
-            </time>
-          </div>
-
+      <%= if @is_tool_result do %>
+        <div class="pl-[26px]">
           <.message_body message={@message} />
-
-          <.message_metrics :if={show_message_metrics?(@message)} message={@message} />
-          <.message_attachments attachments={@message.attachments || []} />
         </div>
-      </div>
-    </div>
-    """
-  end
-
-  attr :message, :map, required: true
-
-  defp message_metrics(assigns) do
-    ~H"""
-    <div class="mt-2 flex flex-wrap gap-1.5">
-      <%= if @message.metadata["total_cost_usd"] do %>
-        <span
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40"
-          title="Total cost"
-        >
-          <.icon name="hero-currency-dollar-mini" class="w-3 h-3" />
-          {:erlang.float_to_binary(@message.metadata["total_cost_usd"] * 1.0, decimals: 4)}
-        </span>
-      <% end %>
-
-      <%= if @message.metadata["usage"] && @message.metadata["usage"]["input_tokens"] do %>
-        <span
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40"
-          title="Input tokens"
-        >
-          {@message.metadata["usage"]["input_tokens"]} in
-        </span>
-      <% end %>
-
-      <%= if @message.metadata["usage"] && @message.metadata["usage"]["output_tokens"] do %>
-        <span
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40"
-          title="Output tokens"
-        >
-          {@message.metadata["usage"]["output_tokens"]} out
-        </span>
-      <% end %>
-
-      <%= if @message.metadata["duration_ms"] do %>
-        <span
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40"
-          title="Duration"
-        >
-          <.icon name="hero-clock-mini" class="w-3 h-3" />
-          {:erlang.float_to_binary(@message.metadata["duration_ms"] * 1.0 / 1000, decimals: 1)}s
-        </span>
-      <% end %>
-
-      <%= if @message.metadata["num_turns"] do %>
-        <span
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40"
-          title="Number of turns"
-        >
-          {@message.metadata["num_turns"]} turns
-        </span>
-      <% end %>
-    </div>
-    """
-  end
-
-  attr :attachments, :list, default: []
-
-  defp message_attachments(assigns) do
-    ~H"""
-    <%= if @attachments != [] do %>
-      <div class="mt-2 space-y-1">
-        <%= for attachment <- @attachments do %>
-          <div class="flex items-center gap-2 rounded-md bg-base-content/[0.04] px-2.5 py-1.5 text-[11px] font-mono">
-            <.icon name="hero-paper-clip" class="h-3 w-3 text-base-content/30" />
-            <span class="text-base-content/60">{attachment.original_filename}</span>
-            <span class="ml-auto text-base-content/25">{attachment.storage_path}</span>
-          </div>
-        <% end %>
-      </div>
-    <% end %>
-    """
-  end
-
-  attr :message, :map, required: true
-
-  defp message_body(assigns) do
-    body =
-      if dm_message?(assigns.message),
-        do: strip_dm_prefix(assigns.message.body),
-        else: assigns.message.body
-
-    segments = parse_body_segments(body)
-    thinking = get_in(assigns.message.metadata || %{}, ["thinking"])
-    stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
-
-    assigns =
-      assigns
-      |> assign(:segments, segments)
-      |> assign(:thinking, thinking)
-      |> assign(:stream_type, stream_type)
-
-    ~H"""
-    <div class="mt-1 space-y-1.5">
-      <details
-        :if={not is_nil(@thinking) && @thinking != ""}
-        class="group rounded border-l-2 border-primary/50 bg-zinc-950/50 overflow-hidden"
-      >
-        <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
-          <.icon name="hero-sparkles" class="w-3.5 h-3.5 flex-shrink-0 text-primary/60" />
-          <span class="text-[11px] font-mono font-semibold text-primary/60 uppercase tracking-wide">
-            Thinking
-          </span>
-          <.icon
-            name="hero-chevron-right"
-            class="w-3 h-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
-          />
-        </summary>
-        <div class="px-2.5 pb-2 pt-1 border-t border-primary/10">
-          <pre class="font-mono text-xs text-base-content/40 whitespace-pre-wrap break-words leading-relaxed">{@thinking}</pre>
-        </div>
-      </details>
-      <%= if @stream_type == "tool_result" do %>
-        <.tool_result_body body={@message.body} />
       <% else %>
-        <%= for {segment, idx} <- Enum.with_index(@segments) do %>
-          <%= case segment do %>
-            <% {:tool_call, name, rest} -> %>
-              <MessageToolWidget.tool_widget name={name} rest={rest} />
-            <% {:text, text} when text != "" -> %>
-              <div
-                id={"msg-body-#{@message.id}-#{idx}"}
-                class="dm-markdown text-sm leading-relaxed text-base-content/85"
-                phx-hook="MarkdownMessage"
-                data-raw-body={text}
-              >
-              </div>
-            <% _ -> %>
+        <div class="flex items-start gap-2.5">
+          <%!-- Sender icon --%>
+          <%= if @role == :user do %>
+            <div class="w-4 h-4 rounded-full mt-1 flex-shrink-0 bg-success/20 flex items-center justify-center">
+              <div class="w-1.5 h-1.5 rounded-full bg-success" />
+            </div>
+          <% else %>
+            <img
+              src={provider_icon(@message.provider)}
+              class={"w-4 h-4 mt-1 flex-shrink-0 #{provider_icon_class(@message.provider)}"}
+              alt={@message.provider || "Agent"}
+              width="16"
+              height="16"
+              loading="lazy"
+            />
           <% end %>
-        <% end %>
+
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span class={[
+                "text-[13px] font-semibold",
+                @role == :agent && "text-primary/80",
+                @role == :user && "text-base-content/70"
+              ]}>
+                {message_sender_name(@message)}
+              </span>
+              <%!-- DM badge --%>
+              <span
+                :if={@is_dm}
+                class="inline-flex items-center gap-1 text-xs font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/40 uppercase tracking-wide"
+              >
+                <.icon name="hero-envelope-mini" class="w-2.5 h-2.5" /> dm
+              </span>
+              <span
+                :if={@role == :agent && message_model(@message)}
+                class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/35"
+              >
+                {message_model(@message)}
+              </span>
+              <span
+                :if={@role == :agent && message_cost(@message)}
+                class="text-[11px] font-mono text-base-content/30"
+              >
+                ${:erlang.float_to_binary(message_cost(@message) * 1.0, decimals: 4)}
+              </span>
+              <time
+                id={"msg-time-#{@message.id}"}
+                class="text-[11px] text-base-content/25"
+                data-utc={to_utc_string(@message.inserted_at)}
+                phx-hook="LocalTime"
+              >
+              </time>
+            </div>
+
+            <.message_body message={@message} />
+
+            <.message_metrics :if={show_message_metrics?(@message)} message={@message} />
+            <.message_attachments attachments={@message.attachments || []} />
+          </div>
+        </div>
       <% end %>
     </div>
     """
   end
 
-  attr :body, :string, default: ""
-
-  defp tool_result_body(assigns) do
-    ~H"""
-    <details
-      open
-      class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden"
-    >
-      <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
-        <.icon name="hero-code-bracket" class="w-3.5 h-3.5 flex-shrink-0 text-base-content/30" />
-        <span class="text-[11px] font-mono font-semibold text-base-content/40 uppercase tracking-wide flex-shrink-0">
-          Output
-        </span>
-        <.icon
-          name="hero-chevron-right"
-          class="w-3 h-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
-        />
-      </summary>
-      <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-        <pre class="font-mono text-xs text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto">{@body}</pre>
-      </div>
-    </details>
-    """
-  end
+  defp normalize_provider("codex"), do: :codex
+  defp normalize_provider(_), do: :claude
 
   attr :session, :map, default: nil
 
   defp stream_provider_avatar(assigns) do
     provider = if assigns.session, do: assigns.session.provider, else: "claude"
-    assigns = assign(assigns, :provider, provider)
+    assigns = assign(assigns, :provider, normalize_provider(provider))
 
     ~H"""
-    <%= if @provider == "codex" do %>
+    <%= if @provider == :codex do %>
       <img
         src="/images/openai.svg"
         class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
@@ -375,7 +255,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   defdelegate dm_message?(msg), to: DmHelpers
   defdelegate message_sender_name(msg), to: DmHelpers
-  defdelegate strip_dm_prefix(body), to: DmHelpers
   defdelegate provider_icon(provider), to: DmHelpers
   defdelegate provider_icon_class(provider), to: DmHelpers
   defdelegate message_model(msg), to: DmHelpers
@@ -386,31 +265,4 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       not is_nil(message.metadata["total_cost_usd"])
   end
 
-  defp parse_body_segments(nil), do: [{:text, ""}]
-
-  defp parse_body_segments(body) when is_binary(body) do
-    body
-    |> String.trim()
-    |> String.split(~r/\n\n/, trim: true)
-    |> Enum.map(&parse_body_segment/1)
-  end
-
-  defp parse_body_segment(text) do
-    trimmed = String.trim(text)
-
-    cond do
-      # session_reader format: > `ToolName` args...
-      match = Regex.run(~r/^> `([^`]+)` ?(.*)/s, trimmed, capture: :all_but_first) ->
-        [name, rest] = match
-        {:tool_call, name, String.trim(rest)}
-
-      # Tool: ToolName\n{json} format
-      match = Regex.run(~r/^Tool: ([^\n]+)\n(.*)/s, trimmed, capture: :all_but_first) ->
-        [name, json_rest] = match
-        {:tool_call, String.trim(name), String.trim(json_rest)}
-
-      true ->
-        {:text, text}
-    end
-  end
 end

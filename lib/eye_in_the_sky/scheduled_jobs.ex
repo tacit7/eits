@@ -25,8 +25,13 @@ defmodule EyeInTheSky.ScheduledJobs do
   # Scheduling math — delegated to JobScheduler
   # ---------------------------------------------------------------------------
 
-  defdelegate compute_next_run_at(schedule_type, schedule_value, from \\ nil, timezone \\ "Etc/UTC"),
-    to: CronParser
+  defdelegate compute_next_run_at(
+                schedule_type,
+                schedule_value,
+                from \\ nil,
+                timezone \\ "Etc/UTC"
+              ),
+              to: CronParser
 
   defdelegate due_jobs(), to: JobScheduler
   defdelegate claim_job(job), to: JobScheduler
@@ -37,40 +42,21 @@ defmodule EyeInTheSky.ScheduledJobs do
   # CRUD
   # ---------------------------------------------------------------------------
 
-  def list_jobs do
-    from(j in ScheduledJob,
-      order_by: [asc: j.origin, asc: j.name]
-    )
-    |> Repo.all()
-  end
-
-  def list_jobs_for_project(project_id) do
-    from(j in ScheduledJob,
-      where: j.project_id == ^project_id,
-      order_by: [asc: j.origin, asc: j.name]
-    )
-    |> Repo.all()
-  end
-
-  def list_global_jobs do
-    from(j in ScheduledJob,
-      where: is_nil(j.project_id),
-      order_by: [asc: j.origin, asc: j.name]
-    )
+  def list_jobs(opts \\ []) do
+    opts
+    |> list_jobs_filters()
+    |> base_jobs_query()
+    |> order_by([j], asc: j.origin, asc: j.name)
     |> Repo.all()
   end
 
   def list_spawn_agent_jobs_by_prompt_ids(prompt_ids) when is_list(prompt_ids) do
-    from(j in ScheduledJob, where: j.prompt_id in ^prompt_ids)
+    base_jobs_query(prompt_ids: prompt_ids)
     |> Repo.all()
   end
 
   def list_filesystem_agent_jobs do
-    from(j in ScheduledJob,
-      where: j.job_type == "spawn_agent",
-      where: is_nil(j.prompt_id),
-      where: like(j.config, "%agent_file_id%")
-    )
+    base_jobs_query(job_type: "spawn_agent", prompt_id_nil: true, config_contains: "%agent_file_id%")
     |> Repo.all()
   end
 
@@ -181,8 +167,13 @@ defmodule EyeInTheSky.ScheduledJobs do
     case enqueue_job(job) do
       {:ok, _} = result ->
         case JobScheduler.mark_job_executed(job) do
-          {:ok, _} -> :ok
-          {:error, reason} -> Logger.warning("run_now: mark_job_executed failed for job #{job.id}: #{inspect(reason)}")
+          {:ok, _} ->
+            :ok
+
+          {:error, reason} ->
+            Logger.warning(
+              "run_now: mark_job_executed failed for job #{job.id}: #{inspect(reason)}"
+            )
         end
 
         result
@@ -249,13 +240,34 @@ defmodule EyeInTheSky.ScheduledJobs do
       end
 
     %{"job_id" => job.id}
-    |> worker.new(unique: [period: 30, fields: [:args, :worker], states: [:available, :scheduled, :executing]])
+    |> worker.new(
+      unique: [period: 30, fields: [:args, :worker], states: [:available, :scheduled, :executing]]
+    )
     |> Oban.insert()
   end
 
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  defp base_jobs_query(filters) do
+    Enum.reduce(filters, ScheduledJob, fn
+      {:project_id, id}, q -> where(q, [j], j.project_id == ^id)
+      {:global_only, true}, q -> where(q, [j], is_nil(j.project_id))
+      {:prompt_ids, ids}, q -> where(q, [j], j.prompt_id in ^ids)
+      {:job_type, type}, q -> where(q, [j], j.job_type == ^type)
+      {:prompt_id_nil, true}, q -> where(q, [j], is_nil(j.prompt_id))
+      {:config_contains, pattern}, q -> where(q, [j], like(j.config, ^pattern))
+      _, q -> q
+    end)
+  end
+
+  defp list_jobs_filters(opts) do
+    case Keyword.get(opts, :project_id) do
+      nil -> if Keyword.get(opts, :global_only, false), do: [global_only: true], else: []
+      id -> [project_id: id]
+    end
+  end
 
   # nil = overview/admin caller (no restriction).
   # integer = project-scoped caller: job must belong to that exact project.

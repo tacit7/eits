@@ -1,4 +1,4 @@
-defmodule EyeInTheSkyWeb.Components.FavoriteFabComponent do
+defmodule EyeInTheSkyWeb.Components.FloatingChatComponent do
   @moduledoc """
   Server-side LiveComponent for the floating action button (FAB) radial menu.
 
@@ -29,7 +29,7 @@ defmodule EyeInTheSkyWeb.Components.FavoriteFabComponent do
     ~H"""
     <div
       id={@id}
-      phx-hook="FavoriteFab"
+      phx-hook="FloatingChat"
       class={["fab fab-flower", if(Enum.empty?(@bookmarks), do: "hidden", else: "")]}
       style="position:fixed;bottom:1rem;right:1rem;width:200px;height:200px;overflow:visible;pointer-events:none"
     >
@@ -58,7 +58,7 @@ defmodule EyeInTheSkyWeb.Components.FavoriteFabComponent do
             data-agent-status={agent_live_status(agent, @statuses)}
           >
             <span class="font-bold text-xs text-base-content/70">
-              <%= initials(agent["name"]) %>
+              {initials(agent["name"])}
             </span>
 
             <%!-- Status dot --%>
@@ -94,7 +94,7 @@ defmodule EyeInTheSkyWeb.Components.FavoriteFabComponent do
 
             <%!-- Tooltip --%>
             <span class="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-base-300 text-base-content text-xs rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-              <%= agent["name"] || "Agent" %>
+              {agent["name"] || "Agent"}
             </span>
           </a>
         <% end %>

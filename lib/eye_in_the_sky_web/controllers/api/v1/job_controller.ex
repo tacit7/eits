@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.Api.V1.JobController do
   use EyeInTheSkyWeb, :controller
 
+  action_fallback EyeInTheSkyWeb.Api.V1.FallbackController
+
   import EyeInTheSkyWeb.ControllerHelpers
 
   alias EyeInTheSky.ScheduledJobs
@@ -11,10 +13,10 @@ defmodule EyeInTheSkyWeb.Api.V1.JobController do
     jobs =
       cond do
         params["project_id"] ->
-          ScheduledJobs.list_jobs_for_project(parse_int(params["project_id"]))
+          ScheduledJobs.list_jobs(project_id: parse_int(params["project_id"]))
 
         params["global"] == "true" ->
-          ScheduledJobs.list_global_jobs()
+          ScheduledJobs.list_jobs(global_only: true)
 
         true ->
           ScheduledJobs.list_jobs()
@@ -31,7 +33,7 @@ defmodule EyeInTheSkyWeb.Api.V1.JobController do
   def show(conn, %{"id" => id}) do
     case ScheduledJobs.get_job(parse_int(id)) do
       {:ok, job} -> json(conn, ApiPresenter.present_job(job))
-      {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "Job not found"})
+      {:error, :not_found} -> {:error, :not_found, "Job not found"}
     end
   end
 
@@ -77,7 +79,7 @@ defmodule EyeInTheSkyWeb.Api.V1.JobController do
         end
 
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Job not found"})
+        {:error, :not_found, "Job not found"}
     end
   end
 
@@ -90,11 +92,11 @@ defmodule EyeInTheSkyWeb.Api.V1.JobController do
             json(conn, %{success: true})
 
           {:error, :system_job} ->
-            conn |> put_status(:forbidden) |> json(%{error: "Cannot delete system jobs"})
+            {:error, :forbidden, "Cannot delete system jobs"}
         end
 
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Job not found"})
+        {:error, :not_found, "Job not found"}
     end
   end
 
@@ -105,10 +107,10 @@ defmodule EyeInTheSkyWeb.Api.V1.JobController do
         json(conn, %{success: true, message: "Job enqueued"})
 
       {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Job not found"})
+        {:error, :not_found, "Job not found"}
 
       {:error, reason} ->
-        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+        {:error, inspect(reason)}
     end
   end
 

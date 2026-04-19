@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
     socket =
       if project_id do
         project =
-          Projects.get_project_with_agents!(project_id)
+          Projects.get_project!(project_id)
 
         socket
         |> assign(:page_title, "Prompts - #{project.name}")

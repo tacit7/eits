@@ -26,7 +26,17 @@ defmodule EyeInTheSky.Projects.Project do
   @doc false
   def changeset(project, attrs) do
     project
-    |> cast(attrs, [:name, :slug, :path, :remote_url, :git_remote, :repo_url, :branch, :active, :bookmarked])
+    |> cast(attrs, [
+      :name,
+      :slug,
+      :path,
+      :remote_url,
+      :git_remote,
+      :repo_url,
+      :branch,
+      :active,
+      :bookmarked
+    ])
     |> validate_required([:name])
     |> unique_constraint(:path)
   end

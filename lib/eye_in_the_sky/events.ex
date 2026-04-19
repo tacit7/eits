@@ -11,20 +11,21 @@ defmodule EyeInTheSky.Events do
   |--------------------------------|-----------------------------------|
   | `"agents"`                     | Sidebar, DMLive, session pages    |
   | `"agent:working"`              | ChatLive, DMLive                  |
-  | `"session:<id>"`               | DMLive, FabHook                   |
+  | `"session:<id>"`               | DMLive, FloatingChatLive          |
   | `"session:<id>:status"`        | DMLive                            |
   | `"dm:<id>:stream"`             | DMLive                            |
   | `"dm:<id>:queue"`              | DMLive                            |
   | `"channel:<id>:messages"`      | ChatLive                          |
   | `"tasks"`                      | Overview, DMLive                  |
   | `"tasks:<project_id>"`         | Kanban                            |
-  | `"notifications"`              | FabHook                           |
+  | `"notifications"`              | FloatingChatLive                  |
   | `"teams"`                      | TeamLive                          |
   | `"settings"`                   | OverviewSettings                  |
   | `"scheduled_jobs"`             | JobsLive                          |
   | `"session_lifecycle"`          | Teams.Subscriber                  |
   | `"projects"`                   | Sidebar                           |
   | `"session:<id>:timer"`         | DMLive                            |
+  | `"canvas:<id>"`                | CanvasLive                        |
 
   ## Payload shape for `agent:working`
 
@@ -65,6 +66,13 @@ defmodule EyeInTheSky.Events do
 
   @doc "Subscribe to queued-prompt updates for a session."
   def subscribe_dm_queue(session_id), do: sub("dm:#{session_id}:queue")
+
+  @doc "Subscribe to raw Codex JSONL stream lines for a session."
+  def subscribe_codex_raw(session_id), do: sub("codex:#{session_id}:raw")
+
+  @doc "Broadcast a raw Codex JSONL line for a session."
+  def broadcast_codex_raw(session_id, line),
+    do: broadcast("codex:#{session_id}:raw", {:codex_raw_line, line})
 
   @doc "Subscribe to new messages on a channel."
   def subscribe_channel_messages(channel_id), do: sub("channel:#{channel_id}:messages")
@@ -282,6 +290,20 @@ defmodule EyeInTheSky.Events do
 
   @doc "Unsubscribe from session status events."
   def unsubscribe_session_status(session_id), do: unsub("session:#{session_id}:status")
+
+  # ---------------------------------------------------------------------------
+  # Canvas events — topic: "canvas:<canvas_id>"
+  # ---------------------------------------------------------------------------
+
+  @doc "Subscribe to canvas-scoped events (session added, etc.)."
+  def subscribe_canvas(canvas_id), do: sub("canvas:#{canvas_id}")
+
+  @doc "Unsubscribe from canvas-scoped events."
+  def unsubscribe_canvas(canvas_id), do: unsub("canvas:#{canvas_id}")
+
+  @doc "A session was added to a canvas."
+  def canvas_session_added(canvas_id),
+    do: broadcast("canvas:#{canvas_id}", {:canvas_session_added, %{canvas_id: canvas_id}})
 
   # ---------------------------------------------------------------------------
   # Orchestrator timer events — topic: "session:<session_id>:timer"

@@ -32,13 +32,13 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
     cond do
       is_nil(from_raw) or from_raw == "" ->
-        conn |> put_status(:bad_request) |> json(%{error: "from_session_id is required"})
+        {:error, :bad_request, "from_session_id is required"}
 
       is_nil(to_raw) or to_raw == "" ->
-        conn |> put_status(:bad_request) |> json(%{error: "to_session_id is required"})
+        {:error, :bad_request, "to_session_id is required"}
 
       is_nil(params["message"]) or params["message"] == "" ->
-        conn |> put_status(:bad_request) |> json(%{error: "message is required"})
+        {:error, :bad_request, "message is required"}
 
       true ->
         {limit, scale} = @dm_rate_limit
@@ -86,14 +86,18 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       else: Sessions.get_session_by_uuid(raw)
   end
 
+  @terminated_statuses ~w(completed failed)
+
   defp do_dm(conn, params, from_raw, to_raw) do
     with {:from, {:ok, from_session}} <- {:from, resolve_from_session(from_raw)},
+         {:from_active, false} <-
+           {:from_active, from_session.status in @terminated_statuses},
          {:to, {:ok, to_session}} <- {:to, resolve_to_session(to_raw)} do
       response_required = params["response_required"] in [true, "true", "1", 1]
       sender_name = ApiPresenter.resolve_session_sender_name(from_session)
 
       dm_body =
-        "DM from:#{sender_name} (session:#{from_session.uuid}) #{params["message"]}"
+        "DM from:#{sender_name} (session:#{from_session.uuid}) #{trim_param(params["message"])}"
 
       attrs = %{
         uuid: Ecto.UUID.generate(),
@@ -120,17 +124,17 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
         {:error, reason} ->
           Logger.error("DM routing failed for session #{to_session.id}: #{inspect(reason)}")
-
-          conn
-          |> put_status(:internal_server_error)
-          |> json(%{error: "Failed to deliver message"})
+          {:error, :internal_server_error, "Failed to deliver message"}
       end
     else
       {:from, {:error, :not_found}} ->
-        conn |> put_status(:not_found) |> json(%{error: "Sender session not found"})
+        {:error, :not_found, "Sender session not found"}
+
+      {:from_active, true} ->
+        {:error, :unprocessable_entity, "Sender session is terminated and cannot send DMs"}
 
       {:to, {:error, :not_found}} ->
-        conn |> put_status(:not_found) |> json(%{error: "Target session not found"})
+        {:error, :not_found, "Target session not found"}
     end
   end
 
@@ -164,15 +168,15 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   def send_channel_message(conn, %{"channel_id" => channel_id} = params) do
     cond do
       is_nil(params["session_id"]) or params["session_id"] == "" ->
-        conn |> put_status(:bad_request) |> json(%{error: "session_id is required"})
+        {:error, :bad_request, "session_id is required"}
 
       is_nil(params["body"]) or params["body"] == "" ->
-        conn |> put_status(:bad_request) |> json(%{error: "body is required"})
+        {:error, :bad_request, "body is required"}
 
       true ->
         case ToolHelpers.resolve_session_int_id(params["session_id"]) do
           {:ok, int_id} -> do_send_channel_message(conn, channel_id, int_id, params)
-          {:error, reason} -> conn |> put_status(:not_found) |> json(%{error: reason})
+          {:error, reason} -> {:error, :not_found, reason}
         end
     end
   end
@@ -181,7 +185,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     attrs = %{
       channel_id: channel_id,
       session_id: int_id,
-      body: params["body"],
+      body: trim_param(params["body"]),
       sender_role: params["sender_role"] || "agent",
       recipient_role: params["recipient_role"] || "user",
       provider: params["provider"] || "claude",
@@ -197,10 +201,8 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
         |> put_status(:created)
         |> json(%{success: true, message: "Message sent", message_id: to_string(msg.id)})
 
-      {:error, cs} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Failed to send message", details: translate_errors(cs)})
+      {:error, _cs} ->
+        {:error, "Failed to send message"}
     end
   end
 
@@ -226,23 +228,34 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   end
 
   defp persist_dm(conn, to_session, attrs) do
-    case Messages.create_message(attrs) do
-      {:ok, msg} ->
-        EyeInTheSky.Events.session_new_dm(to_session.id, msg)
+    case Messages.find_recent_dm(to_session.id, attrs.body, seconds: 30) do
+      nil ->
+        case Messages.create_message(attrs) do
+          {:ok, msg} ->
+            EyeInTheSky.Events.session_new_dm(to_session.id, msg)
 
+            conn
+            |> put_status(:created)
+            |> json(%{
+              success: true,
+              message: "DM delivered to session #{to_session.id}",
+              message_id: to_string(msg.id),
+              message_uuid: msg.uuid
+            })
+
+          {:error, _cs} ->
+            {:error, "Failed to persist DM"}
+        end
+
+      existing ->
         conn
         |> put_status(:created)
         |> json(%{
           success: true,
           message: "DM delivered to session #{to_session.id}",
-          message_id: to_string(msg.id),
-          message_uuid: msg.uuid
+          message_id: to_string(existing.id),
+          message_uuid: existing.uuid
         })
-
-      {:error, cs} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Failed to persist DM", details: translate_errors(cs)})
     end
   end
 

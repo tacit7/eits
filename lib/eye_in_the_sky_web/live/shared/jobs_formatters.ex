@@ -161,11 +161,11 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsFormatters do
   # ---------------------------------------------------------------------------
 
   def type_badge_class("spawn_agent"), do: "badge-primary"
-def type_badge_class("mix_task"), do: "badge-accent"
+  def type_badge_class("mix_task"), do: "badge-accent"
   def type_badge_class(_), do: "badge-ghost"
 
   def type_label("spawn_agent"), do: "Agent"
-def type_label("mix_task"), do: "Mix"
+  def type_label("mix_task"), do: "Mix"
   def type_label(t), do: t
 
   def status_badge_class("running"), do: "badge-info"

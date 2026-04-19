@@ -6,11 +6,8 @@ defmodule EyeInTheSky.Tasks do
   use EyeInTheSky.CrudHelpers, schema: EyeInTheSky.Tasks.Task
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Notes.NoteQueries
-  alias EyeInTheSky.QueryBuilder
-  alias EyeInTheSky.QueryHelpers
+  alias EyeInTheSky.Notes
   alias EyeInTheSky.Repo
-  alias EyeInTheSky.Search.PgSearch
   alias EyeInTheSky.Tasks.{Task, WorkflowState}
   alias EyeInTheSky.Utils.ToolHelpers
 
@@ -42,135 +39,15 @@ defmodule EyeInTheSky.Tasks do
 
   # Task functions
 
-  @doc """
-  Returns the list of tasks.
-
-  Options:
-  - `:limit` - maximum number of tasks to return (default: nil = all)
-  - `:offset` - number of tasks to skip (default: 0)
-  - `:state_id` - filter by workflow state ID (default: nil = all)
-  """
-  def list_tasks(opts \\ []) do
-    sort_by = Keyword.get(opts, :sort_by, "created_desc")
-
-    base_tasks_query(opts)
-    |> preload(^@full_task_preloads)
-    |> task_order(sort_by)
-    |> QueryBuilder.maybe_limit(opts)
-    |> QueryBuilder.maybe_offset(opts)
-    |> Repo.all()
-  end
-
-  defp task_order(query, "created_asc"), do: order_by(query, [t], asc: t.created_at)
-  defp task_order(query, "priority"), do: order_by(query, [t], desc: t.priority, desc: t.created_at)
-  defp task_order(query, _), do: order_by(query, [t], desc: t.created_at)
-
-  @doc """
-  Returns the count of tasks matching the given filters.
-
-  Options:
-  - `:state_id` - filter by workflow state ID (default: nil = all)
-  """
-  def count_tasks(opts \\ []) do
-    base_tasks_query(opts)
-    |> Repo.aggregate(:count, :id)
-  end
-
-  defp base_tasks_query(opts) do
-    Task
-    |> QueryBuilder.maybe_where(opts, :state_id)
-  end
-
-  @doc """
-  Returns the list of tasks for a specific agent.
-  """
-  def list_tasks_for_agent(agent_id) do
-    Task
-    |> where([t], t.agent_id == ^agent_id)
-    |> preload(^@full_task_preloads)
-    |> order_by([t],
-      desc: fragment("CASE WHEN ? IS NULL THEN 0 ELSE 1 END", t.archived),
-      desc: t.priority,
-      asc: t.created_at
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Returns the list of tasks for a specific session.
-  """
-  def list_tasks_for_session(session_id, opts \\ []) do
-    query =
-      QueryHelpers.for_session_join(Task, session_id, "task_sessions",
-        preload: [:state, :tags],
-        order_by: [desc: :priority, asc: :created_at],
-        limit: Keyword.get(opts, :limit),
-        offset: Keyword.get(opts, :offset)
-      )
-
-    if Keyword.get(opts, :notes_count, true) do
-      NoteQueries.with_notes_count(query)
-    else
-      query
-    end
-  end
-
-  @doc """
-  Returns the list of tasks for a specific team.
-  """
-  def list_tasks_for_team(team_id) do
-    Task
-    |> where([t], t.team_id == ^team_id)
-    |> preload([:state, :tags])
-    |> order_by([t], asc: t.id)
-    |> Repo.all()
-  end
-
-  @doc """
-  Returns team tasks with their linked session IDs from task_sessions.
-  Each task has a :session_ids key with a list of session integer IDs.
-  """
-  def list_tasks_for_team_with_sessions(team_id) do
-    tasks = list_tasks_for_team(team_id)
-    task_ids = Enum.map(tasks, & &1.id)
-
-    session_rows =
-      from(ts in "task_sessions",
-        where: ts.task_id in ^task_ids,
-        select: {ts.task_id, ts.session_id}
-      )
-      |> Repo.all()
-
-    sessions_by_task =
-      Enum.group_by(session_rows, fn {task_id, _} -> task_id end, fn {_, sid} -> sid end)
-
-    Enum.map(tasks, fn t ->
-      %{t | session_ids: Map.get(sessions_by_task, t.id, [])}
-    end)
-  end
-
-  @doc """
-  Returns the current in-progress task for a session (state_id = 2), or nil.
-  """
-  def get_current_task_for_session(session_id) do
-    Task
-    |> join(:inner, [t], ts in "task_sessions", on: ts.task_id == t.id)
-    |> where(
-      [t, ts],
-      ts.session_id == ^session_id and t.state_id == ^WorkflowState.in_progress_id()
-    )
-    |> order_by([t], desc: t.updated_at)
-    |> limit(1)
-    |> preload([:state])
-    |> Repo.one()
-  end
-
-  @doc """
-  Counts tasks for a specific session.
-  """
-  def count_tasks_for_session(session_id) do
-    QueryHelpers.count_for_session_join(Task, session_id, "task_sessions")
-  end
+  # Delegates to Tasks.Queries sub-module
+  defdelegate list_tasks(opts \\ []), to: EyeInTheSky.Tasks.Queries
+  defdelegate count_tasks(opts \\ []), to: EyeInTheSky.Tasks.Queries
+  defdelegate list_tasks_for_agent(agent_id), to: EyeInTheSky.Tasks.Queries
+  defdelegate list_tasks_for_session(session_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
+  defdelegate list_tasks_for_team(team_id), to: EyeInTheSky.Tasks.Queries
+  defdelegate list_tasks_for_team_with_sessions(team_id), to: EyeInTheSky.Tasks.Queries
+  defdelegate get_current_task_for_session(session_id), to: EyeInTheSky.Tasks.Queries
+  defdelegate count_tasks_for_session(session_id), to: EyeInTheSky.Tasks.Queries
 
   @doc """
   Gets a single task. Returns `{:ok, task}` or `{:error, :not_found}`.
@@ -327,6 +204,36 @@ defmodule EyeInTheSky.Tasks do
   end
 
   @doc """
+  Completes a task in a single transaction:
+    1. Creates an annotation note with the given message
+    2. Moves the task to Done state
+
+  Returns `{:ok, %{task: task, note: note}}` or `{:error, step, changeset, changes}`.
+  """
+  def complete_task(%Task{} = task, message) when is_binary(message) and message != "" do
+    done_state_id = WorkflowState.done_id()
+
+    note_changeset =
+      Notes.note_changeset(%{
+        title: "Task completed",
+        body: message,
+        parent_type: "task",
+        parent_id: to_string(task.id)
+      })
+
+    Ecto.Multi.new()
+    |> Ecto.Multi.insert(:note, note_changeset)
+    |> Ecto.Multi.run(:task, fn _repo, _changes ->
+      update_task_state(task, done_state_id)
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, changes} -> {:ok, changes}
+      {:error, _step, reason, _changes} -> {:error, reason}
+    end
+  end
+
+  @doc """
   Archives a task (sets archived = true). Non-destructive.
   """
   def archive_task(%Task{} = task) do
@@ -344,17 +251,25 @@ defmodule EyeInTheSky.Tasks do
   Bulk-updates position for a list of tasks within a column.
   `ordered_uuids` is a list of task UUIDs in the desired order (index = position).
   """
+  def reorder_tasks([]), do: :ok
+
   def reorder_tasks(ordered_uuids) when is_list(ordered_uuids) do
     now = DateTime.utc_now()
 
-    ordered_uuids
-    |> Enum.with_index(1)
-    |> Enum.each(fn {uuid, position} ->
-      Repo.update_all(
-        from(t in Task, where: t.uuid == ^uuid),
-        set: [position: position, updated_at: now]
-      )
-    end)
+    {placeholders, params, _} =
+      ordered_uuids
+      |> Enum.with_index(1)
+      |> Enum.reduce({[], [], 1}, fn {uuid, pos}, {ph, p, n} ->
+        {["($#{n}, $#{n + 1}::int)" | ph], [pos, uuid | p], n + 2}
+      end)
+
+    values = placeholders |> Enum.reverse() |> Enum.join(", ")
+    n = length(params) + 1
+
+    Repo.query!(
+      "UPDATE tasks SET position = v.pos, updated_at = $#{n} FROM (VALUES #{values}) AS v(uuid, pos) WHERE tasks.uuid::text = v.uuid",
+      Enum.reverse(params) ++ [now]
+    )
 
     :ok
   end
@@ -403,124 +318,19 @@ defmodule EyeInTheSky.Tasks do
     Task.changeset(task, attrs)
   end
 
-  @doc """
-  Search tasks using PostgreSQL full-text search.
-  """
-  def search_tasks(query, project_id \\ nil) when is_binary(query) do
-    extra_where =
-      if project_id, do: dynamic([t], t.project_id == ^project_id)
+  defdelegate search_tasks(query, project_id \\ nil), to: EyeInTheSky.Tasks.Queries
 
-    PgSearch.search_for(query,
-      table: "tasks",
-      schema: Task,
-      search_columns: ["title", "description"],
-      sql_filter: if(project_id, do: "AND t.project_id = $2", else: ""),
-      sql_params: if(project_id, do: [project_id], else: []),
-      extra_where: extra_where,
-      order_by: [desc: :priority, desc: :created_at],
-      preload: @full_task_preloads
-    )
-  end
+  # Delegates to TaskSessions context (session-linking operations)
+  defdelegate link_session_to_task(task_id, session_id), to: EyeInTheSky.TaskSessions
+  defdelegate task_linked_to_session?(task_id, session_id), to: EyeInTheSky.TaskSessions
+  defdelegate unlink_session_from_task(task_id, session_id), to: EyeInTheSky.TaskSessions
+  defdelegate active_task_count_for_session(session_id), to: EyeInTheSky.TaskSessions
 
-  @doc """
-  Links a session to a task via the task_sessions join table.
-  Uses on_conflict: :nothing to silently skip duplicates.
-  """
-  def link_session_to_task(task_id, session_id)
-      when is_integer(task_id) and is_integer(session_id) do
-    {count, _} =
-      Repo.insert_all("task_sessions", [%{task_id: task_id, session_id: session_id}],
-        on_conflict: :nothing
-      )
+  defdelegate list_tasks_for_project(project_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
+  defdelegate count_tasks_for_project(project_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
 
-    {:ok, count}
-  end
-
-  @doc """
-  Returns true if the given task is linked to the given session via task_sessions.
-  Used to gate EITS-CMD task mutations to tasks the session created or was linked to.
-  """
-  def task_linked_to_session?(task_id, session_id)
-      when is_integer(task_id) and is_integer(session_id) do
-    Repo.exists?(
-      from ts in "task_sessions",
-        where: ts.task_id == ^task_id and ts.session_id == ^session_id
-    )
-  end
-
-  def task_linked_to_session?(_, _), do: false
-
-  @doc """
-  Unlinks a session from a task by deleting the task_sessions row.
-  Returns the number of rows deleted.
-  """
-  def unlink_session_from_task(task_id, session_id)
-      when is_integer(task_id) and is_integer(session_id) do
-    {count, _} =
-      from(ts in "task_sessions",
-        where: ts.task_id == ^task_id and ts.session_id == ^session_id
-      )
-      |> Repo.delete_all()
-
-    {:ok, count}
-  end
-
-  @doc """
-  Returns the count of active (not done, not archived) tasks linked to the given session.
-  Used by the scheduler to determine if an idle session can be auto-archived.
-  State ID 3 = Done.
-  """
-  def active_task_count_for_session(session_id) do
-    from(ts in "task_sessions",
-      join: t in Task,
-      on: t.id == ts.task_id,
-      where: ts.session_id == ^session_id,
-      where: t.state_id != 3 and t.archived == false,
-      select: count()
-    )
-    |> Repo.one()
-  end
-
-  @doc """
-  Lists tasks for a project with optional filtering and pagination.
-
-  ## Options
-    - `:sort_by` - "created_asc", "priority", or default (position asc, created desc)
-    - `:state_id` - filter by workflow state
-    - `:include_archived` - include archived tasks (default: false)
-    - `:limit` / `:offset` - pagination
-  """
-  def list_tasks_for_project(project_id, opts \\ []) when is_integer(project_id) do
-    sort_by = Keyword.get(opts, :sort_by, "created_desc")
-
-    order =
-      case sort_by do
-        "created_asc" -> [asc: :created_at]
-        "priority" -> [desc: :priority, asc: :position]
-        _ -> [asc: :position, desc: :created_at]
-      end
-
-    base_project_tasks_query(project_id, opts)
-    |> order_by(^order)
-    |> QueryBuilder.maybe_limit(opts)
-    |> QueryBuilder.maybe_offset(opts)
-    |> preload(^@full_task_preloads)
-    |> Repo.all()
-  end
-
-  @doc "Counts tasks for a project with optional filtering."
-  def count_tasks_for_project(project_id, opts \\ []) when is_integer(project_id) do
-    base_project_tasks_query(project_id, opts)
-    |> Repo.aggregate(:count, :id)
-  end
-
-  defp base_project_tasks_query(project_id, opts) do
-    include_archived = Keyword.get(opts, :include_archived, false)
-
-    query = from(t in Task, where: t.project_id == ^project_id)
-    query = if include_archived, do: query, else: where(query, [t], t.archived == false)
-    QueryBuilder.maybe_where(query, opts, :state_id)
-  end
+  # Delegates to Tasks.Associations sub-module
+  defdelegate associate_task(task, params), to: EyeInTheSky.Tasks.Associations
 
   # PubSub
 

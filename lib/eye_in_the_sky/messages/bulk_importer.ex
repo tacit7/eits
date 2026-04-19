@@ -46,10 +46,14 @@ defmodule EyeInTheSky.Messages.BulkImporter do
     case Messages.find_unlinked_message(session_id, sender_role, msg.content) do
       {:ok, existing} ->
         update_attrs = %{source_uuid: msg.uuid, updated_at: now}
-        update_attrs = if metadata, do: Map.put(update_attrs, :metadata, metadata), else: update_attrs
+
+        update_attrs =
+          if metadata, do: Map.put(update_attrs, :metadata, metadata), else: update_attrs
 
         case Messages.update_message(existing, update_attrs) do
-          {:ok, _} -> true
+          {:ok, _} ->
+            true
+
           {:error, reason} ->
             Logger.debug(
               "BulkImporter: failed to link #{provider} message #{existing.id}: #{inspect(reason)}"

@@ -1,16 +1,21 @@
 <!DOCTYPE html>
-<html lang="en"
-  data-theme={case EyeInTheSky.Settings.get("theme") do
-    nil -> "dark"
-    "" -> "dark"
-    theme -> theme
-  end}
+<html
+  lang="en"
+  data-theme={
+    case EyeInTheSky.Settings.get("theme") do
+      nil -> "dark"
+      "" -> "dark"
+      theme -> theme
+    end
+  }
   data-cm-tab-size={EyeInTheSky.Settings.get("cm_tab_size") || "2"}
   data-cm-font-size={EyeInTheSky.Settings.get("cm_font_size") || "14"}
-  data-cm-vim={case EyeInTheSky.Settings.get("cm_vim") do
-    "true" -> "true"
-    _ -> "false"
-  end}
+  data-cm-vim={
+    case EyeInTheSky.Settings.get("cm_vim") do
+      "true" -> "true"
+      _ -> "false"
+    end
+  }
 >
   <head>
     <meta charset="utf-8" />
@@ -44,9 +49,13 @@
       names={["js/app.js"]}
       manifest={{:eye_in_the_sky, "priv/static/.vite/manifest.json"}}
       dev_server={PhoenixVite.Components.has_vite_watcher?(EyeInTheSkyWeb.Endpoint)}
-      to_url={if PhoenixVite.Components.has_vite_watcher?(EyeInTheSkyWeb.Endpoint),
-        do: fn p -> Application.get_env(:eye_in_the_sky, :vite_host, "http://localhost:5173") <> p end,
-        else: fn "/" <> _ = p -> p end}
+      to_url={
+        if PhoenixVite.Components.has_vite_watcher?(EyeInTheSkyWeb.Endpoint),
+          do: fn p ->
+            Application.get_env(:eye_in_the_sky, :vite_host, "http://localhost:5173") <> p
+          end,
+          else: fn "/" <> _ = p -> p end
+      }
     />
     <script>
       // Override server-rendered data-theme if localStorage has a saved value
@@ -61,6 +70,11 @@
       // Restore vim mode from localStorage
       const savedVim = localStorage.getItem("cm_vim");
       if (savedVim !== null) document.documentElement.setAttribute("data-cm-vim", savedVim);
+      // Mark <html> as running inside the Tauri shell so CSS and templates can
+      // hide "Open in Desktop App" entry points (they're useless in-app).
+      if (/Tauri/i.test(navigator.userAgent) || window.__TAURI_INTERNALS__) {
+        document.documentElement.setAttribute("data-env", "tauri");
+      }
     </script>
   </head>
   <body class="bg-base-100 min-h-[100dvh] overflow-hidden">

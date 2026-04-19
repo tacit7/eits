@@ -54,18 +54,23 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
 
   defp form_body(assigns) do
     config =
-      case Jason.decode((if assigns.job, do: assigns.job.config) || "{}") do
-        {:ok, m} -> m
-        _ -> %{}
+      case Jason.decode(if(assigns.job, do: assigns.job.config) || "{}") do
+        {:ok, m} ->
+          m
+
+        {:error, reason} ->
+          require Logger
+          Logger.warning("[AgentScheduleForm] Failed to decode job config: #{inspect(reason)}")
+          %{}
       end
 
     assigns =
       assigns
       |> assign(:editing, not is_nil(assigns.job))
-      |> assign(:schedule_type, (if assigns.job, do: assigns.job.schedule_type) || "cron")
-      |> assign(:schedule_value, (if assigns.job, do: assigns.job.schedule_value) || "")
+      |> assign(:schedule_type, job_field(assigns.job, :schedule_type, "cron"))
+      |> assign(:schedule_value, job_field(assigns.job, :schedule_value, ""))
       |> assign(:model, Map.get(config, "model", "sonnet"))
-      |> assign(:timezone, (if assigns.job, do: assigns.job.timezone) || system_timezone())
+      |> assign(:timezone, job_field(assigns.job, :timezone, system_timezone()))
       |> assign(:config, config)
 
     ~H"""
@@ -90,42 +95,30 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
         <input type="hidden" name="schedule[job_id]" value={@job.id} />
       <% end %>
 
-      <.schedule_type_fields
-        schedule_type={@schedule_type}
-        schedule_value={@schedule_value}
-        model={@model}
-      />
+      <div class="grid grid-cols-2 gap-3">
+        <.schedule_type_tabs schedule_type={@schedule_type} />
+        <.model_selector model={@model} />
+      </div>
 
       <%= if @schedule_type == "cron" do %>
-        <.cron_reference />
-        <.timezone_picker timezone={@timezone} />
+        <.cron_fields schedule_value={@schedule_value} />
+        <.timezone_selector timezone={@timezone} />
+      <% else %>
+        <.interval_fields schedule_value={@schedule_value} />
       <% end %>
 
-      <div class="form-control">
-        <label class="label">
-          <span class="label-text text-xs">Project (optional override)</span>
-        </label>
-        <select name="schedule[project_override_id]" class="select select-bordered select-sm w-full">
-          <option value="">— use prompt default —</option>
-          <%= for p <- @projects do %>
-            <option
-              value={p.id}
-              selected={
-                is_nil(@prompt.project_id) &&
-                  not is_nil(@context_project_id) &&
-                  @context_project_id == p.id
-              }
-            >
-              {p.name}
-            </option>
-          <% end %>
-        </select>
-      </div>
+      <.project_selector
+        projects={@projects}
+        prompt={@prompt}
+        context_project_id={@context_project_id}
+      />
 
       <.advanced_cli_flags config={@config} />
 
       <div class="flex justify-end gap-2 pt-2">
-        <button type="button" class="btn btn-ghost btn-sm min-h-[44px]" phx-click="cancel_schedule">Cancel</button>
+        <button type="button" class="btn btn-ghost btn-sm min-h-[44px]" phx-click="cancel_schedule">
+          Cancel
+        </button>
         <button type="submit" class="btn btn-primary btn-sm min-h-[44px]">Save Schedule</button>
       </div>
     </form>
@@ -137,43 +130,141 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
   # ---------------------------------------------------------------------------
 
   attr :schedule_type, :string, required: true
-  attr :schedule_value, :string, required: true
+
+  defp schedule_type_tabs(assigns) do
+    ~H"""
+    <div class="form-control">
+      <label class="label"><span class="label-text text-xs">Schedule Type</span></label>
+      <select name="schedule[schedule_type]" class="select select-bordered select-sm w-full">
+        <option value="cron" selected={@schedule_type == "cron"}>Cron</option>
+        <option value="interval" selected={@schedule_type == "interval"}>Interval</option>
+      </select>
+    </div>
+    """
+  end
+
   attr :model, :string, required: true
 
-  defp schedule_type_fields(assigns) do
+  defp model_selector(assigns) do
     ~H"""
-    <div class="grid grid-cols-2 gap-3">
-      <div class="form-control">
-        <label class="label"><span class="label-text text-xs">Schedule Type</span></label>
-        <select name="schedule[schedule_type]" class="select select-bordered select-sm w-full">
-          <option value="cron" selected={@schedule_type == "cron"}>Cron</option>
-          <option value="interval" selected={@schedule_type == "interval"}>Interval</option>
-        </select>
-      </div>
-      <div class="form-control">
-        <label class="label"><span class="label-text text-xs">Model</span></label>
-        <select name="schedule[model]" class="select select-bordered select-sm w-full">
-          <%= for {value, label} <- claude_models() do %>
-            <option value={value} selected={@model == value}>{label}</option>
-          <% end %>
-        </select>
-      </div>
+    <div class="form-control">
+      <label class="label"><span class="label-text text-xs">Model</span></label>
+      <select name="schedule[model]" class="select select-bordered select-sm w-full">
+        <%= for {value, label} <- claude_models() do %>
+          <option value={value} selected={@model == value}>{label}</option>
+        <% end %>
+      </select>
     </div>
+    """
+  end
 
+  attr :schedule_value, :string, required: true
+
+  defp cron_fields(assigns) do
+    ~H"""
     <div class="form-control">
       <label class="label">
-        <span class="label-text text-xs">
-          {if @schedule_type == "cron", do: "Cron Expression", else: "Interval (seconds)"}
-        </span>
+        <span class="label-text text-xs">Cron Expression</span>
       </label>
       <input
         type="text"
         name="schedule[schedule_value]"
         value={@schedule_value}
-        placeholder={if @schedule_type == "cron", do: "0 9 * * *", else: "3600"}
+        placeholder="0 9 * * *"
         class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
         required
       />
+    </div>
+    <.cron_reference />
+    """
+  end
+
+  attr :schedule_value, :string, required: true
+
+  defp interval_fields(assigns) do
+
+    ~H"""
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Interval (seconds)</span>
+      </label>
+      <input
+        type="text"
+        name="schedule[schedule_value]"
+        value={@schedule_value}
+        placeholder="3600"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+        required
+      />
+    </div>
+    """
+  end
+
+  @common_timezones [
+    "Etc/UTC",
+    "US/Eastern",
+    "US/Central",
+    "US/Mountain",
+    "US/Pacific",
+    "US/Hawaii",
+    "Europe/London",
+    "Europe/Paris",
+    "Europe/Berlin",
+    "Asia/Tokyo",
+    "Asia/Shanghai",
+    "Asia/Kolkata",
+    "Australia/Sydney",
+    "America/Sao_Paulo",
+    "America/Mexico_City"
+  ]
+
+  attr :timezone, :string, required: true
+
+  defp timezone_selector(assigns) do
+    all =
+      if assigns.timezone in @common_timezones,
+        do: @common_timezones,
+        else: [assigns.timezone | @common_timezones]
+
+    assigns = assign(assigns, :timezones, all)
+
+    ~H"""
+    <div class="form-control">
+      <label class="label"><span class="label-text text-xs">Timezone</span></label>
+      <select name="schedule[timezone]" class="select select-bordered select-sm w-full">
+        <%= for tz <- @timezones do %>
+          <option value={tz} selected={tz == @timezone}>{tz}</option>
+        <% end %>
+      </select>
+    </div>
+    """
+  end
+
+  attr :projects, :list, required: true
+  attr :prompt, :any, required: true
+  attr :context_project_id, :any, required: true
+
+  defp project_selector(assigns) do
+    ~H"""
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Project (optional override)</span>
+      </label>
+      <select name="schedule[project_override_id]" class="select select-bordered select-sm w-full">
+        <option value="">— use prompt default —</option>
+        <%= for p <- @projects do %>
+          <option
+            value={p.id}
+            selected={
+              is_nil(@prompt.project_id) &&
+                not is_nil(@context_project_id) &&
+                @context_project_id == p.id
+            }
+          >
+            {p.name}
+          </option>
+        <% end %>
+      </select>
     </div>
     """
   end
@@ -237,97 +328,30 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     """
   end
 
-  @common_timezones [
-    "Etc/UTC",
-    "US/Eastern",
-    "US/Central",
-    "US/Mountain",
-    "US/Pacific",
-    "US/Hawaii",
-    "Europe/London",
-    "Europe/Paris",
-    "Europe/Berlin",
-    "Asia/Tokyo",
-    "Asia/Shanghai",
-    "Asia/Kolkata",
-    "Australia/Sydney",
-    "America/Sao_Paulo",
-    "America/Mexico_City"
-  ]
-
-  attr :timezone, :string, required: true
-
-  defp timezone_picker(assigns) do
-    all =
-      if assigns.timezone in @common_timezones,
-        do: @common_timezones,
-        else: [assigns.timezone | @common_timezones]
-
-    assigns = assign(assigns, :timezones, all)
-
-    ~H"""
-    <div class="form-control">
-      <label class="label"><span class="label-text text-xs">Timezone</span></label>
-      <select name="schedule[timezone]" class="select select-bordered select-sm w-full">
-        <%= for tz <- @timezones do %>
-          <option value={tz} selected={tz == @timezone}>{tz}</option>
-        <% end %>
-      </select>
-    </div>
-    """
-  end
-
   attr :config, :map, required: true
 
   defp advanced_cli_flags(assigns) do
-    %{
-      "max_budget_usd" => max_budget_usd,
-      "max_turns" => max_turns,
-      "fallback_model" => fallback_model,
-      "output_format" => output_format,
-      "permission_mode" => permission_mode,
-      "allowed_tools" => allowed_tools,
-      "add_dir" => add_dir,
-      "mcp_config" => mcp_config,
-      "plugin_dir" => plugin_dir,
-      "settings_file" => settings_file,
-      "skip_permissions" => skip_permissions,
-      "chrome" => chrome,
-      "sandbox" => sandbox
-    } = Map.merge(
-      %{
-        "max_budget_usd" => "",
-        "max_turns" => "",
-        "fallback_model" => "",
-        "output_format" => "",
-        "permission_mode" => "",
-        "allowed_tools" => "",
-        "add_dir" => "",
-        "mcp_config" => "",
-        "plugin_dir" => "",
-        "settings_file" => "",
-        "skip_permissions" => true,
-        "chrome" => false,
-        "sandbox" => false
-      },
-      assigns.config
-    )
+    config =
+      Map.merge(
+        %{
+          "max_budget_usd" => "",
+          "max_turns" => "",
+          "fallback_model" => "",
+          "output_format" => "",
+          "permission_mode" => "",
+          "allowed_tools" => "",
+          "add_dir" => "",
+          "mcp_config" => "",
+          "plugin_dir" => "",
+          "settings_file" => "",
+          "skip_permissions" => true,
+          "chrome" => false,
+          "sandbox" => false
+        },
+        assigns.config
+      )
 
-    assigns =
-      assigns
-      |> assign(:max_budget_usd, max_budget_usd)
-      |> assign(:max_turns, max_turns)
-      |> assign(:fallback_model, fallback_model)
-      |> assign(:output_format, output_format)
-      |> assign(:permission_mode, permission_mode)
-      |> assign(:allowed_tools, allowed_tools)
-      |> assign(:add_dir, add_dir)
-      |> assign(:mcp_config, mcp_config)
-      |> assign(:plugin_dir, plugin_dir)
-      |> assign(:settings_file, settings_file)
-      |> assign(:skip_permissions, skip_permissions)
-      |> assign(:chrome, chrome)
-      |> assign(:sandbox, sandbox)
+    assigns = assign(assigns, :config, config)
 
     ~H"""
     <div class="collapse collapse-arrow bg-base-200 rounded-lg">
@@ -336,186 +360,249 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
         <.icon name="hero-adjustments-horizontal" class="w-3.5 h-3.5" /> Advanced CLI Flags
       </div>
       <div class="collapse-content px-3 pb-3 space-y-3">
-
-        <div class="grid grid-cols-2 gap-3">
-          <div class="form-control">
-            <label class="label"><span class="label-text text-xs">Max Budget (USD)</span></label>
-            <input
-              type="number"
-              name="schedule[max_budget_usd]"
-              value={@max_budget_usd}
-              placeholder="e.g. 5.00"
-              step="0.01"
-              min="0"
-              class="input input-bordered input-sm w-full font-mono min-h-[44px]"
-            />
-          </div>
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text text-xs">Max Turns</span>
-              <span class="label-text-alt text-base-content/40 font-mono text-xs">--max-turns</span>
-            </label>
-            <input
-              type="number"
-              name="schedule[max_turns]"
-              value={@max_turns}
-              placeholder="e.g. 25"
-              min="1"
-              class="input input-bordered input-sm w-full font-mono min-h-[44px]"
-            />
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div class="form-control">
-            <label class="label"><span class="label-text text-xs">Fallback Model</span></label>
-            <select name="schedule[fallback_model]" class="select select-bordered select-sm w-full">
-              <option value="" selected={@fallback_model == ""}>None</option>
-              <%= for {value, label} <- claude_models() do %>
-                <option value={value} selected={@fallback_model == value}>{label}</option>
-              <% end %>
-            </select>
-          </div>
-          <div class="form-control">
-            <label class="label"><span class="label-text text-xs">Output Format</span></label>
-            <select name="schedule[output_format]" class="select select-bordered select-sm w-full">
-              <option value="" selected={@output_format == ""}>Default</option>
-              <option value="text" selected={@output_format == "text"}>Text</option>
-              <option value="json" selected={@output_format == "json"}>JSON</option>
-              <option value="stream-json" selected={@output_format == "stream-json"}>Stream JSON</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text text-xs">Permission Mode</span>
-            <span class="label-text-alt text-base-content/40 font-mono text-xs">--permission-mode</span>
-          </label>
-          <select name="schedule[permission_mode]" class="select select-bordered select-sm w-full">
-            <option value="" selected={@permission_mode == ""}>Default</option>
-            <option value="acceptEdits" selected={@permission_mode == "acceptEdits"}>acceptEdits — auto-accept file edits</option>
-            <option value="bypassPermissions" selected={@permission_mode == "bypassPermissions"}>bypassPermissions — skip all prompts</option>
-            <option value="dontAsk" selected={@permission_mode == "dontAsk"}>dontAsk — never ask</option>
-            <option value="plan" selected={@permission_mode == "plan"}>plan — read-only</option>
-          </select>
-        </div>
-
-        <div class="form-control">
-          <label class="label"><span class="label-text text-xs">Allowed Tools</span></label>
-          <input
-            type="text"
-            name="schedule[allowed_tools]"
-            value={@allowed_tools}
-            placeholder="e.g. Bash,Read,Edit,Write,Grep,Glob"
-            class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-          />
-          <label class="label">
-            <span class="label-text-alt text-base-content/40">Comma-separated. Supports wildcards: Bash(git *)</span>
-          </label>
-        </div>
-
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text text-xs">Add Directory</span>
-            <span class="label-text-alt text-base-content/40 font-mono text-xs">--add-dir</span>
-          </label>
-          <input
-            type="text"
-            name="schedule[add_dir]"
-            value={@add_dir}
-            placeholder="/path/to/shared-lib"
-            class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-          />
-        </div>
-
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text text-xs">MCP Config File</span>
-            <span class="label-text-alt text-base-content/40 font-mono text-xs">--mcp-config</span>
-          </label>
-          <input
-            type="text"
-            name="schedule[mcp_config]"
-            value={@mcp_config}
-            placeholder="./mcp-servers.json"
-            class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-          />
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text text-xs">Plugin Directory</span>
-              <span class="label-text-alt text-base-content/40 font-mono text-xs">--plugin-dir</span>
-            </label>
-            <input
-              type="text"
-              name="schedule[plugin_dir]"
-              value={@plugin_dir}
-              placeholder="./my-plugins"
-              class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-            />
-          </div>
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text text-xs">Settings File</span>
-              <span class="label-text-alt text-base-content/40 font-mono text-xs">--settings</span>
-            </label>
-            <input
-              type="text"
-              name="schedule[settings_file]"
-              value={@settings_file}
-              placeholder="./settings.json"
-              class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-            />
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-1 pt-1">
-          <label class="label cursor-pointer justify-start gap-2 py-1">
-            <input
-              type="checkbox"
-              name="schedule[skip_permissions]"
-              value="true"
-              checked={@skip_permissions}
-              class="checkbox checkbox-sm checkbox-primary"
-            />
-            <span class="label-text text-xs">
-              Skip permissions
-              <span class="font-mono text-base-content/40 text-xs ml-1">--dangerously-skip-permissions</span>
-            </span>
-          </label>
-          <label class="label cursor-pointer justify-start gap-2 py-1">
-            <input
-              type="checkbox"
-              name="schedule[chrome]"
-              value="true"
-              checked={@chrome}
-              class="checkbox checkbox-sm checkbox-primary"
-            />
-            <span class="label-text text-xs">
-              Chrome integration
-              <span class="font-mono text-base-content/40 text-xs ml-1">--chrome</span>
-            </span>
-          </label>
-          <label class="label cursor-pointer justify-start gap-2 py-1">
-            <input
-              type="checkbox"
-              name="schedule[sandbox]"
-              value="true"
-              checked={@sandbox}
-              class="checkbox checkbox-sm checkbox-primary"
-            />
-            <span class="label-text text-xs">
-              OS sandbox isolation
-              <span class="font-mono text-base-content/40 text-xs ml-1">--sandbox</span>
-            </span>
-          </label>
-        </div>
-
+        <.budget_and_turns_row
+          max_budget_usd={@config["max_budget_usd"]}
+          max_turns={@config["max_turns"]}
+        />
+        <.permission_fields
+          fallback_model={@config["fallback_model"]}
+          output_format={@config["output_format"]}
+          permission_mode={@config["permission_mode"]}
+          allowed_tools={@config["allowed_tools"]}
+        />
+        <.path_fields
+          add_dir={@config["add_dir"]}
+          mcp_config={@config["mcp_config"]}
+          plugin_dir={@config["plugin_dir"]}
+          settings_file={@config["settings_file"]}
+        />
+        <.boolean_flags
+          skip_permissions={@config["skip_permissions"]}
+          chrome={@config["chrome"]}
+          sandbox={@config["sandbox"]}
+        />
       </div>
     </div>
     """
   end
+
+  attr :max_budget_usd, :any, required: true
+  attr :max_turns, :any, required: true
+
+  defp budget_and_turns_row(assigns) do
+    ~H"""
+    <div class="grid grid-cols-2 gap-3">
+      <div class="form-control">
+        <label class="label"><span class="label-text text-xs">Max Budget (USD)</span></label>
+        <input
+          type="number"
+          name="schedule[max_budget_usd]"
+          value={@max_budget_usd}
+          placeholder="e.g. 5.00"
+          step="0.01"
+          min="0"
+          class="input input-bordered input-sm w-full font-mono min-h-[44px]"
+        />
+      </div>
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text text-xs">Max Turns</span>
+          <span class="label-text-alt text-base-content/40 font-mono text-xs">--max-turns</span>
+        </label>
+        <input
+          type="number"
+          name="schedule[max_turns]"
+          value={@max_turns}
+          placeholder="e.g. 25"
+          min="1"
+          class="input input-bordered input-sm w-full font-mono min-h-[44px]"
+        />
+      </div>
+    </div>
+    """
+  end
+
+  attr :fallback_model, :string, required: true
+  attr :output_format, :string, required: true
+  attr :permission_mode, :string, required: true
+  attr :allowed_tools, :string, required: true
+
+  defp permission_fields(assigns) do
+    ~H"""
+    <div class="grid grid-cols-2 gap-3">
+      <div class="form-control">
+        <label class="label"><span class="label-text text-xs">Fallback Model</span></label>
+        <select name="schedule[fallback_model]" class="select select-bordered select-sm w-full">
+          <option value="" selected={@fallback_model == ""}>None</option>
+          <%= for {value, label} <- claude_models() do %>
+            <option value={value} selected={@fallback_model == value}>{label}</option>
+          <% end %>
+        </select>
+      </div>
+      <div class="form-control">
+        <label class="label"><span class="label-text text-xs">Output Format</span></label>
+        <select name="schedule[output_format]" class="select select-bordered select-sm w-full">
+          <option value="" selected={@output_format == ""}>Default</option>
+          <option value="text" selected={@output_format == "text"}>Text</option>
+          <option value="json" selected={@output_format == "json"}>JSON</option>
+          <option value="stream-json" selected={@output_format == "stream-json"}>Stream JSON</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Permission Mode</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--permission-mode</span>
+      </label>
+      <select name="schedule[permission_mode]" class="select select-bordered select-sm w-full">
+        <option value="" selected={@permission_mode == ""}>Default</option>
+        <option value="acceptEdits" selected={@permission_mode == "acceptEdits"}>
+          acceptEdits — auto-accept file edits
+        </option>
+        <option value="bypassPermissions" selected={@permission_mode == "bypassPermissions"}>
+          bypassPermissions — skip all prompts
+        </option>
+        <option value="dontAsk" selected={@permission_mode == "dontAsk"}>dontAsk — never ask</option>
+        <option value="plan" selected={@permission_mode == "plan"}>plan — read-only</option>
+      </select>
+    </div>
+
+    <div class="form-control">
+      <label class="label"><span class="label-text text-xs">Allowed Tools</span></label>
+      <input
+        type="text"
+        name="schedule[allowed_tools]"
+        value={@allowed_tools}
+        placeholder="e.g. Bash,Read,Edit,Write,Grep,Glob"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+      />
+      <label class="label">
+        <span class="label-text-alt text-base-content/40">
+          Comma-separated. Supports wildcards: Bash(git *)
+        </span>
+      </label>
+    </div>
+    """
+  end
+
+  attr :add_dir, :string, required: true
+  attr :mcp_config, :string, required: true
+  attr :plugin_dir, :string, required: true
+  attr :settings_file, :string, required: true
+
+  defp path_fields(assigns) do
+    ~H"""
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Add Directory</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--add-dir</span>
+      </label>
+      <input
+        type="text"
+        name="schedule[add_dir]"
+        value={@add_dir}
+        placeholder="/path/to/shared-lib"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+      />
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">MCP Config File</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--mcp-config</span>
+      </label>
+      <input
+        type="text"
+        name="schedule[mcp_config]"
+        value={@mcp_config}
+        placeholder="./mcp-servers.json"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+      />
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text text-xs">Plugin Directory</span>
+          <span class="label-text-alt text-base-content/40 font-mono text-xs">--plugin-dir</span>
+        </label>
+        <input
+          type="text"
+          name="schedule[plugin_dir]"
+          value={@plugin_dir}
+          placeholder="./my-plugins"
+          class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+        />
+      </div>
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text text-xs">Settings File</span>
+          <span class="label-text-alt text-base-content/40 font-mono text-xs">--settings</span>
+        </label>
+        <input
+          type="text"
+          name="schedule[settings_file]"
+          value={@settings_file}
+          placeholder="./settings.json"
+          class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+        />
+      </div>
+    </div>
+    """
+  end
+
+  attr :skip_permissions, :boolean, required: true
+  attr :chrome, :boolean, required: true
+  attr :sandbox, :boolean, required: true
+
+  defp boolean_flags(assigns) do
+    ~H"""
+    <div class="flex flex-col gap-1 pt-1">
+      <label class="label cursor-pointer justify-start gap-2 py-1">
+        <input
+          type="checkbox"
+          name="schedule[skip_permissions]"
+          value="true"
+          checked={@skip_permissions}
+          class="checkbox checkbox-sm checkbox-primary"
+        />
+        <span class="label-text text-xs">
+          Skip permissions
+          <span class="font-mono text-base-content/40 text-xs ml-1">
+            --dangerously-skip-permissions
+          </span>
+        </span>
+      </label>
+      <label class="label cursor-pointer justify-start gap-2 py-1">
+        <input
+          type="checkbox"
+          name="schedule[chrome]"
+          value="true"
+          checked={@chrome}
+          class="checkbox checkbox-sm checkbox-primary"
+        />
+        <span class="label-text text-xs">
+          Chrome integration <span class="font-mono text-base-content/40 text-xs ml-1">--chrome</span>
+        </span>
+      </label>
+      <label class="label cursor-pointer justify-start gap-2 py-1">
+        <input
+          type="checkbox"
+          name="schedule[sandbox]"
+          value="true"
+          checked={@sandbox}
+          class="checkbox checkbox-sm checkbox-primary"
+        />
+        <span class="label-text text-xs">
+          OS sandbox isolation
+          <span class="font-mono text-base-content/40 text-xs ml-1">--sandbox</span>
+        </span>
+      </label>
+    </div>
+    """
+  end
+
+  defp job_field(nil, _field, default), do: default
+  defp job_field(job, field, default), do: Map.get(job, field) || default
 end

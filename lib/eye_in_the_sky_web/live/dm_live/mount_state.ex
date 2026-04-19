@@ -26,6 +26,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     PubSubHelpers.subscribe_dm_queue(session_id)
     PubSubHelpers.subscribe_tasks()
     Events.subscribe_session_timer(session_id)
+    Events.subscribe_codex_raw(session_id)
   end
 
   def assign_sidebar_context(socket, %{"from" => "project", "project_id" => project_id_str}) do
@@ -62,30 +63,24 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
   # Fast path — safe for disconnected mount. No DB or GenServer calls.
   def assign_essential_defaults(socket, session) do
     socket
+    |> assign_ui_flags(session)
+    |> assign_stream_defaults()
+    |> assign_task_defaults()
+    |> assign_upload_config()
+  end
+
+  defp assign_ui_flags(socket, session) do
+    socket
     |> assign(:active_tab, "messages")
     |> assign(:session_ref, nil)
     |> assign(:processing, false)
-    |> assign(:message_limit, @default_message_limit)
-    |> assign(:has_more_messages, false)
     |> assign(:selected_model, session.model || "opus")
     |> assign(:selected_effort, "medium")
     |> assign(:active_overlay, nil)
     |> assign(:show_live_stream, true)
-    |> assign(:stream_content, nil)
-    |> assign(:stream_tool, nil)
-    |> assign(:stream_thinking, nil)
     |> assign(:slash_items, SlashItems.build())
     |> assign(:diff_cache, %{})
-    |> assign(:selected_task, nil)
-    |> assign(:task_notes, [])
-    |> assign(:workflow_states, [])
-    |> assign(:current_task, nil)
     |> assign(:reload_timer, nil)
-    |> assign(:total_tokens, 0)
-    |> assign(:total_cost, 0.0)
-    |> assign(:context_used, 0)
-    |> assign(:context_window, 0)
-    |> assign(:queued_prompts, [])
     |> assign(:thinking_enabled, false)
     |> assign(:max_budget_usd, nil)
     |> assign(:session_cli_opts, [])
@@ -94,7 +89,34 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:session_context, nil)
     |> assign(:reloading, false)
     |> assign(:active_timer, nil)
-    |> allow_upload(:files,
+    |> assign(:codex_raw_lines, [])
+    |> assign(:notify_on_stop, false)
+  end
+
+  defp assign_stream_defaults(socket) do
+    socket
+    |> assign(:stream_content, nil)
+    |> assign(:stream_tool, nil)
+    |> assign(:stream_thinking, nil)
+    |> assign(:total_tokens, 0)
+    |> assign(:total_cost, 0.0)
+    |> assign(:context_used, 0)
+    |> assign(:context_window, 0)
+  end
+
+  defp assign_task_defaults(socket) do
+    socket
+    |> assign(:message_limit, @default_message_limit)
+    |> assign(:has_more_messages, false)
+    |> assign(:selected_task, nil)
+    |> assign(:task_notes, [])
+    |> assign(:workflow_states, [])
+    |> assign(:current_task, nil)
+    |> assign(:queued_prompts, [])
+  end
+
+  defp assign_upload_config(socket) do
+    allow_upload(socket, :files,
       accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
       max_entries: 10,
       max_file_size: 50_000_000,
@@ -104,9 +126,14 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
 
   # Connected-only — runs DB queries and GenServer calls after WebSocket upgrade.
   def assign_connected_defaults(socket, session) do
+    stream_content =
+      if session.status == "working",
+        do: AgentWorker.get_stream_state(session.id),
+        else: ""
+
     socket
     |> assign(:processing, initial_processing?(session))
-    |> assign(:stream_content, AgentWorker.get_stream_state(session.id))
+    |> assign(:stream_content, stream_content)
     |> assign(:workflow_states, Tasks.list_workflow_states())
     |> assign(:current_task, Tasks.get_current_task_for_session(session.id))
     |> assign(:queued_prompts, AgentWorker.get_queue(session.id))

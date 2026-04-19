@@ -102,13 +102,19 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.DmHandler do
 
     case AgentManager.send_message(to_session.id, dm_body) do
       {:ok, _} ->
-        case Messages.create_message(attrs) do
-          {:ok, msg} ->
-            EyeInTheSky.Events.session_new_dm(to_session.id, msg)
-            notify_success(from_session_id, "dm sent to session #{to_session.id}")
+        case Messages.find_recent_dm(to_session.id, dm_body, seconds: 30) do
+          nil ->
+            case Messages.create_message(attrs) do
+              {:ok, msg} ->
+                EyeInTheSky.Events.session_new_dm(to_session.id, msg)
+                notify_success(from_session_id, "dm sent to session #{to_session.id}")
 
-          {:error, reason} ->
-            notify_error(from_session_id, "dm persist", reason)
+              {:error, reason} ->
+                notify_error(from_session_id, "dm persist", reason)
+            end
+
+          _existing ->
+            notify_success(from_session_id, "dm sent to session #{to_session.id}")
         end
 
       {:error, reason} ->

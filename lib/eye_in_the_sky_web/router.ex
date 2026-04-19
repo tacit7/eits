@@ -21,13 +21,15 @@ defmodule EyeInTheSkyWeb.Router do
       port = System.get_env("VITE_PORT", "5173")
       origin = "http://localhost:#{port}"
       ws_origin = "ws://localhost:#{port}"
+      ip_origin = "http://127.0.0.1:#{port}"
+      ip_ws_origin = "ws://127.0.0.1:#{port}"
 
       "default-src 'self'; " <>
-        "script-src 'self' 'unsafe-inline' #{origin}; " <>
+        "script-src 'self' 'unsafe-inline' #{origin} #{ip_origin}; " <>
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " <>
         "font-src 'self' data: https://fonts.gstatic.com; " <>
-        "img-src 'self' data: blob: #{origin}; " <>
-        "connect-src 'self' #{ws_origin}; " <>
+        "img-src 'self' data: blob: #{origin} #{ip_origin}; " <>
+        "connect-src 'self' #{ws_origin} #{ip_ws_origin}; " <>
         "frame-ancestors 'none'; " <>
         "object-src 'none'"
     end
@@ -100,6 +102,11 @@ defmodule EyeInTheSkyWeb.Router do
     post "/login/complete", AuthController, :login_complete
   end
 
+  scope "/.well-known", EyeInTheSkyWeb do
+    pipe_through :browser
+    get "/webauthn", WellKnownController, :webauthn
+  end
+
   # Push notification endpoints — browser-session auth, no Bearer token required
   scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
     pipe_through :browser_json
@@ -115,7 +122,7 @@ defmodule EyeInTheSkyWeb.Router do
     live_session :app,
       on_mount: [
         EyeInTheSkyWeb.AuthHook,
-        EyeInTheSkyWeb.FabHook,
+        EyeInTheSkyWeb.FloatingChatLive,
         EyeInTheSkyWeb.NavHook
       ] do
       live "/", AgentLive.Index, :index
@@ -147,6 +154,12 @@ defmodule EyeInTheSkyWeb.Router do
       live "/dm/:session_id", DmLive, :show
       live "/notes/new", NoteLive.New, :new
       live "/notes/:id/edit", NoteLive.Edit, :edit
+      live "/canvases", CanvasLive, :index
+      live "/canvases/:id", CanvasLive, :show
+      live "/iam/simulator", IAMLive.Simulator, :index
+      live "/iam/policies", IAMLive.Policies, :index
+      live "/iam/policies/new", IAMLive.PolicyNew, :new
+      live "/iam/policies/:id/edit", IAMLive.PolicyEdit, :edit
     end
   end
 
@@ -169,6 +182,11 @@ defmodule EyeInTheSkyWeb.Router do
     post "/sessions/:uuid/tool-events", SessionController, :tool_event
     get "/sessions/:uuid/context", SessionController, :get_context
     patch "/sessions/:uuid/context", SessionController, :update_context
+
+    # Timers
+    get "/sessions/:session_id/timer", TimerController, :show
+    post "/sessions/:session_id/timer", TimerController, :schedule
+    delete "/sessions/:session_id/timer", TimerController, :cancel
 
     # Commits
     get "/commits", CommitController, :index
@@ -195,6 +213,7 @@ defmodule EyeInTheSkyWeb.Router do
     patch "/tasks/:id", TaskController, :update
     delete "/tasks/:id", TaskController, :delete
     post "/tasks/:id/annotations", TaskController, :annotate
+    post "/tasks/:id/complete", TaskController, :complete
     post "/tasks/:id/sessions", TaskController, :link_session
     delete "/tasks/:id/sessions/:uuid", TaskController, :unlink_session
 
@@ -231,6 +250,7 @@ defmodule EyeInTheSkyWeb.Router do
     post "/teams/:team_id/members", TeamController, :join
     patch "/teams/:team_id/members/:member_id", TeamController, :update_member
     delete "/teams/:team_id/members/:member_id", TeamController, :leave
+
   end
 
   # Gitea webhooks — no Bearer auth; controller validates HMAC signature from Gitea
@@ -238,6 +258,13 @@ defmodule EyeInTheSkyWeb.Router do
     pipe_through [:accepts_json]
 
     post "/webhooks/gitea", GiteaWebhookController, :handle
+  end
+
+  # IAM hook endpoint — unauthenticated (hooks run in Claude CLI process with no user session)
+  scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
+    pipe_through [:accepts_json]
+
+    post "/iam/decide", IAMController, :decide
   end
 
   # Unauthenticated settings reads (read-only, no sensitive data)

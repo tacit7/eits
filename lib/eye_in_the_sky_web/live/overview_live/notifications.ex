@@ -40,7 +40,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
   @impl true
   def handle_event("mark_read", %{"id" => id}, socket) do
     case parse_int(id) do
-      nil -> {:noreply, socket}
+      nil ->
+        {:noreply, socket}
+
       int_id ->
         case Notifications.mark_read(int_id) do
           {:ok, _} -> :ok
@@ -170,7 +172,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
                 <div class="flex items-center gap-3 mt-1">
                   <span class="text-xs text-base-content/35">{relative_time(n.inserted_at)}</span>
                   <%= if link do %>
-                    <.link navigate={link} class="text-xs text-primary hover:underline inline-flex items-center min-h-[44px] px-1">
+                    <.link
+                      navigate={link}
+                      class="text-xs text-primary hover:underline inline-flex items-center min-h-[44px] px-1"
+                    >
                       View
                     </.link>
                   <% end %>

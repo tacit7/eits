@@ -256,7 +256,9 @@ defmodule EyeInTheSky.Agents.CmdDispatcherTest do
       member2_agent = create_agent()
       member2_session = create_session(member2_agent)
 
-      {:ok, _} = Teams.join_team(%{team_id: team.id, name: "sender", session_id: sender_session.id})
+      {:ok, _} =
+        Teams.join_team(%{team_id: team.id, name: "sender", session_id: sender_session.id})
+
       {:ok, _} = Teams.join_team(%{team_id: team.id, name: "m1", session_id: member1_session.id})
       {:ok, _} = Teams.join_team(%{team_id: team.id, name: "m2", session_id: member2_session.id})
 
@@ -271,7 +273,9 @@ defmodule EyeInTheSky.Agents.CmdDispatcherTest do
 
       assert length(members) == 3
 
-      other_sessions = members |> Enum.reject(&(&1.session_id == sender_session.id)) |> Enum.map(& &1.session_id)
+      other_sessions =
+        members |> Enum.reject(&(&1.session_id == sender_session.id)) |> Enum.map(& &1.session_id)
+
       assert member1_session.id in other_sessions
       assert member2_session.id in other_sessions
     end
@@ -283,7 +287,9 @@ defmodule EyeInTheSky.Agents.CmdDispatcherTest do
       sender_session = create_session(sender_agent)
 
       # Member with no session
-      {:ok, _} = Teams.join_team(%{team_id: team.id, name: "sender", session_id: sender_session.id})
+      {:ok, _} =
+        Teams.join_team(%{team_id: team.id, name: "sender", session_id: sender_session.id})
+
       {:ok, _} = Teams.join_team(%{team_id: team.id, name: "no-session-member"})
 
       # Should not crash
@@ -303,7 +309,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcherTest do
       sender_agent = create_agent()
       sender_session = create_session(sender_agent)
 
-      {:ok, _} = Teams.join_team(%{team_id: team.id, name: "sender", session_id: sender_session.id})
+      {:ok, _} =
+        Teams.join_team(%{team_id: team.id, name: "sender", session_id: sender_session.id})
 
       # Only member is sender — no one else to broadcast to, should not crash
       dispatch("EITS-CMD: team broadcast --message \"solo\"", sender_session.id)

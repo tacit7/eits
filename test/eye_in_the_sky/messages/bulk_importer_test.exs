@@ -24,7 +24,13 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
     test "imports messages with the given provider", %{session: session} do
       messages = [
         %{uuid: Ecto.UUID.generate(), role: "user", content: "Hello", timestamp: nil, usage: nil},
-        %{uuid: Ecto.UUID.generate(), role: "assistant", content: "Hi", timestamp: nil, usage: nil}
+        %{
+          uuid: Ecto.UUID.generate(),
+          role: "assistant",
+          content: "Hi",
+          timestamp: nil,
+          usage: nil
+        }
       ]
 
       count = BulkImporter.import_messages(messages, session.id, provider: "codex")
@@ -46,14 +52,25 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
 
     test "applies metadata_fn when provided", %{session: session} do
       messages = [
-        %{uuid: Ecto.UUID.generate(), role: "assistant", content: "With usage", timestamp: nil, usage: %{"input_tokens" => 10}}
+        %{
+          uuid: Ecto.UUID.generate(),
+          role: "assistant",
+          content: "With usage",
+          timestamp: nil,
+          usage: %{"input_tokens" => 10}
+        }
       ]
 
       metadata_fn = fn msg ->
         if msg.usage, do: %{"usage" => msg.usage}, else: nil
       end
 
-      count = BulkImporter.import_messages(messages, session.id, provider: "claude", metadata_fn: metadata_fn)
+      count =
+        BulkImporter.import_messages(messages, session.id,
+          provider: "claude",
+          metadata_fn: metadata_fn
+        )
+
       assert count == 1
 
       [msg] = Messages.list_messages_for_session(session.id)
@@ -89,7 +106,13 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
 
     test "parses ISO8601 timestamps", %{session: session} do
       messages = [
-        %{uuid: Ecto.UUID.generate(), role: "user", content: "Timed", timestamp: "2026-03-15T08:30:00Z", usage: nil}
+        %{
+          uuid: Ecto.UUID.generate(),
+          role: "user",
+          content: "Timed",
+          timestamp: "2026-03-15T08:30:00Z",
+          usage: nil
+        }
       ]
 
       BulkImporter.import_messages(messages, session.id, provider: "codex")
@@ -101,7 +124,13 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
     test "maps user role to outbound, assistant to inbound", %{session: session} do
       messages = [
         %{uuid: Ecto.UUID.generate(), role: "user", content: "Out", timestamp: nil, usage: nil},
-        %{uuid: Ecto.UUID.generate(), role: "assistant", content: "In", timestamp: nil, usage: nil}
+        %{
+          uuid: Ecto.UUID.generate(),
+          role: "assistant",
+          content: "In",
+          timestamp: nil,
+          usage: nil
+        }
       ]
 
       BulkImporter.import_messages(messages, session.id, provider: "codex")

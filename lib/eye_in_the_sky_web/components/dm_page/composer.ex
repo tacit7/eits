@@ -33,7 +33,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
     >
       <%= if @display_name do %>
         <div class="flex justify-end px-4 pt-2">
-          <span class="text-[11px] text-base-content/35 bg-base-content/5 px-2 py-0.5 rounded">{@display_name}</span>
+          <span class="text-[11px] text-base-content/35 bg-base-content/5 px-2 py-0.5 rounded">
+            {@display_name}
+          </span>
         </div>
       <% end %>
       <%!-- Upload previews --%>
@@ -96,7 +98,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
               class="w-16 bg-transparent border-0 outline-none focus:ring-0 text-xs placeholder:text-base-content/20 font-mono p-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
-          <%= if @selected_model == "opus" do %>
+          <%= if String.starts_with?(@selected_model, "claude-opus") or @selected_model in ["opus", "opus[1m]"] do %>
             <div
               class="dropdown dropdown-top"
               phx-click="toggle_effort_menu"
@@ -223,11 +225,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
                 <% else %>
                   <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">Claude</li>
                   <%= for {model, label, desc, color} <- [
-                    {"opus", "Opus 4.6", "Most capable", "text-warning"},
-                    {"opus[1m]", "Opus 4.6 (1M)", "Most capable, extended context", "text-warning"},
-                    {"sonnet", "Sonnet 4.5", "Everyday tasks", "text-info"},
-                    {"sonnet[1m]", "Sonnet 4.5 (1M)", "Everyday tasks, extended context", "text-info"},
-                    {"haiku", "Haiku 4.5", "Fast answers", "text-success"}
+                    {"claude-opus-4-7", "Opus 4.7", "Most capable, latest", "text-warning"},
+                    {"claude-opus-4-6", "Opus 4.6", "Most capable", "text-warning"},
+                    {"claude-opus-4-5-20251101", "Opus 4.5", "Capable, extended context", "text-warning"},
+                    {"claude-opus-4-1-20250805", "Opus 4.1", "Capable", "text-warning"},
+                    {"claude-sonnet-4-6", "Sonnet 4.6", "Everyday tasks, latest", "text-info"},
+                    {"claude-sonnet-4-5-20250929", "Sonnet 4.5", "Everyday tasks", "text-info"},
+                    {"claude-haiku-4-5-20251001", "Haiku 4.5", "Fast answers", "text-success"}
                   ] do %>
                     <li>
                       <a
@@ -322,10 +326,16 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
     """
   end
 
-  defp model_display_name("opus"), do: "Opus 4.6"
-  defp model_display_name("opus[1m]"), do: "Opus 4.6 (1M)"
-  defp model_display_name("sonnet"), do: "Sonnet 4.5"
-  defp model_display_name("sonnet[1m]"), do: "Sonnet 4.5 (1M)"
+  defp model_display_name("claude-opus-4-7"), do: "Opus 4.7"
+  defp model_display_name("claude-opus-4-6"), do: "Opus 4.6"
+  defp model_display_name("claude-opus-4-5-20251101"), do: "Opus 4.5"
+  defp model_display_name("claude-opus-4-1-20250805"), do: "Opus 4.1"
+  defp model_display_name("claude-sonnet-4-6"), do: "Sonnet 4.6"
+  defp model_display_name("claude-sonnet-4-5-20250929"), do: "Sonnet 4.5"
+  defp model_display_name("claude-haiku-4-5-20251001"), do: "Haiku 4.5"
+  # backward compat for sessions storing old short slugs
+  defp model_display_name("opus"), do: "Opus 4.7"
+  defp model_display_name("sonnet"), do: "Sonnet 4.6"
   defp model_display_name("haiku"), do: "Haiku 4.5"
   defp model_display_name("gpt-5.4"), do: "gpt-5.4"
   defp model_display_name("gpt-5.3-codex"), do: "gpt-5.3-codex"

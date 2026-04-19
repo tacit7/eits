@@ -21,7 +21,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
     socket =
       if project_id do
         project =
-          Projects.get_project_with_agents!(project_id)
+          Projects.get_project!(project_id)
 
         claude_dir = if project.path, do: Path.join(project.path, ".claude"), else: nil
 
@@ -104,7 +104,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
     path = socket.assigns.selected_file_path
     claude_dir = socket.assigns.claude_dir
 
-    if not is_nil(path) && not is_nil(claude_dir) && String.starts_with?(path, claude_dir) && File.exists?(path) do
+    if not is_nil(path) && not is_nil(claude_dir) && String.starts_with?(path, claude_dir) &&
+         File.exists?(path) do
       EyeInTheSkyWeb.Helpers.ViewHelpers.open_in_system(path)
     end
 

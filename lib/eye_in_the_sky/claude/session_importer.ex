@@ -35,7 +35,10 @@ defmodule EyeInTheSky.Claude.SessionImporter do
   def import_messages(raw_messages, session_id) do
     raw_messages
     |> SessionReader.format_messages()
-    |> BulkImporter.import_messages(session_id, provider: "claude", metadata_fn: &extract_metadata/1)
+    |> BulkImporter.import_messages(session_id,
+      provider: "claude",
+      metadata_fn: &extract_metadata/1
+    )
   end
 
   # ---------------------------------------------------------------------------

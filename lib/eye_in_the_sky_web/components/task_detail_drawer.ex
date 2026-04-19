@@ -163,7 +163,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
               </form>
 
               <%!-- Checklist (rendered via slot — TaskChecklistComponent from parent LiveView) --%>
-              <%= render_slot(@checklist) %>
+              {render_slot(@checklist)}
 
               <%!-- Annotations --%>
               <%= if not is_nil(@notes) && @notes != [] do %>
@@ -184,7 +184,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                             {note.title}
                           </div>
                         <% end %>
-                        <pre class="whitespace-pre-wrap text-xs text-base-content/60 font-mono leading-relaxed">{note.body}</pre>
+                        <pre class="whitespace-pre-wrap text-xs text-base-content/60 font-mono leading-relaxed">{String.trim(note.body || "")}</pre>
                         <div class="mt-1.5 text-[11px] text-base-content/25">
                           {relative_time(note.created_at)}
                         </div>

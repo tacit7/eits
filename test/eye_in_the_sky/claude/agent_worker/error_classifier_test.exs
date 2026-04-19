@@ -69,9 +69,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifierTest do
     end
 
     test "binary containing authentication_error is systemic" do
-      assert ErrorClassifier.systemic?(
-               {:claude_result_error, %{errors: "authentication_error"}}
-             )
+      assert ErrorClassifier.systemic?({:claude_result_error, %{errors: "authentication_error"}})
     end
 
     test "binary without systemic markers is not systemic" do

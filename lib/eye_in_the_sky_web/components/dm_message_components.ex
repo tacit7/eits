@@ -1,109 +1,25 @@
 defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   @moduledoc """
-  Message rendering components for the DM page.
+  Shared message rendering components used by MessagesTab and ChatWindowComponent.
 
-  Covers the full message display hierarchy:
-    message_item -> message_body -> tool_widget -> tool_widget_body
-                 -> message_metrics
-                 -> message_attachments
+  Public API:
+    message_body/1        — renders message content (text, tool calls, tool results, thinking)
+    tool_result_body/1    — renders tool result OUTPUT block
+    tool_widget/1         — renders a tool call collapsible widget
+    tool_widget_body/1    — renders the body inside a tool call widget
+    message_metrics/1     — renders token/cost/duration metrics row
+    message_attachments/1 — renders file attachment list
+    stream_provider_avatar/1 — renders the live-stream avatar
 
-  Also exports stream_provider_avatar for the live-stream bubble.
-
-  Imported by DmPage so all <.component_name ...> call-sites are unchanged.
+  Both message_body and tool_result_body accept a `compact` boolean (default false)
+  that switches to smaller sizing for use in the canvas chat window.
+  message_body also accepts `extra_id` to namespace element IDs when the same
+  message appears in multiple components on the page (e.g. canvas windows).
   """
 
   use EyeInTheSkyWeb, :html
 
   import EyeInTheSkyWeb.Components.DmHelpers
-
-  # ---------------------------------------------------------------------------
-  # message_item
-  # ---------------------------------------------------------------------------
-
-  attr :message, :map, required: true
-
-  def message_item(assigns) do
-    is_user = assigns.message.sender_role == "user"
-    is_dm = dm_message?(assigns.message)
-    assigns = assign(assigns, :is_user, is_user) |> assign(:is_dm, is_dm)
-
-    ~H"""
-    <div
-      class={[
-        "py-3 px-2 -mx-2 rounded-lg opacity-0",
-        @is_dm && "border-l-2 border-primary/30 pl-3 bg-primary/[0.03]"
-      ]}
-      id={"dm-message-#{@message.id}"}
-      phx-mounted={
-        JS.transition(
-          {"transition-all ease-out duration-200", "opacity-0 translate-y-1",
-           "opacity-100 translate-y-0"}
-        )
-      }
-    >
-      <div class="flex items-start gap-2.5">
-        <%!-- Sender icon --%>
-        <%= if @is_user do %>
-          <div class="w-4 h-4 rounded-full mt-1 flex-shrink-0 bg-success/20 flex items-center justify-center">
-            <div class="w-1.5 h-1.5 rounded-full bg-success" />
-          </div>
-        <% else %>
-          <img
-            src={provider_icon(@message.provider)}
-            class={"w-4 h-4 mt-1 flex-shrink-0 #{provider_icon_class(@message.provider)}"}
-            alt={@message.provider || "Agent"}
-            width="16"
-            height="16"
-            loading="lazy"
-          />
-        <% end %>
-
-        <div class="min-w-0 flex-1">
-          <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span class={[
-              "text-[13px] font-semibold",
-              !@is_user && "text-primary/80",
-              @is_user && "text-base-content/70"
-            ]}>
-              {message_sender_name(@message)}
-            </span>
-            <%!-- DM badge --%>
-            <span
-              :if={@is_dm}
-              class="inline-flex items-center gap-1 text-xs font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/40 uppercase tracking-wide"
-            >
-              <.icon name="hero-envelope-mini" class="w-2.5 h-2.5" /> dm
-            </span>
-            <span
-              :if={!@is_user && message_model(@message)}
-              class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/35"
-            >
-              {message_model(@message)}
-            </span>
-            <span
-              :if={!@is_user && message_cost(@message)}
-              class="text-[11px] font-mono text-base-content/30"
-            >
-              ${:erlang.float_to_binary(message_cost(@message) * 1.0, decimals: 4)}
-            </span>
-            <time
-              id={"msg-time-#{@message.id}"}
-              class="text-[11px] text-base-content/25"
-              data-utc={to_utc_string(@message.inserted_at)}
-              phx-hook="LocalTime"
-            >
-            </time>
-          </div>
-
-          <.message_body message={@message} />
-
-          <.message_metrics :if={show_message_metrics?(@message)} message={@message} />
-          <.message_attachments attachments={@message.attachments || []} />
-        </div>
-      </div>
-    </div>
-    """
-  end
 
   # ---------------------------------------------------------------------------
   # message_metrics
@@ -191,6 +107,8 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   # ---------------------------------------------------------------------------
 
   attr :message, :map, required: true
+  attr :compact, :boolean, default: false
+  attr :extra_id, :any, default: nil
 
   def message_body(assigns) do
     body =
@@ -201,35 +119,50 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     segments = parse_body_segments(body)
     thinking = get_in(assigns.message.metadata || %{}, ["thinking"])
     stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
+    id_prefix = if assigns.extra_id, do: "#{assigns.extra_id}-", else: ""
 
     assigns =
       assigns
       |> assign(:segments, segments)
       |> assign(:thinking, thinking)
       |> assign(:stream_type, stream_type)
+      |> assign(:id_prefix, id_prefix)
 
     ~H"""
-    <div class="mt-1 space-y-1.5">
+    <div class={[
+      "space-y-1.5",
+      !@compact && "mt-1",
+      @compact && @stream_type != "tool_result" && "mt-0.5"
+    ]}>
       <details
         :if={@thinking && @thinking != ""}
         class="group rounded border-l-2 border-primary/50 bg-zinc-950/50 overflow-hidden"
       >
-        <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
-          <.icon name="hero-sparkles" class="w-3.5 h-3.5 flex-shrink-0 text-primary/60" />
-          <span class="text-[11px] font-mono font-semibold text-primary/60 uppercase tracking-wide">
+        <summary class={
+          "flex items-center cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors " <>
+            if(@compact, do: "gap-1.5 px-2 py-1", else: "gap-2 px-2.5 py-1.5")
+        }>
+          <.icon
+            name="hero-sparkles"
+            class={if @compact, do: "w-3 h-3 flex-shrink-0 text-primary/60", else: "w-3.5 h-3.5 flex-shrink-0 text-primary/60"}
+          />
+          <span class={
+            "font-mono font-semibold text-primary/60 uppercase tracking-wide " <>
+              if(@compact, do: "text-[10px]", else: "text-[11px]")
+          }>
             Thinking
           </span>
           <.icon
             name="hero-chevron-right"
-            class="w-3 h-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
+            class={if @compact, do: "w-2.5 h-2.5 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90", else: "w-3 h-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"}
           />
         </summary>
-        <div class="px-2.5 pb-2 pt-1 border-t border-primary/10">
-          <pre class="font-mono text-xs text-base-content/40 whitespace-pre-wrap break-words leading-relaxed">{@thinking}</pre>
+        <div class={if @compact, do: "px-2 pb-1.5 pt-1 border-t border-primary/10", else: "px-2.5 pb-2 pt-1 border-t border-primary/10"}>
+          <pre class={if @compact, do: "font-mono text-[10px] text-base-content/40 whitespace-pre-wrap break-words leading-relaxed", else: "font-mono text-xs text-base-content/40 whitespace-pre-wrap break-words leading-relaxed"}>{@thinking}</pre>
         </div>
       </details>
       <%= if @stream_type == "tool_result" do %>
-        <.tool_result_body body={@message.body} />
+        <.tool_result_body body={@message.body} compact={@compact} />
       <% else %>
         <%= for {segment, idx} <- Enum.with_index(@segments) do %>
           <%= case segment do %>
@@ -237,8 +170,8 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
               <.tool_widget name={name} rest={rest} />
             <% {:text, text} when text != "" -> %>
               <div
-                id={"msg-body-#{@message.id}-#{idx}"}
-                class="dm-markdown text-sm leading-relaxed text-base-content/85"
+                id={"msg-body-#{@id_prefix}#{@message.id}-#{idx}"}
+                class={["dm-markdown leading-relaxed text-base-content/85", if(@compact, do: "text-xs", else: "text-sm")]}
                 phx-hook="MarkdownMessage"
                 data-raw-body={text}
               >
@@ -256,25 +189,40 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   # ---------------------------------------------------------------------------
 
   attr :body, :string, default: ""
+  attr :compact, :boolean, default: false
 
   def tool_result_body(assigns) do
     ~H"""
-    <details
-      open
-      class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden"
-    >
-      <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
-        <.icon name="hero-code-bracket" class="w-3.5 h-3.5 flex-shrink-0 text-base-content/30" />
-        <span class="text-[11px] font-mono font-semibold text-base-content/40 uppercase tracking-wide flex-shrink-0">
+    <details class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden">
+      <summary class={
+        "flex items-center cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors " <>
+          if(@compact, do: "gap-1.5 px-2 py-1", else: "gap-2 px-2.5 py-1.5")
+      }>
+        <.icon
+          name="hero-code-bracket"
+          class={if @compact, do: "w-3 h-3 flex-shrink-0 text-base-content/30", else: "w-3.5 h-3.5 flex-shrink-0 text-base-content/30"}
+        />
+        <span class={
+          "font-mono font-semibold text-base-content/40 uppercase tracking-wide flex-shrink-0 " <>
+            if(@compact, do: "text-[10px]", else: "text-[11px]")
+        }>
           Output
         </span>
+        <button
+          class="tool-copy-btn ml-auto mr-1 shrink-0"
+          data-copy-btn
+          data-copy-text={@body}
+          title="Copy output"
+        >
+          <.icon name="hero-clipboard-document" class={if @compact, do: "w-3 h-3", else: "w-3.5 h-3.5"} />
+        </button>
         <.icon
           name="hero-chevron-right"
-          class="w-3 h-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
+          class={if @compact, do: "w-2.5 h-2.5 text-base-content/20 shrink-0 transition-transform group-open:rotate-90", else: "w-3 h-3 text-base-content/20 shrink-0 transition-transform group-open:rotate-90"}
         />
       </summary>
-      <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-        <pre class="font-mono text-xs text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto">{@body}</pre>
+      <div class={if @compact, do: "px-2 pb-1.5 pt-1 border-t border-base-content/5", else: "px-2.5 pb-2 pt-1 border-t border-base-content/5"}>
+        <pre class={if @compact, do: "font-mono text-[10px] text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto", else: "font-mono text-xs text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto"}>{@body}</pre>
       </div>
     </details>
     """
@@ -319,9 +267,17 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         >
           {@detail}
         </span>
+        <button
+          class="tool-copy-btn ml-auto mr-1 shrink-0"
+          data-copy-btn
+          data-copy-text={@rest}
+          title="Copy input"
+        >
+          <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" />
+        </button>
         <.icon
           name="hero-chevron-right"
-          class="w-3 h-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
+          class="w-3 h-3 text-base-content/20 shrink-0 transition-transform group-open:rotate-90"
         />
       </summary>
       <.tool_widget_body name={@name} rest={@rest} detail={@detail} input={@input} />
@@ -403,7 +359,8 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       Map.has_key?(assigns.input, "content")
   end
 
-  defp speak_body?(assigns), do: String.ends_with?(assigns.name, "i-speak") and assigns.detail != ""
+  defp speak_body?(assigns),
+    do: String.ends_with?(assigns.name, "i-speak") and assigns.detail != ""
 
   defp json_body?(assigns) do
     is_map(assigns.input) and map_size(assigns.input) > 0 and

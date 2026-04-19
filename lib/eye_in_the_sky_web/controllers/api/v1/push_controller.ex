@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.Api.V1.PushController do
   use EyeInTheSkyWeb, :controller
 
+  action_fallback EyeInTheSkyWeb.Api.V1.FallbackController
+
   import EyeInTheSkyWeb.ControllerHelpers, only: [translate_errors: 1]
 
   alias EyeInTheSky.PushSubscriptions
@@ -26,7 +28,11 @@ defmodule EyeInTheSkyWeb.Api.V1.PushController do
       {:error, cs} ->
         conn
         |> put_status(:unprocessable_entity)
-        |> json(%{success: false, message: "Invalid subscription data", errors: translate_errors(cs)})
+        |> json(%{
+          success: false,
+          message: "Invalid subscription data",
+          errors: translate_errors(cs)
+        })
     end
   end
 

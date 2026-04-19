@@ -32,6 +32,7 @@ defmodule EyeInTheSky.BookmarksTest do
 
     test "returns {:ok, bookmark} when url bookmark exists" do
       create_bookmark(%{bookmark_type: "url", url: "https://found.com", title: "Found"})
+
       assert {:ok, %Bookmark{bookmark_type: "url", url: "https://found.com"}} =
                Bookmarks.get_bookmark_by("url", "https://found.com")
     end

@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.Api.V1.NotificationController do
   use EyeInTheSkyWeb, :controller
 
+  action_fallback EyeInTheSkyWeb.Api.V1.FallbackController
+
   import EyeInTheSkyWeb.ControllerHelpers, only: [maybe_opt: 3, translate_errors: 1]
 
   alias EyeInTheSky.Notifications
@@ -35,7 +37,11 @@ defmodule EyeInTheSkyWeb.Api.V1.NotificationController do
         {:error, cs} ->
           conn
           |> put_status(:unprocessable_entity)
-          |> json(%{success: false, message: "Invalid notification data", errors: translate_errors(cs)})
+          |> json(%{
+            success: false,
+            message: "Invalid notification data",
+            errors: translate_errors(cs)
+          })
       end
     end
   end

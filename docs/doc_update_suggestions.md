@@ -1,5 +1,55 @@
 # Documentation Update Suggestions
 
+## 2026-04-17
+**Commits reviewed**: ca2f33b7..eb1b17ed
+
+- **IAM_POLICY.md** — Document IAM Phase 4a builtin matchers (commit af3020d8): new BuiltinMatcher behaviour with Registry of 9 stable matcher keys; system policies can dispatch to specialized Elixir modules for detection requiring command parsing, path resolution, or git-state inspection; safe_builtin_match with rescue/catch and telemetry on error (fail closed); includes 9 detectors: block_sudo, block_rm_rf, protect_env_vars, block_env_files, block_read_outside_cwd, block_push_master, block_curl_pipe_sh, block_work_on_main, warn_destructive_sql
+- **IAM_POLICY.md** — Document IAM seeds system (commit af3020d8): new Seeds module with boot-time idempotent seeding task; seeds 9 builtin policies on application start; uses Ecto migrations for schema updates (migration 20260407230411); documents idempotent seeding pattern and transient task error handling
+- **IAM_HOOK_INSTALL.md** — Update to include Phase 4a Policy evaluation flow (commit af3020d8): clarify that hook decisions now dispatch through specialized_matches?/2 for builtin policies; include example policy JSON with builtin_matcher field; note that command/content regex power reserved for registered built-ins (not user-authored policies in v1)
+- **ARCHITECTURE.md or CANVAS.md** — Document Canvas page refactoring (commit eb1b17ed): promoted CanvasOverlayComponent to dedicated CanvasLive page; moved from app.html.heex mount to dedicated route; canvas routes added to router.ex; removed overlay from agent layout; impacts: agent_list, chat_window, sidebar all_projects_section components updated for new canvas route; suggests documenting new canvas route structure and state management
+- **CODE_GUIDELINES.md** — Document canvas submenu UI pattern (commits a80c2f40, 2c68ae39, d6a541e5): DaisyUI dropdown-hover for side-triggered submenu; submenu appears to the right of parent menu item; hover triggers side navigation; CSS positioning: menu-dropdown and dropdown-content classes; applicable to other multi-level menu structures
+- **AGENTS.md or CODE_GUIDELINES.md** — Document active Claude models in agent forms (commit 830e2db3): new active_models feature added to new agent form and DM selector; models fetched from config settings; enables users to select from configured active models instead of hardcoded list; impacts: agent form, DM page model selector
+- **CODE_GUIDELINES.md** — Document Codex.ToolMapper extraction (commit 499b70b6): new separate module extracted from Codex.SDK; encapsulates tool description mapping logic; follows single-responsibility refactoring pattern; enables testing and reuse across SDK implementations
+- **DATABASE.md or ARCHITECTURE.md** — Document migration 20260407230411 (commit af3020d8): adds builtin_matcher column to iam_policies; stores registered BuiltinMatcher key; partial index on (project_id, system_key) for system policy lookup performance; schema validates builtin_matcher against Registry
+
+## 2026-04-16
+**Commits reviewed**: ca2f33b7..e474c794
+
+- **DESKTOP_APP.md (new file)** — Document Tauri desktop app POC (commits d4a1fd60, e3d41708, a13e0a63, b411239a, 0be1a185, 033d34a3, e474c794): ElixirKit facade at lib/eye_in_the_sky/desktop.ex; Tauri 2 + Phoenix integration running on port 5050; file structure (src-tauri/ root with Cargo.toml, tauri.conf.json, capabilities/default.json); system tray with Show/Quit menu items; left-click tray icon shows and focuses window; close button hides to tray instead of quitting; window position/size persists across restarts via tauri-plugin-window-state; build commands and deep-link support; configuration in config/dev.exs (application supervisor updates, vite config changes)
+- **ARCHITECTURE.md** — Document TaskSessions context extraction (commit 85e5b51d): new lib/eye_in_the_sky/task_sessions.ex module extracted from Tasks context; encapsulates session-to-task relationships; follows Sessions context pattern for CRUD operations; schema_preloads and list_task_sessions/2 for querying
+- **CODE_GUIDELINES.md** — Document browser-only UI hiding pattern (commit e474c794): use data-env flag in CSS to conditionally hide browser-specific UI when running inside Tauri shell; pattern: `.hidden-in-tauri { @apply hidden; }` + `data-env="tauri"` attribute on root element; enables single codebase for web and desktop
+- **CODE_GUIDELINES.md** — Document system tray implementation pattern (commits 033d34a3, 0be1a185): tauri-plugin-window-state for persistence; TrayIcon setup in lib.rs with menu items; window hide-on-close vs tray show; capability permission: `window-state:default`
+
+## 2026-04-15
+**Commits reviewed**: ca2f33b7..3e55ea6a
+
+- **REST_API.md** — Document task controller input validation fixes (commits 13e29d3f, 84326f34): GET /api/v1/tasks with invalid project_id now returns empty list (200) instead of FunctionClauseError; POST /api/v1/tasks/:id/sessions and DELETE /api/v1/tasks/:id/sessions/:uuid now return 400 "Invalid task ID" for non-existent tasks instead of foreign key crash; Tasks.get_task/1 validates existence before DB operations
+- **REST_API.md** — Document session controller error handling improvement (commit b7b6dd5d): POST /api/v1/sessions now returns 422 with detailed error when Projects.resolve_project fails instead of silently setting project_id to nil; prevents invalid sessions from being created with unresolved projects
+- **SESSION_MANAGER.md** — Document session status lifecycle change (commit 3e55ea6a): /api/v1/sessions/:id/end endpoint now sets default status to 'completed' instead of 'waiting'; clarify that /end is explicit termination (not hook transition), so completed is correct semantics; waiting status reserved for hook-driven paused states
+- **PRODUCTION.md** — Document major infrastructure updates (commit 1231c244): EITS/Codex config migration to runtime.exs with environment-specific settings; UTC timestamp migration (all tables converted to :utc_datetime_usec); agent definitions auto-sync system; Codex SDK enhancements (comprehensive test coverage in codex_sdk_test.exs); note migration 20260321080000-080200 for timestamp normalization
+- **CODE_GUIDELINES.md** — Document image processor refactoring (commit 1231c244): ImageProcessor module expanded (61+ lines) with media handling improvements; EXIF stripping, resize optimization, and compression logic centralized; applied across multimodal content processing pipeline
+- **ARCHITECTURE.md or CLAUDE.md** — Document agent definitions tracking (commit 1231c244): AgentDefinition schema auto-scans `.claude/agents/` YAML files; on agent spawn, definition lookup checks DB; if not found, triggers auto-sync of agent definition and cached metadata; scope/project_id constraints prevent collisions; advisory locks coordinate sync race conditions
+- **CODE_GUIDELINES.md** — Document LiveView component refactoring patterns (commit 1231c244): dm_page component split into sub-modules (dm_page/commits_tab, dm_page/context_tab, dm_page/notes_tab, dm_page/composer); agent_schedule_form extracted into multiple sub-components; component lifecycle improvements with proper attr drilling and event dispatch; pattern: extract sub-concerns when template >200L or reused across 2+ parents
+- **REST_API.md or SECURITY.md** — Document .well_known controller addition (commit 1231c244): new StandardController with /.well-known/* endpoint support for RFC 5785 metadata (e.g., /.well-known/security.txt); enables standards-compliant security/contact information exposure
+
+## 2026-04-14
+**Commits reviewed**: cf8107bf..ca2f33b7
+
+- **CODEX_SDK.md** — Document Codex SDK refactoring (commits 75850e7b, 9ddd866d, 1e460048): extract shared `run_codex_session/4` private helper from duplicated start/resume setup; consolidate CLI execution into single closure pattern; clarify `eits_session_id` (EITS session UUID) vs `thread_id` (Codex thread ID) naming; normalize error tuples to consistent `{:error, {type, reason}}` shape across provider handlers
+- **REST_API.md** — Document POST `/tasks/:id/complete` endpoint (commit 1d754936): atomic transactional combine of annotate + state update to done; returns task JSON; `eits tasks complete <id>` CLI delegates to this endpoint; enables single-request task finalization in agents
+- **CODE_GUIDELINES.md** — Document WorkflowState alias centralization (commit 91503780): extract state alias resolution (`in-review`, `todo`, `review` aliases) into dedicated WorkflowState module function; replaces inline matches in task_controller; enables consistent state-name mapping across API and CLI
+- **DM_FEATURES.md** — Document Codex JSONL stream rendering (commit 442b6771): DM messages tab now surfaces raw Codex event stream in collapsible panel (last 100 lines); populated via `Events.broadcast_codex_raw` and `MessageHandler.forward_raw_lines` option; enables real-time debugging of Codex agent execution
+- **PERFORMANCE.md** — Document hljs bundle size optimization (commit 1efe9252): switch from full highlight.js (1,014kB) to core-only build registering 6 languages (markdown, json, elixir, bash, yaml, ini/toml); shared `hljs_instance.js` prevents double-import from NotesTab + markdown.js; reduces syntax chunk to 78kB (93% reduction)
+- **CODEX_SDK.md** — Document Codex.Models module (commit f2ff4520): new constant map with context_window and max_output_tokens specs per Codex model; enables context budgeting logic and output token prediction in agent handlers
+- **CODE_GUIDELINES.md** — Document component extraction patterns (commits c5059ef4, 55bd1808, 8802072e, 273e8776, 8839dff1): extract shared ChatModal from favorite_fab and config_chat_guide; extract file_content_pane shared component; extract GiteaWebhookController with_verified_webhook helper; split advanced_cli_flags into sub-components; update Playwright selectors for dynamic ChatModal-generated IDs; apply pattern when component/helper used 2+ times
+- **CODE_GUIDELINES.md** — Document explicit Repo.delete result handling (commit 5b24d576): pattern match on Repo.delete result instead of ignoring; handle both success and error cases explicitly; guard-based Port.close in CLI/port module (catch false clause)
+- **CODE_GUIDELINES.md** — Document nil-guard refactoring (commit 1689e86e): replace `condition && nil` with explicit `if condition do nil else value end`; improves readability and prevents missing variable bindings in rescue clauses
+- **CODE_GUIDELINES.md** — Document dead code removal (commits a020c835, 70bb7a6e): systematically grep for unused functions before removal; commits 822cf3b and 70bb7a6e removed 12+ unused functions (Accounts, Sessions, Notes, Channels contexts) and AgentPresenter module; validate removal via grep + test suite
+- **CODE_GUIDELINES.md** — Document performance index additions (commit 26e93d80): add database indexes on frequently-filtered/joined columns (tasks.agent_id, tasks.archived); measure query impact via ExPlain before/after
+- **CODE_GUIDELINES.md** — Document require Logger placement (commit 35692353): move `require Logger` to module scope (above defmodule) instead of inline; enables macro expansion at compile time; applied across chat_live, telemetry_dispatch, cron_parser
+- **EITS_CLI.md** — Document worktree CLI commands (commit 22fc1381): new `eits worktree create <name>` and `eits worktree remove` commands; creates isolated git worktree with dynamic deps symlink (../../../) for multi-branch development; documented in CLAUDE.md worktree section
+- **CODE_GUIDELINES.md** — Document anti-pattern fixes for Elixir (commits 3d5052af, d621b874, 01436e22): dead module removal (unused .ex files); nested case consolidation (combine cascading case/case into single pattern match); redundant with clause removal (unused :ok clause in with expressions)
+
 ## 2026-04-12
 **Commits reviewed**: ca015ef..cf8107bf
 
@@ -249,3 +299,17 @@
   - Fix bare `_ -> catch-alls` in `with/else` clauses to `{:error, _}` for explicit error handling
   - Simplify `{:ok, x}` pattern matches with direct value assignment when error path irrelevant
 - **WORKERS.md or SESSION_MANAGER.md** — Document AgentWorker idle timeout (commit d74450ce): new IdleTimer module tracks worker idleness, auto-terminates stale workers after timeout to prevent max_children exhaustion under load; includes error recovery integration
+
+## 2026-04-13
+**Commits reviewed**: cf8107bf..472a2dff
+
+- **DM_FEATURES.md** — Document DM timer countdown UI enhancements: timer display in DM schedule modal, countdown timer component (timer_countdown.js hook), pre-fill feature for schedule editing, and new timer settings in general tab
+- **COMMAND_PALETTE.md** — Document command palette improvements: shortcut modifier key configuration (Settings > General), keyboard navigation optimizations (arrow-key optimizations), c-k reassignment from tasks to palette
+- **SECURITY.md or AUTH.md** — Document auth_controller hardening against 4 security bugs: decode_b64url crash protection, challenge reuse validation, sign_count validation, and session matching error handling; include test patterns from auth_controller_test.exs
+- **REFACTORING_PATTERNS.md or COMPONENT_ARCHITECTURE.md** — Document FileBrowserHelpers helper extraction pattern: consolidate duplicate file-browser logic from 3 LiveViews (overview/config, project/config, project/files) into shared module; include test patterns for helper-extracted modules
+- **CODE_PATTERNS.md** — Document form component refactoring pattern from advanced_cli_flags: replace multi-attribute prop drilling (13+ attrs) with config map, reduces component complexity and improves maintainability
+- **WORKERS.md** — Update worker error handling documentation: atomic job claiming patterns, type validation for args (MixTaskWorker, SpawnAgentWorker), strict float parsing, endpoint URL validation in SpawnAgentWorker
+- **REST_API.md** — Update push subscription API documentation: authentication requirement (JSON 401 on unauthenticated requests), routes in browser-session pipeline, broadcast patterns for push_subscriptions
+- **API_LIMITS.md or DM_FEATURES.md** — Document DM message limit increase: raised from default to 50 messages per fetch, includes id tiebreaker sort for pagination stability
+- **WEBHOOK_HANDLING.md** — Document Gitea webhook controller support for pull_request synchronize action (in addition to opened action)
+- **PATH_VALIDATION.md** — Document path_within? security improvements: safe_realpath usage, trailing-slash guard, sibling-prefix validation, and test coverage patterns

@@ -58,9 +58,7 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
         {:error, {:unsupported_provider, nil}}
 
       {:error, reason} ->
-        Logger.error(
-          "❌ start_worker: failed for session.id=#{session_id} - #{inspect(reason)}"
-        )
+        Logger.error("❌ start_worker: failed for session.id=#{session_id} - #{inspect(reason)}")
 
         {:error, reason}
     end

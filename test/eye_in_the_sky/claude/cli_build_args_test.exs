@@ -182,9 +182,12 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
         {"haiku", "claude-haiku-4-5"},
         {"sonnet", "claude-sonnet-4-6"},
         {"opus", "claude-opus-4-6"},
-        {"HAIKU", "claude-haiku-4-5"},  # case insensitive
-        {"custom-model", "custom-model"},  # passthrough for unknown models
-        {nil, nil}  # nil passthrough
+        # case insensitive
+        {"HAIKU", "claude-haiku-4-5"},
+        # passthrough for unknown models
+        {"custom-model", "custom-model"},
+        # nil passthrough
+        {nil, nil}
       ]
 
       for {input, expected} <- test_cases do
@@ -401,7 +404,13 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
 
   describe "build_args with content_blocks" do
     test "adds --input-format stream-json when content_blocks present" do
-      blocks = [%{"type" => "image", "source" => %{"type" => "base64", "media_type" => "image/png", "data" => "abc"}}]
+      blocks = [
+        %{
+          "type" => "image",
+          "source" => %{"type" => "base64", "media_type" => "image/png", "data" => "abc"}
+        }
+      ]
+
       args = CLI.build_args(prompt: "describe this", content_blocks: blocks)
 
       assert "--input-format" in args
@@ -535,7 +544,13 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
     end
 
     test "returns JSON user message with text and image blocks" do
-      blocks = [%{"type" => "image", "source" => %{"type" => "base64", "media_type" => "image/png", "data" => "iVBOR"}}]
+      blocks = [
+        %{
+          "type" => "image",
+          "source" => %{"type" => "base64", "media_type" => "image/png", "data" => "iVBOR"}
+        }
+      ]
+
       json = CLI.content_blocks_json(prompt: "describe this", content_blocks: blocks)
 
       assert json != nil

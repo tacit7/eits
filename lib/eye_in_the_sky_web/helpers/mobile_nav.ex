@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWeb.Helpers.MobileNav do
 
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
-  @type nav_tab :: :sessions | :tasks | :notes | :project | :none
+  @type nav_tab :: :sessions | :tasks | :notes | :project | :canvas | :none
 
   @doc """
   Returns the active mobile nav tab for the given request path.
@@ -32,6 +32,7 @@ defmodule EyeInTheSkyWeb.Helpers.MobileNav do
       path == "/notes" -> :notes
       path in ["/", "/sessions"] -> :sessions
       String.starts_with?(path, "/dm/") -> :sessions
+      String.starts_with?(path, "/canvases") -> :canvas
       true -> :none
     end
   end

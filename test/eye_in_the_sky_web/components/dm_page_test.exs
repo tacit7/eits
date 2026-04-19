@@ -87,6 +87,19 @@ defmodule EyeInTheSkyWeb.Components.DmPageTest do
     assert {:dm_page, 1} in DmPage.__info__(:functions)
   end
 
+  test "dm_page declares codex_raw_lines with a default before passing it to messages tab" do
+    source =
+      File.read!(
+        Path.join(
+          Path.expand("../../..", __DIR__),
+          "lib/eye_in_the_sky_web/components/dm_page.ex"
+        )
+      )
+
+    assert source =~ "attr :codex_raw_lines, :list, default: []",
+           "dm_page must default codex_raw_lines before forwarding it to MessagesTab"
+  end
+
   # ===== Mobile keyboard-aware composer layout tests =====
   #
   # These tests verify the structural requirements for the mobile keyboard

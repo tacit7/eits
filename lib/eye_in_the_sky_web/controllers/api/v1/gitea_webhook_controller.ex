@@ -12,66 +12,65 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
 
   use EyeInTheSkyWeb, :controller
 
+  action_fallback EyeInTheSkyWeb.Api.V1.FallbackController
+
   require Logger
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Agents.WebhookSanitizer
+  alias EyeInTheSky.Codex.ReviewInstructions
   alias EyeInTheSky.{Messages, Sessions}
 
   defp agent_manager,
     do: Application.get_env(:eye_in_the_sky, :agent_manager_module, AgentManager)
 
-  defp unauthorized(conn),
-    do: conn |> put_status(:unauthorized) |> json(%{error: "Invalid signature"}) |> halt()
-
-  # PR opened -> spawn codex reviewer
-  def handle(conn, %{"action" => "opened", "pull_request" => pr} = params) do
+  defp with_verified_webhook(conn, params, fun) do
     with :ok <- verify_signature(conn),
          {:ok, repo} <- require_repo(params),
          {:ok, project_path} <- require_project_path() do
-      handle_pr_opened_event(conn, pr, repo, project_path)
+      fun.(repo, project_path)
     else
       {:error, :unauthorized} ->
-        unauthorized(conn)
+        {:error, :unauthorized, "Invalid signature"}
 
       {:error, :missing_repo} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "Missing repository.full_name in payload"})
+        {:error, :bad_request, "Missing repository.full_name in payload"}
 
       {:error, :project_path_not_configured} ->
-        conn
-        |> put_status(:internal_server_error)
-        |> json(%{error: "Server misconfigured: project_path not set"})
+        {:error, :internal_server_error, "Server misconfigured: project_path not set"}
     end
+  end
+
+  defp with_verified_repo(conn, params, fun) do
+    with :ok <- verify_signature(conn),
+         {:ok, repo} <- require_repo(params) do
+      fun.(repo)
+    else
+      {:error, :unauthorized} ->
+        {:error, :unauthorized, "Invalid signature"}
+
+      {:error, :missing_repo} ->
+        {:error, :bad_request, "Missing repository.full_name in payload"}
+    end
+  end
+
+  # PR opened -> spawn codex reviewer
+  def handle(conn, %{"action" => "opened", "pull_request" => pr} = params) do
+    with_verified_webhook(conn, params, fn repo, project_path ->
+      handle_pr_opened_event(conn, pr, repo, project_path)
+    end)
   end
 
   # PR synchronized (push to open PR branch) -> spawn codex reviewer
   def handle(conn, %{"action" => "synchronize", "pull_request" => pr} = params) do
-    with :ok <- verify_signature(conn),
-         {:ok, repo} <- require_repo(params),
-         {:ok, project_path} <- require_project_path() do
+    with_verified_webhook(conn, params, fn repo, project_path ->
       handle_pr_opened_event(conn, pr, repo, project_path)
-    else
-      {:error, :unauthorized} ->
-        unauthorized(conn)
-
-      {:error, :missing_repo} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "Missing repository.full_name in payload"})
-
-      {:error, :project_path_not_configured} ->
-        conn
-        |> put_status(:internal_server_error)
-        |> json(%{error: "Server misconfigured: project_path not set"})
-    end
+    end)
   end
 
   # PR comment by codex -> DM the claude session
   def handle(conn, %{"action" => "created", "comment" => comment, "issue" => issue} = params) do
-    with :ok <- verify_signature(conn),
-         {:ok, repo} <- require_repo(params) do
+    with_verified_repo(conn, params, fn repo ->
       event = get_req_header(conn, "x-gitea-event") |> List.first()
       commenter = get_in(comment, ["user", "login"]) || ""
       pr_number = issue["number"]
@@ -82,19 +81,16 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
       is_codex = commenter == "codex"
 
       if event in ["issue_comment", "pull_request_comment"] and is_pr and is_codex do
-        handle_codex_comment(conn, %{pr_body: pr_body, pr_number: pr_number, comment_body: comment_body, repo: repo})
+        handle_codex_comment(conn, %{
+          pr_body: pr_body,
+          pr_number: pr_number,
+          comment_body: comment_body,
+          repo: repo
+        })
       else
         json(conn, %{success: true, message: "Ignored: #{event} by #{commenter}"})
       end
-    else
-      {:error, :unauthorized} ->
-        unauthorized(conn)
-
-      {:error, :missing_repo} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "Missing repository.full_name in payload"})
-    end
+    end)
   end
 
   def handle(conn, params) do
@@ -106,7 +102,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
         json(conn, %{success: true, message: "Ignored"})
 
       {:error, :unauthorized} ->
-        unauthorized(conn)
+        {:error, :unauthorized, "Invalid signature"}
     end
   end
 
@@ -129,7 +125,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
       repo: repo
     }
 
-    instructions = build_review_instructions(pr_context)
+    instructions = ReviewInstructions.build(pr_context)
 
     case agent_manager().create_agent(
            agent_type: "codex",
@@ -148,10 +144,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
 
       {:error, reason} ->
         Logger.error("Failed to spawn codex for PR ##{pr_number}: #{inspect(reason)}")
-
-        conn
-        |> put_status(:internal_server_error)
-        |> json(%{error: "Failed to spawn reviewer"})
+        {:error, :internal_server_error, "Failed to spawn reviewer"}
     end
   end
 
@@ -161,47 +154,17 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
 
     case extract_session_uuid(pr_body) do
       {:ok, session_uuid} ->
-        dm_session(conn, %{session_uuid: session_uuid, pr_number: pr_number, comment_body: comment_body, repo: repo})
+        dm_session(conn, %{
+          session_uuid: session_uuid,
+          pr_number: pr_number,
+          comment_body: comment_body,
+          repo: repo
+        })
 
       :not_found ->
         Logger.warning("No Session-ID found in PR ##{pr_number} body; cannot notify session")
         json(conn, %{success: true, message: "No session to notify"})
     end
-  end
-
-  defp build_review_instructions(%{
-         number: pr_number,
-         title: pr_title,
-         body: pr_body,
-         url: pr_url,
-         head_branch: head_branch,
-         repo: repo
-       }) do
-    # repo is "owner/name", e.g. "claude/eits-web" -> tea --repo uses just "name" with --login owner
-    {owner, repo_name} = split_repo(repo)
-
-    """
-    You are a code reviewer. Review PR ##{pr_number} in the #{repo} repo.
-
-    PR Title: #{pr_title}
-    PR URL: #{pr_url}
-    Branch: #{head_branch}
-
-    PR Description:
-    #{pr_body}
-
-    Steps:
-    1. Run: tea pr view #{pr_number} --login codex --repo #{owner}/#{repo_name}
-    2. Check the diff: git fetch gitea && git diff gitea/main...gitea/#{head_branch}
-    3. Review the changes for: correctness, security, code quality, missing tests, breaking changes.
-    4. Post a concise review comment:
-       tea comment #{pr_number} --login codex --repo #{owner}/#{repo_name} "your review here"
-       - Start with: LGTM / NEEDS CHANGES / BLOCKED
-       - List specific issues with file:line references if applicable
-       - Keep it actionable and direct
-
-    Focus on real issues. Skip praise.
-    """
   end
 
   defp verify_signature(conn) do
@@ -265,7 +228,9 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
   end
 
   defp dm_session(conn, event) do
-    %{session_uuid: session_uuid, pr_number: pr_number, comment_body: comment_body, repo: repo} = event
+    %{session_uuid: session_uuid, pr_number: pr_number, comment_body: comment_body, repo: repo} =
+      event
+
     {owner, repo_name} = split_repo(repo)
 
     case Sessions.get_session_by_uuid(session_uuid) do
@@ -303,10 +268,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GiteaWebhookController do
 
           {:error, cs} ->
             Logger.error("Failed to DM session #{session_uuid}: #{inspect(cs)}")
-
-            conn
-            |> put_status(:internal_server_error)
-            |> json(%{error: "Failed to deliver notification"})
+            {:error, :internal_server_error, "Failed to deliver notification"}
         end
 
       {:error, :not_found} ->

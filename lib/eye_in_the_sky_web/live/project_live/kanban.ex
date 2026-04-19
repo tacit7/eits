@@ -393,8 +393,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
       (socket.assigns[:tasks] || [])
       |> Enum.flat_map(&(Map.get(&1, :sessions, []) || []))
 
-    working_ids = all_sessions |> Enum.filter(&(&1.status == "working")) |> Enum.map(& &1.id) |> MapSet.new()
-    waiting_ids = all_sessions |> Enum.filter(&(&1.status == "waiting")) |> Enum.map(& &1.id) |> MapSet.new()
+    working_ids =
+      all_sessions |> Enum.filter(&(&1.status == "working")) |> Enum.map(& &1.id) |> MapSet.new()
+
+    waiting_ids =
+      all_sessions |> Enum.filter(&(&1.status == "waiting")) |> Enum.map(& &1.id) |> MapSet.new()
 
     socket
     |> update(:working_session_ids, &MapSet.union(&1, working_ids))

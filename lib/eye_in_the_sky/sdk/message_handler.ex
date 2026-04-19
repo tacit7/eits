@@ -151,10 +151,15 @@ defmodule EyeInTheSky.SDK.MessageHandler do
     tel_prefix = Keyword.get(opts, :telemetry_prefix, [:eits, :sdk])
     log_raw_key = Keyword.get(opts, :log_raw_key, "log_claude_raw")
     log_raw_prefix = Keyword.get(opts, :log_raw_prefix, "claude.raw")
+    forward_raw_lines = Keyword.get(opts, :forward_raw_lines, false)
 
     receive do
       {:claude_output, _cli_ref, line} ->
         maybe_log_raw_line(session_id, line, log_raw_key, log_raw_prefix)
+        if forward_raw_lines do
+          broadcast_id = Map.get(state, :eits_session_id) || session_id
+          EyeInTheSky.Events.broadcast_codex_raw(broadcast_id, line)
+        end
 
         :telemetry.execute(tel_prefix ++ [:output], %{byte_size: byte_size(line)}, %{
           session_id: session_id
@@ -272,7 +277,9 @@ defmodule EyeInTheSky.SDK.MessageHandler do
     })
 
     if status == 0 do
-      Logger.info("[telemetry] #{tel_label(tel_prefix)}.exit session_id=#{session_id} exit_code=0")
+      Logger.info(
+        "[telemetry] #{tel_label(tel_prefix)}.exit session_id=#{session_id} exit_code=0"
+      )
     else
       Logger.error(
         "[telemetry] #{tel_label(tel_prefix)}.exit session_id=#{session_id} exit_code=#{exit_code} status=#{inspect(status)}"

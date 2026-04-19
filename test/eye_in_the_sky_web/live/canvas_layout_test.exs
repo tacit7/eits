@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.Live.CanvasLayoutTest do
     {:ok, _view, html} = live(conn, ~p"/canvases")
 
     refute html =~ "app-sidebar"
-    assert html =~ "hero-chevron-left"
+    assert html =~ "hero-arrow-left"
     assert html =~ "command-palette"
   end
 
@@ -15,7 +15,7 @@ defmodule EyeInTheSkyWeb.Live.CanvasLayoutTest do
     {:ok, _view, html} = live(conn, ~p"/canvases/999")
 
     refute html =~ "app-sidebar"
-    assert html =~ "hero-chevron-left"
+    assert html =~ "hero-arrow-left"
     assert html =~ "command-palette"
   end
 

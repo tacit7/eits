@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   require Logger
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Agents, ChannelMessages, Channels, Messages, Sessions}
+  alias EyeInTheSky.{Agents, ChannelMessages, Channels, Messages, Sessions, Teams}
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
@@ -238,7 +238,8 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
   @doc """
   POST /api/v1/channels/:channel_id/messages - Send a message to a channel.
-  Body: session_id, body, sender_role (optional), recipient_role (optional)
+  Body: session_id, body, sender_role (optional), recipient_role (optional),
+        broadcast_to_team_id (optional) - if present, DMs all team members after posting.
   """
   def send_channel_message(conn, %{"channel_id" => channel_id} = params) do
     cond do
@@ -274,6 +275,10 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       {:ok, msg} ->
         EyeInTheSky.Events.channel_message(channel_id, msg)
         notify_channel_members(channel_id, int_id, body)
+
+        if team_id = parse_int(params["broadcast_to_team_id"]) do
+          broadcast_to_team(channel_id, int_id, team_id, body)
+        end
 
         conn
         |> put_status(:created)
@@ -333,6 +338,59 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     case Sessions.get_session(session_id) do
       {:ok, session} -> session.name || "session:#{session_id}"
       _ -> "session:#{session_id}"
+    end
+  end
+
+  # Fan out DMs to all team members when broadcast_to_team_id is supplied on channel send.
+  # Targets members with a session_id, excluding the sender.
+  # Failures are logged and do not affect the channel message response.
+  defp broadcast_to_team(channel_id, sender_session_id, team_id, body) do
+    case Teams.get_team(team_id) do
+      {:ok, team} ->
+        sender_label = get_sender_name(sender_session_id)
+
+        dm_body =
+          "Broadcast from #{sender_label} [team:#{team.name}] [channel:#{channel_id}] #{body}"
+
+        team_id
+        |> Teams.list_members()
+        |> Enum.filter(&(&1.session_id && &1.session_id != sender_session_id))
+        |> Enum.each(&deliver_team_dm(&1.session_id, sender_session_id, dm_body, channel_id))
+
+      _ ->
+        Logger.warning("broadcast_to_team: team #{team_id} not found, skipping fanout")
+    end
+  end
+
+  defp deliver_team_dm(target_session_id, from_session_id, dm_body, channel_id) do
+    case agent_manager_mod().send_message(target_session_id, dm_body) do
+      result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
+        attrs = %{
+          uuid: Ecto.UUID.generate(),
+          session_id: target_session_id,
+          from_session_id: from_session_id,
+          to_session_id: target_session_id,
+          body: dm_body,
+          sender_role: "agent",
+          recipient_role: "agent",
+          direction: "inbound",
+          status: "sent",
+          provider: "claude",
+          metadata: %{channel_id: channel_id, broadcast: true}
+        }
+
+        case Messages.create_message(attrs) do
+          {:ok, msg} ->
+            EyeInTheSky.Events.session_new_dm(target_session_id, msg)
+
+          {:error, err} ->
+            Logger.warning("team broadcast persist failed for session #{target_session_id}: #{inspect(err)}")
+        end
+
+      {:error, reason} ->
+        Logger.warning(
+          "team broadcast delivery failed for session #{target_session_id}: #{inspect(reason)}"
+        )
     end
   end
 

@@ -1,5 +1,17 @@
 # Documentation Update Suggestions
 
+## 2026-04-18
+**Commits reviewed**: ca2f33b7..aaf41d78
+
+- **DM_FEATURES.md** — Document message deduplication (commit f5cc825f): new Deduplicator module with 30s idempotency window using message hash; 24h unlinked-message search for duplicates missing link_id; endpoints return 409 Conflict if duplicate detected within window; enables idempotent DM/broadcast retries
+- **DM_FEATURES.md** — Document copy-to-clipboard feature (commit d04b7f63, 10d75ff3): DM messages and tool call/output blocks now have clipboard icon on hover; uses global capture-phase listener to prevent details toggle; MarkdownMessage hook injects icon after render; applies to BASH/edit/write/output widgets
+- **CANVAS.md** — Document window z-order management (commit 10d75ff3): click any canvas window to raise to front via updated CanvasLive; simplified message consolidation in DmMessageComponents (removed duplicates from ChatWindowComponent, MessagesTab); shared compact/extra_id attrs for dual layout rendering
+- **CANVAS.md** — Document window cascade tidy feature (commit 31cf3076): new Tidy button in canvas header cascades all windows into clean layout; Canvases.tidy/1 context function; CanvasLive handles event dispatch; applies spacing and reset positioning
+- **EITS_CLI.md** — Document json() parsing improvements (commits 3f4e35e8, 5958729d, 00f8b226): fix numeric type coercion scoped to _id-suffixed keys only; prevents unintended float conversion on numeric fields; add --help flag to all CLI subcommands; AUTH_HEADER now array type for multi-value support in eits CLI script
+- **AGENT_WORKER_QUEUE.md** — Document synchronous result save (commit b137f1f8): change agent result save from async Task dispatch to synchronous direct call in AgentWorkerEvents; prevents race condition with JSONL importer reading stale state; clarify on_sdk_completed/3 timing expectations
+- **CODE_GUIDELINES.md** — Document DM message component consolidation pattern (commit 10d75ff3): extract DmMessageComponents with dual-layout rendering (DM page default, canvas chat compact); use compact/extra_id attrs for conditional sizing; removes chat_message_body and chat_tool_result_body duplicates from ChatWindowComponent; apply when component reused across 2+ contexts with size variations
+- **REST_API.md** — Document 409 Conflict response for duplicate messages (commit f5cc825f): POST /api/v1/messages?dedup returns 409 with original message if duplicate detected within idempotency window; includes link_id reference; improves broadcast/DM reliability under retries
+
 ## 2026-04-17
 **Commits reviewed**: ca2f33b7..eb1b17ed
 

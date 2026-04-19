@@ -315,16 +315,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   Body: {tag_id: integer}
   """
   def add_tag(conn, %{"id" => task_id, "tag_id" => tag_id_raw}) do
-    with {:ok, task_id_int} <- parse_task_id_int(task_id),
-         {:ok, tag_id_int} <- parse_tag_id(tag_id_raw) do
-      case EyeInTheSky.Repo.query(
-             "INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-             [task_id_int, tag_id_int]
-           ) do
-        {:ok, _} ->
+    with {:ok, task_id_int} <- parse_required_int(task_id, "task_id"),
+         {:ok, tag_id_int} <- parse_required_int(tag_id_raw, "tag_id") do
+      case Tasks.add_tag(task_id_int, tag_id_int) do
+        :ok ->
           json(conn, %{success: true, task_id: task_id_int, tag_id: tag_id_int})
 
-        {:error, %{postgres: %{code: :foreign_key_violation}}} ->
+        {:error, :not_found} ->
           {:error, :not_found, "task or tag not found"}
 
         {:error, _} ->
@@ -383,23 +380,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   defp parse_task_id(id) when is_binary(id), do: Helpers.parse_int(id) || id
   defp parse_task_id(id), do: id
 
-  defp parse_task_id_int(raw) when is_binary(raw) do
+  defp parse_required_int(raw, field_name) when is_binary(raw) do
     case Integer.parse(raw) do
       {n, ""} -> {:ok, n}
-      _ -> {:error, :bad_request, "invalid task_id"}
+      _ -> {:error, :bad_request, "#{field_name} must be an integer"}
     end
   end
 
-  defp parse_task_id_int(n) when is_integer(n), do: {:ok, n}
-
-  defp parse_tag_id(n) when is_integer(n), do: {:ok, n}
-
-  defp parse_tag_id(raw) when is_binary(raw) do
-    case Integer.parse(raw) do
-      {n, ""} -> {:ok, n}
-      _ -> {:error, :bad_request, "tag_id must be an integer"}
-    end
-  end
-
-  defp parse_tag_id(_), do: {:error, :bad_request, "tag_id is required"}
+  defp parse_required_int(n, _) when is_integer(n), do: {:ok, n}
+  defp parse_required_int(_, field_name), do: {:error, :bad_request, "#{field_name} is required"}
 end

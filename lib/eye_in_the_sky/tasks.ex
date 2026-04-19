@@ -321,6 +321,26 @@ defmodule EyeInTheSky.Tasks do
 
   defdelegate search_tasks(query, project_id \\ nil), to: EyeInTheSky.Tasks.Queries
 
+  @doc """
+  Adds a tag to a task via upsert. Returns :ok on success.
+  Returns {:error, :not_found} if task or tag does not exist.
+  Returns {:error, :internal_server_error} for other DB errors.
+  """
+  def add_tag(task_id, tag_id) do
+    try do
+      Repo.insert_all("task_tags", [%{task_id: task_id, tag_id: tag_id}],
+        on_conflict: :nothing
+      )
+      :ok
+    rescue
+      e in Postgrex.Error ->
+        case e.postgres.code do
+          :foreign_key_violation -> {:error, :not_found}
+          _ -> {:error, :internal_server_error}
+        end
+    end
+  end
+
   # Delegates to TaskSessions context (session-linking operations)
   defdelegate link_session_to_task(task_id, session_id), to: EyeInTheSky.TaskSessions
   defdelegate task_linked_to_session?(task_id, session_id), to: EyeInTheSky.TaskSessions

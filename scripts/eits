@@ -1045,7 +1045,7 @@ cmd_prompts() {
 
 cmd_teams() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits teams <list|get|create|delete|members|join|status|update-member|done-self|leave|broadcast|my-teams>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits teams <list|get|create|update|delete|members|join|status|update-member|done-self|leave|broadcast|my-teams>"; return 0; }
   case "$sub" in
     list)
       local project_id="" status=""
@@ -1081,6 +1081,29 @@ cmd_teams() {
     delete)
       local id="${1:-}"; need id
       _delete "/teams/$id"
+      ;;
+    update)
+      # eits teams update <id> [--name <name>] [--description <desc>]
+      local id="${1:-}"; need id; shift
+      local name="" description=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --name)        name="${2:-}";        shift 2 ;;
+          --description) description="${2:-}"; shift 2 ;;
+          *) shift ;;
+        esac
+      done
+      [[ -n "$name" || -n "$description" ]] || die "at least --name or --description required"
+      local payload
+      payload=$(python3 -c "
+import json, sys
+d = {}
+name = sys.argv[1]; desc = sys.argv[2]
+if name: d['name'] = name
+if desc:  d['description'] = desc
+print(json.dumps(d))
+" "$name" "$description")
+      _patch "/teams/$id" "$payload"
       ;;
     members)
       local id="${1:-}"; need id
@@ -1178,7 +1201,7 @@ cmd_teams() {
       done
       ;;
     *)
-      echo "usage: eits teams <list|get|create|delete|members|join|status|update-member|done-self|leave|broadcast|my-teams>"
+      echo "usage: eits teams <list|get|create|update|delete|members|join|status|update-member|done-self|leave|broadcast|my-teams>"
       ;;
   esac
 }
@@ -1309,7 +1332,7 @@ Commands:
   channels      list|send|messages
   notifications create
   prompts       list|get
-  teams         list|get|create|delete|members|join|status|update-member|leave|broadcast|my-teams
+  teams         list|get|create|update|delete|members|join|status|update-member|leave|broadcast|my-teams
   timer         show|set|cancel   (default session: self / $EITS_SESSION_UUID)
   worktree      create|remove   (EITS Elixir projects only)
   me            Print current session/agent/project context and verify server-side

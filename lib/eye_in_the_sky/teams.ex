@@ -69,6 +69,13 @@ defmodule EyeInTheSky.Teams do
     |> tap_broadcast(:team_created)
   end
 
+  def update_team(%Team{} = team, attrs) do
+    team
+    |> Team.changeset(attrs)
+    |> Repo.update()
+    |> tap_broadcast(:team_updated)
+  end
+
   def delete_team(%Team{} = team) do
     team
     |> Team.changeset(%{

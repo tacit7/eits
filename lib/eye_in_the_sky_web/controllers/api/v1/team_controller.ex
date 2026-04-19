@@ -74,6 +74,35 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     end
   end
 
+  # PATCH /api/v1/teams/:id
+  def update(conn, %{"id" => id} = params) do
+    case resolve_team(id) do
+      {:error, :not_found} ->
+        {:error, :not_found, "Team not found"}
+
+      {:ok, team} ->
+        attrs =
+          params
+          |> Map.take(["name", "description"])
+          |> Map.new(fn {k, v} -> {String.to_atom(k), v} end)
+
+        case Teams.update_team(team, attrs) do
+          {:ok, updated} ->
+            json(conn, %{
+              success: true,
+              id: updated.id,
+              uuid: updated.uuid,
+              name: updated.name,
+              description: updated.description,
+              status: updated.status
+            })
+
+          {:error, changeset} ->
+            {:error, changeset}
+        end
+    end
+  end
+
   # DELETE /api/v1/teams/:id
   def delete(conn, %{"id" => id}) do
     case resolve_team(id) do

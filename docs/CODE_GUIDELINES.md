@@ -505,6 +505,26 @@ query = Task |> maybe_where(“title”, “bug fix”) |> Repo.all()
 
 ---
 
+### DM Message Component Consolidation
+
+**Pattern (commit 10d75ff3):** When a message-rendering component is duplicated across 2+ contexts with size variations, extract it into a shared component with `compact` and `extra_id` attrs instead of maintaining parallel copies.
+
+**Location:** `lib/eye_in_the_sky_web_web/components/dm_message_components.ex`
+
+`message_body/1` and `tool_result_body/1` accept:
+- `compact` (boolean) — switches to condensed sizing for canvas chat windows
+- `extra_id` (string) — disambiguates DOM IDs when the same message renders in multiple places
+
+**Consumers:**
+- DM page (`MessagesTab`) — default (non-compact) layout
+- Canvas chat (`ChatWindowComponent`) — passes `compact={true}` for tighter window sizing
+
+Removed duplicates: `chat_message_body` and `chat_tool_result_body` from `ChatWindowComponent`; private copies from `MessagesTab`.
+
+**When to apply:** Component is reused across 2+ contexts, and the only meaningful difference is size/density. Do not branch on layout via `if @page == :dm` inside the component — use a neutral `compact` flag.
+
+---
+
 ## Module Architecture
 
 ### Provider Strategy

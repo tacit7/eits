@@ -248,11 +248,10 @@ _agent_uuid() { cat "$BATS_FILE_TMPDIR/agent_uuid"; }
   echo "$output" | jq -e '.tasks | type == "array"' >/dev/null
 }
 
-@test "tasks list --mine: returns empty array (not all tasks) when no session set" {
-  # When neither env var is set --mine silently adds nothing; result is all tasks.
-  # This test documents the current behavior (no crash) rather than asserting filtering.
-  run env -u EITS_SESSION_UUID -u EITS_SESSION_ID "$EITS" tasks list --mine
-  [ "$status" -eq 0 ]
+@test "tasks list --mine: errors when neither session env var is set" {
+  run env -u EITS_SESSION_UUID -u EITS_SESSION_ID "$EITS" tasks list --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"EITS_SESSION_UUID"* || "$output" == *"EITS_SESSION_ID"* ]]
 }
 
 # ── tasks begin --quiet ────────────────────────────────────────────────────────

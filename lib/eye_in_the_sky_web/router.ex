@@ -272,9 +272,9 @@ defmodule EyeInTheSkyWeb.Router do
     post "/webhooks/gitea", GiteaWebhookController, :handle
   end
 
-  # IAM hook endpoint — unauthenticated (hooks run in Claude CLI process with no user session)
+  # IAM hook endpoint — requires bearer token auth (hooks run in Claude CLI with API key)
   scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
-    pipe_through [:accepts_json]
+    pipe_through :api
 
     post "/iam/decide", IAMController, :decide
   end

@@ -409,6 +409,54 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   end
 
   @doc """
+  POST /api/v1/channels/:channel_id/members - Add a session to a channel.
+  Body: session_id (required), role (optional, default "member")
+  """
+  def join_channel(conn, %{"channel_id" => channel_id} = params) do
+    with {:channel, channel} when not is_nil(channel) <- {:channel, Channels.get_channel(channel_id)},
+         {:session_raw, raw} when not is_nil(raw) and raw != "" <- {:session_raw, params["session_id"]},
+         {:session, {:ok, int_id}} <- {:session, ToolHelpers.resolve_session_int_id(raw)},
+         {:session_record, {:ok, session}} <- {:session_record, Sessions.get_session(int_id)},
+         {:agent_id, agent_id} when not is_nil(agent_id) <- {:agent_id, session.agent_id} do
+      role = params["role"] || "member"
+
+      case Channels.add_member(channel.id, agent_id, session.id, role) do
+        {:ok, member} ->
+          conn
+          |> put_status(:created)
+          |> json(%{
+            success: true,
+            message: "Joined channel #{channel.name}",
+            member: ApiPresenter.present_channel_member(member)
+          })
+
+        {:error, %Ecto.Changeset{} = cs} ->
+          {:error, cs}
+      end
+    else
+      {:channel, nil} -> {:error, :not_found, "Channel not found"}
+      {:session_raw, _} -> {:error, :bad_request, "session_id is required"}
+      {:session, _} -> {:error, :not_found, "Session not found"}
+      {:session_record, _} -> {:error, :not_found, "Session not found"}
+      {:agent_id, nil} -> {:error, :unprocessable_entity, "Session has no registered agent"}
+    end
+  end
+
+  @doc """
+  DELETE /api/v1/channels/:channel_id/members/:session_id - Remove a session from a channel.
+  """
+  def leave_channel(conn, %{"channel_id" => channel_id, "session_id" => session_id_param}) do
+    with {:channel, channel} when not is_nil(channel) <- {:channel, Channels.get_channel(channel_id)},
+         {:session, {:ok, int_id}} <- {:session, ToolHelpers.resolve_session_int_id(session_id_param)} do
+      Channels.remove_member(channel.id, int_id)
+      json(conn, %{success: true, message: "Left channel #{channel.name}"})
+    else
+      {:channel, nil} -> {:error, :not_found, "Channel not found"}
+      {:session, _} -> {:error, :not_found, "Session not found"}
+    end
+  end
+
+  @doc """
   GET /api/v1/channels/:channel_id/messages - List recent messages for a channel.
   Query params: limit (optional, default 20, max 200)
   """

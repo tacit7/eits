@@ -436,16 +436,17 @@ defmodule EyeInTheSkyWeb.CanvasLive do
                   <.icon name="hero-x-mark-mini" class="w-4 h-4" />
                 </button>
               </div>
-              <input
-                type="text"
-                placeholder="Search sessions..."
-                value={@session_search}
-                phx-change="search_sessions"
-                phx-debounce="200"
-                name="query"
-                class="input input-sm w-full shrink-0"
-                autofocus
-              />
+              <form phx-change="search_sessions" class="shrink-0">
+                <input
+                  type="text"
+                  placeholder="Search sessions..."
+                  value={@session_search}
+                  phx-debounce="200"
+                  name="query"
+                  class="input input-sm w-full"
+                  autofocus
+                />
+              </form>
               <div class="overflow-y-auto flex flex-col gap-0.5 min-h-0">
                 <%= for s <- @filtered_sessions do %>
                   <button

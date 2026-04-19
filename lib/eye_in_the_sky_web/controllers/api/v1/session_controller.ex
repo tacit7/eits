@@ -194,12 +194,18 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
 
     sessions_data =
       if with_tasks do
+        session_ids = Enum.map(results, & &1.id)
+        tasks_by_session = Tasks.list_tasks_for_sessions(session_ids)
+
         Enum.map(results, fn s ->
-          tasks = Tasks.list_tasks_for_session(s.id)
-          task_list = Enum.map(tasks, fn t ->
-            %{id: t.id, title: t.title, state_id: t.state_id,
-              state: if(t.state, do: t.state.name, else: nil)}
-          end)
+          task_list =
+            tasks_by_session
+            |> Map.get(s.id, [])
+            |> Enum.map(fn t ->
+              %{id: t.id, title: t.title, state_id: t.state_id,
+                state: if(t.state, do: t.state.name, else: nil)}
+            end)
+
           Map.put(ApiPresenter.present_session(s), :tasks, task_list)
         end)
       else

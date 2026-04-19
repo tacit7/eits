@@ -96,6 +96,17 @@ _agent_uuid() { cat "$BATS_FILE_TMPDIR/agent_uuid"; }
   echo "$output" | jq -e '.results | type == "array"' >/dev/null
 }
 
+@test "sessions list --agent: accepts agent UUID flag" {
+  run "$EITS" sessions list --agent $(_agent_uuid)
+  [ "$status" -eq 0 ]
+}
+
+@test "sessions list --agent: returns results array" {
+  run "$EITS" sessions list --agent $(_agent_uuid)
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.results | type == "array"' >/dev/null
+}
+
 @test "sessions list: rejects unknown flags" {
   run "$EITS" sessions list --bogus foo 2>&1
   [ "$status" -ne 0 ]

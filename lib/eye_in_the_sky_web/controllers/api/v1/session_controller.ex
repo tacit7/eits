@@ -170,6 +170,14 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     opts =
       if params["status"], do: Keyword.put(opts, :status_filter, params["status"]), else: opts
 
+    opts =
+      if params["agent_id"] do
+        agent_int_id = resolve_agent_int_id(params["agent_id"])
+        if agent_int_id, do: Keyword.put(opts, :agent_id, agent_int_id), else: opts
+      else
+        opts
+      end
+
     results = Sessions.list_sessions_filtered(opts) |> Enum.take(limit)
 
     json(conn, %{
@@ -326,5 +334,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     member_status = if status == "failed", do: "failed", else: "done"
     EyeInTheSky.Teams.mark_member_done_by_session(session.id, member_status)
   end
+
+  defp resolve_agent_int_id(uuid), do: resolve_id(uuid, &Agents.get_agent_by_uuid/1)
 
 end

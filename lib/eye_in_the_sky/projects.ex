@@ -21,6 +21,16 @@ defmodule EyeInTheSky.Projects do
   end
 
   @doc """
+  Returns projects filtered by path.
+  """
+  def list_projects_by_path(path) do
+    Project
+    |> where([p], p.path == ^path)
+    |> order_by([p], asc: p.name)
+    |> Repo.all()
+  end
+
+  @doc """
   Returns active projects ordered for sidebar display:
   bookmarked first, then case-insensitive name, then id for stability.
   """

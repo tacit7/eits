@@ -60,6 +60,20 @@ json() {
   echo "$obj"
 }
 
+# Auto-resolve project ID: env → CLAUDE_PROJECT_DIR path lookup → empty
+_project_id() {
+  if [ -n "${EITS_PROJECT_ID:-}" ]; then
+    echo "$EITS_PROJECT_ID"
+    return 0
+  fi
+  local dir="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+  # Strip worktree path if inside .claude/worktrees/<name>
+  if [[ "$dir" == *"/.claude/worktrees/"* ]]; then
+    dir="${dir%%/.claude/worktrees/*}"
+  fi
+  eits projects list --path "$dir" 2>/dev/null | jq -r '.projects[0]?.id // empty' | head -1
+}
+
 # ── sessions ──────────────────────────────────────────────────────────────────
 
 cmd_sessions() {
@@ -104,21 +118,22 @@ cmd_sessions() {
       _get "/sessions/$uuid"
       ;;
     create)
-      # eits sessions create --session-id <uuid> [--name <n>] [--description <d>] [--project <p>] [--model <m>] [--entrypoint <e>]
-      local session_id="" name="" description="" project_name="" model="" entrypoint=""
+      # eits sessions create --session-id <uuid> [--name <n>] [--description <d>] [--project <p>] [--project-path <path>] [--model <m>] [--entrypoint <e>]
+      local session_id="" name="" description="" project_name="" project_path="" model="" entrypoint=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --session-id)  session_id="$2";   shift 2 ;;
           --name)        name="$2";         shift 2 ;;
           --description) description="$2";  shift 2 ;;
           --project)     project_name="$2"; shift 2 ;;
+          --project-path) project_path="$2"; shift 2 ;;
           --model)       model="$2";        shift 2 ;;
           --entrypoint)  entrypoint="$2";   shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
       need session_id
-      _post "/sessions" "$(json session_id "$session_id" name "$name" description "$description" project_name "$project_name" model "$model" entrypoint "$entrypoint")"
+      _post "/sessions" "$(json session_id "$session_id" name "$name" description "$description" project_name "$project_name" project_path "$project_path" model "$model" entrypoint "$entrypoint")"
       ;;
     update)
       # eits sessions update <uuid> [--status <status>] [--intent <text>] [--entrypoint <e>] [--name <name>] [--description <desc>] [--project-id <id>] [--clear-entrypoint] [--ended-at <ISO8601>]
@@ -501,7 +516,14 @@ cmd_projects() {
   [[ "${sub:-}" == "--help" || "${sub:-}" == "-h" ]] && { echo "usage: eits projects <list|get|create>"; return 0; }
   case "$sub" in
     list)
-      _get "/projects"
+      local qs=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --path) qs="${qs}&path=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      _curl "$BASE_URL/projects?${qs#&}" | jq .
       ;;
     get)
       local id="${1:-}"; need id

@@ -63,6 +63,7 @@ import {FlashTimeout} from "./hooks/flash_timeout"
 import {ReloadConfirmModal} from "./hooks/reload_confirm_modal"
 import {ChatWindowHook} from "./hooks/chat_window_hook"
 import {CanvasTabHook, CanvasStatusHook} from "./hooks/canvas_tab_hook"
+import {CanvasPanHook} from "./hooks/canvas_pan_hook"
 import {TimerCountdown} from "./hooks/timer_countdown"
 import {SessionsDropdownGuard} from "./hooks/sessions_dropdown_guard"
 import {showToast} from "./hooks/utils"
@@ -126,6 +127,7 @@ Hooks.ReloadConfirmModal = ReloadConfirmModal
 Hooks.ChatWindowHook = ChatWindowHook
 Hooks.CanvasTabHook = CanvasTabHook
 Hooks.CanvasStatusHook = CanvasStatusHook
+Hooks.CanvasPanHook = CanvasPanHook
 Hooks.TimerCountdown = TimerCountdown
 Hooks.SessionsDropdownGuard = SessionsDropdownGuard
 

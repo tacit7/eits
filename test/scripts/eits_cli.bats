@@ -1181,3 +1181,11 @@ teardown_teams() {
   assert_output --partial '"sessions"'
   eits tasks update "$TASK_ID" --state done
 }
+
+@test "tasks search --project constrains results to project" {
+  # Search with a known project_id should not return cross-project results
+  run eits tasks search "task" --project 1
+  assert_output --partial '"success": true'
+  # All returned tasks should have project_id matching or be null
+  [ "$(echo "$output" | jq '[.tasks[]? | select(.project_id != null and .project_id != "1" and .project_id != 1)] | length')" -eq 0 ]
+}

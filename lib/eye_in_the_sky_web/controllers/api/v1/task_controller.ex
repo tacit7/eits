@@ -35,8 +35,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     end
   end
 
-  defp fetch_tasks_by_filter(%{"q" => q}, limit) when is_binary(q) and q != "" do
-    Tasks.search_tasks(q) |> Enum.take(limit)
+  defp fetch_tasks_by_filter(%{"q" => q} = params, limit) when is_binary(q) and q != "" do
+    project_id = parse_int(params["project_id"], nil)
+    Tasks.search_tasks(q, project_id) |> Enum.take(limit)
   end
 
   defp fetch_tasks_by_filter(%{"session_id" => session_id}, limit) do

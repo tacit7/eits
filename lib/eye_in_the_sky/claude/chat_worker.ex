@@ -127,34 +127,40 @@ defmodule EyeInTheSky.Claude.ChatWorker do
   end
 
   defp fanout(channel_id, message, sender_session_id, opts) do
-    channel = Channels.get_channel(channel_id)
-    channel_ctx = %{id: channel.id, name: channel.name}
-    members = Channels.list_members(channel_id)
+    case Channels.get_channel(channel_id) do
+      nil ->
+        Logger.error("ChatWorker: channel=#{channel_id} not found, skipping fanout")
+        []
 
-    members
-    |> Enum.reject(fn m -> ChannelProtocol.skip?(m.session_id, sender_session_id) end)
-    |> Enum.map(fn member ->
-      {mode, _mentioned_ids, _mention_all} =
-        ChannelProtocol.parse_routing(message, member.session_id)
+      channel ->
+        channel_ctx = %{id: channel.id, name: channel.name}
+        members = Channels.list_members(channel_id)
 
-      prompt = ChannelProtocol.build_prompt(mode, message, channel_ctx)
+        members
+        |> Enum.reject(fn m -> ChannelProtocol.skip?(m.session_id, sender_session_id) end)
+        |> Enum.map(fn member ->
+          {mode, _mentioned_ids, _mention_all} =
+            ChannelProtocol.parse_routing(message, member.session_id)
 
-      result = AgentManager.send_message(member.session_id, prompt, opts)
+          prompt = ChannelProtocol.build_prompt(mode, message, channel_ctx)
 
-      case result do
-        {:ok, admission} ->
-          Logger.info(
-            "ChatWorker: routed to session=#{member.session_id} channel=#{channel_id} mode=#{mode} admission=#{admission}"
-          )
+          result = AgentManager.send_message(member.session_id, prompt, opts)
 
-        {:error, reason} ->
-          Logger.error(
-            "ChatWorker: failed to route to session=#{member.session_id} channel=#{channel_id} reason=#{inspect(reason)}"
-          )
-      end
+          case result do
+            {:ok, admission} ->
+              Logger.info(
+                "ChatWorker: routed to session=#{member.session_id} channel=#{channel_id} mode=#{mode} admission=#{admission}"
+              )
 
-      {member.session_id, result}
-    end)
+            {:error, reason} ->
+              Logger.error(
+                "ChatWorker: failed to route to session=#{member.session_id} channel=#{channel_id} reason=#{inspect(reason)}"
+              )
+          end
+
+          {member.session_id, result}
+        end)
+    end
   end
 
   defp process_next_job(%{queue: []} = state) do

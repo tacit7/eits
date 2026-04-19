@@ -825,3 +825,47 @@ teardown_teams() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"mutually exclusive"* ]]
 }
+
+# ── notifications create resource fields ─────────────────────────────────────
+
+@test "notifications create: accepts --resource-type and --resource-id" {
+  run "$EITS" notifications create --title "test-notif" --resource-type "task" --resource-id "123"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+}
+
+@test "notifications create: resource fields are optional" {
+  run "$EITS" notifications create --title "test-notif-minimal"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+}
+
+# ── sessions update self shorthand ──────────────────────────────────────────
+
+@test "sessions update self: substitutes EITS_SESSION_UUID" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" sessions update self --name "self-updated"
+  [ "$status" -eq 0 ]
+  name=$("$EITS" sessions get "$TEST_SESSION" | jq -r '.name')
+  [ "$name" = "self-updated" ]
+}
+
+@test "sessions update self: errors when EITS_SESSION_UUID unset" {
+  run env -u EITS_SESSION_UUID "$EITS" sessions update self --name "fail" 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"EITS_SESSION_UUID"* ]]
+}
+
+# ── tasks list --search alias ──────────────────────────────────────────────
+
+@test "tasks list --search: accepts search flag (same as --q)" {
+  run "$EITS" tasks list --search "test"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+}
+
+@test "tasks list --search: returns results array" {
+  run "$EITS" tasks list --search "test"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.results | type == "array"' >/dev/null
+}

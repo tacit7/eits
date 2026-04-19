@@ -98,6 +98,37 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
     end
   end
 
+  describe "overflow indicator" do
+    test "shows overflow hint when more than 10 agents match" do
+      many_agents =
+        for i <- 1..12, do: {"agent-#{i}", "Agent #{i}", :global}
+
+      html = render_component(NewSessionModal, base_assigns(%{available_agents: many_agents, agent_search: ""}))
+
+      assert html =~ "more — type to narrow"
+      assert html =~ "hero-ellipsis-horizontal"
+    end
+
+    test "does not show overflow hint when 10 or fewer agents match" do
+      ten_agents =
+        for i <- 1..10, do: {"agent-#{i}", "Agent #{i}", :global}
+
+      html = render_component(NewSessionModal, base_assigns(%{available_agents: ten_agents, agent_search: ""}))
+
+      refute html =~ "more — type to narrow"
+    end
+
+    test "overflow count reflects filtered results, not total agents" do
+      many_agents =
+        for i <- 1..12, do: {"eits-agent-#{i}", "EITS Agent #{i}", :global}
+
+      # All 12 match "eits", so overflow = 2
+      html = render_component(NewSessionModal, base_assigns(%{available_agents: many_agents, agent_search: "eits"}))
+
+      assert html =~ "2 more — type to narrow"
+    end
+  end
+
   describe "module exports" do
     test "NewSessionModal is compiled and exports render/1" do
       assert Code.ensure_loaded?(NewSessionModal)

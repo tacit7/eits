@@ -310,8 +310,7 @@ cmd_tasks() {
       # eits tasks tag <task_id> <tag_id>
       local task_id="${1:-}"; need task_id; shift
       local tag_id="${1:-}"; need tag_id
-      psql -d eits_dev -tAq -c "INSERT INTO task_tags (task_id, tag_id) VALUES ($task_id, $tag_id) ON CONFLICT DO NOTHING;"
-      echo "{\"success\":true,\"task_id\":\"$task_id\",\"tag_id\":\"$tag_id\"}"
+      _post "/tasks/$task_id/tags" "$(json tag_id "$tag_id")"
       ;;
     *)
       echo "usage: eits tasks <list|get|create|update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|tag>"

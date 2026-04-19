@@ -302,26 +302,12 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
       case agent_manager_mod().send_message(member.session_id, dm_body) do
         result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
-          attrs = %{
-            uuid: Ecto.UUID.generate(),
-            session_id: member.session_id,
-            from_session_id: sender_session_id,
-            to_session_id: member.session_id,
-            body: dm_body,
-            sender_role: "agent",
-            recipient_role: "agent",
-            direction: "inbound",
-            status: "sent",
-            provider: "claude",
-            metadata: %{channel_id: channel_id, channel_notification: true}
-          }
-
-          case Messages.create_message(attrs) do
-            {:ok, msg} ->
-              EyeInTheSky.Events.session_new_dm(member.session_id, msg)
-
+          case persist_and_broadcast_dm(member.session_id, sender_session_id, dm_body, %{channel_id: channel_id, channel_notification: true}) do
             {:error, err} ->
               Logger.warning("channel notify persist failed for session #{member.session_id}: #{inspect(err)}")
+
+            _ ->
+              :ok
           end
 
         {:error, reason} ->
@@ -379,26 +365,12 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   defp deliver_team_dm(target_session_id, from_session_id, dm_body, channel_id) do
     case agent_manager_mod().send_message(target_session_id, dm_body) do
       result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
-        attrs = %{
-          uuid: Ecto.UUID.generate(),
-          session_id: target_session_id,
-          from_session_id: from_session_id,
-          to_session_id: target_session_id,
-          body: dm_body,
-          sender_role: "agent",
-          recipient_role: "agent",
-          direction: "inbound",
-          status: "sent",
-          provider: "claude",
-          metadata: %{channel_id: channel_id, broadcast: true}
-        }
-
-        case Messages.create_message(attrs) do
-          {:ok, msg} ->
-            EyeInTheSky.Events.session_new_dm(target_session_id, msg)
-
+        case persist_and_broadcast_dm(target_session_id, from_session_id, dm_body, %{channel_id: channel_id, broadcast: true}) do
           {:error, err} ->
             Logger.warning("team broadcast persist failed for session #{target_session_id}: #{inspect(err)}")
+
+          _ ->
+            :ok
         end
 
       {:error, reason} ->
@@ -432,10 +404,8 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   defp persist_dm(conn, to_session, attrs) do
     case Messages.find_recent_dm(to_session.id, attrs.body, seconds: 30) do
       nil ->
-        case Messages.create_message(attrs) do
+        case persist_and_broadcast_dm(to_session.id, attrs.from_session_id, attrs.body, attrs.metadata) do
           {:ok, msg} ->
-            EyeInTheSky.Events.session_new_dm(to_session.id, msg)
-
             conn
             |> put_status(:created)
             |> json(%{
@@ -445,7 +415,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
               message_uuid: msg.uuid
             })
 
-          {:error, _cs} ->
+          {:error, _err} ->
             {:error, "Failed to persist DM"}
         end
 
@@ -458,6 +428,31 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
           message_id: to_string(existing.id),
           message_uuid: existing.uuid
         })
+    end
+  end
+
+  defp persist_and_broadcast_dm(to_session_id, from_session_id, body, metadata) do
+    attrs = %{
+      uuid: Ecto.UUID.generate(),
+      session_id: to_session_id,
+      from_session_id: from_session_id,
+      to_session_id: to_session_id,
+      body: body,
+      sender_role: "agent",
+      recipient_role: "agent",
+      direction: "inbound",
+      status: "sent",
+      provider: "claude",
+      metadata: metadata
+    }
+
+    case Messages.create_message(attrs) do
+      {:ok, msg} ->
+        EyeInTheSky.Events.session_new_dm(to_session_id, msg)
+        {:ok, msg}
+
+      {:error, err} ->
+        {:error, err}
     end
   end
 

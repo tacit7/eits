@@ -14,8 +14,16 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
 
   @default_message_limit 50
 
-  def maybe_subscribe(is_connected, session_id) do
-    if is_connected, do: setup_subscriptions(session_id), else: :ok
+  def maybe_subscribe(is_connected, session_id, current_user) do
+    if is_connected do
+      if session_belongs_to?(session_id, current_user) do
+        setup_subscriptions(session_id)
+      else
+        :unauthorized
+      end
+    else
+      :ok
+    end
   end
 
   def setup_subscriptions(session_id) do
@@ -27,6 +35,14 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     PubSubHelpers.subscribe_tasks()
     Events.subscribe_session_timer(session_id)
     Events.subscribe_codex_raw(session_id)
+  end
+
+  defp session_belongs_to?(_session_id, nil), do: false
+
+  defp session_belongs_to?(_session_id, _current_user) do
+    # For now, any authenticated user can access sessions.
+    # Future: add user_id to sessions table and verify ownership.
+    true
   end
 
   def assign_sidebar_context(socket, %{"from" => "project", "project_id" => project_id_str}) do

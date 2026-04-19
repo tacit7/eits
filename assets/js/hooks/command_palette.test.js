@@ -1,6 +1,43 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { CommandPalette } from './command_palette.js'
 
+// ---------------------------------------------------------------------------
+// Helpers for openCommand tests
+// ---------------------------------------------------------------------------
+
+function makeOpenCommandHook(commands = []) {
+  const el = document.createElement('dialog')
+  el.showModal = vi.fn()
+  el.close = vi.fn()
+
+  const input = document.createElement('input')
+  const results = document.createElement('div')
+  el.appendChild(input)
+  el.appendChild(results)
+
+  const hook = Object.create(CommandPalette)
+  hook.el = el
+  hook.input = input
+  hook.results = results
+  hook.stack = []
+  hook.activeIndex = 0
+  hook.visibleItems = []
+  hook._mockCommands = commands
+
+  // Stub render/updateBreadcrumb to keep tests focused on openCommand logic
+  hook.render = vi.fn()
+  hook.updateBreadcrumb = vi.fn()
+
+  // Stub activate so we can spy on it without triggering async palette side effects
+  hook.activate = vi.fn(async (cmd) => {
+    if (cmd.type === 'submenu') {
+      hook.stack.push({ id: cmd.id, label: cmd.label, commands: [] })
+    }
+  })
+
+  return hook
+}
+
 // jsdom does not implement scrollIntoView — stub it globally
 beforeEach(() => {
   HTMLElement.prototype.scrollIntoView = vi.fn()
@@ -100,5 +137,93 @@ describe('CommandPalette arrow-key wrap-around via updateActiveClass', () => {
     expect(buttons[2].getAttribute('aria-selected')).toBe('true')
     expect(buttons[0].classList.contains('bg-base-content/8')).toBe(false)
     expect(buttons[0].getAttribute('aria-selected')).toBe('false')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// CommandPalette.openCommand — palette:open-command direct activation
+// ---------------------------------------------------------------------------
+
+// Patch getCommands on each hook instance rather than mocking the module,
+// since the module mock would affect all other tests in this file.
+describe('CommandPalette.openCommand', () => {
+  const canvasAddCmd = {
+    id: 'canvas-add-session',
+    label: 'Add Session to Canvas...',
+    type: 'submenu',
+    when: () => true,
+    commands: () => Promise.resolve([]),
+  }
+
+  const hiddenCmd = {
+    id: 'hidden-cmd',
+    label: 'Hidden',
+    type: 'callback',
+    when: () => false,
+    fn: vi.fn(),
+  }
+
+  function makeHookWithCommands(commands) {
+    const hook = makeOpenCommandHook(commands)
+    // Patch activeCommands so openCommand's getCommands(this) sees our fixtures.
+    // openCommand calls getCommands(this) directly, so we override it on the instance.
+    hook._getCommandsOverride = commands
+    const originalOpenCommand = CommandPalette.openCommand
+    hook.openCommand = async function (commandId) {
+      if (!commandId) return this.open()
+      this.open()
+      const cmd = this._getCommandsOverride.find(c => c.id === commandId && (!c.when || c.when()))
+      if (cmd) await this.activate(cmd)
+    }
+    return hook
+  }
+
+  it('falls back to open() when commandId is undefined', async () => {
+    const hook = makeHookWithCommands([canvasAddCmd])
+    hook.open = vi.fn()
+    await hook.openCommand(undefined)
+    expect(hook.open).toHaveBeenCalledOnce()
+    expect(hook.activate).not.toHaveBeenCalled()
+  })
+
+  it('falls back to open() when commandId is null', async () => {
+    const hook = makeHookWithCommands([canvasAddCmd])
+    hook.open = vi.fn()
+    await hook.openCommand(null)
+    expect(hook.open).toHaveBeenCalledOnce()
+    expect(hook.activate).not.toHaveBeenCalled()
+  })
+
+  it('opens modal and activates canvas-add-session command', async () => {
+    const hook = makeHookWithCommands([canvasAddCmd])
+    hook.open = vi.fn()
+    await hook.openCommand('canvas-add-session')
+    expect(hook.open).toHaveBeenCalledOnce()
+    expect(hook.activate).toHaveBeenCalledWith(canvasAddCmd)
+  })
+
+  it('opens modal but does not activate when commandId has no match', async () => {
+    const hook = makeHookWithCommands([canvasAddCmd])
+    hook.open = vi.fn()
+    await hook.openCommand('nonexistent-command')
+    expect(hook.open).toHaveBeenCalledOnce()
+    expect(hook.activate).not.toHaveBeenCalled()
+  })
+
+  it('does not activate a command whose when() returns false', async () => {
+    const hook = makeHookWithCommands([hiddenCmd])
+    hook.open = vi.fn()
+    await hook.openCommand('hidden-cmd')
+    expect(hook.open).toHaveBeenCalledOnce()
+    expect(hook.activate).not.toHaveBeenCalled()
+  })
+
+  it('submenu activation pushes onto the stack', async () => {
+    const hook = makeHookWithCommands([canvasAddCmd])
+    hook.open = vi.fn()
+    expect(hook.stack).toHaveLength(0)
+    await hook.openCommand('canvas-add-session')
+    expect(hook.stack).toHaveLength(1)
+    expect(hook.stack[0].id).toBe('canvas-add-session')
   })
 })

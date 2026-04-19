@@ -67,6 +67,7 @@ import {CanvasTabHook, CanvasStatusHook} from "./hooks/canvas_tab_hook"
 import {CanvasPanHook} from "./hooks/canvas_pan_hook"
 import {TimerCountdown} from "./hooks/timer_countdown"
 import {SessionsDropdownGuard} from "./hooks/sessions_dropdown_guard"
+import {AgentCombobox} from "./hooks/agent_combobox"
 import {showToast} from "./hooks/utils"
 import {getHooks} from "live_svelte"
 import "./theme"
@@ -132,6 +133,7 @@ Hooks.CanvasStatusHook = CanvasStatusHook
 Hooks.CanvasPanHook = CanvasPanHook
 Hooks.TimerCountdown = TimerCountdown
 Hooks.SessionsDropdownGuard = SessionsDropdownGuard
+Hooks.AgentCombobox = AgentCombobox
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {

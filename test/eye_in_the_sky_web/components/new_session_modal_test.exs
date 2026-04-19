@@ -29,50 +29,73 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
   end
 
   # -------------------------------------------------------------------------
-  # Datalist rendering — verifies HTML structure
+  # JS combobox rendering — verifies HTML structure and data-agents encoding
   # -------------------------------------------------------------------------
 
-  describe "agent datalist input" do
-    test "renders search input with list attribute when agents present" do
+  describe "agent combobox" do
+    test "renders hook element with data-agents JSON when agents present" do
       html = render_component(NewSessionModal, base_assigns())
 
-      assert html =~ ~s(name="agent")
-      assert html =~ ~s(list="agent-options")
+      assert html =~ ~s(phx-hook="AgentCombobox")
+      assert html =~ ~s(data-agents=)
       assert html =~ "Search agents..."
     end
 
     test "does not render agent field when no agents available" do
       html = render_component(NewSessionModal, base_assigns(%{available_agents: []}))
 
-      refute html =~ ~s(list="agent-options")
+      refute html =~ ~s(phx-hook="AgentCombobox")
       refute html =~ "Search agents..."
     end
 
-    test "renders datalist with all agent slugs as options" do
+    test "data-agents JSON contains all agent slugs" do
       html = render_component(NewSessionModal, base_assigns())
 
-      assert html =~ ~s(value="eits-superpowers")
-      assert html =~ ~s(value="eits-workflow")
-      assert html =~ ~s(value="bugfix")
-      assert html =~ ~s(value="code-reviewer")
+      assert html =~ "eits-superpowers"
+      assert html =~ "eits-workflow"
+      assert html =~ "bugfix"
+      assert html =~ "code-reviewer"
     end
 
-    test "all agents are included regardless of count" do
+    test "data-agents JSON contains agent names" do
+      html = render_component(NewSessionModal, base_assigns())
+
+      assert html =~ "EITS Superpowers"
+      assert html =~ "EITS Workflow"
+      assert html =~ "Bug Fixer"
+      assert html =~ "Code Reviewer"
+    end
+
+    test "data-agents JSON contains scope strings" do
+      html = render_component(NewSessionModal, base_assigns())
+
+      assert html =~ "global"
+      assert html =~ "project"
+    end
+
+    test "all agents are encoded regardless of count" do
       many_agents = for i <- 1..15, do: {"agent-#{i}", "Agent #{i}", :global}
 
       html = render_component(NewSessionModal, base_assigns(%{available_agents: many_agents}))
 
       for i <- 1..15 do
-        assert html =~ ~s(value="agent-#{i}")
+        assert html =~ "agent-#{i}"
       end
     end
 
-    test "no overflow indicator or empty-state rendered" do
-      many_agents = for i <- 1..15, do: {"agent-#{i}", "Agent #{i}", :global}
-      html = render_component(NewSessionModal, base_assigns(%{available_agents: many_agents}))
+    test "renders hidden input and visible search input" do
+      html = render_component(NewSessionModal, base_assigns())
 
-      refute html =~ "more — type to narrow"
-      refute html =~ "No agents match"
+      assert html =~ ~s(data-combobox-value)
+      assert html =~ ~s(data-combobox-input)
+      assert html =~ ~s(data-combobox-list)
+    end
+
+    test "no datalist element rendered" do
+      html = render_component(NewSessionModal, base_assigns())
+
+      refute html =~ "<datalist"
+      refute html =~ "list=\"agent-options\""
     end
   end
 

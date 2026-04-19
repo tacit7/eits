@@ -32,8 +32,6 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     # When the form is open, skip parent re-renders entirely to prevent DOM patches from
     # disrupting the modal (e.g. PubSub-driven list updates closing the form). Only update
     # uploads when they actually change so image previews stay current.
-    opening = !socket.assigns[:show] && assigns[:show]
-
     if socket.assigns[:show] && assigns[:show] do
       new_uploads = Map.get(assigns, :file_uploads)
 
@@ -46,16 +44,10 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       project_path = if assigns[:current_project], do: assigns[:current_project].path
       available_agents = Map.get_lazy(assigns, :available_agents, fn -> list_agents(project_path) end)
 
-      socket =
-        socket
-        |> assign(Map.put(assigns, :available_agents, available_agents))
-        |> then(fn s ->
-          if opening && !Map.has_key?(assigns, :agent_search),
-            do: assign(s, :agent_search, ""),
-            else: s
-        end)
-
-      {:ok, socket}
+      {:ok,
+       socket
+       |> assign(Map.put(assigns, :available_agents, available_agents))
+       |> assign(:agent_search, Map.get(assigns, :agent_search, ""))}
     end
   end
 
@@ -71,6 +63,10 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   def handle_event("prompt_selected", %{"prompt_id" => ""}, socket) do
     {:noreply, assign(socket, selected_prompt_id: nil, prefill_text: "")}
+  end
+
+  def handle_event("agent_search_changed", %{"agent_search" => query}, socket) do
+    {:noreply, assign(socket, :agent_search, query)}
   end
 
   def handle_event("project_changed", %{"project_id" => project_id_str}, socket) do
@@ -96,10 +92,6 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     prefill = if prompt, do: prompt.prompt_text || "", else: ""
 
     {:noreply, assign(socket, selected_prompt_id: prompt_id, prefill_text: prefill)}
-  end
-
-  def handle_event("agent_search_changed", %{"agent_search" => query}, socket) do
-    {:noreply, assign(socket, :agent_search, query)}
   end
 
   @impl true
@@ -132,17 +124,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
             <%!-- Agent --%>
             <%= if @available_agents != [] do %>
-              <% filtered_agents =
-                if @agent_search == "" do
-                  @available_agents
-                else
-                  q = String.downcase(@agent_search)
-
-                  Enum.filter(@available_agents, fn {slug, name, _scope} ->
-                    String.contains?(String.downcase(slug), q) or
-                      String.contains?(String.downcase(name), q)
-                  end)
-                end %>
+              <% filtered = filter_agents(@available_agents, @agent_search) %>
+              <% visible = Enum.take(filtered, 10) %>
+              <% overflow = length(filtered) - length(visible) %>
               <div>
                 <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Agent</label>
                 <input
@@ -153,17 +137,27 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
                   autocomplete="off"
                   phx-change="agent_search_changed"
                   phx-target={@myself}
-                  phx-debounce="100"
-                  class="input input-bordered input-sm w-full mb-1.5 text-base"
+                  class="input input-bordered w-full text-base mb-1.5"
                 />
-                <select name="agent" class="select select-bordered w-full">
-                  <option value="">-- None --</option>
-                  <%= for {slug, name, scope} <- filtered_agents do %>
-                    <option value={slug}>{name}{if scope == :project, do: " (project)"}</option>
+                <%= if filtered == [] do %>
+                  <p class="text-sm text-base-content/40 px-1">
+                    No agents match <span class="font-mono">{@agent_search}</span>
+                  </p>
+                <% else %>
+                  <select name="agent" class="select select-bordered w-full">
+                    <option value="">-- None --</option>
+                    <%= for {slug, name, scope} <- visible do %>
+                      <option value={slug}>
+                        {name}{if scope == :project, do: " (project)"}
+                      </option>
+                    <% end %>
+                  </select>
+                  <%= if overflow > 0 do %>
+                    <p class="flex items-center gap-1 text-xs text-base-content/40 mt-1 px-1">
+                      <.icon name="hero-ellipsis-horizontal" class="w-3.5 h-3.5" />
+                      {overflow} more — type to narrow
+                    </p>
                   <% end %>
-                </select>
-                <%= if filtered_agents == [] do %>
-                  <p class="text-xs text-base-content/40 mt-1">No agents match "{@agent_search}"</p>
                 <% end %>
               </div>
             <% end %>
@@ -498,5 +492,16 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   defp list_agents(project_path) do
     AgentFileScanner.scan(project_path)
     |> Enum.map(fn agent -> {agent.slug, agent.name, agent.source} end)
+  end
+
+  defp filter_agents(agents, ""), do: agents
+
+  defp filter_agents(agents, query) do
+    q = String.downcase(query)
+
+    Enum.filter(agents, fn {slug, name, _scope} ->
+      String.contains?(String.downcase(slug), q) or
+        String.contains?(String.downcase(name), q)
+    end)
   end
 end

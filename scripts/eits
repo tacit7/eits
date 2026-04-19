@@ -1140,52 +1140,19 @@ cmd_teams() {
       _delete "/teams/$team_id/members/$member_id"
       ;;
     broadcast)
-      # eits teams broadcast <team_id> --message <text> [--from <session>] [--include-self] [--response-required]
+      # eits teams broadcast <team_id> --body <text> [--from <session>]
+      # POSTs to POST /api/v1/teams/:team_id/broadcast (atomic server-side fanout)
       local team_id="${1:-}"; need team_id; shift
-      local from="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" message="" include_self="false" response_required="false"
+      local from="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" body=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --from)              from="$2";                shift 2 ;;
-          --message|-m)        message="$2";             shift 2 ;;
-          --include-self)      include_self="true";      shift ;;
-          --response-required) response_required="true"; shift ;;
+          --from|-f)    from="$2";  shift 2 ;;
+          --body|-b|-m) body="$2";  shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      need from; need message
-
-      local members_resp
-      members_resp=$(_curl "$BASE_URL/teams/$team_id/members") \
-        || die "failed to fetch members for team $team_id"
-
-      local targets
-      local skip_self; skip_self="$([[ "$include_self" == "true" ]] && echo false || echo true)"
-      targets=$(echo "$members_resp" | jq -r --arg self "$from" --argjson skip_self "$skip_self" \
-        '.members[] | select(.session_uuid != null) | select(($skip_self | not) or (.session_uuid != $self)) | .session_uuid')
-
-      [[ -z "$targets" ]] && die "no recipients found in team $team_id"
-
-      local sent=0 failed=0 results="[]"
-      while IFS= read -r to; do
-        [[ -z "$to" ]] && continue
-        local payload result dm_exit
-        payload=$(jq -n --arg f "$from" --arg t "$to" --arg m "$message" --argjson r "$response_required" \
-          '{from_session_id: $f, to_session_id: $t, message: $m, response_required: $r}')
-        result=$(_curl -X POST -H "Content-Type: application/json" -d "$payload" "$BASE_URL/dm" 2>&1); dm_exit=$?
-        if [[ $dm_exit -eq 0 ]]; then
-          sent=$((sent+1))
-          local safe_result
-          safe_result=$(echo "$result" | jq -c '.' 2>/dev/null || echo '{}')
-          results=$(jq -n --argjson base "$results" --arg to "$to" --argjson r "$safe_result" '$base + [{to: $to, ok: true, result: $r}]')
-        else
-          failed=$((failed+1))
-          results=$(jq -n --argjson base "$results" --arg to "$to" --argjson code "$dm_exit" --arg err "$result" \
-            '$base + [{to: $to, ok: false, exit_code: $code, error: $err}]')
-        fi
-      done <<< "$targets"
-
-      jq -n --argjson s "$sent" --argjson f "$failed" --argjson r "$results" \
-        '{success: ($f == 0), sent: $s, failed: $f, results: $r}'
+      need from; need body
+      _post "/teams/$team_id/broadcast" "$(json from_session_id "$from" body "$body")"
       ;;
     my-teams)
       # List teams where the current agent is a member (by EITS_AGENT_UUID)

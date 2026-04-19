@@ -1,3 +1,8 @@
+defmodule EyeInTheSkyWeb.Api.V1.MockSucceedingAgentManagerForTeam do
+  @moduledoc "Test double — always succeeds send_message."
+  def send_message(_session_id, _message, _opts \\ []), do: :ok
+end
+
 defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
@@ -436,6 +441,41 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       assert resp["success"] == true
       # Both targets are terminated — nothing should be sent
       assert resp["sent_count"] == 0
+    end
+
+    test "delivers to active members and returns correct sent_count", %{conn: conn} do
+      Application.put_env(
+        :eye_in_the_sky,
+        :agent_manager_module,
+        EyeInTheSkyWeb.Api.V1.MockSucceedingAgentManagerForTeam
+      )
+
+      on_exit(fn -> Application.delete_env(:eye_in_the_sky, :agent_manager_module) end)
+
+      team = create_team()
+
+      sender_agent = create_agent()
+      sender = create_session(sender_agent)
+      join_team(team, %{name: "sender", session_id: sender.id})
+
+      r1_agent = create_agent()
+      r1 = create_session(r1_agent)
+      join_team(team, %{name: "recv-1", session_id: r1.id})
+
+      r2_agent = create_agent()
+      r2 = create_session(r2_agent)
+      join_team(team, %{name: "recv-2", session_id: r2.id})
+
+      conn =
+        post(conn, ~p"/api/v1/teams/#{team.id}/broadcast", %{
+          "from_session_id" => sender.uuid,
+          "body" => "ping"
+        })
+
+      resp = json_response(conn, 200)
+      assert resp["success"] == true
+      assert resp["sent_count"] == 2
+      assert resp["failed"] == 0
     end
   end
 end

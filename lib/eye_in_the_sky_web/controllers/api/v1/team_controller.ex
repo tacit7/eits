@@ -274,7 +274,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   end
 
   defp deliver_broadcast_dm(member, from_session, dm_body) do
-    case AgentManager.send_message(member.session_id, dm_body) do
+    case agent_manager_mod().send_message(member.session_id, dm_body) do
       result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
         attrs = %{
           uuid: Ecto.UUID.generate(),
@@ -306,5 +306,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp agent_manager_mod do
+    Application.get_env(:eye_in_the_sky, :agent_manager_module, AgentManager)
   end
 end

@@ -32,6 +32,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     # When the form is open, skip parent re-renders entirely to prevent DOM patches from
     # disrupting the modal (e.g. PubSub-driven list updates closing the form). Only update
     # uploads when they actually change so image previews stay current.
+    opening = !socket.assigns[:show] && assigns[:show]
+
     if socket.assigns[:show] && assigns[:show] do
       new_uploads = Map.get(assigns, :file_uploads)
 
@@ -43,7 +45,13 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     else
       project_path = if assigns[:current_project], do: assigns[:current_project].path
       available_agents = list_agents(project_path)
-      {:ok, assign(socket, Map.put(assigns, :available_agents, available_agents))}
+
+      socket =
+        socket
+        |> assign(Map.put(assigns, :available_agents, available_agents))
+        |> then(fn s -> if opening, do: assign(s, :agent_search, ""), else: s end)
+
+      {:ok, socket}
     end
   end
 
@@ -74,7 +82,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
           if(project, do: project.path)
       end
 
-    {:noreply, assign(socket, :available_agents, list_agents(project_path))}
+    {:noreply, assign(socket, available_agents: list_agents(project_path), agent_search: "")}
   end
 
   def handle_event("prompt_selected", %{"prompt_id" => prompt_id}, socket) do

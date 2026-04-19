@@ -154,4 +154,7 @@ defmodule EyeInTheSkyWeb.Helpers.PubSubHelpers do
 
   @doc "Subscribe to new messages broadcast on the given channel."
   def subscribe_channel_messages(channel_id), do: Events.subscribe_channel_messages(channel_id)
+
+  @doc "Unsubscribe from new messages broadcast on the given channel."
+  def unsubscribe_channel_messages(channel_id), do: Events.unsubscribe_channel_messages(channel_id)
 end

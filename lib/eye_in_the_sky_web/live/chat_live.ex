@@ -58,7 +58,15 @@ defmodule EyeInTheSkyWeb.ChatLive do
     {channel_id, channels} = ensure_default_channel(channel_id, channels, project_id, socket)
 
     if connected?(socket) && channel_id do
-      subscribe_channel_messages(channel_id)
+      prev_channel_id = socket.assigns[:active_channel_id]
+
+      if prev_channel_id && to_string(prev_channel_id) != to_string(channel_id) do
+        unsubscribe_channel_messages(prev_channel_id)
+      end
+
+      unless prev_channel_id && to_string(prev_channel_id) == to_string(channel_id) do
+        subscribe_channel_messages(channel_id)
+      end
     end
 
     {project_id, channel_id, channels}

@@ -77,6 +77,9 @@ defmodule EyeInTheSky.Events do
   @doc "Subscribe to new messages on a channel."
   def subscribe_channel_messages(channel_id), do: sub("channel:#{channel_id}:messages")
 
+  @doc "Unsubscribe from new messages on a channel."
+  def unsubscribe_channel_messages(channel_id), do: unsub("channel:#{channel_id}:messages")
+
   @doc "Subscribe to notification events."
   def subscribe_notifications, do: sub("notifications")
 

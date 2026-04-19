@@ -26,6 +26,8 @@ function onKeydown(e) {
   }
 }
 
+const WS_BADGE_ID = "canvas-ws-badge"
+
 export const CanvasTabHook = {
   mounted() {
     this.el.addEventListener("dblclick", () => {
@@ -43,5 +45,13 @@ export const CanvasTabHook = {
     if (_listenerCount === 0) {
       document.removeEventListener("keydown", onKeydown)
     }
+  },
+
+  disconnected() {
+    document.getElementById(WS_BADGE_ID)?.classList.remove("hidden")
+  },
+
+  reconnected() {
+    document.getElementById(WS_BADGE_ID)?.classList.add("hidden")
   }
 }

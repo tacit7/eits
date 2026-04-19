@@ -3,6 +3,7 @@ import { agentCommands } from "./agents.js"
 import { taskCommands } from "./tasks.js"
 import { noteCommands } from "./notes.js"
 import { sessionCommands } from "./sessions.js"
+import { canvasCommands } from "./canvas.js"
 
 export function getCommands(hook) {
   return [
@@ -11,5 +12,6 @@ export function getCommands(hook) {
     ...taskCommands(hook),
     ...noteCommands(hook),
     ...sessionCommands(hook),
+    ...canvasCommands(hook),
   ]
 }

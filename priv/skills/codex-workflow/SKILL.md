@@ -25,16 +25,18 @@ eits sessions update $EITS_SESSION_UUID --status completed # interactive session
 ## Task Lifecycle
 
 ```bash
-eits tasks create --title "..." --description "..."
-eits tasks claim <task_id>
+# Canonical: create + link + start in one shot
+eits tasks begin --title "..."
 # ... do work ...
 eits tasks complete <task_id> --message "What was done"
 ```
 
-Fallback if `complete` fails:
+Fallback (existing task or if `complete` fails):
 ```bash
+eits tasks start <id>       # sets state=2, links session — use on EXISTING tasks
+# ... do work ...
 eits tasks annotate <id> --body "Summary"
-eits tasks update <id> --state 4
+eits tasks update <id> --state done   # aliases: done, start, in-review, todo; numeric also works
 ```
 
 States: `1` To Do · `2` In Progress · `4` In Review · `3` Done
@@ -77,21 +79,16 @@ unlink _build  # not: rm _build
 ## DMs
 
 ```bash
-eits dm --to <session_uuid> --message "text"
+eits dm --to <session_uuid_or_integer_id> --message "text"
 ```
 
-`--to` requires UUID. Resolve from integer ID if needed:
-```bash
-UUID=$(psql -d eits_dev -tAq -c "SELECT uuid FROM sessions WHERE id = <id>;")
-```
-
-Send sequentially — never in parallel Bash calls.
+`--to` accepts both UUID and integer session ID. Send sequentially — never in parallel Bash calls.
 
 ---
 
 ## Rules
 
-- Claim a task before editing any files.
+- Run `eits tasks begin` before editing any files (`begin` > `create + claim`).
 - Log every commit — hook does it automatically, but verify.
 - Annotate before completing; Stop hook enforces it.
 - Use `unlink`, not `rm`, on symlinks.

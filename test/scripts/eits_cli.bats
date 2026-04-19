@@ -96,6 +96,41 @@ _agent_uuid() { cat "$BATS_FILE_TMPDIR/agent_uuid"; }
   echo "$output" | jq -e '.results | type == "array"' >/dev/null
 }
 
+@test "sessions list --agent: accepts agent UUID flag" {
+  run "$EITS" sessions list --agent $(_agent_uuid)
+  [ "$status" -eq 0 ]
+}
+
+@test "sessions list --agent: returns results array" {
+  run "$EITS" sessions list --agent $(_agent_uuid)
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.results | type == "array"' >/dev/null
+}
+
+@test "sessions list --agent + --status: mutually exclusive" {
+  run "$EITS" sessions list --agent $(_agent_uuid) --status working 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "mutually exclusive" ]]
+}
+
+@test "sessions list --status + --agent: mutually exclusive (reverse order)" {
+  run "$EITS" sessions list --status working --agent $(_agent_uuid) 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "mutually exclusive" ]]
+}
+
+@test "sessions list --agent + --project: mutually exclusive" {
+  run "$EITS" sessions list --agent $(_agent_uuid) --project 1 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "mutually exclusive" ]]
+}
+
+@test "sessions list --agent + --search: mutually exclusive" {
+  run "$EITS" sessions list --agent $(_agent_uuid) --search foo 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "mutually exclusive" ]]
+}
+
 @test "sessions list: rejects unknown flags" {
   run "$EITS" sessions list --bogus foo 2>&1
   [ "$status" -ne 0 ]

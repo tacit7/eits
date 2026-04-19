@@ -393,6 +393,28 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         </button>
         <button
           :if={@canvas_sessions != [] and not is_nil(@active_canvas_id)}
+          phx-hook="CanvasLayoutHook"
+          id="layout-2up"
+          data-layout-btn="2up"
+          phx-update="ignore"
+          class="btn btn-ghost btn-xs px-1.5 text-base-content/50 hover:text-base-content"
+          title="2-up layout"
+        >
+          <.icon name="hero-view-columns" class="w-4 h-4" />
+        </button>
+        <button
+          :if={@canvas_sessions != [] and not is_nil(@active_canvas_id)}
+          phx-hook="CanvasLayoutHook"
+          id="layout-4up"
+          data-layout-btn="4up"
+          phx-update="ignore"
+          class="btn btn-ghost btn-xs px-1.5 text-base-content/50 hover:text-base-content"
+          title="4-up layout"
+        >
+          <.icon name="hero-squares-2x2" class="w-4 h-4" />
+        </button>
+        <button
+          :if={@canvas_sessions != [] and not is_nil(@active_canvas_id)}
           phx-click="tidy_layout"
           class="mr-2 btn btn-ghost btn-xs text-base-content/40 hover:text-base-content flex items-center gap-1"
           title="Tidy windows"

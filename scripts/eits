@@ -26,7 +26,7 @@ _curl() {
   _status="${_body##*$'\n'}"
   _body="${_body%$'\n'*}"
   if [[ "$_status" -ge 400 ]]; then
-    printf '%s\n' "$_body" >&2
+    printf 'HTTP %s: %s\n' "$_status" "$_body" >&2
     return 1
   fi
   printf '%s\n' "$_body"
@@ -64,7 +64,7 @@ json() {
 
 cmd_sessions() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|search|get|create|update|end|context|tasks|notes>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|end|context|tasks|notes>"; return 0; }
   case "$sub" in
     list)
       # eits sessions list [--search <q>] [--status <s>] [--project <id>] [--limit <n>]
@@ -79,11 +79,6 @@ cmd_sessions() {
         esac
       done
       _curl "$BASE_URL/sessions?${qs#&}" | jq .
-      ;;
-    search)
-      # eits sessions search <query>
-      local query="${1:-}"; need query
-      _curl "$BASE_URL/sessions?q=$(printf '%s' "$query" | jq -Rr @uri)" | jq .
       ;;
     tasks)
       # eits sessions tasks <uuid>
@@ -164,7 +159,7 @@ cmd_sessions() {
       fi
       ;;
     *)
-      echo "usage: eits sessions <list|search|get|create|update|end|context|tasks|notes>"
+      echo "usage: eits sessions <list|get|create|update|end|context|tasks|notes>"
       ;;
   esac
 }
@@ -779,7 +774,7 @@ cmd_prompts() {
 
 cmd_teams() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits teams <list|get|create|delete|members|join|status|update-member|leave|broadcast|my-teams>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits teams <list|get|create|delete|members|join|status|update-member|done-self|leave|broadcast|my-teams>"; return 0; }
   case "$sub" in
     list)
       local project_id="" status=""
@@ -854,6 +849,25 @@ cmd_teams() {
       need status
       _patch "/teams/$team_id/members/$member_id" "$(json status "$status")"
       ;;
+    done-self)
+      # eits teams done-self <team_id>
+      # Finds the current session's member in the team and marks them done.
+      local team_id="${1:-}"; need team_id
+      local session_uuid="${EITS_SESSION_UUID:-}"
+      [[ -n "$session_uuid" ]] || die "EITS_SESSION_UUID is required (or set it explicitly)"
+
+      local members_resp
+      members_resp=$(_curl "$BASE_URL/teams/$team_id/members") \
+        || die "failed to fetch members for team $team_id"
+
+      local member_id
+      member_id=$(echo "$members_resp" | jq -r --arg uuid "$session_uuid" \
+        '.members[] | select(.session_uuid == $uuid) | .id' 2>/dev/null)
+
+      [[ -n "$member_id" ]] || die "current session not found in team $team_id members"
+
+      _patch "/teams/$team_id/members/$member_id" '{"status":"done"}'
+      ;;
     leave)
       local team_id="${1:-}"; need team_id; shift
       local member_id="${1:-}"; need member_id
@@ -922,7 +936,7 @@ cmd_teams() {
       done
       ;;
     *)
-      echo "usage: eits teams <list|get|create|delete|members|join|status|update-member|leave|broadcast|my-teams>"
+      echo "usage: eits teams <list|get|create|delete|members|join|status|update-member|done-self|leave|broadcast|my-teams>"
       ;;
   esac
 }

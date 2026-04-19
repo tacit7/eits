@@ -13,6 +13,24 @@ export const ConfigChatGuide = {
 
     this.el.addEventListener('click', () => this._handleClick())
 
+    this.handleEvent('config_guide_agent_started', ({ session_uuid }) => {
+      this._sessionUuid = session_uuid
+      this._modal = new FloatingChatModal({
+        id: MODAL_ID,
+        title: 'Config Guide',
+        initials: 'CG',
+        placeholder: 'Ask about Claude configuration...',
+        errorCloseButton: true,
+        onSend: (body) => this._onSend(body),
+        onClose: () => this._close(),
+      }).create()
+      this.pushEvent('config_guide_open_chat', { session_id: this._sessionUuid })
+
+      this._openTimer = setTimeout(() => {
+        this._showError('Config Guide did not respond. Try closing and reopening.')
+      }, OPEN_TIMEOUT_MS)
+    })
+
     this.handleEvent('config_guide_history', ({ messages }) => {
       clearTimeout(this._openTimer)
       this._openTimer = null
@@ -33,6 +51,7 @@ export const ConfigChatGuide = {
       clearTimeout(this._openTimer)
       this._openTimer = null
       this._isOpening = false
+      this._setButtonLoading(false)
       this._showError(error)
     })
   },
@@ -48,42 +67,7 @@ export const ConfigChatGuide = {
 
     this._isOpening = true
     this._setButtonLoading(true)
-
-    fetch('/api/v1/agents', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        instructions: 'Help me configure Claude Code.',
-        agent: 'claude-config-guide',
-        model: 'sonnet',
-      }),
-    })
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        return res.json()
-      })
-      .then(data => {
-        this._sessionUuid = data.session_uuid
-        this._modal = new FloatingChatModal({
-          id: MODAL_ID,
-          title: 'Config Guide',
-          initials: 'CG',
-          placeholder: 'Ask about Claude configuration...',
-          errorCloseButton: true,
-          onSend: (body) => this._onSend(body),
-          onClose: () => this._close(),
-        }).create()
-        this.pushEvent('config_guide_open_chat', { session_id: this._sessionUuid })
-
-        this._openTimer = setTimeout(() => {
-          this._showError('Config Guide did not respond. Try closing and reopening.')
-        }, OPEN_TIMEOUT_MS)
-      })
-      .catch(err => {
-        this._isOpening = false
-        this._setButtonLoading(false)
-        this._showButtonError(`Failed to start Config Guide: ${err.message}`)
-      })
+    this.pushEvent('start_config_guide_agent', {})
   },
 
   _onSend(body) {

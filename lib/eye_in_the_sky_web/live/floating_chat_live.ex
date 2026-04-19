@@ -141,6 +141,26 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     {:halt, unsubscribe_config_guide_session(socket)}
   end
 
+  defp handle_fab_event("start_config_guide_agent", _params, socket) do
+    params = %{
+      "instructions" => "Help me configure Claude Code.",
+      "agent" => "claude-config-guide",
+      "model" => "sonnet"
+    }
+
+    socket =
+      case AgentManager.spawn_agent(params) do
+        {:ok, %{session: session}} ->
+          push_event(socket, "config_guide_agent_started", %{session_uuid: session.uuid})
+
+        {:error, reason} ->
+          Logger.error("ConfigGuide spawn failed: #{inspect(reason)}")
+          push_event(socket, "config_guide_error", %{error: "Failed to start Config Guide"})
+      end
+
+    {:halt, socket}
+  end
+
   defp handle_fab_event(_event, _params, socket) do
     {:cont, socket}
   end

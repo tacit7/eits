@@ -178,6 +178,11 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
         opts
       end
 
+    opts =
+      if params["include_archived"] in ["true", "1", true],
+        do: Keyword.put(opts, :include_archived, true),
+        else: opts
+
     results = Sessions.list_sessions_filtered(opts) |> Enum.take(limit)
 
     json(conn, %{

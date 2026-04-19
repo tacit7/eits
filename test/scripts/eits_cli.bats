@@ -1140,3 +1140,17 @@ teardown_teams() {
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.id' >/dev/null
 }
+
+# ── cli-audit5-sessions ────────────────────────────────────────────────────────
+
+@test "sessions list: --include-archived flag produces include_archived=true in URL" {
+  export EITS_SESSION_UUID="test-uuid-001"
+  run bash -c 'source scripts/eits; BASE_URL=mock; _curl() { echo "URL: $1"; }; cmd_sessions list --include-archived'
+  [[ "$output" == *"include_archived=true"* ]]
+}
+
+@test "sessions update: --ended-at flag included in patch body" {
+  export EITS_SESSION_UUID="test-uuid-001"
+  run bash -c 'source scripts/eits; BASE_URL=mock; _patch() { echo "BODY: $2"; }; cmd_sessions update some-uuid --status completed --ended-at "2026-01-01T00:00:00Z"'
+  [[ "$output" == *"ended_at"* ]]
+}

@@ -67,7 +67,7 @@ cmd_sessions() {
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|end|context|tasks|notes>"; return 0; }
   case "$sub" in
     list)
-      # eits sessions list [--search <q>] [--status <s>] [--project <id>] [--agent <uuid>] [--limit <n>] [--mine]
+      # eits sessions list [--search <q>] [--status <s>] [--project <id>] [--agent <uuid>] [--limit <n>] [--mine] [--include-archived]
       # --agent is mutually exclusive with --search, --status, --project, and --mine
       # --mine is mutually exclusive with --agent, --search, --status, and --project
       local qs="" _agent_flag=0 _other_flag=0 _mine_flag=0
@@ -79,6 +79,7 @@ cmd_sessions() {
           --agent)   [[ $_other_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--agent is mutually exclusive with --search, --status, --project, and --mine"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
           --mine)    [[ $_agent_flag -eq 1 || $_other_flag -eq 1 ]] && die "--mine cannot combine with --agent, --search, --status, and --project"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;
+          --include-archived) qs="${qs}&include_archived=true"; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -117,10 +118,10 @@ cmd_sessions() {
       _post "/sessions" "$(json session_id "$session_id" name "$name" description "$description" project_name "$project_name" model "$model" entrypoint "$entrypoint")"
       ;;
     update)
-      # eits sessions update <uuid> [--status <status>] [--intent <text>] [--entrypoint <e>] [--name <name>] [--description <desc>] [--clear-entrypoint]
+      # eits sessions update <uuid> [--status <status>] [--intent <text>] [--entrypoint <e>] [--name <name>] [--description <desc>] [--clear-entrypoint] [--ended-at <ISO8601>]
       local uuid="${1:-}"; need uuid; shift
       [[ "$uuid" == "self" ]] && { uuid="${EITS_SESSION_UUID:-}"; [[ -n "$uuid" ]] || die "EITS_SESSION_UUID is not set"; }
-      local status="" intent="" entrypoint="" name="" description="" clear_entrypoint=""
+      local status="" intent="" entrypoint="" name="" description="" clear_entrypoint="" ended_at=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --status)      status="$2";      shift 2 ;;
@@ -129,10 +130,11 @@ cmd_sessions() {
           --name)        name="$2";        shift 2 ;;
           --description) description="$2"; shift 2 ;;
           --clear-entrypoint) clear_entrypoint="true"; shift ;;
+          --ended-at)    ended_at="$2";    shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      _patch "/sessions/$uuid" "$(json status "$status" intent "$intent" entrypoint "$entrypoint" name "$name" description "$description" clear_entrypoint "$clear_entrypoint")"
+      _patch "/sessions/$uuid" "$(json status "$status" intent "$intent" entrypoint "$entrypoint" name "$name" description "$description" clear_entrypoint "$clear_entrypoint" ended_at "$ended_at")"
       ;;
     end)
       # eits sessions end <uuid> [--final-status <completed|failed|waiting>]

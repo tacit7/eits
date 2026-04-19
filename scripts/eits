@@ -171,7 +171,7 @@ cmd_tasks() {
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session> [--mine] [--quiet]"; return 0; }
   case "$sub" in
     list)
-      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--state <id>] [--limit <n>] [--mine]
+      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--state <id>] [--state-name <name>] [--limit <n>] [--mine]
       local qs="" _session_flag=0 _mine_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -180,6 +180,14 @@ cmd_tasks() {
           --agent)   qs="${qs}&agent_id=$2";   shift 2 ;;
           --q)       qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --state)   qs="${qs}&state_id=$2";   shift 2 ;;
+          --state-name)
+            case "$2" in
+              todo)          qs="${qs}&state_id=1"; shift 2 ;;
+              in-progress|start) qs="${qs}&state_id=2"; shift 2 ;;
+              done)          qs="${qs}&state_id=3"; shift 2 ;;
+              in-review|review) qs="${qs}&state_id=4"; shift 2 ;;
+              *) die "unknown state name: $2" ;;
+            esac ;;
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;
           --mine)    [[ $_session_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
           *) die "unknown flag: $1" ;;
@@ -289,10 +297,15 @@ cmd_tasks() {
       _delete "/tasks/$id/sessions/$session_id"
       ;;
     complete)
-      # eits tasks complete <id> --message <text>
+      # eits tasks complete <id> [<message>] [--message <text>]
       # Delegates to POST /tasks/:id/complete — atomic annotate+done via server transaction.
       local id="${1:-}"; need id; shift
       local message=""
+      # Check if next arg is not a flag and treat it as the message
+      if [[ $# -gt 0 && "$1" != --* ]]; then
+        message="$1"
+        shift
+      fi
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --message) message="$2"; shift 2 ;;

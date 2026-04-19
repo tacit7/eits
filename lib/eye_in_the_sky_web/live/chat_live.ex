@@ -144,7 +144,9 @@ defmodule EyeInTheSkyWeb.ChatLive do
     case create_dm_channel_message(channel_id, body, session_id) do
       {:ok, _message} ->
         if target_session_id do
-          prompt = ChannelProtocol.build_prompt(:direct, body)
+          channel = Channels.get_channel(channel_id)
+          channel_ctx = %{id: channel.id, name: channel.name}
+          prompt = ChannelProtocol.build_prompt(:direct, body, channel_ctx)
 
           AgentManager.send_message(target_session_id, prompt, channel_id: channel_id)
         end

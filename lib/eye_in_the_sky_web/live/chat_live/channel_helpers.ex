@@ -47,6 +47,8 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
 
     Enum.each(mentioned_ids, &maybe_auto_add_member(channel_id, &1))
 
+    channel = Channels.get_channel(channel_id)
+    channel_ctx = %{id: channel.id, name: channel.name}
     agent_members = Channels.list_members(channel_id)
 
     Enum.each(agent_members, fn member ->
@@ -62,7 +64,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
           body: body
         })
 
-        prompt = ChannelProtocol.build_prompt(mode, body)
+        prompt = ChannelProtocol.build_prompt(mode, body, channel_ctx)
         Logger.info("Routing to session=#{member.session_id} mode=#{mode}")
 
         AgentManager.send_message(member.session_id, prompt,

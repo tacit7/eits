@@ -127,6 +127,8 @@ defmodule EyeInTheSky.Claude.ChatWorker do
   end
 
   defp fanout(channel_id, message, sender_session_id, opts) do
+    channel = Channels.get_channel(channel_id)
+    channel_ctx = %{id: channel.id, name: channel.name}
     members = Channels.list_members(channel_id)
 
     members
@@ -135,7 +137,7 @@ defmodule EyeInTheSky.Claude.ChatWorker do
       {mode, _mentioned_ids, _mention_all} =
         ChannelProtocol.parse_routing(message, member.session_id)
 
-      prompt = ChannelProtocol.build_prompt(mode, message)
+      prompt = ChannelProtocol.build_prompt(mode, message, channel_ctx)
 
       result = AgentManager.send_message(member.session_id, prompt, opts)
 

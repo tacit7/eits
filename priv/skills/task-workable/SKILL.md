@@ -42,19 +42,16 @@ eits tasks create \
   --agent ""
 ```
 
+`project_id` defaults from `$EITS_PROJECT_ID` and is sent as a number automatically.
+
 4. Extract `task_id` from the response JSON (`.task_id` field).
 
-5. Fix the project_id via psql (the CLI sends it as a string so the API drops it):
-```bash
-psql -d eits_dev -tAq -c "UPDATE tasks SET project_id = $EITS_PROJECT_ID WHERE id = <task_id>;"
-```
-
-6. Assign the tag:
+5. Assign the tag:
 ```bash
 eits tasks tag <task_id> <tag_id>
 ```
 
-7. Confirm to the user:
+6. Confirm to the user:
    - Task ID
    - Title
    - Which model will pick it up

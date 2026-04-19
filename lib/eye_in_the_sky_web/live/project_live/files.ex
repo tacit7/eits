@@ -57,7 +57,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    mode = parse_mode(params)
+    current_mode = socket.assigns[:view_mode] || :list
+    mode = parse_mode(params, current_mode)
     socket = assign(socket, :view_mode, mode)
     project = socket.assigns.project
 
@@ -75,9 +76,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     end
   end
 
-  defp parse_mode(params) do
+  # If the user explicitly sets a mode, honour it.
+  # If there's no mode param but we're already in tree mode and navigating to a
+  # file, preserve tree mode — this means tree view works even when sidebar links
+  # don't carry mode=tree (e.g. stale DOM from phx-update="ignore").
+  defp parse_mode(params, current_mode) do
     case Map.get(params, "mode") do
       "tree" -> :tree
+      "list" -> :list
+      nil ->
+        if current_mode == :tree and is_binary(Map.get(params, "path")) do
+          :tree
+        else
+          :list
+        end
       _ -> :list
     end
   end
@@ -290,7 +302,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       :file ->
         ~H"""
         <li>
-          <.link patch={~p"/projects/#{@project_id}/files?path=#{@item.path}"}>
+          <.link patch={~p"/projects/#{@project_id}/files?path=#{@item.path}&mode=tree"}>
             <.icon name="hero-document" class="w-4 h-4" />
             {@item.name}
             <%= if @item.size do %>
@@ -338,7 +350,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   defp file_tree_view(assigns) do
     ~H"""
     <!-- Tree View -->
-    <div class="h-[calc(100dvh-10rem)] flex flex-col md:flex-row">
+    <div class="h-[calc(100dvh-10rem)] flex flex-col md:flex-row overflow-hidden">
       <!-- File Tree Sidebar -->
       <div
         id="file-tree-sidebar"

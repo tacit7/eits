@@ -1,6 +1,6 @@
 ---
 name: eits-dm
-description: Send and respond to direct messages (DMs) between agents and sessions in EITS. Activates when a message starts with "DM from:" (incoming DM) or when an agent needs to DM another session/agent. Covers: parsing incoming DMs, replying, proactively sending messages, and UUID requirements.
+description: Send and respond to direct messages (DMs) between agents and sessions in EITS. Activates when a message starts with "DM from:" (incoming DM) or when an agent needs to DM another session/agent. Covers: parsing incoming DMs, replying, proactively sending messages.
 user-invocable: false
 ---
 
@@ -36,15 +36,10 @@ Rules:
 ## Sending a DM (proactive)
 
 ```bash
-eits dm --to <target_session_uuid> --message "text"
+eits dm --to <session_uuid_or_integer_id> --message "text"
 ```
 
-**`--to` requires a session UUID — never an integer session ID.** Resolve first if needed:
-
-```bash
-TARGET_UUID=$(psql -d eits_dev -tAq -c "SELECT uuid FROM sessions WHERE id = <session_id>;")
-eits dm --to $TARGET_UUID --message "Status update: what is your progress?"
-```
+`--to` accepts both UUID and integer session ID. Use `$EITS_SESSION_UUID` or `$EITS_SESSION_ID` — both work.
 
 **Send DMs sequentially — never in parallel Bash calls.** One error cancels sibling calls:
 
@@ -60,7 +55,7 @@ eits dm --to $UUID_2 --message "..."
 
 | Variable | Value |
 |----------|-------|
-| `EITS_SESSION_UUID` | Your session UUID (default `--from`) |
+| `EITS_SESSION_UUID` | Your session UUID (default `--from`); `--to` also accepts `$EITS_SESSION_ID` |
 | `EITS_AGENT_UUID` | Your agent UUID |
 
 ---
@@ -79,4 +74,5 @@ eits dm --to f47ac10b-... --message "Auth module 80% done — JWT validation com
 
 ```bash
 eits dm --to $AGENT_UUID --message "Task #817 is still in-progress. Complete the task completion sequence and DM back."
+eits dm --to 2920 --message "Done. PR merged."   # integer ID also works
 ```

@@ -11,7 +11,8 @@
 set -euo pipefail
 
 BASE_URL="${EITS_URL:-http://localhost:5001/api/v1}"
-AUTH_HEADER="${EITS_API_KEY:+Authorization: Bearer ${EITS_API_KEY}}"
+AUTH_ARGS=()
+[[ -n "${EITS_API_KEY:-}" ]] && AUTH_ARGS=(-H "Authorization: Bearer ${EITS_API_KEY}")
 
 # Check deps
 command -v curl &>/dev/null || { echo "error: curl is required" >&2; exit 1; }
@@ -21,11 +22,11 @@ command -v jq   &>/dev/null || { echo "error: jq is required" >&2; exit 1; }
 
 _curl() {
   local _body _status
-  _body=$(curl -sk --write-out '\n%{http_code}' ${AUTH_HEADER:+-H "$AUTH_HEADER"} "$@")
+  _body=$(curl -sk --write-out '\n%{http_code}' "${AUTH_ARGS[@]}" "$@")
   _status="${_body##*$'\n'}"
   _body="${_body%$'\n'*}"
   if [[ "$_status" -ge 400 ]]; then
-    printf '%s\n' "$_body" >&2
+    printf 'HTTP %s: %s\n' "$_status" "$_body" >&2
     return 1
   fi
   printf '%s\n' "$_body"
@@ -63,7 +64,7 @@ json() {
 
 cmd_sessions() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|search|get|create|update|end|context|tasks|notes>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|end|context|tasks|notes>"; return 0; }
   case "$sub" in
     list)
       # eits sessions list [--search <q>] [--status <s>] [--project <id>] [--limit <n>]
@@ -78,11 +79,6 @@ cmd_sessions() {
         esac
       done
       _curl "$BASE_URL/sessions?${qs#&}" | jq .
-      ;;
-    search)
-      # eits sessions search <query>
-      local query="${1:-}"; need query
-      _curl "$BASE_URL/sessions?q=$(printf '%s' "$query" | jq -Rr @uri)" | jq .
       ;;
     tasks)
       # eits sessions tasks <uuid>
@@ -136,11 +132,34 @@ cmd_sessions() {
       _post "/sessions/$uuid/end" '{}'
       ;;
     context)
-      local uuid="${1:-}"; need uuid
-      _get "/sessions/$uuid/context"
+      # eits sessions context <uuid>                                    (GET)
+      # eits sessions context <uuid> --text <text> [--metadata <json>]  (PATCH)
+      # eits sessions context <uuid> --from-stdin [--metadata <json>]   (PATCH; body from stdin)
+      local uuid="${1:-}"; need uuid; shift || true
+      local text="" from_stdin=0 metadata=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --text)       text="$2"; shift 2 ;;
+          --from-stdin) from_stdin=1; shift ;;
+          --metadata)   metadata="$2"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      if [[ $from_stdin -eq 1 ]]; then
+        text="$(cat)"
+      fi
+      if [[ -n "$text" ]]; then
+        if [[ -n "$metadata" ]]; then
+          _patch "/sessions/$uuid/context" "$(jq -n --arg c "$text" --argjson m "$metadata" '{context: $c, metadata: $m}')"
+        else
+          _patch "/sessions/$uuid/context" "$(jq -n --arg c "$text" '{context: $c}')"
+        fi
+      else
+        _get "/sessions/$uuid/context"
+      fi
       ;;
     *)
-      echo "usage: eits sessions <list|search|get|create|update|end|context|tasks|notes>"
+      echo "usage: eits sessions <list|get|create|update|end|context|tasks|notes>"
       ;;
   esac
 }
@@ -584,7 +603,7 @@ cmd_jobs() {
 cmd_dm() {
   # eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
   # --from defaults to $EITS_SESSION_UUID or $EITS_SESSION_ID when omitted
-  local from="${EITS_SESSION_UUID:-$EITS_SESSION_ID}" to="" message="" response_required="false"
+  local from="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" to="" message="" response_required="false"
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --from)              from="$2";              shift 2 ;;
@@ -755,7 +774,7 @@ cmd_prompts() {
 
 cmd_teams() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits teams <list|get|create|delete|members|join|status|update-member|leave|broadcast|my-teams>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits teams <list|get|create|delete|members|join|status|update-member|done-self|leave|broadcast|my-teams>"; return 0; }
   case "$sub" in
     list)
       local project_id="" status=""
@@ -830,6 +849,25 @@ cmd_teams() {
       need status
       _patch "/teams/$team_id/members/$member_id" "$(json status "$status")"
       ;;
+    done-self)
+      # eits teams done-self <team_id>
+      # Finds the current session's member in the team and marks them done.
+      local team_id="${1:-}"; need team_id
+      local session_uuid="${EITS_SESSION_UUID:-}"
+      [[ -n "$session_uuid" ]] || die "EITS_SESSION_UUID is required (or set it explicitly)"
+
+      local members_resp
+      members_resp=$(_curl "$BASE_URL/teams/$team_id/members") \
+        || die "failed to fetch members for team $team_id"
+
+      local member_id
+      member_id=$(echo "$members_resp" | jq -r --arg uuid "$session_uuid" \
+        '.members[] | select(.session_uuid == $uuid) | .id' 2>/dev/null)
+
+      [[ -n "$member_id" ]] || die "current session not found in team $team_id members"
+
+      _patch "/teams/$team_id/members/$member_id" '{"status":"done"}'
+      ;;
     leave)
       local team_id="${1:-}"; need team_id; shift
       local member_id="${1:-}"; need member_id
@@ -870,7 +908,9 @@ cmd_teams() {
         result=$(_curl -X POST -H "Content-Type: application/json" -d "$payload" "$BASE_URL/dm" 2>&1); dm_exit=$?
         if [[ $dm_exit -eq 0 ]]; then
           sent=$((sent+1))
-          results=$(jq -n --argjson base "$results" --arg to "$to" --argjson r "$result" '$base + [{to: $to, ok: true, result: $r}]')
+          local safe_result
+          safe_result=$(echo "$result" | jq -c '.' 2>/dev/null || echo '{}')
+          results=$(jq -n --argjson base "$results" --arg to "$to" --argjson r "$safe_result" '$base + [{to: $to, ok: true, result: $r}]')
         else
           failed=$((failed+1))
           results=$(jq -n --argjson base "$results" --arg to "$to" --argjson code "$dm_exit" --arg err "$result" \
@@ -896,7 +936,7 @@ cmd_teams() {
       done
       ;;
     *)
-      echo "usage: eits teams <list|get|create|delete|members|join|status|update-member|leave|broadcast|my-teams>"
+      echo "usage: eits teams <list|get|create|delete|members|join|status|update-member|done-self|leave|broadcast|my-teams>"
       ;;
   esac
 }

@@ -100,7 +100,11 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
 
   def session_row_menu(assigns) do
     ~H"""
-    <details class="md:opacity-0 md:group-hover:opacity-100 relative dropdown dropdown-end transition-all">
+    <details
+      id={"session-menu-#{@agent.id}"}
+      phx-update="ignore"
+      class="md:opacity-0 md:group-hover:opacity-100 relative dropdown dropdown-end transition-all"
+    >
       <summary
         class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/35 hover:text-base-content/70 hover:bg-base-content/5 transition-colors cursor-pointer list-none"
         aria-label="More options"
@@ -151,7 +155,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
           </li>
         <% end %>
         <%= if @agent.uuid do %>
-          <li class="menu-title mt-1" />
+          <li><hr class="border-base-content/10 my-1" /></li>
           <%= if @agent.archived_at do %>
             <li>
               <button
@@ -241,7 +245,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
               </button>
             </li>
           <% end %>
-          <li class="menu-title mt-0.5" />
+          <li><hr class="border-base-content/10 my-0.5" /></li>
           <%= if @show_new_canvas_for != to_string(@agent.id) do %>
             <li>
               <button

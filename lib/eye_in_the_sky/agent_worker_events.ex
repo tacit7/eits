@@ -125,7 +125,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
   # --- Data Events ---
 
-  @doc "Result received from SDK — save to DB."
+  @doc "Result received from SDK — save to DB synchronously so the message is committed before claude_complete fires."
   def on_result_received(session_id, %{
         provider: provider,
         text: text,
@@ -133,13 +133,11 @@ defmodule EyeInTheSky.AgentWorkerEvents do
         channel_id: channel_id
       })
       when is_binary(text) do
-    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
-      if String.trim(text) in ["", "[NO_RESPONSE]"] do
-        Logger.info("[#{session_id}] Skipping DB save — empty or suppressed response")
-      else
-        save_result(session_id, provider, text, metadata, channel_id)
-      end
-    end)
+    if String.trim(text) in ["", "[NO_RESPONSE]"] do
+      Logger.info("[#{session_id}] Skipping DB save — empty or suppressed response")
+    else
+      save_result(session_id, provider, text, metadata, channel_id)
+    end
 
     :ok
   end

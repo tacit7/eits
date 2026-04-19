@@ -1151,8 +1151,12 @@ cmd_teams() {
       local from="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" body=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --from|-f)    from="$2";  shift 2 ;;
-          --body|-b|-m) body="$2";  shift 2 ;;
+          --from|-f)               from="$2";  shift 2 ;;
+          --body|-b|-m|--message)  body="$2";  shift 2 ;;
+          # Deprecated flags accepted for backward compat; server handles fanout now
+          --include-self|--response-required)
+            if [[ "${2:-}" != --* && -n "${2:-}" ]]; then shift 2; else shift; fi ;;
+
           *) die "unknown flag: $1" ;;
         esac
       done

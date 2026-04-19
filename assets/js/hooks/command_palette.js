@@ -55,6 +55,9 @@ export const CommandPalette = {
     this._openHandler = () => this.open()
     this.el.addEventListener("palette:open", this._openHandler)
 
+    this._openCommandHandler = (e) => this.openCommand(e.detail?.commandId)
+    this.el.addEventListener("palette:open-command", this._openCommandHandler)
+
     this.input?.addEventListener("input", () => {
       this.activeIndex = 0
       this.render()
@@ -74,6 +77,7 @@ export const CommandPalette = {
   destroyed() {
     window.removeEventListener("keydown", this._globalKeyHandler)
     this.el.removeEventListener("palette:open", this._openHandler)
+    this.el.removeEventListener("palette:open-command", this._openCommandHandler)
     this.results?.removeEventListener("click", this._resultsClickHandler)
   },
 
@@ -87,6 +91,13 @@ export const CommandPalette = {
     }
     this.updateBreadcrumb()
     this.render()
+  },
+
+  async openCommand(commandId) {
+    if (!commandId) return this.open()
+    this.open()
+    const cmd = getCommands(this).find(c => c.id === commandId && (!c.when || c.when()))
+    if (cmd) await this.activate(cmd)
   },
 
   activeCommands() {

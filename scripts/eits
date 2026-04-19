@@ -219,9 +219,9 @@ cmd_tasks() {
       _get "/tasks/$id"
       ;;
     create)
-      # eits tasks create --title <t> [--description <d>] [--project <id>] [--priority <p>] [--session <uuid>] [--agent <uuid>] [--tags <id1,id2,...>] [--team <id>]
+      # eits tasks create --title <t> [--description <d>] [--project <id>] [--priority <p>] [--session <uuid>] [--agent <uuid>] [--tags <id1,id2,...>] [--team <id>] [--due-at <ISO8601>]
       # Defaults: --agent from $EITS_AGENT_UUID, --project from $EITS_PROJECT_ID, --session from $EITS_SESSION_UUID (falls back to $EITS_SESSION_ID)
-      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" agent_id="${EITS_AGENT_UUID:-}" tags="" team_id=""
+      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" agent_id="${EITS_AGENT_UUID:-}" tags="" team_id="" due_at=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --title)       title="$2";       shift 2 ;;
@@ -232,12 +232,13 @@ cmd_tasks() {
           --agent)       agent_id="$2";    shift 2 ;;
           --tags)        tags="$2";        shift 2 ;;
           --team)        team_id="$2";     shift 2 ;;
+          --due-at)      due_at="$2";      shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
       need title
       local body
-      body="$(json title "$title" description "$description" project_id "$project_id" priority "$priority" session_id "$session_id" agent_id "$agent_id" team_id "$team_id")"
+      body="$(json title "$title" description "$description" project_id "$project_id" priority "$priority" session_id "$session_id" agent_id "$agent_id" team_id "$team_id" due_at "$due_at")"
       if [[ -n "$tags" ]]; then
         local tag_array
         tag_array=$(echo "$tags" | jq -R 'split(",") | map(tonumber)')
@@ -246,7 +247,7 @@ cmd_tasks() {
       _post "/tasks" "$body"
       ;;
     update)
-      # eits tasks update <id> [--state <id>] [--state-name <done|start>] [--priority <p>] [--description <d>] [--title <t>]
+      # eits tasks update <id> [--state <id>] [--state-name <done|start>] [--priority <p>] [--description <d>] [--title <t>] [--due-at <ISO8601>]
       local id="${1:-}"; need id; shift
       local updates="{}"
       while [[ $# -gt 0 ]]; do
@@ -262,6 +263,7 @@ cmd_tasks() {
           --priority)    updates=$(echo "$updates" | jq --arg v "$2" '. + {priority: $v}');    shift 2 ;;
           --description) updates=$(echo "$updates" | jq --arg v "$2" '. + {description: $v}'); shift 2 ;;
           --title)       updates=$(echo "$updates" | jq --arg v "$2" '. + {title: $v}');       shift 2 ;;
+          --due-at)      updates=$(echo "$updates" | jq --arg v "$2" '. + {due_at: $v}');      shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -387,12 +389,12 @@ cmd_notes() {
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits notes <list|search|get|create|update|add>"; return 0; }
   case "$sub" in
     list)
-      # eits notes list [--q <query>] [--session <uuid>] [--limit <n>] [--mine]
+      # eits notes list [--q <query>] [--search <query>] [--session <uuid>] [--limit <n>] [--mine]
       # --mine is mutually exclusive with --session
       local qs="" _session_flag=0 _mine_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --q)       qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --q|--search) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --session) [[ $_mine_flag -eq 1 ]] && die "--session and --mine are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
           --mine)    [[ $_session_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;

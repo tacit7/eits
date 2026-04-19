@@ -9,7 +9,7 @@ set -uo pipefail
 # --- End Workflow Guard ---
 
 # sdk-cli short-circuit: spawned agents are pre-authorized — skip HTTP calls
-[ -n "${EITS_AGENT_UUID:-}" ] && exit 0
+[ "${CLAUDE_CODE_ENTRYPOINT:-}" = "sdk-cli" ] && exit 0
 
 input_json=$(timeout 2 cat 2>/dev/null) || exit 0
 [ -z "$input_json" ] && exit 0

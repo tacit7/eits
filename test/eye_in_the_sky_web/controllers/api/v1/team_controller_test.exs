@@ -478,4 +478,81 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       assert resp["failed"] == 0
     end
   end
+
+  # ── PATCH /api/v1/teams/:id ───────────────────────────────────────────────
+
+  describe "PATCH /api/v1/teams/:id" do
+    test "updates team name", %{conn: conn} do
+      team = create_team(%{name: "old-name"})
+      conn = patch(conn, ~p"/api/v1/teams/#{team.id}", %{"name" => "new-name"})
+      resp = json_response(conn, 200)
+
+      assert resp["success"] == true
+      assert resp["name"] == "new-name"
+      assert resp["id"] == team.id
+    end
+
+    test "updates team description", %{conn: conn} do
+      team = create_team()
+      conn = patch(conn, ~p"/api/v1/teams/#{team.id}", %{"description" => "updated desc"})
+      resp = json_response(conn, 200)
+
+      assert resp["success"] == true
+      assert resp["description"] == "updated desc"
+    end
+
+    test "updates name and description together", %{conn: conn} do
+      team = create_team(%{name: "before", description: "old"})
+
+      conn =
+        patch(conn, ~p"/api/v1/teams/#{team.id}", %{
+          "name" => "after",
+          "description" => "new"
+        })
+
+      resp = json_response(conn, 200)
+      assert resp["name"] == "after"
+      assert resp["description"] == "new"
+    end
+
+    test "returns 404 for unknown team", %{conn: conn} do
+      conn = patch(conn, ~p"/api/v1/teams/999999", %{"name" => "whatever"})
+      assert json_response(conn, 404)
+    end
+
+    test "persists change to database", %{conn: conn} do
+      team = create_team(%{name: "persist-me"})
+      patch(conn, ~p"/api/v1/teams/#{team.id}", %{"name" => "persisted"})
+      {:ok, reloaded} = Teams.get_team(team.id)
+      assert reloaded.name == "persisted"
+    end
+
+    test "returns 422 for empty name string", %{conn: conn} do
+      team = create_team()
+      conn = patch(conn, ~p"/api/v1/teams/#{team.id}", %{"name" => ""})
+      assert conn.status in [422, 400]
+    end
+
+    test "returns 400 when no updateable fields given", %{conn: conn} do
+      team = create_team()
+      conn = patch(conn, ~p"/api/v1/teams/#{team.id}", %{})
+      assert json_response(conn, 400)
+    end
+
+    test "ignores injected fields like status and uuid", %{conn: conn} do
+      team = create_team(%{name: "safe-name"})
+
+      conn =
+        patch(conn, ~p"/api/v1/teams/#{team.id}", %{
+          "name" => "ok-name",
+          "status" => "archived",
+          "uuid" => "00000000-0000-0000-0000-000000000000"
+        })
+
+      resp = json_response(conn, 200)
+      assert resp["name"] == "ok-name"
+      assert resp["status"] != "archived"
+      assert resp["uuid"] != "00000000-0000-0000-0000-000000000000"
+    end
+  end
 end

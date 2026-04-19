@@ -253,6 +253,7 @@ defmodule EyeInTheSkyWeb.Router do
     get "/teams", TeamController, :index
     post "/teams", TeamController, :create
     get "/teams/:id", TeamController, :show
+    patch "/teams/:id", TeamController, :update
     delete "/teams/:id", TeamController, :delete
     get "/teams/:team_id/members", TeamController, :list_members
     post "/teams/:team_id/members", TeamController, :join

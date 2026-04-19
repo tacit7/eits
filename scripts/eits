@@ -1209,12 +1209,12 @@ print(json.dumps(d))
         local resp
         resp=$(_curl "$BASE_URL/teams/$id") || return 1
         echo "$resp" | jq -r '
-          .team as $t |
+          . as $t |
           (.members // []) as $members |
           ($members | length) as $total |
           ($members | map(select(.session_status == "working")) | length) as $working |
           ($members | map(select(.session_status == "stopped" or .session_status == "waiting")) | length) as $idle |
-          ($members | map(select(.session_status == "completed" or .status == "done")) | length) as $done |
+          ($members | map(select(.session_status == "completed")) | length) as $done |
           ($members | map(select(.session_status == "failed")) | length) as $failed |
           "Team: \($t.name) (ID: \($t.id))\nMembers: \($total) total — \($working) working, \($idle) idle, \($done) done\(if $failed > 0 then ", \($failed) failed" else "" end)"
         '

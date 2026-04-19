@@ -114,6 +114,16 @@ WHERE status = 'processing'
 ORDER BY inserted_at;
 ```
 
+## Agent Result Save Timing
+
+`AgentWorkerEvents.on_sdk_completed/3` saves the agent result **synchronously** via a direct call, not via `Task.start/1` or other async dispatch.
+
+**Why synchronous:** The JSONL importer reads session state immediately after completion. An async save creates a race where the importer reads stale state (missing the latest result row) and produces inconsistent imports.
+
+**Timing expectation:** When `on_sdk_completed/3` returns, the result row is already persisted. Downstream consumers (JSONL importer, status transitions, PubSub broadcasts) can rely on the DB being up-to-date — no sleeps or polling needed.
+
+See commit `b137f1f8`.
+
 ## Code Locations
 
 | File | Responsibility |

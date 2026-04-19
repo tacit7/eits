@@ -204,6 +204,14 @@ export const ChatWindowHook = {
     // --- Click-to-focus: raise window on any mousedown ---
     this.el.addEventListener("mousedown", () => { this._raiseToFront() })
 
+    document.addEventListener("mousedown", this._onBlurWindows = (e) => {
+      if (!e.target.closest("[data-chat-window]")) {
+        document.querySelectorAll("[data-chat-window]").forEach(w => {
+          w.classList.remove("ring-2", "ring-primary/40")
+        })
+      }
+    })
+
     this.handleEvent("messages-updated-" + this.el.dataset.csId, () => {
       if (this._minimized) {
         const handle = this.el.querySelector("[data-drag-handle]")
@@ -226,8 +234,10 @@ export const ChatWindowHook = {
       const z = parseInt(w.style.zIndex, 10) || 1
       if (z > maxZ) maxZ = z
       w.style.zIndex = "1"
+      w.classList.remove("ring-2", "ring-primary/40")
     })
     this.el.style.zIndex = this._maximized ? "20" : String(Math.max(10, maxZ))
+    this.el.classList.add("ring-2", "ring-primary/40")
   },
 
   _applyMinimized() {
@@ -249,5 +259,6 @@ export const ChatWindowHook = {
 
   destroyed() {
     if (this._resizeObserver) this._resizeObserver.disconnect()
+    document.removeEventListener("mousedown", this._onBlurWindows)
   }
 }

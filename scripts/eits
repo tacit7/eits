@@ -927,9 +927,9 @@ cmd_channels() {
       ;;
     join)
       # eits channels join <channel_id> [--session <uuid|id>] [--role <member|admin>]
-      # --session defaults to $EITS_SESSION_UUID
+      # --session defaults to $EITS_SESSION_UUID, falls back to $EITS_SESSION_ID
       local channel_id="${1:-}"; need channel_id; shift
-      local session_id="${EITS_SESSION_UUID:-}" role=""
+      local session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" role=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --session) session_id="$2"; shift 2 ;;
@@ -945,9 +945,9 @@ cmd_channels() {
       ;;
     leave)
       # eits channels leave <channel_id> [--session <uuid|id>]
-      # --session defaults to $EITS_SESSION_UUID
+      # --session defaults to $EITS_SESSION_UUID, falls back to $EITS_SESSION_ID
       local channel_id="${1:-}"; need channel_id; shift
-      local session_id="${EITS_SESSION_UUID:-}"
+      local session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --session) session_id="$2"; shift 2 ;;

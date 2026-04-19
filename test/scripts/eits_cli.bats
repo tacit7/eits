@@ -1037,3 +1037,21 @@ teardown_teams() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"mutually exclusive"* ]]
 }
+
+# ── new feature tests ──────────────────────────────────────────────────────────
+
+@test "sessions end --final-status: accepts flag" {
+  run "$EITS" sessions end "$TEST_SESSION" --final-status completed
+  [ "$status" -eq 0 ]
+}
+
+@test "sessions update --clear-entrypoint: accepts flag" {
+  run "$EITS" sessions update "$TEST_SESSION" --clear-entrypoint
+  [ "$status" -eq 0 ]
+}
+
+@test "commits list --limit: accepts flag" {
+  run "$EITS" commits list --limit 5
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.commits | type == "array"' >/dev/null
+}

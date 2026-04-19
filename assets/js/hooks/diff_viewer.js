@@ -69,6 +69,7 @@ async function makeDiffHighlight() {
 
 export const DiffViewer = {
   async mounted() {
+    this._destroyed = false
     this._view = null
     this._cleanup = null
     await this.render()
@@ -95,6 +96,9 @@ export const DiffViewer = {
       makeThemeCompartment(),
     ])
 
+    // Guard: destroyed() may have fired while awaiting the dynamic imports.
+    if (this._destroyed) return
+
     this._view = new EditorView({
       state: EditorState.create({
         doc: raw,
@@ -120,6 +124,7 @@ export const DiffViewer = {
   },
 
   destroyed() {
+    this._destroyed = true
     this._teardown()
   },
 }

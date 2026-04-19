@@ -5,6 +5,7 @@ const CHECK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" 
 
 export const MarkdownMessage = {
   mounted() {
+    this._renderId = 0
     this.renderContent()
   },
   updated() {
@@ -12,10 +13,15 @@ export const MarkdownMessage = {
   },
   async renderContent() {
     const raw = this.el.dataset.rawBody
-    if (raw) {
-      this.el.innerHTML = await renderMarkdown(raw)
-      this.attachCopyButtons()
-    }
+    if (!raw) return
+    // Increment the render ID so any in-flight render from a previous
+    // updated() call knows it has been superseded and should not commit
+    // its result to the DOM.
+    const id = ++this._renderId
+    const html = await renderMarkdown(raw)
+    if (id !== this._renderId) return  // superseded — discard
+    this.el.innerHTML = html
+    this.attachCopyButtons()
   },
   attachCopyButtons() {
     this.el.querySelectorAll('pre > code').forEach(codeEl => {

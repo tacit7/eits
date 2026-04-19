@@ -256,6 +256,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
           json(conn, %{
             success: true,
             context: ctx.context,
+            metadata: ctx.metadata,
             updated_at: to_string(ctx.updated_at)
           })
       end
@@ -273,20 +274,32 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     if is_nil(context) or context == "" do
       {:error, :bad_request, "context is required"}
     else
+      metadata = normalize_metadata(params["metadata"])
+
       with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
-        do_upsert_context(conn, session, context)
+        do_upsert_context(conn, session, context, metadata)
       else
         {:error, :not_found} -> {:error, :not_found, "Session not found"}
       end
     end
   end
 
-  defp do_upsert_context(conn, session, context) do
-    attrs = %{agent_id: session.agent_id, session_id: session.id, context: context}
+  defp normalize_metadata(nil), do: %{}
+  defp normalize_metadata(m) when is_map(m), do: m
+  defp normalize_metadata(s) when is_binary(s) do
+    case Jason.decode(s) do
+      {:ok, m} when is_map(m) -> m
+      _ -> %{}
+    end
+  end
+  defp normalize_metadata(_), do: %{}
+
+  defp do_upsert_context(conn, session, context, metadata) do
+    attrs = %{agent_id: session.agent_id, session_id: session.id, context: context, metadata: metadata}
 
     case Contexts.upsert_session_context(attrs) do
       {:ok, sc} ->
-        json(conn, %{success: true, context: sc.context})
+        json(conn, %{success: true, context: sc.context, metadata: sc.metadata})
 
       {:error, _cs} ->
         {:error, "Failed"}

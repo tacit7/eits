@@ -40,11 +40,17 @@ export const CanvasPanHook = {
       this.el.style.cursor = this._spaceDown ? "grab" : ""
     }
 
+    const onAddSession = (e) => {
+      const sessionId = e.detail?.sessionId
+      if (sessionId) this.pushEvent("pick_session", { "session-id": String(sessionId) })
+    }
+
     window.addEventListener("keydown", onKeyDown)
     window.addEventListener("keyup", onKeyUp)
     this.el.addEventListener("mousedown", onMouseDown)
     window.addEventListener("mousemove", onMouseMove)
     window.addEventListener("mouseup", onMouseUp)
+    window.addEventListener("canvas:add-session", onAddSession)
 
     this._cleanup = () => {
       window.removeEventListener("keydown", onKeyDown)
@@ -52,6 +58,7 @@ export const CanvasPanHook = {
       this.el.removeEventListener("mousedown", onMouseDown)
       window.removeEventListener("mousemove", onMouseMove)
       window.removeEventListener("mouseup", onMouseUp)
+      window.removeEventListener("canvas:add-session", onAddSession)
     }
   },
   destroyed() {

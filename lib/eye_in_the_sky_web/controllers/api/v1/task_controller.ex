@@ -287,6 +287,29 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   end
 
   @doc """
+  GET /api/v1/tasks/:id/sessions - List sessions linked to a task.
+  """
+  def list_sessions(conn, %{"id" => id}) do
+    case Tasks.get_task(id) do
+      {:error, :not_found} ->
+        {:error, :not_found, "Task not found"}
+
+      {:ok, task} ->
+        sessions =
+          Enum.map(task.sessions, fn s ->
+            %{id: s.id, uuid: s.uuid, name: s.name, status: s.status, description: s.description}
+          end)
+
+        json(conn, %{
+          success: true,
+          task_id: task.id,
+          task_title: task.title,
+          sessions: sessions
+        })
+    end
+  end
+
+  @doc """
   POST /api/v1/tasks/:id/tags
   Body: {tag_id: integer}
   """

@@ -71,7 +71,7 @@ defmodule EyeInTheSky.Teams do
 
   def update_team(%Team{} = team, attrs) do
     team
-    |> Team.changeset(attrs)
+    |> Team.update_changeset(attrs)
     |> Repo.update()
     |> tap_broadcast(:team_updated)
   end

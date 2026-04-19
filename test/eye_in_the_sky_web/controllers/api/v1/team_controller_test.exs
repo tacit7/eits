@@ -526,5 +526,33 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       {:ok, reloaded} = Teams.get_team(team.id)
       assert reloaded.name == "persisted"
     end
+
+    test "returns 422 for empty name string", %{conn: conn} do
+      team = create_team()
+      conn = patch(conn, ~p"/api/v1/teams/#{team.id}", %{"name" => ""})
+      assert conn.status in [422, 400]
+    end
+
+    test "returns 400 when no updateable fields given", %{conn: conn} do
+      team = create_team()
+      conn = patch(conn, ~p"/api/v1/teams/#{team.id}", %{})
+      assert json_response(conn, 400)
+    end
+
+    test "ignores injected fields like status and uuid", %{conn: conn} do
+      team = create_team(%{name: "safe-name"})
+
+      conn =
+        patch(conn, ~p"/api/v1/teams/#{team.id}", %{
+          "name" => "ok-name",
+          "status" => "archived",
+          "uuid" => "00000000-0000-0000-0000-000000000000"
+        })
+
+      resp = json_response(conn, 200)
+      assert resp["name"] == "ok-name"
+      assert resp["status"] != "archived"
+      assert resp["uuid"] != "00000000-0000-0000-0000-000000000000"
+    end
   end
 end

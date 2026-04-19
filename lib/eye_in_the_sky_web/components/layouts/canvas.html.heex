@@ -3,7 +3,7 @@
   data-palette-shortcut={@palette_shortcut}
 >
   <button
-    onclick="history.back()"
+    onclick="history.length > 1 ? history.back() : window.location.href = '/'"
     class="btn btn-ghost btn-sm fixed top-3 left-3 z-50"
     aria-label="Go back"
   >

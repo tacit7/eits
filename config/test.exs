@@ -42,7 +42,10 @@ config :phoenix_live_view,
 config :eye_in_the_sky,
   cli_module: EyeInTheSky.Claude.MockCLI,
   codex_cli_module: EyeInTheSky.Claude.MockCLI,
-  agent_manager_module: EyeInTheSky.Agents.MockAgentManager
+  agent_manager_module: EyeInTheSky.Agents.MockAgentManager,
+  # Core-layer config keys — keeps core modules free of EyeInTheSkyWeb.Endpoint atom references
+  secret_key_base: "nkJhfq4VPfLzvgOOJSPVSc2C8F1X1/VWumsFBiDAmTZDbJHzcF4i0aYV0DIyFUfG",
+  server_base_url: "http://localhost:4002"
 
 # Disable Oban queues in test (use Oban.Testing for manual testing)
 config :eye_in_the_sky, Oban, testing: :manual

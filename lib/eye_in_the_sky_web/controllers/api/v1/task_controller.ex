@@ -316,20 +316,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   """
   def add_tag(conn, %{"id" => task_id, "tag_id" => tag_id_raw}) do
     with {:ok, task_id_int} <- parse_task_id_int(task_id),
-         {:ok, tag_id_int} <- parse_tag_id(tag_id_raw) do
-      case EyeInTheSky.Repo.query(
-             "INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-             [task_id_int, tag_id_int]
-           ) do
-        {:ok, _} ->
-          json(conn, %{success: true, task_id: task_id_int, tag_id: tag_id_int})
-
-        {:error, %{postgres: %{code: :foreign_key_violation}}} ->
-          {:error, :not_found, "task or tag not found"}
-
-        {:error, _} ->
-          {:error, :internal_server_error, "failed to add tag"}
-      end
+         {:ok, tag_id_int} <- parse_tag_id(tag_id_raw),
+         :ok <- Tasks.link_tag_to_task(task_id_int, tag_id_int) do
+      json(conn, %{success: true, task_id: task_id_int, tag_id: tag_id_int})
     end
   end
 

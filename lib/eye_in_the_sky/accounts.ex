@@ -62,7 +62,7 @@ defmodule EyeInTheSky.Accounts do
 
   defp hash_registration_token(raw_token) do
     secret =
-      Application.get_env(:eye_in_the_sky, EyeInTheSkyWeb.Endpoint)[:secret_key_base]
+      Application.get_env(:eye_in_the_sky, :secret_key_base)
 
     :crypto.mac(:hmac, :sha256, secret, raw_token) |> Base.url_encode64(padding: false)
   end

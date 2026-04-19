@@ -187,6 +187,11 @@ if config_env() == :prod do
         else: [hsts: true, rewrite_on: [:x_forwarded_proto]]
       )
 
+  # Core-layer config keys — keeps core modules free of EyeInTheSkyWeb.Endpoint atom references
+  config :eye_in_the_sky,
+    secret_key_base: secret_key_base,
+    server_base_url: "https://#{host}"
+
   # ## SSL Support
   #
   # To get SSL working, you will need to add the `https` key

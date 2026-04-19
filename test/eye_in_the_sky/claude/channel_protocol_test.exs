@@ -81,28 +81,41 @@ defmodule EyeInTheSky.Claude.ChannelProtocolTest do
     end
   end
 
-  describe "build_prompt/2" do
-    test "direct mode includes direct instruction and message" do
-      prompt = ChannelProtocol.build_prompt(:direct, "Hello agent")
+  describe "build_prompt/3" do
+    @channel_ctx %{id: 7, name: "general"}
+
+    test "direct mode includes channel context, direct instruction, and message" do
+      prompt = ChannelProtocol.build_prompt(:direct, "Hello agent", @channel_ctx)
+      assert prompt =~ "#general"
+      assert prompt =~ "ID: 7"
       assert prompt =~ "directly mentioned"
       assert prompt =~ "Hello agent"
     end
 
-    test "broadcast mode includes broadcast instruction and message" do
-      prompt = ChannelProtocol.build_prompt(:broadcast, "Everyone respond")
+    test "broadcast mode includes channel context, broadcast instruction, and message" do
+      prompt = ChannelProtocol.build_prompt(:broadcast, "Everyone respond", @channel_ctx)
+      assert prompt =~ "#general"
+      assert prompt =~ "ID: 7"
       assert prompt =~ "broadcast"
       assert prompt =~ "Everyone respond"
     end
 
-    test "ambient mode includes ambient instruction and message" do
-      prompt = ChannelProtocol.build_prompt(:ambient, "General chat")
+    test "ambient mode includes channel context, ambient instruction, and message" do
+      prompt = ChannelProtocol.build_prompt(:ambient, "General chat", @channel_ctx)
+      assert prompt =~ "#general"
+      assert prompt =~ "ID: 7"
       assert prompt =~ "[NO_RESPONSE]"
       assert prompt =~ "General chat"
     end
 
     test "message body is appended after instruction" do
-      prompt = ChannelProtocol.build_prompt(:direct, "test body")
+      prompt = ChannelProtocol.build_prompt(:direct, "test body", @channel_ctx)
       assert prompt =~ "Message: test body"
+    end
+
+    test "instructs agent not to use DMs for channel discussions" do
+      prompt = ChannelProtocol.build_prompt(:direct, "hello", @channel_ctx)
+      assert prompt =~ "Do NOT use eits dm"
     end
   end
 

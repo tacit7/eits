@@ -631,13 +631,12 @@ cmd_jobs() {
   [[ "${sub:-}" == "--help" || "${sub:-}" == "-h" ]] && { echo "usage: eits jobs <list|get|create|update|run|delete>"; return 0; }
   case "$sub" in
     list)
-      # eits jobs list [--project <id>] [--global] [--limit <n>]
+      # eits jobs list [--project <id>] [--global]
       local qs=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --project) qs="${qs}&project_id=$2"; shift 2 ;;
           --global)  qs="${qs}&global=true";   shift ;;
-          --limit)   qs="${qs}&limit=$2";      shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done

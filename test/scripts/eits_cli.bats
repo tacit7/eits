@@ -771,10 +771,10 @@ teardown_teams() {
   echo "$output" | jq -e '.jobs | type == "array"' >/dev/null
 }
 
-@test "jobs list --limit: accepts limit flag" {
-  run "$EITS" jobs list --limit 10
-  [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.jobs | type == "array"' >/dev/null
+@test "jobs list: rejects unknown flags" {
+  run "$EITS" jobs list --bogus 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "unknown flag" ]]
 }
 
 @test "jobs list: rejects unknown flags" {

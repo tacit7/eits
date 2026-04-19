@@ -119,11 +119,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
   def handle_event("add_to_new_canvas", params, socket),
     do: Actions.add_to_new_canvas(params, socket)
 
-  @impl true
-  def handle_event("set_notify_on_stop", %{"enabled" => enabled}, socket) do
-    {:noreply, assign(socket, :notify_on_stop, !!enabled)}
-  end
-
   # ---------------------------------------------------------------------------
   # PubSub
   # ---------------------------------------------------------------------------

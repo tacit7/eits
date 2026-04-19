@@ -114,11 +114,6 @@ defmodule EyeInTheSkyWeb.DmLive do
   @impl true
   def handle_event("toggle_thinking", _params, socket), do: handle_toggle_thinking(socket)
 
-  @impl true
-  def handle_event("set_notify_on_stop", %{"enabled" => enabled}, socket) do
-    {:noreply, assign(socket, :notify_on_stop, !!enabled)}
-  end
-
   # ---------------------------------------------------------------------------
   # Task CRUD — delegates to TasksHelpers; overlay close handled here
   # ---------------------------------------------------------------------------

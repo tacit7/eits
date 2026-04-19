@@ -69,9 +69,16 @@ defmodule EyeInTheSkyWeb.NavHook do
         :handle_event,
         &PaletteAgentHandlers.handle_delete_agent/3
       )
+      |> attach_hook(:push_notifications, :handle_event, &handle_push_notifications/3)
 
     {:cont, socket}
   end
+
+  defp handle_push_notifications("set_notify_on_stop", %{"enabled" => enabled}, socket) do
+    {:halt, assign(socket, :notify_on_stop, !!enabled)}
+  end
+
+  defp handle_push_notifications(_event, _params, socket), do: {:cont, socket}
 
   defp capture_nav_path(_params, url, socket) do
     path = URI.parse(url).path || "/"

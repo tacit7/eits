@@ -59,11 +59,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
     {:noreply, assign(socket, :show_task_detail_drawer, !socket.assigns.show_task_detail_drawer)}
   end
 
-  @impl true
-  def handle_event("set_notify_on_stop", %{"enabled" => enabled}, socket) do
-    {:noreply, assign(socket, :notify_on_stop, !!enabled)}
-  end
-
   # ---------------------------------------------------------------------------
   # Events: task CRUD (delegated to TasksHelpers)
   # ---------------------------------------------------------------------------

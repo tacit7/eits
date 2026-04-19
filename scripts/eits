@@ -11,7 +11,8 @@
 set -euo pipefail
 
 BASE_URL="${EITS_URL:-http://localhost:5001/api/v1}"
-AUTH_HEADER="${EITS_API_KEY:+Authorization: Bearer ${EITS_API_KEY}}"
+AUTH_ARGS=()
+[[ -n "${EITS_API_KEY:-}" ]] && AUTH_ARGS=(-H "Authorization: Bearer ${EITS_API_KEY}")
 
 # Check deps
 command -v curl &>/dev/null || { echo "error: curl is required" >&2; exit 1; }
@@ -21,7 +22,7 @@ command -v jq   &>/dev/null || { echo "error: jq is required" >&2; exit 1; }
 
 _curl() {
   local _body _status
-  _body=$(curl -sk --write-out '\n%{http_code}' ${AUTH_HEADER:+-H "$AUTH_HEADER"} "$@")
+  _body=$(curl -sk --write-out '\n%{http_code}' "${AUTH_ARGS[@]}" "$@")
   _status="${_body##*$'\n'}"
   _body="${_body%$'\n'*}"
   if [[ "$_status" -ge 400 ]]; then
@@ -584,7 +585,7 @@ cmd_jobs() {
 cmd_dm() {
   # eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
   # --from defaults to $EITS_SESSION_UUID or $EITS_SESSION_ID when omitted
-  local from="${EITS_SESSION_UUID:-$EITS_SESSION_ID}" to="" message="" response_required="false"
+  local from="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" to="" message="" response_required="false"
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --from)              from="$2";              shift 2 ;;
@@ -870,7 +871,9 @@ cmd_teams() {
         result=$(_curl -X POST -H "Content-Type: application/json" -d "$payload" "$BASE_URL/dm" 2>&1); dm_exit=$?
         if [[ $dm_exit -eq 0 ]]; then
           sent=$((sent+1))
-          results=$(jq -n --argjson base "$results" --arg to "$to" --argjson r "$result" '$base + [{to: $to, ok: true, result: $r}]')
+          local safe_result
+          safe_result=$(echo "$result" | jq -c '.' 2>/dev/null || echo '{}')
+          results=$(jq -n --argjson base "$results" --arg to "$to" --argjson r "$safe_result" '$base + [{to: $to, ok: true, result: $r}]')
         else
           failed=$((failed+1))
           results=$(jq -n --argjson base "$results" --arg to "$to" --argjson code "$dm_exit" --arg err "$result" \

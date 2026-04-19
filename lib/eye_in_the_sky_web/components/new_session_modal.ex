@@ -22,6 +22,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
        selected_prompt_id: nil,
        prefill_text: "",
        available_agents: [],
+       agent_search: "",
        file_uploads: nil
      )}
   end
@@ -85,6 +86,10 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     {:noreply, assign(socket, selected_prompt_id: prompt_id, prefill_text: prefill)}
   end
 
+  def handle_event("agent_search_changed", %{"agent_search" => query}, socket) do
+    {:noreply, assign(socket, :agent_search, query)}
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -115,14 +120,39 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
             <%!-- Agent --%>
             <%= if @available_agents != [] do %>
+              <% filtered_agents =
+                if @agent_search == "" do
+                  @available_agents
+                else
+                  q = String.downcase(@agent_search)
+
+                  Enum.filter(@available_agents, fn {slug, name, _scope} ->
+                    String.contains?(String.downcase(slug), q) or
+                      String.contains?(String.downcase(name), q)
+                  end)
+                end %>
               <div>
                 <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Agent</label>
+                <input
+                  type="text"
+                  name="agent_search"
+                  value={@agent_search}
+                  placeholder="Filter agents..."
+                  autocomplete="off"
+                  phx-change="agent_search_changed"
+                  phx-target={@myself}
+                  phx-debounce="100"
+                  class="input input-bordered input-sm w-full mb-1.5 text-base"
+                />
                 <select name="agent" class="select select-bordered w-full">
                   <option value="">-- None --</option>
-                  <%= for {slug, name, scope} <- @available_agents do %>
+                  <%= for {slug, name, scope} <- filtered_agents do %>
                     <option value={slug}>{name}{if scope == :project, do: " (project)"}</option>
                   <% end %>
                 </select>
+                <%= if filtered_agents == [] do %>
+                  <p class="text-xs text-base-content/40 mt-1">No agents match "{@agent_search}"</p>
+                <% end %>
               </div>
             <% end %>
 

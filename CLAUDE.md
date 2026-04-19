@@ -36,6 +36,15 @@ mix compile
 unlink _build && unlink deps
 ```
 
+**Running JS tests (vitest) from a worktree:** Worktrees don't have `node_modules`. Symlink from the main `assets/` directory before running vitest:
+```bash
+cd .claude/worktrees/<name>/assets
+ln -sf ../../../../assets/node_modules node_modules
+ln -sf ../../../../assets/vitest.config.mjs vitest.config.mjs
+ln -sf ../../../../assets/package.json package.json
+npx vitest run js/hooks/your.test.js
+```
+
 ## Build & Run
 
 ```bash

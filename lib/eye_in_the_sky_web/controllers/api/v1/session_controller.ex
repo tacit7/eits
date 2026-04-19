@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   PATCH /api/v1/sessions/:uuid - Update session status (SessionEnd, Stop, Compact hooks).
   """
   def update(conn, %{"uuid" => uuid} = params) do
-    with {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
+    with {:ok, session} <- resolve_session(uuid) do
       attrs = build_update_attrs(params)
 
       case Sessions.update_session(session, attrs) do

@@ -212,6 +212,56 @@ export const ChatWindowHook = {
       }
     })
 
+    // --- Auto-scroll ---
+    this._autoScroll = true
+    this._newMsgCount = 0
+    const chatBody = this.el.querySelector("[data-chat-body]")
+    const autoScrollBtn = this.el.querySelector("[data-autoscroll-btn]")
+    const newMsgPill = this.el.querySelector("[data-new-msg-pill]")
+
+    const scrollToBottom = () => {
+      if (chatBody) chatBody.scrollTop = chatBody.scrollHeight
+    }
+
+    const setAutoScroll = (enabled) => {
+      this._autoScroll = enabled
+      if (autoScrollBtn) {
+        autoScrollBtn.classList.toggle("text-base-content/30", enabled)
+        autoScrollBtn.classList.toggle("text-warning", !enabled)
+      }
+      if (enabled) {
+        this._newMsgCount = 0
+        if (newMsgPill) newMsgPill.classList.add("hidden")
+      }
+    }
+
+    if (chatBody) {
+      scrollToBottom()
+      chatBody.addEventListener("scroll", () => {
+        const atBottom = chatBody.scrollTop + chatBody.clientHeight >= chatBody.scrollHeight - 10
+        const scrolledUp = chatBody.scrollTop + chatBody.clientHeight < chatBody.scrollHeight - 20
+        if (atBottom && !this._autoScroll) {
+          setAutoScroll(true)
+        } else if (scrolledUp && this._autoScroll) {
+          setAutoScroll(false)
+        }
+      })
+    }
+
+    if (autoScrollBtn) {
+      autoScrollBtn.addEventListener("click", () => {
+        setAutoScroll(true)
+        scrollToBottom()
+      })
+    }
+
+    if (newMsgPill) {
+      newMsgPill.addEventListener("click", () => {
+        setAutoScroll(true)
+        scrollToBottom()
+      })
+    }
+
     this.handleEvent("messages-updated-" + this.el.dataset.csId, () => {
       if (this._minimized) {
         const handle = this.el.querySelector("[data-drag-handle]")
@@ -222,6 +272,15 @@ export const ChatWindowHook = {
           const nameSpan = handle.querySelector("span.truncate") || handle.querySelector("span")
           if (nameSpan) nameSpan.after(dot)
           else handle.appendChild(dot)
+        }
+      } else if (this._autoScroll) {
+        scrollToBottom()
+      } else {
+        this._newMsgCount = (this._newMsgCount || 0) + 1
+        if (newMsgPill) {
+          const n = this._newMsgCount
+          newMsgPill.textContent = `\u2193 ${n} new message${n > 1 ? "s" : ""}`
+          newMsgPill.classList.remove("hidden")
         }
       }
     })

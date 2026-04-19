@@ -111,10 +111,12 @@
   function save() {
     if (readonly || saving || !dirty) return
     saving = true
-    live.pushEvent('file_save', { content: value }, () => {
+    live.pushEvent('file_save', { content: value }, (reply) => {
       saving = false
-      dirty = false
-      content = value
+      if (reply && reply.ok) {
+        dirty = false
+        content = value
+      }
     })
   }
 </script>

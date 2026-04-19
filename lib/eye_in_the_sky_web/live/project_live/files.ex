@@ -156,6 +156,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         {:noreply,
          socket
          |> assign(:file_path, path)
+         |> assign(:file_full_path, nil)
          |> assign(:file_content, nil)
          |> assign(:files, file_list)
          |> assign(:error, nil)}
@@ -163,6 +164,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       {:error, reason} ->
         {:noreply,
          socket
+         |> assign(:file_full_path, nil)
          |> assign(:error, "Failed to read directory: #{reason}")
          |> assign(:files, [])}
     end
@@ -173,43 +175,47 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       {:noreply,
        socket
        |> assign(:file_path, path)
+       |> assign(:file_full_path, nil)
        |> assign(:file_content, nil)
        |> assign(:file_type, nil)
        |> assign(:files, [])
        |> assign(:error, "Binary file — cannot preview")}
     else
-    case read_file_safe_detailed(full_path) do
-      {:ok, content} ->
-        {:noreply,
-         socket
-         |> assign(:file_path, path)
-         |> assign(:file_full_path, full_path)
-         |> assign(:file_content, content)
-         |> assign(:file_type, detect_file_type(path))
-         |> assign(:files, [])
-         |> assign(:error, nil)}
+      case read_file_safe_detailed(full_path) do
+        {:ok, content} ->
+          {:noreply,
+           socket
+           |> assign(:file_path, path)
+           |> assign(:file_full_path, full_path)
+           |> assign(:file_content, content)
+           |> assign(:file_type, detect_file_type(path))
+           |> assign(:files, [])
+           |> assign(:error, nil)}
 
-      {:error, :too_large} ->
-        {:noreply,
-         socket
-         |> assign(:file_path, path)
-         |> assign(:file_content, nil)
-         |> assign(:file_type, nil)
-         |> assign(:files, [])
-         |> assign(:error, "File too large to display (over 1 MB)")}
+        {:error, :too_large} ->
+          {:noreply,
+           socket
+           |> assign(:file_path, path)
+           |> assign(:file_full_path, nil)
+           |> assign(:file_content, nil)
+           |> assign(:file_type, nil)
+           |> assign(:files, [])
+           |> assign(:error, "File too large to display (over 1 MB)")}
 
-      {:error, {:stat_error, reason}} ->
-        {:noreply,
-         socket
-         |> assign(:error, "Failed to stat file: #{reason}")
-         |> assign(:file_content, nil)}
+        {:error, {:stat_error, reason}} ->
+          {:noreply,
+           socket
+           |> assign(:file_full_path, nil)
+           |> assign(:error, "Failed to stat file: #{reason}")
+           |> assign(:file_content, nil)}
 
-      {:error, {:read_error, reason}} ->
-        {:noreply,
-         socket
-         |> assign(:error, "Failed to read file: #{reason}")
-         |> assign(:file_content, nil)}
-    end
+        {:error, {:read_error, reason}} ->
+          {:noreply,
+           socket
+           |> assign(:file_full_path, nil)
+           |> assign(:error, "Failed to read file: #{reason}")
+           |> assign(:file_content, nil)}
+      end
     end
   end
 

@@ -47,6 +47,8 @@ defmodule EyeInTheSky.Claude.CLI.Env do
 
     env = maybe_add_env(env, "EITS_SESSION_ID", opts[:eits_session_id])
     env = maybe_add_env(env, "EITS_AGENT_ID", opts[:eits_agent_id])
+    env = maybe_add_env(env, "EITS_AGENT_UUID", opts[:eits_agent_uuid])
+    env = maybe_add_env(env, "EITS_PROJECT_ID", opts[:eits_project_id])
     env = maybe_add_env(env, "EITS_WORKFLOW", opts[:eits_workflow] || "1")
     maybe_add_env(env, "CLAUDE_CODE_EFFORT_LEVEL", opts[:effort_level])
   end

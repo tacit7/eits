@@ -65,6 +65,16 @@ defmodule EyeInTheSky.Sessions.Queries do
         base_query
       end
 
+    name_filter = Keyword.get(opts, :name_filter, nil)
+
+    base_query =
+      if name_filter && name_filter != "" do
+        pattern = "%#{name_filter}%"
+        where(base_query, [s], ilike(s.name, ^pattern))
+      else
+        base_query
+      end
+
     base_query = apply_search_filter(base_query, search_query)
 
     base_query =

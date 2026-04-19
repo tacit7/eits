@@ -77,6 +77,30 @@ defmodule EyeInTheSky.Tasks.Queries do
   end
 
   @doc """
+  Batch-fetches tasks for a list of session integer IDs in a single query.
+  Returns a map of %{session_id => [task, ...]} for in-memory grouping.
+  No notes_count overhead — intended for lightweight list endpoints.
+  """
+  def list_tasks_for_sessions(session_ids) when is_list(session_ids) do
+    if session_ids == [] do
+      %{}
+    else
+      rows =
+        from(t in Task,
+          join: ts in "task_sessions",
+          on: ts.task_id == t.id,
+          where: ts.session_id in ^session_ids,
+          preload: [:state],
+          order_by: [asc: ts.session_id, desc: t.priority, asc: t.created_at],
+          select: {ts.session_id, t}
+        )
+        |> Repo.all()
+
+      Enum.group_by(rows, fn {session_id, _} -> session_id end, fn {_, task} -> task end)
+    end
+  end
+
+  @doc """
   Returns the list of tasks for a specific team.
   """
   def list_tasks_for_team(team_id) do

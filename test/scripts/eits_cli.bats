@@ -1189,3 +1189,46 @@ teardown_teams() {
   # All returned tasks should have project_id matching or be null
   [ "$(echo "$output" | jq '[.tasks[]? | select(.project_id != null and .project_id != "1" and .project_id != 1)] | length')" -eq 0 ]
 }
+
+# ── cli-sessions-name-with-tasks ────────────────────────────────────────────
+
+@test "sessions list --name filters by session name" {
+  run eits sessions list --name "wakeup" --status all
+  assert_output --partial '"success": true'
+}
+
+@test "sessions list --name with no match returns empty results" {
+  run eits sessions list --name "zzznonexistentzzzxxx" --status all
+  assert_output --partial '"results": []'
+}
+
+@test "sessions list --with-tasks includes tasks field" {
+  run eits sessions list --with-tasks --limit 3
+  assert_output --partial '"tasks"'
+  assert_output --partial '"success": true'
+}
+
+@test "sessions list --with-tasks task order is deterministic (priority desc, created_at asc)" {
+  # Create a fresh session with a unique name so the filter returns exactly one result
+  local sess_uuid; sess_uuid=$(uuidgen | tr '[:upper:]' '[:lower:]')
+  local sess_name="bats-order-test-$$"
+  "$EITS" sessions create --session-id "$sess_uuid" --name "$sess_name" --project web
+
+  # Create task A (high priority=10) then task B (low priority=5)
+  # A should appear first: priority desc puts 10 before 5
+  local task_a; task_a=$("$EITS" tasks create --title "bats order A" --priority 10 --session "$sess_uuid" | jq -r '.task_id')
+  local task_b; task_b=$("$EITS" tasks create --title "bats order B" --priority 5  --session "$sess_uuid" | jq -r '.task_id')
+
+  # Fetch the session with tasks via the --name filter introduced in this PR
+  local result; result=$("$EITS" sessions list --name "$sess_name" --with-tasks)
+  echo "$result"
+
+  # Extract task IDs in the order returned for this session
+  local ordered_ids; ordered_ids=$(echo "$result" | jq -r --arg name "$sess_name" '
+    .results[] | select(.name == $name) | .tasks[] | .id
+  ')
+
+  # First ID must be task_a (priority 10 > 5)
+  local first_id; first_id=$(echo "$ordered_ids" | head -1)
+  [ "$first_id" = "$task_a" ]
+}

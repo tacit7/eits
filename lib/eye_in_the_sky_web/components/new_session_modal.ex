@@ -127,8 +127,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
                   class="input input-bordered w-full text-base"
                 />
                 <datalist id="agent-options">
-                  <%= for {slug, name, scope} <- @available_agents do %>
-                    <option value={slug}>{name}{if scope == :project, do: " (project)"}</option>
+                  <%= for {slug, _name, _scope} <- @available_agents do %>
+                    <option value={slug} />
                   <% end %>
                 </datalist>
               </div>

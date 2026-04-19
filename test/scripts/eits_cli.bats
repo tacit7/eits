@@ -731,3 +731,16 @@ teardown_teams() {
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.commits | type == "array"' >/dev/null
 }
+
+@test "commits list --mine: errors when neither session env var is set" {
+  run env -u EITS_SESSION_UUID -u EITS_SESSION_ID "$EITS" commits list --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"EITS_SESSION_UUID"* || "$output" == *"EITS_SESSION_ID"* ]]
+}
+
+@test "commits list --mine: errors when combined with --session" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" commits list --session "$TEST_SESSION" --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}

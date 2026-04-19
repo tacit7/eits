@@ -546,11 +546,11 @@ cmd_commits() {
   case "$sub" in
     list)
       # eits commits list [--session <uuid>] [--mine]
-      local qs=""
+      local qs="" _session_flag=0 _mine_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --session) qs="${qs}&session_id=$2"; shift 2 ;;
-          --mine) local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID"; qs="${qs}&session_id=$_mine"; shift ;;
+          --session) [[ $_mine_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
+          --mine) [[ $_session_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID"; qs="${qs}&session_id=$_mine"; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done

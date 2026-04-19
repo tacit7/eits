@@ -302,8 +302,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   attr :file_path, :string, default: nil
 
   defp file_content_viewer(assigns) do
+    assigns = assign(assigns, :editor_id, "file-editor-#{:erlang.phash2(assigns.file_path)}")
     ~H"""
     <.svelte
+      id={@editor_id}
       name="FileEditor"
       props={%{
         content: @file_content,

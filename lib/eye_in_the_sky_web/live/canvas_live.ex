@@ -266,7 +266,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   def render(assigns) do
     ~H"""
     <div class="flex flex-col h-full bg-base-100">
-      <div role="tablist" class="tabs tabs-border px-2 border-b border-base-300 bg-base-200/70 shrink-0">
+      <div id="canvas-tablist" role="tablist" phx-hook="CanvasStatusHook" class="tabs tabs-border px-2 border-b border-base-300 bg-base-200/70 shrink-0">
         <%= for canvas <- @canvases do %>
           <%= if @renaming_canvas_id == canvas.id do %>
             <form

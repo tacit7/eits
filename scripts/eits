@@ -92,6 +92,7 @@ cmd_sessions() {
       ;;
     get)
       local uuid="${1:-}"; need uuid
+      [[ "$uuid" == "self" ]] && { uuid="${EITS_SESSION_UUID:-}"; [[ -n "$uuid" ]] || die "EITS_SESSION_UUID is not set"; }
       _get "/sessions/$uuid"
       ;;
     create)
@@ -557,11 +558,12 @@ cmd_commits() {
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits commits <list|create>"; return 0; }
   case "$sub" in
     list)
-      # eits commits list [--session <uuid>]
-      local qs=""
+      # eits commits list [--session <uuid>] [--mine]
+      local qs="" _session_flag=0 _mine_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --session) qs="${qs}&session_id=$2"; shift 2 ;;
+          --session) [[ $_mine_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
+          --mine) [[ $_session_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID"; qs="${qs}&session_id=$_mine"; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -1146,6 +1148,7 @@ cmd_worktree() {
 cmd_me() {
   local uuid="${EITS_SESSION_UUID:-}"
   echo "Session UUID:  ${EITS_SESSION_UUID:-(not set)}"
+  echo "Session ID:    ${EITS_SESSION_ID:-(not set)}"
   echo "Agent UUID:    ${EITS_AGENT_UUID:-(not set)}"
   echo "Project ID:    ${EITS_PROJECT_ID:-(not set)}"
   echo "API URL:       ${BASE_URL}"

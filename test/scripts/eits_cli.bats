@@ -745,3 +745,48 @@ teardown_teams() {
   [[ "$output" == *"create"* ]]
   [[ "$output" == *"update"* ]]
 }
+
+# ── me command ────────────────────────────────────────────────────────────────
+
+@test "me: prints Session ID line" {
+  run "$EITS" me
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Session ID:"* ]]
+}
+
+# ── sessions get self ──────────────────────────────────────────────────────────
+
+@test "sessions get self: returns session data when EITS_SESSION_UUID is set" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" sessions get self
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.session_id' >/dev/null
+}
+
+@test "sessions get self: errors when EITS_SESSION_UUID unset" {
+  run env -u EITS_SESSION_UUID "$EITS" sessions get self 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"EITS_SESSION_UUID"* ]]
+}
+
+# ── commits list --mine ───────────────────────────────────────────────────────
+
+@test "commits list --mine: returns commits array" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" commits list --mine
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.commits | type == "array"' >/dev/null
+}
+
+@test "commits list --mine: errors when neither session env var is set" {
+  run env -u EITS_SESSION_UUID -u EITS_SESSION_ID "$EITS" commits list --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"EITS_SESSION_UUID"* || "$output" == *"EITS_SESSION_ID"* ]]
+}
+
+@test "commits list --mine: errors when combined with --session" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" commits list --session "$TEST_SESSION" --mine 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}

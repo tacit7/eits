@@ -37,6 +37,12 @@ function getOrCreateSnapPreview(canvas) {
 
 export const ChatWindowHook = {
   mounted() {
+    // z-index is not rendered server-side; initialize it here so it survives patches.
+    // data-saved-z-index acts as cross-hook shared memory — readable by peer _raiseToFront calls.
+    this.el.style.zIndex = "1"
+    this._zIndex = "1"
+    this.el.dataset.savedZIndex = "1"
+
     // --- Drag + Snap ---
     const handle = this.el.querySelector("[data-drag-handle]")
     if (handle) {
@@ -49,8 +55,10 @@ export const ChatWindowHook = {
       const onMouseMove = (e) => {
         const dx = e.clientX - startX
         const dy = e.clientY - startY
-        this.el.style.left = `${startLeft + dx}px`
-        this.el.style.top  = `${startTop  + dy}px`
+        this._dragLeft = startLeft + dx
+        this._dragTop  = startTop  + dy
+        this.el.style.left = `${this._dragLeft}px`
+        this.el.style.top  = `${this._dragTop}px`
 
         if (canvas && snapPreview) {
           const rect = canvas.getBoundingClientRect()
@@ -68,6 +76,7 @@ export const ChatWindowHook = {
       }
 
       const onMouseUp = () => {
+        this._dragging = false
         document.removeEventListener("mousemove", onMouseMove)
         document.removeEventListener("mouseup", onMouseUp)
         if (snapPreview) snapPreview.style.display = "none"
@@ -105,10 +114,15 @@ export const ChatWindowHook = {
 
       handle.addEventListener("mousedown", (e) => {
         e.preventDefault()
+        this._dragging = true
         startX    = e.clientX
         startY    = e.clientY
         startLeft = parseInt(this.el.style.left, 10) || 0
         startTop  = parseInt(this.el.style.top, 10)  || 0
+        // Initialize to current position so updated() never writes undefinedpx
+        // if a LiveView patch fires before the first mousemove event.
+        this._dragLeft = startLeft
+        this._dragTop  = startTop
 
         canvas      = this.el.closest("[data-canvas-area]")
         snapPreview = canvas ? getOrCreateSnapPreview(canvas) : null
@@ -190,6 +204,8 @@ export const ChatWindowHook = {
           this.el.style.height = canvas.offsetHeight + "px"
           this.el.style.resize = "none"
           this.el.style.zIndex = "20"
+          this._zIndex = "20"
+          this.el.dataset.savedZIndex = "20"
         } else {
           this.el.style.left = this.el.dataset.savedLeft || "0px"
           this.el.style.top = this.el.dataset.savedTop || "0px"
@@ -197,6 +213,8 @@ export const ChatWindowHook = {
           this.el.style.height = this.el.dataset.savedMaxHeight || ""
           this.el.style.resize = "both"
           this.el.style.zIndex = "1"
+          this._zIndex = "1"
+          this.el.dataset.savedZIndex = "1"
         }
       })
     }
@@ -304,9 +322,13 @@ export const ChatWindowHook = {
       const z = parseInt(w.style.zIndex, 10) || 1
       if (z > maxZ) maxZ = z
       w.style.zIndex = "1"
+      w.dataset.savedZIndex = "1"  // update shared memory so peers' updated() won't undo this
       w.classList.remove("ring-2", "ring-primary/40")
     })
-    this.el.style.zIndex = this._maximized ? "20" : String(Math.max(10, maxZ))
+    const zVal = this._maximized ? "20" : String(Math.max(10, maxZ))
+    this.el.style.zIndex = zVal
+    this._zIndex = zVal
+    this.el.dataset.savedZIndex = zVal
     this.el.classList.add("ring-2", "ring-primary/40")
   },
 
@@ -324,6 +346,23 @@ export const ChatWindowHook = {
   },
 
   updated() {
+    // LiveView patches the style attr but doesn't render z-index — restore it.
+    // Prefer dataset.savedZIndex (cross-hook authoritative) over instance memory.
+    const saved = this.el.dataset.savedZIndex
+    if (saved) {
+      this.el.style.zIndex = saved
+      this._zIndex = saved
+    } else if (this._zIndex) {
+      this.el.style.zIndex = this._zIndex
+    }
+
+    // If the user is mid-drag, LiveView may have snapped position back to DB values.
+    // Restore the visual position from the in-flight drag state.
+    if (this._dragging) {
+      this.el.style.left = `${this._dragLeft}px`
+      this.el.style.top  = `${this._dragTop}px`
+    }
+
     if (this._minimized) this._applyMinimized()
   },
 

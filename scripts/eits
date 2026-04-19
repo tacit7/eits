@@ -68,13 +68,14 @@ cmd_sessions() {
   case "$sub" in
     list)
       # eits sessions list [--search <q>] [--status <s>] [--project <id>] [--agent <uuid>] [--limit <n>]
-      local qs=""
+      # --agent is mutually exclusive with --search, --status, and --project
+      local qs="" _agent_flag=0 _other_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --search)  qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
-          --status)  qs="${qs}&status=$2";     shift 2 ;;
-          --project) qs="${qs}&project_id=$2"; shift 2 ;;
-          --agent)   qs="${qs}&agent_id=$2";   shift 2 ;;
+          --search)  [[ $_agent_flag -eq 1 ]] && die "--agent and --search are mutually exclusive"; _other_flag=1; qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --status)  [[ $_agent_flag -eq 1 ]] && die "--agent and --status are mutually exclusive"; _other_flag=1; qs="${qs}&status=$2";     shift 2 ;;
+          --project) [[ $_agent_flag -eq 1 ]] && die "--agent and --project are mutually exclusive"; _other_flag=1; qs="${qs}&project_id=$2"; shift 2 ;;
+          --agent)   [[ $_other_flag -eq 1 ]] && die "--agent is mutually exclusive with --search, --status, and --project"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac

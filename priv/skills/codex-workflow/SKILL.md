@@ -77,13 +77,11 @@ unlink _build  # not: rm _build
 ## DMs
 
 ```bash
-eits dm --to <session_uuid> --message "text"
+eits dm --to <session_id> --message "text"    # integer ID (preferred)
+eits dm --to <session_uuid> --message "text"  # UUID also works
 ```
 
-`--to` requires UUID. Resolve from integer ID if needed:
-```bash
-UUID=$(psql -d eits_dev -tAq -c "SELECT uuid FROM sessions WHERE id = <id>;")
-```
+`$EITS_SESSION_ID` is the integer session ID — use it for DM targets in instructions.
 
 Send sequentially — never in parallel Bash calls.
 

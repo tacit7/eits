@@ -7,6 +7,7 @@ Initialize Eye in the Sky session tracking.
 
 The startup/resume hooks inject these env vars automatically:
 - `$EITS_SESSION_UUID` — session UUID
+- `$EITS_SESSION_ID` — session integer ID (use for `dm --to`, shorter than UUID)
 - `$EITS_PROJECT_ID` — project integer ID
 - `$EITS_AGENT_UUID` — agent UUID (resume only; not set on new sessions)
 - `$EITS_URL` — `http://localhost:5001/api/v1`
@@ -52,7 +53,7 @@ The startup/resume hooks inject these env vars automatically:
 All agents use the `eits` CLI script for DMs and commands:
 
 ```bash
-eits dm --to <session_uuid> --message "your message"
+eits dm --to <session_id> --message "your message"   # integer ID or UUID, both work
 eits tasks begin --title "<title>"
 eits tasks annotate <id> --body "..."
 eits tasks update <id> --state 4
@@ -73,7 +74,9 @@ eits tasks complete <task_id> --message "What was done"
 ```
 
 ```bash
-# Notes
+# Notes (shorthand — defaults parent to current session)
+eits notes add --body "..."
+# Or explicit:
 eits notes create --parent-type session --parent-id $EITS_SESSION_UUID --body "..."
 
 # Commits
@@ -105,6 +108,6 @@ psql -d eits_dev -c "INSERT INTO task_tags (task_id, tag_id) VALUES (<task_id>, 
 | Update state by alias | `eits tasks update <id> --state done` (also: `start`, `in-review`, `review`, `todo`) |
 | Update state by ID | `eits tasks update <id> --state 3` |
 | Annotate task | `eits tasks annotate <id> --body <text>` |
-| Add note | `eits notes create --parent-type session --parent-id $EITS_SESSION_UUID --body <text>` |
+| Add note | `eits notes add --body <text>` (defaults to current session) |
 | Log commits | `eits commits create --hash <h1> [--hash <h2>]` |
 | Link task (after-the-fact) | `eits tasks link-session <task_id>` |

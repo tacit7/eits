@@ -107,7 +107,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
       project_path: state.project_path,
       skip_permissions: true,
       use_script: true,
-      eits_session_id: state.provider_conversation_id,
+      eits_session_id: state.session_id,
       eits_agent_id: state.agent_id,
       eits_workflow: eits_workflow,
       worktree: state.worktree,

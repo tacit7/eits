@@ -39,15 +39,17 @@ Create all tasks upfront so agents can claim them.
 ### 4. Get orchestrator IDs
 
 ```bash
-ORC_SESSION_ID=$(eits sessions get $EITS_SESSION_UUID | jq '.id')
-ORC_AGENT_ID=$(psql -d eits_dev -t -c "SELECT a.id FROM agents a JOIN sessions s ON s.agent_id = a.id WHERE s.uuid = '$EITS_SESSION_UUID'" | tr -d ' ')
+ORC_SESSION_ID=$EITS_SESSION_ID   # integer — already injected by EITS hooks
+ORC_AGENT_ID=$(eits agents list | jq --arg uuid "$EITS_AGENT_UUID" '.agents[] | select(.uuid == $uuid) | .id')
 ```
 
 ### 5. Spawn agents
 
+Use `$EITS_SESSION_ID` (integer) in instructions for DM-back targets — shorter than UUID, works identically:
+
 ```bash
 eits agents spawn \
-  --instructions "Your task prompt. When done: eits tasks complete <id> --message 'summary'. Then DM orchestrator: eits dm --to $EITS_SESSION_UUID --message 'Task #<id> complete.'" \
+  --instructions "Your task prompt. When done: eits tasks complete <id> --message 'summary'. Then DM orchestrator: eits dm --to $EITS_SESSION_ID --message 'Task #<id> complete.'" \
   --model sonnet \
   --project-path /Users/urielmaldonado/projects/eits/web \
   --team-name "<feature>-team" \
@@ -58,7 +60,7 @@ eits agents spawn \
 
 Key points:
 - Always include `--parent-session-id` and `--parent-agent-id`
-- Always include the orchestrator's `$EITS_SESSION_UUID` in instructions for DM replies
+- Embed `$EITS_SESSION_ID` in instructions for DM-back (`dm --to` accepts integer or UUID)
 - Use `--worktree <branch>` for file-editing agents to avoid conflicts
 - Do NOT pass `--project-id`; it is inherited from parent
 
@@ -66,7 +68,7 @@ Key points:
 
 ```bash
 eits teams status <team_id>
-eits dm --to <agent_session_uuid> --message "Status update?"
+eits dm --to <agent_session_id> --message "Status update?"
 ```
 
 DM agents sequentially, never in parallel Bash calls.
@@ -104,5 +106,5 @@ Workflow:
 3. Run: mix compile --warnings-as-errors
 4. Commit your work
 5. eits tasks complete <task_id> --message "<summary>"
-6. DM orchestrator: eits dm --to <ORC_SESSION_UUID> --message "Task #<task_id> complete. <summary>"
+6. DM orchestrator: eits dm --to <ORC_SESSION_ID> --message "Task #<task_id> complete. <summary>"
 ```

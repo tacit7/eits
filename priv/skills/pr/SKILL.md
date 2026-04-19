@@ -71,7 +71,7 @@ Steps:
 3. Review the changes for: correctness, security, code quality, missing tests, breaking changes.
 4. IMPORTANT: You CANNOT post to GitHub directly (sandbox blocks it).
    DM your findings to the session that spawned you:
-   eits dm --to <MY_SESSION_UUID> --message "LGTM|NEEDS CHANGES|BLOCKED: <findings>"
+   eits dm --to <MY_SESSION_ID> --message "LGTM|NEEDS CHANGES|BLOCKED: <findings>"
    The spawner will post on your behalf as urielmaldonado-codex.
 5. DM is required. Focus on real issues only. Skip praise.
 ```
@@ -85,7 +85,7 @@ After spawning the Codex reviewer, tell the user:
 ```
 PR created and Codex reviewer spawned.
 - PR: <URL>
-- Reviewer session: <session_uuid>
+- Reviewer session: <session_id>
 
 I'll address Codex's feedback when it arrives via DM. You can also check the PR comments on GitHub.
 ```

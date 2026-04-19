@@ -22,6 +22,7 @@ eits teams members <id>
 eits teams join <team_id> --name <alias> [--role lead|member] [--session <uuid>]
 eits teams status <id>
 eits teams update-member <team_id> <member_id> --status <active|idle|done|failed>
+eits teams done-self <team_id>          # mark yourself done (resolves member by $EITS_SESSION_UUID)
 eits teams leave <team_id> <member_id>
 ```
 
@@ -73,25 +74,25 @@ eits tasks create --title "Research X" --description "Details" --team <team_id>
 Spawning requires **integer** IDs, not UUIDs:
 
 ```bash
-ORC_SESSION_ID=$(eits sessions get $EITS_SESSION_UUID | jq '.id')
-ORC_AGENT_ID=$(psql -d eits_dev -t -c "SELECT a.id FROM agents a JOIN sessions s ON s.agent_id = a.id WHERE s.uuid = '$EITS_SESSION_UUID'" | tr -d ' ')
+ORC_SESSION_ID=$EITS_SESSION_ID   # integer — injected by EITS hooks
+ORC_AGENT_ID=$(eits agents list | jq --arg uuid "$EITS_AGENT_UUID" '.agents[] | select(.uuid == $uuid) | .id')
 ```
 
 ### 5. Spawn agents
 
-Always include `parent_session_id` and `parent_agent_id` for proper session hierarchy:
+Always include `parent_session_id` and `parent_agent_id` for proper session hierarchy.
+
+**Use `$EITS_SESSION_ID` (integer) in instructions for DM-back targets** — shorter, works with `dm --to`:
 
 ```bash
 eits agents spawn \
-  --instructions "Your task. team_id: <team_id>. When done, DM back: eits dm --to <ORC_SESSION_UUID> --message 'done'" \
+  --instructions "Your task. team_id: <team_id>. When done, DM back: eits dm --to $EITS_SESSION_ID --message 'done'" \
   --model sonnet \
   --team-name my-team \
   --member-name researcher \
   --parent-session-id $ORC_SESSION_ID \
   --parent-agent-id $ORC_AGENT_ID
 ```
-
-**Always embed the orchestrator's UUID literally in instructions** — agents use it to DM back. Use `$EITS_SESSION_UUID` (UUID), never the integer ID.
 
 Spawn all agents in parallel. Each gets a unique `--member-name`.
 
@@ -105,22 +106,18 @@ eits teams status <team_id>
 Send DMs to check progress — **sequentially, never in parallel Bash calls**:
 
 ```bash
-eits dm --to $UUID_1 --message "Status update: what is your progress?"
-eits dm --to $UUID_2 --message "Status update: what is your progress?"
+eits dm --to <session_id_1> --message "Status update: what is your progress?"
+eits dm --to <session_id_2> --message "Status update: what is your progress?"
 ```
 
-Resolve session UUID from integer ID if needed:
-
-```bash
-AGENT_UUID=$(psql -d eits_dev -tAq -c "SELECT uuid FROM sessions WHERE id = <session_id>;")
-```
+`dm --to` accepts both integer session ID and UUID.
 
 ### 7. Review and close out
 
 When an agent DMs that it's done, DM it to complete the task completion sequence:
 
 ```bash
-eits dm --to <agent_uuid> --message "Work complete. Run the task completion sequence and update your session status."
+eits dm --to <session_id> --message "Work complete. Run the task completion sequence and update your session status."
 ```
 
 ### 8. Shutdown
@@ -158,7 +155,7 @@ eits tasks update <task_id> --state 4
 ## Rules
 
 - **Never manually insert DB records and spawn `claude` directly** — breaks `git_worktree_path`, session hierarchy, and "Load messages".
-- **`--to` in `eits dm` requires UUID** — never an integer session ID.
+- **`dm --to` accepts both integer session ID and UUID** — prefer integer (`$EITS_SESSION_ID`) for brevity.
 - **DM sequentially** — parallel Bash DM calls cancel siblings on error.
 - **Don't pass `--project-id` when `--parent-session-id` is set** — it's inherited.
 - `--worktree` requires a clean working tree — commit or stash first.
@@ -179,24 +176,24 @@ eits tasks create --title "Research Claude CLI flags" --team <team_id>
 eits tasks create --title "Write README from research" --team <team_id>
 
 # 4. Get IDs
-ORC_SESSION_ID=$(eits sessions get $EITS_SESSION_UUID | jq '.id')
-ORC_AGENT_ID=$(psql -d eits_dev -t -c "SELECT a.id FROM agents a JOIN sessions s ON s.agent_id = a.id WHERE s.uuid = '$EITS_SESSION_UUID'" | tr -d ' ')
+ORC_SESSION_ID=$EITS_SESSION_ID
+ORC_AGENT_ID=$(eits agents list | jq --arg uuid "$EITS_AGENT_UUID" '.agents[] | select(.uuid == $uuid) | .id')
 
-# 5. Spawn agents
+# 5. Spawn agents (embed integer session ID for DM-back)
 eits agents spawn \
-  --instructions "Investigate all claude --help flags. Write findings to /tmp/research.md. team_id: <team_id>. DM back to $EITS_SESSION_UUID when done." \
+  --instructions "Investigate all claude --help flags. Write findings to /tmp/research.md. team_id: <team_id>. DM back to $EITS_SESSION_ID when done." \
   --model sonnet --team-name docs-team --member-name researcher \
   --parent-session-id $ORC_SESSION_ID --parent-agent-id $ORC_AGENT_ID
 
 eits agents spawn \
-  --instructions "Wait for /tmp/research.md, then write docs/README.md. team_id: <team_id>. DM back to $EITS_SESSION_UUID when done." \
+  --instructions "Wait for /tmp/research.md, then write docs/README.md. team_id: <team_id>. DM back to $EITS_SESSION_ID when done." \
   --model sonnet --team-name docs-team --member-name writer \
   --parent-session-id $ORC_SESSION_ID --parent-agent-id $ORC_AGENT_ID
 
 # 6. Monitor
 eits teams status <team_id>
-eits dm --to $RESEARCHER_UUID --message "Status update?"
-eits dm --to $WRITER_UUID --message "Status update?"
+eits dm --to $RESEARCHER_SESSION_ID --message "Status update?"
+eits dm --to $WRITER_SESSION_ID --message "Status update?"
 ```
 
 ---
@@ -207,4 +204,4 @@ eits dm --to $WRITER_UUID --message "Status update?"
 - **Use descriptive `--member-name` values** — DMs identify agents by this alias.
 - **Teams LiveView at `/teams`** — real-time member status and per-member task lists.
 - **One team per logical unit of work** — don't reuse teams across unrelated tasks.
-- **Task must be linked to session** for Stop hook to gate. `eits tasks claim` handles this. Verify: `psql -d eits_dev -c "SELECT task_id FROM task_sessions WHERE session_id = (SELECT id FROM sessions WHERE uuid = '$EITS_SESSION_UUID')"`
+- **Task must be linked to session** for Stop hook to gate. `eits tasks claim` handles this.

@@ -12,6 +12,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   alias EyeInTheSky.Projects
 
   @ignored_dirs ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
+  @tree_cache_ttl 300
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -32,7 +33,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
         file_tree =
           if project.path do
-            build_file_tree(project.path, project.path)
+            cached_file_tree(project.id, project.path)
           else
             []
           end
@@ -55,9 +56,25 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     end
   end
 
+  defp cached_file_tree(project_id, path) do
+    key = {__MODULE__, :file_tree, project_id}
+    now = System.os_time(:second)
+
+    case :persistent_term.get(key, nil) do
+      {tree, built_at} when now - built_at < @tree_cache_ttl ->
+        tree
+
+      _ ->
+        tree = build_file_tree(path, path)
+        :persistent_term.put(key, {tree, now})
+        tree
+    end
+  end
+
   @impl true
   def handle_params(params, _uri, socket) do
-    mode = parse_mode(params)
+    current_mode = socket.assigns[:view_mode] || :list
+    mode = parse_mode(params, current_mode)
     socket = assign(socket, :view_mode, mode)
     project = socket.assigns.project
 
@@ -75,9 +92,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     end
   end
 
-  defp parse_mode(params) do
+  # If the user explicitly sets a mode, honour it.
+  # If there's no mode param but we're already in tree mode and navigating to a
+  # file, preserve tree mode — this means tree view works even when sidebar links
+  # don't carry mode=tree (e.g. stale DOM from phx-update="ignore").
+  defp parse_mode(params, current_mode) do
     case Map.get(params, "mode") do
       "tree" -> :tree
+      "list" -> :list
+      nil ->
+        if current_mode == :tree and is_binary(Map.get(params, "path")) do
+          :tree
+        else
+          :list
+        end
       _ -> :list
     end
   end

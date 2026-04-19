@@ -173,10 +173,10 @@ cmd_sessions() {
 
 cmd_tasks() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session> [--mine] [--quiet]"; return 0; }
   case "$sub" in
     list)
-      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--state <id>] [--limit <n>]
+      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--state <id>] [--limit <n>] [--mine]
       local qs=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -186,6 +186,7 @@ cmd_tasks() {
           --q)       qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --state)   qs="${qs}&state_id=$2";   shift 2 ;;
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;
+          --mine)    [[ -n "${EITS_SESSION_UUID:-}" ]] && qs="${qs}&session_id=$EITS_SESSION_UUID"; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -223,7 +224,7 @@ cmd_tasks() {
       _post "/tasks" "$body"
       ;;
     update)
-      # eits tasks update <id> [--state <id>] [--state-name <done|start>] [--priority <p>] [--description <d>]
+      # eits tasks update <id> [--state <id>] [--state-name <done|start>] [--priority <p>] [--description <d>] [--title <t>]
       local id="${1:-}"; need id; shift
       local updates="{}"
       while [[ $# -gt 0 ]]; do
@@ -238,6 +239,7 @@ cmd_tasks() {
           --state-name)  updates=$(echo "$updates" | jq --arg v "$2" '. + {state: $v}');       shift 2 ;;
           --priority)    updates=$(echo "$updates" | jq --arg v "$2" '. + {priority: $v}');    shift 2 ;;
           --description) updates=$(echo "$updates" | jq --arg v "$2" '. + {description: $v}'); shift 2 ;;
+          --title)       updates=$(echo "$updates" | jq --arg v "$2" '. + {title: $v}');       shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -306,15 +308,16 @@ cmd_tasks() {
       _post "/tasks/$id/complete" "$(json message "$message")"
       ;;
     begin|quick)
-      # eits tasks quick --title <t> [--description <d>] [--project <id>] [--priority <p>]
+      # eits tasks begin --title <t> [--description <d>] [--project <id>] [--priority <p>] [--quiet|-q]
       # Creates a task, links the current session, and starts it — all in one command.
-      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority=""
+      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" quiet=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --title)       title="$2";       shift 2 ;;
           --description) description="$2"; shift 2 ;;
           --project)     project_id="$2";  shift 2 ;;
           --priority)    priority="$2";    shift 2 ;;
+          --quiet|-q)    quiet=1;          shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -324,9 +327,13 @@ cmd_tasks() {
       body="$(json title "$title" description "$description" project_id "$project_id" priority "$priority" session_id "$_sess")"
       local create_resp task_id
       create_resp=$(_post "/tasks" "$body")
-      echo "$create_resp"
       task_id=$(echo "$create_resp" | jq -r '.task_id // empty')
       [[ -n "$task_id" ]] || die "task creation failed"
+      if [[ $quiet -eq 0 ]]; then
+        echo "$create_resp"
+      else
+        echo "$task_id"
+      fi
       _patch "/tasks/$task_id" "$(json state "start" session_id "$_sess")" > /dev/null
       if [[ -n "$_sess" ]]; then
         _curl -sf -X POST -H "Content-Type: application/json" \
@@ -341,7 +348,7 @@ cmd_tasks() {
       _post "/tasks/$task_id/tags" "$(json tag_id "$tag_id")"
       ;;
     *)
-      echo "usage: eits tasks <list|get|create|update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|tag>"
+      echo "usage: eits tasks <list|get|create|update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|tag> [--mine] [--title] [--quiet]"
       ;;
   esac
 }
@@ -1042,6 +1049,7 @@ Base URL: ${BASE_URL}  (override: EITS_URL=<url>)
 Commands:
   sessions  list|get|create|update|end|context
   tasks     list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session
+            list --mine, update --title, begin --quiet
   notes     list|get|create|update
   projects  list|get|create
   agents    list|get|spawn

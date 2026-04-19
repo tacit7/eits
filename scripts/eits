@@ -345,7 +345,7 @@ cmd_tasks() {
 
 cmd_notes() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits notes <list|search|get|create|update>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits notes <list|search|get|create|update|add>"; return 0; }
   case "$sub" in
     list)
       local qs=""
@@ -398,8 +398,23 @@ cmd_notes() {
       local query="${1:-}"; need query
       _curl "$BASE_URL/notes?q=$(printf '%s' "$query" | jq -Rr @uri)" | jq .
       ;;
+    add)
+      # eits notes add --body <text> [--title <t>]
+      # Creates a note attached to the current session (parent_type=session, parent_id=$EITS_SESSION_UUID)
+      local body="" title=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --body)  body="$2";  shift 2 ;;
+          --title) title="$2"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need body
+      local parent_id="${EITS_SESSION_UUID:-}"; [[ -n "$parent_id" ]] || die "EITS_SESSION_UUID is not set"
+      _post "/notes" "$(json parent_type "session" parent_id "$parent_id" body "$body" title "$title")"
+      ;;
     *)
-      echo "usage: eits notes <list|search|get|create|update>"
+      echo "usage: eits notes <list|search|get|create|update|add>"
       ;;
   esac
 }
@@ -709,8 +724,9 @@ cmd_channels() {
       ;;
     send)
       # eits channels send <channel_id> --session <uuid> --body <text>
+      # --session defaults to $EITS_SESSION_UUID if not provided
       local channel_id="${1:-}"; need channel_id; shift
-      local session_id="" body=""
+      local session_id="${EITS_SESSION_UUID:-}" body=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --session) session_id="$2"; shift 2 ;;
@@ -749,6 +765,33 @@ Examples:
   eits channels messages 1
   eits channels messages 1 -n 5
 USAGE
+      ;;
+  esac
+}
+
+# ── notifications ─────────────────────────────────────────────────────────────
+
+cmd_notifications() {
+  local sub="${1:-}"; shift || true
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits notifications create --title <t> [--body <b>] [--category agent|job|system]"; return 0; }
+  case "$sub" in
+    create)
+      # eits notifications create --title <t> [--body <b>] [--category <agent|job|system>]
+      # --category maps to the API's category field (agent, job, system; default: system)
+      local title="" body="" category=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --title)    title="$2";    shift 2 ;;
+          --body)     body="$2";     shift 2 ;;
+          --category) category="$2"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need title
+      _post "/notifications" "$(json title "$title" body "$body" category "$category")"
+      ;;
+    *)
+      echo "usage: eits notifications <create>"
       ;;
   esac
 }
@@ -1054,20 +1097,21 @@ eits — Eye in the Sky CLI
 Base URL: ${BASE_URL}  (override: EITS_URL=<url>)
 
 Commands:
-  sessions  list|get|create|update|end|context
-  tasks     list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session
-  notes     list|get|create|update
-  projects  list|get|create
-  agents    list|get|spawn
-  commits   list|create
-  jobs      list|get|run|delete
-  dm        [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
-  channels  list|send|messages
-  prompts   list|get
-  teams     list|get|create|delete|members|join|status|update-member|leave|broadcast|my-teams
-  timer     show|set|cancel   (default session: self / \$EITS_SESSION_UUID)
-  worktree  create|remove   (EITS Elixir projects only)
-  me        Print current session/agent/project context and verify server-side
+  sessions      list|get|create|update|end|context
+  tasks         list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session
+  notes         list|get|create|update|add
+  projects      list|get|create
+  agents        list|get|spawn
+  commits       list|create
+  jobs          list|get|run|delete
+  dm            [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
+  channels      list|send|messages
+  notifications create
+  prompts       list|get
+  teams         list|get|create|delete|members|join|status|update-member|leave|broadcast|my-teams
+  timer         show|set|cancel   (default session: self / \$EITS_SESSION_UUID)
+  worktree      create|remove   (EITS Elixir projects only)
+  me            Print current session/agent/project context and verify server-side
 
 Env vars (injected by EITS hooks):
   EITS_SESSION_UUID  current session UUID (default --session / --from)
@@ -1083,20 +1127,21 @@ EOF
 
 cmd="${1:-}"; shift || true
 case "$cmd" in
-  sessions)  cmd_sessions  "$@" ;;
-  tasks)     cmd_tasks     "$@" ;;
-  notes)     cmd_notes     "$@" ;;
-  projects)  cmd_projects  "$@" ;;
-  agents)    cmd_agents    "$@" ;;
-  commits)   cmd_commits   "$@" ;;
-  jobs)      cmd_jobs      "$@" ;;
-  dm)        cmd_dm        "$@" ;;
-  channels)  cmd_channels  "$@" ;;
-  prompts)   cmd_prompts   "$@" ;;
-  teams)     cmd_teams     "$@" ;;
-  timer)     cmd_timer     "$@" ;;
-  worktree)  cmd_worktree "$@" ;;
-  me|whoami) cmd_me ;;
+  sessions)      cmd_sessions      "$@" ;;
+  tasks)         cmd_tasks         "$@" ;;
+  notes)         cmd_notes         "$@" ;;
+  projects)      cmd_projects      "$@" ;;
+  agents)        cmd_agents        "$@" ;;
+  commits)       cmd_commits       "$@" ;;
+  jobs)          cmd_jobs          "$@" ;;
+  dm)            cmd_dm            "$@" ;;
+  channels)      cmd_channels      "$@" ;;
+  notifications) cmd_notifications "$@" ;;
+  prompts)       cmd_prompts       "$@" ;;
+  teams)         cmd_teams         "$@" ;;
+  timer)         cmd_timer         "$@" ;;
+  worktree)      cmd_worktree      "$@" ;;
+  me|whoami)     cmd_me ;;
   help|--help|-h) usage ;;
   "") usage; exit 0 ;;
   *) die "unknown command: $cmd" ;;

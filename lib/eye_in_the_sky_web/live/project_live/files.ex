@@ -195,6 +195,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   end
 
   @impl true
+  def handle_event("set_notify_on_stop", _params, socket), do: {:noreply, socket}
+
+  @impl true
   def handle_info(_msg, socket), do: {:noreply, socket}
 
   attr :error, :string, default: nil

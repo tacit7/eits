@@ -39,7 +39,6 @@ The startup/resume hooks inject these env vars automatically:
      --model "claude-opus-4-6" \
      --entrypoint "${EITS_ENTRYPOINT:-}"
 
-   # GET returns agent UUID (POST response agent_id is numeric, not the UUID)
    EITS_AGENT_UUID=$(eits sessions get $EITS_SESSION_UUID | jq -r '.agent_id')
    ```
 
@@ -52,7 +51,7 @@ The startup/resume hooks inject these env vars automatically:
 All agents use the `eits` CLI script for DMs and commands:
 
 ```bash
-eits dm --to <session_uuid> --message "your message"
+eits dm --to <session_uuid_or_integer_id> --message "your message"
 eits tasks begin --title "<title>"
 eits tasks annotate <id> --body "..."
 eits tasks update <id> --state 4
@@ -84,11 +83,10 @@ eits commits create --hash <hash1> --hash <hash2>
 ## Creating Workable Tasks (auto-worker)
 
 ```bash
-eits tasks create --title "..." --description "..."
-# → task_id; session linked automatically
+eits tasks create --title "..." --description "..." --session "" --agent ""
+# pass --session "" --agent "" to avoid linking to current session
 
-psql -d eits_dev -c "INSERT INTO task_tags (task_id, tag_id) VALUES (<task_id>, 422);"
-# tag_id 422 = sonnet, 421 = haiku
+eits tasks tag <task_id> 422   # 422 = sonnet, 421 = haiku
 ```
 
 ## eits CLI Reference

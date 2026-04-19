@@ -47,7 +47,7 @@ eits tasks create --title "Task B" --team <team_id>
 ### 3. Get orchestrator integer IDs (required for spawn)
 ```bash
 ORC_SESSION_ID=$(eits sessions get $EITS_SESSION_UUID | jq '.id')
-ORC_AGENT_ID=$(psql -d eits_dev -t -c "SELECT a.id FROM agents a JOIN sessions s ON s.agent_id = a.id WHERE s.uuid = '$EITS_SESSION_UUID'" | tr -d ' ')
+ORC_AGENT_ID=$(eits sessions get $EITS_SESSION_UUID | jq '.agent_int_id')
 ```
 
 ### 4. Spawn agents in parallel
@@ -66,7 +66,7 @@ Embed `$EITS_SESSION_UUID` literally in instructions so agents can DM back.
 ### 5. Monitor
 ```bash
 eits teams status <team_id>
-eits dm --to $UUID_1 --message "Status update?"   # sequential
+eits dm --to $UUID_1 --message "Status update?"   # sequential; UUID or integer ID both work
 eits dm --to $UUID_2 --message "Status update?"
 ```
 
@@ -78,7 +78,7 @@ eits dm --to $UUID_2 --message "Status update?"
 
 Include in agent instructions:
 ```
-1. eits tasks claim <task_id>
+1. eits tasks begin --title "<task name>"
 2. Read all files before editing
 3. Make changes in your worktree only
 4. mix compile --warnings-as-errors
@@ -91,7 +91,7 @@ Include in agent instructions:
 
 ## Rules
 
-- `--to` in `eits dm` requires UUID, never integer ID.
+- `--to` in `eits dm` accepts UUID **or** integer session ID — both work.
 - DM sequentially — parallel calls cancel siblings on error.
 - Do NOT delete teams unless explicitly told to.
 - Don't pass `--project-id` when `--parent-session-id` is set.

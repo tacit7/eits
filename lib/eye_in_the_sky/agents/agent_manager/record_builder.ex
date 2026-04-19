@@ -117,7 +117,7 @@ defmodule EyeInTheSky.Agents.AgentManager.RecordBuilder do
     session_opts = %{
       uuid: session_uuid,
       name: description,
-      description: nil,
+      description: "agent-id #{agent_uuid}",
       model: opts[:model],
       provider: provider,
       project_id: project_id,

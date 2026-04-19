@@ -151,7 +151,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
           </li>
         <% end %>
         <%= if @agent.uuid do %>
-          <li class="menu-title mt-1" />
+          <li><hr class="border-base-content/10 my-1" /></li>
           <%= if @agent.archived_at do %>
             <li>
               <button
@@ -241,7 +241,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
               </button>
             </li>
           <% end %>
-          <li class="menu-title mt-0.5" />
+          <li><hr class="border-base-content/10 my-0.5" /></li>
           <%= if @show_new_canvas_for != to_string(@agent.id) do %>
             <li>
               <button

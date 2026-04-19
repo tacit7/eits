@@ -324,6 +324,27 @@ defmodule EyeInTheSky.Events do
   def timer_fired(session_id, timer_or_nil),
     do: broadcast("session:#{session_id}:timer", {:timer_fired, timer_or_nil})
 
+  # ---------------------------------------------------------------------------
+  # Editor events — topic: "editor:<editor_id>"
+  # editor_id is the file path; agents push operations keyed by the file they edited.
+  # ---------------------------------------------------------------------------
+
+  @doc "Subscribe to editor push events for a file path."
+  def subscribe_editor(editor_id), do: sub("editor:#{editor_id}")
+
+  @doc "Unsubscribe from editor push events."
+  def unsubscribe_editor(editor_id), do: unsub("editor:#{editor_id}")
+
+  @doc """
+  Broadcast an editor operation to all LiveViews subscribed to this editor.
+
+  op is one of: "set_content", "insert", "set_cursor", "highlight"
+  payload is a plain map matching the JS handleEvent contract for that op.
+  """
+  def editor_push(editor_id, op, payload) do
+    broadcast("editor:#{editor_id}", {:editor_push, op, payload})
+  end
+
   defp broadcast(topic, message), do: Phoenix.PubSub.broadcast(@pubsub, topic, message)
   defp sub(topic), do: Phoenix.PubSub.subscribe(@pubsub, topic)
   defp unsub(topic), do: Phoenix.PubSub.unsubscribe(@pubsub, topic)

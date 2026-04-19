@@ -2,16 +2,18 @@
 // Lazy-loaded CodeMirror theme management. Loaded on first editor mount,
 // not at app startup, to keep the initial bundle small.
 //
-// dark       → bespin
+// dark       → oneDark
 // light      → eclipse
 // dracula    → dracula
 // tokyonight → tokyoNight
+// autumn     → bespin
 
 const THEME_KEY = {
-  dark: "bespin",
+  dark: "oneDark",
   light: "eclipse",
   dracula: "dracula",
   tokyonight: "tokyoNight",
+  autumn: "bespin",
 }
 
 let _modules = null
@@ -20,6 +22,7 @@ async function ensureModules() {
   if (_modules) return _modules
   const [
     { Compartment },
+    { oneDark },
     { bespin },
     { eclipse },
     { dracula },
@@ -27,21 +30,20 @@ async function ensureModules() {
     { syntaxHighlighting, defaultHighlightStyle },
   ] = await Promise.all([
     import("@codemirror/state"),
+    import("@codemirror/theme-one-dark"),
     import("@uiw/codemirror-theme-bespin"),
     import("@uiw/codemirror-theme-eclipse"),
     import("@uiw/codemirror-theme-dracula"),
     import("@uiw/codemirror-theme-tokyo-night"),
     import("@codemirror/language"),
   ])
-  // Base highlighter applied first (lower priority). Theme's own syntaxHighlighting
-  // overrides tokens it explicitly defines; defaultHighlightStyle covers the rest.
   const highlightBase = syntaxHighlighting(defaultHighlightStyle)
-  _modules = { Compartment, bespin, eclipse, dracula, tokyoNight, highlightBase }
+  _modules = { Compartment, oneDark, bespin, eclipse, dracula, tokyoNight, highlightBase }
   return _modules
 }
 
 function resolveTheme(modules, appTheme) {
-  const key = THEME_KEY[appTheme] ?? "bespin"
+  const key = THEME_KEY[appTheme] ?? "oneDark"
   return modules[key]
 }
 

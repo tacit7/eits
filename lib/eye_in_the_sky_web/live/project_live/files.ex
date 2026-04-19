@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   use EyeInTheSkyWeb, :live_view
 
   import EyeInTheSkyWeb.Helpers.FileHelpers,
-    only: [detect_file_type: 1, language_class: 1, build_file_tree: 2, build_file_listing: 2, build_file_listing: 3]
+    only: [detect_file_type: 1, language_class: 1, binary_file?: 1, build_file_tree: 2, build_file_listing: 2, build_file_listing: 3]
 
   import EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers,
     only: [read_file_safe_detailed: 1, path_within?: 2]
@@ -11,41 +11,58 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   require Logger
 
-  alias EyeInTheSky.Projects
+  alias EyeInTheSky.{Events, Projects}
 
   @ignored_dirs ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
+  @tree_cache_ttl 300
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     socket =
       socket
       |> assign(:file_path, nil)
+      |> assign(:file_full_path, nil)
       |> assign(:file_content, nil)
       |> assign(:file_type, nil)
       |> assign(:file_tree, [])
       |> assign(:files, [])
       |> assign(:view_mode, :list)
       |> assign(:error, nil)
+      |> assign(:subscribed_editor_id, nil)
 
     case Integer.parse(id) do
       {project_id, ""} ->
-        project =
-          Projects.get_project!(project_id)
+        project = Projects.get_project!(project_id)
 
-        file_tree =
+        socket =
+          socket
+          |> assign(:page_title, "Files - #{project.name}")
+          |> assign(:project, project)
+          |> assign(:sidebar_tab, :files)
+          |> assign(:sidebar_project, project)
+
+        socket =
           if project.path do
-            build_file_tree(project.path, project.path)
+            cache_key = {__MODULE__, :file_tree, project.id}
+            now = System.os_time(:second)
+
+            tree =
+              case :persistent_term.get(cache_key, nil) do
+                {cached_tree, built_at} when now - built_at < @tree_cache_ttl ->
+                  cached_tree
+
+                _ ->
+                  t = build_file_tree(project.path, project.path)
+                  :persistent_term.put(cache_key, {t, now})
+                  t
+              end
+
+            assign(socket, :file_tree, tree)
           else
-            []
+            socket
           end
 
-        {:ok,
-         socket
-         |> assign(:page_title, "Files - #{project.name}")
-         |> assign(:project, project)
-         |> assign(:sidebar_tab, :files)
-         |> assign(:sidebar_project, project)
-         |> assign(:file_tree, file_tree)}
+        {:ok, socket}
 
       _ ->
         {:ok,
@@ -71,7 +88,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
       {path, nil} when is_binary(path) ->
         {:noreply,
-         socket |> assign(:error, "Project path not configured") |> assign(:file_content, nil)}
+         socket
+         |> assign(:file_full_path, nil)
+         |> assign(:error, "Project path not configured")
+         |> assign(:file_content, nil)}
 
       {nil, _} ->
         load_root_listing(socket, mode)
@@ -115,6 +135,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     if not path_within?(full_path, project_path) do
       {:noreply,
        socket
+       |> assign(:file_full_path, nil)
        |> assign(:error, "Access denied: path outside project directory")
        |> assign(:file_content, nil)
        |> assign(:files, [])}
@@ -134,6 +155,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       _ ->
         {:noreply,
          socket
+         |> assign(:file_full_path, nil)
          |> assign(:error, "File not found: #{path}")
          |> assign(:file_content, nil)
          |> assign(:files, [])}
@@ -145,7 +167,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       {:ok, file_list} ->
         {:noreply,
          socket
+         |> unsubscribe_editor()
          |> assign(:file_path, path)
+         |> assign(:file_full_path, nil)
          |> assign(:file_content, nil)
          |> assign(:files, file_list)
          |> assign(:error, nil)}
@@ -153,42 +177,83 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       {:error, reason} ->
         {:noreply,
          socket
+         |> unsubscribe_editor()
+         |> assign(:file_full_path, nil)
          |> assign(:error, "Failed to read directory: #{reason}")
          |> assign(:files, [])}
     end
   end
 
   defp handle_file(socket, full_path, path) do
-    case read_file_safe_detailed(full_path) do
-      {:ok, content} ->
-        {:noreply,
-         socket
-         |> assign(:file_path, path)
-         |> assign(:file_content, content)
-         |> assign(:file_type, detect_file_type(path))
-         |> assign(:files, [])
-         |> assign(:error, nil)}
+    if binary_file?(path) do
+      {:noreply,
+       socket
+       |> unsubscribe_editor()
+       |> assign(:file_path, path)
+       |> assign(:file_full_path, nil)
+       |> assign(:file_content, nil)
+       |> assign(:file_type, nil)
+       |> assign(:files, [])
+       |> assign(:error, "Binary file — cannot preview")}
+    else
+      case read_file_safe_detailed(full_path) do
+        {:ok, content} ->
+          {:noreply,
+           socket
+           |> subscribe_editor(path)
+           |> assign(:file_path, path)
+           |> assign(:file_full_path, full_path)
+           |> assign(:file_content, content)
+           |> assign(:file_type, detect_file_type(path))
+           |> assign(:files, [])
+           |> assign(:error, nil)}
 
-      {:error, :too_large} ->
-        {:noreply,
-         socket
-         |> assign(:file_path, path)
-         |> assign(:file_content, nil)
-         |> assign(:file_type, nil)
-         |> assign(:files, [])
-         |> assign(:error, "File too large to display (over 1 MB)")}
+        {:error, :too_large} ->
+          {:noreply,
+           socket
+           |> unsubscribe_editor()
+           |> assign(:file_path, path)
+           |> assign(:file_full_path, nil)
+           |> assign(:file_content, nil)
+           |> assign(:file_type, nil)
+           |> assign(:files, [])
+           |> assign(:error, "File too large to display (over 1 MB)")}
 
-      {:error, {:stat_error, reason}} ->
-        {:noreply,
-         socket
-         |> assign(:error, "Failed to stat file: #{reason}")
-         |> assign(:file_content, nil)}
+        {:error, {:stat_error, reason}} ->
+          {:noreply,
+           socket
+           |> unsubscribe_editor()
+           |> assign(:file_full_path, nil)
+           |> assign(:error, "Failed to stat file: #{reason}")
+           |> assign(:file_content, nil)}
 
-      {:error, {:read_error, reason}} ->
-        {:noreply,
-         socket
-         |> assign(:error, "Failed to read file: #{reason}")
-         |> assign(:file_content, nil)}
+        {:error, {:read_error, reason}} ->
+          {:noreply,
+           socket
+           |> unsubscribe_editor()
+           |> assign(:file_full_path, nil)
+           |> assign(:error, "Failed to read file: #{reason}")
+           |> assign(:file_content, nil)}
+      end
+    end
+  end
+
+  defp subscribe_editor(socket, path) do
+    if socket.assigns.subscribed_editor_id != path do
+      unsubscribe_editor(socket)
+      Events.subscribe_editor(path)
+      assign(socket, :subscribed_editor_id, path)
+    else
+      socket
+    end
+  end
+
+  defp unsubscribe_editor(socket) do
+    case socket.assigns[:subscribed_editor_id] do
+      nil -> socket
+      id ->
+        Events.unsubscribe_editor(id)
+        assign(socket, :subscribed_editor_id, nil)
     end
   end
 
@@ -209,7 +274,39 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   end
 
   @impl true
+  def handle_event("file_save", %{"content" => content}, socket) do
+    project = socket.assigns.project
+    full_path = socket.assigns.file_full_path
+
+    cond do
+      is_nil(full_path) ->
+        {:reply, %{error: "No file open"}, socket}
+
+      not path_within?(full_path, project.path) ->
+        {:reply, %{error: "Access denied"}, socket}
+
+      true ->
+        case File.write(full_path, content) do
+          :ok ->
+            {:reply, %{ok: true},
+             socket
+             |> assign(:file_content, content)
+             |> put_flash(:info, "Saved")}
+
+          {:error, reason} ->
+            {:reply, %{error: "Write failed: #{reason}"},
+             socket |> put_flash(:error, "Save failed: #{reason}")}
+        end
+    end
+  end
+
+  @impl true
   def handle_event("set_notify_on_stop", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_info({:editor_push, op, payload}, socket) do
+    {:noreply, push_event(socket, "cm:#{op}", payload)}
+  end
 
   @impl true
   def handle_info(msg, socket) do
@@ -237,29 +334,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       </div>
     <% end %>
     <%= if @file_content do %>
-      <div class="p-6">
-        <%= if @show_back_button do %>
-          <div class="flex items-center gap-2 mb-4">
-            <%= if @file_path && @file_path != "." do %>
-              <.link
-                patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
-                class="btn btn-sm btn-ghost"
-              >
-                <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
-              </.link>
-            <% end %>
-            <div>
-              <h2 class="text-lg font-semibold text-base-content">{Path.basename(@file_path)}</h2>
-              <p class="text-sm text-base-content/60">{@file_path}</p>
-            </div>
-          </div>
-        <% else %>
-          <div class="mb-4">
-            <h2 class="text-lg font-semibold text-base-content">{Path.basename(@file_path)}</h2>
-            <p class="text-sm text-base-content/60">{@file_path}</p>
+      <div class="flex flex-col h-full">
+        <%= if @show_back_button && @file_path && @file_path != "." do %>
+          <div class="px-4 py-2 border-b border-base-300 shrink-0">
+            <.link
+              patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
+              class="btn btn-sm btn-ghost btn-square"
+            >
+              <.icon name="hero-arrow-left" class="w-4 h-4" />
+            </.link>
           </div>
         <% end %>
-        <.file_content_viewer file_content={@file_content} file_type={@file_type} />
+        <div class="flex-1 min-h-0 overflow-hidden">
+          <.file_content_viewer file_content={@file_content} file_type={@file_type} file_path={@file_path} />
+        </div>
       </div>
     <% else %>
       <div class="flex items-center justify-center h-full">
@@ -275,12 +363,23 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   attr :file_content, :string, required: true
   attr :file_type, :string, default: nil
+  attr :file_path, :string, default: nil
 
   defp file_content_viewer(assigns) do
+    assigns = assign(assigns, :editor_id, "file-editor-#{:erlang.phash2(assigns.file_path)}")
     ~H"""
-    <div class="bg-base-200 rounded-lg overflow-x-auto">
-      <pre class="text-sm"><code id="code-viewer" class={"language-#{language_class(@file_type)}"} phx-hook="Highlight"><%= @file_content %></code></pre>
-    </div>
+    <.svelte
+      id={@editor_id}
+      name="FileEditor"
+      ssr={false}
+      props={%{
+        content: @file_content,
+        lang: language_class(@file_type),
+        filePath: @file_path || "",
+        readonly: false
+      }}
+      class="h-full"
+    />
     """
   end
 
@@ -307,13 +406,21 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       :file ->
         ~H"""
         <li>
-          <.link patch={~p"/projects/#{@project_id}/files?path=#{@item.path}&mode=tree"}>
-            <.icon name="hero-document" class="w-4 h-4" />
-            {@item.name}
-            <%= if @item.size do %>
-              <span class="badge badge-ghost badge-xs ml-auto">{@item.size}</span>
-            <% end %>
-          </.link>
+          <%= if binary_file?(@item.name) do %>
+            <span class="opacity-40 cursor-not-allowed pointer-events-none" title="Binary file — cannot preview">
+              <.icon name="hero-no-symbol" class="w-4 h-4" />
+              {@item.name}
+              <span class="badge badge-ghost badge-xs ml-auto font-mono">bin</span>
+            </span>
+          <% else %>
+            <.link patch={~p"/projects/#{@project_id}/files?path=#{@item.path}&mode=tree"}>
+              <.icon name="hero-document" class="w-4 h-4" />
+              {@item.name}
+              <%= if @item.size do %>
+                <span class="badge badge-ghost badge-xs ml-auto">{@item.size}</span>
+              <% end %>
+            </.link>
+          <% end %>
         </li>
         """
     end
@@ -322,44 +429,46 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   @impl true
   def render(assigns) do
     ~H"""
-    <!-- View Mode Toggle -->
-    <div class="bg-base-100 border-b border-base-300">
-      <div class="px-4 sm:px-6 lg:px-8 py-2">
-        <div class="btn-group btn-group-sm">
-          <button
-            class={"btn btn-sm" <> if @view_mode == :list, do: " btn-active", else: ""}
-            phx-click="toggle_view_mode"
-            phx-value-mode="list"
-          >
-            <.icon name="hero-bars-3" class="w-4 h-4" /> List
-          </button>
-          <button
-            class={"btn btn-sm" <> if @view_mode == :tree, do: " btn-active", else: ""}
-            phx-click="toggle_view_mode"
-            phx-value-mode="tree"
-          >
-            <.icon name="hero-folder" class="w-4 h-4" /> Explore
-          </button>
+    <div class="flex flex-col h-full">
+      <!-- View Mode Toggle -->
+      <div class="flex-shrink-0 bg-base-100 border-b border-base-300">
+        <div class="px-4 sm:px-6 lg:px-8 py-2">
+          <div class="btn-group btn-group-sm">
+            <button
+              class={"btn btn-sm" <> if @view_mode == :list, do: " btn-active", else: ""}
+              phx-click="toggle_view_mode"
+              phx-value-mode="list"
+            >
+              <.icon name="hero-bars-3" class="w-4 h-4" /> List
+            </button>
+            <button
+              class={"btn btn-sm" <> if @view_mode == :tree, do: " btn-active", else: ""}
+              phx-click="toggle_view_mode"
+              phx-value-mode="tree"
+            >
+              <.icon name="hero-folder" class="w-4 h-4" /> Explore
+            </button>
+          </div>
         </div>
       </div>
-    </div>
 
-    <%= if @view_mode == :tree do %>
-      <.file_tree_view {assigns} />
-    <% else %>
-      <.file_list_view {assigns} />
-    <% end %>
+      <%= if @view_mode == :tree do %>
+        <.file_tree_view {assigns} />
+      <% else %>
+        <.file_list_view {assigns} />
+      <% end %>
+    </div>
     """
   end
 
   defp file_tree_view(assigns) do
     ~H"""
     <!-- Tree View -->
-    <div class="h-[calc(100dvh-10rem)] flex flex-col md:flex-row overflow-hidden">
+    <div class="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
       <!-- File Tree Sidebar -->
       <div
         id="file-tree-sidebar"
-        class="w-full md:w-80 md:flex-shrink-0 border-b md:border-b-0 md:border-r border-base-300 bg-base-100 overflow-y-auto max-h-64 md:max-h-none"
+        class="w-full md:w-80 md:flex-shrink-0 border-b md:border-b-0 md:border-r border-base-300 bg-base-100 overflow-y-auto max-h-64 md:max-h-none md:h-full"
         phx-update="ignore"
       >
         <div class="p-4">
@@ -371,7 +480,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       </div>
       
     <!-- File Content Viewer -->
-      <div class="flex-1 min-h-0 overflow-y-auto">
+      <div class="flex-1 min-h-0 overflow-hidden">
         <.file_content_pane
           error={@error}
           file_content={@file_content}
@@ -390,7 +499,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   defp file_list_view(assigns) do
     ~H"""
     <!-- List View -->
-    <div class="h-[calc(100dvh-10rem)]">
+    <div class="flex-1 min-h-0 overflow-auto">
       <%= if @files != [] && !@file_content do %>
         <!-- Directory Listing -->
         <div class="p-6">

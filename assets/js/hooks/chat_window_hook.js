@@ -113,8 +113,7 @@ export const ChatWindowHook = {
         canvas      = this.el.closest("[data-canvas-area]")
         snapPreview = canvas ? getOrCreateSnapPreview(canvas) : null
 
-        document.querySelectorAll("[data-chat-window]").forEach(w => { w.style.zIndex = "1" })
-        this.el.style.zIndex = "10"
+        this._raiseToFront()
 
         document.addEventListener("mousemove", onMouseMove)
         document.addEventListener("mouseup", onMouseUp)
@@ -202,6 +201,9 @@ export const ChatWindowHook = {
       })
     }
 
+    // --- Click-to-focus: raise window on any mousedown ---
+    this.el.addEventListener("mousedown", () => { this._raiseToFront() })
+
     this.handleEvent("messages-updated-" + this.el.dataset.csId, () => {
       if (this._minimized) {
         const handle = this.el.querySelector("[data-drag-handle]")
@@ -216,6 +218,16 @@ export const ChatWindowHook = {
       }
     })
 
+  },
+
+  _raiseToFront() {
+    let maxZ = 1
+    document.querySelectorAll("[data-chat-window]").forEach(w => {
+      const z = parseInt(w.style.zIndex, 10) || 1
+      if (z > maxZ) maxZ = z
+      w.style.zIndex = "1"
+    })
+    this.el.style.zIndex = this._maximized ? "20" : String(Math.max(10, maxZ))
   },
 
   _applyMinimized() {

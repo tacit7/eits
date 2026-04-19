@@ -454,6 +454,8 @@ details[open] .tool-copy-btn { opacity: 1; }
 .tool-copy-btn:hover { color: oklch(var(--bc) / 0.7); }
 .tool-copy-btn[data-copied] { color: oklch(var(--su)); opacity: 1; }
 
+
+
 /* Prevent theme-level code background from bleeding into pre code blocks */
 [data-theme="dark"] .dm-markdown pre code { background: none; }
 [data-theme="light"] .dm-markdown pre code { background: none; }

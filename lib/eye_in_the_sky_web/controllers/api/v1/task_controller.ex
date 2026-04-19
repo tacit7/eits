@@ -383,23 +383,18 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   defp parse_task_id(id) when is_binary(id), do: Helpers.parse_int(id) || id
   defp parse_task_id(id), do: id
 
-  defp parse_task_id_int(raw) when is_binary(raw) do
-    case Integer.parse(raw) do
-      {n, ""} -> {:ok, n}
-      _ -> {:error, :bad_request, "invalid task_id"}
-    end
-  end
-
-  defp parse_task_id_int(n) when is_integer(n), do: {:ok, n}
+  defp parse_task_id_int(raw), do: parse_int_param(raw, "invalid task_id")
 
   defp parse_tag_id(n) when is_integer(n), do: {:ok, n}
+  defp parse_tag_id(raw) when is_binary(raw), do: parse_int_param(raw, "tag_id must be an integer")
+  defp parse_tag_id(_), do: {:error, :bad_request, "tag_id is required"}
 
-  defp parse_tag_id(raw) when is_binary(raw) do
+  defp parse_int_param(n, _msg) when is_integer(n), do: {:ok, n}
+
+  defp parse_int_param(raw, msg) when is_binary(raw) do
     case Integer.parse(raw) do
       {n, ""} -> {:ok, n}
-      _ -> {:error, :bad_request, "tag_id must be an integer"}
+      _ -> {:error, :bad_request, msg}
     end
   end
-
-  defp parse_tag_id(_), do: {:error, :bad_request, "tag_id is required"}
 end

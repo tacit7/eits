@@ -9,6 +9,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   import EyeInTheSkyWeb.Live.FileBrowserHelpers, only: [file_listing: 1]
 
+  require Logger
+
   alias EyeInTheSky.Projects
 
   @ignored_dirs ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
@@ -210,7 +212,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   def handle_event("set_notify_on_stop", _params, socket), do: {:noreply, socket}
 
   @impl true
-  def handle_info(_msg, socket), do: {:noreply, socket}
+  def handle_info(msg, socket) do
+    Logger.warning("#{__MODULE__} unhandled handle_info: #{inspect(msg)}")
+    {:noreply, socket}
+  end
 
   attr :error, :string, default: nil
   attr :file_content, :string, default: nil

@@ -349,13 +349,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       {:ok, team} ->
         members = Teams.list_members(team_id)
 
-        unless Enum.any?(members, &(&1.session_id == sender_session_id)) do
-          Logger.warning(
-            "broadcast_to_team: session #{sender_session_id} is not a member of team #{team_id}, skipping"
-          )
-
-          :ok
-        else
+        if Enum.any?(members, &(&1.session_id == sender_session_id)) do
           sender_label = get_sender_name(sender_session_id)
 
           dm_body =
@@ -369,6 +363,12 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
               m.session.status not in @terminated_statuses
           end)
           |> Enum.each(&deliver_team_dm(&1.session_id, sender_session_id, dm_body, channel_id))
+        else
+          Logger.warning(
+            "broadcast_to_team: session #{sender_session_id} is not a member of team #{team_id}, skipping"
+          )
+
+          :ok
         end
 
       _ ->

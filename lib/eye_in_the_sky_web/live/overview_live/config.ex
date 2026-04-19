@@ -201,10 +201,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
   end
 
   defp resolve_real_path(path) do
-    case System.cmd("realpath", [path], stderr_to_stdout: true) do
-      {real, 0} -> String.trim(real)
-      _ -> path
-    end
+    Path.expand(path)
   end
 
   defp relative_path(path) do
